@@ -1,0 +1,5 @@
+- The first line is the thing to do or answer, in bold.
+- Steps are a numbered list of five or fewer, and the first one is small.
+- No recap, no preamble, no closing offer.
+- Work in progress says where it is in one clause.
+- Time is given in units, or not at all.

@@ -1,0 +1,696 @@
+{
+ "rows": [
+  {
+   "where": "the note in the right-hand panel",
+   "did": "Tab",
+   "outcome": "nothing, the field kept it",
+   "caret": "DIV.tiptap to DIV.tiptap"
+  },
+  {
+   "where": "the note in the right-hand panel",
+   "did": "shift-Tab",
+   "outcome": "nothing, the field kept it",
+   "caret": "DIV.tiptap to DIV.tiptap"
+  },
+  {
+   "where": "the note in the right-hand panel",
+   "did": "click anywhere inert",
+   "outcome": "the caret left and her shortcuts work again",
+   "caret": "DIV.tiptap to BODY",
+   "clicked": "div.day-label at 40,120",
+   "states": {
+    "before": {
+     "tab": "inbox",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "DIV.tiptap",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "mid": {
+     "tab": "inbox",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "after": {
+     "tab": "inbox",
+     "rows": 3,
+     "rail": false,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    }
+   }
+  },
+  {
+   "where": "the note in the right-hand panel",
+   "did": "click nothing at all (control)",
+   "outcome": "the caret STAYED in the field",
+   "caret": "DIV.tiptap to DIV.tiptap",
+   "clicked": "nothing at -1,-1",
+   "states": {
+    "before": {
+     "tab": "inbox",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "DIV.tiptap",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "mid": {
+     "tab": "inbox",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "DIV.tiptap",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "after": {
+     "tab": "inbox",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "DIV.tiptap",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    }
+   }
+  },
+  {
+   "where": "the note in the right-hand panel",
+   "did": "click in the reading pane",
+   "outcome": "nothing inert there to click"
+  },
+  {
+   "where": "the note in the right-hand panel",
+   "did": "click in the right-hand panel",
+   "outcome": "the caret left and her shortcuts work again",
+   "caret": "DIV.tiptap to BODY",
+   "clicked": "aside.rail at 1102,104",
+   "states": {
+    "before": {
+     "tab": "inbox",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "DIV.tiptap",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "mid": {
+     "tab": "inbox",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "after": {
+     "tab": "inbox",
+     "rows": 3,
+     "rail": false,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    }
+   }
+  },
+  {
+   "where": "the note in the right-hand panel",
+   "did": "click on the list behind it",
+   "outcome": "the caret left and her shortcuts work again",
+   "caret": "DIV.tiptap to BODY",
+   "clicked": "main.list-pane at 28,104",
+   "states": {
+    "before": {
+     "tab": "inbox",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "DIV.tiptap",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "mid": {
+     "tab": "inbox",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "after": {
+     "tab": "inbox",
+     "rows": 3,
+     "rail": false,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    }
+   }
+  },
+  {
+   "where": "the reply box on an open task",
+   "did": "Tab",
+   "outcome": "nothing, the field kept it",
+   "caret": "TEXTAREA.dock-input to TEXTAREA.dock-input"
+  },
+  {
+   "where": "the reply box on an open task",
+   "did": "shift-Tab",
+   "outcome": "nothing, the field kept it",
+   "caret": "TEXTAREA.dock-input to TEXTAREA.dock-input"
+  },
+  {
+   "where": "the reply box on an open task",
+   "did": "click anywhere inert",
+   "outcome": "the caret left and her shortcuts work again",
+   "caret": "TEXTAREA.dock-input to BODY",
+   "clicked": "main.list-pane at 40,120",
+   "states": {
+    "before": {
+     "tab": "none",
+     "rows": 0,
+     "rail": true,
+     "focusOpen": true,
+     "palette": false,
+     "dock": true,
+     "active": "TEXTAREA.dock-input",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "mid": {
+     "tab": "none",
+     "rows": 0,
+     "rail": true,
+     "focusOpen": true,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "after": {
+     "tab": "none",
+     "rows": 0,
+     "rail": false,
+     "focusOpen": true,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    }
+   }
+  },
+  {
+   "where": "the reply box on an open task",
+   "did": "click nothing at all (control)",
+   "outcome": "the caret STAYED in the field",
+   "caret": "TEXTAREA.dock-input to TEXTAREA.dock-input",
+   "clicked": "nothing at -1,-1",
+   "states": {
+    "before": {
+     "tab": "none",
+     "rows": 0,
+     "rail": true,
+     "focusOpen": true,
+     "palette": false,
+     "dock": true,
+     "active": "TEXTAREA.dock-input",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "mid": {
+     "tab": "none",
+     "rows": 0,
+     "rail": true,
+     "focusOpen": true,
+     "palette": false,
+     "dock": true,
+     "active": "TEXTAREA.dock-input",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "after": {
+     "tab": "none",
+     "rows": 0,
+     "rail": true,
+     "focusOpen": true,
+     "palette": false,
+     "dock": true,
+     "active": "TEXTAREA.dock-input",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    }
+   }
+  },
+  {
+   "where": "the reply box on an open task",
+   "did": "click in the reading pane",
+   "outcome": "the caret left and her shortcuts work again",
+   "caret": "TEXTAREA.dock-input to BODY",
+   "clicked": "div.focus at 230,119",
+   "states": {
+    "before": {
+     "tab": "none",
+     "rows": 0,
+     "rail": true,
+     "focusOpen": true,
+     "palette": false,
+     "dock": true,
+     "active": "TEXTAREA.dock-input",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "mid": {
+     "tab": "none",
+     "rows": 0,
+     "rail": true,
+     "focusOpen": true,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "after": {
+     "tab": "none",
+     "rows": 0,
+     "rail": false,
+     "focusOpen": true,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    }
+   }
+  },
+  {
+   "where": "the reply box on an open task",
+   "did": "click in the right-hand panel",
+   "outcome": "the caret left and her shortcuts work again",
+   "caret": "TEXTAREA.dock-input to BODY",
+   "clicked": "aside.rail at 1082,40",
+   "states": {
+    "before": {
+     "tab": "none",
+     "rows": 0,
+     "rail": true,
+     "focusOpen": true,
+     "palette": false,
+     "dock": true,
+     "active": "TEXTAREA.dock-input",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "mid": {
+     "tab": "none",
+     "rows": 0,
+     "rail": true,
+     "focusOpen": true,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "after": {
+     "tab": "none",
+     "rows": 0,
+     "rail": false,
+     "focusOpen": true,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    }
+   }
+  },
+  {
+   "where": "the reply box on an open task",
+   "did": "click on the list behind it",
+   "outcome": "the caret left and her shortcuts work again",
+   "caret": "TEXTAREA.dock-input to BODY",
+   "clicked": "main.list-pane at 6,40",
+   "states": {
+    "before": {
+     "tab": "none",
+     "rows": 0,
+     "rail": true,
+     "focusOpen": true,
+     "palette": false,
+     "dock": true,
+     "active": "TEXTAREA.dock-input",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "mid": {
+     "tab": "none",
+     "rows": 0,
+     "rail": true,
+     "focusOpen": true,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "after": {
+     "tab": "none",
+     "rows": 0,
+     "rail": false,
+     "focusOpen": true,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    }
+   }
+  },
+  {
+   "where": "the search field in the tab row",
+   "did": "Tab",
+   "outcome": "nothing, the field kept it",
+   "caret": "INPUT.search-q to INPUT.search-q"
+  },
+  {
+   "where": "the search field in the tab row",
+   "did": "shift-Tab",
+   "outcome": "nothing, the field kept it",
+   "caret": "INPUT.search-q to INPUT.search-q"
+  },
+  {
+   "where": "the search field in the tab row",
+   "did": "click anywhere inert",
+   "outcome": "the caret left and her shortcuts work again",
+   "caret": "INPUT.search-q to BODY",
+   "clicked": "div.day-label at 40,120",
+   "states": {
+    "before": {
+     "tab": "none",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "INPUT.search-q",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "mid": {
+     "tab": "none",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "after": {
+     "tab": "none",
+     "rows": 3,
+     "rail": false,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    }
+   }
+  },
+  {
+   "where": "the search field in the tab row",
+   "did": "click nothing at all (control)",
+   "outcome": "the caret STAYED in the field",
+   "caret": "INPUT.search-q to INPUT.search-q",
+   "clicked": "nothing at -1,-1",
+   "states": {
+    "before": {
+     "tab": "none",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "INPUT.search-q",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "mid": {
+     "tab": "none",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "INPUT.search-q",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "after": {
+     "tab": "none",
+     "rows": 0,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "INPUT.search-q",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    }
+   }
+  },
+  {
+   "where": "the search field in the tab row",
+   "did": "click in the reading pane",
+   "outcome": "nothing inert there to click"
+  },
+  {
+   "where": "the search field in the tab row",
+   "did": "click in the right-hand panel",
+   "outcome": "the caret left and her shortcuts work again",
+   "caret": "INPUT.search-q to BODY",
+   "clicked": "aside.rail at 1102,102",
+   "states": {
+    "before": {
+     "tab": "none",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "INPUT.search-q",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "mid": {
+     "tab": "none",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "after": {
+     "tab": "none",
+     "rows": 3,
+     "rail": false,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    }
+   }
+  },
+  {
+   "where": "the search field in the tab row",
+   "did": "click on the list behind it",
+   "outcome": "the caret left and her shortcuts work again",
+   "caret": "INPUT.search-q to BODY",
+   "clicked": "main.list-pane at 28,102",
+   "states": {
+    "before": {
+     "tab": "none",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "INPUT.search-q",
+     "typing": true,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "mid": {
+     "tab": "none",
+     "rows": 3,
+     "rail": true,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    },
+    "after": {
+     "tab": "none",
+     "rows": 3,
+     "rail": false,
+     "focusOpen": false,
+     "palette": false,
+     "dock": false,
+     "active": "BODY",
+     "typing": false,
+     "toast": "",
+     "compose": false,
+     "composeProject": ""
+    }
+   }
+  }
+ ],
+ "kept": [
+  {
+   "what": "Tab on the list still rotates the views",
+   "ok": true,
+   "saw": "inbox to progress"
+  },
+  {
+   "what": "Shift-Tab in the reply box still cycles permission modes",
+   "ok": true,
+   "saw": "it said \"Permissions · manual mode on for this message\""
+  },
+  {
+   "what": "Tab in the new task card still steps the project",
+   "ok": true,
+   "saw": "Astral to Dawnling"
+  },
+  {
+   "what": "a click on a real control leaves the reply box open",
+   "ok": true,
+   "saw": "clicked rail-section-label, the box is still open"
+  }
+ ]
+}

@@ -1,0 +1,26 @@
+{
+  "rest": {
+    "ribbon": [
+      "Earned at inbox zero",
+      "Opens while every agent is busy"
+    ],
+    "corner": null,
+    "corners": [],
+    "field": null,
+    "press": [
+      "Choose what goes here"
+    ]
+  },
+  "idle": {
+    "ribbon": [],
+    "corner": "7 agents are working",
+    "corners": [
+      "idle-corner idle-bl"
+    ],
+    "field": "drawn",
+    "press": [
+      "What do you need done?C",
+      "7 agents are working"
+    ]
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "system": "A wallpaper for the background of a dark desktop application window. Landscape, 3:2. No text, no letters, no numbers, no logos, no watermark, no people, no user interface, no windows, no frames, no borders. Photographic realism unless the frame says otherwise.\n\nTHE FRAME IS A COMPLETE PICTURE, EDGE TO EDGE. Every part of it has something in it. There is no empty side, no blank field, no plain gradient standing in for a region of the image. If a third of this frame could be cropped away without losing anything, the picture is wrong.\n\nQUIET IS NOT EMPTY, AND THIS IS THE WHOLE CRAFT OF IT. The application lays a large translucent card over the left three quarters of this frame, so that region must be RESTFUL behind text. Restful is achieved with LARGE SMOOTH SURFACES AND ATMOSPHERE, never with absence: still water holding a reflection, low mist, a bank of soft cloud, a far ridge dissolving into haze, a long exposure sea. Those things are full of tone, colour and shape and carry almost no fine texture, which is exactly what text can sit on. What must NOT be in the left three quarters is FINE HIGH CONTRAST TEXTURE at close range: gravel, rust, bark, foliage detail, rippled water, hard-edged rock, scattered bright specks.\n\nDEPTH IN LAYERS. Build the picture out of three or four distinct planes receding into haze, each one a step lighter, bluer and softer than the one in front of it. A near element may sit at the left or the right edge and be the darkest and most defined thing in the frame. The far planes hold the middle. That layering is what makes a picture look like it has a lot in it while staying calm.\n\nTHE FOCAL POINT IS SMALL, BRIGHT AND WARM, AND IT SITS RIGHT OF CENTRE. Not a large object filling the right quarter: a SMALL AREA of the frame, somewhere in the right third, that is markedly brighter and warmer than everything around it, with the highest local contrast in the picture. A sunlit peak, a shaft of low light, a gap of lit sky, a distant glow. Everything else in the frame is subordinate to it and cooler than it.\n\nCOLOUR, AND THIS IS THE PART TO GET RIGHT. This must be a PLAINLY COLOURED photograph, not a monochrome one and not a desaturated one. Build it on an opposition of WARM AGAINST COOL: a warm light source in coral, salmon, amber or rose, falling on a scene whose shadows and distances are cool blue, slate, teal or violet. The warm light should touch several parts of the frame, not only the focal point: the underside of cloud, the top of a far ridge, a reflection in the water below. Somebody looking at any part of this image should be able to name a colour they can see. A picture that comes back grey, or blue-grey everywhere, or brown everywhere, has failed even if the composition is perfect.\n\nTONE. DO NOT PRE-DARKEN THIS IMAGE. The application lays its own dark veil over the picture before anyone sees it, so a picture that arrives already crushed comes out as a black rectangle with nothing in it. Deliver a NORMALLY EXPOSED photograph of a dim scene, not an underexposed photograph. Blue hour, dawn, or heavy overcast: the calm surfaces read as a clear mid-dark tone whose colour you can plainly see, around a third of the way up from black, and the small warm focal point sits around two thirds of the way up. Soft light, gentle falloff, no hard specular points and no blown white. Nothing in this frame is pure black.\n\nTHE TOP TENTH of the frame stays plain and uneventful across the full width.",
+  "heroes": [
+    {
+      "id": "cliff-dawn",
+      "name": "Cliff Dawn",
+      "family": "cliff",
+      "prompt": "A dark basalt sea cliff rising at the right edge of the frame, its face in shadow, seen across a long-exposure sea that is smooth as poured metal. THE LEFT IS NOT EMPTY: two more sea stacks stand further out in the haze at the far left and left of centre, each fainter and bluer than the last, and a low band of mist lies along the water behind them. Dawn light comes from behind the near cliff and catches its top edge and shoulder in warm coral, and the same light lies along the horizon gap between the stacks and glances off the water. The sea holds a soft warm reflection under the lit edge."
+    },
+    {
+      "id": "cliff-fjord",
+      "name": "Cliff Fjord",
+      "family": "cliff",
+      "prompt": "The mouth of a fjord at blue hour. A dark headland shoulders in from the right edge with a small hanging waterfall catching the last warm light halfway down it. Behind and to the left, three receding walls of the fjord step away into blue haze, each softer and paler than the one in front. The water is glass still across the whole bottom half and mirrors the walls and a band of salmon cloud. A thin layer of fog sits on the water at the far left."
+    },
+    {
+      "id": "cliff-storm",
+      "name": "Cliff Storm",
+      "family": "cliff",
+      "prompt": "A basalt sea cliff at the right of the frame under a clearing storm. Heavy soft cloud fills the sky across the whole width, and a single break in it right of centre lets warm amber light down onto the cliff top and onto a patch of the sea below it. The rest of the sea is a smooth grey-teal long exposure with slow mist over it. At the far left a low dark spit of land reaches into the water, and the cloud above it carries a faint warm underside from the same break."
+    },
+    {
+      "id": "cliff-gull",
+      "name": "Cliff Gull",
+      "family": "cliff",
+      "prompt": "A sea cliff face filling the right third of the frame, seen close and in deep shadow, its ledges just readable. The left two thirds is open sea and sky in three soft bands: pale rose sky at the top, a distant blue headland lying low across the middle, and smooth dark water below. Low sun from the right rakes the very top of the cliff in warm gold and lights the underside of a thin cloud layer that runs the full width of the frame in rose and lilac."
+    },
+    {
+      "id": "cliff-arch",
+      "name": "Cliff Arch",
+      "family": "cliff",
+      "prompt": "A natural sea arch of dark rock standing right of centre, photographed from the shore at dawn. The gap under the arch is filled with bright warm sky and is the brightest thing in the frame. To the left, wet sand and shallow water stretch away smooth and mirror-like, holding a long soft reflection of the warm gap, and a headland lies far off in blue haze at the left edge. Coral and lilac cloud runs across the upper frame."
+    },
+    {
+      "id": "ice-vault",
+      "name": "Ice Vault",
+      "family": "ice",
+      "prompt": "Inside a glacier cave, standing well back from the opening. The ribbed blue ice ceiling ARCHES OVER THE WHOLE FRAME from the top right to the top left, its flutes and folds soft and readable everywhere, getting deeper blue and less defined as it goes left. The exit is a small opening right of centre filled with warm daylight, the brightest and warmest thing in the picture. The cave floor is wet smooth ice across the bottom, mirroring both the warm opening and the blue vault. The left of the cave is lit by bounced blue light, dim but clearly not black."
+    },
+    {
+      "id": "ice-river",
+      "name": "Ice River",
+      "family": "ice",
+      "prompt": "A meltwater channel cut down into a glacier, seen from above and along its length. Smooth blue ice walls curve away on both sides of the frame and recede into pale haze at the left. The channel of still water runs from the bottom left up to the right, glassy and reflective. Where it turns, right of centre, warm low sunlight reaches down between the walls and lights a small bend of the water and the ice above it in gold. Everything else is graded cool blue, from deep teal in the near shadows to near-white blue in the distance."
+    },
+    {
+      "id": "ice-mouth",
+      "name": "Ice Mouth",
+      "family": "ice",
+      "prompt": "The mouth of a glacier cave seen from just inside, with a wide view out. The dark ribbed ice frames the top and the right of the frame. Through the opening a lagoon of still water fills the left and centre, holding a mirror of a pale dawn sky, with a low blue iceberg lying far off at the left edge. A small warm sunrise glow sits on the horizon right of centre and lays a warm line across the water and a warm edge along the ice above it."
+    },
+    {
+      "id": "ice-fracture",
+      "name": "Ice Fracture",
+      "family": "ice",
+      "prompt": "A wall of glacier ice filling the frame, photographed straight on from a distance, so that its whole face is visible edge to edge. The face is built of large smooth blue planes and slow curved fractures, soft and low contrast, growing paler and hazier towards the left. Right of centre a deep vertical fissure catches warm daylight from behind the wall and glows amber through the ice, the one bright warm point. Above the wall a strip of rose cloud runs the full width."
+    },
+    {
+      "id": "nebula-rift",
+      "name": "Nebula Rift",
+      "family": "nebula",
+      "prompt": "A deep sky field that FILLS THE ENTIRE FRAME with structure. Great soft banks of rose and salmon hydrogen gas run diagonally across the whole picture, crossed by dark dust lanes, with cooler teal and violet gas layered behind them and a fine dust of stars everywhere. The gas is smooth and cloudlike, not sharp. Right of centre a small dense knot of the nebula is lit from within, distinctly brighter and warmer than the rest, the single focal point. The colours are clearly present and saturated across the whole field, deepening to violet at the left edge, and nowhere in this image is flat black."
+    },
+    {
+      "id": "nebula-veil",
+      "name": "Nebula Veil",
+      "family": "nebula",
+      "prompt": "A wide nebula seen as delicate veils rather than clouds: long soft ribbons of warm rose and cool cyan gas sweeping across the full width of the frame in parallel arcs, layered over a deep indigo sky dense with faint stars. The ribbons are broad and smooth in the left three quarters and gather into a brighter warm crest right of centre where a hot young star lights them from behind. The whole field is plainly coloured, indigo and rose and cyan, and the density of stars keeps every part of the frame occupied."
+    },
+    {
+      "id": "lake-mirror",
+      "name": "Lake Mirror",
+      "family": "lake",
+      "prompt": "A tidal flat at dawn. Wet sand and a skin of still water fill the entire bottom two thirds of the frame as a near-perfect mirror, smooth and unbroken. A low dark headland lies across the middle distance, and behind it two further headlands step away into blue haze. At the far left a small group of dark rocks stands in the shallows, the nearest and sharpest thing in the picture. The sun is just below the horizon right of centre and lights a small bank of coral and salmon cloud there, which the water repeats below in full. The sky above is graded lilac to slate."
+    },
+    {
+      "id": "lake-terrace",
+      "name": "Lake Terrace",
+      "family": "lake",
+      "prompt": "Flooded rice terraces at dusk, seen from above, their curved banks running across the whole frame. Each flooded step is a still mirror holding the sky, so the picture is mostly smooth reflective surface with thin dark lines of the banks between. The terraces recede up and to the right into soft mist, where a small break in the cloud right of centre glows warm amber and is repeated in the nearest few pools as a warm streak. The near terraces at the left are deeper blue and violet, and a dark treeline edges the very left of the frame."
+    },
+    {
+      "id": "lake-cloudsea",
+      "name": "Lake Cloudsea",
+      "family": "lake",
+      "prompt": "A sea of cloud filling the valley below a ridge, seen at first light. The cloud is a soft unbroken white-blue surface across the middle and lower frame, rolling slowly, with no hard edges. Three ranges of peaks rise out of it and step away into haze, and a single summit right of centre catches the first warm gold light and is the brightest thing in the picture. At the far left a few dark pine tops break the cloud in the foreground, near and sharp. The sky above runs from rose at the horizon to deep slate blue at the top."
+    },
+    {
+      "id": "lake-harbour",
+      "name": "Lake Harbour",
+      "family": "lake",
+      "prompt": "A small harbour at blue hour, seen from the water. The whole lower half is glass-still harbour water holding long soft reflections. A low dark quay wall with a few moored hulls runs across the middle distance, and behind it a hillside of buildings rises into blue haze, its shapes soft and simple. A cluster of warm amber lamps right of centre is the brightest and warmest point and lays a long warm reflection down through the water. At the far left a dark mooring post stands close to the camera. The sky is deep teal, with a last band of rose low down."
+    }
+  ]
+}

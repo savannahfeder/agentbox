@@ -1,0 +1,60 @@
+# EVERY PUSH RUNS THE TESTS.
+#
+# Until this file there was nothing. The suite is real and it is large, and it
+# ran only when somebody remembered to type it, which means a branch could be
+# opened, reviewed and merged without one test having been run against it.
+#
+# IF EVERY RUN HERE ENDS IN `startup_failure`, THE CAUSE IS NOT THIS FILE. It
+# happened for three weeks once and the answer was at the GitHub account level,
+# not in the workflow: Actions would not start until the account had a valid
+# payment method on it. A red cross on every push that means nothing at all is
+# the symptom to recognise.
+#
+# macOS AND NOT LINUX, ON PURPOSE. The app ships an arm64 dmg and nothing else,
+# and the suite is written against that: the Claude Code search asks a login
+# zsh, the fresh-user home links a macOS keychain, and a good number of the
+# test files reason about `/Users`, `darwin`, zsh or the keychain. Running the
+# suite somewhere the app never runs would tell you about that machine rather
+# than about the app. Nobody has measured whether it would pass on Linux and
+# this comment is not a claim that it would not.
+#
+# A macOS minute costs about ten Linux ones, so this is the expensive runner to
+# be on. It is worth knowing what the job actually takes before turning it on
+# for a busy fork: a whole job, checkout and `npm ci` included, has measured at
+# about a minute and a half.
+#
+# ONE TRIGGER AND NOT TWO. `push` on every branch already covers a branch that
+# later becomes a pull request, so there is no `pull_request` here; having both
+# is what makes a PR branch pay for two runs of the same commit.
+
+name: tests
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+# A second push to the same branch cancels the first, so a branch pushed five
+# times in a minute pays for one run rather than five.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vitest:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # `npm ci` and not `npm install`: the lockfile is the point of running
+      # this at all, and an install that quietly resolves something newer is a
+      # green run against a tree nobody has.
+      - run: npm ci
+
+      - run: npx vitest run --reporter=basic

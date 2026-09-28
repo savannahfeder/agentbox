@@ -1,0 +1,10 @@
+#!/bin/sh
+# A MERGE IS A COMMIT, AND IT DOES NOT RUN pre-commit (w-17c967b82f).
+#
+# Git runs pre-commit for `git commit`, `git cherry-pick` and `git revert`, but a
+# merge that creates a commit runs THIS hook instead. Without it the commonest
+# way an agent writes to her checkout, folding main into the branch it should
+# never have been on there in the first place, would walk straight past the
+# guard. Same rule, same reason: see scripts/hooks/pre-commit.
+
+exec "$(dirname "$0")/pre-commit"

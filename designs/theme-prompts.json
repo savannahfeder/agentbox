@@ -1,0 +1,95 @@
+{
+  "system": "A wallpaper for the background of a dark desktop application window. Landscape, 3:2. No text, no letters, no numbers, no logos, no watermark, no people, no user interface, no windows, no frames, no borders. Photographic realism unless the frame says otherwise.\n\nTHE COMPOSITION IS THE POINT AND IT IS MEASURED. The application lays a large translucent card over the LEFT 75% of this frame and keeps its sidebar in the RIGHT 24%. So unless the frame below says otherwise: the left three quarters of the image is a CALM, NEARLY EMPTY FIELD with no hard edges, no strong shapes, no bright highlights and no detail that would read as clutter behind frosted glass. Everything worth looking at lives in the right quarter. The top tenth of the frame stays plain and uneventful across the full width.\n\nTONE, AND THIS IS THE PART ROUND ONE GOT WRONG. DO NOT PRE-DARKEN THIS IMAGE. The application lays its own dark veil over the picture before anyone sees it, so a picture that arrives already crushed comes out as a black rectangle with nothing in it. Deliver a NORMALLY EXPOSED photograph of a dim scene, not an underexposed photograph. Blue hour or heavy overcast: the calm empty field reads as a clear mid-dark grey you can plainly see the colour of, around a third of the way up from black, and the brightest thing anywhere in the frame sits around two thirds of the way up. Soft light, gentle falloff, no hard specular points and no blown white. It should look like a well made photograph that happens to be of a dark subject.",
+  "heroes": [
+    {
+      "id": "pines",
+      "name": "Pines",
+      "obeys": true,
+      "prompt": "Dark conifer forest edge. Tall black-green spruce and pine silhouettes crowd the right quarter of the frame and thin out completely as they go left. The left three quarters is deep blue-grey fog with nothing in it at all, a smooth empty wash. Cold northern light, no sun, no sky detail. Muted slate and forest green."
+    },
+    {
+      "id": "dune",
+      "name": "Dune",
+      "obeys": true,
+      "prompt": "A single sand dune ridge sweeping into the frame from the right edge, its crest line soft and unlit. The left three quarters is empty warm charcoal-brown night sky and shadowed sand with no features. Warm dark browns and umber, almost monochrome. Very low contrast, no stars, no moon, no visible sun."
+    },
+    {
+      "id": "rain",
+      "name": "Rain",
+      "obeys": true,
+      "prompt": "Wet dark glass at night, seen from inside. Heavily out-of-focus city lights cluster in the right quarter as soft amber and teal bokeh circles. The left three quarters is near black wet glass with only the faintest smeared runs of water, no lights, no shapes. Deep blacks, warm amber and cold teal only."
+    },
+    {
+      "id": "aurora",
+      "name": "Aurora",
+      "obeys": true,
+      "prompt": "Night sky with an aurora. A soft green and violet curtain of light hangs over the right quarter of the frame only, its lower edge diffuse. The left three quarters is deep empty navy with no stars and no ground. No horizon line, no landscape, no reflection. Very soft, very dim."
+    },
+    {
+      "id": "cliff",
+      "name": "Cliff",
+      "obeys": true,
+      "prompt": "A dark basalt sea cliff at the right edge of the frame, its face in shadow, seen across flat calm water. The left three quarters is misted grey-teal sea meeting a grey-teal sky with the horizon barely readable, and nothing else at all. Long exposure, water smooth as slate. Cold desaturated blue-grey."
+    },
+    {
+      "id": "maple",
+      "name": "Maple",
+      "obeys": true,
+      "prompt": "Japanese maple foliage at night, deep oxblood and near black. A dense canopy of leaves fills the right quarter and reaches only a little way toward the centre. The left three quarters is black lacquered emptiness with a very faint warm glow low down. No lanterns, no path, no building. Deep red-blacks."
+    },
+    {
+      "id": "stars",
+      "name": "Stars",
+      "obeys": true,
+      "prompt": "The Milky Way band running steeply through the top right corner of the frame, dusty and dim, with rust and indigo nebulosity. The left three quarters is empty deep indigo sky over an unlit flat desert plain, no stars bright enough to read as points. No foreground objects, no rocks, no cactus, no horizon glow."
+    },
+    {
+      "id": "ice",
+      "name": "Ice",
+      "obeys": true,
+      "prompt": "Inside a glacier cave. Cold blue daylight enters from an opening at the right edge and falls off fast. The left three quarters is dark wet rock and shadowed ice with no texture detail, almost a flat dark field. Glacial blue and near black only, no white ice, no sparkle, no icicles in the foreground."
+    },
+    {
+      "id": "silk",
+      "name": "Silk",
+      "obeys": true,
+      "prompt": "Dark plum-black silk fabric draped and lit from one side. A single soft fold catches a low sheen in the right quarter of the frame. The left three quarters is smooth unlit cloth falling away into deep shadow, an almost featureless gradient. Studio still life, macro, very shallow depth of field. Plum, aubergine and black."
+    },
+    {
+      "id": "wheat",
+      "name": "Wheat",
+      "obeys": true,
+      "prompt": "A field of dry wheat at last light, shot low. A fringe of dark seed heads stands along the right edge of the frame and falls away to nothing by the centre. The left three quarters is a warm brown-grey haze with no stalks in focus and no horizon. Dusty, soft, warm and dark. No sun in frame."
+    },
+    {
+      "id": "ink",
+      "name": "Ink",
+      "obeys": true,
+      "prompt": "A sumi-e ink wash painting. A single faint mountain form rises in the right quarter, drawn in one or two soft strokes with a lot of bleed. The left three quarters is completely blank, smooth, evenly toned mid-grey paper with nothing painted on it and no visible fibre, grain or texture of any kind. Charcoal, graphite and warm grey. Painterly, not photographic. No seal, no signature, no characters."
+    },
+    {
+      "id": "nebula",
+      "name": "Nebula",
+      "obeys": true,
+      "prompt": "A deep space field. A dusty rose and teal gas cloud occupies the right quarter of the frame, soft edged and dim. The left three quarters is near black interstellar dust with almost no stars. No bright core, no galaxy spiral, no lens flare. Muted rose, teal and black."
+    },
+    {
+      "id": "peak",
+      "name": "Peak",
+      "obeys": false,
+      "prompt": "OVERRIDE THE COMPOSITION RULE FOR THIS FRAME. A moonlit mountain peak stands dead centre of the frame, symmetrical, the single obvious focal point, with the ridge falling away evenly to both edges. Cold blue night, thin cloud below the summit. The centre of the image is the busiest part of it. Still dark and low contrast overall."
+    },
+    {
+      "id": "stone",
+      "name": "Stone",
+      "obeys": false,
+      "prompt": "OVERRIDE THE COMPOSITION RULE FOR THIS FRAME. An even, all-over surface with no focal point anywhere: dark grey-green weathered stone, fine grain and shallow pitting, lit flat and evenly corner to corner. No edges, no seams, no cracks that lead the eye, no vignette, nothing to look at in any one place. Uniform texture across the whole frame. Dark and matte."
+    },
+    {
+      "id": "copper",
+      "name": "Copper",
+      "obeys": false,
+      "prompt": "OVERRIDE THE COMPOSITION RULE FOR THIS FRAME. Mirror the usual composition. All the visual interest lives in the LEFT quarter of the frame: a dark copper and rust oxidised metal surface catching a low raking light, with texture and colour. The RIGHT three quarters is smooth unlit near-black metal with nothing on it. Warm copper, rust and black."
+    }
+  ]
+}
