@@ -58,7 +58,7 @@
   "devDependencies": {
     "@fontsource-variable/source-sans-3": "^5.3.0",
     "@tiptap/core": "^2.27.2",
-    "@tiptap/extension-link": "^2.27.2",
+    "@tiptap/extension-link": "^3.31.3",
     "@tiptap/extension-placeholder": "^2.27.2",
     "@tiptap/extension-table": "^2.27.2",
     "@tiptap/extension-table-cell": "^2.27.2",
