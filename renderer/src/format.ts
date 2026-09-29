@@ -1,0 +1,419 @@
+import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mjs';
+// Time and grouping, Superhuman-style: terse, scannable, never a full date
+// where "3m" will do.
+
+export function ago(ts: number, now = Date.now()): string {
+  const s = Math.max(0, Math.floor((now - ts) / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d`;
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+// THE PANEL CLOCK, AND IT ONLY EVER MOVES ON THE MINUTE. Under a minute this
+// says "now" and then stops, which is the whole of what a quiet row needs to
+// say. The second half is the value of `now` the rail is handed, quantised to
+// the minute in App.tsx, so the text cannot change between minute boundaries
+// however often React draws it.
+export function agoQuiet(ts: number, now = Date.now()): string {
+  const m = Math.max(0, Math.floor((now - ts) / 60_000));
+  if (m < 1) return 'now';
+  return ago(ts, now);
+}
+
+export function stamp(ts: number, now = Date.now()): string {
+  const d = new Date(ts);
+  const days = Math.floor((startOfDay(now) - startOfDay(ts)) / 86_400_000);
+  if (days === 0) return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase();
+}
+
+export function dayLabel(ts: number, now = Date.now()): string {
+  const days = Math.floor((startOfDay(now) - startOfDay(ts)) / 86_400_000);
+  if (days === 0) return 'Today';
+  if (days === -1) return 'Tomorrow';
+  if (days < 0) return new Date(ts).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `Last 7 days`;
+  return 'Earlier';
+}
+
+function startOfDay(ts: number): number {
+  const d = new Date(ts);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+// Options parsing: the worker brief asks for a "## Options" section with a
+// numbered list, "(recommended)" marking the default. Parsing is tolerant; a
+// body without options simply renders as prose.
+export interface ParsedOption {
+  n: number;
+  text: string;
+  recommended: boolean;
+}
+
+export function parseOptions(body?: string): ParsedOption[] {
+  if (!body) return [];
+  const lines = body.split('\n');
+  let inOptions = false;
+  const options: ParsedOption[] = [];
+  for (const line of lines) {
+    if (/^#{1,4}\s/.test(line)) {
+      inOptions = /option/i.test(line);
+      continue;
+    }
+    if (!inOptions) continue;
+    const m = line.match(/^\s*(\d+)[.)]\s+(.*)$/);
+    if (m) {
+      options.push({
+        n: Number(m[1]),
+        text: m[2].trim(),
+        recommended: /\(recommended\)/i.test(m[2]),
+      });
+    }
+  }
+  return options;
+}
+
+// WHICH FIELD A PICK LIVES IN, and it is not always the body.
+//
+// It was the body alone for as long as this existed, and that quietly closed
+// the offer on most rows. The store folds patches per field with the
+// user outranking an agent, so on a task the USER composed the body is the one
+// field a worker cannot write. The moment a pick is worth the most is exactly
+// there: a run finishes on the user's own directive and the honest next word is
+// "merge it" or "leave it", and the worker has nowhere to put that.
+//
+// Measured on a real store: about half of recent results were on rows the
+// user wrote, almost no row could draw the strip at all, and no result ever
+// written carried an offer, because writing one there did nothing.
+//
+// So the offer comes off whatever the pane is actually leading with: the
+// result, else the checkpoint, else the ask. The fallback to the body is what
+// keeps this additive, so no row that already offered a pick loses one.
+export type OptionsField = 'result' | 'note' | 'body';
+
+interface HasFields { result?: string; note?: string; body?: string }
+
+export function optionsFrom(item: HasFields): OptionsField {
+  if (parseOptions(item.result).length) return 'result';
+  if (parseOptions(item.note).length) return 'note';
+  return 'body';
+}
+
+export function itemOptions(item: HasFields): ParsedOption[] {
+  return parseOptions(item[optionsFrom(item)]);
+}
+
+// AND WHETHER THE OFFER IS STILL LIVE, which is not the same as whether she has
+// ever replied on this row.
+//
+// The picker used to hide the moment `answer` held anything at all, and that
+// field is never cleared: a reply from Tuesday is still sitting on the row on
+// Friday. So on every thread the user had ever spoken in, a worker's next offer
+// was suppressed by the user's own last reply. Measured on a real store: most
+// recently finished rows already carried an answer, and in nearly all of those
+// the result was written AFTER the answer, so those offers would have been
+// fresh.
+//
+// So the test is the one the inbox list already makes about news (rowSummary):
+// which text is NEWER. An offer written after her last word is a live offer. An
+// offer she has already answered is spent, and stays hidden, which is the case
+// this rule was built for and still covers.
+export function offerIsLive(item: HasFields & {
+  answer?: string;
+  wrote?: Record<string, { ts: number } | undefined>;
+}): boolean {
+  if (!itemOptions(item).length) return false;
+  if (!item.answer || item.answer === '(withdrawn)') return true;
+  const spoke = item.wrote?.answer?.ts ?? 0;
+  const offered = item.wrote?.[optionsFrom(item)]?.ts ?? 0;
+  return offered > spoke;
+}
+
+// Snooze grammar: deliberately tiny and deterministic, not NLP. Accepts
+// "30m", "3h", "2d", "8am", "6:30pm", "18:30", "mon".."sun", and the words the
+// picker itself prints. Anything else is invalid and says so, rather than
+// guessing.
+const DAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+// What Enter means in the schedule box, in one place so the key handler and the
+// preview beside it cannot disagree about whether the typed words counted.
+//
+// TYPED TEXT ALWAYS DECIDES. Text we could not read is a REFUSAL, never a
+// fall-through to whichever preset happens to be highlighted: that fall-through
+// is what scheduled an item for thirty minutes when the user typed "tomorrow", while
+// the preview beside the box was already admitting it did not understand
+// (tests/snooze-honours-what-she-typed.test.mjs).
+export type EnterMeans = 'typed' | 'refuse' | 'selected';
+
+export function enterMeans(text: string, parsed: unknown): EnterMeans {
+  if (!text.trim()) return 'selected';
+  return parsed ? 'typed' : 'refuse';
+}
+
+// Only the numbers that appear in a schedule out loud, and only at the START of
+// the phrase, where a count belongs. "Six" is a time of day in "six pm" and a
+// count in "six hours"; the clock rule below still owns the first, because it
+// runs on the digits this leaves behind and merely sees "6" either way.
+const WORD_NUMBERS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
+  nine: 9, ten: 10, eleven: 11, twelve: 12, fifteen: 15, 'twenty five': 25,
+  twenty: 20, thirty: 30, 'forty five': 45, forty: 40, fifty: 50, sixty: 60,
+  ninety: 90,
+};
+// Longest first: "twenty" would otherwise eat the front of "twenty five".
+const WORD_NUMBER = new RegExp(`^(${Object.keys(WORD_NUMBERS)
+  .sort((a, b) => b.length - a.length)
+  .map((w) => w.replace(' ', '[\\s-]+'))
+  .join('|')})\\b`);
+
+export function parseWhen(raw: string, now = Date.now()): { ts: number; label: string } | null {
+  let text = raw.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!text) return null;
+
+  // The labels in the list directly beneath this box. Typing a word you can see
+  // on screen and being told it is not a time is a trap that can cost a whole
+  // row; the grammar has to accept what the UI is offering.
+  if (text === 'next week') return atEight(nextWeekday(now, 1), now);
+  if (text === 'tonight' || text === 'this evening' || text === 'evening') {
+    const d = new Date(now);
+    d.setHours(18, 0, 0, 0);
+    // Past 6pm this evening has gone. Roll it forward rather than schedule a
+    // moment already behind us, because an overdue runAt is due forever, which
+    // reads exactly like the row coming straight back.
+    if (d.getTime() <= now) d.setDate(d.getDate() + 1);
+    return stamp2(d.getTime(), now);
+  }
+  if (/^(tomorrow|tomorrow morning|tmrw|tmr|tom)$/.test(text)) {
+    const d = new Date(now + 86_400_000);
+    d.setHours(8, 0, 0, 0);
+    return stamp2(d.getTime(), now);
+  }
+
+  // Filler words a person types around the grammar that already works:
+  // "in 30 minutes", "in an hour", "next monday".
+  text = text.replace(/^in /, '');
+  if (text === 'an hour' || text === 'a hour') text = '1h';
+  if (text === 'a day') text = '1d';
+  if (text === 'half an hour' || text === 'half hour') text = '30m';
+  text = text.replace(/^next /, '');
+
+  // Numbers spelled the way a person says them. "in three hours" used to be
+  // refused by every grammar in the app, which is worse now than it was quiet
+  // before: the box reads back while she types, so an ordinary phrase would
+  // answer "not a time" in front of her.
+  text = text.replace(WORD_NUMBER, (word) => String(WORD_NUMBERS[word.replace(/[\s-]+/g, ' ')]));
+
+  // Minutes first: "30m" must never fall through to the clock-time rule.
+  let m = text.match(/^(\d+)\s*m(?:ins?|inutes?)?$/);
+  if (m) return stamp2(now + Number(m[1]) * 60_000, now);
+
+  m = text.match(/^(\d+(?:\.\d+)?)\s*h(?:ours?|rs?)?$/);
+  if (m) return stamp2(now + Number(m[1]) * 3_600_000, now);
+
+  m = text.match(/^(\d+)\s*d(?:ays?)?$/);
+  if (m) {
+    const d = new Date(now + Number(m[1]) * 86_400_000);
+    d.setHours(8, 0, 0, 0);
+    return stamp2(d.getTime(), now);
+  }
+
+  m = text.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+  if (m) {
+    let hour = Number(m[1]);
+    const minute = Number(m[2] ?? 0);
+    const mer = m[3];
+    if (hour > 23 || minute > 59) return null;
+    if (mer === 'pm' && hour < 12) hour += 12;
+    if (mer === 'am' && hour === 12) hour = 0;
+    const d = new Date(now);
+    d.setHours(hour, minute, 0, 0);
+    if (d.getTime() <= now) d.setDate(d.getDate() + 1);
+    return stamp2(d.getTime(), now);
+  }
+
+  // A DAY NAME SETS THE DATE, AND WHAT FOLLOWS IT SETS THE HOUR. Bare
+  // "thursday" keeps the 8am every day-shaped answer here lands on; "thursday
+  // at 8am" is eight o'clock on that day, which is the one-off she could not
+  // reach at all while the repeat grammar was taking the phrase first.
+  //
+  // Anchored, where this used to be `text.startsWith(name)`: that read "satisfy
+  // the customer" as Saturday and scheduled it. A trailing phrase this cannot
+  // read as a clock is now a no rather than a silent 8am.
+  const named = text.match(/^(sun|mon|tue|wed|thu|fri|sat)[a-z]*(?:\s+(?:at\s+)?(.+))?$/);
+  if (named) {
+    const d = nextWeekday(now, DAY_NAMES.indexOf(named[1]));
+    if (!named[2]) return atEight(d, now);
+    const at = timeOf(named[2]);
+    if (!at) return null;
+    const [hour, minute] = at.split(':').map(Number);
+    d.setHours(hour, minute, 0, 0);
+    return stamp2(d.getTime(), now);
+  }
+
+  return null;
+}
+
+/* ------------------------------- recurrence ------------------------------ */
+// The repeat grammar.
+//
+// The third answer is the whole reason this is not a boolean. With two answers,
+// a phrase it cannot read is indistinguishable from prose, so it would silently
+// become a one-shot, and an absent tag says nothing: she would find out
+// tomorrow, when the thing she set up did not happen.
+export type RepeatParse =
+  | { rule: RepeatRuleValue; label: string }
+  | { unreadable: true }
+  | null;
+
+// Recurrence is read from the FIRST LINE, two ways, because she writes it two
+// ways. Setting one up front opens with it, and changing one mid-thread buries
+// it. The reply field only ever sees the second shape, so an opener-only
+// grammar showed her nothing exactly where she was most likely to type.
+//
+// At the START of a clause the time is optional, because "every morning" there
+// is unambiguously an instruction. ANYWHERE ELSE it must carry an explicit
+// time, which is what keeps "the counter reads zero every day" prose.
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+// Spelled out rather than a prefix wildcard: `sat[a-z]*` reads "satisfy the
+// customer" as Saturday, and this grammar is allowed to say no but never to
+// invent a schedule. The trailing \b in the patterns below is what lets the
+// short forms sit safely beside the long ones.
+const DAY_WORD = String.raw`(?:sun|sunday|sundays|mon|monday|mondays|tue|tues|tuesday|tuesdays|wed|weds|wednesday|wednesdays|thu|thur|thurs|thursday|thursdays|fri|friday|fridays|sat|saturday|saturdays)`;
+// A BARE DAY NAME IS A DATE, NOT A RHYTHM. "Thursday at 8am" is the next
+// Thursday and nothing after it; only the plural or an "every" makes it a
+// habit. This list used to be `DAY_WORD` below, so "thursday at 8am" was read
+// as a weekly rule and there was no way left to ask for the single run: the
+// recurrence grammar gets first look by design (`readWhen`), so it took the
+// phrase before parseWhen ever saw it.
+const DAY_PLURAL = String.raw`(?:sundays|mondays|tuesdays|wednesdays|thursdays|fridays|saturdays)`;
+const RHYTHM = String.raw`(?:(?:every|each)\s+(?:other\s+day|weekday|weekdays|day|morning|night|evening|${DAY_WORD})|daily|weekdays?|${DAY_PLURAL})`;
+const OPENER_RE = new RegExp(`^${RHYTHM}\\b`, 'i');
+const BURIED_RE = new RegExp(`\\b(${RHYTHM})\\s+(?:at\\s+)?([0-9][^,.]*)`, 'i');
+const UNKEEPABLE_RE = /other day|night|evening/i;
+
+export function parseRepeat(raw: string): RepeatParse {
+  const line = (raw ?? '').split('\n')[0].trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!line) return null;
+
+  for (const clause of line.split(',')) {
+    const opener = clause.trim().match(OPENER_RE);
+    if (!opener) continue;
+    if (UNKEEPABLE_RE.test(opener[0])) return { unreadable: true };
+    const rest = clause.trim().slice(opener[0].length).trim();
+    // An explicit "at" is a PROMISE of a time, so what follows it has to be one:
+    // "every day at half past nine" is a recurrence this cannot keep and must
+    // say so. Without "at", the rest is the task itself and the hour defaults,
+    // the way every day-shaped answer in parseWhen already does.
+    const at = rest.match(/^at\s+(.+)$/);
+    return at ? shapeOf(opener[0], at[1]) : shapeOf(opener[0], '');
+  }
+
+  const buried = line.match(BURIED_RE);
+  if (buried) {
+    if (UNKEEPABLE_RE.test(buried[1])) return { unreadable: true };
+    return shapeOf(buried[1], buried[2]);
+  }
+  return null;
+}
+
+// Which of the three shapes the words asked for, and at what hour. The default
+// is 8am, the hour every day-shaped answer in parseWhen already lands on, and
+// that default is part of the contract rather than an accident.
+function shapeOf(rhythm: string, timeText: string): RepeatParse {
+  const at = timeText ? timeOf(timeText) : '08:00';
+  if (!at) return { unreadable: true };
+  const words = rhythm.toLowerCase();
+  if (/weekday/.test(words)) return repeatRule({ every: 'weekday', at });
+  const day = WEEKDAYS.findIndex((name) => new RegExp(`\\b${name.slice(0, 3)}`).test(words));
+  if (day >= 0 && !/every day|each day|daily|morning/.test(words)) {
+    return repeatRule({ every: 'week', on: day, at });
+  }
+  return repeatRule({ every: 'day', at });
+}
+
+function timeOf(text: string): string | null {
+  const m = text.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/);
+  if (!m) return null;
+  let hour = Number(m[1]);
+  const minute = Number(m[2] ?? 0);
+  const mer = m[3];
+  if (minute > 59 || hour > 23) return null;
+  if (mer === 'pm' && hour < 12) hour += 12;
+  if (mer === 'am' && hour === 12) hour = 0;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function repeatRule(rule: RepeatRuleValue): RepeatParse {
+  return { rule, label: ruleLabel(rule) };
+}
+
+// Always the NEXT one: "mon" on a Monday means the Monday coming, not today.
+function nextWeekday(now: number, day: number): Date {
+  const d = new Date(now);
+  d.setDate(d.getDate() + (((day - d.getDay()) + 7) % 7 || 7));
+  return d;
+}
+
+// The morning hour every day-shaped answer lands on.
+function atEight(d: Date, now: number): { ts: number; label: string } {
+  d.setHours(8, 0, 0, 0);
+  return stamp2(d.getTime(), now);
+}
+
+function stamp2(ts: number, now: number): { ts: number; label: string } {
+  const d = new Date(ts);
+  const days = Math.floor((ts - startOfDay(now)) / 86_400_000);
+  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const day = days === 0 ? 'today' : days === 1 ? 'tomorrow'
+    : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  return { ts, label: `${day}, ${time}` };
+}
+
+// Markdown out, one line in. ONE copy of this rule, because search reads the
+// same text the row does and the two must agree about what the words even are:
+// a query that matched `**conversion**` and a row that printed "conversion"
+// would highlight nothing, and a row is the only evidence she has that a search
+// worked. previewText is this with the row's own 200-character ceiling on it;
+// search wants the whole task, since the sentence that matched is usually a
+// long way past the first paragraph.
+//
+// A HEADING IS DROPPED FOR A PREVIEW AND KEPT FOR SEARCH, and that one
+// difference is why there are two of these. On the row, a heading is a label
+// for what follows and never the news, so a preview that opened with it would
+// spend both its lines saying nothing. In search it is the opposite: a heading
+// is a landmark, which is exactly the kind of half-remembered line she types.
+// Measured on a real store: a task whose body carried the heading
+// "Where the code is and how to work" could not be found by typing "how to
+// work" at all, because the only copy of those words was a heading and the
+// searchable text had none.
+function flatten(body: string, headings: 'drop' | 'keep'): string {
+  return body
+    .replace(/^#{1,4}\s.*$/gm, (line) => (headings === 'keep' ? line.replace(/^#{1,4}\s*/, '') : ''))
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[*_`>#]/g, '')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
+export function plainText(body?: string): string {
+  return body ? flatten(body, 'drop') : '';
+}
+
+// The same text, with the headings still in it. Search reads THIS.
+export function searchText(body?: string): string {
+  return body ? flatten(body, 'keep') : '';
+}
+
+export function previewText(body?: string): string {
+  return plainText(body).slice(0, 200);
+}

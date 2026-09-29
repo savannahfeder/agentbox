@@ -1,0 +1,6 @@
+{
+  "//": "Worker settings, passed per-spawn via --settings. It carries NO permission rules of our own, on purpose: workers run on Claude Code's own defaults for whatever mode they are in, the way Codex workers run on the Codex app's own posture (main/codex-session.mjs). The app matches Claude Code's and Codex's default settings rather than keeping its own (w-6ade63e1aa). This used to ship allow Bash plus a 28-entry ask list. In auto mode Claude Code drops a blanket Bash allow and still forces a prompt on every ask rule, so the list did nothing but add cards: on w-60f57bec36, 10 of 10 cards in nine minutes were `vercel` commands it named. additionalDirectories is EMPTY ON PURPOSE and is filled in at spawn time by Supervisor.writeWorkerSettings with this person's own store root: it used to name one developer's home folder, which shipped inside the download and granted every stranger's agents a directory that does not exist on their Mac (w-24fa146714, 2026-08-23).",
+  "permissions": {
+    "additionalDirectories": []
+  }
+}

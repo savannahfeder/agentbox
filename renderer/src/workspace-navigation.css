@@ -1,0 +1,1012 @@
+/* Approved Workspace layout, with shared expanded/collapsed geometry. */
+.app.workspace-layout { --workspace-width: 202px; --workspace-left: calc(44px + var(--workspace-width)); position: relative; padding: 40px 22px 22px var(--workspace-left); }
+.app.workspace-collapsed { --workspace-width: 38px; }
+.workspace-layout::before { content: ''; position: absolute; top: 40px; bottom: 22px; left: var(--workspace-left); right: 22px; border-radius: var(--radius); background: var(--skin-pane, var(--surface)); backdrop-filter: blur(var(--skin-blur, 0px)); box-shadow: inset 0 1px 0 rgba(255,255,255,.40), inset 1px 0 0 rgba(255,255,255,.12), var(--shadow-card); pointer-events: none; }
+:root[data-theme="dark"] .workspace-layout::before { box-shadow: inset 0 1px 0 rgba(255,255,255,.13), inset 1px 0 0 rgba(255,255,255,.05), var(--shadow-card); }
+.workspace-layout > .topbar { position: relative; z-index: 1; padding: 0 20px 0 32px; height: 64px; min-height: 64px; flex: 0 0 64px; border-bottom: 1px solid var(--line); }
+.workspace-title { margin: 0; font-size: 17px; font-weight: 500; letter-spacing: -.015em; }
+.workspace-layout > .body { position: relative; padding: 0; min-height: 0; }
+:root .workspace-layout > .body > .list-pane { background: none; border: 0; box-shadow: none; backdrop-filter: none; border-radius: 0 0 var(--radius) var(--radius); }
+.workspace-navigation { position: absolute; top: 50px; bottom: 22px; left: 22px; width: var(--workspace-width); display: flex; flex-direction: column; z-index: 2; -webkit-app-region: no-drag; }
+.workspace-navigation button { font: inherit; font-size: 13px; color: var(--text-faint); border: 0; background: none; border-radius: var(--radius); cursor: pointer; height: 36px; flex: none; display: flex; align-items: center; padding: 0 10px; gap: 11px; }
+.workspace-navigation svg { width: 18px; height: 18px; flex: none; }
+.workspace-navigation .workspace-search { border: 1px solid var(--line); padding: 0 9px; background: var(--wash); }
+.workspace-search kbd { margin-left: auto; font: inherit; font-size: 11px; opacity: .65; }
+.workspace-section { height: 49px; flex: none; padding: 24px 10px 10px; font-size: 11px; color: var(--text-faint); }
+.workspace-tabs { display: flex; flex-direction: column; gap: 3px; }
+.workspace-navigation .workspace-tab { width: 100%; text-align: left; }
+.workspace-navigation .workspace-tab.active { background: var(--wash); color: var(--text); font-weight: 500; }
+.workspace-navigation button:hover { background: var(--wash); color: var(--text); }
+.workspace-navigation button:focus-visible { outline: 2px solid var(--underline); outline-offset: 2px; }
+.workspace-footer { margin-top: auto; display: flex; align-items: center; gap: 4px; }
+.workspace-create { flex: 1 !important; min-width: 0; }
+.workspace-navigation .workspace-toggle { width: 38px; padding: 0 10px; }
+.workspace-collapsed .workspace-section span { visibility: hidden; }
+.workspace-collapsed .workspace-navigation button > span, .workspace-collapsed .workspace-search kbd { display: none; }
+.workspace-collapsed .workspace-footer { flex-direction: column; align-items: stretch; }
+.workspace-collapsed .workspace-create { flex: none !important; }
+.workspace-layout .topbar .tabs.searching { flex: 1; width: auto; }
+@media(max-width:700px) { .app.workspace-layout { --workspace-width: 38px; } .workspace-layout .workspace-section span, .workspace-layout .workspace-navigation button > span, .workspace-layout .workspace-search kbd { display: none; } .workspace-layout .workspace-footer { flex-direction: column; align-items: stretch; } }
+
+.workspace-layout::after { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 40px; -webkit-app-region: drag; }
+
+/* The task stays inside the same raised foreground as the list. */
+.workspace-layout .focus-pane { position: relative; min-height: 0; }
+.workspace-layout .focus-pane > .back-esc { position: absolute; left: 12px; top: 14px; }
+.workspace-layout .focus-scroll { background: transparent; }
+.workspace-layout .focus-dock { background: transparent; padding-bottom: 24px; }
+.workspace-layout .focus-dock::before { background: none; }
+.workspace-layout .dock-card { background: var(--wash); border-radius: var(--radius); }
+
+.workspace-layout.workspace-task > .topbar { height: 88px; min-height: 88px; flex-basis: 88px; }
+.workspace-task-header { flex: 1; min-width: 0; -webkit-app-region: no-drag; }
+.workspace-task-header .keep-line { max-width: none; width: 100%; margin: 0; padding: 0; border: 0; }
+.workspace-task-header .keep-line-title { font-size: 17px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.workspace-task-header .byline { margin-top: 6px; }
+
+/* THE TWO THINGS AT THE RIGHT OF A TASK'S BAR SHARE ONE EDGE —, 2026-09-20.
+   MEASURED BEFORE, in the running app at 1440: the control cluster sat at
+   1276..1398 and the byline's figures ended at 1276. Exactly 1276. They touched
+   with no gap at all, one row lower, because the header and the controls are
+   flex siblings and the header's right edge IS where the controls begin. So the
+   figures read as a tail wedged under the buttons rather than as anything lined
+   up with them, and the two also overlapped vertically by 11px. The controls
+   come out of the flex row and go to the top right corner, which is the row the
+   TITLE is on. The header then has the full width, so its byline runs to the
+   bar's own 20px inset and the figures end on the same edge the last icon ends
+   on. Title row and byline row, one right edge, nothing touching. ONLY THE
+   TITLE PAYS FOR THE ICONS, with a padding the width of the cluster and a gap.
+   The byline passes underneath them because they no longer reach down into it.
+   The August choice is untouched by all this: the figures are still at the
+   right-hand end of the byline, plain, which is the one thing approved about
+   them. This is the right-hand end finally being an edge rather than
+   wherever the buttons happened to stop.
+*/
+/* The bar is already `position: relative` where it is declared at the top of
+   this file, so the corner has something to be absolute inside. */
+.workspace-layout.workspace-task > .topbar > .topbar-right {
+  position: absolute; top: 14px; right: 20px;
+}
+/* THE RESERVE FOLLOWS WHAT IS ACTUALLY IN THE CORNER (w-581dbc6cc4,
+   2026-09-27). It used to be 3 marks at 34, two 10px gaps and 18 of air. The
+   plus and the ⌘ came off a task's corner, and what is left is the
+   terminal, a 10px gap, the mark's own 4 and the mark: 81 points, measured in
+   the built app. 18 of air on top of that is the same 18 it always kept. */
+.workspace-layout.workspace-task .workspace-task-header .keep-line-title { padding-right: 99px; }
+
+/* AND THE TWO ROWS NEED AIR BETWEEN THEM, w-581dbc6cc4, 2026-09-27. The corner
+   marks sat almost on the change figures below them, a few pixels short of
+   enough, and the whole corner looked wrong as a result.
+
+   MEASURED BEFORE THIS, at 2103 by 1183: the corner marks end at
+   y=88 and the figures begin at y=90. Two points. The marks are 34 tall against
+   a 24 point title row, so they hang 6 points below the title's baseline row
+   and land almost on the line underneath.
+
+   WHY IT IS DONE IN TWO RULES. The bar is a fixed 88 and the header is centred
+   inside it, so growing the header alone moves the TITLE up by half of whatever
+   the byline gains, and the title is what the corner marks are aligned to. So
+   the header is pinned to the top of the bar first, by exactly the 18 points of
+   slack it had above it, and only then does the byline drop. The title does not
+   move at all; the byline does.
+
+   The gap comes out at 10, which is the same 10 the marks in that row keep
+   between themselves. The header ends at 117 against the bar's 128, so nothing
+   is tight at the bottom either. */
+/* MARGIN AND NOT PADDING. The back chevron is absolute against this element
+   with `top: 0`, so padding leaves it behind at the bar's top edge while the
+   title moves down: measured at y=40 against a title at 58, 18 points adrift.
+   A margin moves the whole box, and the chevron keeps the title's line. */
+.workspace-layout.workspace-task .workspace-task-header { align-self: flex-start; margin-top: 18px; }
+/* ONLY THE FIGURES DROP, AND THE WORDS UNDER HER TITLE GO BACK (w-299ee43d2e,
+   2026-09-28). Dropping the whole byline 15 gave the figures their air but
+   also pushed "In your inbox · Claude Code" away from the title on the left,
+   which was spaced right before. The right side stays, the left side goes
+   back, and the two ends of the line are knowingly 8 out of step. So the line
+   takes its old 7 from `.keep-line > .focus-meta` again, and the figures
+   alone are moved the 8 it gave back,
+   which leaves them exactly where the 15 put them. A transform, so the line's
+   own height and everything under it stay put. */
+.workspace-layout.workspace-task .workspace-task-header .keep-line > .focus-meta > .change-figures { transform: translateY(8px); }
+/* Interact with HTML via its filename/Open control in the document pane.
+   An opaque sandbox cannot forward its key events to the task's shortcuts. */
+.workspace-layout .focus-pane iframe { pointer-events: none; }
+
+/* THE INBOX COUNT IS DRAWN IN THE TAB'S OWN TYPE (w-5f02e7b525, option C2:
+   the number is the label's type exactly).
+
+   It was an 11px badge in a --wash capsule, and full ink when it first moved
+   onto Inbox. On a deselected tab it should match the deselected label's type.
+
+   So the number does not have a look of its own at all. `color` and
+   `font-weight` inherit from the tab button, and the size is the label's 13px.
+   A deselected tab is --text-faint at 400 and the number goes with it; `.active`
+   is --text at 500 and the number goes with that too. One rule, both states,
+   and nothing to keep in step by hand if the tab's own type ever moves.
+
+   `font-variant-numeric: tabular-nums` stays: the number changes as work moves
+   and the label must not jog sideways under it. `line-height` matches the
+   label's box so the figures sit on the same line as the word. */
+.workspace-running { font-size: 13px; font-weight: inherit; line-height: 18px; font-variant-numeric: tabular-nums; color: inherit; }
+.has-count .workspace-running { margin-left: auto; min-width: 20px; text-align: right; }
+.workspace-collapsed .workspace-running { display: none; }
+@media(max-width:700px) { .workspace-running { display: none; } }
+
+.workspace-bottom { margin-top: auto; padding-top: 24px; }
+.workspace-utilities { display: flex; flex-direction: column; gap: 2px; padding-bottom: 12px; }
+.workspace-utilities button { width: 100%; }
+.workspace-bottom .workspace-footer { margin-top: 0; border-top: 1px solid var(--line); padding-top: 12px; }
+.workspace-usage:empty { display: none; }
+.workspace-usage .usage-box { width: 100%; }
+.workspace-navigation .usage-pill { display: grid; grid-template-columns: 1fr auto; width: 100%; height: auto; min-height: 50px; padding: 10px; gap: 8px; text-align: left; border-top: 1px solid var(--line); border-radius: 0; }
+.usage-sidebar-label { font-size: 11px; }
+.usage-sidebar-percent { font-size: 10px; font-variant-numeric: tabular-nums; }
+.workspace-usage .usage-pill > .usage-meter { grid-column: 1 / -1; width: 100%; height: 3px; }
+.workspace-usage .usage-panel { top: auto; bottom: calc(100% + 8px); left: 0; right: auto; }
+.workspace-collapsed .workspace-usage .usage-pill { display: flex; min-height: 36px; padding: 10px; }
+.workspace-collapsed .workspace-usage .usage-pill > .usage-meter { display: block; }
+@media(max-width:700px) { .workspace-usage .usage-pill { display: flex; min-height: 36px; padding: 10px; } .workspace-usage .usage-pill > .usage-meter { display: block !important; } }
+
+/* Blur only the backdrop image. Content and controls remain sharp. Overscan
+   prevents transparent edges when the background blur is increased. */
+:root[data-skin] body, :root[data-skin] .settings-screen { isolation: isolate; background-image: none; }
+:root[data-skin] body::before, :root[data-skin] .settings-screen::before {
+  content: ''; position: fixed; inset: calc(-2 * var(--skin-background-blur, 0px)); z-index: -1; pointer-events: none;
+  background-image: var(--skin-veil), var(--skin-tint), var(--skin-image);
+  background-repeat: no-repeat; background-position: center; background-size: cover;
+  background-blend-mode: normal, multiply, normal;
+  filter: blur(var(--skin-background-blur, 0px));
+}
+.theme-dials { flex-wrap: wrap; }
+
+/* Utilities are destinations on the same foreground, with the workspace
+   navigation remaining in place. Hidden tasks cannot take focus underneath. */
+.workspace-settings > .body[hidden] { display: none; }
+.workspace-layout > .settings-embedded { position: relative; inset: auto; z-index: 1; flex: 1; min-height: 0; display: flex; flex-direction: column; background: transparent; isolation: auto; }
+:root[data-skin] .settings-embedded::before { content: none; }
+.workspace-layout .settings-embedded .set-nav { width: auto; min-width: 0; flex: none; padding: 16px 32px 0; border: 0; background: transparent; backdrop-filter: none; }
+.settings-embedded .set-nav-top, .settings-embedded .set-nav-foot, .settings-embedded .set-nav-group { display: none; }
+.settings-embedded .set-nav-scroll { display: flex; gap: 6px; overflow-x: auto; padding: 0 0 16px; border-bottom: 1px solid var(--line); }
+.settings-embedded .set-nav-item { width: auto; flex: none; padding: 7px 12px; }
+.settings-embedded .set-pane { background: transparent; }
+.settings-embedded .set-inner { max-width: 960px; margin: 0; padding: 30px 32px 60px; }
+/* General is written in two blocks since the Agents pane moved into it. The
+   page's own top and bottom air comes off the seam so the two read as one
+   column; measured on the drawn screen, the gap there was 144px against the
+   54px every other group boundary has. The same pair of rules is in styles.css
+   for the standalone screen, and this one is needed because the rule above
+   resets the padding for the embedded one.
+*/
+.settings-embedded .set-inner + .set-inner { padding-top: 0; }
+.settings-embedded .set-inner:has(+ .set-inner) { padding-bottom: 0; }
+/* Instructions and Shortcuts used to hide the settings tabs here and wear a
+   heading of their own, which made them read as separate pages and made Back
+   leave Settings from what looked like one of its pages. They should keep the
+   settings headers (w-5737fe67cf), so both keep the tabs now. */
+.workspace-utilities button[aria-current="page"] { background: var(--wash); color: var(--text); }
+.workspace-navigation .usage-pill { display: flex; align-items: center; justify-content: space-between; min-height: 28px; padding: 4px 10px; border: 0; gap: 8px; color: var(--text-faint); }
+.workspace-usage { padding: 8px 0; }
+.usage-sidebar-percent { margin-left: auto; opacity: .65; }
+.workspace-collapsed .workspace-usage { display: none; }
+@media(max-width:700px) { .workspace-usage { display: none; } }
+.instruction-tabs { display:flex; gap:6px; flex-wrap:wrap; margin:24px 0 32px; }
+.instruction-tabs button, .instruction-editor-head button { font:inherit; font-size:12px; color:var(--text-dim); border:1px solid var(--line); border-radius:var(--radius); background:transparent; padding:8px 12px; cursor:pointer; }
+.instruction-tabs button[aria-pressed="true"] { background:var(--wash); color:var(--text); }
+.instruction-editor-head { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.instruction-editor-head h2 { font-size:16px; font-weight:500; margin:0; }
+.instruction-editor-head button:disabled { opacity:.4; cursor:default; }
+/* RESTORE IS A LINK IN THE CORNER, NOT A BUTTON IN THE WAY (w-94b3af4e70,
+   2026-09-28). Option C of four drawings, chosen because it is clean. It opens
+   the user's own earlier versions of the box,
+   newest first, with the original at the foot of the list. */
+.instruction-restore { position:relative; }
+.instruction-editor-head .instruction-restore-link { border:none; padding:0; color:var(--text-faint); }
+.instruction-editor-head .instruction-restore-link:hover:not(:disabled) { color:var(--text); }
+.instruction-restore-menu { position:absolute; top:calc(100% + 8px); right:0; z-index:20; min-width:260px; max-height:320px; overflow-y:auto;
+ border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow-card); padding:6px; }
+.instruction-editor-head .instruction-restore-menu button { display:flex; width:100%; gap:16px; justify-content:space-between; align-items:baseline;
+ border:none; border-radius:var(--radius); padding:8px 10px; text-align:left; color:var(--text); }
+.instruction-editor-head .instruction-restore-menu button:hover:not(:disabled) { background:var(--wash); }
+.instruction-restore-size { color:var(--text-faint); font-size:11px; white-space:nowrap; }
+.instruction-editor-head .instruction-restore-menu button.instruction-restore-original { border-top:1px solid var(--line); border-radius:0; margin-top:4px; padding-top:12px; }
+.instruction-restore-empty { font-size:12px; line-height:1.5; color:var(--text-faint); padding:8px 10px; max-width:240px; }
+.instruction-undo { font:inherit; font-size:11px; color:var(--text-dim); background:transparent; border:none; padding:0; text-decoration:underline; cursor:pointer; }
+.instruction-editor p { font-size:13px; line-height:1.6; color:var(--text-faint); margin:12px 0 20px; max-width:75ch; }
+/* THE INSTRUCTIONS PAGE, AS APPROVED (w-3dc46f3a67, 2026-09-23): option 2,
+   Card. One raised card per section, and inside it a writing surface.
+
+   NO GRIP AND NO MONOSPACE. The default textarea, with its resize grip, felt
+   almost like raw HTML. The grip is a browser default nothing else in
+   this app shows, and a monospace face makes prose the user wrote read like a
+   config file. This is the user's own writing, set in the app's own text.
+
+   AND IT LOOKS LIKE SOMETHING YOU WRITE IN, WITHOUT A SENTENCE SAYING SO. It
+   was unclear the box could be edited, and that has to be shown visually, not
+   with text explaining it: UX is never explained with text.
+
+   Three states, and each one is doing a job the old sentence was doing badly:
+
+     at rest   a writing panel, the wash at half strength. Faint enough to stay
+               a page of the user's own words, present enough to read as somewhere to
+               type rather than as rendered text.
+     hover     the same panel at full strength, so the pointer finds its edges
+               before the click.
+     focus     an accent down the left edge, with the caret in it. The caret is
+               there the moment the page opens (../components/InstructionSettings).
+
+   The accent rides in the padding rather than outside it, so nothing shifts
+   between the three states: only colour moves. */
+
+/* THE APPROVED CARD: one per section, holding the head, what the section
+   governs and the writing surface, so a section reads as one thing on the page
+   rather than as a form spread down it. */
+.instruction-editor { margin-top:8px; padding:26px 28px 22px; border:1px solid var(--line); border-radius:var(--radius); background:var(--skin-pane,var(--surface)); box-shadow:var(--shadow-card); }
+/* The panel sits DEEPER than the card it is on, or the two surfaces read as one
+   and the place to type disappears again. */
+/* NO MAX-WIDTH (w-5737fe67cf). It was 74ch, so the box stopped short of the
+   Reset button on the same card and the components were not right-aligned.
+   Everything on the card now ends at the card's padding. */
+.instruction-editor textarea { display:block; resize:none; width:100%; min-height:400px;
+  padding:16px 18px; border:0; border-left:2px solid transparent; border-radius:var(--radius);
+  background:var(--wash); color:var(--text); caret-color:var(--text);
+  font:14px/1.75 inherit; font-family:inherit;
+  transition:background .12s ease, border-color .12s ease; }
+.instruction-editor textarea:hover { background:color-mix(in srgb, var(--wash) 100%, var(--text) 4%); }
+.instruction-editor textarea:focus { outline:none; background:color-mix(in srgb, var(--wash) 100%, var(--text) 4%); border-left-color:var(--underline); }
+.instruction-editor textarea::placeholder { color:var(--text-faint); }
+/* Saving, saved, and the errors a person can act on. Empty the rest of the
+   time: an idle line here is the page explaining itself. */
+.instruction-save { font-size:11px; color:var(--text-faint); margin-top:14px; min-height:14px; }
+/* ADHD MODE (w-5737fe67cf): the switch row on the "How agents write to you"
+   card, and its rules in a box under hers while it is on. No plate and no
+   padding of their own, so the switch and the box end on the card's edge like
+   the Reset button above them. */
+.instruction-toggle { display:flex; align-items:center; justify-content:space-between; gap:24px; margin:0 0 20px; }
+.instruction-toggle-label { font-size:14px; color:var(--text); }
+.instruction-toggle-desc { font-size:13px; color:var(--text-faint); margin-top:4px; }
+.instruction-toggle .set-sw { flex:none; }
+.instruction-sub { margin-top:28px; }
+.instruction-sub .instruction-editor-head { margin-bottom:12px; }
+.instruction-sub h3 { font-size:14px; font-weight:500; margin:0; }
+.instruction-sub textarea { min-height:160px; }
+/* The app's own brief is ours, so its card is flat where hers is raised. */
+.instruction-advanced .instruction-editor { background:var(--wash); box-shadow:none; }
+/* The app's own task brief, behind a line she has to open (w-3dc46f3a67). It is
+   quieter than the two boxes above it because it is ours and not hers. */
+.instruction-advanced { margin-top:40px; border-top:1px solid var(--line); padding-top:20px; }
+.instruction-advanced-toggle { font:inherit; font-size:12px; color:var(--text-faint); border:0; background:transparent; padding:0; cursor:pointer; }
+.instruction-advanced-toggle:hover { color:var(--text-dim); }
+.instruction-advanced .instruction-editor { margin-top:24px; }
+
+:root .workspace-layout > .settings-embedded { background: transparent; }
+
+.settings-usage { margin: 28px 0 36px; }
+.settings-usage > h2 { margin:0 0 16px; font-size:16px; font-weight:500; }
+.settings-usage-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
+.settings-usage-provider { padding:20px; background:var(--wash); border:1px solid var(--line); border-radius:var(--radius); }
+.settings-usage-provider h3 { font-size:14px; font-weight:500; margin:0 0 20px; }
+.settings-usage-window { margin-bottom:18px; }
+.settings-usage-window > div { display:flex; justify-content:space-between; gap:12px; font-size:12px; color:var(--text-dim); margin-bottom:9px; }
+.settings-usage-window .usage-meter { display:block; width:100%; height:3px; }
+.settings-usage-window p, .settings-usage-provider small { color:var(--text-faint); font-size:11px; margin:8px 0 0; }
+.settings-usage-empty { font-size:13px; color:var(--text-faint); }
+
+.workspace-page-heading { display:flex; align-items:center; gap:12px; min-width:0; -webkit-app-region:no-drag; }
+.workspace-back { width:28px; height:28px; margin-left:-6px; display:grid; place-items:center; padding:0; background:transparent; border:0; border-radius:var(--radius); color:var(--text-faint); cursor:pointer; }
+.workspace-back svg { width:18px; height:18px; }
+.workspace-back:hover { background:var(--wash); color:var(--text); }
+.workspace-back:focus-visible { outline:2px solid var(--underline); outline-offset:2px; }
+
+/* A task's navigation belongs to its heading, not the conversation gutter. */
+.workspace-task-header { display:flex; align-items:center; gap:14px; }
+.workspace-task-header > .back-esc { position:static; flex:0 0 28px; width:28px; height:28px; padding:5px; margin:0 0 0 -6px; align-self:center; }
+.workspace-task-header > .back-esc svg { width:18px; height:18px; }
+.workspace-task-header > .keep-line { flex:1; min-width:0; }
+.workspace-layout .focus { padding-top:28px; }
+
+/* Inline is a single reading flow; previews open only when asked for. */
+.inline-artifact { width:100%; height:min(680px, 70vh); min-height:360px; margin:24px 0; }
+.inline-artifact .doc-pane { height:100%; width:100%; }
+.workspace-layout .doc-card { border-radius:var(--radius); }
+.inline-artifact .doc-card { margin:0; }
+.inline-artifact .doc-grip { display:none; }
+.workspace-layout .inline-artifact iframe { pointer-events:auto; }
+.artifact-placements { display:flex; align-items:center; gap:2px; }
+.artifact-placements button { font:inherit; font-size:11px; color:var(--text-faint); background:none; border:0; border-radius:var(--radius); padding:5px 7px; cursor:pointer; }
+.artifact-placements button[aria-pressed="true"] { background:var(--wash); color:var(--text); }
+.artifact-placements button:hover { color:var(--text); }
+.artifact-placements button:focus-visible { outline:2px solid var(--underline); }
+.workspace-layout .doc-head { gap:8px; padding:12px; }
+.workspace-layout .doc-crumb { min-width:0; font-size:11px; }
+.workspace-layout .doc-marks { flex:none; gap:6px; }
+.workspace-layout[data-artifact-layout="beside"] > .body > .list-pane { min-width:400px; }
+.workspace-layout[data-artifact-layout="beside"] > .body > .artifact-host > .doc-pane { min-width:560px; }
+.workspace-layout[data-artifact-layout="beside"] .focus { padding:28px 28px 40px; }
+.workspace-layout[data-artifact-layout="beside"] > .body > .artifact-host > .doc-pane .doc-card { margin:12px; }
+/* THE CONVERSATION IS NOT HIDDEN IN FULL SCREEN ANY MORE. It was, until the
+   reply line along the foot was chosen; what is left of it now is its dock,
+   under the page. The block at the end of this file is the whole of it. */
+.workspace-layout[data-artifact-layout="focus"] > .body > .artifact-host > .doc-pane { flex:1 !important; width:100%; }
+.workspace-layout[data-artifact-layout="focus"] .doc-grip { display:none; }
+.workspace-layout[data-artifact-layout="focus"] .doc-card { margin:12px; }
+.artifact-tweaks { position:fixed; right:34px; bottom:30px; z-index:100; display:flex; align-items:center; gap:5px; padding:8px; background:var(--skin-solid,var(--surface)); border:1px solid var(--line-strong); border-radius:6px; box-shadow:0 4px 24px #0002; }
+.artifact-tweaks > span { padding:0 8px; color:var(--text-faint); font-size:11px; }
+.artifact-tweaks button { padding:6px 10px; font:inherit; font-size:12px; background:none; border:0; border-radius:3px; color:var(--text-dim); cursor:pointer; }
+.artifact-tweaks button[aria-pressed="true"] { color:var(--text); background:var(--wash); }
+.artifact-link-card { display:flex; align-items:center; gap:14px; width:100%; margin:22px 0; padding:16px 18px; border:1px solid var(--line); border-radius:var(--radius); background:var(--wash); color:var(--text-dim); text-align:left; font:inherit; cursor:pointer; }
+.artifact-link-card > svg { width:22px; height:22px; flex:none; }
+.artifact-link-card > span:nth-child(2) { min-width:0; flex:1; }
+.artifact-link-card strong { display:block; font-size:13px; font-weight:500; overflow:hidden; text-overflow:ellipsis; }
+.artifact-link-card small { display:block; font-size:11px; color:var(--text-faint); margin-top:4px; }
+.artifact-link-card:hover { border-color:var(--line-strong); color:var(--text); }
+.artifact-link-card:focus-visible { outline:2px solid var(--underline); outline-offset:2px; }
+
+.artifact-host { display:contents; }
+.artifact-tweaks select { font:inherit; font-size:11px; border:0; border-left:1px solid var(--line); padding:5px 8px; color:var(--text-dim); background:var(--skin-solid,var(--surface)); }
+.inline-artifact .doc-text { overflow:auto; }
+.code-file-pick { display:none; }
+.workspace-layout .doc-pane { container-type:inline-size; container-name:artifact; }
+@container artifact (max-width: 800px) {
+  .code-artifact { flex-direction:column; }
+  .code-tree { display:none; }
+  /* THE PICKER IS THE TREE, FOR A PANE TOO NARROW TO HOLD ONE.`appearance:none`
+     is the whole of the fix and the rest follows from it. While it was `auto`,
+     Chromium drew the arrow and the app had no say in where: measured at 772px
+     of pane, the native glyph sat about 9px from the border and a couple of
+     points below the middle, in a filled weight this app uses nowhere else. The
+     right padding below is what reserves room for ours.
+  */
+  .code-file-pick { display:block; position:relative; flex:none; margin:8px 12px; }
+  .code-file-picker { display:block; width:100%; padding:8px 34px 8px 8px; color:var(--text-dim); border:1px solid var(--line); background:var(--code-ground); border-radius:var(--radius); font:12px/1.5 var(--mono); appearance:none; -webkit-appearance:none; }
+  /* Centred on the box rather than on the text, and 12px in from its edge,
+     which is the same 12px the box itself is inset from the code column. The
+     select under it takes every click; this is only the mark. */
+  .code-pick-caret {
+    position:absolute; right:12px; top:50%; margin-top:-6.5px;
+    width:13px; height:13px; color:var(--text-faint); pointer-events:none;
+  }
+}
+
+/* A compact arrow shares the title line; metadata stays below the title. */
+.workspace-task-header { position:relative; display:block; padding:0 0 0 28px; }
+.workspace-task-header > .back-esc {
+ position:absolute; left:0; top:0; margin:0; padding:4px;
+ width:24px; height:24px; display:flex; align-items:center; justify-content:center;
+ color:var(--text-dim);
+}
+.workspace-task-header > .back-esc svg { width:16px; height:16px; }
+.workspace-layout.workspace-task > .topbar { height:88px; min-height:88px; flex-basis:88px; }
+.workspace-layout[data-reading-width="balanced"] .focus { max-width:980px; }
+.workspace-layout[data-reading-width="balanced"] .focus-dock-inner { max-width:916px; }
+.workspace-artifact-header { display:none; min-width:0; flex:1; }
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .workspace-task-header { display:none; }
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .workspace-artifact-header { display:block; }
+.workspace-artifact-header .doc-head { padding:0; background:none; border:0; min-height:32px; }
+.workspace-artifact-header .doc-crumb { font-size:14px; }
+.workspace-artifact-header .doc-crumb-part:not(:last-child),
+.workspace-artifact-header .doc-crumb-sep { display:none; }
+/* NO FILE NAME OVER A FULL SCREEN DOCUMENT.The path is still the crumb
+   everywhere else; it is only this one place, where the file is the whole
+   window and she already knows what she opened, that it is noise. So the bar is
+   0 and the document starts at the top of the window. The marks come out of the
+   flow and float in the corner, drawn only while she is reaching for them. 64
+   points to none. THE WINDOW CAN STILL BE MOVED. `.workspace-layout::after` is
+   a 40 point strip of window drag across the whole top, and with no bar it is
+   the only thing on this screen that moves the window. The marks and the reach
+   sit in that strip, so both are marked no-drag; what it costs is the top right
+   220 points as a drag handle, and the other thousand-odd are untouched.
+*/
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .workspace-artifact-header .doc-crumb { display:none; }
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .topbar {
+  height:0; min-height:0; flex-basis:0; padding:0; border-bottom:0; overflow:visible;
+}
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .workspace-artifact-header .doc-head { min-height:0; }
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .workspace-artifact-header .doc-marks {
+  /* 52, NOT 11, AND THAT IS THE WHOLE BUG (w-a5dae7e990, 2026-09-22). At top:11
+     the marks sat almost entirely inside it, and a drag region swallows the
+     press: macOS moves the window instead of giving the click to the page. They
+     did NOT sit there before this row. They rode in a 64 point bar that put
+     them below 40, and they went dead in the same change that took that bar to
+     nothing. A `no-drag` on the marks is not enough, because `::after` is
+     generated as the LAST child of `.workspace-layout` and its drag rectangle
+     is collected after their no-drag one. Sitting clear of the strip needs no
+     such argument, so that is what they do: 52 puts them just inside the top
+     right corner of the document's own card, which is where the eye already
+     goes. AND HEADLESS CHROME CANNOT SEE ANY OF THIS. `-webkit-app-region`
+     exists only in Electron, so a mark buried under a drag strip hit-tests
+     perfectly in the Chrome harness and is stone dead in the real app. That is
+     why the round before this one measured clean and changed nothing.
+  */
+  position:fixed; top:52px; right:26px; z-index:8;
+  padding:2px; border-radius:var(--radius);
+  background:color-mix(in srgb, var(--surface) 86%, transparent);
+  border:1px solid var(--line);
+  box-shadow:var(--shadow-md);
+  -webkit-app-region:no-drag;
+  opacity:0; transform:translateY(-4px); pointer-events:none;
+  transition:opacity .16s ease, transform .16s ease;
+}
+/* THIS SELECTOR HAS TO MATCH THE SHAPE OF THE ONE ABOVE IT, which carries
+   [data-artifact-layout] and a :not. A shorter one here loses on specificity
+   and is silently ignored, and the marks then never come back at all. That is
+   how it was found: `data-chrome` said "up" and the opacity stayed 0.
+*/
+.workspace-layout[data-artifact-layout="focus"][data-chrome="up"]:not(.workspace-settings) .workspace-artifact-header .doc-marks {
+  opacity:1; transform:none; pointer-events:auto;
+}
+/* The corner that wakes them. Transparent, and the only piece of our own
+   document lying over the file, which is the whole reason it exists: see
+   full-screen-chrome.ts. */
+/* THE REACH SITS UNDER THE MARKS, AND `z-index:1` IS THE WHOLE OF WHY. It was
+   7, which looks higher than the marks' 8 and is not: `.topbar` is
+   `position:relative; z-index:1`, so it opens a stacking context and the marks'
+   8 is spent INSIDE it. Against this element, in the root context, the whole
+   bar is worth 1, so a reach at 7 lay over all three marks and ate every click
+   on them. Measured 2026-09-22 with elementFromPoint at the centre of each
+   mark: `div.chrome-reach` all three times, and a real press on the close mark
+   left the document open.At 1 it ties with `.topbar` and loses the tie on
+   document order, which is what puts it under the marks, and it still beats
+   `.body` (positioned, z-index auto) so it stays over the document it has to
+   lie over.
+*/
+.chrome-reach { position:fixed; top:0; right:0; z-index:1; -webkit-app-region:no-drag; }
+/* AND THE DRAG STRIP STOPS SHORT OF THAT CORNER TOO. The marks are clear of it
+   now, so this is not what makes them work; it is here so that nothing in this
+   corner is a drag region at all, and the reach underneath them cannot be
+   swallowed either. The window is still dragged by the thousand-odd points to
+   the left of it. */
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings)::after { right: 260px; }
+/* AND THE WINDOW DRAG STRIP STOPS SHORT OF THAT CORNER, which is what was
+   really killing the three marks (w-a5dae7e990, 2026-09-22). The marks are at
+   top:11 and 34 tall, so they sit almost entirely inside it. They did not
+   before: they used to ride in a 64 point bar that put them BELOW 40, and they
+   stopped working in the same change that took that bar to nothing. A `no-drag`
+   on the marks themselves is not enough and that is the trap. `::after` is
+   generated as the LAST child of `.workspace-layout`, so its drag rectangle is
+   collected after their no-drag one and wins. The only reliable answer is to
+   not put a drag region there at all. HEADLESS CHROME CANNOT SEE THIS.
+   `-webkit-app-region` exists only in Electron, so a mark buried under a drag
+   strip hit-tests perfectly in the Chrome harness and is stone dead in the
+   real app. That is why the first fix measured clean and changed nothing.
+   240 is the marks plus the reach plus air. The window is still dragged by
+   the thousand-odd points to the left of it.
+*/
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings)::after { right: 240px; }
+/* The card under a full screen document loses its own top margin, because the
+   air it was paying for was under a bar that is not there any more. */
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body { padding-top:0; }
+.workspace-layout[data-reading-width="wide"] .focus { max-width:1200px; }
+.workspace-layout[data-reading-width="wide"] .focus-dock-inner { max-width:1136px; }
+.workspace-layout[data-reading-width="edge"] .focus { max-width:none; padding-left:20px; padding-right:20px; }
+.workspace-layout[data-reading-width="edge"] .focus-dock-inner { max-width:none; margin-left:20px; margin-right:20px; }
+.artifact-tweaks { max-width:calc(100vw - 48px); flex-wrap:wrap; }
+
+/* The preview supplies its own entrance and return, without a layout picker. */
+.artifact-expand, .artifact-return {
+ display:inline-flex; align-items:center; justify-content:center; gap:6px;
+ flex:none; height:28px; padding:0 8px; border:1px solid transparent;
+ border-radius:var(--radius); background:transparent; color:var(--text-dim);
+ font-family:inherit; font-size:12px; line-height:1; cursor:pointer;
+}
+.artifact-expand { border-color:var(--line); }
+.artifact-expand:hover, .artifact-return:hover { background:var(--line); color:var(--text); }
+.artifact-expand:focus-visible, .artifact-return:focus-visible { outline:2px solid var(--text-dim); outline-offset:2px; }
+.workspace-artifact-header .artifact-return { margin-left:-8px; margin-right:12px; }
+.workspace-artifact-header .doc-crumb { flex:1; }
+@media (max-width:700px) {
+ .workspace-artifact-header .artifact-return { margin-right:0; }
+ .workspace-artifact-header .doc-crumb { font-size:12px; }
+}
+
+/* HTML previews float on the conversation; code and notes keep their toolbar. */
+.workspace-layout .inline-artifact .doc-html .doc-card { background:transparent; border:0; box-shadow:none; }
+.workspace-layout .inline-artifact .doc-html .doc-head { background:transparent; padding:0 0 10px; }
+.workspace-layout .inline-artifact .doc-html .doc-view { border:1px solid var(--line); border-radius:var(--radius); }
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .topbar > .topbar-right { display:none; }
+
+.artifact-entry-card { margin:24px 0; padding:20px; border:1px solid var(--line); border-radius:var(--radius); background:color-mix(in srgb, var(--text) 3%, transparent); }
+.artifact-entry-summary { display:flex; align-items:center; gap:12px; }
+.artifact-entry-summary > svg { width:25px; height:25px; color:var(--text-faint); flex:none; }
+.artifact-entry-summary strong { display:block; font-size:14px; font-weight:500; overflow-wrap:anywhere; }
+.artifact-entry-summary small { display:block; margin-top:4px; font-size:12px; color:var(--text-faint); }
+.artifact-entry-actions { display:flex; gap:8px; margin-top:18px; flex-wrap:wrap; }
+.artifact-entry-actions button { display:inline-flex; align-items:center; gap:7px; padding:7px 12px; font:inherit; font-size:12px; color:var(--text-dim); background:transparent; border:1px solid var(--line); border-radius:var(--radius); cursor:pointer; }
+.artifact-entry-actions svg { width:15px; height:15px; }
+.artifact-entry-actions button:hover { background:var(--line); color:var(--text); }
+.artifact-entry-actions button:focus-visible { outline:2px solid var(--text-dim); outline-offset:2px; }
+
+.artifact-entry-card:has(.artifact-thumbnail) { padding:0; overflow:hidden; }
+.artifact-thumbnail { position:relative; width:100%; height:auto; aspect-ratio: 2 / 1; max-height:360px; overflow:hidden; background:var(--surface); border-bottom:1px solid var(--line); }
+.artifact-thumbnail iframe { display:block; width:1200px; height:800px; border:0; transform-origin:top left; pointer-events:none; }
+.artifact-thumbnail > span { position:absolute; inset:0; display:grid; place-items:center; color:var(--text-faint); font-size:12px; }
+.artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary { margin:16px 20px 0; }
+.artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions { margin:14px 20px 18px; }
+
+/* Compact attachments sit between messages without becoming a second page. */
+.artifact-entry-card:has(.artifact-thumbnail) {
+  display:grid; grid-template-columns: 180px minmax(0, 1fr);
+  grid-template-rows:auto auto; gap:0 18px;
+  max-width:620px; padding:12px;
+}
+.artifact-entry-card .artifact-thumbnail {
+  grid-row:1 / 3; width:180px; height:110px; aspect-ratio:auto;
+  border:1px solid var(--line); border-radius:3px;
+}
+.artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary {margin:10px 0 0; min-width:0;}
+.artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary > svg {display:none;}
+.artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary strong {font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block;}
+.artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary > div {min-width:0;}
+.artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions {margin:12px 0 6px; gap:14px;}
+.artifact-entry-card .artifact-entry-actions button {font-size:12px; padding:3px 0; border:0; background:none; box-shadow:none;}
+.artifact-thumbnail pre {margin:0; padding:10px; font:9px/1.8 ui-monospace,monospace; color:var(--text); white-space:pre; overflow:hidden;}
+.artifact-thumbnail[data-kind="markdown"] pre {font-family:inherit; font-size:10px; white-space:pre-wrap;}
+@media (max-width:600px) {
+ .artifact-entry-card:has(.artifact-thumbnail) {grid-template-columns:110px minmax(0,1fr); gap:0 12px;}
+ .artifact-entry-card .artifact-thumbnail {width:110px; height:100px;}
+ .artifact-entry-card .artifact-entry-actions {flex-wrap:wrap;}
+}
+
+/* The approved reading width stays balanced; artifacts never split the chat. */
+.workspace-layout[data-artifact-layout="inline"] > .body > .list-pane {flex:1; width:100%;}
+.inline-artifact:empty {display:none;}
+.inline-artifact:has(.artifact-host:empty) {display:none;}
+.workspace-layout .inline-artifact .doc-pane {flex:1 !important; min-width:0;}
+
+/* Excerpt: a readable content strip, with quiet actions in a single footer. */
+[data-preview-treatment="excerpt"] .artifact-entry-card:has(.artifact-thumbnail) {
+ grid-template-columns:minmax(0,1fr) auto; grid-template-rows:105px auto;
+ max-width:620px; padding:0; gap:0;
+}
+[data-preview-treatment="excerpt"] .artifact-entry-card .artifact-thumbnail {
+ grid-column:1 / 3; grid-row:1; width:100%; height:105px; border:0;
+ border-bottom:1px solid var(--line); border-radius:0;
+}
+[data-preview-treatment="excerpt"] .artifact-thumbnail pre {font-size:11px; line-height:1.6; padding:12px 16px;}
+[data-preview-treatment="excerpt"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary {margin:12px 16px;}
+[data-preview-treatment="excerpt"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions {margin:12px 16px; align-self:center;}
+[data-preview-treatment="excerpt"] .artifact-entry-summary small {display:none;}
+
+/* Cover: a small visual tile, with the document name and actions underneath. */
+[data-preview-treatment="cover"] .artifact-entry-card:has(.artifact-thumbnail) {
+ display:flex; flex-direction:column; max-width:340px; padding:0; gap:0;
+}
+[data-preview-treatment="cover"] .artifact-entry-card .artifact-thumbnail {
+ width:100%; height:150px; border:0; border-bottom:1px solid var(--line); border-radius:0;
+}
+[data-preview-treatment="cover"] .artifact-thumbnail pre {font-size:11px; padding:16px; line-height:1.8;}
+[data-preview-treatment="cover"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary {margin:14px 16px 0;}
+[data-preview-treatment="cover"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions {margin:12px 16px 14px;}
+
+/* Margin: the attachment reads as a quiet text link with a glimpse on the right. */
+[data-preview-treatment="margin"] .artifact-entry-card:has(.artifact-thumbnail) {
+ grid-template-columns:minmax(0,1fr) 140px; max-width:540px;
+ padding:14px 0; gap:0 24px; border:0; border-top:1px solid var(--line);
+ border-bottom:1px solid var(--line); background:transparent; box-shadow:none;
+}
+[data-preview-treatment="margin"] .artifact-entry-card .artifact-thumbnail {
+ grid-column:2; grid-row:1 / 3; width:140px; height:88px;
+}
+[data-preview-treatment="margin"] .artifact-entry-card .artifact-entry-summary {grid-column:1; grid-row:1;}
+[data-preview-treatment="margin"] .artifact-entry-card .artifact-entry-actions {grid-column:1; grid-row:2;}
+
+/* Document: a content excerpt with a title above, lightly marked in the margin. */
+[data-preview-treatment="document"] .artifact-entry-card:has(.artifact-thumbnail) {
+ display:flex; flex-direction:column; max-width:540px;
+ padding:0 0 0 18px; gap:0; border:0; border-left:2px solid var(--line);
+ border-radius:0; background:transparent; box-shadow:none;
+}
+[data-preview-treatment="document"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary {order:0; margin:0 0 12px;}
+[data-preview-treatment="document"] .artifact-entry-summary small {display:none;}
+[data-preview-treatment="document"] .artifact-entry-card .artifact-thumbnail {
+ order:1; width:100%; height:135px; border:0; border-radius:2px;
+}
+[data-preview-treatment="document"] .artifact-thumbnail:not([data-kind="html"]) {background:transparent;}
+[data-preview-treatment="document"] .artifact-thumbnail pre {padding:0; font-size:12px; line-height:1.8;}
+[data-preview-treatment="document"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions {order:2; margin:12px 0 0;}
+
+/* Filmstrip: a wide visual slice with a single compact caption and actions. */
+[data-preview-treatment="filmstrip"] .artifact-entry-card:has(.artifact-thumbnail) {
+ grid-template-columns:minmax(0,1fr) auto; grid-template-rows:76px auto;
+ max-width:740px; padding:0; gap:0; border-radius:5px;
+}
+[data-preview-treatment="filmstrip"] .artifact-entry-card .artifact-thumbnail {
+ grid-row:1; grid-column:1 / 3; width:100%; height:76px; border:0; border-bottom:1px solid var(--line); border-radius:0;
+}
+[data-preview-treatment="filmstrip"] .artifact-thumbnail iframe {margin-top:-22px;}
+[data-preview-treatment="filmstrip"] .artifact-thumbnail pre {font-size:11px; padding:10px 16px; line-height:1.7;}
+[data-preview-treatment="filmstrip"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary {margin:14px 16px;}
+[data-preview-treatment="filmstrip"] .artifact-entry-summary small {display:none;}
+[data-preview-treatment="filmstrip"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions {margin:14px 16px; align-self:center;}
+@media(max-width:700px) {
+ [data-preview-treatment="excerpt"] .artifact-entry-card:has(.artifact-thumbnail),
+ [data-preview-treatment="filmstrip"] .artifact-entry-card:has(.artifact-thumbnail) {grid-template-columns:minmax(0,1fr);}
+ [data-preview-treatment="excerpt"] .artifact-entry-card .artifact-thumbnail,
+ [data-preview-treatment="filmstrip"] .artifact-entry-card .artifact-thumbnail {grid-column:1;}
+ [data-preview-treatment="excerpt"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions,
+ [data-preview-treatment="filmstrip"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions {margin-top:0;}
+}
+
+/* Excerpt refinements: quieter framing and controls revealed on demand. */
+:is([data-preview-treatment="caption"], [data-preview-treatment="overlay"], [data-preview-treatment="preview-only"]) .artifact-entry-card:has(.artifact-thumbnail) {
+ position:relative; display:block; max-width:620px; padding:0; overflow:hidden;
+}
+:is([data-preview-treatment="caption"], [data-preview-treatment="overlay"], [data-preview-treatment="preview-only"]) .artifact-entry-card .artifact-thumbnail {
+ width:100%; height:150px; border:0; border-radius:0;
+}
+:is([data-preview-treatment="caption"], [data-preview-treatment="overlay"], [data-preview-treatment="preview-only"]) .artifact-thumbnail pre {
+ font-size:12px; line-height:1.8; padding:14px 18px;
+}
+:is([data-preview-treatment="caption"], [data-preview-treatment="overlay"], [data-preview-treatment="preview-only"]) .artifact-entry-summary small {display:none;}
+
+[data-preview-treatment="caption"] .artifact-entry-card:has(.artifact-thumbnail) {
+ border:0; background:transparent; box-shadow:none; overflow:visible;
+}
+[data-preview-treatment="caption"] .artifact-entry-card .artifact-thumbnail {border:1px solid var(--line); border-radius:4px; height:110px;}
+[data-preview-treatment="caption"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary {margin:12px 0; padding-right:200px;}
+[data-preview-treatment="caption"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions {position:absolute; right:0; bottom:0; margin:9px 0;}
+[data-preview-treatment="caption"] .artifact-entry-summary strong {font-weight:400; color:var(--text-muted);}
+
+[data-preview-treatment="overlay"] .artifact-entry-card .artifact-thumbnail {height:175px;}
+[data-preview-treatment="overlay"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary {
+ position:absolute; bottom:0; left:0; right:0; margin:0; padding:12px 16px;
+ background:var(--surface); border-top:1px solid var(--line); min-height:42px;
+}
+[data-preview-treatment="overlay"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions {
+ position:absolute; bottom:7px; right:10px; margin:0; padding:3px 6px;
+ background:var(--surface); opacity:0; pointer-events:none; transition:opacity 140ms ease;
+}
+[data-preview-treatment="preview-only"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary {
+ position:absolute; bottom:0; left:0; right:0; margin:0; padding:10px 14px;
+ background:var(--surface); border-top:1px solid var(--line);
+ opacity:0; pointer-events:none; transition:opacity 140ms ease;
+}
+[data-preview-treatment="preview-only"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions {
+ position:absolute; top:10px; right:10px; margin:0; padding:6px 10px; gap:14px;
+ background:var(--surface); border:1px solid var(--line); border-radius:4px;
+ box-shadow:0 2px 8px #0002; opacity:0; pointer-events:none; transition:opacity 140ms ease;
+}
+:is([data-preview-treatment="overlay"], [data-preview-treatment="preview-only"]) .artifact-entry-card:hover .artifact-entry-actions,
+:is([data-preview-treatment="overlay"], [data-preview-treatment="preview-only"]) .artifact-entry-card:focus-within .artifact-entry-actions,
+[data-preview-treatment="preview-only"] .artifact-entry-card:hover .artifact-entry-summary,
+[data-preview-treatment="preview-only"] .artifact-entry-card:focus-within .artifact-entry-summary {opacity:1; pointer-events:auto;}
+@media (hover:none) {
+ :is([data-preview-treatment="overlay"], [data-preview-treatment="preview-only"]) .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions,
+ [data-preview-treatment="preview-only"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary {opacity:1; pointer-events:auto;}
+}
+@media (prefers-reduced-motion:reduce) {
+ .artifact-entry-card .artifact-entry-actions, .artifact-entry-card .artifact-entry-summary {transition:none !important;}
+}
+[data-preview-treatment="caption"] .artifact-entry-card:has(.artifact-thumbnail) {display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:110px auto; gap:0 16px;}
+[data-preview-treatment="caption"] .artifact-entry-card .artifact-thumbnail {grid-column:1 / 3; grid-row:1;}
+[data-preview-treatment="caption"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary {padding:0; margin:12px 0; align-self:center;}
+[data-preview-treatment="caption"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions {position:static; margin:12px 0; align-self:center;}
+
+/* Margin finalists: no horizontal rules, with three different arrangements. */
+:is([data-preview-treatment="margin-clean"], [data-preview-treatment="margin-left"], [data-preview-treatment="margin-row"]) .artifact-entry-card:has(.artifact-thumbnail) {
+ border:0; background:transparent; box-shadow:none; padding:0;
+ max-width:540px; gap:0 22px;
+}
+[data-preview-treatment="margin-clean"] .artifact-entry-card:has(.artifact-thumbnail) {grid-template-columns:minmax(0,1fr) 140px;}
+[data-preview-treatment="margin-clean"] .artifact-entry-card .artifact-thumbnail {grid-column:2; grid-row:1 / 3; width:140px; height:88px;}
+[data-preview-treatment="margin-clean"] .artifact-entry-card .artifact-entry-summary {grid-column:1; grid-row:1;}
+[data-preview-treatment="margin-clean"] .artifact-entry-card .artifact-entry-actions {grid-column:1; grid-row:2;}
+[data-preview-treatment="margin-left"] .artifact-entry-card:has(.artifact-thumbnail) {grid-template-columns:140px minmax(0,1fr);}
+[data-preview-treatment="margin-left"] .artifact-entry-card .artifact-thumbnail {width:140px; height:88px;}
+[data-preview-treatment="margin-row"] .artifact-entry-card:has(.artifact-thumbnail) {grid-template-columns:96px minmax(0,1fr) auto; grid-template-rows:auto; max-width:680px; gap:16px; align-items:center;}
+[data-preview-treatment="margin-row"] .artifact-entry-card .artifact-thumbnail {grid-row:1; width:96px; height:64px;}
+[data-preview-treatment="margin-row"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary,
+[data-preview-treatment="margin-row"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions {margin:0;}
+@media(max-width:700px) {
+ [data-preview-treatment="margin-row"] .artifact-entry-card:has(.artifact-thumbnail) {grid-template-columns:96px minmax(0,1fr); gap:8px 16px;}
+ [data-preview-treatment="margin-row"] .artifact-entry-card .artifact-thumbnail {grid-row:1 / 3;}
+ [data-preview-treatment="margin-row"] .artifact-entry-card .artifact-entry-actions {grid-column:2;}
+}
+
+/* A quiet attachment stack: each thumbnail, label and actions form one row. */
+.workspace-layout.workspace-task > .topbar {padding-left:20px;}
+[data-preview-treatment="margin-left"] .artifact-entry-list {
+ display:flex; flex-direction:column; gap:8px; max-width:560px; margin:24px 0;
+}
+[data-preview-treatment="margin-left"] .artifact-entry-list:empty {display:none;}
+[data-preview-treatment="margin-left"] .artifact-entry-list .artifact-entry-card:has(.artifact-thumbnail) {
+ grid-template-columns:128px minmax(0,1fr); grid-template-rows:auto auto;
+ align-content:center; gap:6px 18px; width:100%; max-width:none;
+ padding:10px; margin:0; border-radius:5px;
+ background:color-mix(in srgb, var(--text) 2%, transparent);
+}
+[data-preview-treatment="margin-left"] .artifact-entry-list .artifact-entry-card:hover {
+ background:color-mix(in srgb, var(--text) 4%, transparent);
+}
+[data-preview-treatment="margin-left"] .artifact-entry-list .artifact-thumbnail {width:128px; height:80px;}
+[data-preview-treatment="margin-left"] .artifact-entry-list .artifact-entry-summary {margin:0 !important; align-self:end;}
+[data-preview-treatment="margin-left"] .artifact-entry-list .artifact-entry-actions {margin:0 !important; gap:6px; align-self:start; align-items:center; justify-content:flex-start;}
+[data-preview-treatment="margin-left"] .artifact-entry-list .artifact-entry-actions button {
+ height:28px; flex:0 0 auto; width:max-content; padding:0 7px;
+ gap:5px; line-height:1; border-radius:4px;
+ background:color-mix(in srgb, var(--text) 4%, transparent);
+}
+[data-preview-treatment="margin-left"] .artifact-entry-list .artifact-entry-actions button:hover {background:var(--line);}
+[data-preview-treatment="margin-left"] .artifact-entry-list .artifact-entry-actions svg {width:13px; height:13px; flex:none;}
+@media(max-width:600px) {
+ [data-preview-treatment="margin-left"] .artifact-entry-list .artifact-entry-card:has(.artifact-thumbnail) {grid-template-columns:96px minmax(0,1fr); gap:6px 12px;}
+ [data-preview-treatment="margin-left"] .artifact-entry-list .artifact-thumbnail {width:96px; height:80px;}
+}
+
+/* The beside design viewer uses the same quiet chrome as the approved inline
+   preview. The page has its own frame; its controls belong to the app glass. */
+.workspace-layout[data-artifact-layout="beside"] .doc-html .doc-card { background:transparent; border:0; box-shadow:none; }
+.workspace-layout[data-artifact-layout="beside"] .doc-html .doc-head { background:transparent; padding:0 0 10px; min-height:38px; }
+.workspace-layout[data-artifact-layout="beside"] .doc-html .doc-view { border:1px solid var(--line); border-radius:var(--radius); }
+.workspace-layout[data-artifact-layout="beside"] .doc-html .artifact-expand { background:transparent; border-color:transparent; }
+.workspace-layout[data-artifact-layout="beside"] .doc-html .artifact-expand:hover { background:var(--wash); }
+/* Both panes already include their own insets; a legacy gutter would overflow
+   the split when the conversation reaches its 400px minimum. */
+.workspace-layout[data-artifact-layout="beside"] > .body { gap:0; }
+
+/* design-hover-toolbar: exploratory HTML chrome. The iframe always owns the
+   full card; revealing controls never shifts its content or scroll position. */
+.workspace-layout:is([data-design-toolbar="floating"],[data-design-toolbar="corner"],[data-design-toolbar="edge"])[data-artifact-layout="beside"] .doc-html .doc-head {
+ position:absolute; z-index:5; opacity:0; pointer-events:none;
+ background:var(--skin-solid,var(--surface)); border:1px solid var(--line);
+ box-shadow:0 3px 14px #0002; min-height:38px; padding:6px 10px;
+ transition:opacity 140ms ease,transform 140ms ease;
+}
+.workspace-layout[data-design-toolbar="floating"][data-artifact-layout="beside"] .doc-html .doc-head {
+ top:10px; left:10px; right:10px; border-radius:6px; transform:translateY(-4px);
+}
+.workspace-layout[data-design-toolbar="corner"][data-artifact-layout="beside"] .doc-html .doc-head {
+ top:10px; right:10px; border-radius:6px; transform:translateY(-4px);
+}
+.workspace-layout[data-design-toolbar="corner"][data-artifact-layout="beside"] .doc-html .doc-crumb { display:none; }
+.workspace-layout[data-design-toolbar="edge"][data-artifact-layout="beside"] .doc-html .doc-head {
+ top:0; left:0; right:0; border-radius:0; border-width:0 0 1px; transform:translateY(-100%); padding:9px 12px;
+}
+.workspace-layout:is([data-design-toolbar="floating"],[data-design-toolbar="corner"],[data-design-toolbar="edge"])[data-artifact-layout="beside"] .doc-html .doc-card:is(:hover,:focus-within) > .doc-head,
+.workspace-layout:is([data-design-toolbar="floating"],[data-design-toolbar="corner"],[data-design-toolbar="edge"])[data-artifact-layout="beside"] .doc-html .doc-card:focus-within > .doc-head {
+ opacity:1; pointer-events:auto; transform:translateY(0);
+}
+@media (hover:none) {
+ .workspace-layout[data-design-toolbar][data-artifact-layout="beside"] .doc-html .doc-head { opacity:1; pointer-events:auto; transform:none; }
+}
+@media (prefers-reduced-motion:reduce) {
+ .workspace-layout[data-design-toolbar] .doc-html .doc-head { transition:none; }
+}
+
+/* The attachment stays in the conversation; selection identifies its viewer. */
+[data-preview-treatment="margin-left"] .artifact-entry-actions button[aria-pressed="true"] {
+ color:var(--text); background:color-mix(in srgb,var(--text) 9%,transparent);
+ border-color:var(--line-strong); box-shadow:inset 0 1px 2px #00000008;
+}
+
+/* Keep the app's material visible until the document has actually loaded. */
+.preview-frame {position:relative; flex:1; min-height:0; overflow:hidden; background:var(--skin-solid,var(--surface));}
+.preview-frame > .doc-view {position:absolute; inset:0; width:100%; height:100%; box-sizing:border-box;}
+ .preview-loading {display:flex; flex:1; min-height:0; overflow:hidden; background:var(--skin-solid,var(--surface));}
+.preview-frame > .preview-loading, .artifact-thumbnail > .preview-loading {position:absolute; inset:0;}
+.preview-skeleton {width:100%; padding:clamp(24px,5%,56px); box-sizing:border-box; animation:preview-skeleton-breathe 2.4s ease-in-out infinite;}
+.preview-skeleton-title, .preview-skeleton-line, .preview-skeleton-block {background:color-mix(in srgb,var(--text) 7%,transparent); border-radius:3px;}
+.preview-skeleton-title {width:48%; height:20px; margin-bottom:24px;}
+.preview-skeleton-line {width:90%; height:9px; margin-bottom:12px;}
+.preview-skeleton-short {width:64%;}
+.preview-skeleton-block {width:100%; height:clamp(80px,20vh,180px); margin:28px 0; opacity:.55;}
+.artifact-thumbnail .preview-skeleton {padding:12px;}
+.artifact-thumbnail .preview-skeleton-title {height:6px; margin-bottom:9px;}
+.artifact-thumbnail .preview-skeleton-line {height:3px; margin-bottom:5px;}
+.artifact-thumbnail .preview-skeleton-block {height:22px; margin:8px 0;}
+@keyframes preview-skeleton-breathe {0%,100% {opacity:.65;} 50% {opacity:1;}}
+@media (prefers-reduced-motion:reduce) {.preview-skeleton {animation:none;}}
+
+/* Paint under the skeleton, then reveal without a dark intermediate frame. */
+.preview-frame > .doc-view, .artifact-thumbnail iframe {transition:opacity 220ms ease;}
+.preview-frame > .preview-loading, .artifact-thumbnail > .preview-loading {z-index:1; pointer-events:none; transition:opacity 220ms ease;}
+.preview-loading[data-ready="true"] {opacity:0;}
+@media (prefers-reduced-motion:reduce) {
+ .preview-frame > .doc-view, .artifact-thumbnail iframe,
+ .preview-frame > .preview-loading, .artifact-thumbnail > .preview-loading {transition:none;}
+}
+
+/* Chat attachments stay quiet; only the expanded viewer uses a crossfade. */
+.retained-preview {display:contents;}
+.artifact-thumbnail iframe {transition:none; filter:saturate(.4);}
+.artifact-thumbnail pre {opacity:.65;}
+.artifact-thumbnail .preview-skeleton {animation:none;}
+.artifact-thumbnail > .preview-loading {transition:none;}
+.preview-loading[data-delayed="true"] .preview-skeleton {visibility:hidden;}
+
+/* Muted warm-gray navigation over Peach Haze's dimmed photograph.
+
+   The reported fault was eye strain reading this sidebar over Peach Haze, and
+   narrowed down it was the top-left corner specifically: Search and Inbox were
+   very hard to read where the rest of the column was fine.
+
+   THE FIX IS IN `assets/peach-haze-2.webp`, NOT IN THIS FILE, AND NOTHING MAY
+   BE DRAWN OVER THIS COLUMN. Three ways of drawing over it were built,
+   measured clear of AA on all ten labels and photographed whole-window on
+   2026-09-22: a blurred scrim (worst label 4.60), a dark frosted panel (4.99),
+   a pale panel in the theme's dark ink (5.82). All three were rejected on
+   sight as unnatural, too dark or too light. The numbers were never the
+   problem. Do not rebuild one of them.
+
+   What was actually wrong was the picture. Its left edge is a steady grey
+   around 135 of 255 all the way down, EXCEPT its top fifth, which climbs to
+   192, and Search and Inbox sit in exactly that band while the rest of the
+   column never did. So the picture now carries its own grey up over that band:
+   content from further down the same column, mirrored about y=25% and
+   feathered out by y=32% and x=36%. It is a haze with no features up there, so
+   the join cannot be seen; the left column measures a flat 130 to 146 from the
+   top corner to the foot, biggest step between neighbouring bands 3.
+
+   THE TEXT COLOURS BELOW ARE CHOSEN AND ARE NOT A LEVER. Against the rgb(141,143,142)
+   the corner used to show, pure white measures 3.31, so no text colour ever
+   passed there. The labels still sit between 2.2 and 2.9, under AA, which was
+   accepted on the grounds that the theme looking right matters more
+   here than clearing the measure. The
+   corner went 1.40 to 2.33 and now matches the rest of the column instead of
+   being the worst of it, and evenness top to bottom went 1.43 to 0.67. */
+:root[data-skin="peach-haze-2"] .workspace-navigation {
+  --text: #c6bfbc;
+  --text-dim: #b7b0ad;
+  --text-faint: #afa9a6;
+  --line: rgba(225, 217, 212, .15);
+  --wash: rgba(225, 217, 212, .07);
+  --underline: #c6bfbc;
+  color: var(--text);
+}
+
+/* AND THE CORNER HAS TO STAY THE CORNER AT EVERY WINDOW SHAPE. The edit above
+   was approved on condition that it works at every screen size.
+
+   The backdrop is `cover` and centred, so the window never shows the whole
+   picture, and WHICH part it drops depends on the window's shape. Wider than
+   3:2 it scales to the width and crops top and bottom, so the window's left
+   edge is the picture's left edge and the corrected corner is where it is
+   wanted. TALLER than 3:2 it scales to the height and crops the SIDES, so the
+   window's left edge lands somewhere in the middle of the picture, which is
+   bright, and the whole bright top band is in view. The edit is then off
+   screen and the corner is back to exactly how it was before.
+
+   Measured on the built app before this rule, contrast of Search:
+
+     1440x944  2.33     1152x900  2.23     980x900   1.84
+     980x600   2.20     980x1200  1.49     980x1400  1.43
+
+   1.43 is the unfixed number; it started at 1.40. The app's minimum is 980x600
+   (main/main.mjs), so 980 wide on a tall display is reachable, and anyone
+   running the window down one side of a portrait monitor would have seen no
+   fix at all.
+
+   So whenever that side crop happens, the picture's left edge is pinned to the
+   window's left edge. At exactly 3:2 there is no side crop, so `left` and
+   `center` are the same pixel and the switch is continuous; nothing moves at
+   3:2 or at any shape wider than it. Only the THIRD layer is the
+   photograph. The first is the veil and the second the tint, both flat, so
+   they keep centre and have to be restated or the shorthand resets them. */
+@media (max-aspect-ratio: 3/2) {
+  :root[data-skin="peach-haze-2"] body::before,
+  :root[data-skin="peach-haze-2"] .settings-screen::before {
+    background-position: center, center, left center;
+  }
+}
+
+:root[data-skin="orbital-glass"] .workspace-layout::before {
+  box-shadow:inset 0 1px 0 rgba(230,242,255,.18),inset 1px 0 0 rgba(200,218,240,.08),0 8px 24px rgba(7,16,28,.04);
+}
+:root[data-skin="orbital-glass"] .workspace-navigation {
+  --text:#c6bfbc;--text-dim:#b7b0ad;--text-faint:#afa9a6;
+}
+
+/* Keep the planet at the far right of the composition, outside the reading
+   focus. Extend the backdrop canvas rather than exposing an empty image edge. */
+:root[data-skin="orbital-glass"] body::before,
+:root[data-skin="orbital-glass"] .settings-screen::before {
+  right: calc(-28vw - 2 * var(--skin-background-blur, 0px));
+}
+
+/* ═══ THE REPLY LINE ALONG THE FOOT ═══, option A, chosen 2026-09-21. In full screen the pane is already mounted with
+   the real thread, the real options strip and the real composer in it, and it
+   used to be hidden outright. This shows only its dock, under the page, so the
+   composer here is the composer used everywhere else. That is the
+   whole of it. WHAT IT COSTS THE PAGE, measured in a 1440 by 944 window where
+   the page is otherwise 882 tall: 56 points on a row with nothing to pick, 97
+   with the options folded, 204 with three of them open. The strip starts FOLDED
+   here and nowhere else, which is in Focus.tsx beside `optsOpen`. THREE OTHER
+   PATHS WERE BUILT AND PHOTOGRAPHED BESIDE THIS ONE and are now deleted with
+   `chat-path.ts` and the `data-chat-path` switch: a drawer over the right edge,
+   a card in the bottom corner, and a permanent left column. Their drawings and
+   their numbers are in decisions.md, 2026-09-21. Do not rebuild one as an
+   option; this is decided.
+*/
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body { flex-direction:column; gap:0; }
+/* `order` IS LOAD-BEARING. The conversation is FIRST in the document, because
+   in every other layout it is the left or the only pane; turned into a column
+   without this the reply line lands above the page instead of under it. */
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body > .doc-pane { order:1; flex:1 1 auto !important; width:100%; min-height:0; }
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body > .list-pane {
+  order:2; display:flex; flex-direction:column; flex:0 0 auto; min-width:0;
+  background:transparent; border-radius:0; overflow:visible;
+}
+/* Everything above the dock is the conversation, and the conversation is what
+   she left to read the page. */
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body > .list-pane .focus-scroll { display:none; }
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body > .list-pane .focus-pane { height:auto; }
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .focus-dock { padding:0 12px 12px; }
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .focus-dock-inner { max-width:none; }
+
+/* ═══ EMBER GRID, the launch film's look (w-b3e123a0af) ═══. The colours are in
+   the theme's token block in styles.css; these are the film's shapes, each
+   scoped to the theme so nothing already approved moves. The card is
+   edged with one hairline and the film's four corner marks instead of the
+   white top light the glass themes wear. The chrome (search, section label,
+   times) is Geist Mono in capitals, the count is the one orange, and titles are
+   the film's 400 weight rather than the app's 500. The floating cards (new
+   task, ⌘K and every other modal) wear the same marks over their own fill and
+   a firmer edge, and page headings drop from 600 to the film's 400. */
+:root[data-skin="ember-grid"] .workspace-layout::before,
+:root[data-skin="ember-grid"] .modal {
+  --grid-ticks:
+    linear-gradient(var(--skin-tick), var(--skin-tick)) left 8px top 8px / 12px 1px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) left 8px top 8px / 1px 12px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) right 8px top 8px / 12px 1px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) right 8px top 8px / 1px 12px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) left 8px bottom 8px / 12px 1px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) left 8px bottom 8px / 1px 12px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) right 8px bottom 8px / 12px 1px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) right 8px bottom 8px / 1px 12px no-repeat;
+}
+:root[data-skin="ember-grid"] .workspace-layout::before {
+  box-shadow: inset 0 0 0 1px var(--skin-pane-line), var(--shadow-card);
+  background: var(--grid-ticks), var(--skin-pane);
+}
+:root[data-skin="ember-grid"] .modal { background: var(--grid-ticks), var(--bg-raised); border-color: var(--line-strong); }
+:root[data-skin="ember-grid"] .set-title { font-weight: 400; letter-spacing: -0.035em; }
+
+/* INBOX ZERO, the film's "0 terminals opened" card, made more visually
+   pleasing in round 3. The figure is the
+   film's 400 weight instead of the app's 200, the line under it is the film's
+   spaced mono capitals, and the brand's 24 rays sit behind the figure in the
+   one orange (--skin-rays). The four margins crop the box to the printed zero
+   and are READINGS for Geist 400 at 200px, not choices: ink ascent 145.2,
+   descent 3.2, side bearings 10 each, off canvas measureText in the built app.
+   The rays centre on the figure, which is the first 148.4px of the column. */
+:root[data-skin="ember-grid"] .idle-zero-col { position: relative; isolation: isolate; }
+:root[data-skin="ember-grid"] .idle-zero-col::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  /* SMALLER AND FAINTER (w-ec62ab6b38, 2026-09-28), because the rays were too
+     much for the inbox zero screen. 980px and full strength
+     reached the window's edges; 620px at 45% keeps the mark round the figure
+     and leaves the rest of the page quiet. */
+  left: 50%; top: 74.2px; width: 620px; height: 620px; transform: translate(-50%, -50%);
+  background: var(--skin-rays) center / contain no-repeat;
+  opacity: 0.45;
+}
+:root[data-skin="ember-grid"] .idle-zero { font-weight: 400; margin: -25.8px -10px -25.8px -10px; }
+:root[data-skin="ember-grid"] .idle-zero-say { color: var(--text-dim); }
+:root[data-skin="ember-grid"] .idle-zero-col .idle-field { margin-top: 36px; }
+:root[data-skin="ember-grid"] .workspace-navigation .workspace-search { background: transparent; }
+:root[data-skin="ember-grid"] .workspace-navigation .workspace-tab.active {
+  background: var(--bg-selected); box-shadow: inset 0 0 0 1px var(--line); font-weight: 400;
+}
+:root[data-skin="ember-grid"] .workspace-running { color: var(--accent); }
+
+/* EMBER'S ACCENTS, ON EVERY THEME (w-3fc39983be, approved on five themes
+   drawn this way). Ember's type goes on the small right-side details, such as
+   times, while the original font stays everywhere else and the main font
+   remains Avenir Next. So the chrome (search, section label, a row's project
+   and time, the running count, the keys, inbox zero's line) is Geist Mono in
+   spaced capitals on every theme, and the body face and weights stay each
+   theme's own. Ember keeps its colour, marks and Geist body above.
+   `:root:root` keeps the weight these rules had when they were Ember's
+   (:root[data-skin]), so nothing that used to lose to them now wins.
+   NOT RE-OFFERED: Geist as the body face on every theme with Ember's 400
+   weights (round two); its CSS is in decisions.md, 2026-09-28. */
+:root:root .workspace-search span,
+:root:root .workspace-section,
+:root:root .row-end .product,
+:root:root .row-end .time {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+}
+:root:root .workspace-running { font-family: var(--mono); }
+:root:root .idle-zero-say { font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+:root:root .idle-key { font-family: var(--mono); font-weight: 400; }
+:root[data-skin="ember-grid"] .workspace-title { font-weight: 400; letter-spacing: -.03em; }
+:root[data-skin="ember-grid"] .row .subject { font-weight: 400; letter-spacing: -.01em; }

@@ -1,0 +1,124 @@
+// THE PROJECTS GET A PAGE, AND THE NAV COLUMN GETS ONE ROW.
+//
+// MEASURED ON HER STORE THAT DAY: 36 projects. The column drew every one of
+// them as a nav row under a heading that had scrolled off the top, so what she
+// saw was five settings pages followed by thirty-six unexplained names.
+//
+// THIS IS NOT THE "ALL PROJECTS" TABLE SHE TURNED DOWN on. This is Settings,
+// where the question is which project's settings to open, and she asked for
+// this one in as many words.
+
+import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+const settings = read('renderer/src/components/Settings.tsx');
+
+describe('the column stops being a list of projects', () => {
+  // THE DEFECT, STATED AS THE THING IT DID. Every project was a row here.
+  it('draws one door and not one row per project', () => {
+    const nav = settings.slice(settings.indexOf('<div className="set-nav-scroll">'), settings.indexOf('<div className="set-pane">'));
+    expect(nav).not.toContain('projects.map(');
+    expect(nav).toContain('All projects');
+    expect(nav).toContain("setPane('projects')");
+  });
+
+  // THE COUNT IS ON THE ROW, because it is the fact that decides whether opening
+  // it is worth doing, and because a row reading "Projects" alone is the heading
+  // again.
+  it('says how many there are without opening anything', () => {
+    const nav = settings.slice(settings.indexOf('<div className="set-nav-scroll">'), settings.indexOf('<div className="set-pane">'));
+    expect(nav).toContain('{projects.length}');
+  });
+
+  // AND WHERE YOU ARE, when you are inside one. With the list gone the column
+  // would otherwise say nothing about which project's page is on screen, which
+  // is worse than the clutter was.
+  it('still shows the project whose page is open', () => {
+    const nav = settings.slice(settings.indexOf('<div className="set-nav-scroll">'), settings.indexOf('<div className="set-pane">'));
+    expect(nav).toContain('{current && (');
+    expect(nav).toContain('setPane({ project: current.slug })');
+  });
+
+  // DOOR C STAYS EXACTLY WHERE SHE PUT IT. a new-project ROW here was "visually
+  // unappealing", so the + lives on the heading.
+  it('keeps the plus on the Projects heading', () => {
+    expect(settings).toContain('className="set-nav-group np-head"');
+    expect(settings).toContain('aria-label="New project"');
+  });
+});
+
+describe('the page itself', () => {
+  it('exists, and is reachable from a link as well as a press', () => {
+    expect(settings).toContain('function ProjectsIndex(');
+    expect(settings).toContain("pane === 'projects'");
+    expect(settings).toContain("want === 'projects'");
+  });
+
+  // THIRTY-SIX IS PAST READING, so the page filters. It matches the name and the
+  // folder, which are the two things she would type.
+  it('can be filtered by name and by folder', () => {
+    const page = settings.slice(settings.indexOf('function ProjectsIndex('), settings.indexOf('export function Settings('));
+    expect(page).toContain('p.name.toLowerCase().includes(needle)');
+    expect(page).toContain('p.slug.toLowerCase().includes(needle)');
+    expect(page).toContain("(p.dir ?? '').toLowerCase().includes(needle)");
+  });
+
+  // THE FOLDER IS DRAWN, because it is the one thing that tells two projects of
+  // the same name apart, and her store has several such pairs.
+  it('shows each project’s folder under its name', () => {
+    const page = settings.slice(settings.indexOf('function ProjectsIndex('), settings.indexOf('export function Settings('));
+    expect(page).toContain('shortPath(p.dir)');
+  });
+
+  // AT MOST ONE STATE WORD PER ROW, and now there is one word it can be. This
+  // read paused, else personal, else autonomous; the first two are deleted
+  // (w-d19d6d387c, 2026-09-22). One question and a null after it, so a row
+  // still cannot end up carrying two words side by side.
+  it('says a project’s state in one word at most', () => {
+    const page = settings.slice(settings.indexOf('function ProjectsIndex('), settings.indexOf('export function Settings('));
+    const flag = page.slice(page.indexOf('const flag ='), page.indexOf('return ('));
+    expect(flag).toContain('on its own');
+    expect(flag.match(/\?/g)).toHaveLength(1);
+    expect(flag).toContain(": null)");
+  });
+
+  // A ROW NAVIGATES AND DOES NOTHING ELSE, which is the rule she set on: "the
+  // sidebar is illogical." Renaming and pictures stay on the page it opens.
+  it('opens the project and does nothing else', () => {
+    const page = settings.slice(settings.indexOf('function ProjectsIndex('), settings.indexOf('export function Settings('));
+    expect(page).toContain('onClick={() => onOpen(p.slug)}');
+    expect(page).not.toContain('onRename');
+    expect(page).not.toContain('ProjectIcon');
+  });
+});
+
+describe('the way back', () => {
+  // A page you can only leave by pressing Escape out of Settings altogether is
+  // the complaint she filed about Settings in the first place.
+  it('gets out of one project back to the list', () => {
+    expect(settings).toContain('className="set-crumb"');
+    const crumb = settings.slice(settings.indexOf('className="set-crumb"'));
+    expect(crumb.slice(0, 300)).toContain("setPane('projects')");
+    expect(crumb.slice(0, 300)).toContain('All projects');
+  });
+
+  // A project that disappears while its page is open lands on the list rather
+  // than on General, because the list is the nearest thing that still answers
+  // the question the page was asked.
+  it('lands on the list when a project goes away underneath it', () => {
+    expect(settings).toContain("if (typeof pane !== 'string' && model && !current) setPane('projects');");
+  });
+
+  // The stylesheet has to actually carry the page, or every class above is a
+  // name pointing at nothing.
+  it('is styled', () => {
+    const css = read('renderer/src/styles.css');
+    for (const name of ['.proj-index', '.proj-card', '.proj-card-where', '.proj-index-find', '.set-crumb']) {
+      expect(css).toContain(name);
+    }
+  });
+});

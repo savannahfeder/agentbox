@@ -1,0 +1,14 @@
+// Corrections must be acknowledged by their UUID, not merely written to stdin.
+// A stream error or exit cannot be presented as successful delivery. A long
+// wait is NOT a failure: Claude takes a queued message at its next break, which
+// can be minutes into one command, and calling that a failure made her re-send
+// a message the agent then received twice (w-d92559b84f).
+import {it,expect,vi} from 'vitest';import {EventEmitter} from 'node:events';
+import {attachClaudeInput,claudeStreamArgs} from '../main/claude-input.mjs';
+function fake(){const c=new EventEmitter();c.stdout=new EventEmitter();c.stdin={writable:true,write:()=>true,end:()=>{c.stdin.writable=false;},on:()=>{}};return c;}
+it('keeps grants and resumes while moving only the prompt to stdin',()=>{expect(claudeStreamArgs(['-p','hello','--resume','session','--permission-mode','default'])).toEqual(['-p','--resume','session','--permission-mode','default','--input-format','stream-json','--replay-user-messages']);});
+it('waits for the matching user acknowledgement',async()=>{const c=fake();let frame;c.stdin.write=s=>{frame=JSON.parse(s);};attachClaudeInput(c);const p=c.steer('correction');let done=false;p.then(()=>done=true);await Promise.resolve();expect(done).toBe(false);c.stdout.emit('data',JSON.stringify({type:'user',uuid:frame.uuid})+'\n');await p;expect(done).toBe(true);});
+it('keeps waiting past two minutes while the agent is inside one long command',async()=>{vi.useFakeTimers();try{const c=fake();let frame;c.stdin.write=s=>{frame=JSON.parse(s);};attachClaudeInput(c);let failed=false,done=false;const p=c.steer('late but real');p.then(()=>done=true,()=>failed=true);await vi.advanceTimersByTimeAsync(10*60*1000);expect(failed).toBe(false);expect(done).toBe(false);c.stdout.emit('data',JSON.stringify({type:'user',uuid:frame.uuid})+'\n');await p;expect(done).toBe(true);}finally{vi.useRealTimers();}});
+it('rejects pending delivery on exit and refuses subsequent sends',async()=>{const c=fake();attachClaudeInput(c);const p=c.steer('x');c.emit('exit',1);await expect(p).rejects.toThrow();await expect(c.steer('y')).rejects.toThrow();});
+it('closes stdin at the result and ignores tool-result user messages',async()=>{const c=fake();attachClaudeInput(c);c.stdout.emit('data',JSON.stringify({type:'result'})+'\n');expect(c.stdin.writable).toBe(false);await expect(c.steer('late')).rejects.toThrow();});
+it('does not close the stream at an earlier result while corrections are pending',async()=>{const c=fake();const frames=[];c.stdin.write=s=>frames.push(JSON.parse(s));attachClaudeInput(c);const a=c.steer('a'),b=c.steer('b');c.stdout.emit('data',JSON.stringify({type:'result'})+'\n');expect(c.stdin.writable).toBe(true);for(const frame of frames)c.stdout.emit('data',JSON.stringify({type:'user',uuid:frame.uuid})+'\n');await Promise.all([a,b]);c.stdout.emit('data',JSON.stringify({type:'result'})+'\n');expect(c.stdin.writable).toBe(false);});

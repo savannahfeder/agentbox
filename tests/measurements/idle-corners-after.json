@@ -1,0 +1,78 @@
+{
+  "pane": {
+    "left": 22,
+    "right": 1418,
+    "bottom": 878,
+    "w": 1396
+  },
+  "agents": {
+    "text": "2 agents are working",
+    "box": {
+      "top": 820,
+      "bottom": 837,
+      "left": 62,
+      "right": 181.35,
+      "h": 17
+    },
+    "fontSize": "12.5px",
+    "lineHeight": "normal",
+    "padBottom": "0px",
+    "borderBottom": "0px",
+    "baseline": 832.5,
+    "inkBottom": 835.5,
+    "inkTop": 823.05
+  },
+  "cap": {
+    "text": "Inbox zero",
+    "box": {
+      "top": 796.5,
+      "bottom": 811.5,
+      "left": 1281.17,
+      "right": 1378,
+      "h": 15
+    },
+    "fontSize": "11px",
+    "lineHeight": "normal",
+    "padBottom": "0px",
+    "borderBottom": "0px",
+    "baseline": 807.5,
+    "inkBottom": 807.63,
+    "inkTop": 799.18
+  },
+  "line": {
+    "text": "since 9:41 AM",
+    "box": {
+      "top": 817.5,
+      "bottom": 838,
+      "left": 1281.17,
+      "right": 1378,
+      "h": 20.5
+    },
+    "fontSize": "15px",
+    "lineHeight": "normal",
+    "padBottom": "0px",
+    "borderBottom": "0px",
+    "baseline": 832.5,
+    "inkBottom": 832.68,
+    "inkTop": 821.61
+  },
+  "plateBox": {
+    "top": 796.5,
+    "bottom": 838,
+    "left": 1281.17,
+    "right": 1378
+  },
+  "agentsCorner": {
+    "top": 817,
+    "bottom": 838,
+    "left": 62,
+    "right": 181.35
+  },
+  "deltas": {
+    "baseline": 0,
+    "inkBottom": 2.82,
+    "boxBottom": -1,
+    "leftInset": 40,
+    "rightInset": 40
+  }
+}

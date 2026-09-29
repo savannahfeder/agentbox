@@ -1,0 +1,177 @@
+#!/bin/sh
+# NOTHING LEAVES THIS MAC UNTIL THE WHOLE SUITE IS GREEN (w-989f7d3e4d).
+#
+# The suite runs on this Mac before every push rather than waiting for GitHub
+# Actions.
+#
+# The background is that Actions has not started a single run in the
+# Astral-Agent organisation since 2026-08-03, so the workflow file in
+# .github/workflows/tests.yml is real and dead. This hook is the same promise
+# kept locally: the suite runs against the code you are about to push, and a
+# red test stops the push.
+#
+# Git runs this with the working tree root as the current directory and feeds
+# it one line per ref on stdin: <local ref> <local sha> <remote ref> <remote sha>.
+# A local sha of all zeroes means "delete this branch", which pushes no code and
+# so needs no tests.
+#
+# The way past it, when you know what you are doing: git push --no-verify.
+#
+# A RED RUN ON A BUSY MAC IS NOT A VERDICT ON THE CODE (w-07faab7372, 2026-09-20).
+#
+# Three pushes of one green tree were refused in a row, at 363s, 1267s and 1765s against a suite that
+# takes about 22s on a quiet machine. Each refusal named something DIFFERENT and
+# not one of them was an assertion about behaviour:
+#
+#   the-workspace-navigation-keeps-all-four-destinations
+#       [vitest-worker]: Timeout calling "resolveId" ... passes in 40ms alone
+#   games-chess
+#       expected 2012 to be less than 1000 ... costs 44ms on a quiet machine
+#   plus  [vitest-worker]: Timeout calling "fetch" with "/@vite/env"
+#
+# The cause is arithmetic. Several agent sessions run at once, vitest takes
+# a fork per core, and ten cores do not go round. At 70x the normal duration
+# everything with a clock in it fires: vitest's own worker RPC gives up, and any
+# test that asserts a wall-clock budget measures the queue instead of the work.
+#
+# So a single red run no longer refuses a push. The files that went red are run
+# AGAIN, by themselves, and only a file that fails that second time stops the
+# push. A real break fails alone too, in a second, so the gate still holds. What
+# it no longer does is refuse code nobody touched because the Mac was busy.
+#
+# THE TRADE, STATED PLAINLY: a test that only fails when it runs ALONGSIDE the
+# others (shared state, a port, a clock they both want) now passes the retry and
+# gets through. That class has never been seen here; contention cost three
+# pushes in one evening. If it ever does show up, the retry is the first
+# place to look, and the output below always names what it re-ran.
+
+set -u
+
+# Where this hook lives, before anything changes directory, so the privacy
+# check beside it is found wherever the push runs from.
+hookdir=$(cd "$(dirname "$0")" && pwd)
+
+# Read the refs first, so a push that only deletes branches costs nothing. They
+# are kept, because the privacy check below needs the same lines.
+refs=$(cat)
+has_code=0
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  [ -z "${local_sha:-}" ] && continue
+  case "$local_sha" in
+    *[!0]*) has_code=1 ;;
+  esac
+done <<EOF
+$refs
+EOF
+
+if [ "$has_code" -eq 0 ]; then
+  # Either every line was a deletion, or git handed us nothing at all, which is
+  # what it does when the only branch you named was already rejected as a
+  # non-fast-forward. Both mean no code is going anywhere.
+  echo "pre-push: no new commits in this push, so there is nothing to test."
+  exit 0
+fi
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || root=$(pwd)
+cd "$root" || exit 1
+
+# NOTHING PRIVATE GOES OUT, and this runs before the suite because it takes
+# seconds and the suite takes minutes. The repository is public; the check reads
+# only what this push adds. See scripts/check-before-public.mjs.
+check="$hookdir/../check-before-public.mjs"
+if [ -f "$check" ]; then
+  printf '%s\n' "$refs" | node "$check" "${1:-}" "${2:-}" || exit 1
+else
+  echo "pre-push: no privacy check beside this hook, so none was run."
+fi
+
+# GIT_DIR AND ITS FRIENDS DO NOT GO INTO THE TESTS, and this is not tidiness.
+# Git exports GIT_DIR, GIT_INDEX_FILE and several more to every hook, and they
+# beat `git -C <somewhere else>`. So a test that makes a folder which is NOT a
+# repo and asks git about it gets THIS repository's answer instead. Measured
+# 2026-08-24 on the first push this hook ever ran: three tests failed inside the
+# hook and passed on the same commit from a shell, because a throwaway folder
+# was reported as having a last commit two seconds ago.
+for v in $(env | sed -n 's/^\(GIT_[A-Za-z0-9_]*\)=.*/\1/p'); do
+  unset "$v"
+done
+
+# vitest lives in node_modules, and a worktree without one would otherwise fail
+# in a way that reads like a broken test rather than a missing install.
+if [ ! -x "node_modules/.bin/vitest" ]; then
+  echo ""
+  echo "  PUSH REFUSED. There is no vitest in $root/node_modules,"
+  echo "  so the tests cannot run and I will not pretend they passed."
+  echo ""
+  echo "  Fix it with:  npm install"
+  echo "  Or push anyway with:  git push --no-verify"
+  echo ""
+  exit 1
+fi
+
+refuse() {
+  echo ""
+  echo "  PUSH REFUSED, because the tests above are red."
+  echo ""
+  echo "  These failed twice, the second time on their own, so this is"
+  echo "  not the Mac being busy. Fix them and push again."
+  echo ""
+  echo "  If you know the failure is not yours and you need this out"
+  echo "  now:  git push --no-verify"
+  echo ""
+  exit 1
+}
+
+echo "pre-push: running the whole suite before this leaves your Mac..."
+started=$(date +%s)
+
+# The json report rides along with the readable one so the retry below knows
+# WHICH files to re-run. It goes in the system temp dir, never in the repo.
+report="${TMPDIR:-/tmp}/zero-pre-push-$$.json"
+trap 'rm -f "$report"' EXIT INT TERM
+
+if node_modules/.bin/vitest run --reporter=basic --reporter=json --outputFile.json="$report"; then
+  echo "pre-push: green in $(( $(date +%s) - started ))s. Pushing."
+  exit 0
+fi
+
+red=$(node scripts/red-test-files.mjs "$report" 2>/dev/null)
+
+echo ""
+if [ -z "$red" ]; then
+  # No file was named, which is what an unhandled worker error looks like. We
+  # cannot retry a file we cannot name, so the whole suite runs once more.
+  echo "  Something went red without naming a file, so the suite is running"
+  echo "  once more before this is called a failure."
+  echo ""
+  if node_modules/.bin/vitest run --reporter=basic; then
+    echo ""
+    echo "pre-push: green on the second run, in $(( $(date +%s) - started ))s total."
+    echo "The first run died on the machine, not on the code. Pushing."
+    exit 0
+  fi
+  refuse
+fi
+
+count=$(printf '%s\n' "$red" | wc -l | tr -d ' ')
+echo "  $count file(s) went red. Running them again on their own, because a"
+echo "  busy Mac fails tests that a quiet one passes:"
+echo ""
+printf '    %s\n' $red
+echo ""
+
+# On their own, and one at a time: no forks competing, which is the condition
+# the first run could not give them. `--no-file-parallelism` is the flag for
+# that; `--poolOptions.forks.maxForks=1` reads like it should be and is not,
+# because it conflicts with the default minimum and vitest dies with
+# "options.minThreads and options.maxThreads must not conflict" before it runs
+# a single test.
+# shellcheck disable=SC2086
+if node_modules/.bin/vitest run --reporter=basic --no-file-parallelism $red; then
+  echo ""
+  echo "pre-push: they all pass on their own, in $(( $(date +%s) - started ))s total."
+  echo "That was the machine, not the code. Pushing."
+  exit 0
+fi
+
+refuse

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Electron's renderer compiles JavaScript at run time, so the hardened
+       runtime has to be told to allow it. Without these three the app is signed
+       and notarised and then dies on launch with a code-signature kill. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <!-- Astral's whole job is to run Claude Code on the user's machine: it spawns
+       the `claude` binary, a shell, and the store's MCP command, none of which
+       carry our signature. Inheriting a hardened runtime that refuses to exec
+       an unsigned child would make every agent fail to start. -->
+  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+  <true/>
+</dict>
+</plist>

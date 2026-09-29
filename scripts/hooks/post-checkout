@@ -1,0 +1,71 @@
+#!/bin/sh
+# THE RUNNING APP'S CHECKOUT STAYS ON main (w-17c967b82f).
+#
+# The person running the app from source must always be running main, never
+# another session's branch with its unsaved work on it.
+#
+# The app runs `npm start` from its primary checkout, so `appDir` in
+# main/main.mjs IS that working tree: the code being run, and the worker brief
+# every agent is handed at spawn (supervisor.mjs buildBrief reads
+# briefs/worker.md from appDir), are whatever branch that one checkout happens
+# to be standing on. Measured off the HEAD reflog: 57 branch switches in seven
+# days, and the checkout was NOT on main for 47% of the week, every hour of it
+# running some agent's half-finished branch without anyone being told.
+#
+# So this hook only guards the PRIMARY worktree. A throwaway worktree under
+# /private/tmp is where the work belongs and is left alone completely: that is
+# the whole point, and briefs/worker.md now says so.
+#
+# It puts the branch back rather than only complaining, because a warning
+# printed into an agent's scrollback is not a guarantee. Switching back is safe:
+# the checkout that just happened has already put the tree on disk, so checking
+# main out again restores exactly the tree that was there a second ago and
+# carries any uncommitted work with it, the same way the first checkout did.
+#
+# Its partner is scripts/hooks/pre-commit, which refuses to commit here at all,
+# so an agent bounced back to main cannot then land its work ON main by
+# accident. Neither of them can stop `git -c core.hooksPath= ...`. They are a
+# guard rail, not a lock.
+#
+# Git calls this with three arguments: the previous HEAD, the new HEAD, and a
+# flag that is 1 for a branch checkout and 0 for a file checkout.
+
+set -u
+
+flag="${3:-0}"
+[ "$flag" = "1" ] || exit 0
+
+# Only the primary worktree. In a linked worktree these two differ.
+git_dir=$(git rev-parse --absolute-git-dir 2>/dev/null) || exit 0
+common_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 0
+[ "$git_dir" = "$common_dir" ] || exit 0
+
+branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo '')
+[ "$branch" = "main" ] && exit 0
+
+echo >&2
+echo "  ================================================================" >&2
+echo "  THIS CHECKOUT IS THE APP THE FOUNDER IS RUNNING. IT STAYS ON main." >&2
+echo "  ================================================================" >&2
+if [ -n "$branch" ]; then
+  echo "  You just moved it to '$branch'. Putting it back." >&2
+else
+  echo "  You just moved it off a branch. Putting it back." >&2
+fi
+echo >&2
+echo "  Her app runs npm start from here, so the branch this folder is on" >&2
+echo "  is the code she is running and the brief every worker is handed." >&2
+echo >&2
+echo "  Do your work in a throwaway worktree instead, and delete it after:" >&2
+echo "    git worktree add -b <branch> /private/tmp/<your item id> main" >&2
+echo "    git worktree remove /private/tmp/<your item id>" >&2
+echo >&2
+
+if git checkout --quiet main 2>/dev/null; then
+  echo "  Back on main." >&2
+else
+  echo "  COULD NOT GET BACK TO main. Say so in your last message." >&2
+fi
+echo >&2
+
+exit 0

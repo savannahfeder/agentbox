@@ -1,0 +1,23 @@
+.remote-control {padding:12px 0 24px;container-type:inline-size;}
+.remote-command {font:11px var(--mono);color:var(--text-faint);margin-bottom:12px;}
+.remote-card {max-width:680px;border:1px solid var(--line-strong);border-radius:3px;background:transparent;overflow:hidden;color:var(--text);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 5%,transparent);}
+.remote-main {display:flex;align-items:flex-start;gap:12px;padding:16px 16px 12px;}
+.remote-icon {width:20px;height:20px;flex:none;color:var(--text-dim);margin-top:1px;}
+
+.remote-copy {min-width:0;}
+.remote-eyebrow {font-size:11px;color:var(--text-faint);line-height:18px;margin:0 0 6px;}
+.remote-control .remote-copy h3 {text-transform:none;font-size:14px;font-weight:500;letter-spacing:-.15px;line-height:21px;margin:0 0 4px;color:var(--text);}
+.remote-control .remote-copy p {font-size:13px;line-height:1.6;margin:0;color:var(--text-dim);}
+.remote-footer {padding:0 16px 16px;}
+.remote-control .remote-permission {font-size:12px;line-height:1.65;color:var(--text-faint);margin:0 0 14px;max-width:60ch;}
+.remote-actions {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.remote-actions :is(button,a) {font:inherit;font-size:12px;font-weight:500;line-height:20px;border-radius:3px;min-height:32px;cursor:pointer;padding:5px 10px;}
+.remote-secondary {background:transparent;border:1px solid var(--line);color:var(--text-dim);}
+.remote-primary {background:linear-gradient(180deg,color-mix(in srgb,var(--text) 10%,transparent),color-mix(in srgb,var(--text) 5%,transparent));border:1px solid color-mix(in srgb,var(--text) 18%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 10%,transparent),0 1px 2px #00000010;color:var(--text);display:inline-flex;align-items:center;gap:10px;order:-1;}
+.remote-actions :is(button,a):hover {background:color-mix(in srgb,var(--text) 12%,transparent);color:var(--text);}
+.remote-actions :is(button,a):active {background:color-mix(in srgb,var(--text) 16%,transparent);}
+.remote-footer {padding-left:48px;}
+.remote-primary {text-decoration:none;}
+.remote-actions button:disabled {opacity:.5;cursor:default;}
+.remote-actions :is(button,a):focus-visible {outline:2px solid var(--text-dim);outline-offset:3px;}
+@container(max-width:360px){.remote-footer{padding-left:16px;}}

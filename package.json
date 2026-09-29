@@ -1,0 +1,187 @@
+{
+  "name": "agentbox-app",
+  "productName": "agentbox",
+  "version": "0.1.7",
+  "description": "An inbox for managing dozens of Claude Code and Codex agents.",
+  "author": "Savannah Feder",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/savannahfeder/agentbox.git"
+  },
+  "homepage": "https://github.com/savannahfeder/agentbox#readme",
+  "bugs": {
+    "url": "https://github.com/savannahfeder/agentbox/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "agents",
+    "ai-agents",
+    "coding-agent",
+    "inbox",
+    "cli",
+    "electron"
+  ],
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "main": "main/main.mjs",
+  "bin": {
+    "agentbox": "bin/agentbox.mjs"
+  },
+  "files": [
+    "bin/",
+    "main/**/*.mjs",
+    "shared/**/*.mjs",
+    "shared/**/*.mts",
+    "shared/**/*.json",
+    "mcp/**/*.mjs",
+    "mcp/**/*.sh",
+    "briefs/**/*.md",
+    "!briefs/founder.md",
+    "renderer/dist/",
+    "scripts/before-publish.mjs",
+    "scripts/after-install.mjs",
+    "scripts/approval-server.sh",
+    "worker-permissions.json",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/prepare-terminal.mjs && node scripts/read-claude-commands.mjs && node scripts/read-claude-models.mjs && vite build renderer",
+    "start": "npm run build && electron .",
+    "test": "vitest run",
+    "icon": "electron scripts/make-icon.mjs",
+    "pack": "node scripts/release.mjs --no-sign",
+    "pack:side": "node scripts/pack-side.mjs",
+    "release": "node scripts/release.mjs",
+    "fresh": "node scripts/fresh-user.mjs",
+    "hooks:install": "node scripts/install-hooks.mjs",
+    "check:public": "node scripts/check-before-public.mjs --all",
+    "prepare": "node scripts/install-hooks.mjs",
+    "serve": "node bin/agentbox.mjs",
+    "prepack": "npm run build",
+    "postinstall": "node scripts/after-install.mjs",
+    "prepublishOnly": "node scripts/before-publish.mjs"
+  },
+  "devDependencies": {
+    "@fontsource-variable/source-sans-3": "^5.3.0",
+    "@tiptap/core": "^2.27.2",
+    "@tiptap/extension-link": "^2.27.2",
+    "@tiptap/extension-placeholder": "^2.27.2",
+    "@tiptap/extension-table": "^2.27.2",
+    "@tiptap/extension-table-cell": "^2.27.2",
+    "@tiptap/extension-table-header": "^2.27.2",
+    "@tiptap/extension-table-row": "^2.27.2",
+    "@tiptap/extension-task-item": "^2.27.2",
+    "@tiptap/extension-task-list": "^2.27.2",
+    "@tiptap/pm": "^2.27.2",
+    "@tiptap/react": "^2.27.2",
+    "@tiptap/starter-kit": "^2.27.2",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-serialize": "^0.14.0",
+    "@xterm/xterm": "^6.0.0",
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3",
+    "pdfjs-dist": "^6.3.289",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.0",
+    "vitest": "^2.0.5"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "electron-updater": "^6.8.9",
+    "node-pty": "^1.1.0",
+    "posthog-node": "^5.21.2",
+    "zod": "^4.4.3"
+  },
+  "build": {
+    "appId": "ac.astral.app",
+    "productName": "agentbox",
+    "copyright": "Copyright © 2026 Agentbox",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main/**/*",
+      "shared/**/*",
+      "preload.cjs",
+      "briefs/**/*",
+      "!briefs/founder.md",
+      "!briefs/writing-rules.md",
+      "worker-permissions.json",
+      "scripts/approval-server.sh",
+      "renderer/dist/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "worker-permissions.json",
+      "scripts/approval-server.sh",
+      "node_modules/node-pty/**"
+    ],
+    "mac": {
+      "extendInfo": {
+        "NSDesktopFolderUsageDescription": "Agentbox needs this to let your agents work in a project you keep on the Desktop.",
+        "NSDocumentsFolderUsageDescription": "Agentbox needs this to let your agents work in a project you keep in Documents.",
+        "NSDownloadsFolderUsageDescription": "Agentbox needs this to let your agents work in a project you keep in Downloads.",
+        "NSRemovableVolumesUsageDescription": "Agentbox needs this to let your agents work in a project you keep on an external disk.",
+        "NSAppleEventsUsageDescription": "Agentbox needs this when an agent you started asks another app to do something."
+      },
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": false
+    },
+    "dmg": {
+      "title": "agentbox",
+      "contents": [
+        {
+          "x": 140,
+          "y": 200,
+          "type": "file"
+        },
+        {
+          "x": 400,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Astral-Agent",
+        "repo": "astral-releases"
+      }
+    ]
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

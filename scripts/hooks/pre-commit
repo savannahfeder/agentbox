@@ -1,0 +1,40 @@
+#!/bin/sh
+# NOTHING IS COMMITTED IN THE RUNNING APP'S CHECKOUT (w-17c967b82f).
+#
+# The partner of scripts/hooks/post-checkout, and the reason that one is safe.
+# post-checkout puts the primary checkout back on main the moment an agent moves it
+# off. Without this hook, an agent that had meant to commit onto its own branch
+# would then commit onto main instead, which is the one thing CLAUDE.md forbids
+# outright. So: no commits in the primary worktree at all, on any branch.
+#
+# Both halves are needed together: the branch block and the commit block.
+#
+# This costs nothing real. Work belongs in a throwaway worktree
+# (briefs/worker.md), and merging is `git push . HEAD:refs/heads/main` from that
+# worktree, which moves the ref and commits nothing here.
+#
+# Only the PRIMARY worktree is guarded. Every linked worktree commits freely,
+# which is where all the work is supposed to be happening anyway.
+#
+# The way past it, when you know what you are doing: git commit --no-verify.
+
+set -u
+
+git_dir=$(git rev-parse --absolute-git-dir 2>/dev/null) || exit 0
+common_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 0
+[ "$git_dir" = "$common_dir" ] || exit 0
+
+echo >&2
+echo "  ================================================================" >&2
+echo "  THIS IS THE CHECKOUT HER APP RUNS FROM. NOTHING COMMITS HERE." >&2
+echo "  ================================================================" >&2
+echo >&2
+echo "  Your edits are safe. Take them to a worktree and commit there:" >&2
+echo "    git worktree add -b <branch> /private/tmp/<your item id> main" >&2
+echo "    cd /private/tmp/<your item id>" >&2
+echo >&2
+echo "  Merge from there with: git push . HEAD:refs/heads/main" >&2
+echo "  Then delete it:        git worktree remove /private/tmp/<your item id>" >&2
+echo >&2
+
+exit 1

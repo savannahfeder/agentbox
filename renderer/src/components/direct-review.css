@@ -1,0 +1,242 @@
+.direct-review {margin:24px 0; max-width:680px; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:color-mix(in srgb,var(--surface) 45%,transparent);}
+.direct-review header {display:flex;justify-content:space-between;gap:12px;padding:13px 16px;font-size:12px;line-height:18px;color:var(--text-dim);}
+.direct-review header span:last-child {font-size:11px;color:var(--text-faint);}
+.direct-review .artifact-thumbnail {width:100%;height:180px;aspect-ratio:auto;max-height:none;border:0;border-radius:0;background:color-mix(in srgb,var(--text) 2%,transparent);}
+.direct-review .artifact-thumbnail pre {font-size:12px;line-height:1.9;padding:16px;opacity:.9;}
+.direct-review .artifact-thumbnail[data-kind="markdown"] pre {font-size:14px;line-height:1.6;white-space:pre-wrap;}
+/* Quiet material and a precise silhouette; review is the primary action. */
+.direct-review footer {display:flex;gap:10px;align-items:center;padding:14px 16px;}
+.direct-review button {font-family:inherit;font-size:13px;font-weight:500;line-height:20px;letter-spacing:-.1px;padding:7px 14px;border-radius:7px;cursor:pointer;color:var(--text);}
+.direct-review .review-open,
+:root[data-code-review] .workspace-layout .doc-pane .artifact-expand {background:linear-gradient(180deg,color-mix(in srgb,var(--text) 10%,transparent),color-mix(in srgb,var(--text) 5%,transparent));border:1px solid color-mix(in srgb,var(--text) 18%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 10%,transparent),0 1px 2px #00000010;}
+.direct-review .review-accept {background:transparent;border:1px solid var(--line);color:var(--text-dim);box-shadow:none;}
+.direct-review button:hover {background:color-mix(in srgb,var(--text) 12%,transparent);color:var(--text);}
+.direct-review button:active {background:color-mix(in srgb,var(--text) 16%,transparent);}
+.direct-review button:focus-visible {outline:2px solid var(--text-dim);outline-offset:3px;}
+[data-review-style="text"] .direct-review .review-open {background:color-mix(in srgb,var(--text) 7%,transparent);box-shadow:none;border-color:var(--line-strong);border-radius:5px;}
+[data-review-style="text"] .direct-review .review-accept {border-color:transparent;}
+.review-lab-controls {position:fixed;bottom:18px;right:18px;z-index:200;display:flex;gap:6px;align-items:center;background:var(--skin-solid,var(--surface));border:1px solid var(--line);border-radius:5px;padding:8px;font-size:12px;}
+.review-lab-controls select {font:inherit;background:transparent;color:var(--text);border:0;padding:6px;}
+.review-lab-controls span {color:var(--text-faint);padding:0 8px;}
+[data-preview-treatment="margin-left"] .artifact-entry-list .direct-review .artifact-thumbnail {width:100%;height:180px;}
+.artifact-entry-list:has(.direct-review) {width:100%;max-width:680px;}
+.artifact-entry-list .direct-review {margin:0;}
+/* One compact surface, with a recessed excerpt instead of an empty middle. */
+.direct-review {border-color:color-mix(in srgb,var(--text) 16%,transparent);border-radius:8px;background:linear-gradient(145deg,color-mix(in srgb,var(--text) 5%,transparent),color-mix(in srgb,var(--surface) 25%,transparent));box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 4%,transparent),0 3px 12px #00000008;}
+.direct-review header {padding:14px 16px 12px;align-items:center;}
+.direct-review header .review-title {font-size:14px;font-weight:500;color:var(--text);letter-spacing:-.15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.direct-review header .review-status {display:flex;gap:7px;align-items:center;flex-shrink:0;color:var(--text-dim);font-size:11px;}
+.review-status i {width:5px;height:5px;background:var(--text-dim);border-radius:50%;opacity:.7;}
+.review-inset {margin:0 14px;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:color-mix(in srgb,var(--surface) 65%,transparent);box-shadow:inset 0 1px 3px #00000008;}
+.review-code {padding:8px 0;overflow-x:auto;font:11px/21px ui-monospace,SFMono-Regular,Menlo,monospace;}
+.review-code-line {display:flex;min-width:max-content;}
+.review-line-number {width:34px;flex-shrink:0;text-align:center;color:var(--text-faint);border-right:1px solid var(--line);user-select:none;}
+.review-code-line code {font:inherit;white-space:pre;padding-right:16px;color:var(--text-dim);}
+.review-mark {display:inline-block;width:28px;text-align:center;color:var(--text-faint);}
+.review-code-line[data-mark="+"] code {color:color-mix(in srgb,var(--text) 75%,#539c85);}
+.review-code-line[data-mark="-"] code {opacity:.55;}
+.direct-review footer {padding:12px 14px 14px;}
+[data-preview-treatment="margin-left"] .artifact-entry-list .direct-review .artifact-thumbnail {height:140px;}
+.direct-review .artifact-thumbnail pre {padding:12px 14px;}
+.direct-review .artifact-thumbnail[data-kind="markdown"] pre {font-size:13px;line-height:1.6;}
+/* Same approved glass material, four ways to express the action hierarchy. */
+.direct-review .review-controls {gap:8px;flex-wrap:wrap;}
+.direct-review .review-controls button {display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;}
+.direct-review .review-controls svg {width:15px;height:15px;flex:none;}
+.direct-review .review-responses {display:flex;align-items:center;gap:6px;margin-left:auto;}
+.direct-review .review-feedback {background:transparent;border:1px solid var(--line);color:var(--text-dim);box-shadow:none;}
+[data-review-style="compact"] .review-controls svg {display:none;}
+[data-review-style="compact-icons"] .review-responses button {padding:7px;width:36px;height:36px;}
+[data-review-style="compact-icons"] .review-responses span {display:none;}
+[data-review-style="split"] .direct-review .review-controls {display:grid;grid-template-columns:1fr;gap:12px;}
+[data-review-style="split"] .direct-review .review-open {width:100%;}
+[data-review-style="split"] .review-responses {margin:0;gap:0;border:1px solid var(--line);border-radius:7px;overflow:hidden;}
+[data-review-style="split"] .review-responses button {flex:1;border:0;border-radius:0;}
+[data-review-style="split"] .review-responses button + button {border-left:1px solid var(--line);}
+@media(max-width:600px){.direct-review .review-controls button {padding-left:10px;padding-right:10px;font-size:12px;}.direct-review .review-responses {margin-left:0;}}
+/* Compact alternatives: fewer independent outlines, one clear opening action. */
+[data-review-style="unified"] .direct-review .review-controls {margin:12px 14px 14px;padding:0;gap:0;flex-wrap:nowrap;border:1px solid color-mix(in srgb,var(--text) 18%,transparent);border-radius:7px;overflow:hidden;background:linear-gradient(180deg,color-mix(in srgb,var(--text) 8%,transparent),color-mix(in srgb,var(--text) 3%,transparent));box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 8%,transparent);}
+[data-review-style="unified"] .direct-review .review-open {flex:1;justify-content:flex-start;border:0;border-radius:0;background:none;box-shadow:none;min-height:38px;}
+[data-review-style="unified"] .review-open svg {order:2;margin-left:auto;opacity:.65;}
+[data-review-style="unified"] .review-responses {margin:0;gap:0;border-left:1px solid var(--line);}
+[data-review-style="unified"] .review-responses button {width:40px;height:38px;padding:0;border:0;border-radius:0;}
+[data-review-style="unified"] .review-responses span {display:none;}
+[data-review-style="unified"] .review-responses button+button {border-left:1px solid var(--line);}
+/* No footer at all: the tools share the filename's row. */
+[data-review-style="header"] .direct-review {display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;padding:12px 14px;gap:12px 8px;}
+[data-review-style="header"] .direct-review header {grid-column:1;grid-row:1;padding:0;min-width:0;}
+[data-review-style="header"] .review-status {display:none!important;}
+[data-review-style="header"] .review-controls {display:contents;}
+[data-review-style="header"] .review-open {grid-column:2;grid-row:1;padding:5px 10px;font-size:12px;}
+[data-review-style="header"] .review-open svg {display:none;}
+[data-review-style="header"] .review-responses {grid-column:3;grid-row:1;margin:0;gap:2px;}
+[data-review-style="header"] .review-responses button {width:28px;height:30px;padding:0;border-color:transparent;}
+[data-review-style="header"] .review-responses span {display:none;}
+[data-review-style="header"] .review-inset {grid-column:1 / -1;grid-row:2;margin:0;}
+/* Secondary feedback reads as a quiet pair; only review has a button surface. */
+[data-review-style="quiet"] .direct-review .review-controls {flex-wrap:nowrap;gap:12px;}
+[data-review-style="quiet"] .review-open svg {display:none;}
+[data-review-style="quiet"] .review-responses {gap:0;}
+[data-review-style="quiet"] .review-responses button {border:0;background:none;box-shadow:none;padding:4px 9px;font-size:12px;}
+[data-review-style="quiet"] .review-responses svg {display:none;}
+[data-review-style="quiet"] .review-responses button+button {border-left:1px solid var(--line);border-radius:0;}
+/* Progressive disclosure, also revealed by keyboard focus and always on touch. */
+[data-review-style="hover"] .direct-review .review-controls {flex-wrap:nowrap;}
+[data-review-style="hover"] .review-responses {opacity:0;pointer-events:none;}
+[data-review-style="hover"] .direct-review:hover .review-responses,
+[data-review-style="hover"] .direct-review:focus-within .review-responses {opacity:1;pointer-events:auto;}
+[data-review-style="hover"] .review-responses button {width:32px;height:32px;padding:0;border-color:transparent;}
+[data-review-style="hover"] .review-responses span {display:none;}
+@media(hover:none){[data-review-style="hover"] .review-responses {opacity:1;pointer-events:auto;}}
+@media(max-width:480px){[data-review-style="header"] .direct-review {gap:10px 4px;padding:10px;}[data-review-style="header"] .review-title {font-size:12px!important;}[data-review-style="header"] .review-open {font-size:11px;padding:5px 7px;}}
+/* Header study: square geometry and explicit boundaries, like the app shell. */
+[data-review-style^="header-"] .direct-review {display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;padding:0;border-radius:3px;border:1px solid var(--line-strong);gap:0;background:color-mix(in srgb,var(--surface) 35%,transparent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 5%,transparent);}
+[data-review-style^="header-"] .direct-review header {grid-column:1;grid-row:1;min-width:0;padding:16px;}
+[data-review-style^="header-"] .review-status {display:none!important;}
+[data-review-style^="header-"] .direct-review .review-title {font-size:13px;}
+[data-review-style^="header-"] .direct-review .review-controls {display:contents;}
+[data-review-style^="header-"] .direct-review .review-open {grid-column:2;grid-row:1;border-radius:3px;padding:5px 10px;font-size:12px;min-height:32px;}
+[data-review-style^="header-"] .review-open svg {display:none;}
+[data-review-style^="header-"] .direct-review .review-responses {grid-column:3;grid-row:1;margin:0 12px 0 8px;gap:4px;}
+[data-review-style^="header-"] .direct-review .review-responses button {width:32px;height:32px;padding:0;border:1px solid var(--line-strong);border-radius:3px;background:color-mix(in srgb,var(--text) 3%,transparent);}
+[data-review-style^="header-"] .review-responses span {display:none;}
+[data-review-style^="header-"] .direct-review .review-inset {grid-column:1 / -1;grid-row:2;margin:0 12px 12px;border-radius:2px;border-color:var(--line-strong);}
+[data-review-style^="header-"] .direct-review button:hover {background:color-mix(in srgb,var(--text) 12%,transparent);}
+/* A single bordered pair gives feedback one home, separated from opening. */
+[data-review-style="header-grouped"] .direct-review header {padding:18px 16px;}
+[data-review-style="header-grouped"] .direct-review .review-responses {margin-left:12px;border:1px solid var(--line-strong);border-radius:3px;gap:0;overflow:hidden;}
+[data-review-style="header-grouped"] .direct-review .review-responses button {border:0;border-radius:0;width:34px;height:30px;}
+[data-review-style="header-grouped"] .direct-review .review-responses button+button {border-left:1px solid var(--line-strong);}
+/* Labels trade a second header line for clarity, without a separate footer. */
+[data-review-style="header-labeled"] .direct-review {grid-template-columns:1fr auto;}
+[data-review-style="header-labeled"] .direct-review header {grid-column:1 / -1;padding:14px 14px 10px;}
+[data-review-style="header-labeled"] .direct-review .review-open {grid-row:2;grid-column:1;justify-self:start;margin:0 0 12px 14px;}
+[data-review-style="header-labeled"] .direct-review .review-responses {grid-row:2;grid-column:2;margin:0 14px 12px 8px;gap:6px;}
+[data-review-style="header-labeled"] .direct-review .review-responses button {width:auto;padding:5px 9px;font-size:12px;gap:6px;}
+[data-review-style="header-labeled"] .review-responses span {display:inline;}
+[data-review-style="header-labeled"] .direct-review .review-inset {grid-row:3;}
+/* All tools in one right-aligned group, with a stronger surface for opening. */
+[data-review-style="header-tools"] .direct-review header {padding:12px;}
+[data-review-style="header-tools"] .direct-review .review-open {width:32px;padding:0;}
+[data-review-style="header-tools"] .review-open svg {display:block;}
+[data-review-style="header-tools"] .review-open span {display:none;}
+[data-review-style="header-tools"] .direct-review .review-responses {margin-left:4px;}
+@media(max-width:480px){[data-review-style^="header-"] .direct-review header {padding-left:12px;padding-right:8px;}[data-review-style^="header-"] .direct-review .review-open {font-size:11px;padding-left:7px;padding-right:7px;}[data-review-style="header-labeled"] .direct-review .review-responses button {font-size:11px;padding:4px 6px;}}
+/* One opening target covers the title, preview and free space. Real buttons
+   sit above it, so feedback never opens the viewer as a side effect. */
+.direct-review {position:relative;}
+.direct-review .review-card-hit {position:absolute;inset:0;z-index:1;width:100%;height:100%;padding:0;border:0;border-radius:inherit;background:none;cursor:pointer;}
+.direct-review .review-card-hit:hover,.direct-review .review-card-hit:active {background:color-mix(in srgb,var(--text) 2%,transparent);}
+.direct-review .review-card-hit:focus-visible {outline:2px solid var(--text-dim);outline-offset:-3px;}
+.direct-review .review-controls button {position:relative;z-index:2;}
+.review-files {padding:8px 12px;border-bottom:1px solid var(--line);font-size:11px;line-height:21px;color:var(--text-dim);}
+.review-files > div {display:flex;justify-content:space-between;gap:12px;}
+.review-files small {color:var(--text-faint);font:inherit;}
+.review-files p {margin:2px 0 0!important;font-size:11px!important;color:var(--text-faint);}
+.review-bundle .review-code {max-height:94px;overflow:hidden;}
+[data-review-style="header-balanced-open"] .review-responses,
+[data-review-style="header-tools-open"] .review-responses {display:none!important;}
+[data-review-style="header-balanced-open"] .direct-review .review-open,
+[data-review-style="header-tools-open"] .direct-review .review-open {margin-right:12px;}
+[data-review-style="header-tools-open"] .direct-review .review-open {width:32px;padding:0;}
+[data-review-style="header-tools-open"] .review-open svg {display:block;}
+[data-review-style="header-tools-open"] .review-open span {display:none;}
+[data-review-style="header-card-only"] .review-controls,
+[data-review-style="header-card-only"] .review-responses,
+[data-review-style="header-card-only"] .review-open {display:none!important;}
+[data-review-style="header-card-only"] .direct-review header {grid-column:1 / -1;}
+[data-review-style="header-card-only"] .direct-review header::after {content:'Open preview ↗';font-size:11px;color:var(--text-faint);white-space:nowrap;}
+[data-review-style="header-feedback-only"] .review-open {display:none!important;}
+[data-review-style="header-feedback-only"] .direct-review .review-responses {grid-column:3;}
+/* The excerpt uses the same theme-aware syntax tokens as the full editor. */
+.review-code-line[data-mark="-"] code {opacity:.85;}
+.review-code-line[data-mark="+"] .review-mark {color:var(--code-plus);}
+.review-code-line[data-mark="-"] .review-mark {color:var(--code-minus);}
+.review-lab-controls {flex-wrap:wrap;max-width:calc(100vw - 36px);}
+/* THE CODE VIEWER HAS NO GLASS ON IT. What stood here was a
+   whole second treatment of the change: a gradient card, a tinted file tree, a
+   translucent block per file, softened +/- beds, and a `backdrop-filter:
+   blur(12px)` on `.code-file-head`, which is sticky and drawn once per file —
+   seventeen blurred layers on a large real change. All of it is deleted
+   rather than switched off, because a treatment behind a flag is one the user
+   has to decide about twice. IT WAS NOT THE JITTER, and that is measured rather
+   than assumed, so nobody puts it back looking for the speed. On a 2,562-row
+   change with the processor turned down six times, the blurred build and the
+   plain one scrolled at the same median frame, 16.7ms each, and the plain one
+   did MORE style and layout work, not less. The jitter was the pane measuring
+   every file on every frame and rebuilding every row when the reader crossed a
+   file boundary; both are fixed in CodeArtifact.tsx and neither had anything to
+   do with the blur. A TEXT ARTIFACT KEEPS ITS CARD. `.doc-md` was drawn by the
+   same rules and this change is not about it, so the two rules that reach it
+   are narrowed to it rather than deleted. Nothing about the review card in the
+   conversation, the `.direct-review` block above, is touched either: that is a
+   different surface and it is out of scope here.
+*/
+:root[data-code-review]:not([data-code-review="original"]) .doc-pane.doc-md .doc-card {
+ background:linear-gradient(145deg,color-mix(in srgb,var(--text) 5%,transparent),color-mix(in srgb,var(--surface) 25%,transparent));
+ border:1px solid var(--line-strong);border-radius:3px;
+ box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 4%,transparent);
+}
+:root[data-code-review]:not([data-code-review="original"]) .doc-pane.doc-md .doc-head {background:transparent;padding:12px 16px;border-bottom:1px solid var(--line);}
+/* Light picture themes: a shared tint, not multiple layers of white paper. */
+:root[data-code-review]:is([data-skin="frost-haze"],[data-skin="slate-haze"]) {--review-material:rgba(255,255,255,.07);}
+:root[data-code-review][data-skin="slate-haze"] {--review-material:rgba(28,44,58,.025);}
+:root[data-code-review]:is([data-skin="frost-haze"],[data-skin="slate-haze"]) .direct-review,
+:root[data-code-review]:not([data-code-review="original"]):is([data-skin="frost-haze"],[data-skin="slate-haze"]) .doc-pane.doc-md .doc-card {background:var(--review-material);box-shadow:none;}
+:root[data-code-review]:is([data-skin="frost-haze"],[data-skin="slate-haze"]) .direct-review .review-inset {background:var(--review-material);box-shadow:none;}
+:root[data-code-review]:is([data-skin="frost-haze"],[data-skin="slate-haze"]) .direct-review .artifact-thumbnail {background:transparent;}
+:root[data-code-review][data-skin="slate-haze"] .direct-review .artifact-thumbnail pre {color:var(--text-dim);opacity:1;}
+/* An alternative for reading prose on the same foreground as the conversation. */
+:root[data-code-review][data-review-style][data-text-review="clear"] .doc-pane.doc-md .doc-card {background:transparent;}
+:root[data-code-review][data-review-style][data-text-review="clear"] .doc-pane.doc-md .doc-head {background:transparent;}
+
+/* The click target is invisible, including while the pointer is over content. */
+[data-review-style] .direct-review .review-card-hit:is(:hover,:active) {background:none;box-shadow:none;}
+:root[data-code-review] .direct-review .review-inset:has(.artifact-thumbnail) {background:transparent;box-shadow:none;}
+:root[data-code-review] .direct-review .artifact-thumbnail {background:transparent;}
+/* The approved preview frame carries no additional darkened paper layer. */
+:root[data-code-review][data-review-style] .direct-review {background:transparent;}
+:root[data-code-review][data-review-style] .direct-review .review-inset {background:transparent;box-shadow:none;}
+/* The four rules that lifted each file onto its own pane of soft glass went
+   with the rest of the code viewer's glass above, 2026-09-18.
+*/
+
+:root[data-code-review] .workspace-layout .doc-pane .artifact-expand {border-radius:3px;color:var(--text);}
+:root[data-code-review] .workspace-layout .doc-pane .artifact-expand:hover {background:linear-gradient(180deg,color-mix(in srgb,var(--text) 14%,transparent),color-mix(in srgb,var(--text) 8%,transparent));}
+:root[data-code-review] .workspace-layout .doc-pane .artifact-expand:active {background:color-mix(in srgb,var(--text) 8%,transparent);box-shadow:inset 0 1px 2px #00000012;}
+:root[data-code-review] .workspace-layout .focus-mode-control {background:linear-gradient(180deg,color-mix(in srgb,var(--text) 10%,transparent),color-mix(in srgb,var(--text) 5%,transparent));border:1px solid color-mix(in srgb,var(--text) 18%,transparent);border-radius:3px;box-shadow:inset 0 1px 0 color-mix(in srgb,var(--text) 10%,transparent),0 1px 2px #00000010;color:var(--text);gap:7px;}
+.focus-mode-control svg {width:16px;height:16px;}
+.focus-mode-control kbd {font:10px/1 inherit;opacity:.55;margin-left:3px;}
+:root[data-code-review] .workspace-layout .focus-mode-control.focus-icon-only {width:28px;min-width:28px;padding:0;}
+
+/* Bare corners match the adjacent external-open and close controls. */
+:root[data-code-review] .workspace-layout .focus-mode-control.focus-bare,
+:root[data-code-review] .workspace-layout .focus-mode-control.focus-bare:hover,
+:root[data-code-review] .workspace-layout .focus-mode-control.focus-bare:active {
+  background:transparent;border-color:transparent;box-shadow:none;color:var(--text-dim);
+}
+:root[data-code-review] .workspace-layout .focus-mode-control.focus-bare:hover {
+  color:var(--text);
+}
+
+/* Equal hit areas, optical scale and states for the bare corner action set. */
+:root[data-code-review] .workspace-layout .doc-marks {gap:6px;}
+:root[data-code-review] .workspace-layout .doc-marks :is(.doc-mark,.focus-bare) {
+  display:inline-flex;align-items:center;justify-content:center;
+  width:28px;min-width:28px;height:28px;padding:0;flex:none;
+  border:0;border-radius:3px;background:transparent;box-shadow:none;
+  color:var(--text-dim);cursor:pointer;
+}
+:root[data-code-review] .workspace-layout .doc-marks :is(.doc-mark,.focus-bare):is(:hover,:active) {
+  background:transparent;box-shadow:none;color:var(--text);
+}
+:root[data-code-review] .workspace-layout .doc-marks :is(.doc-mark,.focus-bare):focus-visible {
+  outline:2px solid var(--underline);outline-offset:2px;
+}
+:root[data-code-review] .workspace-layout .doc-marks svg {
+  display:block;width:16px;height:16px;flex:none;
+}
+
+.review-code-placeholder {height:140px;position:relative;display:flex;align-items:center;justify-content:center;color:var(--text-faint);font-size:12px;}
+.direct-review .review-files > div > span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+.direct-review .review-files small {flex:none;}

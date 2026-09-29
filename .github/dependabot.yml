@@ -1,0 +1,15 @@
+# Pins remain reproducible; upgrades arrive as reviewable PRs, never auto-merges.
+# Active after this file reaches the GitHub default branch. Security updates
+# additionally require Dependabot alerts/security updates enabled in the repo.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
