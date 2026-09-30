@@ -390,7 +390,9 @@ export function foldWorkItems(lines, now = Date.now()) {
     if (line.claim) {
       // A claim at or above the current epoch takes the item. A heartbeat only
       // extends a lease it still legitimately holds.
-      if (line.epoch >= item.epoch) {
+      const renewsHeldClaim = !line.heartbeat || (item.claim
+        && line.epoch === item.epoch && line.claim.holder === item.claim.holder);
+      if (line.epoch >= item.epoch && renewsHeldClaim) {
         item.epoch = line.epoch;
         item.claim = {
           holder: String(line.claim.holder ?? ''),

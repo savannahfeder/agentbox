@@ -180,6 +180,11 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
     for (const [id, { dir, epoch, live }] of held) {
       if (!live) continue;
       try {
+        const current = readWorkItem(dir, id);
+        if (!current?.claim || current.epoch !== epoch || current.claim.holder !== holder) {
+          held.get(id).live = false;
+          continue;
+        }
         heartbeatWorkItem(dir, id, { epoch, holder });
       } catch (err) {
         // A failed beat is not fatal: the lease still has two beats of margin,
@@ -188,6 +193,7 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
         console.error(`${LOG} heartbeat failed for ${id}: ${err?.message ?? err}`);
       }
     }
+    stopTimer();
   };
 
   const ensureTimer = () => {

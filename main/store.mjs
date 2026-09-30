@@ -308,6 +308,10 @@ export class Store {
     return workItemsDisk.updateWorkItem(dir, id, { status }, { source: 'system' });
   }
 
+  releaseRunClaim(slug, id, run) {
+    return this.modules.workItemsDisk.releaseRunClaim(this.productDir(slug), id, run);
+  }
+
   // THE WRITTEN NAME THE LIST DRAWS. Written by the app rather than by a
   // session, on agent authority, and never onto `title`: the title is what she
   // typed and the fold keeps it hers (main/row-label.mjs says why at length).
