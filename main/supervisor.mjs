@@ -5956,6 +5956,7 @@ export class Supervisor {
           this.store.recordSessionResult(item.product, item.id, { result: session.result, status: null });
         } catch (e) { console.warn('zero: writing the closing message as the answer failed:', e.message); }
       }
+      this.releaseFinishedClaim(item, session);
       // A session that finished under its own power has nothing left to resume.
       // ANYTHING ELSE STAYS REMEMBERED, and that includes a kill of ours: an
       // app quit is the commonest way her fleet dies, and it is the case where
@@ -6454,6 +6455,19 @@ export class Supervisor {
       const wrote = fresh.wrote?.result;
       return !(wrote?.source === 'agent' && (wrote.ts ?? 0) >= (session.startedAt ?? 0));
     } catch { return false; }
+  }
+
+  // A clean terminal result ends the run, even if its shared tool server
+  // stays alive for other turns. Release the run's claim without choosing a
+  // status for the conversation. Failed runs retain the existing retry path.
+  releaseFinishedClaim(item, session) {
+    if (session.exitFailed || session.resultIsError || session.claimRefused || session.stoppedByUs
+      || !String(session.result ?? '').trim()) return;
+    try {
+      this.store.releaseRunClaim?.(item.product, item.id, {
+        afterEpoch: item.epoch ?? 0, startedAt: session.startedAt,
+      });
+    } catch (error) { console.warn('zero: could not release the finished run:', error.message); }
   }
 
   // The permission rules handed to a worker, generated fresh at every spawn for

@@ -18,7 +18,7 @@ import crypto from 'node:crypto';
 import { machineryPath } from './home.mjs';
 import { withProjectLock } from './project-lock.mjs';
 import {
-  foldWorkItems, buildLine, buildClaimLine, buildHeartbeatLine, buildReleaseLine,
+  foldWorkItems, normalizeLine, buildLine, buildClaimLine, buildHeartbeatLine, buildReleaseLine,
   isClaimable, sortForPull, matchesFilter, isWorkItemId, MAX_LINE_BYTES, LEASE_MS,
 } from '../../shared/work-items.mjs';
 
@@ -293,6 +293,25 @@ export function heartbeatWorkItem(projectDir, id, { epoch, holder, leaseMs = LEA
 export function releaseWorkItem(projectDir, id, { epoch, now = Date.now() } = {}) {
   appendLine(ledgerPath(projectDir), buildReleaseLine({ id, epoch, now }));
   return readWorkItem(projectDir, id, now);
+}
+
+// Release only the uninterrupted claim acquired by this run. A tool server
+// may outlive its turn, so process lifetime is not run lifetime. The first
+// claim after the spawn snapshot identifies the holder; same-holder renewals
+// are allowed, but a release or another holder ends this run's ownership.
+export function releaseRunClaim(projectDir, id, { afterEpoch, startedAt, now = Date.now() } = {}) {
+  if (!Number.isFinite(afterEpoch) || !Number.isFinite(startedAt)) return null;
+  const lines = readLines(ledgerPath(projectDir)).map(normalizeLine).filter(line => line?.id === id);
+  const item = foldWorkItems(lines, now).get(id);
+  if (!item?.claim) return item;
+  const claims = lines.filter(line => line.claim && !line.heartbeat && line.epoch > afterEpoch);
+  const first = claims[0];
+  if (!first || first.epoch !== afterEpoch + 1 || first.ts < startedAt) return item;
+  if (claims.some(line => line.claim.holder !== first.claim.holder)) return item;
+  if (lines.some(line => line.release && line.epoch >= first.epoch)) return item;
+  if (item.claim.holder !== first.claim.holder) return item;
+  // A concurrent new claim fences this append out through its newer epoch.
+  return releaseWorkItem(projectDir, id, { epoch: item.epoch, now });
 }
 
 export { LEASE_MS };
