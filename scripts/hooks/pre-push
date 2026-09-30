@@ -51,6 +51,14 @@ set -u
 # check beside it is found wherever the push runs from.
 hookdir=$(cd "$(dirname "$0")" && pwd)
 
+# NOT TO THE RETIRED REPOSITORY, whatever the push carries, and before anything
+# else runs. A checkout whose origin was never repointed sent a green push
+# there on 2026-09-29. See scripts/push-destination.mjs.
+guard="$hookdir/../push-destination.mjs"
+if [ -f "$guard" ]; then
+  node "$guard" "${1:-}" "${2:-}" || exit 1
+fi
+
 # Read the refs first, so a push that only deletes branches costs nothing. They
 # are kept, because the privacy check below needs the same lines.
 refs=$(cat)
