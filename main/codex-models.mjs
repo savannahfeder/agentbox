@@ -27,10 +27,9 @@
 // models (checked against 0.148.0), and even if it did, a picker must never be
 // the reason a login shell is spawned while she is typing.
 //
-// AND NOTHING HERE IS CACHED IN MEMORY, for the reason main/codex-bin.mjs
-// gives about its own stat calls: caching a cheap read is how a screen ends up
-// still saying the old answer after the thing changed underneath it. The CLI
-// rewrites this file whenever its etag moves, and a spawn is not a hot path.
+// A successful model/list refresh now keeps an account-scoped live catalog in
+// memory. Startup and hourly refreshes replace it; before the first success,
+// the CLI-maintained disk cache remains the fallback.
 //
 // ---------------------------------------------------------------------------
 // TWO QUESTIONS, NOT ONE, AND THE 2026-08-26 ORIGINAL ONLY ASKED THE FIRST.
