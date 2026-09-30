@@ -1,4 +1,5 @@
 import { artifactSampleChange, artifactSampleNotes, reviewSampleChange } from './artifact-fixtures';
+import {updateFixture} from './agent-update-fixture';
 // One seam between the UI and the world. Real mode talks to the preload
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
@@ -29,6 +30,7 @@ installBrowserBridge();
 // it runs.
 const search = typeof location === 'undefined' ? '' : location.search;
 const params = new URLSearchParams(search);
+const modelUpdateFixture=updateFixture(params.get('modelUpdates')==='fail');
 const useFixtures = params.has('fixtures') || typeof window === 'undefined' || !window.zero;
 const emptyFixtures = params.get('fixtures') === 'empty';
 // ?working=3 puts three running agents into ?fixtures=empty. The empty
@@ -376,7 +378,13 @@ export const api = {
     return window.zero!.dashboard(slug);
   },
 
+  async agentUpdate(engine:string,action:'check'|'recheck'|'start'|'status'|'refresh'):Promise<any>{
+    if(useFixtures)return params.has('modelUpdates')?modelUpdateFixture.action(engine,action):{engine,state:'current'};
+    if(!window.zero?.agentUpdate)return {engine,state:'unknown'};
+    return window.zero.agentUpdate({engine,action});
+  },
   async terminal(p: Parameters<NonNullable<Window['zero']>['terminal']>[0]): Promise<any> {
+    if(useFixtures&&p.product==='@agent-update'&&params.has('modelUpdates'))return modelUpdateFixture.terminal(p);
     if(useFixtures) throw new Error('Terminal requires the desktop app and a real task.');
     if(!window.zero?.terminal) throw new Error(`Restart ${NAME} to use the terminal.`);
     return window.zero.terminal(p);

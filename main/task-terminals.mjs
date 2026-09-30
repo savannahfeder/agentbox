@@ -133,7 +133,8 @@ export class TaskTerminals {
     }
     const place=this.resolve(key);
     const cwd=typeof place==='string'?place:place.cwd;
-    const pty=this.spawn(this.shell,['-l'],{cwd,env:this.env,cols:80,rows:24,name:'xterm-256color'});
+    const command=place?.command;
+    const pty=this.spawn(command?.file??this.shell,command?.args??['-l'],{cwd,env:{...this.env,...command?.env},cols:80,rows:24,name:'xterm-256color'});
     let resolveExit;const exitPromise=new Promise(resolve=>{resolveExit=resolve;});
     const session={token:randomUUID(),pty,cwd,buffer:'',offset:0,exitCode:null,exited:false,exitPromise,lastReadAt:this.now()};this.sessions.set(key,session);
     /*

@@ -13,6 +13,7 @@
 /** Asked, and the screen waits for the answer. */
 export const REQUEST_CHANNELS = {
   terminal: 'zero:terminal',
+  agentUpdate: 'zero:agent-update',
   snapshot: 'zero:snapshot',
   dashboard: 'zero:dashboard',
   commandCatalog: 'zero:command-catalog',

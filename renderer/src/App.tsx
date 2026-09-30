@@ -796,7 +796,7 @@ export default function App() {
   // reachable from three places long after the walk is over, and it wants the
   // same answer.
   useEffect(() => {
-    api.settings().then((s) => {
+    const readModels=()=>api.settings().then((s) => {
       const said = s.workspace?.homePath;
       if (typeof said === 'string' && said) setHome(said);
       // AND WHAT THIS MAC'S CLAUDE CODE CALLS ITS MODELS, which is set BEFORE
@@ -811,6 +811,8 @@ export default function App() {
       if (Array.isArray(models)) setCodexModels(models);
       setCodexModelDefault(s.workspace?.codexModelDefault ?? null);
     }).catch(() => { /* nothing here stops because a setting did not read */ });
+    void readModels();window.addEventListener('agent-models-changed',readModels);
+    return()=>window.removeEventListener('agent-models-changed',readModels);
   }, []);
 
   // CLAUDE CODE IS ASKED ABOUT ONCE, AT THE END, AND NOWHERE ELSE.
@@ -5668,4 +5670,3 @@ export default function App() {
     </div>
   );
 }
-
