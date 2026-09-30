@@ -27,10 +27,9 @@
 // models (checked against 0.148.0), and even if it did, a picker must never be
 // the reason a login shell is spawned while she is typing.
 //
-// AND NOTHING HERE IS CACHED IN MEMORY, for the reason main/codex-bin.mjs
-// gives about its own stat calls: caching a cheap read is how a screen ends up
-// still saying the old answer after the thing changed underneath it. The CLI
-// rewrites this file whenever its etag moves, and a spawn is not a hot path.
+// A successful model/list refresh now keeps an account-scoped live catalog in
+// memory. Startup and hourly refreshes replace it; before the first success,
+// the CLI-maintained disk cache remains the fallback.
 //
 // ---------------------------------------------------------------------------
 // TWO QUESTIONS, NOT ONE, AND THE 2026-08-26 ORIGINAL ONLY ASKED THE FIRST.
@@ -60,6 +59,12 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+const liveCatalogs=new Map();
+export function rememberCodexModels(home,models){
+ const rows=models.filter(m=>typeof m.model==='string'&&m.model).map((m,i)=>({slug:m.model,display_name:m.displayName,visibility:m.hidden?'hide':'list',priority:i,default_reasoning_level:m.defaultReasoningEffort,supported_reasoning_levels:(m.supportedReasoningEfforts||[]).map(l=>({effort:l.reasoningEffort,description:l.description}))}));
+ if(rows.length)liveCatalogs.set(home,rows);
+}
+const catalogRows=(home,read)=>liveCatalogs.get(home)??modelRows(read(path.join(home,'models_cache.json')));
 
 /**
  * WHICH CODEX HOME. Her own setting first, then the environment, then the
@@ -93,7 +98,7 @@ export function codexHome({ configured = null, env = process.env, home = os.home
  * supervisor's refusal is built to need a list before it refuses anything.
  */
 export function codexModels({ home = codexHome(), read = readJson } = {}) {
-  return modelRows(read(path.join(home, 'models_cache.json')))
+  return catalogRows(home,read)
     .filter((m) => m.visibility === 'list')
     .sort((a, b) => priorityOf(a) - priorityOf(b))
     .map((m) => ({
@@ -112,7 +117,7 @@ export function codexModels({ home = codexHome(), read = readJson } = {}) {
  * were handed the word, which is a different question from what she may pick.
  */
 export function codexKnownSlugs({ home = codexHome(), read = readJson } = {}) {
-  return new Set(modelRows(read(path.join(home, 'models_cache.json'))).map((m) => String(m.slug)));
+  return new Set(catalogRows(home,read).map((m) => String(m.slug)));
 }
 
 /**
@@ -126,7 +131,7 @@ export function codexKnownSlugs({ home = codexHome(), read = readJson } = {}) {
  * `codexModels`, asked about the other field.
  */
 export function codexModelLevels(slug, { home = codexHome(), read = readJson } = {}) {
-  const cache = read(path.join(home, 'models_cache.json'));
+  const cache = liveCatalogs.has(home)?{models:liveCatalogs.get(home)}:read(path.join(home, 'models_cache.json'));
   if (!cache) return null;
   const row = modelRows(cache).find((m) => m.slug === slug);
   if (!row) return null;

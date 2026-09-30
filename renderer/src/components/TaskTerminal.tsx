@@ -7,7 +7,7 @@ import '@xterm/xterm/css/xterm.css';
 import './task-terminal.css';
 const screenCache=new Map<string,{token:string;screen:string;offset:number;cols:number;rows:number}>();
 const views=new Map<string,{open:boolean;placement:'bottom'|'side'}>();
-export function TaskTerminal({product,id,headerTarget,startOpen=false}:{product:string;id:string;headerTarget?:HTMLElement|null;
+export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSession=false}:{product:string;id:string;headerTarget?:HTMLElement|null;commandSession?:boolean;
   /**
    * OPEN WITHOUT BEING ASKED, for the one caller that IS the terminal rather
    * than a task that happens to have one: the Codex sign in on Settings. A
@@ -74,7 +74,7 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false}:{product:
       onHide={()=>setOpen(false)}/>
     {error&&<div className="task-terminal-message" role="alert">{error} <button onClick={()=>setRevision(v=>v+1)}>Retry</button></div>}
     <div className="task-terminal-screen" ref={host}/>
-    {exited&&<div className="task-terminal-message">Shell exited. <button onClick={()=>void restart()}>New session</button></div>}
+    {exited&&<div className="task-terminal-message">{commandSession?'Command exited.':<>Shell exited. <button onClick={()=>void restart()}>New session</button></>}</div>}
     {/* The name was the one live word in it, read from shared/product-name.mjs; there is
        nothing left here to read it into.
      */}

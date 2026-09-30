@@ -17,6 +17,7 @@ import {
 } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortShown, type EffortChoice } from '../effort';
 import { useKeepInWindow } from '../keep-in-window';
+import {useAgentUpdates} from './AgentUpdates';
 
 // THE EFFORT LIVES IN HERE TOO.The levels sit under a hairline at the foot of
 // this drawer, as a strip, and the sentence outside stays "On Fable 5.1."
@@ -54,6 +55,10 @@ export function ModelPicker({ value, onChange, title, onOpenChange, engine = nul
   codexDefault?: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const {updates,start}=useAgentUpdates();
+  const updateEngine=engine==='codex'?'codex':'claude';
+  const update=updates[updateEngine];
+  const showUpdate=['available','running','failed'].includes(update?.state);
   const [cursor, setCursor] = useState(0);
   // A span, not a div: this sits inside a line of prose and a div there is not
   // phrasing content.
@@ -69,7 +74,7 @@ export function ModelPicker({ value, onChange, title, onOpenChange, engine = nul
   const lit = effortShown(effort, efforts, defaultEffortFor(engine, value, { codexModels, codexDefault }));
 
   useEffect(() => { onOpenChange?.(open); }, [open]);
-  useKeepInWindow(wrap, open, [rows.length, efforts.length]);
+  useKeepInWindow(wrap, open, [rows.length, efforts.length,showUpdate]);
 
   useEffect(() => {
     if (!open) return;
@@ -89,6 +94,7 @@ export function ModelPicker({ value, onChange, title, onOpenChange, engine = nul
     <span className="compose-word-wrap" ref={wrap}>
       {open && (
         <span className="prio-menu model-menu" role="listbox" aria-label="Model">
+          {showUpdate&&<span className="model-update-row"><span>{updateEngine==='codex'?'Codex':'Claude Code'}</span><button type="button" title={`Update ${updateEngine==='codex'?'Codex':'Claude Code'} in the app terminal`} onClick={()=>{setOpen(false);start(updateEngine);}}>{update.state==='running'?'Updating…':'Update now'}</button></span>}
           {rows.map((m, i) => (
             <button
               key={m.id}

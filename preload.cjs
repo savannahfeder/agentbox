@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('zero', {
   terminal: (payload) => ipcRenderer.invoke('zero:terminal', payload),
+  agentUpdate: (payload) => ipcRenderer.invoke('zero:agent-update', payload),
   snapshot: () => ipcRenderer.invoke('zero:snapshot'),
   dashboard: (slug) => ipcRenderer.invoke('zero:dashboard', slug),
   commandCatalog: (payload) => ipcRenderer.invoke('zero:command-catalog', payload),

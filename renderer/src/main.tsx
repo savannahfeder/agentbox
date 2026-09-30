@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import {AgentUpdates} from './components/AgentUpdates';
 import '@fontsource-variable/source-sans-3';
 import './styles.css';
 import './workspace-navigation.css';
@@ -55,7 +56,7 @@ const boot = () => {
   paintTheLook();
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <App />
+      <AgentUpdates><App /></AgentUpdates>
     </React.StrictMode>
   );
 };

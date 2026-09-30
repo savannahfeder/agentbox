@@ -21,6 +21,8 @@ import {submitReply} from './live-replies.mjs';
 import {terminalSenderAllowed} from './terminal-access.mjs';
 import {TaskTerminals,terminalPlace} from './task-terminals.mjs';
 import {SETTINGS_TERMINAL} from '../shared/settings-terminal.mjs';
+import {AgentUpdates,installedAgent} from './agent-updates.mjs';
+import {refreshAgentModels} from './refresh-agent-models.mjs';
 import {readInstruction,writeInstruction,listVersions,readVersion} from './instruction-settings.mjs';
 import path from 'node:path';
 import os from 'node:os';
@@ -304,17 +306,32 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const agent=id.startsWith('agent:')?liveAgents().find(a=>'agent:'+a.pid===id && (a.product??'')===product):null;
     return terminalPlace({store,supervisor,product,id,agent});
   }});
+  const agentUpdates=new AgentUpdates({
+    installation:async engine=>{if(engine==='claude')recheckClaude(config);else recheckCodex(config);return installedAgent(engine,config);},
+    refresh:async engine=>{if(engine==='claude')recheckClaude(config);else recheckCodex(config);await refreshAgentModels(engine,config,supervisor._codexHome());if(engine==='codex')for(const profile of supervisor._codexProfiles())supervisor._releaseIdleCodex(profile);},
+  });
+  ipcMain.handle('zero:agent-update',async(event,{engine,action}={})=>{
+    if(event.senderFrame?.parent||(event.sender&&event.sender!==window.webContents))throw Error('Updates are only available in the main app window.');
+    if(!['claude','codex'].includes(engine))throw Error('Unknown agent.');
+    if(action==='check')return agentUpdates.check(engine);
+    if(action==='recheck')return agentUpdates.check(engine,true);
+    if(action==='start')return agentUpdates.start(engine);
+    if(action==='status')return agentUpdates.status(engine);
+    if(action==='refresh'){await refreshAgentModels(engine,config,supervisor._codexHome());return true;}
+    throw Error('Unknown update action.');
+  });
   let terminalQuitPending=false,terminalQuitReady=false;
   app.on('before-quit',event=>{
-    if(terminalQuitReady||(!terminalQuitPending&&!terminals.sessions.size))return;
+    if(terminalQuitReady||(!terminalQuitPending&&!terminals.sessions.size&&!agentUpdates.terminals.sessions.size))return;
     event.preventDefault();
-    if(!terminalQuitPending){terminalQuitPending=true;void terminals.shutdown().finally(()=>{terminalQuitReady=true;app.quit();});}
+    if(!terminalQuitPending){terminalQuitPending=true;void Promise.all([terminals.shutdown(),agentUpdates.shutdown()]).finally(()=>{terminalQuitReady=true;app.quit();});}
   });
   ipcMain.handle('zero:terminal',(_event,payload={})=>{
     if(_event.senderFrame?.parent || (_event.sender && _event.sender!==window.webContents)) throw Error('Terminal is only available in the main app window.');
     const {product,id,action,data,cols,rows,offset}=payload;
     if(typeof product!=='string'||typeof id!=='string'||!id||id.length>300)throw Error('Invalid task.');
     const key=JSON.stringify({product,id});
+    if(product==='@agent-update')return agentUpdates.terminal(id,payload);
     switch(action){
       case 'open':return terminals.open(key);
       case 'read':return terminals.read(key,offset);
