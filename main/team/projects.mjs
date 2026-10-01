@@ -49,7 +49,7 @@ export function readTeam(dir) {
 export function listSharedProjects(products) {
   return products
     .filter((p) => p.team?.projectId)
-    .map((p) => ({ projectId: p.team.projectId, dir: p.dir, name: p.name, slug: p.slug }));
+    .map((p) => ({ projectId: p.team.projectId, dir: p.dir, name: p.name, slug: p.slug, direct: p.team.direct === true }));
 }
 
 // Mark a local project shared. Its cloud id is minted the first time and kept
@@ -76,7 +76,7 @@ export function joinSharedProject(accountRoot, cloudProject) {
     // The same project joined before (a folder that already carries its id) is
     // not joined twice.
     if (readTeam(path.join(accountRoot, slug))?.projectId === cloudProject.id) {
-      return { projectId: cloudProject.id, dir: path.join(accountRoot, slug), name: cloudProject.name, slug };
+      return { projectId: cloudProject.id, dir: path.join(accountRoot, slug), name: cloudProject.name, slug, direct: readTeam(path.join(accountRoot, slug))?.direct === true };
     }
     slug = `${base}-${n}`;
   }
@@ -96,7 +96,7 @@ export function joinSharedProject(accountRoot, cloudProject) {
       ...(cloudProject.direct ? { direct: true } : {}),
     },
   });
-  return { projectId: cloudProject.id, dir, name: cloudProject.name, slug };
+  return { projectId: cloudProject.id, dir, name: cloudProject.name, slug, direct: cloudProject.direct === true };
 }
 
 // THE RECORD A MESSAGE BETWEEN TWO PEOPLE LIVES IN, made on the sender's Mac

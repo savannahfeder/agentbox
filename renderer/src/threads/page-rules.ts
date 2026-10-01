@@ -111,6 +111,10 @@ export function teamEntries({ items, products, cards, me, now }: { items: WorkIt
     if (item.agent) continue;
     const product = bySlug.get(item.product);
     if (!product || isDirect(product)) continue;
+    // A teammate's row that synced into a shared project is theirs, and their
+    // card already stands for it; drawn here it would be on the board twice,
+    // once under your name.
+    if (me && item.createdBy && item.createdBy !== me) continue;
     const state = threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
     out.push({
@@ -120,6 +124,10 @@ export function teamEntries({ items, products, cards, me, now }: { items: WorkIt
   }
   for (const card of cards) {
     if (card.personId === me) continue;
+    // A PRIVATE THREAD IS NOT ON THE BOARD AT ALL (decided 2026-10-01, from six
+    // interviews: "a lock gets noticed"). Cards are no longer published for
+    // them; one left over from before is skipped here.
+    if (!card.visible) continue;
     if (card.state === 'done' && !(card.updatedAt >= today)) continue;
     out.push({
       key: `card/${card.personId}/${card.threadId}`, ownerId: card.personId, state: card.state, title: card.visible ? card.title : null,

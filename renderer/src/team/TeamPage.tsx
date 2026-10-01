@@ -100,18 +100,28 @@ function SignIn({ error }: { error: string | null }) {
 function TeamSetup({ team, products, onDone }: { team: TeamState; products: Product[]; onDone?: () => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  // AN INVITE IS ASKED, NEVER TAKEN UP ON ITS OWN (review, 2026-10-01). Not
+  // now hides it until the page is opened again.
+  const [notNow, setNotNow] = useState<string[]>([]);
   const { busy, error, run } = useCall();
   const me = team.me;
+  const invite = (team.invites ?? []).find((i) => !notNow.includes(i.teamId));
   return <div className="tm-setup">
     <div className="tm-signed">{me && <Face person={me} me />}<span>Signed in as {me?.email}</span><button className="tm-btn" disabled={busy} onClick={() => run(() => api.teamSignOut())}>Sign out</button></div>
-    {!team.team ? <>
+    {!team.team && invite ? <>
+      <h2>{invite.invitedByName ? `${invite.invitedByName.split(/\s+/)[0]} invited you to ${invite.teamName}.` : `You are invited to ${invite.teamName}.`} Join?</h2>
+      <div className="tm-field-row">
+        <button className="tm-btn" disabled={busy} onClick={() => run(() => api.teamAcceptInvite(invite.teamId))}>Join</button>
+        <button className="tm-btn" disabled={busy} onClick={() => setNotNow([...notNow, invite.teamId])}>Not now</button>
+      </div>
+    </> : !team.team ? <>
       <h2>Start your team</h2>
-      <p>Name it, then invite people by email. Anyone you invite joins when they sign in with that email.</p>
+      <p>Name it, then invite people by email. Anyone you invite is asked to join when they sign in with that email.</p>
       <form className="tm-field-row" onSubmit={(e) => { e.preventDefault(); void run(() => api.teamCreate(name)); }}>
         <input className="tm-input" placeholder="Team name" value={name} onChange={(e) => setName(e.target.value)} />
         <button className="tm-btn" disabled={busy || !name.trim()}>Start team</button>
       </form>
-      <p>Waiting for an invite instead? Ask a teammate to invite {me?.email}. You join within a few seconds of it.</p>
+      <p>Waiting for an invite instead? Ask a teammate to invite {me?.email}. It shows up here within a few seconds.</p>
     </> : <>
       <h2>{team.team.name}</h2>
       <div className="tm-section">People</div>

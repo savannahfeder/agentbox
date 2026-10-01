@@ -610,6 +610,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:team-sign-in', teamCall(() => team.signIn()));
   ipcMain.handle('zero:team-sign-out', teamCall(() => team.signOut()));
   ipcMain.handle('zero:team-create', teamCall(({ name }) => team.createTeam(name)));
+  // An invite answered yes. Nothing else joins a team.
+  ipcMain.handle('zero:team-accept-invite', teamCall(({ teamId }) => team.acceptInvite(teamId)));
   ipcMain.handle('zero:team-invite', teamCall(({ email }) => team.invite(email)));
   ipcMain.handle('zero:team-share', teamCall(({ product, visibility, people }) => team.share(product, { visibility, people })));
   ipcMain.handle('zero:team-sync', teamCall(() => team.syncNow()));

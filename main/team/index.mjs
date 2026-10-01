@@ -5,7 +5,9 @@
 // is signed in:
 //   - stamps every ledger line this Mac writes with their person id, here and
 //     in the store server the supervisor starts (AGENTBOX_PERSON_ID);
-//   - joins any team that invited their email;
+//   - shows them the invites waiting for their email, and joins one only when
+//     they say yes (acceptInvite). Once this Mac is in a team it stays in that
+//     team: an invite, or an older team somebody made, never moves it;
 //   - syncs every few seconds, and at once when a teammate writes;
 //   - answers the window's questions: who am I, who is on my team, what are
 //     my teammates' private tasks doing.
@@ -16,7 +18,7 @@ import { firstSentence } from '../../shared/thread-cards.mjs';
 import { cardsFor } from '../../shared/thread-cards.mjs';
 import fs from 'node:fs';
 
-const EMPTY = { configured: false, signedIn: false, me: null, team: null, people: [], cards: [], lastSyncAt: null, error: null };
+const EMPTY = { configured: false, signedIn: false, me: null, team: null, invites: [], people: [], cards: [], lastSyncAt: null, error: null };
 
 export function createTeamService({
   session, store, disk, accountRoot, stateFile, onChange = () => {}, log = () => {}, intervalMs = 5000,
@@ -27,11 +29,25 @@ export function createTeamService({
   let timer = null;
   let unsubscribe = null;
   let pending = null;
+  // The sync cursors and which team this Mac is in, in one file.
+  let local = null;
+  const kept = () => (local ??= fileSyncState(stateFile, fs));
 
   const set = (patch) => { state = { ...state, ...patch }; onChange(); };
 
   function products() {
     try { return store.listProducts(); } catch { return []; }
+  }
+
+  // THE MESSAGE RECORD OF EXACTLY TWO PEOPLE, made by one of them (see
+  // `message` below for why both halves matter).
+  function directWith(me, to) {
+    const two = new Set([me, to]);
+    const justUs = (t) => {
+      const on = new Set([...t.people, ...(t.sharedBy ? [t.sharedBy] : [])]);
+      return two.has(t.sharedBy) && on.size === 2 && [...on].every((p) => two.has(p));
+    };
+    return products().find((p) => p.team?.direct && justUs(p.team)) ?? null;
   }
 
   // THE CONVERSATION IN A MESSAGE RECORD: its most recently touched row. Older
@@ -43,11 +59,22 @@ export function createTeamService({
     return rows.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0] ?? null;
   }
 
+  // THE TEAM THIS MAC IS IN IS THE ONE IT REMEMBERS. Found by review
+  // 2026-10-01: the app took whichever of your teams was oldest, and joined
+  // every team that invited you at each start, so a team made with a
+  // backdated created_at and an invite moved your work into it unasked. Now
+  // the first team is remembered, and a remembered team you are no longer on
+  // leaves you in no team rather than in another one.
   async function refreshTeam() {
-    const team = await backend.myTeam();
+    const me = state.me?.id;
+    const teams = await backend.myTeams();
+    const remembered = me ? kept().getTeam(me) : null;
+    const team = remembered ? teams.find((t) => t.id === remembered) ?? null : teams[0] ?? null;
+    if (team && !remembered && me) kept().setTeam(me, team.id);
     const people = team ? await backend.teamPeople(team.id) : [];
     const cards = team ? await backend.listCards() : [];
-    set({ team, people, cards });
+    const invites = team ? [] : await backend.pendingInvites();
+    set({ team, people, cards, invites });
   }
 
   async function syncNow() {
@@ -55,9 +82,9 @@ export function createTeamService({
     if (pending) return pending;
     pending = (async () => {
       try {
-        // An invite sent after this person signed in is taken up here, not at
-        // their next sign-in.
-        if (!state.team) { await backend.acceptInvites(); await refreshTeam(); }
+        // An invite sent after this person signed in shows up here, not at
+        // their next sign-in. It is offered, never taken up.
+        if (!state.team) await refreshTeam();
         const report = await sync.syncOnce();
         // The people are read again on every pass, with the activity, so a
         // teammate who joined after this Mac signed in has a name and a face
@@ -67,6 +94,7 @@ export function createTeamService({
           : [[], []];
         set({ lastSyncAt: Date.now(), error: null, cards, people });
         if (report.joined.length || report.pulled) log(`team: joined ${report.joined.length}, pulled ${report.pulled}, pushed ${report.pushed}`);
+        if (report.notJoined) log(`team: left ${report.notJoined} shared project(s) unjoined, this Mac already holds the most it takes on by itself`);
         return report;
       } catch (err) {
         set({ error: String(err?.message ?? err) });
@@ -91,13 +119,12 @@ export function createTeamService({
     if (!me) throw new Error('signed in, but no person record came back');
     disk.setLineAuthor(me.id);
     process.env.AGENTBOX_PERSON_ID = me.id;
-    await backend.acceptInvites();
     set({ signedIn: true, me, error: null });
     await refreshTeam();
     sync = createTeamSync({
       backend,
       disk,
-      state: fileSyncState(stateFile, fs),
+      state: kept(),
       listShared: () => listSharedProjects(products()),
       joinProject: (project) => joinSharedProject(accountRoot, project),
       listCards: () => cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir) }),
@@ -146,8 +173,22 @@ export function createTeamService({
       if (!backend) throw new Error('sign in first');
       const clean = String(name ?? '').trim();
       if (!clean) throw new Error('a team needs a name');
-      await backend.createTeam(clean);
+      const made = await backend.createTeam(clean);
+      kept().setTeam(state.me.id, made.id);
       await refreshTeam();
+      return state;
+    },
+
+    // JOIN A TEAM BECAUSE ITS INVITE WAS ANSWERED YES, and only then. A Mac
+    // already in a team does not move: that is a choice nobody offers here.
+    async acceptInvite(teamId) {
+      if (!backend || !state.me) throw new Error('sign in first');
+      if (state.team) throw new Error(`this Mac is already in ${state.team.name}`);
+      if (!state.invites.some((i) => i.teamId === teamId)) throw new Error('that invite is no longer waiting');
+      await backend.acceptInvite(teamId);
+      kept().setTeam(state.me.id, teamId);
+      await refreshTeam();
+      await syncNow();
       return state;
     },
 
@@ -180,7 +221,7 @@ export function createTeamService({
     conversation(to) {
       const me = state.me?.id;
       if (!me || !to) return null;
-      const product = products().find((p) => p.team?.direct && p.team.people.includes(to) && p.team.people.includes(me));
+      const product = directWith(me, to);
       const convo = product ? conversationIn(product.slug) : null;
       return convo ? { product: product.slug, id: convo.id } : null;
     },
@@ -192,7 +233,11 @@ export function createTeamService({
       if (!state.people.some((p) => p.id === to)) throw new Error('that person is not on your team');
       const text = String(body ?? '').trim();
       if (!text) throw new Error('a message needs some words');
-      let product = products().find((p) => p.team?.direct && p.team.people.includes(to) && p.team.people.includes(me));
+      // THE RECORD IS REUSED ONLY IF IT IS EXACTLY THE TWO OF YOU AND ONE OF
+      // YOU MADE IT. Found by review 2026-10-01: a teammate could make a
+      // "direct" record holding you and somebody else, and the next message
+      // either of you sent the other went into it, where its maker read it.
+      let product = directWith(me, to);
       if (!product) {
         const made = makeDirect(accountRoot, { teamId: state.team.id, me, other: to });
         await backend.shareProject({ id: made.projectId, teamId: state.team.id, name: 'Direct', visibility: 'people', people: [to], direct: true });

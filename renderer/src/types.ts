@@ -144,11 +144,20 @@ export interface ThreadCard {
 }
 
 /** The team, as the main process sees it (main/team/index.mjs). */
+export interface TeamInvite {
+  teamId: string;
+  teamName: string;
+  invitedBy: string | null;
+  invitedByName: string | null;
+}
+
 export interface TeamState {
   configured: boolean;
   signedIn: boolean;
   me: Person | null;
   team: { id: string; name: string } | null;
+  /** Invites waiting for your confirmed email, while you are in no team. Joining one needs your yes. */
+  invites?: TeamInvite[];
   people: Person[];
   /** Every card in the team, yours included (shared/thread-cards.mjs). */
   cards: ThreadCard[];
@@ -870,6 +879,7 @@ declare global {
       teamSignIn(): Promise<TeamCallResult>;
       teamSignOut(): Promise<TeamCallResult>;
       teamCreate(p: { name: string }): Promise<TeamCallResult>;
+      teamAcceptInvite(p: { teamId: string }): Promise<TeamCallResult>;
       teamInvite(p: { email: string }): Promise<TeamCallResult>;
       teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult>;
       teamSync(): Promise<TeamCallResult>;

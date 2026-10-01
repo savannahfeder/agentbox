@@ -2,6 +2,8 @@
 // against the tables in cloud/supabase/migrations, through a supabase-js
 // client that is already signed in. Row level security on the server is what
 // actually keeps people apart; nothing here is trusted to.
+import { asPulled } from '../../shared/team-rules.mjs';
+
 const PAGE = 500;
 const PUSH_BATCH = 200;
 
@@ -32,15 +34,33 @@ export function supabaseBackend(client) {
       return personOut(rows[0]) ?? null;
     },
 
-    async acceptInvites() {
+    // THE INVITES WAITING FOR YOU, to the email Google confirmed. Nothing is
+    // joined by reading them: joining is acceptInvite, one team, on a yes.
+    async pendingInvites() {
       await myId();
-      return must(await client.rpc('accept_invites'), 'joining your team') ?? [];
+      const rows = must(await client.rpc('pending_invites'), 'reading your invites') ?? [];
+      return rows.map((r) => ({ teamId: r.team_id, teamName: r.team_name, invitedBy: r.invited_by ?? null, invitedByName: r.invited_by_name ?? null }));
+    },
+
+    async acceptInvite(teamId) {
+      await myId();
+      must(await client.rpc('accept_invite', { p_team: teamId }), 'joining the team');
+      return teamId;
+    },
+
+    // Every team you are on, oldest first. Which one this Mac is in is the
+    // Mac's own record (main/team/index.mjs), never this order alone.
+    async myTeams() {
+      const id = await myId();
+      const members = must(await client.from('team_members').select('team_id').eq('person_id', id), 'reading your team');
+      const ids = members.map((m) => m.team_id);
+      if (!ids.length) return [];
+      const rows = must(await client.from('teams').select('id,name').in('id', ids).order('created_at'), 'reading your team');
+      return rows.map((r) => ({ id: r.id, name: r.name }));
     },
 
     async myTeam() {
-      await myId();
-      const rows = must(await client.from('teams').select('id,name').order('created_at').limit(1), 'reading your team');
-      return rows[0] ? { id: rows[0].id, name: rows[0].name } : null;
+      return (await this.myTeams())[0] ?? null;
     },
 
     async createTeam(name) {
@@ -107,20 +127,24 @@ export function supabaseBackend(client) {
     },
 
     async pullLines(projectId, afterSeq = 0, limit = PAGE) {
-      await myId();
-      const rows = must(await client.from('lines').select('seq,body,by_person').eq('project_id', projectId).gt('seq', afterSeq).order('seq').limit(limit), 'reading your team\'s changes');
+      const me = await myId();
+      const rows = must(await client.from('lines').select('seq,body,by_person,created_at').eq('project_id', projectId).gt('seq', afterSeq).order('seq').limit(limit), 'reading your team\'s changes');
       // WHO WROTE A LINE IS THE COLUMN THE DATABASE CHECKED, never the copy
       // inside the line: row level security makes by_person the signed-in
       // writer, while the body is whatever their Mac sent. A teammate who
-      // wrote somebody else's id into a body would otherwise be believed.
-      return rows.map((r) => ({ seq: Number(r.seq), line: { ...r.body, by: r.by_person } }));
+      // wrote somebody else's id into a body would otherwise be believed. WHEN
+      // is the database's too, and their Mac's lease fields are dropped
+      // (shared/team-rules.mjs asPulled).
+      return rows.map((r) => ({ seq: Number(r.seq), line: asPulled(r.body, { by: r.by_person, at: Date.parse(r.created_at), me }) }));
     },
 
     // YOUR CARDS: one per thread worth showing the team (shared/thread-cards.mjs).
     // Upserted whole, and any card of yours the Mac no longer lists is removed,
-    // so a thread made private or finished yesterday leaves the board.
-    async putCards(teamId, cards) {
+    // so a thread made private or finished yesterday leaves the board. A card
+    // not marked visible never goes up at all, whatever the Mac handed over.
+    async putCards(teamId, all) {
       const me = await myId();
+      const cards = all.filter((c) => c.visible === true);
       if (cards.length) {
         must(await client.from('thread_cards').upsert(cards.map((c) => ({
           person_id: me, team_id: teamId, thread_id: c.threadId, visible: !!c.visible,
