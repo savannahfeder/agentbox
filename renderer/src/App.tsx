@@ -16,7 +16,7 @@ import { readySkin, swapLook } from './look-switch';
 import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import { api } from './api';
 import { setClaudeModels } from './models';
-import { advanceAfter, type Advance } from './advance';
+import { advanceAfter, nextAfterAdvance, type Advance } from './advance';
 import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
 import { isTroubleRow, troubleRow } from './trouble-row';
@@ -106,7 +106,7 @@ import {
   saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, wearsTheWalksLook, whyNotMade, type FirstRun,
 } from './onboarding';
 import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from './priority';
-import { NO_FILTER, filterMenu, filterTags, isFiltering, matchesBoxFilter, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
+import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
 import { BoxFilter } from './components/BoxFilter';
 import { itemPriority, moveProduct, productRankScore } from '../../shared/rank.mjs';
 import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
@@ -1935,12 +1935,7 @@ export default function App() {
       : view === 'progress' ? progress
         : view === 'all' ? allOpen
           : done;
-  const shownBox = useMemo(
-    () => (isFiltering(boxFilter)
-      ? wholeBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || matchesBoxFilter(i, boxFilter))
-      : wholeBox),
-    [wholeBox, boxFilter],
-  );
+  const shownBox = useMemo(() => filterBox(wholeBox, boxFilter), [wholeBox, boxFilter]);
   // THE DISPLAY MENU'S FILTERS AND SORT, on top of the box (approved
   // 2026-10-01). Remembered per page; the Inbox is a list by default and the
   // Team a board.
@@ -1951,6 +1946,14 @@ export default function App() {
   const displayedBox = useMemo(
     () => sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay),
     [shownBox, inboxDisplay, now],
+  );
+  // The inbox as she sees it, whichever tab is up: her filter AND her display
+  // menu. Finishing a task from inside it advances through THIS, never the
+  // whole inbox, or the next task opened can be one she has hidden
+  // (w-27759abd33).
+  const shownInbox = useMemo(
+    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay),
+    [inbox, boxFilter, inboxDisplay, now],
   );
   const list = search !== null ? (hits ?? []).map((h) => h.item) : displayedBox;
   const boxFilterMenu = useMemo(
@@ -2498,9 +2501,9 @@ export default function App() {
     setView('inbox');
     // Pointed at the row she was just reading, which is where it now sits with
     // its answer on it, rather than at the top of a list she did not ask for.
-    const at = inbox.findIndex((i) => i.id === following.id && i.product === following.product);
+    const at = shownInbox.findIndex((i) => i.id === following.id && i.product === following.product);
     setSelected(at >= 0 ? at : 0);
-  }, [focused, following, inbox]);
+  }, [focused, following, shownInbox]);
 
   // She clicked the banner, so open the row it was about. It lands her on the
   // card rather than on whatever the cursor was left on, which is the whole
@@ -2736,9 +2739,9 @@ export default function App() {
   // cost her are in ./advance; what is here is only which state answers "was a
   // task open when she acted", and that is `focused`.
   const noteAdvance = useCallback((item: WorkItem) => {
-    const index = inbox.findIndex((i) => i.id === item.id);
+    const index = shownInbox.findIndex((i) => i.id === item.id);
     advanceRef.current = advanceAfter({ fromTask: !!focused, index, id: item.id });
-  }, [inbox, focused]);
+  }, [shownInbox, focused]);
 
   // AND EVERY WAY A ROW LEAVES HER INBOX CLOSES THE TASK THROUGH HERE.
   //
@@ -4101,11 +4104,9 @@ export default function App() {
     const pending = advanceRef.current;
     if (!pending || view !== 'inbox' || focused) return;
     advanceRef.current = null;
-    const remaining = inbox.filter((i) => i.id !== pending.excludeId);
-    const index = Math.min(pending.index, remaining.length - 1);
-    const next = remaining[index];
-    if (next) { setFocused(next); markSeen(next); setSelected(index); }
-  }, [inbox, view, focused, markSeen]);
+    const next = nextAfterAdvance(shownInbox, pending);
+    if (next) { setFocused(next.item); markSeen(next.item); setSelected(next.index); }
+  }, [shownInbox, view, focused, markSeen]);
 
   /* -------------------------------- render -------------------------------- */
   // (Hooks live ABOVE the boot return: below it, React counts them
