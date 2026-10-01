@@ -44,8 +44,9 @@ describe('the cards a Mac publishes', () => {
   const products = [{ slug: 'nw', name: 'Northwind', team: null }, { slug: 'dm', name: 'dm', team: { direct: true } }];
   const lists = {
     nw: [
-      item({ id: 'w-a', problem: 'Contract ends.', progress: 'Drafted.', blockedBy: ['w-b'] }),
+      item({ id: 'w-a', problem: 'Contract ends.', progress: 'Drafted.', blockedBy: ['w-c', 'w-b'] }),
       item({ id: 'w-b', title: 'Sign in with Google', visibility: 'private', status: 'claimed', claim: { holder: 'h' } }),
+      item({ id: 'w-c', title: 'Legal review', status: 'done', updatedAt: NOW - 3 * 86_400_000 }),
       item({ id: 'w-old', status: 'done', updatedAt: NOW - 3 * 86_400_000 }),
     ],
     dm: [item({ id: 'w-msg', title: 'Can you take the call?', assignee: 'p-maya' })],
@@ -53,13 +54,23 @@ describe('the cards a Mac publishes', () => {
   const cards = cardsFor({ products, readItems: (p) => lists[p.slug], now: NOW });
 
   it('carries the summary of a visible thread and the titles of what blocks it', () => {
-    expect(cards.find((c) => c.threadId === 'w-a')).toMatchObject({ visible: true, title: 'Acme renewal terms', project: 'Northwind', state: 'running', problem: 'Contract ends.', progress: 'Drafted.', blockedBy: [{ id: 'w-b', title: 'Sign in with Google' }] });
+    expect(cards.find((c) => c.threadId === 'w-a')).toMatchObject({ visible: true, title: 'Acme renewal terms', project: 'Northwind', state: 'running', problem: 'Contract ends.', progress: 'Drafted.' });
+    expect(cards.find((c) => c.threadId === 'w-a').blockedBy[0]).toEqual({ id: 'w-c', title: 'Legal review' });
   });
-  it('says nothing of a private thread but its state', () => {
-    const c = cards.find((x) => x.threadId === 'w-b');
-    expect(c).toMatchObject({ visible: false, title: null, project: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [], state: 'running' });
+  // Found by review 2026-10-01: w-a's card said "blocked by Sign in with
+  // Google", the title of a thread marked private, on every teammate's board.
+  it('never names a private thread in another card\'s links', () => {
+    expect(cards.find((c) => c.threadId === 'w-a').blockedBy[1]).toEqual({ id: 'w-b', title: null });
+    expect(JSON.stringify(cards)).not.toMatch(/Sign in with Google/);
+  });
+  // Decided 2026-10-01 from user research: a private thread publishes no card
+  // at all. It used to go up as a wordless card with a lock, which still told
+  // the team you had private work and how much of it.
+  it('publishes no card at all for a private thread', () => {
+    expect(cards.find((x) => x.threadId === 'w-b')).toBeUndefined();
+    expect(cards.every((c) => c.visible === true)).toBe(true);
   });
   it('never cards a message between two people, or work finished before today', () => {
-    expect(cards.map((c) => c.threadId).sort()).toEqual(['w-a', 'w-b']);
+    expect(cards.map((c) => c.threadId).sort()).toEqual(['w-a']);
   });
 });

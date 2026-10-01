@@ -319,7 +319,7 @@ async function createWindow() {
   // line this Mac writes says who wrote it and shared projects stay in sync.
   // Its session file sits beside the store, encrypted with the Mac's own
   // keychain-backed key, so each store root is its own signed-in person.
-  const cloudConfig = loadCloudConfig(appDir);
+  const cloudConfig = loadCloudConfig(appDir, { packaged: app.isPackaged });
   const encrypt = safeStorage.isEncryptionAvailable() ? (text) => safeStorage.encryptString(text) : null;
   const decrypt = safeStorage.isEncryptionAvailable() ? (buf) => safeStorage.decryptString(buf) : null;
   const team = cloudConfig ? createTeamService({
@@ -327,6 +327,7 @@ async function createWindow() {
       cloudConfig,
       sessionFile: path.join(config.storeRoot, '.team-session'),
       encrypt, decrypt,
+      packaged: app.isPackaged,
       openExternal: (url) => shell.openExternal(url),
     }),
     store,

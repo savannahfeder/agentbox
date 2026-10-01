@@ -433,6 +433,7 @@ export const api = {
   async teamSignIn(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignIn()); },
   async teamSignOut(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignOut()); },
   async teamCreate(name: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamCreate({ name })); },
+  async teamAcceptInvite(teamId: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamAcceptInvite({ teamId })); },
   async teamInvite(email: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamInvite({ email })); },
   async teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamShare(p)); },
   async teamSync(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSync()); },

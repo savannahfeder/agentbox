@@ -12,8 +12,9 @@
 //                ask and the latest word on the thread stand in, so a new
 //                thread is never a blank summary.
 //   cardsFor     every thread worth showing the team, as a card: the summary
-//                and nothing more ("it shouldn't have new information"), or,
-//                for a private thread, no words at all.
+//                and nothing more ("it shouldn't have new information"). A
+//                private thread publishes no card at all (decided 2026-10-01
+//                from user research): not a wordless one, not a count.
 
 export const THREAD_STATES = ['waiting', 'running', 'scheduled', 'done'];
 
@@ -62,7 +63,7 @@ const startOfDay = (now) => { const d = new Date(now); d.setHours(0, 0, 0, 0); r
 /**
  * One card per thread worth showing the team: every open thread, and the ones
  * finished today. Message threads between two people are never carded; they
- * are nobody else's business and they are not work.
+ * are nobody else's business and they are not work. Nor is a private thread.
  */
 export function cardsFor({ products, readItems, now = Date.now() }) {
   const cards = [];
@@ -72,26 +73,25 @@ export function cardsFor({ products, readItems, now = Date.now() }) {
     if (product.team?.direct) continue;
     for (const item of readItems(product)) {
       if (item.agent) continue;
-      titleOf.set(item.id, item.label || item.title);
+      // A LINK NAMES A THREAD ONLY IF THAT THREAD IS ITSELF VISIBLE. A public
+      // card that is blocked by a private thread said the private thread's
+      // title out loud (review, 2026-10-01); now it says only that one exists.
+      titleOf.set(item.id, item.visibility === 'private' ? null : item.label || item.title);
       all.push({ item, product });
     }
   }
   const linked = (ids) => (Array.isArray(ids) ? ids : []).map((id) => ({ id, title: titleOf.get(id) ?? null }));
   const today = startOfDay(now);
   for (const { item, product } of all) {
+    if (item.visibility === 'private') continue;
     const state = threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
-    const visible = item.visibility !== 'private';
     const s = summaryOf(item);
-    cards.push(visible ? {
+    cards.push({
       threadId: item.id, visible: true, title: item.label || item.title, project: product.name,
       state, priority: Number.isFinite(item.priority) ? item.priority : null,
       problem: s.problem || null, progress: s.progress || null, solution: s.solution || null,
       blockedBy: linked(item.blockedBy), blocks: linked(item.blocks), updatedAt: item.updatedAt ?? now,
-    } : {
-      threadId: item.id, visible: false, title: null, project: null, state,
-      priority: Number.isFinite(item.priority) ? item.priority : null,
-      problem: null, progress: null, solution: null, blockedBy: [], blocks: [], updatedAt: item.updatedAt ?? now,
     });
   }
   return cards;

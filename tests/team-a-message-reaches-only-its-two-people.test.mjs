@@ -15,6 +15,7 @@ import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/mem
 import { createTeamService } from '../main/team/index.mjs';
 import { memorySession } from '../main/team/session.mjs';
 import { inMyInbox, mayRunHere, handedOnByReply } from '../shared/team-rules.mjs';
+import { joinSharedProject } from '../main/team/projects.mjs';
 import { cardsFor } from '../shared/thread-cards.mjs';
 
 async function aMac(cloud, personId) {
@@ -29,7 +30,7 @@ async function aMac(cloud, personId) {
   // Three people share one process here, and the author is process-wide, so
   // it is set around each person's own writes, awaited.
   const on = async (fn) => { disk.setLineAuthor(personId); try { return await fn(); } finally { disk.setLineAuthor(null); } };
-  return { personId, store, service, on };
+  return { personId, store, service, on, accountRoot };
 }
 
 let cloud, maya, theo, jun;
@@ -45,6 +46,9 @@ beforeEach(async () => {
   await maya.service.invite('jun@nw.test');
   await theo.service.signIn();
   await jun.service.signIn();
+  const teamId = maya.service.state().team.id;
+  await theo.service.acceptInvite(teamId);
+  await jun.service.acceptInvite(teamId);
   await maya.service.syncNow();
 });
 afterEach(async () => { for (const m of [maya, theo, jun]) await m.service.signOut(); });
@@ -88,6 +92,19 @@ it('is never a card on the Team board, and no agent runs on it', async () => {
   expect(cardsFor({ products, readItems: (p) => disk.readWorkItems(p.dir) })).toEqual([]);
   const item = maya.store.listItems()[0];
   expect(mayRunHere(item, products.find((p) => p.slug === item.product), maya.personId)).toBe(false);
+});
+
+// Review 2026-10-01: Jun could make a "direct" record holding Maya and Theo,
+// and Maya's next message to Theo went into it, where Jun read it. A record
+// is reused only if it is exactly the two of them and one of them made it.
+it('never goes into a record a third person made, or one with anybody else on it', async () => {
+  const teamId = maya.service.state().team.id;
+  joinSharedProject(maya.accountRoot, { id: 'jun-made-it', teamId, name: 'Direct', visibility: 'people', people: [maya.personId, theo.personId], createdBy: jun.personId, direct: true });
+  await maya.on(() => maya.service.message(theo.personId, 'Only for Theo.'));
+  const directs = maya.store.listProducts().filter((p) => p.team?.direct);
+  const used = directs.find((p) => disk.readWorkItems(p.dir).length);
+  expect(used.team.projectId).not.toBe('jun-made-it');
+  expect(new Set([...used.team.people, used.team.sharedBy])).toEqual(new Set([maya.personId, theo.personId]));
 });
 
 it('refuses somebody who is not on the team, and an empty message', async () => {

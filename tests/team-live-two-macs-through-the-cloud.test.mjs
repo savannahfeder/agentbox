@@ -3,10 +3,10 @@
 // Everything below the screen, for real: two stores (two "Macs"), each signed
 // in through the app's own session code (main/team/session.mjs) to the hosted
 // agentbox-team project, each running the app's own team service
-// (main/team/index.mjs). Maya starts a team, invites Theo, shares a project
-// and hands Theo a task; Theo's Mac joins the project, finds the task in his
-// inbox, answers it, and the answer comes back to Maya's inbox. Private work
-// shows up on the other Mac as a blank line and nothing more.
+// (main/team/index.mjs). Maya starts a team and invites Theo; Theo says yes,
+// his Mac joins the project Maya shares, Maya's message lands in his inbox,
+// he answers it, and the answer comes back to Maya's inbox. Private work does
+// not reach the other Mac at all.
 //
 // It needs the hosted project's service key, used only to make two throwaway
 // people (Google sign-in cannot be clicked through by a test) and to delete
@@ -76,7 +76,7 @@ describe.skipIf(!live)('two Macs through the hosted cloud', () => {
     delete process.env.AGENTBOX_PERSON_ID;
   }, 60_000);
 
-  let website, task;
+  let website, message;
 
   it('signs Maya in, starts a team and invites Theo', async () => {
     const { maya, theo } = macs;
@@ -87,52 +87,56 @@ describe.skipIf(!live)('two Macs through the hosted cloud', () => {
     expect(maya.service.state().team.name).toBe('Live test');
   }, 60_000);
 
-  it('shares Maya\'s project and hands Theo a task in it', async () => {
+  // Since a review on 2026-10-01 an invite is asked, never taken up on its own.
+  it('asks Theo to join, and puts him on the team when he says yes', async () => {
+    const { maya, theo } = macs;
+    await theo.service.start();
+    expect(theo.service.state().team).toBeNull();
+    const [invite] = theo.service.state().invites;
+    expect(invite).toMatchObject({ teamName: 'Live test', invitedByName: 'Maya Live' });
+    await theo.service.acceptInvite(invite.teamId);
+    expect(theo.service.state().team?.id).toBe(maya.service.state().team.id);
+  }, 60_000);
+
+  it('shares Maya\'s project, and it appears on Theo\'s Mac', async () => {
     const { maya, theo } = macs;
     website = maya.store.createProduct({ name: `Website ${tag}` }).slug;
     const home = maya.store.createProduct({ name: `Home ${tag}` }).slug;
     on(maya, () => maya.store.composeItem(home, { title: 'An old private task', visibility: 'private' }));
     await maya.service.share(website, { visibility: 'team' });
-    task = on(maya, () => maya.store.composeItem(website, { title: 'Send Acme the renewal terms', assignee: theo.id, people: [maya.id, theo.id], due: '2026-10-08' }));
-    await maya.service.syncNow();
-    expect(maya.store.listProducts().find((p) => p.slug === website).team.projectId).toBeTruthy();
+    await theo.service.syncNow();
+    expect(theo.store.listProducts().find((p) => p.team?.projectId && !p.team.direct)?.name).toBe(`Website ${tag}`);
   }, 60_000);
 
-  it('puts the project and the task on Theo\'s Mac, in Theo\'s inbox', async () => {
+  // A teammate's words reach you as a message, never as a task in a shared
+  // project (shared/team-rules.mjs whatATeammateMaySet).
+  it('carries Maya\'s message to Theo\'s inbox and his answer back to hers', async () => {
     const { maya, theo } = macs;
-    await theo.service.start();
-    expect(theo.service.state().team?.name).toBe('Live test');
-    const joined = theo.store.listProducts().find((p) => p.team?.projectId);
-    expect(joined?.name).toBe(`Website ${tag}`);
-    const there = theo.store.listItems().find((i) => i.id === task.id);
-    expect(there).toMatchObject({ title: 'Send Acme the renewal terms', assignee: theo.id, due: '2026-10-08', createdBy: maya.id });
-    expect(inMyInbox(there, joined, theo.id)).toBe(true);
-    expect(inMyInbox(there, joined, maya.id)).toBe(false);
-  }, 60_000);
-
-  it('carries Theo\'s answer back to Maya and hands the task back to her', async () => {
-    const { maya, theo } = macs;
-    const joined = theo.store.listProducts().find((p) => p.team?.projectId);
-    on(theo, () => theo.store.answerItem(joined.slug, task.id, { answer: 'Sent them this morning' }));
-    const row = theo.store.readItem(joined.slug, task.id);
-    const next = handedOnByReply(row, joined, theo.id);
+    disk.setLineAuthor(maya.id);
+    try { message = await maya.service.message(theo.id, 'Can you send Acme the renewal terms?'); } finally { disk.setLineAuthor(null); }
+    await theo.service.syncNow();
+    const direct = theo.store.listProducts().find((p) => p.team?.direct);
+    const there = theo.store.listItems().find((i) => i.id === message.id);
+    expect(there).toMatchObject({ title: 'Can you send Acme the renewal terms?', assignee: theo.id, createdBy: maya.id });
+    expect(inMyInbox(there, direct, theo.id)).toBe(true);
+    on(theo, () => theo.store.answerItem(direct.slug, message.id, { answer: 'Sent them this morning' }));
+    const next = handedOnByReply(theo.store.readItem(direct.slug, message.id), direct, theo.id);
     expect(next).toBe(maya.id);
-    on(theo, () => theo.store.teamPatch(joined.slug, task.id, { assignee: next }));
+    on(theo, () => theo.store.teamPatch(direct.slug, message.id, { assignee: next }));
     await theo.service.syncNow();
     await maya.service.syncNow();
-    const back = maya.store.readItem(website, task.id);
+    const back = maya.store.listItems().find((i) => i.id === message.id);
     expect(back.answer).toBe('Sent them this morning');
     expect(back.wrote.answer.by).toBe(theo.id);
     expect(back.assignee).toBe(maya.id);
-    expect(inMyInbox(back, maya.store.listProducts().find((p) => p.slug === website), maya.id)).toBe(true);
   }, 60_000);
 
-  it('shows Maya\'s private work on Theo\'s Mac as a blank line, never its title', async () => {
+  // A private thread publishes no card at all (decided 2026-10-01).
+  it('publishes nothing of Maya\'s private work to Theo', async () => {
     const { maya, theo } = macs;
     await maya.service.syncNow();
     await theo.service.syncNow();
-    const seen = theo.service.state().cards.filter((c) => c.personId === maya.id && !c.visible);
-    expect(seen.length).toBeGreaterThan(0);
+    expect(theo.service.state().cards.filter((c) => c.personId === maya.id && !c.visible)).toEqual([]);
     expect(JSON.stringify(theo.service.state().cards)).not.toContain('old private task');
     expect(theo.store.listProducts().map((p) => p.name)).not.toContain(maya.store.listProducts().find((p) => !p.team)?.name);
   }, 60_000);

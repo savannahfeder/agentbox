@@ -35,7 +35,7 @@ import { Supervisor } from './supervisor.mjs';
 import { registerIpc } from './ipc.mjs';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mjs';
-import { loadCloudConfig, supabaseSession } from './team/session.mjs';
+import { loadCloudConfig, supabaseSession, headlessSessionFile } from './team/session.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.dirname(here);
@@ -133,14 +133,15 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   const window = broadcastingWindow();
   const host = nodeHost();
   // THE TEAM, as on the desktop (main/main.mjs), with no Electron: the session
-  // file beside the store is plain JSON readable only by this user, and Google
-  // sign-in opens in the Mac's own browser.
+  // file is plain JSON readable only by this user, kept in this copy's own
+  // folder and not in the store (headlessSessionFile), and Google sign-in opens
+  // in the Mac's own browser.
   const cloudConfig = loadCloudConfig(appDir);
   let ipc = null;
   const team = cloudConfig ? createTeamService({
     session: supabaseSession({
       cloudConfig,
-      sessionFile: path.join(config.storeRoot, '.team-session'),
+      sessionFile: headlessSessionFile({ userDir, storeRoot: config.storeRoot }),
       openExternal: async (url) => { spawn('open', [url], { stdio: 'ignore', detached: true }).unref(); },
     }),
     store,

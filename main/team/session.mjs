@@ -10,11 +10,19 @@ import path from 'node:path';
 import { supabaseBackend } from './supabase-backend.mjs';
 import { signInWithGoogle } from './sign-in.mjs';
 
+// A BUILD SOMEONE INSTALLED IGNORES THE TWO TEST SWITCHES BELOW. Found by
+// review 2026-10-01: AGENTBOX_TEAM_CONFIG and AGENTBOX_TEAM_TEST_LOGIN were
+// honoured in the packaged app, so anything that could set an environment
+// variable for it could point it at another server or sign it in as somebody
+// else. Electron sets defaultApp only when run from a checkout.
+export const isPackagedElectron = () => !!process.versions?.electron && !process.defaultApp;
+
 // The hosted project's address and public key. They are meant to ship inside
 // the app (row level security, not secrecy, is what protects the data), so
-// they live in the repository; AGENTBOX_TEAM_CONFIG points at another file.
-export function loadCloudConfig(appDir) {
-  const file = process.env.AGENTBOX_TEAM_CONFIG || path.join(appDir, 'cloud', 'team.config.json');
+// they live in the repository; AGENTBOX_TEAM_CONFIG points at another file
+// from a checkout only.
+export function loadCloudConfig(appDir, { packaged = isPackagedElectron() } = {}) {
+  const file = (!packaged && process.env.AGENTBOX_TEAM_CONFIG) || path.join(appDir, 'cloud', 'team.config.json');
   try {
     const c = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (typeof c.url === 'string' && typeof c.anonKey === 'string') return c;
@@ -44,8 +52,9 @@ function fileStorage(file, { encrypt, decrypt }) {
   };
 }
 
-export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decrypt = null, openExternal, testLogin = process.env.AGENTBOX_TEAM_TEST_LOGIN }) {
+export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decrypt = null, openExternal, packaged = isPackagedElectron(), testLogin = process.env.AGENTBOX_TEAM_TEST_LOGIN }) {
   const configured = !!cloudConfig;
+  if (packaged) testLogin = null;
   let client = null;
 
   async function getClient() {
@@ -93,6 +102,23 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       if (client) await client.auth.signOut().catch(() => {});
     },
   };
+}
+
+// WHERE THE HEADLESS APP KEEPS ITS SIGN-IN: in its own data folder, readable by
+// this user only, never in the store root. The store is the folder people
+// copy, sync and hand to agents, and this file holds a refresh token in plain
+// JSON (review, 2026-10-01). One left in the store by an older copy is moved.
+export function headlessSessionFile({ userDir, storeRoot }) {
+  const file = path.join(userDir, 'team-session.json');
+  const old = path.join(storeRoot, '.team-session');
+  try {
+    if (!fs.existsSync(file) && fs.existsSync(old)) {
+      fs.mkdirSync(userDir, { recursive: true });
+      fs.renameSync(old, file);
+    }
+    if (fs.existsSync(file)) fs.chmodSync(file, 0o600);
+  } catch { /* a session that cannot be moved is a sign-in to do again */ }
+  return file;
 }
 
 // The same session shape over the in-memory cloud, for tests.
