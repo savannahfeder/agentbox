@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  ANCHOR, COPY, FLOOR_OF, START, TEAM_TABS, advance, coach, teamTab,
+  ANCHOR, COPY, FLOOR_OF, START, TEAM_TABS, TEAM_TAB_NAMES, advance, coach, teamTab,
 } from '../renderer/src/onboarding.ts';
 import { PRACTICE_ANSWER, PRACTICE_ROWS, PRACTICE_TASK, PRACTICE_TASK_TRACE } from '../shared/first-run-practice.mjs';
 
@@ -67,6 +67,19 @@ describe('1. the walk is never a blank screen', () => {
     expect(teamTab('progress')).toBe('.th-bar .tm-tab:nth-child(2)');
     expect(teamTab('nowhere')).toBeNull();
     expect(view).toMatch(/teamTab\(goingTo\)/);
+  });
+
+  it('names the tab as well as the key, where the strip has names', () => {
+    const labels = [...pages.slice(pages.indexOf('export const INBOX_TABS')).matchAll(/label: '([^']+)'|label: DONE\.short/g)]
+      .slice(0, 5).map((m) => m[1] ?? 'Done');
+    expect(TEAM_TABS.map((v) => TEAM_TAB_NAMES[v])).toEqual(labels);
+    const tabs = ['inbox', 'progress', 'snoozed', 'done'];
+    const named = coach('where', 0, { view: 'inbox', tabs, tabNames: TEAM_TAB_NAMES });
+    expect(`${named.lead}${named.key}${named.tail}`).toBe('Press ⌘2 or click Running to see where it all went.');
+    const onward = coach('where', 0, { view: 'progress', tabs, tabNames: TEAM_TAB_NAMES });
+    expect(onward.tail).toMatch(/^ or click Scheduled /);
+    // The old layout's strip has its own words and gets no name.
+    expect(coach('where', 0, { view: 'inbox', tabs }).tail).toBe(' to see where it all went.');
   });
 });
 

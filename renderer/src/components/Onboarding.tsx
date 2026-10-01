@@ -15,7 +15,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
-  ALSO, ANCHOR, BOUNDS, BREATHE_AFTER_MS, COACHED, COPY, FLOOR, FLOOR_OF, TEXT_MAX, TEXT_MIN, teamTab,
+  ALSO, ANCHOR, BOUNDS, BREATHE_AFTER_MS, COACHED, COPY, FLOOR, FLOOR_OF, TEAM_TAB_NAMES, TEXT_MAX, TEXT_MIN, teamTab,
   HELD_EVENTS, LINE_H, SLAB_OF, TEXT_GAP, UNDER,
   anyAgents, clearOf, finishCard, forgetAgentsWhileLookingAgain,
   forgetFoldersWhileLookingAgain, keepSecondRead, keyName, keyToken, padFor,
@@ -506,7 +506,7 @@ function Lights({ of, cap, left: given }: { of: number; cap: string; left?: numb
   const lit = Math.max(0, Math.min(of, of - left));
   return (
     // DOTS, NOT KEYS (2026-10-01). Two more E caps under "Press E to close it"
-    // read as "E E", a key to press twice, in a persona test. A dot is a count
+    // showed a persona test "E E", two keys where one was meant. A dot is a count
     // and nothing else; the key is already named once on the line above.
     <span className="fr-lights" aria-hidden="true" data-key={cap}>
       {Array.from({ length: of }, (_, i) => (
@@ -1269,7 +1269,7 @@ function Finished({
 */
 /* LONG ENOUGH TO READ WHAT TO DO NEXT (2026-10-01). It was 5.2 seconds for two
    lines; it carries two more now, the next thread and the Team page, and a
-   persona test read the old ending as no ending at all. Any key or any click
+   persona test reached the end of the tutorial with nothing saying it was over. Any key or any click
    still takes it down at once, and the click still reaches the app. */
 export const LANDED_MS = 14_000;
 
@@ -1436,8 +1436,8 @@ function PieceNav({ count = 0, on = 'inbox' }: { count?: number; on?: 'inbox' | 
  *  tutorial keeps is intact; these sit under them, from invented projects.
  */
 // A TEAM'S WORK, NOT ONLY AN ENGINEER'S (2026-10-01). These were all code:
-// database drivers, push providers, React upgrades. Somebody who does not code
-// read the first picture of the product as not for them.
+// database drivers, push providers, React upgrades. They are the first picture
+// of the product, and most of the team it is for does not code.
 const INTRO_MORE: Array<{ title: string; result: string; agoMs: number; project: string }> = [
   { title: 'Drafted the agenda for the offsite.', result: 'Three sessions and a working lunch. I left the dinner spot for you to pick.', agoMs: 38 * 60_000, project: 'Operations' },
   { title: 'Which launch date should we announce?', result: 'The 14th clears every review. The 7th is a week tighter but still possible.', agoMs: 44 * 60_000, project: 'Launch' },
@@ -2251,8 +2251,15 @@ export function Onboarding({
     // IT, so the tab tour's sentences name the tab the next press really opens
     // rather than the one that came next in a list. Same `tabs` the ring below
     // is drawn off, which is the point of handing it to both.
+    // THE TEAM LAYOUT'S TAB STRIP, when it is the one on the screen. A card
+    // beside one of its tabs sits on the tabs after it, which is the "hints
+    // covered the tabs" a persona test reported, so there the card goes under
+    // the strip, and it names the tab as well as the key (2026-10-01).
+    const teamStrip = run.step === 'where' && typeof document !== 'undefined'
+      && !!document.querySelector('.th-bar .tm-tabs');
     const say = coach(run.step, run.sentAt ? now - run.sentAt : 0, {
       opened, view, picking, palette, left: beat?.length, tabs,
+      tabNames: teamStrip ? TEAM_TAB_NAMES : undefined,
     });
     if (!say) return null;
     // HER TASK'S OWN ROW FIRST. The walk knows which item it made, so on the
@@ -2303,11 +2310,7 @@ export function Onboarding({
             // data-tab, so `teamTab` finds the tab by its place in the strip.
             ? [...(teamTab(goingTo) ? [teamTab(goingTo) as string] : []), `.workspace-navigation [data-tab="${goingTo}"]`, `.tabs .tab[data-tab="${goingTo}"]`, ...ANCHOR.where ?? []]
             : ANCHOR[run.step];
-    // A CARD BESIDE A TAB IN THE TEAM STRIP SITS ON THE TABS AFTER IT, which is
-    // the "hints covered the tabs" a persona test reported. That strip runs
-    // across the top of the list, so the card goes under it instead.
-    const teamStrip = run.step === 'where' && typeof document !== 'undefined'
-      && !!document.querySelector('.th-bar .tm-tabs');
+
     if (!sel || !sel.length) return null;
     return (
       <Ringed

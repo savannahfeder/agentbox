@@ -15,6 +15,7 @@
 
 import { PRACTICE_NAME, PRACTICE_TASK } from '../../shared/first-run-practice.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
+import { DONE } from './done-word';
 
 /**
  * THE BEATS. `landed` is the end and draws nothing over the app.
@@ -749,8 +750,8 @@ export const COPY = {
   // The product is an inbox for managing dozens of agents at a time, and it
   // is not Claude Code specific: it works with Codex too.
   // REWRITTEN FOR THE WHOLE TEAM (2026-10-01). A persona test of an executive
-  // assistant read "coding agents" and "Claude Code and Codex" as a sign the
-  // app was not for her. The product is threads: you write one, an agent does
+  // assistant found "coding agents" and "Claude Code and Codex" written for
+  // programmers, and the team version is for designers, assistants and PMs too. The product is threads: you write one, an agent does
   // the work on your Mac, and it comes back when it needs you.
   head: 'Hand work to agents and get it back in one inbox.',
   headSub: 'Write a thread, an agent works on it, and it comes back when it needs you.',
@@ -1317,6 +1318,11 @@ export function nextTab(tabs: readonly string[] | undefined, view: string | unde
  *  Inbox and Team (2026-10-01). */
 export const TEAM_TABS: readonly string[] = ['inbox', 'progress', 'snoozed', 'done', 'all'];
 
+/** And the words on those tabs, the same ones Pages.tsx draws. */
+export const TEAM_TAB_NAMES: Readonly<Record<string, string>> = {
+  inbox: 'Needs you', progress: 'Running', snoozed: 'Scheduled', done: DONE.short, all: 'All',
+};
+
 export function teamTab(view: string | null | undefined): string | null {
   const at = view ? TEAM_TABS.indexOf(view) : -1;
   return at >= 0 ? `.th-bar .tm-tab:nth-child(${at + 1})` : null;
@@ -1362,6 +1368,8 @@ export function coach(
   ctx: {
     opened?: boolean; view?: string; picking?: boolean; left?: number; palette?: boolean;
     tabs?: readonly string[];
+    /** The team strip's tab names, when that strip is what is drawn. */
+    tabNames?: Readonly<Record<string, string>>;
   } = {},
 ): Coach | null {
   switch (step) {
@@ -1593,12 +1601,17 @@ export function coach(
       // different days and a cap written out here would send her to the wrong
       // one. `tabCap` reads the same list the ring and the press obey.
       const cap = tabCap(ctx.tabs ?? [], nextTab(ctx.tabs, ctx.view));
-      const sends = TAB_TOUR_SENDS_YOU[nextTab(ctx.tabs, ctx.view)]
+      // AND THE TAB'S NAME FOR SOMEBODY WHO CLICKS (2026-10-01). The tour is now
+      // walked by people who have never used a shortcut, and the ringed tab is
+      // clickable, so where the strip has names on it the card says the name.
+      const named = ctx.tabNames?.[nextTab(ctx.tabs, ctx.view)];
+      const or = named ? ` or click ${named}` : '';
+      const sends = or + (TAB_TOUR_SENDS_YOU[nextTab(ctx.tabs, ctx.view)]
         // A TAB THIS FILE HAS NO WORDS FOR SAYS SO PLAINLY rather than borrow
         // the words of a different one. Nothing in the app reaches this today;
         // it is here so that adding a fifth tab is a card that reads a little
         // thin rather than a card that lies.
-        ?? ' for the next one.';
+        ?? ' for the next one.');
       // AND THE FIRST STOP IS WHERE THE ONE SHE PUT OFF WENT (2026-08-24). The
       // snooze beat gives the app a Scheduled tab it did not have a minute ago,
       // and a tab appearing on the screen with nothing said about it is the
@@ -1643,7 +1656,7 @@ export function coach(
       // longer says it. The first sentence stays word for word in front of it.
       return say(
         'Great! Your inbox is now empty. That is inbox zero, and it is the goal.',
-        'Press ', cap, ' to see where it all went.',
+        'Press ', cap, `${or} to see where it all went.`,
       );
     }
     /*

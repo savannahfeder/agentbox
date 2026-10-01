@@ -6711,8 +6711,8 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 .fr-screen-intro .fr-go { position: fixed; right: 64px; bottom: 64px; margin: 0; }
 
 /* INSIDE THE WINDOW (2026-10-01). It ran 190px off the right edge on purpose,
-   to stay at full size; at 1440 by 900 a persona test read that as a panel
-   that did not fit. It stops 40px short of the edge now, still at full size,
+   to stay at full size; at 1440 by 900 a persona test flagged it as a panel
+   running off the edge. It stops 40px short of the edge now, still at full size,
    and the list inside it gives up the margin it kept for the overhang. */
 .fr-piece {
   position: absolute; z-index: 300;

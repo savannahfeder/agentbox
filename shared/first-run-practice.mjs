@@ -65,8 +65,8 @@ export const PRACTICE_FLAG = 'practice';
  *  one card, which is why the body opens by naming the app the title names. */
 // EVERYDAY WORK, NOT CODE (2026-10-01). It was a sign-out button for a pretend
 // app, and the four rows below were a sign-in route, a flaky test, a slow CI run
-// and dead code. A persona test of an executive assistant read all of it as a
-// tool for programmers. A meeting summary, a reply, a tidy list, a budget and a
+// and dead code. A persona test of an executive assistant found all of it
+// written for programmers. A meeting summary, a reply, a tidy list, a budget and a
 // date are work everybody on a team does, engineers included.
 export const PRACTICE_TASK = {
   title: 'Add a summary to the Practice meeting notes.',
