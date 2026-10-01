@@ -3124,7 +3124,12 @@ export class Supervisor {
     try {
       const nowTs = Date.now();
       const autonomous = new Set(this.config.autonomousProducts ?? []);
+      // THE TEAM VERSION: a shared row is queued only on its runner's Mac, and
+      // a row a person holds on nobody's, by the same rule the tick obeys.
+      const productBySlug = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
+      const me = process.env.AGENTBOX_PERSON_ID;
       queued = this.store.listItems(nowTs)
+        .filter((i) => mayRunHere(i, productBySlug.get(i.product), me))
         .filter((i) => !this.sessions.has(i.id) && i.status === 'open'
           && this.store.isDue(i, nowTs))
         // The walk's own example task is NOT queued: nothing is going to spawn

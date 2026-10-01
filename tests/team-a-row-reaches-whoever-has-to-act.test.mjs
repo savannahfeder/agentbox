@@ -73,3 +73,25 @@ describe('a reply hands the row on', () => {
     expect(handedOnByReply({ createdBy: MAYA, assignee: MAYA, people: [MAYA, THEO] }, privateProject, MAYA)).toBeNull();
   });
 });
+
+// Photographed 2026-09-30 on two real copies: Theo's answer handed the row
+// back to Maya, and her inbox line still read her own question.
+describe('the line under a row a teammate answered', () => {
+  it('is what they said', async () => {
+    const { rowSummary } = await import('../renderer/src/list-rules.ts');
+    const row = {
+      title: 'Launch video: ship Friday\u2019s cut?',
+      body: '**Ship Friday\u2019s launch video, or change the ending first?**',
+      answer: 'Change the ending first. I will send the new cut tonight.',
+      status: 'open',
+      wrote: { body: { ts: 1, by: 'maya' }, answer: { ts: 2, by: 'theo' } },
+    };
+    expect(rowSummary(row, 'inbox')).toBe('Change the ending first. I will send the new cut tonight.');
+  });
+
+  it('is unchanged on one Mac, where no line says who wrote it', async () => {
+    const { rowSummary } = await import('../renderer/src/list-rules.ts');
+    const row = { title: 'x', body: 'Pick a palette.', answer: 'B', status: 'open', wrote: { body: { ts: 1 }, answer: { ts: 2 } } };
+    expect(rowSummary(row, 'inbox')).toBe('Pick a palette.');
+  });
+});

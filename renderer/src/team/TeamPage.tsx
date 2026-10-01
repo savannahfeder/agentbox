@@ -16,14 +16,10 @@ import type { Person, Product, TeamCallResult, TeamState, WorkItem } from '../ty
 import { api } from '../api';
 import { isShared } from '../../../shared/team-rules.mjs';
 import { Face, LockIcon, firstName } from './people';
-import { companyLines, type CompanyLine as Line } from './company';
+import { companyLines, movedAgo as ago, type CompanyLine as Line } from './company';
 
 type Tab = 'open' | 'run' | 'wait' | 'sched' | 'done';
 
-const ago = (ms: number) => {
-  const m = Math.max(0, Math.round(ms / 60_000));
-  return m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`;
-};
 
 export function TeamPage({ team, products, items, now, onOpen }: {
   team: TeamState | null | undefined; products: Product[]; items: WorkItem[]; now: number; onOpen: (item: WorkItem) => void;

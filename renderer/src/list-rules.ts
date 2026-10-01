@@ -490,7 +490,7 @@ export function clickIntent(
 // with a result whose timestamp the fold never recorded (older ledgers), and
 // dropping it would take news off rows that have been showing it correctly.
 export function rowSummary(
-  i: { id?: string; body?: string; result?: string; status?: string; title?: string; wrote?: Record<string, { ts: number } | undefined> },
+  i: { id?: string; body?: string; result?: string; answer?: string; status?: string; title?: string; wrote?: Record<string, { ts: number; by?: string } | undefined> },
   view: string,
 ): string {
   // THE ROW THAT SAYS HER TASKS ARE NOT RUNNING SAYS ITS FIRST LINE AND STOPS.
@@ -500,6 +500,16 @@ export function rowSummary(
   // causes line ends on a count rather than on a full stop and the clip keeps
   // going until it finds one.
   if (i.id === TROUBLE_ID) return clipToSentence((i.body ?? '').split('\n')[0].trim());
+  // A TEAMMATE'S REPLY IS THE NEWS (the team version). Theo answering the
+  // question Maya sent him hands the row back to her, and the line under its
+  // title has to be what he said, not her own question read back to her. Only
+  // a reply by somebody other than whoever wrote the ask counts, so on one Mac,
+  // where no line carries a writer, nothing changes.
+  const said = i.wrote?.answer;
+  if (i.answer && said?.by && said.by !== i.wrote?.body?.by
+    && said.ts >= Math.max(i.wrote?.body?.ts ?? 0, i.wrote?.result?.ts ?? 0)) {
+    return clipToSentence(previewText(i.answer));
+  }
   const finished = view === 'done' || i.status === 'done';
   const resultIsNewer = (i.wrote?.result?.ts ?? 0) > (i.wrote?.body?.ts ?? 0);
   const showResult = !!i.result && (finished || resultIsNewer);

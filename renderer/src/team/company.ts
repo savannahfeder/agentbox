@@ -90,3 +90,13 @@ export function sentFrom(item: WorkItem, product: Product | undefined, me: strin
   if (!from || from === me) return null;
   return { from, agent: !heldByAPerson(item) };
 }
+
+/**
+ * How long since a task last moved, in the Team page's last column. Under a
+ * minute is "now": the real copies read "0m" on a task given a moment earlier.
+ */
+export function movedAgo(ms: number): string {
+  const m = Math.max(0, Math.floor(ms / 60_000));
+  if (m < 1) return 'now';
+  return m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`;
+}

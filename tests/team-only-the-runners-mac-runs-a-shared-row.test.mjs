@@ -110,4 +110,22 @@ describe('the supervisor on Theo\'s Mac', () => {
       if (before === undefined) delete process.env.AGENTBOX_PERSON_ID; else process.env.AGENTBOX_PERSON_ID = before;
     }
   });
+  // Photographed 2026-09-30 in Theo's real window: the task Maya gave him read
+  // "Queued" on his inbox row, a promise that an agent was about to start it.
+  // Nothing runs a row a person holds, so nothing may say it is waiting its turn.
+  it('says nothing is queued that will not run here', () => {
+    const before = process.env.AGENTBOX_PERSON_ID;
+    process.env.AGENTBOX_PERSON_ID = THEO;
+    try {
+      const sup = supervisorWith([
+        row('w-000001', 'website', { createdBy: MAYA }),
+        row('w-000002', 'website', { createdBy: THEO }),
+        row('w-000003', 'website', { createdBy: MAYA, assignee: THEO }),
+        row('w-000004', 'home', { createdBy: null }),
+      ], [shared, mine]);
+      expect(sup.status().queued.sort()).toEqual(['w-000002', 'w-000004']);
+    } finally {
+      if (before === undefined) delete process.env.AGENTBOX_PERSON_ID; else process.env.AGENTBOX_PERSON_ID = before;
+    }
+  });
 });

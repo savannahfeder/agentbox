@@ -8,7 +8,7 @@
 // (renderer/src/team/company.ts), plus the row end's due-day words and who a
 // row is from.
 import { it, expect, describe } from 'vitest';
-import { companyLines, dueWords, sentFrom } from '../renderer/src/team/company.ts';
+import { companyLines, dueWords, sentFrom, movedAgo } from '../renderer/src/team/company.ts';
 
 const ME = 'p-me', MAYA = 'p-maya', THEO = 'p-theo';
 const shared = { slug: 'site', name: 'Website', team: { projectId: 'x', sharedBy: ME } };
@@ -87,5 +87,14 @@ describe('who a row is from', () => {
   it('is nobody on your own row, or in a private project', () => {
     expect(sentFrom({ createdBy: ME }, shared, ME)).toBeNull();
     expect(sentFrom({ createdBy: MAYA }, home, ME)).toBeNull();
+  });
+});
+
+describe('how long since a task moved', () => {
+  it('says now for under a minute, then minutes, hours and days', () => {
+    expect(movedAgo(20_000)).toBe('now');
+    expect(movedAgo(5 * 60_000)).toBe('5m');
+    expect(movedAgo(3 * 3_600_000)).toBe('3h');
+    expect(movedAgo(2 * 86_400_000)).toBe('2d');
   });
 });

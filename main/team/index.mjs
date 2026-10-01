@@ -44,9 +44,17 @@ export function createTeamService({
     if (pending) return pending;
     pending = (async () => {
       try {
+        // An invite sent after this person signed in is taken up here, not at
+        // their next sign-in.
+        if (!state.team) { await backend.acceptInvites(); await refreshTeam(); }
         const report = await sync.syncOnce();
-        const activity = state.team ? await backend.listActivity() : [];
-        set({ lastSyncAt: Date.now(), error: null, activity });
+        // The people are read again on every pass, with the activity, so a
+        // teammate who joined after this Mac signed in has a name and a face
+        // on the first line of theirs that arrives here.
+        const [activity, people] = state.team
+          ? await Promise.all([backend.listActivity(), backend.teamPeople(state.team.id)])
+          : [[], []];
+        set({ lastSyncAt: Date.now(), error: null, activity, people });
         if (report.joined.length || report.pulled) log(`team: joined ${report.joined.length}, pulled ${report.pulled}, pushed ${report.pushed}`);
         return report;
       } catch (err) {

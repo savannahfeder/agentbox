@@ -84,6 +84,28 @@ describe('signing in', () => {
     expect(theo.service.state().people.map((p) => p.name).sort()).toEqual(['Maya', 'Theo']);
   });
 
+  // Photographed 2026-09-30 on two real copies: Theo joined after Maya had
+  // signed in, and his answer reached her window as "A" from "Someone",
+  // because her copy read the team's people once and never again.
+  it('learns a teammate who joins after you signed in, on the next sync', async () => {
+    await maya.service.signIn();
+    await maya.service.createTeam('Northwind');
+    await maya.service.invite('theo@northwind.test');
+    await theo.service.signIn();
+    await maya.service.syncNow();
+    expect(maya.service.state().people.map((p) => p.name).sort()).toEqual(['Maya', 'Theo']);
+  });
+
+  it('joins a team that invited you after you signed in, without signing in again', async () => {
+    await theo.service.signIn();
+    expect(theo.service.state().team).toBeNull();
+    await maya.service.signIn();
+    await maya.service.createTeam('Northwind');
+    await maya.service.invite('theo@northwind.test');
+    await theo.service.syncNow();
+    expect(theo.service.state().team?.name).toBe('Northwind');
+  });
+
   it('refuses an invite that is not an email address, and a team with no name', async () => {
     await maya.service.signIn();
     await expect(maya.service.createTeam('  ')).rejects.toThrow(/name/);

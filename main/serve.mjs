@@ -28,10 +28,14 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
+import { spawn } from 'node:child_process';
 import { loadConfig } from './config.mjs';
 import { Store } from './store.mjs';
 import { Supervisor } from './supervisor.mjs';
 import { registerIpc } from './ipc.mjs';
+import * as workItemsDisk from './store/work-items.mjs';
+import { createTeamService, teamStateFile } from './team/index.mjs';
+import { loadCloudConfig, supabaseSession } from './team/session.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.dirname(here);
@@ -128,8 +132,25 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   const window = broadcastingWindow();
   const host = nodeHost();
-  const ipc = registerIpc({ store, supervisor, config, window, host });
-  return { config, store, supervisor, window, host, ipc, channels: host.ipcMain.handlers };
+  // THE TEAM, as on the desktop (main/main.mjs), with no Electron: the session
+  // file beside the store is plain JSON readable only by this user, and Google
+  // sign-in opens in the Mac's own browser.
+  const cloudConfig = loadCloudConfig(appDir);
+  let ipc = null;
+  const team = cloudConfig ? createTeamService({
+    session: supabaseSession({
+      cloudConfig,
+      sessionFile: path.join(config.storeRoot, '.team-session'),
+      openExternal: async (url) => { spawn('open', [url], { stdio: 'ignore', detached: true }).unref(); },
+    }),
+    store,
+    disk: workItemsDisk,
+    accountRoot: config.accountRoot,
+    stateFile: teamStateFile(config.storeRoot),
+    onChange: () => ipc?.push?.(),
+  }) : null;
+  ipc = registerIpc({ store, supervisor, config, window, host, team });
+  return { config, store, supervisor, window, host, ipc, team, channels: host.ipcMain.handlers };
 }
 
 /** A token in the url, because the port alone is not a door key. */
@@ -161,10 +182,14 @@ export function createServer({ channels, token, listeners = new Set(), dist = pa
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
 
-    // The token rides in a header on api calls and in the query on the first
-    // page load, because a browser cannot put a header on a navigation.
+    // The token rides in a header on api calls and in the query on the event
+    // stream, because a browser cannot put a header on either a navigation or
+    // an EventSource. It guards the two doors that reach the store. The built
+    // screen is the same public files for everybody, and its own script and
+    // style requests carry no token, so asking for one there drew a blank tab.
+    const guarded = url.pathname === '/events' || url.pathname.startsWith('/api/');
     const given = req.headers['x-agentbox-token'] || url.searchParams.get('token');
-    if (given !== token) {
+    if (guarded && given !== token) {
       res.writeHead(403, { 'content-type': 'text/plain' });
       res.end('Wrong or missing token. Use the url the terminal printed.');
       return;

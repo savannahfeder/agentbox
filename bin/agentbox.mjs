@@ -56,6 +56,8 @@ if (!fs.existsSync(path.join(dist, 'index.html'))) {
 }
 
 const booted = await bootHeadless({ dataDir, appDir, userDir: dataDir });
+// Whoever was signed in to the team last time is signed in again.
+booted.team?.start().catch((err) => console.warn(`team: ${err.message}`));
 const token = newToken();
 const server = createServer({
   channels: booted.channels,

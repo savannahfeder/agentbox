@@ -155,7 +155,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     if (markBy) for (let k = markAt; k < events.length; k += 1) if (!events[k].by) events[k].by = markBy;
   };
 
-  for (const line of lines) {
+  for (const [at_, line] of lines.entries()) {
     tagWriter();
     markAt = events.length;
     markBy = typeof line.by === 'string' ? line.by : undefined;
@@ -180,6 +180,15 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
       first = false;
       title = String(patch!.title ?? '');
       if (words(patch!.body)) opened = true;
+      // A PERSON'S OWN APP STAMPED IT (the team version). On a signed-in Mac
+      // every line carries who wrote it, so the system's wordless stamp that
+      // comes straight before a person's words is that person sending a task,
+      // and "An agent opened this" over their face would be false. Their words
+      // on the next line open the thread instead. With nobody signed in no line
+      // carries `by`, and this reads as it always has.
+      const next = lines[at_ + 1];
+      if (line.source === 'system' && line.by && !words(patch!.body)
+        && next?.source === 'founder' && next.by === line.by && words(next.patch?.body)) continue;
       events.push({
         at, who,
         said: mine ? 'You opened this' : 'An agent opened this',
