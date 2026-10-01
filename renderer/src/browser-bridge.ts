@@ -112,6 +112,6 @@ export function installBrowserBridge(): boolean {
   (window as any).zero = bridge;
   // A tab has no title bar to clear, so the window's top inset can match its
   // bottom one (renderer/src/threads/pages.css reads this).
-  document.documentElement.dataset.shell = 'tab';
+  if (typeof document !== 'undefined') document.documentElement.dataset.shell = 'tab';
   return true;
 }
