@@ -294,6 +294,10 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   // heading.
   const firstUrgent = view === 'inbox' && !ranked ? items.findIndex(isUrgentRow) : -1;
   const groups = dayGroups(items, (item, index) => {
+    // THE TABLE IS ONE GROUP. It draws no headings, and a group it cannot name
+    // still starts a new wrapper, so its first row had no row before it and
+    // drew no hairline: the line under an urgent row went missing.
+    if (table) return '';
     // CLOSED NAMES THE CONVERSATIONS DECLINED FOR NOW, so the way back is
     // a heading she can see rather than a row she has to remember.
     if (view === 'done' && isNotImportedRow(item)) return NOT_IMPORTED_HEADING;
