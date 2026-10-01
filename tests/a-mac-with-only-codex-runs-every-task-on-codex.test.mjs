@@ -162,18 +162,22 @@ describe('a Mac with Codex and no Claude Code', () => {
 
   // THE ROW NAMER WAS THE LAST THING ON THE TICK STILL CALLING CLAUDE CODE. It
   // failed quietly, so rows only went unnamed, which is why nothing caught it.
+  // A long dictated title, because a short clean one may already count as a
+  // name and then nothing is spawned for it at all.
+  const dictated = () => row({ title: 'I tried to check out on my phone and the button does nothing when I tap it.' });
+
   it('names its rows with Codex, without her Codex config or a saved session', () => {
     const { sup } = build();
-    sup.nameTheRows([row()]);
+    sup.nameTheRows([dictated()]);
     const naming = spawns.find((s) => s.args?.[0] === 'exec');
     expect(naming?.bin).toBe(CODEX_BIN);
     expect(naming.args).toEqual(expect.arrayContaining(['--ephemeral', '--ignore-user-config', 'read-only']));
-    expect(naming.args.at(-1)).toContain('Fix the checkout button');
+    expect(naming.args.at(-1)).toContain('the button does nothing');
   });
 
   it('names rows with Claude Code on a Mac that has it', () => {
     const { sup } = build({ claudeFound: true });
-    sup.nameTheRows([row()]);
+    sup.nameTheRows([dictated()]);
     expect(spawns.map((s) => [s.bin, s.args[0]])).toEqual([[CLAUDE_BIN, '-p']]);
   });
 });
