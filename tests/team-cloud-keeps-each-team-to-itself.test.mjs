@@ -104,7 +104,10 @@ describe('people', () => {
 
 describe('a project shared with the whole team', () => {
   beforeAll(async () => {
-    await as(MAYA, `insert into public.projects (id, team_id, name, visibility, created_by) values ($1, $2, 'Website', 'team', $3)`, [PROJECT, team.id, MAYA]);
+    // Shared the way the app shares, as an upsert: Postgres holds the proposed
+    // row to the read policy too, which a plain insert never exercised.
+    await as(MAYA, `insert into public.projects (id, team_id, name, visibility, created_by) values ($1, $2, 'Website', 'team', $3)
+                    on conflict (id) do update set name = excluded.name, visibility = excluded.visibility`, [PROJECT, team.id, MAYA]);
   });
 
   it('lets a teammate read it and add lines as themselves', async () => {
