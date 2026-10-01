@@ -4107,7 +4107,6 @@ export default function App() {
   const artifactView = artifactPlacement(artifactMode, artifactWidth);
   const [artifactHeader, setArtifactHeader] = useState<HTMLDivElement | null>(null);
   const readingWidth = 'balanced';
-  const [terminalHeaderTarget,setTerminalHeaderTarget]=useState<HTMLSpanElement|null>(null);
   const [taskHeader, setTaskHeader] = useState<HTMLDivElement | null>(null);
   // The socket look B of w-581dbc6cc4's round teleports the code mark into.
   const [cornerHeaderTarget, setCornerHeaderTarget] = useState<HTMLSpanElement | null>(null);
@@ -4581,12 +4580,12 @@ export default function App() {
               engine: snap.usage?.engine ?? null,
             })}
           />}
-          {workspaceNavigation && focused && <span style={{display:'contents'}} ref={setTerminalHeaderTarget}/>}
-          {/* AND THE SOCKET THE MARK THAT FINISHES A TASK IS TELEPORTED INTO
-              (w-581dbc6cc4). It is drawn by Focus because only Focus knows
-              whether this row can still be finished, and it lands here because
-              the corner is where a task's own controls live. `order` decides
-              where in the row it sits, not this. */}
+          {/* AND THE SOCKET A THREAD'S OWN CONTROLS ARE TELEPORTED INTO: the
+              Summary button and the thread's menu, which holds the code, the
+              terminal and Done (w-e731ca9376, 2026-10-01). They are drawn by
+              Focus because only Focus knows which of them this thread has, and
+              they land here because the corner is where a task's own controls
+              live. */}
           {/* Not while Settings or the Team page covers the thread: the thread's
               state and Summary button were left standing in their header. */}
           {workspaceNavigation && focused && !settingsOpen && !teamShown && <span style={{display:'contents'}} ref={setCornerHeaderTarget}/>}
@@ -4862,7 +4861,6 @@ export default function App() {
                   items={items}
                   onHandToAgent={handToAgent}
                   headerTarget={workspaceNavigation ? taskHeader : null}
-                  terminalHeaderTarget={terminalHeaderTarget}
                   cornerHeaderTarget={cornerHeaderTarget}
                   inlineArtifacts={workspaceNavigation}
                   previewSample={api.isFixtures && (reviewLab || new URLSearchParams(location.search).has('artifactTweaks')) ? artifactPreviewSample : undefined}
