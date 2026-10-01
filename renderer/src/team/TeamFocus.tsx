@@ -1,0 +1,72 @@
+// AN OPENED SHARED TASK: who it came from, the people on it, and, on a task a
+// teammate gave you, the three ways to route it with one click. Drawn with the
+// app's own option-strip classes so it reads as the same control as any other
+// row's options (approved 2026-09-30, screen 3 of the team design).
+import { useContext, useState } from 'react';
+import type { WorkItem } from '../types';
+import { api } from '../api';
+import { isShared, heldByAPerson } from '../../../shared/team-rules.mjs';
+import { Face, TeamContext, dueWords, firstName, type TeamView } from './people';
+
+/** Is this a shared row given to a person? Then the team draws its header. */
+export function teamHeld(item: WorkItem, team: TeamView | null): boolean {
+  return !!team && isShared(team.products.get(item.product)) && heldByAPerson(item);
+}
+
+/** The line under the task's name on a row given to a person:
+ *  "NORTHWIND · MAYA GAVE YOU THIS · DUE SAT" or "NORTHWIND · WITH THEO · DUE SAT". */
+export function TeamSaid({ item }: { item: WorkItem }) {
+  const team = useContext(TeamContext);
+  if (!team) return null;
+  const mine = item.assignee === team.me;
+  const other = mine ? (item.people ?? []).find((p) => p !== team.me) ?? item.createdBy : item.assignee;
+  const name = firstName(team.byId.get(other ?? ''));
+  const due = dueWords(item.due);
+  return <span className="fm-said">
+    {item.productName} · {mine ? `${name} gave you this` : `with ${name}`}
+    {due && <> · <span className="tm-due-word">{due}</span></>}
+  </span>;
+}
+
+/** Who is on the row: their faces, the person it is with first. */
+export function TeamPeople({ item }: { item: WorkItem }) {
+  const team = useContext(TeamContext);
+  if (!team) return null;
+  const ids = [...new Set([...(item.people ?? []), item.createdBy, item.assignee].filter((p): p is string => !!p && p !== 'agent'))];
+  if (ids.length < 2) return null;
+  return <span className="tm-people" style={{ marginLeft: 'auto' }}>
+    {ids.map((id) => <Face key={id} person={team.byId.get(id)} me={id === team.me} />)}
+  </span>;
+}
+
+/** On a task a teammate gave you: give it to an agent, keep it, or hand it back. */
+export function TeamRouteStrip({ item }: { item: WorkItem }) {
+  const team = useContext(TeamContext);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!team || !teamHeld(item, team) || item.assignee !== team.me) return null;
+  // Once you have chosen to keep it, the choices go away.
+  if (item.wrote?.assignee?.by === team.me) return null;
+  const from = (item.people ?? []).find((p) => p !== team.me) ?? item.createdBy ?? undefined;
+  const choices: [string, 'agent' | 'me' | 'back'][] = [
+    ['Give it to an agent', 'agent'],
+    ['Do it myself', 'me'],
+    [`Hand it back to ${firstName(team.byId.get(from ?? ''))}`, 'back'],
+  ];
+  const route = async (r: 'agent' | 'me' | 'back') => {
+    setBusy(true); setError(null);
+    const out = await api.teamRoute({ product: item.product, id: item.id, route: r });
+    setBusy(false);
+    if (!out.ok) setError(out.error ?? 'That did not work.');
+  };
+  const ask = (item.body ?? item.title).split('\n').find((l) => l.trim())?.replace(/\*\*/g, '').trim() ?? item.title;
+  return <div className="opt-strip">
+    <div className="opt-head opt-head-ask"><span>{ask}</span></div>
+    {choices.map(([label, r], i) => <button key={r} className="opt-row" disabled={busy} onClick={() => route(r)}>
+      <span className="opt-key">{i + 1}</span><span className="opt-text">{label}</span>
+    </button>)}
+    {error && <div className="opt-head"><span className="tm-error">{error}</span></div>}
+  </div>;
+}
+
+export { Face };

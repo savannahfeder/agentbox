@@ -30,10 +30,16 @@ export interface LedgerLine {
   heartbeat?: boolean;
   release?: boolean;
   epoch?: number;
+  // Who wrote it, on a signed-in Mac (the team version). Absent on every line
+  // of the single-person app.
+  by?: string;
 }
 
 export interface ThreadEvent {
   at: number;
+  // WHICH PERSON SAID IT, when a teammate did: their person id, off the
+  // ledger line's `by`. The thread draws their face and name instead of "You".
+  by?: string;
   // Hers reads at full strength, an agent's is quiet. The same split the pane
   // already makes everywhere else.
   who: 'you' | 'agent';
@@ -140,8 +146,19 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
   // The short written name, folded forward like `title`. Read once at the end:
   // see `withTitleSaid`.
   let label: string | null = null;
+  // WHO SAID EACH EVENT, for a teammate's line (the team version). Every event
+  // a line produced is tagged with its writer when the next line begins, and
+  // once more after the last, which leaves the loop below exactly as it was.
+  let markAt = 0;
+  let markBy: string | undefined;
+  const tagWriter = () => {
+    if (markBy) for (let k = markAt; k < events.length; k += 1) if (!events[k].by) events[k].by = markBy;
+  };
 
   for (const line of lines) {
+    tagWriter();
+    markAt = events.length;
+    markBy = typeof line.by === 'string' ? line.by : undefined;
     const patch = line.patch ?? null;
     if (has(patch, 'label')) label = String(patch!.label ?? '');
     const mine = line.source === 'founder';
@@ -281,6 +298,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     }
     // Anything else is bookkeeping and stays silent.
   }
+  tagWriter();
 
   return withTitleSaid(events, title, label);
 }

@@ -55,8 +55,11 @@
 // other home in the app (the palette can only say "put this first"), so it
 // could not simply be dropped when the row was.
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Product, RepeatShape } from '../types';
+import { TeamContext, firstName } from '../team/people';
+import { WhoPicker, DuePicker } from '../team/WhoPicker';
+import { isShared } from '../../../shared/team-rules.mjs';
 import { collectFiles, fromPaste, persistAttachments, type PendingAttachment } from '../attachments';
 import { AttachRow } from './AttachRow';
 import { PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId } from './Priority';
@@ -98,7 +101,9 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
   // card stays open and her draft must stay with it (a refused repeat rule).
   // Anything else counts as sent.
   onSend: (p: { product: string; title: string; body?: string; kind: string; priority?: number;
-                repeat?: RepeatShape; runAt?: number; model?: string; engine?: string; effort?: string }) => void | boolean | Promise<void | boolean>;
+                repeat?: RepeatShape; runAt?: number; model?: string; engine?: string; effort?: string;
+                // A task given to a person (the team version), and when it is due.
+                assignee?: string; due?: string }) => void | boolean | Promise<void | boolean>;
   onReorder: (slugs: string[]) => void;
   onHide: (slug: string, hide: boolean) => void;
   // Door A: the new project card, opened from inside this list. Absent in the
@@ -146,7 +151,16 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
   const [productSlug, setProductSlug] = useState(() => localStorage.getItem(LAST_PRODUCT_KEY) ?? '');
   // ../compose-project.ts owns the resolution, and says why it resolves against
   // every project rather than only the displayed ones.
+  // WHO DOES IT, WHEN IT IS A PERSON (the team version). Only on a shared
+  // project, where teammates exist; null is "an agent does it", as always.
+  const team = useContext(TeamContext);
+  const [assignee, setAssignee] = useState<string | null>(null);
+  const [due, setDue] = useState<string | null>(null);
   const product = resolveProject(products, shown, productSlug);
+  // A person can only be given a task in a project they can see: a shared one.
+  const sharedHere = !!team && isShared(team.products.get(product?.slug ?? ''));
+  const givenTo = sharedHere ? assignee : null;
+  const givenName = givenTo ? (givenTo === team?.me ? 'yourself' : firstName(team?.byId.get(givenTo))) : null;
   // Picking is what gets remembered, so it is the one place the choice is
   // written. Sending writes it too, because what she actually sent to may be
   // the fallback above rather than anything she ever clicked.
@@ -416,7 +430,10 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
       // than as a second call: main/store.mjs#composeItem already writes it as
       // part of the founder patch, so "start it in 30 minutes" is one write and
       // there is no window where the item exists and is already running.
-      ...(when.runAt && !repeat ? { runAt: when.runAt } : {}),
+      ...(when.runAt && !repeat && !givenTo ? { runAt: when.runAt } : {}),
+      // A TASK GIVEN TO A PERSON goes to them, with its due day, and no agent
+      // runs on it until they hand it to one.
+      ...(givenTo ? { assignee: givenTo, ...(due ? { due } : {}) } : {}),
       // The model she named, when she named one, and it is READ DOWNSTREAM. It
       // lands on the work item as its own field and the spawn turns it into
       // `--model` for Claude Code or `thread/start`'s `model` for Codex. The
@@ -761,14 +778,39 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
             </span>
             {' '}
             <span className="clause clause-when">
-              <WhenPicker
-                value={when}
-                onChange={setWhen}
-                onOpenChange={setWhenOpen}
-              />
+              {/* A task given to a person is due on a day; it does not start. */}
+              {givenTo
+                ? <DuePicker value={due} onChange={setDue} onOpenChange={setWhenOpen} />
+                : <WhenPicker
+                  value={when}
+                  onChange={setWhen}
+                  onOpenChange={setWhenOpen}
+                />}
               {'.'}
             </span>
             {' '}
+            {/* WHO DOES IT, on a shared project (the team version, approved
+                2026-09-30): the engine word, grown to hold the teammates. It
+                reads "With Claude Code." for an agent, as it always did, and
+                "Maya does it." for a person. Drawn even on a Mac with one
+                coding agent, because the people are a real choice there. */}
+            {sharedHere && team && (<>
+              <span className="clause clause-engine">
+                {givenTo ? '' : 'With '}
+                <WhoPicker
+                  engine={engine}
+                  person={givenTo}
+                  engines={engineRows}
+                  people={team.state.people}
+                  me={team.state.me}
+                  onEngine={pickEngine}
+                  onPerson={setAssignee}
+                  onOpenChange={setEngineOpen}
+                />
+                {givenTo ? (givenTo === team.me ? ' do it myself.' : ' does it.') : '.'}
+              </span>
+              {' '}
+            </>)}
             {/* THE ENGINE COMES BEFORE THE MODEL, because the engine decides
                 which models exist (w-83b8bfdcd3). `pickEngine` above throws the
                 model away and restores that engine's own last pick, since the
@@ -784,7 +826,7 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
                 choose, which is every Mac until she opens the gate.
                 `EnginePicker` refuses itself below two rows as well, so this
                 guard is the sentence's punctuation rather than the safeguard. */}
-            {engineRows.length > 1 && (<>
+            {engineRows.length > 1 && !sharedHere && (<>
               <span className="clause clause-engine">
                 {'With '}
                 <EnginePicker
@@ -800,7 +842,7 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
             {/* The model, last in the line. It is the clause this whole footer
                 was redrawn for (w-e5ed202958): fifteen ways to put it on the
                 card were drawn and the one chosen adds nothing at rest. */}
-            <span className="clause clause-model">
+            {!givenTo && <span className="clause clause-model">
               {'On '}
               <ModelPicker
                 value={model}
@@ -813,7 +855,7 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
                 onEffortChange={pickEffort}
               />
               {'.'}
-            </span>
+            </span>}
           </span>
           {/* THE REFUSAL IS ON THE BUTTON TOO. The note above it is the real
               answer, and this is for the pointer that goes to the button first,
@@ -823,8 +865,8 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
             className="dock-send"
             onClick={send}
             disabled={!canSend}
-            title={refusal ?? 'Start it · ⌘↵'}
-          >Start it <kbd>⌘↵</kbd></button>
+            title={refusal ?? (givenName ? `Send to ${givenName} · ⌘↵` : 'Start it · ⌘↵')}
+          >{givenName && givenTo !== team?.me ? `Send to ${givenName}` : givenTo ? 'Add it' : 'Start it'} <kbd>⌘↵</kbd></button>
         </div>
       </div>
     </div>

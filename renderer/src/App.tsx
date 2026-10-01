@@ -110,6 +110,9 @@ import { BoxFilter } from './components/BoxFilter';
 import { itemPriority, moveProduct, productRankScore } from '../../shared/rank.mjs';
 import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
+import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
+import { TeamContext, teamView } from './team/people';
+import { TeamPage } from './team/TeamPage';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing' | 'themes';
 
@@ -460,6 +463,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(
     () => new URLSearchParams(location.search).has('settings'),
   );
+  // THE TEAM PAGE, a page like Settings: it takes the main area and leaves the
+  // header and the sidebar where they are.
+  const [teamOpen, setTeamOpen] = useState(() => new URLSearchParams(location.search).has('team'));
   /*
    * EVERYTHING DRAWN OVER THE APP, IN ONE PLACE.
      Read by `closeWhatFloats` below, which is how a walk hands the whole window
@@ -1393,6 +1399,31 @@ export default function App() {
   // and pinned, so the inbox and Scheduled cannot read it two different ways.
   const hiddenAt = useCallback((i: WorkItem) => hiddenUntil(i, snoozes[i.id] ?? 0), [snoozes]);
 
+  // THE TEAM, as the window reads it: who is signed in, their people, and
+  // which projects are shared. Null when nobody is signed in, and then every
+  // list below is exactly the single-person app's.
+  const team = useMemo(() => teamView(snap?.team, snap?.products ?? []), [snap?.team, snap?.products]);
+  // A SHARED ROW IS IN ONE INBOX AT A TIME (shared/team-rules.mjs). A row given
+  // to a person is theirs while it is open, whatever its kind, because a task a
+  // teammate handed you is waiting on you the moment it arrives. Null means
+  // "not a team question", and the inbox's ordinary rules decide.
+  const teamInbox = useCallback((i: WorkItem): boolean | null => {
+    if (!team) return null;
+    const product = team.products.get(i.product);
+    if (!isShared(product)) return null;
+    if (!inMyInbox(i, product, team.me)) return false;
+    return heldByAPerson(i) ? true : null;
+  }, [team]);
+  // AND IN PROGRESS SHOWS WHAT IS MOVING FOR YOU: your own agents' shared
+  // rows, and tasks you gave a teammate. Everyone else's is on the Team page.
+  const teamProgress = useCallback((i: WorkItem): boolean => {
+    if (!team) return true;
+    const product = team.products.get(i.product);
+    if (!isShared(product)) return true;
+    if (heldByAPerson(i)) return i.assignee !== team.me && (i.createdBy === team.me || (i.people ?? []).includes(team.me!));
+    return runnerOf(i, product) === team.me;
+  }, [team]);
+
   // Everything the inbox would show before the thread mask, kept separate
   // because an ACTION needs it too: the rows this list hides are the rows her
   // bulk snooze was leaving behind (maskedAncestors, list-rules). EVERY ROW A
@@ -1444,8 +1475,11 @@ export default function App() {
     // The rule itself lives in list-rules.ts, pure and pinned by tests. What
     // is left here is the view's own business: the grace window, the clock,
     // the practice scope.
+    const shared = teamInbox(i);
+    if (shared === false) return false;
+    if (shared === true) return i.status !== 'done' && !(hiddenAt(i) > now);
     return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now });
-  }), [items, hiddenAt, scope, now, pendingId]);
+  }), [items, hiddenAt, scope, now, pendingId, teamInbox]);
 
   // EVERY PLACE SHE CAN SEE A ROW, which is what the thread mask reads. A row
   // that left the inbox because she answered it has not left her: it is in In
@@ -1656,6 +1690,9 @@ export default function App() {
       // sent thing still sitting in the inbox reads as not sent. A deferred row
       // is the exception, and it has somewhere to be: Scheduled.
       if (i.id === pendingId && deferredUntil <= now) return true;
+      if (!teamProgress(i)) return false;
+      // A task you gave a teammate is moving, for you, until it is done.
+      if (team && heldByAPerson(i) && isShared(team.products.get(i.product))) return i.status !== 'done';
       return belongsInProgress(i, { deferredUntil, now });
     }),
     ...agentList.filter((r) => r.agent && progressAfterReply(r.agent, now, agentMode)),
@@ -1669,7 +1706,7 @@ export default function App() {
     // Same score as the inbox and as the supervisor, so the top of this list is
     // what the fleet takes next. Recency only breaks a tie now.
   ].sort(byRunningOrder(score)),
-  [items, agentList, agentMode, scope, pendingId, dueAt, score, now]);
+  [items, agentList, agentMode, scope, pendingId, dueAt, score, now, team, teamProgress]);
 
   const done = useMemo(() => items.filter((i) => i.status === 'done' && (!scope || i.product === scope))
     .sort((a, b) => b.updatedAt - a.updatedAt), [items, scope]);
@@ -4196,6 +4233,7 @@ export default function App() {
   // `.toast` in the stylesheet and says why it moves to the top rather than
   // merely further up.
   return (
+    <TeamContext.Provider value={team}>
     <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${workspaceCollapsed ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}`}>
       {/* THE TOP BAR IS NOT DRAWN ON AN OPENED TASK.
 
@@ -4213,7 +4251,7 @@ export default function App() {
        */}
       {reviewLab && <div className="review-lab-controls"><span>Review exploration</span><select aria-label="Focus controls" value={focusControlStyle} onChange={e=>setFocusControlStyle(e.target.value as FocusControlStyle)}><option value="text">Focus · Text only</option><option value="corners">Focus · Frame corners + label</option><option value="corners-icon">Focus · Frame corners button</option><option value="corners-bare">Focus · Bare frame corners</option><option value="layout">Focus · Workspace layout</option></select><select aria-label="Review file type" value={artifactPreviewSample} onChange={e=>{setArtifactPreviewSample(e.target.value);setOpenDoc(null);}}><option value="code">Code</option><option value="design">Design</option><option value="notes">Text</option><option value="multiple">All three</option></select><select aria-label="Review actions" value={reviewStyle} onChange={e=>setReviewStyle(e.target.value)}><option value="header-balanced-open">1 · Balanced · open only</option><option value="header-tools-open">2 · Compact · open only</option><option value="header-card-only">3 · Clickable card · no controls</option><option value="header-feedback-only">4 · Clickable card · feedback tools</option><option value="header-balanced">Compare · all controls</option></select>{artifactPreviewSample !== "code" &&<select aria-label="Text surface" value={textReviewStyle} onChange={e=>setTextReviewStyle(e.target.value)}><option value="clear">Text · Fully transparent</option><option value="glass">Text · Matched glass</option></select>}</div>}
       {!reviewLab && api.isFixtures && new URLSearchParams(location.search).has('artifactTweaks') && <div className="artifact-tweaks"><select aria-label="Design toolbar" value={designToolbar} onChange={e => setDesignToolbar(e.target.value)}><option value="floating">Floating bar</option><option value="corner">Corner controls</option><option value="edge">Top edge</option><option value="always">Always visible</option></select>{focused && <select aria-label="Sample artifact" value={artifactPreviewSample} onChange={e => { setArtifactPreviewSample(e.target.value); setOpenDoc(null); }}><option value="multiple">Multiple artifacts</option><option value="design">Design sample</option><option value="code">Code sample</option><option value="notes">Notes sample</option></select>}</div>}
-      {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? 'settings' : null} onSettings={() => { setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
+      {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? 'settings' : teamOpen && !focused ? 'team' : null} hasTeam={!!snap?.team?.configured} onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
           only part of our own document lying over the file, so a pointer
           brought up there wakes the marks that a pointer moving across the
@@ -4304,7 +4342,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <h1 className="workspace-title">{workspacePageTitle(view, DONE.noun)}</h1>) : (
+        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <h1 className="workspace-title">{teamOpen ? 'Team' : workspacePageTitle(view, DONE.noun)}</h1>) : (
         <nav
           className="tabs"
           /* NO HINT ON THIS NAV. It carried one while the keys were ⌘⌥ and an
@@ -4580,7 +4618,12 @@ export default function App() {
           picked, and it is built in `updateItem` above. */}
 
       <div ref={setArtifactBody} hidden={settingsOpen && workspaceNavigation} className="body">
-        {inboxEmpty ? (
+        {teamOpen && !focused && !settingsOpen ? (
+          <main className="list-pane">
+            <TeamPage team={snap?.team} products={snap?.products ?? []} items={items} now={now}
+              onOpen={(item) => { setTeamOpen(false); setFocused(item); markSeen(item); }} />
+          </main>
+        ) : inboxEmpty ? (
           /* * AND DURING THE WALK THIS PAGE IS EMPTY.
 
              THIS IS THE SCREEN IN QUESTION.
@@ -4766,6 +4809,7 @@ export default function App() {
                 />
               ) : (
                 <List
+                  team={team}
                   items={list}
                   // Results are grouped and stamped like the inbox, whatever
                   // tab she opened search from. Scheduled would otherwise label
@@ -5668,5 +5712,6 @@ export default function App() {
       {/* ⌘F, on every screen, for the same reason. */}
       <FindBar />
     </div>
+    </TeamContext.Provider>
   );
 }

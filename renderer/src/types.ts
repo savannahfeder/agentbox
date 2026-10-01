@@ -373,6 +373,9 @@ export interface AgentTurn {
   at: number;
   who: 'you' | 'it';
   text: string;
+  // Which person wrote it, on a shared project (the team version). A message
+  // from a teammate is drawn with their face and name instead of "You".
+  by?: string;
   // A CONTINUATION OF THE BLOCK ABOVE, not a new message. Shape B puts the
   // work between the messages, so a reply that stopped for a tool is drawn as
   // two blocks with the thing it ran between them. They are still one reply:

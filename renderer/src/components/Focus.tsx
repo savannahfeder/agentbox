@@ -18,7 +18,8 @@ import { providerCommand } from '../../../shared/provider-commands.mjs';
 // One typographic system throughout (markdown, no cards, no stripes). Reply is
 // a docked composer, never a modal over the text.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { TeamContext } from '../team/people';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -80,6 +81,7 @@ import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
 import { isUpdateRow, SAY as UPDATE_SAY } from '../update-row';
+import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
 } from './Priority';
@@ -422,6 +424,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // is the one a hand that has never read a shortcut list cannot reach.
   onSnooze?: () => void;
 }) {
+  // A TASK GIVEN TO A PERSON has no agent on it, so nothing says one is not running.
+  const teamCtx = useContext(TeamContext);
+  const heldByPerson = teamHeld(item, teamCtx);
   // Whatever the pane is leading with, not the ask alone: on a row the user wrote,
   // the ask is the one field a worker cannot answer in (format.ts says why).
   const options = itemOptions(item);
@@ -1195,7 +1200,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             the byline this pane already draws, and nowhere else on this screen
             (w-6246b0c91f). Handing them to `Live` as
             well is what made one screen say "Codex" twice. */}
-        <Live item={item} facts={{ ...live, session, stalled, scheduledUntil }} />
+        {!heldByPerson && <Live item={item} facts={{ ...live, session, stalled, scheduledUntil }} />}
 
       </div>
 
@@ -1327,6 +1332,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     <div className="focus-dock">
       <div className="focus-dock-inner">
         <div className="dock-card">
+          {/* A TASK A TEAMMATE GAVE YOU: to an agent, keep it, or hand it back. */}
+          <TeamRouteStrip item={item} />
           {stripShown && (
             <div className="opt-strip">
               {/* THE HEADING IS THE QUESTION, NOT THE NAME OF THE CONTROL.

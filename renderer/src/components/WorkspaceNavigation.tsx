@@ -39,8 +39,12 @@ import { DONE } from '../done-word';
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch, onCompose, inboxCount = 0, scheduledCount = 0, usage, onSettings, onInstructions, page }: {
+export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch, onCompose, inboxCount = 0, scheduledCount = 0, usage, onSettings, onInstructions, page, hasTeam = false, onTeam }: {
   page?: string | null; inboxCount?: number; scheduledCount?: number; usage?: ReactNode; onSettings?: () => void; onInstructions?: () => void;
+  // THE TEAM TAB, the one thing the team version adds to the sidebar. No
+  // people and no counts here: approved 2026-09-30, a list of who is busy is
+  // not worth seeing all the time, and the Team page is where you look.
+  hasTeam?: boolean; onTeam?: () => void;
   view: View; collapsed: boolean; onToggle: () => void; onView: (view: View) => void; onSearch: () => void; onCompose: () => void;
 }) {
   const waiting = Number.isFinite(inboxCount) ? Math.max(0, Math.floor(inboxCount)) : 0;
@@ -72,7 +76,12 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   return <aside className="workspace-navigation" aria-label="Workspace">
     <button className="workspace-search" data-hint="search" data-hint-text="span" title="Search tasks (/)" aria-label="Search tasks" onClick={onSearch}><SearchIcon/><span>Search</span><kbd>/</kbd></button>
     <div className="workspace-section"><span>Workspace</span></div>
-    <nav className="workspace-tabs" aria-label="Tasks">{destinations.map((d, slot) => BELOW.includes(d[0]) ? null : tab(d, slot))}</nav>
+    <nav className="workspace-tabs" aria-label="Tasks">{destinations.map((d, slot) => BELOW.includes(d[0]) ? null : tab(d, slot))}
+      {hasTeam && onTeam && <button data-tab="team" className={`workspace-tab${page === 'team' ? ' active' : ''}`} aria-label="Team" aria-current={page === 'team' ? 'page' : undefined} title={collapsed ? 'Team' : undefined} onClick={onTeam}>
+        <svg className="workspace-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden="true"><circle cx="5.5" cy="5.5" r="2.2"/><path d="M1.8 13.2c.5-2.3 2-3.5 3.7-3.5s3.2 1.2 3.7 3.5"/><circle cx="11" cy="6" r="1.9"/><path d="M10.2 9.8c.3-.1.5-.1.8-.1 1.5 0 2.8 1 3.2 3.2"/></svg>
+        <span>Team</span>
+      </button>}
+    </nav>
     <div className="workspace-bottom">
       <div className="workspace-utilities">
         {/* Projects used to be the first row here (w-d19d6d387c). It came out

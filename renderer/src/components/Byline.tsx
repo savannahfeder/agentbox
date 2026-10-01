@@ -2,8 +2,10 @@
 // the conversation foot in Live.tsx, may use lattice + shimmer. Byline
 // still owns the same status, timing, location and change figures.
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useState, type ReactNode } from 'react';
 import { bylineFacts, WHERE_LINE, type BylineFacts, type EngineFacts, type WhereFacts } from '../byline';
+import { TeamContext } from '../team/people';
+import { TeamPeople, TeamSaid, teamHeld } from '../team/TeamFocus';
 import { isTroubleRow } from '../trouble-row';
 import { isUpdateRow } from '../update-row';
 import type { LiveFacts } from '../live-line';
@@ -55,6 +57,17 @@ export function Byline({ item, facts, returned, figures, tail }: {
   }, [running]);
 
   const f: BylineFacts = bylineFacts(item, { ...facts, now });
+  // A TASK GIVEN TO A PERSON (the team version) says who it is with and when
+  // it is due instead, and nothing about agents: none is on it.
+  const team = useContext(TeamContext);
+  if (teamHeld(item, team)) {
+    return <div className="focus-meta by-lead">
+      <TeamSaid item={item} />
+      <TeamPeople item={item} />
+      {figures}
+      {tail}
+    </div>;
+  }
 
   return (
     // The whole thing said at length, because a mark and three fragments is a

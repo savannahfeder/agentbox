@@ -1,0 +1,118 @@
+/* THE TEAM VERSION'S PIECES, in the theme's own tokens, so they wear every
+   skin. Drawn and approved in Ember Grid on 2026-09-30 (w-e731ca9376,
+   designs/w-e731ca9376/team.html); these are the measured values from that
+   round, where every alignment was checked to under a pixel.
+
+   AVATARS ARE INLINE BLOCKS, NOT FLEX ITEMS, wherever they sit in a line of
+   text, so the words beside them keep the baseline the app aligns on. */
+.tm-av { box-sizing: border-box; display: inline-block; width: 18px; height: 18px; vertical-align: middle;
+  border: 1px solid var(--line-strong); background: var(--film-strong); color: var(--text-dim);
+  font: 500 9px/16px var(--mono); letter-spacing: .02em; text-transform: uppercase; text-align: center;
+  border-radius: var(--radius); object-fit: cover; flex: 0 0 auto; }
+img.tm-av { background: var(--bg-selected); }
+.tm-av.lg { width: 28px; height: 28px; line-height: 26px; font-size: 10.5px; }
+.tm-av.you { color: var(--on-solid); background: var(--text-dim); border-color: var(--text-dim); }
+.tm-av.bot { border-style: dashed; background: transparent; }
+
+/* the row end: who sent it, then the due day, then the app's own time */
+.row-end .tm-who { white-space: nowrap; font: 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+.row-end .tm-who .tm-av { width: 16px; height: 16px; line-height: 14px; font-size: 8px; margin-right: 8px; position: relative; top: -1px; }
+.row-end .tm-due { white-space: nowrap; font: 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.row-end .tm-lock svg { display: inline-block; vertical-align: middle; position: relative; top: -1.5px; margin-right: 6px; color: var(--text-faint); }
+
+/* The line under an opened task's name (project, who it came from, due day)
+   wears the inbox row end's type. Her pick, 2026-09-30. */
+.workspace-task-header .focus-meta .fm-said { font: 12px/18px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+.fm-said .tm-due-word { color: var(--accent); }
+
+/* who is on a thread, in the topbar beside the app's own icons */
+.tm-people { display: flex; align-items: center; gap: 4px; height: 34px; margin-right: 4px; }
+.tm-people .tm-av { width: 22px; height: 22px; line-height: 20px; }
+
+/* a teammate's message: their face before their name */
+.msg-who .tm-av { margin-right: 9px; position: relative; top: -1px; }
+
+/* who does it: the engine menu, grown to hold people */
+.prio-menu .tm-sep { display: block; height: 1px; background: var(--line); margin: 4px 0; }
+/* 9px across, the menu row's own padding (styles.css .prio-menu-row), so a
+   heading starts where the marks under it start. */
+.prio-menu .tm-menu-head { display: block; padding: 8px 9px 4px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.tm-who-menu .prio-menu-row { display: flex; align-items: center; }
+.tm-who-menu .prio-menu-row .tm-av { margin-right: 10px; }
+.tm-who-menu .prio-menu-row .tm-av.bot { font-size: 8.5px; text-transform: none; color: var(--text-faint); }
+
+/* routing a task a teammate gave you */
+.tm-route { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* THE TEAM PAGE: every open task in the company, one line each, never
+   grouped. The tabs filter by state, the faces by person. */
+/* The list's own insets, declared here as well: the setup screens sit outside
+   any .list, where the app defines them, and drew flush against the card. */
+.tm-team-pane, .tm-setup { --gutter: 8px; --text-x: 32px; --row-r: 24px; }
+.tm-team-pane { height: 100%; overflow: auto; }
+.tm-bar { display: flex; align-items: center; gap: 24px; padding: 14px var(--row-r) 8px var(--text-x); }
+.tm-tabs { display: flex; align-items: center; gap: 22px; }
+.tm-tab { display: inline-flex; align-items: baseline; gap: 8px; height: 30px; line-height: 30px; padding: 0; background: none; border: 0;
+  border-bottom: 1px solid transparent; font: 11px/30px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); cursor: pointer; }
+.tm-tab b { font-weight: 400; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.tm-tab.on { color: var(--text); border-bottom-color: var(--accent); }
+.tm-tab.on b { color: var(--text); }
+.tm-faces { margin-left: auto; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+.tm-every { height: 26px; padding: 0 10px; margin-right: 6px; background: none; border: 1px solid var(--line-strong);
+  font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); cursor: pointer; }
+.tm-every.on { color: var(--text); border-color: var(--text-dim); background: var(--wash-strong); }
+.tm-face-btn { padding: 0; border: 0; background: none; cursor: pointer; line-height: 0; }
+.tm-faces .tm-av { width: 24px; height: 24px; line-height: 22px; }
+.tm-faces.picked .tm-face-btn .tm-av { opacity: .38; }
+.tm-faces.picked .tm-face-btn.on .tm-av { opacity: 1; outline: 1px solid var(--accent); outline-offset: 2px; }
+
+.tm-grid { display: grid; grid-template-columns: 8px minmax(0, 1fr) 128px 132px 168px 44px; column-gap: 20px; align-items: baseline; }
+.tm-grid > .tm-mark { align-self: center; position: relative; top: -1px; }
+.row.tm-head { padding-top: 10px; padding-bottom: 8px; font: 10.5px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.row.tm-head .row-main, .tm-row .row-main { width: 100%; }
+.tm-head .num, .tm-row .num { text-align: right; }
+.tm-row.row { padding-top: 9px; padding-bottom: 9px; align-items: center; cursor: default; }
+.tm-mark { box-sizing: border-box; width: 8px; height: 8px; }
+/* tm-is-* and never .run: the app already styles a .run (its run history) */
+.tm-mark.tm-is-run { background: var(--accent); }
+.tm-mark.tm-is-wait { border: 1px solid var(--text-dim); }
+.tm-mark.tm-is-sched { border: 1px dashed var(--text-faint); }
+.tm-title { font-size: 14px; line-height: 20px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-title.private { color: var(--text-faint); }
+.tm-title svg { display: inline-block; vertical-align: middle; position: relative; top: -1.5px; margin-right: 7px; color: var(--text-faint); }
+.tm-title small { margin-left: 10px; font-size: 12.5px; color: var(--text-faint); }
+.tm-proj { font: 11.5px/20px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-owner { font-size: 13px; line-height: 20px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-owner .tm-av { margin-right: 9px; position: relative; top: -1px; }
+.tm-state { font-size: 13px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-state.tm-is-run { color: var(--text); }
+.tm-state.tm-is-sched { color: var(--text-faint); }
+.tm-row .num { font: 12px/20px var(--mono); color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.tm-empty-note { padding: 32px var(--row-r) 32px var(--text-x); color: var(--text-faint); font-size: 14px; }
+
+/* signing in, starting a team, inviting, and sharing projects */
+.tm-setup { padding: 28px var(--row-r) 40px var(--text-x); max-width: 640px; }
+.tm-setup h2 { margin: 0 0 6px; font-size: 18px; line-height: 24px; font-weight: 400; letter-spacing: -.02em; color: var(--text); }
+.tm-setup p { margin: 0 0 18px; color: var(--text-faint); font-size: 13.5px; line-height: 20px; }
+.tm-setup .tm-error { color: var(--accent); }
+.tm-field-row { display: flex; gap: 8px; margin-bottom: 22px; }
+.tm-input { flex: 1; box-sizing: border-box; height: 34px; padding: 0 10px; border: 1px solid var(--line-strong); background: transparent;
+  color: var(--text); font: inherit; font-size: 13.5px; border-radius: var(--radius); }
+.tm-input:focus { outline: none; border-color: var(--text-dim); }
+.tm-btn { height: 34px; padding: 0 14px; border: 1px solid var(--line-strong); background: var(--wash); color: var(--text);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; border-radius: var(--radius); white-space: nowrap; }
+.tm-btn:hover { border-color: var(--text-dim); }
+.tm-btn:disabled { opacity: .5; cursor: default; }
+.tm-section { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); margin: 24px 0 10px; }
+.tm-person-line { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 14px; color: var(--text); }
+.tm-person-line small { margin-left: auto; color: var(--text-faint); font-size: 12.5px; }
+.tm-project-line { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--text); }
+.tm-project-line:last-child { border-bottom: 0; }
+.tm-project-line .tm-seg { margin-left: auto; }
+.tm-seg { display: flex; height: 28px; border: 1px solid var(--line-strong); }
+.tm-seg button { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint);
+  background: none; border: 0; padding: 0 10px; cursor: pointer; }
+.tm-seg button + button { border-left: 1px solid var(--line-strong); }
+.tm-seg button.on { color: var(--text); background: var(--wash-strong); }
+.tm-signed { display: flex; align-items: center; gap: 10px; color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
+.tm-signed button { margin-left: auto; }

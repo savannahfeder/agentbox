@@ -24,7 +24,8 @@
 // Round three: consecutive tool calls fold into one line, and what is never
 // folded is a failure.
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Face, TeamContext, firstName } from '../team/people';
 import { activitySummary, keepActivityKeyLocal } from '../activity-summary';
 import { herTurnEnds, herTurnStarts } from '../her-turns';
 import { holdAtBottom } from '../thread-bottom';
@@ -103,6 +104,12 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, name, landO
   // are aggregated, and a run she opened stays open while she reads.
   const [runsOpen, setRunsOpen] = useState<Set<number>>(new Set());
   const foot = useRef<HTMLDivElement>(null);
+  // A TEAMMATE'S MESSAGE is theirs, not "You": drawn with their face and name.
+  const team = useContext(TeamContext);
+  const teammateOf = (e: AgentEvent) => {
+    const by = (e as { by?: string }).by;
+    return team && by && by !== team.me ? team.byId.get(by) ?? { id: by, email: '', name: 'A teammate', avatarUrl: null } : null;
+  };
 
   useEffect(() => {
     setOpen(new Map());
@@ -239,10 +246,12 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, name, landO
               // saying so, and here it gets its name back. The fold is
               // untouched, so the header still counts it as one message with
               // the half she cannot see.
-              <div className={`msg ${e.who === 'you' ? 'yours' : ''} ${turnStarts[n] ? 'turn' : ''} ${turnEnds[n] ? 'turn-end' : ''}${e.same && !e.resumed ? 'same' : ''} ${e.pending ? 'sending' : ''}`}>
+              <div className={`msg ${e.who === 'you' && !teammateOf(e) ? 'yours' : ''} ${turnStarts[n] ? 'turn' : ''} ${turnEnds[n] ? 'turn-end' : ''}${e.same && !e.resumed ? 'same' : ''} ${e.pending ? 'sending' : ''}`}>
                 {(!e.same || e.resumed) && (
                   <div className="msg-head">
-                    <span className="msg-who">{e.who === 'you' ? 'You' : name}</span>
+                    <span className="msg-who">{teammateOf(e)
+                      ? <><Face person={teammateOf(e)} />{firstName(teammateOf(e))}</>
+                      : e.who === 'you' ? 'You' : name}</span>
                     {/* SENT, AND THE AGENT HAS NOT TAKEN IT YET (w-1ef03d6f27).
                         It stands where the time stands, because it is the same
                         fact: a message with no time on it has not happened to

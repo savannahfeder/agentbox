@@ -17,6 +17,8 @@ import { isUpdateRow, UPDATE_ID } from '../update-row';
 import { IMPORT_KEYS, JUST_IMPORTED_WORD, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEYS, isImportRow, isNotImportedRow, justImported, type ImportChoice } from '../import-row';
 import { splitHits } from '../search';
 import { isCleanRun, nextRunAt } from '../../../shared/repeats.mjs';
+import { TeamRowEnd, type TeamView } from '../team/people';
+import { heldByAPerson } from '../../../shared/team-rules.mjs';
 
 /**
  * THE AGENT A ROW WITH NOTHING RUNNING WOULD RUN ON.
@@ -101,7 +103,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null }: {
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -182,6 +184,9 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   // THE YES OR NO ON A CODEX CONVERSATION'S ROW, and the Import on one she
   // declined. A click on the keycap sends the same word the key does.
   onAnswerImport?: (item: WorkItem, choice: ImportChoice) => void;
+  // THE TEAM (renderer/src/team/people.tsx). Null unless someone is signed in,
+  // and then the row end is exactly the single-person app's.
+  team?: TeamView | null;
 }) {
   const rules = view === 'snoozed' ? (repeats ?? []) : [];
   // The keys the rows in THIS list offer, drawn on the row under the pointer.
@@ -521,7 +526,10 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                   {/* Which product this is about, read per row rather than
                       scanned down a column: it sits with the timestamp because
                       both answer "where and when did this come from". */}
-                  <span className="product">{item.productName}</span>
+                  {/* ON A TEAM, a row a teammate sent shows their face and
+                      name here instead, a task given to you its due day, and a
+                      private project a lock (renderer/src/team/people.tsx). */}
+                  {team ? <TeamRowEnd item={item} team={team} /> : <span className="product">{item.productName}</span>}
                   {/* A live session is the fact that matters on the row: "16h"
                       (the item's last write) read as abandonment while an agent
                       was three minutes into the job, and it read as nothing
@@ -590,7 +598,9 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                       of this file, with the cost and with the arrangement that
                       was turned down.
                    */}
-                  {!justImported(item, seen) && !session && agentRest({ engineChoice, engines, item })
+                  {/* No coding agent is named on a task given to a person:
+                      none is on it until they hand it to one. */}
+                  {!justImported(item, seen) && !session && !(team && heldByAPerson(item)) && agentRest({ engineChoice, engines, item })
                     && <span className="time agent">{agentRest({ engineChoice, engines, item })}</span>}
                   {!justImported(item, seen) && session && agentAtWork({ engineChoice, session })
                     && <span className="time agent">{agentAtWork({ engineChoice, session })}</span>}
