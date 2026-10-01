@@ -12,8 +12,6 @@
 -- Every table is behind row level security. A person sees only their team, and
 -- only the shared projects they are on.
 
-create extension if not exists pgcrypto;
-
 -- People. One row per signed-in person, made from their Google profile.
 create table if not exists public.people (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -123,7 +121,9 @@ create policy people_read on public.people for select using (
 create policy people_update_self on public.people for update using (id = auth.uid());
 
 -- Teams: the ones you are on. Anyone signed in may start one.
-create policy teams_read on public.teams for select using (id in (select public.my_teams()));
+-- Its maker can read it too, before they have joined it: creating a team and
+-- reading it back is one statement, and they join a moment later.
+create policy teams_read on public.teams for select using (id in (select public.my_teams()) or created_by = auth.uid());
 create policy teams_create on public.teams for insert with check (created_by = auth.uid());
 
 create policy members_read on public.team_members for select using (team_id in (select public.my_teams()));
