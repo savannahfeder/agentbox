@@ -136,7 +136,10 @@ describe('the door to a project', () => {
   it('lights Settings while any project page is open', () => {
     expect(settings).toContain("pane === 'projects' ? pane");
     expect(settings).toContain("typeof pane === 'object' ? 'projects'");
-    expect(app).toContain("page={settingsOpen ? 'settings' : null}");
+    // Settings is asked first, so a project page lights Settings whatever else
+    // is true. The members page joined the same prop on 2026-10-01
+    // (w-e731ca9376), after Settings, so it cannot steal the light from it.
+    expect(app).toContain("page={settingsOpen ? 'settings' : teamShown && membersOpen ? 'members' : null}");
   });
 
   it('titles the page it lands on', () => {

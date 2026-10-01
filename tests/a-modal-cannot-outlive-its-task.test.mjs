@@ -32,7 +32,7 @@ import {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const src = (...p) => fs.readFileSync(path.join(here, '..', 'renderer', 'src', ...p), 'utf8');
 const app = src('App.tsx');
-const nav = src('components/WorkspaceNavigation.tsx');
+const pages = src('threads', 'Pages.tsx');
 
 describe('the rule', () => {
   it('drops a modal that belongs to a task', () => {
@@ -118,7 +118,10 @@ describe('C means the same thing on both screens', () => {
     // strip is the app changing under the pointer. C is promised by the sidebar
     // button now, on a plate beside it. This pins the promise, not the drawing.
     // It promises N since w-fb9051e597; C still works and is not advertised.
+    // approved 2026-10-01 (w-e731ca9376): the New thread button left the
+    // sidebar for the right end of the header (HeaderActions), and the promise
+    // went with it.
     expect(HINTS['new-task'][0].key).toBe('N');
-    expect(nav).toContain('data-hint="new-task"');
+    expect(pages).toMatch(/data-hint="new-task"[^>]*onClick=\{onCompose\}/);
   });
 });

@@ -192,15 +192,21 @@ describe('the Done mark she picked', () => {
     expect(focus).toContain("const canFinish = item.status !== 'done';");
   });
 
-  it('names the verb once, and every surface reads that one', () => {
+  it('names the verb once, and every surface reads that one', async () => {
     const rules = fs.readFileSync(path.join(root, 'renderer', 'src', 'list-rules.ts'), 'utf8');
-    const nav = fs.readFileSync(path.join(root, 'renderer', 'src', 'components', 'WorkspaceNavigation.tsx'), 'utf8');
     expect(word).toContain("export const DONE = { verb: 'Done', short: 'Done', noun: 'Done' };");
     expect(rules).toContain("{ key: 'E', word: DONE.short }");
-    expect(nav).toContain('doneNoun: DONE.noun');
     expect(app).toContain('DONE.verb} Task');
-    expect(app).toContain('workspacePageTitle(view, DONE.noun)');
     expect(focus).toContain('aria-label={DONE.verb}');
+    // approved 2026-10-01 (w-e731ca9376): the Done place left the sidebar and
+    // the heading over every list reads Inbox, so the two readers that were
+    // there (the sidebar tab and the page title) are gone. The Done tab is now
+    // drawn by StateTabs on the Inbox page. Pages.tsx writes that label out
+    // rather than reading done-word.ts, so this compares the drawn word with
+    // the one word, which is what fails the day the two drift apart.
+    const { INBOX_TABS } = await import('../renderer/src/threads/Pages.tsx');
+    const { DONE } = await import('../renderer/src/done-word.ts');
+    expect(INBOX_TABS.find((t) => t.view === 'done').label).toBe(DONE.noun);
   });
 });
 
@@ -244,19 +250,33 @@ describe('the corner marks do not land on the code figures', () => {
 
 // THE CORNER ON A TASK IS THE TASK'S (w-581dbc6cc4). The '+' and ⌘K buttons
 // are not needed on a task page; they stay on the plain inbox list page.
+//
+// approved 2026-10-01 (w-e731ca9376): on the sidebar layout the plus and the ⌘
+// mark are not drawn at all, on a list or on a task. The right end of a list's
+// header is Search, New thread and Display (HeaderActions), and that whole
+// group stands down while a task is open, which keeps the rule above: the
+// corner on a task is the task's.
 describe('the corner carries the task on a task and the app on a list', () => {
   it('draws neither the plus nor the palette mark while a task is open', () => {
     expect(app).toContain('const taskOpen = workspaceNavigation && !!focused && !settingsOpen;');
-    expect(app).toMatch(/\{!taskOpen && <button[\s\S]{0,200}aria-label="New thread"/);
-    expect(app).toMatch(/\{!taskOpen && <button[\s\S]{0,200}aria-label="Commands"/);
+    expect(app).toMatch(/\{!taskOpen && !workspaceNavigation && <button[\s\S]{0,200}aria-label="New thread"/);
+    expect(app).toMatch(/\{!taskOpen && !workspaceNavigation && <button[\s\S]{0,200}aria-label="Commands"/);
+    // Search and New thread in the header go the same way on a task.
+    expect(app).toMatch(/\{workspaceNavigation && !focused && !settingsOpen && [^\n]*\(\s*<HeaderActions/);
   });
 
   it('costs neither verb a route she already has', () => {
-    // The sidebar carries New task on every screen including a task's, its own
-    // key opens it, ⌘K opens the palette, and both marks are untouched on the
-    // lists. The key itself is not this test's business and has changed once.
-    const nav = fs.readFileSync(path.join(root, 'renderer', 'src', 'components', 'WorkspaceNavigation.tsx'), 'utf8');
-    expect(nav).toContain('className="workspace-create"');
+    // New thread is a button at the right end of every list's header, and its
+    // key opens it on a list and on a task. ⌘K opens the palette from
+    // anywhere. The key itself is not this test's business and has changed once.
+    // On a task the sidebar's New thread button used to be a mouse route as
+    // well; it went with the redesign (approved 2026-10-01, w-e731ca9376), so
+    // there the key is the route.
+    const pages = fs.readFileSync(path.join(root, 'renderer', 'src', 'threads', 'Pages.tsx'), 'utf8');
+    expect(pages).toMatch(/className="th-new"[^>]*onClick=\{onCompose\}[^>]*>[\s\S]{0,40}New thread/);
+    expect(app).toMatch(/<HeaderActions[\s\S]{0,400}onCompose=\{\(\) => setModal\('compose'\)\}/);
+    // The key on a task is pinned in full in a-modal-cannot-outlive-its-task.
+    expect(app).toContain("e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }");
     expect(app).toMatch(/\(e\.metaKey \|\| e\.ctrlKey\) && e\.key\.toLowerCase\(\) === 'k'/);
   });
 });

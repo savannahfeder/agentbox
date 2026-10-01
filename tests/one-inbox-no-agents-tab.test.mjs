@@ -31,9 +31,15 @@ describe('the tab is gone, not hidden', () => {
     expect(app).not.toMatch(/setView\('agents'\)/);
   });
 
-  it('leaves no fifth view for anything to route to', () => {
+  it('leaves no agents view for anything to route to', () => {
+    // The fifth view is 'all' since 2026-10-01, and it is not this tab coming
+    // back. approved 2026-10-01 (w-e731ca9376): 'all' is the Inbox page's All
+    // tab, every thread of hers in one list, drawn by StateTabs beside Needs
+    // you, Running, Scheduled and Done.
     const types = read('renderer/src/types.ts');
-    expect(types).toMatch(/export type View = 'inbox' \| 'snoozed' \| 'progress' \| 'done';/);
+    expect(types).toMatch(/export type View = 'inbox' \| 'snoozed' \| 'progress' \| 'done' \| 'all';/);
+    expect(types).not.toMatch(/export type View = [^;]*'agents'/);
+    expect(read('renderer/src/threads/Pages.tsx')).toContain("{ view: 'all', label: 'All' }");
     expect(app).not.toMatch(/view === 'agents'/);
   });
 
