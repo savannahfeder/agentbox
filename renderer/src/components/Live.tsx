@@ -108,7 +108,7 @@ export function Live({ item, facts }: { item: WorkItem; facts: LiveFacts }) {
         <div className="live-details" id={detailId}>
           {earlier > 0 && <div className="live-earlier">{earlier} earlier {earlier === 1 ? 'step' : 'steps'} since it last said something</div>}
           {recent.map((action, index) => <ActivityRow key={`${action.at}-${index}`}
-            label={`${action.verb.charAt(0).toUpperCase()}${action.verb.slice(1)} ${action.subject}`}
+            label={`${action.verb.charAt(0).toUpperCase()}${action.verb.slice(1)} ${action.subject}`.trim()}
             detail={action.full || action.subject || ''} />)}
           {activity.map(action => <ActivityRow key={action.id} label={action.label} detail={action.detail} />)}
           {historyError && <div>Couldn’t read the command history.</div>}
