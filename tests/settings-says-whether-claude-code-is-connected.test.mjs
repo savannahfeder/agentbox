@@ -66,8 +66,9 @@ const onboarding = read('renderer/src/onboarding.ts');
 const block = settings.slice(
   settings.indexOf('/* --------------------- IS CLAUDE CODE CONNECTED OR NOT'),
   // The Updates block that used to close this slice is gone (w-5737fe67cf),
-  // so it ends where the next section starts.
-  settings.indexOf('/* --------------------------- project instructions'),
+  // so it ends where the next section starts. The project instructions box
+  // that followed it moved to the Instructions page (w-4cbcd888ae).
+  settings.indexOf('/* ---------------------------- the mark, changed'),
 );
 
 /**
