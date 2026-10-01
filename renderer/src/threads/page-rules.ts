@@ -169,9 +169,11 @@ export interface BoardEntry {
 // and Inbox, which should pretty much never happen"). Your own threads sit in
 // the column whose tab lists them; `threadState` is only the fallback for a row
 // no tab lists. `live` is the set an agent is on right now.
-export function teamEntries({ items, products, cards, me, now, since = null, stateOf, live }: {
+export function teamEntries({ items, products, cards, me, now, since = null, stateOf, live, allMine = false }: {
   items: WorkItem[]; products: Product[]; cards: ThreadCard[]; me: string | null; now: number; since?: number | null;
   stateOf?: (item: WorkItem) => ThreadStateWord | null; live?: Set<string>;
+  /** Your own page (w-05ff3d1438): every thread of yours, the private ones included. */
+  allMine?: boolean;
 }): BoardEntry[] {
   const bySlug = new Map(products.map((p) => [p.slug, p]));
   const today = startOfDay(now);
@@ -187,7 +189,9 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     // Your threads from before you joined are not on the team's board, any
     // more than they are on anyone else's (shared/thread-cards.mjs). One you
     // made private stays, with its lock, so you can see it is hidden.
-    if (item.visibility !== 'private' && !shownToTeam(item, since)) continue;
+    // ON YOUR OWN PAGE EVERY ONE OF YOURS STAYS (w-05ff3d1438): leaving them
+    // out is how 1,211 of her threads went missing from the board.
+    if (!allMine && item.visibility !== 'private' && !shownToTeam(item, since)) continue;
     const state = stateOf?.(item) ?? threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
     out.push({

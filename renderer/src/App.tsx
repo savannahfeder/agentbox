@@ -112,12 +112,13 @@ import { itemPriority, moveProduct, productRankScore } from '../../shared/rank.m
 import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
-import { TeamContext, teamView } from './team/people';
+import { Face, TeamContext, firstName, teamView } from './team/people';
 import { TeamPage } from './team/TeamPage';
-import { EmptyTab, HeaderActions, InboxBoard, InboxClear, LiveContext, StateTabs, TeamView } from './threads/Pages';
+import { EmptyTab, HeaderActions, InboxBoard, InboxClear, LiveContext, PeoplePicker, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { conversationWith, isDirect, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
+import { DEFAULT_DISPLAY, conversationWith, isDirect, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
+import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing' | 'themes';
 
@@ -1955,13 +1956,47 @@ export default function App() {
   // 2026-10-01). Remembered per page; the Inbox is a list by default and the
   // Team a board.
   const [inboxDisplay, setInboxDisplayRaw] = useState<Display>(() => readDisplay('inbox'));
-  const [teamDisplay, setTeamDisplayRaw] = useState<Display>(() => readDisplay('team'));
   const setInboxDisplay = useCallback((d: Display) => { setInboxDisplayRaw(d); writeDisplay('inbox', d); }, []);
-  const setTeamDisplay = useCallback((d: Display) => { setTeamDisplayRaw(d); writeDisplay('team', d); }, []);
+  // WHOSE THREADS ARE ON THE PAGE (w-05ff3d1438): the faces at the end of the
+  // tab bar. The Inbox and the Team page were one question on two pages; this
+  // is the one page, and it opens as yours. Remembered between launches.
+  const everyone = useMemo(() => {
+    if (!team) return [];
+    const people = [...team.byId.values()];
+    return team.state.me && !team.byId.has(team.state.me.id) ? [team.state.me, ...people] : people;
+  }, [team]);
+  const [pickedRaw, setPickedRaw] = useState<string[] | null>(() => readPicked());
+  const picked = useMemo(() => normalizePicked(pickedRaw, team?.me ?? null, everyone.map((p) => p.id)), [pickedRaw, team?.me, everyone]);
+  const setPicked = useCallback((next: string[]) => { setPickedRaw(next); writePicked(next); setSelected(0); }, []);
+  const withOthers = !!team && othersInView(picked, team.me);
+  // Your own rows are on the page unless you took yourself off it.
+  const mineShown = !team || picked.includes(team.me ?? '');
   const displayedBox = useMemo(
-    () => sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay),
-    [shownBox, inboxDisplay, now],
+    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay) : []),
+    [shownBox, inboxDisplay, now, mineShown],
   );
+  // THE PICKED TEAMMATES' THREADS FOR THIS TAB, from the cards their Macs
+  // publish, merged into your rows in the Display's order.
+  const cards = snap?.team?.cards ?? [];
+  const theirRows = useMemo(
+    () => (withOthers ? teammateRows(cards, { tab: view, picked, me: team?.me ?? null, display: inboxDisplay, products: snap?.products ?? [], now }) : []),
+    [withOthers, cards, view, picked, team?.me, inboxDisplay, snap?.products, now],
+  );
+  const mixedRows = useMemo(() => (withOthers ? mergeRows(displayedBox, theirRows, inboxDisplay.sort) : null), [withOthers, displayedBox, theirRows, inboxDisplay.sort]);
+  // A teammate's thread opens as their card, over the page, and Back returns here.
+  const openTeammateCard = useCallback((card: ThreadCard) => { setMembersOpen(false); setOpenCard(card); setTeamOpen(true); }, []);
+  const personCell = useCallback((id: string | null) => {
+    const p = id ? team?.byId.get(id) ?? null : null;
+    return <><Face person={p} me={id === team?.me} />{id === team?.me ? 'You' : firstName(p)}</>;
+  }, [team]);
+  const peoplePicker = team
+    ? <PeoplePicker everyone={everyone} picked={picked} me={team.me} onPick={setPicked} />
+    : undefined;
+  // Each tab's number, theirs added in, before the Display's filters, the way
+  // yours have always been counted.
+  const theirCount = useCallback((tab: string) => (withOthers
+    ? teammateRows(cards, { tab, picked, me: team?.me ?? null, display: DEFAULT_DISPLAY.inbox, products: snap?.products ?? [], now }).length : 0),
+  [withOthers, cards, picked, team?.me, snap?.products, now]);
   // The inbox as she sees it, whichever tab is up: her filter AND her display
   // menu. Finishing a task from inside it advances through THIS, never the
   // whole inbox, or the next task opened can be one she has hidden
@@ -4480,7 +4515,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">{membersOpen ? 'Team members' : 'Team'}</h1> : <h1 className="workspace-title">Inbox</h1>)) : (
+        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">{membersOpen ? 'Team members' : openCard ? 'Inbox' : 'Team'}</h1> : <h1 className="workspace-title">Inbox</h1>)) : (
         <nav
           className="tabs"
           /* NO HINT ON THIS NAV. It carried one while the keys were ⌘⌥ and an
@@ -4630,18 +4665,19 @@ export default function App() {
               first five minutes and into an app they have not been shown. The
               band above the window is what says where they are. */}
           {/* SEARCH, NEW THREAD AND DISPLAY (approved 2026-10-01): the whole of
-              the right end on the Inbox and the Team. Display holds the view,
-              the sort and the filters. */}
-          {workspaceNavigation && !focused && !settingsOpen && !(teamShown && membersOpen) && (
+              the right end on the Inbox, which is the one page of threads now
+              (w-05ff3d1438). Display holds the view, the sort and the filters.
+              Not over a teammate's card or the team's setup. */}
+          {workspaceNavigation && !focused && !settingsOpen && !teamShown && (
             <HeaderActions
-              page={teamShown ? 'team' : 'inbox'}
-              display={teamShown ? teamDisplay : inboxDisplay}
-              onDisplay={teamShown ? setTeamDisplay : setInboxDisplay}
+              page="inbox"
+              display={inboxDisplay}
+              onDisplay={setInboxDisplay}
               products={snap.products}
               onSearch={openSearch}
               onCompose={() => setModal('compose')}
-              shown={teamShown ? undefined : displayedBox.length}
-              total={teamShown ? undefined : shownBox.length}
+              shown={displayedBox.length + theirRows.length}
+              total={(mineShown ? shownBox.length : 0) + theirRows.length}
             />
           )}
           {!workspaceNavigation && !focused && !settingsOpen && !inPractice && (
@@ -4777,18 +4813,20 @@ export default function App() {
       {teamShown && (
         <div className="body tm-body">
           <main className="list-pane">
-            {/* THE TEAM (approved 2026-10-01): everyone's threads as a board by
-                default, yours from this Mac and your teammates' from their
-                cards. Until you are signed in and on a team, and on Team
-                members or Invite people, the setup page stands in. */}
-            {snap?.team?.signedIn && snap.team.team && !membersOpen ? (
+            {/* THE TEAM BOARD IS GONE (w-05ff3d1438): its people are on the
+                Inbox, picked by the faces in its tab bar. What is left here is
+                a teammate's thread opened from the Inbox, and, until you are
+                signed in and on a team, or on Team members or Invite people,
+                the setup page. */}
+            {snap?.team?.signedIn && snap.team.team && !membersOpen && openCard ? (
               <div className="tm-team-pane th-pane">
                 {openCard && (
                   /* A TEAMMATE'S THREAD (approved round 9): one card with the
                      same summary fields, and Message Maya in its top bar. */
                   <div className="th-card-page">
                     <div className="th-card-bar">
-                      <button type="button" className="th-back" onClick={() => setOpenCard(null)}><span aria-hidden="true">←</span>Team</button>
+                      {/* Back to the Inbox, with the same people picked. */}
+                      <button type="button" className="th-back" onClick={() => { setOpenCard(null); setTeamOpen(false); }}><span aria-hidden="true">←</span>Inbox</button>
                       <MessagePerson person={team?.byId.get(openCard.personId) ?? null}
                         onMessage={() => {
                           const convo = conversationWith(openCard.personId, { products: snap.products, items, me: team?.me ?? null });
@@ -4801,20 +4839,9 @@ export default function App() {
                     <TeammateCard card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now} />
                   </div>
                 )}
-                {/* Kept mounted under an open card, so Back finds the person
-                    and project it was filtered to (a persona test lost both). */}
-                <div hidden={!!openCard}>
-                <TeamView items={items} products={snap.products} cards={snap.team.cards ?? []} display={teamDisplay} now={now} stateOf={stateOfMine}
-                  // BACK RETURNS TO TEAM (her bug, 2026-10-01): the Team page
-                  // stays open under a thread opened from it, so closing the
-                  // thread lands where she came from, not on the Inbox.
-                  onOpenItem={(item) => { setFocused(item); markSeen(item); }}
-                  onOpenCard={(card) => setOpenCard(card)} />
-                </div>
               </div>
             ) : (
-              <TeamPage team={snap?.team} products={snap?.products ?? []} items={items} now={now} forceSetup={membersOpen} inviteFocus={inviteFocus}
-                onOpen={(item) => { setFocused(item); markSeen(item); }} />
+              <TeamPage team={snap?.team} products={snap?.products ?? []} inviteFocus={inviteFocus} />
             )}
           </main>
         </div>
@@ -5016,17 +5043,30 @@ export default function App() {
                     the sidebar places they used to be. */}
                 {workspaceNavigation && search === null && inboxDisplay.view === 'board' ? (
                   <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine}
+                    cards={cards} picked={team ? picked : undefined} end={peoplePicker}
+                    onOpenCard={openTeammateCard}
                     onOpenItem={(item) => { setFocused(item); markSeen(item); }} />
                 ) : <>
                 {workspaceNavigation && search === null && (
                   <StateTabs
                     view={view}
-                    counts={{ inbox: inbox.length, progress: progress.length, snoozed: snoozed.length, done: done.length, all: allOpen.length }}
+                    // Yours while you are on the page, and the picked teammates' added in.
+                    counts={{
+                      inbox: (mineShown ? inbox.length : 0) + theirCount('inbox'),
+                      progress: (mineShown ? progress.length : 0) + theirCount('progress'),
+                      snoozed: (mineShown ? snoozed.length : 0) + theirCount('snoozed'),
+                      done: (mineShown ? done.length : 0) + theirCount('done'),
+                      all: (mineShown ? allOpen.length : 0) + theirCount('all'),
+                    }}
+                    needs={team ? needsWord(picked, team.me) : undefined}
+                    end={peoplePicker}
                     onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
                   />
                 )}
-                {workspaceNavigation && emptyView ? (
-                  view === 'inbox'
+                {workspaceNavigation && emptyView && !theirRows.length ? (
+                  // "Nothing needs you" is about you alone; with a teammate
+                  // on the page the quiet line says it instead.
+                  view === 'inbox' && !withOthers
                     ? run === null && <InboxClear running={progress.length} scheduled={snoozed.length}
                         onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
                         onCompose={() => setModal('compose')} />
@@ -5035,6 +5075,9 @@ export default function App() {
                   table={workspaceNavigation && search === null}
                   products={snap.products}
                   team={team}
+                  mixed={search === null ? mixedRows : null}
+                  personCell={personCell}
+                  onOpenCard={openTeammateCard}
                   items={list}
                   // Results are grouped and stamped like the inbox, whatever
                   // tab she opened search from. Scheduled would otherwise label
