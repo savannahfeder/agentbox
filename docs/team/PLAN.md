@@ -70,8 +70,22 @@ company, filterable by person. Nothing in the sidebar shows who is busy.
 7. End to end: two copies of the app on one Mac against the stand-in server,
    photographed; then the same against Supabase once it exists.
 
+### Where it stands, 2026-09-30 night
+
+All seven are built, on `main` of this repo. Proven against the hosted
+project, not a stand-in: `tests/team-live-two-macs-through-the-cloud.test.mjs`
+(needs `TEAM_SERVICE_KEY`) and `scripts/scratch/team-two-real-copies.mjs`, which
+runs two headless copies of the real app as two throwaway people, photographs
+both windows, and deletes everything it made. Electron was not launched on her
+Mac: it shares her running app's single-instance lock. What is NOT proven:
+Google sign-in itself, which waits on her OAuth client (the tests sign in with
+a password the admin key creates).
+
 ## Founder's steps outside the code
 
 - Supabase project `agentbox-team` in the Astral org, password saved to
   `~/.agentbox-team-db-password` (she was given these steps on 2026-09-30).
 - Google sign-in client, in the morning: steps go in the morning summary.
+  The consent screen must be published, or every teammate added as a test
+  user, or Google refuses everyone but her.
+- Each teammate needs read access to Astral-Agent/agentbox-team on GitHub.

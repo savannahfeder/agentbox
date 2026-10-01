@@ -1,5 +1,11 @@
 # Agentbox
 
+> **This is the private team version.** To run it on your Mac: install Node 22
+> and Claude Code, then `git clone https://github.com/Astral-Agent/agentbox-team.git`,
+> `cd agentbox-team`, `npm install`, `npm start`. Open **Team** in the sidebar
+> and sign in with Google, using the email you were invited with. Never push
+> this repository anywhere else.
+
 **An inbox for your coding agents.** You file the work, each item gets its own
 agent in its own thread, and they come back to you with a summary of what they
 did and what they need. You read, you approve or redirect, you move on.
