@@ -85,6 +85,8 @@ import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
 } from './Priority';
+import { SummaryPanel, ThreadStatusAndToggle, useSummaryOpen, useSummaryShortcut } from '../threads/Summary';
+import { engineModelLabel } from '../models';
 
 // With the options strip riding on the composer, the field's own "## Options"
 // section would say everything twice; drop the heading and its numbered items
@@ -321,8 +323,19 @@ function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 // not the user's, and it is the part that was unnecessary. `filesFromRuns` stays,
 // because App.tsx still reads it to choose the design a card opens itself on.
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, terminalHeaderTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onInstallUpdate }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, terminalHeaderTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onInstallUpdate, items, onHandToAgent }: {
   previewSample?: string;
+  /**
+   * EVERY THREAD THE WINDOW HOLDS, for the summary's linked titles and the
+   *  menu that adds a link. Optional because App.tsx does not hand it over yet;
+   *  until it does, the summary reads the snapshot once for itself. */
+  items?: WorkItem[];
+  /**
+   * A MESSAGE FROM A PERSON IS NOT WORK UNTIL SHE SAYS SO. The one line under
+   *  the latest message on a message thread calls this to make it a task for
+   *  an agent. Absent, the line is not drawn, because a word that does nothing
+   *  when pressed is worse than no word. */
+  onHandToAgent?: (item: WorkItem) => void;
   artifactSlot?: (node: HTMLDivElement | null) => void;
   inlineArtifacts?: boolean;
   artifactView?: 'beside' | 'focus';
@@ -470,6 +483,47 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // 2026-08-17. The only agent a message really is swallowed by is the one
   // frozen on a permission prompt, and that is now the only one without a box.
   const replyBlocked = agent ? replyIsSwallowed(agent) : false;
+
+  // THE THREAD'S SUMMARY (approved 2026-10-01, w-e731ca9376): the state and a
+  // Summary button in the top bar, and the panel beside the conversation.
+  //
+  // NOT ON A MESSAGE FROM A PERSON. A message between two people lives in a
+  // record of its own (main/team/projects.mjs makeDirect), is not work, and is
+  // never carded for the team, so it has no state to report and nothing to
+  // summarise. Not on the rows with no ledger behind them either: a running
+  // agent's row, the trouble row and the update row have no fields to keep.
+  //
+  // AND IT GIVES WAY TO A DOCUMENT. With a file open beside the task the pane
+  // is a narrow column, and a 352 point panel inside it would leave the words
+  // no room; the button goes with it, so nothing on screen does nothing.
+  const direct = teamCtx?.products.get(item.product)?.team?.direct === true;
+  const summarised = !agent && !made && !direct;
+  const [summaryOpen, toggleSummary] = useSummaryOpen();
+  const summaryOffered = summarised && !openDoc;
+  const summaryShown = summaryOffered && summaryOpen;
+  useSummaryShortcut(toggleSummary, summaryOffered);
+  // The window's threads, read once for the panel when App.tsx has not handed
+  // them over (see `items` above). Only while the panel is up, and once per
+  // thread, so a closed panel costs nothing.
+  const [ownItems, setOwnItems] = useState<WorkItem[]>([]);
+  useEffect(() => {
+    if (items || !summaryShown) return undefined;
+    let live = true;
+    void api.snapshot().then((s) => { if (live) setOwnItems(s?.items ?? []); }).catch(() => {});
+    return () => { live = false; };
+  }, [items, summaryShown, item.product, item.id]);
+
+  // THE MODEL, IN THE REPLY BOX AND NOT THE HEADER. The folded box says which
+  // model picks up what she sends next, at its right end, and pressing the word
+  // opens the box with the model drawer already open: the same drawer and the
+  // same pick the composer's sentence has, so there is one place it is chosen.
+  // Not on a running agent's row (a message goes straight into it) or on a
+  // message to a person (no agent reads it).
+  const modelWord = !agent && !direct
+    ? engineModelLabel(runningEngine ?? null, item.model ?? null, { codexModels, codexDefault: codexModelDefault })
+    : null;
+  const [openModel, setOpenModel] = useState(false);
+  useEffect(() => { if (!replyOpen) setOpenModel(false); }, [replyOpen]);
 
   // WHAT THE DOCK SAYS ONCE IT HAS FOLDED SHUT.
   //
@@ -968,7 +1022,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // away with the words. An earlier cut of folded state into the className and
   // turned that guard off silently.
   return (
-    <div className="focus-pane">
+    <div className="focus-pane" data-summary={summaryShown ? 'open' : undefined}>
     {/* THERE IS NO WAY-OUT CONTROL ON AN OPENED TASK ANY MORE.
 
         Both faults were real and both are measured on this row. With a
@@ -1015,6 +1069,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         what puts it there: the span that holds it is `display: contents`, so
         the button is laid out by the corner row itself and markup order does
         nothing. What varies now is only the mark in it. */}
+    {/* THE THREAD'S STATE AND ITS SUMMARY BUTTON, in the same corner and
+        before Done, so the way into the summary is in the top bar however
+        far down the conversation she has read. */}
+    {summaryOffered && cornerHeaderTarget && createPortal(<ThreadStatusAndToggle item={item} open={summaryOpen} onToggle={toggleSummary} />, cornerHeaderTarget)}
     {canFinish && cornerHeaderTarget && createPortal(doneButton, cornerHeaderTarget)}
     <div className="focus-scroll" ref={scrollRef}>
     <div className="focus">
@@ -1201,6 +1259,14 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             (w-6246b0c91f). Handing them to `Live` as
             well is what made one screen say "Codex" twice. */}
         {!heldByPerson && <Live item={item} facts={{ ...live, session, stalled, scheduledUntil }} />}
+
+        {/* A MESSAGE FROM A PERSON BECOMES WORK ONLY WHEN SHE SAYS SO: one quiet
+            line under the latest message, and the dotted words are the door. */}
+        {direct && onHandToAgent && (
+          <p className="ts-hand">
+            <button type="button" onClick={() => onHandToAgent(item)}>Hand it to an agent</button> to turn it into a task.
+          </p>
+        )}
 
       </div>
 
@@ -1455,7 +1521,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} stop={stopButton} />
+            <DockComposer item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
@@ -1466,16 +1532,29 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                had. See ../folded-reply.ts. */
             /* NOTHING RIDES ON THE FOLDED BOX. The stop belongs in the slot
                that appears when she clicks in, not on a box she has not
-               touched, and Done is up in the corner row. */
+               touched, and Done is up in the corner row. The one word it
+               carries is the model, at its right end (w-e731ca9376): it says
+               what picks up her next message, which is a fact about the box. */
             <button className={`dock-pill${folded.draft ? ' dock-pill-kept' : ''}`} onClick={onReply}>
               <span className="dock-pill-text">{folded.text}</span>
               {folded.files && <span className="dock-pill-files">{folded.files}</span>}
+              {modelWord && (
+                <span
+                  className="ts-model"
+                  title="Which model this conversation runs on"
+                  onClick={(e) => { e.stopPropagation(); setOpenModel(true); onReply(); }}
+                >{modelWord}</span>
+              )}
               <span className="dock-pill-key"><kbd>R</kbd></span>
             </button>
           )}
         </div>
       </div>
     </div>
+    {/* THE SUMMARY, beside the conversation and the dock rather than inside
+        either: both give up its width (`data-summary` above, summary.css), so
+        the words narrow instead of running under it, and it scrolls on its own. */}
+    {summaryShown && <SummaryPanel item={item} items={items ?? ownItems} team={teamCtx} onOpenItem={onOpenItem} />}
     <TaskTerminal key={`${item.product}:${item.id}`} product={item.product} id={item.id} headerTarget={terminalHeaderTarget}/>
     </div>
   );
@@ -1659,7 +1738,7 @@ function ModePicker({ value, options, label, onChange }: {
   );
 }
 
-function DockComposer({ item, runningMode, runningEngine, codexModels = [], codexModelDefault = null, onSend, onClose, onNotice, stop }: {
+function DockComposer({ item, runningMode, runningEngine, codexModels = [], codexModelDefault = null, onSend, onClose, onNotice, stop, openModel = false }: {
   item: WorkItem;
   runningMode?: PermissionMode;
   /**
@@ -1693,6 +1772,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
    *  empty and gives it back the moment she types, so typing anything makes
    *  the slot send again, the way Codex works. */
   stop?: ReactNode;
+  /** She opened the box by pressing the model word on the folded box, so the
+   *  model drawer opens with it (w-e731ca9376). */
+  openModel?: boolean;
 }) {
   // The draft outlives the dock. Tab away, click elsewhere, even restart the
   // app: coming back to this item finds your words where you left them. A
@@ -2307,6 +2389,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             // and the next run takes it, because a spawned harness cannot
             // change model mid-flight.
             title="Which model this conversation runs on"
+            // Open already when she got here by pressing the model word on
+            // the folded box, which is what that word promised.
+            openAtStart={openModel}
           />
           {'.'}
           </>}

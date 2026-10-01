@@ -1,0 +1,130 @@
+/* A THREAD'S SUMMARY, in the theme's own tokens so it wears every skin.
+   Approved in Ember Grid on 2026-10-01 (w-e731ca9376): round 7 drew the panel,
+   round 9 made the Summary button square and the teammate's card the summary's
+   fields and nothing else. The values below are the measured ones from those
+   drawings (scripts/scratch/draw-round7.mjs, draw-round9.mjs), renamed ts-.
+
+   SQUARE SHAPES ONLY. Every box here takes the skin's own --radius, which is
+   0 in Ember Grid, and nothing is a rounded pill. The menus are the app's own
+   `.prio-menu` rather than a second popover shape. */
+
+.focus-pane { --ts-panel-w: 352px; }
+
+/* the state's mark: filled when it waits on you, a ring when it waits on
+   someone else, half filled while it runs, dashed while it is scheduled */
+.ts-st { display: inline-block; width: 12px; height: 12px; border-radius: 50%; box-sizing: border-box; margin-right: 9px; flex: none; }
+.ts-st-need { background: var(--accent); }
+.ts-st-run { border: 1.5px solid var(--accent); background: conic-gradient(var(--accent) 0 50%, transparent 50% 100%); }
+.ts-st-wait { border: 1.5px solid var(--text-dim); }
+.ts-st-sched { border: 1.5px dashed var(--text-faint); }
+.ts-st-done { background: var(--text-faint); }
+
+/* THE TOP BAR: the state in plain words, then the square Summary button with
+   its key. It rides in the corner socket beside Done, which is display:
+   contents, so this group is laid out by the corner row itself. */
+.ts-top { display: inline-flex; align-items: center; gap: 10px; margin-right: 10px; }
+.ts-status { display: inline-flex; align-items: center; padding: 0 4px 0 0; font-size: 13px; color: var(--text-dim); white-space: nowrap; }
+.ts-sumbtn { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+.ts-sumbtn:hover { color: var(--text); border-color: var(--line-strong); }
+.ts-sumbtn.on { background: var(--wash-strong); color: var(--text); border-color: var(--line-strong); }
+.ts-sumbtn kbd { font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; padding: 0; }
+
+/* THE PANEL, on the right of the conversation. The conversation and the reply
+   dock both give up its width, so the words narrow beside it rather than run
+   under it, and it scrolls on its own. */
+.focus-pane[data-summary="open"] > .focus-scroll,
+.focus-pane[data-summary="open"] > .focus-dock { margin-right: var(--ts-panel-w); }
+/* A pane with its own band (no top bar to portal into) narrows that too, and
+   the band's inset is reckoned against the narrower column. */
+.focus-pane[data-summary="open"] > .keep-line { margin-right: var(--ts-panel-w); }
+.focus-pane[data-summary="open"] { --keep-inset: max(32px, calc((100% - var(--ts-panel-w) - var(--read-w)) / 2 + 32px)); }
+/* No fill of its own: it sits beside the words rather than over them, and a
+   fill would paint over the frame's corner marks. */
+.ts-panel { position: absolute; top: 0; right: 0; bottom: 0; width: var(--ts-panel-w); box-sizing: border-box; padding: 26px 28px 40px; border-left: 1px solid var(--line); background: none; overflow-y: auto; z-index: 2; }
+
+.ts-props { display: grid; grid-template-columns: 92px minmax(0, 1fr); row-gap: 14px; font-size: 13.5px; line-height: 20px; margin: 0 0 26px; }
+.ts-label { color: var(--text-faint); font-size: 13px; }
+.ts-value { color: var(--text); display: flex; align-items: center; min-width: 0; }
+.ts-value .tm-av { margin-right: 8px; }
+.ts-menu-anchor { position: relative; }
+.ts-prop-btn { display: inline-flex; align-items: center; font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: left; }
+.ts-prop-btn .prio-bars { margin-right: 8px; }
+.ts-prop-btn:hover { text-decoration: underline dotted var(--line-strong); text-underline-offset: 3px; }
+
+.ts-h { display: block; margin: 0 0 10px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+
+.ts-links { margin: 0 0 26px; display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; line-height: 20px; color: var(--text); }
+.ts-link-row { position: relative; display: flex; align-items: baseline; gap: 10px; }
+.ts-link-row > .ts-label { width: 82px; flex: none; }
+.ts-link-values { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; flex: 1; padding-right: 22px; }
+.ts-link { display: flex; align-items: center; gap: 6px; max-width: 100%; }
+.ts-link-title { font: inherit; color: var(--text); background: none; border: 0; padding: 0; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ts-link-title:disabled { cursor: default; }
+.ts-link-title.dim { color: var(--text-dim); }
+.ts-link-title:not(:disabled):hover { text-decoration: underline dotted var(--line-strong); text-underline-offset: 3px; }
+/* The remove and add marks are there for the hand that is already on the row,
+   and invisible to the eye that is only reading it. */
+.ts-x, .ts-add { display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: var(--radius); background: none; color: var(--text-faint); cursor: pointer; flex: none; opacity: 0; }
+.ts-link-row:hover .ts-x, .ts-link-row:hover .ts-add, .ts-x:focus-visible, .ts-add:focus-visible, .ts-add[aria-expanded="true"] { opacity: 1; }
+.ts-x:hover, .ts-add:hover { color: var(--text); background: var(--wash-strong); }
+/* The add mark sits at the row's right end, out of the flow, so a row with
+   links is exactly as tall as its titles. */
+.ts-add:not(.ts-add-empty) { position: absolute; right: 0; top: 1px; }
+.ts-add-empty { width: auto; height: auto; opacity: 1; font: inherit; color: var(--text-faint); }
+.ts-add-empty:hover { background: none; color: var(--text-dim); }
+
+/* the link and priority menus drop from the row, since the panel sits high */
+.ts-panel .prio-menu.ts-menu { top: calc(100% + 6px); bottom: auto; left: -9px; }
+.ts-panel .prio-menu.ts-menu-wide { left: 82px; right: -9px; min-width: 0; max-height: 280px; overflow-y: auto; }
+.ts-menu .prio-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ts-menu-head { display: block; padding: 6px 9px 4px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.ts-menu-none { display: block; padding: 6px 9px 8px; font-size: 13px; color: var(--text-faint); }
+
+.ts-rule { height: 1px; background: var(--line); margin: 0 0 22px; }
+
+/* THE THREE LINES. Each one is its own text box the moment it is clicked, and
+   the box is the same shape as the line: same type, same padding, a border
+   that was there all along in transparent. */
+.ts-sec { margin: 0 0 18px; }
+.ts-line, .ts-edit { display: block; box-sizing: border-box; width: calc(100% + 16px); margin: 0 -8px; padding: 6px 8px; border: 1px solid transparent; border-radius: var(--radius); font: inherit; font-size: 13.5px; line-height: 21px; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ts-line { cursor: text; }
+.ts-line:hover { border-color: var(--line); }
+.ts-line:focus-visible { outline: none; border-color: var(--line-strong); }
+.ts-line.dim { color: var(--text-dim); }
+.ts-edit { resize: none; overflow: hidden; border-color: var(--line-strong); background: var(--wash); outline: none; caret-color: var(--accent); }
+.ts-by { font-size: 12px; line-height: 18px; color: var(--text-faint); margin-top: 4px; }
+.ts-by-error { color: var(--text-dim); }
+
+/* THE MODEL, at the right end of the reply box's pill. A dotted underline
+   says it opens something, the way every other word that opens a drawer in
+   the composer's sentence does. */
+.ts-model { margin-right: 12px; font-size: 13px; color: var(--text-dim); text-decoration: underline dotted var(--line-strong); text-underline-offset: 3px; white-space: nowrap; cursor: pointer; }
+.ts-model:hover { color: var(--text); }
+
+/* A MESSAGE FROM A PERSON: one quiet line under the latest message. */
+.ts-hand { margin: 18px 0 0; font-size: 13px; line-height: 20px; color: var(--text-faint); }
+.ts-hand button { font: inherit; color: var(--text-dim); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline dotted var(--line-strong); text-underline-offset: 3px; }
+.ts-hand button:hover { color: var(--text); }
+
+/* A TEAMMATE'S THREAD: one centred card made of the summary's fields. */
+.ts-ticket { max-width: 680px; margin: 44px auto 40px; box-sizing: border-box; border: 1px solid var(--line); border-radius: var(--radius); background: var(--wash); padding: 26px 30px 24px; }
+.ts-tk-top { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--text-dim); margin: 0 0 18px; }
+.ts-tk-top > span { display: inline-flex; align-items: center; }
+.ts-tk-top .ts-st { margin-right: 7px; }
+.ts-tk-top .prio-bars { margin-right: 7px; }
+.ts-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--text-faint); flex: none; }
+.ts-tk-lead { margin: 0 0 24px; font-size: 18px; line-height: 28px; letter-spacing: -.01em; color: var(--text); }
+.ts-tk-lead.dim, .ts-ticket p.dim, .ts-ticket span.dim { color: var(--text-dim); }
+.ts-tk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 20px 0 22px; border-top: 1px solid var(--line); }
+.ts-tk-grid .ts-h { margin: 0 0 6px; }
+.ts-tk-grid p { margin: 0; font-size: 14px; line-height: 21px; color: var(--text); }
+.ts-tk-next { padding-top: 16px; border-bottom: 1px solid var(--line); }
+.ts-tk-foot { display: flex; align-items: center; gap: 10px; padding-top: 16px; font-size: 13px; color: var(--text-faint); }
+.ts-tk-foot .tm-av { width: 22px; height: 22px; line-height: 20px; font-size: 8px; }
+.ts-tk-foot b { font-weight: 400; color: var(--text); }
+.ts-tk-state { display: inline-flex; align-items: center; margin-left: auto; color: var(--text-dim); }
+.ts-ticket-private .ts-tk-lead { margin-bottom: 4px; }
+
+/* "Message Maya": their face and the words, square, for the top bar */
+.ts-msgbtn { display: inline-flex; align-items: center; gap: 9px; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
+.ts-msgbtn:hover { background: var(--wash-strong); }
