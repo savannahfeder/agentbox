@@ -54,6 +54,7 @@ import { agentKey } from '../shared/agents.mjs';
 import { machineryPath } from './store/home.mjs';
 import { EVENT_NAMES } from '../shared/analytics-events.mjs';
 import { Name } from '../shared/product-name.mjs';
+import { handedOnByReply } from '../shared/team-rules.mjs';
 
 // WHAT A WORKER IS TOLD WHEN HER DECISION COULD NOT BE RECORDED.
 const SPOOL_REFUSED = `${Name} could not record the founder's decision, so nothing was allowed. Finish what your grants cover and file the rest as a review.`;
@@ -545,6 +546,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // race the run usually wins, so she would pick a model and watch the old one
     // take the task. `answerItem` writes both, and it writes the model first.
     const out = await submitReply(supervisor,{product,id,answer,status,permissionMode},()=>store.answerItem(product, id, { answer, status, priority, permissionMode, model, effort }));
+    // A REPLY ON A ROW A TEAMMATE GAVE YOU HANDS IT BACK TO THEM, so the
+    // conversation moves to their inbox instead of sitting in both
+    // (shared/team-rules.mjs handedOnByReply). Archiving hands nothing on.
+    if (team && status !== 'done' && typeof answer === 'string' && answer.trim()) handOnByReply(product, id);
     // THAT the user replied and THAT something finished. Never a word of either:
     // in Agentbox the answer IS the prompt (privacy page, section 4).
     if (typeof answer === 'string' && answer.trim()) analytics.track('reply_sent');
@@ -575,6 +580,20 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return supervisor.status();
   });
 
+  // WHO IS SIGNED IN, and the project a row is in, for the team's rules.
+  const teamMe = () => team?.state()?.me?.id ?? null;
+  const productOf = (slug) => store.listProducts().find((p) => p.slug === slug) ?? null;
+
+  function handOnByReply(product, id) {
+    try {
+      const row = store.readItem(product, id);
+      const next = row && handedOnByReply(row, productOf(product), teamMe());
+      if (next) store.teamPatch(product, id, { assignee: next });
+    } catch (err) {
+      console.warn(`team: could not hand ${id} on: ${err.message}`);
+    }
+  }
+
   // THE TEAM'S DOORS. Each answers { ok, team } or { ok: false, error } with
   // the error in words, so the window can say what went wrong where it
   // happened instead of a row silently not appearing.
@@ -594,6 +613,24 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:team-invite', teamCall(({ email }) => team.invite(email)));
   ipcMain.handle('zero:team-share', teamCall(({ product, visibility, people }) => team.share(product, { visibility, people })));
   ipcMain.handle('zero:team-sync', teamCall(() => team.syncNow()));
+  // A TASK A TEAMMATE GAVE YOU, ROUTED WITH ONE KEY. To an agent: it runs on
+  // your Mac (you become its runner). Keep it: it stays yours and the routing
+  // choices go away. Hand it back: it returns to whoever gave it to you.
+  ipcMain.handle('zero:team-route', teamCall(({ product, id, route }) => {
+    const me = teamMe();
+    if (!me) throw new Error('sign in first');
+    const row = store.readItem(product, id);
+    if (!row) throw new Error('that task is gone');
+    if (row.assignee !== me) throw new Error('this task is not yours to route');
+    if (route === 'agent') store.teamPatch(product, id, { assignee: 'agent', runner: me });
+    else if (route === 'me') store.teamPatch(product, id, { assignee: me });
+    else if (route === 'back') {
+      const to = (row.people ?? []).find((p) => p !== me) || row.createdBy;
+      if (!to || to === me) throw new Error('there is nobody to hand it back to');
+      store.teamPatch(product, id, { assignee: to });
+    } else throw new Error(`unknown route ${route}`);
+    supervisor.wake();
+  }));
 
   ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, labels, engine, model, effort, assignee, due }) => {
     const out = store.composeItem(product, {
@@ -603,8 +640,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // `codexEffortRefusal` for Codex).
       title, body, kind, priority, runAt, labels, effort,
       // WHO DOES IT, when it is a person (the team version): the teammate it
-      // goes to and the day it is due. An agent's row carries neither.
+      // goes to and the day it is due, and the two of you as the conversation,
+      // so a reply can hand it back. An agent's row carries none of these.
       assignee, due,
+      people: assignee && teamMe() ? [teamMe(), assignee] : undefined,
       // WHICH CODING AGENT SHE CHOSE, AND ONLY IF SHE COULD HAVE. `engineOffered`
       // is the supervisor's own test and the door makes no judgement of its own:
       // it answers null on any Mac where the picker is not drawn, so a renderer

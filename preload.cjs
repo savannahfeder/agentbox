@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('zero', {
   teamInvite: (payload) => ipcRenderer.invoke('zero:team-invite', payload),
   teamShare: (payload) => ipcRenderer.invoke('zero:team-share', payload),
   teamSync: () => ipcRenderer.invoke('zero:team-sync'),
+  teamRoute: (payload) => ipcRenderer.invoke('zero:team-route', payload),
   // Repeating tasks. A rule, not a work item, so it has its own channels
   // rather than a flag on compose.
   repeats: () => ipcRenderer.invoke('zero:repeats'),

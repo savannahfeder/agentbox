@@ -25,3 +25,22 @@ export function mayRunHere(item, product, me) {
   if (heldByAPerson(item)) return false;
   return runnerOf(item, product) === me;
 }
+
+// WHOSE INBOX A SHARED ROW IS IN: one person's at a time, whoever has to act.
+// A row given to a person is theirs until it is done; an agent's row is its
+// runner's. True leaves the row to the inbox's ordinary rules, which is what a
+// private row, or any row on a Mac nobody is signed in on, always gets.
+export function inMyInbox(item, product, me) {
+  if (!isShared(product) || !me) return true;
+  if (heldByAPerson(item)) return item.assignee === me && item.status !== 'done';
+  return runnerOf(item, product) === me;
+}
+
+// A REPLY HANDS A PERSON-TO-PERSON ROW TO THE OTHER PERSON, so a conversation
+// goes back and forth between two inboxes instead of sitting in both. Returns
+// who it goes to, or null when a reply changes nothing about whose it is.
+export function handedOnByReply(item, product, me) {
+  if (!isShared(product) || !me || !heldByAPerson(item) || item.assignee !== me) return null;
+  const people = Array.isArray(item.people) ? item.people : [];
+  return people.find((p) => p !== me) || (item.createdBy && item.createdBy !== me ? item.createdBy : null);
+}

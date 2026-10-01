@@ -4,7 +4,14 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { AgentConversation, AnswerMode, DemoOpened, FolderListing, FreshUser, PermissionMode, RepeatRule, RepeatShape, Settings, Snapshot, UpdateState, WorkItem } from './types';
+import type { AgentConversation, AnswerMode, DemoOpened, FolderListing, FreshUser, PermissionMode, RepeatRule, RepeatShape, Settings, Snapshot, TeamCallResult, UpdateState, WorkItem } from './types';
+
+// A team call, in words: a build or a window with no team door says so rather
+// than throwing somewhere the person cannot see.
+async function teamCall(fn: () => Promise<TeamCallResult>): Promise<TeamCallResult> {
+  if (!window.zero?.teamSignIn) return { ok: false, error: 'This build has no team cloud set up.' };
+  try { return await fn(); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+}
 import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -420,7 +427,18 @@ export const api = {
     return window.zero!.answer(p);
   },
 
-  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string }): Promise<WorkItem | null> {
+  /* --------------------------------- the team ------------------------------- */
+  // Every call answers { ok, team } or { ok: false, error } in words.
+  async teamSignIn(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignIn()); },
+  async teamSignOut(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignOut()); },
+  async teamCreate(name: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamCreate({ name })); },
+  async teamInvite(email: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamInvite({ email })); },
+  async teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamShare(p)); },
+  async teamSync(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSync()); },
+  // A task somebody gave you: to an agent (on your Mac), keep it, or hand it back.
+  async teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRoute(p)); },
+
+  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; assignee?: string; due?: string }): Promise<WorkItem | null> {
     // FIXTURES ANSWER WITH THE TASK, the way the real store does. Returning
     // null here meant the send had nothing to point at, and the caller reads
     // that as "no task was made" and puts no way back on the undo pile — so the

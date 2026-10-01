@@ -51,7 +51,16 @@ export interface WorkItem {
   // bookkeeping, handed over rather than discarded, because an agent's `done`
   // and her archive are the same word for opposite events and the inbox has to
   // tell them apart (shared/work-items.mjs).
-  wrote?: Record<string, { ts: number; source: string } | undefined>;
+  wrote?: Record<string, { ts: number; source: string; by?: string } | undefined>;
+  // THE TEAM FIELDS (shared/work-items.mjs). Absent on every private row.
+  // `createdBy` is the person who started the row, `assignee` the person who
+  // has to act next (or 'agent'), `runner` whose Mac runs its agents, `due` a
+  // calendar day, `people` who is on the conversation.
+  createdBy?: string | null;
+  assignee?: string;
+  runner?: string;
+  due?: string;
+  people?: string[];
   // Set only on the synthesized rows that stand for a running Claude Code
   // agent. Its presence is what every action path checks: an agent row is drawn
   // by the same list and reached by the same keys, and nothing may write it to
@@ -85,6 +94,35 @@ export interface Product {
   // because the supervisor refuses to start a session in a practice project on
   // purpose and the card used to take the task anyway.
   practice?: boolean;
+  // SHARED OR PRIVATE (main/team/projects.mjs). Null or absent is private.
+  team?: { projectId: string; teamId: string | null; visibility: 'team' | 'people'; people: string[]; sharedBy: string | null } | null;
+}
+
+/** A person on the team, as the cloud knows them. */
+export interface Person {
+  id: string;
+  email: string;
+  name: string;
+  avatarUrl: string | null;
+}
+
+/** What every team call answers: the team as it now stands, or why not. */
+export interface TeamCallResult {
+  ok: boolean;
+  team?: TeamState;
+  error?: string;
+}
+
+/** The team, as the main process sees it (main/team/index.mjs). */
+export interface TeamState {
+  configured: boolean;
+  signedIn: boolean;
+  me: Person | null;
+  team: { id: string; name: string } | null;
+  people: Person[];
+  activity: { personId: string; taskKey: string; state: 'run' | 'wait' | 'sched' | 'done'; movedAt: number }[];
+  lastSyncAt: number | null;
+  error: string | null;
 }
 
 export interface RunningSession {
@@ -446,6 +484,9 @@ export interface UpdateState {
 export interface Snapshot {
   products: Product[];
   items: WorkItem[];
+  // The team (main/team/index.mjs). Null or absent on a build with no team
+  // cloud, which is the single-person app.
+  team?: TeamState | null;
   agents?: AgentSession[];
   approvals?: Approval[];
   supervisor: SupervisorStatus;
@@ -790,7 +831,15 @@ declare global {
       answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null }): Promise<WorkItem>;
       setProductOrder(p: { order: string[] }): Promise<unknown>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
-      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; effort?: string }): Promise<WorkItem>;
+      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string }): Promise<WorkItem>;
+      // The team version (main/team/index.mjs through main/ipc.mjs).
+      teamSignIn(): Promise<TeamCallResult>;
+      teamSignOut(): Promise<TeamCallResult>;
+      teamCreate(p: { name: string }): Promise<TeamCallResult>;
+      teamInvite(p: { email: string }): Promise<TeamCallResult>;
+      teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult>;
+      teamSync(): Promise<TeamCallResult>;
+      teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;
       schedule(p: { product: string; id: string; runAt: number }): Promise<WorkItem>;
       repeats(): Promise<RepeatRule[]>;
       composeRepeat(p: { product: string; title: string; body?: string; priority?: number; rule: RepeatShape; engine?: string; model?: string }): Promise<RepeatRule>;
