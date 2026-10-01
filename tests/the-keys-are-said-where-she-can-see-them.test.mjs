@@ -289,10 +289,10 @@ describe('the Mac’s label names the button and nothing more', () => {
   it('leaves the Mac’s label naming the button and nothing more', () => {
     // The key is drawn in the app now, so the system label saying it too would
     // be the same fact twice, a second apart, in two different hands.
-    expect(app).toContain('title="Search tasks"');
+    expect(app).toContain('title="Search threads"');
     // w-ec62ab6b38 (2026-09-28): the plus is titled New thread now, not New task.
     expect(app).toContain('title="New thread"');
-    expect(app).not.toMatch(/title=\{keyHints \? 'Search tasks \(\/\)'/);
+    expect(app).not.toMatch(/title=\{keyHints \? 'Search threads \(\/\)'/);
     expect(app).not.toMatch(/title=\{keyHints \? 'New (task|thread) \(C\)'/);
   });
 

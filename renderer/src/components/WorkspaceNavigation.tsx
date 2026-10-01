@@ -63,7 +63,21 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   const teamName = team?.team?.name ?? Name;
   const onTeamNow = !!(team?.signedIn && team.team);
   return <aside className="workspace-navigation" aria-label="Workspace">
-    <div className="th-team" title={teamName}><span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span><span>{teamName}</span></div>
+    {/* THE TOGGLE SITS BESIDE THE TEAM'S NAME, at the top, where sidebars keep
+        it (her note, 2026-10-01). Collapsed, the mark itself is the way back
+        open, and shows the sidebar icon under the pointer. */}
+    <div className="th-team" title={collapsed ? undefined : teamName}>
+      {collapsed ? (
+        <button type="button" className="th-mark-btn" data-hint="sidebar" aria-label="Expand sidebar" title="Expand sidebar" onClick={onToggle}>
+          <span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span>
+          <span className="th-mark-open" aria-hidden="true"><SidebarToggleIcon collapsed /></span>
+        </button>
+      ) : <>
+        <span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span>
+        <span className="th-team-name">{teamName}</span>
+        <button type="button" className="workspace-toggle th-toggle" data-hint="sidebar" data-hint-align="right" aria-label="Collapse sidebar" title="Collapse sidebar" onClick={onToggle}><SidebarToggleIcon collapsed={false} /></button>
+      </>}
+    </div>
     <nav className="workspace-tabs" aria-label="Threads">
       <button data-tab="inbox" data-hint={sectionHint(1)} data-hint-text="span" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label="Inbox" aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `Inbox · ${waitingDescription}` : collapsed ? 'Inbox' : undefined} onClick={() => onView('inbox')}><SidebarIcon view="inbox" /><span>Inbox</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
       {hasTeam && onTeam && <button data-tab="team" className={`workspace-tab${page === 'team' ? ' active' : ''}`} aria-label="Team" aria-current={page === 'team' ? 'page' : undefined} title={collapsed ? 'Team' : undefined} onClick={onTeam}>
@@ -81,9 +95,8 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
       {usage && <div className="workspace-usage">{usage}</div>}
       <div className="th-me">
         {me ? <><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></>
-          : team?.configured && onTeam ? <button type="button" className="th-me-signin" onClick={onTeam}>Sign in to your team</button>
+          : team?.configured && onTeam ? <button type="button" className="th-me-signin" aria-label="Sign in to your team" onClick={onTeam}>Sign in to your team</button>
             : <span />}
-        <button className="workspace-toggle" data-hint="sidebar" data-hint-align="right" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} onClick={onToggle}><SidebarToggleIcon collapsed={collapsed}/></button>
       </div>
     </div>
   </aside>;

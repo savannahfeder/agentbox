@@ -21,10 +21,12 @@ import { companyLines, movedAgo as ago, type CompanyLine as Line } from './compa
 type Tab = 'open' | 'run' | 'wait' | 'sched' | 'done';
 
 
-export function TeamPage({ team, products, items, now, onOpen, forceSetup = false }: {
+export function TeamPage({ team, products, items, now, onOpen, forceSetup = false, inviteFocus = false }: {
   team: TeamState | null | undefined; products: Product[]; items: WorkItem[]; now: number; onOpen: (item: WorkItem) => void;
   /** Team members and Invite people, from the foot of the sidebar: the setup page, always. */
   forceSetup?: boolean;
+  /** Opened from Invite people: the email box has the cursor. */
+  inviteFocus?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>('open');
   const [who, setWho] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export function TeamPage({ team, products, items, now, onOpen, forceSetup = fals
 
   if (!team?.configured) return <div className="tm-setup"><h2>Teams are not set up in this build</h2><p>This copy of the app has no team cloud configured.</p></div>;
   if (!team.signedIn) return <SignIn error={team.error} />;
-  if (!team.team || setup || forceSetup) return <TeamSetup team={team} products={products} onDone={team.team && !forceSetup ? () => setSetup(false) : undefined} />;
+  if (!team.team || setup || forceSetup) return <TeamSetup team={team} products={products} inviteFocus={inviteFocus} onDone={team.team && !forceSetup ? () => setSetup(false) : undefined} />;
 
   const byPerson = (l: Line) => !who || l.owner === who;
   const open = lines.open.filter(byPerson);
@@ -97,9 +99,12 @@ function SignIn({ error }: { error: string | null }) {
   </div>;
 }
 
-function TeamSetup({ team, products, onDone }: { team: TeamState; products: Product[]; onDone?: () => void }) {
+function TeamSetup({ team, products, onDone, inviteFocus = false }: { team: TeamState; products: Product[]; onDone?: () => void; inviteFocus?: boolean }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  // WHO YOU INVITED, SAID BACK (persona test, 2026-10-01: "The field emptied,
+  // with no toast, no pending row... I can't tell if it worked").
+  const [invited, setInvited] = useState<string[]>([]);
   // AN INVITE IS ASKED, NEVER TAKEN UP ON ITS OWN (review, 2026-10-01). Not
   // now hides it until the page is opened again.
   const [notNow, setNotNow] = useState<string[]>([]);
@@ -126,8 +131,11 @@ function TeamSetup({ team, products, onDone }: { team: TeamState; products: Prod
       <h2>{team.team.name}</h2>
       <div className="tm-section">People</div>
       {[me, ...team.people.filter((p) => p.id !== me?.id)].map((p) => p && <div key={p.id} className="tm-person-line"><Face person={p} me={p.id === me?.id} />{p.id === me?.id ? 'You' : p.name}<small>{p.email}</small></div>)}
-      <form className="tm-field-row" style={{ marginTop: 10 }} onSubmit={async (e) => { e.preventDefault(); if (await run(() => api.teamInvite(email))) setEmail(''); }}>
-        <input className="tm-input" placeholder="Invite by email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      {invited.filter((e) => !team.people.some((p) => p.email?.toLowerCase() === e.toLowerCase())).map((e) => (
+        <div key={e} className="tm-person-line tm-invited"><span className="tm-av tm-av-empty" aria-hidden="true" />{e}<small>Invited. They join when they sign in with this email.</small></div>
+      ))}
+      <form className="tm-field-row" style={{ marginTop: 10 }} onSubmit={async (e) => { e.preventDefault(); const sent = email.trim(); if (await run(() => api.teamInvite(sent))) { setEmail(''); setInvited((was) => [...was.filter((x) => x !== sent), sent]); } }}>
+        <input className="tm-input" placeholder="Invite by email" value={email} autoFocus={inviteFocus} onChange={(e) => setEmail(e.target.value)} />
         <button className="tm-btn" disabled={busy || !email.trim()}>Invite</button>
       </form>
       {onDone && <div className="tm-field-row" style={{ marginTop: 22 }}><button className="tm-btn" onClick={onDone}>Done</button></div>}

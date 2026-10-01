@@ -69,7 +69,7 @@ describe('the corner is the three marks she named, in her order', () => {
   });
 
   it('has no magnifier left in it', () => {
-    expect(corner).not.toContain('Search tasks');
+    expect(corner).not.toContain('Search threads');
     expect(corner).not.toContain('<SearchIcon />');
   });
 });
@@ -111,7 +111,7 @@ describe('the door to ⌘K', () => {
 
 describe('search stands at the head of the tab row', () => {
   it('is inside the nav, before the first tab', () => {
-    const mag = tabNav.indexOf('aria-label="Search tasks"');
+    const mag = tabNav.indexOf('aria-label="Search threads"');
     const inbox = tabNav.indexOf("view === 'inbox' ? 'tab active' : 'tab'");
     expect(mag, 'no magnifier in the tab row').toBeGreaterThan(-1);
     expect(mag).toBeLessThan(inbox);
@@ -144,7 +144,7 @@ describe('search stands at the head of the tab row', () => {
     // nav around it carries none.
     expect(app).not.toContain('className="tab-hint');
     expect(app).not.toContain('STRIP_HINTS');
-    expect(tabNav).toMatch(/aria-label="Search tasks"[\s\S]{0,200}onClick=\{openSearch\}/);
+    expect(tabNav).toMatch(/aria-label="Search threads"[\s\S]{0,200}onClick=\{openSearch\}/);
     // The sections hint moved onto each TAB when the keys became ⌘1 to ⌘4.
     // approved 2026-10-01 (w-e731ca9376): Inbox is the only section tab left
     // in the sidebar, so it is the one that wears it.

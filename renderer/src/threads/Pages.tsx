@@ -293,7 +293,8 @@ export function InboxBoard({ items, products, display, now, onOpenItem }: {
     {BOARD_COLUMNS.map((col) => {
       const rows = entries.filter((e) => e.state === col.state);
       return <div key={col.state}>
-        <div className="th-col-h"><StateGlyph state={col.state} />{col.label}<b>{rows.length}</b></div>
+        {/* Your own board says what the tab says: what waits on you needs you. */}
+        <div className="th-col-h"><StateGlyph state={col.state} />{col.state === 'waiting' ? 'Needs you' : col.label}<b>{rows.length}</b></div>
         {rows.length === 0 && <div className="th-col-empty">Nothing here.</div>}
         {rows.map((e) => <button type="button" key={e.key} className="th-card" onClick={() => e.item && onOpenItem(e.item)}>
           <div className="t">{e.title}{e.item?.visibility === 'private' && <LockMark />}</div>

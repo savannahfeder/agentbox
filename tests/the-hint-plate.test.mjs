@@ -197,7 +197,7 @@ describe('a button with a key never says nothing', () => {
     expect(app).toMatch(/aria-label="New thread"/);
     expect(app).toMatch(/data-hint="new-task"[\s\S]{0,120}aria-label="New thread"/);
     expect(app).toMatch(/data-hint="commands"[\s\S]{0,120}aria-label="Commands"/);
-    expect(app).toMatch(/data-hint="search"[\s\S]{0,120}title="Search tasks"/);
+    expect(app).toMatch(/data-hint="search"[\s\S]{0,120}title="Search threads"/);
   });
 
   it('says the same key for the same thing wherever it is drawn', () => {

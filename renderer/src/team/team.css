@@ -119,3 +119,5 @@ img.tm-av { background: var(--bg-selected); }
 .tm-seg button.on { color: var(--text); background: var(--wash-strong); }
 .tm-signed { display: flex; align-items: center; gap: 10px; color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
 .tm-signed button { margin-left: auto; }
+.tm-invited { color: var(--text-dim); }
+.tm-av-empty { width: 24px; height: 24px; border: 1px dashed var(--line-strong); box-sizing: border-box; flex: none; background: none; }
