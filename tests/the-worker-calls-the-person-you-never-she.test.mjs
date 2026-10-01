@@ -24,7 +24,8 @@ import { buildTools } from '../mcp/tools.mjs';
 import { appHomeEnv } from './app-home.mjs';
 
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const RULE = /anyone on a team[\s\S]{0,200}"you"[\s\S]{0,120}"they"[\s\S]{0,60}never "she" or "he"/;
+// And never "the founder" (a PM persona, 2026-10-01, was called that in a summary).
+const RULE = /anyone on a team[\s\S]{0,200}"you"[\s\S]{0,120}"they"[\s\S]{0,60}never "she", "he" or "the founder"/;
 
 let root;
 let appDir;

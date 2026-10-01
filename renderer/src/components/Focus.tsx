@@ -1525,7 +1525,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer talkTo={direct ? talkName : null} item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} stop={stopButton} />
+            <DockComposer item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} stop={stopButton} talkTo={direct ? talkName : null} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
@@ -1783,6 +1783,13 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
    *  model drawer opens with it (w-e731ca9376). */
   openModel?: boolean;
 }) {
+  // A CONVERSATION WITH A PERSON ASKS FOR A REPLY TO THEM, not for the
+  // agent's next step. Set on the box itself so the one literal sentence the
+  // reply box is pinned to stays the agent's.
+  useEffect(() => {
+    const box = document.querySelector<HTMLTextAreaElement>('.dock-input');
+    if (box) box.placeholder = talkTo ? `Reply to ${talkTo}` : 'What should the agent do next?';
+  });
   // The draft outlives the dock. Tab away, click elsewhere, even restart the
   // app: coming back to this item finds your words where you left them. A
   // draft holds the composer open: esc folds only an empty one.
@@ -2219,7 +2226,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
            typed here becomes the agent's next instruction, without having to explain it.
            `tests/the-reply-box-asks-one-question.test.mjs` holds the sentence count.
         */
-        placeholder={talkTo ? `Reply to ${talkTo}` : 'What should the agent do next?'}
+        placeholder="What should the agent do next?"
         onKeyDown={(e) => {
           // THE MENU TAKES THE KEYS FIRST WHILE IT IS OPEN, and gives every
           // one of them back the moment it closes. Escape here clears the

@@ -3118,7 +3118,7 @@ export default function App() {
     // A REPLY IN A CONVERSATION STAYS IN THE CONVERSATION (persona test,
     // 2026-10-01: sending to Bea "kicked me out to search").
     const talking = isDirect(snap?.products.find((p) => p.slug === item.product));
-    const stay = talking || staysOnTheTask(item, text, engine);
+    const stay = staysOnTheTask(item, text, engine) || talking;
     if (stay) setFollowing({ product: item.product, id: item.id });
     await deferCommit(item, async () => {
       await api.answer({
