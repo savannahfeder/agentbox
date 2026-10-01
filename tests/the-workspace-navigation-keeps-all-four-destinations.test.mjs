@@ -214,8 +214,9 @@ describe('every control keeps its name in either width', () => {
     expect(toggle).toContain('data-hint="sidebar"');
   });
 
-  it('titles the Inbox tab in the collapsed rail, where its word is hidden', () => {
-    expect(inboxTab(draw({ collapsed: true }))).toContain('title="Inbox"');
+  // The tab is named Threads since w-05ff3d1438; its internal name is still inbox.
+  it('titles the Threads tab in the collapsed rail, where its word is hidden', () => {
+    expect(inboxTab(draw({ collapsed: true }))).toContain('title="Threads"');
     expect(inboxTab(draw({ collapsed: false }))).not.toContain('title=');
   });
 });
