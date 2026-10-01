@@ -9178,15 +9178,3 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 }
 .fp-use { background: var(--accent); border-color: transparent; color: var(--on-solid); }
 .fp-use:disabled { opacity: .45; cursor: default; }
-
-/* FINISHING A TASK: THE TWO TICKS IN THE CORNER ROW (w-581dbc6cc4).
-
-   IT IS AN `.icon-btn`, which is the terminal's own class, so everything about
-   it that could drift is shared rather than copied: the 34 box, the 19 point
-   glyph, `--text-faint`, the hover. It should match the colour of the terminal
-   button beside it. All this rule adds is where it sits.
-
-   `order: 1` IS WHAT PUTS IT LAST. The span Focus teleports into is
-   `display: contents`, so the button is laid out by the corner row itself and
-   markup order does nothing at all. */
-.done-mark { order: 1; flex: 0 0 auto; margin-left: 4px; }

@@ -68,11 +68,11 @@
   position: absolute; top: 14px; right: 20px;
 }
 /* THE RESERVE FOLLOWS WHAT IS ACTUALLY IN THE CORNER (w-581dbc6cc4,
-   2026-09-27). It used to be 3 marks at 34, two 10px gaps and 18 of air. The
-   plus and the ⌘ came off a task's corner, and what is left is the
-   terminal, a 10px gap, the mark's own 4 and the mark: 81 points, measured in
-   the built app. 18 of air on top of that is the same 18 it always kept. */
-.workspace-layout.workspace-task .workspace-task-header .keep-line-title { padding-right: 99px; }
+   2026-09-27, and again w-e731ca9376, 2026-10-01). What is in it now is the
+   Summary button, a 10 point gap and the square three-dot button: 161 points,
+   measured in the built app at 1440 (1237..1398). 18 of air on top of that is
+   the same 18 it always kept. */
+.workspace-layout.workspace-task .workspace-task-header .keep-line-title { padding-right: 179px; }
 
 /* AND THE TWO ROWS NEED AIR BETWEEN THEM, w-581dbc6cc4, 2026-09-27. The corner
    marks sat almost on the change figures below them, a few pixels short of
@@ -98,16 +98,10 @@
    title moves down: measured at y=40 against a title at 58, 18 points adrift.
    A margin moves the whole box, and the chevron keeps the title's line. */
 .workspace-layout.workspace-task .workspace-task-header { align-self: flex-start; margin-top: 18px; }
-/* ONLY THE FIGURES DROP, AND THE WORDS UNDER HER TITLE GO BACK (w-299ee43d2e,
-   2026-09-28). Dropping the whole byline 15 gave the figures their air but
-   also pushed "In your inbox · Claude Code" away from the title on the left,
-   which was spaced right before. The right side stays, the left side goes
-   back, and the two ends of the line are knowingly 8 out of step. So the line
-   takes its old 7 from `.keep-line > .focus-meta` again, and the figures
-   alone are moved the 8 it gave back,
-   which leaves them exactly where the 15 put them. A transform, so the line's
-   own height and everything under it stay put. */
-.workspace-layout.workspace-task .workspace-task-header .keep-line > .focus-meta > .change-figures { transform: translateY(8px); }
+/* THE FIGURES NO LONGER CLOSE THIS LINE (w-e731ca9376, 2026-10-01). They
+   are the detail on the code row of the thread's menu, so the 8 point drop
+   that gave them air under the corner marks (w-299ee43d2e) went with them. The
+   words under her title keep their 7 from `.keep-line > .focus-meta`. */
 /* Interact with HTML via its filename/Open control in the document pane.
    An opaque sandbox cannot forward its key events to the task's shortcuts. */
 .workspace-layout .focus-pane iframe { pointer-events: none; }
@@ -367,10 +361,16 @@
   }
 }
 
-/* A compact arrow shares the title line; metadata stays below the title. */
+/* A compact arrow shares the title line; metadata stays below the title.
+   ONE POINT UP (w-e731ca9376, 2026-10-01): "The back button looks like it is a
+   couple of pixels too low". Measured in the built renderer at 1440 with the
+   title at 17px: at top 0 the chevron's ink top sat 1.6 points under the top
+   of the title's capitals and its centre 0.45 under theirs. At -1 the ink top
+   is 0.6 under and the centre 0.55 over, so it sits on the title's first line
+   and starts where the letters start. */
 .workspace-task-header { position:relative; display:block; padding:0 0 0 28px; }
 .workspace-task-header > .back-esc {
- position:absolute; left:0; top:0; margin:0; padding:4px;
+ position:absolute; left:0; top:-1px; margin:0; padding:4px;
  width:24px; height:24px; display:flex; align-items:center; justify-content:center;
  color:var(--text-dim);
 }

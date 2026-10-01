@@ -19,15 +19,51 @@
 .ts-st-sched { border: 1.5px dashed var(--text-faint); }
 .ts-st-done { background: var(--text-faint); }
 
-/* THE TOP BAR: the state in plain words, then the square Summary button with
-   its key. It rides in the corner socket beside Done, which is display:
-   contents, so this group is laid out by the corner row itself. */
-.ts-top { display: inline-flex; align-items: center; gap: 10px; margin-right: 10px; }
-.ts-status { display: inline-flex; align-items: center; padding: 0 4px 0 0; font-size: 13px; color: var(--text-dim); white-space: nowrap; }
+/* THE STATE, FIRST ON THE LINE UNDER THE TITLE (w-e731ca9376, 2026-10-01).
+   It stood at the right of the top bar until she asked for it here, in place of
+   "Working". It wears the line's own uppercase mono (team.css), so the mark is
+   drawn a size down to sit on a 12 point line, and the dot that separates it
+   from the facts after it is the same dot the live word used to carry. */
+.ts-lead { display: inline-flex; align-items: center; flex: none; white-space: nowrap; }
+.ts-lead .ts-st { width: 10px; height: 10px; margin-right: 8px; }
+.by-lead .ts-lead ~ .fm-said::before { content: '· '; }
+
+/* THE TOP BAR: the square Summary button with its key, then the square
+   three-dot button that opens the thread's menu. It rides in the corner socket,
+   which is display: contents, so this group is laid out by the corner row
+   itself, and it ends on the bar's right edge. The 2 points above and below
+   keep the row the 34 it was with the terminal and Done marks in it, so the
+   Summary button stays where it was approved (56..86 at 1440). */
+.ts-top { display: inline-flex; align-items: center; gap: 10px; margin: 2px 0; }
 .ts-sumbtn { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
 .ts-sumbtn:hover { color: var(--text); border-color: var(--line-strong); }
 .ts-sumbtn.on { background: var(--wash-strong); color: var(--text); border-color: var(--line-strong); }
 .ts-sumbtn kbd { font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; padding: 0; }
+
+/* THE THREAD'S MENU (threads/ThreadMenu.tsx). The button is the Summary
+   button's square: its height, its hairline, its hover. The menu is the app's
+   own popover, `.th-menu` in pages.css, dropped from the button's right edge
+   because the button is at the right of the window. */
+.ts-more-wrap { position: relative; display: inline-flex; }
+.ts-more { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim); cursor: pointer; }
+.ts-more:hover, .ts-more[aria-expanded="true"] { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
+.ts-more:focus-visible { outline: 2px solid var(--underline); outline-offset: 2px; }
+.th-menu.ts-more-menu { top: calc(100% + 6px); left: auto; right: 0; min-width: 264px; }
+/* THE BAR RISES WHILE ITS MENU IS OPEN. The bar is its own layer at 1 and the
+   summary panel under it stands at 2, so the menu was drawn under the panel's
+   words (measured in the built renderer, "Status Running" through the card).
+   3 clears the panel and stays under the app's modals at 40. */
+.workspace-layout > .topbar:has(.ts-more-menu) { z-index: 3; }
+.ts-more-menu .ts-more-row { width: 100%; white-space: nowrap; }
+.ts-more-menu .ts-more-row:focus-visible { outline: none; background: rgba(255,255,255,.07); color: var(--text); }
+:root[data-theme="light"] .ts-more-menu .ts-more-row:focus-visible { background: var(--wash-strong); }
+.ts-more-label { flex: 1; }
+.ts-more-menu kbd { margin-left: 18px; font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; padding: 0; }
+/* The figures on the code row are the ones that closed the line under the
+   title, in the code pane's two colours. Here they are a detail of the row,
+   not a control of their own, so they take the row's pointer. */
+.ts-more-menu .change-figures { margin-left: 18px; font-size: 12px; cursor: inherit; }
+.ts-more-menu .change-figures .code-plus, .ts-more-menu .change-figures .code-minus { font-size: 12px; }
 
 /* THE PANEL, on the right of the conversation. The conversation and the reply
    dock both give up its width, so the words narrow beside it rather than run

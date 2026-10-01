@@ -243,6 +243,35 @@ export function bylineFacts(
   };
 }
 
+/* ------------------------- when the thread's state leads ------------------- */
+// THE STATE IS SAID ONCE (w-e731ca9376, 2026-10-01). On a thread the line now
+// opens on the thread's own mark and word (Waiting, Running, Scheduled, Done,
+// drawn by threads/Summary.tsx), and it said the same thing twice more: the
+// live word ("Working") and the tab's word ("In progress"). Both come off.
+//
+// WHAT STAYS IS WHAT THE STATE WORD DOES NOT SAY. Blocked is not one of the four
+// words. Queued, Paused and Nothing came back are why a Running or Waiting
+// thread is not moving. A count of subagents is the one fact "Working" was
+// carrying beyond the word itself, so the count stays and the word goes.
+// "Nothing running" goes: under a thread that says Running it is the line
+// arguing with its own first word.
+
+/** The fact beside the state word, when there is one it does not already say. */
+function besideTheState(f: BylineFacts): string | null {
+  if (f.state === 'working') return f.stateWord && f.stateWord !== 'Working' ? f.stateWord.replace(/ Working$/, '') : null;
+  if (f.state === 'idle') return null;
+  return f.stateWord;
+}
+
+/**
+ * The dotted list after the state, in the order the unled line keeps: the
+ * project first, so a narrow card cuts the clock before it cuts the project.
+ * `age` is the clock already put into words by the caller.
+ */
+export function stateLedParts(f: BylineFacts, age: string | null): (string | null)[] {
+  return [f.project, f.where === 'blocked' ? f.whereWord : null, besideTheState(f), f.engineWord, age];
+}
+
 /**
  * The whole line as one plain sentence, for whatever reads the pane aloud,
  * because a mark and three fragments is a picture and a picture has to be

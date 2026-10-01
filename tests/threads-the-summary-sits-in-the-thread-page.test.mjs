@@ -4,8 +4,9 @@
 // Approved 2026-10-01 (w-e731ca9376, rounds 7 and 9). Four things about where
 // the pieces go, each of which an edit to Focus.tsx could undo without any
 // other test noticing:
-//   - the state word and the Summary button ride in the top bar's corner, the
-//     socket Done already uses, so they stay put however far down she reads;
+//   - the Summary button rides in the top bar's corner, beside the thread's
+//     menu, so it stays put however far down she reads (the state word moved
+//     to the line under the title on 2026-10-01);
 //   - the panel is a sibling of the conversation and the reply dock, so both
 //     narrow beside it and it scrolls on its own;
 //   - the model word moved out of the header and into the reply box's pill;
@@ -19,11 +20,14 @@ const css = fs.readFileSync(new URL('../renderer/src/threads/summary.css', impor
 const summary = fs.readFileSync(new URL('../renderer/src/threads/Summary.tsx', import.meta.url), 'utf8');
 
 describe('the top bar', () => {
-  it('portals the state and the Summary button into the corner, before Done', () => {
-    const mine = focus.indexOf('createPortal(<ThreadStatusAndToggle');
-    const done = focus.indexOf('createPortal(doneButton, cornerHeaderTarget)');
-    expect(mine).toBeGreaterThan(-1);
-    expect(mine).toBeLessThan(done);
+  // Since w-e731ca9376 (2026-10-01) the state leads the line under the title
+  // and Done is a row in the thread's menu, so the corner holds the Summary
+  // button and then the menu's dots.
+  it('portals the Summary button into the corner, before the thread’s menu', () => {
+    const portal = focus.slice(focus.indexOf('createPortal(<span className="ts-top">'));
+    expect(portal.indexOf('<SummaryToggle')).toBeGreaterThan(-1);
+    expect(portal.indexOf('<SummaryToggle')).toBeLessThan(portal.indexOf('{threadMenu}'));
+    expect(focus).toContain('lead={summarised ? <ThreadStateMark item={item} /> : null}');
   });
   it('toggles with S only while focus is out of a text field', () => {
     expect(summary).toMatch(/useSummaryShortcut/);
