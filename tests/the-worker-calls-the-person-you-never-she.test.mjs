@@ -10,9 +10,9 @@
 //
 // AND THE WORDS HANDED TO IT ON A REPLY MUST NOT CONTRADICT THE RULE. That
 // tester's line came on the turn after his reply, which the supervisor hands
-// over as "What she said:" (`replyBrief`). The turn prompts, the picture block
-// and the conversation transcript are the app's own words to a worker, so
-// they say "they" too.
+// over as "What she said:" (`replyBrief`). The turn prompts, the picture block,
+// the conversation transcript and the store tools' own descriptions are the
+// app's own words to a worker, so they say "they" too.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -20,6 +20,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Supervisor } from '../main/supervisor.mjs';
+import { buildTools } from '../mcp/tools.mjs';
+import { appHomeEnv } from './app-home.mjs';
 
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const RULE = /anyone on a team[\s\S]{0,200}"you"[\s\S]{0,120}"they"[\s\S]{0,60}never "she" or "he"/;
@@ -103,5 +105,29 @@ describe('what a worker is handed on later turns', () => {
     ]);
     expect(text).toContain('Make it warmer.');
     expect(text).not.toMatch(GENDERED);
+  });
+});
+
+describe('the store tools a worker reads', () => {
+  it('describe the person as "they"', () => {
+    const home = appHomeEnv();
+    fs.mkdirSync(path.join(home, 'accounts', 'acct-you'), { recursive: true });
+    const was = process.env.STORE_ACCOUNT_ID;
+    process.env.STORE_ACCOUNT_ID = 'acct-you';
+    try {
+      const { tools } = buildTools({ holder: 'test' });
+      const gendered = /\b(she|her|hers|herself|he|him|his)\b/i;
+      const said = [];
+      for (const tool of tools) {
+        said.push(`${tool.name}: ${tool.description}`);
+        for (const [field, schema] of Object.entries(tool.schema ?? {})) {
+          if (schema?.description) said.push(`${tool.name}.${field}: ${schema.description}`);
+        }
+      }
+      expect(said.length).toBeGreaterThan(10);
+      expect(said.filter((s) => gendered.test(s))).toEqual([]);
+    } finally {
+      if (was === undefined) delete process.env.STORE_ACCOUNT_ID; else process.env.STORE_ACCOUNT_ID = was;
+    }
   });
 });
