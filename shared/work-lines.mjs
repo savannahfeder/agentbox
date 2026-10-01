@@ -417,13 +417,20 @@ function stageWords(stage, cwd, home) {
     const words2 = commandWork(unquote(rest[flag + 1]), cwd, home);
     return words2 ? { ...words2, names: words2.subject ? [words2.subject] : [], whole: true } : null;
   }
-  if (head === 'git') return gitWords(rest);
+  if (head === 'git') return gitWords(rest, cwd, home);
   if (head === 'sed' || head === 'perl') return sedWords(rest, cwd, home);
   if (RUNNERS.has(head)) return runnerWords(rest, cwd, home);
   if (SCRIPTS.has(head) || /\.(?:sh|mjs|js|py)$/.test(head)) {
     const args = argumentsOf(rest);
     if (args === null) return null;
-    const file = stage.includes('…') ? null : args.find(looksLikeAFile);
+    // `python3 - <<'PY'` is a script with no name, and `plainCommand` already
+    // puts its first line after the ellipsis. That line is what a developer
+    // reads to tell one of 2,793 of these from another, so it is kept.
+    if (stage.includes('…')) {
+      const first = stage.slice(stage.lastIndexOf('…') + 1).trim();
+      return { ...SCRIPT, names: first ? [first] : [] };
+    }
+    const file = args.find(looksLikeAFile);
     return { ...SCRIPT, names: file ? [lastSegment(file)] : [] };
   }
   if (TEST_RUNNERS.has(head)) return testWords(rest);
@@ -455,7 +462,11 @@ function namesFor(family, args, cwd, home) {
   return files;
 }
 
-function gitWords(rest) {
+// WHAT THE SUBCOMMAND NAMED, because a developer reads these lines for the
+// file, the branch or the message, and a verb on its own tells them less than
+// the command did. Measured over the same traces: `git add`, `git commit`,
+// `git push` and `git merge` are 563 lines that said nothing but their verb.
+function gitWords(rest, cwd, home) {
   const words = [...rest];
   // `git -C <path> <subcommand>`: the folder is not the verb.
   while (words.length && isFlag(unquote(words[0]))) {
@@ -464,7 +475,28 @@ function gitWords(rest) {
   }
   const sub = unquote(words[0] ?? '');
   const known = GIT[sub];
-  return known ? { ...known, names: [] } : null;
+  if (!known) return null;
+  return { ...known, names: gitNames(sub, words.slice(1), cwd, home) };
+}
+
+// Not a ref: the remote it went to, and the `--` that ends the flags.
+const NOT_A_REF = new Set(['origin', 'upstream', '.', '--', 'HEAD']);
+
+function gitNames(sub, rest, cwd, home) {
+  if (sub === 'commit') {
+    // The message, which is the one thing a commit line is read for. It is
+    // absent when the message came in on stdin (`git commit -F -`).
+    const at = rest.findIndex((w) => unquote(w) === '-m' || unquote(w) === '--message');
+    const message = at >= 0 ? unquote(rest[at + 1] ?? '') : '';
+    return message ? [message] : [];
+  }
+  const args = argumentsOf(rest, ['-m', '--message', '-C', '-S']);
+  if (args === null) return [];
+  if (sub === 'push' || sub === 'merge' || sub === 'checkout' || sub === 'switch' || sub === 'fetch' || sub === 'pull') {
+    const refs = args.filter((a) => a && !NOT_A_REF.has(a));
+    return refs.length ? [refs[refs.length - 1]] : [];
+  }
+  return args.filter(looksLikeAFile).map((a) => shortPath(a, cwd, home));
 }
 
 // The leading quote survives on a line the trace cut mid-string.
@@ -507,9 +539,13 @@ function runnerWords(rest, cwd, home) {
   return null;
 }
 
+// A trace line is cut at 200 characters, so the last test file on a long
+// `vitest run a b c` often arrives without its extension. Anything that looks
+// like a path counts, which is how 586 lines that named nothing got their name.
 function testWords(rest) {
-  const files = rest.map(unquote).filter((w) => TEST_FILE.test(w)).map(lastSegment);
-  return { ...TESTS, names: files };
+  const args = rest.map(unquote).filter((w) => !isFlag(w) && w !== 'run');
+  const files = args.filter((w) => TEST_FILE.test(w) || w.includes('/'));
+  return { ...TESTS, names: files.map(lastSegment) };
 }
 
 // Up to three names, then the count. Her standing objection to a cap is one

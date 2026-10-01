@@ -116,12 +116,12 @@ describe('a command in plain words', () => {
     expect(say('npx tsc -p renderer --noEmit')).toBe('checked the types');
     expect(say('git status')).toBe('checked what changed');
     expect(say('git -C /tmp/w log -5')).toBe('read the code history');
-    expect(say('git add -A && git commit -m "a change"')).toBe('saved the changes');
+    expect(say('git add -A && git commit -m "a change"')).toBe('saved the changes a change');
     expect(say('sed -i "" s/a/b/ src/cart.js')).toBe('changed src/cart.js');
     expect(say('mkdir -p scripts/scratch')).toBe('made a folder scripts/scratch');
     expect(say('rm -rf /tmp/w/frames')).toBe('deleted /tmp/w/frames');
     expect(say('node scripts/scratch/measure.mjs')).toBe('ran a script measure.mjs');
-    expect(say('python3 - <<\'PY\'\nimport re\nPY')).toBe('ran a script');
+    expect(say('python3 - <<\'PY\'\nimport re\nPY')).toBe('ran a script import re');
   });
 
   // THE WHOLE POINT OF THE CONSERVATIVE RULE. One segment nobody taught it and
@@ -146,6 +146,34 @@ describe('a command in plain words', () => {
   // The prelude still comes off first, which is what `plainCommand` is for.
   it('reads through a cd into an absolute path', () => {
     expect(commandWork('cd /Users/you/Desktop/dev/zero && git status').verb).toBe('checked what changed');
+  });
+});
+
+// MOST OF THE EARLY USERS ARE DEVELOPERS (2026-10-01). Plain words must not
+// cost them the detail they read these lines FOR: which branch, which message,
+// which test, which script. MEASURED over the same traces, the words named
+// nothing on 4,791 lines before this group existed and on 849 after, and the
+// 849 are the commands that named nothing either (`git status`, `npx tsc`,
+// `npm install`).
+describe('a developer keeps the detail they read the line for', () => {
+  const say = (c) => { const w = commandWork(c); return w ? `${w.verb} ${w.subject}`.trim() : null; };
+
+  it('names the branch, the message, the test and the script', () => {
+    expect(say('git push origin agentbox/w-1 2>&1 | tail -5')).toBe('pushed the branch agentbox/w-1');
+    expect(say('git merge --no-edit agentbox/w-1')).toBe('merged the branch agentbox/w-1');
+    expect(say('git commit -m "Say what a command did"')).toBe('saved the changes Say what a command did');
+    expect(say('git add renderer/src/App.tsx')).toBe('saved the changes renderer/src/App.tsx');
+    expect(say('git diff renderer/src/styles.css')).toBe('checked what changed renderer/src/styles.css');
+    // The trace cuts a line at 200 characters, so the suffix is often gone.
+    expect(say('npx vitest run tests/team-one-page-s')).toBe('ran the tests team-one-page-s');
+    expect(say('node -e "console.log(1)"')).toBe('ran a script console.log(1)');
+  });
+
+  // A command that named nothing is still allowed to say nothing: inventing a
+  // subject for `git status` would be worse than the verb alone.
+  it('says only the verb when the command named nothing', () => {
+    expect(say('git status --short')).toBe('checked what changed');
+    expect(say('npx tsc -p renderer --noEmit')).toBe('checked the types');
   });
 });
 
