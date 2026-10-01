@@ -578,7 +578,7 @@ export interface Snapshot {
 }
 
 // FOUR, not five.
-export type View = 'inbox' | 'snoozed' | 'progress' | 'done';
+export type View = 'inbox' | 'snoozed' | 'progress' | 'done' | 'all';
 
 // How many of her own Claude Code sessions the inbox takes. 'all' so she can go
 // through them once and close them, 'waiting' for only the ones stopped on a

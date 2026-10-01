@@ -21,8 +21,10 @@ import { companyLines, movedAgo as ago, type CompanyLine as Line } from './compa
 type Tab = 'open' | 'run' | 'wait' | 'sched' | 'done';
 
 
-export function TeamPage({ team, products, items, now, onOpen }: {
+export function TeamPage({ team, products, items, now, onOpen, forceSetup = false }: {
   team: TeamState | null | undefined; products: Product[]; items: WorkItem[]; now: number; onOpen: (item: WorkItem) => void;
+  /** Team members and Invite people, from the foot of the sidebar: the setup page, always. */
+  forceSetup?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>('open');
   const [who, setWho] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export function TeamPage({ team, products, items, now, onOpen }: {
 
   if (!team?.configured) return <div className="tm-setup"><h2>Teams are not set up in this build</h2><p>This copy of the app has no team cloud configured.</p></div>;
   if (!team.signedIn) return <SignIn error={team.error} />;
-  if (!team.team || setup) return <TeamSetup team={team} products={products} onDone={team.team ? () => setSetup(false) : undefined} />;
+  if (!team.team || setup || forceSetup) return <TeamSetup team={team} products={products} onDone={team.team && !forceSetup ? () => setSetup(false) : undefined} />;
 
   const byPerson = (l: Line) => !who || l.owner === who;
   const open = lines.open.filter(byPerson);
@@ -89,7 +91,7 @@ function SignIn({ error }: { error: string | null }) {
   const { busy, error: callError, run } = useCall();
   return <div className="tm-setup">
     <h2>Sign in to see your team</h2>
-    <p>Your projects stay private until you share one. Signing in opens Google in your browser.</p>
+    <p>Your team sees a short summary of each of your threads, unless you mark one private. Signing in opens Google in your browser.</p>
     <div className="tm-field-row"><button className="tm-btn" disabled={busy} onClick={() => run(() => api.teamSignIn())}>{busy ? 'Waiting for Google…' : 'Sign in with Google'}</button></div>
     {(callError || error) && <p className="tm-error">{callError || error}</p>}
   </div>;
@@ -118,37 +120,9 @@ function TeamSetup({ team, products, onDone }: { team: TeamState; products: Prod
         <input className="tm-input" placeholder="Invite by email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <button className="tm-btn" disabled={busy || !email.trim()}>Invite</button>
       </form>
-      <div className="tm-section">Projects</div>
-      <p>A private project never leaves this Mac. A shared one appears on your teammates' Macs, and its tasks reach whoever has to act.</p>
-      {products.filter((p) => !p.practice).map((p) => <ProjectLine key={p.slug} product={p} team={team} busy={busy} run={run} />)}
       {onDone && <div className="tm-field-row" style={{ marginTop: 22 }}><button className="tm-btn" onClick={onDone}>Done</button></div>}
     </>}
     {error && <p className="tm-error">{error}</p>}
   </div>;
 }
 
-function ProjectLine({ product, team, busy, run }: { product: Product; team: TeamState; busy: boolean; run: (fn: () => Promise<TeamCallResult>) => Promise<boolean> }) {
-  const shared = isShared(product);
-  const visibility = shared ? product.team!.visibility : 'private';
-  const [picking, setPicking] = useState(false);
-  const [people, setPeople] = useState<string[]>(product.team?.people ?? []);
-  const mates = team.people.filter((p) => p.id !== team.me?.id);
-  const share = (v: 'team' | 'people', who: string[] = []) => run(() => api.teamShare({ product: product.slug, visibility: v, people: who }));
-  return <>
-    <div className="tm-project-line">
-      {!shared && <LockIcon />}{product.name}
-      <div className="tm-seg">
-        <button className={visibility === 'private' ? 'on' : ''} disabled={busy || shared} title={shared ? 'A shared project cannot be made private again yet.' : 'Only you'}>Private</button>
-        <button className={visibility === 'team' ? 'on' : ''} disabled={busy} onClick={() => { setPicking(false); void share('team'); }}>Everyone</button>
-        <button className={visibility === 'people' || picking ? 'on' : ''} disabled={busy} onClick={() => setPicking(!picking)}>Specific people</button>
-      </div>
-    </div>
-    {picking && <div style={{ padding: '6px 0 12px 22px' }}>
-      {mates.map((p) => <label key={p.id} className="tm-person-line" style={{ cursor: 'pointer' }}>
-        <input type="checkbox" checked={people.includes(p.id)} onChange={(e) => setPeople(e.target.checked ? [...people, p.id] : people.filter((x) => x !== p.id))} />
-        <Face person={p} />{p.name}
-      </label>)}
-      <button className="tm-btn" disabled={busy} onClick={async () => { if (await share('people', people)) setPicking(false); }}>Share with {people.length || 'no'} {people.length === 1 ? 'person' : 'people'}</button>
-    </div>}
-  </>;
-}

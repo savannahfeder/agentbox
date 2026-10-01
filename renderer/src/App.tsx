@@ -13,7 +13,7 @@ import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, View, WorkItem } from './types';
+import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, ThreadCard, View, WorkItem } from './types';
 import { api } from './api';
 import { setClaudeModels } from './models';
 import { advanceAfter, type Advance } from './advance';
@@ -113,6 +113,8 @@ import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
 import { TeamContext, teamView } from './team/people';
 import { TeamPage } from './team/TeamPage';
+import { HeaderActions, InboxBoard, StateTabs, TeamView } from './threads/Pages';
+import { readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing' | 'themes';
 
@@ -466,6 +468,10 @@ export default function App() {
   // THE TEAM PAGE, a page like Settings: it takes the main area and leaves the
   // header and the sidebar where they are.
   const [teamOpen, setTeamOpen] = useState(() => new URLSearchParams(location.search).has('team'));
+  // TEAM MEMBERS AND INVITING, from the foot of the sidebar: the team's setup page.
+  const [membersOpen, setMembersOpen] = useState(false);
+  // A TEAMMATE'S THREAD, opened from the Team board: its card, never its conversation.
+  const [openCard, setOpenCard] = useState<ThreadCard | null>(null);
   // Drawn when it is open and nothing sits over it: an opened task or Settings
   // takes the page, and closing them returns to the Team page.
   const teamShown = teamOpen && !focused && !settingsOpen;
@@ -1861,17 +1867,35 @@ export default function App() {
   // a waiting update is not something a filter should be able to hide. Search
   // ignores the filter, as it has always ignored the product filter, because
   // it reads every project and every tab on purpose.
+  // ALL (the team version, approved 2026-10-01): every open thread of yours,
+  // whatever it is waiting on, as one list.
+  const allOpen = useMemo(() => {
+    const seenIds = new Set<string>();
+    return [...inbox, ...progress, ...snoozed].filter((i) => (seenIds.has(i.id) ? false : (seenIds.add(i.id), true)));
+  }, [inbox, progress, snoozed]);
   const wholeBox = view === 'inbox' ? inbox
     : view === 'snoozed' ? snoozed
       : view === 'progress' ? progress
-        : done;
+        : view === 'all' ? allOpen
+          : done;
   const shownBox = useMemo(
     () => (isFiltering(boxFilter)
       ? wholeBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || matchesBoxFilter(i, boxFilter))
       : wholeBox),
     [wholeBox, boxFilter],
   );
-  const list = search !== null ? (hits ?? []).map((h) => h.item) : shownBox;
+  // THE DISPLAY MENU'S FILTERS AND SORT, on top of the box (approved
+  // 2026-10-01). Remembered per page; the Inbox is a list by default and the
+  // Team a board.
+  const [inboxDisplay, setInboxDisplayRaw] = useState<Display>(() => readDisplay('inbox'));
+  const [teamDisplay, setTeamDisplayRaw] = useState<Display>(() => readDisplay('team'));
+  const setInboxDisplay = useCallback((d: Display) => { setInboxDisplayRaw(d); writeDisplay('inbox', d); }, []);
+  const setTeamDisplay = useCallback((d: Display) => { setTeamDisplayRaw(d); writeDisplay('team', d); }, []);
+  const displayedBox = useMemo(
+    () => sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay),
+    [shownBox, inboxDisplay, now],
+  );
+  const list = search !== null ? (hits ?? []).map((h) => h.item) : displayedBox;
   const boxFilterMenu = useMemo(
     () => (modal === 'filter' ? filterMenu(wholeBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i)), boxFilter, snap?.products ?? []) : null),
     [modal, wholeBox, boxFilter, snap?.products],
@@ -4255,7 +4279,10 @@ export default function App() {
        */}
       {reviewLab && <div className="review-lab-controls"><span>Review exploration</span><select aria-label="Focus controls" value={focusControlStyle} onChange={e=>setFocusControlStyle(e.target.value as FocusControlStyle)}><option value="text">Focus · Text only</option><option value="corners">Focus · Frame corners + label</option><option value="corners-icon">Focus · Frame corners button</option><option value="corners-bare">Focus · Bare frame corners</option><option value="layout">Focus · Workspace layout</option></select><select aria-label="Review file type" value={artifactPreviewSample} onChange={e=>{setArtifactPreviewSample(e.target.value);setOpenDoc(null);}}><option value="code">Code</option><option value="design">Design</option><option value="notes">Text</option><option value="multiple">All three</option></select><select aria-label="Review actions" value={reviewStyle} onChange={e=>setReviewStyle(e.target.value)}><option value="header-balanced-open">1 · Balanced · open only</option><option value="header-tools-open">2 · Compact · open only</option><option value="header-card-only">3 · Clickable card · no controls</option><option value="header-feedback-only">4 · Clickable card · feedback tools</option><option value="header-balanced">Compare · all controls</option></select>{artifactPreviewSample !== "code" &&<select aria-label="Text surface" value={textReviewStyle} onChange={e=>setTextReviewStyle(e.target.value)}><option value="clear">Text · Fully transparent</option><option value="glass">Text · Matched glass</option></select>}</div>}
       {!reviewLab && api.isFixtures && new URLSearchParams(location.search).has('artifactTweaks') && <div className="artifact-tweaks"><select aria-label="Design toolbar" value={designToolbar} onChange={e => setDesignToolbar(e.target.value)}><option value="floating">Floating bar</option><option value="corner">Corner controls</option><option value="edge">Top edge</option><option value="always">Always visible</option></select>{focused && <select aria-label="Sample artifact" value={artifactPreviewSample} onChange={e => { setArtifactPreviewSample(e.target.value); setOpenDoc(null); }}><option value="multiple">Multiple artifacts</option><option value="design">Design sample</option><option value="code">Code sample</option><option value="notes">Notes sample</option></select>}</div>}
-      {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? 'settings' : null} teamPage={teamShown} hasTeam={!!snap?.team?.configured} onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
+      {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? 'settings' : teamShown && membersOpen ? 'members' : null} teamPage={teamShown && !membersOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
+        onInvite={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setMembersOpen(true); setTeamOpen(true); }}
+        onMembers={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setMembersOpen(true); setTeamOpen(true); }}
+        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setMembersOpen(false); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setMembersOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
           only part of our own document lying over the file, so a pointer
           brought up there wakes the marks that a pointer moving across the
@@ -4346,7 +4373,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">Team</h1> : <h1 className="workspace-title">{workspacePageTitle(view, DONE.noun)}</h1>)) : (
+        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">{membersOpen ? 'Team members' : 'Team'}</h1> : <h1 className="workspace-title">Inbox</h1>)) : (
         <nav
           className="tabs"
           /* NO HINT ON THIS NAV. It carried one while the keys were ⌘⌥ and an
@@ -4493,7 +4520,22 @@ export default function App() {
               there is a cross that drops somebody out of the middle of their
               first five minutes and into an app they have not been shown. The
               band above the window is what says where they are. */}
-          {!focused && !settingsOpen && !inPractice && (
+          {/* SEARCH, NEW THREAD AND DISPLAY (approved 2026-10-01): the whole of
+              the right end on the Inbox and the Team. Display holds the view,
+              the sort and the filters. */}
+          {workspaceNavigation && !focused && !settingsOpen && !(teamShown && membersOpen) && (
+            <HeaderActions
+              page={teamShown ? 'team' : 'inbox'}
+              display={teamShown ? teamDisplay : inboxDisplay}
+              onDisplay={teamShown ? setTeamDisplay : setInboxDisplay}
+              products={snap.products}
+              onSearch={openSearch}
+              onCompose={() => setModal('compose')}
+              shown={teamShown ? undefined : displayedBox.length}
+              total={teamShown ? undefined : shownBox.length}
+            />
+          )}
+          {!workspaceNavigation && !focused && !settingsOpen && !inPractice && (
             <BoxFilter
               filter={boxFilter}
               menu={boxFilterMenu ?? { projects: [], moreProjects: [], priorities: [], harnesses: [] }}
@@ -4514,7 +4556,7 @@ export default function App() {
               NEITHER VERB LOSES A ROUTE SHE HAS. The sidebar carries New task on
               every screen including this one, C still opens it, ⌘K still opens
               the palette, and both marks are untouched on the lists. */}
-          {!taskOpen && <button
+          {!taskOpen && !workspaceNavigation && <button
             className="icon-btn"
             data-hint="new-task"
             data-hint-align="right"
@@ -4538,7 +4580,7 @@ export default function App() {
               discovery point for the palette, which otherwise had no easy entry
               point, so it stays on every list, where somebody meeting the app
               for the first time is. */}
-          {!taskOpen && <button
+          {!taskOpen && !workspaceNavigation && <button
             className="icon-btn"
             data-hint="commands"
             data-hint-align="right"
@@ -4626,8 +4668,20 @@ export default function App() {
       {teamShown && (
         <div className="body tm-body">
           <main className="list-pane">
-            <TeamPage team={snap?.team} products={snap?.products ?? []} items={items} now={now}
-              onOpen={(item) => { setTeamOpen(false); setFocused(item); markSeen(item); }} />
+            {/* THE TEAM (approved 2026-10-01): everyone's threads as a board by
+                default, yours from this Mac and your teammates' from their
+                cards. Until you are signed in and on a team, and on Team
+                members or Invite people, the setup page stands in. */}
+            {snap?.team?.signedIn && snap.team.team && !membersOpen ? (
+              <div className="tm-team-pane th-pane">
+                <TeamView items={items} products={snap.products} cards={snap.team.cards ?? []} display={teamDisplay} now={now}
+                  onOpenItem={(item) => { setTeamOpen(false); setFocused(item); markSeen(item); }}
+                  onOpenCard={(card) => setOpenCard(card)} />
+              </div>
+            ) : (
+              <TeamPage team={snap?.team} products={snap?.products ?? []} items={items} now={now} forceSetup={membersOpen}
+                onOpen={(item) => { setTeamOpen(false); setFocused(item); markSeen(item); }} />
+            )}
           </main>
         </div>
       )}
@@ -4817,7 +4871,24 @@ export default function App() {
                   stoppable={!walking && stoppableNow(focused)}
                 />
               ) : (
+                <>
+                {/* THE STATE TABS (approved 2026-10-01): Needs you, Running,
+                    Scheduled, Done and All, on the Inbox itself. They replace
+                    the sidebar places they used to be. */}
+                {workspaceNavigation && search === null && inboxDisplay.view === 'board' ? (
+                  <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now}
+                    onOpenItem={(item) => { setFocused(item); markSeen(item); }} />
+                ) : <>
+                {workspaceNavigation && search === null && (
+                  <StateTabs
+                    view={view}
+                    counts={{ inbox: inbox.length, progress: progress.length, snoozed: snoozed.length, done: done.length, all: allOpen.length }}
+                    onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
+                  />
+                )}
                 <List
+                  table={workspaceNavigation && search === null}
+                  products={snap.products}
                   team={team}
                   items={list}
                   // Results are grouped and stamped like the inbox, whatever
@@ -4870,6 +4941,8 @@ export default function App() {
                     setSelected(i);
                   }}
                 />
+                </>}
+                </>
               )}
             </main>
             {/* THE RIGHT HALF OF THE WINDOW IS THE FILE ITSELF (w-74b0b5cd87).
