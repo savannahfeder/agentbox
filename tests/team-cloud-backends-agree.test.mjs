@@ -51,9 +51,15 @@ async function liveWorld() {
   }
   return {
     ...people, emails,
+    // Fails loudly: a silent failure here once left test people in the
+    // real project (the admin role had no table rights).
     cleanup: async () => {
-      await admin.from('teams').delete().in('created_by', made);
-      for (const id of made) await admin.auth.admin.deleteUser(id);
+      const teams = await admin.from('teams').delete().in('created_by', made);
+      if (teams.error) throw new Error(`could not delete the test team: ${teams.error.message}`);
+      for (const id of made) {
+        const gone = await admin.auth.admin.deleteUser(id);
+        if (gone.error) throw new Error(`could not delete test person ${id}: ${gone.error.message}`);
+      }
     },
   };
 }

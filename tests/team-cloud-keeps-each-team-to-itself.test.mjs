@@ -30,6 +30,7 @@ create function auth.uid() returns uuid language sql stable as $$
 $$;
 create role authenticated;
 create role anon;
+create role service_role;
 create publication supabase_realtime;
 `;
 // Only what Supabase itself grants; the table rights come from our own
