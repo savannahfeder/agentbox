@@ -16,8 +16,9 @@
 //     itself is the toggle;
 //   - one list tab, Inbox, lit on every list view, since every list is a tab
 //     on the Inbox page, and not lit on the Team page, Settings or members;
-//   - a Team tab, only when the team cloud is configured and there is a way
-//     to open it;
+//   - no Team tab, in any state (w-05ff3d1438, 2026-10-01): the Inbox and the
+//     Team page were one question on two pages, so the faces on the Inbox's
+//     tab bar pick whose threads are listed, and the sidebar keeps one list;
 //   - at the foot, Invite people and Team members (only when signed in to a
 //     team), Instructions, Settings, then the signed-in person's face, name
 //     and email.
@@ -61,12 +62,11 @@ describe('one list tab, and it is lit wherever her threads are listed', () => {
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
   });
 
-  it('lights Team and not Inbox while the Team page is up', () => {
+  it('lights nothing while the team setup page is up, since no tab leads there', () => {
     const html = draw({ teamPage: true, hasTeam: true, onTeam: noop });
     expect(inboxTab(html)).not.toContain('active');
     expect(inboxTab(html)).not.toContain('aria-current');
-    expect(buttonWith(html, 'data-tab="team"')).toContain('aria-current="page"');
-    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(html).not.toContain('data-tab="team"');
   });
 
   it('lights Settings and not Inbox while Settings is open', () => {
@@ -96,16 +96,18 @@ describe('one list tab, and it is lit wherever her threads are listed', () => {
   });
 });
 
-describe('the Team tab', () => {
+describe('there is no Team tab', () => {
+  // Before w-05ff3d1438 the first case drew one. Now no combination does: the
+  // team is on the Inbox, behind the faces in its tab bar.
   it.each([
-    [true, true, true],
-    [true, false, false],
-    [false, true, false],
-    [false, false, false],
-  ])('with hasTeam=%s and a way to open it=%s, draws the tab: %s', (hasTeam, withOnTeam, drawn) => {
-    const html = draw({ hasTeam, ...(withOnTeam ? { onTeam: noop } : {}) });
-    expect(html.includes('data-tab="team"')).toBe(drawn);
-    if (drawn) expect(buttonWith(html, 'data-tab="team"')).toContain('aria-label="Team"');
+    [true, true],
+    [true, false],
+    [false, true],
+    [false, false],
+  ])('with hasTeam=%s and a way to open it=%s, draws no Team tab', (hasTeam, withOnTeam) => {
+    const html = draw({ hasTeam, team: onATeam, ...(withOnTeam ? { onTeam: noop } : {}) });
+    expect(html).not.toContain('data-tab="team"');
+    expect(html.match(/data-tab=/g)).toHaveLength(1);
   });
 });
 
@@ -195,9 +197,9 @@ describe('every control keeps its name in either width', () => {
       onInstructions: noop, onSettings: noop, inboxCount: 2,
     });
     const buttons = html.match(/<button[^>]*>/g);
-    // Inbox, Team, Invite people, Team members, Instructions, Settings, the
-    // toggle, and your own row (it opens your account).
-    expect(buttons).toHaveLength(8);
+    // Inbox, Invite people, Team members, Instructions, Settings, the toggle,
+    // and your own row (it opens your account). Team left with w-05ff3d1438.
+    expect(buttons).toHaveLength(7);
     for (const b of buttons) expect(b).toMatch(/aria-label="[^"]+"/);
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
   });

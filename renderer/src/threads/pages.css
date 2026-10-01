@@ -203,3 +203,22 @@
 @media (prefers-reduced-motion: reduce) { .th-st.live { animation: none; } }
 .th-cell-title .th-st.live { margin-right: 8px; top: 1px; }
 .th-card .m .th-st.live { margin-right: 8px; top: 0; }
+
+/* WHOSE THREADS: the faces at the right end of the tab bar (w-05ff3d1438).
+   Lit is on the page, faint is not; the row never grows past four marks. */
+.th-people { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; }
+.th-face { position: relative; display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--radius); background: none; cursor: pointer; opacity: .42; filter: grayscale(1); transition: opacity .12s ease, filter .12s ease, box-shadow .12s ease; }
+.th-face .tm-av { width: 22px; height: 22px; line-height: 20px; font-size: 8.5px; }
+.th-face:hover { opacity: .85; filter: none; }
+.th-face.on { opacity: 1; filter: none; box-shadow: 0 0 0 1px var(--text-faint); }
+.th-face:focus-visible { outline: none; box-shadow: 0 0 0 1.5px var(--accent); }
+.th-more { width: auto; min-width: 24px; padding: 0 5px; font: 500 10.5px/24px var(--mono); color: var(--text-dim); border: 1px solid var(--line); filter: none; opacity: .8; }
+.th-more:hover, .th-more.open { opacity: 1; color: var(--text); border-color: var(--line-strong); }
+.th-more.on { opacity: 1; color: var(--text); box-shadow: none; border-color: var(--text-faint); }
+.th-more-wrap { position: relative; display: inline-flex; }
+.th-people-menu { left: auto; right: 0; top: 32px; }
+.th-people-menu .th-check { margin-left: auto; color: var(--text-dim); }
+/* Over the board there are no tabs, so the faces sit alone at the right. */
+.th-bar-end { justify-content: flex-end; padding-bottom: 0; }
+/* A teammate's row has no select box: nothing on this Mac can act on it. */
+.th-their-row .mark { visibility: hidden; }

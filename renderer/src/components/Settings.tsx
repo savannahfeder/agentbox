@@ -701,8 +701,8 @@ const CLAUDE = {
   connected: 'Claude Code is connected',
   connectedSay: `${Name} can see it on this Mac, so your agents have something to run on. There is nothing for you to set up.`,
   missing: 'Claude Code is not on this Mac',
-  // The walk's sentence, and then the walk's instruction.
-  missingSay: `${Name} could not find Claude Code on this Mac, and your agents run on it. Install it, then check again.`,
+  // Not "your agents run on it": with Codex here they run on Codex instead.
+  missingSay: `${Name} could not find Claude Code on this Mac. Install it, then check again.`,
   missingLink: 'Get Claude Code',
   unsure: `${Name} could not check`,
   unsureSay: `${Name} has not been able to look for Claude Code on this Mac. That is not the same as it being missing, only that the answer never came back. Try again in a moment.`,

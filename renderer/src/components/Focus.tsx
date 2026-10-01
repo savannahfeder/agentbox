@@ -323,7 +323,7 @@ function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 // not the user's, and it is the part that was unnecessary. `filesFromRuns` stays,
 // because App.tsx still reads it to choose the design a card opens itself on.
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onInstallUpdate, items, onHandToAgent }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onInstallUpdate, items, onHandToAgent, onAddPeople }: {
   previewSample?: string;
   /**
    * EVERY THREAD THE WINDOW HOLDS, for the summary's linked titles and the
@@ -336,6 +336,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    *  an agent. Absent, the line is not drawn, because a word that does nothing
    *  when pressed is worse than no word. */
   onHandToAgent?: (item: WorkItem) => void;
+  /** Opens New thread with this conversation's people already in To, so adding
+   *  one more starts the group's conversation and leaves this one alone. */
+  onAddPeople?: (who: { to: string; also: string[] }) => void;
   artifactSlot?: (node: HTMLDivElement | null) => void;
   inlineArtifacts?: boolean;
   artifactView?: 'beside' | 'focus';
@@ -906,6 +909,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         inProgress: stoppable,
       }}
       lead={summarised ? <ThreadStateMark item={item} /> : null}
+      /* ADD PEOPLE, beside the faces (w-71e6af492d). A conversation only: the
+         control decides that for itself off the record on screen, so nothing
+         here has to ask again. */
+      onAddPeople={onAddPeople}
     />
   );
 

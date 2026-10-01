@@ -178,6 +178,22 @@ export function cleanName(text) {
 }
 
 /**
+ * THE SAME CALL ON A MAC THAT HAS ONLY CODEX. `codex exec` prints the reply
+ *  alone on stdout and everything else on stderr, so the reading below is the
+ *  same. No session is kept, none of her Codex config or MCP servers is loaded,
+ *  and nothing may be written. Measured 2026-10-01, codex-cli 0.160.0: 5.6s. */
+export function codexNameArgs(item) {
+  return codexArgs(namePrompt(item));
+}
+
+function codexArgs(prompt) {
+  return [
+    'exec', '--skip-git-repo-check', '--ephemeral', '--ignore-user-config', '--ignore-rules',
+    '-s', 'read-only', '-c', 'model_reasoning_effort=low', prompt,
+  ];
+}
+
+/**
  * Name one row. Resolves to a clean name, or to '' for every failure there is:
  * the binary missing, a non-zero exit, a timeout, an empty reply, a reply that
  * is not a name. Never throws and never rejects, because this is called from a
@@ -188,16 +204,18 @@ export function nameRow(item, opts = {}) {
 }
 
 /**
- * One short question to the small model, its reply put through `clean`. The
- * same promise as `nameRow` and for the same reason: '' for every failure,
- * never a throw. Shared with the message sorter (main/message-priority.mjs).
+ * One short question to the small model, on Claude Code or Codex, its reply put
+ * through `clean`. The same promise as `nameRow` and for the same reason: ''
+ * for every failure, never a throw. Shared with the message sorter
+ * (main/message-priority.mjs).
  */
-export function askSmallModel(prompt, clean, { claudeBin, model = NAME_MODEL, timeoutMs = NAME_TIMEOUT_MS } = {}) {
+export function askSmallModel(prompt, clean, { claudeBin, codexBin = null, engine = 'claude', model = NAME_MODEL, timeoutMs = NAME_TIMEOUT_MS } = {}) {
   return new Promise((resolve) => {
-    if (!claudeBin) return resolve('');
+    const bin = engine === 'codex' ? codexBin : claudeBin;
+    if (!bin) return resolve('');
     let child;
     try {
-      child = spawn(claudeBin, ['-p', prompt, '--model', model], {
+      child = spawn(bin, engine === 'codex' ? codexArgs(prompt) : ['-p', prompt, '--model', model], {
         // Somewhere that is nobody's project. A naming call must not pick up a
         // CLAUDE.md, a settings file or a hook from whatever folder it lands in.
         cwd: '/tmp',

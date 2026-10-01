@@ -67,13 +67,13 @@ describe('a message\'s priority', () => {
 describe('the Inbox board carries messages', () => {
   const waiting = () => 'waiting';
   it('puts a message from a teammate in the column the Inbox tabs give it', () => {
-    const entries = teamEntries({ items: [msg()], products: [direct], cards: [], me: ME, now: T, stateOf: waiting, inbox: true });
+    const entries = teamEntries({ items: [msg()], products: [direct], cards: [], me: ME, now: T, stateOf: waiting, allMine: true });
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({ state: 'waiting', title: 'Hi, it is Riley.', message: { people: [RILEY], fromMe: false } });
   });
 
   it('leaves out a conversation no Inbox tab holds', () => {
-    expect(teamEntries({ items: [msg()], products: [direct], cards: [], me: ME, now: T, stateOf: () => null, inbox: true })).toHaveLength(0);
+    expect(teamEntries({ items: [msg()], products: [direct], cards: [], me: ME, now: T, stateOf: () => null, allMine: true })).toHaveLength(0);
   });
 
   it('keeps conversations off the Team page board, which is about work', () => {
@@ -82,7 +82,7 @@ describe('the Inbox board carries messages', () => {
 
   it('still draws an ordinary thread of mine the same way', () => {
     const task = msg({ id: 'w-2', product: 'website', productName: 'Website', createdBy: ME, people: undefined, assignee: undefined, priority: 7, visibility: 'private' });
-    const [e] = teamEntries({ items: [task], products: [website], cards: [], me: ME, now: T, stateOf: waiting, inbox: true });
+    const [e] = teamEntries({ items: [task], products: [website], cards: [], me: ME, now: T, stateOf: waiting, allMine: true });
     expect(e).toMatchObject({ title: 'Hi', project: 'Website', priority: 7 });
     expect(e.message).toBeUndefined();
   });
@@ -98,6 +98,7 @@ describe('drawn', () => {
     expect(pages).toMatch(/e\.message \? <MessageTitle/);
   });
   it('asks the board for messages on the Inbox', () => {
-    expect(pages).toMatch(/teamEntries\(\{ items, products, cards: \[\], me, now, stateOf, live: liveIds, inbox: true \}\)/);
+    // Your own page's board (w-05ff3d1438) is the one that asks for all of yours.
+    expect(pages).toMatch(/teamEntries\(\{[^}]*allMine: true \}\)/);
   });
 });

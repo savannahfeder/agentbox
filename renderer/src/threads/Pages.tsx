@@ -17,6 +17,7 @@ import {
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
+import { facesShown, togglePicked } from './people-rules';
 import { api } from '../api';
 import './pages.css';
 
@@ -26,7 +27,6 @@ const SearchGlyph = () => <svg viewBox="0 0 24 24" width="15" height="15" fill="
 const SlidersIcon = () => <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>;
 const ListIcon = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>;
 const BoardIcon = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3.5" y="4" width="5" height="16" rx="1" /><rect x="10.5" y="4" width="5" height="11" rx="1" /><rect x="17.5" y="4" width="3" height="7" rx="1" /></svg>;
-const CaretIcon = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>;
 export const PeopleIcon = () => <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="9" cy="9" r="3.2" /><path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5" /><path d="M15.5 6.2a3 3 0 0 1 0 5.6M17.5 14.8c1.8.6 3 2.1 3.4 4.7" /></svg>;
 export const LockMark = () => <svg className="th-lock" width="11" height="12" viewBox="0 0 11 12" fill="none" stroke="currentColor" strokeWidth="1.2" aria-label="Private"><rect x="1.5" y="5.5" width="8" height="6" rx="1" /><path d="M3.5 5.5V3.8a2 2 0 0 1 4 0v1.7" /></svg>;
 /** Two people: the team can see this thread. After the title on the inbox rows
@@ -134,11 +134,58 @@ export const INBOX_TABS: { view: TabView; label: string }[] = [
   { view: 'all', label: 'All' },
 ];
 
-export function StateTabs({ view, counts, onView }: { view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void }) {
+/** `needs` renames the first tab (Waiting, once a teammate is on the page);
+ *  `end` is what sits at the bar's right end, the faces. */
+export function StateTabs({ view, counts, onView, needs, end }: {
+  view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string; end?: ReactNode;
+}) {
   return <div className="th-bar"><div className="tm-tabs">
-    {INBOX_TABS.map((t) => <button type="button" key={t.view} className={`tm-tab${view === t.view ? ' on' : ''}`} onClick={() => onView(t.view)}>{t.label}{counts[t.view] !== undefined && <b>{counts[t.view]}</b>}</button>)}
-  </div></div>;
+    {INBOX_TABS.map((t) => <button type="button" key={t.view} className={`tm-tab${view === t.view ? ' on' : ''}`} onClick={() => onView(t.view)}>{t.view === 'inbox' && needs ? needs : t.label}{counts[t.view] !== undefined && <b>{counts[t.view]}</b>}</button>)}
+  </div>{end}</div>;
 }
+
+/* ------------------------------------------------------------ whose threads */
+/**
+ * THE FACES THAT PICK WHOSE THREADS ARE ON THE PAGE (w-05ff3d1438). At the
+ * right end of the tab bar, you first. A face is a switch: lit when that
+ * person's threads are on the page, faint when not. Past four people the rest
+ * fold into "+N", which opens everyone as a list. Nothing is drawn for a
+ * person alone on a team, or for nobody signed in.
+ */
+export function PeoplePicker({ everyone, picked, me, onPick }: {
+  everyone: Person[]; picked: string[]; me: string | null; onPick: (picked: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useOutside(open, () => setOpen(false));
+  const { faces, more } = facesShown(everyone, picked, me);
+  if (!faces.length) return null;
+  const name = (p: Person) => (p.id === me ? 'You' : p.name || p.email || 'Someone');
+  const face = (p: Person) => {
+    const on = picked.includes(p.id);
+    return <button type="button" key={p.id} className={`th-face${on ? ' on' : ''}`} aria-pressed={on}
+      title={on ? `${name(p)}: shown. Click to hide.` : `Show ${p.id === me ? 'your' : `${firstName(p)}’s`} threads`}
+      onClick={() => onPick(togglePicked(picked, p.id, me))}><Face person={p} me={p.id === me} /></button>;
+  };
+  const sorted = [...everyone.filter((p) => p.id === me), ...everyone.filter((p) => p.id !== me).sort((a, b) => name(a).localeCompare(name(b)))];
+  const hiddenPicked = more > 0 && picked.some((id) => !faces.some((f) => f.id === id));
+  return <div className="th-people" role="group" aria-label="Whose threads are shown">
+    {faces.map(face)}
+    {more > 0 && <span ref={(el) => { ref.current = el; }} className="th-more-wrap">
+      <button type="button" className={`th-face th-more${open ? ' open' : ''}${hiddenPicked ? ' on' : ''}`} aria-haspopup="listbox" aria-expanded={open}
+        title={`${more} more`} onClick={() => setOpen(!open)}>+{more}</button>
+      {open && <div className="th-menu th-people-menu" role="listbox" aria-multiselectable="true">
+        <button type="button" className="row-i" onClick={() => { onPick(me ? [me] : picked); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Just you</button>
+        <button type="button" className="row-i" onClick={() => { onPick(sorted.map((p) => p.id)); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Everyone</button>
+        <span className="sep" />
+        {sorted.map((p) => <button type="button" key={p.id} role="option" aria-selected={picked.includes(p.id)} className={`row-i${picked.includes(p.id) ? ' on' : ''}`}
+          onClick={() => onPick(togglePicked(picked, p.id, me))}>
+          <Face person={p} me={p.id === me} />{name(p)}{picked.includes(p.id) && <CheckMark />}
+        </button>)}
+      </div>}
+    </span>}
+  </div>;
+}
+const CheckMark = () => <svg className="th-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
 
 /* ------------------------------------------------------------ an empty tab */
 /** AN EMPTY INBOX, DRAWN AGAIN FROM THE QUESTION IT ANSWERS (2026-10-01). She
@@ -229,8 +276,13 @@ export function MessageTitle({ people, fromMe, text }: { people: string[]; fromM
   </span>;
 }
 
-/** The cells of one row in the inbox's table: thread, project (or who a message is from), priority, updated. */
-export function ThreadCells({ item, product, now }: { item: WorkItem; product: Product | undefined; now: number }) {
+/** The cells of one row in the inbox's table: thread, project (or who a message is from), priority, updated.
+ *  With a teammate on the page (w-05ff3d1438) it also carries the Person
+ *  cell, and a thread of yours the team cannot see wears the lock in place of
+ *  the people mark. */
+export function ThreadCells({ item, product, now, person, withOthers = false }: {
+  item: WorkItem; product: Product | undefined; now: number; person?: ReactNode; withOthers?: boolean;
+}) {
   const liveIds = useContext(LiveContext);
   const team = useContext(TeamContext);
   // WHO SEES IT, AT A GLANCE AND ONE CLICK FROM CHANGING (2026-10-01). A
@@ -260,111 +312,59 @@ export function ThreadCells({ item, product, now }: { item: WorkItem; product: P
   // newest message, the way a chat list does. Every other row keeps its title.
   const said = messageLine(item, product, team?.me ?? null);
   if (said) {
-    return <RowCells live={liveIds.has(item.id)} title={<MessageTitle people={said.people} fromMe={said.fromMe} text={said.text} />} where="Message"
+    return <RowCells live={liveIds.has(item.id)} title={<MessageTitle people={said.people} fromMe={said.fromMe} text={said.text} />} where="Message" person={person}
       priority={messagePriority(item)} updatedAt={item.updatedAt} now={now} action={action} />;
   }
-  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={seen === 'team'} where={product?.name ?? ''}
+  // A LOCK, ONCE A TEAMMATE IS ON THE PAGE (w-05ff3d1438): then "they cannot
+  // see this one" is the news, so the lock marks it and the people mark,
+  // which would be on every other row, steps aside.
+  // It follows her click at once, the way the Share button does.
+  const lock = withOthers && seen === 'private';
+  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={!withOthers && seen === 'team'} lock={lock} where={product?.name ?? ''} person={person}
     priority={item.priority ?? 0} updatedAt={item.updatedAt} now={now} action={action} />;
 }
 
-/* ------------------------------------------------------------ the Team page */
-function Picker({ label, open, setOpen, children }: { label: ReactNode; open: boolean; setOpen: (o: boolean) => void; children: ReactNode }) {
-  const ref = useOutside(open, () => setOpen(false));
-  return <span ref={(el) => { ref.current = el; }} style={{ position: 'relative', display: 'inline-flex' }}>
-    <button type="button" className={`th-scope${open ? ' open' : ''}`} onClick={() => setOpen(!open)}>{label}<CaretIcon /></button>
-    {open && <div className="th-menu" role="listbox">{children}</div>}
-  </span>;
-}
-
-export function TeamView({ items, products, cards, display, now, onOpenItem, onOpenCard, stateOf }: {
-  items: WorkItem[]; products: Product[]; cards: ThreadCard[]; display: Display; now: number;
-  /** Your own threads' column, by the Inbox tabs' rule (App.tsx). */
-  stateOf?: (item: WorkItem) => ThreadStateWord | null;
-  onOpenItem: (item: WorkItem) => void; onOpenCard: (card: ThreadCard) => void;
-}) {
-  const team = useContext(TeamContext);
-  const me = team?.me ?? null;
-  const [person, setPerson] = useState<string | null>(null);
-  const [projectName, setProjectName] = useState<string | null>(null);
-  const [peopleOpen, setPeopleOpen] = useState(false);
-  const [projectsOpen, setProjectsOpen] = useState(false);
-  const everyone: Person[] = team ? [...team.byId.values()] : [];
-  const mine = everyone.find((p) => p.id === me) ?? null;
-  const others = everyone.filter((p) => p.id !== me).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  const since = team?.state.since ?? null;
-  const liveIds = useContext(LiveContext);
-  const all = useMemo(() => teamEntries({ items, products, cards, me, now, since, stateOf, live: liveIds }), [items, products, cards, me, now, since, stateOf, liveIds]);
-  const entries = all.filter((e) => teamKeeps(e, { person, projectName }, display, now));
-  const projectNames = [...new Set(all.map((e) => e.project).filter((p): p is string => !!p))].sort();
-  const who = person ? team?.byId.get(person) ?? null : null;
-  const open = (e: BoardEntry) => (e.item ? onOpenItem(e.item) : e.card && onOpenCard(e.card));
-  const nameOf = (id: string | null) => (id === me ? 'You' : firstName(id ? team?.byId.get(id) ?? null : null));
-
-  return <div className="list hm-all">
-    <div className="th-bar"><span className="th-scopes">
-      <Picker open={peopleOpen} setOpen={setPeopleOpen} label={who ? <><Face person={who} me={who.id === me} />{who.id === me ? 'You' : who.name}</> : <><PeopleIcon />Everyone</>}>
-        <button type="button" className={`row-i${!person ? ' on' : ''}`} onClick={() => { setPerson(null); setPeopleOpen(false); }}><span className="ico"><PeopleIcon /></span>Everyone</button>
-        <span className="sep" />
-        {mine && <button type="button" className={`row-i${person === mine.id ? ' on' : ''}`} onClick={() => { setPerson(mine.id); setPeopleOpen(false); }}><Face person={mine} me />You</button>}
-        {others.map((p) => <button type="button" key={p.id} className={`row-i${person === p.id ? ' on' : ''}`} onClick={() => { setPerson(p.id); setPeopleOpen(false); }}><Face person={p} />{p.name}</button>)}
-      </Picker>
-      <span className="th-dot">·</span>
-      <Picker open={projectsOpen} setOpen={setProjectsOpen} label={projectName ?? 'All projects'}>
-        <button type="button" className={`row-i${!projectName ? ' on' : ''}`} onClick={() => { setProjectName(null); setProjectsOpen(false); }}>All projects</button>
-        {projectNames.length > 0 && <span className="sep" />}
-        {projectNames.map((n) => <button type="button" key={n} className={`row-i${projectName === n ? ' on' : ''}`} onClick={() => { setProjectName(n); setProjectsOpen(false); }}>{n}</button>)}
-      </Picker>
-    </span></div>
-    {display.view === 'board' ? <div className="th-board">
-      {BOARD_COLUMNS.map((col) => {
-        const rows = entries.filter((e) => e.state === col.state);
-        return <div key={col.state}>
-          <div className="th-col-h"><StateGlyph state={col.state} />{col.label}<b>{rows.length}</b></div>
-          {rows.map((e) => <button type="button" key={e.key} className="th-card" onClick={() => open(e)}>
-            <div className={`t${e.title === null ? ' hidden' : ''}`}>{e.title ?? 'Private thread'}{(e.title === null || e.item?.visibility === 'private') && <LockMark />}</div>
-            <div className="m">{e.live && <StateGlyph state="running" live />}{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project ?? 'Hidden'}</span><Face person={e.ownerId ? team?.byId.get(e.ownerId) ?? null : null} me={e.ownerId === me} /></div>
-          </button>)}
-        </div>;
-      })}
-    </div> : <div className="th-table">
-      <TableHead person />
-      {entries.length === 0 && <div className="th-empty">Nothing here.</div>}
-      {entries.map((e) => <div key={e.key} className="row" onClick={() => open(e)}>
-        <span className="mark" aria-hidden="true" />
-        <RowCells live={!!e.live} title={e.title ?? 'Private thread'} hidden={e.title === null} lock={e.title === null || e.item?.visibility === 'private'}
-          where={e.project ?? 'Hidden'}
-          person={<><Face person={e.ownerId ? team?.byId.get(e.ownerId) ?? null : null} me={e.ownerId === me} />{nameOf(e.ownerId)}</>}
-          priority={e.priority} updatedAt={e.updatedAt} now={now} />
-      </div>)}
-    </div>}
-  </div>;
-}
-
-/** Your own threads as a board, when the Inbox's Display says Board. */
-export function InboxBoard({ items, products, display, now, onOpenItem, stateOf }: {
+/* ------------------------------------------------------------ the board */
+// THE TEAM PAGE THAT STOOD HERE IS GONE (w-05ff3d1438): its Everyone picker
+// became the faces on the Inbox's tab bar, and its board is the one below.
+/** THE PAGE AS A BOARD, when the Display says Board: your threads and, once
+ *  you pick them, your teammates' (w-05ff3d1438). Every thread of yours is on
+ *  it, the private ones included; with a teammate in view, those wear a lock
+ *  and every card names its person. `end` is the faces, over the board. */
+export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, end }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number; onOpenItem: (item: WorkItem) => void;
   /** The column each thread sits in, by the Inbox tabs' rule (App.tsx). */
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
+  cards?: ThreadCard[]; picked?: string[]; onOpenCard?: (card: ThreadCard) => void; end?: ReactNode;
 }) {
   const liveIds = useContext(LiveContext);
   const team = useContext(TeamContext);
   const me = team?.me ?? null;
-  const entries = teamEntries({ items, products, cards: [], me, now, stateOf, live: liveIds, inbox: true })
+  const who = picked ?? (me ? [me] : []);
+  const withOthers = who.some((p) => p !== me);
+  const since = team?.state.since ?? null;
+  const entries = teamEntries({ items: me && !who.includes(me) ? [] : items, products, cards: cards.filter((c) => who.includes(c.personId)), me, now, since, stateOf, live: liveIds, allMine: true })
     .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
     .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
-  const teamSees = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since: team.state.since ?? null } : null) === 'team';
-  return <div className="list hm-me"><div className="th-board">
+  const sharing = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since } : null);
+  return <div className="list hm-me">
+    {end && <div className="th-bar th-bar-end">{end}</div>}
+    <div className="th-board">
     {BOARD_COLUMNS.map((col) => {
       const rows = entries.filter((e) => e.state === col.state);
       return <div key={col.state}>
         {/* Your own board says what the tab says: what waits on you needs you. */}
-        <div className="th-col-h"><StateGlyph state={col.state} />{col.state === 'waiting' ? 'Needs you' : col.label}<b>{rows.length}</b></div>
+        <div className="th-col-h"><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b></div>
         {rows.length === 0 && <div className="th-col-empty">Nothing here.</div>}
-        {/* The same mark as the table's rows: on what the team can see, and
-            on nothing else. */}
-        {rows.map((e) => <button type="button" key={e.key} className="th-card" onClick={() => e.item && onOpenItem(e.item)}>
-          <div className="t">{e.message ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} /> : e.title}{!e.message && e.item && teamSees(e.item) && <SharedMark label="Visible to the team" />}</div>
-          <div className="m">{e.live && <StateGlyph state="running" live />}{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project}</span></div>
+        {/* On your board alone, the people mark on what the team can see. With
+            a teammate beside you, the lock on what they cannot. */}
+        {rows.map((e) => <button type="button" key={e.key} className="th-card" onClick={() => (e.item ? onOpenItem(e.item) : e.card && onOpenCard?.(e.card))}>
+          <div className="t">{e.message ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} /> : e.title}
+            {e.item && !e.message && !withOthers && sharing(e.item) === 'team' && <SharedMark label="Visible to the team" />}
+            {e.item && !e.message && withOthers && sharing(e.item) === 'private' && <LockMark />}
+          </div>
+          <div className="m">{e.live && <StateGlyph state="running" live />}{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project}</span>
+            {withOthers && <Face person={e.ownerId ? team?.byId.get(e.ownerId) ?? null : null} me={e.ownerId === me} />}</div>
         </button>)}
       </div>;
     })}

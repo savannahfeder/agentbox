@@ -85,6 +85,43 @@ export function updatedWords(ts: number, now = Date.now()): string {
 export const isDirect = (p: Product | undefined | null) => !!(p as { team?: { direct?: boolean } } | undefined)?.team?.direct;
 
 /**
+ * WHO AN OPEN CONVERSATION WOULD HAND TO NEW THREAD, in the shape the card's
+ * `initial` takes: the first person in To, everyone else beside them.
+ *
+ * Everyone in the record but you, because you are in every conversation you
+ * can see and a To field that named you would be asking you to message
+ * yourself. The person who STARTED the record counts the same as the rest:
+ * they are its `sharedBy` rather than one of its `people`, which is the one
+ * place a conversation's membership is written in two fields.
+ *
+ * Null on anything that is not a conversation, which is what keeps the Add
+ * people control off every other page, and null where the only person in it
+ * is you, because there is nothing there to add to.
+ *
+ * AND NULL WHEN THE COMPANY HOLDS NOBODY WHO IS NOT ALREADY HERE (the founder,
+ * 2026-10-01: "it should only have that Add people button if there are more
+ * people in the company to add. Otherwise it's cleaner if it just doesn't show
+ * that at all."). A two person company, or a group that is already everyone,
+ * has nothing the control could do: it would open a card holding exactly the
+ * people on screen. Somebody who is in the conversation and has since left the
+ * company is not room either, which is why this counts the company against
+ * this conversation rather than counting heads on both sides.
+ */
+export function peopleInConversation(
+  product: Product | undefined | null,
+  me: string | null,
+  company: ReadonlyArray<{ id: string }> = [],
+): { to: string; also: string[] } | null {
+  if (!isDirect(product) || !me) return null;
+  const t = product!.team!;
+  const here = new Set([...(t.people ?? []), ...(t.sharedBy ? [t.sharedBy] : [])]);
+  const ids = [...here].filter((p) => p && p !== me);
+  if (!ids.length) return null;
+  if (!company.some((p) => p.id !== me && !here.has(p.id))) return null;
+  return { to: ids[0], also: ids.slice(1) };
+}
+
+/**
  * WHO SEES A ROW, AS THE INBOX SAYS IT (2026-10-01). Her threads from before
  * she joined stay hers unless she shares them, so the inbox has to say which
  * ones the team can see and let her change it. 'team' or 'private' by the
@@ -162,11 +199,12 @@ export interface BoardEntry {
 // and Inbox, which should pretty much never happen"). Your own threads sit in
 // the column whose tab lists them; `threadState` is only the fallback for a row
 // no tab lists. `live` is the set an agent is on right now.
-export function teamEntries({ items, products, cards, me, now, since = null, stateOf, live, inbox = false }: {
+export function teamEntries({ items, products, cards, me, now, since = null, stateOf, live, allMine = false }: {
   items: WorkItem[]; products: Product[]; cards: ThreadCard[]; me: string | null; now: number; since?: number | null;
   stateOf?: (item: WorkItem) => ThreadStateWord | null; live?: Set<string>;
-  /** Your own Inbox board, which carries your conversations with people too. */
-  inbox?: boolean;
+  /** Your own page (w-05ff3d1438): every thread of yours, the private ones
+   *  included, and your conversations with people (w-2ad23ca814). */
+  allMine?: boolean;
 }): BoardEntry[] {
   const bySlug = new Map(products.map((p) => [p.slug, p]));
   const today = startOfDay(now);
@@ -179,7 +217,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     // (w-2ad23ca814: a message from a teammate was on no column at all). The
     // Team page's board stays about work, so it never draws one.
     if (isDirect(product)) {
-      const said = inbox ? messageLine(item, product, me) : null;
+      const said = allMine ? messageLine(item, product, me) : null;
       const state = said && stateOf?.(item);
       if (!said || !state) continue;
       if (state === 'done' && !(item.updatedAt >= today)) continue;
@@ -197,7 +235,9 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     // Your threads from before you joined are not on the team's board, any
     // more than they are on anyone else's (shared/thread-cards.mjs). One you
     // made private stays, with its lock, so you can see it is hidden.
-    if (item.visibility !== 'private' && !shownToTeam(item, since)) continue;
+    // ON YOUR OWN PAGE EVERY ONE OF YOURS STAYS (w-05ff3d1438): leaving them
+    // out is how 1,211 of her threads went missing from the board.
+    if (!allMine && item.visibility !== 'private' && !shownToTeam(item, since)) continue;
     const state = stateOf?.(item) ?? threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
     out.push({
