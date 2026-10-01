@@ -70,18 +70,18 @@ export function supabaseBackend(client) {
 
     async listProjects() {
       await myId();
-      const projects = must(await client.from('projects').select('id,team_id,name,visibility,created_by'), 'reading shared projects');
+      const projects = must(await client.from('projects').select('id,team_id,name,visibility,created_by,direct'), 'reading shared projects');
       const ids = projects.map((p) => p.id);
       const people = ids.length ? must(await client.from('project_people').select('project_id,person_id').in('project_id', ids), 'reading who is on them') : [];
       return projects.map((p) => ({
-        id: p.id, teamId: p.team_id, name: p.name, visibility: p.visibility, createdBy: p.created_by,
+        id: p.id, teamId: p.team_id, name: p.name, visibility: p.visibility, createdBy: p.created_by, direct: !!p.direct,
         people: people.filter((pp) => pp.project_id === p.id).map((pp) => pp.person_id),
       }));
     },
 
-    async shareProject({ id, teamId, name, visibility = 'team', people = [] }) {
+    async shareProject({ id, teamId, name, visibility = 'team', people = [], direct = false }) {
       const me = await myId();
-      must(await client.from('projects').upsert({ id, team_id: teamId, name, visibility, created_by: me }, { onConflict: 'id' }), 'sharing the project');
+      must(await client.from('projects').upsert({ id, team_id: teamId, name, visibility, created_by: me, direct: !!direct }, { onConflict: 'id' }), 'sharing the project');
       const current = must(await client.from('project_people').select('person_id').eq('project_id', id), 'reading who is on it');
       const want = new Set(people);
       const have = new Set(current.map((r) => r.person_id));

@@ -190,7 +190,7 @@ export function buildTools({ holder } = {}) {
     },
     {
       name: 'update_work_item',
-      description: 'Report progress on an item: set status to done when it is finished, blocked when it cannot proceed until something outside it changes, and leave a note saying where things stand. A worker the app started for a row ends with its answer as its last message, and the app writes that message onto the row as the result, so such a worker does not pass result for its own row: the same answer written twice is what she then reads twice. A row the founder wrote (labelled founder) is closed only when she asked for it: answering her is not finishing it, so the row stays open for her. To close one, pass closeBecause with her exact words asking you to; without them the rest of the write lands and the row is left open. Writing to a row this session is not holding takes the row first, so there is no need to claim before you speak; the write is only refused when another session is genuinely on it, and that refusal is kept rather than thrown away, parked where the error says and handed to whoever takes the row next. Finishing a row hands the claim straight back, and you can still answer on it afterwards.',
+      description: 'Report progress on an item: set status to done when it is finished, blocked when it cannot proceed until something outside it changes, and leave a note saying where things stand. Keep the summary current with problem, progress and solution, which is all a teammate sees of the thread. A worker the app started for a row ends with its answer as its last message, and the app writes that message onto the row as the result, so such a worker does not pass result for its own row: the same answer written twice is what she then reads twice. A row the founder wrote (labelled founder) is closed only when she asked for it: answering her is not finishing it, so the row stays open for her. To close one, pass closeBecause with her exact words asking you to; without them the rest of the write lands and the row is left open. Writing to a row this session is not holding takes the row first, so there is no need to claim before you speak; the write is only refused when another session is genuinely on it, and that refusal is kept rather than thrown away, parked where the error says and handed to whoever takes the row next. Finishing a row hands the claim straight back, and you can still answer on it afterwards.',
       schema: {
         id: z.string(),
         status: z.enum(WORK_ITEM_STATUSES).optional(),
@@ -200,6 +200,11 @@ export function buildTools({ holder } = {}) {
         labels: z.array(z.string()).optional(),
         runAt: z.number().int().optional().describe('epoch ms to defer this item until; 0 clears a schedule and makes it available now'),
         closeBecause: z.string().optional().describe('only with status done on a row the founder wrote: her own words, quoted exactly from the row, asking you to close it'),
+        problem: z.string().optional().describe('the thread\'s summary: what it is for, a sentence or two'),
+        progress: z.string().optional().describe('the thread\'s summary: where it stands now, a sentence or two'),
+        solution: z.string().optional().describe('the thread\'s summary: what done looks like, or what was done'),
+        blockedBy: z.array(z.string()).optional().describe('ids of threads this one waits on'),
+        blocks: z.array(z.string()).optional().describe('ids of threads that wait on this one'),
       },
       run: async ({ id, ...patch }) => json(await claims.update(id, patch)),
     },

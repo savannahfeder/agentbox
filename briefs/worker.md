@@ -35,6 +35,14 @@ Everything below follows from that.
 The product's docs directory holds its documents and work items; use the store
 tools, not the files. Make a document only when plain Claude Code would; the
 answer is the message.
+
+Keep the thread's summary current. Whenever you leave a note or finish, also
+pass `problem`, `progress` and `solution` to update_work_item: a sentence or
+two each, in plain words, for a teammate who will read nothing else. Problem is
+what this thread is for, progress is where it stands now, and solution is what
+done looks like or what was done. If it waits on another thread, pass that
+thread's id in `blockedBy`. The person may have edited the summary; read it
+before you rewrite it, and keep what they said unless it is no longer true.
 <!-- store-tools:end -->
 <!-- no-store-tools:start -->
 The product's docs directory holds its documents; edit them with your ordinary

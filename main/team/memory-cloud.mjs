@@ -39,7 +39,7 @@ export function memoryBackend(cloud, personId) {
       || cloud.projectPeople.some((pp) => pp.projectId === projectId && pp.personId === personId);
   };
   const projectOut = (p) => ({
-    id: p.id, teamId: p.teamId, name: p.name, visibility: p.visibility, createdBy: p.createdBy,
+    id: p.id, teamId: p.teamId, name: p.name, visibility: p.visibility, createdBy: p.createdBy, direct: !!p.direct,
     people: cloud.projectPeople.filter((pp) => pp.projectId === p.id).map((pp) => pp.personId),
   });
   const refuse = (what) => { throw new Error(`not allowed: ${what}`); };
@@ -95,11 +95,11 @@ export function memoryBackend(cloud, personId) {
       return [...cloud.projects.values()].filter((p) => canSee(p.id)).map(projectOut);
     },
 
-    async shareProject({ id, teamId, name, visibility = 'team', people = [] }) {
+    async shareProject({ id, teamId, name, visibility = 'team', people = [], direct = false }) {
       const existing = cloud.projects.get(id);
       if (existing && existing.createdBy !== personId) refuse('change a project somebody else shared');
       if (!myTeams().includes(teamId)) refuse('share into a team you are not on');
-      cloud.projects.set(id, { id, teamId, name, visibility, createdBy: personId });
+      cloud.projects.set(id, { id, teamId, name, visibility, createdBy: personId, direct: !!direct });
       cloud.projectPeople = cloud.projectPeople.filter((pp) => pp.projectId !== id);
       for (const person of new Set(people)) cloud.projectPeople.push({ projectId: id, personId: person });
       return projectOut(cloud.projects.get(id));

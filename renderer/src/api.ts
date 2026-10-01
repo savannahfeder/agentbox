@@ -4,7 +4,7 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { AgentConversation, AnswerMode, DemoOpened, FolderListing, FreshUser, PermissionMode, RepeatRule, RepeatShape, Settings, Snapshot, TeamCallResult, UpdateState, WorkItem } from './types';
+import type { AgentConversation, AnswerMode, DemoOpened, FolderListing, FreshUser, PermissionMode, RepeatRule, RepeatShape, Settings, Snapshot, TeamCallResult, ThreadEditPatch, UpdateState, WorkItem } from './types';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -438,8 +438,15 @@ export const api = {
   async teamSync(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSync()); },
   // A task somebody gave you: to an agent (on your Mac), keep it, or hand it back.
   async teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRoute(p)); },
+  // A MESSAGE TO A PERSON (people get messages, never tasks).
+  async teamMessage(to: string, body: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessage({ to, body })); },
+  // An edit to a thread's summary, visibility or priority, made in place.
+  async threadEdit(product: string, id: string, patch: ThreadEditPatch): Promise<{ ok: boolean; error?: string }> {
+    if (useFixtures || !window.zero?.threadEdit) return { ok: true };
+    try { return await window.zero.threadEdit({ product, id, patch }); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  },
 
-  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; assignee?: string; due?: string }): Promise<WorkItem | null> {
+  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'private' }): Promise<WorkItem | null> {
     // FIXTURES ANSWER WITH THE TASK, the way the real store does. Returning
     // null here meant the send had nothing to point at, and the caller reads
     // that as "no task was made" and puts no way back on the undo pile — so the

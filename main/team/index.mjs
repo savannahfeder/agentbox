@@ -11,7 +11,8 @@
 //     my teammates' private tasks doing.
 import path from 'node:path';
 import { createTeamSync, fileSyncState } from './sync.mjs';
-import { listSharedProjects, joinSharedProject, markShared } from './projects.mjs';
+import { listSharedProjects, joinSharedProject, markShared, makeDirect } from './projects.mjs';
+import { firstSentence } from '../../shared/thread-cards.mjs';
 import { cardsFor } from '../../shared/thread-cards.mjs';
 import fs from 'node:fs';
 
@@ -161,6 +162,29 @@ export function createTeamService({
       onChange();
       await syncNow();
       return state;
+    },
+
+    // A MESSAGE TO A PERSON (approved 2026-10-01: people get messages, never
+    // tasks). It goes into the record the two of them share, made the first
+    // time and reused after, and it waits in their inbox until they answer.
+    async message(to, body) {
+      if (!backend || !state.team || !state.me) throw new Error('start or join a team first');
+      const me = state.me.id;
+      if (!to || to === me) throw new Error('pick someone to message');
+      if (!state.people.some((p) => p.id === to)) throw new Error('that person is not on your team');
+      const text = String(body ?? '').trim();
+      if (!text) throw new Error('a message needs some words');
+      let product = products().find((p) => p.team?.direct && p.team.people.includes(to) && p.team.people.includes(me));
+      if (!product) {
+        const made = makeDirect(accountRoot, { teamId: state.team.id, me, other: to });
+        await backend.shareProject({ id: made.projectId, teamId: state.team.id, name: 'Direct', visibility: 'people', people: [to], direct: true });
+        product = products().find((p) => p.dir === made.dir) ?? { slug: made.slug, dir: made.dir };
+      }
+      const title = firstSentence(text, 90) || text.slice(0, 90);
+      const item = store.composeItem(product.slug, { title, body: text, assignee: to, people: [me, to] });
+      onChange();
+      await syncNow();
+      return item;
     },
 
     syncNow,

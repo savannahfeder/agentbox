@@ -61,6 +61,15 @@ export interface WorkItem {
   runner?: string;
   due?: string;
   people?: string[];
+  // THE THREAD'S OWN FIELDS (approved 2026-10-01, shared/work-items.mjs).
+  // `visibility` absent reads as 'team'. The summary is shared: the agent keeps
+  // it current and the person can edit it, and the later write wins.
+  visibility?: 'team' | 'private';
+  problem?: string;
+  progress?: string;
+  solution?: string;
+  blockedBy?: string[];
+  blocks?: string[];
   // Set only on the synthesized rows that stand for a running Claude Code
   // agent. Its presence is what every action path checks: an agent row is drawn
   // by the same list and reached by the same keys, and nothing may write it to
@@ -113,6 +122,25 @@ export interface TeamCallResult {
   error?: string;
 }
 
+export type ThreadStateWord = 'waiting' | 'running' | 'scheduled' | 'done';
+
+/** What a teammate sees of one of your threads: its summary and nothing more. */
+export interface ThreadCard {
+  personId: string;
+  threadId: string;
+  visible: boolean;
+  title: string | null;
+  project: string | null;
+  state: ThreadStateWord;
+  priority: number | null;
+  problem: string | null;
+  progress: string | null;
+  solution: string | null;
+  blockedBy: { id: string; title: string | null }[];
+  blocks: { id: string; title: string | null }[];
+  updatedAt: number;
+}
+
 /** The team, as the main process sees it (main/team/index.mjs). */
 export interface TeamState {
   configured: boolean;
@@ -120,7 +148,8 @@ export interface TeamState {
   me: Person | null;
   team: { id: string; name: string } | null;
   people: Person[];
-  activity: { personId: string; taskKey: string; state: 'run' | 'wait' | 'sched' | 'done'; movedAt: number }[];
+  /** Every card in the team, yours included (shared/thread-cards.mjs). */
+  cards: ThreadCard[];
   lastSyncAt: number | null;
   error: string | null;
 }
@@ -834,7 +863,7 @@ declare global {
       answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null }): Promise<WorkItem>;
       setProductOrder(p: { order: string[] }): Promise<unknown>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
-      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string }): Promise<WorkItem>;
+      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'private' }): Promise<WorkItem>;
       // The team version (main/team/index.mjs through main/ipc.mjs).
       teamSignIn(): Promise<TeamCallResult>;
       teamSignOut(): Promise<TeamCallResult>;
@@ -843,6 +872,8 @@ declare global {
       teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult>;
       teamSync(): Promise<TeamCallResult>;
       teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;
+      teamMessage(p: { to: string; body: string }): Promise<TeamCallResult>;
+      threadEdit(p: { product: string; id: string; patch: ThreadEditPatch }): Promise<{ ok: boolean; error?: string }>;
       schedule(p: { product: string; id: string; runAt: number }): Promise<WorkItem>;
       repeats(): Promise<RepeatRule[]>;
       composeRepeat(p: { product: string; title: string; body?: string; priority?: number; rule: RepeatShape; engine?: string; model?: string }): Promise<RepeatRule>;
@@ -955,3 +986,10 @@ export type FolderListing = {
   refused?: string | null;
   unreadable?: string;
 };
+
+/** What a person may change on a thread from its summary (main/store.mjs threadEdit). */
+export type ThreadEditPatch = Partial<{
+  problem: string; progress: string; solution: string;
+  visibility: 'team' | 'private'; priority: number;
+  blockedBy: string[]; blocks: string[];
+}>;

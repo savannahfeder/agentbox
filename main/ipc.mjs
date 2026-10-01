@@ -613,6 +613,21 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:team-invite', teamCall(({ email }) => team.invite(email)));
   ipcMain.handle('zero:team-share', teamCall(({ product, visibility, people }) => team.share(product, { visibility, people })));
   ipcMain.handle('zero:team-sync', teamCall(() => team.syncNow()));
+  // A MESSAGE TO A PERSON (approved 2026-10-01: people get messages, never
+  // tasks). main/team/index.mjs keeps it between the two of them.
+  ipcMain.handle('zero:team-message', teamCall(({ to, body }) => team.message(to, body)));
+  // AN EDIT TO A THREAD, MADE IN PLACE from its summary: the summary's lines,
+  // who sees it, its priority and what it is linked to. Works with or without a
+  // team, since every thread has a summary.
+  ipcMain.handle('zero:thread-edit', (_e, { product, id, patch }) => {
+    try {
+      store.threadEdit(product, id, patch);
+      push();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String(err?.message ?? err) };
+    }
+  });
   // A TASK A TEAMMATE GAVE YOU, ROUTED WITH ONE KEY. To an agent: it runs on
   // your Mac (you become its runner). Keep it: it stays yours and the routing
   // choices go away. Hand it back: it returns to whoever gave it to you.
@@ -632,7 +647,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     supervisor.wake();
   }));
 
-  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, labels, engine, model, effort, assignee, due }) => {
+  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, labels, engine, model, effort, assignee, due, visibility }) => {
     const out = store.composeItem(product, {
       // HOW HARD IT THINKS rides through unjudged: the store keeps any word
       // shaped like a level, and the spawn is the gate that knows each
@@ -642,7 +657,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // WHO DOES IT, when it is a person (the team version): the teammate it
       // goes to and the day it is due, and the two of you as the conversation,
       // so a reply can hand it back. An agent's row carries none of these.
-      assignee, due,
+      assignee, due, visibility,
       people: assignee && teamMe() ? [teamMe(), assignee] : undefined,
       // WHICH CODING AGENT SHE CHOSE, AND ONLY IF SHE COULD HAVE. `engineOffered`
       // is the supervisor's own test and the door makes no judgement of its own:

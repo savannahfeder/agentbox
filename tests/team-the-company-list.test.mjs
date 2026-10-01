@@ -16,7 +16,7 @@ const home = { slug: 'home', name: 'Personal', team: null };
 const team = {
   configured: true, signedIn: true, me: { id: ME, name: 'Sam Rivera' }, team: { id: 't', name: 'Northwind' },
   people: [{ id: ME, name: 'Sam Rivera' }, { id: MAYA, name: 'Maya Chen' }, { id: THEO, name: 'Theo Park' }],
-  activity: [{ personId: MAYA, taskKey: 'k1', state: 'run', movedAt: 500 }, { personId: ME, taskKey: 'k-mine', state: 'run', movedAt: 600 }],
+  cards: [{ personId: MAYA, threadId: 'k1', visible: false, title: null, project: null, state: 'running', priority: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [], updatedAt: 500 }, { personId: ME, threadId: 'k-mine', visible: false, title: null, project: null, state: 'running', priority: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [], updatedAt: 600 }],
   lastSyncAt: 0, error: null,
 };
 const row = (id, product, extra = {}) => ({ id, product, productName: product, title: id, status: 'open', claim: null, updatedAt: 100, createdAt: 1, ...extra });

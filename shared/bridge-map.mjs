@@ -32,6 +32,8 @@ export const REQUEST_CHANNELS = {
   teamShare: 'zero:team-share',
   teamSync: 'zero:team-sync',
   teamRoute: 'zero:team-route',
+  teamMessage: 'zero:team-message',
+  threadEdit: 'zero:thread-edit',
   repeats: 'zero:repeats',
   composeRepeat: 'zero:compose-repeat',
   setRepeat: 'zero:set-repeat',
