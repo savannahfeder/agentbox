@@ -200,7 +200,12 @@ export function RowCells({ title, hidden = false, lock = false, where, person, p
 export function ThreadCells({ item, product, now }: { item: WorkItem; product: Product | undefined; now: number }) {
   const team = useContext(TeamContext);
   let where: ReactNode = product?.name ?? '';
-  if (isDirect(product)) {
+  // A group conversation names everyone else in it; a pair says From or To.
+  const members = isDirect(product) ? [...new Set([...(product?.team?.people ?? []), ...(product?.team?.sharedBy ? [product.team.sharedBy] : [])])].filter((p) => p !== team?.me) : [];
+  if (isDirect(product) && members.length > 1) {
+    const first = team?.byId.get(members[0]) ?? null;
+    where = <>{first && <Face person={first} />}{members.map((id) => firstName(team?.byId.get(id) ?? null)).join(', ')}</>;
+  } else if (isDirect(product)) {
     const otherId = otherPerson(item, team?.me ?? null);
     const other = otherId ? team?.byId.get(otherId) ?? null : null;
     const fromThem = item.createdBy && item.createdBy !== team?.me;

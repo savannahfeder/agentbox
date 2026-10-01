@@ -35,7 +35,7 @@ import type { Product, WorkItem } from '../types';
 import type { Engine } from '../../../shared/engines.mjs';
 import { ENGINES } from '../../../shared/engines.mjs';
 import { api } from '../api';
-import { TeamContext, Face } from '../team/people';
+import { TeamContext, Face, firstName } from '../team/people';
 import { conversationWith } from './page-rules';
 import { collectFiles, fromPaste, persistAttachments, type PendingAttachment } from '../attachments';
 import { AttachRow } from '../components/AttachRow';
@@ -65,6 +65,8 @@ export interface ThreadSent {
   runAt?: number;
   /** The repeating rule's id, so ending it can be the undo. */
   ruleId?: string;
+  /** Everyone a message went to, when it went to more than one person. */
+  toMany?: string[];
   /** The person a message went to. */
   to?: string;
 }
@@ -84,7 +86,7 @@ export function ThreadComposer({
   /** The project on screen, which the card opens on ahead of the one last used. */
   defaultProduct?: string | null;
   /** Who it is to (a teammate's id) and words to start from, for a card opened from somewhere. */
-  initial?: { to?: string; body?: string } | null;
+  initial?: { to?: string; also?: string[]; body?: string } | null;
   /** Picking someone you already talk to opens that conversation instead,
    *  carrying whatever was typed into its reply box (2026-10-01: a strip of
    *  the last few lines "looks pretty unappealing" for a conversation that is
@@ -103,7 +105,16 @@ export function ThreadComposer({
   // A teammate who leaves the team while the card is open takes the To with them.
   useEffect(() => { if (to !== 'agent' && !person) setTo('agent'); }, [to, person]);
   const [query, setQuery] = useState('');
-  const found = findPeople(others, query);
+  // MORE THAN ONE PERSON (2026-10-01: "say you're sending messages to three
+  // people at once"). `to` is the first person; `also` is everyone added after.
+  // One conversation belongs to exactly that group (main/team/index.mjs).
+  const [also, setAlso] = useState<string[]>(() => initial?.also ?? []);
+  const [adding, setAdding] = useState(false);
+  const extra = also.map((id) => others.find((p) => p.id === id)).filter((p): p is NonNullable<typeof p> => !!p);
+  const group = person ? [person, ...extra] : [];
+  const names = joinNames(group.map((p) => firstName(p)));
+  const found = findPeople(others, query).filter((p) => !adding || (p.id !== person?.id && !also.includes(p.id)));
+  const groupConvo = person && extra.length ? conversationWith([person.id, ...also], { products, items, me: team?.me ?? null }) : null;
 
   /* ------------------------------ words --------------------------------- */
   const opened = useRef(readComposeDraft());
@@ -326,13 +337,13 @@ export function ThreadComposer({
     if (!canSend || !person) return;
     setSending(true);
     setError(null);
-    const res = await api.teamMessage(person.id, text.trim());
+    const res = await api.teamMessage(extra.length ? [person.id, ...also] : person.id, text.trim());
     if (!res.ok) {
       setError(`Not sent: ${res.error ?? 'the team cloud did not answer.'}`);
       setSending(false);
       return;
     }
-    onSent(null, { kind: 'message', to: person.id });
+    onSent(null, { kind: 'message', to: person.id, ...(extra.length ? { toMany: [person.id, ...also] } : {}) });
     clearComposeDraft();
   };
 
@@ -346,20 +357,28 @@ export function ThreadComposer({
 
   /* ------------------------------- menus -------------------------------- */
   const chooseTo = (id: string) => {
+    if (adding && person && id !== 'agent') {
+      if (id !== person.id && !also.includes(id)) setAlso((was) => [...was, id]);
+      setAdding(false); setQuery(''); close('text');
+      return;
+    }
+    setAdding(false);
     if (id !== 'agent' && onOpenConversation) {
       const convo = conversationWith(id, { products, items, me: team?.me ?? null });
       if (convo) { onOpenConversation(convo, text); return; }
     }
-    setTo(id); setError(null); close('text');
+    setTo(id); setAlso([]); setError(null); close('text');
   };
 
   const toMenu = (
     <div className="tc-menu tc-drop tc-to-menu" role="listbox" aria-label="To" onKeyDown={menuKeys}>
-      <button type="button" data-item className={`tc-row ${person ? '' : 'on'}`} onPointerEnter={hover} onClick={() => chooseTo('agent')}>
-        <span className="tc-agent" aria-hidden="true" /><span className="tc-row-label">Agent</span>
-      </button>
+      {!adding && (
+        <button type="button" data-item className={`tc-row ${person ? '' : 'on'}`} onPointerEnter={hover} onClick={() => chooseTo('agent')}>
+          <span className="tc-agent" aria-hidden="true" /><span className="tc-row-label">Agent</span>
+        </button>
+      )}
       {team && others.length > 0 && (<>
-        <span className="tc-sep" />
+        {!adding && <span className="tc-sep" />}
         <span className="tc-menu-head">People</span>
         <input
           data-item
@@ -555,6 +574,16 @@ export function ThreadComposer({
                 {person ? <Face person={person} /> : <span className="tc-agent" aria-hidden="true" />}
                 <span className="tc-word-text">{person ? person.name : 'Agent'}</span>
               </button>
+              {extra.map((p) => (
+                <span key={p.id} className="tc-also">
+                  <Face person={p} />{p.name}
+                  <button type="button" aria-label={`Remove ${p.name}`} title={`Remove ${p.name}`} onClick={() => setAlso((was) => was.filter((x) => x !== p.id))}>×</button>
+                </span>
+              ))}
+              {person && others.length > group.length && (
+                <button type="button" className="tc-add" aria-label="Add someone" title="Add someone"
+                  onClick={() => { setAdding(true); setQuery(''); if (open !== 'to') toggle('to'); }}>+</button>
+              )}
               {open === 'to' && toMenu}
             </span>
           </div>
@@ -572,12 +601,18 @@ export function ThreadComposer({
           )}
         </div>
 
+        {groupConvo && onOpenConversation && (
+          <div className="tc-note tc-continues">
+            Continues your conversation with {names}. <button type="button" onClick={() => onOpenConversation(groupConvo, text)}>Open it</button>
+          </div>
+        )}
+
         <textarea
           ref={textRef}
           className="tc-text"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder={placeholderFor(person)}
+          placeholder={person ? `Message ${names}` : placeholderFor(null)}
           onPaste={async (e) => {
             if (person) return;
             const pasted = await fromPaste(e);
@@ -611,7 +646,7 @@ export function ThreadComposer({
 
         {person ? (
           <div className="tc-bar">
-            <span className="tc-only">{onlyYouAnd(person)}</span>
+            <span className="tc-only">{extra.length ? `Only you, ${names} see this.` : onlyYouAnd(person)}</span>
             <span className="tc-send solo">
               <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title="Send · ⌘↵">
                 Send <kbd>⌘↵</kbd>
@@ -701,3 +736,10 @@ const RepeatIcon = () => (
     <path d="M17 3l3 3-3 3" /><path d="M4 11V9a3 3 0 0 1 3-3h13M7 21l-3-3 3-3" /><path d="M20 13v2a3 3 0 0 1-3 3H4" />
   </svg>
 );
+
+/** "Bea", "Bea and Carla", "Bea, Carla and Dev". */
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+

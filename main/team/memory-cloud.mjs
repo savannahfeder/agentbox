@@ -148,9 +148,9 @@ export function memoryBackend(cloud, personId) {
       const existing = cloud.projects.get(id);
       if (existing && existing.createdBy !== personId) refuse('change a project somebody else shared');
       if (!myTeams().includes(teamId)) refuse('share into a team you are not on');
-      // A message thread is its maker and one other person, as the database
-      // insists (migration 20261001000500_security.sql).
-      if (direct && (visibility !== 'people' || new Set(people.filter((p) => p !== personId)).size > 1)) refuse('put a third person on a message thread');
+      // A message thread is its maker and up to eleven others, as the database
+      // insists (migration 20261001000700_group_messages.sql).
+      if (direct && (visibility !== 'people' || new Set(people.filter((p) => p !== personId)).size > 11)) refuse('put more than twelve people on a message thread');
       cloud.projects.set(id, { id, teamId, name, visibility, createdBy: personId, direct: !!direct });
       cloud.projectPeople = cloud.projectPeople.filter((pp) => pp.projectId !== id);
       for (const person of new Set(people)) cloud.projectPeople.push({ projectId: id, personId: person });

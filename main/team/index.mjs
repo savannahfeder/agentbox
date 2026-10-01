@@ -41,11 +41,13 @@ export function createTeamService({
 
   // THE MESSAGE RECORD OF EXACTLY TWO PEOPLE, made by one of them (see
   // `message` below for why both halves matter).
+  // `to` is one person or several (2026-10-01: messages to a few people at
+  // once). The record must hold EXACTLY you and them, and one of you made it.
   function directWith(me, to) {
-    const two = new Set([me, to]);
+    const two = new Set([me, ...[].concat(to)]);
     const justUs = (t) => {
       const on = new Set([...t.people, ...(t.sharedBy ? [t.sharedBy] : [])]);
-      return two.has(t.sharedBy) && on.size === 2 && [...on].every((p) => two.has(p));
+      return two.has(t.sharedBy) && on.size === two.size && [...on].every((p) => two.has(p));
     };
     // ONE RECORD FOR THE TWO OF YOU, THE SAME ONE ON BOTH MACS. Two people who
     // write each other first within the same second each make one (measured
@@ -306,11 +308,15 @@ export function createTeamService({
       return convo ? { product: product.slug, id: convo.id } : null;
     },
 
-    async message(to, body) {
+    async message(toIn, body) {
       if (!backend || !state.team || !state.me) throw new Error('start or join a team first');
       const me = state.me.id;
-      if (!to || to === me) throw new Error('pick someone to message');
-      if (!state.people.some((p) => p.id === to)) throw new Error('that person is not on your team');
+      // One person or a few: the same conversation for the same people.
+      const others = [...new Set([].concat(toIn ?? []).filter((p) => p && p !== me))].sort();
+      if (!others.length) throw new Error('pick someone to message');
+      if (others.length > 11) throw new Error('a message goes to at most eleven people');
+      if (others.some((p) => !state.people.some((q) => q.id === p))) throw new Error('that person is not on your team');
+      const to = others.length === 1 ? others[0] : others;
       const text = String(body ?? '').trim();
       if (!text) throw new Error('a message needs some words');
       // THE RECORD IS REUSED ONLY IF IT IS EXACTLY THE TWO OF YOU AND ONE OF
@@ -322,8 +328,8 @@ export function createTeamService({
       // made one, and the pull is what brings it here.
       if (!product) { await syncNow(); product = directWith(me, to); }
       if (!product) {
-        const made = makeDirect(accountRoot, { teamId: state.team.id, me, other: to });
-        await backend.shareProject({ id: made.projectId, teamId: state.team.id, name: 'Direct', visibility: 'people', people: [to], direct: true });
+        const made = makeDirect(accountRoot, { teamId: state.team.id, me, others });
+        await backend.shareProject({ id: made.projectId, teamId: state.team.id, name: 'Direct', visibility: 'people', people: others, direct: true });
         product = products().find((p) => p.dir === made.dir) ?? { slug: made.slug, dir: made.dir };
       }
       // ONE CONVERSATION PER PERSON (decided 2026-10-01, from six interviews
@@ -337,12 +343,14 @@ export function createTeamService({
       const convo = conversationIn(product.slug);
       if (convo) {
         store.answerItem(product.slug, convo.id, { answer: text });
-        store.teamPatch(product.slug, convo.id, { assignee: to });
+        // Who answers next is whoever did not speak last (shared/team-rules.mjs,
+        // `inMyInbox`); the assignee stays for a Mac on an older build.
+        store.teamPatch(product.slug, convo.id, { assignee: others[0] });
         onChange();
         await syncNow();
         return store.readItem(product.slug, convo.id);
       }
-      const item = store.composeItem(product.slug, { title, body: text, assignee: to, people: [me, to] });
+      const item = store.composeItem(product.slug, { title, body: text, assignee: others[0], people: [me, ...others] });
       onChange();
       await syncNow();
       return item;

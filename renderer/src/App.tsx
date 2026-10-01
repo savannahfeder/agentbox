@@ -5110,8 +5110,9 @@ export default function App() {
             const sent = readComposeDraft();
             setModal(null);
             if (how?.kind === 'message') {
-              const name = team?.byId.get(how.to ?? '')?.name?.split(/\s+/)[0];
-              showToast(name ? `Sent to ${name}` : 'Message sent');
+              const firsts = (how.toMany ?? [how.to ?? '']).map((id) => team?.byId.get(id)?.name?.split(/\s+/)[0]).filter(Boolean) as string[];
+              const said = firsts.length > 1 ? `${firsts.slice(0, -1).join(', ')} and ${firsts[firsts.length - 1]}` : firsts[0];
+              showToast(said ? `Sent to ${said}` : 'Message sent');
               await refresh();
               return;
             }

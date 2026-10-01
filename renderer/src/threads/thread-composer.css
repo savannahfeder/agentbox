@@ -218,3 +218,12 @@
 .tc-schedule:focus { outline: none; background: var(--wash-strong, rgba(255, 255, 255, 0.07)); }
 .tc-schedule:disabled { opacity: 0.45; cursor: default; }
 .tc-prio { display: inline-flex; align-items: center; }
+
+/* MORE THAN ONE PERSON IN To (2026-10-01): each added person a square chip
+   with a remove mark, and a quiet plus to add another. */
+.tc-also { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 4px 0 8px; margin-left: 6px; border: 1px solid var(--line); border-radius: var(--radius); font-size: 13.5px; color: var(--text); }
+.tc-also > button { width: 20px; height: 20px; border: 0; background: none; color: var(--text-faint); font: inherit; font-size: 14px; line-height: 1; cursor: pointer; border-radius: var(--radius); }
+.tc-also > button:hover { color: var(--text); background: var(--wash); }
+.tc-add { width: 28px; height: 28px; margin-left: 6px; border: 1px dashed var(--line-strong); border-radius: var(--radius); background: none; color: var(--text-dim); font: inherit; font-size: 15px; cursor: pointer; }
+.tc-add:hover { color: var(--text); border-style: solid; background: var(--wash); }
+.tc-continues button { background: none; border: 0; padding: 0; font: inherit; color: var(--text); text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; cursor: pointer; }

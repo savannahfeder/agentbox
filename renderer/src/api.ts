@@ -446,7 +446,7 @@ export const api = {
   // A task somebody gave you: to an agent (on your Mac), keep it, or hand it back.
   async teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRoute(p)); },
   // A MESSAGE TO A PERSON (people get messages, never tasks).
-  async teamMessage(to: string, body: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessage({ to, body })); },
+  async teamMessage(to: string | string[], body: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessage({ to, body })); },
   // An edit to a thread's summary, visibility or priority, made in place.
   async threadEdit(product: string, id: string, patch: ThreadEditPatch): Promise<{ ok: boolean; error?: string }> {
     if (useFixtures || !window.zero?.threadEdit) return { ok: true };

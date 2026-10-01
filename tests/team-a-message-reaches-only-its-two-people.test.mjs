@@ -157,3 +157,25 @@ it('keeps one conversation when both people write first at the same moment', asy
   expect(theo.store.readItem(after.product, after.id).answer).toBe('Lunch?');
   expect(mine.product === theirs.product || after.product === mine.product).toBe(true);
 });
+
+// MESSAGES TO A FEW PEOPLE AT ONCE (2026-10-01): one conversation for the
+// group, in everyone's inbox until someone answers, and the answer puts it in
+// everyone else's.
+it('keeps a group conversation for three people, needing whoever did not speak last', async () => {
+  await maya.on(() => maya.service.message([theo.personId, jun.personId], 'Lunch Friday, all three of us?'));
+  await theo.service.syncNow();
+  await jun.service.syncNow();
+  expect(inbox(theo).map((i) => i.title)).toEqual(['Lunch Friday, all three of us?']);
+  expect(inbox(jun).map((i) => i.title)).toEqual(['Lunch Friday, all three of us?']);
+  expect(inbox(maya)).toEqual([]);
+  await theo.on(() => theo.service.message([maya.personId, jun.personId], 'Yes, 12:30 works.'));
+  await maya.service.syncNow();
+  await jun.service.syncNow();
+  expect(inbox(maya).map((i) => i.answer)).toEqual(['Yes, 12:30 works.']);
+  expect(inbox(jun).map((i) => i.answer)).toEqual(['Yes, 12:30 works.']);
+  expect(inbox(theo)).toEqual([]);
+  const groups = maya.store.listProducts().filter((p) => p.team?.direct && p.team.people.length + 1 >= 3);
+  expect(groups).toHaveLength(1);
+  // The pair's own conversation is a different one.
+  expect(maya.service.conversation(theo.personId)).toBeNull();
+});

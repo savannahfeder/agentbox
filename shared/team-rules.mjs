@@ -49,8 +49,24 @@ const STARTS_A_RUN = ['body', 'answer', 'status', 'runAt'];
 // A row given to a person is theirs until it is done; an agent's row is its
 // runner's. True leaves the row to the inbox's ordinary rules, which is what a
 // private row, or any row on a Mac nobody is signed in on, always gets.
+// WHO SPOKE LAST IN A CONVERSATION: the writer of its newest message.
+export function lastSpeaker(item) {
+  const a = item?.wrote?.answer;
+  const b = item?.wrote?.body;
+  const latest = a && (!b || (a.ts ?? 0) >= (b.ts ?? 0)) ? a : b;
+  return latest?.by ?? item?.createdBy ?? null;
+}
+
 export function inMyInbox(item, product, me) {
   if (!isShared(product) || !me) return true;
+  // A CONVERSATION NEEDS WHOEVER DID NOT SPEAK LAST (2026-10-01), so a message
+  // to three people is in all three inboxes until one of them answers, and the
+  // answer puts it back in everyone else's. One person to one works the same.
+  if (product?.team?.direct) {
+    if (item.status === 'done') return false;
+    const by = lastSpeaker(item);
+    return by ? by !== me : item.assignee === me;
+  }
   if (heldByAPerson(item)) return item.assignee === me && item.status !== 'done';
   return runnerOf(item, product) === me;
 }

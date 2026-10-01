@@ -163,11 +163,14 @@ export function teamKeeps(e: BoardEntry, { person, projectName }: { person: stri
 /** YOUR CONVERSATION WITH ONE PERSON: the newest row in the message record of
  *  exactly you two (the record lists who it was shared with; its maker is
  *  `sharedBy`). Null before the first message. */
-export function conversationWith(personId: string, { products, items, me }: { products: Product[]; items: WorkItem[]; me: string | null }): WorkItem | null {
-  const on = (t: NonNullable<Product['team']>) => [...t.people, ...(t.sharedBy ? [t.sharedBy] : [])];
+export function conversationWith(personIds: string | string[], { products, items, me }: { products: Product[]; items: WorkItem[]; me: string | null }): WorkItem | null {
+  // Exactly these people and you: a pair's conversation is not the group's.
+  const want = new Set([...[].concat(personIds as never), ...(me ? [me] : [])] as string[]);
+  const on = (t: NonNullable<Product['team']>) => [...new Set([...t.people, ...(t.sharedBy ? [t.sharedBy] : [])])];
+  const exactly = (t: NonNullable<Product['team']>) => on(t).length === want.size && on(t).every((p) => want.has(p));
   // The record both Macs settle on: the lowest id (main/team/index.mjs, directWith).
   const record = products
-    .filter((p) => p.team?.direct && on(p.team).includes(personId) && (!me || on(p.team).includes(me)))
+    .filter((p) => p.team?.direct && exactly(p.team))
     .sort((a, b) => String(a.team!.projectId).localeCompare(String(b.team!.projectId)))[0];
   if (!record) return null;
   return items.filter((i) => i.product === record.slug && !i.agent)

@@ -103,7 +103,7 @@ export function joinSharedProject(accountRoot, cloudProject) {
 // the first time they write to that person. Its folder is named for nobody, so
 // it can never collide with a project, and both people are on it from the
 // start; the other Mac joins it like any shared record.
-export function makeDirect(accountRoot, { teamId, me, other }) {
+export function makeDirect(accountRoot, { teamId, me, other, others = other ? [other] : [] }) {
   const projectId = crypto.randomUUID();
   const slug = `direct-${projectId.slice(0, 8)}`;
   const dir = path.join(accountRoot, slug);
@@ -113,7 +113,7 @@ export function makeDirect(accountRoot, { teamId, me, other }) {
     id: slug,
     name: 'Direct',
     createdAt: new Date().toISOString(),
-    team: { projectId, teamId, visibility: 'people', people: [me, other], sharedBy: me, direct: true },
+    team: { projectId, teamId, visibility: 'people', people: [me, ...others], sharedBy: me, direct: true },
   });
   return { projectId, dir, slug };
 }

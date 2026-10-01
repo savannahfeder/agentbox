@@ -137,8 +137,11 @@ for (const [where, makeWorld, enabled] of worlds) {
       expect((await w.theo.listProjects()).find((p) => p.id === secret)?.people).toEqual([w.theo.personId]);
     });
 
-    it('keeps a message record to two people', async () => {
-      await expect(w.maya.shareProject({ id: crypto.randomUUID(), teamId: team.id, name: 'Direct', visibility: 'people', people: [w.theo.personId, w.jun.personId], direct: true })).rejects.toThrow();
+    // A small group now (2026-10-01, 20261001000700): its maker and up to eleven others.
+    it('keeps a message record to a small group', async () => {
+      await w.maya.shareProject({ id: crypto.randomUUID(), teamId: team.id, name: 'Direct', visibility: 'people', people: [w.theo.personId, w.jun.personId], direct: true });
+      const twelve = Array.from({ length: 12 }, () => crypto.randomUUID());
+      await expect(w.maya.shareProject({ id: crypto.randomUUID(), teamId: team.id, name: 'Direct', visibility: 'people', people: twelve, direct: true })).rejects.toThrow();
     });
 
     // A private thread publishes no card at all (decided 2026-10-01), and a

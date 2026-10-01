@@ -255,20 +255,31 @@ describe('a team is as old as the database says', () => {
   });
 });
 
-describe('a direct message record holds two people', () => {
+// A MESSAGE RECORD HOLDS A SMALL GROUP (2026-10-01, 20261001000700): its maker
+// and up to eleven others. The app writes only into a record whose people are
+// exactly the ones chosen, which is what keeps a stranger's record unread.
+describe('a direct message record holds a small group', () => {
   const DIRECT = '77777777-7777-7777-7777-777777777777';
   const PEOPLE = '88888888-8888-8888-8888-888888888888';
+  const extra = Array.from({ length: 12 }, (_, i) => `99999999-9999-9999-9999-${String(i).padStart(12, '0')}`);
 
-  it('takes its maker and one other, and refuses a third', async () => {
-    await as(MAYA, `insert into public.projects (id, team_id, name, visibility, created_by, direct) values ($1, $2, 'Direct', 'people', $3, true)`, [DIRECT, team.id, MAYA]);
-    await as(MAYA, `insert into public.project_people (project_id, person_id) values ($1, $2)`, [DIRECT, THEO]);
-    expect(await refused(MAYA, `insert into public.project_people (project_id, person_id) values ($1, $2)`, [DIRECT, JUN])).toBe(true);
-    expect((await rows(MAYA, `select person_id from public.project_people where project_id = $1`, [DIRECT])).map((r) => r.person_id)).toEqual([THEO]);
+  beforeAll(async () => {
+    for (const [i, id] of extra.entries()) {
+      await signUp(id, `extra${i}@northwind.test`, `Extra ${i}`);
+      await db.query(`insert into public.team_members (team_id, person_id) values ($1, $2)`, [team.id, id]);
+    }
   });
 
-  it('will not turn a project with two other people on it into a message record', async () => {
-    await as(MAYA, `insert into public.projects (id, team_id, name, visibility, created_by) values ($1, $2, 'Two others', 'people', $3)`, [PEOPLE, team.id, MAYA]);
-    await as(MAYA, `insert into public.project_people (project_id, person_id) values ($1, $2), ($1, $3)`, [PEOPLE, THEO, JUN]);
+  it('takes its maker and eleven others, and refuses a twelfth', async () => {
+    await as(MAYA, `insert into public.projects (id, team_id, name, visibility, created_by, direct) values ($1, $2, 'Direct', 'people', $3, true)`, [DIRECT, team.id, MAYA]);
+    for (const id of extra.slice(0, 11)) await as(MAYA, `insert into public.project_people (project_id, person_id) values ($1, $2)`, [DIRECT, id]);
+    expect(await refused(MAYA, `insert into public.project_people (project_id, person_id) values ($1, $2)`, [DIRECT, extra[11]])).toBe(true);
+    expect((await rows(MAYA, `select person_id from public.project_people where project_id = $1`, [DIRECT])).length).toBe(11);
+  });
+
+  it('will not turn a project with twelve other people on it into a message record', async () => {
+    await as(MAYA, `insert into public.projects (id, team_id, name, visibility, created_by) values ($1, $2, 'Twelve others', 'people', $3)`, [PEOPLE, team.id, MAYA]);
+    for (const id of extra) await as(MAYA, `insert into public.project_people (project_id, person_id) values ($1, $2)`, [PEOPLE, id]);
     expect(await refused(MAYA, `update public.projects set direct = true where id = $1`, [PEOPLE])).toBe(true);
   });
 });

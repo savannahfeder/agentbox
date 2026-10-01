@@ -501,8 +501,14 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const talkPerson = direct && teamCtx
     ? teamCtx.byId.get((item.people ?? []).find((p) => p !== teamCtx.me) ?? (item.createdBy !== teamCtx.me ? item.createdBy ?? '' : item.assignee ?? '')) ?? null
     : null;
-  const talkName = direct && teamCtx ? firstName(talkPerson) : null;
-  const talkFull = talkPerson?.name || talkName;
+  // A group conversation: everyone in it but you, from its record.
+  const talkTeam = direct ? teamCtx?.products.get(item.product)?.team : null;
+  const talkOthers = talkTeam && teamCtx
+    ? [...new Set([...(talkTeam.people ?? []), ...(talkTeam.sharedBy ? [talkTeam.sharedBy] : [])])].filter((p) => p !== teamCtx.me).map((id) => teamCtx.byId.get(id) ?? null).filter((p): p is NonNullable<typeof p> => !!p)
+    : [];
+  const join = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] ?? '');
+  const talkName = direct && teamCtx ? (talkOthers.length > 1 ? join(talkOthers.map((p) => firstName(p))) : firstName(talkPerson)) : null;
+  const talkFull = talkOthers.length > 1 ? talkOthers.map((p) => p.name).join(', ') : talkPerson?.name || talkName;
   const summarised = !agent && !made && !direct;
   const [summaryOpen, toggleSummary] = useSummaryOpen();
   const summaryOffered = summarised && !openDoc;
@@ -2345,7 +2351,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             sentence about a thing that is not happening. What is left is the
             send button, which is the whole act. */}
         <span className="compose-clauses">
-          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo ? <span className="dim">Only you and {talkTo} see this.</span> : <>
+          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo ? <span className="dim">{`Only you${talkTo.includes(' and ') ? ', ' : ' and '}${talkTo} see this.`}</span> : <>
           <PriorityPicker
             variant="word"
             value={shown}

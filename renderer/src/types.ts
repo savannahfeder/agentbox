@@ -900,7 +900,7 @@ declare global {
       teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult>;
       teamSync(): Promise<TeamCallResult>;
       teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;
-      teamMessage(p: { to: string; body: string }): Promise<TeamCallResult>;
+      teamMessage(p: { to: string | string[]; body: string }): Promise<TeamCallResult>;
       threadEdit(p: { product: string; id: string; patch: ThreadEditPatch }): Promise<{ ok: boolean; error?: string }>;
       schedule(p: { product: string; id: string; runAt: number }): Promise<WorkItem>;
       repeats(): Promise<RepeatRule[]>;
