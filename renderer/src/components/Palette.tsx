@@ -28,7 +28,7 @@ interface Command {
   run: () => void;
 }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, onSetLook, onThemes, staleFiles = [], updateReady = null, onInstallUpdate, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onNewProject, onStanding, onSettings, onShortcuts, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, onSetLook, onThemes, staleFiles = [], updateReady = null, onInstallUpdate, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onProjectPriority, onNewProject, onStanding, onSettings, onShortcuts, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -62,6 +62,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   onResume: () => void;
   order?: string[];
   onRankFirst: (slug: string) => void;
+  /** Settings, opened on the Priority page. */
+  onProjectPriority?: () => void;
   // Door B: the new project card. The palette no longer names a project
   // itself; it opens the one card that does.
   onNewProject: () => void;
@@ -132,8 +134,16 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // and does not come back.
     // The standing rank. A running order is not something to type your way
     // through one step at a time, so the palette offers only the move worth
-    // naming: put this project at the top. Everything finer is the drag in the
-    // composer, where the whole order is visible at once.
+    // naming: put this project at the top. Everything finer is the Priority
+    // page in Settings, where the whole order is visible at once, and the
+    // first row here is the door to it.
+    ...(onProjectPriority ? [{
+      id: 'project-priority',
+      label: 'Project priority…',
+      hint: 'which project agents work on first',
+      keywords: 'order rank reorder sort projects first top priorities',
+      run: onProjectPriority,
+    }] : []),
     ...products.map((p, i) => ({
       id: `rank-${p.slug}`,
       label: `Rank ${p.name} first`,
@@ -439,7 +449,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onStanding, onSettings, onShortcuts, look, onSetLook, onThemes, staleFiles, updateReady, onInstallUpdate, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo]);
+  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onProjectPriority, onStanding, onSettings, onShortcuts, look, onSetLook, onThemes, staleFiles, updateReady, onInstallUpdate, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -34,6 +34,8 @@ import { SHORTCUTS } from '../shortcuts';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';
 import { TaskTerminal } from './TaskTerminal';
+import { ProjectPriority } from './ProjectPriority';
+import type { Product } from '../types';
 
 /* * THERE IS NO ACCOUNTS PANE ANY MORE. It is a group on the Agents page now, next to the
  number of agents whose ceiling that subscription sets. `?settings=accounts` still opens
@@ -41,7 +43,7 @@ import { TaskTerminal } from './TaskTerminal';
 */
 // 'agents' is gone from this union with the pane itself; the name is still
 // accepted at the door above and resolves to 'general'.
-type Pane = 'instructions' | 'general' | 'appearance' | 'shortcuts' | 'projects' | { project: string };
+type Pane = 'instructions' | 'general' | 'appearance' | 'shortcuts' | 'projects' | 'priority' | { project: string };
 
 const paneKey = (p: Pane) => (typeof p === 'string' ? p : `project:${p.project}`);
 
@@ -1182,7 +1184,7 @@ function ProjectsIndex({ projects, onOpen, onNew }: {
   );
 }
 
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, onClose }: {
+export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, onClose }: {
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
@@ -1210,6 +1212,10 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   onSectionChange?: (section: string | null) => void;
   // Door C: the + on the PROJECTS heading, opening the new project card.
   onNewProject?: () => void;
+  // The running order, for the Priority page: every project already in order
+  // (App's `rankedProducts`), and the write. Absent means no Priority row.
+  ranked?: Product[];
+  onSetOrder?: (slugs: string[]) => void | Promise<void>;
   onClose: () => void;
 }) {
   const [model, setModel] = useState<SettingsModel | null>(null);
@@ -1220,7 +1226,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // URL the window was opened with.
   const [pane, setPane] = useState<Pane>(() => {
     const want = startPane || new URLSearchParams(location.search).get('settings') || '';
-    if (want === 'instructions' || want === 'appearance' || want === 'general' || want === 'shortcuts' || want === 'projects') return want;
+    if (want === 'instructions' || want === 'appearance' || want === 'general' || want === 'shortcuts' || want === 'projects' || want === 'priority') return want;
     // The page moved into Agents, so the old name lands where its content went.
     // ?settings=accounts still opens the account rows, wherever they live.). An
     // old link is not somebody's mistake. AND AGENTS ITSELF JOINED THEM ON
@@ -1397,6 +1403,19 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               opening it is worth doing, and because a nav row reading "Projects"
               with nothing beside it is the heading again.
            */}
+          {/* WHICH PROJECT GOES FIRST, BY NAME. The order was only ever set by
+              dragging chips in the old composer, which most people never
+              found. First under Projects because it is the one thing here
+              about all of them at once. */}
+          {onSetOrder && (
+            <button
+              type="button"
+              className={`set-nav-item ${pane === 'priority' ? 'on' : ''}`}
+              onClick={() => setPane('priority')}
+            >
+              <span className="set-nav-label">Priority</span>
+            </button>
+          )}
           <button
             type="button"
             className={`set-nav-item ${pane === 'projects' ? 'on' : ''}`}
@@ -1450,7 +1469,13 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
         {/* The Shortcuts page is excluded: it reads nothing off the main
             process, so "Reading settings…" over it would be the app waiting
             for an answer it does not need. */}
-        {!model && pane !== 'shortcuts' && pane !== 'instructions' && <div className="set-inner"><div className="set-lede">Reading settings…</div></div>}
+        {!model && pane !== 'shortcuts' && pane !== 'instructions' && pane !== 'priority' && <div className="set-inner"><div className="set-lede">Reading settings…</div></div>}
+
+        {pane === 'priority' && onSetOrder && (
+          <div className="set-inner">
+            <ProjectPriority ranked={ranked} onSetOrder={onSetOrder} />
+          </div>
+        )}
 
         {model && pane === 'projects' && (
           <div className="set-inner">

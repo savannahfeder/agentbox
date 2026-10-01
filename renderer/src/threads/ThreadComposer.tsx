@@ -74,7 +74,7 @@ export interface ThreadSent {
 type MenuKey = 'to' | 'model' | 'project' | 'priority' | 'visibility' | 'later';
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, onClose, onSent, onOpenConversation,
+  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, onClose, onSent, onOpenConversation, onReorderProjects,
 }: {
   products: Product[];
   items: WorkItem[];
@@ -92,6 +92,8 @@ export function ThreadComposer({
    *  the last few lines reads badly for a conversation that is hundreds of
    *  lines long). */
   onOpenConversation?: (item: WorkItem, draft: string) => void;
+  /** Opens Settings > Priority, from the "Reorder" beside the project menu's heading. */
+  onReorderProjects?: () => void;
   onClose: () => void;
   /** Called once the send stands, BEFORE the draft is cleared, so the caller can still read it for an undo. */
   onSent: (item: WorkItem | null, sent?: ThreadSent) => void;
@@ -475,7 +477,18 @@ export function ThreadComposer({
 
   const projectMenu = (
     <div className="tc-menu tc-rise" role="listbox" aria-label="Project" onKeyDown={menuKeys}>
-      <span className="tc-menu-head">Project</span>
+      {/* THE LIST IS ALREADY IN PRIORITY ORDER, AND NOW IT SAYS SO, with the
+          way to change it beside the words. The drag that used to live in this
+          menu was the only way to set the order and almost nobody found it;
+          the order now has its own page in Settings, and this is its door. */}
+      {onReorderProjects ? (
+        <span className="tc-menu-head tc-head-split">
+          <span>By priority</span>
+          {/* The card closes behind it; the draft is saved on every keystroke,
+              so it is all still there next time the card opens. */}
+          <button type="button" className="tc-head-link" onClick={onReorderProjects}>Reorder</button>
+        </span>
+      ) : <span className="tc-menu-head">Project</span>}
       {offered.map((p) => (
         <button key={p.slug} type="button" data-item className={`tc-row ${p.slug === product?.slug ? 'on' : ''}`} onPointerEnter={hover}
           onClick={() => { pickProject(p.slug); close('text'); }}>
