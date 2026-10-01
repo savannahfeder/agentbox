@@ -158,10 +158,13 @@ describe('it is said in English', () => {
   });
 
   it('matches the voice of the only other screen that talks about this', () => {
-    // The walk's own line, word for word, so the two screens do not describe
-    // one fact in two vocabularies.
-    expect(onboarding).toContain('missing: `${Name} could not find Claude Code on this Mac, and your agents run on it.`');
-    expect(copy('missingSay')).toContain(`${Name} could not find Claude Code on this Mac, and your agents run on it.`);
+    // The walk's own words, so the two screens do not describe one fact in two
+    // vocabularies. Since 2026-10-01 the walk names Codex beside Claude Code,
+    // because either one runs the app, and this card says only what it knows:
+    // with Codex on the Mac, "your agents run on it" would be false here.
+    expect(onboarding).toContain('missing: `${Name} could not find Claude Code or Codex on this Mac, and your agents run on one of them.`');
+    expect(copy('missingSay')).toContain(`${Name} could not find Claude Code on this Mac.`);
+    expect(copy('missingSay')).not.toContain('your agents run on it');
     expect(copy('missingSay')).toContain('Install it, then check again.');
   });
 

@@ -53,7 +53,7 @@ npm start
 ```
 
 `npm start` builds the app and opens it. On first run it walks you through
-connecting Claude Code and choosing a folder to work in.
+connecting Claude Code or Codex and choosing a folder to work in.
 
 ## The chat window is the bottleneck
 
