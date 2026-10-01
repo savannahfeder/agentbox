@@ -699,8 +699,10 @@ function RecentWith({ person, products, items }: { person: { id: string }; produ
   const team = useContext(TeamContext);
   const me = team?.me ?? null;
   const convo = useMemo(() => {
+    // The record's people are who it was shared WITH; its maker is `sharedBy`.
+    const on = (t: NonNullable<Product['team']>) => [...t.people, ...(t.sharedBy ? [t.sharedBy] : [])];
     const slugs = new Set(products
-      .filter((p) => p.team?.direct && p.team.people.includes(person.id) && (!me || p.team.people.includes(me)))
+      .filter((p) => p.team?.direct && on(p.team).includes(person.id) && (!me || on(p.team).includes(me)))
       .map((p) => p.slug));
     return items.filter((i) => slugs.has(i.product) && !i.agent)
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0] ?? null;
