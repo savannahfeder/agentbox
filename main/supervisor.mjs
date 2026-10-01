@@ -40,7 +40,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, productRankScore } from '../shared/rank.mjs';
 import { isCleanRun, ruleIdOf } from '../shared/repeats.mjs';
-import { agentSpokeSince, answerSettled, answerTs } from '../shared/answers.mjs';
+import { agentSpokeSince, answerSettled, answerTs, stoppedByHer } from '../shared/answers.mjs';
 import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
 import { linkAccountTooling, toolingLine } from './account-tooling.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
@@ -3496,6 +3496,11 @@ export class Supervisor {
       // behind the clause outlives them: blocked means a session stopped until
       // something outside it changed, and her reply IS that change.
       if (i.status !== 'open' && i.status !== 'blocked') return false;
+      // BUT NOT A ROW SHE STOPPED, on the reply she sent before stopping it.
+      // The kill hands that reply back to the queue, and this used to start a
+      // fresh run on it ten seconds after her stop, on a row sitting in her
+      // inbox. Her stop is the newest thing she said; a later reply wakes it.
+      if (stoppedByHer(i)) return false;
       return true;
     };
 
