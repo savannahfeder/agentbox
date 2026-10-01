@@ -221,18 +221,12 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
     if (!cancelled.current) send(editing, draft);
     setEditing(null);
   };
-  const cancel = () => {
-    if (!editing) return;
-    if (timer.current) clearTimeout(timer.current);
-    cancelled.current = true;
-    // Words already saved while she typed go back to what she started from.
-    if (lastSent.current !== started.current) send(editing, started.current);
-    setEditing(null);
-  };
   const onBoxKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    // Escape here cancels the edit and goes no further: the window's own
-    // Escape would close the thread she is in the middle of writing on.
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); }
+    // Escape here closes the box and goes no further: the window's own Escape
+    // would close the thread she is in the middle of writing on. It KEEPS what
+    // was typed, as the box has been saving all along: a persona pressed
+    // Escape, lost the words, and was still told "Edited by you".
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(); }
     else if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); finish(); }
   };
   // The box grows with what is in it, so a line being edited is the same shape

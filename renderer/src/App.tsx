@@ -4724,6 +4724,8 @@ export default function App() {
                       <MessagePerson person={team?.byId.get(openCard.personId) ?? null}
                         onMessage={() => { setComposeInitial({ to: openCard.personId }); setModal('compose'); }} />
                     </div>
+                    {/* Which thread this is, which the card alone never said. */}
+                    {openCard.title && <h2 className="th-card-title">{openCard.title}</h2>}
                     <TeammateCard card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now} />
                   </div>
                 )}
