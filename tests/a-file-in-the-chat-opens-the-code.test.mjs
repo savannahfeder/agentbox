@@ -117,8 +117,8 @@ describe('one of her own tasks', () => {
   );
   const work = built.events.filter((e) => e.kind === 'work');
 
-  it('hands the edited file over whole, and hands nothing over for a read or a command', () => {
-    const edited = work.find((w) => w.verb === 'edited');
+  it('hands the changed file over whole, and hands nothing over for a read or a command', () => {
+    const edited = work.find((w) => w.verb === 'changed');
     expect(edited?.file).toBe(`${ROOT}/renderer/src/styles.css`);
     expect(work.find((w) => w.verb === 'read')?.file).toBeUndefined();
     expect(work.find((w) => w.verb === 'ran')?.file).toBeUndefined();
@@ -127,7 +127,7 @@ describe('one of her own tasks', () => {
   it('keeps the SHORTENED path on the screen and the whole one for the match', () => {
     // The subject is trimmed from the front for the line she reads, so it can
     // never be what the change is matched against. Both are on the event.
-    const edited = work.find((w) => w.verb === 'edited');
+    const edited = work.find((w) => w.verb === 'changed');
     expect(edited?.subject).not.toBe(edited?.file);
     expect(edited?.file.endsWith(edited.subject.replace(/^…\//, ''))).toBe(true);
     expect(fileInChange(['renderer/src/styles.css'], edited.file)).toBe('renderer/src/styles.css');

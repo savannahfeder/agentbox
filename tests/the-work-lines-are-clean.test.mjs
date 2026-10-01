@@ -19,7 +19,9 @@ describe('what it did, in her words', () => {
     expect(workVerb('Bash')).toBe('ran');
     expect(workVerb('Read')).toBe('read');
     expect(workVerb('Write')).toBe('wrote');
-    expect(workVerb('Edit')).toBe('edited');
+    // `changed` since w-0bd0d8b2ef: a tester who is not a programmer reads
+    // "edited" as a document being revised.
+    expect(workVerb('Edit')).toBe('changed');
     expect(workVerb('Grep')).toBe('searched for');
     expect(workVerb('WebFetch')).toBe('fetched');
     expect(workVerb('')).toBe('did something');

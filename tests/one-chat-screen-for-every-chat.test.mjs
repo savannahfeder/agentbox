@@ -113,7 +113,8 @@ describe('her own task, read as the conversation it already is', () => {
     expect(tools).toEqual([
       'read renderer/src/components/AgentThread.tsx',
       'searched for leadField',
-      'ran npx vitest run',
+      // `npx vitest run` says what it did now, not how it was typed.
+      'ran the tests',
     ]);
   });
 

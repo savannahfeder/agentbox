@@ -10,7 +10,7 @@ import { previewFocus } from '../renderer/src/preview-focus';
 globalThis.React = React;
 it('keeps recorded commands distinct from agent prose', () => {
  const nodes = runNodes({startedAt:Date.now(),text:'12:00:00  I am checking now\n12:00:01  [Bash] npm test\n12:00:02  [Read] src/app.ts'});
- expect(nodes.filter(n=>n.kind==='work').map(n=>n.subject)).toEqual(['npm test','src/app.ts']);
+ expect(nodes.filter(n=>n.kind==='work').map(n=>`${n.verb} ${n.subject}`.trim())).toEqual(['ran the tests','read src/app.ts']);
  expect(runNodes({startedAt:Date.now(),text:''})).toEqual([]);
 });
 it('puts elapsed time inside the control before its chevron', () => {

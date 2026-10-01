@@ -31,7 +31,7 @@ describe('what the work line says it did', () => {
     expect(workVerb('Bash')).toBe('ran');
     expect(workVerb('Read')).toBe('read');
     expect(workVerb('Write')).toBe('wrote');
-    expect(workVerb('Edit')).toBe('edited');
+    expect(workVerb('Edit')).toBe('changed');
     expect(workVerb('Grep')).toBe('searched for');
     expect(workVerb('WebFetch')).toBe('fetched');
   });

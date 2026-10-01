@@ -15,7 +15,8 @@ it('starts a fresh group each time the agent speaks', () => {
     '12:00:03  [Bash] npm test',
     '12:00:04  [Edit] src/b.ts',
   ]));
-  expect(stepsSinceLastSaid(nodes).map(n => n.subject)).toEqual(['npm test', 'src/b.ts']);
+  expect(stepsSinceLastSaid(nodes).map(n => `${n.verb} ${n.subject}`.trim()))
+    .toEqual(['ran the tests', 'changed src/b.ts']);
 });
 
 it('is empty right after the agent speaks, and whole when it has not spoken', () => {
