@@ -21,8 +21,11 @@ describe('the instructions are the field, not a button', () => {
     expect(settings).not.toMatch(/>Edit</);
   });
 
+  // The Settings screen itself still has no Edit button. The Instructions page
+  // does, since one page of rendered sections with Edit was picked over the
+  // always-open boxes (w-4cbcd888ae), and that page is its own file.
   it('opens both workspace files on the page', () => {
-    expect(settings).toContain('<InstructionSettings />');
+    expect(settings).toContain('<InstructionSettings projects={projects}');
     expect(read('renderer/src/components/InstructionSettings.tsx')).toContain('How agents write to you');
   });
 
@@ -57,12 +60,11 @@ describe('the instructions are the field, not a button', () => {
     // and takes it straight back when a save has something to report.
     expect(page).toContain('className="instruction-save" role="status">');
     expect(page).toContain(': status}</div>');
-    // And the caret is in the box when the page opens, which is the one thing a
-    // page of rendered text can never have.
+    // And the caret is in the box the moment it opens for writing.
     expect(page).toContain('box.current?.focus({preventScroll:true})');
     const css = read('renderer/src/workspace-navigation.css');
-    expect(css).toMatch(/\.instruction-editor textarea:hover \{[^}]*background/);
-    expect(css).toMatch(/\.instruction-editor textarea:focus \{[^}]*border-left-color/);
+    expect(css).toMatch(/\.instr-part textarea:hover \{[^}]*background/);
+    expect(css).toMatch(/\.instr-part textarea:focus \{[^}]*border-left-color/);
   });
 
   // ONE SHAPE, AND NOTHING LEFT TO FLIP (w-3dc46f3a67). Option 2, the card, was
@@ -76,9 +78,10 @@ describe('the instructions are the field, not a button', () => {
     expect(page).not.toContain('location.search).get');
     const css = read('renderer/src/workspace-navigation.css');
     expect(css).not.toContain('data-shape');
-    // The card, and the writing surface sitting deeper than the card it is on.
-    expect(css).toMatch(/\.instruction-editor \{[^}]*box-shadow:var\(--shadow-card\)/);
-    expect(css).toMatch(/\.instruction-editor textarea \{[\s\S]*?background:var\(--wash\)/);
+    // Since w-4cbcd888ae the approved shape is one page: one card holding every
+    // section, and the writing surface sitting deeper than that card.
+    expect(css).toMatch(/\.instr-card \{[^}]*background:var\(--film-strong\)/);
+    expect(css).toMatch(/\.instr-part textarea \{[\s\S]*?background:var\(--wash\)/);
   });
 
   // ⌘K is the way in from everywhere that is not this screen, and the card it
@@ -97,9 +100,11 @@ describe('the box has an edge, and shows whole lines', () => {
   // the one chosen, and the other three are dead. The first build had a wash
   // with NO border, which was the problem, so the hairline is asserted beside
   // the fill.
-  it('draws both instruction boxes as a wash with a hairline round it', () => {
-    const rule = css.match(/\.set-write textarea, \.set-instr textarea \{([^}]*)\}/);
-    expect(rule, 'the two instruction boxes no longer share one rule').toBeTruthy();
+  // The project's own box that shared this rule is gone: a project's
+  // instructions are written on the Instructions page (w-4cbcd888ae).
+  it('draws the writing box as a wash with a hairline round it', () => {
+    const rule = css.match(/\.set-write textarea \{([^}]*)\}/);
+    expect(rule, 'the writing box lost its rule').toBeTruthy();
     expect(rule[1]).toContain('background: var(--wash)');
     expect(rule[1]).toContain('border: 1px solid var(--line-strong)');
   });
@@ -108,7 +113,7 @@ describe('the box has an edge, and shows whole lines', () => {
   // height that is not one top border, one top padding and N whole line boxes
   // slices the last line through the letters, which is what the bug looked like.
   const LINE = 1.72, SIZE = 13, TOP = 15;
-  for (const [sel, lines] of [['.set-write textarea', 6], ['.set-instr textarea', 7]]) {
+  for (const [sel, lines] of [['.set-write textarea', 6]]) {
     it(`${sel} is exactly ${lines} whole lines tall`, () => {
       const m = css.match(new RegExp(`\\${sel} \\{[^}]*min-height: calc\\(([^)]*)\\)`));
       expect(m, `${sel} has no measured min-height`).toBeTruthy();
