@@ -41,7 +41,7 @@
  *  overlay in App.tsx, so the list can be checked total against the file:
  *  `tests/nothing-the-app-had-open-outlives-the-walk.test.mjs` fails on an
  *  overlay that has been added and not sorted. */
-export const FLOATS_OVER_THE_APP = ['modal', 'settings', 'importAgents', 'newProject'] as const;
+export const FLOATS_OVER_THE_APP = ['modal', 'settings', 'importAgents', 'newProject', 'teamShown'] as const;
 
 export type Floating = (typeof FLOATS_OVER_THE_APP)[number];
 
@@ -53,15 +53,17 @@ export type OpenOverTheApp = {
   settings: boolean;
   importAgents: boolean;
   newProject: boolean;
+  // The Team page (the team version), a page like Settings.
+  teamShown: boolean;
 };
 
 export const NOTHING_OVER_THE_APP: OpenOverTheApp = {
-  modal: null, settings: false, importAgents: false, newProject: false,
+  modal: null, settings: false, importAgents: false, newProject: false, teamShown: false,
 };
 
 /** Whether anything at all is drawn over the app. */
 export function anythingOverTheApp(open: OpenOverTheApp): boolean {
-  return !!open.modal || open.settings || open.importAgents || open.newProject;
+  return !!open.modal || open.settings || open.importAgents || open.newProject || open.teamShown;
 }
 
 /**

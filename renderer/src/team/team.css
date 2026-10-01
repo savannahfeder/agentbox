@@ -46,6 +46,9 @@ img.tm-av { background: var(--bg-selected); }
 
 /* THE TEAM PAGE: every open task in the company, one line each, never
    grouped. The tabs filter by state, the faces by person. */
+/* The Team page takes the body's place, as Settings does. */
+.workspace-team > .body[hidden] { display: none; }
+
 /* The list's own insets, declared here as well: the setup screens sit outside
    any .list, where the app defines them, and drew flush against the card. */
 .tm-team-pane, .tm-setup { --gutter: 8px; --text-x: 32px; --row-r: 24px; }

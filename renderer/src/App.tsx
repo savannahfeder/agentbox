@@ -466,6 +466,9 @@ export default function App() {
   // THE TEAM PAGE, a page like Settings: it takes the main area and leaves the
   // header and the sidebar where they are.
   const [teamOpen, setTeamOpen] = useState(() => new URLSearchParams(location.search).has('team'));
+  // Drawn when it is open and nothing sits over it: an opened task or Settings
+  // takes the page, and closing them returns to the Team page.
+  const teamShown = teamOpen && !focused && !settingsOpen;
   /*
    * EVERYTHING DRAWN OVER THE APP, IN ONE PLACE.
      Read by `closeWhatFloats` below, which is how a walk hands the whole window
@@ -474,7 +477,7 @@ export default function App() {
      ends from three different callbacks and none of them should be rebuilt
      every time one of these opens. `./walk-scope.ts` is the rule. */
   const floatingRef = useRef<OpenOverTheApp>(NOTHING_OVER_THE_APP);
-  floatingRef.current = { modal, settings: settingsOpen, importAgents, newProject };
+  floatingRef.current = { modal, settings: settingsOpen, importAgents, newProject, teamShown };
   // WHICH PAGE OF SETTINGS A PRESS ASKED FOR, when it asked for one. ⌘K's
   // "Keyboard shortcuts" row opens Settings on the Shortcuts page rather than
   // on its front door; the cog and the plain "Settings…" row leave this null
@@ -1123,6 +1126,7 @@ export default function App() {
     setSettingsPane(null);
     setImportAgents(shut.importAgents);
     setNewProject(shut.newProject);
+    setTeamOpen(shut.teamShown);
   }, []);
 
   const finishRun = useCallback((
@@ -4234,7 +4238,7 @@ export default function App() {
   // merely further up.
   return (
     <TeamContext.Provider value={team}>
-    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${workspaceCollapsed ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}`}>
+    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${workspaceCollapsed ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}`}>
       {/* THE TOP BAR IS NOT DRAWN ON AN OPENED TASK.
 
           WHAT REPLACES IT IS NOT NOTHING, and the reason is three buttons this
@@ -4251,7 +4255,7 @@ export default function App() {
        */}
       {reviewLab && <div className="review-lab-controls"><span>Review exploration</span><select aria-label="Focus controls" value={focusControlStyle} onChange={e=>setFocusControlStyle(e.target.value as FocusControlStyle)}><option value="text">Focus · Text only</option><option value="corners">Focus · Frame corners + label</option><option value="corners-icon">Focus · Frame corners button</option><option value="corners-bare">Focus · Bare frame corners</option><option value="layout">Focus · Workspace layout</option></select><select aria-label="Review file type" value={artifactPreviewSample} onChange={e=>{setArtifactPreviewSample(e.target.value);setOpenDoc(null);}}><option value="code">Code</option><option value="design">Design</option><option value="notes">Text</option><option value="multiple">All three</option></select><select aria-label="Review actions" value={reviewStyle} onChange={e=>setReviewStyle(e.target.value)}><option value="header-balanced-open">1 · Balanced · open only</option><option value="header-tools-open">2 · Compact · open only</option><option value="header-card-only">3 · Clickable card · no controls</option><option value="header-feedback-only">4 · Clickable card · feedback tools</option><option value="header-balanced">Compare · all controls</option></select>{artifactPreviewSample !== "code" &&<select aria-label="Text surface" value={textReviewStyle} onChange={e=>setTextReviewStyle(e.target.value)}><option value="clear">Text · Fully transparent</option><option value="glass">Text · Matched glass</option></select>}</div>}
       {!reviewLab && api.isFixtures && new URLSearchParams(location.search).has('artifactTweaks') && <div className="artifact-tweaks"><select aria-label="Design toolbar" value={designToolbar} onChange={e => setDesignToolbar(e.target.value)}><option value="floating">Floating bar</option><option value="corner">Corner controls</option><option value="edge">Top edge</option><option value="always">Always visible</option></select>{focused && <select aria-label="Sample artifact" value={artifactPreviewSample} onChange={e => { setArtifactPreviewSample(e.target.value); setOpenDoc(null); }}><option value="multiple">Multiple artifacts</option><option value="design">Design sample</option><option value="code">Code sample</option><option value="notes">Notes sample</option></select>}</div>}
-      {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? 'settings' : teamOpen && !focused ? 'team' : null} hasTeam={!!snap?.team?.configured} onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
+      {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? 'settings' : null} teamPage={teamShown} hasTeam={!!snap?.team?.configured} onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
           only part of our own document lying over the file, so a pointer
           brought up there wakes the marks that a pointer moving across the
@@ -4342,7 +4346,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <h1 className="workspace-title">{teamOpen ? 'Team' : workspacePageTitle(view, DONE.noun)}</h1>) : (
+        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">Team</h1> : <h1 className="workspace-title">{workspacePageTitle(view, DONE.noun)}</h1>)) : (
         <nav
           className="tabs"
           /* NO HINT ON THIS NAV. It carried one while the keys were ⌘⌥ and an
@@ -4617,13 +4621,18 @@ export default function App() {
           one of the four drawn for w-86452550e5; the row in the inbox is the one
           picked, and it is built in `updateItem` above. */}
 
-      <div ref={setArtifactBody} hidden={settingsOpen && workspaceNavigation} className="body">
-        {teamOpen && !focused && !settingsOpen ? (
+      {/* THE TEAM PAGE takes the body's place the way Settings does: drawn
+          beside it, with the body hidden while it is up. */}
+      {teamShown && (
+        <div className="body tm-body">
           <main className="list-pane">
             <TeamPage team={snap?.team} products={snap?.products ?? []} items={items} now={now}
               onOpen={(item) => { setTeamOpen(false); setFocused(item); markSeen(item); }} />
           </main>
-        ) : inboxEmpty ? (
+        </div>
+      )}
+      <div ref={setArtifactBody} hidden={(settingsOpen || teamShown) && workspaceNavigation} className="body">
+        {inboxEmpty ? (
           /* * AND DURING THE WALK THIS PAGE IS EMPTY.
 
              THIS IS THE SCREEN IN QUESTION.

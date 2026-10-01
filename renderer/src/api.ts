@@ -5,13 +5,6 @@ import {updateFixture} from './agent-update-fixture';
 // developed, reviewed, and screenshotted without a live store or any agents.
 
 import type { AgentConversation, AnswerMode, DemoOpened, FolderListing, FreshUser, PermissionMode, RepeatRule, RepeatShape, Settings, Snapshot, TeamCallResult, UpdateState, WorkItem } from './types';
-
-// A team call, in words: a build or a window with no team door says so rather
-// than throwing somewhere the person cannot see.
-async function teamCall(fn: () => Promise<TeamCallResult>): Promise<TeamCallResult> {
-  if (!window.zero?.teamSignIn) return { ok: false, error: 'This build has no team cloud set up.' };
-  try { return await fn(); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
-}
 import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
@@ -28,6 +21,14 @@ import { NAME, Name } from '../../shared/product-name.mjs';
 import { installBrowserBridge } from './browser-bridge';
 
 installBrowserBridge();
+
+// A team call, in words: a build or a window with no team door says so rather
+// than throwing somewhere the person cannot see. Below the bridge's install,
+// like every other read of window.zero in this file.
+async function teamCall(fn: () => Promise<TeamCallResult>): Promise<TeamCallResult> {
+  if (!window.zero?.teamSignIn) return { ok: false, error: 'This build has no team cloud set up.' };
+  try { return await fn(); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+}
 
 // READ SAFELY, BECAUSE THIS MODULE IS NOW REACHED FROM A COMPONENT THE TESTS
 // RENDER WITHOUT A WINDOW. The walk's last card is <ImportAgents> now, so

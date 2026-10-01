@@ -14,73 +14,16 @@
 import { useMemo, useState } from 'react';
 import type { Person, Product, TeamCallResult, TeamState, WorkItem } from '../types';
 import { api } from '../api';
-import { isShared, heldByAPerson, runnerOf } from '../../../shared/team-rules.mjs';
+import { isShared } from '../../../shared/team-rules.mjs';
 import { Face, LockIcon, firstName } from './people';
+import { companyLines, type CompanyLine as Line } from './company';
 
-type State = 'run' | 'wait' | 'sched';
-type Line = {
-  key: string;
-  item: WorkItem | null;
-  title: string | null;
-  mine: boolean;
-  project: string;
-  owner: string | null;
-  state: State;
-  stateText: string;
-  movedAt: number;
-};
 type Tab = 'open' | 'run' | 'wait' | 'sched' | 'done';
 
 const ago = (ms: number) => {
   const m = Math.max(0, Math.round(ms / 60_000));
   return m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`;
 };
-
-function stateOf(item: WorkItem, now: number): State {
-  if (item.status === 'claimed' && item.claim && !item.claimExpired) return 'run';
-  if (item.runAt && item.runAt > now) return 'sched';
-  return 'wait';
-}
-
-export function companyLines(items: WorkItem[], products: Product[], team: TeamState, now: number): { open: Line[]; doneToday: Line[] } {
-  const me = team.me?.id ?? null;
-  const bySlug = new Map(products.map((p) => [p.slug, p]));
-  const name = (id: string | null | undefined) => (id === me ? 'you' : firstName(team.people.find((p) => p.id === id)));
-  const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
-  const open: Line[] = [];
-  const doneToday: Line[] = [];
-  for (const item of items) {
-    if (item.agent) continue;
-    const product = bySlug.get(item.product);
-    const shared = isShared(product);
-    // A private project's rows are yours: they are on this Mac only.
-    if (!shared && !product) continue;
-    const owner = shared ? (heldByAPerson(item) ? item.assignee! : runnerOf(item, product)) : me;
-    const state = stateOf(item, now);
-    const line: Line = {
-      key: `${item.product}/${item.id}`, item, title: item.label || item.title, mine: !shared,
-      project: product?.name ?? item.productName, owner, state,
-      stateText: state === 'run' ? 'Running'
-        : state === 'sched' ? `Starts ${new Date(item.runAt!).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' })}`
-          : `Waiting on ${name(owner)}`,
-      movedAt: item.updatedAt,
-    };
-    if (item.status === 'done') { if (item.updatedAt >= startOfDay.getTime()) doneToday.push(line); continue; }
-    open.push(line);
-  }
-  // Teammates' private work: who and what state, nothing else.
-  for (const a of team.activity) {
-    if (a.personId === me || a.state === 'done') continue;
-    open.push({
-      key: `private/${a.personId}/${a.taskKey}`, item: null, title: null, mine: false, project: '', owner: a.personId,
-      state: a.state === 'run' ? 'run' : a.state === 'sched' ? 'sched' : 'wait',
-      stateText: a.state === 'run' ? 'Running' : a.state === 'sched' ? 'Scheduled' : `Waiting on ${name(a.personId)}`,
-      movedAt: a.movedAt,
-    });
-  }
-  const newest = (a: Line, b: Line) => b.movedAt - a.movedAt;
-  return { open: open.sort(newest), doneToday: doneToday.sort(newest) };
-}
 
 export function TeamPage({ team, products, items, now, onOpen }: {
   team: TeamState | null | undefined; products: Product[]; items: WorkItem[]; now: number; onOpen: (item: WorkItem) => void;

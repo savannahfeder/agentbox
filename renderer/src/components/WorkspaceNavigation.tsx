@@ -39,14 +39,18 @@ import { DONE } from '../done-word';
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch, onCompose, inboxCount = 0, scheduledCount = 0, usage, onSettings, onInstructions, page, hasTeam = false, onTeam }: {
+export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch, onCompose, inboxCount = 0, scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false }: {
   page?: string | null; inboxCount?: number; scheduledCount?: number; usage?: ReactNode; onSettings?: () => void; onInstructions?: () => void;
   // THE TEAM TAB, the one thing the team version adds to the sidebar. No
   // people and no counts here: approved 2026-09-30, a list of who is busy is
   // not worth seeing all the time, and the Team page is where you look.
   hasTeam?: boolean; onTeam?: () => void;
+  // Whether the Team page is up, which lights its tab and darkens the others.
+  teamPage?: boolean;
   view: View; collapsed: boolean; onToggle: () => void; onView: (view: View) => void; onSearch: () => void; onCompose: () => void;
 }) {
+  // The Team page is a page like Settings: while it is up no list tab is lit.
+  const page = pageIn ?? (teamPage ? 'team' : null);
   const waiting = Number.isFinite(inboxCount) ? Math.max(0, Math.floor(inboxCount)) : 0;
   const waitingDescription = `${waiting} ${waiting === 1 ? 'task' : 'tasks'} waiting`;
   const scheduled = Number.isFinite(scheduledCount) ? Math.max(0, Math.floor(scheduledCount)) : 0;

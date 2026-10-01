@@ -1332,8 +1332,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     <div className="focus-dock">
       <div className="focus-dock-inner">
         <div className="dock-card">
-          {/* A TASK A TEAMMATE GAVE YOU: to an agent, keep it, or hand it back. */}
-          <TeamRouteStrip item={item} />
+          {/* A TASK A TEAMMATE GAVE YOU: to an agent, keep it, or hand it back.
+              Unless they wrote options of their own, which are the better
+              answers to their question and are drawn instead. */}
+          {!stripShown && <TeamRouteStrip item={item} />}
           {stripShown && (
             <div className="opt-strip">
               {/* THE HEADING IS THE QUESTION, NOT THE NAME OF THE CONTROL.

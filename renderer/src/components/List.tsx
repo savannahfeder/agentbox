@@ -45,6 +45,9 @@ function agentRest(
   { engineChoice?: boolean; engines?: { workspace: string; byItem: Record<string, string> }; item: WorkItem },
 ): string | null {
   if (!engineChoice || !engines) return null;
+  // No coding agent is named on a task given to a person (the team version):
+  // none is on it until they hand it to one.
+  if (heldByAPerson(item)) return null;
   const codexRow = (item.labels ?? []).some((l) => l === 'codex' || l === 'codex-import' || l === 'not-imported');
   const engine = codexRow ? 'codex' : (engines.byItem?.[item.id] ?? engines.workspace ?? DEFAULT_ENGINE);
   return engineWordFor({ engineChoice, engine });
@@ -598,9 +601,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                       of this file, with the cost and with the arrangement that
                       was turned down.
                    */}
-                  {/* No coding agent is named on a task given to a person:
-                      none is on it until they hand it to one. */}
-                  {!justImported(item, seen) && !session && !(team && heldByAPerson(item)) && agentRest({ engineChoice, engines, item })
+                  {!justImported(item, seen) && !session && agentRest({ engineChoice, engines, item })
                     && <span className="time agent">{agentRest({ engineChoice, engines, item })}</span>}
                   {!justImported(item, seen) && session && agentAtWork({ engineChoice, session })
                     && <span className="time agent">{agentAtWork({ engineChoice, session })}</span>}
