@@ -104,7 +104,9 @@ export interface Product {
   // purpose and the card used to take the task anyway.
   practice?: boolean;
   // SHARED OR PRIVATE (main/team/projects.mjs). Null or absent is private.
-  team?: { projectId: string; teamId: string | null; visibility: 'team' | 'people'; people: string[]; sharedBy: string | null } | null;
+  // `direct` marks the record a message between two people lives in, which is
+  // not a project and holds no work (main/team/projects.mjs makeDirect).
+  team?: { projectId: string; teamId: string | null; visibility: 'team' | 'people'; people: string[]; sharedBy: string | null; direct?: boolean } | null;
 }
 
 /** A person on the team, as the cloud knows them. */
