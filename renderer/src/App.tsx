@@ -1888,10 +1888,15 @@ export default function App() {
   // it reads every project and every tab on purpose.
   // ALL (the team version, approved 2026-10-01): every open thread of yours,
   // whatever it is waiting on, as one list.
+  // ALL IS EVERYTHING OPEN, YOUR CONVERSATIONS INCLUDED. A conversation whose
+  // turn is the other person's is in no other tab (it is not running and it
+  // does not need you), so without this a message you just answered vanished
+  // from the Inbox altogether.
   const allOpen = useMemo(() => {
     const seenIds = new Set<string>();
-    return [...inbox, ...progress, ...snoozed].filter((i) => (seenIds.has(i.id) ? false : (seenIds.add(i.id), true)));
-  }, [inbox, progress, snoozed]);
+    const talking = items.filter((i) => !i.agent && i.status !== 'done' && isDirect(snap?.products.find((p) => p.slug === i.product)));
+    return [...inbox, ...progress, ...snoozed, ...talking].filter((i) => (seenIds.has(i.id) ? false : (seenIds.add(i.id), true)));
+  }, [inbox, progress, snoozed, items, snap?.products]);
   const wholeBox = view === 'inbox' ? inbox
     : view === 'snoozed' ? snoozed
       : view === 'progress' ? progress
