@@ -4312,7 +4312,7 @@ export default function App() {
       {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? 'settings' : teamShown && membersOpen ? (inviteFocus ? 'invite' : 'members') : null} teamPage={teamOpen && !settingsOpen && !membersOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
         onInvite={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setInviteFocus(true); setMembersOpen(true); setTeamOpen(true); }}
         onMembers={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setInviteFocus(false); setMembersOpen(true); setTeamOpen(true); }}
-        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setMembersOpen(false); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setMembersOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
+        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setMembersOpen(false); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setMembersOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
           only part of our own document lying over the file, so a pointer
           brought up there wakes the marks that a pointer moving across the
@@ -4540,7 +4540,9 @@ export default function App() {
               whether this row can still be finished, and it lands here because
               the corner is where a task's own controls live. `order` decides
               where in the row it sits, not this. */}
-          {workspaceNavigation && focused && <span style={{display:'contents'}} ref={setCornerHeaderTarget}/>}
+          {/* Not while Settings or the Team page covers the thread: the thread's
+              state and Summary button were left standing in their header. */}
+          {workspaceNavigation && focused && !settingsOpen && !teamShown && <span style={{display:'contents'}} ref={setCornerHeaderTarget}/>}
           {/* THE FILTER, LEFT OF THE PLUS (w-aa3fa4cbf0): a small filter icon
               button just left of the plus. Over a box
               only: an opened task has no box to narrow.
@@ -4704,7 +4706,7 @@ export default function App() {
                 members or Invite people, the setup page stands in. */}
             {snap?.team?.signedIn && snap.team.team && !membersOpen ? (
               <div className="tm-team-pane th-pane">
-                {openCard ? (
+                {openCard && (
                   /* A TEAMMATE'S THREAD (approved round 9): one card with the
                      same summary fields, and Message Maya in its top bar. */
                   <div className="th-card-page">
@@ -4715,14 +4717,17 @@ export default function App() {
                     </div>
                     <TeammateCard card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now} />
                   </div>
-                ) : (
+                )}
+                {/* Kept mounted under an open card, so Back finds the person
+                    and project it was filtered to (a persona test lost both). */}
+                <div hidden={!!openCard}>
                 <TeamView items={items} products={snap.products} cards={snap.team.cards ?? []} display={teamDisplay} now={now}
                   // BACK RETURNS TO TEAM (her bug, 2026-10-01): the Team page
                   // stays open under a thread opened from it, so closing the
                   // thread lands where she came from, not on the Inbox.
                   onOpenItem={(item) => { setFocused(item); markSeen(item); }}
                   onOpenCard={(card) => setOpenCard(card)} />
-                )}
+                </div>
               </div>
             ) : (
               <TeamPage team={snap?.team} products={snap?.products ?? []} items={items} now={now} forceSetup={membersOpen} inviteFocus={inviteFocus}

@@ -6664,9 +6664,17 @@ export function unpacked(p) {
 // compared against a stored watermark and an undefined would make every
 // comparison false, so a row she has never touched would rest forever the
 // moment she did touch it.
+//
+// FILING IS NOT SPEAKING (2026-10-01). Marking a thread Private, moving its
+// priority, or editing a summary line or a link is the founder writing to the
+// row, and it used to count as a word: a persona test switched a finished
+// thread to Private and the agent ran again on its own, unasked and paid for.
+// Those fields describe the thread; they never ask it anything.
+const NOT_A_WORD = new Set(['visibility', 'priority', 'problem', 'progress', 'solution', 'blockedBy', 'blocks']);
 function lastFounderWrite(item) {
   let latest = 0;
-  for (const w of Object.values(item?.wrote ?? {})) {
+  for (const [field, w] of Object.entries(item?.wrote ?? {})) {
+    if (NOT_A_WORD.has(field)) continue;
     if (w?.source === 'founder' && w.ts > latest) latest = w.ts;
   }
   return latest;

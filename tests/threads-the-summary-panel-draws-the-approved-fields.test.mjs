@@ -92,7 +92,8 @@ describe('a teammate’s card', () => {
   };
   it('is exactly the summary’s fields: state, priority, project, visible to, progress first, then the pairs, then the owner', () => {
     const words = text(draw(React.createElement(TeammateCard, { card, person: maya })));
-    expect(words).toBe('Waiting High Northwind Visible to the team Terms are drafted at 8% over last year. Problem Acme’s contract ends on the 14th. Solution One page of terms. Blocked by Sign in with Google Blocks A thread you cannot see Ma Maya Chen · kept up to date by the agent · 19 min ago');
+    // "Waiting on Maya": a persona (2026-10-01) could not tell who a waiting card waits on.
+    expect(words).toBe('Waiting on Maya High Northwind Visible to the team Terms are drafted at 8% over last year. Problem Acme’s contract ends on the 14th. Solution One page of terms. Blocked by Sign in with Google Blocks A thread you cannot see Ma Maya Chen · kept up to date by the agent · 19 min ago');
   });
   it('shows nothing of a private thread but that it is private, whose it is and its state', () => {
     const words = text(draw(React.createElement(TeammateCard, { card: { ...card, visible: false, title: null, project: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [] }, person: maya })));

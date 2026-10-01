@@ -157,7 +157,9 @@ export function EmptyTab({ view }: { view: TabView }) {
   const words: Partial<Record<TabView, string>> = {
     progress: 'Nothing is running.',
     snoozed: 'Nothing is scheduled.',
-    done: 'Nothing finished yet.',
+    // A finished thread waits in Needs you until its owner closes it, which a
+    // persona read as the app losing it.
+    done: 'Nothing closed yet. A finished thread waits in Needs you until you close it.',
     all: 'No threads yet.',
   };
   return <div className="th-empty">{words[view] ?? 'Nothing here.'}</div>;

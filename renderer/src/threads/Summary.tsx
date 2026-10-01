@@ -422,12 +422,13 @@ export function TeammateCard({ card, person, now = Date.now() }: { card: ThreadC
   return (
     <article className="ts-ticket">
       <div className="ts-tk-top">
-        <span>{glyph}{word}</span>
+        {/* Who it waits on, which a persona could not tell from "Waiting". */}
+        <span>{glyph}{card.state === 'waiting' ? `Waiting on ${name.split(/\s+/)[0]}` : word}</span>
         {pid && <><i className="ts-sep" /><span><PriorityIcon id={pid} />{priorityLabelOf(pid)}</span></>}
         {card.project && <><i className="ts-sep" /><span>{card.project}</span></>}
         <i className="ts-sep" /><span>Visible to the team</span>
       </div>
-      <p className={`ts-tk-lead${card.progress ? '' : ' dim'}`}>{card.progress || NOT_WRITTEN}</p>
+      <p className={`ts-tk-lead${card.progress || card.solution ? '' : ' dim'}`}>{card.progress || card.solution || NOT_WRITTEN}</p>
       <div className="ts-tk-grid">
         <div><span className="ts-h">Problem</span>{prose(card.problem)}</div>
         <div><span className="ts-h">Solution</span>{prose(card.solution)}</div>

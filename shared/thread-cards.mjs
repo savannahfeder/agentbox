@@ -49,11 +49,18 @@ export function firstSentence(text, max = 240) {
 /** The thread's summary: what the agent or the person wrote, else stand-ins. */
 export function summaryOf(item) {
   const has = (f) => typeof item[f] === 'string';
-  const latest = item.result || item.note || '';
+  // A finished turn's result is what was done, so it stands in for the
+  // Solution, and a checkpoint for the Progress. Read the other way round, a
+  // persona saw "Progress: Done: ..." over "Solution: Not written yet" and
+  // could not tell whether the thread was finished or stuck.
+  // A result that asks something is still progress: the thread waits on its
+  // owner's answer, and nothing is solved yet.
+  const said = firstSentence(item.result || '');
+  const asks = said.endsWith('?');
   return {
     problem: has('problem') ? item.problem : firstSentence(item.body || item.title),
-    progress: has('progress') ? item.progress : firstSentence(latest),
-    solution: has('solution') ? item.solution : '',
+    progress: has('progress') ? item.progress : (asks ? said : firstSentence(item.result ? '' : item.note || '')),
+    solution: has('solution') ? item.solution : (asks ? '' : said),
     written: has('problem') || has('progress') || has('solution'),
   };
 }
