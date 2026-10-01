@@ -1,0 +1,219 @@
+/* THE NEW THREAD CARD (./ThreadComposer.tsx), ported from the approved drawing
+   (w-e731ca9376 round 6: scripts/scratch/draw-round6.mjs and
+   draw-compose-redesign.mjs). Every class is `tc-` so nothing here can restyle
+   the rest of the app, and nothing in the app's own `.modal` or `.compose-*`
+   rules can reach in and move it.
+
+   SQUARE, NOT ROUND. Chips, menus, the swatch and the Agent glyph all take
+   var(--radius), which is the product's pattern; no pill shapes anywhere.
+
+   THE COLOURS ARE THE DRAWING'S IN EMBER GRID, where it was drawn and approved,
+   and the theme's own tokens everywhere else: the card on its solid, menus one
+   step lighter than the card, hairlines one step lighter than the card's own
+   edge. */
+
+.tc-card {
+  --tc-modal: var(--bg-raised);
+  --tc-pop: var(--bg-selected);
+  --tc-hair: var(--line);
+}
+:root[data-skin] .tc-card { --tc-modal: var(--skin-solid, var(--bg-raised)); }
+:root[data-skin="ember-grid"] .tc-card { --tc-modal: #2d2b29; --tc-pop: #363431; --tc-hair: #3b3937; }
+
+/* One raised surface over a lighter veil, centred a little above the middle
+   the way the old card was (styles.css, .compose-backdrop). */
+.modal-backdrop.tc-veil {
+  background: rgba(16, 14, 13, 0.52);
+  backdrop-filter: blur(3px);
+  place-items: center;
+  padding-top: 0;
+  padding-bottom: 10vh;
+}
+
+.tc-card {
+  position: relative;
+  width: 680px;
+  max-width: 92vw;
+  background: var(--tc-modal);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  text-align: left;
+  color: var(--text);
+}
+
+/* ------------------------------ the header ------------------------------- */
+.tc-head { border-bottom: 1px solid var(--tc-hair); }
+.tc-field { display: flex; align-items: center; height: 42px; padding: 0 18px; font-size: 14px; line-height: 21px; }
+.tc-field + .tc-field { border-top: 1px solid var(--tc-hair); }
+.tc-label { width: 66px; flex: none; font: 11px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+
+.tc-anchor { position: relative; display: inline-flex; align-items: center; }
+
+/* The value is a word you click, like the old card's `.compose-word`: no box,
+   a dotted underline, and its glyph HUNG to the left of it so the value itself
+   starts on the same x in both fields. */
+.tc-word {
+  display: inline-flex; align-items: center;
+  font: inherit; color: var(--text);
+  background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
+}
+.tc-word > .tm-av, .tc-word > .tc-agent { margin-left: -27px; margin-right: 9px; position: relative; top: -1px; }
+.tc-word-text {
+  text-decoration: underline dotted var(--line-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.14s;
+}
+.tc-word:hover .tc-word-text, .tc-word.open .tc-word-text { text-decoration-color: var(--text-faint); }
+.tc-word:focus-visible { outline: none; }
+.tc-word:focus-visible .tc-word-text { text-decoration-color: var(--text-dim); }
+
+.tc-agent {
+  display: inline-block; flex: none; width: 18px; height: 18px; box-sizing: border-box;
+  border: 1px dashed var(--line-strong); border-radius: var(--radius);
+}
+
+/* ------------------------------- the body -------------------------------- */
+.tc-text {
+  display: block; width: 100%; height: 156px; box-sizing: border-box;
+  background: none; border: none; outline: none; resize: none;
+  color: var(--text); font-family: inherit; font-size: 15px; line-height: 1.55;
+  padding: 12px 18px 6px;
+}
+.tc-text::placeholder { color: var(--text-faint); }
+.tc-card .attach-row { padding: 0 18px 10px; }
+.tc-note { padding: 0 18px 10px; font-size: 13px; line-height: 19px; color: var(--text-dim); }
+
+/* -------------------------------- the bar -------------------------------- */
+.tc-bar { display: flex; align-items: center; gap: 8px; padding: 12px 14px 12px 18px; border-top: 1px solid var(--tc-hair); position: relative; }
+.tc-chip {
+  display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: rgba(255, 255, 255, 0.03);
+  color: var(--text-dim); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer;
+}
+.tc-chip:hover, .tc-chip.open, .tc-chip:focus-visible { color: var(--text); border-color: var(--line-strong); outline: none; }
+.tc-chip svg { color: var(--text-faint); flex: none; }
+.tc-chip-name { display: inline-block; max-width: 200px; overflow: hidden; white-space: nowrap; }
+.tc-chip-name.cut { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+
+.tc-swatch { width: 17px; height: 17px; display: inline-grid; place-items: center; flex: none; }
+.tc-swatch i { width: 9px; height: 9px; display: block; border-radius: var(--radius); }
+
+.tc-pr { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 11px; flex: none; }
+.tc-pr i { display: block; width: 3px; background: var(--line-strong); border-radius: 1px; }
+.tc-pr i:nth-child(1) { height: 5px; }
+.tc-pr i:nth-child(2) { height: 8px; }
+.tc-pr i:nth-child(3) { height: 11px; }
+.tc-pr i.on { background: var(--text-dim); }
+.tc-urgent {
+  display: inline-grid; place-items: center; flex: none; width: 12px; height: 12px;
+  border-radius: var(--radius); background: var(--accent); color: var(--on-solid, #1a1817); font: 700 9px var(--mono);
+}
+
+.tc-icon {
+  width: 30px; height: 30px; display: grid; place-items: center; margin-left: auto;
+  color: var(--text-faint); background: none; border: 0; border-radius: var(--radius); cursor: pointer;
+}
+.tc-icon:hover, .tc-icon:focus-visible { color: var(--text); outline: none; }
+
+/* The split Send: the word and the key, and a caret half that opens Send later. */
+.tc-send { display: inline-flex; height: 32px; position: relative; flex: none; }
+.tc-send > button {
+  display: inline-flex; align-items: center; gap: 9px; height: 32px;
+  background: var(--accent); color: #fff; border: 0; cursor: pointer;
+  font: inherit; font-size: 13.5px; font-weight: 500; padding: 0 14px;
+}
+.tc-send > .tc-send-main { border-radius: var(--radius) 0 0 var(--radius); }
+.tc-send.solo > .tc-send-main { border-radius: var(--radius); }
+.tc-send > .tc-send-caret { padding: 0 9px; border-left: 1px solid rgba(26, 24, 23, 0.28); border-radius: 0 var(--radius) var(--radius) 0; }
+.tc-send > button:hover:not(:disabled) { filter: brightness(1.08); }
+.tc-send > button:focus-visible { outline: 1px solid var(--text); outline-offset: 1px; }
+.tc-send > button:disabled { opacity: 0.45; cursor: default; }
+.tc-send kbd { font: 11px var(--mono); opacity: 0.75; }
+.tc-only { flex: 1; min-width: 0; font-size: 13px; color: var(--text-faint); }
+
+/* ------------------------------- the menus ------------------------------- */
+/* One step lighter than the card. */
+.tc-menu {
+  position: absolute; z-index: 80; min-width: 230px; box-sizing: border-box; padding: 5px;
+  background: var(--tc-pop); border: 1px solid var(--line-strong); border-radius: var(--radius);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  display: flex; flex-direction: column; gap: 1px; text-align: left;
+  font-size: 13.5px; line-height: 20px; color: var(--text-dim);
+  animation: tc-in 0.13s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@keyframes tc-in { from { opacity: 0; transform: translateY(3px); } }
+.tc-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box;
+  padding: 7px 10px; border: 0; border-radius: var(--radius); background: none;
+  font: inherit; color: var(--text-dim); white-space: nowrap; text-align: left; cursor: pointer;
+}
+.tc-row:focus { outline: none; background: var(--wash-strong, rgba(255, 255, 255, 0.07)); color: var(--text); }
+.tc-row.on { color: var(--text); }
+.tc-row svg { color: var(--text-faint); flex: none; }
+.tc-row-label { flex: 1; min-width: 0; }
+.tc-row small { margin-left: auto; padding-left: 18px; color: var(--text-faint); font-size: 12px; }
+.tc-menu-head { display: block; padding: 7px 10px 4px; font: 10.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+.tc-sep { display: block; height: 1px; background: var(--line); margin: 4px 6px; flex: none; }
+.tc-none { padding: 7px 10px; font-size: 12.5px; color: var(--text-faint); }
+
+/* The header's menus DROP below their field, and their names sit on the same x
+   as the value above them: the menu's border (1), padding (5) and the row's own
+   padding (10) are taken back out of its left edge. */
+.tc-drop { top: calc(100% + 8px); left: -16px; }
+.tc-drop .tc-row.on .tc-row-label { font-weight: 600; }
+/* The To menu hangs its glyphs where the field hangs its own, 27px left of the
+   name, so the names line up and so do the faces. */
+.tc-to-menu { left: -43px; min-width: 262px; }
+.tc-to-menu .tc-row { gap: 9px; }
+.tc-find {
+  margin: 2px 0 4px; padding: 6px 9px; box-sizing: border-box; width: 100%;
+  font: inherit; font-size: 13px; color: var(--text);
+  background: none; border: 1px solid var(--line); border-radius: var(--radius); outline: none;
+}
+.tc-find::placeholder { color: var(--text-faint); }
+.tc-find:focus { border-color: var(--line-strong); }
+
+/* All models, two columns side by side. */
+.tc-cols { display: flex; gap: 6px; }
+.tc-col { display: flex; flex-direction: column; gap: 1px; min-width: 176px; }
+
+/* The effort strip at the foot of the model menu, as the old drawer drew it,
+   with its first word on the menu's own left line. */
+.tc-effort-head { display: block; padding: 6px 10px 2px; font-size: 11px; color: var(--text-faint); letter-spacing: 0.02em; }
+.tc-effort { display: flex; gap: 2px; padding: 3px 2px 2px; }
+.tc-effort button {
+  font: inherit; font-size: 12.5px; color: var(--text-dim); background: none; border: none;
+  border-radius: var(--radius); padding: 5px 8px; cursor: pointer; white-space: nowrap;
+}
+.tc-effort button:focus { outline: none; color: var(--text); background: var(--wash, rgba(255, 255, 255, 0.04)); }
+.tc-effort button.lit { color: var(--text); background: var(--wash-strong, rgba(255, 255, 255, 0.08)); font-weight: 600; }
+
+/* The bar's menus RISE out of it, because the bar is the bottom of the card. */
+.tc-rise { bottom: calc(100% + 12px); left: 0; }
+.tc-rise.tc-right { left: auto; right: 0; bottom: calc(100% + 8px); }
+.tc-narrow { min-width: 190px; }
+.tc-wide { min-width: 300px; }
+.tc-two { align-items: flex-start; white-space: normal; }
+.tc-two svg { margin-top: 2px; }
+.tc-two small { display: block; margin: 2px 0 0; padding: 0; font-size: 12px; line-height: 17px; white-space: nowrap; }
+/* Wide enough that each choice's one line stays one line. */
+.tc-vis-menu { min-width: 330px; }
+.tc-row .tc-pr, .tc-row .tc-urgent { margin: 0 2px 0 1px; }
+
+/* Pick a date and time: the field and its button, under the row that opened them. */
+.tc-pick { display: flex; align-items: center; gap: 8px; padding: 4px 10px 8px 35px; }
+.tc-date {
+  flex: 1; min-width: 0; height: 28px; box-sizing: border-box; padding: 0 8px;
+  font: inherit; font-size: 13px; color: var(--text);
+  background: none; border: 1px solid var(--line); border-radius: var(--radius); outline: none;
+}
+.tc-date:focus { border-color: var(--line-strong); }
+:root[data-skin] .tc-date, :root[data-theme="dark"] .tc-date { color-scheme: dark; }
+.tc-schedule {
+  height: 28px; padding: 0 11px; font: inherit; font-size: 13px; color: var(--text);
+  background: none; border: 1px solid var(--line-strong); border-radius: var(--radius); cursor: pointer;
+}
+.tc-schedule:focus { outline: none; background: var(--wash-strong, rgba(255, 255, 255, 0.07)); }
+.tc-schedule:disabled { opacity: 0.45; cursor: default; }

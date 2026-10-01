@@ -98,8 +98,10 @@ function startPresets(now = Date.now()) {
 }
 
 // The bottom half. Repeat's presets, unchanged, with "Once" first as the way
-// back off rather than as a thing to notice on the card.
-function repeatPresets(now = Date.now()): Array<{ label: string; rule: RepeatRuleValue | null }> {
+// back off rather than as a thing to notice on the card. Exported because the
+// New thread card's "Repeat it" offers the same rules, and two lists of them
+// would drift the way the two priority lists once did.
+export function repeatPresets(now = Date.now()): Array<{ label: string; rule: RepeatRuleValue | null }> {
   const weekday = new Date(now).getDay();
   const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][weekday];
   return [

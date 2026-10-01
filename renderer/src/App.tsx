@@ -33,6 +33,7 @@ import { documentCandidates } from './message-artifacts';
 import { filesFromRuns } from './run-files';
 import { Rail } from './components/Rail';
 import { Compose } from './components/Compose';
+import { ThreadComposer } from './threads/ThreadComposer';
 import { proposeParent } from '../../shared/project-folder-check.mjs';
 import { NewProject } from './components/NewProject';
 import { ImportAgents } from './components/ImportAgents';
@@ -4973,7 +4974,61 @@ export default function App() {
         )}
       </div>
 
-      {modal === 'compose' && (
+      {/* THE NEW THREAD CARD (w-e731ca9376): To, Model, the message, then the
+          project, priority and who sees it. It sends by itself and hands back
+          what went out, so this only closes it, says so, and puts the way back
+          on the undo pile exactly as the old card's send did below. The draft
+          is read FIRST, before the card clears it, because it is the only copy
+          an undo can hand back. */}
+      {modal === 'compose' && run?.step !== 'task' && (
+        <ThreadComposer
+          products={rankedProducts}
+          items={items}
+          engines={snap.engines?.choices}
+          codexModels={codexModels}
+          codexModelDefault={codexModelDefault}
+          defaultProduct={productFilter}
+          onClose={() => setModal(null)}
+          onSent={async (made, how) => {
+            const sent = readComposeDraft();
+            setModal(null);
+            if (how?.kind === 'message') {
+              const name = team?.byId.get(how.to ?? '')?.name?.split(/\s+/)[0];
+              showToast(name ? `Sent to ${name}` : 'Message sent');
+              await refresh();
+              return;
+            }
+            const slug = how?.product ?? made?.product ?? '';
+            const to = snap.products.find((x) => x.slug === slug)?.name;
+            if (how?.kind === 'repeat') {
+              if (how.ruleId) {
+                noteNewTask(`Repeating task canceled: ${clipToSentence(how.title ?? '', TOAST_TITLE)}`, 'cancel that repeating task', sent, async () => {
+                  await api.endRepeat({ product: slug, id: how.ruleId! });
+                  setRepeats(await api.repeats());
+                });
+              }
+              showToast(`Repeating → ${to ?? slug} · Z to undo`);
+              await refresh();
+              return;
+            }
+            if (made?.id) {
+              noteNewTask(`Withdrawn: ${clipToSentence(made.title, TOAST_TITLE)}`, 'take back the task you just made', sent, async () => {
+                await api.answer({ product: made.product, id: made.id, status: 'done' });
+              });
+            }
+            showToast(sentLine({
+              to: to ?? slug,
+              when: how?.runAt ? whenLabel({ runAt: how.runAt, repeat: null }) : null,
+            }), made?.id ? { product: made.product, id: made.id } : undefined);
+            await refresh();
+          }}
+        />
+      )}
+      {/* THE FIRST RUN'S EXAMPLE TASK KEEPS THE OLD CARD. The walk types its
+          task into that card's field and points its tether at that card's
+          Start it, and its send carries the first-run label, so it is left
+          exactly as it was until the walk is redrawn for the new card. */}
+      {modal === 'compose' && run?.step === 'task' && (
         <Compose
           products={rankedProducts}
           /*
