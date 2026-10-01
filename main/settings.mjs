@@ -270,6 +270,10 @@ export function recheckClaude(config) {
   // has just found Claude Code updates it rather than leaving the rest of the
   // app pointing at where it used to not be.
   if (state.claudeFound && state.claudeBin) config.claudeBin = state.claudeBin;
+  // And whether it is here at all, which is what decides that a Mac with only
+  // Codex runs on Codex (`Supervisor#_enginesFound`). Only a certain answer
+  // moves it, so an unsure search never takes Claude Code away from anybody.
+  if (state.claudeFound || state.claudeCertain) config.claudeFound = state.claudeFound;
   return state;
 }
 
@@ -317,6 +321,12 @@ export function codexState(config, where = {}) {
     certain: found.certain !== false,
     url: CODEX_INSTALL_URL,
   };
+}
+
+/** `codexState` under the names the walk's last card reads beside Claude's. */
+export function codexFoundState(config, where = {}) {
+  const state = codexState(config, where);
+  return { codexFound: state.found, codexCertain: state.certain, codexInstallUrl: state.url };
 }
 
 /**
@@ -508,6 +518,10 @@ export function readSettings({ config, supervisor, store }) {
       // Someone who reads "install it, then open this screen again" and does
       // exactly that has to see it turn found, without restarting the app.
       ...claudeState(config),
+      // AND WHETHER CODEX IS, because the app needs one of the two and not
+      // both: the last card of the walk only shuts the inbox when neither is
+      // here (renderer/src/App.tsx).
+      ...codexFoundState(config),
       // AND WHAT THIS MAC'S CLAUDE CODE CALLS ITS MODELS.
       //
       // In the same trip, and for the same reason the line above is looked up
@@ -576,7 +590,9 @@ function engineSettings(supervisor, config) {
   // and that stopped being true somewhere between codex-cli versions.
   // main/codex-account.mjs holds the measurement. Null when nobody is signed
   // in, and the card then reads exactly as it always did.
-  const codex = supervisor.engineChoiceOpened()
+  // A Mac that runs on Codex alone has asked about it by having nothing else.
+  const codexIsHome = engine === 'codex';
+  const codex = supervisor.engineChoiceOpened() || codexIsHome
     ? {
       ...codexState(config),
       trouble: engineTroubleFor(supervisor, 'codex'),
@@ -590,7 +606,7 @@ function engineSettings(supervisor, config) {
       accounts: codexAccountRows(supervisor),
     }
     : null;
-  if (choices.length < 2) {
+  if (choices.length < 2 && !codexIsHome) {
     return { engine, engineChoices: choices, codex, codexModels: [], codexModelDefault: null, codexModel: null };
   }
   const home = supervisor._codexHome();

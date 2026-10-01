@@ -717,6 +717,12 @@ export interface WorkspaceSettings {
   claudeCertain: boolean;
   // Where to send someone who does not have it. One copy, in main/claude-bin.mjs.
   claudeInstallUrl: string;
+  // The same two facts about Codex. Either engine is enough to run the app, so
+  // the walk's last card shuts the inbox only when both are missing for sure.
+  // Optional so an older main process still typechecks.
+  codexFound?: boolean;
+  codexCertain?: boolean;
+  codexInstallUrl?: string;
   standingLines: number;
   // How much of the message rules is left after her edits. Zero means she
   // emptied the box, and no session is briefed with any of them. ONE count
