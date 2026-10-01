@@ -72,11 +72,39 @@ export function supabaseBackend(client) {
 
     async teamPeople(teamId) {
       await myId();
-      const members = must(await client.from('team_members').select('person_id').eq('team_id', teamId), 'reading your team');
+      const members = must(await client.from('team_members').select('person_id,role').eq('team_id', teamId), 'reading your team');
       const ids = members.map((m) => m.person_id);
       if (!ids.length) return [];
+      const roles = new Map(members.map((m) => [m.person_id, m.role]));
       const people = must(await client.from('people').select('id,email,name,avatar_url').in('id', ids), 'reading your teammates');
-      return people.map(personOut);
+      return people.map((p) => ({ ...personOut(p), role: roles.get(p.id) ?? 'member' }));
+    },
+
+    // TEAM SETTINGS (2026-10-01). The rules are the database's
+    // (20261001000600_team_settings.sql): the owner renames, removes and
+    // cancels; anyone leaves.
+    async renameTeam(teamId, name) {
+      await myId();
+      const rows = must(await client.from('teams').update({ name: String(name).trim() }).eq('id', teamId).select('id,name'), 'renaming the team');
+      if (!rows.length) throw new Error('only the team’s owner can rename it');
+      return rows[0];
+    },
+
+    async removeMember(teamId, who) {
+      await myId();
+      const rows = must(await client.from('team_members').delete().eq('team_id', teamId).eq('person_id', who).select('person_id'), 'removing them');
+      if (!rows.length) throw new Error('only the team’s owner can remove somebody');
+    },
+
+    async listInvites(teamId) {
+      await myId();
+      const rows = must(await client.from('team_invites').select('email,invited_by').eq('team_id', teamId), 'reading the invites');
+      return rows.map((r) => ({ email: r.email, invitedBy: r.invited_by ?? null }));
+    },
+
+    async cancelInvite(teamId, email) {
+      await myId();
+      must(await client.from('team_invites').delete().eq('team_id', teamId).eq('email', String(email).trim()), 'cancelling the invite');
     },
 
     async invite(teamId, email) {

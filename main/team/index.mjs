@@ -18,7 +18,7 @@ import { firstSentence } from '../../shared/thread-cards.mjs';
 import { cardsFor } from '../../shared/thread-cards.mjs';
 import fs from 'node:fs';
 
-const EMPTY = { configured: false, started: false, signedIn: false, me: null, team: null, invites: [], people: [], cards: [], lastSyncAt: null, error: null };
+const EMPTY = { configured: false, started: false, signedIn: false, me: null, team: null, invites: [], sent: [], people: [], cards: [], lastSyncAt: null, error: null };
 
 export function createTeamService({
   session, store, disk, accountRoot, stateFile, onChange = () => {}, log = () => {}, intervalMs = 5000, startRetryMs = 1500,
@@ -75,7 +75,8 @@ export function createTeamService({
     const me = state.me?.id;
     const teams = await backend.myTeams();
     const remembered = me ? kept().getTeam(me) : null;
-    const team = remembered ? teams.find((t) => t.id === remembered) ?? null : teams[0] ?? null;
+    // '' is "left a team, and joins nothing until asked": never quietly the next one.
+    const team = remembered === '' ? null : remembered ? teams.find((t) => t.id === remembered) ?? null : teams[0] ?? null;
     if (team && !remembered && me) kept().setTeam(me, team.id);
     // The moment sharing starts on this Mac, kept so it never moves later.
     if (team && me && !kept().getSince(me)) kept().setSince(me, Date.now());
@@ -84,7 +85,10 @@ export function createTeamService({
     // An invite lookup that fails (an older cloud, a dropped request) leaves
     // you signed in with nothing offered, never signed out.
     const invites = team ? [] : await backend.pendingInvites().catch((err) => { log(`team: invites: ${err.message}`); return []; });
-    set({ team, people, cards, invites, since: me ? kept().getSince(me) : null });
+    // The invites this team has out, so the settings page can say who has not
+    // joined yet and let them be cancelled.
+    const sent = team && backend.listInvites ? await backend.listInvites(team.id).catch(() => []) : [];
+    set({ team, people, cards, invites, sent, since: me ? kept().getSince(me) : null });
   }
 
   async function syncNow() {
@@ -218,6 +222,41 @@ export function createTeamService({
       return state;
     },
 
+    // TEAM SETTINGS (2026-10-01): her words, "the invite team page and the team
+    // settings I had mentioned". The database decides who may (owners rename,
+    // remove and cancel; anyone leaves); these only ask it and say what it said.
+    async renameTeam(name) {
+      if (!backend || !state.team) throw new Error('start or join a team first');
+      const clean = String(name ?? '').trim();
+      if (!clean) throw new Error('a team needs a name');
+      await backend.renameTeam(state.team.id, clean);
+      await refreshTeam();
+      return state;
+    },
+
+    async removeMember(personId) {
+      if (!backend || !state.team) throw new Error('start or join a team first');
+      if (personId === state.me?.id) throw new Error('to leave the team, use Leave team');
+      await backend.removeMember(state.team.id, personId);
+      await refreshTeam();
+      return state;
+    },
+
+    async leaveTeam() {
+      if (!backend || !state.team || !state.me) throw new Error('you are not on a team');
+      await backend.removeMember(state.team.id, state.me.id);
+      kept().setTeam(state.me.id, '');
+      await refreshTeam();
+      return state;
+    },
+
+    async cancelInvite(email) {
+      if (!backend || !state.team) throw new Error('start or join a team first');
+      await backend.cancelInvite(state.team.id, email);
+      await refreshTeam();
+      return state;
+    },
+
     // JOIN A TEAM BECAUSE ITS INVITE WAS ANSWERED YES, and only then. A Mac
     // already in a team does not move: that is a choice nobody offers here.
     async acceptInvite(teamId) {
@@ -236,6 +275,8 @@ export function createTeamService({
       const clean = String(email ?? '').trim();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) throw new Error(`${clean || 'that'} is not an email address`);
       await backend.invite(state.team.id, clean);
+      // So the settings page lists it as invited straight away.
+      await refreshTeam().catch(() => {});
       return state;
     },
 

@@ -115,6 +115,8 @@ export interface Person {
   email: string;
   name: string;
   avatarUrl: string | null;
+  /** On a team's member list: who owns it (and so may rename it and remove people). */
+  role?: 'owner' | 'member';
 }
 
 /** What every team call answers: the team as it now stands, or why not. */
@@ -159,6 +161,8 @@ export interface TeamState {
   started?: boolean;
   /** When this person began sharing on this Mac: threads started before it stay theirs unless shared by hand. */
   since?: number | null;
+  /** The invites this team has out that nobody has taken up yet. */
+  sent?: { email: string; invitedBy: string | null }[];
   signedIn: boolean;
   me: Person | null;
   team: { id: string; name: string } | null;
@@ -885,6 +889,10 @@ declare global {
       teamSignIn(): Promise<TeamCallResult>;
       teamSignOut(): Promise<TeamCallResult>;
       teamSignInEmail(p: { email: string; password: string }): Promise<TeamCallResult>;
+      teamRename(p: { name: string }): Promise<TeamCallResult>;
+      teamRemoveMember(p: { personId: string }): Promise<TeamCallResult>;
+      teamLeave(): Promise<TeamCallResult>;
+      teamCancelInvite(p: { email: string }): Promise<TeamCallResult>;
       teamSignUp(p: { name: string; email: string; password: string }): Promise<TeamCallResult>;
       teamCreate(p: { name: string }): Promise<TeamCallResult>;
       teamAcceptInvite(p: { teamId: string }): Promise<TeamCallResult>;

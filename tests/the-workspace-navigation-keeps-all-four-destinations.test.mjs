@@ -118,8 +118,15 @@ describe('the foot of the sidebar', () => {
     expect(html).toContain('aria-label="Team members"');
   });
 
+  // Signed in with no team yet, both are offered and open the page that starts
+  // one (her note, 2026-10-01: "it's missing the invite team page").
+  it('offers both to someone signed in who is on no team yet', () => {
+    const html = draw({ team: signedInNoTeam, ...both });
+    expect(html).toContain('aria-label="Invite people"');
+    expect(html).toContain('aria-label="Team members"');
+  });
+
   it.each([
-    ['signed in but on no team', signedInNoTeam],
     ['signed out', signedOut],
     ['with no team cloud at all', null],
   ])('offers neither when %s', (_, team) => {

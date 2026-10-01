@@ -121,3 +121,7 @@ img.tm-av { background: var(--bg-selected); }
 .tm-signed button { margin-left: auto; }
 .tm-invited { color: var(--text-dim); }
 .tm-av-empty { width: 24px; height: 24px; border: 1px dashed var(--line-strong); box-sizing: border-box; flex: none; background: none; }
+/* Team settings (2026-10-01): a quiet action at the end of a person's line. */
+.tm-line-act { margin-left: 14px; flex: none; height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim); font: inherit; font-size: 12.5px; cursor: pointer; }
+.tm-line-act:hover:not(:disabled) { border-color: var(--line-strong); color: var(--text); background: var(--wash); }
+.tm-leave-ask { font-size: 13.5px; color: var(--text-dim); margin-right: 6px; }

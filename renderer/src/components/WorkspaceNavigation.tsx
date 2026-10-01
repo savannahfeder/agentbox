@@ -61,7 +61,6 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   const inboxLit = !page && (['inbox', 'progress', 'snoozed', 'done', 'all'] as string[]).includes(view);
   const me = team?.signedIn ? team.me : null;
   const teamName = team?.team?.name ?? Name;
-  const onTeamNow = !!(team?.signedIn && team.team);
   return <aside className="workspace-navigation" aria-label="Workspace">
     {/* THE TOGGLE SITS BESIDE THE TEAM'S NAME, at the top, where sidebars keep
         it (her note, 2026-10-01). Collapsed, the mark itself is the way back
@@ -87,8 +86,11 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
     </nav>
     <div className="workspace-bottom">
       <div className="workspace-utilities th-side-foot">
-        {onTeamNow && onInvite && <button aria-label="Invite people" aria-current={page === 'invite' ? 'page' : undefined} title={collapsed ? 'Invite people' : undefined} onClick={onInvite}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="10" cy="8.5" r="3.5"/><path d="M3.5 20c.7-3.4 3.3-5.3 6.5-5.3 1.4 0 2.6.3 3.7.9"/><path d="M18 14v6M15 17h6"/></svg><span>Invite people</span></button>}
-        {onTeamNow && onMembers && <button aria-label="Team members" aria-current={page === 'members' ? 'page' : undefined} title={collapsed ? 'Team members' : undefined} onClick={onMembers}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/><circle cx="9.5" cy="11" r="2.2"/><path d="M5.8 16.5c.5-1.6 1.9-2.5 3.7-2.5s3.2.9 3.7 2.5M15 10h3M15 13h3"/></svg><span>Team members</span></button>}
+        {/* Shown to anyone signed in, on a team or not (her note, 2026-10-01:
+            "it's missing the invite team page and the team settings"). With no
+            team yet, both open the page that starts one. */}
+        {me && onInvite && <button aria-label="Invite people" aria-current={page === 'invite' ? 'page' : undefined} title={collapsed ? 'Invite people' : undefined} onClick={onInvite}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="10" cy="8.5" r="3.5"/><path d="M3.5 20c.7-3.4 3.3-5.3 6.5-5.3 1.4 0 2.6.3 3.7.9"/><path d="M18 14v6M15 17h6"/></svg><span>Invite people</span></button>}
+        {me && onMembers && <button aria-label="Team members" aria-current={page === 'members' ? 'page' : undefined} title={collapsed ? 'Team members' : undefined} onClick={onMembers}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/><circle cx="9.5" cy="11" r="2.2"/><path d="M5.8 16.5c.5-1.6 1.9-2.5 3.7-2.5s3.2.9 3.7 2.5M15 10h3M15 13h3"/></svg><span>Team members</span></button>}
         {onInstructions && <button aria-label="Instructions" aria-current={page === 'instructions' ? 'page' : undefined} title="Instructions for every agent" onClick={onInstructions}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 16h6"/></svg><span>Instructions</span></button>}
         {onSettings && <button aria-label="Settings" aria-current={page === 'settings' ? 'page' : undefined} title="Settings" onClick={onSettings}><SettingsIcon/><span>Settings</span></button>}
       </div>

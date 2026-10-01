@@ -127,20 +127,74 @@ function TeamSetup({ team, products, onDone, inviteFocus = false }: { team: Team
         <button className="tm-btn" disabled={busy || !name.trim()}>Start team</button>
       </form>
       <p>Waiting for an invite instead? Ask a teammate to invite {me?.email}. It shows up here within a few seconds.</p>
-    </> : <>
-      <h2>{team.team.name}</h2>
-      <div className="tm-section">People</div>
-      {[me, ...team.people.filter((p) => p.id !== me?.id)].map((p) => p && <div key={p.id} className="tm-person-line"><Face person={p} me={p.id === me?.id} />{p.id === me?.id ? 'You' : p.name}<small>{p.email}</small></div>)}
-      {invited.filter((e) => !team.people.some((p) => p.email?.toLowerCase() === e.toLowerCase())).map((e) => (
-        <div key={e} className="tm-person-line tm-invited"><span className="tm-av tm-av-empty" aria-hidden="true" />{e}<small>Invited. They join when they sign in with this email.</small></div>
-      ))}
-      <form className="tm-field-row" style={{ marginTop: 10 }} onSubmit={async (e) => { e.preventDefault(); const sent = email.trim(); if (await run(() => api.teamInvite(sent))) { setEmail(''); setInvited((was) => [...was.filter((x) => x !== sent), sent]); } }}>
-        <input className="tm-input" placeholder="Invite by email" value={email} autoFocus={inviteFocus} onChange={(e) => setEmail(e.target.value)} />
-        <button className="tm-btn" disabled={busy || !email.trim()}>Invite</button>
-      </form>
-      {onDone && <div className="tm-field-row" style={{ marginTop: 22 }}><button className="tm-btn" onClick={onDone}>Done</button></div>}
-    </>}
+    </> : <TeamSettings team={team} me={me} inviteFocus={inviteFocus} invited={invited} setInvited={setInvited} email={email} setEmail={setEmail} busy={busy} run={run} onDone={onDone} />}
     {error && <p className="tm-error">{error}</p>}
   </div>;
+}
+
+/** TEAM SETTINGS (2026-10-01): her words, "the invite team page and the team
+ *  settings I had mentioned". The team's name, its people, the invites still
+ *  out, and leaving. The owner renames, removes and cancels; anyone leaves.
+ *  The database is what enforces it; this only hides what would be refused. */
+function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEmail, busy, run, onDone }: {
+  team: TeamState; me: Person | null; inviteFocus: boolean; invited: string[]; setInvited: (f: (was: string[]) => string[]) => void;
+  email: string; setEmail: (v: string) => void; busy: boolean; run: (fn: () => Promise<TeamCallResult>) => Promise<boolean>; onDone?: () => void;
+}) {
+  const name = team.team?.name ?? '';
+  const [draft, setDraft] = useState(name);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const owner = team.people.find((p) => p.id === me?.id)?.role === 'owner';
+  // You first, from the team's own list so your role comes with you.
+  const mine = team.people.find((p) => p.id === me?.id) ?? me;
+  const people = [mine, ...team.people.filter((p) => p.id !== me?.id)].filter((p): p is Person => !!p);
+  const joined = (e: string) => team.people.some((p) => p.email?.toLowerCase() === e.toLowerCase());
+  const out = [...new Set([...(team.sent ?? []).map((s) => s.email), ...invited])].filter((e) => !joined(e));
+  return <>
+    <div className="tm-section">Team name</div>
+    {owner ? (
+      <form className="tm-field-row" onSubmit={(e) => { e.preventDefault(); void run(() => api.teamRename(draft)); }}>
+        <input className="tm-input" value={draft} aria-label="Team name" onChange={(e) => setDraft(e.target.value)} />
+        <button className="tm-btn" disabled={busy || !draft.trim() || draft.trim() === name}>Rename</button>
+      </form>
+    ) : <h2>{name}</h2>}
+
+    <div className="tm-section">People</div>
+    {people.map((p) => (
+      <div key={p.id} className="tm-person-line">
+        <Face person={p} me={p.id === me?.id} />{p.id === me?.id ? 'You' : p.name}
+        <small>{p.role === 'owner' ? `${p.email} · owner` : p.email}</small>
+        {owner && p.id !== me?.id && (
+          <button type="button" className="tm-line-act" disabled={busy} onClick={() => void run(() => api.teamRemoveMember(p.id))}>Remove</button>
+        )}
+      </div>
+    ))}
+    {out.map((e) => (
+      <div key={e} className="tm-person-line tm-invited">
+        <span className="tm-av tm-av-empty" aria-hidden="true" />{e}
+        <small>Invited. They join when they sign in with this email.</small>
+        {(owner || invited.includes(e)) && (
+          <button type="button" className="tm-line-act" disabled={busy} onClick={async () => { if (await run(() => api.teamCancelInvite(e))) setInvited((was) => was.filter((x) => x !== e)); }}>Cancel</button>
+        )}
+      </div>
+    ))}
+
+    <div className="tm-section">Invite people</div>
+    <form className="tm-field-row" onSubmit={async (e) => { e.preventDefault(); const sent = email.trim(); if (await run(() => api.teamInvite(sent))) { setEmail(''); setInvited((was) => [...was.filter((x) => x !== sent), sent]); } }}>
+      <input className="tm-input" placeholder="Their email" value={email} autoFocus={inviteFocus} onChange={(e) => setEmail(e.target.value)} />
+      <button className="tm-btn" disabled={busy || !email.trim()}>Invite</button>
+    </form>
+
+    <div className="tm-section">Leave</div>
+    {confirmLeave ? (
+      <div className="tm-field-row">
+        <span className="tm-leave-ask">Leave {name}? Your threads stay on this Mac; the team stops seeing them.</span>
+        <button type="button" className="tm-btn" disabled={busy} onClick={() => void run(() => api.teamLeave())}>Leave</button>
+        <button type="button" className="tm-btn" onClick={() => setConfirmLeave(false)}>Stay</button>
+      </div>
+    ) : (
+      <div className="tm-field-row"><button type="button" className="tm-btn" onClick={() => setConfirmLeave(true)}>Leave {name}</button></div>
+    )}
+    {onDone && <div className="tm-field-row" style={{ marginTop: 22 }}><button className="tm-btn" onClick={onDone}>Done</button></div>}
+  </>;
 }
 

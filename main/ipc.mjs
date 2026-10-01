@@ -626,6 +626,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // An invite answered yes. Nothing else joins a team.
   ipcMain.handle('zero:team-accept-invite', teamCall(({ teamId }) => team.acceptInvite(teamId)));
   ipcMain.handle('zero:team-invite', teamCall(({ email }) => team.invite(email)));
+  ipcMain.handle('zero:team-rename', teamCall(({ name }) => team.renameTeam(name)));
+  ipcMain.handle('zero:team-remove-member', teamCall(({ personId }) => team.removeMember(personId)));
+  ipcMain.handle('zero:team-leave', teamCall(() => team.leaveTeam()));
+  ipcMain.handle('zero:team-cancel-invite', teamCall(({ email }) => team.cancelInvite(email)));
   ipcMain.handle('zero:team-share', teamCall(({ product, visibility, people }) => team.share(product, { visibility, people })));
   ipcMain.handle('zero:team-sync', teamCall(() => team.syncNow()));
   // A MESSAGE TO A PERSON (approved 2026-10-01: people get messages, never

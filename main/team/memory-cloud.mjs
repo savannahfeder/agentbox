@@ -43,6 +43,7 @@ export function memoryBackend(cloud, personId) {
     const me = cloud.people.get(personId);
     return me && !cloud.unconfirmed?.has(personId) ? String(me.email).toLowerCase() : null;
   };
+  const owns = (teamId) => cloud.members.some((m) => m.teamId === teamId && m.personId === personId && m.role === 'owner');
   const canSee = (projectId) => {
     const p = cloud.projects.get(projectId);
     if (!p || !myTeams().includes(p.teamId)) return false;
@@ -101,8 +102,34 @@ export function memoryBackend(cloud, personId) {
 
     async teamPeople(teamId) {
       if (!myTeams().includes(teamId)) return [];
-      const ids = cloud.members.filter((m) => m.teamId === teamId).map((m) => m.personId);
-      return ids.map((id) => ({ ...cloud.people.get(id) })).filter((p) => p.id);
+      const rows = cloud.members.filter((m) => m.teamId === teamId);
+      return rows.map((m) => ({ ...cloud.people.get(m.personId), role: m.role })).filter((p) => p.id);
+    },
+
+    // TEAM SETTINGS (2026-10-01), the same rules as 20261001000600_team_settings.sql.
+    async renameTeam(teamId, name) {
+      if (!owns(teamId)) refuse('rename a team you do not own');
+      const t = cloud.teams.get(teamId);
+      t.name = String(name).trim();
+      return { id: t.id, name: t.name };
+    },
+
+    async removeMember(teamId, who) {
+      if (who !== personId && !owns(teamId)) refuse('remove somebody from a team you do not own');
+      cloud.members = cloud.members.filter((m) => !(m.teamId === teamId && m.personId === who));
+    },
+
+    async listInvites(teamId) {
+      if (!myTeams().includes(teamId)) return [];
+      return cloud.invites.filter((i) => i.teamId === teamId).map((i) => ({ email: i.email, invitedBy: i.invitedBy ?? null }));
+    },
+
+    async cancelInvite(teamId, email) {
+      const clean = String(email).trim().toLowerCase();
+      const inv = cloud.invites.find((i) => i.teamId === teamId && i.email.toLowerCase() === clean);
+      if (!inv) return;
+      if (!owns(teamId) && inv.invitedBy !== personId) refuse('cancel an invite you did not send');
+      cloud.invites = cloud.invites.filter((i) => i !== inv);
     },
 
     async invite(teamId, email) {
