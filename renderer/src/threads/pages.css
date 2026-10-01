@@ -115,13 +115,19 @@
 .th-card .t.hidden { color: var(--text-dim); }
 
 /* A message from a person: their face and name first, then what they said. */
-.th-msg { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; vertical-align: top; }
-.th-msg .tm-av { width: 20px; height: 20px; line-height: 18px; }
-.th-msg-who { flex: 0 0 auto; font-weight: 600; color: var(--text); }
-.th-msg-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
+/* Plain inline in a row, never flex: the row's hover and selected underline is
+   a text-decoration on `.subject`, and a decoration stops at an inline-flex
+   box, so a message row lit up with no underline at all. */
+.th-msg { display: inline; }
+.th-msg .tm-av { width: 20px; height: 20px; line-height: 18px; margin-right: 8px; position: relative; top: -1px; }
+.th-msg-who { font-weight: 600; color: var(--text); }
+.th-msg-who::after { content: '\00a0\00a0'; }
+.th-msg-text { color: var(--text-dim); }
 /* On a card the message wraps under the name, as a card's title does. */
 .th-card .th-msg { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; row-gap: 4px; }
 .th-card .th-msg-text { grid-column: 1 / -1; white-space: normal; color: var(--text); }
+.th-card .th-msg-who::after { content: none; }
+.th-card .th-msg .tm-av { margin-right: 0; top: 0; }
 .th-card .m { display: flex; align-items: center; font: 11px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); min-width: 0; }
 .th-card .m .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .th-card .m .tm-av { width: 18px; height: 18px; line-height: 16px; font-size: 8px; margin-left: auto; flex: none; }

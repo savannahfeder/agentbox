@@ -97,6 +97,21 @@ describe('drawn', () => {
   it('draws the same on a board card', () => {
     expect(pages).toMatch(/e\.message \? <MessageTitle/);
   });
+  // THE UNDERLINE REACHES A MESSAGE ROW (her note, 2026-10-01: hovering a
+  // message row showed no underline, and the selected one none either). The
+  // row's highlight is `text-decoration` on `.subject` (styles.css), and a
+  // decoration never propagates into an inline-flex or inline-block box, which
+  // is what `.th-msg` was. In a row it is plain inline, so the name and the
+  // words carry the underline like any other title.
+  it('lets the row\'s underline reach the name and the words', () => {
+    const css = fs.readFileSync(new URL('../renderer/src/threads/pages.css', import.meta.url), 'utf8');
+    const rule = (sel) => css.match(new RegExp(`(^|\\n)${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`))?.[2] ?? '';
+    expect(rule('.th-msg')).toMatch(/display:\s*inline;/);
+    for (const sel of ['.th-msg', '.th-msg-who', '.th-msg-text']) expect(rule(sel)).not.toMatch(/display:\s*inline-(flex|block)|display:\s*(flex|grid|block)/);
+    // The card, which has no underline, may still lay itself out.
+    expect(rule('.th-card .th-msg')).toMatch(/display:\s*grid/);
+  });
+
   it('asks the board for messages on the Inbox', () => {
     // Your own page's board (w-05ff3d1438) is the one that asks for all of yours.
     expect(pages).toMatch(/teamEntries\(\{[^}]*allMine: true \}\)/);
