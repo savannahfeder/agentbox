@@ -121,14 +121,14 @@ describe('the card says which project the task is going to', () => {
 
 describe('the confirmation on send', () => {
   it('names the project it went to', () => {
-    expect(sentLine({ to: 'Kestrel' })).toBe('Sent to Kestrel · Z to undo');
+    expect(sentLine({ to: 'Kestrel' })).toBe('Started in Kestrel · Z to undo');
   });
 
   // A task she asked to start later has still been SENT; it just has not
   // started. Dropping either half is how "Queued" became a small lie.
   it('says so and still says when it starts', () => {
     expect(sentLine({ to: 'Kestrel', when: 'Starts in 30 minutes' }))
-      .toBe('Sent to Kestrel · Starts in 30 minutes · Z to undo');
+      .toBe('Scheduled in Kestrel · Starts in 30 minutes · Z to undo');
   });
 
   it('keeps the way back in the sentence', () => {

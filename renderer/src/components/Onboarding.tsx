@@ -1956,7 +1956,10 @@ export function Onboarding({
   // the conversation walk takes about two seconds on a busy Mac and the
   // welcome is where there is time to spare.
   const [recent, setRecent] = useState<RecentFolder[] | null>(null);
-  const [lit, setLit] = useState(0);
+  // NOTHING IS PICKED UNTIL THEY PICK IT (persona test, 2026-10-01): the first
+  // recent folder used to be lit, so the Return that left the welcome could
+  // land on a folder the person never chose. Arrow down lights the first.
+  const [lit, setLit] = useState(-1);
   const wantsRecent = run.step === 'welcome' || run.step === 'folder';
   useEffect(() => {
     if (!wantsRecent || recent) return;
@@ -2127,6 +2130,8 @@ export function Onboarding({
       if (e.key === 'ArrowUp') { e.preventDefault(); setLit((i) => Math.max(0, i - 1)); }
       // The row past the chooser is the way past with no folder.
       if (e.key === 'Enter' && lit > rows) { e.preventDefault(); skipFolder(); return; }
+      // Return with nothing lit picks nothing.
+      if (e.key === 'Enter' && lit < 0) { e.preventDefault(); return; }
       if (e.key === 'Enter') {
         e.preventDefault();
         if (lit < rows && recent[lit]) takeFolder(recent[lit].folder);
@@ -2567,6 +2572,9 @@ export function Onboarding({
               value={run.name}
               spellCheck={false}
               onChange={(e) => { setNotMade(null); onEvent({ t: 'name', name: e.target.value }); }}
+              // The suggested name is selected, so typing replaces it rather
+              // than running on from it ("My workOffice admin", a persona test).
+              onFocus={(e) => e.currentTarget.select()}
               /*
                * ESCAPE IS NOT HERE ANY MORE, and that is not a deletion of the
                  behaviour. It used to be this field's own handler, which meant
