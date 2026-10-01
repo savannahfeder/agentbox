@@ -34,3 +34,17 @@ export function advanceAfter(p: { fromTask: boolean; index: number; id: string }
   if (!p.fromTask) return null;
   return p.index >= 0 ? { index: p.index, excludeId: p.id } : null;
 }
+
+/**
+ * The task to open once the resolved one is gone: whatever now occupies its
+ *  slot, or the one above when it was last. `rows` must be the inbox she is
+ *  LOOKING AT, filter applied, and the same list `index` was counted in. Handed
+ *  the whole inbox, the slot after the last task of a filtered project was a
+ *  task from another project (w-27759abd33). */
+export function nextAfterAdvance<T extends { id: string }>(rows: T[], pending: Advance | null): { item: T; index: number } | null {
+  if (!pending) return null;
+  const remaining = rows.filter((i) => i.id !== pending.excludeId);
+  const index = Math.min(pending.index, remaining.length - 1);
+  const item = remaining[index];
+  return item ? { item, index } : null;
+}
