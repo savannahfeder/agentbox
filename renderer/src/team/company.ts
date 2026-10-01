@@ -55,13 +55,13 @@ export function companyLines(items: WorkItem[], products: Product[], team: TeamS
     if (item.status === 'done') { if (item.updatedAt >= startOfDay.getTime()) doneToday.push(line); continue; }
     open.push(line);
   }
-  for (const a of team.activity) {
-    if (a.personId === me || a.state === 'done') continue;
+  for (const c of team.cards ?? []) {
+    if (c.personId === me || c.visible || c.state === 'done') continue;
     open.push({
-      key: `private/${a.personId}/${a.taskKey}`, item: null, title: null, mine: false, project: '', owner: a.personId,
-      state: a.state === 'run' ? 'run' : a.state === 'sched' ? 'sched' : 'wait',
-      stateText: a.state === 'run' ? 'Running' : a.state === 'sched' ? 'Scheduled' : `Waiting on ${name(a.personId)}`,
-      movedAt: a.movedAt,
+      key: `private/${c.personId}/${c.threadId}`, item: null, title: null, mine: false, project: '', owner: c.personId,
+      state: c.state === 'running' ? 'run' : c.state === 'scheduled' ? 'sched' : 'wait',
+      stateText: c.state === 'running' ? 'Running' : c.state === 'scheduled' ? 'Scheduled' : `Waiting on ${name(c.personId)}`,
+      movedAt: c.updatedAt,
     });
   }
   const newest = (a: CompanyLine, b: CompanyLine) => b.movedAt - a.movedAt;

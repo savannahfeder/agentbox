@@ -11,9 +11,12 @@
 import http from 'node:http';
 import { Name } from '../../shared/product-name.mjs';
 
-const PAGE = (title, line) => `<!doctype html><meta charset="utf-8"><title>${title}</title>
+// Whatever came back in the address is the browser's to show as text, never
+// as markup: error_description is anybody's to write (review, 2026-10-01).
+const escape = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+export const PAGE = (title, line) => `<!doctype html><meta charset="utf-8"><title>${title}</title>
 <body style="margin:0;height:100vh;display:grid;place-items:center;background:#1a1817;color:#efebe7;font:16px -apple-system,system-ui,sans-serif">
-<div style="text-align:center"><div style="font-size:22px;margin-bottom:8px">${title}</div><div style="color:#a09994">${line}</div></div>`;
+<div style="text-align:center"><div style="font-size:22px;margin-bottom:8px">${escape(title)}</div><div style="color:#a09994">${escape(line)}</div></div>`;
 
 export async function signInWithGoogle({ client, openExternal, returnUrl, timeoutMs = 5 * 60 * 1000 }) {
   const url = new URL(returnUrl);

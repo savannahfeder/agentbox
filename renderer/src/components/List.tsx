@@ -3,7 +3,7 @@
 // end, on the title's line, the things that are not the message: priority, the
 // product, and when (or that an agent is on it, or that one stopped).
 
-import type { RepeatRule, RunningSession, View, WorkItem } from '../types';
+import type { Product, RepeatRule, RunningSession, View, WorkItem } from '../types';
 import { ago, dayLabel, previewText, stamp } from '../format';
 import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitle, walkRowKeys } from '../list-rules';
 import { isUrgentRow } from '../interrupt';
@@ -18,6 +18,7 @@ import { IMPORT_KEYS, JUST_IMPORTED_WORD, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEY
 import { splitHits } from '../search';
 import { isCleanRun, nextRunAt } from '../../../shared/repeats.mjs';
 import { TeamRowEnd, type TeamView } from '../team/people';
+import { TableHead, ThreadCells } from '../threads/Pages';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
 
 /**
@@ -106,7 +107,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null, table = false, products = [] }: {
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -189,6 +190,9 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   onAnswerImport?: (item: WorkItem, choice: ImportChoice) => void;
   // THE TEAM (renderer/src/team/people.tsx). Null unless someone is signed in,
   // and then the row end is exactly the single-person app's.
+  /** The inbox as a table (the team version, approved 2026-10-01): thread, project, priority, updated. */
+  table?: boolean;
+  products?: Product[];
   team?: TeamView | null;
 }) {
   const rules = view === 'snoozed' ? (repeats ?? []) : [];
@@ -293,7 +297,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   });
 
   return (
-    <div className="list">
+    <div className={`list${table ? ' th-table' : ''}`}>
+      {table && <TableHead />}
       {/* Repeating tasks sit above the deferred rows, in the tab that already
           holds work with a moment attached. They are RULES, not items, so they
           arrive on their own list and no inbox rule has an opinion about them. */}
@@ -330,7 +335,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
               running, and it draws NOTHING: an empty div here still spends the
               day label's whole height and leaves a band of nothing above the
               first result. */}
-          {group.label && <div className="day-label">{group.label}</div>}
+          {group.label && !table && <div className="day-label">{group.label}</div>}
           {group.items.map(({ item, index }) => {
             const session = running.find((r) => r.itemId === item.id);
             const checked = multiSel.has(item.id);
@@ -408,6 +413,12 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                    column of them is a second alphabet to learn before you can read the
                    first.
                  */}
+                {table && !(walk && keysFor(item.id).length) && !isImportRow(item) ? (
+                  // THE TABLE ROW (the team version): the same row, its select
+                  // box and its keys, with the approved columns instead of a
+                  // title over a summary.
+                  <ThreadCells item={item} product={products.find((p) => p.slug === item.product)} now={Date.now()} />
+                ) : <>
                 <div className="row-main">
                   {/* THE WRITTEN NAME, WHERE THERE IS ONE. `rowTitle` prefers
                       the label a session wrote over the first line of what she
@@ -621,6 +632,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                   </>
                   )}
                 </div>
+                </>}
               </div>
             );
           })}

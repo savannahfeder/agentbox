@@ -26,7 +26,7 @@ function memoryWorld() {
   for (const [name, email] of [['Maya', 'maya@northwind.test'], ['Theo', 'theo@northwind.test'], ['Jun', 'jun@elsewhere.test']]) {
     people[name.toLowerCase()] = memoryBackend(cloud, signUpMemory(cloud, { email, name }));
   }
-  return { ...people, emails: { theo: 'theo@northwind.test' }, cleanup: async () => {} };
+  return { ...people, emails: { theo: 'theo@northwind.test', jun: 'jun@elsewhere.test' }, cleanup: async () => {} };
 }
 
 async function liveWorld() {
@@ -81,7 +81,7 @@ for (const [where, makeWorld, enabled] of worlds) {
       await w.jun.me();
       team = await w.maya.createTeam('Northwind');
       await w.maya.invite(team.id, w.emails.theo.toUpperCase());
-      await w.theo.acceptInvites();
+      await w.theo.acceptInvite(team.id);
     }, 60_000);
     afterAll(async () => { await w?.cleanup(); }, 60_000);
 
@@ -89,6 +89,14 @@ for (const [where, makeWorld, enabled] of worlds) {
       expect((await w.theo.myTeam())?.id).toBe(team.id);
       expect((await w.theo.teamPeople(team.id)).map((p) => p.name).sort()).toEqual(['Maya', 'Theo'].map((n) => expect.stringContaining(n)));
       expect(await w.jun.myTeam()).toBeNull();
+    });
+
+    it('offers an invite without joining, and uses one up once accepted', async () => {
+      await w.maya.invite(team.id, w.emails.jun);
+      expect((await w.jun.pendingInvites()).map((i) => [i.teamId, i.teamName])).toEqual([[team.id, 'Northwind']]);
+      expect(await w.jun.myTeam()).toBeNull();
+      expect(await w.theo.pendingInvites()).toEqual([]);
+      await expect(w.theo.acceptInvite(team.id)).rejects.toThrow();
     });
 
     it('shows a project shared with the team to the team and nobody else', async () => {
@@ -106,6 +114,18 @@ for (const [where, makeWorld, enabled] of worlds) {
       expect(after.map((r) => r.line.patch.note)).toEqual(['n2']);
     });
 
+    // Review 2026-10-01: a pulled line's ts, claim and epoch came straight from
+    // the body its writer's Mac sent, so a teammate could date a line into the
+    // future to outrank every later edit, or hand this Mac a worker's lease.
+    it('dates a teammate\'s line by the server and drops the lease it carried', async () => {
+      const sent = { ...line(w.maya, 9), ts: 1, epoch: 7, claim: { holder: 'h', leaseUntil: 9e15 }, release: true, heartbeat: true };
+      await w.maya.pushLines(shared, [sent]);
+      const got = (await w.theo.pullLines(shared, 0)).find((r) => r.line.uid === sent.uid).line;
+      expect(Math.abs(got.ts - Date.now())).toBeLessThan(10 * 60_000);
+      expect(['claim', 'epoch', 'release', 'heartbeat'].filter((k) => k in got)).toEqual([]);
+      expect(got.by).toBe(w.maya.personId);
+    });
+
     it('refuses a line pushed as somebody else', async () => {
       await expect(w.theo.pushLines(shared, [line(w.maya, 3)])).rejects.toThrow();
     });
@@ -117,12 +137,25 @@ for (const [where, makeWorld, enabled] of worlds) {
       expect((await w.theo.listProjects()).find((p) => p.id === secret)?.people).toEqual([w.theo.personId]);
     });
 
-    it('publishes private work to the team without a title, and can take it back', async () => {
-      await w.theo.putActivity([{ taskKey: 'k1', state: 'run', movedAt: 1_790_000_000_000 }]);
-      expect((await w.maya.listActivity()).filter((a) => a.personId === w.theo.personId).map((a) => a.state)).toEqual(['run']);
-      expect(await w.jun.listActivity()).toEqual([]);
-      await w.theo.putActivity([]);
-      expect((await w.maya.listActivity()).filter((a) => a.personId === w.theo.personId)).toEqual([]);
+    // A small group now (2026-10-01, 20261001000700): its maker and up to eleven others.
+    it('keeps a message record to a small group', async () => {
+      await w.maya.shareProject({ id: crypto.randomUUID(), teamId: team.id, name: 'Direct', visibility: 'people', people: [w.theo.personId, w.jun.personId], direct: true });
+      const twelve = Array.from({ length: 12 }, () => crypto.randomUUID());
+      await expect(w.maya.shareProject({ id: crypto.randomUUID(), teamId: team.id, name: 'Direct', visibility: 'people', people: twelve, direct: true })).rejects.toThrow();
+    });
+
+    // A private thread publishes no card at all (decided 2026-10-01), and a
+    // card not marked visible that reaches a backend anyway never goes up.
+    it('publishes a thread card to the team, never a private one, and can take it back', async () => {
+      const card = { threadId: 'w-1', visible: true, title: 'Acme renewal terms', project: 'Northwind', state: 'running', priority: 7, problem: 'P', progress: 'Q', solution: null, blockedBy: [], blocks: [], updatedAt: 1_790_000_000_000 };
+      await w.theo.putCards(team.id, [card, { threadId: 'w-2', visible: false, title: null, project: null, state: 'waiting', priority: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [], updatedAt: 1_790_000_000_000 }]);
+      const seen = (await w.maya.listCards()).filter((c) => c.personId === w.theo.personId).sort((a, b) => a.threadId.localeCompare(b.threadId));
+      expect(seen.map((c) => [c.threadId, c.visible, c.title, c.state])).toEqual([['w-1', true, 'Acme renewal terms', 'running']]);
+      expect(await w.jun.listCards()).toEqual([]);
+      await w.theo.putCards(team.id, [{ ...card, threadId: 'w-3', visible: false }]);
+      expect((await w.maya.listCards()).filter((c) => c.personId === w.theo.personId)).toEqual([]);
+      await w.theo.putCards(team.id, []);
+      expect((await w.maya.listCards()).filter((c) => c.personId === w.theo.personId)).toEqual([]);
     });
   });
 }

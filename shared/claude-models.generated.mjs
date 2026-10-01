@@ -11,14 +11,14 @@
 // number typed into a file of ours would look authoritative while being a
 // guess. Running an old model by mistake is the failure being avoided.
 
-export const READ_FROM = "2.1.283";
-export const READ_AT = "2026-09-28";
+export const READ_FROM = "2.1.286";
+export const READ_AT = "2026-10-01";
 
 export const CLAUDE_MODELS = [
   {"alias":"opus","id":"claude-opus-5-5","label":"Opus 5.5","defaultLevel":"medium"},
   {"alias":"claude-opus-5","id":"claude-opus-5","label":"Opus 5","defaultLevel":"high"},
-  {"alias":"sonnet","id":"claude-sonnet-5","label":"Sonnet 5","defaultLevel":"high"},
-  {"alias":"claude-sonnet-4-6","id":"claude-sonnet-4-6","label":"Sonnet 4.6","defaultLevel":null},
+  {"alias":"sonnet","id":"claude-sonnet-5-5","label":"Sonnet 5.5","defaultLevel":"medium"},
+  {"alias":"claude-sonnet-5","id":"claude-sonnet-5","label":"Sonnet 5","defaultLevel":"high"},
   {"alias":"haiku","id":"claude-haiku-4-5","label":"Haiku 4.5","defaultLevel":null},
   {"alias":"claude-3-5-haiku","id":"claude-3-5-haiku","label":"Haiku 3.5","defaultLevel":null},
   {"alias":"fable","id":"claude-fable-5-1","label":"Fable 5.1","defaultLevel":"high"},

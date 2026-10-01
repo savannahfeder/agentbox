@@ -14,7 +14,9 @@
 
 import { engineLabel } from '../../shared/engines.mjs';
 import { PRIORITIES, priorityIdOf, type PriorityId } from './priority';
+import { isTroubleRow } from './trouble-row';
 import type { WorkItem } from './types';
+import { isUpdateRow } from './update-row';
 
 export type Harness = 'claude' | 'codex';
 
@@ -62,6 +64,18 @@ export function matchesBoxFilter(item: Row, f: BoxFilter, except?: FilterPart): 
 
 export function isFiltering(f: BoxFilter): boolean {
   return PARTS.some((part) => f[part] !== null);
+}
+
+/**
+ * THE BOX SHE IS LOOKING AT. The two rows the app makes itself belong to no
+ * project and always stay: a broken session or a waiting update is not
+ * something a filter should be able to hide. One copy, because the list and the
+ * advance after finishing a task (./advance) both read it, and when the advance
+ * read the whole inbox instead it opened tasks the filter hid (w-27759abd33).
+ */
+export function filterBox<T extends Row & { id?: string }>(rows: T[], f: BoxFilter): T[] {
+  if (!isFiltering(f)) return rows;
+  return rows.filter((i) => isTroubleRow(i) || isUpdateRow(i) || matchesBoxFilter(i, f));
 }
 
 /** Picking the value that is already on takes it off; anything else replaces it. */

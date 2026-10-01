@@ -41,7 +41,11 @@ it('counts what the Scheduled page actually lists, deferred rows and repeats', (
 });
 it('does not bounce out of an empty Scheduled page', () => {
   expect(app).not.toContain("if (view === 'snoozed' && snoozed.length === 0");
-  // The page heading takes the round's word too (w-581dbc6cc4), so the title
-  // over the list and the tab in the sidebar cannot say different things.
-  expect(app).toContain('className="workspace-title">{workspacePageTitle(view, DONE.noun)}');
+  // The heading used to name the list (w-581dbc6cc4), so it said Scheduled over
+  // an empty Scheduled page. approved 2026-10-01 (w-e731ca9376): every list is
+  // a tab on the Inbox page now, so the heading reads Inbox over all of them
+  // and the lit state tab under it says which list she is on. Either way the
+  // page she is standing on keeps its heading and its tab.
+  expect(app).toContain('<h1 className="workspace-title">Inbox</h1>');
+  expect(app).not.toContain('className="workspace-title">{workspacePageTitle(');
 });

@@ -122,7 +122,7 @@ describe('the ⌘K beat', () => {
     // other half of this beat is only read by somebody who pressed.
     expect(shut.quiet).toContain('type tutorial');
     // w-ec62ab6b38 (2026-09-28): her word for a row is thread now, not task.
-    expect(`${shut.lead}${shut.tail}`).toBe('Press  then start your first real thread.');
+    expect(`${shut.lead}${shut.tail}`).toBe('Press  to find any command, or N to start your first real thread.');
     expect(shut.key).toBe('⌘K');
   });
 
@@ -168,7 +168,9 @@ describe('the ⌘K beat', () => {
     // so `ring` flips the sentence above it rather than beside it, and there
     // are no neighbouring buttons left to stand off.
     const src = wiring('renderer/src/components/Onboarding.tsx');
-    expect(src).toContain("beside={run.step === 'where' || (run.step === 'command' && !!palette)}");
+    // The tab tour stands beside its ring except in the team layout, where a
+    // card beside one tab sat on the tabs after it (2026-10-01).
+    expect(src).toContain("beside={(run.step === 'where' && !teamStrip) || (run.step === 'command' && !!palette)}");
     expect(src).not.toContain("run.step === 'answer' ||");
     expect(src).not.toContain('.focus-actions button');
     expect(src).toContain('const all = [...document.querySelectorAll(sel)];');
@@ -216,14 +218,17 @@ describe('the tab strip', () => {
     // which is the only thing that beat is for.
     // The sidebar's list comes first since w-ec62ab6b38 (2026-09-28), because
     // the sidebar is what the walk draws now; `.tabs` is the last floor.
-    expect(ANCHOR.where).toEqual(['.workspace-navigation .workspace-tabs', '.tabs']);
+    // The team layout's own strip leads since 2026-10-01: there the sidebar
+    // holds only Inbox and Team, so it is not the strip the tour is about.
+    expect(ANCHOR.where).toEqual(['.th-bar .tm-tabs', '.workspace-navigation .workspace-tabs', '.tabs']);
     const src = read('renderer/src/components/Onboarding.tsx');
     // `goingTo` was called `nextTab` until 2026-09-02, when the working out
     // behind it moved into ../onboarding so the card's own sentences could be
     // drawn off the same answer as the ring. Same ring, and the name it gave
     // up is now the shared function's.
     // The sidebar's own row is rung first, the old strip's tab after it.
-    expect(src).toContain('[`.workspace-navigation [data-tab="${goingTo}"]`, `.tabs .tab[data-tab="${goingTo}"]`, ...ANCHOR.where ?? []]');
+    // And the team strip's own tab before both, found by its place (`teamTab`).
+    expect(src).toContain('[...(teamTab(goingTo) ? [teamTab(goingTo) as string] : []), `.workspace-navigation [data-tab="${goingTo}"]`, `.tabs .tab[data-tab="${goingTo}"]`, ...ANCHOR.where ?? []]');
     expect(src).toContain("const goingTo = run.step === 'where' ? nextTab(tabs, view) : null;");
     // And the card stands off the sidebar's right edge on that beat.
     expect(src).toContain("besideOf={run.step === 'where' ? '.workspace-navigation, .tabs' : undefined}");

@@ -19,6 +19,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const css = fs.readFileSync(path.join(root, 'renderer', 'src', 'styles.css'), 'utf8');
 const focus = fs.readFileSync(path.join(root, 'renderer', 'src', 'components', 'Focus.tsx'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'renderer', 'src', 'App.tsx'), 'utf8');
+const menu = fs.readFileSync(path.join(root, 'renderer', 'src', 'threads', 'ThreadMenu.tsx'), 'utf8');
 
 describe('the message just stops, because she dropped the line', () => {
   it('draws no rule over the foot', () => {
@@ -169,38 +170,49 @@ describe('the Done mark she picked', () => {
     expect(css).not.toContain('.dm-');
   });
 
+  // THE MARK IS A ROW NOW (w-e731ca9376, 2026-10-01). Her words on the bar it
+  // sat in: "This area is a bit cluttered... viewing the code, opening the
+  // terminal, and marking done would be better placed in maybe a little
+  // three-dot menu." So Done is the last row of the thread's menu, it keeps
+  // its two ticks as the row's mark, and it sits beside the terminal's row
+  // drawn at the same stroke, which is what sharing the terminal's class used
+  // to guarantee.
   it('draws two ticks and nothing else', () => {
-    expect(focus).toContain('<path d="m3 13 3.6 3.6L13.4 9" />');
-    expect(focus).toContain('<path d="m10.6 13 3.6 3.6L21 9" />');
-    expect(focus.match(/className="icon-btn done-mark"/g)).toHaveLength(1);
+    expect(menu).toContain('<path d="m3 13 3.6 3.6L13.4 9" />');
+    expect(menu).toContain('<path d="m10.6 13 3.6 3.6L21 9" />');
+    expect(menu.match(/function DoneMark/g)).toHaveLength(1);
+    expect(focus).not.toContain('done-mark');
   });
 
-  it("is the terminal's own component, not a copy of its colour", () => {
-    // It matches the colour of its neighbour, the terminal control. Sharing the class is what stops the two
-    // drifting, and the stroke has to match too, because a heavier one reads as
-    // a darker mark at this size.
-    expect(focus).toMatch(/className="icon-btn done-mark"[\s\S]{0,900}strokeWidth="1.1"/);
-    expect(css).toContain('.done-mark { order: 1; flex: 0 0 auto; margin-left: 4px; }');
+  it("is drawn the way the terminal's row beside it is drawn", () => {
+    expect(menu).toMatch(/function TerminalMark\(\) \{\s*return <svg \{\.\.\.mark\}>/);
+    expect(menu).toMatch(/function DoneMark\(\) \{\s*return <svg \{\.\.\.mark\}>/);
+    expect(css).not.toContain('.done-mark');
   });
 
-  it('sits last in the corner row, by order rather than by markup', () => {
-    expect(focus).toContain('{canFinish && cornerHeaderTarget && createPortal(doneButton, cornerHeaderTarget)}');
-    expect(css).toMatch(/\.done-mark \{[^}]*order: 1/s);
+  it('sits last in the thread’s menu, and only while there is something to finish', () => {
+    expect(menu).toMatch(/if \(finish\) rows\.push\(\{ id: 'done', label: 'Mark done', key: 'E' \}\);\s*return rows;/);
+    expect(focus).toContain('onFinish={canFinish ? onResolve : null}');
   });
 
   it('offers nothing to finish on a task that is already finished', () => {
     expect(focus).toContain("const canFinish = item.status !== 'done';");
   });
 
-  it('names the verb once, and every surface reads that one', () => {
+  it('names the verb once, and every surface reads that one', async () => {
     const rules = fs.readFileSync(path.join(root, 'renderer', 'src', 'list-rules.ts'), 'utf8');
-    const nav = fs.readFileSync(path.join(root, 'renderer', 'src', 'components', 'WorkspaceNavigation.tsx'), 'utf8');
     expect(word).toContain("export const DONE = { verb: 'Done', short: 'Done', noun: 'Done' };");
     expect(rules).toContain("{ key: 'E', word: DONE.short }");
-    expect(nav).toContain('doneNoun: DONE.noun');
     expect(app).toContain('DONE.verb} Task');
-    expect(app).toContain('workspacePageTitle(view, DONE.noun)');
-    expect(focus).toContain('aria-label={DONE.verb}');
+    // approved 2026-10-01 (w-e731ca9376): the Done place left the sidebar and
+    // the heading over every list reads Inbox, so the two readers that were
+    // there (the sidebar tab and the page title) are gone. The Done tab is now
+    // drawn by StateTabs on the Inbox page. Pages.tsx writes that label out
+    // rather than reading done-word.ts, so this compares the drawn word with
+    // the one word, which is what fails the day the two drift apart.
+    const { INBOX_TABS } = await import('../renderer/src/threads/Pages.tsx');
+    const { DONE } = await import('../renderer/src/done-word.ts');
+    expect(INBOX_TABS.find((t) => t.view === 'done').label).toBe(DONE.noun);
   });
 });
 
@@ -218,7 +230,9 @@ describe('the corner marks do not land on the code figures', () => {
     // The bar is a fixed 88 and the header is centred inside it, so growing the
     // header alone moves the TITLE, which is what the marks are aligned to.
     expect(nav).toContain('.workspace-layout.workspace-task .workspace-task-header { align-self: flex-start; margin-top: 18px; }');
-    expect(nav).toContain('.workspace-layout.workspace-task .workspace-task-header .keep-line > .focus-meta > .change-figures { transform: translateY(8px); }');
+    // The figures that dropped here left the line on w-e731ca9376
+    // (2026-10-01) for the thread's menu, and their drop went with them.
+    expect(nav).not.toMatch(/> \.change-figures \{ transform/);
   });
 
   // w-299ee43d2e, 2026-09-28: dropping the whole line pushed the words on the
@@ -233,7 +247,8 @@ describe('the corner marks do not land on the code figures', () => {
   it('moves the header with a margin, so the back chevron comes too', () => {
     // The chevron is absolute against the header with `top: 0`. Padding leaves
     // it behind at the bar's top edge, measured 18 points adrift of the title.
-    expect(nav).toContain('.workspace-task-header > .back-esc {\n position:absolute; left:0; top:0;');
+    // One point up since w-e731ca9376 (2026-10-01), still against the header.
+    expect(nav).toContain('.workspace-task-header > .back-esc {\n position:absolute; left:0; top:-1px;');
     expect(nav).not.toMatch(/\.workspace-task-header \{ align-self: flex-start; padding-top/);
   });
 
@@ -244,37 +259,49 @@ describe('the corner marks do not land on the code figures', () => {
 
 // THE CORNER ON A TASK IS THE TASK'S (w-581dbc6cc4). The '+' and ⌘K buttons
 // are not needed on a task page; they stay on the plain inbox list page.
+//
+// approved 2026-10-01 (w-e731ca9376): on the sidebar layout the plus and the ⌘
+// mark are not drawn at all, on a list or on a task. The right end of a list's
+// header is Search, New thread and Display (HeaderActions), and that whole
+// group stands down while a task is open, which keeps the rule above: the
+// corner on a task is the task's.
 describe('the corner carries the task on a task and the app on a list', () => {
   it('draws neither the plus nor the palette mark while a task is open', () => {
     expect(app).toContain('const taskOpen = workspaceNavigation && !!focused && !settingsOpen;');
-    expect(app).toMatch(/\{!taskOpen && <button[\s\S]{0,200}aria-label="New thread"/);
-    expect(app).toMatch(/\{!taskOpen && <button[\s\S]{0,200}aria-label="Commands"/);
+    expect(app).toMatch(/\{!taskOpen && !workspaceNavigation && <button[\s\S]{0,200}aria-label="New thread"/);
+    expect(app).toMatch(/\{!taskOpen && !workspaceNavigation && <button[\s\S]{0,200}aria-label="Commands"/);
+    // Search and New thread in the header go the same way on a task.
+    expect(app).toMatch(/\{workspaceNavigation && !focused && !settingsOpen && [^\n]*\(\s*<HeaderActions/);
   });
 
   it('costs neither verb a route she already has', () => {
-    // The sidebar carries New task on every screen including a task's, its own
-    // key opens it, ⌘K opens the palette, and both marks are untouched on the
-    // lists. The key itself is not this test's business and has changed once.
-    const nav = fs.readFileSync(path.join(root, 'renderer', 'src', 'components', 'WorkspaceNavigation.tsx'), 'utf8');
-    expect(nav).toContain('className="workspace-create"');
+    // New thread is a button at the right end of every list's header, and its
+    // key opens it on a list and on a task. ⌘K opens the palette from
+    // anywhere. The key itself is not this test's business and has changed once.
+    // On a task the sidebar's New thread button used to be a mouse route as
+    // well; it went with the redesign (approved 2026-10-01, w-e731ca9376), so
+    // there the key is the route.
+    const pages = fs.readFileSync(path.join(root, 'renderer', 'src', 'threads', 'Pages.tsx'), 'utf8');
+    expect(pages).toMatch(/className="th-new"[^>]*onClick=\{onCompose\}[^>]*>[\s\S]{0,40}New thread/);
+    expect(app).toMatch(/<HeaderActions[\s\S]{0,400}onCompose=\{\(\) => setModal\('compose'\)\}/);
+    // The key on a task is pinned in full in a-modal-cannot-outlive-its-task.
+    expect(app).toContain("e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }");
     expect(app).toMatch(/\(e\.metaKey \|\| e\.ctrlKey\) && e\.key\.toLowerCase\(\) === 'k'/);
   });
 });
 
 // THE MARK SAYS ITS KEY ON HOVER (w-581dbc6cc4). The Done button needs the
 // same shortcut hint on hover as its neighbours.
-describe('the Done mark hangs a hint plate like its neighbours', () => {
+// THE MARK HUNG A PLATE UNTIL IT BECAME A ROW (w-e731ca9376, 2026-10-01). A
+// row in the thread's menu prints its key beside its words, and a component
+// that already shows its key carries no plate, so the plate's line went too.
+describe('the Done row says its key the way its plate did', () => {
   const plate = fs.readFileSync(path.join(root, 'renderer', 'src', 'hint-plate.ts'), 'utf8');
 
-  it('carries the data-hint the plate is keyed by', () => {
-    expect(focus).toContain('data-hint="done"');
-    expect(plate).toContain("done: [{ key: 'E', what: 'Mark done' }],");
-  });
-
-  it('hangs it the way the corner marks beside it do', () => {
-    // It is at the right-hand end of the bar, so the plate lines up on its
-    // right edge rather than running off the window.
-    expect(focus).toMatch(/data-hint="done"\s*\n\s*data-hint-align="right"/);
+  it('prints E on its row and wears no plate', () => {
+    expect(focus).not.toContain('data-hint="done"');
+    expect(plate).not.toContain("done: [{ key: 'E', what: 'Mark done' }],");
+    expect(menu).toContain('<kbd>{row.key}</kbd>');
   });
 
   it('describes E exactly as the row plate describes it', () => {
@@ -282,5 +309,6 @@ describe('the Done mark hangs a hint plate like its neighbours', () => {
     // ways, and the row is where most people meet it.
     const row = plate.slice(plate.indexOf('  row: ['), plate.indexOf('  row: [') + 400);
     expect(row).toContain("{ key: 'E', what: 'Mark done' }");
+    expect(menu).toContain("{ id: 'done', label: 'Mark done', key: 'E' }");
   });
 });

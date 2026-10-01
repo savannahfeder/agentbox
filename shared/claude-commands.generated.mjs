@@ -10,8 +10,8 @@
 // build time, rather than typing them into a file, is the only way the list
 // cannot rot quietly.
 
-export const READ_FROM = "2.1.282";
-export const READ_AT = "2026-09-25";
+export const READ_FROM = "2.1.286";
+export const READ_AT = "2026-10-01";
 export const CLAUDE_COMMANDS = [
   {
     "name": "model",

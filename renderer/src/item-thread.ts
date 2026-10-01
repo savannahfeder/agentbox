@@ -41,6 +41,13 @@ import type { AgentEvent, AgentWork } from './types';
 // rest is its key input, already flattened to one string on the way to disk.
 const TOOL = /^\[([^\]]+)\]\s*(.*)$/;
 
+// A ROW'S ID ON ITS OWN IS HOW THE STORE ADDRESSES IT, NEVER WHAT A PERSON
+// READS. The trace keeps a store tool's `id` argument as the line's subject, so
+// a claim read "Claim work item w-4ac1af8c99" on a tester's screen
+// (2026-10-01). Only a subject that is nothing but an id goes; a command that
+// mentions one keeps it.
+const ROW_ID = /^w-[0-9a-f]{10}$/i;
+
 /**
  * THE CONCISE ANSWER, KEPT WHOLE, AT THE FOOT OF THE CONVERSATION.
  *
@@ -111,7 +118,7 @@ export interface ItemThread {
 
 /** One trace line that ran a tool, as the quiet line the thread draws. */
 function workLine(at: number, name: string, hint: string): AgentWork {
-  const subject = name === 'Bash' ? plainCommand(hint) : shortPath(hint);
+  const subject = ROW_ID.test(hint.trim()) ? '' : name === 'Bash' ? plainCommand(hint) : shortPath(hint);
   return {
     kind: 'work',
     at,
@@ -438,7 +445,7 @@ export function itemThread(
   //
   // `pending`: WHAT SHE HAS JUST SENT AND THE LEDGER DOES NOT HAVE YET. See
   // `PendingSaid`.
-  opts: { whole?: boolean; engine?: string | null; pending?: PendingSaid[] } = {},
+  opts: { whole?: boolean; engine?: string | null; pending?: PendingSaid[]; chat?: boolean } = {},
 ): ItemThread {
   // The pickup-to-run match is thread-history's, not a second copy of it: it is
   // the part that can be wrong while the screen still looks perfect (a run
@@ -622,7 +629,10 @@ export function itemThread(
   // AND THE ANSWER AT THE FOOT IS NEITHER WINDOWED NOR MISSING. It is on the
   // page, in full, below the stream, so it counts toward the head's total and
   // never toward the gap's.
-  const windowed = threadWindow(out, { whole: !!opts.whole }) as { events: AgentEvent[]; omitted: number };
+  // A CONVERSATION WITH A PERSON reads like a chat: the latest sixty messages,
+  // and everything older behind the line at the top, never a first message
+  // pinned above a gap.
+  const windowed = threadWindow(out, opts.chat ? { whole: !!opts.whole, opening: 0, keep: 60 } : { whole: !!opts.whole }) as { events: AgentEvent[]; omitted: number };
   const shown = saidCount(windowed.events) + (outcome ? 1 : 0);
   return { events: windowed.events, outcome, total: spoken, omitted: spoken - shown };
 }

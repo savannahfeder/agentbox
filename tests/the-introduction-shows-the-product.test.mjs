@@ -67,8 +67,11 @@ describe('the introduction shows the product', () => {
     expect(block.length).toBeGreaterThan(200);
     expect(block).not.toMatch(/transform:\s*scale/);
     expect(block).not.toMatch(/zoom:/);
-    // And it does run off the edge, which is how it stays full size.
-    expect(block).toMatch(/right:\s*-\d+px/);
+    // IT USED TO RUN OFF THE RIGHT EDGE to stay full size. At 1440 by 900 a
+    // persona test read that as a panel that did not fit (2026-10-01), so it
+    // stops short of the edge now and is still not scaled.
+    expect(block).not.toMatch(/right:\s*-\d+px/);
+    expect(block).toMatch(/right:\s*\d+px/);
   });
 
   it('centres the words with a flex box, never with a transform', () => {

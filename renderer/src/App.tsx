@@ -13,10 +13,10 @@ import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, View, WorkItem } from './types';
+import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import { api } from './api';
 import { setClaudeModels } from './models';
-import { advanceAfter, type Advance } from './advance';
+import { advanceAfter, nextAfterAdvance, type Advance } from './advance';
 import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
 import { isTroubleRow, troubleRow } from './trouble-row';
@@ -26,13 +26,14 @@ import type { PendingSaid } from './item-thread';
 import { DocPane, type OpenDoc } from './components/DocPane';
 import { docKind, EVEN_SPLIT, escapeClosesDoc, escapeInTheFileClosesIt, focusIsInTheFile, readSplit, writeSplit } from './doc-pane';
 import { changeOwnsKey } from './code-keys';
-import { askStillStands, nextUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO } from './undo-window';
+import { askStillStands, nextUndo, shownAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO } from './undo-window';
 import { whatTheFileSentUp } from '../../shared/artifact-keys.mjs';
 import { type Place, placeIsSomewhere, readPlace, writePlace, writeScroll } from './where-she-was';
 import { documentCandidates } from './message-artifacts';
 import { filesFromRuns } from './run-files';
 import { Rail } from './components/Rail';
 import { Compose } from './components/Compose';
+import { ThreadComposer } from './threads/ThreadComposer';
 import { proposeParent } from '../../shared/project-folder-check.mjs';
 import { NewProject } from './components/NewProject';
 import { ImportAgents } from './components/ImportAgents';
@@ -53,7 +54,7 @@ import { announcesUpdate, isUpdateRow, updateRow } from './update-row';
 import { IdlePage } from './components/IdlePage';
 import { ago, itemOptions, offerIsLive, parseRepeat } from './format';
 import {
-  hasDraft, restoreDraft, restoreFailedDraft, readComposeDraft, restoreComposeDraft,
+  hasDraft, restoreDraft, restoreFailedDraft, readComposeDraft, restoreComposeDraft, saveDraft, clearComposeDraft,
   type SentDraft, type ComposeDraft,
 } from './drafts';
 import { approvalStage } from './approval-stage';
@@ -105,7 +106,7 @@ import {
   saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, wearsTheWalksLook, whyNotMade, type FirstRun,
 } from './onboarding';
 import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from './priority';
-import { NO_FILTER, filterMenu, filterTags, isFiltering, matchesBoxFilter, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
+import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
 import { BoxFilter } from './components/BoxFilter';
 import { itemPriority, moveProduct, productRankScore } from '../../shared/rank.mjs';
 import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
@@ -113,6 +114,10 @@ import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
 import { TeamContext, teamView } from './team/people';
 import { TeamPage } from './team/TeamPage';
+import { EmptyTab, HeaderActions, InboxBoard, InboxClear, LiveContext, StateTabs, TeamView } from './threads/Pages';
+import { MessagePerson, TeammateCard } from './threads/Summary';
+import { SignInPage } from './team/SignInPage';
+import { conversationWith, isDirect, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing' | 'themes';
 
@@ -466,9 +471,49 @@ export default function App() {
   // THE TEAM PAGE, a page like Settings: it takes the main area and leaves the
   // header and the sidebar where they are.
   const [teamOpen, setTeamOpen] = useState(() => new URLSearchParams(location.search).has('team'));
+  // TEAM MEMBERS AND INVITING, from the foot of the sidebar: the team's setup page.
+  const [membersOpen, setMembersOpen] = useState(false);
+  // A TEAMMATE'S THREAD, opened from the Team board: its card, never its conversation.
+  const [openCard, setOpenCard] = useState<ThreadCard | null>(null);
+  // Invite people and Team members open the same page; this says which, so the
+  // sidebar lights the one pressed and Invite puts the cursor in the email box.
+  const [inviteFocus, setInviteFocus] = useState(false);
+  // WHAT THE COMPOSER OPENS WITH, when something hands it a start: "Hand it to
+  // an agent" on a message from a person turns that message into a thread.
+  const [composeInitial, setComposeInitial] = useState<{ to?: string; body?: string } | null>(null);
+  // OPEN A CONVERSATION WITH THE REPLY BOX READY, carrying what was typed. The
+  // composer hands over here when its To is someone you already talk to, and
+  // "Message Maya" comes here first.
+  const openConversation = useCallback((convo: WorkItem, draft = '') => {
+    if (draft.trim()) saveDraft(convo, draft);
+    clearComposeDraft();
+    setComposeInitial(null);
+    setTeamOpen(false);
+    setOpenCard(null);
+    setFocused(convo);
+    setModal('reply');
+  }, []);
+  const handToAgent = useCallback((item: WorkItem) => {
+    const from = item.createdBy ? teamView(snap?.team ?? null, snap?.products ?? [])?.byId.get(item.createdBy)?.name : null;
+    const quoted = (item.body ?? item.title ?? '').trim();
+    setComposeInitial({ to: 'agent', body: from ? `${from} asked:\n\n${quoted}\n\n` : `${quoted}\n\n` });
+    setModal('compose');
+  }, [snap?.team, snap?.products]);
   // Drawn when it is open and nothing sits over it: an opened task or Settings
   // takes the page, and closing them returns to the Team page.
   const teamShown = teamOpen && !focused && !settingsOpen;
+  // THE SIGN-IN PAGE STANDS OVER EVERYTHING when a team build has nobody
+  // signed in, once the saved sign-in has been looked for (team/SignInPage.tsx).
+  // Signing out lands on it, and it says so.
+  const signInGate = !api.isFixtures && !!snap?.team?.configured && snap.team.started === true && !snap.team.signedIn;
+  const wasSignedIn = useRef(false);
+  const [signedOutHere, setSignedOutHere] = useState(false);
+  useEffect(() => {
+    if (snap?.team?.signedIn) { wasSignedIn.current = true; setSignedOutHere(false); }
+    else if (wasSignedIn.current && snap?.team?.started) setSignedOutHere(true);
+  }, [snap?.team?.signedIn, snap?.team?.started]);
+  const signInGateRef = useRef(false);
+  signInGateRef.current = signInGate;
   /*
    * EVERYTHING DRAWN OVER THE APP, IN ONE PLACE.
      Read by `closeWhatFloats` below, which is how a walk hands the whole window
@@ -649,6 +694,8 @@ export default function App() {
     undoes: string;
     run: () => Promise<void>;
     restore?: () => Restored;
+    /** The row this puts back, which a Z opens once it has run (./undo-window, `shownAfterUndo`). */
+    brings?: WorkItem;
   };
   const [undoStack, setUndoStack] = useState<Array<Undoable & { at: number }>>([]);
   /**
@@ -1695,6 +1742,11 @@ export default function App() {
       // is the exception, and it has somewhere to be: Scheduled.
       if (i.id === pendingId && deferredUntil <= now) return true;
       if (!teamProgress(i)) return false;
+      // A MESSAGE IS NEVER RUNNING. Nothing is working on it; it waits on a
+      // person, and the two persona tests both read "Running" there as an
+      // agent at work. It shows in Needs you when it is yours to answer, and
+      // under All otherwise.
+      if (isDirect(snap?.products.find((p) => p.slug === i.product))) return false;
       // A task you gave a teammate is moving, for you, until it is done.
       if (team && heldByAPerson(i) && isShared(team.products.get(i.product))) return i.status !== 'done';
       return belongsInProgress(i, { deferredUntil, now });
@@ -1712,8 +1764,14 @@ export default function App() {
   ].sort(byRunningOrder(score)),
   [items, agentList, agentMode, scope, pendingId, dueAt, score, now, team, teamProgress]);
 
-  const done = useMemo(() => items.filter((i) => i.status === 'done' && (!scope || i.product === scope))
-    .sort((a, b) => b.updatedAt - a.updatedAt), [items, scope]);
+  // NOT A ROW THAT STILL NEEDS HER (2026-10-01): an agent's done on her own
+  // thread waits in Needs you until she closes it, and Done counted it too,
+  // so the tabs read "DONE 2 · ALL 2" with two rows still needing her.
+  const done = useMemo(() => {
+    const needsYou = new Set(inbox.map((i) => i.id));
+    return items.filter((i) => i.status === 'done' && (!scope || i.product === scope) && !needsYou.has(i.id))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [items, scope, inbox]);
 
   // Scheduled is the future inbox: everything waiting for its moment, soonest
   // first. The view only exists while something is in it. It holds two things
@@ -1861,17 +1919,43 @@ export default function App() {
   // a waiting update is not something a filter should be able to hide. Search
   // ignores the filter, as it has always ignored the product filter, because
   // it reads every project and every tab on purpose.
+  // ALL (the team version, approved 2026-10-01): every open thread of yours,
+  // whatever it is waiting on, as one list.
+  // ALL IS EVERYTHING OPEN, YOUR CONVERSATIONS INCLUDED. A conversation whose
+  // turn is the other person's is in no other tab (it is not running and it
+  // does not need you), so without this a message you just answered vanished
+  // from the Inbox altogether.
+  const allOpen = useMemo(() => {
+    const seenIds = new Set<string>();
+    const talking = items.filter((i) => !i.agent && i.status !== 'done' && isDirect(snap?.products.find((p) => p.slug === i.product)));
+    return [...inbox, ...progress, ...snoozed, ...talking].filter((i) => (seenIds.has(i.id) ? false : (seenIds.add(i.id), true)));
+  }, [inbox, progress, snoozed, items, snap?.products]);
   const wholeBox = view === 'inbox' ? inbox
     : view === 'snoozed' ? snoozed
       : view === 'progress' ? progress
-        : done;
-  const shownBox = useMemo(
-    () => (isFiltering(boxFilter)
-      ? wholeBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || matchesBoxFilter(i, boxFilter))
-      : wholeBox),
-    [wholeBox, boxFilter],
+        : view === 'all' ? allOpen
+          : done;
+  const shownBox = useMemo(() => filterBox(wholeBox, boxFilter), [wholeBox, boxFilter]);
+  // THE DISPLAY MENU'S FILTERS AND SORT, on top of the box (approved
+  // 2026-10-01). Remembered per page; the Inbox is a list by default and the
+  // Team a board.
+  const [inboxDisplay, setInboxDisplayRaw] = useState<Display>(() => readDisplay('inbox'));
+  const [teamDisplay, setTeamDisplayRaw] = useState<Display>(() => readDisplay('team'));
+  const setInboxDisplay = useCallback((d: Display) => { setInboxDisplayRaw(d); writeDisplay('inbox', d); }, []);
+  const setTeamDisplay = useCallback((d: Display) => { setTeamDisplayRaw(d); writeDisplay('team', d); }, []);
+  const displayedBox = useMemo(
+    () => sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay),
+    [shownBox, inboxDisplay, now],
   );
-  const list = search !== null ? (hits ?? []).map((h) => h.item) : shownBox;
+  // The inbox as she sees it, whichever tab is up: her filter AND her display
+  // menu. Finishing a task from inside it advances through THIS, never the
+  // whole inbox, or the next task opened can be one she has hidden
+  // (w-27759abd33).
+  const shownInbox = useMemo(
+    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay),
+    [inbox, boxFilter, inboxDisplay, now],
+  );
+  const list = search !== null ? (hits ?? []).map((h) => h.item) : displayedBox;
   const boxFilterMenu = useMemo(
     () => (modal === 'filter' ? filterMenu(wholeBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i)), boxFilter, snap?.products ?? []) : null),
     [modal, wholeBox, boxFilter, snap?.products],
@@ -1886,6 +1970,20 @@ export default function App() {
     if (run?.step !== 'working' || !run.item) return real;
     return [{ itemId: run.item, product: run.product ?? '', startedAt: run.sentAt ?? Date.now(), tail: [] }, ...real];
   }, [snap?.supervisor.running, run?.step, run?.item, run?.product, run?.sentAt]);
+  // THE THREADS AN AGENT IS ON RIGHT NOW: the turning mark (threads/Pages.tsx).
+  const liveIds = useMemo(() => new Set(runningRows.map((r) => r.itemId)), [runningRows]);
+  // ONE RULE FOR WHERE A THREAD SITS, THE TABS' OWN (her note, 2026-10-01: the
+  // board said Running for queued work the tab did not). Needs you wins, then
+  // In progress, Scheduled and Done, exactly as the tabs list them.
+  const tabState = useMemo(() => {
+    const m = new Map<string, ThreadStateWord>();
+    for (const i of done) m.set(i.id, 'done');
+    for (const i of snoozed) m.set(i.id, 'scheduled');
+    for (const i of progress) m.set(i.id, 'running');
+    for (const i of inbox) m.set(i.id, 'waiting');
+    return m;
+  }, [inbox, progress, snoozed, done]);
+  const stateOfMine = useCallback((i: WorkItem) => tabState.get(i.id) ?? null, [tabState]);
 
   const current: WorkItem | undefined = list[Math.min(selected, Math.max(0, list.length - 1))];
   // THE ROW THE ROW-KEYS ACT ON. The pointer's row when it is on one, and the
@@ -2403,9 +2501,9 @@ export default function App() {
     setView('inbox');
     // Pointed at the row she was just reading, which is where it now sits with
     // its answer on it, rather than at the top of a list she did not ask for.
-    const at = inbox.findIndex((i) => i.id === following.id && i.product === following.product);
+    const at = shownInbox.findIndex((i) => i.id === following.id && i.product === following.product);
     setSelected(at >= 0 ? at : 0);
-  }, [focused, following, inbox]);
+  }, [focused, following, shownInbox]);
 
   // She clicked the banner, so open the row it was about. It lands her on the
   // card rather than on whatever the cursor was left on, which is the whole
@@ -2641,9 +2739,9 @@ export default function App() {
   // cost her are in ./advance; what is here is only which state answers "was a
   // task open when she acted", and that is `focused`.
   const noteAdvance = useCallback((item: WorkItem) => {
-    const index = inbox.findIndex((i) => i.id === item.id);
+    const index = shownInbox.findIndex((i) => i.id === item.id);
     advanceRef.current = advanceAfter({ fromTask: !!focused, index, id: item.id });
-  }, [inbox, focused]);
+  }, [shownInbox, focused]);
 
   // AND EVERY WAY A ROW LEAVES HER INBOX CLOSES THE TASK THROUGH HERE.
   //
@@ -2782,7 +2880,7 @@ export default function App() {
     }
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, status: 'done' });
-      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'open' }); } });
+      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'open' }); } });
     }, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`);
   }, [deferCommit, closeAgentRow, closeTroubleRow, closeUpdateRow, snap?.supervisor.spawnTrouble?.since, snap?.update?.newVersion, run, showToast, pushUndo]);
 
@@ -2819,7 +2917,7 @@ export default function App() {
         // user-visible strings held one, and they are the four undo labels, the
         // two stop toasts and the resume toast. Everything else was comment
         // prose, which she never reads.
-        pushUndo({ label: 'Approval withdrawn, back in your inbox', undoes: 'take back that approval and stop the agent', run: async () => {
+        pushUndo({ label: 'Approval withdrawn, back in your inbox', undoes: 'take back that approval and stop the agent', brings: item, run: async () => {
           await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
           await api.answer({ product: item.product, id: item.id, answer: '(withdrawn)', status: 'open' });
         } });
@@ -3061,7 +3159,10 @@ export default function App() {
     // handed in rather than read off `item.engine`, which is what she MARKED
     // and may be a row from before the gate; this is what will really pick it
     // up.
-    const stay = staysOnTheTask(item, text, engine);
+    // A REPLY IN A CONVERSATION STAYS IN THE CONVERSATION (persona test,
+    // 2026-10-01: sending to Bea "kicked me out to search").
+    const talking = isDirect(snap?.products.find((p) => p.slug === item.product));
+    const stay = staysOnTheTask(item, text, engine) || talking;
     if (stay) setFollowing({ product: item.product, id: item.id });
     await deferCommit(item, async () => {
       await api.answer({
@@ -3098,8 +3199,8 @@ export default function App() {
         // means what it always meant.
         setFollowing(null);
       } });
-    }, `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id });
-  }, [deferCommit, snap?.supervisor.running, showToast, refresh, markSeen, pushUndo]);
+    }, talking ? 'Sent' : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id });
+  }, [deferCommit, snap?.supervisor.running, snap?.products, showToast, refresh, markSeen, pushUndo]);
 
   /* ------------------------ answering one of her agents -------------------- */
   // THE ONE THING AGENTBOX SAYS OUT LOUD TO THE REST OF HER MACHINE. The reply goes
@@ -3190,7 +3291,7 @@ export default function App() {
     const status = statusForReply(item.status);
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, answer: `Option ${option.n}: ${option.text}`, ...(status ? { status } : {}) });
-      pushUndo({ label: `Option ${option.n} withdrawn, back in your inbox`, undoes: `take back option ${option.n}`, run: async () => {
+      pushUndo({ label: `Option ${option.n} withdrawn, back in your inbox`, undoes: `take back option ${option.n}`, brings: item, run: async () => {
         await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
         // Back exactly where the pick found it, the same one write a typed
         // reply's undo makes. Hardcoding 'open' was right while a pick could
@@ -3568,10 +3669,15 @@ export default function App() {
       return;
     }
     undoAskRef.current = null;
+    // The close that put this row away also queued the step onto the next task.
+    // If that step has not been taken yet, it must not be taken now, or it
+    // would open the next task straight over the row this Z brings back.
+    advanceRef.current = null;
     setUndoStack(rest);
     await last.run();
     const restored = last.restore?.();
     const item = restoredItem(restored ?? null);
+    const shown = shownAfterUndo(restored, last.brings);
     // Say what the undo actually did, AND WHERE THE WORDS WENT, because the two
     // boxes are different places and she has to be told which one to look in. A
     // bare "Undone" left her hunting for a task Z had silently pulled out of
@@ -3585,13 +3691,18 @@ export default function App() {
     // A withdrawn reply reopens where she was writing it, words and all. A
     // withdrawn new task reopens the card instead: there is no thread to go to,
     // and the whole point of the press was to add a sentence to what was written.
-    if (item) { setFocused(item); markSeen(item); }
-    else if (restored) { setFocused(null); setModal('compose'); }
+    // AND A ROW IT PUT BACK IS OPENED, the same as a Z inside the grace window
+    // opens it. It used to be announced and left in the list, while she stayed
+    // on whatever the close had moved her to (w-7eb39d3c97).
+    if (shown.open) { setFocused(shown.open); markSeen(shown.open); }
+    else if (shown.compose) { setFocused(null); setModal('compose'); }
   }, [undoStack, refresh, showToast, markSeen]);
 
   /* ------------------------------- keyboard ------------------------------- */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Nothing behind the sign-in page answers a key.
+      if (signInGateRef.current) return;
       // EVERY OTHER KEY ANSWERS NO TO THE QUESTION A LATE Z ASKED, and it is
       // here, above every screen guard, because the answer is no wherever she
       // happens to be typing. Only a second Z goes through with it (`undo`).
@@ -3993,11 +4104,9 @@ export default function App() {
     const pending = advanceRef.current;
     if (!pending || view !== 'inbox' || focused) return;
     advanceRef.current = null;
-    const remaining = inbox.filter((i) => i.id !== pending.excludeId);
-    const index = Math.min(pending.index, remaining.length - 1);
-    const next = remaining[index];
-    if (next) { setFocused(next); markSeen(next); setSelected(index); }
-  }, [inbox, view, focused, markSeen]);
+    const next = nextAfterAdvance(shownInbox, pending);
+    if (next) { setFocused(next.item); markSeen(next.item); setSelected(next.index); }
+  }, [shownInbox, view, focused, markSeen]);
 
   /* -------------------------------- render -------------------------------- */
   // (Hooks live ABOVE the boot return: below it, React counts them
@@ -4013,7 +4122,6 @@ export default function App() {
   const artifactView = artifactPlacement(artifactMode, artifactWidth);
   const [artifactHeader, setArtifactHeader] = useState<HTMLDivElement | null>(null);
   const readingWidth = 'balanced';
-  const [terminalHeaderTarget,setTerminalHeaderTarget]=useState<HTMLSpanElement|null>(null);
   const [taskHeader, setTaskHeader] = useState<HTMLDivElement | null>(null);
   // The socket look B of w-581dbc6cc4's round teleports the code mark into.
   const [cornerHeaderTarget, setCornerHeaderTarget] = useState<HTMLSpanElement | null>(null);
@@ -4198,7 +4306,11 @@ export default function App() {
   // an empty inbox drew that sentence behind her card. The idle page stays up
   // under the overlay now, which is the call `idlePinned` above already makes
   // about the theme for exactly the same reason.
-  const inboxEmpty = view === 'inbox' && inbox.length === 0 && !focused && !settingsOpen && search === null;
+  // THE TEAM VERSION KEEPS ITS TABS ON AN EMPTY INBOX (2026-10-01): her words,
+  // "it's supposed to show those categories... but I don't see them". So the
+  // whole-page zero is only the old layout's; the new one draws its zero under
+  // the tabs, in the list's place (threads/Pages.tsx, InboxClear).
+  const inboxEmpty = !workspaceNavigation && view === 'inbox' && inbox.length === 0 && !focused && !settingsOpen && search === null;
 
   // AND A VIEW WITH NOTHING IN IT DRAWS NO CARD EITHER. The other half of the
   // same directive: painting the sentence out of the empty pane leaves a large
@@ -4209,8 +4321,10 @@ export default function App() {
   // SEARCH IS NOT THIS. A query that matches nothing still gets the card and
   // still gets its sentence (List.tsx says why), so this asks for search to be
   // off, not merely empty.
-  const bareView = search === null && !focused && !focusedRepeat && list.length === 0
+  const emptyView = search === null && !focused && !focusedRepeat && list.length === 0
     && !(view === 'snoozed' && repeats.length > 0);
+  const bareView = search === null && !focused && !focusedRepeat && list.length === 0
+    && !(view === 'snoozed' && repeats.length > 0) && !workspaceNavigation;
   // ONE SURFACE ON AN OPENED TASK (design C): no card, hairlines
   // only, and the reading column centred on the window rather than on the pane
   // the panel left over. `flat` is the same condition that used to draw the
@@ -4238,7 +4352,9 @@ export default function App() {
   // merely further up.
   return (
     <TeamContext.Provider value={team}>
+    <LiveContext.Provider value={liveIds}>
     <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${workspaceCollapsed ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}`}>
+      {signInGate && <SignInPage signedOut={signedOutHere} error={snap?.team?.error ?? null} />}
       {/* THE TOP BAR IS NOT DRAWN ON AN OPENED TASK.
 
           WHAT REPLACES IT IS NOT NOTHING, and the reason is three buttons this
@@ -4255,7 +4371,10 @@ export default function App() {
        */}
       {reviewLab && <div className="review-lab-controls"><span>Review exploration</span><select aria-label="Focus controls" value={focusControlStyle} onChange={e=>setFocusControlStyle(e.target.value as FocusControlStyle)}><option value="text">Focus · Text only</option><option value="corners">Focus · Frame corners + label</option><option value="corners-icon">Focus · Frame corners button</option><option value="corners-bare">Focus · Bare frame corners</option><option value="layout">Focus · Workspace layout</option></select><select aria-label="Review file type" value={artifactPreviewSample} onChange={e=>{setArtifactPreviewSample(e.target.value);setOpenDoc(null);}}><option value="code">Code</option><option value="design">Design</option><option value="notes">Text</option><option value="multiple">All three</option></select><select aria-label="Review actions" value={reviewStyle} onChange={e=>setReviewStyle(e.target.value)}><option value="header-balanced-open">1 · Balanced · open only</option><option value="header-tools-open">2 · Compact · open only</option><option value="header-card-only">3 · Clickable card · no controls</option><option value="header-feedback-only">4 · Clickable card · feedback tools</option><option value="header-balanced">Compare · all controls</option></select>{artifactPreviewSample !== "code" &&<select aria-label="Text surface" value={textReviewStyle} onChange={e=>setTextReviewStyle(e.target.value)}><option value="clear">Text · Fully transparent</option><option value="glass">Text · Matched glass</option></select>}</div>}
       {!reviewLab && api.isFixtures && new URLSearchParams(location.search).has('artifactTweaks') && <div className="artifact-tweaks"><select aria-label="Design toolbar" value={designToolbar} onChange={e => setDesignToolbar(e.target.value)}><option value="floating">Floating bar</option><option value="corner">Corner controls</option><option value="edge">Top edge</option><option value="always">Always visible</option></select>{focused && <select aria-label="Sample artifact" value={artifactPreviewSample} onChange={e => { setArtifactPreviewSample(e.target.value); setOpenDoc(null); }}><option value="multiple">Multiple artifacts</option><option value="design">Design sample</option><option value="code">Code sample</option><option value="notes">Notes sample</option></select>}</div>}
-      {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? 'settings' : null} teamPage={teamShown} hasTeam={!!snap?.team?.configured} onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
+      {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? 'settings' : teamShown && membersOpen ? (inviteFocus ? 'invite' : 'members') : null} teamPage={teamOpen && !settingsOpen && !membersOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
+        onInvite={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setInviteFocus(true); setMembersOpen(true); setTeamOpen(true); }}
+        onMembers={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setInviteFocus(false); setMembersOpen(true); setTeamOpen(true); }}
+        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setMembersOpen(false); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setMembersOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
           only part of our own document lying over the file, so a pointer
           brought up there wakes the marks that a pointer moving across the
@@ -4317,10 +4436,10 @@ export default function App() {
               // is a string. The fallback is what the compiler wants now that
               // the test is a named rule and not an inline `search !== null`.
               value={search ?? ''}
-              placeholder="Search tasks"
+              placeholder="Search threads"
               spellCheck={false}
               autoComplete="off"
-              aria-label="Search tasks"
+              aria-label="Search threads"
               onChange={(e) => { setSearch(e.target.value); setSelected(0); }}
               onKeyDown={(e) => {
                 // The list's own keys, forwarded from inside the field, because
@@ -4346,7 +4465,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">Team</h1> : <h1 className="workspace-title">{workspacePageTitle(view, DONE.noun)}</h1>)) : (
+        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">{membersOpen ? 'Team members' : 'Team'}</h1> : <h1 className="workspace-title">Inbox</h1>)) : (
         <nav
           className="tabs"
           /* NO HINT ON THIS NAV. It carried one while the keys were ⌘⌥ and an
@@ -4374,8 +4493,8 @@ export default function App() {
           {search === null && <button
             className="icon-btn tab-search"
             data-hint="search"
-            title="Search tasks"
-            aria-label="Search tasks"
+            title="Search threads"
+            aria-label="Search threads"
             onClick={openSearch}
           >
             <SearchIcon />
@@ -4477,13 +4596,15 @@ export default function App() {
               engine: snap.usage?.engine ?? null,
             })}
           />}
-          {workspaceNavigation && focused && <span style={{display:'contents'}} ref={setTerminalHeaderTarget}/>}
-          {/* AND THE SOCKET THE MARK THAT FINISHES A TASK IS TELEPORTED INTO
-              (w-581dbc6cc4). It is drawn by Focus because only Focus knows
-              whether this row can still be finished, and it lands here because
-              the corner is where a task's own controls live. `order` decides
-              where in the row it sits, not this. */}
-          {workspaceNavigation && focused && <span style={{display:'contents'}} ref={setCornerHeaderTarget}/>}
+          {/* AND THE SOCKET A THREAD'S OWN CONTROLS ARE TELEPORTED INTO: the
+              Summary button and the thread's menu, which holds the code, the
+              terminal and Done (w-e731ca9376, 2026-10-01). They are drawn by
+              Focus because only Focus knows which of them this thread has, and
+              they land here because the corner is where a task's own controls
+              live. */}
+          {/* Not while Settings or the Team page covers the thread: the thread's
+              state and Summary button were left standing in their header. */}
+          {workspaceNavigation && focused && !settingsOpen && !teamShown && <span style={{display:'contents'}} ref={setCornerHeaderTarget}/>}
           {/* THE FILTER, LEFT OF THE PLUS (w-aa3fa4cbf0): a small filter icon
               button just left of the plus. Over a box
               only: an opened task has no box to narrow.
@@ -4493,7 +4614,22 @@ export default function App() {
               there is a cross that drops somebody out of the middle of their
               first five minutes and into an app they have not been shown. The
               band above the window is what says where they are. */}
-          {!focused && !settingsOpen && !inPractice && (
+          {/* SEARCH, NEW THREAD AND DISPLAY (approved 2026-10-01): the whole of
+              the right end on the Inbox and the Team. Display holds the view,
+              the sort and the filters. */}
+          {workspaceNavigation && !focused && !settingsOpen && !(teamShown && membersOpen) && (
+            <HeaderActions
+              page={teamShown ? 'team' : 'inbox'}
+              display={teamShown ? teamDisplay : inboxDisplay}
+              onDisplay={teamShown ? setTeamDisplay : setInboxDisplay}
+              products={snap.products}
+              onSearch={openSearch}
+              onCompose={() => setModal('compose')}
+              shown={teamShown ? undefined : displayedBox.length}
+              total={teamShown ? undefined : shownBox.length}
+            />
+          )}
+          {!workspaceNavigation && !focused && !settingsOpen && !inPractice && (
             <BoxFilter
               filter={boxFilter}
               menu={boxFilterMenu ?? { projects: [], moreProjects: [], priorities: [], harnesses: [] }}
@@ -4514,7 +4650,7 @@ export default function App() {
               NEITHER VERB LOSES A ROUTE SHE HAS. The sidebar carries New task on
               every screen including this one, C still opens it, ⌘K still opens
               the palette, and both marks are untouched on the lists. */}
-          {!taskOpen && <button
+          {!taskOpen && !workspaceNavigation && <button
             className="icon-btn"
             data-hint="new-task"
             data-hint-align="right"
@@ -4538,7 +4674,7 @@ export default function App() {
               discovery point for the palette, which otherwise had no easy entry
               point, so it stays on every list, where somebody meeting the app
               for the first time is. */}
-          {!taskOpen && <button
+          {!taskOpen && !workspaceNavigation && <button
             className="icon-btn"
             data-hint="commands"
             data-hint-align="right"
@@ -4626,8 +4762,45 @@ export default function App() {
       {teamShown && (
         <div className="body tm-body">
           <main className="list-pane">
-            <TeamPage team={snap?.team} products={snap?.products ?? []} items={items} now={now}
-              onOpen={(item) => { setTeamOpen(false); setFocused(item); markSeen(item); }} />
+            {/* THE TEAM (approved 2026-10-01): everyone's threads as a board by
+                default, yours from this Mac and your teammates' from their
+                cards. Until you are signed in and on a team, and on Team
+                members or Invite people, the setup page stands in. */}
+            {snap?.team?.signedIn && snap.team.team && !membersOpen ? (
+              <div className="tm-team-pane th-pane">
+                {openCard && (
+                  /* A TEAMMATE'S THREAD (approved round 9): one card with the
+                     same summary fields, and Message Maya in its top bar. */
+                  <div className="th-card-page">
+                    <div className="th-card-bar">
+                      <button type="button" className="th-back" onClick={() => setOpenCard(null)}><span aria-hidden="true">←</span>Team</button>
+                      <MessagePerson person={team?.byId.get(openCard.personId) ?? null}
+                        onMessage={() => {
+                          const convo = conversationWith(openCard.personId, { products: snap.products, items, me: team?.me ?? null });
+                          if (convo) openConversation(convo);
+                          else { setComposeInitial({ to: openCard.personId }); setModal('compose'); }
+                        }} />
+                    </div>
+                    {/* Which thread this is, which the card alone never said. */}
+                    {openCard.title && <h2 className="th-card-title">{openCard.title}</h2>}
+                    <TeammateCard card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now} />
+                  </div>
+                )}
+                {/* Kept mounted under an open card, so Back finds the person
+                    and project it was filtered to (a persona test lost both). */}
+                <div hidden={!!openCard}>
+                <TeamView items={items} products={snap.products} cards={snap.team.cards ?? []} display={teamDisplay} now={now} stateOf={stateOfMine}
+                  // BACK RETURNS TO TEAM (her bug, 2026-10-01): the Team page
+                  // stays open under a thread opened from it, so closing the
+                  // thread lands where she came from, not on the Inbox.
+                  onOpenItem={(item) => { setFocused(item); markSeen(item); }}
+                  onOpenCard={(card) => setOpenCard(card)} />
+                </div>
+              </div>
+            ) : (
+              <TeamPage team={snap?.team} products={snap?.products ?? []} items={items} now={now} forceSetup={membersOpen} inviteFocus={inviteFocus}
+                onOpen={(item) => { setFocused(item); markSeen(item); }} />
+            )}
           </main>
         </div>
       )}
@@ -4698,8 +4871,12 @@ export default function App() {
                 />
               ) : focused ? (
                 <Focus
+                  // The summary panel reads the live rows for its linked
+                  // threads, and a message from a person can be handed to an
+                  // agent from its page.
+                  items={items}
+                  onHandToAgent={handToAgent}
                   headerTarget={workspaceNavigation ? taskHeader : null}
-                  terminalHeaderTarget={terminalHeaderTarget}
                   cornerHeaderTarget={cornerHeaderTarget}
                   inlineArtifacts={workspaceNavigation}
                   previewSample={api.isFixtures && (reviewLab || new URLSearchParams(location.search).has('artifactTweaks')) ? artifactPreviewSample : undefined}
@@ -4817,7 +4994,30 @@ export default function App() {
                   stoppable={!walking && stoppableNow(focused)}
                 />
               ) : (
-                <List
+                <>
+                {/* THE STATE TABS (approved 2026-10-01): Needs you, Running,
+                    Scheduled, Done and All, on the Inbox itself. They replace
+                    the sidebar places they used to be. */}
+                {workspaceNavigation && search === null && inboxDisplay.view === 'board' ? (
+                  <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine}
+                    onOpenItem={(item) => { setFocused(item); markSeen(item); }} />
+                ) : <>
+                {workspaceNavigation && search === null && (
+                  <StateTabs
+                    view={view}
+                    counts={{ inbox: inbox.length, progress: progress.length, snoozed: snoozed.length, done: done.length, all: allOpen.length }}
+                    onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
+                  />
+                )}
+                {workspaceNavigation && emptyView ? (
+                  view === 'inbox'
+                    ? run === null && <InboxClear running={progress.length} scheduled={snoozed.length}
+                        onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
+                        onCompose={() => setModal('compose')} />
+                    : <EmptyTab view={view} />
+                ) : <List
+                  table={workspaceNavigation && search === null}
+                  products={snap.products}
                   team={team}
                   items={list}
                   // Results are grouped and stamped like the inbox, whatever
@@ -4869,7 +5069,9 @@ export default function App() {
                     setMultiSel((m) => new Set([...m, ...list.slice(lo, hi + 1).map((x) => x.id)]));
                     setSelected(i);
                   }}
-                />
+                />}
+                </>}
+                </>
               )}
             </main>
             {/* THE RIGHT HALF OF THE WINDOW IS THE FILE ITSELF (w-74b0b5cd87).
@@ -4900,7 +5102,75 @@ export default function App() {
         )}
       </div>
 
-      {modal === 'compose' && (
+      {/* THE NEW THREAD CARD (w-e731ca9376): To, Model, the message, then the
+          project, priority and who sees it. It sends by itself and hands back
+          what went out, so this only closes it, says so, and puts the way back
+          on the undo pile exactly as the old card's send did below. The draft
+          is read FIRST, before the card clears it, because it is the only copy
+          an undo can hand back. */}
+      {modal === 'compose' && run?.step !== 'task' && (
+        <ThreadComposer
+          products={rankedProducts}
+          items={items}
+          engines={snap.engines?.choices}
+          codexModels={codexModels}
+          codexModelDefault={codexModelDefault}
+          defaultProduct={productFilter}
+          initial={composeInitial}
+          onOpenConversation={openConversation}
+          onClose={() => { setModal(null); setComposeInitial(null); }}
+          onSent={async (made, how) => {
+            setComposeInitial(null);
+            const sent = readComposeDraft();
+            setModal(null);
+            if (how?.kind === 'message') {
+              const firsts = (how.toMany ?? [how.to ?? '']).map((id) => team?.byId.get(id)?.name?.split(/\s+/)[0]).filter(Boolean) as string[];
+              const said = firsts.length > 1 ? `${firsts.slice(0, -1).join(', ')} and ${firsts[firsts.length - 1]}` : firsts[0];
+              showToast(said ? `Sent to ${said}` : 'Message sent');
+              await refresh();
+              return;
+            }
+            const slug = how?.product ?? made?.product ?? '';
+            const to = snap.products.find((x) => x.slug === slug)?.name;
+            if (how?.kind === 'repeat') {
+              if (how.ruleId) {
+                noteNewTask(`Repeating task canceled: ${clipToSentence(how.title ?? '', TOAST_TITLE)}`, 'cancel that repeating task', sent, async () => {
+                  await api.endRepeat({ product: slug, id: how.ruleId! });
+                  setRepeats(await api.repeats());
+                });
+              }
+              showToast(`Repeating → ${to ?? slug} · Z to undo`);
+              await refresh();
+              return;
+            }
+            if (made?.id) {
+              noteNewTask(`Withdrawn: ${clipToSentence(made.title, TOAST_TITLE)}`, 'take back the task you just made', sent, async () => {
+                await api.answer({ product: made.product, id: made.id, status: 'done' });
+              });
+            }
+            showToast(sentLine({
+              to: to ?? slug,
+              when: how?.runAt ? whenLabel({ runAt: how.runAt, repeat: null }) : null,
+            }), made?.id ? { product: made.product, id: made.id } : undefined);
+            // SHOW WHERE IT WENT (her bug, 2026-10-01: "it doesn't actually
+            // create it in the inbox"). A thread sent to an agent is not
+            // waiting on her, so it never lands in Needs you. On the Inbox the
+            // tab moves to where it did land, Running or Scheduled, so she
+            // sees the row arrive instead of an unchanged page.
+            if (workspaceNavigation && !teamOpen && !focused && (['inbox', 'progress', 'snoozed'] as View[]).includes(view)) {
+              setView(how?.runAt && how.runAt > Date.now() ? 'snoozed' : 'progress');
+              setSelected(0);
+              setMultiSel(new Set());
+            }
+            await refresh();
+          }}
+        />
+      )}
+      {/* THE FIRST RUN'S EXAMPLE TASK KEEPS THE OLD CARD. The walk types its
+          task into that card's field and points its tether at that card's
+          Start it, and its send carries the first-run label, so it is left
+          exactly as it was until the walk is redrawn for the new card. */}
+      {modal === 'compose' && run?.step === 'task' && (
         <Compose
           products={rankedProducts}
           /*
@@ -5721,6 +5991,7 @@ export default function App() {
       {/* ⌘F, on every screen, for the same reason. */}
       <FindBar />
     </div>
+    </LiveContext.Provider>
     </TeamContext.Provider>
   );
 }

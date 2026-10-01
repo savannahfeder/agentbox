@@ -1,39 +1,36 @@
-import {useEffect, useRef, useState} from 'react';
+import {Fragment, useCallback, useEffect, useRef, useState} from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import defaults from '../../../shared/instruction-defaults.json';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { api } from '../api';
-const sections = [
- // The name chosen on w-3dc46f3a67, and it has to be the SAME name here, in
- // ⌘K (./Palette) and on the card itself (./Standing). This box said "Your
- // rules" while ⌘K said something else, and the cost of that was the box not
- // being found at all.
- {id:'rules',label:'General agent instructions',description:'Your instructions for every agent, on every project. The default is an empty page.',defaultText:''},
- // TWO BOXES BECAME THIS ONE (w-3dc46f3a67, 2026-09-22). "How agents write to
- // you" shaped the messages during a task and "How every task ends" shaped the
- // last one. Five adjustable layers of prompts were too many. Nobody sitting
- // down to write rules divides them that way: a real instructions file is
- // mostly about how agents write to the user rather than what they do.
- {id:'messages',label:'How agents write to you',description:'The titles, opening lines and questions you receive, and the last message of every task. Empty the box and agents follow none of it.',defaultText:defaults.messages},
-];
-// OURS, NOT THE USER'S, AND BEHIND A LINE THAT HAS TO BE OPENED. It is the task brief every
-// project worker is spawned with. Somebody editing it by accident breaks their
-// own inbox with no way to see why, which is not a thing a page should offer at
-// the same weight as the two boxes above.
-const advanced = [
- {id:'system',label:'System prompt',description:`${Name}’s task-brief template for project work. Keep the template placeholders for task context. Personal tasks use your message directly. The coding provider’s own system instructions are managed by that provider.`,defaultText:defaults.system},
-];
-// ADHD MODE (w-5737fe67cf, 2026-09-25). Not a tab: a switch on the "How agents
-// write to you" card, and while it is on, its rules in their own box under the
-// user's. Turning it on appends that text to the user's instructions and
-// turning it off removes it, shown as a separate section of additional
-// instructions. Its own box so edits to it never mix with the user's own rules
-// and are still there next time.
-const adhd = {id:'adhd',label:'ADHD mode',description:'',defaultText:defaults.adhd};
+import { EVERY, resolveScope, scopeChoices, scopeWords, sectionsFor, startsWriting, type Scope, type SectionId } from '../instruction-scope';
+import type { ProjectSettings } from '../types';
+type Section = {id:string;label:string;description?:string;defaultText:string};
+// The name chosen on w-3dc46f3a67, and it has to be the SAME name here, in
+// ⌘K (./Palette) and on the card itself (./Standing). This box said "Your
+// rules" while ⌘K said something else, and the cost of that was the box not
+// being found at all.
+const rules:Section = {id:'rules',label:'General agent instructions',defaultText:''};
+// One document since w-3dc46f3a67: the messages during a task and the last one
+// of every task were two boxes, and a real instructions file is mostly about
+// how agents write to the user anyway.
+const messages:Section = {id:'messages',label:'How agents write to you',defaultText:defaults.messages};
+// ADHD MODE (w-5737fe67cf). Its own file so edits to it never mix with the
+// user's own rules and are still there next time. Whether it rides at all is a
+// workspace setting, which is the switch on its section.
+const adhd:Section = {id:'adhd',label:'ADHD mode',defaultText:defaults.adhd};
+// OURS, NOT THE USER'S, AND BEHIND A LINE THAT HAS TO BE OPENED. It is the task
+// brief every project worker is spawned with. Somebody editing it by accident
+// breaks their own inbox with no way to see why.
+const system:Section = {id:'system',label:'System prompt',description:`${Name}’s task-brief template for project work. Keep the template placeholders for task context. Personal tasks use your message directly. The coding provider’s own system instructions are managed by that provider.`,defaultText:defaults.system};
+const SHARED:Record<Exclude<SectionId,'project'>,Section> = {rules,messages,adhd};
 const fixtureText = new Map<string,string>();
 const preview = () => new URLSearchParams(location.search).has('fixtures') || !window.zero;
-// Reading, saving and resetting one instruction file. Shared by the card and by
-// the ADHD box inside it, so both save the same way and say so the same way.
-function useInstruction(section: typeof sections[number]) {
+// What every section's writing surface needs, whichever file is under it.
+type Writing = {text:string|null;status:string;edit:(v:string)=>void;restore?:{section:Section;defaultText:string;pick:(v:string,label:string)=>void};undo?:{label:string}|null;undoRestore?:()=>void};
+// Reading, saving and restoring one of the app's instruction files.
+function useInstruction(section: Section): Writing {
  const [text,setText]=useState<string|null>(null);
  const [defaultText,setDefault]=useState(section.defaultText);
  const [status,setStatus]=useState('');
@@ -69,17 +66,38 @@ function useInstruction(section: typeof sections[number]) {
  },[section.id]);
  const edit=(value:string)=>{setText(value);pending.current=value;setStatus('Saving…');if(timer.current)clearTimeout(timer.current);timer.current=setTimeout(()=>flush(value),400);};
  // PUTTING A VERSION BACK IS AN EDIT, AND IT IS UNDOABLE (w-94b3af4e70).
- // It saves through the same path as typing, so the text she is leaving becomes
- // a restore point of its own, and the line under the box keeps the one step
- // back for as long as the page is open.
  const [undo,setUndo]=useState<{text:string;label:string}|null>(null);
- const restore=(value:string,label:string)=>{if(text!==null) setUndo({text,label});edit(value);};
+ const pick=(value:string,label:string)=>{if(text!==null) setUndo({text,label});edit(value);};
  const undoRestore=()=>{if(!undo)return;edit(undo.text);setUndo(null);};
- return {text,defaultText,status,edit,restore,undo:trouble?null:undo,undoRestore};
+ return {text,status,edit,restore:{section,defaultText,pick},undo:trouble?null:undo,undoRestore};
 }
-// One of the user's earlier versions, or ours. The times are the user's, so they
-// are written the way a person would say them out loud: today at a time, yesterday at a time, and
-// a date once it is older than that.
+// A project's own instructions.md. Saved through the settings model, so the
+// project page and the spawn read the same file.
+function useProjectInstruction(project: ProjectSettings, onSaved: () => void): Writing {
+ const [text,setText]=useState(project.instructions);
+ const [status,setStatus]=useState('');
+ const timer=useRef<number|null>(null);
+ const pending=useRef<string|null>(null);
+ // Keyed on the SLUG alone, never on the text. A save refreshes the settings
+ // model, so a text-keyed reset would overwrite what she typed since.
+ const loaded=useRef(project.instructions);
+ loaded.current=project.instructions;
+ useEffect(()=>{setText(loaded.current);setStatus('');pending.current=null;},[project.slug]);
+ const flush=useCallback(async(value:string)=>{
+  const r=await api.writeProjectInstructions(project.slug,value);
+  if(r.ok){pending.current=null;setStatus('Saved');onSaved();}
+  else setStatus(r.error ?? 'Could not save');
+ },[project.slug,onSaved]);
+ useEffect(()=>()=>{
+  if(timer.current) window.clearTimeout(timer.current);
+  if(pending.current!==null) void flush(pending.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[project.slug]);
+ const edit=(value:string)=>{setText(value);pending.current=value;setStatus('Saving…');if(timer.current)window.clearTimeout(timer.current);timer.current=window.setTimeout(()=>void flush(value),400);};
+ return {text,status,edit};
+}
+// One of the user's earlier versions, or ours, written the way a person would
+// say it out loud.
 export function versionLabel(ts:number,now=Date.now()):string {
  const d=new Date(ts);
  const time=d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
@@ -91,18 +109,26 @@ export function versionLabel(ts:number,now=Date.now()):string {
  return `${d.toLocaleDateString(undefined,{month:'short',day:'numeric'})} at ${time}`;
 }
 export const sizeLabel=(chars:number)=>chars===0 ? 'an empty page' : `${chars.toLocaleString()} characters`;
-/* THE LINK OPENS THE USER'S OWN VERSIONS, NOT JUST OURS (w-94b3af4e70).
-   Design C was picked for its surface: a quiet link in the corner instead of a
-   button in the way. What the link does is the half that had to change. A user
-   who edits the agent instructions can lose something important and want the
-   version that worked better before. Our shipped text cannot answer that, so
-   the list is the user's recent versions by time, with the original at the
-   bottom of it. */
-function Restore({section,text,defaultText,onPick}:{section:{id:string;label:string};text:string|null;defaultText:string;onPick:(value:string,label:string)=>void}) {
+// A quiet link, closed until pressed, that closes on a click away or Escape.
+function useMenu() {
  const [open,setOpen]=useState(false);
+ const wrap=useRef<HTMLDivElement|HTMLSpanElement>(null);
+ useEffect(()=>{
+  if(!open) return;
+  const away=(e:MouseEvent)=>{if(!wrap.current?.contains(e.target as Node)) setOpen(false);};
+  const key=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.stopPropagation();setOpen(false);}};
+  document.addEventListener('mousedown',away);
+  document.addEventListener('keydown',key,true);
+  return ()=>{document.removeEventListener('mousedown',away);document.removeEventListener('keydown',key,true);};
+ },[open]);
+ return {open,setOpen,wrap};
+}
+/* THE LINK OPENS THE USER'S OWN VERSIONS, NOT JUST OURS (w-94b3af4e70). The
+   list is the user's recent versions by time, with the original at the bottom. */
+function Restore({section,text,defaultText,onPick}:{section:Section;text:string|null;defaultText:string;onPick:(value:string,label:string)=>void}) {
+ const {open,setOpen,wrap}=useMenu();
  const [versions,setVersions]=useState<{ts:number;chars:number}[]|null>(null);
  const [error,setError]=useState('');
- const wrap=useRef<HTMLDivElement>(null);
  useEffect(()=>{
   if(!open) return;
   let active=true;
@@ -113,11 +139,7 @@ function Restore({section,text,defaultText,onPick}:{section:{id:string;label:str
    if(r.error) setError(r.error);
    setVersions(r.versions ?? []);
   }).catch(e=>{if(active){setError(String(e.message));setVersions([]);}});
-  const away=(e:MouseEvent)=>{if(!wrap.current?.contains(e.target as Node)) setOpen(false);};
-  const key=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.stopPropagation();setOpen(false);}};
-  document.addEventListener('mousedown',away);
-  document.addEventListener('keydown',key,true);
-  return ()=>{active=false;document.removeEventListener('mousedown',away);document.removeEventListener('keydown',key,true);};
+  return ()=>{active=false;};
  },[open,section.id]);
  const pick=async(at:number,label:string)=>{
   setOpen(false);
@@ -128,7 +150,7 @@ function Restore({section,text,defaultText,onPick}:{section:{id:string;label:str
    onPick(r.text,label);
   } catch(e) {setError(String((e as Error).message));}
  };
- return <div className="instruction-restore" ref={wrap}>
+ return <div className="instruction-restore" ref={wrap as React.RefObject<HTMLDivElement>}>
   <button type="button" className="instruction-restore-link" aria-expanded={open} aria-haspopup="menu" disabled={text===null} onClick={()=>setOpen(v=>!v)}>Restore</button>
   {open && <div className="instruction-restore-menu" role="menu" aria-label={`Restore ${section.label}`}>
    {versions===null && <div className="instruction-restore-empty">Looking for earlier versions…</div>}
@@ -143,90 +165,108 @@ function Restore({section,text,defaultText,onPick}:{section:{id:string;label:str
   </div>}
  </div>;
 }
-// Whether ADHD mode is on. It is a workspace setting rather than an instruction
-// file, because the supervisor reads it at every spawn to decide whether the box
-// rides at all. Drawn off what the main process answers, never off the click.
+// Whether ADHD mode is on. A workspace setting rather than an instruction file,
+// because the supervisor reads it at every spawn. Drawn off what the main
+// process answers, never off the click.
 function useAdhdMode() {
  const [on,setOn]=useState<boolean|null>(null);
  useEffect(()=>{let active=true;api.settings().then(s=>{if(active&&s.ok) setOn(!!s.workspace.adhdMode);});return ()=>{active=false;};},[]);
  const set=async(v:boolean)=>{const s=await api.setWorkspaceSetting({key:'adhdMode',value:v});if(s.ok) setOn(!!s.workspace.adhdMode);};
  return [on,set] as const;
 }
-function Editor({section}: {section: typeof sections[number]}) {
- const {text,defaultText,status,edit,restore,undo,undoRestore}=useInstruction(section);
- const withAdhd=section.id==='messages';
- const [adhdOn,setAdhd]=useAdhdMode();
- /* THE PAGE SHOWS THAT IT IS WRITABLE, IT DOES NOT SAY SO (w-3dc46f3a67).
-    On all three shapes it was unclear the text could be edited, and the rule
-    is to show that visually, never to explain UX with text.
-
-    So the line that sat under the text, the one about saving while typing and
-    applying to the next session, is gone, and so is the page's lede. (Neither
-    string is repeated here: a test reads this file for them.) What replaced them
-    is the surface: a quiet writing panel that is there at rest, deepens under
-    the pointer, and takes an accent down its left edge when it has focus
-    (../workspace-navigation.css). The caret is in it the moment the page opens,
-    which is the one thing a page of rendered text never has.
-
-    The status line stays for what is NOT an explanation: saving, saved, and the
-    errors a person can act on. It is empty the rest of the time. */
+/* ONE SECTION OF THE PAGE: a page you read, and Edit makes it a page you write.
+   What she wrote is rendered the way it will read, headings and lists and code
+   blocks, because a file of instructions is a document and was being shown as
+   a form field. An empty section has nothing to read, so it opens as the
+   writing surface with the caret in it. */
+function Part({id,label,writing,description,head,hidden}:{id:string;label?:string;writing:Writing;description?:string;head?:React.ReactNode;hidden?:boolean}) {
+ const {text,status,edit,restore,undo,undoRestore}=writing;
+ const [writingNow,setWriting]=useState(false);
+ const decided=useRef(false);
+ useEffect(()=>{if(text!==null&&!decided.current){decided.current=true;setWriting(startsWriting(text));}},[text]);
  const box=useRef<HTMLTextAreaElement>(null);
- useEffect(()=>{if(text!==null) box.current?.focus({preventScroll:true});},[text!==null]);
- return <div className="instruction-editor">
-  <div className="instruction-editor-head"><h2>{section.label}</h2><Restore section={section} text={text} defaultText={defaultText} onPick={restore}/></div>
-  <p>{section.description}</p>
-  {/* ONE RIGHT EDGE FOR THE WHOLE CARD (w-5737fe67cf). On the drawing the
-      components were not right-aligned. The switch, both Reset buttons
-      and both writing boxes end where the card's padding ends. */}
-  {withAdhd && adhdOn!==null && <div className="instruction-toggle">
-   <div><div className="instruction-toggle-label">ADHD mode</div><div className="instruction-toggle-desc">Adds a short set of rules under yours.</div></div>
-   <button type="button" role="switch" aria-checked={adhdOn} aria-label="ADHD mode" className={`set-sw ${adhdOn ? 'on' : ''}`} onClick={()=>void setAdhd(!adhdOn)}/>
+ useEffect(()=>{if(writingNow&&text!==null) box.current?.focus({preventScroll:true});},[writingNow]);
+ return <section className="instr-part" id={`instr-${id}`}>
+  <div className="instr-part-head">
+   {label && <h2>{label}</h2>}
+   <div className="instr-part-tools">
+    {writingNow && restore && <Restore section={restore.section} text={text} defaultText={restore.defaultText} onPick={restore.pick}/>}
+    {!hidden && <button type="button" className="instr-edit" aria-pressed={writingNow} disabled={text===null} onClick={()=>setWriting(v=>!v)}>{writingNow?'Done':'Edit'}</button>}
+    {head}
+   </div>
+  </div>
+  {description && <p className="instr-part-desc">{description}</p>}
+  {!hidden && (writingNow
+   ? <>
+     <textarea ref={box} aria-label={label ?? 'Instructions'} spellCheck={false} disabled={text===null} value={text ?? ''} onChange={e=>edit(e.target.value)} onKeyDown={e=>{e.stopPropagation();if(e.key==='Escape') setWriting(false);}} placeholder="Write your instructions here…"/>
+     <div className="instruction-save" role="status">{undo ? <>Restored {undo.label.toLowerCase()}. <button type="button" className="instruction-undo" onClick={undoRestore}>Undo</button></> : status}</div>
+    </>
+   : <div className="instr-md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{text ?? ''}</ReactMarkdown></div>)}
+ </section>;
+}
+function SharedPart({section}:{section:Section}) {
+ const writing=useInstruction(section);
+ return <Part id={section.id} label={section.label} writing={writing} description={section.description}/>;
+}
+function AdhdPart() {
+ const writing=useInstruction(adhd);
+ const [on,setOn]=useAdhdMode();
+ const toggle=on===null ? null : <button type="button" role="switch" aria-checked={on} aria-label="ADHD mode" className={`set-sw ${on ? 'on' : ''}`} onClick={()=>void setOn(!on)}/>;
+ return <Part id="adhd" label={adhd.label} writing={writing} head={toggle} hidden={!on}/>;
+}
+function ProjectPart({project,onSaved}:{project:ProjectSettings;onSaved:()=>void}) {
+ const writing=useProjectInstruction(project,onSaved);
+ return <Part key={project.slug} id="project" writing={writing}/>;
+}
+/* THE HEADING IS THE SWITCH (w-4cbcd888ae). "Instructions for every project",
+   and the words after "for" open the list of who else it can be for. A dotted
+   underline did not read as clickable, so the words carry a solid underline
+   and an arrow, which is the one that was approved. */
+function ScopeSwitch({scope,projects,onScope}:{scope:Scope;projects:ProjectSettings[];onScope:(s:Scope)=>void}) {
+ const {open,setOpen,wrap}=useMenu();
+ return <h1 className="instr-lead">Instructions for <span className="instr-scope" ref={wrap as React.RefObject<HTMLSpanElement>}>
+  <button type="button" className="instr-scope-word" aria-haspopup="menu" aria-expanded={open} onClick={()=>setOpen(v=>!v)}>
+   {scopeWords(scope,projects)}
+   <svg className="instr-scope-arrow" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
+  </button>
+  {open && <div className="instr-scope-menu" role="menu" aria-label="Instructions for">
+   {scopeChoices(projects).map((c,i)=><Fragment key={c.id}>
+    {i===1 && <hr/>}
+    <button type="button" role="menuitemradio" aria-checked={c.id===scope} onClick={()=>{setOpen(false);onScope(c.id);}}>{c.label}</button>
+   </Fragment>)}
   </div>}
-  <textarea ref={box} aria-label={section.label} spellCheck={false} disabled={text===null} value={text ?? ''} onChange={e=>edit(e.target.value)} onKeyDown={e=>e.stopPropagation()} placeholder="Write your instructions here…"/>
-  <div className="instruction-save" role="status">{undo ? <>Restored {undo.label.toLowerCase()}. <button type="button" className="instruction-undo" onClick={undoRestore}>Undo</button></> : status}</div>
-  {withAdhd && adhdOn && <AdhdBox/>}
- </div>;
+ </span></h1>;
 }
-// The ADHD rules, under the user's, while the mode is on. Same box, same saving, same
-// Reset as the card above it, one size down so it reads as part of that card.
-function AdhdBox() {
- const {text,defaultText,status,edit,restore,undo,undoRestore}=useInstruction(adhd);
- return <div className="instruction-sub">
-  <div className="instruction-editor-head"><h3>{adhd.label}</h3><Restore section={adhd} text={text} defaultText={defaultText} onPick={restore}/></div>
-  <textarea aria-label={adhd.label} spellCheck={false} disabled={text===null} value={text ?? ''} onChange={e=>edit(e.target.value)} onKeyDown={e=>e.stopPropagation()} placeholder="Write your instructions here…"/>
-  <div className="instruction-save" role="status">{undo ? <>Restored {undo.label.toLowerCase()}. <button type="button" className="instruction-undo" onClick={undoRestore}>Undo</button></> : status}</div>
- </div>;
-}
-/* THE SECTION SITS IN A CARD, AND THAT IS SETTLED (w-3dc46f3a67, 2026-09-23).
-
-   Three shapes were drawn in the real app for that round and the card was
-   approved. The other two are gone along with the `?shape=` switch that drew them:
-   a document with nothing around the words, and a list of rows that opened a
-   writing screen. Both are in this file's history at 8f8d04eb and written up in
-   decisions.md. Nothing here is switchable any more, because a page that can
-   still be flipped is a page that has to be decided about twice.
-
-   What the card has to keep doing, which is why it was picked: it holds one
-   section together and separates it from the page, the way a task reads in the
-   inbox, and the writing surface inside it sits DEEPER than the card so the
-   place to type is still the obvious thing on the screen
-   (../workspace-navigation.css). */
-export function InstructionSettings(){
- const [selected,setSelected]=useState(sections[0]);
- // Shut every time the page opens, on purpose. The one thing behind it is ours,
- // and a disclosure that remembers being open is a disclosure that stops being
- // one.
+/* ONE PAGE (w-4cbcd888ae, 2026-10-01). Picked from three drawn in the real
+   app. Who it is for is the heading. On every project the three shared
+   sections sit in one card in the order an agent reads them, with a short list
+   on the left that jumps to each. On a project the card holds that project's
+   own file and nothing else, at the same left edge so switching does not jump.
+   The task brief is ours, behind Advanced, where it always was. */
+export function InstructionSettings({projects=[],scope:asked=EVERY,onScope,onSaved=()=>{}}:{projects?:ProjectSettings[];scope?:Scope;onScope?:(s:Scope)=>void;onSaved?:()=>void}){
+ const [own,setOwn]=useState<Scope>(asked);
+ useEffect(()=>setOwn(asked),[asked]);
+ const scope=resolveScope(own,projects);
+ const pick=(s:Scope)=>{setOwn(s);onScope?.(s);};
+ const project=projects.find(p=>p.slug===scope);
+ const ids=sectionsFor(scope);
  const [showAdvanced,setShowAdvanced]=useState(false);
-
- // NO LEDE. The line that used to sit here said the sections could be
- // edited and reset, which is the page explaining itself in words and the thing
- // ruled out above. The writing surface and the Reset button each say their own
- // half without it.
+ const jump=(id:string)=>document.getElementById(`instr-${id}`)?.scrollIntoView({block:'start',behavior:'smooth'});
  return <div className="set-inner instructions-page">
- <div className="instruction-tabs" aria-label="Instruction sections">{sections.map(section=><button key={section.id} aria-pressed={section.id===selected.id} onClick={()=>setSelected(section)}>{section.label}</button>)}</div>
- <Editor key={selected.id} section={selected}/>
- <div className="instruction-advanced">
-  <button className="instruction-advanced-toggle" aria-expanded={showAdvanced} onClick={()=>setShowAdvanced(v=>!v)}>{showAdvanced?'Hide advanced':'Advanced'}</button>
-  {showAdvanced && advanced.map(section=><Editor key={section.id} section={section}/>)}
- </div></div>;
+  <ScopeSwitch scope={scope} projects={projects} onScope={pick}/>
+  <div className="instr-body">
+   <nav className="instr-toc" aria-label="Sections">{scope===EVERY && ids.map(id=><button key={id} type="button" onClick={()=>jump(id)}>{SHARED[id as keyof typeof SHARED].label}</button>)}</nav>
+   <div>
+    <div className="instr-card">
+     {scope===EVERY
+      ? <><SharedPart section={rules}/><SharedPart section={messages}/><AdhdPart/></>
+      : project && <ProjectPart project={project} onSaved={onSaved}/>}
+    </div>
+    {scope===EVERY && <div className="instruction-advanced">
+     <button className="instruction-advanced-toggle" aria-expanded={showAdvanced} onClick={()=>setShowAdvanced(v=>!v)}>{showAdvanced?'Hide advanced':'Advanced'}</button>
+     {showAdvanced && <div className="instr-card instr-card-ours"><SharedPart section={system}/></div>}
+    </div>}
+   </div>
+  </div>
+ </div>;
 }

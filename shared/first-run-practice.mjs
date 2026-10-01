@@ -63,9 +63,14 @@ export const PRACTICE_FLAG = 'practice';
  *  what she reads at beat ten is these two paragraphs together, under the
  *  practice band and over a "Start it ⌘↵" button. They have to make sense as
  *  one card, which is why the body opens by naming the app the title names. */
+// EVERYDAY WORK, NOT CODE (2026-10-01). It was a sign-out button for a pretend
+// app, and the four rows below were a sign-in route, a flaky test, a slow CI run
+// and dead code. A persona test of an executive assistant found all of it
+// written for programmers. A meeting summary, a reply, a tidy list, a budget and a
+// date are work everybody on a team does, engineers included.
 export const PRACTICE_TASK = {
-  title: 'Add a sign-out button to the Practice app.',
-  body: `Practice is a pretend project, not your code and not ${NAME}. This one is written for you already.`,
+  title: 'Add a summary to the Practice meeting notes.',
+  body: `Practice is a pretend project, not your work and not ${NAME}. This one is written for you already.`,
 };
 
 /**
@@ -78,7 +83,7 @@ export const PRACTICE_TASK = {
  * IT STILL TAKES TWO SECONDS AND IT IS STILL A REAL ROW WITH A REAL RESULT ON
  * THE REAL LEDGER.*/
 export const PRACTICE_ANSWER =
-  'Done, and the tests pass. I put it next to the avatar rather than inside the menu. Say the word and I will move it.';
+  'Done, and it is five lines at the top of the notes: three decisions and two open questions. Say the word and I will make it shorter.';
 
 /**
  * WHAT IS IN THE PRACTICE PROJECT'S SIDEBAR NOTE.
@@ -145,93 +150,84 @@ export const PRACTICE_NOTE = [
 export const PRACTICE_ROWS = [
   {
     kind: 'task',
-    title: 'Added the sign-in route. Tests green.',
-    body: 'Add a sign-in route at /sign-in. Reuse whatever we already have for sessions.',
+    title: 'Drafted a reply to the venue.',
+    body: 'Draft a reply to the venue for the offsite. We want Thursday, not Friday, and ask whether lunch is included.',
     trace: [
-      'Reading how auth works here before I touch anything.',
-      '[Read] src/server/auth.ts',
-      '[Read] src/server/routes.ts',
-      '[Grep] createSession',
-      'There is already a signed session cookie in here, seven days, refreshed on use. I will reuse it rather than adding tokens, because two ways to be signed in is the bug that follows.',
-      '[Write] src/server/routes/sign-in.ts',
-      '[Edit] src/server/routes.ts',
-      '[Edit] src/server/auth.ts',
-      '[Bash] npm test -- auth',
-      'Fourteen tests, all green, and nothing else in the suite moved.',
+      'Reading what the venue has already said before I write anything.',
+      '[Read] Venue emails.pdf',
+      '[Read] Offsite plan.docx',
+      '[Grep] lunch',
+      'They offered Friday twice, and their price list says lunch costs extra on weekdays, so I asked rather than guessed.',
+      '[Write] Reply to the venue.docx',
+      'Four sentences, ready for you to send.',
     ],
-    result: 'I reused the session cookie rather than tokens. Say if you disagree.',
+    result: 'The draft asks for Thursday and whether lunch is included. It is ready for you to send.',
     agoMs: 6 * 60_000,
   },
   {
     kind: 'task',
-    title: 'Fixed the flaky checkout test.',
-    body: 'checkout.spec.ts fails about one run in five on CI and passes every time on my Mac. Find out why.',
+    title: 'Tidied the team contact list.',
+    body: 'Clean up the team contact sheet. Remove the duplicates and sort everyone by last name.',
     trace: [
-      '[Bash] npx vitest run checkout.spec.ts --repeat 20',
-      'Three failures in twenty, every one of them on the same assertion, so it is a race and not the assertion.',
-      '[Read] tests/checkout.spec.ts',
-      '[Read] tests/fixtures/cart.ts',
-      'The fixture writes the cart and returns before the write lands. The test reads it straight away, so on a slow machine it reads an empty cart.',
-      '[Edit] tests/fixtures/cart.ts',
-      '[Bash] npx vitest run checkout.spec.ts --repeat 40',
-      'Forty for forty. I changed the fixture and nothing in the test itself.',
+      '[Read] Team contacts.xlsx',
+      'Forty two rows, and six of them are the same person twice with a different spelling.',
+      '[Edit] Team contacts.xlsx',
+      '[Read] Team contacts.xlsx',
+      'Thirty six people now, sorted by last name.',
+      '[Grep] email',
+      'Two people have no email address, so I put them at the bottom rather than guess one.',
     ],
-    result: 'It was a race on the fixture. It awaits now. Nothing else changed.',
+    result: 'Six duplicates are gone and everyone is sorted by last name. Two people have no email, so they are at the bottom.',
     agoMs: 14 * 60_000,
   },
   /* * THE ONE THAT IS NOT FOR TODAY, and snoozing it is the point of beat fourteen.
 
      IT HAD TO BE A FOURTH SHAPE OF ROW, not one of the three already here. Two
      of those are finished, so E is right on them, and the third is an agent
-     stopped, where answering is the only right move. Snoozing either would be
-     teaching the key on a row it is wrong for, which is the exact fault round
-     four was opened about. This one is real work, it is nobody's emergency, and
-     half a day is the reason to put it off rather than an excuse: that is the
-     row S exists for.
-  */
+     stopped, where answering is the only right move. This one is real work, it
+     is nobody's emergency, and a week is the reason to put it off rather than
+     an excuse: that is the row S exists for. */
   {
     kind: 'task',
     later: true,
-    title: 'The check runs are 40 seconds slower than Monday.',
-    body: 'CI got slower this week and nobody changed the workflow. Find out what did it.',
+    title: 'The budget draft for next quarter is ready.',
+    body: "Pull last quarter's spending into a first draft of next quarter's budget.",
     trace: [
-      '[Bash] gh run list --limit 40 --json databaseId,createdAt,conclusion',
-      'Monday it was 2m14s and today it is 2m54s, and the step that grew is the type check rather than the tests.',
-      '[Read] .github/workflows/ci.yml',
-      '[Read] tsconfig.json',
-      '[Bash] npx tsc --noEmit --extendedDiagnostics',
-      'The type check now runs over every package instead of the ones that changed, because the project references came out of tsconfig in the pnpm move.',
-      'Putting them back means splitting the config per package and re-pointing the workflow. It is about half a day and nothing is broken while it waits.',
+      '[Read] Spending last quarter.xlsx',
+      '[Read] Plan for next quarter.docx',
+      'Spending was close to plan except travel, which ran about a fifth over.',
+      '[Write] Budget draft.xlsx',
+      '[Edit] Budget draft.xlsx',
+      'Every line is filled in. It needs about an hour of your time to check, and nothing is due until next week.',
     ],
-    result: 'It is the type check running over every package. The fix is half a day of config, and nothing breaks while it waits.',
+    result: 'It is ready for you to check. It needs about an hour, and nothing is due until next week.',
     agoMs: 22 * 60_000,
   },
   /*
-   * THE ONE THAT IS WAITING. It is a question, it is not finished, and an agent
-     is stopped on it until somebody answers. Its result carries the options,
-     because `optionsFrom` in renderer/src/format.ts reads the offer off the
-     result first, and the options are what make answering it one key. */
+     THE ONE AN AGENT IS STOPPED ON, and it stays stopped until somebody answers.
+     Its result carries the options, because `optionsFrom` in
+     renderer/src/format.ts reads the offer off the result first, and the
+     options are what make answering it one key. */
   {
     kind: 'question',
     waiting: true,
-    title: 'Delete 340 lines of dead code?',
-    body: 'Have a look for anything in src/ that nothing imports.',
+    title: 'Which date should I send for the team dinner?',
+    body: 'Find a date for the team dinner that works for everyone, and ask me before you send it.',
     trace: [
-      '[Bash] npx knip --include files,exports',
-      '[Read] src/lib/legacy-client.ts',
-      '[Grep] legacy-client',
-      '[Read] src/lib/format-old.ts',
-      '[Grep] formatOld',
-      'Three files, 340 lines. Nothing in src/ imports any of them and nothing in tests/ does either.',
-      'The legacy client is the one I would ask about: it is the only thing left that speaks to the v1 API, so if anything outside this repository still calls that, deleting it is the end of it.',
+      '[Read] Team calendar.ics',
+      '[Grep] out of office',
+      '[Read] Restaurant bookings.pdf',
+      'Two evenings work for everyone: Thursday the 12th and Tuesday the 17th.',
+      'The restaurant has a table for twelve on both, but only the 12th has the private room.',
+      'I have not sent anything yet, as you asked.',
     ],
     result: [
-      'Nothing imports any of the three, so this is safe on my side, but the legacy client is the last thing that speaks v1 and I would rather you said so.',
+      'Two dates work for everyone. I would pick the 12th, because it is the only one with the private room.',
       '',
       '## Options',
-      '1. Delete all three (recommended)',
-      '2. Keep the legacy client, delete the other two',
-      '3. Leave all of it alone',
+      '1. Thursday the 12th (recommended)',
+      '2. Tuesday the 17th',
+      '3. Ask the team to vote',
     ].join('\n'),
     agoMs: 31 * 60_000,
   },
@@ -245,10 +241,9 @@ export const PRACTICE_ROWS = [
  *  shape as the traces above, so the first task anybody opens in Agentbox shows
  *  them what a task holds. */
 export const PRACTICE_TASK_TRACE = [
-  '[Read] src/components/Header.tsx',
-  '[Grep] useSession',
-  'The header already knows who is signed in, so this is one button and one call.',
-  '[Edit] src/components/Header.tsx',
-  '[Bash] npm test -- header',
-  'Green. I put it beside the avatar rather than inside the menu, because the menu is three clicks deep on mobile.',
+  '[Read] Meeting notes.docx',
+  '[Grep] decided',
+  'Three things were decided and two were left open, so the summary says which is which.',
+  '[Edit] Meeting notes.docx',
+  'Five lines at the top. I kept the name of whoever owns each open question.',
 ];

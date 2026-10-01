@@ -21,8 +21,14 @@ img.tm-av { background: var(--bg-selected); }
 .row-end .tm-lock svg { display: inline-block; vertical-align: middle; position: relative; top: -1.5px; margin-right: 6px; color: var(--text-faint); }
 
 /* The line under an opened task's name (project, who it came from, due day)
-   wears the inbox row end's type. Her pick, 2026-09-30. */
-.workspace-task-header .focus-meta .fm-said { font: 12px/18px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+   wears the inbox row end's type. Her pick, 2026-09-30. ALL OF IT, from the
+   first word (2026-10-01): the state that leads it, and on a row with no thread
+   state the live word and its clock, were left in sentence case and she asked
+   for them to match. */
+.workspace-task-header .focus-meta .fm-said,
+.workspace-task-header .focus-meta .ts-lead,
+.workspace-task-header .focus-meta .live-word,
+.workspace-task-header .focus-meta .live-span { font: 12px/18px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
 .fm-said .tm-due-word { color: var(--accent); }
 
 /* who is on a thread, in the topbar beside the app's own icons */
@@ -119,3 +125,9 @@ img.tm-av { background: var(--bg-selected); }
 .tm-seg button.on { color: var(--text); background: var(--wash-strong); }
 .tm-signed { display: flex; align-items: center; gap: 10px; color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
 .tm-signed button { margin-left: auto; }
+.tm-invited { color: var(--text-dim); }
+.tm-av-empty { width: 24px; height: 24px; border: 1px dashed var(--line-strong); box-sizing: border-box; flex: none; background: none; }
+/* Team settings (2026-10-01): a quiet action at the end of a person's line. */
+.tm-line-act { margin-left: 14px; flex: none; height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim); font: inherit; font-size: 12.5px; cursor: pointer; }
+.tm-line-act:hover:not(:disabled) { border-color: var(--line-strong); color: var(--text); background: var(--wash); }
+.tm-leave-ask { font-size: 13.5px; color: var(--text-dim); margin-right: 6px; }

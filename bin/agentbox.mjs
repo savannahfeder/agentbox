@@ -57,7 +57,11 @@ if (!fs.existsSync(path.join(dist, 'index.html'))) {
 
 const booted = await bootHeadless({ dataDir, appDir, userDir: dataDir });
 // Whoever was signed in to the team last time is signed in again.
-booted.team?.start().catch((err) => console.warn(`team: ${err.message}`));
+booted.team?.start().then(() => booted.supervisor.wake?.()).catch((err) => console.warn(`team: ${err.message}`));
+// AND THE AGENTS' CLOCK, as the desktop starts it (main/main.mjs). Without it a
+// tab only moved work when something woke the supervisor: a queued thread sat
+// queued and a scheduled one never fired (found 2026-10-01 on a test copy).
+booted.supervisor.start();
 const token = newToken();
 const server = createServer({
   channels: booted.channels,

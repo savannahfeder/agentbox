@@ -9,7 +9,12 @@ import fs from 'node:fs';
 
 const page = fs.readFileSync(new URL('../renderer/src/team/TeamPage.tsx', import.meta.url), 'utf8');
 
-it('tells a person waiting for an invite that they join on their own', () => {
+// Since 2026-10-01 an invite is asked, never taken up on its own (review: an
+// automatic join let a stranger's team take your work), so the page says the
+// invite shows up, and the person answers it with Join or Not now.
+it('tells a person waiting for an invite that it shows up on its own', () => {
   expect(page).not.toMatch(/sign out and in again/);
-  expect(page).toMatch(/You join within a few seconds/);
+  expect(page).toMatch(/It shows up here within a few seconds/);
+  expect(page).toMatch(/>Join</);
+  expect(page).toMatch(/>Not now</);
 });

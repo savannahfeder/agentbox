@@ -61,6 +61,15 @@ export interface WorkItem {
   runner?: string;
   due?: string;
   people?: string[];
+  // THE THREAD'S OWN FIELDS (approved 2026-10-01, shared/work-items.mjs).
+  // `visibility` absent reads as 'team'. The summary is shared: the agent keeps
+  // it current and the person can edit it, and the later write wins.
+  visibility?: 'team' | 'private';
+  problem?: string;
+  progress?: string;
+  solution?: string;
+  blockedBy?: string[];
+  blocks?: string[];
   // Set only on the synthesized rows that stand for a running Claude Code
   // agent. Its presence is what every action path checks: an agent row is drawn
   // by the same list and reached by the same keys, and nothing may write it to
@@ -95,7 +104,9 @@ export interface Product {
   // purpose and the card used to take the task anyway.
   practice?: boolean;
   // SHARED OR PRIVATE (main/team/projects.mjs). Null or absent is private.
-  team?: { projectId: string; teamId: string | null; visibility: 'team' | 'people'; people: string[]; sharedBy: string | null } | null;
+  // `direct` marks the record a message between two people lives in, which is
+  // not a project and holds no work (main/team/projects.mjs makeDirect).
+  team?: { projectId: string; teamId: string | null; visibility: 'team' | 'people'; people: string[]; sharedBy: string | null; direct?: boolean } | null;
 }
 
 /** A person on the team, as the cloud knows them. */
@@ -104,6 +115,8 @@ export interface Person {
   email: string;
   name: string;
   avatarUrl: string | null;
+  /** On a team's member list: who owns it (and so may rename it and remove people). */
+  role?: 'owner' | 'member';
 }
 
 /** What every team call answers: the team as it now stands, or why not. */
@@ -111,16 +124,53 @@ export interface TeamCallResult {
   ok: boolean;
   team?: TeamState;
   error?: string;
+  /** A new account that waits on the link in its confirmation email. */
+  confirm?: boolean;
+}
+
+export type ThreadStateWord = 'waiting' | 'running' | 'scheduled' | 'done';
+
+/** What a teammate sees of one of your threads: its summary and nothing more. */
+export interface ThreadCard {
+  personId: string;
+  threadId: string;
+  visible: boolean;
+  title: string | null;
+  project: string | null;
+  state: ThreadStateWord;
+  priority: number | null;
+  problem: string | null;
+  progress: string | null;
+  solution: string | null;
+  blockedBy: { id: string; title: string | null }[];
+  blocks: { id: string; title: string | null }[];
+  updatedAt: number;
 }
 
 /** The team, as the main process sees it (main/team/index.mjs). */
+export interface TeamInvite {
+  teamId: string;
+  teamName: string;
+  invitedBy: string | null;
+  invitedByName: string | null;
+}
+
 export interface TeamState {
   configured: boolean;
+  /** The first look for a saved sign-in is over (false while it is still being found). */
+  started?: boolean;
+  /** When this person began sharing on this Mac: threads started before it stay theirs unless shared by hand. */
+  since?: number | null;
+  /** The invites this team has out that nobody has taken up yet. */
+  sent?: { email: string; invitedBy: string | null }[];
   signedIn: boolean;
   me: Person | null;
   team: { id: string; name: string } | null;
+  /** Invites waiting for your confirmed email, while you are in no team. Joining one needs your yes. */
+  invites?: TeamInvite[];
   people: Person[];
-  activity: { personId: string; taskKey: string; state: 'run' | 'wait' | 'sched' | 'done'; movedAt: number }[];
+  /** Every card in the team, yours included (shared/thread-cards.mjs). */
+  cards: ThreadCard[];
   lastSyncAt: number | null;
   error: string | null;
 }
@@ -549,7 +599,7 @@ export interface Snapshot {
 }
 
 // FOUR, not five.
-export type View = 'inbox' | 'snoozed' | 'progress' | 'done';
+export type View = 'inbox' | 'snoozed' | 'progress' | 'done' | 'all';
 
 // How many of her own Claude Code sessions the inbox takes. 'all' so she can go
 // through them once and close them, 'waiting' for only the ones stopped on a
@@ -834,15 +884,24 @@ declare global {
       answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null }): Promise<WorkItem>;
       setProductOrder(p: { order: string[] }): Promise<unknown>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
-      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string }): Promise<WorkItem>;
+      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'private' }): Promise<WorkItem>;
       // The team version (main/team/index.mjs through main/ipc.mjs).
       teamSignIn(): Promise<TeamCallResult>;
       teamSignOut(): Promise<TeamCallResult>;
+      teamSignInEmail(p: { email: string; password: string }): Promise<TeamCallResult>;
+      teamRename(p: { name: string }): Promise<TeamCallResult>;
+      teamRemoveMember(p: { personId: string }): Promise<TeamCallResult>;
+      teamLeave(): Promise<TeamCallResult>;
+      teamCancelInvite(p: { email: string }): Promise<TeamCallResult>;
+      teamSignUp(p: { name: string; email: string; password: string }): Promise<TeamCallResult>;
       teamCreate(p: { name: string }): Promise<TeamCallResult>;
+      teamAcceptInvite(p: { teamId: string }): Promise<TeamCallResult>;
       teamInvite(p: { email: string }): Promise<TeamCallResult>;
       teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult>;
       teamSync(): Promise<TeamCallResult>;
       teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;
+      teamMessage(p: { to: string | string[]; body: string }): Promise<TeamCallResult>;
+      threadEdit(p: { product: string; id: string; patch: ThreadEditPatch }): Promise<{ ok: boolean; error?: string }>;
       schedule(p: { product: string; id: string; runAt: number }): Promise<WorkItem>;
       repeats(): Promise<RepeatRule[]>;
       composeRepeat(p: { product: string; title: string; body?: string; priority?: number; rule: RepeatShape; engine?: string; model?: string }): Promise<RepeatRule>;
@@ -955,3 +1014,10 @@ export type FolderListing = {
   refused?: string | null;
   unreadable?: string;
 };
+
+/** What a person may change on a thread from its summary (main/store.mjs threadEdit). */
+export type ThreadEditPatch = Partial<{
+  problem: string; progress: string; solution: string;
+  visibility: 'team' | 'private'; priority: number;
+  blockedBy: string[]; blocks: string[];
+}>;

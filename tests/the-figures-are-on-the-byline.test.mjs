@@ -141,8 +141,12 @@ describe('that it survives a narrow card', () => {
     expect(block[1]).not.toMatch(/code-plus|code-minus/);
   });
 
+  // The figures left this line on w-e731ca9376 (2026-10-01) for the code row
+  // of the thread's menu, where they are the row's detail and the row is the
+  // press. Everything above about what they say is unchanged.
   it('presses through to the same change the chip in the conversation opens', () => {
-    expect(focus).toMatch(/className="change-figures"[\s\S]{0,220}changePathFor\(item\.id\)/);
+    expect(focus).toMatch(/const changeFigures = figures \? \(\s*<span className="change-figures"/);
+    expect(focus).toMatch(/change=\{changeFigures\}\s*onViewChange=\{\(\) => onOpenDoc\?\.\(changePathFor\(item\.id\)\)\}/);
   });
 
   // NOT ONE NEW COLOUR. --code-plus and --code-minus are the code pane's own

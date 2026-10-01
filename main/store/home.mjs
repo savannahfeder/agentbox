@@ -304,6 +304,51 @@ export function machineryPath(projectDir, rel, home = appHome()) {
 }
 
 /**
+ * RECORDS A COPY WROTE UNDER THE WRONG HOME, CARRIED TO ITS OWN.
+ *
+ * The headless door (main/serve.mjs) used to open the store without pointing
+ * the app's home at `storeRoot`, so it wrote its ledgers under whatever home it
+ * inherited: `~/.agentbox` for `npx agentbox-app`, and on the test Mac
+ * 2026-10-01 the founder's own store, because the copies were started from an
+ * agent session. Its workers were handed `storeRoot`, found nothing there, and
+ * answered "no work item" to every store call. Pointing the home at `storeRoot`
+ * fixes the next write; this is what keeps the rows already written from
+ * vanishing on the first boot after the fix.
+ *
+ * ONLY WHAT IS PROVABLY THIS STORE'S MOVES. A machinery directory names the
+ * product it belongs to in `.origin`; one is carried only when that product is
+ * inside `storeRoot`. Everything else under `fromHome` is somebody else's
+ * store and is not touched. Each record goes through `foldStray`, so a ledger
+ * is appended rather than overwritten and nothing is ever destroyed; the old
+ * directory is removed only once nothing but its marker is left in it.
+ *
+ * Returns the product folders whose records were carried.
+ */
+export function carryMisplacedMachinery(fromHome, storeRoot, toHome = storeRoot) {
+  if (!fromHome || !storeRoot) return [];
+  const from = path.resolve(fromHome);
+  if (from === path.resolve(toHome)) return [];
+  const inside = path.resolve(storeRoot) + path.sep;
+  let names = [];
+  try { names = fs.readdirSync(path.join(from, 'projects')); } catch { return []; }
+  const carried = [];
+  for (const name of names) {
+    const dir = path.join(from, 'projects', name);
+    const origin = readOrigin(dir);
+    if (!origin || !path.resolve(origin).startsWith(inside)) continue;
+    const target = ensureMachineryDir(origin, toHome);
+    for (const rel of MACHINERY) foldStray(path.join(dir, rel), path.join(target, rel), rel);
+    let left = [];
+    try { left = fs.readdirSync(dir); } catch { /* gone already */ }
+    if (left.length === 1 && left[0] === ORIGIN) {
+      try { fs.rmSync(path.join(dir, ORIGIN)); fs.rmdirSync(dir); } catch { /* best effort */ }
+    }
+    carried.push(origin);
+  }
+  return carried;
+}
+
+/**
  * EVERY RECORD OF OURS FOR ONE PROJECT, GONE.
  *
  * This exists for exactly one caller: the practice project, which the founder

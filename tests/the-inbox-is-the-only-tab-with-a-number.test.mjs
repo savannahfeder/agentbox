@@ -5,6 +5,12 @@
 // shows a number, like a classic email client, and of the four designs drawn
 // the chosen one sets the number in exactly the label's type.
 //
+// THE SIDEBAR AROUND IT CHANGED ON 2026-10-01 AND THE RULE DID NOT. approved
+// 2026-10-01 (w-e731ca9376): In progress and Scheduled stopped being sidebar
+// tabs and became tabs on the Inbox page, so the only other tab the sidebar
+// can draw is Team, and Team carries no number either. The word under the
+// number is "threads" since the app started calling a row a thread.
+//
 // Two things are checked and they are the two halves of that: WHERE the number
 // is, and WHAT IT IS MADE OF. The second one is a stylesheet fact, so it is read
 // out of the stylesheet rather than guessed at, because the whole point of that
@@ -21,21 +27,34 @@ const draw = (extra = {}) => renderToStaticMarkup(createElement(WorkspaceNavigat
   view: 'inbox', collapsed: false, onToggle() {}, onView() {}, onSearch() {}, onCompose() {}, ...extra,
 }));
 
-it.each([1, 3, 120])('puts the number on Inbox for %s waiting tasks', inboxCount => {
+// The Inbox tab as drawn, from its opening tag to its own closing one.
+const inboxTab = (html) => {
+  const start = html.lastIndexOf('<button', html.indexOf('data-tab="inbox"'));
+  return html.slice(start, html.indexOf('</button>', start));
+};
+
+it.each([1, 3, 120])('puts the number on Inbox for %s waiting threads', inboxCount => {
   const html = draw({ inboxCount });
   expect(html.match(/class="workspace-running/g)).toHaveLength(1);
-  expect(html).toContain(`${inboxCount} ${inboxCount === 1 ? 'task' : 'tasks'} waiting`);
+  expect(html).toContain(`${inboxCount} ${inboxCount === 1 ? 'thread' : 'threads'} waiting`);
   // It hangs off the Inbox tab and nothing else.
-  const onInbox = html.slice(html.indexOf('data-tab="inbox"'), html.indexOf('data-tab="progress"'));
-  expect(onInbox).toContain('class="workspace-running');
+  expect(inboxTab(html)).toContain('class="workspace-running');
 });
 
-it('leaves In progress and Scheduled bare however much is running or scheduled', () => {
-  const html = draw({ inboxCount: 0, scheduledCount: 9 });
-  expect(html).toContain('data-tab="snoozed"');
-  expect(html).not.toContain('class="workspace-running');
-  expect(html).not.toContain('agents running');
-  expect(html).not.toContain('tasks scheduled');
+it('leaves the Team tab bare however busy the team is or however much is scheduled', () => {
+  // approved 2026-10-01 (w-e731ca9376): Team is the only other tab, and the
+  // component says why it has no number: a count of who is busy is not worth
+  // seeing all the time, and the Team page is where you look.
+  const quiet = draw({ inboxCount: 0, scheduledCount: 9, hasTeam: true, onTeam() {} });
+  expect(quiet).toContain('data-tab="team"');
+  expect(quiet).not.toContain('class="workspace-running');
+  expect(quiet).not.toContain('scheduled');
+  const busy = draw({ inboxCount: 5, scheduledCount: 9, hasTeam: true, onTeam() {} });
+  expect(busy.match(/class="workspace-running/g)).toHaveLength(1);
+  expect(inboxTab(busy)).toContain('class="workspace-running');
+  // The words the Team tab shows, with its icon's drawing numbers left out.
+  const team = busy.slice(busy.lastIndexOf('<button', busy.indexOf('data-tab="team"')));
+  expect(team.slice(0, team.indexOf('</button>')).replace(/<[^>]*>/g, '')).toBe('Team');
 });
 
 it.each([0, -1, NaN])('draws nothing for an empty or invalid count: %s', inboxCount => {
@@ -44,7 +63,8 @@ it.each([0, -1, NaN])('draws nothing for an empty or invalid count: %s', inboxCo
 
 it('keeps a singular accessible description in the collapsed rail', () => {
   const html = draw({ inboxCount: 1, collapsed: true });
-  expect(html).toContain('1 task waiting');
+  expect(html).toContain('1 thread waiting');
+  expect(html).not.toContain('1 threads waiting');
   expect(html).toContain('aria-label="Inbox"');
 });
 

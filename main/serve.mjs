@@ -35,7 +35,8 @@ import { Supervisor } from './supervisor.mjs';
 import { registerIpc } from './ipc.mjs';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mjs';
-import { loadCloudConfig, supabaseSession } from './team/session.mjs';
+import { loadCloudConfig, supabaseSession, headlessSessionFile } from './team/session.mjs';
+import { appHome, carryMisplacedMachinery, storeRootEnv } from './store/home.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.dirname(here);
@@ -128,19 +129,31 @@ function readVersion() {
  */
 export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, userDir = dataDir } = {}) {
   const config = loadConfig(dataDir);
+  // THE APP'S OWN HOME IS THE STORE ROOT, BEFORE ANYTHING OPENS THE STORE, as
+  // main/main.mjs does for the desktop. The ledgers live under the home the
+  // store reads from this variable, and every worker is handed `storeRoot` as
+  // that same variable. Without this line the two disagreed: the copy wrote its
+  // rows wherever an inherited variable pointed (or `~/.agentbox`), each worker
+  // looked under `storeRoot`, and every store call answered "no work item".
+  // tests/an-agent-in-a-browser-copy-can-reach-its-own-work-item.test.mjs.
+  // Rows already written under the old home come along, or they would vanish.
+  const inheritedHome = appHome();
+  Object.assign(process.env, storeRootEnv(config.storeRoot));
+  carryMisplacedMachinery(inheritedHome, config.storeRoot);
   const store = await new Store(config).init();
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   const window = broadcastingWindow();
   const host = nodeHost();
   // THE TEAM, as on the desktop (main/main.mjs), with no Electron: the session
-  // file beside the store is plain JSON readable only by this user, and Google
-  // sign-in opens in the Mac's own browser.
+  // file is plain JSON readable only by this user, kept in this copy's own
+  // folder and not in the store (headlessSessionFile), and Google sign-in opens
+  // in the Mac's own browser.
   const cloudConfig = loadCloudConfig(appDir);
   let ipc = null;
   const team = cloudConfig ? createTeamService({
     session: supabaseSession({
       cloudConfig,
-      sessionFile: path.join(config.storeRoot, '.team-session'),
+      sessionFile: headlessSessionFile({ userDir, storeRoot: config.storeRoot }),
       openExternal: async (url) => { spawn('open', [url], { stdio: 'ignore', detached: true }).unref(); },
     }),
     store,

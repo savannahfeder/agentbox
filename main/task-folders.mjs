@@ -50,6 +50,9 @@ const BRANCH_PREFIX = `${nameSlug}/`;
 /** Ids are `w-` plus hex today. This is the guard for the day they are not. */
 const SAFE_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 
+/** What an unfinished folder is called. A task name may never start with a dot. */
+const BUILDING = '.building-';
+
 const git = (cwd, args) => execFileSync('git', args, {
   cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
 }).trim();
@@ -78,6 +81,32 @@ export const real = (dir) => { try { return fs.realpathSync(dir); } catch { retu
 
 export function taskFolderPath(repoPath, id) {
   return path.join(real(repoPath), ...WORKTREES, safeTaskName(id));
+}
+
+/**
+ * WHERE A FOLDER IS BUILT, WHICH IS NEVER WHERE IT IS RUN IN.
+ *
+ * Making one is a worktree plus a block clone of the checkout. It used to be
+ * built AT the path a session runs in, so for the whole of that a directory sat
+ * there, registered with git and holding almost none of the code. MEASURED on
+ * astral-video, the repository this happened in, 2026-10-01: the build takes 115
+ * seconds now that the checkout is 14 GB, and the path a session runs in
+ * appeared 2.7 seconds in. That is 112 seconds of a folder that looked ready and
+ * was not, against a supervisor tick of fifteen seconds, so seven ticks could
+ * read it. Everything that asks whether a row's folder is ready asks the disk,
+ * which means for those 112 seconds every one of them said yes:
+ * the supervisor started a session in a half written folder, and when the build
+ * finished it started a second session on the same row (2026-09-30,
+ * w-4d722ecf92, where the second one's claim came back refused and the first
+ * one's folder was deleted under it a minute in).
+ *
+ * Built here and MOVED into place once it is finished and checked, so a
+ * directory at the real path means a folder that is complete. That makes every
+ * existing question correct without any of them learning a new one, and it
+ * leaves the rollback below nothing to delete but its own unfinished copy.
+ */
+export function buildingFolderPath(repoPath, id) {
+  return path.join(real(repoPath), ...WORKTREES, `${BUILDING}${safeTaskName(id)}`);
 }
 
 export function taskBranch(id) { return `${BRANCH_PREFIX}${safeTaskName(id)}`; }
@@ -155,18 +184,46 @@ export function ensureTaskFolder(dir, id, { pid = process.pid, dependencies = tr
 
   hideFromTheCheckout(root);
 
+  // EVERY STEP BELOW HAPPENS SOMEWHERE ELSE, and the folder appears at its own
+  // path in one move at the end. `buildingFolderPath` is why. A build the app
+  // died in the middle of leaves an unfinished copy there, which nobody wants
+  // and which would refuse the next attempt, so it goes first.
+  const staging = buildingFolderPath(root, name);
+  clearUnfinished(root, staging);
+
   const branchExists = tryGit(root, ['rev-parse', '--verify', '-q', `refs/heads/${branch}`]).ok;
   const from = branchExists ? branch : baseRef(root);
-  if (!cloneCheckout(root, folder, branch, from, branchExists)) {
+  if (!cloneCheckout(root, staging, branch, from, branchExists)) {
     const add = branchExists
-      ? tryGit(root, ['worktree', 'add', folder, branch])
-      : tryGit(root, ['worktree', 'add', '-b', branch, folder, baseRef(root)]);
+      ? tryGit(root, ['worktree', 'add', staging, branch])
+      : tryGit(root, ['worktree', 'add', '-b', branch, staging, baseRef(root)]);
     if (!add.ok) throw Error(`Could not make a folder for ${name}: ${add.out}`);
-    if (dependencies) cloneDependencies(root, folder);
+    if (dependencies) cloneDependencies(root, staging);
+  }
+
+  // `worktree move` rather than a rename, so git's own record of where this
+  // worktree lives moves with it. It refuses if anything is already at the
+  // destination, which is the last guard against walking over a live folder.
+  const moved = tryGit(root, ['worktree', 'move', staging, folder]);
+  if (!moved.ok) {
+    clearUnfinished(root, staging);
+    throw Error(`Could not make a folder for ${name}: ${moved.out}`);
   }
 
   lock(root, folder, pid);
   return { path: folder, branch, created: true };
+}
+
+/**
+ * Throw away an unfinished copy. Nothing is ever lost here: a staging folder
+ * has never been handed to anybody, so the most it can hold is a checkout that
+ * did not finish. The branch is left alone, as everywhere else in this file.
+ */
+function clearUnfinished(root, staging) {
+  if (!fs.existsSync(staging) && !record(root, staging)) return;
+  tryGit(root, ['worktree', 'remove', '--force', staging]);
+  try { fs.rmSync(staging, { recursive: true, force: true }); } catch { /* already gone */ }
+  tryGit(root, ['worktree', 'prune']);
 }
 
 /**
@@ -216,10 +273,12 @@ function cloneCheckout(root, folder, branch, from, branchExists) {
     if (!after.ok || after.out.length > 0) throw Error('the clone did not match the commit');
     return true;
   } catch {
-    // Back to nothing, so the ordinary path starts from a clean sheet.
-    tryGit(root, ['worktree', 'remove', '--force', folder]);
-    try { fs.rmSync(folder, { recursive: true, force: true }); } catch { /* already gone */ }
-    tryGit(root, ['worktree', 'prune']);
+    // Back to nothing, so the ordinary path starts from a clean sheet. What is
+    // thrown away here is the UNFINISHED COPY and never a folder anybody is in:
+    // `folder` is the staging path, which no session has ever been given. It
+    // used to be the real one, and a `remove --force` of that is how a running
+    // agent lost the ground under it.
+    clearUnfinished(root, folder);
     return false;
   }
 }
@@ -389,7 +448,10 @@ export function listTaskFolders(dir) {
   if (!root) return [];
   const home = path.join(root, ...WORKTREES);
   return registered(root)
-    .filter((w) => path.dirname(w.path) === home && !w.prunable)
+    // A folder still being built is not one of hers: it has no row standing in
+    // it and nothing in it is wanted, so it may never be listed, shown or swept.
+    .filter((w) => path.dirname(w.path) === home && !w.prunable
+      && !path.basename(w.path).startsWith(BUILDING))
     .map((w) => {
       const { dirty, merged } = folderState(root, w.path);
       let touchedAt = null;

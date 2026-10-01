@@ -24,7 +24,7 @@ const migration = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')
 // What a Supabase project already has before our migration runs.
 const SUPABASE_STAND_IN = `
 create schema auth;
-create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb);
+create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz, raw_user_meta_data jsonb default '{}'::jsonb);
 create function auth.uid() returns uuid language sql stable as $$
   select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
 $$;
@@ -63,8 +63,10 @@ const refused = async (person, sql, params) => {
   try { await as(person, sql, params); return false; } catch { return true; }
 };
 
-async function signUp(id, email, fullName) {
-  await db.query(`insert into auth.users (id, email, raw_user_meta_data) values ($1, $2, $3)`, [id, email, { full_name: fullName, avatar_url: `https://faces/${fullName}.jpg` }]);
+// Supabase confirms an email when its owner proves they hold it (Google does
+// that at sign-in). `confirmed: false` is somebody who never did.
+async function signUp(id, email, fullName, { confirmed = true } = {}) {
+  await db.query(`insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values ($1, $2, $3, $4)`, [id, email, confirmed ? new Date() : null, { full_name: fullName, avatar_url: `https://faces/${fullName}.jpg` }]);
 }
 
 beforeAll(async () => {
@@ -78,7 +80,7 @@ beforeAll(async () => {
   [team] = await rows(MAYA, `insert into public.teams (name, created_by) values ('Northwind', $1) returning id`, [MAYA]);
   await as(MAYA, `insert into public.team_members (team_id, person_id, role) values ($1, $2, 'owner')`, [team.id, MAYA]);
   await as(MAYA, `insert into public.team_invites (team_id, email, invited_by) values ($1, 'THEO@northwind.test', $2)`, [team.id, MAYA]);
-  await as(THEO, `select public.accept_invites()`);
+  await as(THEO, `select public.accept_invite($1)`, [team.id]);
 }, 60_000);
 
 describe('people', () => {
@@ -172,5 +174,121 @@ describe('private work on the Team page', () => {
 
   it('will not let anyone write activity as somebody else', async () => {
     expect(await refused(THEO, `insert into public.private_activity (person_id, task_key, state, moved_at) values ($1, 'k2', 'run', now())`, [MAYA])).toBe(true);
+  });
+});
+
+describe('thread cards, what a teammate sees of your threads', () => {
+  const card = (person, thread, extra = {}) => [person, team.id, thread, extra.visible ?? true, extra.title ?? null, extra.state ?? 'running'];
+  const insert = `insert into public.thread_cards (person_id, team_id, thread_id, visible, title, state) values ($1, $2, $3, $4, $5, $6)`;
+
+  it('shows a teammate your visible card and a stranger nothing', async () => {
+    await as(MAYA, insert, card(MAYA, 'w-card1', { title: 'Acme renewal terms' }));
+    expect((await rows(THEO, `select title from public.thread_cards where thread_id = 'w-card1'`)).map((c) => c.title)).toEqual(['Acme renewal terms']);
+    expect(await rows(JUN, `select title from public.thread_cards`)).toEqual([]);
+  });
+
+  it('will not let anyone write a card as somebody else', async () => {
+    expect(await refused(THEO, insert, card(MAYA, 'w-forged', { title: 'Forged' }))).toBe(true);
+  });
+
+  // The second wall only: since 2026-10-01 the app sends no card at all for a
+  // private thread (shared/thread-cards.mjs, both backends' putCards).
+  it('refuses words on a private card, so a private title can never leave the Mac', async () => {
+    expect(await refused(MAYA, insert, card(MAYA, 'w-secret', { visible: false, title: 'Board deck numbers' }))).toBe(true);
+    await as(MAYA, insert, card(MAYA, 'w-secret', { visible: false }));
+    expect((await rows(THEO, `select visible, title from public.thread_cards where thread_id = 'w-secret'`))).toEqual([{ visible: false, title: null }]);
+  });
+
+  it('lets only its owner change or remove it', async () => {
+    await as(THEO, `update public.thread_cards set title = 'Taken over' where thread_id = 'w-card1'`);
+    await as(THEO, `delete from public.thread_cards where thread_id = 'w-card1'`);
+    expect((await rows(MAYA, `select title from public.thread_cards where thread_id = 'w-card1'`)).map((c) => c.title)).toEqual(['Acme renewal terms']);
+  });
+});
+
+// THE DOORS A REVIEW FOUND OPEN ON 2026-10-01 (cloud/supabase/migrations/
+// 20261001000500_security.sql). Each was walked through by hand before the
+// fix: a stranger rewrote their own email to a teammate's and joined the team;
+// a team made with created_at in 2000 became the "oldest" team an invited
+// person's app picked; a "direct" record took a third person and read what two
+// teammates said to each other; a project moved into a team its maker was not
+// on.
+describe('joining a team takes a confirmed email and a yes', () => {
+  const LEE = '66666666-6666-6666-6666-666666666666';
+  beforeAll(async () => {
+    await signUp(LEE, 'lee@northwind.test', 'Lee Unconfirmed', { confirmed: false });
+  });
+
+  it('will not let a person change their own email, only their name and face', async () => {
+    expect(await refused(JUN, `update public.people set email = 'theo@northwind.test' where id = $1`, [JUN])).toBe(true);
+    await as(JUN, `update public.people set name = 'Jun I.' where id = $1`, [JUN]);
+    expect((await rows(JUN, `select email, name from public.people where id = $1`, [JUN]))).toEqual([{ email: 'jun@elsewhere.test', name: 'Jun I.' }]);
+  });
+
+  it('uses an invite up once it is accepted', async () => {
+    expect(await rows(MAYA, `select email from public.team_invites`)).toEqual([]);
+    expect(await refused(THEO, `select public.accept_invite($1)`, [team.id])).toBe(true);
+  });
+
+  it('never matches an invite against an email nobody confirmed', async () => {
+    await as(MAYA, `insert into public.team_invites (team_id, email, invited_by) values ($1, 'lee@northwind.test', $2)`, [team.id, MAYA]);
+    expect(await rows(LEE, `select team_id from public.pending_invites()`)).toEqual([]);
+    expect(await refused(LEE, `select public.accept_invite($1)`, [team.id])).toBe(true);
+    expect(await rows(LEE, `select team_id from public.team_members`)).toEqual([]);
+  });
+
+  it('shows a pending invite with its team and who sent it, and joins nothing until the person accepts', async () => {
+    await as(MAYA, `insert into public.team_invites (team_id, email, invited_by) values ($1, 'jun@elsewhere.test', $2)`, [team.id, MAYA]);
+    // What a build from before this change calls at every start.
+    await as(JUN, `select public.accept_invites()`);
+    expect(await rows(JUN, `select team_id from public.team_members`)).toEqual([]);
+    expect(await rows(JUN, `select team_id, team_name, invited_by_name from public.pending_invites()`))
+      .toEqual([{ team_id: team.id, team_name: 'Northwind', invited_by_name: 'Maya Chen' }]);
+  });
+});
+
+describe('a team is as old as the database says', () => {
+  it('ignores a created_at its maker sends', async () => {
+    const before = Date.now() - 60_000;
+    const [made] = await rows(JUN, `insert into public.teams (name, created_by, created_at) values ('Backdated', $1, '2000-01-01') returning id, created_at`, [JUN]);
+    expect(new Date(made.created_at).getTime()).toBeGreaterThan(before);
+  });
+});
+
+// A MESSAGE RECORD HOLDS A SMALL GROUP (2026-10-01, 20261001000700): its maker
+// and up to eleven others. The app writes only into a record whose people are
+// exactly the ones chosen, which is what keeps a stranger's record unread.
+describe('a direct message record holds a small group', () => {
+  const DIRECT = '77777777-7777-7777-7777-777777777777';
+  const PEOPLE = '88888888-8888-8888-8888-888888888888';
+  const extra = Array.from({ length: 12 }, (_, i) => `99999999-9999-9999-9999-${String(i).padStart(12, '0')}`);
+
+  beforeAll(async () => {
+    for (const [i, id] of extra.entries()) {
+      await signUp(id, `extra${i}@northwind.test`, `Extra ${i}`);
+      await db.query(`insert into public.team_members (team_id, person_id) values ($1, $2)`, [team.id, id]);
+    }
+  });
+
+  it('takes its maker and eleven others, and refuses a twelfth', async () => {
+    await as(MAYA, `insert into public.projects (id, team_id, name, visibility, created_by, direct) values ($1, $2, 'Direct', 'people', $3, true)`, [DIRECT, team.id, MAYA]);
+    for (const id of extra.slice(0, 11)) await as(MAYA, `insert into public.project_people (project_id, person_id) values ($1, $2)`, [DIRECT, id]);
+    expect(await refused(MAYA, `insert into public.project_people (project_id, person_id) values ($1, $2)`, [DIRECT, extra[11]])).toBe(true);
+    expect((await rows(MAYA, `select person_id from public.project_people where project_id = $1`, [DIRECT])).length).toBe(11);
+  });
+
+  it('will not turn a project with twelve other people on it into a message record', async () => {
+    await as(MAYA, `insert into public.projects (id, team_id, name, visibility, created_by) values ($1, $2, 'Twelve others', 'people', $3)`, [PEOPLE, team.id, MAYA]);
+    for (const id of extra) await as(MAYA, `insert into public.project_people (project_id, person_id) values ($1, $2)`, [PEOPLE, id]);
+    expect(await refused(MAYA, `update public.projects set direct = true where id = $1`, [PEOPLE])).toBe(true);
+  });
+});
+
+describe('a project stays in its maker\'s team', () => {
+  it('cannot be moved into a team its maker is not on', async () => {
+    const [other] = await rows(JUN, `select id from public.teams where name = 'Backdated'`);
+    expect(await refused(MAYA, `update public.projects set team_id = $1 where id = $2`, [other.id, PROJECT])).toBe(true);
+    const [still] = await rows(MAYA, `select team_id from public.projects where id = $1`, [PROJECT]);
+    expect(still.team_id).toBe(team.id);
   });
 });

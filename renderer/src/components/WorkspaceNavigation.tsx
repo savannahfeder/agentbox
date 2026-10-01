@@ -1,13 +1,11 @@
 import { sectionHint } from '../hint-plate';
 import type { ReactNode } from 'react';
 import { SettingsIcon } from './SettingsIcon';
-import type { View } from '../types';
+import type { TeamState, View } from '../types';
+import { Face } from '../team/people';
+import { Name } from '../../../shared/product-name.mjs';
 import { SidebarIcon } from './SidebarIcon';
 import { SidebarToggleIcon } from './SidebarToggleIcon';
-import { SearchIcon } from './SearchIcon';
-import { ComposeIcon } from './ComposeIcon';
-import { workspaceDestinations } from '../workspace-navigation.mjs';
-import { DONE } from '../done-word';
 /** ONE NUMBER IN THE SIDEBAR, ON INBOX, AND IT IS DRAWN IN THE TAB'S OWN TYPE.
  *
  *  w-5f02e7b525. Only Inbox shows a number, like a classic email client, and of
@@ -39,64 +37,73 @@ import { DONE } from '../done-word';
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch, onCompose, inboxCount = 0, scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false }: {
+export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onMembers }: {
   page?: string | null; inboxCount?: number; scheduledCount?: number; usage?: ReactNode; onSettings?: () => void; onInstructions?: () => void;
-  // THE TEAM TAB, the one thing the team version adds to the sidebar. No
-  // people and no counts here: approved 2026-09-30, a list of who is busy is
-  // not worth seeing all the time, and the Team page is where you look.
+  // THE TEAM TAB. No people and no counts here: approved 2026-09-30, a list of
+  // who is busy is not worth seeing all the time, and the Team page is where
+  // you look.
   hasTeam?: boolean; onTeam?: () => void;
   // Whether the Team page is up, which lights its tab and darkens the others.
   teamPage?: boolean;
+  // THE FOOT OF THE SIDEBAR (approved 2026-10-01): invite people, the team's
+  // members, settings, and you. Her words: "move it into the sidebar, along with
+  // settings, team members, invite people, your profile".
+  team?: TeamState | null; onInvite?: () => void; onMembers?: () => void;
   view: View; collapsed: boolean; onToggle: () => void; onView: (view: View) => void; onSearch: () => void; onCompose: () => void;
 }) {
   // The Team page is a page like Settings: while it is up no list tab is lit.
   const page = pageIn ?? (teamPage ? 'team' : null);
   const waiting = Number.isFinite(inboxCount) ? Math.max(0, Math.floor(inboxCount)) : 0;
-  const waitingDescription = `${waiting} ${waiting === 1 ? 'task' : 'tasks'} waiting`;
-  const scheduled = Number.isFinite(scheduledCount) ? Math.max(0, Math.floor(scheduledCount)) : 0;
-  // The last tab's word is the button's (w-581dbc6cc4): both read `DONE`, so
-  // they cannot disagree the way Close and Done did.
-  const destinations = workspaceDestinations({ scheduledCount: scheduled, view, doneNoun: DONE.noun }) as [View, string][];
-  // The one tab that carries a number, and the words a screen reader gets for it.
-  const badgeOf = (key: View) => key === 'inbox' ? waiting : 0;
-  const badgeWords = (_key: View) => waitingDescription;
-  // CLOSED LIVES AT THE BOTTOM, WITH THE STACK (w-6c5534a58d, 2026-09-26). Inbox
-  // and In progress sit at the top, and Closed joins the stack at the bottom.
-  // The reason was clutter: Closed is not used often but is used enough to keep,
-  // so it leaves the lists she works and joins the places she
-  // visits. It is still a destination in `workspaceDestinations`, so Tab still
-  // rotates through it and its hint keeps its slot number; only where it is
-  // drawn moved. It keeps `data-tab` so anything looking for the tab finds it.
-  //
-  // SCHEDULED JOINED IT THE SAME DAY, AND SHORTCUTS LEFT. The top reads better
-  // with only Inbox and In progress; Scheduled sitting third there looked worse.
-  // The Shortcuts tab stopped mattering once shortcuts showed on hover, and
-  // Scheduled is only visible when something is actually scheduled. So the bottom is
-  // Scheduled (when it exists), Closed, Settings. The Shortcuts page is still in
-  // Settings and in ⌘K.
-  const BELOW: View[] = ['snoozed', 'done'];
-  const tab =([key, label]: [View, string], slot: number) => <button key={key} data-tab={key} data-hint={sectionHint(slot + 1)} data-hint-text="span" className={`workspace-tab${!page && view===key ? ' active' : ''}${badgeOf(key) > 0 ? ' has-count' : ''}`} aria-label={label} aria-current={!page && view===key ? 'page' : undefined} title={badgeOf(key) > 0 ? `${label} · ${badgeWords(key)}` : collapsed ? label : undefined} onClick={()=>onView(key)}><SidebarIcon view={key}/><span>{label}</span>{badgeOf(key) > 0 && <small className="workspace-running" aria-label={badgeWords(key)}>{badgeOf(key)}</small>}</button>;
-  const place = ([key, label]: [View, string], slot: number) => <button key={key} data-tab={key} data-hint={sectionHint(slot + 1)} data-hint-text="span" aria-label={label} aria-current={!page && view === key ? 'page' : undefined} title={collapsed ? label : undefined} onClick={() => onView(key)}><SidebarIcon view={key}/><span>{label}</span></button>;
+  const waitingDescription = `${waiting} ${waiting === 1 ? 'thread' : 'threads'} waiting`;
+  // ONE PAGE OF YOUR THREADS (approved 2026-10-01). In progress, Scheduled and
+  // Closed are tabs on the Inbox now, not places in the sidebar, so the Inbox
+  // tab is lit on every one of them.
+  const inboxLit = !page && (['inbox', 'progress', 'snoozed', 'done', 'all'] as string[]).includes(view);
+  const me = team?.signedIn ? team.me : null;
+  const teamName = team?.team?.name ?? Name;
   return <aside className="workspace-navigation" aria-label="Workspace">
-    <button className="workspace-search" data-hint="search" data-hint-text="span" title="Search tasks (/)" aria-label="Search tasks" onClick={onSearch}><SearchIcon/><span>Search</span><kbd>/</kbd></button>
-    <div className="workspace-section"><span>Workspace</span></div>
-    <nav className="workspace-tabs" aria-label="Tasks">{destinations.map((d, slot) => BELOW.includes(d[0]) ? null : tab(d, slot))}
+    {/* THE TOGGLE SITS BESIDE THE TEAM'S NAME, at the top, where sidebars keep
+        it (her note, 2026-10-01). Collapsed, the mark itself is the way back
+        open, and shows the sidebar icon under the pointer. */}
+    <div className="th-team" title={collapsed ? undefined : teamName}>
+      {collapsed ? (
+        <button type="button" className="workspace-toggle th-mark-btn" data-hint="sidebar" aria-label="Expand sidebar" title="Expand sidebar" onClick={onToggle}>
+          <span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span>
+          <span className="th-mark-open" aria-hidden="true"><SidebarToggleIcon collapsed /></span>
+        </button>
+      ) : <>
+        <span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span>
+        <span className="th-team-name">{teamName}</span>
+        <button type="button" className="workspace-toggle th-toggle" data-hint="sidebar" data-hint-align="right" aria-label="Collapse sidebar" title="Collapse sidebar" onClick={onToggle}><SidebarToggleIcon collapsed={false} /></button>
+      </>}
+    </div>
+    <nav className="workspace-tabs" aria-label="Threads">
+      <button data-tab="inbox" data-hint={sectionHint(1)} data-hint-text="span" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label="Inbox" aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `Inbox · ${waitingDescription}` : collapsed ? 'Inbox' : undefined} onClick={() => onView('inbox')}><SidebarIcon view="inbox" /><span>Inbox</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
       {hasTeam && onTeam && <button data-tab="team" className={`workspace-tab${page === 'team' ? ' active' : ''}`} aria-label="Team" aria-current={page === 'team' ? 'page' : undefined} title={collapsed ? 'Team' : undefined} onClick={onTeam}>
         <svg className="workspace-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden="true"><circle cx="5.5" cy="5.5" r="2.2"/><path d="M1.8 13.2c.5-2.3 2-3.5 3.7-3.5s3.2 1.2 3.7 3.5"/><circle cx="11" cy="6" r="1.9"/><path d="M10.2 9.8c.3-.1.5-.1.8-.1 1.5 0 2.8 1 3.2 3.2"/></svg>
         <span>Team</span>
       </button>}
     </nav>
     <div className="workspace-bottom">
-      <div className="workspace-utilities">
-        {/* Projects used to be the first row here (w-d19d6d387c). It came out
-            because the row did not earn its place. Every project's page is still one click inside
-            Settings, which has its own Projects entry. */}
-        {destinations.map((d, slot) => BELOW.includes(d[0]) ? place(d, slot) : null)}
+      <div className="workspace-utilities th-side-foot">
+        {/* Shown to anyone signed in, on a team or not (her note, 2026-10-01:
+            "it's missing the invite team page and the team settings"). With no
+            team yet, both open the page that starts one. */}
+        {me && onInvite && <button aria-label="Invite people" aria-current={page === 'invite' ? 'page' : undefined} title={collapsed ? 'Invite people' : undefined} onClick={onInvite}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="10" cy="8.5" r="3.5"/><path d="M3.5 20c.7-3.4 3.3-5.3 6.5-5.3 1.4 0 2.6.3 3.7.9"/><path d="M18 14v6M15 17h6"/></svg><span>Invite people</span></button>}
+        {me && onMembers && <button aria-label="Team members" aria-current={page === 'members' ? 'page' : undefined} title={collapsed ? 'Team members' : undefined} onClick={onMembers}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/><circle cx="9.5" cy="11" r="2.2"/><path d="M5.8 16.5c.5-1.6 1.9-2.5 3.7-2.5s3.2.9 3.7 2.5M15 10h3M15 13h3"/></svg><span>Team members</span></button>}
         {onInstructions && <button aria-label="Instructions" aria-current={page === 'instructions' ? 'page' : undefined} title="Instructions for every agent" onClick={onInstructions}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 16h6"/></svg><span>Instructions</span></button>}
         {onSettings && <button aria-label="Settings" aria-current={page === 'settings' ? 'page' : undefined} title="Settings" onClick={onSettings}><SettingsIcon/><span>Settings</span></button>}
       </div>
       {usage && <div className="workspace-usage">{usage}</div>}
-    <div className="workspace-footer"><button className="workspace-create" data-hint="new-task" title="New thread (N)" onClick={onCompose}><ComposeIcon/><span>New thread</span></button><button className="workspace-toggle" data-hint="sidebar" data-hint-align="right" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} onClick={onToggle}><SidebarToggleIcon collapsed={collapsed}/></button></div>
+      <div className="th-me">
+        {/* Your own row opens the page with your account on it (a persona test:
+            "clicking her own name does nothing"). */}
+        {me ? (onMembers
+          ? <button type="button" className="th-me-btn" aria-label="Your account" title={collapsed ? 'Your account' : undefined} onClick={onMembers}><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></button>
+          : <><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></>)
+          : team?.configured && onTeam ? <button type="button" className="th-me-signin" aria-label="Sign in to your team" onClick={onTeam}>Sign in to your team</button>
+            : <span />}
+      </div>
     </div>
   </aside>;
 }

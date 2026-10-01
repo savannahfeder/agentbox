@@ -18,6 +18,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const css = fs.readFileSync(path.join(root, 'renderer/src/styles.css'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'renderer/src/App.tsx'), 'utf8');
 const nav = fs.readFileSync(path.join(root, 'renderer/src/components/WorkspaceNavigation.tsx'), 'utf8');
+const pages = fs.readFileSync(path.join(root, 'renderer/src/threads/Pages.tsx'), 'utf8');
 
 const box = (left, top, width, height) => ({
   left, top, width, height, right: left + width, bottom: top + height,
@@ -179,21 +180,36 @@ describe('every line says a key the app really has', () => {
 // some of those buttons showed no shortcut at all, and there may have been
 // more buttons like them.
 describe('a button with a key never says nothing', () => {
-  it('gives the plus, the command mark and the magnifier each a hint', () => {
+  it('gives the header\'s Search and New thread each a hint, and no hint to Display', () => {
+    // approved 2026-10-01 (w-e731ca9376): on the sidebar layout the right end
+    // of the header is Search, New thread and Display (HeaderActions), and the
+    // plus and the ⌘ mark are not drawn there. Search and New thread both have
+    // a key, so both say it. Display has none, so it says nothing.
+    expect(pages).toMatch(/data-hint="search"[^>]*onClick=\{onSearch\}/);
+    expect(pages).toMatch(/data-hint="new-task"[^>]*onClick=\{onCompose\}/);
+    const display = pages.match(/<button[^>]*th-disp[^>]*>/);
+    expect(display, 'no Display button in the header').toBeTruthy();
+    expect(display[0]).not.toContain('data-hint');
+  });
+
+  it('keeps the plus, the command mark and the magnifier their hints in the layout without the sidebar', () => {
     // w-ec62ab6b38 (2026-09-28): the plus is labelled New thread now; the hint key stays new-task.
     expect(app).toMatch(/aria-label="New thread"/);
     expect(app).toMatch(/data-hint="new-task"[\s\S]{0,120}aria-label="New thread"/);
     expect(app).toMatch(/data-hint="commands"[\s\S]{0,120}aria-label="Commands"/);
-    expect(app).toMatch(/data-hint="search"[\s\S]{0,120}title="Search tasks"/);
-    expect(nav).toContain('data-hint="search"');
+    expect(app).toMatch(/data-hint="search"[\s\S]{0,120}title="Search threads"/);
   });
 
   it('says the same key for the same thing wherever it is drawn', () => {
-    // New task is a button in the sidebar AND a plus in the corner. Two hints
-    // for one action would be two places to get it wrong, so both wear the
-    // same id.
-    expect((app + nav).match(/data-hint="new-task"/g)).toHaveLength(2);
-    expect((app + nav).match(/data-hint="search"/g)).toHaveLength(2);
+    // New thread and Search are each drawn twice in the code: once in the
+    // header's right end and once in the corner of the layout without the
+    // sidebar. Two hints for one action would be two places to get it wrong,
+    // so both wear the same id.
+    expect((app + pages).match(/data-hint="new-task"/g)).toHaveLength(2);
+    expect((app + pages).match(/data-hint="search"/g)).toHaveLength(2);
+    // approved 2026-10-01 (w-e731ca9376): the sidebar carries neither any more.
+    expect(nav).not.toContain('data-hint="new-task"');
+    expect(nav).not.toContain('data-hint="search"');
   });
 
   it('leaves the cog alone, because it has no key at all', () => {

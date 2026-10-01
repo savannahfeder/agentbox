@@ -133,3 +133,20 @@ describe('awaitingHer, on its own', () => {
     expect(awaitingHer(undefined)).toBe(false);
   });
 });
+
+// FILING IS NOT SPEAKING (2026-10-01): a persona switched a finished thread to
+// Private and the agent ran again unasked. Her edits to how a thread is filed
+// (who sees it, its priority, its summary lines, its links) are not a reply.
+describe('filing a thread is not a reply to it', () => {
+  it.each(['visibility', 'priority', 'problem', 'progress', 'solution', 'blockedBy', 'blocks'])('a founder %s edit after the result leaves it waiting on her', (field) => {
+    const row = {
+      id: 'w-file', product: 'agentbox', status: 'open', kind: 'directive', labels: ['founder'], priority: 7,
+      wrote: { body: { ts: 1_000, source: 'founder' }, result: { ts: 2_000, source: 'agent' }, [field]: { ts: 3_000, source: 'founder' } },
+    };
+    expect(awaitingHer(row)).toBe(true);
+  });
+  it('a word from her after the result still makes it fresh', () => {
+    const row = { id: 'w-word', wrote: { result: { ts: 2_000, source: 'agent' }, answer: { ts: 3_000, source: 'founder' } } };
+    expect(awaitingHer(row)).toBe(false);
+  });
+});

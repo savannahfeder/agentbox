@@ -102,6 +102,15 @@ const appDir = path.join(__dirname, '..');
 // live. This has to happen before ANYTHING reads a path, because everything
 // downstream keys off app.getName, the single-instance lock at the foot of
 // this file included.
+// THE TEAM VERSION RUNS BESIDE THE ONE IN USE TODAY (2026-10-01). Run from
+// source, this checkout is named exactly like the solo app, so it would read
+// her data folder, take her single-instance lock and quit on the spot. A
+// profile (`AGENTBOX_PROFILE=team npx electron .`) gives it a name of its own,
+// and with the name a data folder and a lock of its own. Letters, digits and
+// dashes only, and never a space: "agentbox team" reads as a side build, and
+// side builds share the real data folder on purpose.
+const PROFILE = String(process.env.AGENTBOX_PROFILE ?? '').trim().replace(/[^a-z0-9-]/gi, '');
+if (PROFILE) app.setName(`${NAME}-${PROFILE}`);
 if (dataFolderName(app.getName()) !== app.getName()) app.setName(dataFolderName(app.getName()));
 
 // "ASTRAL NEW USER" IS A STRANGER EVERY TIME IT OPENS.
@@ -135,7 +144,8 @@ if (isNewUserBuild(app.getName()) && !runningAsAFreshUser()) {
 // existing user's folder is called the app, not the app, so a bare the app check would
 // have found nothing and handed them an empty Powerup. Whoever renames this app
 // a third time adds one entry here and nothing else.
-try {
+// A profile never falls back to an older folder: an older folder is hers.
+if (!PROFILE) try {
   const named = path.join(app.getPath('appData'), app.getName());
   if (!fs.existsSync(named)) {
     // THESE ARE HISTORY AND NOT COPY. They are the folder names this app has
@@ -319,7 +329,7 @@ async function createWindow() {
   // line this Mac writes says who wrote it and shared projects stay in sync.
   // Its session file sits beside the store, encrypted with the Mac's own
   // keychain-backed key, so each store root is its own signed-in person.
-  const cloudConfig = loadCloudConfig(appDir);
+  const cloudConfig = loadCloudConfig(appDir, { packaged: app.isPackaged });
   const encrypt = safeStorage.isEncryptionAvailable() ? (text) => safeStorage.encryptString(text) : null;
   const decrypt = safeStorage.isEncryptionAvailable() ? (buf) => safeStorage.decryptString(buf) : null;
   const team = cloudConfig ? createTeamService({
@@ -327,6 +337,7 @@ async function createWindow() {
       cloudConfig,
       sessionFile: path.join(config.storeRoot, '.team-session'),
       encrypt, decrypt,
+      packaged: app.isPackaged,
       openExternal: (url) => shell.openExternal(url),
     }),
     store,
