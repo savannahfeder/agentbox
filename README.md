@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Give your agents an inbox.</strong><br>
-  Run twenty coding agents at once and only hear from the ones that need you.
+  Run dozens of coding agents at once and only hear from the ones that need you.
 </p>
 
 <p align="center">
