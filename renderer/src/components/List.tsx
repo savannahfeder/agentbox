@@ -3,7 +3,8 @@
 // end, on the title's line, the things that are not the message: priority, the
 // product, and when (or that an agent is on it, or that one stopped).
 
-import type { Product, RepeatRule, RunningSession, View, WorkItem } from '../types';
+import type { ReactNode } from 'react';
+import type { Product, RepeatRule, RunningSession, ThreadCard, View, WorkItem } from '../types';
 import { ago, dayLabel, previewText, stamp } from '../format';
 import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitle, walkRowKeys } from '../list-rules';
 import { isUrgentRow } from '../interrupt';
@@ -18,7 +19,8 @@ import { IMPORT_KEYS, JUST_IMPORTED_WORD, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEY
 import { splitHits } from '../search';
 import { isCleanRun, nextRunAt } from '../../../shared/repeats.mjs';
 import { TeamRowEnd, type TeamView } from '../team/people';
-import { TableHead, ThreadCells } from '../threads/Pages';
+import { RowCells, TableHead, ThreadCells } from '../threads/Pages';
+import type { MixedRow } from '../threads/people-rules';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
 
 /**
@@ -107,7 +109,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null, table = false, products = [] }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard }: {
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -194,6 +196,13 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   table?: boolean;
   products?: Product[];
   team?: TeamView | null;
+  /** WITH A TEAMMATE ON THE PAGE (w-05ff3d1438): your rows and theirs in one
+   *  table, in this order. Yours are the rows above, with every key they had;
+   *  theirs open their card. Null is the page as it always was. */
+  mixed?: MixedRow[] | null;
+  /** The Person cell, for your rows (personId = you) and for theirs. */
+  personCell?: (personId: string | null) => ReactNode;
+  onOpenCard?: (card: ThreadCard) => void;
 }) {
   const rules = view === 'snoozed' ? (repeats ?? []) : [];
   // The keys the rows in THIS list offer, drawn on the row under the pointer.
@@ -226,7 +235,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   //
   // `emptyText` survives because search is the one case that is NOT an empty
   // page: something was typed and the app has to say what it matched.
-  if (items.length === 0 && rules.length === 0) {
+  if (items.length === 0 && rules.length === 0 && !mixed?.length) {
     return emptyText ? <div className="empty">{emptyText}</div> : null;
   }
 
@@ -295,10 +304,19 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
     if (firstUrgent >= 0 && index >= firstUrgent) return isUrgentRow(item) ? URGENT_HEADING : REST_HEADING;
     return '';
   });
+  // YOURS AND YOUR TEAMMATES' IN ONE RUN OF ROWS (w-05ff3d1438). The table
+  // wears no headings, so one unlabelled group holds the merged order; each of
+  // your rows keeps the index the keyboard selects it by.
+  type Entry = { item: WorkItem; index: number; card?: undefined } | { card: ThreadCard; item?: undefined; index?: undefined };
+  const at = new Map(items.map((item, index) => [item.id, index]));
+  const shown: { key: string; label: string; items: Entry[] }[] = table && mixed
+    ? [{ key: 'mixed', label: '', items: mixed.flatMap((r): Entry[] => (r.card ? [{ card: r.card }] : at.has(r.item.id) ? [{ item: r.item, index: at.get(r.item.id)! }] : [])) }]
+    : groups;
+  const withPerson = table && !!mixed;
 
   return (
     <div className={`list${table ? ' th-table' : ''}`}>
-      {table && <TableHead />}
+      {table && <TableHead person={withPerson} />}
       {/* Repeating tasks sit above the deferred rows, in the tab that already
           holds work with a moment attached. They are RULES, not items, so they
           arrive on their own list and no inbox rule has an opinion about them. */}
@@ -329,14 +347,27 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
           })}
         </div>
       )}
-      {groups.map((group) => (
+      {shown.map((group) => (
         <div key={group.key}>
           {/* An empty label is a ranked list or the row that says nothing is
               running, and it draws NOTHING: an empty div here still spends the
               day label's whole height and leaves a band of nothing above the
               first result. */}
           {group.label && !table && <div className="day-label">{group.label}</div>}
-          {group.items.map(({ item, index }) => {
+          {group.items.map((entry) => {
+            // A TEAMMATE'S THREAD: their card, opened on a click. No select
+            // box and no keys, because nothing on this Mac can act on it.
+            if (entry.card) {
+              const c = entry.card;
+              return (
+                <div key={`card/${c.personId}/${c.threadId}`} className="row th-their-row" onClick={() => onOpenCard?.(c)}>
+                  <span className="mark" aria-hidden="true" />
+                  <RowCells title={c.title ?? 'Private thread'} where={c.project ?? ''} person={personCell?.(c.personId)}
+                    priority={c.priority} updatedAt={c.updatedAt} now={Date.now()} />
+                </div>
+              );
+            }
+            const { item, index } = entry;
             const session = running.find((r) => r.itemId === item.id);
             const checked = multiSel.has(item.id);
             // THE TWO ROWS THIS APP MAKES ITSELF. Neither is in a ledger, so
@@ -417,7 +448,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                   // THE TABLE ROW (the team version): the same row, its select
                   // box and its keys, with the approved columns instead of a
                   // title over a summary.
-                  <ThreadCells item={item} product={products.find((p) => p.slug === item.product)} now={Date.now()} />
+                  <ThreadCells item={item} product={products.find((p) => p.slug === item.product)} now={Date.now()}
+                    person={withPerson ? personCell?.(team?.me ?? null) : undefined} withOthers={withPerson} />
                 ) : <>
                 <div className="row-main">
                   {/* THE WRITTEN NAME, WHERE THERE IS ONE. `rowTitle` prefers

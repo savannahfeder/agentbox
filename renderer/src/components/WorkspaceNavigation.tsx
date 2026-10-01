@@ -79,10 +79,10 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
     </div>
     <nav className="workspace-tabs" aria-label="Threads">
       <button data-tab="inbox" data-hint={sectionHint(1)} data-hint-text="span" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label="Inbox" aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `Inbox · ${waitingDescription}` : collapsed ? 'Inbox' : undefined} onClick={() => onView('inbox')}><SidebarIcon view="inbox" /><span>Inbox</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
-      {hasTeam && onTeam && <button data-tab="team" className={`workspace-tab${page === 'team' ? ' active' : ''}`} aria-label="Team" aria-current={page === 'team' ? 'page' : undefined} title={collapsed ? 'Team' : undefined} onClick={onTeam}>
-        <svg className="workspace-nav-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden="true"><circle cx="5.5" cy="5.5" r="2.2"/><path d="M1.8 13.2c.5-2.3 2-3.5 3.7-3.5s3.2 1.2 3.7 3.5"/><circle cx="11" cy="6" r="1.9"/><path d="M10.2 9.8c.3-.1.5-.1.8-.1 1.5 0 2.8 1 3.2 3.2"/></svg>
-        <span>Team</span>
-      </button>}
+      {/* THERE IS NO TEAM TAB (w-05ff3d1438, 2026-10-01). The Team page and
+          the Inbox were one question on two pages, so they are one page: the
+          faces at the end of the Inbox's tab bar pick whose threads are on
+          it. `onTeam` is still the sign-in link at the foot. */}
     </nav>
     <div className="workspace-bottom">
       <div className="workspace-utilities th-side-foot">

@@ -1,79 +1,28 @@
-// THE TEAM PAGE: the state of the company.
+// THE TEAM'S SETUP PAGE: where you sign in, start a team, invite people and
+// see who is on it, because those are the only times the team is a thing you
+// set up rather than a place you look.
 //
-// Approved 2026-09-30 (w-e731ca9376): every open task in the company, one line
-// each, newest movement first, NEVER grouped (there could be 200 tasks in a
-// project). Tabs filter by state, a row of faces filters by person. Live work
-// is shown here on purpose: this is the page you open to see what is going on.
-// A teammate's private task is a blank "Private task" line (person and state,
-// never title or project); your own private task shows its title, a lock and
-// "Hidden from the team", so a work task left private by mistake is easy to see.
-//
-// It is also where you sign in, start a team, invite people and choose which
-// projects are shared, because those are the only times the team is a thing
-// you set up rather than a place you look.
-import { useMemo, useState } from 'react';
-import type { Person, Product, TeamCallResult, TeamState, WorkItem } from '../types';
+// It used to be the Team page as well, the state of the company in one list.
+// That half moved onto the Inbox (w-05ff3d1438, 2026-10-01): the Inbox and the
+// Team page were one question on two pages, so the faces at the end of the
+// Inbox's tab bar now pick whose threads are on it.
+import { useState } from 'react';
+import type { Person, Product, TeamCallResult, TeamState } from '../types';
 import { api } from '../api';
-import { isShared } from '../../../shared/team-rules.mjs';
-import { Face, LockIcon, firstName } from './people';
-import { companyLines, movedAgo as ago, type CompanyLine as Line } from './company';
-
-type Tab = 'open' | 'run' | 'wait' | 'sched' | 'done';
+import { Face } from './people';
 
 
-export function TeamPage({ team, products, items, now, onOpen, forceSetup = false, inviteFocus = false }: {
-  team: TeamState | null | undefined; products: Product[]; items: WorkItem[]; now: number; onOpen: (item: WorkItem) => void;
-  /** Team members and Invite people, from the foot of the sidebar: the setup page, always. */
-  forceSetup?: boolean;
+export function TeamPage({ team, products, inviteFocus = false }: {
+  team: TeamState | null | undefined; products: Product[];
   /** Opened from Invite people: the email box has the cursor. */
   inviteFocus?: boolean;
 }) {
-  const [tab, setTab] = useState<Tab>('open');
-  const [who, setWho] = useState<string | null>(null);
-  const [setup, setSetup] = useState(false);
-  const lines = useMemo(() => (team?.signedIn && team.team ? companyLines(items, products, team, now) : { open: [], doneToday: [] }), [items, products, team, now]);
-
   if (!team?.configured) return <div className="tm-setup"><h2>Teams are not set up in this build</h2><p>This copy of the app has no team cloud configured.</p></div>;
   if (!team.signedIn) return <SignIn error={team.error} />;
-  if (!team.team || setup || forceSetup) return <TeamSetup team={team} products={products} inviteFocus={inviteFocus} onDone={team.team && !forceSetup ? () => setSetup(false) : undefined} />;
-
-  const byPerson = (l: Line) => !who || l.owner === who;
-  const open = lines.open.filter(byPerson);
-  const done = lines.doneToday.filter(byPerson);
-  const shown = tab === 'open' ? open : tab === 'done' ? done : open.filter((l) => l.state === tab);
-  const count = (t: Tab) => (t === 'open' ? open.length : t === 'done' ? done.length : open.filter((l) => l.state === t).length);
-  const everyone: (Person | null)[] = [team.me, ...team.people.filter((p) => p.id !== team.me?.id)];
-  const tabs: [Tab, string][] = [['open', 'Open'], ['run', 'Running'], ['wait', 'Waiting'], ['sched', 'Scheduled'], ['done', 'Done today']];
-
-  return <div className="tm-team-pane"><div className="list">
-    <div className="tm-bar">
-      <div className="tm-tabs">{tabs.map(([t, label]) => <button key={t} className={`tm-tab${tab === t ? ' on' : ''}`} onClick={() => setTab(t)}>{label}<b>{count(t)}</b></button>)}</div>
-      <div className={`tm-faces${who ? ' picked' : ''}`}>
-        <button className={`tm-every${who ? '' : ' on'}`} onClick={() => setWho(null)}>Everyone</button>
-        {everyone.map((p) => p && <button key={p.id} className={`tm-face-btn${who === p.id ? ' on' : ''}`} title={p.id === team.me?.id ? 'You' : p.name} onClick={() => setWho(who === p.id ? null : p.id)}><Face person={p} me={p.id === team.me?.id} /></button>)}
-        <button className="tm-every" style={{ marginLeft: 8 }} title="Invite people and choose which projects are shared" onClick={() => setSetup(true)}>Team</button>
-      </div>
-    </div>
-    <div>
-      <div className="row tm-head"><div className="row-main tm-grid"><div /><div>Task</div><div>Project</div><div>Person</div><div>State</div><div className="num">Moved</div></div></div>
-      {shown.length === 0 && <div className="tm-empty-note">{who ? 'Nothing here for this person.' : 'Nothing here yet. Share a project from Team to see its work.'}</div>}
-      {shown.map((l) => {
-        const person = l.owner === team.me?.id ? team.me : team.people.find((p) => p.id === l.owner) ?? null;
-        return <div key={l.key} className="row tm-row" onClick={() => l.item && onOpen(l.item)} style={{ cursor: l.item ? 'pointer' : 'default' }}>
-          <div className="row-main tm-grid">
-            <span className={`tm-mark tm-is-${l.state}`} />
-            <div className={`tm-title${l.title === null ? ' private' : ''}`}>
-              {l.title === null ? <><LockIcon />Private task</> : <>{l.mine && <LockIcon />}{l.title}{l.mine && <small>Hidden from the team</small>}</>}
-            </div>
-            <div className="tm-proj">{l.title === null ? '' : l.project}</div>
-            <div className="tm-owner"><Face person={person} me={l.owner === team.me?.id} />{l.owner === team.me?.id ? 'You' : firstName(person)}</div>
-            <div className={`tm-state tm-is-${l.state}`}>{l.stateText}</div>
-            <div className="num">{ago(now - l.movedAt)}</div>
-          </div>
-        </div>;
-      })}
-    </div>
-  </div></div>;
+  // THE COMPANY LIST THAT STOOD HERE IS GONE (w-05ff3d1438): whose threads you
+  // see is picked by the faces on the Inbox now, so this page only ever sets
+  // the team up.
+  return <TeamSetup team={team} products={products} inviteFocus={inviteFocus} />;
 }
 
 function useCall() {

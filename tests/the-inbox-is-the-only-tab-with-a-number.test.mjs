@@ -41,20 +41,16 @@ it.each([1, 3, 120])('puts the number on Inbox for %s waiting threads', inboxCou
   expect(inboxTab(html)).toContain('class="workspace-running');
 });
 
-it('leaves the Team tab bare however busy the team is or however much is scheduled', () => {
-  // approved 2026-10-01 (w-e731ca9376): Team is the only other tab, and the
-  // component says why it has no number: a count of who is busy is not worth
-  // seeing all the time, and the Team page is where you look.
+it('draws one number, on Inbox, however busy the team is or however much is scheduled', () => {
+  // Inbox is the only tab now (w-05ff3d1438: the Team tab folded into the
+  // Inbox's faces), and nothing scheduled or teamed adds a second number.
   const quiet = draw({ inboxCount: 0, scheduledCount: 9, hasTeam: true, onTeam() {} });
-  expect(quiet).toContain('data-tab="team"');
+  expect(quiet).not.toContain('data-tab="team"');
   expect(quiet).not.toContain('class="workspace-running');
   expect(quiet).not.toContain('scheduled');
   const busy = draw({ inboxCount: 5, scheduledCount: 9, hasTeam: true, onTeam() {} });
   expect(busy.match(/class="workspace-running/g)).toHaveLength(1);
   expect(inboxTab(busy)).toContain('class="workspace-running');
-  // The words the Team tab shows, with its icon's drawing numbers left out.
-  const team = busy.slice(busy.lastIndexOf('<button', busy.indexOf('data-tab="team"')));
-  expect(team.slice(0, team.indexOf('</button>')).replace(/<[^>]*>/g, '')).toBe('Team');
 });
 
 it.each([0, -1, NaN])('draws nothing for an empty or invalid count: %s', inboxCount => {
