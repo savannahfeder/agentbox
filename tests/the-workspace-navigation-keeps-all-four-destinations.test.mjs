@@ -188,8 +188,9 @@ describe('every control keeps its name in either width', () => {
       onInstructions: noop, onSettings: noop, inboxCount: 2,
     });
     const buttons = html.match(/<button[^>]*>/g);
-    // Inbox, Team, Invite people, Team members, Instructions, Settings and the toggle.
-    expect(buttons).toHaveLength(7);
+    // Inbox, Team, Invite people, Team members, Instructions, Settings, the
+    // toggle, and your own row (it opens your account).
+    expect(buttons).toHaveLength(8);
     for (const b of buttons) expect(b).toMatch(/aria-label="[^"]+"/);
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
   });

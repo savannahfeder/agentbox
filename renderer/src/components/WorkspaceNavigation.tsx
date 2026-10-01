@@ -94,7 +94,11 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
       </div>
       {usage && <div className="workspace-usage">{usage}</div>}
       <div className="th-me">
-        {me ? <><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></>
+        {/* Your own row opens the page with your account on it (a persona test:
+            "clicking her own name does nothing"). */}
+        {me ? (onMembers
+          ? <button type="button" className="th-me-btn" aria-label="Your account" title={collapsed ? 'Your account' : undefined} onClick={onMembers}><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></button>
+          : <><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></>)
           : team?.configured && onTeam ? <button type="button" className="th-me-signin" aria-label="Sign in to your team" onClick={onTeam}>Sign in to your team</button>
             : <span />}
       </div>

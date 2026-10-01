@@ -159,3 +159,9 @@
 .workspace-collapsed .workspace-navigation .th-mark-btn:focus-visible > .th-mark-open { display: grid; }
 /* The heading row draws no hairline under itself, on both pages. */
 .th-table .row.th-head + .row::after { display: none; }
+
+/* Your row in the sidebar's foot is a button to your account page. */
+.workspace-navigation .th-me-btn { display: flex; align-items: center; gap: 9px; width: 100%; height: 38px; padding: 0 8px; margin-left: -8px; min-width: 0; text-align: left; color: var(--text); font-size: 13.5px; }
+.workspace-navigation .th-me-btn > span:nth-child(2) { min-width: 0; overflow: hidden; }
+.workspace-collapsed .workspace-navigation .th-me-btn { width: 38px; padding: 0 0 0 8px; }
+.workspace-collapsed .workspace-navigation .th-me-btn > .tm-av { display: inline-block; }
