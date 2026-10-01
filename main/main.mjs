@@ -1,7 +1,10 @@
 // The app: the agent inbox. Electron shell around a keyboard-first renderer, a
 // file-derived store, and a supervisor of headless sessions.
 
-import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, screen as electronScreen, shell, session } from 'electron';
+import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, screen as electronScreen, shell, session, safeStorage } from 'electron';
+import * as workItemsDisk from './store/work-items.mjs';
+import { createTeamService, teamStateFile } from './team/index.mjs';
+import { loadCloudConfig, supabaseSession } from './team/session.mjs';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -311,6 +314,34 @@ async function createWindow() {
   imageRoots = () => [config.accountRoot, ...store.listProducts().map((p) => p.repoPath).filter(Boolean)];
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   app.on('before-quit', () => supervisor.killAll());
+  // THE TEAM. Off entirely on a build with no team cloud (the single-person
+  // app). Otherwise it restores whoever was signed in, and from then on every
+  // line this Mac writes says who wrote it and shared projects stay in sync.
+  // Its session file sits beside the store, encrypted with the Mac's own
+  // keychain-backed key, so each store root is its own signed-in person.
+  const cloudConfig = loadCloudConfig(appDir);
+  const encrypt = safeStorage.isEncryptionAvailable() ? (text) => safeStorage.encryptString(text) : null;
+  const decrypt = safeStorage.isEncryptionAvailable() ? (buf) => safeStorage.decryptString(buf) : null;
+  const team = cloudConfig ? createTeamService({
+    session: supabaseSession({
+      cloudConfig,
+      sessionFile: path.join(config.storeRoot, '.team-session'),
+      encrypt, decrypt,
+      openExternal: (url) => shell.openExternal(url),
+    }),
+    store,
+    disk: workItemsDisk,
+    accountRoot: config.accountRoot,
+    stateFile: teamStateFile(config.storeRoot),
+    // The window's push is declared further down and wired once the window
+    // exists; until then a change has nobody to tell.
+    onChange: () => { try { pushUpdate(); } catch { /* no window yet */ } },
+    log: (line) => console.log(line),
+  }) : null;
+  if (team) {
+    team.start().then(() => supervisor.wake?.()).catch((err) => console.warn(`team: ${err.message}`));
+    app.on('before-quit', () => team.stop());
+  }
   // HER CODEX CONVERSATIONS ASK TO COME IN. Once a minute: a new one in a
   // folder a project points at gets a row asking yes or no, and the ones she
   // said yes to follow Codex's latest answer.
@@ -577,6 +608,7 @@ async function createWindow() {
   const ipc = registerIpc({
     store, supervisor, config, window, analytics, docGrants, updater,
     host: { ipcMain, app, dialog },
+    team,
   });
   pushUpdate = ipc.push;
   // The Agents menu's Allow/Deny, bound to the real door now that there is one.

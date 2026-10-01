@@ -18,6 +18,7 @@ import {
 import { NOTE_NAME } from './rail-note.mjs';
 import { iconPathFor } from './project-identity.mjs';
 import { imgUrl } from './img-scheme.mjs';
+import { teamOf } from './team/projects.mjs';
 import {
   agentImportRow, agentsNeedingRows, threadImportRow, threadsNeedingRows,
 } from '../shared/agent-import.mjs';
@@ -117,6 +118,10 @@ export class Store {
         // that turn on this flag — never spawning a worker in it, drawing a
         // band over it — must never happen to real work.
         practice: project[PRACTICE_FLAG] === true,
+        // SHARED OR PRIVATE. Null on a private project, which is every
+        // project of a person who never signs in; otherwise the cloud id that
+        // is the same on every teammate's Mac (main/team/projects.mjs).
+        team: teamOf(project),
       });
     }
     return products.sort((a, b) => a.name.localeCompare(b.name));
@@ -381,7 +386,7 @@ export class Store {
     );
   }
 
-  composeItem(slug, { title, body, kind = 'directive', priority = 0, labels, runAt, engine, model, effort }) {
+  composeItem(slug, { title, body, kind = 'directive', priority = 0, labels, runAt, engine, model, effort, assignee, due }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     // The 'founder' label is the human-in-the-loop marker: only items the
@@ -421,6 +426,11 @@ export class Store {
       // whole gate exists for. Whether the word may be written at all is decided
       // before it gets here, by `Supervisor#engineOffered`.
       ...(engine ? { engine: String(engine) } : {}),
+      // A TASK GIVEN TO A PERSON (the team version): who has to do it and
+      // when. No agent runs on it until that person hands it to one
+      // (shared/team-rules.mjs), and it reaches their inbox, not the sender's.
+      ...(assignee ? { assignee: String(assignee) } : {}),
+      ...(due ? { due: String(due) } : {}),
     };
     return workItemsDisk.updateWorkItem(dir, created.id, contentPatch, { source: 'founder' });
   }

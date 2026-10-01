@@ -40,6 +40,15 @@ import path from 'node:path';
 import os from 'node:os';
 import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, productRankScore } from '../shared/rank.mjs';
 import { isCleanRun, ruleIdOf } from '../shared/repeats.mjs';
+import { mayRunHere } from '../shared/team-rules.mjs';
+
+// WHO IS SIGNED IN, handed to the store server a worker talks through. An MCP
+// server starts with only the variables it is given, not the app's, and every
+// line it writes for a shared project has to say whose Mac wrote it
+// (main/store/work-items.mjs stamps it from this).
+function teamPersonEnv() {
+  return process.env.AGENTBOX_PERSON_ID ? { AGENTBOX_PERSON_ID: process.env.AGENTBOX_PERSON_ID } : {};
+}
 import { agentSpokeSince, answerSettled, answerTs } from '../shared/answers.mjs';
 import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
 import { linkAccountTooling, toolingLine } from './account-tooling.mjs';
@@ -3548,13 +3557,22 @@ export class Supervisor {
     // and cannot be got round by writing a new one. `worksHere` is that rule
     // and it is the same one `spawnWorker` refuses on; this set only saves the
     // queue the work of considering rows it would refuse anyway.
+    const products = this.store.listProducts();
     const noWorkHere = new Set(
-      this.store.listProducts().filter((p) => !this.worksHere(p)).map((p) => p.slug),
+      products.filter((p) => !this.worksHere(p)).map((p) => p.slug),
     );
+    // A SHARED PROJECT'S ROW RUNS ON ITS RUNNER'S MAC AND NOWHERE ELSE, and a
+    // row a person has been given runs nowhere until they hand it back. Every
+    // teammate's supervisor sees every shared row; without this each would
+    // start its own worker on it. shared/team-rules.mjs is the rule, and the
+    // window reads the same one to decide whose inbox a row is in.
+    const productBySlug = new Map(products.map((p) => [p.slug, p]));
+    const me = process.env.AGENTBOX_PERSON_ID || null;
 
     const queue = [];
     for (const item of items) {
       if (noWorkHere.has(item.product)) continue;
+      if (!mayRunHere(item, productBySlug.get(item.product), me)) continue;
       if (this.sessions.has(item.id)) continue;
       // Interrupted a moment ago so an Urgent row could have its slot. Putting
       // a worker back on it here — as a stranger, on the fresh-work or
@@ -5229,6 +5247,7 @@ export class Supervisor {
       env: {
         STORE_ACCOUNT_ID: this.config.accountId,
         ...storeRootEnv(this.config.storeRoot),
+        ...teamPersonEnv(),
         ZERO_PRODUCT: item.product,
         ZERO_ITEM: item.id,
       },
@@ -6561,6 +6580,7 @@ export class Supervisor {
         env: {
           STORE_ACCOUNT_ID: this.config.accountId,
           ...storeRootEnv(this.config.storeRoot),
+          ...teamPersonEnv(),
         },
       };
     }

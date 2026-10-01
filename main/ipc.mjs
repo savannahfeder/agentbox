@@ -87,7 +87,7 @@ const NO_UPDATER = {
   install: () => false,
 };
 
-export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host }) {
+export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null }) {
   // The three Electron things, or a plain Node stand-in for them. There is no
   // default: a caller that forgets says so here rather than throwing eighty
   // lines further down on `ipcMain.handle` of undefined.
@@ -362,6 +362,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return {
       products: store.listProducts(),
       items,
+      // THE TEAM: who is signed in, their team and its people, and the
+      // title-free activity of their private work. Null on a build with no
+      // team cloud, which is the single-person app.
+      team: team ? team.state() : null,
       agents: liveAgents(),
       approvals: approvals.listPending(config.storeRoot),
       supervisor: running,
@@ -571,13 +575,36 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return supervisor.status();
   });
 
-  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, labels, engine, model, effort }) => {
+  // THE TEAM'S DOORS. Each answers { ok, team } or { ok: false, error } with
+  // the error in words, so the window can say what went wrong where it
+  // happened instead of a row silently not appearing.
+  const teamCall = (fn) => async (_e, arg) => {
+    if (!team) return { ok: false, error: 'This build has no team cloud set up.' };
+    try {
+      await fn(arg ?? {});
+      push();
+      return { ok: true, team: team.state() };
+    } catch (err) {
+      return { ok: false, error: String(err?.message ?? err), team: team.state() };
+    }
+  };
+  ipcMain.handle('zero:team-sign-in', teamCall(() => team.signIn()));
+  ipcMain.handle('zero:team-sign-out', teamCall(() => team.signOut()));
+  ipcMain.handle('zero:team-create', teamCall(({ name }) => team.createTeam(name)));
+  ipcMain.handle('zero:team-invite', teamCall(({ email }) => team.invite(email)));
+  ipcMain.handle('zero:team-share', teamCall(({ product, visibility, people }) => team.share(product, { visibility, people })));
+  ipcMain.handle('zero:team-sync', teamCall(() => team.syncNow()));
+
+  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, labels, engine, model, effort, assignee, due }) => {
     const out = store.composeItem(product, {
       // HOW HARD IT THINKS rides through unjudged: the store keeps any word
       // shaped like a level, and the spawn is the gate that knows each
       // engine's real list (`Supervisor#spawnPlan` for Claude Code,
       // `codexEffortRefusal` for Codex).
       title, body, kind, priority, runAt, labels, effort,
+      // WHO DOES IT, when it is a person (the team version): the teammate it
+      // goes to and the day it is due. An agent's row carries neither.
+      assignee, due,
       // WHICH CODING AGENT SHE CHOSE, AND ONLY IF SHE COULD HAVE. `engineOffered`
       // is the supervisor's own test and the door makes no judgement of its own:
       // it answers null on any Mac where the picker is not drawn, so a renderer
