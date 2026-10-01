@@ -21,19 +21,19 @@
 export const EXAMPLES = [
   {
     kind: 'question',
-    title: 'Example: which of these two names should the project use?',
-    result: 'Example. Both are free. Say either one and I will rename everything to match.',
+    title: 'Example: which of these two dates should the offsite use?',
+    result: 'Example. Both are free. Say either one and I will book it.',
     agoMs: 4 * 60_000,
   },
   {
     kind: 'task',
-    title: 'Example: the sign in page is built and the tests are green.',
+    title: 'Example: the meeting notes are summarised and shared.',
     result: 'Example. Nothing here needs you. Close it and it is gone.',
     agoMs: 11 * 60_000,
   },
   {
     kind: 'review',
-    title: 'Example: I took the smaller library, say if you disagree.',
+    title: 'Example: I picked the cheaper venue, say if you disagree.',
     result: 'Example. This is what an agent looks like when it made a call without you.',
     agoMs: 26 * 60_000,
   },

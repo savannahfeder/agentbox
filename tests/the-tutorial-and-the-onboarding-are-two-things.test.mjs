@@ -180,7 +180,8 @@ describe('1. the tutorial offers itself when somebody makes a new project', () =
     // The practice project is deleted at the end of the walk rather than
     // archived, so this card may say so. Before that it could not have.
     expect(COPY.offerLine.toLowerCase()).toContain('nothing in it is kept');
-    expect(COPY.offerLine.toLowerCase()).toContain('nothing in it is your code');
+    // "your code" until 2026-10-01; most of the team has no code in it.
+    expect(COPY.offerLine.toLowerCase()).toContain('nothing in it is yours');
   });
 
   it('says where the tutorial lives to the one person who turns it down', () => {

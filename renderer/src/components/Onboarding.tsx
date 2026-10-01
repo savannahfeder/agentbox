@@ -15,7 +15,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
-  ALSO, ANCHOR, BOUNDS, BREATHE_AFTER_MS, COACHED, COPY, FLOOR, FLOOR_OF,
+  ALSO, ANCHOR, BOUNDS, BREATHE_AFTER_MS, COACHED, COPY, FLOOR, FLOOR_OF, TEXT_MAX, TEXT_MIN, teamTab,
   HELD_EVENTS, LINE_H, SLAB_OF, TEXT_GAP, UNDER,
   anyAgents, clearOf, finishCard, forgetAgentsWhileLookingAgain,
   forgetFoldersWhileLookingAgain, keepSecondRead, keyName, keyToken, padFor,
@@ -73,6 +73,15 @@ function PlusGlyph() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
       <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+/** The folder screen's way past, for somebody with no folder. */
+function SkipGlyph() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 8h9M8.5 4.5L12 8l-3.5 3.5" />
     </svg>
   );
 }
@@ -496,9 +505,12 @@ function Lights({ of, cap, left: given }: { of: number; cap: string; left?: numb
   const left = given ?? seen;
   const lit = Math.max(0, Math.min(of, of - left));
   return (
-    <span className="fr-lights" aria-hidden="true">
+    // DOTS, NOT KEYS (2026-10-01). Two more E caps under "Press E to close it"
+    // read as "E E", a key to press twice, in a persona test. A dot is a count
+    // and nothing else; the key is already named once on the line above.
+    <span className="fr-lights" aria-hidden="true" data-key={cap}>
       {Array.from({ length: of }, (_, i) => (
-        <kbd key={i} className={i < lit ? 'fr-lit' : undefined}>{cap}</kbd>
+        <i key={i} className={i < lit ? 'fr-dot fr-lit' : 'fr-dot'} />
       ))}
     </span>
   );
@@ -719,6 +731,24 @@ function Veil({ box, knocked = '' }: {
 
    So the card goes to the right of the ring, vertically centred on it, out in
    the empty half of the strip the tabs live in. */
+/** How long a beat may have nothing to point at before its card is printed anyway. */
+const ADRIFT_MS = 900;
+
+/** The top of the list, under the team layout's tabs when they are drawn. */
+function adriftAt(): { x: number; y: number; w: number } {
+  const pane = document.querySelector('.list-pane') ?? document.querySelector('.body');
+  const r = pane ? pane.getBoundingClientRect() : null;
+  const bar = document.querySelector('.th-bar');
+  const top = bar ? bar.getBoundingClientRect().bottom + 28 : (r && r.height > 0 ? r.top + 48 : 120);
+  const left = r && r.width > 0 ? r.left + 40 : 80;
+  const right = r && r.width > 0 ? r.right : window.innerWidth;
+  return {
+    x: Math.round(left),
+    y: Math.round(top),
+    w: Math.round(Math.max(TEXT_MIN, Math.min(TEXT_MAX + 120, right - left - 40))),
+  };
+}
+
 function Ringed({
   selector, boundsSel, underSel, makesRoom, say, beside, besideRing, besideOf, beat, pointed,
   hold, also,
@@ -752,6 +782,9 @@ function Ringed({
   also?: string[];
 }) {
   const [geo, setGeo] = useState<ReturnType<typeof ring> | null>(null);
+  // WHERE THE CARD GOES WHEN THE THING IT POINTS AT IS NOT ON THE SCREEN.
+  const [adrift, setAdrift] = useState<{ x: number; y: number; w: number } | null>(null);
+  const lostAt = useRef<number | null>(null);
   const cardRef = useRef<HTMLParagraphElement>(null);
   // HOW MANY STRAY CLICKS THIS BEAT HAS ANSWERED. It is a count rather than a
   // flag for the reason the cap's own count is: the class comes off with the
@@ -762,10 +795,24 @@ function Ringed({
 
   useLayoutEffect(() => {
     let live = true;
+    /* A BEAT WITH NOTHING TO POINT AT STILL SAYS WHAT TO DO (2026-10-01).
+       This returned nothing, and a persona test on the team build sat on a
+       blank inbox for over thirty seconds after "Start the tutorial", because
+       the first beat's button was drawn under a name this list did not know.
+       So after a short grace, long enough for the render between two beats,
+       the card is printed with no ring at the top of the list. It stays quiet
+       while something else is open over the app, which is the rule below. */
+    const lost = () => {
+      setGeo(null);
+      if (document.querySelector('.modal-backdrop')) { lostAt.current = null; setAdrift(null); return; }
+      const t = Date.now();
+      if (lostAt.current === null) lostAt.current = t;
+      if (t - lostAt.current >= ADRIFT_MS) setAdrift(adriftAt());
+    };
     const measure = () => {
       if (!live) return;
       const el = firstOf(selector);
-      if (!el) { setGeo(null); return; }
+      if (!el) { lost(); return; }
       // AND NOT OVER WHATEVER SHE HAS OPENED ON TOP OF THE APP.The walk draws
       // at z-index 301, above the palette and the compose card, so a ring
       // round a row behind ⌘K cut across the palette and its sentence ran
@@ -774,9 +821,11 @@ function Ringed({
       // is the compose card step, and otherwise it waits. The walk has not
       // stopped, it is just not talking over her.
       const over = [...document.querySelectorAll(".modal-backdrop")];
-      if (over.length && !over.some((o) => o.contains(el))) { setGeo(null); return; }
+      if (over.length && !over.some((o) => o.contains(el))) { lostAt.current = null; setAdrift(null); setGeo(null); return; }
       const box = anchorOf(el);
-      if (!box) { setGeo(null); return; }
+      if (!box) { lost(); return; }
+      lostAt.current = null;
+      setAdrift(null);
       const b = boundsSel ? document.querySelector(boundsSel) : null;
       const br = b ? b.getBoundingClientRect() : null;
       const view = { w: window.innerWidth, h: window.innerHeight };
@@ -892,7 +941,17 @@ function Ringed({
   // runs after every placement rather than inside the one that made it.
   useLayoutEffect(() => { settle(cardRef.current); lift(cardRef.current, geo); });
 
-  if (!geo) return null;
+  if (!geo) {
+    if (!adrift) return null;
+    return (
+      <p
+        ref={cardRef}
+        className="fr-tether fr-adrift"
+        style={{ left: adrift.x, top: adrift.y, maxWidth: adrift.w }}
+        role="status"
+      ><Card say={say} beat={beat} pointed={pointed} knock={knock} /></p>
+    );
+  }
   const pad = 10;
   // WHAT A STRAY CLICK IS ANSWERED WITH, and it is three parts of one gesture,
   // all of them 620ms and none of them a word: the veil deepens so what she
@@ -1208,7 +1267,11 @@ function Finished({
    inbox behind these words has a row per agent in it, so it cannot say the
    inbox is empty; that is w-27e3ab9c48's fault read on the new surface.
 */
-export const LANDED_MS = 5_200;
+/* LONG ENOUGH TO READ WHAT TO DO NEXT (2026-10-01). It was 5.2 seconds for two
+   lines; it carries two more now, the next thread and the Team page, and a
+   persona test read the old ending as no ending at all. Any key or any click
+   still takes it down at once, and the click still reaches the app. */
+export const LANDED_MS = 14_000;
 
 export function Landed({ agents, onGone }: {
   /**
@@ -1238,9 +1301,11 @@ export function Landed({ agents, onGone }: {
     // C to write their first task gets the compose card AND their screen back.
     const on = () => onGone();
     const armed = setTimeout(() => window.addEventListener('keydown', on), 0);
+    const armedClick = setTimeout(() => window.addEventListener('pointerdown', on), 0);
     return () => {
-      clearTimeout(t); clearTimeout(armed);
+      clearTimeout(t); clearTimeout(armed); clearTimeout(armedClick);
       window.removeEventListener('keydown', on);
+      window.removeEventListener('pointerdown', on);
     };
   }, [onGone]);
   return (
@@ -1264,6 +1329,9 @@ export function Landed({ agents, onGone }: {
       <div className="fr-landed-say">
         <h1 className="fr-landed-head">{COPY.finishHead}</h1>
         <p className="fr-landed-line">{agents ? COPY.finishLineAgents : COPY.finishLine}</p>
+        <ul className="fr-landed-next">
+          {COPY.finishNext.map((line) => <li key={line}>{line}</li>)}
+        </ul>
       </div>
     </div>
   );
@@ -1367,11 +1435,14 @@ function PieceNav({ count = 0, on = 'inbox' }: { count?: number; on?: 'inbox' | 
  *  said the opposite. The practice rows still come first, so the promise the
  *  tutorial keeps is intact; these sit under them, from invented projects.
  */
+// A TEAM'S WORK, NOT ONLY AN ENGINEER'S (2026-10-01). These were all code:
+// database drivers, push providers, React upgrades. Somebody who does not code
+// read the first picture of the product as not for them.
 const INTRO_MORE: Array<{ title: string; result: string; agoMs: number; project: string }> = [
-  { title: 'Moved the pricing page onto the new layout.', result: 'Screens match the design at all three widths. Ready to merge.', agoMs: 38 * 60_000, project: 'Storefront' },
-  { title: 'Which push provider should the app use?', result: 'Two work. One is free up to ten thousand devices, the other has better delivery reports.', agoMs: 44 * 60_000, project: 'Mobile' },
-  { title: 'Wrote the migration guide for version two.', result: 'Every renamed option has an example. I left the CLI section for you.', agoMs: 52 * 60_000, project: 'Docs' },
-  { title: 'Upgraded the database driver.', result: 'All 412 tests pass. Connection time is down by about a third.', agoMs: 61 * 60_000, project: 'Storefront' },
+  { title: 'Drafted the agenda for the offsite.', result: 'Three sessions and a working lunch. I left the dinner spot for you to pick.', agoMs: 38 * 60_000, project: 'Operations' },
+  { title: 'Which launch date should we announce?', result: 'The 14th clears every review. The 7th is a week tighter but still possible.', agoMs: 44 * 60_000, project: 'Launch' },
+  { title: 'Rewrote the pricing page.', result: 'All three plans now say the same thing in the same order. Ready for you to read.', agoMs: 52 * 60_000, project: 'Website' },
+  { title: 'Summarised this week of customer calls.', result: 'Five calls, and two of them asked for the same thing. One page of notes.', agoMs: 61 * 60_000, project: 'Research' },
 ];
 
 /**
@@ -1380,13 +1451,13 @@ const INTRO_MORE: Array<{ title: string; result: string; agoMs: number; project:
  *  not need you, working on their own with their current step under each.
  */
 const INTRO_WORKING: Array<{ title: string; step: string; project: string }> = [
-  { title: 'Add rate limiting to the public API.', step: 'Writing tests for the burst case.', project: 'Storefront' },
-  { title: 'Port the settings screen to SwiftUI.', step: 'Reading the old view controller.', project: 'Mobile' },
-  { title: 'Find why checkout is slow on Safari.', step: 'Profiling the payment form.', project: 'Storefront' },
-  { title: 'Document the webhook retries.', step: 'Drafting the examples.', project: 'Docs' },
-  { title: 'Upgrade to React 19.', step: 'Fixing two type errors in the cart.', project: 'Storefront' },
-  { title: 'Add offline mode to the reader.', step: 'Caching the last ten articles.', project: 'Mobile' },
-  { title: 'Split the search index by locale.', step: 'Rebuilding the French index.', project: 'Docs' },
+  { title: 'Tidy the vendor contact list.', step: 'Removing duplicates.', project: 'Operations' },
+  { title: 'Draft the release notes for March.', step: 'Reading what changed this month.', project: 'Launch' },
+  { title: 'Find why checkout is slow on Safari.', step: 'Timing the payment form.', project: 'Website' },
+  { title: 'Book rooms for the team offsite.', step: 'Comparing three hotels.', project: 'Operations' },
+  { title: 'Turn the survey answers into a chart.', step: 'Counting answers by team.', project: 'Research' },
+  { title: 'Fix the broken link in the welcome email.', step: 'Checking every link in it.', project: 'Website' },
+  { title: 'Write up the hiring plan.', step: 'Drafting the timeline.', project: 'Launch' },
 ];
 
 function IntroPiece({ kind }: { kind: 'list' | 'ask' | 'empty' | 'progress' }) {
@@ -1831,7 +1902,7 @@ export function Onboarding({
   claude: { missing: boolean; url: string };
   home: string;
   /** Something really happened: a folder chosen, a project made. */
-  onEvent: (e: { t: 'start' } | { t: 'folder'; path: string } | { t: 'name'; name: string }) => void;
+  onEvent: (e: { t: 'start' } | { t: 'folder'; path: string } | { t: 'noFolder' } | { t: 'name'; name: string }) => void;
   /** Move to a step. Separate from onEvent because a move records nothing. */
   onStep: (step: FirstRun['step']) => void;
   /* * * The name screen's Next: make the project for real, then walk on. Answers * with the
@@ -2051,8 +2122,11 @@ export function Onboarding({
   useEffect(() => {
     if (run.step !== 'folder' || recent === null) return;
     const on = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowDown') { e.preventDefault(); setLit((i) => Math.min(rows, i + 1)); }
+      // One row past "Choose another folder": the way past for somebody with no folder.
+      if (e.key === 'ArrowDown') { e.preventDefault(); setLit((i) => Math.min(rows + 1, i + 1)); }
       if (e.key === 'ArrowUp') { e.preventDefault(); setLit((i) => Math.max(0, i - 1)); }
+      // The row past the chooser is the way past with no folder.
+      if (e.key === 'Enter' && lit > rows) { e.preventDefault(); skipFolder(); return; }
       if (e.key === 'Enter') {
         e.preventDefault();
         if (lit < rows && recent[lit]) takeFolder(recent[lit].folder);
@@ -2083,6 +2157,15 @@ export function Onboarding({
   // a box and waited for Submit, which is the step people could not read. A
   // folder picked from the list or from the Mac chooser goes straight to the
   // name, where the folder is shown again with a way to change it.
+  // NO FOLDER, AND THAT IS FINE (2026-10-01). The project is made without one
+  // and its agents work in a folder the app keeps for it, so somebody with no
+  // code folder still ends the setup with a project that works.
+  const skipFolder = () => {
+    setRefused(null);
+    onEvent({ t: 'noFolder' });
+    onStep('name');
+  };
+
   const takeFolder = (picked: string) => {
     setRefused(null);
     onEvent({ t: 'folder', path: picked });
@@ -2216,8 +2299,15 @@ export function Onboarding({
         : run.step === 'snooze' && later && !picking
           ? [`.list-pane .row[data-item-id="${later}"]`, ...ANCHOR.snooze ?? []]
           : goingTo
-            ? [`.workspace-navigation [data-tab="${goingTo}"]`, `.tabs .tab[data-tab="${goingTo}"]`, ...ANCHOR.where ?? []]
+            // THE TEAM LAYOUT'S TAB FIRST (2026-10-01): its strip has no
+            // data-tab, so `teamTab` finds the tab by its place in the strip.
+            ? [...(teamTab(goingTo) ? [teamTab(goingTo) as string] : []), `.workspace-navigation [data-tab="${goingTo}"]`, `.tabs .tab[data-tab="${goingTo}"]`, ...ANCHOR.where ?? []]
             : ANCHOR[run.step];
+    // A CARD BESIDE A TAB IN THE TEAM STRIP SITS ON THE TABS AFTER IT, which is
+    // the "hints covered the tabs" a persona test reported. That strip runs
+    // across the top of the list, so the card goes under it instead.
+    const teamStrip = run.step === 'where' && typeof document !== 'undefined'
+      && !!document.querySelector('.th-bar .tm-tabs');
     if (!sel || !sel.length) return null;
     return (
       <Ringed
@@ -2237,7 +2327,7 @@ export function Onboarding({
         // already flips the sentence above it into the empty middle of the
         // pane. There is nothing beside it to stand off and nothing under it to
         // cover: the overlap the rig prints as `overDock` is 0 by construction.
-        beside={run.step === 'where' || (run.step === 'command' && !!palette)}
+        beside={(run.step === 'where' && !teamStrip) || (run.step === 'command' && !!palette)}
         besideRing={run.step === 'command' && !!palette}
         // The tour's tabs are the sidebar's rows now, so the card stands off
         // the sidebar's right edge and holds one x for every press.
@@ -2413,7 +2503,10 @@ export function Onboarding({
                 <span className="fr-fold"><FolderGlyph /></span>
                 <span className="fr-folder-name">{f.name}</span>
                 <span className="fr-folder-path">{f.short}</span>
-                <span className="fr-folder-via">{f.via.map((v) => COPY.folderVia[v]).join(' · ')}</span>
+                {/* NO TOOL NAMES ON THE ROW (2026-10-01). It said which agent
+                    app the folder was found through, which means nothing to
+                    most of the team. The cell stays so the grid holds. */}
+                <span className="fr-folder-via" />
                 <span className="fr-folder-key">{lit === i && <Cap cap="↵" />}</span>
               </button>
             ))}
@@ -2429,6 +2522,18 @@ export function Onboarding({
               <span className="fr-folder-name">{recent && recent.length ? COPY.folderOther : COPY.folderFirst}</span>
               <span className="fr-folder-key">{lit === (recent?.length ?? 0) && <Cap cap="↵" />}</span>
             </button>
+            <button
+              type="button"
+              role="option"
+              aria-selected={lit === (recent?.length ?? 0) + 1}
+              className={`fr-folder fr-folder-other fr-folder-none${lit === (recent?.length ?? 0) + 1 ? ' lit' : ''}`}
+              onMouseEnter={() => setLit((recent?.length ?? 0) + 1)}
+              onClick={skipFolder}
+            >
+              <span className="fr-fold"><SkipGlyph /></span>
+              <span className="fr-folder-name">{COPY.folderNone}</span>
+              <span className="fr-folder-key">{lit === (recent?.length ?? 0) + 1 && <Cap cap="↵" />}</span>
+            </button>
           </div>
           {refused && <p className="fr-note fr-refused">{refused}</p>}
         </div>
@@ -2441,10 +2546,17 @@ export function Onboarding({
               the heading, the field is the card, and the folder it is for sits
               under it with a way back to change it. */}
           <h1 className="fr-page">{COPY.nameQ}</h1>
-          <p className="fr-lede">
-            {COPY.nameIn} <span className="fr-lede-path">{folderShown}</span>.{' '}
-            <button type="button" className="fr-lede-link" onClick={() => onStep('folder')}>{COPY.nameChange}</button>
-          </p>
+          {folderShown ? (
+            <p className="fr-lede">
+              {COPY.nameIn} <span className="fr-lede-path">{folderShown}</span>.{' '}
+              <button type="button" className="fr-lede-link" onClick={() => onStep('folder')}>{COPY.nameChange}</button>
+            </p>
+          ) : (
+            <p className="fr-lede">
+              {COPY.nameInNone}{' '}
+              <button type="button" className="fr-lede-link" onClick={() => onStep('folder')}>{COPY.nameChoose}</button>
+            </p>
+          )}
           <div className="fr-card fr-name-card">
             <input
               ref={nameRef}

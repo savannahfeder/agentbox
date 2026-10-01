@@ -36,7 +36,10 @@ describe('the ten beats, in her order', () => {
     const practising = advance({ ...made, step: 'hand' }, { t: 'practice', product: 'practice', examples: [] });
     expect(practising.step).toBe('make');
     // w-ec62ab6b38 (2026-09-28): the plus is labelled New thread now, not New task.
-    expect(ANCHOR.make).toEqual(['button[aria-label="New thread"]']);
+    // AND THE TEAM HEADER'S NEW THREAD BUTTON AFTER IT (2026-10-01). That
+    // layout draws no plus, and its button has no aria-label, so the first
+    // beat of the tutorial drew no card at all in a persona test.
+    expect(ANCHOR.make).toEqual(['button[aria-label="New thread"]', '.th-right button[data-hint="new-task"]', 'button.th-new']);
     // AND IT IS THE PLUS ALONE, WHICH SHE RULED ON AGAINST US (2026-08-27). A
     // round put the idle page's compose field in front of the plus, because
     // that field is 710px wide, sits mid-window and wears a `C` cap while the
