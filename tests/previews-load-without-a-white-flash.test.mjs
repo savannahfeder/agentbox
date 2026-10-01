@@ -8,7 +8,9 @@ it('keeps both frame sizes hidden until their own load event',()=>{
   const s=read(`components/${file}.tsx`);
   expect(s).toContain('onLoad={revealFrame}');
   expect(s).toContain('opacity:frameReady ?');
-  expect(s).toContain('usePreviewReveal(url)');
+  // The pane keys its reveal on the frame, not the bare address, so a local
+  // app that comes back up starts hidden again (local-preview.ts).
+  expect(s).toMatch(/usePreviewReveal\((url|frameKey)\)/);
  }
 });
 it('shows a quiet status while resolving and never uses empty loading placeholders',()=>{

@@ -813,6 +813,21 @@
 .artifact-thumbnail > .preview-loading {transition:none;}
 .preview-loading[data-delayed="true"] .preview-skeleton {visibility:hidden;}
 
+/* A LOCAL APP SAYS WHAT IT IS DOING IN WORDS (local-preview.ts). The skeleton
+   alone read as an empty card on a dark theme, and a port nothing listens on
+   looked exactly like one still loading. The words sit over the skeleton,
+   centred, at reading contrast; with nothing running the skeleton goes and the
+   words and Try again are all that is left. */
+.preview-loading {position:relative;}
+.preview-words {position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:32px; text-align:center;}
+.preview-words-title {display:flex; align-items:center; gap:10px; color:var(--text); font-size:15px; font-weight:500;}
+.preview-words-detail {max-width:34em; color:var(--text-dim); font-size:13.5px; line-height:1.5;}
+.preview-words-pulse {width:7px; height:7px; border-radius:50%; background:var(--text-dim); animation:preview-skeleton-breathe 1.2s ease-in-out infinite;}
+.preview-words-retry {pointer-events:auto; margin-top:10px; padding:6px 14px; border:1px solid var(--line-strong); border-radius:var(--radius); background:var(--wash); color:var(--text); font:inherit; font-size:13px; cursor:pointer;}
+.preview-words-retry:hover {border-color:var(--text-faint);}
+.preview-loading[data-stopped="true"] {opacity:1;}
+@media (prefers-reduced-motion:reduce) {.preview-words-pulse {animation:none;}}
+
 /* Muted warm-gray navigation over Peach Haze's dimmed photograph.
 
    The reported fault was eye strain reading this sidebar over Peach Haze, and
