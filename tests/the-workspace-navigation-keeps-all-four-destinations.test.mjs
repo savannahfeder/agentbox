@@ -10,14 +10,17 @@
 // at the right end of the header (HeaderActions in the same file).
 //
 // What the sidebar is now, and what this file pins:
-//   - the team's mark and name at the top;
+//   - the team's mark and name at the top, with the collapse toggle beside
+//     them (her note, 2026-10-01: "better placed at the top, right next to the
+//     workspace or the company name, as is the standard"); collapsed, the mark
+//     itself is the toggle;
 //   - one list tab, Inbox, lit on every list view, since every list is a tab
 //     on the Inbox page, and not lit on the Team page, Settings or members;
 //   - a Team tab, only when the team cloud is configured and there is a way
 //     to open it;
 //   - at the foot, Invite people and Team members (only when signed in to a
 //     team), Instructions, Settings, then the signed-in person's face, name
-//     and email beside the collapse toggle.
+//     and email.
 // The promise that survives from the old file is the accessible one: in the
 // collapsed rail the words are hidden, so every button has to carry its name
 // in an aria-label or it is a blank square.
@@ -140,12 +143,13 @@ describe('the foot of the sidebar', () => {
     expect(html.indexOf('workspace-tabs')).toBeLessThan(html.indexOf('workspace-bottom'));
   });
 
-  it('shows the signed-in person, name and email, in the row with the collapse toggle', () => {
+  it('shows the signed-in person, name and email, and the toggle sits at the top instead', () => {
     const html = draw({ team: onATeam });
     const row = html.slice(html.indexOf('class="th-me"'));
     expect(row).toContain('Ada Lovelace');
     expect(row).toContain('<small>ada@example.test</small>');
-    expect(row).toContain('workspace-toggle');
+    expect(row).not.toContain('workspace-toggle');
+    expect(html.slice(0, html.indexOf('workspace-tabs'))).toContain('workspace-toggle');
   });
 
   it('offers to sign in instead when the team cloud is set up and nobody is signed in', () => {
@@ -166,13 +170,13 @@ describe('the top of the sidebar', () => {
     const html = draw({ team: onATeam });
     const top = html.slice(0, html.indexOf('workspace-tabs'));
     expect(top).toContain('>N</span>');
-    expect(top).toContain('<span>Northwind</span>');
+    expect(top).toContain('>Northwind</span>');
   });
 
   it('falls back to the app name when there is no team', () => {
     const html = draw();
     const top = html.slice(0, html.indexOf('workspace-tabs'));
-    expect(top).toContain(`<span>${Name}</span>`);
+    expect(top).toContain(`>${Name}</span>`);
     expect(top).toContain(`>${Name.slice(0, 1).toUpperCase()}</span>`);
   });
 });

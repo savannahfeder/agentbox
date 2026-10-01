@@ -2,6 +2,7 @@ import { claudeActivity, codexActivity, currentActivity } from './agent-activity
 import { taskRemoteControl } from './task-remote-control.mjs';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mjs';
 import { folderJob } from './task-folders-offthread.mjs';
+import { gitJob } from './git-change-offthread.mjs';
 import { queuedReplyText } from './live-replies.mjs';
 import { attachClaudeInput, claudeStreamArgs } from './claude-input.mjs';
 import { hookFailure } from '../shared/hook-failure.mjs';
@@ -1399,6 +1400,45 @@ export class Supervisor {
         try { this.spawnWorker(entry.item, entry.opts); }
         catch (error) { console.warn(`zero: could not start ${item.id}:`, error.message); }
         finally { this._madeFolders.delete(item.id); }
+        this.onChange?.();
+      });
+    return true;
+  }
+
+  /**
+   * THE CHECKOUT, PHOTOGRAPHED OFF THE MAIN THREAD BEFORE THE RUN STARTS
+   * (2026-10-01, main/git-change-offthread.mjs says why). The same pending
+   * entry `_folderFirst` uses, so a row being photographed counts against its
+   * slot and Stop cancels it exactly as it cancels a folder being made.
+   */
+  _photoFirst(item, product, engine, opts) {
+    if (opts.remoteOnly) return false;
+    this._photos ??= new Map();
+    if (this._photos.has(item.id)) return false;
+    const held = this._preparing?.get(item.id);
+    if (held) { held.item = item; held.opts = opts; return true; }
+    let cwd = null;
+    try { cwd = this.workFolderFor(item, product); } catch { return false; }
+    // Only a folder that is itself a checkout (a task folder carries a `.git`
+    // file, a repository a `.git` folder). Anything else has nothing to
+    // photograph, and keeps starting in the same call as before.
+    if (!cwd || !fs.existsSync(path.join(cwd, '.git'))) return false;
+    this._preparing ??= new Map();
+    const entry = { item, opts, engine, madeFolder: this._madeFolders?.get(item.id) };
+    this._preparing.set(item.id, entry);
+    gitJob('snapshotRepo', cwd)
+      .then((photo) => photo ?? null, () => null)
+      .then((photo) => {
+        if (this._preparing.get(item.id) !== entry) return;
+        this._preparing.delete(item.id);
+        this._photos.set(item.id, photo);
+        if (entry.madeFolder !== undefined) { this._madeFolders ??= new Map(); this._madeFolders.set(item.id, entry.madeFolder); }
+        try { this.spawnWorker(entry.item, entry.opts); }
+        catch (error) { console.warn(`zero: could not start ${item.id}:`, error.message); }
+        finally {
+          this._photos.delete(item.id);
+          if (entry.madeFolder !== undefined) this._madeFolders?.delete(item.id);
+        }
         this.onChange?.();
       });
     return true;
@@ -5517,6 +5557,7 @@ export class Supervisor {
       return;
     }
     if (this._folderFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly })) return;
+    if (this._photoFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly })) return;
 
     const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine });
     const { args } = plan;
@@ -5644,7 +5685,10 @@ export class Supervisor {
     //
     // Never allowed to stop a spawn. A product with no repository gets null
     // and the conversation carries the card exactly as it did before.
-    try { session.repoBefore = snapshotRepo(cwd); } catch { session.repoBefore = null; }
+    // Taken off the main thread a moment ago by `_photoFirst`, before the
+    // process existed; read here inline only when that step did not run.
+    if (this._photos?.has(item.id)) session.repoBefore = this._photos.get(item.id);
+    else { try { session.repoBefore = snapshotRepo(cwd); } catch { session.repoBefore = null; } }
 
     // A MODE BELONGS TO THE THREAD, NOT TO ONE SEND, AND THIS IS WHERE THAT
     // CHANGED (w-34b7b861b6, 2026-09-24).

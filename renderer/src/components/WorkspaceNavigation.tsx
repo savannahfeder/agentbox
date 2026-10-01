@@ -68,7 +68,7 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
         open, and shows the sidebar icon under the pointer. */}
     <div className="th-team" title={collapsed ? undefined : teamName}>
       {collapsed ? (
-        <button type="button" className="th-mark-btn" data-hint="sidebar" aria-label="Expand sidebar" title="Expand sidebar" onClick={onToggle}>
+        <button type="button" className="workspace-toggle th-mark-btn" data-hint="sidebar" aria-label="Expand sidebar" title="Expand sidebar" onClick={onToggle}>
           <span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span>
           <span className="th-mark-open" aria-hidden="true"><SidebarToggleIcon collapsed /></span>
         </button>

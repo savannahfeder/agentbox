@@ -65,7 +65,8 @@ describe('sharing', () => {
       { slug: 'a', dir: '/a', name: 'A', team: { projectId: 'x' } },
       { slug: 'b', dir: '/b', name: 'B', team: null },
     ];
-    expect(listSharedProjects(products)).toEqual([{ projectId: 'x', dir: '/a', name: 'A', slug: 'a' }]);
+    // `direct` says whether it is a message record, whose lines the pull keeps more of.
+    expect(listSharedProjects(products)).toEqual([{ projectId: 'x', dir: '/a', name: 'A', slug: 'a', direct: false }]);
   });
 });
 

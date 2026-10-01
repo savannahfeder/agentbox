@@ -29,6 +29,7 @@ export const REQUEST_CHANNELS = {
   teamSignOut: 'zero:team-sign-out',
   teamCreate: 'zero:team-create',
   teamInvite: 'zero:team-invite',
+  teamAcceptInvite: 'zero:team-accept-invite',
   teamShare: 'zero:team-share',
   teamSync: 'zero:team-sync',
   teamRoute: 'zero:team-route',

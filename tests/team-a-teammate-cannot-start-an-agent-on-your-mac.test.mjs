@@ -73,9 +73,11 @@ describe('what a teammate\'s line may set on this Mac', () => {
       patch: { problem: 'P', progress: 'Q', solution: 'S', blockedBy: ['w-2'], blocks: [], assignee: ME } });
   });
 
+  // The status rides in a message too (2026-10-01): a new message reopens a
+  // conversation that was put away. A message record never runs an agent.
   it('lets a message carry its words, and still nothing that runs', () => {
     const kept = whatATeammateMaySet(hostile, { direct: true });
-    expect(Object.keys(kept.patch).sort()).toEqual(['answer', 'assignee', 'blockedBy', 'blocks', 'body', 'problem', 'progress', 'solution', 'title'].sort());
+    expect(Object.keys(kept.patch).sort()).toEqual(['answer', 'assignee', 'blockedBy', 'blocks', 'body', 'problem', 'progress', 'solution', 'status', 'title'].sort());
   });
 
   it('drops a line that has nothing left', () => {

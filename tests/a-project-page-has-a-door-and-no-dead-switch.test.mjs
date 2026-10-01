@@ -139,7 +139,8 @@ describe('the door to a project', () => {
     // Settings is asked first, so a project page lights Settings whatever else
     // is true. The members page joined the same prop on 2026-10-01
     // (w-e731ca9376), after Settings, so it cannot steal the light from it.
-    expect(app).toContain("page={settingsOpen ? 'settings' : teamShown && membersOpen ? 'members' : null}");
+    // Invite people and Team members open the same page and light their own row.
+    expect(app).toContain("page={settingsOpen ? 'settings' : teamShown && membersOpen ? (inviteFocus ? 'invite' : 'members') : null}");
   });
 
   it('titles the page it lands on', () => {
