@@ -140,6 +140,18 @@
 .ts-menu .ts-who { margin-right: 0; }
 .ts-menu-head { display: block; padding: 6px 9px 4px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 .ts-menu-none { display: block; padding: 6px 9px 8px; font-size: 13px; color: var(--text-faint); }
+/* THE PEOPLE BEHIND "CHOSEN PEOPLE" (w-41ff964775). The list scrolls rather
+   than growing past the panel, and the find box only appears on a company big
+   enough to need it (Summary.tsx). */
+.ts-panel .prio-menu.ts-menu { max-height: 300px; overflow-y: auto; }
+.ts-find {
+  display: block; margin: 2px 6px 4px; padding: 5px 8px; box-sizing: border-box; width: calc(100% - 12px);
+  font: inherit; font-size: 13px; color: var(--text);
+  background: none; border: 1px solid var(--line); border-radius: var(--radius); outline: none;
+}
+.ts-find::placeholder { color: var(--text-faint); }
+.ts-find:focus { border-color: var(--line-strong); }
+.ts-menu .prio-menu-row .tm-av { margin-right: 8px; flex: none; }
 
 .ts-rule { height: 1px; background: var(--line); margin: 0 0 22px; }
 

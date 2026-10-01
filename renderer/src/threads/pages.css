@@ -60,6 +60,10 @@
 /* WHO SEES A ROW (2026-10-01): two people after the title of a thread the team
    can see, and nothing on the rest, which is most of an older inbox. */
 .th-shared { display: inline-block; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
+/* AND HOW WIDELY (w-41ff964775): a thread only a few people see carries their
+   count beside the same mark, in the mark's own faint colour, so team and
+   chosen people differ without a second glyph to learn. */
+.th-shared-n { display: inline-block; margin-left: 3px; font: 10.5px var(--mono); color: var(--text-faint); vertical-align: 0; }
 
 /* ------------------------------------------------------------ the list as a table */
 .th-table .row.th-head { padding-top: 10px; padding-bottom: 8px; font: 10.5px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); cursor: default; }

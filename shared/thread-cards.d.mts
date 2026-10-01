@@ -7,3 +7,4 @@ export function firstSentence(text: string | undefined | null, max?: number): st
 export function summaryOf(item: Partial<WorkItem>): { problem: string; progress: string; solution: string; written: boolean };
 export function cardsFor(p: { products: unknown[]; readItems: (product: any) => any[]; now?: number; since?: number | null }): any[];
 export function shownToTeam(item: Partial<WorkItem>, since?: number | null): boolean;
+export function shownToPeople(item: Partial<WorkItem>): string[];

@@ -18,6 +18,7 @@ import {
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
 import { facesShown, togglePicked } from './people-rules';
+import { shownToPeople } from '../../../shared/thread-cards.mjs';
 import { api } from '../api';
 import './pages.css';
 
@@ -244,15 +245,20 @@ export function otherPerson(item: WorkItem, me: string | null): string | null {
 /** ONE ROW OF THE TABLE, FOR THE INBOX AND THE TEAM PAGE BOTH (2026-10-01).
  *  The Team page's list view is the same component as the Inbox's, with small
  *  differences only. So there is one set of cells, and the Team page only adds Person. */
-export function RowCells({ live = false, title, hidden = false, lock = false, shared = false, where, person, priority, updatedAt, now, action }: {
+export function RowCells({ live = false, title, hidden = false, lock = false, shared = false, chosen = 0, where, person, priority, updatedAt, now, action }: {
   /** An agent is on this thread right now: a turning mark before its name. */
   live?: boolean;
   title: ReactNode; hidden?: boolean; lock?: boolean; shared?: boolean; where: ReactNode; person?: ReactNode;
+  /** How many people a thread shared with chosen people reaches; 0 for the team. */
+  chosen?: number;
   priority: number | null; updatedAt: number; now: number; action?: ReactNode;
 }) {
   const id = priority === null ? null : priorityIdOf(priority);
   return <div className={`row-main th-grid${person !== undefined ? ' with-person' : ''}`}>
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live && <StateGlyph state="running" live />}{title}{shared && <SharedMark label="Visible to the team" />}{lock && <LockMark />}</div>
+    {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
+        people alone for the whole team, and a small count beside them for a
+        thread only a few people see. No second glyph to learn. */}
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live && <StateGlyph state="running" live />}{title}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}</div>
     <div className="th-cell-proj">{where}</div>
     {person !== undefined && <div className="th-cell-person">{person}</div>}
     <div className={`th-cell-prio${id === 'urgent' ? ' urgent' : ''}`}>{id && <><PriorityMark id={id} />{priorityLabelOf(id)}</>}</div>
@@ -289,21 +295,25 @@ export function ThreadCells({ item, product, now, person, withOthers = false }: 
   // the rest, which is most of her rows, so the mark only ever means one
   // thing. Hovering the row offers Share or Unshare at its end. Her click
   // shows at once; the row catches up when the store's next snapshot does.
+  // A thread shared with chosen people is shared too (w-41ff964775): the mark
+  // is the same and a count beside it says how few. Unshare takes it away from
+  // whoever had it, the team or those people.
   const sharing = rowSharing(item, product, team ? { me: team.me, since: team.state.since ?? null } : null);
-  const [chosen, setChosen] = useState<'team' | 'private' | null>(null);
-  useEffect(() => { setChosen(null); }, [item.visibility]);
-  const seen = sharing && (chosen ?? sharing);
+  const [flipped, setFlipped] = useState<'team' | 'private' | null>(null);
+  useEffect(() => { setFlipped(null); }, [item.visibility, item.visibleTo]);
+  const seen = sharing && (flipped ?? sharing);
+  const chosen = seen === 'people' ? shownToPeople(item).length : 0;
   const flip = async () => {
     if (!seen) return;
     const patch = sharePatch(seen);
-    setChosen(patch.visibility);
+    setFlipped(patch.visibility);
     const out = await api.threadEdit(item.product, item.id, patch);
-    if (!out.ok) setChosen(null);
+    if (!out.ok) setFlipped(null);
   };
   const action = seen ? (
     <button type="button" className="th-row-act" onClick={(e) => { e.stopPropagation(); void flip(); }}
-      title={seen === 'team' ? 'Stop showing this thread to the team' : 'Show this thread to the team'}>
-      <SharedMark className="th-row-act-mark" />{seen === 'team' ? 'Unshare' : 'Share'}
+      title={seen === 'private' ? 'Show this thread to the team' : 'Stop showing this thread'}>
+      <SharedMark className="th-row-act-mark" />{seen === 'private' ? 'Share' : 'Unshare'}
     </button>
   ) : undefined;
   // A CONVERSATION WITH A PERSON READS LIKE A MESSAGE, showing who it is
@@ -319,7 +329,8 @@ export function ThreadCells({ item, product, now, person, withOthers = false }: 
   // which would be on every other row, steps aside.
   // It follows her click at once, the way the Share button does.
   const lock = withOthers && seen === 'private';
-  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={!withOthers && seen === 'team'} lock={lock} where={product?.name ?? ''} person={person}
+  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={!withOthers && (seen === 'team' || seen === 'people')} chosen={withOthers ? 0 : chosen}
+    lock={lock} where={product?.name ?? ''} person={person}
     priority={item.priority ?? 0} updatedAt={item.updatedAt} now={now} action={action} />;
 }
 
@@ -355,11 +366,13 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
         {/* Your own board says what the tab says: what waits on you needs you. */}
         <div className="th-col-h"><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b></div>
         {rows.length === 0 && <div className="th-col-empty">Nothing here.</div>}
-        {/* On your board alone, the people mark on what the team can see. With
-            a teammate beside you, the lock on what they cannot. */}
+        {/* On your board alone, the people mark on what the team can see, or
+            on the few people it was shared with. With a teammate beside you,
+            the lock on what they cannot see. */}
         {rows.map((e) => <button type="button" key={e.key} className="th-card" onClick={() => (e.item ? onOpenItem(e.item) : e.card && onOpenCard?.(e.card))}>
           <div className="t">{e.message ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} /> : e.title}
-            {e.item && !e.message && !withOthers && sharing(e.item) === 'team' && <SharedMark label="Visible to the team" />}
+            {e.item && !e.message && !withOthers && (sharing(e.item) === 'team' || sharing(e.item) === 'people')
+              && <SharedMark label={shownToPeople(e.item).length ? 'Visible to the people on it' : 'Visible to the team'} />}
             {e.item && !e.message && withOthers && sharing(e.item) === 'private' && <LockMark />}
           </div>
           <div className="m">{e.live && <StateGlyph state="running" live />}{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project}</span>

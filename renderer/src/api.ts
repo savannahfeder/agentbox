@@ -453,7 +453,7 @@ export const api = {
     try { return await window.zero.threadEdit({ product, id, patch }); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   },
 
-  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'private' }): Promise<WorkItem | null> {
+  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem | null> {
     // FIXTURES ANSWER WITH THE TASK, the way the real store does. Returning
     // null here meant the send had nothing to point at, and the caller reads
     // that as "no task was made" and puts no way back on the undo pile — so the

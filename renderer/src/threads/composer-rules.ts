@@ -276,14 +276,38 @@ export function onlyYouAnd(person: Person): string {
 
 /* ------------------------------- visibility ------------------------------- */
 
-export type Visibility = 'team' | 'private';
+export type Visibility = 'team' | 'people' | 'private';
 
 export const VISIBILITY_KEY = 'threads.composer.visibility';
 
+// THREE CHOICES SINCE w-41ff964775, her words: "you might only want certain
+// people to see what you're up to... you might want to share it with your boss
+// or some people". Chosen people sits between the two it already had, because
+// that is where it sits in how much it shares.
 export const VISIBILITY_ROWS: ReadonlyArray<{ id: Visibility; label: string; line: string }> = [
   { id: 'team', label: 'Team', line: 'Teammates see its summary on the Team board.' },
+  { id: 'people', label: 'Chosen people', line: 'Only the people you pick see its summary.' },
   { id: 'private', label: 'Private', line: 'Only you see it. It is not on the Team board.' },
 ];
+
+/**
+ * WHAT A SEND SAYS ABOUT WHO SEES IT. Chosen people with nobody picked reaches
+ * nobody, which is Private: one stored word per thing that is true, so the
+ * panel can never say "Chosen people" over a thread no person can see.
+ */
+export function sharingFields(visibility: Visibility, chosen: readonly string[]): { visibility: Visibility; visibleTo?: string[] } {
+  if (visibility !== 'people') return { visibility };
+  const people = [...new Set(chosen.filter(Boolean))];
+  return people.length ? { visibility: 'people', visibleTo: people } : { visibility: 'private' };
+}
+
+/** The names on the Visibility chip: "Theo", "Theo and Ana", "3 people". */
+export function chosenWords(chosen: readonly string[], people: readonly Person[]): string {
+  const named = chosen.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => !!p);
+  if (!named.length) return 'Chosen people';
+  if (named.length > 2) return `${named.length} people`;
+  return named.map((p) => firstName(p)).join(' and ');
+}
 
 interface KeyStore { getItem(key: string): string | null; setItem?(key: string, value: string): void }
 

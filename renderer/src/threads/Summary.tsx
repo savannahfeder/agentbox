@@ -22,7 +22,9 @@ import {
   STATE_WORD, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, lastEdit, linkCandidates, linkedThreads,
   ownerName, readSummaryOpen, stateGlyph, type StateGlyph, type SummaryField,
 } from './summary-rules';
-import { VISIBILITY_WORD, whoSees } from './summary-rules';
+import { VISIBILITY_WORD, chosenNames, whoSees, type Seen } from './summary-rules';
+import { findPeople, teammates } from './composer-rules';
+import { shownToPeople } from '../../../shared/thread-cards.mjs';
 import { rowTitle } from '../list-rules';
 import { SharedMark } from './Pages';
 import './summary.css';
@@ -129,7 +131,7 @@ export function SummaryToggle({ open, onToggle }: { open: boolean; onToggle: () 
 
 /* ------------------------------------------------------------------- panel */
 
-type Field = SummaryField | 'priority' | 'visibility' | 'blockedBy' | 'blocks';
+type Field = SummaryField | 'priority' | 'visibility' | 'visibleTo' | 'blockedBy' | 'blocks';
 type Pending = Partial<Record<Field, { value: unknown; ts: number }>>;
 type Menu = null | 'priority' | 'visibility' | 'blockedBy' | 'blocks';
 
@@ -186,6 +188,10 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
 
   // One small menu at a time, closed by a press anywhere outside it.
   const [menu, setMenu] = useState<Menu>(null);
+  // The second page of the Visible to menu: which people see it.
+  const [pickPeople, setPickPeople] = useState(false);
+  const [find, setFind] = useState('');
+  useEffect(() => { if (menu !== 'visibility') { setPickPeople(false); setFind(''); } }, [menu]);
   const menuRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!menu) return undefined;
@@ -202,7 +208,19 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
   const prio: PriorityId = priorityIdOf(valueOf<number>('priority'));
   // A thread from before you joined is yours until you share it, whatever it
   // says on disk (summary-rules.ts `whoSees`, the Team page's own rule).
-  const visibility = whoSees({ ...item, visibility: valueOf<'team' | 'private' | undefined>('visibility') }, team?.state.since ?? null);
+  const visibility = whoSees({
+    ...item,
+    visibility: valueOf<'team' | 'people' | 'private' | undefined>('visibility'),
+    visibleTo: valueOf<string[] | undefined>('visibleTo') ?? item.visibleTo,
+  }, team?.state.since ?? null);
+  // WHO IS ON THE LIST, when it is shared with chosen people (w-41ff964775).
+  // Read off the row the same way, so her tick shows before the store's next
+  // snapshot comes back with it.
+  const chosen = shownToPeople({
+    visibility: valueOf<'team' | 'people' | 'private' | undefined>('visibility') ?? item.visibility,
+    visibleTo: valueOf<string[] | undefined>('visibleTo') ?? item.visibleTo,
+  });
+  const others = useMemo(() => teammates(team?.state.people ?? [], team?.me ?? null), [team]);
   const owner = ownerName(item, me, team?.byId ?? new Map());
   const ownerPerson = owner === 'You' ? null : team?.byId.get(item.createdBy ?? '') ?? null;
 
@@ -375,27 +393,62 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
         </span>
         <span className="ts-label">Visible to</span>
         <span className="ts-value ts-menu-anchor" ref={holdMenu('visibility')}>
-          {/* Both choices in a menu, like Priority, so she sees what she is
-              choosing between before anything is written. The marks are the
-              inbox's: two people for the team, one for you. */}
-          <button type="button" className="ts-prop-btn" aria-haspopup="listbox" aria-expanded={menu === 'visibility'} title="Change who sees it" onClick={() => setMenu(menu === 'visibility' ? null : 'visibility')}>
-            {visibility === 'team' ? <SharedMark className="ts-who" /> : <OnlyYouMark />}{VISIBILITY_WORD[visibility]}<Caret />
+          {/* All three choices in a menu, like Priority, so she sees what she
+              is choosing between before anything is written. The marks are the
+              inbox's: two people for the team or a few of them, one for you.
+              Chosen people names them in the button, so the panel answers
+              "visible to whom" without opening anything. */}
+          <button type="button" className="ts-prop-btn" aria-haspopup="listbox" aria-expanded={menu === 'visibility'} title="Change who sees it" onClick={() => { setPickPeople(false); setMenu(menu === 'visibility' ? null : 'visibility'); }}>
+            {visibility === 'private' ? <OnlyYouMark /> : <SharedMark className="ts-who" />}
+            {visibility === 'people' ? chosenNames(chosen, team?.byId ?? new Map()) : VISIBILITY_WORD[visibility]}<Caret />
           </button>
           {menu === 'visibility' && (
             <span className="prio-menu ts-menu" role="listbox" aria-label="Visible to">
-              {(['team', 'private'] as const).map((v) => (
+              {/* CHOSEN PEOPLE OPENS THE PEOPLE LIST (w-41ff964775), the same
+                  one the composer uses, and a tick writes the list at once.
+                  Taking the last person off leaves nobody who can see it,
+                  which is Private: one stored word per thing that is true. */}
+              {!pickPeople ? (['team', 'people', 'private'] as const).map((v) => (
                 <button
                   key={v}
                   type="button"
                   role="option"
                   aria-selected={v === visibility}
                   className={`prio-menu-row${v === visibility ? ' on' : ''}`}
-                  onClick={() => { setMenu(null); if (v !== visibility) void save({ visibility: v }); }}
+                  onClick={() => {
+                    if (v === 'people') { setPickPeople(true); return; }
+                    setMenu(null);
+                    if (v !== visibility) void save({ visibility: v });
+                  }}
                 >
-                  {v === 'team' ? <SharedMark className="ts-who" /> : <OnlyYouMark />}
+                  {v === 'private' ? <OnlyYouMark /> : <SharedMark className="ts-who" />}
                   <span className="prio-menu-label">{VISIBILITY_WORD[v]}</span>
                 </button>
-              ))}
+              )) : (<>
+                <button type="button" className="prio-menu-row" onClick={() => setPickPeople(false)}>
+                  <span className="prio-menu-label">‹ Visible to</span>
+                </button>
+                {others.length > 6 && (
+                  <input className="ts-find" placeholder="Find a person" value={find} onChange={(e) => setFind(e.target.value)} />
+                )}
+                {findPeople(others, find).map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    role="option"
+                    aria-selected={chosen.includes(p.id)}
+                    className={`prio-menu-row${chosen.includes(p.id) ? ' on' : ''}`}
+                    onClick={() => {
+                      const next = chosen.includes(p.id) ? chosen.filter((id) => id !== p.id) : [...chosen, p.id];
+                      void save(next.length ? { visibility: 'people', visibleTo: next } : { visibility: 'private', visibleTo: [] });
+                    }}
+                  >
+                    <Face person={p} />
+                    <span className="prio-menu-label">{p.name}</span>
+                  </button>
+                ))}
+                {!others.length && <span className="ts-menu-none">Nobody else is on the team yet.</span>}
+              </>)}
             </span>
           )}
         </span>

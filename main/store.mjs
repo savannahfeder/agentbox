@@ -409,13 +409,13 @@ export class Store {
   // person's own words; on the summary the later write wins either way
   // (SHARED_FIELDS in shared/work-items.mjs).
   threadEdit(slug, id, patch) {
-    const fields = ['problem', 'progress', 'solution', 'visibility', 'priority', 'blockedBy', 'blocks'];
+    const fields = ['problem', 'progress', 'solution', 'visibility', 'visibleTo', 'priority', 'blockedBy', 'blocks'];
     const allowed = Object.fromEntries(Object.entries(patch ?? {}).filter(([k]) => fields.includes(k)));
     if (!Object.keys(allowed).length) throw new Error('nothing to change');
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, allowed, { source: 'founder' });
   }
 
-  composeItem(slug, { title, body, kind = 'directive', priority = 0, labels, runAt, engine, model, effort, assignee, due, people, visibility }) {
+  composeItem(slug, { title, body, kind = 'directive', priority = 0, labels, runAt, engine, model, effort, assignee, due, people, visibility, visibleTo }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     // The 'founder' label is the human-in-the-loop marker: only items the
@@ -461,9 +461,12 @@ export class Store {
       ...(assignee ? { assignee: String(assignee) } : {}),
       ...(due ? { due: String(due) } : {}),
       ...(Array.isArray(people) && people.length ? { people } : {}),
-      // WHO SEES IT (approved 2026-10-01): the team by default, or nobody but
-      // its owner. Only 'private' is written; no field reads as the team.
+      // WHO SEES IT (approved 2026-10-01): the team by default, nobody but its
+      // owner, or the people she chose (w-41ff964775). Only the two words that
+      // are not the default are written; no field at all reads as the team.
       ...(visibility === 'private' ? { visibility } : {}),
+      ...(visibility === 'people' && Array.isArray(visibleTo) && visibleTo.length
+        ? { visibility, visibleTo: [...new Set(visibleTo.map(String))] } : {}),
     };
     return workItemsDisk.updateWorkItem(dir, created.id, contentPatch, { source: 'founder' });
   }

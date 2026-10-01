@@ -176,6 +176,9 @@ export function supabaseBackend(client) {
       if (cards.length) {
         must(await client.from('thread_cards').upsert(cards.map((c) => ({
           person_id: me, team_id: teamId, thread_id: c.threadId, visible: !!c.visible,
+          // WHO IT REACHES: the chosen people, or no list at all for the whole
+          // team (w-41ff964775). The read rule on the table does the enforcing.
+          people: c.people == null ? null : [...new Set(c.people.filter((p) => typeof p === 'string' && p))],
           title: c.visible ? c.title : null, project: c.visible ? c.project : null, state: c.state,
           priority: Number.isFinite(c.priority) ? c.priority : null,
           problem: c.visible ? c.problem : null, progress: c.visible ? c.progress : null, solution: c.visible ? c.solution : null,
@@ -192,7 +195,7 @@ export function supabaseBackend(client) {
       await myId();
       const rows = must(await client.from('thread_cards').select('*'), 'reading your team\'s threads');
       return rows.map((r) => ({
-        personId: r.person_id, threadId: r.thread_id, visible: r.visible, title: r.title, project: r.project,
+        personId: r.person_id, threadId: r.thread_id, visible: r.visible, title: r.title, project: r.project, people: r.people ?? null,
         state: r.state, priority: r.priority, problem: r.problem, progress: r.progress, solution: r.solution,
         blockedBy: r.blocked_by ?? [], blocks: r.blocks ?? [], updatedAt: Date.parse(r.updated_at),
       }));

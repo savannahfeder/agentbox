@@ -5,7 +5,8 @@
 // the rows are ordered, how "Updated" is said, and what goes in each board
 // column for the Team, where your own threads come from this Mac and your
 // teammates' from the cards their Macs publish.
-import { shownToTeam } from '../../../shared/thread-cards.mjs';
+import { shownToPeople, shownToTeam } from '../../../shared/thread-cards.mjs';
+import type { Seen } from './summary-rules';
 import type { Product, ThreadCard, ThreadStateWord, WorkItem } from '../types';
 import { priorityIdOf, type PriorityId } from '../priority';
 import { threadState } from '../../../shared/thread-cards.mjs';
@@ -129,14 +130,18 @@ export function peopleInConversation(
  * the question does not arise: nobody signed in, a message between people, an
  * agent's own row, or a teammate's thread, which is theirs to share.
  */
+// 'people' SINCE w-41ff964775: shared, but with the people named on it rather
+// than the team. The row says which quietly (a count beside the mark) and the
+// summary panel is where the list is changed.
 export function rowSharing(
-  item: Pick<WorkItem, 'visibility' | 'createdAt' | 'createdBy' | 'agent'>,
+  item: Pick<WorkItem, 'visibility' | 'visibleTo' | 'createdAt' | 'createdBy' | 'agent'>,
   product: Product | undefined | null,
   team: { me: string | null; since?: number | null } | null,
-): 'team' | 'private' | null {
+): Seen | null {
   if (!team || !product || isDirect(product) || item.agent) return null;
   if (item.createdBy && item.createdBy !== team.me) return null;
-  return shownToTeam(item, team.since ?? null) ? 'team' : 'private';
+  if (!shownToTeam(item, team.since ?? null)) return 'private';
+  return shownToPeople(item).length ? 'people' : 'team';
 }
 
 /**
@@ -167,8 +172,14 @@ export function messagePriority(item: WorkItem): number | null {
   return set && set.source !== 'system' ? item.priority ?? null : null;
 }
 
-/** What one click on Share or Unshare writes: the other one. */
-export const sharePatch = (now: 'team' | 'private'): { visibility: 'team' | 'private' } => ({ visibility: now === 'team' ? 'private' : 'team' });
+/**
+ * What one click on Share or Unshare writes. Share puts a thread in front of
+ * the whole team; Unshare takes it away from everyone, whether it was the
+ * team's or a few people's. The list of people is left where it is, so
+ * unsharing and sharing again does not quietly rebuild it from memory.
+ */
+export const sharePatch = (now: Seen): { visibility: 'team' | 'private' } =>
+  ({ visibility: now === 'private' ? 'team' : 'private' });
 
 // ------------------------------------------------------------------ the board
 

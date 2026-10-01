@@ -51,7 +51,7 @@ import { fitMenu } from '../keep-in-window';
 import {
   allModels, findPeople, harnessFields, inputValueOf, laterHint, momentFromInput, mondayMorning, moreCount,
   onlyYouAnd, placeholderFor, projectsOffered, projectSwatch, recentModels, sameModel,
-  startingProject, teammates, threadMessage, tomorrowMorning, VISIBILITY_ROWS,
+  sharingFields, startingProject, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   type Harness, type ModelPick, type Visibility,
 } from './composer-rules';
 import './thread-composer.css';
@@ -145,8 +145,18 @@ export function ThreadComposer({
   // Visibility follows what the task is, not where it lives. It was
   // remembered per project for a while, and a tester then found the next
   // thread silently Private; nothing carries over now.
+  // AND IT MAY BE A FEW PEOPLE RATHER THAN THE TEAM (w-41ff964775): "you might
+  // only want certain people to see what you're up to". Chosen people opens the
+  // same picker the To field uses, and the pick stands only while somebody is
+  // on the list; with nobody on it the thread is sent Private, because that is
+  // who can see it (composer-rules.ts `sharingFields`).
   const [visibility, setVisibility] = useState<Visibility>('team');
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [visPage, setVisPage] = useState<'rows' | 'people'>('rows');
   const pickVisibility = (v: Visibility) => { setVisibility(v); };
+  const toggleChosen = (id: string) => setChosen((c) => (c.includes(id) ? c.filter((p) => p !== id) : [...c, id]));
+  // Anyone who leaves the team comes off the list with them.
+  const chosenHere = chosen.filter((id) => others.some((p) => p.id === id));
 
   /* ------------------------------ model --------------------------------- */
   const engineRows = engines?.length ? engines : [ENGINES[0]];
@@ -202,6 +212,8 @@ export function ThreadComposer({
     setOpen((o) => (o === key ? null : key));
     setModelPage('recent');
     setLaterPage('list');
+    // Who sees it opens on its three rows, even if the picker was last open.
+    setVisPage('rows');
     setPicking(false);
     setQuery('');
   };
@@ -234,7 +246,7 @@ export function ThreadComposer({
     fitMenu(menu);
     const target = menu.querySelector<HTMLElement>('[data-item].on') ?? menu.querySelector<HTMLElement>('[data-item]');
     target?.focus({ preventScroll: true });
-  }, [open, modelPage, laterPage]);
+  }, [open, modelPage, laterPage, visPage]);
   useLayoutEffect(() => {
     if (!open) return;
     const menu = anchors.current[open]?.querySelector<HTMLElement>(':scope > .tc-menu');
@@ -320,7 +332,7 @@ export function ThreadComposer({
           product: product.slug, title: message.title, body: body || undefined, kind: 'directive', priority,
           ...(when.runAt ? { runAt: when.runAt } : {}),
           ...harness,
-          ...(team ? { visibility } : {}),
+          ...(team ? sharingFields(visibility, chosenHere) : {}),
         });
         onSent(made, { kind: 'task', product: product.slug, title: message.title, ...(when.runAt ? { runAt: when.runAt } : {}) });
       }
@@ -485,16 +497,54 @@ export function ThreadComposer({
     </div>
   );
 
+  // WHO SEES IT: three rows, and Chosen people turns the menu into the same
+  // people list the To field uses. Ticking a name stays open (she is naming a
+  // few people, and closing on the first makes her open it three times); Done
+  // closes it. The row under it says who it reaches as she builds the list.
+  const visiblePeople = findPeople(others, query);
   const visibilityMenu = (
     <div className="tc-menu tc-rise tc-vis-menu" role="listbox" aria-label="Who sees it" onKeyDown={menuKeys}>
-      <span className="tc-menu-head">Who sees it</span>
-      {VISIBILITY_ROWS.map((v) => (
-        <button key={v.id} type="button" data-item className={`tc-row tc-two ${v.id === visibility ? 'on' : ''}`} onPointerEnter={hover}
-          onClick={() => { pickVisibility(v.id); close('text'); }}>
-          {v.id === 'team' ? <PeopleIcon /> : <LockIcon />}
-          <span className="tc-row-label">{v.label}<small>{v.line}</small></span>
+      {visPage === 'rows' ? (<>
+        <span className="tc-menu-head">Who sees it</span>
+        {VISIBILITY_ROWS.map((v) => (
+          <button key={v.id} type="button" data-item className={`tc-row tc-two ${v.id === visibility ? 'on' : ''}`} onPointerEnter={hover}
+            onClick={() => {
+              pickVisibility(v.id);
+              if (v.id === 'people') setVisPage('people');
+              else close('text');
+            }}>
+            {/* The same people mark for both shared rows: the words say how
+                widely, and a second invented glyph would say it twice. */}
+            {v.id === 'private' ? <LockIcon /> : <PeopleIcon />}
+            <span className="tc-row-label">
+              {v.label}
+              <small>{v.id === 'people' && chosenHere.length ? `${chosenWords(chosenHere, others)} see its summary.` : v.line}</small>
+            </span>
+          </button>
+        ))}
+      </>) : (<>
+        <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => setVisPage('rows')}>
+          <span className="tc-row-label">‹ Who sees it</span>
         </button>
-      ))}
+        <span className="tc-sep" />
+        <span className="tc-menu-head">People who see it</span>
+        <input
+          data-item
+          className="tc-find"
+          placeholder="Find a person"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && query.trim() && visiblePeople[0]) { e.preventDefault(); toggleChosen(visiblePeople[0].id); } }}
+        />
+        {visiblePeople.map((p) => (
+          <button key={p.id} type="button" data-item role="option" aria-selected={chosen.includes(p.id)}
+            className={`tc-row ${chosen.includes(p.id) ? 'on' : ''}`} onPointerEnter={hover} onClick={() => toggleChosen(p.id)}>
+            <Face person={p} /><span className="tc-row-label">{p.name}</span>{chosen.includes(p.id) && <small>✓</small>}
+          </button>
+        ))}
+        {!visiblePeople.length && <span className="tc-none">Nobody on the team matches that.</span>}
+        {!chosenHere.length && <span className="tc-none">Pick a person, or nobody but you will see it.</span>}
+      </>)}
     </div>
   );
 
@@ -674,7 +724,8 @@ export function ThreadComposer({
               <span className="tc-anchor" ref={anchor('visibility')}>
                 <button type="button" data-trigger className={`tc-chip ${open === 'visibility' ? 'open' : ''}`} title="Who sees it"
                   aria-haspopup="listbox" aria-expanded={open === 'visibility'} onClick={() => toggle('visibility')} onKeyDown={triggerKeys('visibility')}>
-                  {visibility === 'team' ? <PeopleIcon /> : <LockIcon />}{visibility === 'team' ? 'Team' : 'Private'}
+                  {visibility === 'private' ? <LockIcon /> : <PeopleIcon />}
+                  {visibility === 'team' ? 'Team' : visibility === 'private' ? 'Private' : chosenWords(chosenHere, others)}
                 </button>
                 {open === 'visibility' && visibilityMenu}
               </span>

@@ -114,7 +114,8 @@ describe('Visible to says who really sees it', () => {
   });
   it('keeps the old rule with nobody signed in', () => {
     expect(whoSees(item({ createdAt: 5 }), null)).toBe('team');
-    expect(VISIBILITY_WORD).toEqual({ team: 'Team', private: 'Only you' });
+    // Three words since w-41ff964775: the team, a few people, or nobody.
+    expect(VISIBILITY_WORD).toEqual({ team: 'Team', people: 'Chosen people', private: 'Only you' });
   });
   it('writes the choice through threadEdit as team or private, from a menu that shows both', () => {
     expect(src).toMatch(/menu === 'visibility' &&/);

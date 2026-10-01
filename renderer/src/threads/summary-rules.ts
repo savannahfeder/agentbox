@@ -7,7 +7,7 @@
 // are shared with the Mac that publishes cards, so they live in
 // shared/thread-cards.mjs and are only read here.
 import type { Person, ThreadStateWord, WorkItem } from '../types';
-import { shownToTeam } from '../../../shared/thread-cards.mjs';
+import { shownToPeople, shownToTeam } from '../../../shared/thread-cards.mjs';
 
 export const SUMMARY_FIELDS = ['problem', 'progress', 'solution'] as const;
 export type SummaryField = (typeof SUMMARY_FIELDS)[number];
@@ -136,12 +136,22 @@ export function ownerName(item: Pick<WorkItem, 'createdBy'>, me: string | null, 
  * it asks the same rule the Team page does (shared/thread-cards.mjs
  * shownToTeam), and an old thread nobody shared reads "Only you".
  */
-export function whoSees(item: Pick<WorkItem, 'visibility' | 'createdAt'>, since: number | null): 'team' | 'private' {
-  return shownToTeam(item, since) ? 'team' : 'private';
+export function whoSees(item: Pick<WorkItem, 'visibility' | 'visibleTo' | 'createdAt'>, since: number | null): Seen {
+  if (!shownToTeam(item, since)) return 'private';
+  return shownToPeople(item).length ? 'people' : 'team';
 }
 
-/** The two words, in the panel and in its menu. */
-export const VISIBILITY_WORD = { team: 'Team', private: 'Only you' } as const;
+export type Seen = 'team' | 'people' | 'private';
+
+/** The three words, in the panel and in its menu. */
+export const VISIBILITY_WORD = { team: 'Team', people: 'Chosen people', private: 'Only you' } as const;
+
+/** The line under "Chosen people" in the panel: "Theo", "Theo and Ana", "3 people". */
+export function chosenNames(ids: readonly string[], byId: Map<string, Pick<Person, 'name'>>): string {
+  if (!ids.length) return 'Nobody yet';
+  if (ids.length > 2) return `${ids.length} people`;
+  return ids.map((id) => firstOf(byId.get(id)?.name)).join(' and ');
+}
 
 /** Where open or closed is remembered, across threads and restarts. */
 export const SUMMARY_OPEN_KEY = 'threads.summary.open';

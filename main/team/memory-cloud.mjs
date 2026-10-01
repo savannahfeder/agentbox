@@ -184,13 +184,28 @@ export function memoryBackend(cloud, personId) {
       for (const key of [...cloud.cards.keys()]) if (key.startsWith(`${personId}:`)) cloud.cards.delete(key);
       // A private card never goes up at all, whatever the Mac handed over, as
       // supabase-backend does; the database refuses words on one besides.
-      for (const c of cards) if (c.visible === true) cloud.cards.set(`${personId}:${c.threadId}`, { ...structuredClone(c), personId, teamId });
+      for (const c of cards) {
+        if (c.visible !== true) continue;
+        // NO LIST IS THE WHOLE TEAM, and an empty one is refused rather than
+        // stored, as the table's own check does: it would have to mean both
+        // everyone and nobody (20261001000800_chosen_people.sql).
+        const people = c.people == null ? null : [...new Set(c.people.filter((p) => typeof p === 'string' && p))];
+        if (people && !people.length) refuse('share a thread with nobody');
+        cloud.cards.set(`${personId}:${c.threadId}`, { ...structuredClone(c), people, personId, teamId });
+      }
       cloud.events.emit('cards', {});
     },
 
+    // A CARD REACHES WHOEVER IT NAMES, and everyone on the team when it names
+    // nobody (w-41ff964775). The hosted database says the same thing in its
+    // own row level security (20261001000800_chosen_people.sql), which is what
+    // actually stops a teammate's app asking for a card it was not sent.
     async listCards() {
       const teams = new Set(myTeams());
-      return [...cloud.cards.values()].filter((c) => teams.has(c.teamId)).map(({ teamId, ...c }) => structuredClone(c));
+      return [...cloud.cards.values()]
+        .filter((c) => teams.has(c.teamId))
+        .filter((c) => c.people == null || c.personId === personId || c.people.includes(personId))
+        .map(({ teamId, ...c }) => structuredClone(c));
     },
 
     subscribe(onChange) {

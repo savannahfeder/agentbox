@@ -64,7 +64,10 @@ export interface WorkItem {
   // THE THREAD'S OWN FIELDS (approved 2026-10-01, shared/work-items.mjs).
   // `visibility` absent reads as 'team'. The summary is shared: the agent keeps
   // it current and the person can edit it, and the later write wins.
-  visibility?: 'team' | 'private';
+  // 'people' is shared with the people in `visibleTo` and nobody else
+  // (w-41ff964775); `visibleTo` means nothing beside the other two words.
+  visibility?: 'team' | 'people' | 'private';
+  visibleTo?: string[];
   problem?: string;
   progress?: string;
   solution?: string;
@@ -144,6 +147,8 @@ export interface ThreadCard {
   solution: string | null;
   blockedBy: { id: string; title: string | null }[];
   blocks: { id: string; title: string | null }[];
+  /** Whom it reaches: the chosen people, or null for the whole team. */
+  people: string[] | null;
   updatedAt: number;
 }
 
@@ -890,7 +895,7 @@ declare global {
       answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null }): Promise<WorkItem>;
       setProductOrder(p: { order: string[] }): Promise<unknown>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
-      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'private' }): Promise<WorkItem>;
+      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
       // The team version (main/team/index.mjs through main/ipc.mjs).
       teamSignIn(): Promise<TeamCallResult>;
       teamSignOut(): Promise<TeamCallResult>;
@@ -1024,6 +1029,6 @@ export type FolderListing = {
 /** What a person may change on a thread from its summary (main/store.mjs threadEdit). */
 export type ThreadEditPatch = Partial<{
   problem: string; progress: string; solution: string;
-  visibility: 'team' | 'private'; priority: number;
+  visibility: 'team' | 'people' | 'private'; visibleTo: string[]; priority: number;
   blockedBy: string[]; blocks: string[];
 }>;

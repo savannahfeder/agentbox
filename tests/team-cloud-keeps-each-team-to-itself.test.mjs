@@ -199,6 +199,58 @@ describe('thread cards, what a teammate sees of your threads', () => {
     expect((await rows(THEO, `select visible, title from public.thread_cards where thread_id = 'w-secret'`))).toEqual([{ visible: false, title: null }]);
   });
 
+  // CHOSEN PEOPLE (w-41ff964775, 20261001000800). A card carries the people it
+  // is for, and an empty list is the whole team, which is what every card
+  // written before that migration says.
+  describe('shared with chosen people', () => {
+    const chosen = `insert into public.thread_cards (person_id, team_id, thread_id, visible, title, state, people) values ($1, $2, $3, true, $4, 'running', $5)`;
+    let ana;
+
+    beforeAll(async () => {
+      // A third teammate, so "not everyone" is a real distinction here.
+      ana = '77777777-7777-7777-7777-777777777777';
+      await signUp(ana, 'ana@northwind.test', 'Ana Ruiz');
+      await as(MAYA, `insert into public.team_invites (team_id, email, invited_by) values ($1, 'ana@northwind.test', $2)`, [team.id, MAYA]);
+      await as(ana, `select public.accept_invite($1)`, [team.id]);
+      await as(MAYA, chosen, [MAYA, team.id, 'w-chosen', 'Pay review', [THEO]]);
+    });
+
+    it('shows the card to the person it names and to nobody else on the team', async () => {
+      expect((await rows(THEO, `select title from public.thread_cards where thread_id = 'w-chosen'`)).map((c) => c.title)).toEqual(['Pay review']);
+      expect(await rows(ana, `select title from public.thread_cards where thread_id = 'w-chosen'`)).toEqual([]);
+      expect(await rows(JUN, `select title from public.thread_cards where thread_id = 'w-chosen'`)).toEqual([]);
+    });
+
+    it('still shows it to the person whose thread it is', async () => {
+      expect((await rows(MAYA, `select title from public.thread_cards where thread_id = 'w-chosen'`)).map((c) => c.title)).toEqual(['Pay review']);
+    });
+
+    it('takes it off their page when they come off the list', async () => {
+      await as(MAYA, `update public.thread_cards set people = $1 where thread_id = 'w-chosen'`, [[ana]]);
+      expect(await rows(THEO, `select title from public.thread_cards where thread_id = 'w-chosen'`)).toEqual([]);
+      expect((await rows(ana, `select title from public.thread_cards where thread_id = 'w-chosen'`)).map((c) => c.title)).toEqual(['Pay review']);
+      await as(MAYA, `update public.thread_cards set people = $1 where thread_id = 'w-chosen'`, [[THEO]]);
+    });
+
+    // FAIL CLOSED. An empty list would have to mean both "everyone" and
+    // "nobody", so the table refuses to store one; the app never sends one
+    // either (shared/thread-cards.mjs publishes no card for a thread shared
+    // with nobody).
+    it('refuses a card that names nobody, rather than letting it mean everybody', async () => {
+      expect(await refused(MAYA, chosen, [MAYA, team.id, 'w-nobody', 'Named nobody', []])).toBe(true);
+    });
+
+    it('leaves a card with no list on it visible to the whole team, as before', async () => {
+      await as(MAYA, `insert into public.thread_cards (person_id, team_id, thread_id, visible, title, state) values ($1, $2, 'w-everyone', true, 'Launch video', 'running')`, [MAYA, team.id]);
+      expect((await rows(ana, `select title from public.thread_cards where thread_id = 'w-everyone'`)).map((c) => c.title)).toEqual(['Launch video']);
+    });
+
+    it('will not let a card name somebody who is not on the team', async () => {
+      expect(await refused(MAYA, chosen, [MAYA, team.id, 'w-stranger', 'Out of the team', [JUN]])).toBe(true);
+      expect(await refused(MAYA, `update public.thread_cards set people = $1 where thread_id = 'w-chosen'`, [[JUN]])).toBe(true);
+    });
+  });
+
   it('lets only its owner change or remove it', async () => {
     await as(THEO, `update public.thread_cards set title = 'Taken over' where thread_id = 'w-card1'`);
     await as(THEO, `delete from public.thread_cards where thread_id = 'w-card1'`);

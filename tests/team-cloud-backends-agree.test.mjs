@@ -157,5 +157,21 @@ for (const [where, makeWorld, enabled] of worlds) {
       await w.theo.putCards(team.id, []);
       expect((await w.maya.listCards()).filter((c) => c.personId === w.theo.personId)).toEqual([]);
     });
+
+    // SHARED WITH CHOSEN PEOPLE (w-41ff964775, 20261001000800). No list is the
+    // whole team; a list reaches exactly those people; an empty list is
+    // refused rather than read as everyone. Jun is on another team here, so
+    // the third person who must not see it is Maya.
+    it('shows a card with a list of people only to the people on it', async () => {
+      const card = { threadId: 'w-chosen', visible: true, title: 'Pay review', project: 'Northwind', state: 'running', priority: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [], updatedAt: 1_790_000_000_000 };
+      await w.theo.putCards(team.id, [{ ...card, people: [w.theo.personId] }]);
+      expect((await w.maya.listCards()).filter((c) => c.threadId === 'w-chosen')).toEqual([]);
+      expect((await w.theo.listCards()).map((c) => c.title)).toEqual(['Pay review']);
+
+      await w.theo.putCards(team.id, [{ ...card, people: [w.maya.personId] }]);
+      expect((await w.maya.listCards()).map((c) => c.title)).toEqual(['Pay review']);
+
+      await expect(w.theo.putCards(team.id, [{ ...card, people: [] }])).rejects.toThrow();
+    });
   });
 }

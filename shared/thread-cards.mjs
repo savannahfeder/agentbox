@@ -80,10 +80,28 @@ const startOfDay = (now) => { const d = new Date(now); d.setHours(0, 0, 0, 0); r
  * private and was started after `since`, the moment this person began sharing
  * on this Mac. No `since` is the old rule: everything not private.
  */
+/**
+ * AND A THREAD MAY BE SHARED WITH CHOSEN PEOPLE RATHER THAN THE TEAM
+ * (w-41ff964775, her words: "you might only want certain people to see what
+ * you're up to"). That is still sharing, so this stays the one rule for
+ * whether a card is published at all, and `shownToPeople` says who it reaches.
+ *
+ * Chosen people naming NOBODY reaches nobody, so nothing is published: a card
+ * carrying an empty list would otherwise read as the whole team's, and that is
+ * the one mistake nobody can take back.
+ */
 export function shownToTeam(item, since = null) {
   if (item?.visibility === 'team') return true;
+  if (item?.visibility === 'people') return shownToPeople(item).length > 0;
   if (item?.visibility === 'private') return false;
   return !since || (item?.createdAt ?? 0) >= since;
+}
+
+/** Whom a shared thread reaches, by id, or [] for the whole team. */
+export function shownToPeople(item) {
+  if (item?.visibility !== 'people') return [];
+  const ids = Array.isArray(item.visibleTo) ? item.visibleTo : [];
+  return [...new Set(ids.filter((id) => typeof id === 'string' && id))];
 }
 
 export function cardsFor({ products, readItems, now = Date.now(), since = null }) {
@@ -97,7 +115,13 @@ export function cardsFor({ products, readItems, now = Date.now(), since = null }
       // A LINK NAMES A THREAD ONLY IF THAT THREAD IS ITSELF VISIBLE. A public
       // card that is blocked by a private thread said the private thread's
       // title out loud (review, 2026-10-01); now it says only that one exists.
-      titleOf.set(item.id, shownToTeam(item, since) ? item.label || item.title : null);
+      //
+      // A thread shared with chosen people is named by nothing either
+      // (w-41ff964775): every card is read by its own set of people, and a
+      // blocker shared with two of them would have told a third its title.
+      // Only a thread the whole team may read is safe in anybody's links.
+      const open = shownToTeam(item, since) && !shownToPeople(item).length;
+      titleOf.set(item.id, open ? item.label || item.title : null);
       all.push({ item, product });
     }
   }
@@ -110,6 +134,10 @@ export function cardsFor({ products, readItems, now = Date.now(), since = null }
     const s = summaryOf(item);
     cards.push({
       threadId: item.id, visible: true, title: item.label || item.title, project: product.name,
+      // WHO IT REACHES: the chosen people, or NO LIST AT ALL for the whole
+      // team. Never an empty list, which would have to mean both. Both clouds
+      // carry it and refuse to show the card to anybody else.
+      people: shownToPeople(item).length ? shownToPeople(item) : null,
       state, priority: Number.isFinite(item.priority) ? item.priority : null,
       problem: s.problem || null, progress: s.progress || null, solution: s.solution || null,
       blockedBy: linked(item.blockedBy), blocks: linked(item.blocks), updatedAt: item.updatedAt ?? now,

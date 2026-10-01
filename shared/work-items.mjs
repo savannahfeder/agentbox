@@ -120,8 +120,12 @@ export const WORK_ITEM_FIELDS = [
   //   people    who is on the conversation
   'assignee', 'runner', 'due', 'people',
   // THE THREAD'S OWN FIELDS (the team version, approved 2026-10-01).
-  //   visibility  'team' (the default) or 'private': whether teammates see this
-  //               thread's summary on the Team board, or only that it exists
+  //   visibility  'team' (the default), 'people' or 'private': whether every
+  //               teammate sees this thread's summary on the Team board, only
+  //               the people named in `visibleTo`, or nobody but you
+  //   visibleTo   the people a 'people' thread reaches, by id. Ignored on the
+  //               other two, and a 'people' thread naming nobody reaches
+  //               nobody (shared/thread-cards.mjs says why it fails closed)
   //   problem, progress, solution
   //               the SUMMARY, a sentence or two each. The agent keeps it
   //               current and the person can edit it in place, so these are
@@ -129,7 +133,7 @@ export const WORK_ITEM_FIELDS = [
   //               (SHARED_FIELDS below)
   //   blockedBy, blocks
   //               other threads' ids, the summary's Linked part
-  'visibility', 'problem', 'progress', 'solution', 'blockedBy', 'blocks',
+  'visibility', 'visibleTo', 'problem', 'progress', 'solution', 'blockedBy', 'blocks',
 ];
 
 // THE SUMMARY IS SHARED BETWEEN THE PERSON AND THE AGENT. Everywhere else the
@@ -394,7 +398,13 @@ function coerceField(field, value) {
       const people = [...new Set(value.map(shortId).filter(Boolean))].slice(0, MAX_LABELS);
       return people.length ? people : undefined;
     }
-    case 'visibility': return value === 'private' || value === 'team' ? value : undefined;
+    case 'visibility': return value === 'private' || value === 'team' || value === 'people' ? value : undefined;
+    // An empty list is a real value: it is how the last chosen person comes
+    // off a thread, and the thread then reaches nobody until she names one.
+    case 'visibleTo': {
+      if (!Array.isArray(value)) return undefined;
+      return [...new Set(value.map(shortId).filter(Boolean))].slice(0, MAX_LABELS);
+    }
     // An empty string is a real value here: it is how a person clears a line
     // of the summary, and a field that coerces to undefined cannot be cleared.
     case 'problem': case 'progress': case 'solution':

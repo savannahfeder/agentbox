@@ -666,7 +666,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     supervisor.wake();
   }));
 
-  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, labels, engine, model, effort, assignee, due, visibility }) => {
+  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, labels, engine, model, effort, assignee, due, visibility, visibleTo }) => {
     const out = store.composeItem(product, {
       // HOW HARD IT THINKS rides through unjudged: the store keeps any word
       // shaped like a level, and the spawn is the gate that knows each
@@ -677,6 +677,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // goes to and the day it is due, and the two of you as the conversation,
       // so a reply can hand it back. An agent's row carries none of these.
       assignee, due, visibility,
+      // AND WHO MAY SEE IT, when she chose people rather than the team
+      // (w-41ff964775). The store keeps the list only beside 'people'.
+      visibleTo,
       people: assignee && teamMe() ? [teamMe(), assignee] : undefined,
       // WHICH CODING AGENT SHE CHOSE, AND ONLY IF SHE COULD HAVE. `engineOffered`
       // is the supervisor's own test and the door makes no judgement of its own:
