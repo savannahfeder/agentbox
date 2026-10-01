@@ -73,7 +73,9 @@ export function createTeamService({
     if (team && !remembered && me) kept().setTeam(me, team.id);
     const people = team ? await backend.teamPeople(team.id) : [];
     const cards = team ? await backend.listCards() : [];
-    const invites = team ? [] : await backend.pendingInvites();
+    // An invite lookup that fails (an older cloud, a dropped request) leaves
+    // you signed in with nothing offered, never signed out.
+    const invites = team ? [] : await backend.pendingInvites().catch((err) => { log(`team: invites: ${err.message}`); return []; });
     set({ team, people, cards, invites });
   }
 
