@@ -9,6 +9,7 @@ import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from
 import type { Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName } from '../team/people';
+import { PriorityIcon } from '../components/Priority';
 import { rowTitle } from '../list-rules';
 import {
   BOARD_COLUMNS, isDirect, isFiltered, teamEntries, teamKeeps, updatedWords,
@@ -31,10 +32,10 @@ export function StateGlyph({ state }: { state: ThreadStateWord }) {
   return <span className={`th-st s-${state}`} aria-hidden="true" />;
 }
 
+// THE APP'S OWN PRIORITY BARS. Urgent is a fourth bar, never an exclamation
+// mark in a box (w-bba20a03f5, Priority.tsx), whatever the drawing showed.
 export function PriorityMark({ id }: { id: PriorityId }) {
-  if (id === 'urgent') return <span className="th-urgent" aria-hidden="true">!</span>;
-  const lit = { high: 3, medium: 2, low: 1 }[id];
-  return <span className="th-pr" aria-hidden="true">{[1, 2, 3].map((n) => <i key={n} className={n <= lit ? 'on' : ''} />)}</span>;
+  return <span className="th-prio-mark"><PriorityIcon id={id} /></span>;
 }
 
 /* ------------------------------------------------------------ outside clicks */

@@ -473,6 +473,15 @@ export default function App() {
   const [membersOpen, setMembersOpen] = useState(false);
   // A TEAMMATE'S THREAD, opened from the Team board: its card, never its conversation.
   const [openCard, setOpenCard] = useState<ThreadCard | null>(null);
+  // WHAT THE COMPOSER OPENS WITH, when something hands it a start: "Hand it to
+  // an agent" on a message from a person turns that message into a thread.
+  const [composeInitial, setComposeInitial] = useState<{ to?: string; body?: string } | null>(null);
+  const handToAgent = useCallback((item: WorkItem) => {
+    const from = item.createdBy ? teamView(snap?.team ?? null, snap?.products ?? [])?.byId.get(item.createdBy)?.name : null;
+    const quoted = (item.body ?? item.title ?? '').trim();
+    setComposeInitial({ to: 'agent', body: from ? `${from} asked:\n\n${quoted}\n\n` : `${quoted}\n\n` });
+    setModal('compose');
+  }, [snap?.team, snap?.products]);
   // Drawn when it is open and nothing sits over it: an opened task or Settings
   // takes the page, and closing them returns to the Team page.
   const teamShown = teamOpen && !focused && !settingsOpen;
@@ -4988,8 +4997,10 @@ export default function App() {
           codexModels={codexModels}
           codexModelDefault={codexModelDefault}
           defaultProduct={productFilter}
-          onClose={() => setModal(null)}
+          initial={composeInitial}
+          onClose={() => { setModal(null); setComposeInitial(null); }}
           onSent={async (made, how) => {
+            setComposeInitial(null);
             const sent = readComposeDraft();
             setModal(null);
             if (how?.kind === 'message') {

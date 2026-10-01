@@ -98,3 +98,5 @@
 .th-card .m .tm-av { width: 18px; height: 18px; line-height: 16px; font-size: 8px; margin-left: auto; flex: none; }
 .th-col-empty { font-size: 13px; color: var(--text-faint); padding: 4px 2px; }
 .tm-team-pane.th-pane { height: 100%; overflow: auto; }
+.th-prio-mark { display: inline-flex; margin-right: 8px; }
+.th-pop .opts .th-prio-mark { margin-right: 0; }

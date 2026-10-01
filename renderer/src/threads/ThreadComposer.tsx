@@ -29,6 +29,7 @@
 // time, and the keyboard reaches every row: arrows move, Enter picks, Escape
 // closes the menu before it closes the card.
 
+import { PriorityIcon } from '../components/Priority';
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Product, WorkItem } from '../types';
 import type { Engine } from '../../../shared/engines.mjs';
@@ -100,7 +101,7 @@ export function ThreadComposer({
 
   /* ------------------------------ words --------------------------------- */
   const opened = useRef(readComposeDraft());
-  const [text, setText] = useState(() => opened.current.text || initial?.body || '');
+  const [text, setText] = useState(() => initial?.body || opened.current.text || '');
   const [attachments, setAttachments] = useState<PendingAttachment[]>(() => opened.current.attachments);
   const [dropped, setDropped] = useState(0);
 
@@ -654,12 +655,9 @@ function Swatch({ slug }: { slug: string }) {
   return <span className="tc-swatch" aria-hidden="true"><i style={{ background: projectSwatch(slug) }} /></span>;
 }
 
-/** Bars for Low, Medium and High, a filled square for Urgent: the approved drawing. */
-function PrioGlyph({ id }: { id: PriorityId }) {
-  if (id === 'urgent') return <span className="tc-urgent" aria-hidden="true">!</span>;
-  const lit = id === 'low' ? 1 : id === 'medium' ? 2 : 3;
-  return <span className="tc-pr" aria-hidden="true">{[1, 2, 3].map((n) => <i key={n} className={n <= lit ? 'on' : ''} />)}</span>;
-}
+// THE APP'S OWN PRIORITY BARS. Urgent is a fourth bar, never an exclamation
+// mark in a box (w-bba20a03f5, Priority.tsx), whatever the drawing showed.
+const PrioGlyph = ({ id }: { id: PriorityId }) => <span className="tc-prio"><PriorityIcon id={id} /></span>;
 
 const PeopleIcon = () => (
   <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
