@@ -82,6 +82,34 @@ it('reuses the same record for the next message between the same two people', as
   expect(maya.store.listProducts().filter((p) => p.team?.direct)).toHaveLength(1);
 });
 
+// ONE CONVERSATION PER PERSON (decided 2026-10-01 from six interviews): the
+// next message goes on the end of the conversation the two already have, and
+// a reply from the other side lands in the same row, back in the inbox.
+it('continues the one conversation the two of them already have', async () => {
+  await maya.on(() => maya.service.message(theo.personId, 'Can you take the Acme call?'));
+  await theo.service.syncNow();
+  const first = inbox(theo)[0];
+  await maya.on(() => maya.service.message(theo.personId, 'It moved to 3pm, by the way.'));
+  await theo.service.syncNow();
+  const rows = theo.store.listItems().filter((i) => i.product === first.product);
+  expect(rows).toHaveLength(1);
+  expect(rows[0].id).toBe(first.id);
+  expect(rows[0].answer).toBe('It moved to 3pm, by the way.');
+  expect(inbox(theo).map((i) => i.id)).toEqual([first.id]);
+  expect(maya.service.conversation(theo.personId)).toEqual({ product: first.product, id: first.id });
+  expect(maya.service.conversation(jun.personId)).toBeNull();
+});
+
+it('reopens a conversation that was put away', async () => {
+  await maya.on(() => maya.service.message(theo.personId, 'Lunch?'));
+  const row = maya.store.listItems()[0];
+  await maya.on(() => maya.store.answerItem(row.product, row.id, { status: 'done' }));
+  await maya.on(() => maya.service.message(theo.personId, 'Actually, coffee instead?'));
+  const again = maya.store.readItem(row.product, row.id);
+  expect(again.status).toBe('open');
+  expect(again.assignee).toBe(theo.personId);
+});
+
 it('is never a card on the Team board, and no agent runs on it', async () => {
   await maya.on(() => maya.service.message(theo.personId, 'Private between us.'));
   const products = maya.store.listProducts();

@@ -282,7 +282,7 @@ export const VISIBILITY_KEY = 'threads.composer.visibility';
 
 export const VISIBILITY_ROWS: ReadonlyArray<{ id: Visibility; label: string; line: string }> = [
   { id: 'team', label: 'Team', line: 'Teammates see its summary on the Team board.' },
-  { id: 'private', label: 'Private', line: 'Teammates see only that you have a thread.' },
+  { id: 'private', label: 'Private', line: 'Only you see it. It is not on the Team board.' },
 ];
 
 interface KeyStore { getItem(key: string): string | null; setItem?(key: string, value: string): void }
@@ -291,10 +291,18 @@ const storeOf = (store?: KeyStore): KeyStore | null =>
   store ?? (globalThis as unknown as { localStorage?: KeyStore }).localStorage ?? null;
 
 /** Team unless she chose Private. Anything else, or a refused read, is Team. */
-export function readVisibility(store?: KeyStore): Visibility {
-  try { return storeOf(store)?.getItem(VISIBILITY_KEY) === 'private' ? 'private' : 'team'; } catch { return 'team'; }
+// REMEMBERED PER PROJECT (2026-10-01). A Private pick used to follow her to
+// every next thread, so teammates quietly stopped seeing work in projects she
+// never meant to hide (a persona test caught it). People who keep some work
+// quiet keep it quiet by project ("anything in Board or Exec is always
+// private"), so the choice sticks to the project it was made in, and every
+// other project still starts at Team.
+const visibilityKey = (project?: string | null) => (project ? `${VISIBILITY_KEY}.${project}` : VISIBILITY_KEY);
+
+export function readVisibility(store?: KeyStore, project?: string | null): Visibility {
+  try { return storeOf(store)?.getItem(visibilityKey(project)) === 'private' ? 'private' : 'team'; } catch { return 'team'; }
 }
 
-export function writeVisibility(v: Visibility, store?: KeyStore): void {
-  try { storeOf(store)?.setItem?.(VISIBILITY_KEY, v); } catch { /* the card still sends */ }
+export function writeVisibility(v: Visibility, store?: KeyStore, project?: string | null): void {
+  try { storeOf(store)?.setItem?.(visibilityKey(project), v); } catch { /* the card still sends */ }
 }

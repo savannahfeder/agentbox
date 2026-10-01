@@ -204,7 +204,10 @@ export function ThreadCells({ item, product, now }: { item: WorkItem; product: P
     const fromThem = item.createdBy && item.createdBy !== team?.me;
     where = <>{other && <Face person={other} />}{fromThem ? 'From ' : 'To '}{firstName(other)}</>;
   }
-  return <RowCells title={rowTitle(item)} lock={item.visibility === 'private'} where={where}
+  // A conversation with a person reads as its latest message, the way a chat
+  // list does; every other row keeps its title.
+  const latest = isDirect(product) ? (item.answer || item.body || '').trim().split('\n')[0] : '';
+  return <RowCells title={latest || rowTitle(item)} lock={item.visibility === 'private'} where={where}
     priority={isDirect(product) ? null : item.priority ?? 0} updatedAt={item.updatedAt} now={now} />;
 }
 

@@ -115,7 +115,8 @@ import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-
 import { TeamContext, teamView } from './team/people';
 import { TeamPage } from './team/TeamPage';
 import { EmptyTab, HeaderActions, InboxBoard, InboxZero, StateTabs, TeamView } from './threads/Pages';
-import { readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
+import { MessagePerson, TeammateCard } from './threads/Summary';
+import { isDirect, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing' | 'themes';
 
@@ -1711,6 +1712,11 @@ export default function App() {
       // is the exception, and it has somewhere to be: Scheduled.
       if (i.id === pendingId && deferredUntil <= now) return true;
       if (!teamProgress(i)) return false;
+      // A MESSAGE IS NEVER RUNNING. Nothing is working on it; it waits on a
+      // person, and the two persona tests both read "Running" there as an
+      // agent at work. It shows in Needs you when it is yours to answer, and
+      // under All otherwise.
+      if (isDirect(snap?.products.find((p) => p.slug === i.product))) return false;
       // A task you gave a teammate is moving, for you, until it is done.
       if (team && heldByAPerson(i) && isShared(team.products.get(i.product))) return i.status !== 'done';
       return belongsInProgress(i, { deferredUntil, now });
@@ -4294,7 +4300,7 @@ export default function App() {
        */}
       {reviewLab && <div className="review-lab-controls"><span>Review exploration</span><select aria-label="Focus controls" value={focusControlStyle} onChange={e=>setFocusControlStyle(e.target.value as FocusControlStyle)}><option value="text">Focus · Text only</option><option value="corners">Focus · Frame corners + label</option><option value="corners-icon">Focus · Frame corners button</option><option value="corners-bare">Focus · Bare frame corners</option><option value="layout">Focus · Workspace layout</option></select><select aria-label="Review file type" value={artifactPreviewSample} onChange={e=>{setArtifactPreviewSample(e.target.value);setOpenDoc(null);}}><option value="code">Code</option><option value="design">Design</option><option value="notes">Text</option><option value="multiple">All three</option></select><select aria-label="Review actions" value={reviewStyle} onChange={e=>setReviewStyle(e.target.value)}><option value="header-balanced-open">1 · Balanced · open only</option><option value="header-tools-open">2 · Compact · open only</option><option value="header-card-only">3 · Clickable card · no controls</option><option value="header-feedback-only">4 · Clickable card · feedback tools</option><option value="header-balanced">Compare · all controls</option></select>{artifactPreviewSample !== "code" &&<select aria-label="Text surface" value={textReviewStyle} onChange={e=>setTextReviewStyle(e.target.value)}><option value="clear">Text · Fully transparent</option><option value="glass">Text · Matched glass</option></select>}</div>}
       {!reviewLab && api.isFixtures && new URLSearchParams(location.search).has('artifactTweaks') && <div className="artifact-tweaks"><select aria-label="Design toolbar" value={designToolbar} onChange={e => setDesignToolbar(e.target.value)}><option value="floating">Floating bar</option><option value="corner">Corner controls</option><option value="edge">Top edge</option><option value="always">Always visible</option></select>{focused && <select aria-label="Sample artifact" value={artifactPreviewSample} onChange={e => { setArtifactPreviewSample(e.target.value); setOpenDoc(null); }}><option value="multiple">Multiple artifacts</option><option value="design">Design sample</option><option value="code">Code sample</option><option value="notes">Notes sample</option></select>}</div>}
-      {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? 'settings' : teamShown && membersOpen ? 'members' : null} teamPage={teamShown && !membersOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
+      {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? 'settings' : teamShown && membersOpen ? 'members' : null} teamPage={teamOpen && !settingsOpen && !membersOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
         onInvite={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setMembersOpen(true); setTeamOpen(true); }}
         onMembers={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setMembersOpen(true); setTeamOpen(true); }}
         onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setMembersOpen(false); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setMembersOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
@@ -4689,13 +4695,29 @@ export default function App() {
                 members or Invite people, the setup page stands in. */}
             {snap?.team?.signedIn && snap.team.team && !membersOpen ? (
               <div className="tm-team-pane th-pane">
+                {openCard ? (
+                  /* A TEAMMATE'S THREAD (approved round 9): one card with the
+                     same summary fields, and Message Maya in its top bar. */
+                  <div className="th-card-page">
+                    <div className="th-card-bar">
+                      <button type="button" className="th-back" onClick={() => setOpenCard(null)}><span aria-hidden="true">←</span>Team</button>
+                      <MessagePerson person={team?.byId.get(openCard.personId) ?? null}
+                        onMessage={() => { setComposeInitial({ to: openCard.personId }); setModal('compose'); }} />
+                    </div>
+                    <TeammateCard card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now} />
+                  </div>
+                ) : (
                 <TeamView items={items} products={snap.products} cards={snap.team.cards ?? []} display={teamDisplay} now={now}
-                  onOpenItem={(item) => { setTeamOpen(false); setFocused(item); markSeen(item); }}
+                  // BACK RETURNS TO TEAM (her bug, 2026-10-01): the Team page
+                  // stays open under a thread opened from it, so closing the
+                  // thread lands where she came from, not on the Inbox.
+                  onOpenItem={(item) => { setFocused(item); markSeen(item); }}
                   onOpenCard={(card) => setOpenCard(card)} />
+                )}
               </div>
             ) : (
               <TeamPage team={snap?.team} products={snap?.products ?? []} items={items} now={now} forceSetup={membersOpen}
-                onOpen={(item) => { setTeamOpen(false); setFocused(item); markSeen(item); }} />
+                onOpen={(item) => { setFocused(item); markSeen(item); }} />
             )}
           </main>
         </div>
@@ -4767,6 +4789,11 @@ export default function App() {
                 />
               ) : focused ? (
                 <Focus
+                  // The summary panel reads the live rows for its linked
+                  // threads, and a message from a person can be handed to an
+                  // agent from its page.
+                  items={items}
+                  onHandToAgent={handToAgent}
                   headerTarget={workspaceNavigation ? taskHeader : null}
                   terminalHeaderTarget={terminalHeaderTarget}
                   cornerHeaderTarget={cornerHeaderTarget}
@@ -5042,6 +5069,16 @@ export default function App() {
               to: to ?? slug,
               when: how?.runAt ? whenLabel({ runAt: how.runAt, repeat: null }) : null,
             }), made?.id ? { product: made.product, id: made.id } : undefined);
+            // SHOW WHERE IT WENT (her bug, 2026-10-01: "it doesn't actually
+            // create it in the inbox"). A thread sent to an agent is not
+            // waiting on her, so it never lands in Needs you. On the Inbox the
+            // tab moves to where it did land, Running or Scheduled, so she
+            // sees the row arrive instead of an unchanged page.
+            if (workspaceNavigation && !teamOpen && !focused && (['inbox', 'progress', 'snoozed'] as View[]).includes(view)) {
+              setView(how?.runAt && how.runAt > Date.now() ? 'snoozed' : 'progress');
+              setSelected(0);
+              setMultiSel(new Set());
+            }
             await refresh();
           }}
         />

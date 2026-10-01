@@ -100,3 +100,9 @@
 .tm-team-pane.th-pane { height: 100%; overflow: auto; }
 .th-prio-mark { display: inline-flex; margin-right: 8px; }
 .th-pop .opts .th-prio-mark { margin-right: 0; }
+
+/* ------------------------------------------------------------ a teammate's thread */
+.th-card-page { padding: 14px var(--row-r, 24px) 32px var(--text-x, 32px); max-width: 760px; }
+.th-card-bar { display: flex; align-items: center; justify-content: space-between; margin: 0 0 18px; }
+.th-back { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px 0 6px; margin-left: -6px; border: 0; border-radius: var(--radius); background: none; color: var(--text-dim); font: inherit; font-size: 13.5px; cursor: pointer; }
+.th-back:hover { background: var(--wash); color: var(--text); }

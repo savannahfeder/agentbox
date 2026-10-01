@@ -34,6 +34,15 @@ export function createTeamService({
     try { return store.listProducts(); } catch { return []; }
   }
 
+  // THE CONVERSATION IN A MESSAGE RECORD: its most recently touched row. Older
+  // records may hold one row per message, from before a message continued the
+  // conversation, and the newest of those is where the talk is.
+  function conversationIn(slug) {
+    let rows = [];
+    try { rows = store.listItems().filter((i) => i.product === slug && !i.agent); } catch { rows = []; }
+    return rows.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0] ?? null;
+  }
+
   async function refreshTeam() {
     const team = await backend.myTeam();
     const people = team ? await backend.teamPeople(team.id) : [];
@@ -167,6 +176,15 @@ export function createTeamService({
     // A MESSAGE TO A PERSON (approved 2026-10-01: people get messages, never
     // tasks). It goes into the record the two of them share, made the first
     // time and reused after, and it waits in their inbox until they answer.
+    /** The conversation in a message record: its newest row, if it has one. */
+    conversation(to) {
+      const me = state.me?.id;
+      if (!me || !to) return null;
+      const product = products().find((p) => p.team?.direct && p.team.people.includes(to) && p.team.people.includes(me));
+      const convo = product ? conversationIn(product.slug) : null;
+      return convo ? { product: product.slug, id: convo.id } : null;
+    },
+
     async message(to, body) {
       if (!backend || !state.team || !state.me) throw new Error('start or join a team first');
       const me = state.me.id;
@@ -180,7 +198,22 @@ export function createTeamService({
         await backend.shareProject({ id: made.projectId, teamId: state.team.id, name: 'Direct', visibility: 'people', people: [to], direct: true });
         product = products().find((p) => p.dir === made.dir) ?? { slug: made.slug, dir: made.dir };
       }
+      // ONE CONVERSATION PER PERSON (decided 2026-10-01, from six interviews
+      // across the people this is for: five of six expected to click a name and
+      // see what was said before, and "subject lines between two coworkers feel
+      // like filing Jira tickets"). So a message goes on the end of the
+      // conversation the two of you already have, reopened if it was put away,
+      // and only the first message ever starts one. Work stays in threads; this
+      // is talk.
       const title = firstSentence(text, 90) || text.slice(0, 90);
+      const convo = conversationIn(product.slug);
+      if (convo) {
+        store.answerItem(product.slug, convo.id, { answer: text, status: 'open' });
+        store.teamPatch(product.slug, convo.id, { assignee: to });
+        onChange();
+        await syncNow();
+        return store.readItem(product.slug, convo.id);
+      }
       const item = store.composeItem(product.slug, { title, body: text, assignee: to, people: [me, to] });
       onChange();
       await syncNow();
