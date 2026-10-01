@@ -36,6 +36,7 @@ import { registerIpc } from './ipc.mjs';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mjs';
 import { loadCloudConfig, supabaseSession } from './team/session.mjs';
+import { appHome, carryMisplacedMachinery, storeRootEnv } from './store/home.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.dirname(here);
@@ -128,6 +129,17 @@ function readVersion() {
  */
 export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, userDir = dataDir } = {}) {
   const config = loadConfig(dataDir);
+  // THE APP'S OWN HOME IS THE STORE ROOT, BEFORE ANYTHING OPENS THE STORE, as
+  // main/main.mjs does for the desktop. The ledgers live under the home the
+  // store reads from this variable, and every worker is handed `storeRoot` as
+  // that same variable. Without this line the two disagreed: the copy wrote its
+  // rows wherever an inherited variable pointed (or `~/.agentbox`), each worker
+  // looked under `storeRoot`, and every store call answered "no work item".
+  // tests/an-agent-in-a-browser-copy-can-reach-its-own-work-item.test.mjs.
+  // Rows already written under the old home come along, or they would vanish.
+  const inheritedHome = appHome();
+  Object.assign(process.env, storeRootEnv(config.storeRoot));
+  carryMisplacedMachinery(inheritedHome, config.storeRoot);
   const store = await new Store(config).init();
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   const window = broadcastingWindow();
