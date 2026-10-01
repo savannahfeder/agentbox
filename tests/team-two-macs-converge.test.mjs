@@ -23,7 +23,7 @@ const tmp = (name) => fs.mkdtempSync(path.join(os.tmpdir(), `two-macs-${name}-`)
 // One Mac: its own folders, its own record of which projects are shared.
 function mac(cloud, personId) {
   const local = []; // { projectId, dir, name }
-  const privateItems = []; // what the Mac's private projects hold, for activity
+  const cards = []; // the thread cards this Mac would publish
   const backend = memoryBackend(cloud, personId);
   const sync = createTeamSync({
     backend,
@@ -35,11 +35,12 @@ function mac(cloud, personId) {
       local.push(entry);
       return entry;
     },
-    listPrivateOpen: () => privateItems.slice(),
+    listCards: () => cards.slice(),
+    teamIdOf: () => team?.id ?? null,
   });
   // Writing on this Mac: the store stamps the signed-in person.
   const as = (fn) => { disk.setLineAuthor(personId); try { return fn(); } finally { disk.setLineAuthor(null); } };
-  return { personId, backend, sync, local, privateItems, as };
+  return { personId, backend, sync, local, cards, as };
 }
 
 let cloud, maya, theo, team, shared;
@@ -111,24 +112,26 @@ describe('a shared project', () => {
   });
 });
 
-describe('a private project', () => {
-  it('sends nothing of itself, only a title-free line per open task', async () => {
-    maya.privateItems.push({ taskKey: 'k-private-1', state: 'run', movedAt: 1_790_000_000_000 });
+describe('the cards a Mac publishes', () => {
+  const blank = (threadId, state) => ({ threadId, visible: false, title: null, project: null, state, priority: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [], updatedAt: 1_790_000_000_000 });
+
+  it('reach a teammate, and a private thread arrives without a word of it', async () => {
+    maya.cards.push(blank('w-private-1', 'running'));
     await maya.sync.syncOnce();
-    const seen = await theo.backend.listActivity();
-    expect(seen).toEqual([{ personId: maya.personId, taskKey: 'k-private-1', state: 'run', movedAt: 1_790_000_000_000 }]);
-    expect(JSON.stringify(seen)).not.toMatch(/title|project/i);
+    const seen = await theo.backend.listCards();
+    expect(seen.map((c) => [c.personId, c.threadId, c.visible, c.state])).toEqual([[maya.personId, 'w-private-1', false, 'running']]);
+    expect(seen[0].title).toBeNull();
   });
 
-  it('does not republish activity that has not changed', async () => {
-    maya.privateItems.push({ taskKey: 'k1', state: 'wait', movedAt: 1 });
+  it('are not republished when nothing changed', async () => {
+    maya.cards.push(blank('w-1', 'waiting'));
     let writes = 0;
-    const put = maya.backend.putActivity;
-    maya.backend.putActivity = async (e) => { writes += 1; return put(e); };
+    const put = maya.backend.putCards;
+    maya.backend.putCards = async (t, c) => { writes += 1; return put(t, c); };
     await maya.sync.syncOnce();
     await maya.sync.syncOnce();
     expect(writes).toBe(1);
-    maya.privateItems[0].state = 'run';
+    maya.cards[0].state = 'running';
     await maya.sync.syncOnce();
     expect(writes).toBe(2);
   });

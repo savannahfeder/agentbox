@@ -91,7 +91,7 @@ describe.skipIf(!live)('two Macs through the hosted cloud', () => {
     const { maya, theo } = macs;
     website = maya.store.createProduct({ name: `Website ${tag}` }).slug;
     const home = maya.store.createProduct({ name: `Home ${tag}` }).slug;
-    on(maya, () => maya.store.composeItem(home, { title: 'An old private task' }));
+    on(maya, () => maya.store.composeItem(home, { title: 'An old private task', visibility: 'private' }));
     await maya.service.share(website, { visibility: 'team' });
     task = on(maya, () => maya.store.composeItem(website, { title: 'Send Acme the renewal terms', assignee: theo.id, people: [maya.id, theo.id], due: '2026-10-08' }));
     await maya.service.syncNow();
@@ -131,9 +131,9 @@ describe.skipIf(!live)('two Macs through the hosted cloud', () => {
     const { maya, theo } = macs;
     await maya.service.syncNow();
     await theo.service.syncNow();
-    const seen = theo.service.state().activity.filter((a) => a.personId === maya.id);
+    const seen = theo.service.state().cards.filter((c) => c.personId === maya.id && !c.visible);
     expect(seen.length).toBeGreaterThan(0);
-    expect(JSON.stringify(seen)).not.toContain('old private task');
+    expect(JSON.stringify(theo.service.state().cards)).not.toContain('old private task');
     expect(theo.store.listProducts().map((p) => p.name)).not.toContain(maya.store.listProducts().find((p) => !p.team)?.name);
   }, 60_000);
 });

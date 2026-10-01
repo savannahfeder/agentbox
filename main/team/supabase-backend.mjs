@@ -112,30 +112,40 @@ export function supabaseBackend(client) {
       return rows.map((r) => ({ seq: Number(r.seq), line: r.body }));
     },
 
-    async putActivity(entries) {
+    // YOUR CARDS: one per thread worth showing the team (shared/thread-cards.mjs).
+    // Upserted whole, and any card of yours the Mac no longer lists is removed,
+    // so a thread made private or finished yesterday leaves the board.
+    async putCards(teamId, cards) {
       const me = await myId();
-      const keys = entries.map((e) => e.taskKey);
-      if (entries.length) {
-        must(await client.from('private_activity').upsert(
-          entries.map((e) => ({ person_id: me, task_key: e.taskKey, state: e.state, moved_at: new Date(e.movedAt).toISOString() })),
-          { onConflict: 'person_id,task_key' },
-        ), 'sharing your private activity');
+      if (cards.length) {
+        must(await client.from('thread_cards').upsert(cards.map((c) => ({
+          person_id: me, team_id: teamId, thread_id: c.threadId, visible: !!c.visible,
+          title: c.visible ? c.title : null, project: c.visible ? c.project : null, state: c.state,
+          priority: Number.isFinite(c.priority) ? c.priority : null,
+          problem: c.visible ? c.problem : null, progress: c.visible ? c.progress : null, solution: c.visible ? c.solution : null,
+          blocked_by: c.visible ? c.blockedBy ?? [] : [], blocks: c.visible ? c.blocks ?? [] : [],
+          updated_at: new Date(c.updatedAt).toISOString(),
+        })), { onConflict: 'person_id,thread_id' }), 'sharing your threads with the team');
       }
-      let stale = client.from('private_activity').delete().eq('person_id', me);
-      if (keys.length) stale = stale.not('task_key', 'in', `(${keys.map((k) => `"${k}"`).join(',')})`);
-      must(await stale, 'clearing old private activity');
+      let stale = client.from('thread_cards').delete().eq('person_id', me);
+      if (cards.length) stale = stale.not('thread_id', 'in', `(${cards.map((c) => `"${c.threadId}"`).join(',')})`);
+      must(await stale, 'clearing threads the team no longer needs to see');
     },
 
-    async listActivity() {
+    async listCards() {
       await myId();
-      const rows = must(await client.from('private_activity').select('person_id,task_key,state,moved_at'), 'reading private activity');
-      return rows.map((r) => ({ personId: r.person_id, taskKey: r.task_key, state: r.state, movedAt: Date.parse(r.moved_at) }));
+      const rows = must(await client.from('thread_cards').select('*'), 'reading your team\'s threads');
+      return rows.map((r) => ({
+        personId: r.person_id, threadId: r.thread_id, visible: r.visible, title: r.title, project: r.project,
+        state: r.state, priority: r.priority, problem: r.problem, progress: r.progress, solution: r.solution,
+        blockedBy: r.blocked_by ?? [], blocks: r.blocks ?? [], updatedAt: Date.parse(r.updated_at),
+      }));
     },
 
     subscribe(onChange) {
       const channel = client.channel(`team-${Math.random().toString(36).slice(2)}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lines' }, () => onChange())
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'private_activity' }, () => onChange())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'thread_cards' }, () => onChange())
         .subscribe();
       return () => { client.removeChannel(channel); };
     },

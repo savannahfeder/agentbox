@@ -18,7 +18,7 @@ export function createMemoryCloud() {
     projects: new Map(), // id -> { id, teamId, name, visibility, createdBy }
     projectPeople: [], // { projectId, personId }
     lines: [], // { seq, projectId, uid, byPerson, body }
-    activity: new Map(), // `${personId}:${taskKey}` -> { personId, taskKey, state, movedAt }
+    cards: new Map(), // `${personId}:${threadId}` -> a thread card, as shared/thread-cards.mjs makes them
     seq: 0,
     events: new EventEmitter(),
   };
@@ -125,24 +125,26 @@ export function memoryBackend(cloud, personId) {
         .slice(0, limit).map((l) => ({ seq: l.seq, line: structuredClone(l.body) }));
     },
 
-    async putActivity(entries) {
-      for (const key of [...cloud.activity.keys()]) if (key.startsWith(`${personId}:`)) cloud.activity.delete(key);
-      for (const e of entries) {
-        cloud.activity.set(`${personId}:${e.taskKey}`, { personId, taskKey: e.taskKey, state: e.state, movedAt: e.movedAt });
-      }
-      cloud.events.emit('activity', {});
+    async putCards(teamId, cards) {
+      if (!myTeams().includes(teamId)) throw new Error('not on that team');
+      for (const key of [...cloud.cards.keys()]) if (key.startsWith(`${personId}:`)) cloud.cards.delete(key);
+      // A private card goes up with no words, whatever the Mac handed over, as
+      // supabase-backend does; the database refuses words on one besides.
+      const bare = (c) => (c.visible ? structuredClone(c) : { ...structuredClone(c), title: null, project: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [] });
+      for (const c of cards) cloud.cards.set(`${personId}:${c.threadId}`, { ...bare(c), visible: !!c.visible, personId, teamId });
+      cloud.events.emit('cards', {});
     },
 
-    async listActivity() {
-      const mates = new Set(cloud.members.filter((m) => myTeams().includes(m.teamId)).map((m) => m.personId));
-      return [...cloud.activity.values()].filter((a) => mates.has(a.personId)).map((a) => ({ ...a }));
+    async listCards() {
+      const teams = new Set(myTeams());
+      return [...cloud.cards.values()].filter((c) => teams.has(c.teamId)).map(({ teamId, ...c }) => structuredClone(c));
     },
 
     subscribe(onChange) {
       const fire = () => onChange();
       cloud.events.on('lines', fire);
-      cloud.events.on('activity', fire);
-      return () => { cloud.events.off('lines', fire); cloud.events.off('activity', fire); };
+      cloud.events.on('cards', fire);
+      return () => { cloud.events.off('lines', fire); cloud.events.off('cards', fire); };
     },
   };
 }

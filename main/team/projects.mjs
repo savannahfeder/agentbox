@@ -94,24 +94,3 @@ export function joinSharedProject(accountRoot, cloudProject) {
   });
   return { projectId: cloudProject.id, dir, name: cloudProject.name, slug };
 }
-
-// THE TEAM PAGE'S VIEW OF PRIVATE WORK: one line per open task, with no title
-// and no project. The key is a hash, so the cloud cannot tell which task it is,
-// only that it is the same one from one minute to the next.
-export function privateActivity(products, readItems, { now = Date.now(), salt = '' } = {}) {
-  const out = [];
-  for (const product of products) {
-    if (product.team?.projectId) continue;
-    for (const item of readItems(product)) {
-      if (item.status === 'done') continue;
-      const running = item.status === 'claimed' && item.claim && !item.claimExpired;
-      const scheduled = Number.isFinite(item.runAt) && item.runAt > now;
-      out.push({
-        taskKey: crypto.createHash('sha256').update(`${salt}:${product.slug}:${item.id}`).digest('hex').slice(0, 24),
-        state: running ? 'run' : scheduled ? 'sched' : 'wait',
-        movedAt: item.updatedAt ?? now,
-      });
-    }
-  }
-  return out;
-}

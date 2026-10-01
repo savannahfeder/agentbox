@@ -117,12 +117,17 @@ for (const [where, makeWorld, enabled] of worlds) {
       expect((await w.theo.listProjects()).find((p) => p.id === secret)?.people).toEqual([w.theo.personId]);
     });
 
-    it('publishes private work to the team without a title, and can take it back', async () => {
-      await w.theo.putActivity([{ taskKey: 'k1', state: 'run', movedAt: 1_790_000_000_000 }]);
-      expect((await w.maya.listActivity()).filter((a) => a.personId === w.theo.personId).map((a) => a.state)).toEqual(['run']);
-      expect(await w.jun.listActivity()).toEqual([]);
-      await w.theo.putActivity([]);
-      expect((await w.maya.listActivity()).filter((a) => a.personId === w.theo.personId)).toEqual([]);
+    it('publishes a thread card to the team, sends a private one without words, and can take it back', async () => {
+      const card = { threadId: 'w-1', visible: true, title: 'Acme renewal terms', project: 'Northwind', state: 'running', priority: 7, problem: 'P', progress: 'Q', solution: null, blockedBy: [], blocks: [], updatedAt: 1_790_000_000_000 };
+      await w.theo.putCards(team.id, [card, { threadId: 'w-2', visible: false, title: null, project: null, state: 'waiting', priority: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [], updatedAt: 1_790_000_000_000 }]);
+      const seen = (await w.maya.listCards()).filter((c) => c.personId === w.theo.personId).sort((a, b) => a.threadId.localeCompare(b.threadId));
+      expect(seen.map((c) => [c.threadId, c.visible, c.title, c.state])).toEqual([['w-1', true, 'Acme renewal terms', 'running'], ['w-2', false, null, 'waiting']]);
+      expect(await w.jun.listCards()).toEqual([]);
+      await w.theo.putCards(team.id, [{ ...card, threadId: 'w-3', visible: false }]);
+      const bare = (await w.maya.listCards()).find((c) => c.threadId === 'w-3');
+      expect([bare.visible, bare.title, bare.project, bare.problem, bare.progress]).toEqual([false, null, null, null, null]);
+      await w.theo.putCards(team.id, []);
+      expect((await w.maya.listCards()).filter((c) => c.personId === w.theo.personId)).toEqual([]);
     });
   });
 }

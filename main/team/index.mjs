@@ -11,10 +11,11 @@
 //     my teammates' private tasks doing.
 import path from 'node:path';
 import { createTeamSync, fileSyncState } from './sync.mjs';
-import { listSharedProjects, joinSharedProject, markShared, privateActivity } from './projects.mjs';
+import { listSharedProjects, joinSharedProject, markShared } from './projects.mjs';
+import { cardsFor } from '../../shared/thread-cards.mjs';
 import fs from 'node:fs';
 
-const EMPTY = { configured: false, signedIn: false, me: null, team: null, people: [], activity: [], lastSyncAt: null, error: null };
+const EMPTY = { configured: false, signedIn: false, me: null, team: null, people: [], cards: [], lastSyncAt: null, error: null };
 
 export function createTeamService({
   session, store, disk, accountRoot, stateFile, onChange = () => {}, log = () => {}, intervalMs = 5000,
@@ -35,8 +36,8 @@ export function createTeamService({
   async function refreshTeam() {
     const team = await backend.myTeam();
     const people = team ? await backend.teamPeople(team.id) : [];
-    const activity = team ? await backend.listActivity() : [];
-    set({ team, people, activity });
+    const cards = team ? await backend.listCards() : [];
+    set({ team, people, cards });
   }
 
   async function syncNow() {
@@ -51,10 +52,10 @@ export function createTeamService({
         // The people are read again on every pass, with the activity, so a
         // teammate who joined after this Mac signed in has a name and a face
         // on the first line of theirs that arrives here.
-        const [activity, people] = state.team
-          ? await Promise.all([backend.listActivity(), backend.teamPeople(state.team.id)])
+        const [cards, people] = state.team
+          ? await Promise.all([backend.listCards(), backend.teamPeople(state.team.id)])
           : [[], []];
-        set({ lastSyncAt: Date.now(), error: null, activity, people });
+        set({ lastSyncAt: Date.now(), error: null, cards, people });
         if (report.joined.length || report.pulled) log(`team: joined ${report.joined.length}, pulled ${report.pulled}, pushed ${report.pushed}`);
         return report;
       } catch (err) {
@@ -89,7 +90,8 @@ export function createTeamService({
       state: fileSyncState(stateFile, fs),
       listShared: () => listSharedProjects(products()),
       joinProject: (project) => joinSharedProject(accountRoot, project),
-      listPrivateOpen: () => privateActivity(products(), (p) => disk.readWorkItems(p.dir), { salt: me.id }),
+      listCards: () => cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir) }),
+      teamIdOf: () => state.team?.id ?? null,
     });
     stopLoop();
     timer = setInterval(() => { syncNow(); }, intervalMs);

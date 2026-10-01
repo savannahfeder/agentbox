@@ -10,7 +10,7 @@ import { it, expect, describe, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { markShared, readTeam, joinSharedProject, listSharedProjects, privateActivity, teamOf } from '../main/team/projects.mjs';
+import { markShared, readTeam, joinSharedProject, listSharedProjects, teamOf } from '../main/team/projects.mjs';
 
 let root;
 const project = (slug, extra = {}) => {
@@ -94,31 +94,5 @@ describe('joining a teammate\'s project', () => {
   });
 });
 
-describe('private work on the Team page', () => {
-  const products = [
-    { slug: 'home', team: null },
-    { slug: 'website', team: { projectId: 'x' } },
-  ];
-  const items = {
-    home: [
-      { id: 'w-1', title: 'Pay the Q3 tax estimate', status: 'claimed', claim: { holder: 'h' }, claimExpired: false, updatedAt: 5 },
-      { id: 'w-2', title: 'Book the dentist', status: 'open', runAt: 9_999_999_999_999, updatedAt: 6 },
-      { id: 'w-3', title: 'Renew passport', status: 'open', updatedAt: 7 },
-      { id: 'w-4', title: 'Old', status: 'done', updatedAt: 8 },
-    ],
-    website: [{ id: 'w-9', title: 'Shared row', status: 'open', updatedAt: 1 }],
-  };
-  const read = (p) => items[p.slug];
-
-  it('says running, scheduled or waiting for each open private task, and nothing about shared ones', () => {
-    const out = privateActivity(products, read, { now: 10 });
-    expect(out.map((a) => a.state)).toEqual(['run', 'sched', 'wait']);
-  });
-
-  it('carries no title and no project, only a key that stays the same', () => {
-    const out = privateActivity(products, read, { now: 10, salt: 's' });
-    const text = JSON.stringify(out);
-    for (const word of ['Q3', 'dentist', 'passport', 'home']) expect(text).not.toContain(word);
-    expect(privateActivity(products, read, { now: 10, salt: 's' })).toEqual(out);
-  });
-});
+// Private work on the Team board is a thread card now, not a project-wide
+// activity line: tests/team-a-teammate-sees-the-summary-and-nothing-more.test.mjs.

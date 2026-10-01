@@ -174,3 +174,30 @@ describe('private work on the Team page', () => {
     expect(await refused(THEO, `insert into public.private_activity (person_id, task_key, state, moved_at) values ($1, 'k2', 'run', now())`, [MAYA])).toBe(true);
   });
 });
+
+describe('thread cards, what a teammate sees of your threads', () => {
+  const card = (person, thread, extra = {}) => [person, team.id, thread, extra.visible ?? true, extra.title ?? null, extra.state ?? 'running'];
+  const insert = `insert into public.thread_cards (person_id, team_id, thread_id, visible, title, state) values ($1, $2, $3, $4, $5, $6)`;
+
+  it('shows a teammate your visible card and a stranger nothing', async () => {
+    await as(MAYA, insert, card(MAYA, 'w-card1', { title: 'Acme renewal terms' }));
+    expect((await rows(THEO, `select title from public.thread_cards where thread_id = 'w-card1'`)).map((c) => c.title)).toEqual(['Acme renewal terms']);
+    expect(await rows(JUN, `select title from public.thread_cards`)).toEqual([]);
+  });
+
+  it('will not let anyone write a card as somebody else', async () => {
+    expect(await refused(THEO, insert, card(MAYA, 'w-forged', { title: 'Forged' }))).toBe(true);
+  });
+
+  it('refuses words on a private card, so a private title can never leave the Mac', async () => {
+    expect(await refused(MAYA, insert, card(MAYA, 'w-secret', { visible: false, title: 'Board deck numbers' }))).toBe(true);
+    await as(MAYA, insert, card(MAYA, 'w-secret', { visible: false }));
+    expect((await rows(THEO, `select visible, title from public.thread_cards where thread_id = 'w-secret'`))).toEqual([{ visible: false, title: null }]);
+  });
+
+  it('lets only its owner change or remove it', async () => {
+    await as(THEO, `update public.thread_cards set title = 'Taken over' where thread_id = 'w-card1'`);
+    await as(THEO, `delete from public.thread_cards where thread_id = 'w-card1'`);
+    expect((await rows(MAYA, `select title from public.thread_cards where thread_id = 'w-card1'`)).map((c) => c.title)).toEqual(['Acme renewal terms']);
+  });
+});
