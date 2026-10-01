@@ -18,7 +18,7 @@ import { providerCommand } from '../../../shared/provider-commands.mjs';
 // One typographic system throughout (markdown, no cards, no stripes). Reply is
 // a docked composer, never a modal over the text.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -56,7 +56,7 @@ import { changePathFor } from '../code-artifact';
 import { fileCount, figuresFrom, figuresLabel, signed, type ChangeFigures } from '../change-figures';
 import { embeddedDocuments, isBookkeeping } from '../message-artifacts';
 import { opensInPane } from '../doc-pane';
-import { isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
+import { artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
 import { api } from '../api';
 import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveDraftAttachments, type SentDraft } from '../drafts';
 import { foldedReply } from '../folded-reply';
@@ -222,7 +222,7 @@ export function ArtifactMedia({ src, label, roots, onOpen }: { src: string; labe
     </button>
   );
   // Not in any root: it stays a name she can press, and the press says it is missing.
-  if (attempt >= candidates.length) return <span className="inline-media">{name}</span>;
+  if (attempt >= candidates.length) return <span className="inline-media-missing">{name}</span>;
   const next = () => setAttempt(attempt + 1);
   const film = /\.(mp4|mov|m4v|webm)(?:[?#]|$)/i.test(rel);
   return (
@@ -614,6 +614,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     return () => { live = false; clearInterval(timer); };
   }, [item.product, item.id, item.updatedAt, session?.startedAt, agent]);
 
+  // Parent callbacks change on polling and when a document opens. Keep the
+  // current actions without making them React component identities: replacing
+  // an `a` renderer remounts all its players and resets missing-file retries.
+  const markdownActions = useRef({ onOpenDoc, onNotice });
+  useLayoutEffect(() => { markdownActions.current = { onOpenDoc, onNotice }; });
+
   // Everything the markdown renderer closes over, memoized as ONE stable
   // object. The component functions' identity is what React reconciles by:
   // fresh arrows every render meant every store push (workers stream one per
@@ -647,6 +653,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // A miss now SAYS SO.
     const openHref = (href?: string) => {
       if (!href) return;
+      const { onOpenDoc, onNotice } = markdownActions.current;
       // A PAGE OR A MARKDOWN FILE OPENS IN THE PANE.Everything else still goes
       // to the app that owns it, because Preview draws a png better than we
       // ever will.
@@ -656,7 +663,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       const source = sourceReference(href);
       api.openArtifact({ product, src: source ?? href, ...(source ? { mode: 'source' } : {}) }).then((r: { ok: boolean; error?: string }) => {
         if (!r?.ok) onNotice(r?.error || `${href} could not be opened.`);
-      });
+      }).catch(() => onNotice(`${href} could not be opened.`));
     };
 
     const mdComponents = {
@@ -699,7 +706,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       },
     };
     return { resolveSrc, mdComponents, openHref, roots };
-  }, [product, productDir, repoDir, onNotice, onOpenDoc]);
+  }, [product, productDir, repoDir]);
 
   const mdPlugins = useMemo(
     () => [remarkGfm, [remarkArtifactPaths, { dir: productDir ?? null }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]['remarkPlugins']>,
@@ -707,7 +714,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   );
 
   const md = (text: string) => (
-    <ReactMarkdown remarkPlugins={mdPlugins} components={mdComponents}>{text}</ReactMarkdown>
+    <ReactMarkdown remarkPlugins={mdPlugins} components={mdComponents} urlTransform={artifactUrlTransform}>{text}</ReactMarkdown>
   );
 
   // Every design THIS MESSAGE names, embedded live under it. The whole

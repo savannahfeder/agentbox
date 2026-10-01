@@ -793,6 +793,13 @@ export function setWorkspaceSetting({ config, supervisor }, { key, value }) {
       // starting number, one row up.
       const n = Math.max(1, Math.min(MAX_SLOTS, Math.round(Number(value) || 1)));
       saveConfig(config, { maxConcurrentSessions: n });
+      // An explicit choice replaces the startup plan suggestion for BOTH
+      // engines. Leaving this marker set makes Codex ignore the new number
+      // until loadConfig runs again at restart. It is derived, not persisted.
+      config.planSlotsFrom = null;
+      // Fill newly available slots through the usual queue and its guards.
+      // Lowering the cap leaves existing work running and gates new starts.
+      supervisor.wake?.();
       break;
     }
     // Written as an opt-OUT (`diagnostics: false`) so that on is what a config
