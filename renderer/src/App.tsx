@@ -480,7 +480,9 @@ export default function App() {
   const [inviteFocus, setInviteFocus] = useState(false);
   // WHAT THE COMPOSER OPENS WITH, when something hands it a start: "Hand it to
   // an agent" on a message from a person turns that message into a thread.
-  const [composeInitial, setComposeInitial] = useState<{ to?: string; body?: string } | null>(null);
+  // `also` is everyone after the first in To, which is how "Add people" on an
+  // open conversation hands the whole group over (threads/page-rules.ts).
+  const [composeInitial, setComposeInitial] = useState<{ to?: string; also?: string[]; body?: string } | null>(null);
   // OPEN A CONVERSATION WITH THE REPLY BOX READY, carrying what was typed. The
   // composer hands over here when its To is someone you already talk to, and
   // "Message Maya" comes here first.
@@ -499,6 +501,14 @@ export default function App() {
     setComposeInitial({ to: 'agent', body: from ? `${from} asked:\n\n${quoted}\n\n` : `${quoted}\n\n` });
     setModal('compose');
   }, [snap?.team, snap?.products]);
+  // ADD PEOPLE on an open conversation: New thread, with everyone already in
+  // that conversation in To. Nothing is written to the conversation on screen,
+  // because adding somebody makes the group's conversation and leaves this one
+  // as it was; sending is what makes it (main/team/index.mjs directWith).
+  const addPeopleToConversation = useCallback((who: { to: string; also: string[] }) => {
+    setComposeInitial({ to: who.to, also: who.also });
+    setModal('compose');
+  }, []);
   // Drawn when it is open and nothing sits over it: an opened task or Settings
   // takes the page, and closing them returns to the Team page.
   const teamShown = teamOpen && !focused && !settingsOpen;
@@ -4861,6 +4871,7 @@ export default function App() {
                   // agent from its page.
                   items={items}
                   onHandToAgent={handToAgent}
+                  onAddPeople={addPeopleToConversation}
                   headerTarget={workspaceNavigation ? taskHeader : null}
                   terminalHeaderTarget={terminalHeaderTarget}
                   cornerHeaderTarget={cornerHeaderTarget}

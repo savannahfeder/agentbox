@@ -3,9 +3,10 @@
 // app's own option-strip classes so it reads as the same control as any other
 // row's options (approved 2026-09-30, screen 3 of the team design).
 import { useContext, useState } from 'react';
-import type { WorkItem } from '../types';
+import type { Product, WorkItem } from '../types';
 import { api } from '../api';
 import { isShared, heldByAPerson } from '../../../shared/team-rules.mjs';
+import { peopleInConversation } from '../threads/page-rules';
 import { Face, TeamContext, dueWords, firstName, type TeamView } from './people';
 
 /** Is this a shared row given to a person? Then the team draws its header. */
@@ -37,6 +38,40 @@ export function TeamPeople({ item }: { item: WorkItem }) {
   return <span className="tm-people" style={{ marginLeft: 'auto' }}>
     {ids.map((id) => <Face key={id} person={team.byId.get(id)} me={id === team.me} />)}
   </span>;
+}
+
+/**
+ * ADD PEOPLE, beside the faces at the top of a conversation (w-71e6af492d).
+ *
+ * The conversation page named who was in it and offered no way to reach the
+ * one with one more person in it, so the only route to a group was to start a
+ * New thread and type every name again.
+ *
+ * IT ADDS NOBODY TO THIS CONVERSATION. Slack's rule, and the one the founder
+ * asked for: adding someone makes the group's conversation and the old one
+ * stays exactly as it was. So this opens New thread with everyone already here
+ * in To, and the composer's own group rule takes it from there: one
+ * conversation per exact group (main/team/index.mjs directWith), already
+ * started or new.
+ *
+ * On conversation pages only, which `peopleInConversation` decides, so no
+ * other page can grow this control by accident.
+ */
+export function AddPeople({ product, onAdd }: {
+  product: Product | undefined | null;
+  onAdd: (who: { to: string; also: string[] }) => void;
+}) {
+  const team = useContext(TeamContext);
+  const who = peopleInConversation(product, team?.me ?? null);
+  if (!who) return null;
+  return <button type="button" className="tm-add-people" title="Add people to a new conversation" onClick={() => onAdd(who)}>
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true">
+      <circle cx="6" cy="5.5" r="2.5" />
+      <path d="M1.75 13c0-2.2 1.9-3.6 4.25-3.6 1 0 1.9.25 2.6.7" />
+      <path d="M12 9v5M9.5 11.5h5" />
+    </svg>
+    Add people
+  </button>;
 }
 
 /** On a task a teammate gave you: give it to an agent, keep it, or hand it back. */

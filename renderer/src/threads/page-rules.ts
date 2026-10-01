@@ -85,6 +85,31 @@ export function updatedWords(ts: number, now = Date.now()): string {
 export const isDirect = (p: Product | undefined | null) => !!(p as { team?: { direct?: boolean } } | undefined)?.team?.direct;
 
 /**
+ * WHO AN OPEN CONVERSATION WOULD HAND TO NEW THREAD, in the shape the card's
+ * `initial` takes: the first person in To, everyone else beside them.
+ *
+ * Everyone in the record but you, because you are in every conversation you
+ * can see and a To field that named you would be asking you to message
+ * yourself. The person who STARTED the record counts the same as the rest:
+ * they are its `sharedBy` rather than one of its `people`, which is the one
+ * place a conversation's membership is written in two fields.
+ *
+ * Null on anything that is not a conversation, which is what keeps the Add
+ * people control off every other page, and null where the only person in it
+ * is you, because there is nothing there to add to.
+ */
+export function peopleInConversation(
+  product: Product | undefined | null,
+  me: string | null,
+): { to: string; also: string[] } | null {
+  if (!isDirect(product) || !me) return null;
+  const t = product!.team!;
+  const ids = [...new Set([...(t.people ?? []), ...(t.sharedBy ? [t.sharedBy] : [])])].filter((p) => p && p !== me);
+  if (!ids.length) return null;
+  return { to: ids[0], also: ids.slice(1) };
+}
+
+/**
  * WHO SEES A ROW, AS THE INBOX SAYS IT (2026-10-01). Her threads from before
  * she joined stay hers unless she shares them, so the inbox has to say which
  * ones the team can see and let her change it. 'team' or 'private' by the

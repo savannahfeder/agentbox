@@ -29,6 +29,23 @@ img.tm-av { background: var(--bg-selected); }
 .tm-people { display: flex; align-items: center; gap: 4px; height: 34px; margin-right: 4px; }
 .tm-people .tm-av { width: 22px; height: 22px; line-height: 20px; }
 
+/* ADD PEOPLE, beside those faces on a conversation and nowhere else
+   (w-71e6af492d). It wears the byline's own mono so it reads as part of the
+   line rather than as a button parked on it, and it is quiet until the cursor
+   is on it: no border at rest, a background on hover, which is what every
+   button, tab and picker in this app does. Square, like everything else.
+
+   `margin-left: auto` is here as well as on `.tm-people`, because the faces
+   are not drawn on every conversation (a row nobody has been handed has none)
+   and the control still belongs at the right-hand end of the line. Two autos
+   on one flex row cost nothing: the first one takes the slack. */
+.tm-add-people { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-left: auto;
+  height: 24px; padding: 0 7px; border: 0; border-radius: var(--radius); background: none; cursor: pointer;
+  white-space: nowrap; font: 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+.tm-people + .tm-add-people { margin-left: 2px; }
+.tm-add-people svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.tm-add-people:hover { background: var(--wash); color: var(--text-dim); }
+
 /* a teammate's message: their face before their name */
 .msg-who .tm-av { margin-right: 9px; position: relative; top: -1px; }
 
