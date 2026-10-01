@@ -99,7 +99,7 @@ import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   finishedCleared, firstRunNeeded, inboxCleared, laterCleared, laterId, laterIndex,
-  mayOpenInbox, practising, restartFirstRun, snoozeRefused, tutorialRun,
+  mayOpenInbox, noCodingAgent, practising, restartFirstRun, snoozeRefused, tutorialRun,
   waitingId, waitingIndex,
   finishFirstRun, forcedStep, readFirstRun, walkRows,
   saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, wearsTheWalksLook, whyNotMade, type FirstRun,
@@ -834,8 +834,12 @@ export default function App() {
       // answer, or when this Mac shows signs of Claude Code that the search
       // could not turn into a path. Any of those means nothing may be said.
       const sure = s.ok !== false && s.workspace?.claudeCertain === true;
+      // AND CODEX IS ENOUGH ON ITS OWN. The card shuts the inbox only when we
+      // are sure of both: no Claude Code, and no Codex either.
+      const codexSure = s.ok !== false && s.workspace?.codexCertain === true;
       setClaude({
-        missing: sure && !s.workspace?.claudeFound,
+        missing: sure && !s.workspace?.claudeFound
+          && noCodingAgent({ found: false, certain: true }, { found: !!s.workspace?.codexFound, certain: codexSure }),
         url: s.workspace?.claudeInstallUrl || 'https://code.claude.com/docs/en/setup',
       });
     }).catch(() => { /* the walk does not end because a setting did not read */ });
@@ -851,8 +855,9 @@ export default function App() {
   // entitled to act on, and shutting somebody out of their own app on an answer
   // we could not establish would be worse than the line she complained about.
   const recheckClaude = useCallback(async () => {
-    const r = await api.recheckClaude();
-    const missing = r.certain && !r.found;
+    // Both searches, because whichever one they just installed opens the door.
+    const [r, codex] = await Promise.all([api.recheckClaude(), api.recheckCodex()]);
+    const missing = noCodingAgent(r, codex);
     setClaude({ missing, url: r.url });
     return missing;
   }, []);
