@@ -11,6 +11,7 @@ import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../p
 import { Face, TeamContext, firstName } from '../team/people';
 import { PriorityIcon } from '../components/Priority';
 import { rowTitle } from '../list-rules';
+import { DONE } from '../done-word';
 import {
   BOARD_COLUMNS, isDirect, isFiltered, teamEntries, teamKeeps, updatedWords,
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
@@ -113,7 +114,7 @@ export const INBOX_TABS: { view: TabView; label: string }[] = [
   { view: 'inbox', label: 'Needs you' },
   { view: 'progress', label: 'Running' },
   { view: 'snoozed', label: 'Scheduled' },
-  { view: 'done', label: 'Done' },
+  { view: 'done', label: DONE.short },
   { view: 'all', label: 'All' },
 ];
 
@@ -121,6 +122,45 @@ export function StateTabs({ view, counts, onView }: { view: TabView; counts: Par
   return <div className="th-bar"><div className="tm-tabs">
     {INBOX_TABS.map((t) => <button type="button" key={t.view} className={`tm-tab${view === t.view ? ' on' : ''}`} onClick={() => onView(t.view)}>{t.label}{counts[t.view] !== undefined && <b>{counts[t.view]}</b>}</button>)}
   </div></div>;
+}
+
+/* ------------------------------------------------------------ an empty tab */
+/** INBOX ZERO, DRAWN AGAIN FROM THE QUESTION IT ANSWERS (2026-10-01). She
+ *  asked for this page redrawn from first principles. When nothing needs you,
+ *  the page has three things to say: that you are clear, whether work is
+ *  moving without you, and how to start the next thing. It sits where the
+ *  first row would, under the tabs, left aligned with the titles, so the page
+ *  does not jump when a thread lands. The tabs stay: an empty Needs you is
+ *  still the Inbox, and Running is one click away. */
+export function InboxZero({ running, scheduled, onView, onCompose }: {
+  running: number; scheduled: number; onView: (v: TabView) => void; onCompose: () => void;
+}) {
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  return <div className="th-zero">
+    <h2>Nothing needs you</h2>
+    <p>
+      {running > 0
+        ? <><button type="button" className="th-zero-link" onClick={() => onView('progress')}>{plural(running, 'thread is running', 'threads are running')}</button>. Each one lands here when it needs you.</>
+        : scheduled > 0
+          ? <><button type="button" className="th-zero-link" onClick={() => onView('snoozed')}>{plural(scheduled, 'thread is scheduled', 'threads are scheduled')}</button>. Nothing else is open.</>
+          : 'Start a thread and an agent picks it up, or message a teammate.'}
+    </p>
+    <div className="th-zero-acts">
+      <button type="button" className="th-new" onClick={onCompose}><PenIcon />New thread</button>
+      <span className="th-zero-key">or press <kbd>N</kbd></span>
+    </div>
+  </div>;
+}
+
+/** The other tabs, empty: one quiet line where the rows would be. */
+export function EmptyTab({ view }: { view: TabView }) {
+  const words: Partial<Record<TabView, string>> = {
+    progress: 'Nothing is running.',
+    snoozed: 'Nothing is scheduled.',
+    done: 'Nothing finished yet.',
+    all: 'No threads yet.',
+  };
+  return <div className="th-empty">{words[view] ?? 'Nothing here.'}</div>;
 }
 
 /* ------------------------------------------------------------ one thread's cells */
@@ -136,10 +176,27 @@ export function otherPerson(item: WorkItem, me: string | null): string | null {
   return people.find((p) => p !== me) ?? (item.createdBy && item.createdBy !== me ? item.createdBy : null);
 }
 
+/** ONE ROW OF THE TABLE, FOR THE INBOX AND THE TEAM PAGE BOTH. Her words on
+ *  2026-10-01: "The team page in list view should be the same component...
+ *  with maybe some slight differences, such as an extra column for the
+ *  person". So there is one set of cells, and the Team page only adds Person. */
+export function RowCells({ title, hidden = false, lock = false, where, person, priority, updatedAt, now }: {
+  title: ReactNode; hidden?: boolean; lock?: boolean; where: ReactNode; person?: ReactNode;
+  priority: number | null; updatedAt: number; now: number;
+}) {
+  const id = priority === null ? null : priorityIdOf(priority);
+  return <div className={`row-main th-grid${person !== undefined ? ' with-person' : ''}`}>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{title}{lock && <LockMark />}</div>
+    <div className="th-cell-proj">{where}</div>
+    {person !== undefined && <div className="th-cell-person">{person}</div>}
+    <div className={`th-cell-prio${id === 'urgent' ? ' urgent' : ''}`}>{id && <><PriorityMark id={id} />{priorityLabelOf(id)}</>}</div>
+    <div className="th-cell-when num">{updatedWords(updatedAt, now)}</div>
+  </div>;
+}
+
 /** The cells of one row in the inbox's table: thread, project (or who a message is from), priority, updated. */
 export function ThreadCells({ item, product, now }: { item: WorkItem; product: Product | undefined; now: number }) {
   const team = useContext(TeamContext);
-  const id = priorityIdOf(item.priority);
   let where: ReactNode = product?.name ?? '';
   if (isDirect(product)) {
     const otherId = otherPerson(item, team?.me ?? null);
@@ -147,12 +204,8 @@ export function ThreadCells({ item, product, now }: { item: WorkItem; product: P
     const fromThem = item.createdBy && item.createdBy !== team?.me;
     where = <>{other && <Face person={other} />}{fromThem ? 'From ' : 'To '}{firstName(other)}</>;
   }
-  return <div className="row-main th-grid">
-    <div className="th-cell-title subject">{rowTitle(item)}{item.visibility === 'private' && <LockMark />}</div>
-    <div className="th-cell-proj">{where}</div>
-    <div className={`th-cell-prio${id === 'urgent' ? ' urgent' : ''}`}>{!isDirect(product) && <><PriorityMark id={id} />{priorityLabelOf(id)}</>}</div>
-    <div className="th-cell-when num">{updatedWords(item.updatedAt, now)}</div>
-  </div>;
+  return <RowCells title={rowTitle(item)} lock={item.visibility === 'private'} where={where}
+    priority={isDirect(product) ? null : item.priority ?? 0} updatedAt={item.updatedAt} now={now} />;
 }
 
 /* ------------------------------------------------------------ the Team page */
@@ -215,13 +268,10 @@ export function TeamView({ items, products, cards, display, now, onOpenItem, onO
       {entries.length === 0 && <div className="th-empty">Nothing here.</div>}
       {entries.map((e) => <div key={e.key} className="row" onClick={() => open(e)}>
         <span className="mark" aria-hidden="true" />
-        <div className="row-main th-grid with-person">
-          <div className={`th-cell-title${e.title === null ? ' hidden' : ''}`}>{e.title ?? 'Private thread'}{(e.title === null || e.item?.visibility === 'private') && <LockMark />}</div>
-          <div className="th-cell-proj">{e.project ?? 'Hidden'}</div>
-          <div className="th-cell-person"><Face person={e.ownerId ? team?.byId.get(e.ownerId) ?? null : null} me={e.ownerId === me} />{nameOf(e.ownerId)}</div>
-          <div className={`th-cell-prio${e.priority !== null && priorityIdOf(e.priority) === 'urgent' ? ' urgent' : ''}`}>{e.priority !== null && <><PriorityMark id={priorityIdOf(e.priority)} />{priorityLabelOf(priorityIdOf(e.priority))}</>}</div>
-          <div className="th-cell-when num">{updatedWords(e.updatedAt, now)}</div>
-        </div>
+        <RowCells title={e.title ?? 'Private thread'} hidden={e.title === null} lock={e.title === null || e.item?.visibility === 'private'}
+          where={e.project ?? 'Hidden'}
+          person={<><Face person={e.ownerId ? team?.byId.get(e.ownerId) ?? null : null} me={e.ownerId === me} />{nameOf(e.ownerId)}</>}
+          priority={e.priority} updatedAt={e.updatedAt} now={now} />
       </div>)}
     </div>}
   </div>;

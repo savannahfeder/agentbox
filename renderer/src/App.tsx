@@ -114,7 +114,7 @@ import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
 import { TeamContext, teamView } from './team/people';
 import { TeamPage } from './team/TeamPage';
-import { HeaderActions, InboxBoard, StateTabs, TeamView } from './threads/Pages';
+import { EmptyTab, HeaderActions, InboxBoard, InboxZero, StateTabs, TeamView } from './threads/Pages';
 import { readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing' | 'themes';
@@ -4232,7 +4232,11 @@ export default function App() {
   // an empty inbox drew that sentence behind her card. The idle page stays up
   // under the overlay now, which is the call `idlePinned` above already makes
   // about the theme for exactly the same reason.
-  const inboxEmpty = view === 'inbox' && inbox.length === 0 && !focused && !settingsOpen && search === null;
+  // THE TEAM VERSION KEEPS ITS TABS ON AN EMPTY INBOX (2026-10-01): her words,
+  // "it's supposed to show those categories... but I don't see them". So the
+  // whole-page zero is only the old layout's; the new one draws its zero under
+  // the tabs, in the list's place (threads/Pages.tsx, InboxZero).
+  const inboxEmpty = !workspaceNavigation && view === 'inbox' && inbox.length === 0 && !focused && !settingsOpen && search === null;
 
   // AND A VIEW WITH NOTHING IN IT DRAWS NO CARD EITHER. The other half of the
   // same directive: painting the sentence out of the empty pane leaves a large
@@ -4243,8 +4247,9 @@ export default function App() {
   // SEARCH IS NOT THIS. A query that matches nothing still gets the card and
   // still gets its sentence (List.tsx says why), so this asks for search to be
   // off, not merely empty.
-  const bareView = search === null && !focused && !focusedRepeat && list.length === 0
+  const emptyView = search === null && !focused && !focusedRepeat && list.length === 0
     && !(view === 'snoozed' && repeats.length > 0);
+  const bareView = emptyView && !workspaceNavigation;
   // ONE SURFACE ON AN OPENED TASK (design C): no card, hairlines
   // only, and the reading column centred on the window rather than on the pane
   // the panel left over. `flat` is the same condition that used to draw the
@@ -4896,7 +4901,13 @@ export default function App() {
                     onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
                   />
                 )}
-                <List
+                {workspaceNavigation && emptyView ? (
+                  view === 'inbox'
+                    ? run === null && <InboxZero running={progress.length} scheduled={snoozed.length}
+                        onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
+                        onCompose={() => setModal('compose')} />
+                    : <EmptyTab view={view} />
+                ) : <List
                   table={workspaceNavigation && search === null}
                   products={snap.products}
                   team={team}
@@ -4950,7 +4961,7 @@ export default function App() {
                     setMultiSel((m) => new Set([...m, ...list.slice(lo, hi + 1).map((x) => x.id)]));
                     setSelected(i);
                   }}
-                />
+                />}
                 </>}
                 </>
               )}
