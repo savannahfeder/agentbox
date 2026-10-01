@@ -57,6 +57,9 @@
 .th-pr i.on { background: var(--text-dim); }
 .th-urgent { display: inline-grid; place-items: center; width: 12px; height: 12px; border-radius: 3px; background: var(--accent); color: #1a1817; font: 700 9px var(--mono); margin-right: 8px; position: relative; top: 1px; flex: none; }
 .th-lock { display: inline-block; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
+/* WHO SEES A ROW (2026-10-01): two people after the title of a thread the team
+   can see, and nothing on the rest, which is most of an older inbox. */
+.th-shared { display: inline-block; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
 
 /* ------------------------------------------------------------ the list as a table */
 .th-table .row.th-head { padding-top: 10px; padding-bottom: 8px; font: 10.5px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); cursor: default; }
@@ -72,7 +75,16 @@
 .th-cell-proj .tm-av { width: 16px; height: 16px; line-height: 14px; font-size: 8px; margin-right: 8px; flex: none; }
 .th-cell-prio { font: 11.5px/20px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); display: flex; align-items: center; }
 .th-cell-prio.urgent { color: var(--accent); }
-.th-cell-when { font-size: 13px; line-height: 20px; color: var(--text-dim); white-space: nowrap; }
+.th-cell-when { font-size: 13px; line-height: 20px; color: var(--text-dim); white-space: nowrap; position: relative; }
+/* SHARE OR UNSHARE, one click, at the row's end while the pointer is on the
+   row. It takes the time's place rather than adding a column, the time comes
+   back when the pointer leaves, and a row with nothing to share keeps its
+   time. Square, quiet, and the one thing on the row that does not open it. */
+.th-row-act { position: absolute; right: -9px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity .08s ease; }
+.th-table .row:hover .th-row-act, .th-row-act:focus-visible { opacity: 1; pointer-events: auto; }
+.th-table .row:hover .has-act .th-when, .has-act:focus-within .th-when { visibility: hidden; }
+.th-row-act:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
+.th-row-act:focus-visible { outline: none; border-color: var(--line-strong); }
 .th-cell-person { font-size: 13px; line-height: 20px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
 .th-cell-person .tm-av { margin-right: 9px; flex: none; }
 .th-empty { padding: 32px var(--row-r, 24px) 32px var(--text-x, 32px); color: var(--text-faint); font-size: 14px; }

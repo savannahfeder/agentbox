@@ -11,7 +11,6 @@
 // summary, main/store.mjs threadEdit writes an edit); this file only draws it.
 // The rules that decide words (how long ago, who wrote last, which threads may
 // be linked) are in ./summary-rules.ts, where the tests read them.
-import { shownToTeam } from '../../../shared/thread-cards.mjs';
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Person, ThreadCard, ThreadEditPatch, WorkItem } from '../types';
 import { api } from '../api';
@@ -23,12 +22,29 @@ import {
   STATE_WORD, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, lastEdit, linkCandidates, linkedThreads,
   ownerName, readSummaryOpen, stateGlyph, type StateGlyph, type SummaryField,
 } from './summary-rules';
+import { VISIBILITY_WORD, whoSees } from './summary-rules';
+import { rowTitle } from '../list-rules';
+import { SharedMark } from './Pages';
 import './summary.css';
 
 /* ------------------------------------------------------------------ pieces */
 
 function Glyph({ kind }: { kind: StateGlyph }) {
   return <span className={`ts-st ts-st-${kind}`} aria-hidden="true" />;
+}
+
+// THE MARKS A CHANGEABLE FIELD SHOWS UNDER THE POINTER: a caret on a field
+// that opens a menu, a pencil on a line that turns into a text box. Both are
+// invisible at rest (summary.css), and a field she cannot change has neither.
+function Caret() {
+  return <svg className="ts-caret" viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M3 4.5 6 7.5l3-3" /></svg>;
+}
+function Pen() {
+  return <svg className="ts-pen" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m4 20 1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5 4 20Z" /></svg>;
+}
+// One person, for "Only you", beside the team's two (Pages.tsx SharedMark).
+function OnlyYouMark() {
+  return <svg className="ts-who" width="13" height="12" viewBox="0 0 24 22" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="7" r="4" /><path d="M4.5 20.5c.8-4 3.8-6.3 7.5-6.3s6.7 2.3 7.5 6.3" /></svg>;
 }
 
 function PanelIcon() {
@@ -107,7 +123,7 @@ export function ThreadStatusAndToggle({ item, open, onToggle }: { item: WorkItem
 
 type Field = SummaryField | 'priority' | 'visibility' | 'blockedBy' | 'blocks';
 type Pending = Partial<Record<Field, { value: unknown; ts: number }>>;
-type Menu = null | 'priority' | 'blockedBy' | 'blocks';
+type Menu = null | 'priority' | 'visibility' | 'blockedBy' | 'blocks';
 
 const NOT_WRITTEN = 'Not written yet';
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -177,8 +193,8 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
   const state = threadState(item);
   const prio: PriorityId = priorityIdOf(valueOf<number>('priority'));
   // A thread from before you joined is yours until you share it, whatever it
-  // says on disk (shared/thread-cards.mjs, `shownToTeam`).
-  const visibility = shownToTeam({ ...item, visibility: valueOf<'team' | 'private' | undefined>('visibility') }, team?.state.since ?? null) ? 'team' : 'private';
+  // says on disk (summary-rules.ts `whoSees`, the Team page's own rule).
+  const visibility = whoSees({ ...item, visibility: valueOf<'team' | 'private' | undefined>('visibility') }, team?.state.since ?? null);
   const owner = ownerName(item, me, team?.byId ?? new Map());
   const ownerPerson = owner === 'You' ? null : team?.byId.get(item.createdBy ?? '') ?? null;
 
@@ -287,7 +303,7 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
           >
             {links.length
               ? <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M6 2v8M2 6h8" /></svg>
-              : 'None'}
+              : <>None<Caret /></>}
           </button>
         </span>
         {menu === field && (
@@ -307,6 +323,16 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
 
   return (
     <aside className="ts-panel" aria-label="Summary">
+      {/* WHICH THREAD THIS IS, by the name its row shows (list-rules.ts
+          rowTitle). Without it the panel was a list of properties about
+          nothing in particular. */}
+      <h2 className="ts-title">{rowTitle(item)}</h2>
+      {/* CHANGEABLE LOOKS CHANGEABLE (2026-10-01). Priority and Visible to are
+          buttons that wash, point and show a caret under the pointer; Status,
+          Owner and Project are plain words with no hover at all. Owner stays
+          read-only because people here get messages, never tasks. Project
+          does because nothing in the store moves a thread from one project's
+          ledger to another, and a menu here would have to invent that. */}
       <div className="ts-props">
         <span className="ts-label">Status</span>
         <span className="ts-value"><Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{STATE_WORD[state]}</span>
@@ -318,8 +344,8 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
         <span className="ts-value ts-menu-anchor" ref={holdMenu('priority')}>
           {/* The app's own bars (components/Priority.tsx), Urgent as a fourth
               bar and never an exclamation mark. */}
-          <button type="button" className="ts-prop-btn" aria-haspopup="listbox" aria-expanded={menu === 'priority'} onClick={() => setMenu(menu === 'priority' ? null : 'priority')}>
-            <PriorityIcon id={prio} />{priorityLabelOf(prio)}
+          <button type="button" className="ts-prop-btn" aria-haspopup="listbox" aria-expanded={menu === 'priority'} title="Change the priority" onClick={() => setMenu(menu === 'priority' ? null : 'priority')}>
+            <PriorityIcon id={prio} />{priorityLabelOf(prio)}<Caret />
           </button>
           {menu === 'priority' && (
             <span className="prio-menu ts-menu" role="listbox" aria-label="Priority">
@@ -340,13 +366,30 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
           )}
         </span>
         <span className="ts-label">Visible to</span>
-        <span className="ts-value">
-          <button
-            type="button"
-            className="ts-prop-btn"
-            title={visibility === 'team' ? 'Make it private' : 'Show it to the team'}
-            onClick={() => void save({ visibility: visibility === 'team' ? 'private' : 'team' })}
-          >{visibility === 'team' ? 'Team' : 'Private'}</button>
+        <span className="ts-value ts-menu-anchor" ref={holdMenu('visibility')}>
+          {/* Both choices in a menu, like Priority, so she sees what she is
+              choosing between before anything is written. The marks are the
+              inbox's: two people for the team, one for you. */}
+          <button type="button" className="ts-prop-btn" aria-haspopup="listbox" aria-expanded={menu === 'visibility'} title="Change who sees it" onClick={() => setMenu(menu === 'visibility' ? null : 'visibility')}>
+            {visibility === 'team' ? <SharedMark className="ts-who" /> : <OnlyYouMark />}{VISIBILITY_WORD[visibility]}<Caret />
+          </button>
+          {menu === 'visibility' && (
+            <span className="prio-menu ts-menu" role="listbox" aria-label="Visible to">
+              {(['team', 'private'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="option"
+                  aria-selected={v === visibility}
+                  className={`prio-menu-row${v === visibility ? ' on' : ''}`}
+                  onClick={() => { setMenu(null); if (v !== visibility) void save({ visibility: v }); }}
+                >
+                  {v === 'team' ? <SharedMark className="ts-who" /> : <OnlyYouMark />}
+                  <span className="prio-menu-label">{VISIBILITY_WORD[v]}</span>
+                </button>
+              ))}
+            </span>
+          )}
         </span>
       </div>
 
@@ -380,7 +423,7 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
               title="Click to edit"
               onClick={() => begin(f)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); begin(f); } }}
-            >{stood[f] || NOT_WRITTEN}</p>
+            >{stood[f] || NOT_WRITTEN}<Pen /></p>
           )}
         </div>
       ))}

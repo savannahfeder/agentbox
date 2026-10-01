@@ -84,6 +84,27 @@ export function updatedWords(ts: number, now = Date.now()): string {
 /** A product that is a message record between two people, which no project list shows. */
 export const isDirect = (p: Product | undefined | null) => !!(p as { team?: { direct?: boolean } } | undefined)?.team?.direct;
 
+/**
+ * WHO SEES A ROW, AS THE INBOX SAYS IT (2026-10-01). Her threads from before
+ * she joined stay hers unless she shares them, so the inbox has to say which
+ * ones the team can see and let her change it. 'team' or 'private' by the
+ * Team page's own rule (shared/thread-cards.mjs shownToTeam), or null where
+ * the question does not arise: nobody signed in, a message between people, an
+ * agent's own row, or a teammate's thread, which is theirs to share.
+ */
+export function rowSharing(
+  item: Pick<WorkItem, 'visibility' | 'createdAt' | 'createdBy' | 'agent'>,
+  product: Product | undefined | null,
+  team: { me: string | null; since?: number | null } | null,
+): 'team' | 'private' | null {
+  if (!team || !product || isDirect(product) || item.agent) return null;
+  if (item.createdBy && item.createdBy !== team.me) return null;
+  return shownToTeam(item, team.since ?? null) ? 'team' : 'private';
+}
+
+/** What one click on Share or Unshare writes: the other one. */
+export const sharePatch = (now: 'team' | 'private'): { visibility: 'team' | 'private' } => ({ visibility: now === 'team' ? 'private' : 'team' });
+
 // ------------------------------------------------------------------ the board
 
 export interface BoardEntry {
