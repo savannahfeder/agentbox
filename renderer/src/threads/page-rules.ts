@@ -97,15 +97,27 @@ export const isDirect = (p: Product | undefined | null) => !!(p as { team?: { di
  * Null on anything that is not a conversation, which is what keeps the Add
  * people control off every other page, and null where the only person in it
  * is you, because there is nothing there to add to.
+ *
+ * AND NULL WHEN THE COMPANY HOLDS NOBODY WHO IS NOT ALREADY HERE (the founder,
+ * 2026-10-01: "it should only have that Add people button if there are more
+ * people in the company to add. Otherwise it's cleaner if it just doesn't show
+ * that at all."). A two person company, or a group that is already everyone,
+ * has nothing the control could do: it would open a card holding exactly the
+ * people on screen. Somebody who is in the conversation and has since left the
+ * company is not room either, which is why this counts the company against
+ * this conversation rather than counting heads on both sides.
  */
 export function peopleInConversation(
   product: Product | undefined | null,
   me: string | null,
+  company: ReadonlyArray<{ id: string }> = [],
 ): { to: string; also: string[] } | null {
   if (!isDirect(product) || !me) return null;
   const t = product!.team!;
-  const ids = [...new Set([...(t.people ?? []), ...(t.sharedBy ? [t.sharedBy] : [])])].filter((p) => p && p !== me);
+  const here = new Set([...(t.people ?? []), ...(t.sharedBy ? [t.sharedBy] : [])]);
+  const ids = [...here].filter((p) => p && p !== me);
   if (!ids.length) return null;
+  if (!company.some((p) => p.id !== me && !here.has(p.id))) return null;
   return { to: ids[0], also: ids.slice(1) };
 }
 

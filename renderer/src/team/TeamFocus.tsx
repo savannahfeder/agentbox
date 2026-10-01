@@ -62,7 +62,7 @@ export function AddPeople({ product, onAdd }: {
   onAdd: (who: { to: string; also: string[] }) => void;
 }) {
   const team = useContext(TeamContext);
-  const who = peopleInConversation(product, team?.me ?? null);
+  const who = peopleInConversation(product, team?.me ?? null, team?.state.people ?? []);
   if (!who) return null;
   return <button type="button" className="tm-add-people" title="Add people to a new conversation" onClick={() => onAdd(who)}>
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true">

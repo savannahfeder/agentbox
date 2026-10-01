@@ -13,8 +13,17 @@
 // changes the record on screen, which is why this is a handoff to the
 // composer and not a write.
 //
+// AND IT IS NOT THERE WHEN THERE IS NOBODY TO ADD (the founder, 2026-10-01:
+// "it should only have that Add people button if there are more people in the
+// company to add. Otherwise it's cleaner if it just doesn't show that at
+// all."). A two person company, or a group that is already everyone, gets no
+// control, because pressing it could only ever open a card with the same
+// people in it.
+//
 // What is pinned here:
 //   - the control is on conversation pages ONLY, and nowhere else;
+//   - it is gone when the company holds nobody who is not already in this
+//     conversation;
 //   - it hands over everyone in the conversation but you, in To, so the
 //     composer's own group rule picks up from there;
 //   - the person who started the record counts even when the record lists
@@ -32,6 +41,9 @@ globalThis.React = React;
 const ME = 'p-me';
 const MAYA = 'p-maya';
 const THEO = 'p-theo';
+const JUN = 'p-jun';
+// The company: everyone signed in to this team, as the app holds them.
+const COMPANY = [{ id: ME }, { id: MAYA }, { id: THEO }, { id: JUN }];
 
 const project = { slug: 'northwind', name: 'Northwind', team: { projectId: 'x', teamId: 't', visibility: 'team', people: [], sharedBy: null } };
 const pair = { slug: 'direct-1', name: 'Maya', team: { projectId: 'd1', teamId: 't', visibility: 'people', people: [ME, MAYA], sharedBy: null, direct: true } };
@@ -42,43 +54,67 @@ const alone = { slug: 'direct-4', name: 'You', team: { projectId: 'd4', teamId: 
 
 describe('who a conversation hands to New thread', () => {
   it('hands the one person you are talking to', () => {
-    expect(peopleInConversation(pair, ME)).toEqual({ to: MAYA, also: [] });
+    expect(peopleInConversation(pair, ME, COMPANY)).toEqual({ to: MAYA, also: [] });
   });
 
   it('hands everyone in a group, and never you', () => {
-    const out = peopleInConversation(group, ME);
+    const out = peopleInConversation(group, ME, COMPANY);
     expect(out).not.toBeNull();
     expect([out.to, ...out.also].sort()).toEqual([MAYA, THEO]);
     expect([out.to, ...out.also]).not.toContain(ME);
   });
 
   it('counts the person who started the record', () => {
-    expect(peopleInConversation(theirs, ME)).toEqual({ to: MAYA, also: [] });
+    expect(peopleInConversation(theirs, ME, COMPANY)).toEqual({ to: MAYA, also: [] });
   });
 
   it('offers nothing on a project, which is not a conversation', () => {
-    expect(peopleInConversation(project, ME)).toBeNull();
+    expect(peopleInConversation(project, ME, COMPANY)).toBeNull();
   });
 
   it('offers nothing where there is nobody but you', () => {
-    expect(peopleInConversation(alone, ME)).toBeNull();
+    expect(peopleInConversation(alone, ME, COMPANY)).toBeNull();
   });
 
   it('offers nothing when nobody is signed in', () => {
-    expect(peopleInConversation(pair, null)).toBeNull();
-    expect(peopleInConversation(undefined, ME)).toBeNull();
+    expect(peopleInConversation(pair, null, COMPANY)).toBeNull();
+    expect(peopleInConversation(undefined, ME, COMPANY)).toBeNull();
+  });
+});
+
+describe('nobody left in the company to add', () => {
+  it('offers nothing in a company of two', () => {
+    expect(peopleInConversation(pair, ME, [{ id: ME }, { id: MAYA }])).toBeNull();
+  });
+
+  it('offers nothing on a group that is already everyone', () => {
+    expect(peopleInConversation(group, ME, [{ id: ME }, { id: MAYA }, { id: THEO }])).toBeNull();
+  });
+
+  it('offers it on that same group once one more person joins', () => {
+    expect(peopleInConversation(group, ME, COMPANY)).not.toBeNull();
+  });
+
+  it('counts somebody who left the company as nobody to add', () => {
+    // Theo is in the conversation and no longer on the list. That is not room.
+    expect(peopleInConversation(group, ME, [{ id: ME }, { id: MAYA }])).toBeNull();
+  });
+
+  it('offers nothing before the company list has arrived', () => {
+    expect(peopleInConversation(pair, ME, [])).toBeNull();
   });
 });
 
 describe('the control at the top of a conversation', () => {
-  const team = {
-    state: { signedIn: true, people: [] },
+  const teamOf = (company) => ({
+    state: { signedIn: true, people: company },
     me: ME,
-    byId: new Map([[MAYA, { id: MAYA, name: 'Maya Chen' }], [THEO, { id: THEO, name: 'Theo Park' }]]),
+    byId: new Map(company.map((p) => [p.id, { id: p.id, name: p.id }])),
     products: new Map([[pair.slug, pair], [group.slug, group], [project.slug, project]]),
-  };
-  const draw = (product) => renderToStaticMarkup(
-    React.createElement(TeamContext.Provider, { value: team },
+  });
+  const team = teamOf(COMPANY);
+  const draw = (product, t = team) => renderToStaticMarkup(
+    React.createElement(TeamContext.Provider, { value: t },
       React.createElement(AddPeople, { product, onAdd: () => {} })),
   );
 
@@ -93,6 +129,14 @@ describe('the control at the top of a conversation', () => {
 
   it('is not on a task page', () => {
     expect(draw(project)).toBe('');
+  });
+
+  it('is not there in a company of two', () => {
+    expect(draw(pair, teamOf([{ id: ME }, { id: MAYA }]))).toBe('');
+  });
+
+  it('is not there on a group that is already the whole company', () => {
+    expect(draw(group, teamOf([{ id: ME }, { id: MAYA }, { id: THEO }]))).toBe('');
   });
 
   it('is not there with nobody signed in', () => {
