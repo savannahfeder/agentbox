@@ -5590,25 +5590,23 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 .set-write + .set-row, .set-row + .set-write, .set-write + .set-write { border-top: 1px solid var(--line); }
 .set-write-head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; }
 .set-write-desc { margin-top: 5px; font-size: 13px; line-height: 1.62; color: var(--text-faint); }
-.set-write textarea, .set-instr textarea {
+.set-write textarea {
   display: block; width: 100%; resize: vertical;
   background: var(--wash); color: var(--text);
   border: 1px solid var(--line-strong); border-radius: var(--radius);
   padding: 13px 15px; font: 13px/1.72 var(--mono); outline: none;
 }
-.set-write textarea:focus, .set-instr textarea:focus { border-color: var(--text-faint); }
-.set-write textarea::placeholder, .set-instr textarea::placeholder { color: var(--text-faint); }
+.set-write textarea:focus { border-color: var(--text-faint); }
+.set-write textarea::placeholder { color: var(--text-faint); }
 /* 15px = the two 1px borders plus the 13px top padding. Everything after it is
-   whole lines. Six here, seven on a project's own page, where the box is the
-   thing the page is for. */
+   whole lines. A project's own box used to share this rule; its instructions
+   are written on the Instructions page now (w-4cbcd888ae). */
 .set-write textarea { margin-top: 12px; min-height: calc(15px + 6 * 1.72 * 13px); }
-.set-instr textarea { min-height: calc(15px + 7 * 1.72 * 13px); }
 /* The one line under the box: what typing in it does, and which file it is. */
-.set-write-foot, .set-instr-foot {
+.set-write-foot {
   display: flex; justify-content: space-between; align-items: center; gap: 14px;
   margin-top: 9px; font-size: 12px; color: var(--text-faint);
 }
-.set-instr { padding: 16px 0; }
 
 /* ==========================================================================
    THE NEW PROJECT CARD
@@ -9178,15 +9176,3 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 }
 .fp-use { background: var(--accent); border-color: transparent; color: var(--on-solid); }
 .fp-use:disabled { opacity: .45; cursor: default; }
-
-/* FINISHING A TASK: THE TWO TICKS IN THE CORNER ROW (w-581dbc6cc4).
-
-   IT IS AN `.icon-btn`, which is the terminal's own class, so everything about
-   it that could drift is shared rather than copied: the 34 box, the 19 point
-   glyph, `--text-faint`, the hover. It should match the colour of the terminal
-   button beside it. All this rule adds is where it sits.
-
-   `order: 1` IS WHAT PUTS IT LAST. The span Focus teleports into is
-   `display: contents`, so the button is laid out by the corner row itself and
-   markup order does nothing at all. */
-.done-mark { order: 1; flex: 0 0 auto; margin-left: 4px; }

@@ -44,8 +44,10 @@ it('makes only the title pay for the icons, not the byline', () => {
   // 2026-09-27 (w-581dbc6cc4): the plus and the ⌘ came off a task's corner on
   // her word, and the Done mark went on. Measured in the built app, that
   // cluster is 81 wide, and 18 of air on top is the same 18 it always kept.
+  // AND AGAIN on 2026-10-01 (w-e731ca9376): the corner is the Summary button
+  // and the thread's three-dot menu, 161 wide in the built app, plus the 18.
   // What this test is for is that only the TITLE reserves it.
   const title = rule('.workspace-layout.workspace-task .workspace-task-header .keep-line-title');
-  expect(title).toMatch(/padding-right:\s*99px/);
+  expect(title).toMatch(/padding-right:\s*179px/);
   expect(rule('.workspace-task-header .byline')).not.toMatch(/padding-right/);
 });

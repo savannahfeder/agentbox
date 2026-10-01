@@ -788,7 +788,7 @@ export const COPY = {
   nameGo: 'Continue',
   // CLAUDE CODE MISSING IS THE LINE ONLY. One quiet line here and
   // no screen of its own anywhere: the walk never stops and never gains a step.
-  missing: `${Name} could not find Claude Code on this Mac, and your agents run on it.`,
+  missing: `${Name} could not find Claude Code or Codex on this Mac, and your agents run on one of them.`,
   missingLink: 'Get Claude Code',
   nameQ: 'What is this project called?',
   // The clause is kept here and drawn nowhere, because deleting the words is
@@ -1139,8 +1139,8 @@ export const COPY = {
   // headline names it, `missing` above says what was looked for, and the two
   // buttons are the way through. `finishGo` is not drawn at all, because a
   // button that opens an inbox nobody can work in is a broken promise.
-  gateHead: `${Name} needs Claude Code.`,
-  gateDo: `Install it, then check again. Your inbox opens as soon as ${NAME} can see it.`,
+  gateHead: `${Name} needs Claude Code or Codex.`,
+  gateDo: `Install either one, then check again. Your inbox opens as soon as ${NAME} can see it.`,
   gateCheck: 'Check again',
   gateChecking: 'Looking',
   // AFTER A CHECK THAT FOUND NOTHING. It is a different sentence from the one
@@ -1225,6 +1225,15 @@ export function finishCard(
  *  answered the same way. */
 export function mayOpenInbox(claude: { missing: boolean }): boolean {
   return !claude.missing;
+}
+
+/**
+ * WHETHER THIS MAC HAS NO CODING AGENT AT ALL, which is the only thing the
+ *  last card shuts the inbox for. Claude Code or Codex is enough, so it takes a
+ *  certain "not here" about BOTH. An unsure search about either one keeps the
+ *  door open, for the reason `certain` exists everywhere else in this file. */
+export function noCodingAgent(claude: { found: boolean; certain: boolean }, codex: { found: boolean; certain: boolean }): boolean {
+  return claude.certain && !claude.found && codex.certain && !codex.found;
 }
 
 /* ------------------------------ THE CARD ---------------------------------- */
@@ -1320,7 +1329,7 @@ export const TEAM_TABS: readonly string[] = ['inbox', 'progress', 'snoozed', 'do
 
 /** And the words on those tabs, the same ones Pages.tsx draws. */
 export const TEAM_TAB_NAMES: Readonly<Record<string, string>> = {
-  inbox: 'Needs you', progress: 'Running', snoozed: 'Scheduled', done: DONE.short, all: 'All',
+  inbox: 'Needs you', progress: 'In progress', snoozed: 'Scheduled', done: DONE.short, all: 'All',
 };
 
 export function teamTab(view: string | null | undefined): string | null {
@@ -1739,7 +1748,7 @@ export function coach(
           'Everything you just did is one key away. So is this: type tutorial.',
           // ⌘K finds commands; N starts a thread. The old line read as if ⌘K
           // started one (a persona test, 2026-10-01).
-          'Press ', '⌘K', ' to find any command. Press N to start your first real thread.',
+          'Press ', '⌘K', ' to find any command, or N to start your first real thread.',
         );
     default:
       return null;

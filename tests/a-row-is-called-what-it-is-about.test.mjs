@@ -22,7 +22,7 @@
 import { describe, it, expect } from 'vitest';
 import { foldWorkItems, WORK_ITEM_FIELDS } from '../shared/work-items.mjs';
 import { rowTitle } from '../renderer/src/list-rules';
-import { cleanName, contentTouchedAt, namePrompt, wantsName, NAME_MAX } from '../main/row-label.mjs';
+import { cleanName, namePrompt, wantsName, NAME_MAX } from '../main/row-label.mjs';
 
 const line = (patch, { id = 'w-1', ts = 1000, source = 'agent' } = {}) => ({ id, ts, source, patch });
 
@@ -71,7 +71,14 @@ describe('what the list calls a row', () => {
 });
 
 describe('which rows the app offers to name', () => {
-  const row = (over = {}) => ({ status: 'open', title: 'Something she dictated', ...over });
+  // A DICTATED LINE, because a short clear title is now left alone: its person
+  // named the thread and that is the name they will look for
+  // (tests/a-thread-keeps-the-name-you-gave-it.test.mjs, w-c141733b61).
+  const row = (over = {}) => ({
+    status: 'open',
+    title: 'I feel like the inbox is a little bit messy. For instance:',
+    ...over,
+  });
 
   it('names a live row that has never been named', () => {
     expect(wantsName(row())).toBe(true);
@@ -95,28 +102,32 @@ describe('which rows the app offers to name', () => {
     expect(wantsName(named)).toBe(false);
   });
 
-  it('names it again when she answers, because the thread has moved', () => {
+  // THIS USED TO SAY THE OPPOSITE, and the brief for w-c141733b61 overrode it:
+  // "names it again when she answers, because the thread has moved". Following
+  // the thread meant a name that moved on every run, and a tester lost their
+  // threads to it. A named row is never named again.
+  it('does NOT name it again when she answers, however the thread moves', () => {
     const answered = row({
       label: 'Inbox row titles',
       wrote: {
         title: { ts: 10, source: 'founder' },
         label: { ts: 20, source: 'agent' },
         answer: { ts: 30, source: 'founder' },
+        result: { ts: 40, source: 'agent' },
       },
     });
-    expect(wantsName(answered)).toBe(true);
+    expect(wantsName(answered)).toBe(false);
   });
 
   it('does NOT rename on a claim, a heartbeat or a release', () => {
-    // contentTouchedAt reads the four fields that carry words. Everything else
-    // about a row moves several times a minute while a worker is on it.
+    // Everything about a row moves several times a minute while a worker is on
+    // it, and none of it is a reason to touch the name.
     const busy = {
       wrote: {
         title: { ts: 10 }, label: { ts: 20 },
         status: { ts: 999 }, runAt: { ts: 999 }, answeredThrough: { ts: 999 },
       },
     };
-    expect(contentTouchedAt(busy)).toBe(10);
     expect(wantsName({ status: 'claimed', title: 'x', label: 'A name', ...busy })).toBe(false);
   });
 });

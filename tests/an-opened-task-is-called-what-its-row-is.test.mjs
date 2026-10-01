@@ -31,7 +31,9 @@ const opening = (events) => events.find((e) => e.field === 'body') ?? events.fin
 
 describe('the header', () => {
   it('prints the name the row prints, with her title on hover', () => {
-    expect(focus).toMatch(/className="keep-line-title" title=\{item\.title\}>\{rowTitle\(item\)\}</);
+    // A conversation with a person is named for the person (2026-10-01); every
+    // other thread prints the name its row prints.
+    expect(focus).toMatch(/className="keep-line-title" title=\{item\.title\}>\{direct && talkFull \? talkFull : rowTitle\(item\)\}</);
   });
 });
 

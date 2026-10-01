@@ -99,23 +99,31 @@ export function useSummaryShortcut(onToggle: () => void, enabled = true) {
 
 /* ----------------------------------------------------------------- top bar */
 
-/** "● Waiting" and the square Summary button with its key, for the top bar. */
-export function ThreadStatusAndToggle({ item, open, onToggle }: { item: WorkItem; open: boolean; onToggle: () => void }) {
+/**
+ * "● Running": the thread's mark and its word, FIRST ON THE LINE UNDER THE
+ * TITLE (w-e731ca9376, 2026-10-01). It stood at the right of the bar beside the
+ * Summary button until she asked for it here, in place of the live word
+ * "Working" that said the same thing in other letters. Byline.tsx draws it
+ * where it was handed it, in the line's own uppercase mono.
+ */
+export function ThreadStateMark({ item }: { item: WorkItem }) {
   const team = useContext(TeamContext);
   const state = threadState(item);
+  return <span className="ts-lead"><Glyph kind={stateGlyph(state, waitsOnYou(item, team?.me ?? null))} />{STATE_WORD[state]}</span>;
+}
+
+/** The square Summary button with its key, for the top bar. */
+export function SummaryToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
-    <span className="ts-top">
-      <span className="ts-status"><Glyph kind={stateGlyph(state, waitsOnYou(item, team?.me ?? null))} />{STATE_WORD[state]}</span>
-      <button
-        type="button"
-        className={`ts-sumbtn${open ? ' on' : ''}`}
-        aria-pressed={open}
-        title={open ? 'Hide the summary · S' : 'Show the summary · S'}
-        onClick={onToggle}
-      >
-        <PanelIcon />Summary<kbd>S</kbd>
-      </button>
-    </span>
+    <button
+      type="button"
+      className={`ts-sumbtn${open ? ' on' : ''}`}
+      aria-pressed={open}
+      title={open ? 'Hide the summary · S' : 'Show the summary · S'}
+      onClick={onToggle}
+    >
+      <PanelIcon />Summary<kbd>S</kbd>
+    </button>
   );
 }
 

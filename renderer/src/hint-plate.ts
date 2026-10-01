@@ -119,15 +119,9 @@ export const HINTS: Record<string, HintLine[]> = {
   commands: [{ key: '⌘K', what: 'Everything by name' }],
   search: [{ key: '/', what: 'Search your tasks' }],
   // A task she has opened.
-  // THE MARK THAT FINISHES IT, which was missing its shortcut hover at first.
-  // It belongs here on the
-  // same reading that brought the ⌘ mark and the magnifier in: two ticks are a
-  // picture of a button, not a statement that the key is E.
-  //
-  // IT SAYS WHAT THE ROW'S OWN PLATE SAYS FOR E, word for word. The same key
-  // doing the same thing in two places may not be described two ways, and the
-  // row is where most people meet it.
-  done: [{ key: 'E', what: 'Mark done' }],
+  // THE MARK THAT FINISHED IT IS A ROW NOW (w-e731ca9376, 2026-10-01): Mark
+  // done, in the thread's menu, which prints E beside its words. A component
+  // that already shows its key carries no plate, so its line went with it.
   terminal: [{ key: '⌘J', what: 'Show or hide the terminal' }],
   back: [{ key: 'esc', what: 'Go back one level' }],
 };

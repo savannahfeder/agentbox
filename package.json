@@ -63,7 +63,7 @@
     "prepack": "npm run build",
     "postinstall": "node scripts/after-install.mjs",
     "prepublishOnly": "node scripts/before-publish.mjs",
-    "app": "node scripts/prepare-terminal.mjs && electron ."
+    "app": "vite build renderer --logLevel warn && node scripts/prepare-terminal.mjs && electron ."
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

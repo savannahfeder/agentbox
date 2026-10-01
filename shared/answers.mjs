@@ -78,3 +78,15 @@ export function answerSettled(item) {
 export function answerTs(item) {
   return item?.wrote?.answer?.ts ?? 0;
 }
+
+// SHE STOPPED THIS ROW AND HAS NOT SPOKEN SINCE. Stop writes `blocked` in her
+// hand (zero:stop-session), and it promises the row stays in her inbox until
+// she replies, resumes it or sends it back. A reply she wrote BEFORE the stop
+// is not one of those, though a kill hands it back to the queue: that is how a
+// stopped run came straight back ten seconds later (2026-10-01).
+// tests/a-stopped-agent-stays-stopped-until-she-resumes-it.test.mjs
+export function stoppedByHer(item) {
+  const status = item?.wrote?.status;
+  return item?.status === 'blocked' && status?.source === 'founder'
+    && answerTs(item) <= (status.ts ?? 0);
+}

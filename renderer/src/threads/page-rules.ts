@@ -155,6 +155,8 @@ export interface BoardEntry {
   updatedAt: number;
   item: WorkItem | null;
   card: ThreadCard | null;
+  /** An agent is on it right now (your own threads only; a teammate's card does not say). */
+  live?: boolean;
 }
 
 /**
@@ -162,7 +164,15 @@ export interface BoardEntry {
  * (so they open), your teammates' from their cards (so they show their
  * summary), done ones only from today. Messages between two people never.
  */
-export function teamEntries({ items, products, cards, me, now, since = null }: { items: WorkItem[]; products: Product[]; cards: ThreadCard[]; me: string | null; now: number; since?: number | null }): BoardEntry[] {
+// `stateOf` IS THE TABS' OWN RULE, handed in by App.tsx (her note, 2026-10-01:
+// the board said Running for work the tab did not, "a discrepancy between Team
+// and Inbox, which should pretty much never happen"). Your own threads sit in
+// the column whose tab lists them; `threadState` is only the fallback for a row
+// no tab lists. `live` is the set an agent is on right now.
+export function teamEntries({ items, products, cards, me, now, since = null, stateOf, live }: {
+  items: WorkItem[]; products: Product[]; cards: ThreadCard[]; me: string | null; now: number; since?: number | null;
+  stateOf?: (item: WorkItem) => ThreadStateWord | null; live?: Set<string>;
+}): BoardEntry[] {
   const bySlug = new Map(products.map((p) => [p.slug, p]));
   const today = startOfDay(now);
   const out: BoardEntry[] = [];
@@ -178,11 +188,12 @@ export function teamEntries({ items, products, cards, me, now, since = null }: {
     // more than they are on anyone else's (shared/thread-cards.mjs). One you
     // made private stays, with its lock, so you can see it is hidden.
     if (item.visibility !== 'private' && !shownToTeam(item, since)) continue;
-    const state = threadState(item, now);
+    const state = stateOf?.(item) ?? threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
     out.push({
       key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: item.label || item.title, project: product.name,
       projectSlug: product.slug, priority: item.priority ?? null, updatedAt: item.updatedAt, item, card: null,
+      live: !!live?.has(item.id),
     });
   }
   for (const card of cards) {
@@ -202,7 +213,7 @@ export function teamEntries({ items, products, cards, me, now, since = null }: {
 
 export const BOARD_COLUMNS: { state: ThreadStateWord; label: string }[] = [
   { state: 'waiting', label: 'Waiting' },
-  { state: 'running', label: 'Running' },
+  { state: 'running', label: 'In progress' },
   { state: 'scheduled', label: 'Scheduled' },
   { state: 'done', label: 'Done today' },
 ];

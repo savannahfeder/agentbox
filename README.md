@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Give your agents an inbox.</strong><br>
-  Run twenty coding agents at once and only hear from the ones that need you.
+  Run dozens of coding agents at once and only hear from the ones that need you.
 </p>
 
 <p align="center">
@@ -29,25 +29,9 @@
 
 ---
 
-## The chat window is the bottleneck
+## Install
 
-Today you run agents in chat windows and terminals, and you wait for each one
-to finish before you prompt it again. So the number of agents you can run is limited 
-by the number of windows you can keep track of.
-
-<p align="center">
-  <img src="docs/readme/before.webp" alt="Five terminal windows, each with an agent waiting on a different task" width="60%">
-</p>
-
-Models are now good enough that most tasks do not need watching. They need
-someone to review the work at the right moment. Agentbox drops the chat window
-and gives each agent a row in an inbox instead, so you can run far more of them
-than you could ever watch and only deal with one when it actually needs you.
-
-## Get it
-
-Two ways to run it. Both need Node 22 and Claude Code installed and signed in.
-Codex is optional and is picked up when it is there.
+There are two ways to run it: in the browser, or as a Mac app. Both need Node 22 and Claude Code or Codex installed and signed in.
 
 **In your browser.** One command, nothing to install first:
 
@@ -69,7 +53,22 @@ npm start
 ```
 
 `npm start` builds the app and opens it. On first run it walks you through
-connecting Claude Code and choosing a folder to work in.
+connecting Claude Code or Codex and choosing a folder to work in.
+
+## The chat window is the bottleneck
+
+Today you run agents in chat windows and terminals, and you wait for each one
+to finish before you prompt it again. So the number of agents you can run is limited 
+by the number of windows you can keep track of.
+
+<p align="center">
+  <img src="docs/readme/before.webp" alt="Five terminal windows, each with an agent waiting on a different task" width="60%">
+</p>
+
+Models are now good enough that most tasks do not need watching. They need
+someone to review the work at the right moment. Agentbox drops the chat window
+and gives each agent a row in an inbox instead, so you can run far more of them
+than you could ever watch and only deal with one when it actually needs you.
 
 ## How it works
 

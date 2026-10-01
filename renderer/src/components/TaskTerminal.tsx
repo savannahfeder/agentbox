@@ -7,7 +7,13 @@ import '@xterm/xterm/css/xterm.css';
 import './task-terminal.css';
 const screenCache=new Map<string,{token:string;screen:string;offset:number;cols:number;rows:number}>();
 const views=new Map<string,{open:boolean;placement:'bottom'|'side'}>();
-export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSession=false}:{product:string;id:string;headerTarget?:HTMLElement|null;commandSession?:boolean;
+export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSession=false,onOpenChange}:{product:string;id:string;headerTarget?:HTMLElement|null;commandSession?:boolean;
+  /**
+   * TOLD WHENEVER IT OPENS OR CLOSES, for the thread's menu (threads/ThreadMenu.tsx),
+   * whose row says Open terminal or Hide terminal by what pressing it will do.
+   * The thread page passes this instead of `headerTarget`: the mark in the top
+   * bar went into that menu (w-e731ca9376, 2026-10-01). */
+  onOpenChange?:(open:boolean)=>void;
   /**
    * OPEN WITHOUT BEING ASKED, for the one caller that IS the terminal rather
    * than a task that happens to have one: the Codex sign in on Settings. A
@@ -22,6 +28,7 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
   const [exited,setExited]=useState(false);const [processName,setProcessName]=useState('Shell');
   const [revision,setRevision]=useState(0);const host=useRef<HTMLDivElement>(null);
   useEffect(()=>{views.set(key,{open,placement});},[key,open,placement]);
+  useEffect(()=>{onOpenChange?.(open);},[open,onOpenChange]);
   // ⌘K's "Open Terminal" row opens it; ⌘J is a switch, the way ⌘J is a switch
   // in every editor she already uses. The two events stay separate because a
   // menu row named "Open Terminal" that closed an open terminal would be

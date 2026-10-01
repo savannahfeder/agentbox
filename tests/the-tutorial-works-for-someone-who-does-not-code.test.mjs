@@ -75,7 +75,7 @@ describe('1. the walk is never a blank screen', () => {
     expect(TEAM_TABS.map((v) => TEAM_TAB_NAMES[v])).toEqual(labels);
     const tabs = ['inbox', 'progress', 'snoozed', 'done'];
     const named = coach('where', 0, { view: 'inbox', tabs, tabNames: TEAM_TAB_NAMES });
-    expect(`${named.lead}${named.key}${named.tail}`).toBe('Press ⌘2 or click Running to see where it all went.');
+    expect(`${named.lead}${named.key}${named.tail}`).toBe('Press ⌘2 or click In progress to see where it all went.');
     const onward = coach('where', 0, { view: 'progress', tabs, tabNames: TEAM_TAB_NAMES });
     expect(onward.tail).toMatch(/^ or click Scheduled /);
     // The old layout's strip has its own words and gets no name.

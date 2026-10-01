@@ -47,7 +47,7 @@ describe('the panel opens with the thread’s name', () => {
   it('says the name the row shows, the label, before anything else', () => {
     const html = draw(item());
     expect(html).toMatch(/^<aside[^>]*><h2 class="ts-title">Acme renewal terms<\/h2>/);
-    expect(text(html)).toMatch(/^Acme renewal terms Status Running Owner You Project Northwind/);
+    expect(text(html)).toMatch(/^Acme renewal terms Status In progress Owner You Project Northwind/);
   });
   it('falls back to the title on a thread with no label', () => {
     expect(draw(item({ label: undefined }))).toContain('<h2 class="ts-title">Can you send Acme their renewal terms by Thursday? Their contract ends on the 14th.</h2>');

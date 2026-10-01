@@ -19,7 +19,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel } from '../types';
 import { api, RESTART_NOTE } from '../api';
-import { InstructionSettings } from './InstructionSettings';
+import { InstructionSettings, sizeLabel } from './InstructionSettings';
+import { EVERY } from '../instruction-scope';
 import type {Usage, WorkspaceSettings} from '../types';
 import { limitRows } from '../../../shared/usage.mjs';
 import { ago } from '../format';
@@ -700,8 +701,8 @@ const CLAUDE = {
   connected: 'Claude Code is connected',
   connectedSay: `${Name} can see it on this Mac, so your agents have something to run on. There is nothing for you to set up.`,
   missing: 'Claude Code is not on this Mac',
-  // The walk's sentence, and then the walk's instruction.
-  missingSay: `${Name} could not find Claude Code on this Mac, and your agents run on it. Install it, then check again.`,
+  // Not "your agents run on it": with Codex here they run on Codex instead.
+  missingSay: `${Name} could not find Claude Code on this Mac. Install it, then check again.`,
   missingLink: 'Get Claude Code',
   unsure: `${Name} could not check`,
   unsureSay: `${Name} has not been able to look for Claude Code on this Mac. That is not the same as it being missing, only that the answer never came back. Try again in a moment.`,
@@ -972,86 +973,6 @@ const CodexCli = (props: EngineConnection) => (
    downloaded and waiting still reaches the user as a row in the inbox
    (../update-row.ts), which is where it asks for the one thing that is the
    user's to time, the restart. What went is only the page that reported on it. */
-
-/* --------------------------- project instructions ------------------------- */
-// The layer that did not exist anywhere: her rules for ONE project, briefed to
-// every session on it after her standing instructions. One file beside that
-// project's docs dir, read fresh at every spawn.
-//
-// It saves as she types, for the same reason the standing box does: the
-// alternative is a rule she believes she has set sitting unsaved behind an
-// Apply button while the fleet works without it.
-
-function Instructions({ project, onSaved }: { project: ProjectSettings; onSaved: () => void }) {
-  const [text, setText] = useState(project.instructions);
-  const [save, setSave] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
-  const [error, setError] = useState<string | null>(null);
-  const timer = useRef<number | null>(null);
-  const pending = useRef<string | null>(null);
-
-  // Switching projects in the nav swaps the box's subject, so the text has to
-  // come with it. Without this the previous project's rules stayed on screen
-  // over the new project's name, which is the worst possible lie this box could
-  // tell.
-  //
-  // Keyed on the SLUG alone, never on the text. Saving refreshes the settings
-  // model, so a text-keyed reset would fire on every landed keystroke: it would
-  // wipe the "saved" line the moment it appeared, and a save that lands while
-  // she is still typing would overwrite what she has typed since.
-  const slug = project.slug;
-  const loaded = useRef(project.instructions);
-  loaded.current = project.instructions;
-  useEffect(() => {
-    setText(loaded.current);
-    setSave('idle');
-    setError(null);
-    pending.current = null;
-  }, [slug]);
-
-  const flush = useCallback(async (value: string) => {
-    setSave('saving');
-    const r = await api.writeProjectInstructions(project.slug, value);
-    if (r.ok) { pending.current = null; setSave('saved'); setError(null); onSaved(); }
-    else { setSave('failed'); setError(r.error ?? 'could not save'); }
-  }, [project.slug, onSaved]);
-
-  // Flush what the user typed in the last 400ms when the box's subject changes, so
-  // clicking to another project cannot swallow a half-typed rule.
-  useEffect(() => () => {
-    if (timer.current) window.clearTimeout(timer.current);
-    if (pending.current !== null) void flush(pending.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project.slug]);
-
-  const edit = (value: string) => {
-    setText(value);
-    pending.current = value;
-    setSave('saving');
-    if (timer.current) window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => void flush(value), 400);
-  };
-
-  const status = save === 'failed' ? (error ?? 'not saved')
-    : save === 'saving' ? 'saving…'
-    : save === 'saved' ? 'saved'
-    : `Every agent on ${project.name} reads this, after your rules.`;
-
-  return (
-    <div className="set-instr">
-      <textarea
-        spellCheck={false}
-        value={text}
-        placeholder={`Rules that apply to ${project.name} and nothing else. Agents on other projects never see them.`}
-        onChange={(e) => edit(e.target.value)}
-        onKeyDown={(e) => e.stopPropagation()}
-      />
-      <div className="set-instr-foot">
-        <span>{status}</span>
-        <span className="set-mono">{project.slug}/instructions.md</span>
-      </div>
-    </div>
-  );
-}
 
 /* ---------------------------- the mark, changed --------------------------- */
 
@@ -1365,6 +1286,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
     write(api.setWorkspaceSetting({ key, value }));
 
   const projects = model?.projects ?? [];
+  // WHO THE INSTRUCTIONS PAGE IS FOR. Held here so a project's own page can
+  // open it already pointed at that project, which is the one place a
+  // project's instructions are written now.
+  const [instrScope, setInstrScope] = useState<string>(EVERY);
+  const openInstructions = (slug: string) => { setInstrScope(slug); setPane('instructions'); };
   const current = useMemo(
     () => (typeof pane === 'string' ? null : projects.find((p) => p.slug === pane.project) ?? null),
     [pane, projects],
@@ -1506,7 +1432,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
       </div>
 
       <div className="set-pane">
-        {pane === 'instructions' && <InstructionSettings />}
+        {pane === 'instructions' && <InstructionSettings projects={projects} scope={instrScope} onScope={setInstrScope} onSaved={load} />}
         {/* AND THE SETTINGS ERROR IS EXCLUDED FROM SHORTCUTS FOR THE SAME REASON AS THE WAIT
            BELOW (w-1bc916a880, 2026-09-22). This banner says "quit and reopen agentbox to
            change settings", which is what `api.ts` answers when the window has outrun the
@@ -2091,8 +2017,14 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               )}
             </Group>
 
-            <Group label="Instructions for this project" note="A project without any behaves exactly as it did before this screen existed.">
-              <Instructions project={current} onSaved={load} />
+            {/* ONE PLACE FOR A PROJECT'S INSTRUCTIONS (w-4cbcd888ae). They are
+                written on the Instructions page, pointed at this project, and
+                this row is the door to it rather than a second box onto the
+                same file. */}
+            <Group label="Instructions">
+              <Row label="Instructions for this project" desc={current.instructions.trim() ? sizeLabel(current.instructions.length) : 'None yet.'}>
+                <button type="button" className="set-ghost" onClick={() => openInstructions(current.slug)}>Open</button>
+              </Row>
             </Group>
 
             <Group label="Where this project is kept on this Mac">

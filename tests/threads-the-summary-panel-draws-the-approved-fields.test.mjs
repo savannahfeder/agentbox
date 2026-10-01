@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SummaryPanel, ThreadStatusAndToggle, TeammateCard, MessagePerson } from '../renderer/src/threads/Summary.tsx';
+import { SummaryPanel, SummaryToggle, ThreadStateMark, TeammateCard, MessagePerson } from '../renderer/src/threads/Summary.tsx';
 globalThis.React = React;
 
 const NOW = Date.now();
@@ -31,17 +31,23 @@ const items = [item(), { ...item({ id: 'w-google', title: 'Sign in with Google' 
 const draw = (el) => renderToStaticMarkup(el);
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
+// THE STATE MOVED TO THE LINE UNDER THE TITLE on w-e731ca9376 (2026-10-01),
+// in place of "Working", and the top bar kept the square Summary button. So
+// the state is drawn on its own now; the four words and their marks are the
+// same four.
 describe('the top bar', () => {
-  it('says the state in a plain word with its mark, then a square Summary button with its key', () => {
-    const html = draw(React.createElement(ThreadStatusAndToggle, { item: item(), open: true, onToggle: () => {} }));
-    expect(text(html)).toBe('Waiting Summary S');
-    expect(html).toContain('ts-st');
+  it('draws a square Summary button with its key, and the state word with its mark', () => {
+    const html = draw(React.createElement(SummaryToggle, { open: true, onToggle: () => {} }));
+    expect(text(html)).toBe('Summary S');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('<kbd>S</kbd>');
+    const state = draw(React.createElement(ThreadStateMark, { item: item() }));
+    expect(text(state)).toBe('Waiting');
+    expect(state).toContain('ts-st');
   });
   it('says Running, Scheduled and Done for the other three states', () => {
-    const say = (o) => text(draw(React.createElement(ThreadStatusAndToggle, { item: item(o), open: false, onToggle: () => {} })));
-    expect(say({ status: 'claimed', claim: { holder: 'h', leaseUntil: NOW + M } })).toMatch(/^Running/);
+    const say = (o) => text(draw(React.createElement(ThreadStateMark, { item: item(o) })));
+    expect(say({ status: 'claimed', claim: { holder: 'h', leaseUntil: NOW + M } })).toMatch(/^In progress/);
     expect(say({ runAt: NOW + 60 * M })).toMatch(/^Scheduled/);
     expect(say({ status: 'done' })).toMatch(/^Done/);
   });

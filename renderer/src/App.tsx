@@ -13,10 +13,10 @@ import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, ThreadCard, View, WorkItem } from './types';
+import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import { api } from './api';
 import { setClaudeModels } from './models';
-import { advanceAfter, type Advance } from './advance';
+import { advanceAfter, nextAfterAdvance, type Advance } from './advance';
 import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
 import { isTroubleRow, troubleRow } from './trouble-row';
@@ -100,13 +100,13 @@ import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   finishedCleared, firstRunNeeded, inboxCleared, laterCleared, laterId, laterIndex,
-  mayOpenInbox, practising, restartFirstRun, snoozeRefused, tutorialRun,
+  mayOpenInbox, noCodingAgent, practising, restartFirstRun, snoozeRefused, tutorialRun,
   waitingId, waitingIndex,
   finishFirstRun, forcedStep, readFirstRun, walkRows,
   saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, wearsTheWalksLook, whyNotMade, type FirstRun,
 } from './onboarding';
 import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from './priority';
-import { NO_FILTER, filterMenu, filterTags, isFiltering, matchesBoxFilter, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
+import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
 import { BoxFilter } from './components/BoxFilter';
 import { itemPriority, moveProduct, productRankScore } from '../../shared/rank.mjs';
 import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
@@ -114,7 +114,7 @@ import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
 import { TeamContext, teamView } from './team/people';
 import { TeamPage } from './team/TeamPage';
-import { EmptyTab, HeaderActions, InboxBoard, InboxClear, StateTabs, TeamView } from './threads/Pages';
+import { EmptyTab, HeaderActions, InboxBoard, InboxClear, LiveContext, StateTabs, TeamView } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
 import { conversationWith, isDirect, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
@@ -898,8 +898,12 @@ export default function App() {
       // answer, or when this Mac shows signs of Claude Code that the search
       // could not turn into a path. Any of those means nothing may be said.
       const sure = s.ok !== false && s.workspace?.claudeCertain === true;
+      // AND CODEX IS ENOUGH ON ITS OWN. The card shuts the inbox only when we
+      // are sure of both: no Claude Code, and no Codex either.
+      const codexSure = s.ok !== false && s.workspace?.codexCertain === true;
       setClaude({
-        missing: sure && !s.workspace?.claudeFound,
+        missing: sure && !s.workspace?.claudeFound
+          && noCodingAgent({ found: false, certain: true }, { found: !!s.workspace?.codexFound, certain: codexSure }),
         url: s.workspace?.claudeInstallUrl || 'https://code.claude.com/docs/en/setup',
       });
     }).catch(() => { /* the walk does not end because a setting did not read */ });
@@ -915,8 +919,9 @@ export default function App() {
   // entitled to act on, and shutting somebody out of their own app on an answer
   // we could not establish would be worse than the line she complained about.
   const recheckClaude = useCallback(async () => {
-    const r = await api.recheckClaude();
-    const missing = r.certain && !r.found;
+    // Both searches, because whichever one they just installed opens the door.
+    const [r, codex] = await Promise.all([api.recheckClaude(), api.recheckCodex()]);
+    const missing = noCodingAgent(r, codex);
     setClaude({ missing, url: r.url });
     return missing;
   }, []);
@@ -1945,12 +1950,7 @@ export default function App() {
       : view === 'progress' ? progress
         : view === 'all' ? allOpen
           : done;
-  const shownBox = useMemo(
-    () => (isFiltering(boxFilter)
-      ? wholeBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || matchesBoxFilter(i, boxFilter))
-      : wholeBox),
-    [wholeBox, boxFilter],
-  );
+  const shownBox = useMemo(() => filterBox(wholeBox, boxFilter), [wholeBox, boxFilter]);
   // THE DISPLAY MENU'S FILTERS AND SORT, on top of the box (approved
   // 2026-10-01). Remembered per page; the Inbox is a list by default and the
   // Team a board.
@@ -1961,6 +1961,14 @@ export default function App() {
   const displayedBox = useMemo(
     () => sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay),
     [shownBox, inboxDisplay, now],
+  );
+  // The inbox as she sees it, whichever tab is up: her filter AND her display
+  // menu. Finishing a task from inside it advances through THIS, never the
+  // whole inbox, or the next task opened can be one she has hidden
+  // (w-27759abd33).
+  const shownInbox = useMemo(
+    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay),
+    [inbox, boxFilter, inboxDisplay, now],
   );
   const list = search !== null ? (hits ?? []).map((h) => h.item) : displayedBox;
   const boxFilterMenu = useMemo(
@@ -1977,6 +1985,20 @@ export default function App() {
     if (run?.step !== 'working' || !run.item) return real;
     return [{ itemId: run.item, product: run.product ?? '', startedAt: run.sentAt ?? Date.now(), tail: [] }, ...real];
   }, [snap?.supervisor.running, run?.step, run?.item, run?.product, run?.sentAt]);
+  // THE THREADS AN AGENT IS ON RIGHT NOW: the turning mark (threads/Pages.tsx).
+  const liveIds = useMemo(() => new Set(runningRows.map((r) => r.itemId)), [runningRows]);
+  // ONE RULE FOR WHERE A THREAD SITS, THE TABS' OWN (her note, 2026-10-01: the
+  // board said Running for queued work the tab did not). Needs you wins, then
+  // In progress, Scheduled and Done, exactly as the tabs list them.
+  const tabState = useMemo(() => {
+    const m = new Map<string, ThreadStateWord>();
+    for (const i of done) m.set(i.id, 'done');
+    for (const i of snoozed) m.set(i.id, 'scheduled');
+    for (const i of progress) m.set(i.id, 'running');
+    for (const i of inbox) m.set(i.id, 'waiting');
+    return m;
+  }, [inbox, progress, snoozed, done]);
+  const stateOfMine = useCallback((i: WorkItem) => tabState.get(i.id) ?? null, [tabState]);
 
   const current: WorkItem | undefined = list[Math.min(selected, Math.max(0, list.length - 1))];
   // THE ROW THE ROW-KEYS ACT ON. The pointer's row when it is on one, and the
@@ -2494,9 +2516,9 @@ export default function App() {
     setView('inbox');
     // Pointed at the row she was just reading, which is where it now sits with
     // its answer on it, rather than at the top of a list she did not ask for.
-    const at = inbox.findIndex((i) => i.id === following.id && i.product === following.product);
+    const at = shownInbox.findIndex((i) => i.id === following.id && i.product === following.product);
     setSelected(at >= 0 ? at : 0);
-  }, [focused, following, inbox]);
+  }, [focused, following, shownInbox]);
 
   // She clicked the banner, so open the row it was about. It lands her on the
   // card rather than on whatever the cursor was left on, which is the whole
@@ -2732,9 +2754,9 @@ export default function App() {
   // cost her are in ./advance; what is here is only which state answers "was a
   // task open when she acted", and that is `focused`.
   const noteAdvance = useCallback((item: WorkItem) => {
-    const index = inbox.findIndex((i) => i.id === item.id);
+    const index = shownInbox.findIndex((i) => i.id === item.id);
     advanceRef.current = advanceAfter({ fromTask: !!focused, index, id: item.id });
-  }, [inbox, focused]);
+  }, [shownInbox, focused]);
 
   // AND EVERY WAY A ROW LEAVES HER INBOX CLOSES THE TASK THROUGH HERE.
   //
@@ -4097,11 +4119,9 @@ export default function App() {
     const pending = advanceRef.current;
     if (!pending || view !== 'inbox' || focused) return;
     advanceRef.current = null;
-    const remaining = inbox.filter((i) => i.id !== pending.excludeId);
-    const index = Math.min(pending.index, remaining.length - 1);
-    const next = remaining[index];
-    if (next) { setFocused(next); markSeen(next); setSelected(index); }
-  }, [inbox, view, focused, markSeen]);
+    const next = nextAfterAdvance(shownInbox, pending);
+    if (next) { setFocused(next.item); markSeen(next.item); setSelected(next.index); }
+  }, [shownInbox, view, focused, markSeen]);
 
   /* -------------------------------- render -------------------------------- */
   // (Hooks live ABOVE the boot return: below it, React counts them
@@ -4117,7 +4137,6 @@ export default function App() {
   const artifactView = artifactPlacement(artifactMode, artifactWidth);
   const [artifactHeader, setArtifactHeader] = useState<HTMLDivElement | null>(null);
   const readingWidth = 'balanced';
-  const [terminalHeaderTarget,setTerminalHeaderTarget]=useState<HTMLSpanElement|null>(null);
   const [taskHeader, setTaskHeader] = useState<HTMLDivElement | null>(null);
   // The socket look B of w-581dbc6cc4's round teleports the code mark into.
   const [cornerHeaderTarget, setCornerHeaderTarget] = useState<HTMLSpanElement | null>(null);
@@ -4348,6 +4367,7 @@ export default function App() {
   // merely further up.
   return (
     <TeamContext.Provider value={team}>
+    <LiveContext.Provider value={liveIds}>
     <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${workspaceCollapsed ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}`}>
       {signInGate && <SignInPage signedOut={signedOutHere} error={snap?.team?.error ?? null} />}
       {/* THE TOP BAR IS NOT DRAWN ON AN OPENED TASK.
@@ -4591,12 +4611,12 @@ export default function App() {
               engine: snap.usage?.engine ?? null,
             })}
           />}
-          {workspaceNavigation && focused && <span style={{display:'contents'}} ref={setTerminalHeaderTarget}/>}
-          {/* AND THE SOCKET THE MARK THAT FINISHES A TASK IS TELEPORTED INTO
-              (w-581dbc6cc4). It is drawn by Focus because only Focus knows
-              whether this row can still be finished, and it lands here because
-              the corner is where a task's own controls live. `order` decides
-              where in the row it sits, not this. */}
+          {/* AND THE SOCKET A THREAD'S OWN CONTROLS ARE TELEPORTED INTO: the
+              Summary button and the thread's menu, which holds the code, the
+              terminal and Done (w-e731ca9376, 2026-10-01). They are drawn by
+              Focus because only Focus knows which of them this thread has, and
+              they land here because the corner is where a task's own controls
+              live. */}
           {/* Not while Settings or the Team page covers the thread: the thread's
               state and Summary button were left standing in their header. */}
           {workspaceNavigation && focused && !settingsOpen && !teamShown && <span style={{display:'contents'}} ref={setCornerHeaderTarget}/>}
@@ -4784,7 +4804,7 @@ export default function App() {
                 {/* Kept mounted under an open card, so Back finds the person
                     and project it was filtered to (a persona test lost both). */}
                 <div hidden={!!openCard}>
-                <TeamView items={items} products={snap.products} cards={snap.team.cards ?? []} display={teamDisplay} now={now}
+                <TeamView items={items} products={snap.products} cards={snap.team.cards ?? []} display={teamDisplay} now={now} stateOf={stateOfMine}
                   // BACK RETURNS TO TEAM (her bug, 2026-10-01): the Team page
                   // stays open under a thread opened from it, so closing the
                   // thread lands where she came from, not on the Inbox.
@@ -4873,7 +4893,6 @@ export default function App() {
                   onHandToAgent={handToAgent}
                   onAddPeople={addPeopleToConversation}
                   headerTarget={workspaceNavigation ? taskHeader : null}
-                  terminalHeaderTarget={terminalHeaderTarget}
                   cornerHeaderTarget={cornerHeaderTarget}
                   inlineArtifacts={workspaceNavigation}
                   previewSample={api.isFixtures && (reviewLab || new URLSearchParams(location.search).has('artifactTweaks')) ? artifactPreviewSample : undefined}
@@ -4996,7 +5015,7 @@ export default function App() {
                     Scheduled, Done and All, on the Inbox itself. They replace
                     the sidebar places they used to be. */}
                 {workspaceNavigation && search === null && inboxDisplay.view === 'board' ? (
-                  <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now}
+                  <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine}
                     onOpenItem={(item) => { setFocused(item); markSeen(item); }} />
                 ) : <>
                 {workspaceNavigation && search === null && (
@@ -5988,6 +6007,7 @@ export default function App() {
       {/* ⌘F, on every screen, for the same reason. */}
       <FindBar />
     </div>
+    </LiveContext.Provider>
     </TeamContext.Provider>
   );
 }
