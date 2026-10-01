@@ -143,7 +143,9 @@ describe('the wiring, which is the half a pure test cannot see', () => {
   });
 
   it('sends her back to the card, not to a thread that does not exist', () => {
-    expect(app).toMatch(/else if \(restored\) \{ setFocused\(null\); setModal\('compose'\); \}/);
+    // Which of the two it is comes from `shownAfterUndo` in undo-window.ts
+    // (pinned in z-puts-the-row-back-in-front-of-her), since w-7eb39d3c97.
+    expect(app).toMatch(/else if \(shown\.compose\) \{ setFocused\(null\); setModal\('compose'\); \}/);
     // "Thread", her word for a row since w-ec62ab6b38 (2026-09-28).
     expect(app).toMatch(/your thread is back in the new thread card/);
   });
