@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  Free and open source. A macOS app that runs on the Claude Code or Codex plan you already have.<br>
+  Free and open source. Runs in your browser or as a Mac app, on the Claude Code or Codex plan you already have.<br>
   No server, no account, no extra subscription.
 </p>
 
@@ -36,13 +36,40 @@ to finish before you prompt it again. So the number of agents you can run is
 the number of windows you can keep track of, which is about four.
 
 <p align="center">
-  <img src="docs/readme/before.webp" alt="Five terminal windows, each with an agent waiting on a different task" width="80%">
+  <img src="docs/readme/before.webp" alt="Five terminal windows, each with an agent waiting on a different task" width="60%">
 </p>
 
 Models are now good enough that most tasks do not need watching. They need
 someone to review the work at the right moment. Agentbox drops the chat window
 and gives each agent a row in an inbox instead, so you can run far more of them
 than you could ever watch and only deal with one when it actually needs you.
+
+## Get it
+
+Two ways to run it. Both need Node 22 and Claude Code installed and signed in.
+Codex is optional and is picked up when it is there.
+
+**In your browser.** One command, nothing to install first:
+
+```
+npx agentbox-app
+```
+
+It starts on your machine and opens a tab. Nothing is hosted: it listens only
+on your own computer, and the address carries a key that is new every run. Add
+`--help` to see the options.
+
+**As a Mac app.** Build it from this repo:
+
+```
+git clone https://github.com/savannahfeder/agentbox.git
+cd agentbox
+npm install
+npm start
+```
+
+`npm start` builds the app and opens it. On first run it walks you through
+connecting Claude Code and choosing a folder to work in.
 
 ## How it works
 
@@ -147,21 +174,6 @@ Agentbox drives Claude Code and Codex on your own machine, signed in with your
 own subscription. When you first open it, it finds the agents you have already
 set up and offers to bring them in. There is no server, no account to make, and
 nothing new to pay for.
-
-## Get it
-
-You need a Mac, Claude Code installed and signed in, and Node 22 to build.
-Codex is optional and is picked up when it is there.
-
-```
-git clone https://github.com/savannahfeder/agentbox.git
-cd agentbox
-npm install
-npm start
-```
-
-`npm start` builds the app and opens it. On first run it walks you through
-connecting Claude Code and choosing a folder to work in.
 
 ---
 
