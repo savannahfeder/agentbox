@@ -3142,7 +3142,20 @@ export default function App() {
     // Handing back the joined body instead put the markdown in the reply box as
     // text. The fallback is the body, for a caller that does not carry a
     // draft.
-    const restore = (): Restored => (restoreDraft(item, sent?.words ?? text, sent?.attachments ?? []) ? { item } : null);
+    //
+    // A REPLY IN A CONVERSATION IS ON THE SCREEN WHEN SHE SENDS IT (w-2ad23ca814:
+    // "a strange delay after sending it where I didn't see it"). The write
+    // below waits out the three seconds Z can take it back, and the thread is
+    // drawn off the ledger, so the words were nowhere for those three seconds.
+    // A message to a person is held in `sending` like one to a running agent;
+    // the written copy replaces it (item-thread.ts) and Z takes it off.
+    const talking = isDirect(snap?.products.find((p) => p.slug === item.product));
+    const mine = { product: item.product, id: item.id, at: Date.now(), text, held: true };
+    if (talking) setSending((q) => [...q, mine]);
+    const restore = (): Restored => {
+      setSending((q) => q.filter((s) => s !== mine));
+      return restoreDraft(item, sent?.words ?? text, sent?.attachments ?? []) ? { item } : null;
+    };
     // A REPLY IS A CLAIM ON NOW, so it cancels a schedule rather than queueing
     // behind it. The rule and the reason are in list-rules; what is here is the
     // write and the way back. The old moment rides on the undo, so answering
@@ -3161,7 +3174,6 @@ export default function App() {
     // up.
     // A REPLY IN A CONVERSATION STAYS IN THE CONVERSATION (persona test,
     // 2026-10-01: sending to Bea "kicked me out to search").
-    const talking = isDirect(snap?.products.find((p) => p.slug === item.product));
     const stay = staysOnTheTask(item, text, engine) || talking;
     if (stay) setFollowing({ product: item.product, id: item.id });
     await deferCommit(item, async () => {
@@ -3180,6 +3192,7 @@ export default function App() {
         // one it was on (main/store.mjs, answerItem).
         ...(pick ? { model: pick.model, effort: pick.effort } : {}),
       });
+      if (talking) setTimeout(() => setSending((q) => q.filter((s) => s !== mine)), LANDED_MS);
       if (wasScheduled) {
         await api.schedule({ product: item.product, id: item.id, runAt: 0 });
         // The legacy localStorage snooze hides a row on read all by itself, so

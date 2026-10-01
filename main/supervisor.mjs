@@ -101,6 +101,7 @@ import { createCodexApprovals } from './codex-approvals.mjs';
 import { approvalPublicKey } from './approvals.mjs';
 import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexModels } from './codex-models.mjs';
 import { nameRow, wantsName } from './row-label.mjs';
+import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mjs';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
 
 const POLL_MS = 15_000;
@@ -2328,6 +2329,37 @@ export class Supervisor {
       .finally(() => { this._naming = false; });
   }
 
+  /**
+   * SORT ONE TEAMMATE'S MESSAGE A TICK by how urgent it is
+   * (main/message-priority.mjs). Paced like the namer above: one call at a
+   * time, newest first, not awaited by the tick. Each message is asked about
+   * once per run of the app, so a write that does not take is not retried
+   * every fifteen seconds.
+   */
+  sortTheMessages(items, me) {
+    if (this._sortingMessages || !me) return undefined;
+    this._sortedMessages ??= new Set();
+    const products = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
+    const next = items
+      .filter((i) => wantsPriority(i, products.get(i.product), me))
+      .map((i) => ({ item: i, latest: latestMessage(i) }))
+      .filter(({ item, latest }) => !this._sortedMessages.has(`${item.product}:${item.id}:${latest.ts}`))
+      .sort((a, b) => b.latest.ts - a.latest.ts)[0];
+    if (!next) return undefined;
+    this._sortingMessages = true;
+    this._sortedMessages.add(`${next.item.product}:${next.item.id}:${next.latest.ts}`);
+    return this._askPriority(next.latest)
+      .then((level) => {
+        if (level) this.store.prioritizeItem(next.item.product, next.item.id, LEVELS[level]);
+      })
+      .catch((e) => console.warn('zero: could not sort a message:', e.message))
+      .finally(() => { this._sortingMessages = false; });
+  }
+
+  _askPriority(latest) {
+    return sortMessage(latest, { claudeBin: this.config?.claudeBin });
+  }
+
   sayItOnEveryStrandedRow(items, now = Date.now()) {
     let dirty = false;
     // AND THE SAME PASS COUNTS THEM, for the line above her list. The count
@@ -3533,6 +3565,8 @@ export class Supervisor {
     // And is there a row still wearing the first line of what she dictated?
     // One a tick, never awaited, silent on every failure (nameTheRows above).
     try { this.nameTheRows(items); } catch (e) { console.warn('zero: could not name a row:', e.message); }
+    // And has a teammate written something that needs sorting by urgency?
+    try { this.sortTheMessages(items, process.env.AGENTBOX_PERSON_ID); } catch (e) { console.warn('zero: could not sort a message:', e.message); }
 
     // Before anything is resumed or spawned: has the urgent row we interrupted
     // something FOR actually got its slot? Every hold this clears is a row that

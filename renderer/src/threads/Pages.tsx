@@ -16,7 +16,7 @@ import {
   BOARD_COLUMNS, isDirect, isFiltered, teamEntries, teamKeeps, updatedWords,
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
-import { rowSharing, sharePatch } from './page-rules';
+import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
 import { api } from '../api';
 import './pages.css';
 
@@ -216,6 +216,19 @@ export function RowCells({ live = false, title, hidden = false, lock = false, sh
   </div>;
 }
 
+/** A message's line: the other person's face and name, then what was said,
+ *  "You: " first when you spoke last. A group names everyone else. */
+export function MessageTitle({ people, fromMe, text }: { people: string[]; fromMe: boolean; text: string }) {
+  const team = useContext(TeamContext);
+  const first = people.length ? team?.byId.get(people[0]) ?? null : null;
+  const names = people.map((id) => (people.length > 1 ? firstName(team?.byId.get(id) ?? null) : team?.byId.get(id)?.name || firstName(team?.byId.get(id) ?? null))).join(', ');
+  return <span className="th-msg">
+    <Face person={first} />
+    <b className="th-msg-who">{names}</b>
+    <span className="th-msg-text">{fromMe ? `You: ${text}` : text}</span>
+  </span>;
+}
+
 /** The cells of one row in the inbox's table: thread, project (or who a message is from), priority, updated. */
 export function ThreadCells({ item, product, now }: { item: WorkItem; product: Product | undefined; now: number }) {
   const liveIds = useContext(LiveContext);
@@ -242,23 +255,16 @@ export function ThreadCells({ item, product, now }: { item: WorkItem; product: P
       <SharedMark className="th-row-act-mark" />{seen === 'team' ? 'Unshare' : 'Share'}
     </button>
   ) : undefined;
-  let where: ReactNode = product?.name ?? '';
-  // A group conversation names everyone else in it; a pair says From or To.
-  const members = isDirect(product) ? [...new Set([...(product?.team?.people ?? []), ...(product?.team?.sharedBy ? [product.team.sharedBy] : [])])].filter((p) => p !== team?.me) : [];
-  if (isDirect(product) && members.length > 1) {
-    const first = team?.byId.get(members[0]) ?? null;
-    where = <>{first && <Face person={first} />}{members.map((id) => firstName(team?.byId.get(id) ?? null)).join(', ')}</>;
-  } else if (isDirect(product)) {
-    const otherId = otherPerson(item, team?.me ?? null);
-    const other = otherId ? team?.byId.get(otherId) ?? null : null;
-    const fromThem = item.createdBy && item.createdBy !== team?.me;
-    where = <>{other && <Face person={other} />}{fromThem ? 'From ' : 'To '}{firstName(other)}</>;
+  // A CONVERSATION WITH A PERSON READS LIKE A MESSAGE (w-2ad23ca814: "at least
+  // I should see her profile"): their face and name lead the row, then the
+  // newest message, the way a chat list does. Every other row keeps its title.
+  const said = messageLine(item, product, team?.me ?? null);
+  if (said) {
+    return <RowCells live={liveIds.has(item.id)} title={<MessageTitle people={said.people} fromMe={said.fromMe} text={said.text} />} where="Message"
+      priority={messagePriority(item)} updatedAt={item.updatedAt} now={now} action={action} />;
   }
-  // A conversation with a person reads as its latest message, the way a chat
-  // list does; every other row keeps its title.
-  const latest = isDirect(product) ? (item.answer || item.body || '').trim().split('\n')[0] : '';
-  return <RowCells live={liveIds.has(item.id)} title={latest || rowTitle(item)} shared={seen === 'team'} where={where}
-    priority={isDirect(product) ? null : item.priority ?? 0} updatedAt={item.updatedAt} now={now} action={action} />;
+  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={seen === 'team'} where={product?.name ?? ''}
+    priority={item.priority ?? 0} updatedAt={item.updatedAt} now={now} action={action} />;
 }
 
 /* ------------------------------------------------------------ the Team page */
@@ -343,7 +349,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf 
   const liveIds = useContext(LiveContext);
   const team = useContext(TeamContext);
   const me = team?.me ?? null;
-  const entries = teamEntries({ items, products, cards: [], me, now, stateOf, live: liveIds })
+  const entries = teamEntries({ items, products, cards: [], me, now, stateOf, live: liveIds, inbox: true })
     .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
     .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
   const teamSees = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since: team.state.since ?? null } : null) === 'team';
@@ -357,7 +363,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf 
         {/* The same mark as the table's rows: on what the team can see, and
             on nothing else. */}
         {rows.map((e) => <button type="button" key={e.key} className="th-card" onClick={() => e.item && onOpenItem(e.item)}>
-          <div className="t">{e.title}{e.item && teamSees(e.item) && <SharedMark label="Visible to the team" />}</div>
+          <div className="t">{e.message ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} /> : e.title}{!e.message && e.item && teamSees(e.item) && <SharedMark label="Visible to the team" />}</div>
           <div className="m">{e.live && <StateGlyph state="running" live />}{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project}</span></div>
         </button>)}
       </div>;

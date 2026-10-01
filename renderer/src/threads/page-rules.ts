@@ -102,6 +102,34 @@ export function rowSharing(
   return shownToTeam(item, team.since ?? null) ? 'team' : 'private';
 }
 
+/**
+ * WHAT A MESSAGE ROW SAYS (w-2ad23ca814: "it should be more identifiable as a
+ * message... at least I should see her profile"). Who else is in the
+ * conversation, whether the newest message is mine, and its first line. Null
+ * on anything that is not a conversation.
+ */
+export function messageLine(item: WorkItem, product: Product | undefined | null, me: string | null): { people: string[]; fromMe: boolean; text: string } | null {
+  if (!isDirect(product)) return null;
+  const team = (product as { team?: { people?: string[]; sharedBy?: string | null } }).team;
+  const everyone = [...(team?.people ?? []), ...(team?.sharedBy ? [team.sharedBy] : []), ...(item.people ?? [])];
+  let people = [...new Set(everyone)].filter((p) => p && p !== me);
+  if (!people.length && item.createdBy && item.createdBy !== me) people = [item.createdBy];
+  const answered = !!item.answer && item.answer !== '(withdrawn)';
+  const text = String((answered ? item.answer : item.body) || item.title || '').trim().split('\n')[0];
+  const by = (answered ? item.wrote?.answer?.by : item.wrote?.body?.by) ?? item.createdBy ?? null;
+  return { people, fromMe: !!me && by === me, text };
+}
+
+/**
+ * A MESSAGE'S PRIORITY, once anyone has set one. A message is made with 0 by
+ * the system, which would read as Low on every row; the sorter
+ * (main/message-priority.mjs) or the person setting it is what makes it real.
+ */
+export function messagePriority(item: WorkItem): number | null {
+  const set = item.wrote?.priority;
+  return set && set.source !== 'system' ? item.priority ?? null : null;
+}
+
 /** What one click on Share or Unshare writes: the other one. */
 export const sharePatch = (now: 'team' | 'private'): { visibility: 'team' | 'private' } => ({ visibility: now === 'team' ? 'private' : 'team' });
 
@@ -120,6 +148,8 @@ export interface BoardEntry {
   card: ThreadCard | null;
   /** An agent is on it right now (your own threads only; a teammate's card does not say). */
   live?: boolean;
+  /** A conversation with people, on your own Inbox board: who, and whether you spoke last. */
+  message?: { people: string[]; fromMe: boolean };
 }
 
 /**
@@ -132,9 +162,11 @@ export interface BoardEntry {
 // and Inbox, which should pretty much never happen"). Your own threads sit in
 // the column whose tab lists them; `threadState` is only the fallback for a row
 // no tab lists. `live` is the set an agent is on right now.
-export function teamEntries({ items, products, cards, me, now, since = null, stateOf, live }: {
+export function teamEntries({ items, products, cards, me, now, since = null, stateOf, live, inbox = false }: {
   items: WorkItem[]; products: Product[]; cards: ThreadCard[]; me: string | null; now: number; since?: number | null;
   stateOf?: (item: WorkItem) => ThreadStateWord | null; live?: Set<string>;
+  /** Your own Inbox board, which carries your conversations with people too. */
+  inbox?: boolean;
 }): BoardEntry[] {
   const bySlug = new Map(products.map((p) => [p.slug, p]));
   const today = startOfDay(now);
@@ -142,7 +174,22 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
   for (const item of items) {
     if (item.agent) continue;
     const product = bySlug.get(item.product);
-    if (!product || isDirect(product)) continue;
+    if (!product) continue;
+    // A MESSAGE IS ON YOUR OWN BOARD, in the column the Inbox tabs give it
+    // (w-2ad23ca814: a message from a teammate was on no column at all). The
+    // Team page's board stays about work, so it never draws one.
+    if (isDirect(product)) {
+      const said = inbox ? messageLine(item, product, me) : null;
+      const state = said && stateOf?.(item);
+      if (!said || !state) continue;
+      if (state === 'done' && !(item.updatedAt >= today)) continue;
+      out.push({
+        key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: said.text, project: 'Message',
+        projectSlug: product.slug, priority: messagePriority(item), updatedAt: item.updatedAt, item, card: null,
+        message: { people: said.people, fromMe: said.fromMe },
+      });
+      continue;
+    }
     // A teammate's row that synced into a shared project is theirs, and their
     // card already stands for it; drawn here it would be on the board twice,
     // once under your name.

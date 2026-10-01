@@ -113,6 +113,15 @@
 .th-card:hover { border-color: var(--line-strong); background: rgba(255,255,255,.05); }
 .th-card .t { font-size: 14px; line-height: 20px; color: var(--text); margin: 0 0 14px; }
 .th-card .t.hidden { color: var(--text-dim); }
+
+/* A message from a person: their face and name first, then what they said. */
+.th-msg { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; vertical-align: top; }
+.th-msg .tm-av { width: 20px; height: 20px; line-height: 18px; }
+.th-msg-who { flex: 0 0 auto; font-weight: 600; color: var(--text); }
+.th-msg-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
+/* On a card the message wraps under the name, as a card's title does. */
+.th-card .th-msg { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; row-gap: 4px; }
+.th-card .th-msg-text { grid-column: 1 / -1; white-space: normal; color: var(--text); }
 .th-card .m { display: flex; align-items: center; font: 11px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); min-width: 0; }
 .th-card .m .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .th-card .m .tm-av { width: 18px; height: 18px; line-height: 16px; font-size: 8px; margin-left: auto; flex: none; }

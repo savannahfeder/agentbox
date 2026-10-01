@@ -183,12 +183,21 @@ export function cleanName(text) {
  * is not a name. Never throws and never rejects, because this is called from a
  * timer whose only correct behaviour on failure is to leave the row alone.
  */
-export function nameRow(item, { claudeBin, model = NAME_MODEL, timeoutMs = NAME_TIMEOUT_MS } = {}) {
+export function nameRow(item, opts = {}) {
+  return askSmallModel(namePrompt(item), cleanName, opts);
+}
+
+/**
+ * One short question to the small model, its reply put through `clean`. The
+ * same promise as `nameRow` and for the same reason: '' for every failure,
+ * never a throw. Shared with the message sorter (main/message-priority.mjs).
+ */
+export function askSmallModel(prompt, clean, { claudeBin, model = NAME_MODEL, timeoutMs = NAME_TIMEOUT_MS } = {}) {
   return new Promise((resolve) => {
     if (!claudeBin) return resolve('');
     let child;
     try {
-      child = spawn(claudeBin, ['-p', namePrompt(item), '--model', model], {
+      child = spawn(claudeBin, ['-p', prompt, '--model', model], {
         // Somewhere that is nobody's project. A naming call must not pick up a
         // CLAUDE.md, a settings file or a hook from whatever folder it lands in.
         cwd: '/tmp',
@@ -207,8 +216,8 @@ export function nameRow(item, { claudeBin, model = NAME_MODEL, timeoutMs = NAME_
       resolve(value);
     };
     const timer = setTimeout(() => finish(''), timeoutMs);
-    child.stdout.on('data', (d) => { out += d.toString(); if (out.length > 4000) finish(cleanName(out)); });
+    child.stdout.on('data', (d) => { out += d.toString(); if (out.length > 4000) finish(clean(out)); });
     child.on('error', () => finish(''));
-    child.on('close', (code) => finish(code === 0 ? cleanName(out) : ''));
+    child.on('close', (code) => finish(code === 0 ? clean(out) : ''));
   });
 }

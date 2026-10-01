@@ -329,6 +329,15 @@ export class Store {
     return workItemsDisk.updateWorkItem(this.productDir(slug), id, { label: clean }, { source: 'agent' });
   }
 
+  // How urgent a teammate's message is, as the sorter judged it
+  // (main/message-priority.mjs). On agent authority, so a level the person set
+  // by hand stays theirs.
+  prioritizeItem(slug, id, value) {
+    const { workItemsDisk } = this.modules;
+    if (!Number.isFinite(value)) return null;
+    return workItemsDisk.updateWorkItem(this.productDir(slug), id, { priority: value }, { source: 'agent' });
+  }
+
   // A one-off permission mode has been spent. Called by the supervisor at the
   // moment it launches the run that mode was set for, so a mode she chose for
   // one message cannot silently govern a respawn three hours later.
