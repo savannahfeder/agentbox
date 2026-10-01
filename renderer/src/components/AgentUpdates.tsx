@@ -1,5 +1,4 @@
 import {createContext,useContext,useEffect,useRef,useState,type ReactNode} from 'react';
-import {createPortal} from 'react-dom';
 import {api} from '../api';
 import {TaskTerminal} from './TaskTerminal';
 type Update={engine:string;state:string;message?:string;installed?:string;latest?:string};
@@ -45,11 +44,14 @@ export function AgentUpdates({children}:{children:ReactNode}){
   finally{busy.current.delete(engine);}
  };
  const u=panel?updates[panel]:null;
- return <Context.Provider value={{updates,start}}>{children}{panel&&createPortal(
+ // The panel docks BELOW the app in one column, so opening it shrinks the app
+ // rather than covering its bottom. The wrapper is always drawn: wrapping only
+ // while the panel is open would remount the whole app on every click.
+ return <Context.Provider value={{updates,start}}><div className="agent-update-host"><div className="agent-update-app">{children}</div>{panel&&
   <section className="agent-update-panel" role="dialog" aria-label={`Update ${panel==='codex'?'Codex':'Claude Code'}`} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();setPanel(null);}}}>
    <header className="agent-update-heading"><span>Update {panel==='codex'?'Codex':'Claude Code'}</span><button type="button" onClick={()=>setPanel(null)} aria-label="Hide update terminal">×</button></header>
    {u?.message&&<div className="agent-update-status" role="status">{u.message} {u.state==='failed'&&<button type="button" onClick={()=>void start(panel)}>Retry</button>}</div>}
    {!ready&&!u?.message&&<div className="agent-update-status" role="status">Checking the installed agent…</div>}
    {ready&&<TaskTerminal key={`${panel}:${revision}`} product="@agent-update" id={panel} startOpen commandSession/>}
-  </section>,document.body)}</Context.Provider>;
+  </section>}</div></Context.Provider>;
 }
