@@ -8,6 +8,7 @@
 // runs one scenario against both to keep them honest.
 import { EventEmitter } from 'node:events';
 import crypto from 'node:crypto';
+import { asPulled } from '../../shared/team-rules.mjs';
 
 export function createMemoryCloud() {
   return {
@@ -17,21 +18,32 @@ export function createMemoryCloud() {
     invites: [], // { teamId, email }
     projects: new Map(), // id -> { id, teamId, name, visibility, createdBy }
     projectPeople: [], // { projectId, personId }
-    lines: [], // { seq, projectId, uid, byPerson, body }
-    activity: new Map(), // `${personId}:${taskKey}` -> { personId, taskKey, state, movedAt }
+    lines: [], // { seq, projectId, uid, byPerson, body, createdAt }
+    cards: new Map(), // `${personId}:${threadId}` -> a thread card, as shared/thread-cards.mjs makes them
     seq: 0,
+    teamsMade: 0, // the order teams were made in, which is their age
+    now: () => Date.now(), // the server's clock
     events: new EventEmitter(),
   };
 }
 
-// A sign-in, the way Supabase's trigger turns one into a person.
-export function signUpMemory(cloud, { id = crypto.randomUUID(), email, name, avatarUrl = null }) {
+// A sign-in, the way Supabase's trigger turns one into a person. Google
+// confirms the email; `confirmed: false` is somebody who never proved theirs.
+export function signUpMemory(cloud, { id = crypto.randomUUID(), email, name, avatarUrl = null, confirmed = true }) {
   cloud.people.set(id, { id, email, name: name || String(email).split('@')[0], avatarUrl });
+  if (!confirmed) (cloud.unconfirmed ??= new Set()).add(id);
   return id;
 }
 
 export function memoryBackend(cloud, personId) {
-  const myTeams = () => cloud.members.filter((m) => m.personId === personId).map((m) => m.teamId);
+  const myTeams = () => cloud.members.filter((m) => m.personId === personId).map((m) => m.teamId)
+    .sort((a, b) => (cloud.teams.get(a)?.made ?? 0) - (cloud.teams.get(b)?.made ?? 0));
+  // The email the sign-in confirmed, never one a person could have typed.
+  const confirmedEmail = () => {
+    const me = cloud.people.get(personId);
+    return me && !cloud.unconfirmed?.has(personId) ? String(me.email).toLowerCase() : null;
+  };
+  const owns = (teamId) => cloud.members.some((m) => m.teamId === teamId && m.personId === personId && m.role === 'owner');
   const canSee = (projectId) => {
     const p = cloud.projects.get(projectId);
     if (!p || !myTeams().includes(p.teamId)) return false;
@@ -39,7 +51,7 @@ export function memoryBackend(cloud, personId) {
       || cloud.projectPeople.some((pp) => pp.projectId === projectId && pp.personId === personId);
   };
   const projectOut = (p) => ({
-    id: p.id, teamId: p.teamId, name: p.name, visibility: p.visibility, createdBy: p.createdBy,
+    id: p.id, teamId: p.teamId, name: p.name, visibility: p.visibility, createdBy: p.createdBy, direct: !!p.direct,
     people: cloud.projectPeople.filter((pp) => pp.projectId === p.id).map((pp) => pp.personId),
   });
   const refuse = (what) => { throw new Error(`not allowed: ${what}`); };
@@ -53,41 +65,78 @@ export function memoryBackend(cloud, personId) {
       return me ? { ...me } : null;
     },
 
-    async acceptInvites() {
-      const me = cloud.people.get(personId);
-      for (const inv of cloud.invites) {
-        if (me && inv.email.toLowerCase() === me.email.toLowerCase()
-          && !cloud.members.some((m) => m.teamId === inv.teamId && m.personId === personId)) {
-          cloud.members.push({ teamId: inv.teamId, personId, role: 'member' });
-        }
-      }
-      return myTeams();
+    async pendingInvites() {
+      const email = confirmedEmail();
+      if (!email) return [];
+      return cloud.invites
+        .filter((inv) => inv.email.toLowerCase() === email && !myTeams().includes(inv.teamId))
+        .map((inv) => ({ teamId: inv.teamId, teamName: cloud.teams.get(inv.teamId)?.name ?? '', invitedBy: inv.invitedBy ?? null, invitedByName: cloud.people.get(inv.invitedBy)?.name ?? null }));
+    },
+
+    // One team, on a yes, and the invite is used up.
+    async acceptInvite(teamId) {
+      const email = confirmedEmail();
+      if (!email) refuse('join a team without a confirmed email');
+      const at = cloud.invites.findIndex((inv) => inv.teamId === teamId && inv.email.toLowerCase() === email);
+      if (at < 0) refuse('join a team that did not invite you');
+      cloud.invites.splice(at, 1);
+      if (!cloud.members.some((m) => m.teamId === teamId && m.personId === personId)) cloud.members.push({ teamId, personId, role: 'member' });
+      return teamId;
+    },
+
+    async myTeams() {
+      return myTeams().map((id) => cloud.teams.get(id)).filter(Boolean).map((t) => ({ id: t.id, name: t.name }));
     },
 
     async myTeam() {
-      const id = myTeams()[0];
-      const team = id ? cloud.teams.get(id) : null;
-      return team ? { id: team.id, name: team.name } : null;
+      return (await this.myTeams())[0] ?? null;
     },
 
     async createTeam(name) {
       const id = crypto.randomUUID();
-      cloud.teams.set(id, { id, name, createdBy: personId });
+      cloud.teamsMade += 1;
+      cloud.teams.set(id, { id, name, createdBy: personId, made: cloud.teamsMade });
       cloud.members.push({ teamId: id, personId, role: 'owner' });
       return { id, name };
     },
 
     async teamPeople(teamId) {
       if (!myTeams().includes(teamId)) return [];
-      const ids = cloud.members.filter((m) => m.teamId === teamId).map((m) => m.personId);
-      return ids.map((id) => ({ ...cloud.people.get(id) })).filter((p) => p.id);
+      const rows = cloud.members.filter((m) => m.teamId === teamId);
+      return rows.map((m) => ({ ...cloud.people.get(m.personId), role: m.role })).filter((p) => p.id);
+    },
+
+    // TEAM SETTINGS (2026-10-01), the same rules as 20261001000600_team_settings.sql.
+    async renameTeam(teamId, name) {
+      if (!owns(teamId)) refuse('rename a team you do not own');
+      const t = cloud.teams.get(teamId);
+      t.name = String(name).trim();
+      return { id: t.id, name: t.name };
+    },
+
+    async removeMember(teamId, who) {
+      if (who !== personId && !owns(teamId)) refuse('remove somebody from a team you do not own');
+      cloud.members = cloud.members.filter((m) => !(m.teamId === teamId && m.personId === who));
+    },
+
+    async listInvites(teamId) {
+      if (!myTeams().includes(teamId)) return [];
+      return cloud.invites.filter((i) => i.teamId === teamId).map((i) => ({ email: i.email, invitedBy: i.invitedBy ?? null }));
+    },
+
+    async cancelInvite(teamId, email) {
+      const clean = String(email).trim().toLowerCase();
+      const inv = cloud.invites.find((i) => i.teamId === teamId && i.email.toLowerCase() === clean);
+      if (!inv) return;
+      if (!owns(teamId) && inv.invitedBy !== personId) refuse('cancel an invite you did not send');
+      cloud.invites = cloud.invites.filter((i) => i !== inv);
     },
 
     async invite(teamId, email) {
       if (!myTeams().includes(teamId)) refuse('invite to a team you are not on');
       const clean = String(email).trim();
       if (!cloud.invites.some((i) => i.teamId === teamId && i.email.toLowerCase() === clean.toLowerCase())) {
-        cloud.invites.push({ teamId, email: clean });
+        cloud.invites.push({ teamId, email: clean, invitedBy: personId });
       }
     },
 
@@ -95,11 +144,16 @@ export function memoryBackend(cloud, personId) {
       return [...cloud.projects.values()].filter((p) => canSee(p.id)).map(projectOut);
     },
 
-    async shareProject({ id, teamId, name, visibility = 'team', people = [] }) {
+    async shareProject({ id, teamId, name, visibility = 'team', people = [], direct = false }) {
       const existing = cloud.projects.get(id);
       if (existing && existing.createdBy !== personId) refuse('change a project somebody else shared');
       if (!myTeams().includes(teamId)) refuse('share into a team you are not on');
-      cloud.projects.set(id, { id, teamId, name, visibility, createdBy: personId });
+      // A test can make the cloud refuse a share, to prove a failed start leaves nothing.
+      if (cloud.refuseShares) refuse(cloud.refuseShares);
+      // A message thread is its maker and up to eleven others, as the database
+      // insists (migration 20261001000700_group_messages.sql).
+      if (direct && (visibility !== 'people' || new Set(people.filter((p) => p !== personId)).size > 11)) refuse('put more than twelve people on a message thread');
+      cloud.projects.set(id, { id, teamId, name, visibility, createdBy: personId, direct: !!direct });
       cloud.projectPeople = cloud.projectPeople.filter((pp) => pp.projectId !== id);
       for (const person of new Set(people)) cloud.projectPeople.push({ projectId: id, personId: person });
       return projectOut(cloud.projects.get(id));
@@ -112,7 +166,7 @@ export function memoryBackend(cloud, personId) {
         if (!line?.uid || line.by !== personId) refuse('write a line as somebody else');
         if (cloud.lines.some((l) => l.uid === line.uid)) continue;
         cloud.seq += 1;
-        cloud.lines.push({ seq: cloud.seq, projectId, uid: line.uid, byPerson: personId, body: structuredClone(line) });
+        cloud.lines.push({ seq: cloud.seq, projectId, uid: line.uid, byPerson: personId, body: structuredClone(line), createdAt: cloud.now() });
         added += 1;
       }
       if (added) cloud.events.emit('lines', { projectId });
@@ -122,27 +176,28 @@ export function memoryBackend(cloud, personId) {
     async pullLines(projectId, afterSeq = 0, limit = 500) {
       if (!canSee(projectId)) return [];
       return cloud.lines.filter((l) => l.projectId === projectId && l.seq > afterSeq)
-        .slice(0, limit).map((l) => ({ seq: l.seq, line: structuredClone(l.body) }));
+        .slice(0, limit).map((l) => ({ seq: l.seq, line: asPulled(structuredClone(l.body), { by: l.byPerson, at: l.createdAt, me: personId }) }));
     },
 
-    async putActivity(entries) {
-      for (const key of [...cloud.activity.keys()]) if (key.startsWith(`${personId}:`)) cloud.activity.delete(key);
-      for (const e of entries) {
-        cloud.activity.set(`${personId}:${e.taskKey}`, { personId, taskKey: e.taskKey, state: e.state, movedAt: e.movedAt });
-      }
-      cloud.events.emit('activity', {});
+    async putCards(teamId, cards) {
+      if (!myTeams().includes(teamId)) throw new Error('not on that team');
+      for (const key of [...cloud.cards.keys()]) if (key.startsWith(`${personId}:`)) cloud.cards.delete(key);
+      // A private card never goes up at all, whatever the Mac handed over, as
+      // supabase-backend does; the database refuses words on one besides.
+      for (const c of cards) if (c.visible === true) cloud.cards.set(`${personId}:${c.threadId}`, { ...structuredClone(c), personId, teamId });
+      cloud.events.emit('cards', {});
     },
 
-    async listActivity() {
-      const mates = new Set(cloud.members.filter((m) => myTeams().includes(m.teamId)).map((m) => m.personId));
-      return [...cloud.activity.values()].filter((a) => mates.has(a.personId)).map((a) => ({ ...a }));
+    async listCards() {
+      const teams = new Set(myTeams());
+      return [...cloud.cards.values()].filter((c) => teams.has(c.teamId)).map(({ teamId, ...c }) => structuredClone(c));
     },
 
     subscribe(onChange) {
       const fire = () => onChange();
       cloud.events.on('lines', fire);
-      cloud.events.on('activity', fire);
-      return () => { cloud.events.off('lines', fire); cloud.events.off('activity', fire); };
+      cloud.events.on('cards', fire);
+      return () => { cloud.events.off('lines', fire); cloud.events.off('cards', fire); };
     },
   };
 }

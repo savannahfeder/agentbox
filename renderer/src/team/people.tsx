@@ -48,7 +48,9 @@ export function TeamRowEnd({ item, team }: { item: WorkItem; team: TeamView | nu
   const sent = team ? sentFrom(item, product, team.me) : null;
   const person = sent ? team!.byId.get(sent.from) : undefined;
   const due = item.assignee === team?.me ? dueWords(item.due) : null;
-  const locked = !!team && !isShared(product);
+  // Privacy is per thread now (approved 2026-10-01), so the lock follows the
+  // thread's own choice, not whether its project is shared.
+  const locked = !!team && item.visibility === 'private';
   return <>
     {sent
       ? <span className="tm-who"><Face person={person} agent={sent.agent} />{sent.agent ? `${firstName(person)}’s agent` : firstName(person)}</span>

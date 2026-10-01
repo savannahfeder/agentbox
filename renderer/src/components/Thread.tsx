@@ -66,8 +66,11 @@ export interface CodeInThread {
   open: (path: string) => void;
 }
 
-export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, name, landOn, md, code }: {
+export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, name, landOn, md, code, chat = false }: {
   events: AgentEvent[];
+  /** A conversation with a person: what is not on screen is the oldest part,
+   *  so its line sits at the top, the way a chat's history does. */
+  chat?: boolean;
   // How many messages are not on screen, when the middle of a long
   // conversation was cut. The app on a task, which is never long enough to cut.
   omitted?: number;
@@ -149,7 +152,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, name, landO
   // with a second, different count, and the two drifted: see the note on
   // `gapIndex` in shared/agents.mjs for the 56 rows that put the line in the
   // wrong place. One rule, one file, and they cannot disagree again.
-  const gapAfter = gapIndex(events, omitted);
+  const gapAfter = chat ? -2 : gapIndex(events, omitted);
 
   // HER PLACE ON THE PAGE, ACROSS THE MIDDLE COMING BACK.
   //
@@ -189,6 +192,11 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, name, landO
 
   return (
     <div className="thread">
+      {chat && omitted > 0 && (
+        <button type="button" className="thread-gap thread-gap-top" onClick={openGap}>
+          {`Show ${omitted} earlier message${omitted === 1 ? '' : 's'}`}
+        </button>
+      )}
       {nodes.map((e, n) => {
         // A folded run answers to the index of its first line, so opening one
         // survives the thread reloading under her while an agent works.

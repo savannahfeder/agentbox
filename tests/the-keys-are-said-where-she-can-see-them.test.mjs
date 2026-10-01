@@ -38,6 +38,8 @@ const css = read('renderer/src/styles.css');
 const nav1 = read('renderer/src/components/WorkspaceNavigation.tsx');
 const terminal = read('renderer/src/components/TaskTerminal.tsx');
 const focus = read('renderer/src/components/Focus.tsx');
+// The header's right end and the Inbox page's state tabs (approved 2026-10-01).
+const pages = read('renderer/src/threads/Pages.tsx');
 
 // The list's own key switch, which is the only place the row keys are run.
 // Everything above it belongs to modals, chords and full-screen reading.
@@ -176,11 +178,17 @@ describe('⌘ and a number go to a section', () => {
     expect(tab.slice(0, 700)).toContain("const slot = sidebarSlot(e);");
   });
 
-  it('wears the hint on each TAB, because the key goes straight to that one', () => {
+  it('wears ⌘1 on the Inbox tab, the one section the sidebar still draws', () => {
     // It was on the nav while the keys were ⌘⌥ and an arrow, because those
     // moved BETWEEN the four and belonged to no single tab. ⌘1 to ⌘4 go
-    // straight to a section, so each tab now says its own number.
-    expect(nav1).toContain('data-hint={sectionHint(slot + 1)}');
+    // straight to a section, so each sidebar tab said its own number.
+    //
+    // approved 2026-10-01 (w-e731ca9376): In progress, Scheduled and Done left
+    // the sidebar and became tabs on the Inbox page, so Inbox is the only
+    // section tab the sidebar draws and it says ⌘1. The keys ⌘2 to ⌘4 still run
+    // through `tabOrder` above, and the state tabs do not wear their hints.
+    expect(nav1).toMatch(/data-tab="inbox" data-hint=\{sectionHint\(1\)\}/);
+    expect(nav1).not.toContain('sectionHint(slot + 1)');
     expect(app).not.toContain('className="tab-hint');
     expect(app).not.toContain('STRIP_HINTS');
     for (const slot of [1, 2, 3, 4]) {
@@ -201,18 +209,23 @@ describe('⌘ and a number go to a section', () => {
 describe('only a component that does not already show its key carries a hint', () => {
   it('wears a data-hint for every id the list knows, and knows every id worn', () => {
     const worn = new Set();
-    for (const file of [app, list, nav1, terminal, focus]) {
+    for (const file of [app, list, nav1, terminal, focus, pages]) {
       // The row writes its own as a spread, because it is only worn in the
       // inbox and only off an ordinary row.
       for (const m of file.matchAll(/data-hint(?:="|': ')([a-z-]+)/g)) worn.add(m[1]);
-      // The four tabs get theirs from `sectionHint(slot + 1)`, computed rather
-      // than written out, because which section sits in which slot changes with
-      // whether anything is scheduled.
-      if (/data-hint=\{sectionHint\(slot \+ 1\)\}/.test(file)) {
-        for (const slot of [1, 2, 3, 4]) worn.add(sectionHint(slot));
-      }
+      // A section tab gets its id from `sectionHint(n)` rather than writing it
+      // out, so the id is read off the slot it names.
+      for (const m of file.matchAll(/data-hint=\{sectionHint\((\d)\)\}/g)) worn.add(sectionHint(Number(m[1])));
     }
-    expect([...worn].sort()).toEqual(Object.keys(HINTS).sort());
+    // Every id worn is one the list knows. That half is unchanged.
+    for (const id of worn) expect(Object.keys(HINTS), `${id} is worn but has no line`).toContain(id);
+    // And every id the list knows is worn, with one exception the redesign
+    // made. approved 2026-10-01 (w-e731ca9376): the sidebar lost its In
+    // progress, Scheduled and Done tabs, which were the ones wearing ⌘2 to ⌘4.
+    // The keys still run, so their lines stay, but nothing wears them until
+    // the Inbox page's state tabs do. Anything else unworn is a dead line.
+    const unworn = Object.keys(HINTS).filter((id) => !worn.has(id));
+    for (const id of unworn) expect(['section-2', 'section-3', 'section-4'], `${id} is a line nothing wears`).toContain(id);
   });
 
   it('says nothing on the four she named', () => {
@@ -276,10 +289,10 @@ describe('the Mac’s label names the button and nothing more', () => {
   it('leaves the Mac’s label naming the button and nothing more', () => {
     // The key is drawn in the app now, so the system label saying it too would
     // be the same fact twice, a second apart, in two different hands.
-    expect(app).toContain('title="Search tasks"');
+    expect(app).toContain('title="Search threads"');
     // w-ec62ab6b38 (2026-09-28): the plus is titled New thread now, not New task.
     expect(app).toContain('title="New thread"');
-    expect(app).not.toMatch(/title=\{keyHints \? 'Search tasks \(\/\)'/);
+    expect(app).not.toMatch(/title=\{keyHints \? 'Search threads \(\/\)'/);
     expect(app).not.toMatch(/title=\{keyHints \? 'New (task|thread) \(C\)'/);
   });
 

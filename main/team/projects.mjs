@@ -35,6 +35,9 @@ export function teamOf(project) {
     // Who shared it. Runs the rows written before anyone signed in
     // (shared/team-rules.mjs runnerOf).
     sharedBy: typeof t.sharedBy === 'string' ? t.sharedBy : null,
+    // A MESSAGE THREAD between two people (approved 2026-10-01): a shared
+    // record the two of them only can see, kept out of every project list.
+    direct: t.direct === true,
   };
 }
 
@@ -46,7 +49,7 @@ export function readTeam(dir) {
 export function listSharedProjects(products) {
   return products
     .filter((p) => p.team?.projectId)
-    .map((p) => ({ projectId: p.team.projectId, dir: p.dir, name: p.name, slug: p.slug }));
+    .map((p) => ({ projectId: p.team.projectId, dir: p.dir, name: p.name, slug: p.slug, direct: p.team.direct === true }));
 }
 
 // Mark a local project shared. Its cloud id is minted the first time and kept
@@ -67,13 +70,13 @@ export function markShared(dir, { teamId, visibility = 'team', people = [], shar
 // A project a teammate shared, made into a project here. Its folder is named
 // from the project's name, and a name already taken on this Mac gets -2, -3.
 export function joinSharedProject(accountRoot, cloudProject) {
-  const base = String(cloudProject.name || 'shared').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'shared';
+  const base = cloudProject.direct ? `direct-${String(cloudProject.id).slice(0, 8)}` : String(cloudProject.name || 'shared').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'shared';
   let slug = base;
   for (let n = 2; fs.existsSync(path.join(accountRoot, slug)); n += 1) {
     // The same project joined before (a folder that already carries its id) is
     // not joined twice.
     if (readTeam(path.join(accountRoot, slug))?.projectId === cloudProject.id) {
-      return { projectId: cloudProject.id, dir: path.join(accountRoot, slug), name: cloudProject.name, slug };
+      return { projectId: cloudProject.id, dir: path.join(accountRoot, slug), name: cloudProject.name, slug, direct: readTeam(path.join(accountRoot, slug))?.direct === true };
     }
     slug = `${base}-${n}`;
   }
@@ -90,28 +93,27 @@ export function joinSharedProject(accountRoot, cloudProject) {
       visibility: cloudProject.visibility === 'people' ? 'people' : 'team',
       people: cloudProject.people ?? [],
       sharedBy: cloudProject.createdBy ?? null,
+      ...(cloudProject.direct ? { direct: true } : {}),
     },
   });
-  return { projectId: cloudProject.id, dir, name: cloudProject.name, slug };
+  return { projectId: cloudProject.id, dir, name: cloudProject.name, slug, direct: cloudProject.direct === true };
 }
 
-// THE TEAM PAGE'S VIEW OF PRIVATE WORK: one line per open task, with no title
-// and no project. The key is a hash, so the cloud cannot tell which task it is,
-// only that it is the same one from one minute to the next.
-export function privateActivity(products, readItems, { now = Date.now(), salt = '' } = {}) {
-  const out = [];
-  for (const product of products) {
-    if (product.team?.projectId) continue;
-    for (const item of readItems(product)) {
-      if (item.status === 'done') continue;
-      const running = item.status === 'claimed' && item.claim && !item.claimExpired;
-      const scheduled = Number.isFinite(item.runAt) && item.runAt > now;
-      out.push({
-        taskKey: crypto.createHash('sha256').update(`${salt}:${product.slug}:${item.id}`).digest('hex').slice(0, 24),
-        state: running ? 'run' : scheduled ? 'sched' : 'wait',
-        movedAt: item.updatedAt ?? now,
-      });
-    }
-  }
-  return out;
+// THE RECORD A MESSAGE BETWEEN TWO PEOPLE LIVES IN, made on the sender's Mac
+// the first time they write to that person. Its folder is named for nobody, so
+// it can never collide with a project, and both people are on it from the
+// start; the other Mac joins it like any shared record.
+export function makeDirect(accountRoot, { teamId, me, other, others = other ? [other] : [] }) {
+  const projectId = crypto.randomUUID();
+  const slug = `direct-${projectId.slice(0, 8)}`;
+  const dir = path.join(accountRoot, slug);
+  fs.mkdirSync(dir, { recursive: true });
+  writeProject(dir, {
+    schemaVersion: 1,
+    id: slug,
+    name: 'Direct',
+    createdAt: new Date().toISOString(),
+    team: { projectId, teamId, visibility: 'people', people: [me, ...others], sharedBy: me, direct: true },
+  });
+  return { projectId, dir, slug };
 }

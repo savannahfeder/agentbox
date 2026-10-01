@@ -95,6 +95,7 @@ export function practiceRefusal(
  * one she will not take.
  */
 export function sentLine(p: { to: string; when?: string | null }): string {
-  const where = `Sent to ${p.to}`;
+  // "Started in", because "Sent to Office admin" read as a message to a person.
+  const where = p.when ? `Scheduled in ${p.to}` : `Started in ${p.to}`;
   return `${p.when ? `${where} · ${p.when}` : where} · Z to undo`;
 }

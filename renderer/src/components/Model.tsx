@@ -34,7 +34,7 @@ import {useAgentUpdates} from './AgentUpdates';
 // and the engine chooses for the model, and this app does not know what it
 // chooses, so it does not draw a guess as if it were running it. Pressing the
 // lit button again unpicks it, which is the way back to that.
-export function ModelPicker({ value, onChange, title, onOpenChange, engine = null, codexModels = [], codexDefault = null, effort = null, onEffortChange }: {
+export function ModelPicker({ value, onChange, title, onOpenChange, engine = null, codexModels = [], codexDefault = null, effort = null, onEffortChange, openAtStart = false }: {
   value: string | null;
   onChange: (id: string | null) => void;
   title?: string;
@@ -53,8 +53,11 @@ export function ModelPicker({ value, onChange, title, onOpenChange, engine = nul
   engine?: string | null;
   codexModels?: ModelChoice[];
   codexDefault?: string | null;
+  /** Drawn already open, for a box opened by pressing the model word itself
+   *  (the reply box's folded pill, Focus.tsx). Read once, on mount. */
+  openAtStart?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(openAtStart);
   const {updates,start}=useAgentUpdates();
   const updateEngine=engine==='codex'?'codex':'claude';
   const update=updates[updateEngine];

@@ -69,7 +69,7 @@ describe('the corner is the three marks she named, in her order', () => {
   });
 
   it('has no magnifier left in it', () => {
-    expect(corner).not.toContain('Search tasks');
+    expect(corner).not.toContain('Search threads');
     expect(corner).not.toContain('<SearchIcon />');
   });
 });
@@ -111,7 +111,7 @@ describe('the door to ⌘K', () => {
 
 describe('search stands at the head of the tab row', () => {
   it('is inside the nav, before the first tab', () => {
-    const mag = tabNav.indexOf('aria-label="Search tasks"');
+    const mag = tabNav.indexOf('aria-label="Search threads"');
     const inbox = tabNav.indexOf("view === 'inbox' ? 'tab active' : 'tab'");
     expect(mag, 'no magnifier in the tab row').toBeGreaterThan(-1);
     expect(mag).toBeLessThan(inbox);
@@ -138,17 +138,48 @@ describe('search stands at the head of the tab row', () => {
     expect(css).toMatch(/\.tabs \{[^}]*gap: 26px/s);
   });
 
-  it('leaves the magnifier with no hint, because it already prints one', () => {
-    // The strip's hint slot is gone (w-2f7fac6027). The magnifier is also out
-    // of the set that carries a plate at all: the search field it opens prints
-    // / at its own right end, and her rule is that a component already showing
-    // its key gets nothing. The nav around it carries the SECTIONS hint, which
-    // is ⌘⌥↓ and ⌘⌥↑ and belongs to the four tabs.
+  it('keeps the strip free of a hint slot of its own, and puts the section key on the Inbox tab', () => {
+    // The strip's hint slot is gone (w-2f7fac6027). The magnifier wears the
+    // search hint like any other button (the-hint-plate pins that), and the
+    // nav around it carries none.
     expect(app).not.toContain('className="tab-hint');
     expect(app).not.toContain('STRIP_HINTS');
-    expect(tabNav).toMatch(/aria-label="Search tasks"[\s\S]{0,200}onClick=\{openSearch\}/);
-    // The sections hint moved onto each TAB when the keys became ⌘1 to ⌘4, and
-    // the tabs she actually sees are the sidebar's.
-    expect(nav).toContain('data-hint={sectionHint(slot + 1)}');
+    expect(tabNav).toMatch(/aria-label="Search threads"[\s\S]{0,200}onClick=\{openSearch\}/);
+    // The sections hint moved onto each TAB when the keys became ⌘1 to ⌘4.
+    // approved 2026-10-01 (w-e731ca9376): Inbox is the only section tab left
+    // in the sidebar, so it is the one that wears it.
+    expect(nav).toMatch(/data-tab="inbox" data-hint=\{sectionHint\(1\)\}/);
+  });
+});
+
+// THE SIDEBAR LAYOUT'S HEADER, approved 2026-10-01 (w-e731ca9376). Everything
+// above is the corner and the tab row of the layout without the sidebar, which
+// App.tsx still carries. On the sidebar layout the plus, the ⌘ mark and the
+// cog are not drawn in the header at all: its right end is Search, New thread
+// and the Display button, in that order, and Settings lives at the foot of the
+// sidebar. ⌘K itself still opens the palette from anywhere.
+describe('the header on the sidebar layout', () => {
+  const pages = read('renderer/src/threads/Pages.tsx');
+  const right = pages.slice(pages.indexOf('<div className="th-right">'), pages.indexOf('</div>;', pages.indexOf('<div className="th-right">')));
+
+  it('draws no plus, no ⌘ mark and no cog there', () => {
+    for (const label of ['New thread', 'Commands', 'Settings']) {
+      expect(corner).toMatch(new RegExp(`!workspaceNavigation && <button[\\s\\S]{0,200}aria-label="${label}"`));
+    }
+    expect(right).not.toContain('cmd-glyph');
+    expect(right).not.toContain('aria-label="Commands"');
+  });
+
+  it('puts Search first, then New thread, then Display', () => {
+    const search = right.indexOf('data-hint="search"');
+    const compose = right.indexOf('data-hint="new-task"');
+    const display = right.indexOf('aria-label="View and filters"');
+    expect(search).toBeGreaterThan(-1);
+    expect(search).toBeLessThan(compose);
+    expect(compose).toBeLessThan(display);
+  });
+
+  it('still opens the palette on ⌘K', () => {
+    expect(app).toMatch(/\(e\.metaKey \|\| e\.ctrlKey\) && e\.key\.toLowerCase\(\) === 'k'[\s\S]{0,120}setModal\(\(m\) => \(m === 'palette' \? null : 'palette'\)\)/);
   });
 });

@@ -529,17 +529,29 @@ export function rowSummary(
 // the same thing on a smaller sample). It is written by whoever is on the row, which is the one party that
 // knows where the thread has got to.
 //
-// AND IT IS WRITTEN FROM WHERE THE THREAD STANDS, NOT FROM ITS FIRST MESSAGE.
-// That is the difference that was shown and picked. Titled from the opening
-// line alone, a row came back named for the fixes it started as, which was true
-// when it was written, though the row had moved on to landing five branches.
-// Given the last thing written on it too, the same call named the landing.
-// briefs/worker.md asks for the second kind.
+// AND IT IS WRITTEN ONCE, when the thread is made and from where the thread
+// stood then, never again (main/row-label.mjs). A row whose person wrote a
+// short clear title of their own is not named at all: that title is what they
+// will look for and what they will point a teammate at.
+//
+// THE NEWEST NAME A PERSON WROTE BEATS THE ONE WE WROTE. A title stamped later
+// than the label is a rename, and the label cannot be erased through the ledger
+// (an empty field is dropped, shared/work-items.mjs), so the choice is made
+// here instead. Without this a rename would be accepted and then invisible.
 //
 // A LABEL OF WHITESPACE IS NOT A LABEL, so it falls through to the title rather
 // than emptying the row: this list may never draw a nameless line.
-export function rowTitle(i: { title?: string; label?: string }): string {
-  return (i.label ?? '').trim() || (i.title ?? '');
+export function rowTitle(i: {
+  title?: string;
+  label?: string;
+  wrote?: { title?: { ts: number; source?: string }; label?: { ts: number } };
+}): string {
+  const label = (i.label ?? '').trim();
+  if (!label) return i.title ?? '';
+  const theirs = i.wrote?.title;
+  const ours = i.wrote?.label;
+  const renamed = !!theirs && !!ours && theirs.source === 'founder' && theirs.ts > ours.ts;
+  return (renamed && (i.title ?? '').trim()) || label;
 }
 
 // THE ROW MUST NOT SAY THE SAME SENTENCE TWICE. On a message written as one

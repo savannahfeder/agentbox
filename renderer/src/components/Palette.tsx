@@ -145,7 +145,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // finds out it never needs the mouse again. It prints the key rather than
     // describing it, the way every other chord in here does, and it is why ⌘K
     // on its own was not enough to be the entry point.
-    { id: 'search', label: 'Search tasks', keyHint: '/', run: onSearch },
+    { id: 'search', label: 'Search threads', keyHint: '/', run: onSearch },
     // NAMESPACED, because these ids are React keys over a list that filters as
     // she types, and 'done' collided with the item command of the same name.
     // Two entries under one key made React keep a stale row alive through the

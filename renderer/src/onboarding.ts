@@ -15,6 +15,7 @@
 
 import { PRACTICE_NAME, PRACTICE_TASK } from '../../shared/first-run-practice.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
+import { DONE } from './done-word';
 
 /**
  * THE BEATS. `landed` is the end and draws nothing over the app.
@@ -188,6 +189,9 @@ export function afterCommand(run: { tutorial?: boolean } | null): 'done' | 'end'
 export type Event =
   | { t: 'start' }
   | { t: 'folder'; path: string }
+  // NO FOLDER (2026-10-01): somebody who has none goes on without one, and the
+  // project is made with no folder of its own (see `folderNone` in COPY).
+  | { t: 'noFolder' }
   | { t: 'name'; name: string }
   | { t: 'made'; product: string }
   | { t: 'practice'; product: string; examples: string[] }
@@ -214,6 +218,14 @@ export function advance(s: FirstRun, e: Event): FirstRun {
         ...s,
         folder: e.path,
         name: !s.name || (s.folder && s.name === nameFromFolder(s.folder)) ? nameFromFolder(e.path) : s.name,
+      };
+    case 'noFolder':
+      // The same rule as a folder's proposed name: one typed by hand stays, and
+      // one that only came off the last folder gives way.
+      return {
+        ...s,
+        folder: null,
+        name: !s.name.trim() || (s.folder && s.name === nameFromFolder(s.folder)) ? COPY.noFolderName : s.name,
       };
     case 'name':
       return { ...s, name: e.name };
@@ -737,8 +749,12 @@ export function inboxCleared(rows: { id: string }[], run: FirstRun | null): bool
 export const COPY = {
   // The product is an inbox for managing dozens of agents at a time, and it
   // is not Claude Code specific: it works with Codex too.
-  head: 'Run dozens of coding agents from one inbox.',
-  headSub: 'Works with Claude Code and Codex.',
+  // REWRITTEN FOR THE WHOLE TEAM (2026-10-01). A persona test of an executive
+  // assistant found "coding agents" and "Claude Code and Codex" written for
+  // programmers, and the team version is for designers, assistants and PMs too. The product is threads: you write one, an agent does
+  // the work on your Mac, and it comes back when it needs you.
+  head: 'Hand work to agents and get it back in one inbox.',
+  headSub: 'Write a thread, an agent works on it, and it comes back when it needs you.',
   terms: 'Get started means you agree to the terms and the privacy policy.',
   getStarted: 'Get started',
   page: 'Set up your first project.',
@@ -749,18 +765,30 @@ export const COPY = {
   folderAgain: 'Choose a different one',
   // THE FOLDER SCREEN, REBUILT (w-ec62ab6b38). A heading that asks the real
   // question, one short line under it, then the folders to click.
-  folderHead: 'Which project should your agents work on first?',
-  folderLede: 'Pick its folder. Your agents run inside it.',
-  folderRecent: 'Where you have run agents recently',
+  //
+  // AND IT NO LONGER ASSUMES A CODE FOLDER (2026-10-01). An assistant has no
+  // project folder and the screen had no way past it. `folderNone` is that way
+  // past: the project is made with no folder, and its agents work in a folder
+  // the app keeps for it (`productFolder` in main/supervisor.mjs falls back to
+  // the project's own directory in the store).
+  folderHead: 'Pick a folder for your first project.',
+  folderLede: 'Agents can read and change the files in it. Any folder of documents works.',
+  folderRecent: 'Folders you used recently',
+  folderNone: 'I do not have one, skip for now',
   folderOther: 'Choose another folder',
   folderFirst: 'Choose a folder',
-  folderVia: { claude: 'Claude Code', codex: 'Codex' } as Record<'claude' | 'codex', string>,
   nameIn: 'Agents will work in',
+  // THE NAME SCREEN WHEN THERE IS NO FOLDER. Says where the work goes instead,
+  // and the link beside it goes back to choosing one.
+  nameInNone: 'Agents will work in a new folder made for this project.',
+  nameChoose: 'Choose a folder',
+  // The name a project with no folder starts with. Hers to change.
+  noFolderName: 'My work',
   nameChange: 'Change',
   nameGo: 'Continue',
   // CLAUDE CODE MISSING IS THE LINE ONLY. One quiet line here and
   // no screen of its own anywhere: the walk never stops and never gains a step.
-  missing: `${Name} could not find Claude Code on this Mac, and your agents run on it.`,
+  missing: `${Name} could not find Claude Code or Codex on this Mac, and your agents run on one of them.`,
   missingLink: 'Get Claude Code',
   nameQ: 'What is this project called?',
   // The clause is kept here and drawn nowhere, because deleting the words is
@@ -867,18 +895,18 @@ export const COPY = {
     // really a sentence reads as marketing fluff, so each line is one idea,
     // ideally with no commas or periods in it.
     {
-      head: 'All your Claude Code and Codex agents report to one inbox',
-      line: 'Each agent writes back here the moment it finishes or gets stuck',
+      head: 'Write a thread and an agent picks it up',
+      line: 'It works on your Mac and writes back here when it finishes or gets stuck',
       piece: 'list' as const,
     },
     {
-      head: 'You only see an agent when it needs you',
-      line: 'The rest keep working in In progress until they finish or have a question',
+      head: 'A thread comes back to you only when it needs you',
+      line: 'The rest keep running until they finish or have a question',
       piece: 'progress' as const,
     },
     {
-      head: 'So one person can run dozens of agents at once',
-      line: 'No terminals to watch and no tabs to check',
+      head: 'An empty inbox means nothing is waiting on you',
+      line: 'Your agents keep working in the background while you get on with your day',
       piece: 'empty' as const,
     },
   ],
@@ -928,7 +956,7 @@ export const COPY = {
      AND THE THING IS CALLED THE TUTORIAL NOW (w-9a6ea066d6, 2026-08-28).
   */
   handHead: 'This is the tutorial.',
-  handLine: 'Nothing in here is your code and nothing you do in here is saved. Your own project is made already and it is waiting behind this.',
+  handLine: 'A practice project with a few example threads, and nothing you do in here is saved. Your own project is made already and it is waiting behind this.',
   handGo: 'Start the tutorial',
 
   /* * THE QUIET WAY OUT, AND THE LINE THAT ASKS THEM TO STAY.
@@ -944,8 +972,8 @@ export const COPY = {
      There is no number in it, because nobody has timed the walk.
   */
   leave: 'Skip',
-  leaveHead: 'Stay for the walk?',
-  leaveLine: `It is the quickest way to pick up the few keys ${NAME} runs on, and it is the only place they are shown to you. You can leave now and start it again whenever you like from ⌘K.`,
+  leaveHead: 'Stay for the tutorial?',
+  leaveLine: `It is the quickest way to learn how threads work in ${NAME}. You can leave now and start it again whenever you like from ⌘K.`,
   leaveStay: 'Keep going',
   leaveGo: 'Skip it',
 
@@ -979,7 +1007,7 @@ export const COPY = {
   /* * TWO SENTENCES: what it is, and what it costs. NO NUMBER OF MINUTES IS CLAIMED
      anywhere here, for the same reason `leaveLine` claims none: nobody has timed the walk.
   */
-  offerLine: `A pretend project with pretend work in it, and the few keys ${NAME} runs on. Nothing in it is your code and nothing in it is kept.`,
+  offerLine: 'A practice project with a few example threads, so you can see how it all works. Nothing in it is yours and nothing in it is kept.',
   /*
    * THE SAME WORD THE HAND-OFF CARD USES, because pressing it opens that card.
      A button promising one thing and delivering a screen headed another is the
@@ -1080,7 +1108,9 @@ export const COPY = {
   // components/Onboarding.tsx): they fall over her own inbox, over the app she
   // is about to work in, and nothing has to be pressed to get past them. The
   // card they used to sit on is the agents card above.
-  finishHead: 'You are ready to get started.',
+  // AND IT SAYS THE TUTORIAL IS OVER (2026-10-01). The persona test ended on a
+  // blank inbox with nothing saying she was done. The head says so in words.
+  finishHead: 'You finished the tutorial.',
   // WHAT SHE LEARNED, IN ONE LINE, AND NOTHING ELSE. The beats are not listed
   // back at her: a summary of the last two minutes is reading, and the point of
   // this card is that there is nothing left to read. AND "THAT IS THE WHOLE
@@ -1093,6 +1123,13 @@ export const COPY = {
   // above stays on every card that leaves the inbox empty. Same lesson, minus
   // the sentence that stops being true.
   finishLineAgents: 'Getting your inbox back to empty is the goal.',
+  // WHAT TO TRY NEXT, which is the other half of an ending. Two lines, and the
+  // second is the only place the walk names the Team page and messaging a
+  // person, which are half the product and were never mentioned.
+  finishNext: [
+    'Next, start a real thread. Press N or click New thread.',
+    'Open Team to see what your teammates are working on. To message one, start a thread and pick them in To.',
+  ] as readonly string[],
   finishGo: 'Open my inbox',
   // --------------------------------------------------------------------- AND
   // WHEN CLAUDE CODE REALLY IS MISSING, THE CARD IS NOT A CELEBRATION.
@@ -1102,8 +1139,8 @@ export const COPY = {
   // headline names it, `missing` above says what was looked for, and the two
   // buttons are the way through. `finishGo` is not drawn at all, because a
   // button that opens an inbox nobody can work in is a broken promise.
-  gateHead: `${Name} needs Claude Code.`,
-  gateDo: `Install it, then check again. Your inbox opens as soon as ${NAME} can see it.`,
+  gateHead: `${Name} needs Claude Code or Codex.`,
+  gateDo: `Install either one, then check again. Your inbox opens as soon as ${NAME} can see it.`,
   gateCheck: 'Check again',
   gateChecking: 'Looking',
   // AFTER A CHECK THAT FOUND NOTHING. It is a different sentence from the one
@@ -1190,6 +1227,15 @@ export function mayOpenInbox(claude: { missing: boolean }): boolean {
   return !claude.missing;
 }
 
+/**
+ * WHETHER THIS MAC HAS NO CODING AGENT AT ALL, which is the only thing the
+ *  last card shuts the inbox for. Claude Code or Codex is enough, so it takes a
+ *  certain "not here" about BOTH. An unsure search about either one keeps the
+ *  door open, for the reason `certain` exists everywhere else in this file. */
+export function noCodingAgent(claude: { found: boolean; certain: boolean }, codex: { found: boolean; certain: boolean }): boolean {
+  return claude.certain && !claude.found && codex.certain && !codex.found;
+}
+
 /* ------------------------------ THE CARD ---------------------------------- */
 /* * TWO LINES, AND THE SECOND ONE IS THE INSTRUCTION. The quiet line says where you are and
  the loud line says the one key, with the key drawn as a key.
@@ -1273,6 +1319,24 @@ export function nextTab(tabs: readonly string[] | undefined, view: string | unde
  *  again. Each hop is its own key now, ⌘2 then ⌘3 then ⌘4, so "Press ⌘3 again"
  *  named a key she had not pressed yet. Coming back is ⌘1, also new, so it
  *  loses "once more" too. */
+/**
+ * THE TEAM LAYOUT'S STATE TABS, in the order threads/Pages.tsx draws them
+ *  (`INBOX_TABS` there; a test holds the two lists together). Those buttons
+ *  carry no `data-tab`, so the tab tour finds one by its place in the strip.
+ *  Without this the tour rang the sidebar, which in that layout holds only
+ *  Inbox and Team (2026-10-01). */
+export const TEAM_TABS: readonly string[] = ['inbox', 'progress', 'snoozed', 'done', 'all'];
+
+/** And the words on those tabs, the same ones Pages.tsx draws. */
+export const TEAM_TAB_NAMES: Readonly<Record<string, string>> = {
+  inbox: 'Needs you', progress: 'In progress', snoozed: 'Scheduled', done: DONE.short, all: 'All',
+};
+
+export function teamTab(view: string | null | undefined): string | null {
+  const at = view ? TEAM_TABS.indexOf(view) : -1;
+  return at >= 0 ? `.th-bar .tm-tab:nth-child(${at + 1})` : null;
+}
+
 const TAB_TOUR_SENDS_YOU: Record<string, string> = {
   inbox: ' to come back.',
   snoozed: ' for the one you put off.',
@@ -1313,12 +1377,17 @@ export function coach(
   ctx: {
     opened?: boolean; view?: string; picking?: boolean; left?: number; palette?: boolean;
     tabs?: readonly string[];
+    /** The team strip's tab names, when that strip is what is drawn. */
+    tabNames?: Readonly<Record<string, string>>;
   } = {},
 ): Coach | null {
   switch (step) {
     case 'make':
       // "Thread", not task, the word since w-ec62ab6b38 (2026-09-28).
-      return say('A thread is a job you hand to an agent.', 'Press ', 'N', ' to start your first one.');
+      // AND IT NAMES THE BUTTON AS WELL AS THE KEY (2026-10-01). Somebody who
+      // has never used a keyboard shortcut reads "Press N" as a riddle; the
+      // button is on the screen with those words on it.
+      return say('A thread is a job you hand to an agent.', 'Press ', 'N', ' or click New thread to write your first one.');
     /* * AND THE GREY LINE IS GONE FROM THIS BEAT.
     */
     case 'task':
@@ -1541,12 +1610,17 @@ export function coach(
       // different days and a cap written out here would send her to the wrong
       // one. `tabCap` reads the same list the ring and the press obey.
       const cap = tabCap(ctx.tabs ?? [], nextTab(ctx.tabs, ctx.view));
-      const sends = TAB_TOUR_SENDS_YOU[nextTab(ctx.tabs, ctx.view)]
+      // AND THE TAB'S NAME FOR SOMEBODY WHO CLICKS (2026-10-01). The tour is now
+      // walked by people who have never used a shortcut, and the ringed tab is
+      // clickable, so where the strip has names on it the card says the name.
+      const named = ctx.tabNames?.[nextTab(ctx.tabs, ctx.view)];
+      const or = named ? ` or click ${named}` : '';
+      const sends = or + (TAB_TOUR_SENDS_YOU[nextTab(ctx.tabs, ctx.view)]
         // A TAB THIS FILE HAS NO WORDS FOR SAYS SO PLAINLY rather than borrow
         // the words of a different one. Nothing in the app reaches this today;
         // it is here so that adding a fifth tab is a card that reads a little
         // thin rather than a card that lies.
-        ?? ' for the next one.';
+        ?? ' for the next one.');
       // AND THE FIRST STOP IS WHERE THE ONE SHE PUT OFF WENT (2026-08-24). The
       // snooze beat gives the app a Scheduled tab it did not have a minute ago,
       // and a tab appearing on the screen with nothing said about it is the
@@ -1591,7 +1665,7 @@ export function coach(
       // longer says it. The first sentence stays word for word in front of it.
       return say(
         'Great! Your inbox is now empty. That is inbox zero, and it is the goal.',
-        'Press ', cap, ' to see where it all went.',
+        'Press ', cap, `${or} to see where it all went.`,
       );
     }
     /*
@@ -1672,7 +1746,9 @@ export function coach(
         // stop.
         : say(
           'Everything you just did is one key away. So is this: type tutorial.',
-          'Press ', '⌘K', ' then start your first real thread.',
+          // ⌘K finds commands; N starts a thread. The old line read as if ⌘K
+          // started one (a persona test, 2026-10-01).
+          'Press ', '⌘K', ' to find any command, or N to start your first real thread.',
         );
     default:
       return null;
@@ -2004,11 +2080,19 @@ export const ANCHOR: Partial<Record<Step, string[]>> = {
      people cannot find afterwards has taught nothing. DO NOT PUT THE IDLE FIELD BACK IN
      THIS LIST.
   */
-  make: ['button[aria-label="New thread"]'],
+  // AND THE TEAM HEADER'S BUTTON AFTER IT (2026-10-01). The team layout draws
+  // no plus: its New thread button is `.th-new` in the header, with no
+  // aria-label, so this list matched nothing there and the first beat of the
+  // tutorial drew no card at all. A persona test sat on that blank screen for
+  // over thirty seconds.
+  make: ['button[aria-label="New thread"]', '.th-right button[data-hint="new-task"]', 'button.th-new'],
   task: ['.modal.compose .dock-send'],
   // THE ROW, AND ONLY THE ROW. The walk hands its own item's row in front of
   // this one; this is the fallback for the moment before that row is drawn.
-  working: ['.list-pane .row'],
+  // AND THE RUNNING TAB WHEN THE ROW IS NOT IN THE LIST (2026-10-01). The team
+  // layout keeps a running thread out of Needs you, so the row she just sent
+  // is not drawn there; the ring goes to the tab it went to instead.
+  working: ['.list-pane .row', '.th-bar .tm-tab:nth-child(2)'],
   open: ['.list-pane .row'],
   // THE REPLY BOX, BECAUSE THE BUTTON THIS USED TO RING NO LONGER EXISTS. On
   // 2026-08-27 that button was taken out, and `.focus-actions` itself is
@@ -2052,7 +2136,10 @@ export const ANCHOR: Partial<Record<Step, string[]>> = {
   // for the render between two views where neither is up yet.
   // The sidebar is what is drawn during the walk now (w-ec62ab6b38); the old
   // strip stays as a floor only for a window that somehow has no sidebar.
-  where: ['.workspace-navigation .workspace-tabs', '.tabs'],
+  // AND THE TEAM LAYOUT'S OWN STRIP FIRST (2026-10-01), the Needs you,
+  // Running, Scheduled, Done and All tabs over the list. The sidebar there
+  // carries Inbox and Team only, so ringing it pointed at the wrong thing.
+  where: ['.th-bar .tm-tabs', '.workspace-navigation .workspace-tabs', '.tabs'],
   // THE PALETTE FIRST, THEN THE KEY THAT OPENS IT. Same order-of-preference
   // shape as `snooze` and `unblock` above: the thing that is only on the screen
   // part of the time wins while it is there. Before this the only anchor was
@@ -2339,7 +2426,9 @@ export const BOUNDS: Partial<Record<Step, string>> = {
  *  task, and holding the card off it only pushes the card back down the screen. */
 export const FLOOR = 10;
 /** Everything the floor is measured against. */
-export const FLOOR_OF = '.list-pane .row, .dock-card, .modal, .focus-actions';
+// `.th-bar` is the team layout's tab strip: a card that lands on it hides the
+// tabs it may be talking about (2026-10-01).
+export const FLOOR_OF = '.list-pane .row, .dock-card, .modal, .focus-actions, .th-bar';
 
 // ---------------------------------------------------------------------------
 // WHERE THE WALK IS KEPT. One key, so a half-finished first run survives a quit

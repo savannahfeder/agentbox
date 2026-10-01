@@ -23,7 +23,9 @@ describe('the walk ends by saying it is over', () => {
   });
 
   it('says she is ready, in her own words, and does not recap the walk', () => {
-    expect(COPY.finishHead).toBe('You are ready to get started.');
+    // It says the tutorial is over in so many words since 2026-10-01: a
+    // persona test read the old ending as no ending at all.
+    expect(COPY.finishHead).toBe('You finished the tutorial.');
     expect(COPY.finishLine.length).toBeLessThan(90);
     // No list of what just happened. The card is the end of reading.
     expect(COPY.finishLine).not.toMatch(/⌘K|press |beat|step/i);

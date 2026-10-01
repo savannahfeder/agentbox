@@ -119,7 +119,26 @@ export const WORK_ITEM_FIELDS = [
   //   due       a calendar day, YYYY-MM-DD, or 'none' to clear one
   //   people    who is on the conversation
   'assignee', 'runner', 'due', 'people',
+  // THE THREAD'S OWN FIELDS (the team version, approved 2026-10-01).
+  //   visibility  'team' (the default) or 'private': whether teammates see this
+  //               thread's summary on the Team board, or only that it exists
+  //   problem, progress, solution
+  //               the SUMMARY, a sentence or two each. The agent keeps it
+  //               current and the person can edit it in place, so these are
+  //               the fields where the later write wins whoever wrote it
+  //               (SHARED_FIELDS below)
+  //   blockedBy, blocks
+  //               other threads' ids, the summary's Linked part
+  'visibility', 'problem', 'progress', 'solution', 'blockedBy', 'blocks',
 ];
+
+// THE SUMMARY IS SHARED BETWEEN THE PERSON AND THE AGENT. Everywhere else the
+// founder's word outranks an agent's forever, which here would mean one edit
+// of hers freezes the summary the agent is meant to keep up to date. So on
+// these fields the later write wins, whoever made it, and the source is still
+// recorded so the panel can say who touched it last.
+const SHARED_FIELDS = new Set(['problem', 'progress', 'solution', 'blockedBy', 'blocks']);
+const MAX_SUMMARY = 1200;
 
 // A person id or a line id: short, plain, never an object a writer slipped in.
 const MAX_PERSON_CHARS = 64;
@@ -375,6 +394,15 @@ function coerceField(field, value) {
       const people = [...new Set(value.map(shortId).filter(Boolean))].slice(0, MAX_LABELS);
       return people.length ? people : undefined;
     }
+    case 'visibility': return value === 'private' || value === 'team' ? value : undefined;
+    // An empty string is a real value here: it is how a person clears a line
+    // of the summary, and a field that coerces to undefined cannot be cleared.
+    case 'problem': case 'progress': case 'solution':
+      return typeof value === 'string' ? value.trim().slice(0, MAX_SUMMARY) : undefined;
+    case 'blockedBy': case 'blocks': {
+      if (!Array.isArray(value)) return undefined;
+      return [...new Set(value.map(shortId).filter(Boolean))].slice(0, MAX_LABELS);
+    }
     default: return undefined;
   }
 }
@@ -460,7 +488,7 @@ export function foldWorkItems(lines, now = Date.now()) {
       // ledger any more (see the note beside WORK_ITEM_FIELDS), so
       // the plain rule is the only rule: a weaker writer never overwrites a
       // stronger one's value.
-      if (held && !beats(line, held)) continue;
+      if (held && !beats(line, held, field)) continue;
       item[field] = value;
       item.wrote[field] = { ts: line.ts, source: authorityOf(line, field, value) };
       if (line.by) item.wrote[field].by = line.by;
@@ -554,7 +582,8 @@ function authorityOf(line, field, value) {
 
 // Does the incoming line outrank the one already holding this field? The founder
 // wins over any agent regardless of time; between equals, later wins.
-function beats(incoming, held) {
+function beats(incoming, held, field) {
+  if (SHARED_FIELDS.has(field)) return incoming.ts >= held.ts;
   if (held.source === 'founder' && incoming.source !== 'founder') return false;
   if (incoming.source === 'founder' && held.source !== 'founder') return true;
   return incoming.ts >= held.ts;

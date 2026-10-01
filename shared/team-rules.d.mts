@@ -7,4 +7,5 @@ export function runnerOf(item: Row, product: ProductLike): string | null;
 export function heldByAPerson(item: Row): boolean;
 export function mayRunHere(item: Row, product: ProductLike, me: string | null): boolean;
 export function inMyInbox(item: Row, product: ProductLike, me: string | null): boolean;
+export function lastSpeaker(item: Row): string | null;
 export function handedOnByReply(item: Row, product: ProductLike, me: string | null): string | null;

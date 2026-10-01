@@ -223,6 +223,8 @@ describe('the anchors', () => {
   });
 
   it('point the In progress step at the row, which is the picture she picked', () => {
-    expect(ANCHOR.working).toEqual(['.list-pane .row']);
+    // The row first, always. The team layout's Running tab is only the floor
+    // for a list that does not draw her running thread at all (2026-10-01).
+    expect(ANCHOR.working).toEqual(['.list-pane .row', '.th-bar .tm-tab:nth-child(2)']);
   });
 });

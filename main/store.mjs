@@ -329,6 +329,15 @@ export class Store {
     return workItemsDisk.updateWorkItem(this.productDir(slug), id, { label: clean }, { source: 'agent' });
   }
 
+  // How urgent a teammate's message is, as the sorter judged it
+  // (main/message-priority.mjs). On agent authority, so a level the person set
+  // by hand stays theirs.
+  prioritizeItem(slug, id, value) {
+    const { workItemsDisk } = this.modules;
+    if (!Number.isFinite(value)) return null;
+    return workItemsDisk.updateWorkItem(this.productDir(slug), id, { priority: value }, { source: 'agent' });
+  }
+
   // A one-off permission mode has been spent. Called by the supervisor at the
   // moment it launches the run that mode was set for, so a mode she chose for
   // one message cannot silently govern a respawn three hours later.
@@ -395,7 +404,18 @@ export class Store {
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, allowed, { source: 'founder' });
   }
 
-  composeItem(slug, { title, body, kind = 'directive', priority = 0, labels, runAt, engine, model, effort, assignee, due, people }) {
+  // AN EDIT TO A THREAD FROM ITS SUMMARY (approved 2026-10-01): the summary's
+  // three lines and its links, who sees it, and its priority. Written as the
+  // person's own words; on the summary the later write wins either way
+  // (SHARED_FIELDS in shared/work-items.mjs).
+  threadEdit(slug, id, patch) {
+    const fields = ['problem', 'progress', 'solution', 'visibility', 'priority', 'blockedBy', 'blocks'];
+    const allowed = Object.fromEntries(Object.entries(patch ?? {}).filter(([k]) => fields.includes(k)));
+    if (!Object.keys(allowed).length) throw new Error('nothing to change');
+    return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, allowed, { source: 'founder' });
+  }
+
+  composeItem(slug, { title, body, kind = 'directive', priority = 0, labels, runAt, engine, model, effort, assignee, due, people, visibility }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     // The 'founder' label is the human-in-the-loop marker: only items the
@@ -441,6 +461,9 @@ export class Store {
       ...(assignee ? { assignee: String(assignee) } : {}),
       ...(due ? { due: String(due) } : {}),
       ...(Array.isArray(people) && people.length ? { people } : {}),
+      // WHO SEES IT (approved 2026-10-01): the team by default, or nobody but
+      // its owner. Only 'private' is written; no field reads as the team.
+      ...(visibility === 'private' ? { visibility } : {}),
     };
     return workItemsDisk.updateWorkItem(dir, created.id, contentPatch, { source: 'founder' });
   }

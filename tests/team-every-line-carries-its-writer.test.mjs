@@ -100,6 +100,15 @@ describe('pulling a teammate in', () => {
     expect(all).toHaveLength(2);
   });
 
+  // Review 2026-10-01: one pulled line over the 256 KiB ceiling made writeLine
+  // throw, the pull cursor never moved past it, and every later line from
+  // that project was stuck behind it for good.
+  it('skips a line too big to write instead of throwing, and keeps the rest', () => {
+    const huge = theirs('l-big', { note: 'x'.repeat(300 * 1024) });
+    expect(disk.appendForeignLines(dir, [huge, theirs('l-after', { note: 'after' }, 101)])).toBe(1);
+    expect(disk.readWorkItem(dir, 'w-abcdef').note).toBe('after');
+  });
+
   it('refuses a line with no uid or no writer, which cannot be told apart on the next pull', () => {
     expect(disk.appendForeignLines(dir, [{ id: 'w-abcdef', ts: 1, source: 'founder', patch: { title: 'x' } }])).toBe(0);
     expect(disk.appendForeignLines(dir, [{ id: 'w-abcdef', ts: 1, source: 'founder', uid: 'l-9', patch: { title: 'x' } }])).toBe(0);

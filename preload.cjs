@@ -17,11 +17,20 @@ contextBridge.exposeInMainWorld('zero', {
   // The team version: signing in, the team, and sharing a project.
   teamSignIn: () => ipcRenderer.invoke('zero:team-sign-in'),
   teamSignOut: () => ipcRenderer.invoke('zero:team-sign-out'),
+  teamSignInEmail: (payload) => ipcRenderer.invoke('zero:team-sign-in-email', payload),
+  teamSignUp: (payload) => ipcRenderer.invoke('zero:team-sign-up', payload),
   teamCreate: (payload) => ipcRenderer.invoke('zero:team-create', payload),
+  teamAcceptInvite: (payload) => ipcRenderer.invoke('zero:team-accept-invite', payload),
   teamInvite: (payload) => ipcRenderer.invoke('zero:team-invite', payload),
+  teamRename: (payload) => ipcRenderer.invoke('zero:team-rename', payload),
+  teamRemoveMember: (payload) => ipcRenderer.invoke('zero:team-remove-member', payload),
+  teamLeave: () => ipcRenderer.invoke('zero:team-leave'),
+  teamCancelInvite: (payload) => ipcRenderer.invoke('zero:team-cancel-invite', payload),
   teamShare: (payload) => ipcRenderer.invoke('zero:team-share', payload),
   teamSync: () => ipcRenderer.invoke('zero:team-sync'),
   teamRoute: (payload) => ipcRenderer.invoke('zero:team-route', payload),
+  teamMessage: (payload) => ipcRenderer.invoke('zero:team-message', payload),
+  threadEdit: (payload) => ipcRenderer.invoke('zero:thread-edit', payload),
   // Repeating tasks. A rule, not a work item, so it has its own channels
   // rather than a flag on compose.
   repeats: () => ipcRenderer.invoke('zero:repeats'),

@@ -32,10 +32,11 @@ it('still gives a design and a note theirs', () => {
   expect(real).toContain('referencedFiles');
 });
 
-it('keeps the byline figures, which are now the only way in', () => {
-  // The figures were a moving part of w-581dbc6cc4's round for two rounds and
-  // are not any more: Done went to the corner row instead, so this line keeps
-  // the right-hand end it has held since w-8019e8476e.
+it('keeps the figures as the one way in, now on the menu’s code row', () => {
+  // The figures closed the byline from w-8019e8476e until w-e731ca9376
+  // (2026-10-01), when she asked for viewing the code to go into the thread's
+  // three-dot menu with the terminal and Done. They are the code row's detail
+  // there, and that row is still the one door: it opens the same path.
   expect(focus).toContain('className="change-figures"');
-  expect(focus).toContain('onClick={() => onOpenDoc?.(changePathFor(item.id))}');
+  expect(focus).toContain('onViewChange={() => onOpenDoc?.(changePathFor(item.id))}');
 });

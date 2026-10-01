@@ -342,7 +342,9 @@ export function releaseRunClaim(projectDir, id, { afterEpoch, startedAt, now = D
 // several Macs. Each line goes in verbatim, still its author's, and a line
 // whose uid the ledger already holds is skipped, so pulling the same page twice
 // stores it once. A line with no uid or no writer is refused: nothing could tell
-// it apart on the next pull. Returns how many lines were appended.
+// it apart on the next pull. So is one too big to write, which used to throw
+// and leave the pull cursor in front of it forever (review, 2026-10-01): a bad
+// line is skipped and the pull moves past it. Returns how many were appended.
 export function appendForeignLines(projectDir, lines) {
   const file = ledgerPath(projectDir);
   const have = new Set();
@@ -354,6 +356,7 @@ export function appendForeignLines(projectDir, lines) {
   for (const raw of Array.isArray(lines) ? lines : []) {
     const line = normalizeLine(raw);
     if (!line || !line.uid || !line.by || have.has(line.uid)) continue;
+    if (Buffer.byteLength(JSON.stringify(raw) + '\n', 'utf8') > MAX_LINE_BYTES) continue;
     writeLine(file, raw);
     have.add(line.uid);
     added += 1;

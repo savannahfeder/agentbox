@@ -1,0 +1,195 @@
+/* A THREAD'S SUMMARY, in the theme's own tokens so it wears every skin.
+   Approved in Ember Grid on 2026-10-01 (w-e731ca9376): round 7 drew the panel,
+   round 9 made the Summary button square and the teammate's card the summary's
+   fields and nothing else. The values below are the measured ones from those
+   drawings (scripts/scratch/draw-round7.mjs, draw-round9.mjs), renamed ts-.
+
+   SQUARE SHAPES ONLY. Every box here takes the skin's own --radius, which is
+   0 in Ember Grid, and nothing is a rounded pill. The menus are the app's own
+   `.prio-menu` rather than a second popover shape. */
+
+.focus-pane { --ts-panel-w: 352px; }
+
+/* the state's mark: filled when it waits on you, a ring when it waits on
+   someone else, half filled while it runs, dashed while it is scheduled */
+.ts-st { display: inline-block; width: 12px; height: 12px; border-radius: 50%; box-sizing: border-box; margin-right: 9px; flex: none; }
+.ts-st-need { background: var(--accent); }
+.ts-st-run { border: 1.5px solid var(--accent); background: conic-gradient(var(--accent) 0 50%, transparent 50% 100%); }
+.ts-st-wait { border: 1.5px solid var(--text-dim); }
+.ts-st-sched { border: 1.5px dashed var(--text-faint); }
+.ts-st-done { background: var(--text-faint); }
+
+/* THE STATE, FIRST ON THE LINE UNDER THE TITLE (w-e731ca9376, 2026-10-01).
+   It stood at the right of the top bar until she asked for it here, in place of
+   "Working". It wears the line's own uppercase mono (team.css), so the mark is
+   drawn a size down to sit on a 12 point line, and the dot that separates it
+   from the facts after it is the same dot the live word used to carry. */
+.ts-lead { display: inline-flex; align-items: center; flex: none; white-space: nowrap; }
+.ts-lead .ts-st { width: 10px; height: 10px; margin-right: 8px; }
+.by-lead .ts-lead ~ .fm-said::before { content: '· '; }
+
+/* THE TOP BAR: the square Summary button with its key, then the square
+   three-dot button that opens the thread's menu. It rides in the corner socket,
+   which is display: contents, so this group is laid out by the corner row
+   itself, and it ends on the bar's right edge. The 2 points above and below
+   keep the row the 34 it was with the terminal and Done marks in it, so the
+   Summary button stays where it was approved (56..86 at 1440). */
+.ts-top { display: inline-flex; align-items: center; gap: 10px; margin: 2px 0; }
+.ts-sumbtn { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+.ts-sumbtn:hover { color: var(--text); border-color: var(--line-strong); }
+.ts-sumbtn.on { background: var(--wash-strong); color: var(--text); border-color: var(--line-strong); }
+.ts-sumbtn kbd { font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; padding: 0; }
+
+/* THE THREAD'S MENU (threads/ThreadMenu.tsx). The button is the Summary
+   button's square: its height, its hairline, its hover. The menu is the app's
+   own popover, `.th-menu` in pages.css, dropped from the button's right edge
+   because the button is at the right of the window. */
+.ts-more-wrap { position: relative; display: inline-flex; }
+.ts-more { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim); cursor: pointer; }
+.ts-more:hover, .ts-more[aria-expanded="true"] { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
+.ts-more:focus-visible { outline: 2px solid var(--underline); outline-offset: 2px; }
+.th-menu.ts-more-menu { top: calc(100% + 6px); left: auto; right: 0; min-width: 264px; }
+/* THE BAR RISES WHILE ITS MENU IS OPEN. The bar is its own layer at 1 and the
+   summary panel under it stands at 2, so the menu was drawn under the panel's
+   words (measured in the built renderer, "Status Running" through the card).
+   3 clears the panel and stays under the app's modals at 40. */
+.workspace-layout > .topbar:has(.ts-more-menu) { z-index: 3; }
+.ts-more-menu .ts-more-row { width: 100%; white-space: nowrap; }
+.ts-more-menu .ts-more-row:focus-visible { outline: none; background: rgba(255,255,255,.07); color: var(--text); }
+:root[data-theme="light"] .ts-more-menu .ts-more-row:focus-visible { background: var(--wash-strong); }
+.ts-more-label { flex: 1; }
+.ts-more-menu kbd { margin-left: 18px; font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; padding: 0; }
+/* The figures on the code row are the ones that closed the line under the
+   title, in the code pane's two colours. Here they are a detail of the row,
+   not a control of their own, so they take the row's pointer. */
+.ts-more-menu .change-figures { margin-left: 18px; font-size: 12px; cursor: inherit; }
+.ts-more-menu .change-figures .code-plus, .ts-more-menu .change-figures .code-minus { font-size: 12px; }
+
+/* THE PANEL, on the right of the conversation. The conversation and the reply
+   dock both give up its width, so the words narrow beside it rather than run
+   under it, and it scrolls on its own. */
+.focus-pane[data-summary="open"] > .focus-scroll,
+.focus-pane[data-summary="open"] > .focus-dock { margin-right: var(--ts-panel-w); }
+/* A pane with its own band (no top bar to portal into) narrows that too, and
+   the band's inset is reckoned against the narrower column. */
+.focus-pane[data-summary="open"] > .keep-line { margin-right: var(--ts-panel-w); }
+.focus-pane[data-summary="open"] { --keep-inset: max(32px, calc((100% - var(--ts-panel-w) - var(--read-w)) / 2 + 32px)); }
+/* No fill of its own: it sits beside the words rather than over them, and a
+   fill would paint over the frame's corner marks. */
+.ts-panel { position: absolute; top: 0; right: 0; bottom: 0; width: var(--ts-panel-w); box-sizing: border-box; padding: 26px 28px 40px; border-left: 1px solid var(--line); background: none; overflow-y: auto; z-index: 2; }
+
+/* THE THREAD'S NAME, the row's own (list-rules.ts rowTitle), so the panel
+   says what it is about before it says anything about it. Three lines at most;
+   the conversation beside it has the rest. Read-only, so it answers no hover. */
+.ts-title { margin: 0 0 22px; font-size: 16px; font-weight: 500; line-height: 23px; letter-spacing: -.01em; color: var(--text); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+.ts-props { display: grid; grid-template-columns: 92px minmax(0, 1fr); row-gap: 14px; font-size: 13.5px; line-height: 20px; margin: 0 0 26px; }
+.ts-label { color: var(--text-faint); font-size: 13px; }
+.ts-value { color: var(--text); display: flex; align-items: center; min-width: 0; }
+.ts-value .tm-av { margin-right: 8px; }
+.ts-menu-anchor { position: relative; }
+/* A FIELD SHE CAN CHANGE ANSWERS THE POINTER (2026-10-01). A dotted underline
+   on hover was the only sign Priority could be changed, and it took a
+   deliberate click to find out. Now the whole value cell washes, the pointer
+   says it is pressable, and a caret at its right end says a menu opens. The
+   wash runs 8px past the words on each side, pulled back by the margin, so the
+   words still line up with the read-only values above them, which have no
+   hover of any kind. */
+.ts-prop-btn { flex: 1; min-width: 0; display: flex; align-items: center; margin: -3px -8px; padding: 3px 8px; font: inherit; color: inherit; background: none; border: 0; border-radius: var(--radius); cursor: pointer; text-align: left; transition: background-color .08s ease; }
+.ts-prop-btn .prio-bars, .ts-who { margin-right: 8px; flex: none; }
+.ts-who { color: var(--text-dim); }
+.ts-prop-btn:hover, .ts-prop-btn:focus-visible, .ts-prop-btn[aria-expanded="true"] { background: var(--wash); outline: none; }
+/* The caret and the pencil: there for the hand on the field, invisible to the
+   eye only reading it. */
+.ts-caret, .ts-pen { flex: none; color: var(--text-faint); opacity: 0; transition: opacity .08s ease; }
+.ts-caret { margin-left: auto; padding-left: 8px; box-sizing: content-box; }
+.ts-prop-btn:hover .ts-caret, .ts-prop-btn:focus-visible .ts-caret, .ts-prop-btn[aria-expanded="true"] .ts-caret { opacity: 1; }
+
+.ts-h { display: block; margin: 0 0 10px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+
+.ts-links { margin: 0 0 26px; display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; line-height: 20px; color: var(--text); }
+.ts-link-row { position: relative; display: flex; align-items: baseline; gap: 10px; }
+.ts-link-row > .ts-label { width: 82px; flex: none; }
+.ts-link-values { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; flex: 1; padding-right: 22px; }
+.ts-link { display: flex; align-items: center; gap: 6px; max-width: 100%; }
+.ts-link-title { font: inherit; color: var(--text); background: none; border: 0; padding: 0; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ts-link-title:disabled { cursor: default; }
+.ts-link-title.dim { color: var(--text-dim); }
+.ts-link-title:not(:disabled):hover { text-decoration: underline dotted var(--line-strong); text-underline-offset: 3px; }
+/* The remove and add marks are there for the hand that is already on the row,
+   and invisible to the eye that is only reading it. */
+.ts-x, .ts-add { display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: var(--radius); background: none; color: var(--text-faint); cursor: pointer; flex: none; opacity: 0; }
+.ts-link-row:hover .ts-x, .ts-link-row:hover .ts-add, .ts-x:focus-visible, .ts-add:focus-visible, .ts-add[aria-expanded="true"] { opacity: 1; }
+.ts-x:hover, .ts-add:hover { color: var(--text); background: var(--wash-strong); }
+/* The add mark sits at the row's right end, out of the flow, so a row with
+   links is exactly as tall as its titles. */
+.ts-add:not(.ts-add-empty) { position: absolute; right: 0; top: 1px; }
+/* "None" opens the same menu the plus does, so it answers the pointer the way
+   Priority does: the wash across the value, and the caret at the same right
+   edge (the 22px the plus keeps clear, plus the wash's 8). */
+.ts-add-empty { display: flex; align-items: center; align-self: stretch; width: auto; height: auto; margin: -3px -30px -3px -8px; padding: 3px 8px; opacity: 1; font: inherit; color: var(--text-faint); text-align: left; transition: background-color .08s ease; }
+.ts-add-empty:hover, .ts-add-empty:focus-visible, .ts-add-empty[aria-expanded="true"] { background: var(--wash); color: var(--text-dim); }
+.ts-add-empty:hover .ts-caret, .ts-add-empty:focus-visible .ts-caret, .ts-add-empty[aria-expanded="true"] .ts-caret { opacity: 1; }
+
+/* the link and priority menus drop from the row, since the panel sits high */
+.ts-panel .prio-menu.ts-menu { top: calc(100% + 6px); bottom: auto; left: -9px; }
+.ts-panel .prio-menu.ts-menu-wide { left: 82px; right: -9px; min-width: 0; max-height: 280px; overflow-y: auto; }
+.ts-menu .prio-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* and each choice in them answers the pointer the way the field that opened it did */
+.ts-panel .ts-menu .prio-menu-row:hover, .ts-panel .ts-menu .prio-menu-row:focus-visible { background: var(--wash); color: var(--text); outline: none; }
+.ts-menu .ts-who { margin-right: 0; }
+.ts-menu-head { display: block; padding: 6px 9px 4px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.ts-menu-none { display: block; padding: 6px 9px 8px; font-size: 13px; color: var(--text-faint); }
+
+.ts-rule { height: 1px; background: var(--line); margin: 0 0 22px; }
+
+/* THE THREE LINES. Each one is its own text box the moment it is clicked, and
+   the box is the same shape as the line: same type, same padding, a border
+   that was there all along in transparent. Under the pointer a line washes
+   like the fields above it and shows a pencil at its top right, in room both
+   shapes keep clear on the right, so the words do not move when it opens. */
+.ts-sec { margin: 0 0 18px; }
+.ts-line, .ts-edit { display: block; box-sizing: border-box; width: calc(100% + 16px); margin: 0 -8px; padding: 6px 28px 6px 8px; border: 1px solid transparent; border-radius: var(--radius); font: inherit; font-size: 13.5px; line-height: 21px; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ts-line { position: relative; cursor: pointer; transition: background-color .08s ease; }
+.ts-line:hover { background: var(--wash); }
+.ts-pen { position: absolute; top: 10px; right: 8px; }
+.ts-line:hover .ts-pen, .ts-line:focus-visible .ts-pen { opacity: 1; }
+.ts-line:focus-visible { outline: none; border-color: var(--line-strong); }
+.ts-line.dim { color: var(--text-dim); }
+.ts-edit { resize: none; overflow: hidden; border-color: var(--line-strong); background: var(--wash); outline: none; caret-color: var(--accent); }
+.ts-by { font-size: 12px; line-height: 18px; color: var(--text-faint); margin-top: 4px; }
+.ts-by-error { color: var(--text-dim); }
+
+/* THE MODEL, at the right end of the reply box's pill. A dotted underline
+   says it opens something, the way every other word that opens a drawer in
+   the composer's sentence does. */
+.ts-model { margin-right: 12px; font-size: 13px; color: var(--text-dim); text-decoration: underline dotted var(--line-strong); text-underline-offset: 3px; white-space: nowrap; cursor: pointer; }
+.ts-model:hover { color: var(--text); }
+
+/* A MESSAGE FROM A PERSON: one quiet line under the latest message. */
+.ts-hand { margin: 18px 0 0; font-size: 13px; line-height: 20px; color: var(--text-faint); }
+.ts-hand button { font: inherit; color: var(--text-dim); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline dotted var(--line-strong); text-underline-offset: 3px; }
+.ts-hand button:hover { color: var(--text); }
+
+/* A TEAMMATE'S THREAD: one centred card made of the summary's fields. */
+.ts-ticket { max-width: 680px; margin: 44px auto 40px; box-sizing: border-box; border: 1px solid var(--line); border-radius: var(--radius); background: var(--wash); padding: 26px 30px 24px; }
+.ts-tk-top { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--text-dim); margin: 0 0 18px; }
+.ts-tk-top > span { display: inline-flex; align-items: center; }
+.ts-tk-top .ts-st { margin-right: 7px; }
+.ts-tk-top .prio-bars { margin-right: 7px; }
+.ts-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--text-faint); flex: none; }
+.ts-tk-lead { margin: 0 0 24px; font-size: 18px; line-height: 28px; letter-spacing: -.01em; color: var(--text); }
+.ts-tk-lead.dim, .ts-ticket p.dim, .ts-ticket span.dim { color: var(--text-dim); }
+.ts-tk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 20px 0 22px; border-top: 1px solid var(--line); }
+.ts-tk-grid .ts-h { margin: 0 0 6px; }
+.ts-tk-grid p { margin: 0; font-size: 14px; line-height: 21px; color: var(--text); }
+.ts-tk-next { padding-top: 16px; border-bottom: 1px solid var(--line); }
+.ts-tk-foot { display: flex; align-items: center; gap: 10px; padding-top: 16px; font-size: 13px; color: var(--text-faint); }
+.ts-tk-foot .tm-av { width: 22px; height: 22px; line-height: 20px; font-size: 8px; }
+.ts-tk-foot b { font-weight: 400; color: var(--text); }
+.ts-tk-state { display: inline-flex; align-items: center; margin-left: auto; color: var(--text-dim); }
+.ts-ticket-private .ts-tk-lead { margin-bottom: 4px; }
+
+/* "Message Maya": their face and the words, square, for the top bar */
+.ts-msgbtn { display: inline-flex; align-items: center; gap: 9px; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
+.ts-msgbtn:hover { background: var(--wash-strong); }
