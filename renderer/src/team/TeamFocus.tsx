@@ -45,6 +45,9 @@ export function TeamRouteStrip({ item }: { item: WorkItem }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (!team || !teamHeld(item, team) || item.assignee !== team.me) return null;
+  // A message is talk, not a task (approved 2026-10-01): its page offers the
+  // one way to make work of it, "Hand it to an agent", and nothing else.
+  if ((team.products.get(item.product) as { team?: { direct?: boolean } } | undefined)?.team?.direct) return null;
   // Once you have chosen to keep it, the choices go away.
   if (item.wrote?.assignee?.by === team.me) return null;
   const from = (item.people ?? []).find((p) => p !== team.me) ?? item.createdBy ?? undefined;
