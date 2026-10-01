@@ -166,3 +166,7 @@
 .workspace-collapsed .workspace-navigation .th-me-btn { width: 38px; padding: 0 0 0 8px; }
 .workspace-collapsed .workspace-navigation .th-me-btn > .tm-av { display: inline-block; }
 .th-card-title { margin: 0 0 14px; font-size: 18px; font-weight: 500; letter-spacing: -.01em; color: var(--text); }
+/* Collapsed, the Inbox still says something is waiting: a dot where the
+   number was (a persona lost the count when the sidebar was shut). */
+.workspace-collapsed .workspace-navigation .workspace-tab.has-count { position: relative; }
+.workspace-collapsed .workspace-navigation .workspace-tab.has-count::after { content: ''; position: absolute; top: 8px; right: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
