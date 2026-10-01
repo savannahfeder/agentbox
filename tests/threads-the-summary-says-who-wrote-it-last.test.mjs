@@ -61,7 +61,7 @@ describe('the line under the summary', () => {
 
 describe('the state, as a word and a mark', () => {
   it('has exactly the four approved words', () => {
-    expect(STATE_WORD).toEqual({ waiting: 'Waiting', running: 'Running', scheduled: 'Scheduled', done: 'Done' });
+    expect(STATE_WORD).toEqual({ waiting: 'Waiting', running: 'In progress', scheduled: 'Scheduled', done: 'Done' });
   });
   it('fills the mark when the thread waits on you and leaves it hollow when it waits on someone else', () => {
     expect(stateGlyph('waiting', true)).toBe('need');

@@ -122,7 +122,7 @@ describe('the ⌘K beat', () => {
     // other half of this beat is only read by somebody who pressed.
     expect(shut.quiet).toContain('type tutorial');
     // w-ec62ab6b38 (2026-09-28): her word for a row is thread now, not task.
-    expect(`${shut.lead}${shut.tail}`).toBe('Press  to find any command. Press N to start your first real thread.');
+    expect(`${shut.lead}${shut.tail}`).toBe('Press  to find any command, or N to start your first real thread.');
     expect(shut.key).toBe('⌘K');
   });
 

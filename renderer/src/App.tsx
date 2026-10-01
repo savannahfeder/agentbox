@@ -13,7 +13,7 @@ import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, ThreadCard, View, WorkItem } from './types';
+import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import { api } from './api';
 import { setClaudeModels } from './models';
 import { advanceAfter, type Advance } from './advance';
@@ -114,7 +114,7 @@ import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
 import { TeamContext, teamView } from './team/people';
 import { TeamPage } from './team/TeamPage';
-import { EmptyTab, HeaderActions, InboxBoard, InboxClear, StateTabs, TeamView } from './threads/Pages';
+import { EmptyTab, HeaderActions, InboxBoard, InboxClear, LiveContext, StateTabs, TeamView } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
 import { conversationWith, isDirect, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
@@ -1967,6 +1967,20 @@ export default function App() {
     if (run?.step !== 'working' || !run.item) return real;
     return [{ itemId: run.item, product: run.product ?? '', startedAt: run.sentAt ?? Date.now(), tail: [] }, ...real];
   }, [snap?.supervisor.running, run?.step, run?.item, run?.product, run?.sentAt]);
+  // THE THREADS AN AGENT IS ON RIGHT NOW: the turning mark (threads/Pages.tsx).
+  const liveIds = useMemo(() => new Set(runningRows.map((r) => r.itemId)), [runningRows]);
+  // ONE RULE FOR WHERE A THREAD SITS, THE TABS' OWN (her note, 2026-10-01: the
+  // board said Running for queued work the tab did not). Needs you wins, then
+  // In progress, Scheduled and Done, exactly as the tabs list them.
+  const tabState = useMemo(() => {
+    const m = new Map<string, ThreadStateWord>();
+    for (const i of done) m.set(i.id, 'done');
+    for (const i of snoozed) m.set(i.id, 'scheduled');
+    for (const i of progress) m.set(i.id, 'running');
+    for (const i of inbox) m.set(i.id, 'waiting');
+    return m;
+  }, [inbox, progress, snoozed, done]);
+  const stateOfMine = useCallback((i: WorkItem) => tabState.get(i.id) ?? null, [tabState]);
 
   const current: WorkItem | undefined = list[Math.min(selected, Math.max(0, list.length - 1))];
   // THE ROW THE ROW-KEYS ACT ON. The pointer's row when it is on one, and the
@@ -4337,6 +4351,7 @@ export default function App() {
   // merely further up.
   return (
     <TeamContext.Provider value={team}>
+    <LiveContext.Provider value={liveIds}>
     <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${workspaceCollapsed ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}`}>
       {signInGate && <SignInPage signedOut={signedOutHere} error={snap?.team?.error ?? null} />}
       {/* THE TOP BAR IS NOT DRAWN ON AN OPENED TASK.
@@ -4773,7 +4788,7 @@ export default function App() {
                 {/* Kept mounted under an open card, so Back finds the person
                     and project it was filtered to (a persona test lost both). */}
                 <div hidden={!!openCard}>
-                <TeamView items={items} products={snap.products} cards={snap.team.cards ?? []} display={teamDisplay} now={now}
+                <TeamView items={items} products={snap.products} cards={snap.team.cards ?? []} display={teamDisplay} now={now} stateOf={stateOfMine}
                   // BACK RETURNS TO TEAM (her bug, 2026-10-01): the Team page
                   // stays open under a thread opened from it, so closing the
                   // thread lands where she came from, not on the Inbox.
@@ -4983,7 +4998,7 @@ export default function App() {
                     Scheduled, Done and All, on the Inbox itself. They replace
                     the sidebar places they used to be. */}
                 {workspaceNavigation && search === null && inboxDisplay.view === 'board' ? (
-                  <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now}
+                  <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine}
                     onOpenItem={(item) => { setFocused(item); markSeen(item); }} />
                 ) : <>
                 {workspaceNavigation && search === null && (
@@ -5975,6 +5990,7 @@ export default function App() {
       {/* ⌘F, on every screen, for the same reason. */}
       <FindBar />
     </div>
+    </LiveContext.Provider>
     </TeamContext.Provider>
   );
 }

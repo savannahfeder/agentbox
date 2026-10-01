@@ -186,3 +186,11 @@
    number was (a persona lost the count when the sidebar was shut). */
 .workspace-collapsed .workspace-navigation .workspace-tab.has-count { position: relative; }
 .workspace-collapsed .workspace-navigation .workspace-tab.has-count::after { content: ''; position: absolute; top: 8px; right: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+/* IN PROGRESS, AND AN AGENT ON IT NOW (2026-10-01). Queued and running share
+   the word; only the ones an agent is on turn. */
+.th-st.live { animation: th-turn 1.6s linear infinite; }
+@keyframes th-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .th-st.live { animation: none; } }
+.th-cell-title .th-st.live { margin-right: 8px; top: 1px; }
+.th-card .m .th-st.live { margin-right: 8px; top: 0; }

@@ -97,8 +97,8 @@ describe('the state leads the line under the title, said once', () => {
       facts: { session, inProgress: true, engineChoice: true },
       lead: React.createElement(ThreadStateMark, { item: running }),
     }));
-    expect(text(html)).toBe('Running 1m Agentbox · Claude Code');
-    expect(html.indexOf('ts-st-run')).toBeLessThan(html.indexOf('Running'));
+    expect(text(html)).toBe('In progress 1m Agentbox · Claude Code');
+    expect(html.indexOf('ts-st-run')).toBeLessThan(html.indexOf('In progress'));
     expect(html).not.toMatch(/live-word/);
   });
 
@@ -111,7 +111,7 @@ describe('the state leads the line under the title, said once', () => {
     const mark = (o) => draw(React.createElement(ThreadStateMark, { item: row(o) }));
     expect(text(mark({ result: 'Two tiers or three?', labels: [] }))).toBe('Waiting');
     expect(mark({ result: 'Two tiers or three?', labels: [] })).toContain('ts-st-need');
-    expect(text(mark({ status: 'claimed', claim: { holder: 'h', leaseUntil: NOW + M } }))).toBe('Running');
+    expect(text(mark({ status: 'claimed', claim: { holder: 'h', leaseUntil: NOW + M } }))).toBe('In progress');
     expect(text(mark({ runAt: NOW + 60 * M }))).toBe('Scheduled');
     expect(mark({ runAt: NOW + 60 * M })).toContain('ts-st-sched');
     expect(text(mark({ status: 'done' }))).toBe('Done');

@@ -1320,7 +1320,7 @@ export const TEAM_TABS: readonly string[] = ['inbox', 'progress', 'snoozed', 'do
 
 /** And the words on those tabs, the same ones Pages.tsx draws. */
 export const TEAM_TAB_NAMES: Readonly<Record<string, string>> = {
-  inbox: 'Needs you', progress: 'Running', snoozed: 'Scheduled', done: DONE.short, all: 'All',
+  inbox: 'Needs you', progress: 'In progress', snoozed: 'Scheduled', done: DONE.short, all: 'All',
 };
 
 export function teamTab(view: string | null | undefined): string | null {
@@ -1739,7 +1739,7 @@ export function coach(
           'Everything you just did is one key away. So is this: type tutorial.',
           // ⌘K finds commands; N starts a thread. The old line read as if ⌘K
           // started one (a persona test, 2026-10-01).
-          'Press ', '⌘K', ' to find any command. Press N to start your first real thread.',
+          'Press ', '⌘K', ' to find any command, or N to start your first real thread.',
         );
     default:
       return null;

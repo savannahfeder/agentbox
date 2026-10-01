@@ -5,7 +5,7 @@
 // Everyone and project pickers over a board or a list. The rules they follow
 // are in ./page-rules.ts; the look is ./pages.css, ported from the drawings
 // she approved.
-import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName } from '../team/people';
@@ -40,9 +40,14 @@ export function SharedMark({ className = 'th-shared', label }: { className?: str
 }
 
 /* ------------------------------------------------------------ marks */
-export function StateGlyph({ state }: { state: ThreadStateWord }) {
-  return <span className={`th-st s-${state}`} aria-hidden="true" />;
+/** A thread's state mark. `live` turns it: an agent is on the thread now,
+ *  rather than the thread waiting its turn. */
+export function StateGlyph({ state, live = false }: { state: ThreadStateWord; live?: boolean }) {
+  return <span className={`th-st s-${state}${live ? ' live' : ''}`} aria-hidden="true" title={live ? 'An agent is on it now' : undefined} />;
 }
+
+/** The threads an agent is on right now, by id (App.tsx provides it). */
+export const LiveContext = createContext<Set<string>>(new Set());
 
 // THE APP'S OWN PRIORITY BARS. Urgent is a fourth bar, never an exclamation
 // mark in a box (w-bba20a03f5, Priority.tsx), whatever the drawing showed.
@@ -123,7 +128,7 @@ export function DisplayMenu({ page, display, onDisplay, products, shown, total }
 export type TabView = View | 'all';
 export const INBOX_TABS: { view: TabView; label: string }[] = [
   { view: 'inbox', label: 'Needs you' },
-  { view: 'progress', label: 'Running' },
+  { view: 'progress', label: 'In progress' },
   { view: 'snoozed', label: 'Scheduled' },
   { view: 'done', label: DONE.short },
   { view: 'all', label: 'All' },
@@ -193,13 +198,15 @@ export function otherPerson(item: WorkItem, me: string | null): string | null {
  *  2026-10-01: "The team page in list view should be the same component...
  *  with maybe some slight differences, such as an extra column for the
  *  person". So there is one set of cells, and the Team page only adds Person. */
-export function RowCells({ title, hidden = false, lock = false, shared = false, where, person, priority, updatedAt, now, action }: {
+export function RowCells({ live = false, title, hidden = false, lock = false, shared = false, where, person, priority, updatedAt, now, action }: {
+  /** An agent is on this thread right now: a turning mark before its name. */
+  live?: boolean;
   title: ReactNode; hidden?: boolean; lock?: boolean; shared?: boolean; where: ReactNode; person?: ReactNode;
   priority: number | null; updatedAt: number; now: number; action?: ReactNode;
 }) {
   const id = priority === null ? null : priorityIdOf(priority);
   return <div className={`row-main th-grid${person !== undefined ? ' with-person' : ''}`}>
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{title}{shared && <SharedMark label="Visible to the team" />}{lock && <LockMark />}</div>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live && <StateGlyph state="running" live />}{title}{shared && <SharedMark label="Visible to the team" />}{lock && <LockMark />}</div>
     <div className="th-cell-proj">{where}</div>
     {person !== undefined && <div className="th-cell-person">{person}</div>}
     <div className={`th-cell-prio${id === 'urgent' ? ' urgent' : ''}`}>{id && <><PriorityMark id={id} />{priorityLabelOf(id)}</>}</div>
@@ -211,6 +218,7 @@ export function RowCells({ title, hidden = false, lock = false, shared = false, 
 
 /** The cells of one row in the inbox's table: thread, project (or who a message is from), priority, updated. */
 export function ThreadCells({ item, product, now }: { item: WorkItem; product: Product | undefined; now: number }) {
+  const liveIds = useContext(LiveContext);
   const team = useContext(TeamContext);
   // WHO SEES IT, AT A GLANCE AND ONE CLICK FROM CHANGING (2026-10-01). A
   // people mark after the title of a thread the team can see and nothing on
@@ -249,7 +257,7 @@ export function ThreadCells({ item, product, now }: { item: WorkItem; product: P
   // A conversation with a person reads as its latest message, the way a chat
   // list does; every other row keeps its title.
   const latest = isDirect(product) ? (item.answer || item.body || '').trim().split('\n')[0] : '';
-  return <RowCells title={latest || rowTitle(item)} shared={seen === 'team'} where={where}
+  return <RowCells live={liveIds.has(item.id)} title={latest || rowTitle(item)} shared={seen === 'team'} where={where}
     priority={isDirect(product) ? null : item.priority ?? 0} updatedAt={item.updatedAt} now={now} action={action} />;
 }
 
@@ -262,8 +270,10 @@ function Picker({ label, open, setOpen, children }: { label: ReactNode; open: bo
   </span>;
 }
 
-export function TeamView({ items, products, cards, display, now, onOpenItem, onOpenCard }: {
+export function TeamView({ items, products, cards, display, now, onOpenItem, onOpenCard, stateOf }: {
   items: WorkItem[]; products: Product[]; cards: ThreadCard[]; display: Display; now: number;
+  /** Your own threads' column, by the Inbox tabs' rule (App.tsx). */
+  stateOf?: (item: WorkItem) => ThreadStateWord | null;
   onOpenItem: (item: WorkItem) => void; onOpenCard: (card: ThreadCard) => void;
 }) {
   const team = useContext(TeamContext);
@@ -276,7 +286,8 @@ export function TeamView({ items, products, cards, display, now, onOpenItem, onO
   const mine = everyone.find((p) => p.id === me) ?? null;
   const others = everyone.filter((p) => p.id !== me).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   const since = team?.state.since ?? null;
-  const all = useMemo(() => teamEntries({ items, products, cards, me, now, since }), [items, products, cards, me, now, since]);
+  const liveIds = useContext(LiveContext);
+  const all = useMemo(() => teamEntries({ items, products, cards, me, now, since, stateOf, live: liveIds }), [items, products, cards, me, now, since, stateOf, liveIds]);
   const entries = all.filter((e) => teamKeeps(e, { person, projectName }, display, now));
   const projectNames = [...new Set(all.map((e) => e.project).filter((p): p is string => !!p))].sort();
   const who = person ? team?.byId.get(person) ?? null : null;
@@ -305,7 +316,7 @@ export function TeamView({ items, products, cards, display, now, onOpenItem, onO
           <div className="th-col-h"><StateGlyph state={col.state} />{col.label}<b>{rows.length}</b></div>
           {rows.map((e) => <button type="button" key={e.key} className="th-card" onClick={() => open(e)}>
             <div className={`t${e.title === null ? ' hidden' : ''}`}>{e.title ?? 'Private thread'}{(e.title === null || e.item?.visibility === 'private') && <LockMark />}</div>
-            <div className="m">{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project ?? 'Hidden'}</span><Face person={e.ownerId ? team?.byId.get(e.ownerId) ?? null : null} me={e.ownerId === me} /></div>
+            <div className="m">{e.live && <StateGlyph state="running" live />}{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project ?? 'Hidden'}</span><Face person={e.ownerId ? team?.byId.get(e.ownerId) ?? null : null} me={e.ownerId === me} /></div>
           </button>)}
         </div>;
       })}
@@ -314,7 +325,7 @@ export function TeamView({ items, products, cards, display, now, onOpenItem, onO
       {entries.length === 0 && <div className="th-empty">Nothing here.</div>}
       {entries.map((e) => <div key={e.key} className="row" onClick={() => open(e)}>
         <span className="mark" aria-hidden="true" />
-        <RowCells title={e.title ?? 'Private thread'} hidden={e.title === null} lock={e.title === null || e.item?.visibility === 'private'}
+        <RowCells live={!!e.live} title={e.title ?? 'Private thread'} hidden={e.title === null} lock={e.title === null || e.item?.visibility === 'private'}
           where={e.project ?? 'Hidden'}
           person={<><Face person={e.ownerId ? team?.byId.get(e.ownerId) ?? null : null} me={e.ownerId === me} />{nameOf(e.ownerId)}</>}
           priority={e.priority} updatedAt={e.updatedAt} now={now} />
@@ -324,12 +335,15 @@ export function TeamView({ items, products, cards, display, now, onOpenItem, onO
 }
 
 /** Your own threads as a board, when the Inbox's Display says Board. */
-export function InboxBoard({ items, products, display, now, onOpenItem }: {
+export function InboxBoard({ items, products, display, now, onOpenItem, stateOf }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number; onOpenItem: (item: WorkItem) => void;
+  /** The column each thread sits in, by the Inbox tabs' rule (App.tsx). */
+  stateOf?: (item: WorkItem) => ThreadStateWord | null;
 }) {
+  const liveIds = useContext(LiveContext);
   const team = useContext(TeamContext);
   const me = team?.me ?? null;
-  const entries = teamEntries({ items, products, cards: [], me, now })
+  const entries = teamEntries({ items, products, cards: [], me, now, stateOf, live: liveIds })
     .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
     .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
   const teamSees = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since: team.state.since ?? null } : null) === 'team';
@@ -344,7 +358,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem }: {
             on nothing else. */}
         {rows.map((e) => <button type="button" key={e.key} className="th-card" onClick={() => e.item && onOpenItem(e.item)}>
           <div className="t">{e.title}{e.item && teamSees(e.item) && <SharedMark label="Visible to the team" />}</div>
-          <div className="m">{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project}</span></div>
+          <div className="m">{e.live && <StateGlyph state="running" live />}{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project}</span></div>
         </button>)}
       </div>;
     })}

@@ -47,7 +47,7 @@ describe('the top bar', () => {
   });
   it('says Running, Scheduled and Done for the other three states', () => {
     const say = (o) => text(draw(React.createElement(ThreadStateMark, { item: item(o) })));
-    expect(say({ status: 'claimed', claim: { holder: 'h', leaseUntil: NOW + M } })).toMatch(/^Running/);
+    expect(say({ status: 'claimed', claim: { holder: 'h', leaseUntil: NOW + M } })).toMatch(/^In progress/);
     expect(say({ runAt: NOW + 60 * M })).toMatch(/^Scheduled/);
     expect(say({ status: 'done' })).toMatch(/^Done/);
   });
