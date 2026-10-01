@@ -263,7 +263,7 @@ export function createTeamService({
       const title = firstSentence(text, 90) || text.slice(0, 90);
       const convo = conversationIn(product.slug);
       if (convo) {
-        store.answerItem(product.slug, convo.id, { answer: text, status: 'open' });
+        store.answerItem(product.slug, convo.id, { answer: text });
         store.teamPatch(product.slug, convo.id, { assignee: to });
         onChange();
         await syncNow();

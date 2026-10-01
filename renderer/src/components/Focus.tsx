@@ -19,7 +19,7 @@ import { providerCommand } from '../../../shared/provider-commands.mjs';
 // a docked composer, never a modal over the text.
 
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { TeamContext } from '../team/people';
+import { TeamContext, firstName } from '../team/people';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -497,6 +497,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // is a narrow column, and a 352 point panel inside it would leave the words
   // no room; the button goes with it, so nothing on screen does nothing.
   const direct = teamCtx?.products.get(item.product)?.team?.direct === true;
+  // Who a conversation is with, from where you sit, for its reply box.
+  const talkName = direct && teamCtx
+    ? firstName(teamCtx.byId.get((item.people ?? []).find((p) => p !== teamCtx.me) ?? (item.createdBy !== teamCtx.me ? item.createdBy ?? '' : item.assignee ?? '')) ?? null)
+    : null;
   const summarised = !agent && !made && !direct;
   const [summaryOpen, toggleSummary] = useSummaryOpen();
   const summaryOffered = summarised && !openDoc;
@@ -1521,7 +1525,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} stop={stopButton} />
+            <DockComposer talkTo={direct ? talkName : null} item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
@@ -1738,8 +1742,11 @@ function ModePicker({ value, options, label, onChange }: {
   );
 }
 
-function DockComposer({ item, runningMode, runningEngine, codexModels = [], codexModelDefault = null, onSend, onClose, onNotice, stop, openModel = false }: {
+function DockComposer({ item, runningMode, runningEngine, codexModels = [], codexModelDefault = null, onSend, onClose, onNotice, stop, openModel = false, talkTo = null }: {
   item: WorkItem;
+  /** On a conversation with a person, their first name: the box replies to
+   *  them, and nothing about an agent, a priority or a model is offered. */
+  talkTo?: string | null;
   runningMode?: PermissionMode;
   /**
    * WHICH CODING AGENT THIS ROW'S NEXT SEND WILL REACH, for the slash menu and
@@ -2212,7 +2219,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
            typed here becomes the agent's next instruction, without having to explain it.
            `tests/the-reply-box-asks-one-question.test.mjs` holds the sentence count.
         */
-        placeholder="What should the agent do next?"
+        placeholder={talkTo ? `Reply to ${talkTo}` : 'What should the agent do next?'}
         onKeyDown={(e) => {
           // THE MENU TAKES THE KEYS FIRST WHILE IT IS OPEN, and gives every
           // one of them back the moment it closes. Escape here clears the
@@ -2307,7 +2314,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             sentence about a thing that is not happening. What is left is the
             send button, which is the whole act. */}
         <span className="compose-clauses">
-          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : <>
+          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo ? <span className="dim">Only you and {talkTo} see this.</span> : <>
           <PriorityPicker
             variant="word"
             value={shown}

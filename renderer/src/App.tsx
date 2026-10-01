@@ -3109,7 +3109,10 @@ export default function App() {
     // handed in rather than read off `item.engine`, which is what she MARKED
     // and may be a row from before the gate; this is what will really pick it
     // up.
-    const stay = staysOnTheTask(item, text, engine);
+    // A REPLY IN A CONVERSATION STAYS IN THE CONVERSATION (persona test,
+    // 2026-10-01: sending to Bea "kicked me out to search").
+    const talking = isDirect(snap?.products.find((p) => p.slug === item.product));
+    const stay = talking || staysOnTheTask(item, text, engine);
     if (stay) setFollowing({ product: item.product, id: item.id });
     await deferCommit(item, async () => {
       await api.answer({
@@ -3146,8 +3149,8 @@ export default function App() {
         // means what it always meant.
         setFollowing(null);
       } });
-    }, `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id });
-  }, [deferCommit, snap?.supervisor.running, showToast, refresh, markSeen, pushUndo]);
+    }, talking ? 'Sent' : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id });
+  }, [deferCommit, snap?.supervisor.running, snap?.products, showToast, refresh, markSeen, pushUndo]);
 
   /* ------------------------ answering one of her agents -------------------- */
   // THE ONE THING AGENTBOX SAYS OUT LOUD TO THE REST OF HER MACHINE. The reply goes
