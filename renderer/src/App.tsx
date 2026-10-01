@@ -26,7 +26,7 @@ import type { PendingSaid } from './item-thread';
 import { DocPane, type OpenDoc } from './components/DocPane';
 import { docKind, EVEN_SPLIT, escapeClosesDoc, escapeInTheFileClosesIt, focusIsInTheFile, readSplit, writeSplit } from './doc-pane';
 import { changeOwnsKey } from './code-keys';
-import { askStillStands, nextUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO } from './undo-window';
+import { askStillStands, nextUndo, shownAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO } from './undo-window';
 import { whatTheFileSentUp } from '../../shared/artifact-keys.mjs';
 import { type Place, placeIsSomewhere, readPlace, writePlace, writeScroll } from './where-she-was';
 import { documentCandidates } from './message-artifacts';
@@ -694,6 +694,8 @@ export default function App() {
     undoes: string;
     run: () => Promise<void>;
     restore?: () => Restored;
+    /** The row this puts back, which a Z opens once it has run (./undo-window, `shownAfterUndo`). */
+    brings?: WorkItem;
   };
   const [undoStack, setUndoStack] = useState<Array<Undoable & { at: number }>>([]);
   /**
@@ -2861,7 +2863,7 @@ export default function App() {
     }
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, status: 'done' });
-      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'open' }); } });
+      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'open' }); } });
     }, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`);
   }, [deferCommit, closeAgentRow, closeTroubleRow, closeUpdateRow, snap?.supervisor.spawnTrouble?.since, snap?.update?.newVersion, run, showToast, pushUndo]);
 
@@ -2898,7 +2900,7 @@ export default function App() {
         // user-visible strings held one, and they are the four undo labels, the
         // two stop toasts and the resume toast. Everything else was comment
         // prose, which she never reads.
-        pushUndo({ label: 'Approval withdrawn, back in your inbox', undoes: 'take back that approval and stop the agent', run: async () => {
+        pushUndo({ label: 'Approval withdrawn, back in your inbox', undoes: 'take back that approval and stop the agent', brings: item, run: async () => {
           await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
           await api.answer({ product: item.product, id: item.id, answer: '(withdrawn)', status: 'open' });
         } });
@@ -3272,7 +3274,7 @@ export default function App() {
     const status = statusForReply(item.status);
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, answer: `Option ${option.n}: ${option.text}`, ...(status ? { status } : {}) });
-      pushUndo({ label: `Option ${option.n} withdrawn, back in your inbox`, undoes: `take back option ${option.n}`, run: async () => {
+      pushUndo({ label: `Option ${option.n} withdrawn, back in your inbox`, undoes: `take back option ${option.n}`, brings: item, run: async () => {
         await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
         // Back exactly where the pick found it, the same one write a typed
         // reply's undo makes. Hardcoding 'open' was right while a pick could
@@ -3650,10 +3652,15 @@ export default function App() {
       return;
     }
     undoAskRef.current = null;
+    // The close that put this row away also queued the step onto the next task.
+    // If that step has not been taken yet, it must not be taken now, or it
+    // would open the next task straight over the row this Z brings back.
+    advanceRef.current = null;
     setUndoStack(rest);
     await last.run();
     const restored = last.restore?.();
     const item = restoredItem(restored ?? null);
+    const shown = shownAfterUndo(restored, last.brings);
     // Say what the undo actually did, AND WHERE THE WORDS WENT, because the two
     // boxes are different places and she has to be told which one to look in. A
     // bare "Undone" left her hunting for a task Z had silently pulled out of
@@ -3667,8 +3674,11 @@ export default function App() {
     // A withdrawn reply reopens where she was writing it, words and all. A
     // withdrawn new task reopens the card instead: there is no thread to go to,
     // and the whole point of the press was to add a sentence to what was written.
-    if (item) { setFocused(item); markSeen(item); }
-    else if (restored) { setFocused(null); setModal('compose'); }
+    // AND A ROW IT PUT BACK IS OPENED, the same as a Z inside the grace window
+    // opens it. It used to be announced and left in the list, while she stayed
+    // on whatever the close had moved her to (w-7eb39d3c97).
+    if (shown.open) { setFocused(shown.open); markSeen(shown.open); }
+    else if (shown.compose) { setFocused(null); setModal('compose'); }
   }, [undoStack, refresh, showToast, markSeen]);
 
   /* ------------------------------- keyboard ------------------------------- */
