@@ -4515,7 +4515,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">{membersOpen ? 'Team members' : openCard ? 'Inbox' : 'Team'}</h1> : <h1 className="workspace-title">Inbox</h1>)) : (
+        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">{membersOpen ? 'Team members' : openCard ? 'Threads' : 'Team'}</h1> : <h1 className="workspace-title">Threads</h1>)) : (
         <nav
           className="tabs"
           /* NO HINT ON THIS NAV. It carried one while the keys were ⌘⌥ and an
@@ -4825,8 +4825,10 @@ export default function App() {
                      same summary fields, and Message Maya in its top bar. */
                   <div className="th-card-page">
                     <div className="th-card-bar">
-                      {/* Back to the Inbox, with the same people picked. */}
-                      <button type="button" className="th-back" onClick={() => { setOpenCard(null); setTeamOpen(false); }}><span aria-hidden="true">←</span>Inbox</button>
+                      {/* Back to Threads, with the same people picked. The
+                          page is called Threads since w-05ff3d1438: once a
+                          teammate is on it, it is more than an inbox. */}
+                      <button type="button" className="th-back" onClick={() => { setOpenCard(null); setTeamOpen(false); }}><span aria-hidden="true">←</span>Threads</button>
                       <MessagePerson person={team?.byId.get(openCard.personId) ?? null}
                         onMessage={() => {
                           const convo = conversationWith(openCard.personId, { products: snap.products, items, me: team?.me ?? null });
