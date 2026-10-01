@@ -194,7 +194,7 @@
    short list of sections on the left, and one card holding every section as a
    page you read. It is wider than the other settings pages because what it
    shows is documents, not rows. */
-.set-inner.instructions-page { max-width:1200px; padding-left:8px; padding-right:8px; }
+.set-inner.instructions-page { max-width:1200px; }
 /* THE HEADING IS THE SWITCH. A dotted underline did not read as something to
    click, so the words carry a solid underline and an arrow after them. */
 .instr-lead { font-size:20px; font-weight:600; letter-spacing:-.012em; margin:0 0 24px; color:var(--text); }
