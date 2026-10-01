@@ -6710,9 +6710,13 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 }
 .fr-screen-intro .fr-go { position: fixed; right: 64px; bottom: 64px; margin: 0; }
 
+/* INSIDE THE WINDOW (2026-10-01). It ran 190px off the right edge on purpose,
+   to stay at full size; at 1440 by 900 a persona test flagged it as a panel
+   running off the edge. It stops 40px short of the edge now, still at full size,
+   and the list inside it gives up the margin it kept for the overhang. */
 .fr-piece {
   position: absolute; z-index: 300;
-  left: 47%; right: -190px;
+  left: 47%; right: 40px;
   /* CENTRED ON THE SENTENCE, not hung off the top of the window. The two halves
      of the screen are one statement and they read as one only if they are at
      the same height. */
@@ -6721,8 +6725,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   padding: 22px 0 0 36px;
   display: flex; flex-direction: column; gap: 20px;
   background: var(--bg);
-  border-top-left-radius: var(--radius);
-  border-bottom-left-radius: var(--radius);
+  border-radius: var(--radius);
   box-shadow: 0 0 0 1px var(--line), var(--shadow-lg);
 }
 /* AND UNDER A SKIN IT IS GLASS, NOT A SLAB, which is what the app already
@@ -6757,7 +6760,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
    rows on a raised surface with the window's ground round them. It stops short
    of the window's right edge so a row's own right end, the project and the
    time, is inside the picture; what runs off the edge is the ground under it. */
-.fr-piece .list-pane { flex: 1; min-height: 0; overflow: hidden; margin-right: 226px; }
+.fr-piece .list-pane { flex: 1; min-height: 0; overflow: hidden; margin-right: 22px; }
 .fr-piece .tabs { flex: 0 0 auto; }
 /* Nothing in here is pressable and nothing in here answers a pointer. It is a
    still of the product drawn out of live elements, so every hover rule those
@@ -7389,13 +7392,16 @@ a.set-ghost { text-decoration: none; display: inline-block; }
    second thing to learn.
 */
 .fr-lights { display: flex; gap: 8px; margin-top: 12px; }
-.fr-tether .fr-lights kbd { margin: 0; padding: 3px 11px; font-size: 14px; }
+/* DOTS, NOT KEYS (2026-10-01): two E caps under "Press E" read as "E E". */
+.fr-tether .fr-lights .fr-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--text-dim);
+}
 /* SPENT, NOT MISSING. A light that has been pressed fills rather than fading
-   out: three empty boxes at the end would read as three still to do. */
-.fr-tether .fr-lights kbd.fr-lit {
+   out: empty dots at the end would read as still to do. */
+.fr-tether .fr-lights .fr-dot.fr-lit {
   background: var(--text);
-  border-color: var(--text);
-  color: var(--bg);
+  box-shadow: none;
 }
 /* `.fr-why` IS DELETED, AND WITH IT THE THIRD LINE OF EVERY CARD IN THE WALK.
    It was a sentence under a hairline rule saying why the beat mattered, on four
@@ -7944,13 +7950,28 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%);
   width: min(560px, calc(100vw - 96px));
   text-align: center;
-  animation: fr-landed-say 5.2s ease forwards;
+  animation: fr-landed-say 14s ease forwards;
 }
+/* Timed to LANDED_MS in components/Onboarding.tsx: in over half a second, out
+   over the last second. */
 @keyframes fr-landed-say {
   0%   { opacity: 0; transform: translate(-50%, calc(-50% + 10px)); }
-  9%   { opacity: 1; transform: translate(-50%, -50%); }
-  78%  { opacity: 1; transform: translate(-50%, -50%); }
+  4%   { opacity: 1; transform: translate(-50%, -50%); }
+  93%  { opacity: 1; transform: translate(-50%, -50%); }
   100% { opacity: 0; transform: translate(-50%, calc(-50% - 8px)); }
+}
+/* WHAT TO TRY NEXT, under the line. Two short lines, left aligned so they read
+   as a list rather than as more headline. */
+.fr-landed-next {
+  margin: 22px auto 0; padding: 0; list-style: none;
+  display: inline-flex; flex-direction: column; gap: 8px;
+  text-align: left; font-size: 14px; line-height: 1.5; color: var(--text);
+  text-shadow: 0 2px 18px var(--fr-card-drop);
+}
+.fr-landed-next li { position: relative; padding-left: 16px; }
+.fr-landed-next li::before {
+  content: ''; position: absolute; left: 0; top: 0.62em;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--text-dim);
 }
 /* A MAC THAT ASKS FOR LESS MOVEMENT GETS THE WORDS AND NO DRIFT, the same rule
    the burst above keeps: the message is not the flourish. */

@@ -1737,8 +1737,14 @@ export default function App() {
   ].sort(byRunningOrder(score)),
   [items, agentList, agentMode, scope, pendingId, dueAt, score, now, team, teamProgress]);
 
-  const done = useMemo(() => items.filter((i) => i.status === 'done' && (!scope || i.product === scope))
-    .sort((a, b) => b.updatedAt - a.updatedAt), [items, scope]);
+  // NOT A ROW THAT STILL NEEDS HER (2026-10-01): an agent's done on her own
+  // thread waits in Needs you until she closes it, and Done counted it too,
+  // so the tabs read "DONE 2 · ALL 2" with two rows still needing her.
+  const done = useMemo(() => {
+    const needsYou = new Set(inbox.map((i) => i.id));
+    return items.filter((i) => i.status === 'done' && (!scope || i.product === scope) && !needsYou.has(i.id))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [items, scope, inbox]);
 
   // Scheduled is the future inbox: everything waiting for its moment, soonest
   // first. The view only exists while something is in it. It holds two things
