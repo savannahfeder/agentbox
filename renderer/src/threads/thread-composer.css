@@ -218,10 +218,3 @@
 .tc-schedule:focus { outline: none; background: var(--wash-strong, rgba(255, 255, 255, 0.07)); }
 .tc-schedule:disabled { opacity: 0.45; cursor: default; }
 .tc-prio { display: inline-flex; align-items: center; }
-
-/* THE CONVERSATION SO FAR, above the box when the card goes to a person. */
-.tc-recent { max-height: 220px; overflow-y: auto; margin: 4px 0 0; padding: 10px 20px 12px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
-.tc-said { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.tc-said-who { font-size: 12.5px; color: var(--text); display: flex; align-items: baseline; gap: 8px; }
-.tc-said-who small { font-size: 11.5px; color: var(--text-faint); }
-.tc-said-words { font-size: 13.5px; line-height: 19px; color: var(--text-dim); white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -53,8 +53,10 @@ const REFRESH_MS = 8_000;
 // screen is the kind of drift this row exists to end.
 const THEM = 'The agent';
 
-export function ItemThread({ item, engine, session, opening, sending, onOpenOrigin, md, clean, onOpenDoc }: {
+export function ItemThread({ item, engine, session, opening, sending, onOpenOrigin, md, clean, onOpenDoc, chat = false }: {
   item: WorkItem;
+  /** A conversation with a person: drawn as a chat (item-thread.ts). */
+  chat?: boolean;
   // WHICH CODING AGENT THIS ROW RUNS ON, main's answer off the snapshot. One
   // sentence in the conversation turns on it -- `blocked` after one of Claude
   // Code's eight commands is an ANSWER, and on the other engine the same reply
@@ -184,7 +186,7 @@ export function ItemThread({ item, engine, session, opening, sending, onOpenOrig
   const saying = session?.saying && session.sayingAt
     ? { text: session.saying, at: session.sayingAt, run: session.startedAt }
     : null;
-  const built = itemThread(ledger.lines, sessions, saying, { whole, engine, pending: sending });
+  const built = itemThread(ledger.lines, sessions, saying, { whole, engine, pending: sending, chat });
   const said = built.events.map((e) => (e.kind === 'work' ? e : { ...e, text: clean(e.text ?? '') }));
   /* * WHILE AN AGENT IS WORKING, THE LAST THING ON THE PAGE IS THE THINKING
      COMPONENT, AND THE COMMANDS UNDER IT ARE ITS OWN.
@@ -239,6 +241,7 @@ export function ItemThread({ item, engine, session, opening, sending, onOpenOrig
       <Thread
         events={events}
         omitted={omitted}
+        chat={chat}
         name={THEM}
         landOn={item.id}
         onWhole={() => setWhole(true)}

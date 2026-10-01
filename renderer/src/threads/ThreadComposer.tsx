@@ -35,8 +35,8 @@ import type { Product, WorkItem } from '../types';
 import type { Engine } from '../../../shared/engines.mjs';
 import { ENGINES } from '../../../shared/engines.mjs';
 import { api } from '../api';
-import { TeamContext, Face, firstName } from '../team/people';
-import { threadEvents } from '../thread-history';
+import { TeamContext, Face } from '../team/people';
+import { conversationWith } from './page-rules';
 import { collectFiles, fromPaste, persistAttachments, type PendingAttachment } from '../attachments';
 import { AttachRow } from '../components/AttachRow';
 import { PRIORITIES, priorityLabelOf, priorityValueOf, readLastPriority, writeLastPriority, type PriorityId } from '../priority';
@@ -72,7 +72,7 @@ export interface ThreadSent {
 type MenuKey = 'to' | 'model' | 'project' | 'priority' | 'visibility' | 'later';
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, onClose, onSent,
+  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, onClose, onSent, onOpenConversation,
 }: {
   products: Product[];
   items: WorkItem[];
@@ -85,6 +85,11 @@ export function ThreadComposer({
   defaultProduct?: string | null;
   /** Who it is to (a teammate's id) and words to start from, for a card opened from somewhere. */
   initial?: { to?: string; body?: string } | null;
+  /** Picking someone you already talk to opens that conversation instead,
+   *  carrying whatever was typed into its reply box (2026-10-01: a strip of
+   *  the last few lines "looks pretty unappealing" for a conversation that is
+   *  hundreds of lines long). */
+  onOpenConversation?: (item: WorkItem, draft: string) => void;
   onClose: () => void;
   /** Called once the send stands, BEFORE the draft is cleared, so the caller can still read it for an undo. */
   onSent: (item: WorkItem | null, sent?: ThreadSent) => void;
@@ -337,7 +342,13 @@ export function ThreadComposer({
   };
 
   /* ------------------------------- menus -------------------------------- */
-  const chooseTo = (id: string) => { setTo(id); setError(null); close('text'); };
+  const chooseTo = (id: string) => {
+    if (id !== 'agent' && onOpenConversation) {
+      const convo = conversationWith(id, { products, items, me: team?.me ?? null });
+      if (convo) { onOpenConversation(convo, text); return; }
+    }
+    setTo(id); setError(null); close('text');
+  };
 
   const toMenu = (
     <div className="tc-menu tc-drop tc-to-menu" role="listbox" aria-label="To" onKeyDown={menuKeys}>
@@ -558,8 +569,6 @@ export function ThreadComposer({
           )}
         </div>
 
-        {person && <RecentWith person={person} products={products} items={items} />}
-
         <textarea
           ref={textRef}
           className="tc-text"
@@ -689,48 +698,3 @@ const RepeatIcon = () => (
     <path d="M17 3l3 3-3 3" /><path d="M4 11V9a3 3 0 0 1 3-3h13M7 21l-3-3 3-3" /><path d="M20 13v2a3 3 0 0 1-3 3H4" />
   </svg>
 );
-
-/** WHAT YOU TWO LAST SAID (decided 2026-10-01, from six interviews: "when I
- *  click someone I expect to see what we last said"). Picking a person shows
- *  the end of your conversation with them above the box, and Send carries it
- *  on (main/team/index.mjs, `message`). Nothing is drawn before the first
- *  message, so a new conversation starts on an empty card. */
-function RecentWith({ person, products, items }: { person: { id: string }; products: Product[]; items: WorkItem[] }) {
-  const team = useContext(TeamContext);
-  const me = team?.me ?? null;
-  const convo = useMemo(() => {
-    // The record's people are who it was shared WITH; its maker is `sharedBy`.
-    const on = (t: NonNullable<Product['team']>) => [...t.people, ...(t.sharedBy ? [t.sharedBy] : [])];
-    const slugs = new Set(products
-      .filter((p) => p.team?.direct && on(p.team).includes(person.id) && (!me || on(p.team).includes(me)))
-      .map((p) => p.slug));
-    return items.filter((i) => slugs.has(i.product) && !i.agent)
-      .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0] ?? null;
-  }, [products, items, person.id, me]);
-  const [said, setSaid] = useState<{ by?: string; at: number; words: string }[]>([]);
-  const end = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!convo) { setSaid([]); return; }
-    let live = true;
-    api.itemHistory({ product: convo.product, id: convo.id }).then((r) => {
-      if (!live) return;
-      const lines = threadEvents(r.lines ?? []).filter((e) => e.message && e.words);
-      setSaid(lines.slice(-6).map((e) => ({ by: e.by, at: e.at, words: e.words! })));
-    }).catch(() => { if (live) setSaid([]); });
-    return () => { live = false; };
-  }, [convo?.product, convo?.id, convo?.updatedAt]);
-  useLayoutEffect(() => { if (end.current) end.current.scrollTop = end.current.scrollHeight; }, [said]);
-  if (!said.length) return null;
-  const when = (at: number) => new Date(at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  return (
-    <div className="tc-recent" ref={end} aria-label="Your conversation so far">
-      {said.map((m, i) => (
-        <div className="tc-said" key={`${m.at}-${i}`}>
-          <span className="tc-said-who">{m.by && m.by !== me ? firstName(team?.byId.get(m.by) ?? null) : 'You'}<small>{when(m.at)}</small></span>
-          <span className="tc-said-words">{m.words}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-

@@ -445,7 +445,7 @@ export function itemThread(
   //
   // `pending`: WHAT SHE HAS JUST SENT AND THE LEDGER DOES NOT HAVE YET. See
   // `PendingSaid`.
-  opts: { whole?: boolean; engine?: string | null; pending?: PendingSaid[] } = {},
+  opts: { whole?: boolean; engine?: string | null; pending?: PendingSaid[]; chat?: boolean } = {},
 ): ItemThread {
   // The pickup-to-run match is thread-history's, not a second copy of it: it is
   // the part that can be wrong while the screen still looks perfect (a run
@@ -629,7 +629,10 @@ export function itemThread(
   // AND THE ANSWER AT THE FOOT IS NEITHER WINDOWED NOR MISSING. It is on the
   // page, in full, below the stream, so it counts toward the head's total and
   // never toward the gap's.
-  const windowed = threadWindow(out, { whole: !!opts.whole }) as { events: AgentEvent[]; omitted: number };
+  // A CONVERSATION WITH A PERSON reads like a chat: the latest sixty messages,
+  // and everything older behind the line at the top, never a first message
+  // pinned above a gap.
+  const windowed = threadWindow(out, opts.chat ? { whole: !!opts.whole, opening: 0, keep: 60 } : { whole: !!opts.whole }) as { events: AgentEvent[]; omitted: number };
   const shown = saidCount(windowed.events) + (outcome ? 1 : 0);
   return { events: windowed.events, outcome, total: spoken, omitted: spoken - shown };
 }

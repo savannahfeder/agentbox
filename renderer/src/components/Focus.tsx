@@ -497,10 +497,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // is a narrow column, and a 352 point panel inside it would leave the words
   // no room; the button goes with it, so nothing on screen does nothing.
   const direct = teamCtx?.products.get(item.product)?.team?.direct === true;
-  // Who a conversation is with, from where you sit, for its reply box.
-  const talkName = direct && teamCtx
-    ? firstName(teamCtx.byId.get((item.people ?? []).find((p) => p !== teamCtx.me) ?? (item.createdBy !== teamCtx.me ? item.createdBy ?? '' : item.assignee ?? '')) ?? null)
+  // Who a conversation is with, from where you sit, for its title and reply box.
+  const talkPerson = direct && teamCtx
+    ? teamCtx.byId.get((item.people ?? []).find((p) => p !== teamCtx.me) ?? (item.createdBy !== teamCtx.me ? item.createdBy ?? '' : item.assignee ?? '')) ?? null
     : null;
+  const talkName = direct && teamCtx ? firstName(talkPerson) : null;
+  const talkFull = talkPerson?.name || talkName;
   const summarised = !agent && !made && !direct;
   const [summaryOpen, toggleSummary] = useSummaryOpen();
   const summaryOffered = summarised && !openDoc;
@@ -573,6 +575,23 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     resumed.current = item.id;
     return resumeTo(scrollRef.current, resumeAt.top);
   }, [item.id, resumeAt]);
+
+  // A CONVERSATION OPENS AT ITS NEWEST MESSAGE AND STAYS THERE, the way a chat
+  // does: hundreds of lines above are one scroll up, and a new message keeps
+  // the page at the bottom unless she has scrolled up to read.
+  useEffect(() => {
+    if (!direct) return;
+    const box = scrollRef.current;
+    if (!box) return;
+    let pinned = true;
+    const onScroll = () => { pinned = box.scrollHeight - box.scrollTop - box.clientHeight < 80; };
+    const stick = () => { if (pinned) box.scrollTop = box.scrollHeight; };
+    box.addEventListener('scroll', onScroll, { passive: true });
+    const grew = new MutationObserver(stick);
+    grew.observe(box, { childList: true, subtree: true, characterData: true });
+    stick();
+    return () => { box.removeEventListener('scroll', onScroll); grew.disconnect(); };
+  }, [direct, item.id]);
 
   // WHERE SHE IS, SO ⌘R HAS SOMETHING TO REMEMBER. Only the number, and only
   // while a task is open; App.tsx decides whether it is ever worth reading back.
@@ -867,7 +886,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   */
   const theByline = (
     <Byline
-      item={item}
+      // A conversation's record is called "Direct" on disk; on the page it is Messages.
+      item={direct ? { ...item, productName: 'Messages' } : item}
       returned={!!returnedFromSnooze}
       facts={{
         ...live, session, stalled, scheduledUntil,
@@ -875,7 +895,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         // `stoppable` IS `belongsInProgress` (App.tsx hands over the tab's own
         // rule), so the line says which tab this row is on by asking the tab
         // rather than by inventing a second definition of under way.
-        inProgress: stoppable,
+        inProgress: stoppable && !direct,
       }}
       figures={figures ? (
         /*
@@ -928,7 +948,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
      yet. WHERE THE ROW GOES is said by the toast the press raises rather than
      on the button, which is why the button can be two words: "Agent stopped.
      Back in your inbox. Reply to redirect it." */
-  const stopButton = stoppable ? (
+  // A conversation with a person has nothing running to stop.
+  const stopButton = stoppable && !direct ? (
     <button
       type="button"
       className="dock-stop"
@@ -1014,7 +1035,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           cut off mid-sentence, so the title of an opened task is now the same
           summary the row shows. The original text stays one hover away, and in
           full at the top of the thread. */}
-      <div className="keep-line-title" title={item.title}>{rowTitle(item)}</div>
+      {/* A conversation is named for the person in it, never for what the
+          first message happened to be about. */}
+      <div className="keep-line-title" title={item.title}>{direct && talkFull ? talkFull : rowTitle(item)}</div>
       {theByline}
     </div>
   );
@@ -1224,6 +1247,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           : !agent && (
             <ItemThread
               item={item}
+              chat={direct}
               /*
                * WHICH CODING AGENT THIS ROW RUNS ON, because one sentence in the
                  conversation depends on it: `blocked` after one of Claude Code's
@@ -1559,7 +1583,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         either: both give up its width (`data-summary` above, summary.css), so
         the words narrow instead of running under it, and it scrolls on its own. */}
     {summaryShown && <SummaryPanel item={item} items={items ?? ownItems} team={teamCtx} onOpenItem={onOpenItem} />}
-    <TaskTerminal key={`${item.product}:${item.id}`} product={item.product} id={item.id} headerTarget={terminalHeaderTarget}/>
+    {!direct && <TaskTerminal key={`${item.product}:${item.id}`} product={item.product} id={item.id} headerTarget={terminalHeaderTarget}/>}
     </div>
   );
 }

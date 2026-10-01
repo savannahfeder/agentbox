@@ -139,3 +139,21 @@ it('refuses somebody who is not on the team, and an empty message', async () => 
   await expect(maya.service.message('p-stranger', 'Hi')).rejects.toThrow(/not on your team/);
   await expect(maya.service.message(theo.personId, '   ')).rejects.toThrow(/words/);
 });
+
+// TWO FIRST MESSAGES AT ONCE (2026-10-01): each Mac made its own record and
+// kept writing into it. Both now settle on the lowest id, so after one sync
+// the two are writing into the same conversation.
+it('keeps one conversation when both people write first at the same moment', async () => {
+  await maya.on(() => maya.service.message(theo.personId, 'Hi Theo'));
+  await theo.on(() => theo.service.message(maya.personId, 'Hi Maya'));
+  await maya.service.syncNow();
+  await theo.service.syncNow();
+  await maya.service.syncNow();
+  const mine = maya.service.conversation(theo.personId);
+  const theirs = theo.service.conversation(maya.personId);
+  await maya.on(() => maya.service.message(theo.personId, 'Lunch?'));
+  await theo.service.syncNow();
+  const after = theo.service.conversation(maya.personId);
+  expect(theo.store.readItem(after.product, after.id).answer).toBe('Lunch?');
+  expect(mine.product === theirs.product || after.product === mine.product).toBe(true);
+});

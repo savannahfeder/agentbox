@@ -47,7 +47,13 @@ export function createTeamService({
       const on = new Set([...t.people, ...(t.sharedBy ? [t.sharedBy] : [])]);
       return two.has(t.sharedBy) && on.size === 2 && [...on].every((p) => two.has(p));
     };
-    return products().find((p) => p.team?.direct && justUs(p.team)) ?? null;
+    // ONE RECORD FOR THE TWO OF YOU, THE SAME ONE ON BOTH MACS. Two people who
+    // write each other first within the same second each make one (measured
+    // 2026-10-01 on two test copies), and each Mac then kept writing into its
+    // own. Both now settle on the record with the lowest id, so the talk
+    // comes back together the moment both records are known.
+    return products().filter((p) => p.team?.direct && justUs(p.team))
+      .sort((a, b) => String(a.team.projectId).localeCompare(String(b.team.projectId)))[0] ?? null;
   }
 
   // THE CONVERSATION IN A MESSAGE RECORD: its most recently touched row. Older
@@ -269,6 +275,9 @@ export function createTeamService({
       // "direct" record holding you and somebody else, and the next message
       // either of you sent the other went into it, where its maker read it.
       let product = directWith(me, to);
+      // Before making a record, look once more: the other person may have just
+      // made one, and the pull is what brings it here.
+      if (!product) { await syncNow(); product = directWith(me, to); }
       if (!product) {
         const made = makeDirect(accountRoot, { teamId: state.team.id, me, other: to });
         await backend.shareProject({ id: made.projectId, teamId: state.team.id, name: 'Direct', visibility: 'people', people: [to], direct: true });

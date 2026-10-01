@@ -54,7 +54,7 @@ import { announcesUpdate, isUpdateRow, updateRow } from './update-row';
 import { IdlePage } from './components/IdlePage';
 import { ago, itemOptions, offerIsLive, parseRepeat } from './format';
 import {
-  hasDraft, restoreDraft, restoreFailedDraft, readComposeDraft, restoreComposeDraft,
+  hasDraft, restoreDraft, restoreFailedDraft, readComposeDraft, restoreComposeDraft, saveDraft, clearComposeDraft,
   type SentDraft, type ComposeDraft,
 } from './drafts';
 import { approvalStage } from './approval-stage';
@@ -117,7 +117,7 @@ import { TeamPage } from './team/TeamPage';
 import { EmptyTab, HeaderActions, InboxBoard, InboxClear, StateTabs, TeamView } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { isDirect, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
+import { conversationWith, isDirect, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing' | 'themes';
 
@@ -481,6 +481,18 @@ export default function App() {
   // WHAT THE COMPOSER OPENS WITH, when something hands it a start: "Hand it to
   // an agent" on a message from a person turns that message into a thread.
   const [composeInitial, setComposeInitial] = useState<{ to?: string; body?: string } | null>(null);
+  // OPEN A CONVERSATION WITH THE REPLY BOX READY, carrying what was typed. The
+  // composer hands over here when its To is someone you already talk to, and
+  // "Message Maya" comes here first.
+  const openConversation = useCallback((convo: WorkItem, draft = '') => {
+    if (draft.trim()) saveDraft(convo, draft);
+    clearComposeDraft();
+    setComposeInitial(null);
+    setTeamOpen(false);
+    setOpenCard(null);
+    setFocused(convo);
+    setModal('reply');
+  }, []);
   const handToAgent = useCallback((item: WorkItem) => {
     const from = item.createdBy ? teamView(snap?.team ?? null, snap?.products ?? [])?.byId.get(item.createdBy)?.name : null;
     const quoted = (item.body ?? item.title ?? '').trim();
@@ -4738,7 +4750,11 @@ export default function App() {
                     <div className="th-card-bar">
                       <button type="button" className="th-back" onClick={() => setOpenCard(null)}><span aria-hidden="true">←</span>Team</button>
                       <MessagePerson person={team?.byId.get(openCard.personId) ?? null}
-                        onMessage={() => { setComposeInitial({ to: openCard.personId }); setModal('compose'); }} />
+                        onMessage={() => {
+                          const convo = conversationWith(openCard.personId, { products: snap.products, items, me: team?.me ?? null });
+                          if (convo) openConversation(convo);
+                          else { setComposeInitial({ to: openCard.personId }); setModal('compose'); }
+                        }} />
                     </div>
                     {/* Which thread this is, which the card alone never said. */}
                     {openCard.title && <h2 className="th-card-title">{openCard.title}</h2>}
@@ -5077,6 +5093,7 @@ export default function App() {
           codexModelDefault={codexModelDefault}
           defaultProduct={productFilter}
           initial={composeInitial}
+          onOpenConversation={openConversation}
           onClose={() => { setModal(null); setComposeInitial(null); }}
           onSent={async (made, how) => {
             setComposeInitial(null);

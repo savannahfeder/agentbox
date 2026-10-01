@@ -153,3 +153,18 @@ export function teamKeeps(e: BoardEntry, { person, projectName }: { person: stri
   if (d.updated === 'week' && !(e.updatedAt >= now - 7 * 86_400_000)) return false;
   return true;
 }
+
+
+/** YOUR CONVERSATION WITH ONE PERSON: the newest row in the message record of
+ *  exactly you two (the record lists who it was shared with; its maker is
+ *  `sharedBy`). Null before the first message. */
+export function conversationWith(personId: string, { products, items, me }: { products: Product[]; items: WorkItem[]; me: string | null }): WorkItem | null {
+  const on = (t: NonNullable<Product['team']>) => [...t.people, ...(t.sharedBy ? [t.sharedBy] : [])];
+  // The record both Macs settle on: the lowest id (main/team/index.mjs, directWith).
+  const record = products
+    .filter((p) => p.team?.direct && on(p.team).includes(personId) && (!me || on(p.team).includes(me)))
+    .sort((a, b) => String(a.team!.projectId).localeCompare(String(b.team!.projectId)))[0];
+  if (!record) return null;
+  return items.filter((i) => i.product === record.slug && !i.agent)
+    .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0] ?? null;
+}
