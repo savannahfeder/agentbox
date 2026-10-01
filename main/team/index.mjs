@@ -77,12 +77,14 @@ export function createTeamService({
     const remembered = me ? kept().getTeam(me) : null;
     const team = remembered ? teams.find((t) => t.id === remembered) ?? null : teams[0] ?? null;
     if (team && !remembered && me) kept().setTeam(me, team.id);
+    // The moment sharing starts on this Mac, kept so it never moves later.
+    if (team && me && !kept().getSince(me)) kept().setSince(me, Date.now());
     const people = team ? await backend.teamPeople(team.id) : [];
     const cards = team ? await backend.listCards() : [];
     // An invite lookup that fails (an older cloud, a dropped request) leaves
     // you signed in with nothing offered, never signed out.
     const invites = team ? [] : await backend.pendingInvites().catch((err) => { log(`team: invites: ${err.message}`); return []; });
-    set({ team, people, cards, invites });
+    set({ team, people, cards, invites, since: me ? kept().getSince(me) : null });
   }
 
   async function syncNow() {
@@ -135,7 +137,7 @@ export function createTeamService({
       state: kept(),
       listShared: () => listSharedProjects(products()),
       joinProject: (project) => joinSharedProject(accountRoot, project),
-      listCards: () => cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir) }),
+      listCards: () => cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null }),
       teamIdOf: () => state.team?.id ?? null,
     });
     stopLoop();

@@ -38,6 +38,8 @@ export function memorySyncState() {
     setCardsHash: (hash) => { map.set('__cards__', { hash }); },
     getTeam: (personId) => map.get('__teams__')?.[personId] ?? null,
     setTeam: (personId, teamId) => { map.set('__teams__', { ...(map.get('__teams__') || {}), [personId]: teamId }); },
+    getSince: (personId) => map.get('__since__')?.[personId] ?? null,
+    setSince: (personId, at) => { map.set('__since__', { ...(map.get('__since__') || {}), [personId]: at }); },
   };
 }
 
@@ -58,6 +60,10 @@ export function fileSyncState(file, fs) {
     // until that person says otherwise (main/team/index.mjs).
     getTeam: (personId) => data.teams?.[personId] ?? null,
     setTeam: (personId, teamId) => { data.teams = { ...(data.teams || {}), [personId]: teamId }; save(); },
+    // WHEN THIS PERSON STARTED SHARING ON THIS MAC. Threads from before it stay
+    // theirs unless they share one (shared/thread-cards.mjs, `shownToTeam`).
+    getSince: (personId) => data.since?.[personId] ?? null,
+    setSince: (personId, at) => { data.since = { ...(data.since || {}), [personId]: at }; save(); },
   };
 }
 

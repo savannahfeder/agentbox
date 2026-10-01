@@ -72,7 +72,21 @@ const startOfDay = (now) => { const d = new Date(now); d.setHours(0, 0, 0, 0); r
  * finished today. Message threads between two people are never carded; they
  * are nobody else's business and they are not work. Nor is a private thread.
  */
-export function cardsFor({ products, readItems, now = Date.now() }) {
+/**
+ * NOTHING FROM BEFORE YOU JOINED IS SHARED UNLESS YOU SHARE IT (2026-10-01).
+ * Her own store holds hundreds of threads written for nobody but her, and the
+ * first sign-in would have put a summary of every one of them on the team's
+ * board. So a thread is shown when it was marked Team, or when it is not
+ * private and was started after `since`, the moment this person began sharing
+ * on this Mac. No `since` is the old rule: everything not private.
+ */
+export function shownToTeam(item, since = null) {
+  if (item?.visibility === 'team') return true;
+  if (item?.visibility === 'private') return false;
+  return !since || (item?.createdAt ?? 0) >= since;
+}
+
+export function cardsFor({ products, readItems, now = Date.now(), since = null }) {
   const cards = [];
   const titleOf = new Map();
   const all = [];
@@ -83,14 +97,14 @@ export function cardsFor({ products, readItems, now = Date.now() }) {
       // A LINK NAMES A THREAD ONLY IF THAT THREAD IS ITSELF VISIBLE. A public
       // card that is blocked by a private thread said the private thread's
       // title out loud (review, 2026-10-01); now it says only that one exists.
-      titleOf.set(item.id, item.visibility === 'private' ? null : item.label || item.title);
+      titleOf.set(item.id, shownToTeam(item, since) ? item.label || item.title : null);
       all.push({ item, product });
     }
   }
   const linked = (ids) => (Array.isArray(ids) ? ids : []).map((id) => ({ id, title: titleOf.get(id) ?? null }));
   const today = startOfDay(now);
   for (const { item, product } of all) {
-    if (item.visibility === 'private') continue;
+    if (!shownToTeam(item, since)) continue;
     const state = threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
     const s = summaryOf(item);

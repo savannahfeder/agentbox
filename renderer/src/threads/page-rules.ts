@@ -5,6 +5,7 @@
 // the rows are ordered, how "Updated" is said, and what goes in each board
 // column for the Team, where your own threads come from this Mac and your
 // teammates' from the cards their Macs publish.
+import { shownToTeam } from '../../../shared/thread-cards.mjs';
 import type { Product, ThreadCard, ThreadStateWord, WorkItem } from '../types';
 import { priorityIdOf, type PriorityId } from '../priority';
 import { threadState } from '../../../shared/thread-cards.mjs';
@@ -103,7 +104,7 @@ export interface BoardEntry {
  * (so they open), your teammates' from their cards (so they show their
  * summary), done ones only from today. Messages between two people never.
  */
-export function teamEntries({ items, products, cards, me, now }: { items: WorkItem[]; products: Product[]; cards: ThreadCard[]; me: string | null; now: number }): BoardEntry[] {
+export function teamEntries({ items, products, cards, me, now, since = null }: { items: WorkItem[]; products: Product[]; cards: ThreadCard[]; me: string | null; now: number; since?: number | null }): BoardEntry[] {
   const bySlug = new Map(products.map((p) => [p.slug, p]));
   const today = startOfDay(now);
   const out: BoardEntry[] = [];
@@ -115,6 +116,10 @@ export function teamEntries({ items, products, cards, me, now }: { items: WorkIt
     // card already stands for it; drawn here it would be on the board twice,
     // once under your name.
     if (me && item.createdBy && item.createdBy !== me) continue;
+    // Your threads from before you joined are not on the team's board, any
+    // more than they are on anyone else's (shared/thread-cards.mjs). One you
+    // made private stays, with its lock, so you can see it is hidden.
+    if (item.visibility !== 'private' && !shownToTeam(item, since)) continue;
     const state = threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
     out.push({

@@ -157,6 +157,8 @@ export interface TeamState {
   configured: boolean;
   /** The first look for a saved sign-in is over (false while it is still being found). */
   started?: boolean;
+  /** When this person began sharing on this Mac: threads started before it stay theirs unless shared by hand. */
+  since?: number | null;
   signedIn: boolean;
   me: Person | null;
   team: { id: string; name: string } | null;

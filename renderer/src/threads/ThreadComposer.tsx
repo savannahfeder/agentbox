@@ -50,8 +50,8 @@ import { repeatPresets } from '../components/When';
 import { fitMenu } from '../keep-in-window';
 import {
   allModels, findPeople, harnessFields, inputValueOf, laterHint, momentFromInput, mondayMorning, moreCount,
-  onlyYouAnd, placeholderFor, projectsOffered, projectSwatch, readVisibility, recentModels, sameModel,
-  startingProject, teammates, threadMessage, tomorrowMorning, writeVisibility, VISIBILITY_ROWS,
+  onlyYouAnd, placeholderFor, projectsOffered, projectSwatch, recentModels, sameModel,
+  startingProject, teammates, threadMessage, tomorrowMorning, VISIBILITY_ROWS,
   type Harness, type ModelPick, type Visibility,
 } from './composer-rules';
 import './thread-composer.css';
@@ -130,9 +130,12 @@ export function ThreadComposer({
   const pickPrio = (id: PriorityId) => { setPrio(id); writeLastPriority(id); };
 
   /* --------------------------- visibility ------------------------------- */
-  const [visibility, setVisibility] = useState<Visibility>(() => readVisibility(undefined, product?.slug));
-  useEffect(() => { setVisibility(readVisibility(undefined, product?.slug)); }, [product?.slug]);
-  const pickVisibility = (v: Visibility) => { setVisibility(v); writeVisibility(v, undefined, product?.slug); };
+  // EVERY NEW THREAD STARTS AS TEAM, AND WHO SEES IT IS CHOSEN FOR THAT THREAD.
+  // Her words: visibility is "determined by the nature of the task". It was
+  // remembered per project for a while, and a tester then found the next
+  // thread silently Private; nothing carries over now.
+  const [visibility, setVisibility] = useState<Visibility>('team');
+  const pickVisibility = (v: Visibility) => { setVisibility(v); };
 
   /* ------------------------------ model --------------------------------- */
   const engineRows = engines?.length ? engines : [ENGINES[0]];

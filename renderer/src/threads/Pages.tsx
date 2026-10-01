@@ -235,7 +235,8 @@ export function TeamView({ items, products, cards, display, now, onOpenItem, onO
   const everyone: Person[] = team ? [...team.byId.values()] : [];
   const mine = everyone.find((p) => p.id === me) ?? null;
   const others = everyone.filter((p) => p.id !== me).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  const all = useMemo(() => teamEntries({ items, products, cards, me, now }), [items, products, cards, me, now]);
+  const since = team?.state.since ?? null;
+  const all = useMemo(() => teamEntries({ items, products, cards, me, now, since }), [items, products, cards, me, now, since]);
   const entries = all.filter((e) => teamKeeps(e, { person, projectName }, display, now));
   const projectNames = [...new Set(all.map((e) => e.project).filter((p): p is string => !!p))].sort();
   const who = person ? team?.byId.get(person) ?? null : null;

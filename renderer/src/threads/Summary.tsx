@@ -11,6 +11,7 @@
 // summary, main/store.mjs threadEdit writes an edit); this file only draws it.
 // The rules that decide words (how long ago, who wrote last, which threads may
 // be linked) are in ./summary-rules.ts, where the tests read them.
+import { shownToTeam } from '../../../shared/thread-cards.mjs';
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Person, ThreadCard, ThreadEditPatch, WorkItem } from '../types';
 import { api } from '../api';
@@ -175,7 +176,9 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
 
   const state = threadState(item);
   const prio: PriorityId = priorityIdOf(valueOf<number>('priority'));
-  const visibility = valueOf<string | undefined>('visibility') === 'private' ? 'private' : 'team';
+  // A thread from before you joined is yours until you share it, whatever it
+  // says on disk (shared/thread-cards.mjs, `shownToTeam`).
+  const visibility = shownToTeam({ ...item, visibility: valueOf<'team' | 'private' | undefined>('visibility') }, team?.state.since ?? null) ? 'team' : 'private';
   const owner = ownerName(item, me, team?.byId ?? new Map());
   const ownerPerson = owner === 'You' ? null : team?.byId.get(item.createdBy ?? '') ?? null;
 

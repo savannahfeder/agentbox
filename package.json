@@ -62,7 +62,8 @@
     "serve": "node bin/agentbox.mjs",
     "prepack": "npm run build",
     "postinstall": "node scripts/after-install.mjs",
-    "prepublishOnly": "node scripts/before-publish.mjs"
+    "prepublishOnly": "node scripts/before-publish.mjs",
+    "app": "node scripts/prepare-terminal.mjs && electron ."
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
@@ -107,7 +108,7 @@
   "build": {
     "appId": "ac.astral.app",
     "productName": "agentbox",
-    "copyright": "Copyright © 2026 Agentbox",
+    "copyright": "Copyright \u00a9 2026 Agentbox",
     "directories": {
       "output": "release",
       "buildResources": "build"
