@@ -119,10 +119,14 @@
 /* "When I hover over something, it responds with a typical pattern, such as
    changing the background color slightly." Rows, tabs, pickers and the header
    all answer the pointer now; the sidebar already did. */
-.th-table .row:not(.th-head) { cursor: pointer; transition: background-color .08s ease; }
-.th-table .row:not(.th-head):hover { background: rgba(255,255,255,.035); }
-:root[data-theme="light"] .th-table .row:not(.th-head):hover { background: var(--wash); }
-.th-table .row:not(.th-head):hover + .row::after, .th-table .row:not(.th-head):hover::after { opacity: 0; }
+/* ROWS ANSWER WITH THE UNDERLINE, AS THE OLD APP DID (her note, 2026-10-01:
+   "when I had a particular thread selected, it would change the underline
+   rather than the background color... it worked really well when I hovered
+   and tried to navigate up and down"). Hover is the faint underline and the
+   selected row the accent one (styles.css, `.row .subject`): one idea, two
+   weights, so the pointer and the keys never light two different rows the
+   same way. Buttons, tabs and pickers keep their background hover. */
+.th-table .row:not(.th-head) { cursor: pointer; }
 .tm-tab { transition: color .08s ease; }
 .tm-tab:hover { color: var(--text); }
 .th-search { transition: border-color .08s ease, color .08s ease; }
