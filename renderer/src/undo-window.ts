@@ -99,6 +99,28 @@ export function undoAsk(undoes: string): string {
   return `Press Z again to ${undoes}.`;
 }
 
+/**
+ * WHAT A Z PUTS IN FRONT OF HER ONCE IT HAS RUN (w-7eb39d3c97).
+ *
+ * Inside the grace window the row was never written away, and Z has always
+ * opened it again. Past it, Z reopened the row in the store and opened nothing,
+ * so she stayed on the task the close had moved her to and had to go looking.
+ * A reflex Z often lands a few seconds after the close, past that window.
+ *
+ * `restored` is what the entry handed back (a withdrawn reply's thread, or the
+ * new task card), and it wins, because her words are in it. Otherwise `brings`
+ * is the row the entry put back, and that is opened. An entry that names no row
+ * (a schedule, the update row) opens nothing and leaves her where she is.
+ */
+export function shownAfterUndo<I>(
+  restored: { item: I } | { compose: true } | null | undefined,
+  brings: I | undefined,
+): { open: I | null; compose: boolean } {
+  if (restored && 'item' in restored) return { open: restored.item, compose: false };
+  if (restored) return { open: null, compose: true };
+  return { open: brings ?? null, compose: false };
+}
+
 /** And what a Z says when there is nothing on the pile at all. */
 export const NOTHING_TO_UNDO = 'Nothing to undo yet.';
 

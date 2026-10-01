@@ -1,7 +1,7 @@
 // A clean run saved its answer but retained a claim while its shared tool
 // server kept heartbeating. Reproduce that lifecycle through the real store
 // and both list predicates, including late beats and a replacement worker.
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,6 +14,11 @@ import { appHome } from '../main/store/home.mjs';
 
 let root, dir, store, sup, item, session, claim;
 beforeEach(async () => {
+  // A real run answers after the request. Fast synchronous fixtures can put
+  // both in the same millisecond, which intentionally does not count as a
+  // newer answer. Control Date only; stream and registry timers stay real.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-09-29T12:00:00Z'));
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'finished-inbox-'));
   dir = path.join(root, 'project');
   fs.mkdirSync(dir);
@@ -22,13 +27,18 @@ beforeEach(async () => {
   store = await new Store(config).init();
   sup = new Supervisor(config, store, path.resolve('.'), root);
   item = { ...store.composeItem('project', { title: 'Check readiness', body: 'Check the release.' }), product: 'project' };
+  vi.setSystemTime(Date.now() + 1000);
   session = { startedAt: Date.now(), result: 'The check is complete.', exitFailed: false };
   claim = await disk.claimWorkItem(dir, { id: item.id, holder: 'worker-a' });
 });
-afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+afterEach(() => {
+  vi.useRealTimers();
+  fs.rmSync(root, { recursive: true, force: true });
+});
 const read = () => store.readItem('project', item.id);
 const beat = (held = claim, holder = 'worker-a') => disk.heartbeatWorkItem(dir, item.id, { epoch: held.epoch, holder });
 const finish = () => {
+  vi.setSystemTime(Date.now() + 1000);
   store.recordSessionResult('project', item.id, { result: session.result, status: null });
   sup.releaseFinishedClaim(item, session);
 };
@@ -51,6 +61,7 @@ describe('finished agents return to the inbox', () => {
     sup.spawnWorker(item, { engine: 'codex', profile: 'default', continuation: true });
     expect(sup.sessions.has(item.id)).toBe(true);
     claim = await disk.claimWorkItem(dir, { id: item.id, holder: 'worker-a' });
+    vi.setSystemTime(Date.now() + 1000);
     child.emit('event', 'item/completed', { item: {
       type: 'agentMessage', phase: 'final_answer', text: 'The check is complete.',
     } });
