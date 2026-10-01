@@ -110,7 +110,31 @@ export const WORK_ITEM_FIELDS = [
   'title', 'label', 'body', 'kind', 'labels', 'priority', 'parent',
   'status', 'result', 'note', 'answer', 'product', 'runAt', 'answeredThrough',
   'engine', 'model', 'effort',
+  // THE TEAM FIELDS. All four are about PEOPLE on a shared project, and a
+  // private project never sets them, so a row without them reads as before.
+  //   assignee  the person who has to act next, or 'agent' once a person has
+  //             handed it back to the agents
+  //   runner    the person whose Mac runs agents on this row; without one it
+  //             is whoever started it (`createdBy`)
+  //   due       a calendar day, YYYY-MM-DD, or 'none' to clear one
+  //   people    who is on the conversation
+  'assignee', 'runner', 'due', 'people',
 ];
+
+// A person id or a line id: short, plain, never an object a writer slipped in.
+const MAX_PERSON_CHARS = 64;
+function shortId(value) {
+  return typeof value === 'string' && value && value.length <= MAX_PERSON_CHARS ? value : null;
+}
+const DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+function calendarDay(value) {
+  if (value === 'none') return 'none';
+  const m = typeof value === 'string' ? DAY_RE.exec(value) : null;
+  if (!m) return undefined;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d ? value : undefined;
+}
 
 // How long a claim survives without a heartbeat. The MCP server heartbeats on a
 // timer while it holds any claim, so this is a liveness signal about the PROCESS
@@ -234,6 +258,11 @@ export function normalizeLine(line) {
     id: raw.id,
     ts: Number.isFinite(raw.ts) ? raw.ts : 0,
     source,
+    // WHO WROTE IT and the line's own id. Stamped where a line reaches the
+    // disk on a signed-in Mac (main/store/work-items.mjs), absent everywhere
+    // else, and a line without them reads exactly as it always did.
+    by: shortId(raw.by),
+    uid: shortId(raw.uid),
     // A founder line is never fenced, so its epoch is ignored even if present.
     epoch: source === 'agent' && Number.isFinite(raw.epoch) ? raw.epoch : null,
     claim: raw.claim && typeof raw.claim === 'object' ? raw.claim : null,
@@ -339,6 +368,13 @@ function coerceField(field, value) {
       const labels = value.map((l) => str(l, MAX_SHORT)).filter(Boolean).slice(0, MAX_LABELS);
       return labels.length ? labels : undefined;
     }
+    case 'assignee': case 'runner': return shortId(value) ?? undefined;
+    case 'due': return calendarDay(value);
+    case 'people': {
+      if (!Array.isArray(value)) return undefined;
+      const people = [...new Set(value.map(shortId).filter(Boolean))].slice(0, MAX_LABELS);
+      return people.length ? people : undefined;
+    }
     default: return undefined;
   }
 }
@@ -377,9 +413,14 @@ export function foldWorkItems(lines, now = Date.now()) {
       item = {
         id: line.id, status: 'open', title: '', kind: '', labels: [],
         priority: 0, epoch: 0, claim: null, createdAt: line.ts, updatedAt: line.ts,
-        wrote: {},
+        createdBy: line.by, wrote: {},
       };
       items.set(line.id, item);
+    }
+    // Who started the row is whoever wrote its EARLIEST line, not the first
+    // line this Mac happened to receive: a teammate's lines arrive late.
+    if (line.ts < item.createdAt || (line.ts === item.createdAt && !item.createdBy)) {
+      if (line.by) item.createdBy = line.by;
     }
 
     // Fencing. An agent line written under a superseded epoch is the whole
@@ -422,6 +463,7 @@ export function foldWorkItems(lines, now = Date.now()) {
       if (held && !beats(line, held)) continue;
       item[field] = value;
       item.wrote[field] = { ts: line.ts, source: authorityOf(line, field, value) };
+      if (line.by) item.wrote[field].by = line.by;
     }
 
     item.updatedAt = Math.max(item.updatedAt, line.ts);

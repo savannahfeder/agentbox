@@ -47,7 +47,29 @@ function ledgerPath(projectDir) {
 // and the result is two corrupted records rather than one. A short write means
 // the guarantee did not hold, so it throws rather than leaving a half line for
 // the fold to skip and the founder to never hear about.
+// WHO IS WRITING, on a Mac someone has signed in on (the team version).
+//
+// Main sets it on sign-in. The store's MCP server is another process, so it
+// reads AGENTBOX_PERSON_ID, which the supervisor hands it. With neither, no line
+// is stamped and the single-person app writes exactly what it always wrote.
+let lineAuthor = null;
+export function setLineAuthor(personId) {
+  lineAuthor = typeof personId === 'string' && personId ? personId : null;
+}
+function currentAuthor() {
+  return lineAuthor ?? (process.env.AGENTBOX_PERSON_ID || null);
+}
+const newLineUid = () => `l-${crypto.randomBytes(8).toString('hex')}`;
+
 function appendLine(file, obj) {
+  const author = currentAuthor();
+  // `by` and `uid` are added here, the one place every line passes, so no
+  // writer can forget them. A line that already carries them keeps its own.
+  const line = author ? { ...obj, by: obj.by ?? author, uid: obj.uid ?? newLineUid() } : obj;
+  return writeLine(file, line);
+}
+
+function writeLine(file, obj) {
   const buf = Buffer.from(JSON.stringify(obj) + '\n', 'utf8');
   if (buf.length > MAX_LINE_BYTES) throw new Error(`work item line too large (${buf.length} bytes, max ${MAX_LINE_BYTES})`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -312,6 +334,64 @@ export function releaseRunClaim(projectDir, id, { afterEpoch, startedAt, now = D
   if (item.claim.holder !== first.claim.holder) return item;
   // A concurrent new claim fences this append out through its newer epoch.
   return releaseWorkItem(projectDir, id, { epoch: item.epoch, now });
+}
+
+/* ------------------------------ the team sync ----------------------------- */
+// A TEAMMATE'S LINES, PULLED FROM THE CLOUD, ENTER THE LEDGER HERE AND ONLY
+// HERE, which keeps this file the one write path even with several writers on
+// several Macs. Each line goes in verbatim, still its author's, and a line
+// whose uid the ledger already holds is skipped, so pulling the same page twice
+// stores it once. A line with no uid or no writer is refused: nothing could tell
+// it apart on the next pull. Returns how many lines were appended.
+export function appendForeignLines(projectDir, lines) {
+  const file = ledgerPath(projectDir);
+  const have = new Set();
+  for (const text of readLines(file)) {
+    const uid = /"uid":"([^"]+)"/.exec(text)?.[1];
+    if (uid) have.add(uid);
+  }
+  let added = 0;
+  for (const raw of Array.isArray(lines) ? lines : []) {
+    const line = normalizeLine(raw);
+    if (!line || !line.uid || !line.by || have.has(line.uid)) continue;
+    writeLine(file, raw);
+    have.add(line.uid);
+    added += 1;
+  }
+  return added;
+}
+
+// Every line after a byte offset, as written, and where the file ends. The
+// ledger only grows, so an offset is a cursor: sync keeps the one it pushed to
+// and asks from there next time.
+export function readLinesFrom(projectDir, offset = 0) {
+  const file = ledgerPath(projectDir);
+  let size;
+  try { size = fs.statSync(file).size; } catch (err) {
+    if (err.code === 'ENOENT') return { lines: [], end: 0 };
+    throw err;
+  }
+  const start = Math.max(0, Math.min(Number(offset) || 0, size));
+  if (start >= size) return { lines: [], end: size };
+  const fd = fs.openSync(file, 'r');
+  let text;
+  try {
+    const buf = Buffer.allocUnsafe(size - start);
+    const read = fs.readSync(fd, buf, 0, size - start, start);
+    text = buf.toString('utf8', 0, read);
+  } finally {
+    fs.closeSync(fd);
+  }
+  // Stop at the last whole line: a line still being written is read next time.
+  const lastNewline = text.lastIndexOf('\n');
+  if (lastNewline < 0) return { lines: [], end: start };
+  const whole = text.slice(0, lastNewline + 1);
+  const lines = [];
+  for (const piece of whole.split('\n')) {
+    if (!piece || Buffer.byteLength(piece, 'utf8') > MAX_LINE_BYTES) continue;
+    try { lines.push(JSON.parse(piece)); } catch { /* a torn line reads as nothing, as in the fold */ }
+  }
+  return { lines, end: start + Buffer.byteLength(whole, 'utf8') };
 }
 
 export { LEASE_MS };
