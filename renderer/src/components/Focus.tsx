@@ -323,7 +323,7 @@ function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 // not the user's, and it is the part that was unnecessary. `filesFromRuns` stays,
 // because App.tsx still reads it to choose the design a card opens itself on.
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, terminalHeaderTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onInstallUpdate, items, onHandToAgent }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, terminalHeaderTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onInstallUpdate, items, onHandToAgent }: {
   previewSample?: string;
   /**
    * EVERY THREAD THE WINDOW HOLDS, for the summary's linked titles and the
@@ -497,6 +497,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // is a narrow column, and a 352 point panel inside it would leave the words
   // no room; the button goes with it, so nothing on screen does nothing.
   const direct = teamCtx?.products.get(item.product)?.team?.direct === true;
+  // A conversation with a person has nothing running to stop.
+  const stoppable = stoppableIn && !direct;
   // Who a conversation is with, from where you sit, for its title and reply box.
   const talkPerson = direct && teamCtx
     ? teamCtx.byId.get((item.people ?? []).find((p) => p !== teamCtx.me) ?? (item.createdBy !== teamCtx.me ? item.createdBy ?? '' : item.assignee ?? '')) ?? null
@@ -901,7 +903,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         // `stoppable` IS `belongsInProgress` (App.tsx hands over the tab's own
         // rule), so the line says which tab this row is on by asking the tab
         // rather than by inventing a second definition of under way.
-        inProgress: stoppable && !direct,
+        inProgress: stoppable,
       }}
       figures={figures ? (
         /*
@@ -954,8 +956,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
      yet. WHERE THE ROW GOES is said by the toast the press raises rather than
      on the button, which is why the button can be two words: "Agent stopped.
      Back in your inbox. Reply to redirect it." */
-  // A conversation with a person has nothing running to stop.
-  const stopButton = stoppable && !direct ? (
+  const stopButton = stoppable ? (
     <button
       type="button"
       className="dock-stop"
@@ -1555,7 +1556,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} stop={stopButton} talkTo={direct ? talkName : null} />
+            <DockComposer item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkName : null} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
