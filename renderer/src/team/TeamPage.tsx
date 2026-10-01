@@ -109,7 +109,7 @@ function TeamSetup({ team, products, onDone }: { team: TeamState; products: Prod
         <input className="tm-input" placeholder="Team name" value={name} onChange={(e) => setName(e.target.value)} />
         <button className="tm-btn" disabled={busy || !name.trim()}>Start team</button>
       </form>
-      <p>Waiting for an invite instead? Ask a teammate to invite {me?.email}, then sign out and in again.</p>
+      <p>Waiting for an invite instead? Ask a teammate to invite {me?.email}. You join within a few seconds of it.</p>
     </> : <>
       <h2>{team.team.name}</h2>
       <div className="tm-section">People</div>
