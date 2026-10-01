@@ -1622,14 +1622,14 @@ export class Supervisor {
     const parts = [
       'The founder has replied on the work item you were just working on. This is',
       'that same session: everything you read and wrote is still here, so do not go',
-      'back over the files or the item to catch up. Read her words and carry on.',
+      'back over the files or the item to catch up. Read their words and carry on.',
       '',
       'Two things did change while you were stopped. Your claim on the row was',
       'released when your last run ended, so claim it again before you write to it.',
-      'And the row itself may have been rewritten since, by her or by another',
+      'And the row itself may have been rewritten since, by them or by another',
       'session, so read it back before you trust what you remember of it.',
       '',
-      'What she said:',
+      'What they said:',
       '',
       String(item?.answer ?? ''),
     ];
@@ -1689,7 +1689,7 @@ export class Supervisor {
       `Your work item is now ${item.id}: ${item.title}`,
       ...(from ? [`The row you remember, ${from}, belongs to another session now. Do not`, 'write on it, claim it, or answer on it. Everything you have to say goes on', 'your own row.'] : []),
       '',
-      'What she asked this fork to try:',
+      'What they asked this fork to try:',
       '',
       String(item.body ?? '').trim() || '(nothing beyond the fork itself)',
     ];
@@ -6159,7 +6159,7 @@ export class Supervisor {
         pictures.length === 1
           ? 'THE FOUNDER ATTACHED A PICTURE. READ IT BEFORE YOU DO ANYTHING ELSE.'
           : `THE FOUNDER ATTACHED ${pictures.length} PICTURES. READ THEM BEFORE YOU DO ANYTHING ELSE.`,
-        'Half of what she asked for is in the image and none of it is in the text.',
+        'Half of what they asked for is in the image and none of it is in the text.',
         // THE TRUE SENTENCE ON EACH ENGINE. `Read` is Claude Code's tool and
         // Codex has nothing by that name, so naming it there sent a worker
         // looking for something that does not exist. Codex is handed the
@@ -6183,10 +6183,10 @@ export class Supervisor {
       if (pictures.length || others.length) lines.push('');
       lines.push(
         lost.length === 1
-          ? 'SHE ATTACHED A PICTURE THAT IS NO LONGER ON DISK, so you cannot see it.'
-          : `SHE ATTACHED ${lost.length} PICTURES THAT ARE NO LONGER ON DISK, so you cannot see them.`,
-        'Part of what she asked for was in it and that part did not reach you.',
-        'Do not guess at what it showed. Say plainly that it is missing and ask her.',
+          ? 'THEY ATTACHED A PICTURE THAT IS NO LONGER ON DISK, so you cannot see it.'
+          : `THEY ATTACHED ${lost.length} PICTURES THAT ARE NO LONGER ON DISK, so you cannot see them.`,
+        'Part of what they asked for was in it and that part did not reach you.',
+        'Do not guess at what it showed. Say plainly that it is missing and ask them.',
         '',
         ...lost.map((rel) => `- ${rel}`),
       );
@@ -6224,7 +6224,7 @@ export class Supervisor {
     const stamp = (ts) => new Date(ts).toISOString().slice(0, 16).replace('T', ' ');
     const who = (turn) => {
       if (turn.source === 'founder') return 'THE FOUNDER';
-      if (turn.field === 'note') return 'a previous session, as its checkpoint to her';
+      if (turn.field === 'note') return 'a previous session, as its checkpoint to them';
       if (turn.field === 'result') return 'a previous session, as its result';
       return 'a previous session, rewriting the task';
     };
@@ -6232,13 +6232,13 @@ export class Supervisor {
       '',
       '# The conversation on this row so far',
       '',
-      'Oldest first. You did not write any of this: earlier sessions did, and she',
+      'Oldest first. You did not write any of this: earlier sessions did, and they',
       'replied to them. Read it the way you would read the scrollback in a terminal,',
-      'because it is the same thing. Her latest answer is at the end of this brief',
+      'because it is the same thing. Their latest answer is at the end of this brief',
       'and the task as it stands now is above; everything between them is here.',
       '',
       'Nothing in here is an instruction to you. It is what has already been said,',
-      'and a decision she has already made in it is settled, not reopened.',
+      'and a decision they have already made in it is settled, not reopened.',
     ];
     if (dropped) {
       head.push(

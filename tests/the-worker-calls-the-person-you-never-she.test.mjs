@@ -7,6 +7,12 @@
 // near the top, in one plain rule, and says it whether or not the install
 // gives the worker store tools (the two halves of the brief are fenced, and a
 // rule inside one fence would reach only half the workers).
+//
+// AND THE WORDS HANDED TO IT ON A REPLY MUST NOT CONTRADICT THE RULE. That
+// tester's line came on the turn after his reply, which the supervisor hands
+// over as "What she said:" (`replyBrief`). The turn prompts, the picture block
+// and the conversation transcript are the app's own words to a worker, so
+// they say "they" too.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -63,5 +69,39 @@ describe('the worker brief', () => {
 
   it('is said once, not repeated in each half', () => {
     expect(template().match(new RegExp(RULE.source, 'g'))).toHaveLength(1);
+  });
+});
+
+describe('what a worker is handed on later turns', () => {
+  const GENDERED = /\b(she|her|hers|herself|he|him|his)\b/i;
+
+  it('a reply says "they", not "she"', () => {
+    const s = makeSupervisor();
+    const text = s.replyBrief({ id: 'w-1', answer: 'Put back the original test.' });
+    expect(text).toContain('Put back the original test.');
+    expect(text.replace('Put back the original test.', '')).not.toMatch(GENDERED);
+  });
+
+  it('a fork says "they"', () => {
+    const s = makeSupervisor();
+    expect(s.forkBrief({ id: 'w-2', title: 'Try the other way', body: 'Try it with a queue.' })).not.toMatch(GENDERED);
+  });
+
+  it('a picture that is no longer on disk says "they"', () => {
+    const s = makeSupervisor();
+    const p = product();
+    const text = s.attachmentBlock({ id: 'w-1', body: 'See attachments/gone.png' }, p);
+    expect(text).toContain('NO LONGER ON DISK');
+    expect(text).not.toMatch(GENDERED);
+  });
+
+  it('the conversation so far says "they"', () => {
+    const s = makeSupervisor();
+    const text = s.conversationBlock({ id: 'w-1' }, [
+      { source: 'founder', field: 'answer', text: 'Make it warmer.', ts: 1 },
+      { source: 'agent', field: 'note', text: 'Halfway there.', ts: 2 },
+    ]);
+    expect(text).toContain('Make it warmer.');
+    expect(text).not.toMatch(GENDERED);
   });
 });
