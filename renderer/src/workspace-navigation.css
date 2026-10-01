@@ -256,9 +256,7 @@
 .instr-part-head .instruction-restore-menu button.instruction-restore-original { border-top:1px solid var(--line); border-radius:0; margin-top:4px; padding-top:12px; }
 .instruction-restore-empty { font-size:12px; line-height:1.5; color:var(--text-faint); padding:8px 10px; max-width:240px; }
 .instruction-undo { font:inherit; font-size:11px; color:var(--text-dim); background:transparent; border:none; padding:0; text-decoration:underline; cursor:pointer; }
-.instruction-editor p { font-size:13px; line-height:1.6; color:var(--text-faint); margin:12px 0 20px; max-width:75ch; }
-/* THE INSTRUCTIONS PAGE, AS APPROVED (w-3dc46f3a67, 2026-09-23): option 2,
-   Card. One raised card per section, and inside it a writing surface.
+/* THE WRITING SURFACE, behind Edit (and straight away on an empty section).
 
    NO GRIP AND NO MONOSPACE. The default textarea, with its resize grip, felt
    almost like raw HTML. The grip is a browser default nothing else in
@@ -277,51 +275,30 @@
      hover     the same panel at full strength, so the pointer finds its edges
                before the click.
      focus     an accent down the left edge, with the caret in it. The caret is
-               there the moment the page opens (../components/InstructionSettings).
+               there the moment Edit is pressed (../components/InstructionSettings).
 
    The accent rides in the padding rather than outside it, so nothing shifts
-   between the three states: only colour moves. */
-
-/* THE APPROVED CARD: one per section, holding the head, what the section
-   governs and the writing surface, so a section reads as one thing on the page
-   rather than as a form spread down it. */
-.instruction-editor { margin-top:8px; padding:26px 28px 22px; border:1px solid var(--line); border-radius:var(--radius); background:var(--skin-pane,var(--surface)); box-shadow:var(--shadow-card); }
-/* The panel sits DEEPER than the card it is on, or the two surfaces read as one
-   and the place to type disappears again. */
-/* NO MAX-WIDTH (w-5737fe67cf). It was 74ch, so the box stopped short of the
-   Reset button on the same card and the components were not right-aligned.
-   Everything on the card now ends at the card's padding. */
-.instruction-editor textarea { display:block; resize:none; width:100%; min-height:400px;
+   between the three states: only colour moves. It grows with what is in it, so
+   the page and the writing surface hold the same text at the same length. */
+.instr-part textarea { display:block; resize:none; width:100%; min-height:220px; margin-top:10px; field-sizing:content;
   padding:16px 18px; border:0; border-left:2px solid transparent; border-radius:var(--radius);
   background:var(--wash); color:var(--text); caret-color:var(--text);
   font:14px/1.75 inherit; font-family:inherit;
   transition:background .12s ease, border-color .12s ease; }
-.instruction-editor textarea:hover { background:color-mix(in srgb, var(--wash) 100%, var(--text) 4%); }
-.instruction-editor textarea:focus { outline:none; background:color-mix(in srgb, var(--wash) 100%, var(--text) 4%); border-left-color:var(--underline); }
-.instruction-editor textarea::placeholder { color:var(--text-faint); }
+.instr-part textarea:hover { background:color-mix(in srgb, var(--wash) 100%, var(--text) 4%); }
+.instr-part textarea:focus { outline:none; background:color-mix(in srgb, var(--wash) 100%, var(--text) 4%); border-left-color:var(--underline); }
+.instr-part textarea::placeholder { color:var(--text-faint); }
 /* Saving, saved, and the errors a person can act on. Empty the rest of the
    time: an idle line here is the page explaining itself. */
 .instruction-save { font-size:11px; color:var(--text-faint); margin-top:14px; min-height:14px; }
-/* ADHD MODE (w-5737fe67cf): the switch row on the "How agents write to you"
-   card, and its rules in a box under hers while it is on. No plate and no
-   padding of their own, so the switch and the box end on the card's edge like
-   the Reset button above them. */
-.instruction-toggle { display:flex; align-items:center; justify-content:space-between; gap:24px; margin:0 0 20px; }
-.instruction-toggle-label { font-size:14px; color:var(--text); }
-.instruction-toggle-desc { font-size:13px; color:var(--text-faint); margin-top:4px; }
-.instruction-toggle .set-sw { flex:none; }
-.instruction-sub { margin-top:28px; }
-.instruction-sub .instruction-editor-head { margin-bottom:12px; }
-.instruction-sub h3 { font-size:14px; font-weight:500; margin:0; }
-.instruction-sub textarea { min-height:160px; }
-/* The app's own brief is ours, so its card is flat where hers is raised. */
-.instruction-advanced .instruction-editor { background:var(--wash); box-shadow:none; }
+/* ADHD MODE: its switch sits where Edit sits on the others, and its rules show
+   only while it is on. */
+.instr-part-tools .set-sw { flex:none; }
 /* The app's own task brief, behind a line she has to open (w-3dc46f3a67). It is
    quieter than the two boxes above it because it is ours and not hers. */
 .instruction-advanced { margin-top:40px; border-top:1px solid var(--line); padding-top:20px; }
 .instruction-advanced-toggle { font:inherit; font-size:12px; color:var(--text-faint); border:0; background:transparent; padding:0; cursor:pointer; }
 .instruction-advanced-toggle:hover { color:var(--text-dim); }
-.instruction-advanced .instruction-editor { margin-top:24px; }
 
 :root .workspace-layout > .settings-embedded { background: transparent; }
 
