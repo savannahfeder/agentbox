@@ -16,6 +16,8 @@ import {
   BOARD_COLUMNS, isDirect, isFiltered, teamEntries, teamKeeps, updatedWords,
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
+import { rowSharing, sharePatch } from './page-rules';
+import { api } from '../api';
 import './pages.css';
 
 /* ------------------------------------------------------------ icons */
@@ -27,6 +29,15 @@ const BoardIcon = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="no
 const CaretIcon = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>;
 export const PeopleIcon = () => <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="9" cy="9" r="3.2" /><path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5" /><path d="M15.5 6.2a3 3 0 0 1 0 5.6M17.5 14.8c1.8.6 3 2.1 3.4 4.7" /></svg>;
 export const LockMark = () => <svg className="th-lock" width="11" height="12" viewBox="0 0 11 12" fill="none" stroke="currentColor" strokeWidth="1.2" aria-label="Private"><rect x="1.5" y="5.5" width="8" height="6" rx="1" /><path d="M3.5 5.5V3.8a2 2 0 0 1 4 0v1.7" /></svg>;
+/** Two people: the team can see this thread. After the title on the inbox rows
+ *  the team can see and on nothing else, and beside "Team" in the summary.
+ *  `label` names it for a screen reader where no word stands beside it. */
+export function SharedMark({ className = 'th-shared', label }: { className?: string; label?: string }) {
+  return <svg className={className} width="14" height="12" viewBox="2 4 20 17" fill="none" stroke="currentColor" strokeWidth="1.7"
+    {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}>
+    <circle cx="9" cy="9" r="3.2" /><path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5" /><path d="M15.5 6.2a3 3 0 0 1 0 5.6M17.5 14.8c1.8.6 3 2.1 3.4 4.7" />
+  </svg>;
+}
 
 /* ------------------------------------------------------------ marks */
 export function StateGlyph({ state }: { state: ThreadStateWord }) {
@@ -182,23 +193,47 @@ export function otherPerson(item: WorkItem, me: string | null): string | null {
  *  2026-10-01: "The team page in list view should be the same component...
  *  with maybe some slight differences, such as an extra column for the
  *  person". So there is one set of cells, and the Team page only adds Person. */
-export function RowCells({ title, hidden = false, lock = false, where, person, priority, updatedAt, now }: {
-  title: ReactNode; hidden?: boolean; lock?: boolean; where: ReactNode; person?: ReactNode;
-  priority: number | null; updatedAt: number; now: number;
+export function RowCells({ title, hidden = false, lock = false, shared = false, where, person, priority, updatedAt, now, action }: {
+  title: ReactNode; hidden?: boolean; lock?: boolean; shared?: boolean; where: ReactNode; person?: ReactNode;
+  priority: number | null; updatedAt: number; now: number; action?: ReactNode;
 }) {
   const id = priority === null ? null : priorityIdOf(priority);
   return <div className={`row-main th-grid${person !== undefined ? ' with-person' : ''}`}>
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{title}{lock && <LockMark />}</div>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{title}{shared && <SharedMark label="Visible to the team" />}{lock && <LockMark />}</div>
     <div className="th-cell-proj">{where}</div>
     {person !== undefined && <div className="th-cell-person">{person}</div>}
     <div className={`th-cell-prio${id === 'urgent' ? ' urgent' : ''}`}>{id && <><PriorityMark id={id} />{priorityLabelOf(id)}</>}</div>
-    <div className="th-cell-when num">{updatedWords(updatedAt, now)}</div>
+    {/* The row's one hover action, if it has one, covers the time while the
+        pointer is on the row (pages.css .th-row-act). */}
+    <div className={`th-cell-when num${action ? ' has-act' : ''}`}><span className="th-when">{updatedWords(updatedAt, now)}</span>{action}</div>
   </div>;
 }
 
 /** The cells of one row in the inbox's table: thread, project (or who a message is from), priority, updated. */
 export function ThreadCells({ item, product, now }: { item: WorkItem; product: Product | undefined; now: number }) {
   const team = useContext(TeamContext);
+  // WHO SEES IT, AT A GLANCE AND ONE CLICK FROM CHANGING (2026-10-01). A
+  // people mark after the title of a thread the team can see and nothing on
+  // the rest, which is most of her rows, so the mark only ever means one
+  // thing. Hovering the row offers Share or Unshare at its end. Her click
+  // shows at once; the row catches up when the store's next snapshot does.
+  const sharing = rowSharing(item, product, team ? { me: team.me, since: team.state.since ?? null } : null);
+  const [chosen, setChosen] = useState<'team' | 'private' | null>(null);
+  useEffect(() => { setChosen(null); }, [item.visibility]);
+  const seen = sharing && (chosen ?? sharing);
+  const flip = async () => {
+    if (!seen) return;
+    const patch = sharePatch(seen);
+    setChosen(patch.visibility);
+    const out = await api.threadEdit(item.product, item.id, patch);
+    if (!out.ok) setChosen(null);
+  };
+  const action = seen ? (
+    <button type="button" className="th-row-act" onClick={(e) => { e.stopPropagation(); void flip(); }}
+      title={seen === 'team' ? 'Stop showing this thread to the team' : 'Show this thread to the team'}>
+      <SharedMark className="th-row-act-mark" />{seen === 'team' ? 'Unshare' : 'Share'}
+    </button>
+  ) : undefined;
   let where: ReactNode = product?.name ?? '';
   // A group conversation names everyone else in it; a pair says From or To.
   const members = isDirect(product) ? [...new Set([...(product?.team?.people ?? []), ...(product?.team?.sharedBy ? [product.team.sharedBy] : [])])].filter((p) => p !== team?.me) : [];
@@ -214,8 +249,8 @@ export function ThreadCells({ item, product, now }: { item: WorkItem; product: P
   // A conversation with a person reads as its latest message, the way a chat
   // list does; every other row keeps its title.
   const latest = isDirect(product) ? (item.answer || item.body || '').trim().split('\n')[0] : '';
-  return <RowCells title={latest || rowTitle(item)} lock={item.visibility === 'private'} where={where}
-    priority={isDirect(product) ? null : item.priority ?? 0} updatedAt={item.updatedAt} now={now} />;
+  return <RowCells title={latest || rowTitle(item)} shared={seen === 'team'} where={where}
+    priority={isDirect(product) ? null : item.priority ?? 0} updatedAt={item.updatedAt} now={now} action={action} />;
 }
 
 /* ------------------------------------------------------------ the Team page */
@@ -297,6 +332,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem }: {
   const entries = teamEntries({ items, products, cards: [], me, now })
     .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
     .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
+  const teamSees = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since: team.state.since ?? null } : null) === 'team';
   return <div className="list hm-me"><div className="th-board">
     {BOARD_COLUMNS.map((col) => {
       const rows = entries.filter((e) => e.state === col.state);
@@ -304,8 +340,10 @@ export function InboxBoard({ items, products, display, now, onOpenItem }: {
         {/* Your own board says what the tab says: what waits on you needs you. */}
         <div className="th-col-h"><StateGlyph state={col.state} />{col.state === 'waiting' ? 'Needs you' : col.label}<b>{rows.length}</b></div>
         {rows.length === 0 && <div className="th-col-empty">Nothing here.</div>}
+        {/* The same mark as the table's rows: on what the team can see, and
+            on nothing else. */}
         {rows.map((e) => <button type="button" key={e.key} className="th-card" onClick={() => e.item && onOpenItem(e.item)}>
-          <div className="t">{e.title}{e.item?.visibility === 'private' && <LockMark />}</div>
+          <div className="t">{e.title}{e.item && teamSees(e.item) && <SharedMark label="Visible to the team" />}</div>
           <div className="m">{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project}</span></div>
         </button>)}
       </div>;

@@ -7,6 +7,7 @@
 // are shared with the Mac that publishes cards, so they live in
 // shared/thread-cards.mjs and are only read here.
 import type { Person, ThreadStateWord, WorkItem } from '../types';
+import { shownToTeam } from '../../../shared/thread-cards.mjs';
 
 export const SUMMARY_FIELDS = ['problem', 'progress', 'solution'] as const;
 export type SummaryField = (typeof SUMMARY_FIELDS)[number];
@@ -124,6 +125,20 @@ export function ownerName(item: Pick<WorkItem, 'createdBy'>, me: string | null, 
   if (!item.createdBy || !me || item.createdBy === me) return 'You';
   return byId.get(item.createdBy)?.name || 'Someone';
 }
+
+/**
+ * WHO SEES A THREAD, BY THE RULE AND NOT BY THE WORD ON DISK (2026-10-01).
+ * Her threads from before she joined carry no visibility at all, and the panel
+ * read that as Team on every one of them while the Team page showed none. So
+ * it asks the same rule the Team page does (shared/thread-cards.mjs
+ * shownToTeam), and an old thread nobody shared reads "Only you".
+ */
+export function whoSees(item: Pick<WorkItem, 'visibility' | 'createdAt'>, since: number | null): 'team' | 'private' {
+  return shownToTeam(item, since) ? 'team' : 'private';
+}
+
+/** The two words, in the panel and in its menu. */
+export const VISIBILITY_WORD = { team: 'Team', private: 'Only you' } as const;
 
 /** Where open or closed is remembered, across threads and restarts. */
 export const SUMMARY_OPEN_KEY = 'threads.summary.open';

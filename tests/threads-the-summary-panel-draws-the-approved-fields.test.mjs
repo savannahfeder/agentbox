@@ -75,8 +75,10 @@ describe('the panel', () => {
     expect(card).toContain('prio-bars p4');
     expect(text(card)).not.toContain('!');
   });
-  it('reads Private for a private thread', () => {
-    expect(text(draw(React.createElement(SummaryPanel, { item: item({ visibility: 'private' }), items, team: null })))).toMatch(/Visible to Private/);
+  // "Only you" since 2026-10-01: the same words an old thread nobody shared
+  // reads (tests/threads-the-summary-names-its-thread-and-shows-what-you-can-change.test.mjs).
+  it('reads Only you for a private thread', () => {
+    expect(text(draw(React.createElement(SummaryPanel, { item: item({ visibility: 'private' }), items, team: null })))).toMatch(/Visible to Only you/);
   });
   it('uses no em dash anywhere', () => {
     expect(html).not.toContain('—');
