@@ -179,3 +179,17 @@ it('keeps a group conversation for three people, needing whoever did not speak l
   // The pair's own conversation is a different one.
   expect(maya.service.conversation(theo.personId)).toBeNull();
 });
+
+// A START THAT FAILS LEAVES NOTHING BEHIND (2026-10-01): the cloud refused a
+// group's people, the half-made record stayed, and the next send reused it and
+// reached nobody.
+it('leaves no record behind when the cloud refuses to start a conversation', async () => {
+  const before = maya.store.listProducts().filter((p) => p.team?.direct).length;
+  cloud.refuseShares = 'adding people to it: refused';
+  await expect(maya.on(() => maya.service.message([theo.personId, jun.personId], 'All three?'))).rejects.toThrow(/refused/);
+  expect(maya.store.listProducts().filter((p) => p.team?.direct).length).toBe(before);
+  cloud.refuseShares = null;
+  await maya.on(() => maya.service.message([theo.personId, jun.personId], 'All three?'));
+  await theo.service.syncNow();
+  expect(inbox(theo).map((i) => i.title)).toContain('All three?');
+});

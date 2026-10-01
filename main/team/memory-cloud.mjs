@@ -148,6 +148,8 @@ export function memoryBackend(cloud, personId) {
       const existing = cloud.projects.get(id);
       if (existing && existing.createdBy !== personId) refuse('change a project somebody else shared');
       if (!myTeams().includes(teamId)) refuse('share into a team you are not on');
+      // A test can make the cloud refuse a share, to prove a failed start leaves nothing.
+      if (cloud.refuseShares) refuse(cloud.refuseShares);
       // A message thread is its maker and up to eleven others, as the database
       // insists (migration 20261001000700_group_messages.sql).
       if (direct && (visibility !== 'people' || new Set(people.filter((p) => p !== personId)).size > 11)) refuse('put more than twelve people on a message thread');

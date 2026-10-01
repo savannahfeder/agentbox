@@ -329,7 +329,15 @@ export function createTeamService({
       if (!product) { await syncNow(); product = directWith(me, to); }
       if (!product) {
         const made = makeDirect(accountRoot, { teamId: state.team.id, me, others });
-        await backend.shareProject({ id: made.projectId, teamId: state.team.id, name: 'Direct', visibility: 'people', people: others, direct: true });
+        // A START THAT FAILS LEAVES NOTHING BEHIND. A record shared only in
+        // part (the cloud refused its people) was reused by the next send and
+        // never reached anyone (found 2026-10-01 on a test copy).
+        try {
+          await backend.shareProject({ id: made.projectId, teamId: state.team.id, name: 'Direct', visibility: 'people', people: others, direct: true });
+        } catch (err) {
+          try { fs.rmSync(made.dir, { recursive: true, force: true }); } catch { /* the error below still says what failed */ }
+          throw err;
+        }
         product = products().find((p) => p.dir === made.dir) ?? { slug: made.slug, dir: made.dir };
       }
       // ONE CONVERSATION PER PERSON (decided 2026-10-01, from six interviews
