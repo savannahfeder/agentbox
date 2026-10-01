@@ -13,15 +13,28 @@
 // renderer/).
 //
 // The moving pictures are cut from the launch film, which is not in this repo.
-// Each is a few seconds of it, denoised (the film's grain made a GIF of one
-// clip 22 MB) and written as a lossy animated WebP, about 0.5 MB each:
+// Each is a few seconds of it written as a lossy animated WebP, 0.6 to 5 MB
+// each, 17 MB for all ten:
 //
 //   ffmpeg -ss <start> -t <seconds> -i film.mp4 \
-//     -vf "hqdn3d=6:6:10:10,fps=15,scale=960:-1:flags=lanczos" frames/%04d.png
-//   img2webp -loop 0 -lossy -q 55 -m 4 -mixed -d 67 <all but last> \
+//     -vf "fps=15,scale=960:-1:flags=lanczos" frames/%04d.png
+//   img2webp -loop 0 -lossy -q 85 -m 5 -exact -d 67 <all but last> \
 //     -d 1500 <last> -o docs/readme/<name>.webp
 //
 // The last frame is held so a loop can be read before it starts again.
+//
+// THREE SETTINGS LOOK LIKE SAVINGS AND EACH ONE PUT VISIBLE DAMAGE ON GITHUB
+// (w-96babd2cfc, 2026-10-01). The first cut used all three and came to 6.9 MB,
+// and in the browser it showed ghost boxes, smeared text and blocky squares.
+// - Leaving out -exact: the encoder rewrites the pixels around the part of
+//   each frame that changed, which img2webp's own help warns "may cause
+//   artifacts with lossy animations". That is where the ghost boxes came from.
+// - -mixed: frames flip between lossy and lossless, and the seams show.
+// - A denoise (hqdn3d) to strip the film's grain: the grain is what dithers
+//   the dark gradients, so without it they band, and the temporal half
+//   smears moving light into trails.
+// Below q85 the dark backgrounds break into 8 pixel blocks even with all
+// three fixed; q75 and q80 were measured and both did.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
