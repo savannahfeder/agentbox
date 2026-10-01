@@ -32,8 +32,8 @@
 ## The chat window is the bottleneck
 
 Today you run agents in chat windows and terminals, and you wait for each one
-to finish before you prompt it again. So the number of agents you can run is
-the number of windows you can keep track of, which is about four.
+to finish before you prompt it again. So the number of agents you can run is limited 
+by the number of windows you can keep track of.
 
 <p align="center">
   <img src="docs/readme/before.webp" alt="Five terminal windows, each with an agent waiting on a different task" width="60%">
