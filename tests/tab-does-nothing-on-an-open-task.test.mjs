@@ -27,10 +27,25 @@ const src = (...p) => fs.readFileSync(path.join(here, '..', 'renderer', 'src', .
 const app = src('App.tsx');
 
 // 2026-09-14: Tab now moves browser focus, but never changes the page.
+//
+// 2026-10-01 (w-5a08121f99): and on the Inbox's list it moves along the state
+// tabs again, which she asked for by name. NOTHING ABOVE CHANGES. An opened
+// task is exactly the screen this file is about, and it is the first thing the
+// rotation's gate tests, so the press still cannot throw the task away. The
+// assertion moved from the shape of the old line to the fact underneath it.
 describe('Tab on an opened task', () => {
- it('returns to browser focus before sidebar navigation', () => {
-  expect(app).toContain("if (e.key === 'Tab') return;");
+ it('changes nothing, because the rotation refuses an opened task', () => {
+  const gate = app.slice(app.indexOf("if (e.key === 'Tab') {"), app.indexOf("if (e.key === 'Tab') {") + 700);
+  for (const part of ['!focused', '!focusedRepeat', '!inFullScreen']) expect(gate).toContain(part);
+  expect(gate).toContain('if (!onTheTabs) return;');
   expect(app).toContain('if (slot && !inInput && !modal && !inFullScreen)');
+ });
+
+ it('hands the press back to the browser there rather than swallowing it', () => {
+  // The `return` is before the preventDefault, so on an opened task the press
+  // is the browser's, which is the September behaviour this screen kept.
+  const gate = app.slice(app.indexOf("if (e.key === 'Tab') {"), app.indexOf("if (e.key === 'Tab') {") + 700);
+  expect(gate.indexOf('if (!onTheTabs) return;')).toBeLessThan(gate.indexOf('e.preventDefault()'));
  });
 });
 
