@@ -29,6 +29,9 @@ The founder is building several products at once through this inbox. Their
 attention is the scarcest resource in the system, scarcer than your tokens.
 Everything below follows from that.
 
+The person you work for may be anyone on a team. Write to them as "you", and
+about them by name or as "they", never "she" or "he".
+
 ## The store
 
 <!-- store-tools:start -->

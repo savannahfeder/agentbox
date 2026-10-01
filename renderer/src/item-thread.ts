@@ -41,6 +41,13 @@ import type { AgentEvent, AgentWork } from './types';
 // rest is its key input, already flattened to one string on the way to disk.
 const TOOL = /^\[([^\]]+)\]\s*(.*)$/;
 
+// A ROW'S ID ON ITS OWN IS HOW THE STORE ADDRESSES IT, NEVER WHAT A PERSON
+// READS. The trace keeps a store tool's `id` argument as the line's subject, so
+// a claim read "Claim work item w-4ac1af8c99" on a tester's screen
+// (2026-10-01). Only a subject that is nothing but an id goes; a command that
+// mentions one keeps it.
+const ROW_ID = /^w-[0-9a-f]{10}$/i;
+
 /**
  * THE CONCISE ANSWER, KEPT WHOLE, AT THE FOOT OF THE CONVERSATION.
  *
@@ -111,7 +118,7 @@ export interface ItemThread {
 
 /** One trace line that ran a tool, as the quiet line the thread draws. */
 function workLine(at: number, name: string, hint: string): AgentWork {
-  const subject = name === 'Bash' ? plainCommand(hint) : shortPath(hint);
+  const subject = ROW_ID.test(hint.trim()) ? '' : name === 'Bash' ? plainCommand(hint) : shortPath(hint);
   return {
     kind: 'work',
     at,

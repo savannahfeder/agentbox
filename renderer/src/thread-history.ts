@@ -177,18 +177,26 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     // directives, agents file most of the inbox, and putting her name on an
     // agent's words inside her own thread is the one thing this must not do.
     if (first && has(patch, 'title')) {
-      first = false;
-      title = String(patch!.title ?? '');
-      if (words(patch!.body)) opened = true;
       // A PERSON'S OWN APP STAMPED IT (the team version). On a signed-in Mac
       // every line carries who wrote it, so the system's wordless stamp that
       // comes straight before a person's words is that person sending a task,
-      // and "An agent opened this" over their face would be false. Their words
-      // on the next line open the thread instead. With nobody signed in no line
-      // carries `by`, and this reads as it always has.
+      // and "An agent opened this" over their face would be false. Their own
+      // line opens the thread instead, so the stamp leaves `first` alone. With
+      // nobody signed in no line carries `by`, and this reads as it always has.
+      //
+      // THEIR LINE MAY HOLD ONLY A TITLE. A task typed as one line has no body,
+      // and requiring one is what opened a tester's thread as the agent's on
+      // 2026-10-01 (tests/team-a-one-line-task-opens-as-yours-not-the-agents).
       const next = lines[at_ + 1];
-      if (line.source === 'system' && line.by && !words(patch!.body)
-        && next?.source === 'founder' && next.by === line.by && words(next.patch?.body)) continue;
+      const theirs = line.source === 'system' && !!line.by && !words(patch!.body)
+        && next?.source === 'founder' && next.by === line.by;
+      // Their line carries the title too, so it is the birth.
+      if (theirs && has(next!.patch, 'title')) continue;
+      first = false;
+      title = String(patch!.title ?? '');
+      if (words(patch!.body)) opened = true;
+      // Their words with no title: the ask branch below opens the thread.
+      if (theirs && words(next!.patch?.body)) continue;
       events.push({
         at, who,
         said: mine ? 'You opened this' : 'An agent opened this',
@@ -257,7 +265,11 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
       continue;
     }
 
-    if (has(patch, 'title')) {
+    // THE SAME TITLE AGAIN IS NOT A RENAME. It falls through, so whatever else
+    // the line set (a close, a pause) still speaks. "You renamed it" over a
+    // name that never changed is what sat above a tester's agent's first
+    // steps on 2026-10-01.
+    if (has(patch, 'title') && String(patch.title ?? '') !== title) {
       const was = title;
       title = String(patch.title ?? '');
       events.push({
