@@ -98,10 +98,47 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       return supabaseBackend(c);
     },
 
+    // EMAIL AND PASSWORD, beside Google (2026-10-01: "it needs a real sign-in
+    // page"). Google stays the first way in; this is the one that works
+    // before a team has set Google up, and for anyone who would rather not.
+    async signInWithPassword(email, password) {
+      if (!configured) throw new Error('this build has no team cloud configured');
+      const c = await getClient();
+      const { error } = await c.auth.signInWithPassword({ email: String(email ?? '').trim(), password: String(password ?? '') });
+      if (error) throw new Error(plainAuthError(error.message));
+      return supabaseBackend(c);
+    },
+
+    // A new account. With email confirmation on (the hosted project's setting)
+    // there is no session until the link in the email is followed, so this
+    // answers { confirm: true } and the page says to check the inbox.
+    async signUp({ email, password, name }) {
+      if (!configured) throw new Error('this build has no team cloud configured');
+      const c = await getClient();
+      const { data, error } = await c.auth.signUp({
+        email: String(email ?? '').trim(),
+        password: String(password ?? ''),
+        options: { data: { full_name: String(name ?? '').trim() || undefined } },
+      });
+      if (error) throw new Error(plainAuthError(error.message));
+      return data?.session ? { backend: supabaseBackend(c) } : { confirm: true };
+    },
+
     async signOut() {
       if (client) await client.auth.signOut().catch(() => {});
     },
   };
+}
+
+// The cloud's words, said the way the page says everything else.
+export function plainAuthError(message) {
+  const m = String(message ?? '');
+  if (/invalid login credentials/i.test(m)) return 'That email and password do not match an account.';
+  if (/email not confirmed/i.test(m)) return 'Confirm your email first: follow the link we sent, then sign in.';
+  if (/already registered|already been registered/i.test(m)) return 'There is already an account with that email. Sign in instead.';
+  if (/password should be at least/i.test(m)) return 'Use a password of at least 6 characters.';
+  if (/rate limit/i.test(m)) return 'Too many tries just now. Wait a minute and try again.';
+  return m || 'That did not work. Try again.';
 }
 
 // WHERE THE HEADLESS APP KEEPS ITS SIGN-IN: in its own data folder, readable by
@@ -128,6 +165,8 @@ export function memorySession(backendFor) {
     configured: true,
     async restore() { return signedIn; },
     async signIn() { signedIn = backendFor(); return signedIn; },
+    async signInWithPassword() { signedIn = backendFor(); return signedIn; },
+    async signUp() { return { confirm: true }; },
     async signOut() { signedIn = null; },
   };
 }

@@ -609,6 +609,19 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   };
   ipcMain.handle('zero:team-sign-in', teamCall(() => team.signIn()));
   ipcMain.handle('zero:team-sign-out', teamCall(() => team.signOut()));
+  ipcMain.handle('zero:team-sign-in-email', teamCall(({ email, password }) => team.signInWithEmail(email, password)));
+  // Its own door, because it has one more thing to say: whether the account
+  // waits on the link in its confirmation email.
+  ipcMain.handle('zero:team-sign-up', async (_e, { email, password, name } = {}) => {
+    if (!team) return { ok: false, error: 'This build has no team cloud set up.' };
+    try {
+      const out = await team.signUp(email, password, name);
+      push();
+      return { ok: true, team: team.state(), confirm: !!out?.confirm };
+    } catch (err) {
+      return { ok: false, error: String(err?.message ?? err), team: team.state() };
+    }
+  });
   ipcMain.handle('zero:team-create', teamCall(({ name }) => team.createTeam(name)));
   // An invite answered yes. Nothing else joins a team.
   ipcMain.handle('zero:team-accept-invite', teamCall(({ teamId }) => team.acceptInvite(teamId)));

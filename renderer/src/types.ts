@@ -122,6 +122,8 @@ export interface TeamCallResult {
   ok: boolean;
   team?: TeamState;
   error?: string;
+  /** A new account that waits on the link in its confirmation email. */
+  confirm?: boolean;
 }
 
 export type ThreadStateWord = 'waiting' | 'running' | 'scheduled' | 'done';
@@ -153,6 +155,8 @@ export interface TeamInvite {
 
 export interface TeamState {
   configured: boolean;
+  /** The first look for a saved sign-in is over (false while it is still being found). */
+  started?: boolean;
   signedIn: boolean;
   me: Person | null;
   team: { id: string; name: string } | null;
@@ -878,6 +882,8 @@ declare global {
       // The team version (main/team/index.mjs through main/ipc.mjs).
       teamSignIn(): Promise<TeamCallResult>;
       teamSignOut(): Promise<TeamCallResult>;
+      teamSignInEmail(p: { email: string; password: string }): Promise<TeamCallResult>;
+      teamSignUp(p: { name: string; email: string; password: string }): Promise<TeamCallResult>;
       teamCreate(p: { name: string }): Promise<TeamCallResult>;
       teamAcceptInvite(p: { teamId: string }): Promise<TeamCallResult>;
       teamInvite(p: { email: string }): Promise<TeamCallResult>;

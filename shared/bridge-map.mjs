@@ -27,6 +27,8 @@ export const REQUEST_CHANNELS = {
   // The team version: signing in, the team, sharing, routing a given task.
   teamSignIn: 'zero:team-sign-in',
   teamSignOut: 'zero:team-sign-out',
+  teamSignInEmail: 'zero:team-sign-in-email',
+  teamSignUp: 'zero:team-sign-up',
   teamCreate: 'zero:team-create',
   teamInvite: 'zero:team-invite',
   teamAcceptInvite: 'zero:team-accept-invite',

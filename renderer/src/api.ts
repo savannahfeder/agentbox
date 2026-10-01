@@ -432,6 +432,8 @@ export const api = {
   // Every call answers { ok, team } or { ok: false, error } in words.
   async teamSignIn(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignIn()); },
   async teamSignOut(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignOut()); },
+  async teamSignInEmail(email: string, password: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignInEmail({ email, password })); },
+  async teamSignUp(name: string, email: string, password: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignUp({ name, email, password })); },
   async teamCreate(name: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamCreate({ name })); },
   async teamAcceptInvite(teamId: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamAcceptInvite({ teamId })); },
   async teamInvite(email: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamInvite({ email })); },

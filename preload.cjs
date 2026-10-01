@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('zero', {
   // The team version: signing in, the team, and sharing a project.
   teamSignIn: () => ipcRenderer.invoke('zero:team-sign-in'),
   teamSignOut: () => ipcRenderer.invoke('zero:team-sign-out'),
+  teamSignInEmail: (payload) => ipcRenderer.invoke('zero:team-sign-in-email', payload),
+  teamSignUp: (payload) => ipcRenderer.invoke('zero:team-sign-up', payload),
   teamCreate: (payload) => ipcRenderer.invoke('zero:team-create', payload),
   teamAcceptInvite: (payload) => ipcRenderer.invoke('zero:team-accept-invite', payload),
   teamInvite: (payload) => ipcRenderer.invoke('zero:team-invite', payload),

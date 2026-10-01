@@ -116,6 +116,7 @@ import { TeamContext, teamView } from './team/people';
 import { TeamPage } from './team/TeamPage';
 import { EmptyTab, HeaderActions, InboxBoard, InboxClear, StateTabs, TeamView } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
+import { SignInPage } from './team/SignInPage';
 import { isDirect, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing' | 'themes';
@@ -489,6 +490,18 @@ export default function App() {
   // Drawn when it is open and nothing sits over it: an opened task or Settings
   // takes the page, and closing them returns to the Team page.
   const teamShown = teamOpen && !focused && !settingsOpen;
+  // THE SIGN-IN PAGE STANDS OVER EVERYTHING when a team build has nobody
+  // signed in, once the saved sign-in has been looked for (team/SignInPage.tsx).
+  // Signing out lands on it, and it says so.
+  const signInGate = !api.isFixtures && !!snap?.team?.configured && snap.team.started === true && !snap.team.signedIn;
+  const wasSignedIn = useRef(false);
+  const [signedOutHere, setSignedOutHere] = useState(false);
+  useEffect(() => {
+    if (snap?.team?.signedIn) { wasSignedIn.current = true; setSignedOutHere(false); }
+    else if (wasSignedIn.current && snap?.team?.started) setSignedOutHere(true);
+  }, [snap?.team?.signedIn, snap?.team?.started]);
+  const signInGateRef = useRef(false);
+  signInGateRef.current = signInGate;
   /*
    * EVERYTHING DRAWN OVER THE APP, IN ONE PLACE.
      Read by `closeWhatFloats` below, which is how a walk hands the whole window
@@ -3649,6 +3662,8 @@ export default function App() {
   /* ------------------------------- keyboard ------------------------------- */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Nothing behind the sign-in page answers a key.
+      if (signInGateRef.current) return;
       // EVERY OTHER KEY ANSWERS NO TO THE QUESTION A LATE Z ASKED, and it is
       // here, above every screen guard, because the answer is no wherever she
       // happens to be typing. Only a second Z goes through with it (`undo`).
@@ -4302,6 +4317,7 @@ export default function App() {
   return (
     <TeamContext.Provider value={team}>
     <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${workspaceCollapsed ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}`}>
+      {signInGate && <SignInPage signedOut={signedOutHere} error={snap?.team?.error ?? null} />}
       {/* THE TOP BAR IS NOT DRAWN ON AN OPENED TASK.
 
           WHAT REPLACES IT IS NOT NOTHING, and the reason is three buttons this

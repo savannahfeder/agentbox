@@ -18,7 +18,7 @@ import { firstSentence } from '../../shared/thread-cards.mjs';
 import { cardsFor } from '../../shared/thread-cards.mjs';
 import fs from 'node:fs';
 
-const EMPTY = { configured: false, signedIn: false, me: null, team: null, invites: [], people: [], cards: [], lastSyncAt: null, error: null };
+const EMPTY = { configured: false, started: false, signedIn: false, me: null, team: null, invites: [], people: [], cards: [], lastSyncAt: null, error: null };
 
 export function createTeamService({
   session, store, disk, accountRoot, stateFile, onChange = () => {}, log = () => {}, intervalMs = 5000, startRetryMs = 1500,
@@ -146,18 +146,23 @@ export function createTeamService({
     // out until it was restarted (measured 2026-10-01 on a loaded Mac: the
     // sign-in went through and the very next call failed). A session that is
     // simply not there is not an error and is not retried.
+    // `started` says the first look for a saved sign-in is over, so the window
+    // can tell "signed out" from "still finding out" and never flashes the
+    // sign-in page at somebody who is signed in.
     async start() {
       if (!session?.configured) return state;
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
           const b = await session.restore();
           if (b) await signedIn(b);
+          set({ started: true });
           return state;
         } catch (err) {
           set({ error: String(err?.message ?? err) });
           if (attempt < 2) await new Promise((r) => setTimeout(r, startRetryMs * (attempt + 1)));
         }
       }
+      set({ started: true });
       return state;
     },
 
@@ -167,6 +172,21 @@ export function createTeamService({
       return state;
     },
 
+    async signInWithEmail(email, password) {
+      if (!session?.signInWithPassword) throw new Error('this build cannot sign in with email');
+      const b = await session.signInWithPassword(email, password);
+      await signedIn(b);
+      return state;
+    },
+
+    /** A new account: signed in at once, or { confirm: true } until the email is confirmed. */
+    async signUp(email, password, name) {
+      if (!session?.signUp) throw new Error('this build cannot make accounts');
+      const out = await session.signUp({ email, password, name });
+      if (out?.backend) { await signedIn(out.backend); return state; }
+      return { ...state, confirm: true };
+    },
+
     async signOut() {
       stopLoop();
       await session.signOut?.();
@@ -174,7 +194,8 @@ export function createTeamService({
       delete process.env.AGENTBOX_PERSON_ID;
       backend = null;
       sync = null;
-      state = { ...EMPTY, configured: !!session?.configured };
+      // Signed out is a known answer, so the window shows the sign-in page at once.
+      state = { ...EMPTY, configured: !!session?.configured, started: true };
       onChange();
       return state;
     },
