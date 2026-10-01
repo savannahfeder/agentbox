@@ -720,8 +720,8 @@ export const WORK_TOTAL = 200;
 // three: the verb, the subject and the fold. It is re-exported here so that
 // nothing that already reads this file has to learn a second import.
 export {
-  workVerb, workSubject, fullSubject, shortPath, plainCommand,
-  groupWork, runSummary, runFailures, RUN_MIN,
+  workVerb, workSubject, fullSubject, shortPath, plainCommand, commandWork,
+  groupWork, runSummary, runFailures, RUN_MIN, isBookkeeping,
   changedFile, fileInChange, CHANGES_A_FILE,
 } from './work-lines.mjs';
 

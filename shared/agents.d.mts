@@ -139,6 +139,15 @@ export function workSubject(
 export function fullSubject(input: Record<string, unknown> | null | undefined): string;
 export function shortPath(raw: string, cwd?: string, home?: string): string;
 export function plainCommand(raw: string): string;
+// What a shell command did, in words, or null to leave it as the command. And
+// the steps that are the store's own records rather than the work, which are
+// not drawn at all.
+export function commandWork(
+  raw: string | null | undefined,
+  cwd?: string,
+  home?: string,
+): { verb: string; doing: string; subject: string } | null;
+export function isBookkeeping(name: string | null | undefined): boolean;
 export const RUN_MIN: number;
 export function groupWork<T extends { kind?: string }>(
   events: T[],

@@ -18,7 +18,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 import {
-  WORK_CHARS, agentKey, changedFile, fullSubject, saidCount, sameInstant, threadWindow, workSubject, workVerb,
+  WORK_CHARS, agentKey, changedFile, commandWork, fullSubject, isBookkeeping, saidCount, sameInstant, threadWindow, workSubject, workVerb,
 } from '../shared/agents.mjs';
 
 const run = promisify(execFile);
@@ -888,7 +888,13 @@ function workedOn(obj, events, byId, dir = '') {
   const at = Date.parse(obj.timestamp ?? 0) || 0;
   for (const c of obj.message.content) {
     if (c.type !== 'tool_use') continue;
-    const subject = workSubject(c.input, dir, os.homedir());
+    // The store's own records are how a session talks to the app, not work it
+    // did, and a thread that opens on them reads as noise (w-0bd0d8b2ef).
+    if (isBookkeeping(c.name)) continue;
+    // WHAT A COMMAND DID, IN WORDS, when the whole of it is recognised; null on
+    // anything else, and the line is then the command it always was.
+    const plain = c.name === 'Bash' ? commandWork(c.input?.command, dir, os.homedir()) : null;
+    const subject = plain ? plain.subject : workSubject(c.input, dir, os.homedir());
     const whole = fullSubject(c.input);
     // THE FILE IT CHANGED, WHOLE, so the thread can offer it as a chip into the
     // code. Empty on everything that did not write a file, which is most calls:
@@ -897,10 +903,13 @@ function workedOn(obj, events, byId, dir = '') {
     const event = {
       kind: 'work',
       at,
-      verb: workVerb(c.name),
+      verb: plain ? plain.verb : workVerb(c.name),
       subject,
       ...(changed ? { file: changed } : {}),
-      full: whole && whole.replace(/\s+/g, ' ').trim() !== subject ? cappedHead(whole) : '',
+      // A line put in words always carries the command, even when the words name
+      // nothing ("Checked what changed"): the words replaced the only copy of it
+      // on the screen, so it has to stay one press behind them.
+      full: plain || (whole && whole.replace(/\s+/g, ' ').trim() !== subject) ? cappedHead(whole) : '',
       output: '',
       lines: 0,
       failed: false,

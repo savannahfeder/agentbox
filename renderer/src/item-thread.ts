@@ -30,7 +30,7 @@
 // protecting: every node here carries the moment the ledger or the trace
 // stamped it, and nothing is invented, dropped or merged to put them in order.
 
-import { changedFile, plainCommand, saidCount, shortPath, threadWindow, unleaked, workVerb } from '../../shared/agents.mjs';
+import { changedFile, commandWork, isBookkeeping, plainCommand, saidCount, shortPath, threadWindow, unleaked, workVerb } from '../../shared/agents.mjs';
 import { said, traceLines } from './terminal';
 import type { TraceSession } from './notes';
 import { threadEvents, withRuns, type LedgerLine, type ThreadEvent } from './thread-history';
@@ -111,11 +111,15 @@ export interface ItemThread {
 
 /** One trace line that ran a tool, as the quiet line the thread draws. */
 function workLine(at: number, name: string, hint: string): AgentWork {
-  const subject = name === 'Bash' ? plainCommand(hint) : shortPath(hint);
+  // WHAT THE COMMAND DID, WHEN THAT IS READABLE. `commandWork` is null on every
+  // shape it was not taught, and the line is then the command it always was:
+  // a guessed verb cannot be checked against anything on the screen.
+  const plain = name === 'Bash' ? commandWork(hint) : null;
+  const subject = plain ? plain.subject : name === 'Bash' ? plainCommand(hint) : shortPath(hint);
   return {
     kind: 'work',
     at,
-    verb: workVerb(name),
+    verb: plain ? plain.verb : workVerb(name),
     subject,
     // THE FILE IT CHANGED, whole, which is what the thread turns into a chip
     // into the code. The trace writes one argument per line and for an edit
@@ -123,7 +127,11 @@ function workLine(at: number, name: string, hint: string): AgentWork {
     ...(changedFile(name, { file_path: hint.trim() }) ? { file: hint.trim() } : {}),
     // The whole string, only when shortening changed it. Empty means the head
     // already shows all of it, and the line then opens onto nothing.
-    ...(subject && subject !== hint.trim() ? { full: hint.trim() } : {}),
+    //
+    // A LINE PUT IN WORDS ALWAYS CARRIES IT, even when the words name nothing
+    // ("Checked what changed"), because the words are the only thing left on
+    // screen and the command has to stay one press behind them.
+    ...(plain || (subject && subject !== hint.trim()) ? { full: hint.trim() } : {}),
     output: '',
     lines: 0,
     failed: false,
@@ -149,6 +157,10 @@ export function runNodes(session: TraceSession): AgentEvent[] {
   for (const line of traceLines(session)) {
     if (line.kind === 'tool') {
       const parts = TOOL.exec(line.text);
+      // THE STORE'S OWN RECORDS ARE NOT ACTIVITY. Taking the item and writing
+      // its status back are how a session talks to the app; they are the first
+      // two lines of nearly every thread and they say nothing about the work.
+      if (parts && isBookkeeping(parts[1])) continue;
       out.push(parts
         ? workLine(line.at, parts[1], parts[2])
         : workLine(line.at, '', line.text));

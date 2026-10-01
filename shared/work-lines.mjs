@@ -44,13 +44,18 @@
 /* ------------------------------ WHAT IT DID ------------------------------- */
 // PLAIN WORDS AND NOT OUR TOOL NAMES. The design law forbids jargon in UI copy,
 // so "Bash" and "Glob" are ours, not the reader's.
+//
+// `changed` RATHER THAN `edited` (2026-10-01). A tester who is not a programmer
+// reads "edited" as a document being revised; the thing that happened is that a
+// file in the code is now different, and the line next to it already offers the
+// file as a chip into the change. One word for one event.
 const VERBS = {
   Bash: 'ran',
   Read: 'read',
   Write: 'wrote',
-  Edit: 'edited',
-  MultiEdit: 'edited',
-  NotebookEdit: 'edited',
+  Edit: 'changed',
+  MultiEdit: 'changed',
+  NotebookEdit: 'changed',
   Glob: 'looked for',
   Grep: 'searched for',
   WebFetch: 'fetched',
@@ -217,6 +222,335 @@ export function plainCommand(raw) {
   }
   s = s.replace(/\s+/g, ' ').trim();
   return s || whole.replace(/\s+/g, ' ').trim();
+}
+
+/* --------------------- THE STORE'S OWN BOOKKEEPING ------------------------ */
+// NOT WORK, AND NOT SHOWN AT ALL.
+//
+// Testers who are not programmers read the top of every thread as noise, and
+// the top of every thread is this: a tool lookup, a claim, and later an update
+// to the item. MEASURED over 3,344 real session traces from 2026-09-20 to
+// 2026-10-01: 55,500 tool lines, of which 2,462 are the store's own records
+// (claim 1,212, update 999, release 138, the lists 113) and 498 are a tool
+// lookup. Three per cent of the lines and the first two lines of nearly every
+// thread.
+//
+// NOTHING OF THE WORK IS HIDDEN BY THIS. Reading a document, writing one,
+// filing a question and looking at a page are what the session was asked to do;
+// taking the item and writing its status back are how it tells the app it is
+// running. The second kind is what comes off the screen.
+//
+// The server is named after the product (`mcp__agentbox__`, `mcp__daydream__`),
+// so the prefix is never one fixed string and the tool is what follows the last
+// double underscore, the same reading `workVerb` makes.
+const BOOKKEEPING = new Set([
+  'claim_work_item', 'release_work_item', 'update_work_item',
+  'list_work_items', 'list_documents', 'list_products', 'list_skills',
+  'list_chats', 'get_product',
+]);
+
+// The name arrives three ways and all three are the same tool: the full
+// `mcp__<server>__<tool>` a Claude transcript writes, the bare tool Codex
+// reports beside its server, and `ToolSearch`, which is the harness loading a
+// schema and is nobody's work.
+export function isBookkeeping(name) {
+  const n = String(name ?? '').trim();
+  if (!n) return false;
+  if (n === 'ToolSearch') return true;
+  return BOOKKEEPING.has(n.startsWith('mcp__') ? n.slice(n.lastIndexOf('__') + 2) : n);
+}
+
+/* ------------------------- A COMMAND, IN PLAIN WORDS ---------------------- */
+// "Running cat README.md; echo ---; cat package.json" is what a tester was
+// shown. What happened was that it read two files.
+//
+// MEASURED over the same 3,344 traces: 32,349 Bash lines, 361 distinct leading
+// programs, and the eleven commonest cover 80% of them (grep 5,325, git 3,998,
+// sed 3,894, npx 2,471, python3 2,435, cat 2,074, ls 1,814, a shell -c 1,464,
+// arch 947, a for loop 894, node 689). 55% of the lines are compound (`a && b;
+// c`) and 48% hold a pipe, so the thing on the screen is a shell one-liner and
+// not a sentence.
+//
+// THE RULE IS THAT A GUESS IS WORSE THAN A COMMAND. Every segment has to be
+// recognised and they all have to agree on one verb; one unknown part, or two
+// different verbs, and this returns null and the line stays the command it
+// always was. A wrong verb on her screen cannot be checked against anything,
+// and the raw command at least is true. The exact string is one press away
+// either way (`full` on the work line).
+//
+// `doing` IS THE SAME EVENT WHILE IT IS STILL HAPPENING, because the live line
+// under a running row reads "Reading README.md" and the thread above it reads
+// "Read README.md". One table, so the two can never drift.
+
+// Scaffolding between the real steps of a line. A banner, a `cd`, a wait.
+const NOISE = new Set(['echo', 'cd', 'pwd', 'true', 'false', ':', 'sleep', 'clear', 'date', 'printf', 'set']);
+
+// `2>&1` and `2>/dev/null` say nothing about what ran and are on a third of
+// these lines. Any OTHER redirect writes or reads a file we have not accounted
+// for, so it gives up rather than guess.
+const QUIET_REDIRECT = /^[0-9]*>>?&?(?:[0-9]+|\/dev\/null)$/;
+
+const FAMILIES = [
+  { verb: 'read', doing: 'Reading', heads: ['cat', 'head', 'tail', 'less', 'more', 'nl', 'bat'], take: 'files', skip: ['-n', '-c', '-m'] },
+  { verb: 'counted the lines in', doing: 'Counting the lines in', heads: ['wc'], take: 'files' },
+  { verb: 'searched for', doing: 'Searching for', heads: ['grep', 'rg', 'ag', 'ack'], take: 'first', many: 'things', skip: ['-e', '-m', '-A', '-B', '-C'] },
+  { verb: 'listed', doing: 'Listing', heads: ['ls'], take: 'files', empty: './', many: 'folders' },
+  { verb: 'looked for', doing: 'Looking for', heads: ['find', 'fd'], take: 'named', many: 'things' },
+  { verb: 'copied', doing: 'Copying', heads: ['cp'], take: 'files' },
+  { verb: 'moved', doing: 'Moving', heads: ['mv'], take: 'files' },
+  { verb: 'deleted', doing: 'Deleting', heads: ['rm'], take: 'files' },
+  { verb: 'made a folder', doing: 'Making a folder', heads: ['mkdir'], take: 'files', many: 'folders', plural: { verb: 'made folders', doing: 'Making folders' } },
+  { verb: 'made a file', doing: 'Making a file', heads: ['touch'], take: 'files', plural: { verb: 'made files', doing: 'Making files' } },
+  { verb: 'fetched', doing: 'Fetching', heads: ['curl', 'wget'], take: 'url', many: 'pages', skip: ['-o', '-w', '-H', '-X', '-d', '-u', '-A', '-e', '-F', '--output', '--header', '--data'] },
+];
+const BY_HEAD = new Map();
+for (const family of FAMILIES) for (const head of family.heads) BY_HEAD.set(head, family);
+
+// A `git` subcommand is the verb; the ones not listed keep their command,
+// because "checked the code" over `git merge-base` says less than the line did.
+const GIT = {
+  status: { verb: 'checked what changed', doing: 'Checking what changed' },
+  diff: { verb: 'checked what changed', doing: 'Checking what changed' },
+  log: { verb: 'read the code history', doing: 'Reading the code history' },
+  show: { verb: 'read the code history', doing: 'Reading the code history' },
+  blame: { verb: 'read the code history', doing: 'Reading the code history' },
+  add: { verb: 'saved the changes', doing: 'Saving the changes' },
+  commit: { verb: 'saved the changes', doing: 'Saving the changes' },
+  branch: { verb: 'looked at the branches', doing: 'Looking at the branches' },
+  push: { verb: 'pushed the branch', doing: 'Pushing the branch' },
+  fetch: { verb: 'fetched the latest code', doing: 'Fetching the latest code' },
+  pull: { verb: 'fetched the latest code', doing: 'Fetching the latest code' },
+  merge: { verb: 'merged the branch', doing: 'Merging the branch' },
+  checkout: { verb: 'switched branch', doing: 'Switching branch' },
+  switch: { verb: 'switched branch', doing: 'Switching branch' },
+};
+
+const TESTS = { verb: 'ran the tests', doing: 'Running the tests', many: 'test files' };
+const SCRIPT = { verb: 'ran a script', doing: 'Running a script', many: 'scripts' };
+const RUNNERS = new Set(['npx', 'npm', 'pnpm', 'yarn', 'bun']);
+const SHELLS = new Set(['sh', 'bash', 'zsh', '/bin/sh', '/bin/bash', '/bin/zsh']);
+const SCRIPTS = new Set(['node', 'python', 'python3', 'ruby', 'osascript', 'deno', 'tsx']);
+const TEST_RUNNERS = new Set(['vitest', 'jest', 'pytest', 'mocha', 'ava']);
+const TEST_FILE = /\.(?:test|spec)\.[a-z]+$/;
+
+const lastSegment = (file) => String(file).split('/').filter(Boolean).pop() ?? '';
+
+function unquote(token) {
+  const t = String(token);
+  if (t.length > 1 && (t[0] === '"' || t[0] === "'") && t[t.length - 1] === t[0]) return t.slice(1, -1);
+  return t;
+}
+
+// Split on separators that are OUTSIDE quotes. A `;` inside a sed script or a
+// grep pattern is not a new command, and splitting on it is how a reader of
+// shell lines invents steps that never ran.
+function splitOutside(text, separators) {
+  const out = [];
+  let buffer = '';
+  let quote = '';
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (quote) {
+      buffer += ch;
+      if (ch === quote) quote = '';
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; buffer += ch; continue; }
+    const pair = text.slice(i, i + 2);
+    if (separators.includes(pair)) { out.push(buffer); buffer = ''; i += 1; continue; }
+    if (separators.includes(ch)) { out.push(buffer); buffer = ''; continue; }
+    buffer += ch;
+  }
+  out.push(buffer);
+  return out.map((part) => part.trim()).filter(Boolean);
+}
+
+const tokens = (segment) => splitOutside(segment, [' ', '\t']);
+const isFlag = (token) => token.startsWith('-') && token !== '-';
+const looksLikeAFile = (token) => /[./]/.test(token) && !token.startsWith('-');
+
+// The arguments of one stage, with the quiet redirects and the flag values
+// dropped. Null when something is there that this file cannot account for.
+function argumentsOf(words, skip = []) {
+  const out = [];
+  for (let i = 0; i < words.length; i += 1) {
+    const raw = words[i];
+    const quoted = raw[0] === '"' || raw[0] === "'";
+    const token = unquote(raw);
+    if (!quoted) {
+      if (QUIET_REDIRECT.test(token)) continue;
+      // Anything else involving a file handle, a subshell or a glob of
+      // commands is a shape nobody taught this.
+      if (/[<>`]/.test(token) || token.includes('$(')) return null;
+    }
+    if (isFlag(token)) {
+      if (skip.includes(token)) i += 1;
+      continue;
+    }
+    out.push(token);
+  }
+  return out;
+}
+
+// One stage of one segment, as a verb and the things it names, or 'noise', or
+// null for "this file does not know".
+function stageWords(stage, cwd, home) {
+  const words = tokens(stage);
+  if (!words.length) return 'noise';
+  const head = unquote(words[0]);
+  const rest = words.slice(1);
+  if (NOISE.has(head)) {
+    // `echo something > a file` writes a file, and this is not the reader of it.
+    const args = argumentsOf(rest);
+    return args === null ? null : 'noise';
+  }
+  // `timeout 300 npx vitest …` and `arch -arm64 node …` are the real command
+  // with a wrapper in front of it.
+  if (head === 'timeout' || head === 'nice' || head === 'arch' || head === 'env') {
+    const inner = rest.filter((w) => !isFlag(unquote(w)) && !/^[0-9]+$/.test(unquote(w)));
+    return inner.length ? stageWords(inner.join(' '), cwd, home) : null;
+  }
+  // A shell asked to run a string: the string is the command.
+  if (SHELLS.has(head)) {
+    const flag = rest.findIndex((w) => /^-[a-z]*c$/.test(unquote(w)));
+    if (flag < 0 || !rest[flag + 1]) return null;
+    const words2 = commandWork(unquote(rest[flag + 1]), cwd, home);
+    return words2 ? { ...words2, names: words2.subject ? [words2.subject] : [], whole: true } : null;
+  }
+  if (head === 'git') return gitWords(rest);
+  if (head === 'sed' || head === 'perl') return sedWords(rest, cwd, home);
+  if (RUNNERS.has(head)) return runnerWords(rest, cwd, home);
+  if (SCRIPTS.has(head) || /\.(?:sh|mjs|js|py)$/.test(head)) {
+    const args = argumentsOf(rest);
+    if (args === null) return null;
+    const file = stage.includes('…') ? null : args.find(looksLikeAFile);
+    return { ...SCRIPT, names: file ? [lastSegment(file)] : [] };
+  }
+  if (TEST_RUNNERS.has(head)) return testWords(rest);
+  if (head === 'tsc') return { verb: 'checked the types', doing: 'Checking the types', names: [] };
+  if (head === 'eslint') return { verb: 'checked the code style', doing: 'Checking the code style', names: [] };
+  const family = BY_HEAD.get(head);
+  if (!family) return null;
+  const args = argumentsOf(rest, family.skip);
+  if (args === null) return null;
+  return { ...family, names: namesFor(family, args, cwd, home) };
+}
+
+const URL_LIKE = /^(?:https?:\/\/|www\.|localhost|127\.0\.0\.1)/;
+
+function namesFor(family, args, cwd, home) {
+  if (family.take === 'first') return args.slice(0, 1);
+  // A fetch names the page, which is not always the first argument: `curl -s -o
+  // /dev/null -w '%{http_code}' <url>` had three before it.
+  if (family.take === 'url') {
+    const url = args.find((a) => URL_LIKE.test(a));
+    return url ? [url] : args.slice(0, 1);
+  }
+  if (family.take === 'named') {
+    const named = args.find((a) => /[*?]/.test(a));
+    return named ? [named] : args.slice(0, 1).map((a) => shortPath(a, cwd, home));
+  }
+  const files = args.filter(looksLikeAFile).map((a) => shortPath(a, cwd, home));
+  if (!files.length) return family.empty ? [family.empty] : [];
+  return files;
+}
+
+function gitWords(rest) {
+  const words = [...rest];
+  // `git -C <path> <subcommand>`: the folder is not the verb.
+  while (words.length && isFlag(unquote(words[0]))) {
+    const flag = unquote(words.shift());
+    if (flag === '-C' || flag === '--git-dir' || flag === '--work-tree') words.shift();
+  }
+  const sub = unquote(words[0] ?? '');
+  const known = GIT[sub];
+  return known ? { ...known, names: [] } : null;
+}
+
+// The leading quote survives on a line the trace cut mid-string.
+const SED_SCRIPT = /^['"]?[0-9,$]*[a-zA-Z]?[/#|]/;
+
+function sedWords(rest, cwd, home) {
+  const args = argumentsOf(rest);
+  if (args === null) return null;
+  const flags = rest.map(unquote).filter(isFlag);
+  const inPlace = flags.some((f) => f.startsWith('-i'));
+  // THE FILE IS THE LAST ARGUMENT, AND A SED SCRIPT IS NOT IT. A trace line is
+  // cut at 200 characters, so the file is sometimes not on it at all and the
+  // script (`s#a#b#`) is the last thing that looks like a path.
+  const file = [...args].reverse().find((a) => looksLikeAFile(a) && !SED_SCRIPT.test(a));
+  if (inPlace) {
+    return file ? { verb: 'changed', doing: 'Changing', names: [shortPath(file, cwd, home)] } : null;
+  }
+  // `sed -n 1,200p <file>` is how an agent reads part of a file; 3,529 of the
+  // 3,894 sed lines measured were exactly that, against 325 that edited.
+  if (!flags.some((f) => f === '-n' || f === '-e' || f === '-E')) return null;
+  return file ? { verb: 'read', doing: 'Reading', names: [shortPath(file, cwd, home)] } : null;
+}
+
+function runnerWords(rest, cwd, home) {
+  const words = rest.map(unquote).filter((w) => w !== '--yes' && w !== '-y' && w !== '-s');
+  let tool = words[0] ?? '';
+  if (tool === 'run' || tool === 'exec') tool = words[1] ?? '';
+  // `npx vitest@4` and `npx hyperframes@0.8.77` name a version, not a tool.
+  tool = tool.replace(/@[^@/]*$/, '');
+  if (tool === 'test' || TEST_RUNNERS.has(tool)) return testWords(words.slice(1));
+  if (tool === 'tsc' || tool === 'typecheck') return { verb: 'checked the types', doing: 'Checking the types', names: [] };
+  if (tool === 'eslint' || tool === 'lint') return { verb: 'checked the code style', doing: 'Checking the code style', names: [] };
+  if (tool === 'build' || (tool === 'vite' && words.includes('build'))) {
+    return { verb: 'built the app', doing: 'Building the app', names: [] };
+  }
+  if (tool === 'install' || tool === 'ci' || tool === 'i') {
+    return { verb: 'installed the packages', doing: 'Installing the packages', names: [] };
+  }
+  if (SCRIPTS.has(tool)) return stageWords(words.join(' '), cwd, home);
+  return null;
+}
+
+function testWords(rest) {
+  const files = rest.map(unquote).filter((w) => TEST_FILE.test(w)).map(lastSegment);
+  return { ...TESTS, names: files };
+}
+
+// Up to three names, then the count. Her standing objection to a cap is one
+// that rounds off in silence, so the count says what it counted.
+function joinNames(names, many = 'files') {
+  const list = [...new Set(names.filter(Boolean))];
+  if (!list.length) return '';
+  if (list.length > 3) return `${list.length} ${many}`;
+  if (list.length === 1) return list[0];
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+}
+
+/**
+ * What a shell command did, in words, or null to leave it as the command.
+ *
+ * `cwd` and `home` are the folder the session ran in and the Mac's home, the
+ * same two arguments `shortPath` takes and for the same reason: a path is only
+ * shortenable against the folder it sits under, and nothing is guessed when
+ * nobody says.
+ */
+export function commandWork(raw, cwd = '', home = '') {
+  const command = plainCommand(raw);
+  if (!command) return null;
+  const steps = [];
+  for (const segment of splitOutside(command, ['&&', '||', ';', '\n'])) {
+    // A pipeline's first stage is what ran; the rest is plumbing that shapes
+    // its output (`| head`, `| sort | uniq -c`).
+    const stage = splitOutside(segment, ['|'])[0] ?? '';
+    const read = stageWords(stage, cwd, home);
+    if (read === null) return null;
+    if (read !== 'noise') steps.push(read);
+  }
+  if (!steps.length) return null;
+  const first = steps[0];
+  if (steps.some((step) => step.verb !== first.verb)) return null;
+  if (first.whole) return { verb: first.verb, doing: first.doing, subject: first.names[0] ?? '' };
+  const names = [...new Set(steps.flatMap((step) => step.names).filter(Boolean))];
+  // "Made a folder, 4 folders" is the verb and the count disagreeing about how
+  // many there were. A family that counts its own subject says both ways.
+  const said = names.length > 1 && first.plural ? first.plural : first;
+  return { verb: said.verb, doing: said.doing, subject: joinNames(names, first.many) };
 }
 
 /* ------------------------------- THE SUBJECT ------------------------------ */

@@ -1,5 +1,5 @@
 import type { AgentWork } from './types';
-const names: Record<string, string> = { ran: 'ran commands', read: 'read files', wrote: 'wrote files', edited: 'edited files', 'searched for': 'searched files', 'looked for': 'looked for files', fetched: 'read web pages' };
+const names: Record<string, string> = { ran: 'ran commands', read: 'read files', wrote: 'wrote files', changed: 'changed files', deleted: 'deleted files', 'searched for': 'searched files', 'looked for': 'looked for files', fetched: 'read web pages' };
 export function activitySummary(items: Pick<AgentWork, 'verb' | 'subject'>[]): string {
   if (!items.length) return '';
   const text = items.length === 1

@@ -1,7 +1,7 @@
 // Ephemeral, local status from matched tool start/end events. A persisted trace
 // is history and cannot prove a command is still running. Nothing here executes
 // commands, records reasoning, or changes worker permissions.
-import { plainCommand, shortPath } from '../shared/work-lines.mjs';
+import { commandWork, isBookkeeping, plainCommand, shortPath } from '../shared/work-lines.mjs';
 const clean = value => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
 function add(session, id, label, detail) {
   if (!id || !label) return false;
@@ -16,7 +16,14 @@ export function currentActivity(session) { return [...(session.activeTools?.valu
 function toolLabel(name, input) {
   const command = clean(input.command);
   const file = clean(input.file_path ?? input.path);
-  if (name === 'Bash') return ['Running ' + (plainCommand(command) || 'command'), input.command ?? ''];
+  if (name === 'Bash') {
+    // WHAT IT IS DOING, IN WORDS, when the whole command is recognised. The
+    // line under a running row is the same event as the line in the thread
+    // above it, read in the present tense (`doing`, shared/work-lines.mjs).
+    const plain = commandWork(command);
+    if (plain) return [`${plain.doing} ${plain.subject}`.trim(), input.command ?? ''];
+    return ['Running ' + (plainCommand(command) || 'command'), input.command ?? ''];
+  }
   if (['Read','Write','Edit','MultiEdit'].includes(name)) return [`${name === 'Read' ? 'Reading' : name === 'Write' ? 'Writing' : 'Editing'} ${shortPath(file) || 'file'}`, file];
   if (['Grep','Glob','WebSearch'].includes(name)) return [`Searching ${clean(input.pattern ?? input.query) || 'files'}`, input.pattern ?? input.query ?? ''];
   if (name === 'WebFetch') return ['Reading web page', input.url ?? ''];
@@ -31,6 +38,9 @@ export function claudeActivity(session, line) {
     let changed = false;
     for (const part of Array.isArray(obj.message?.content) ? obj.message.content : []) {
       if (obj.type === 'assistant' && part.type === 'tool_use') {
+        // The store's own records never become the word on the row: taking the
+        // item is not what the session is doing (w-0bd0d8b2ef).
+        if (isBookkeeping(part.name)) continue;
         const [label, detail] = toolLabel(part.name, part.input ?? {});
         changed = add(session, part.id, label, detail) || changed;
       }
@@ -47,9 +57,14 @@ export function codexActivity(session, method, params) {
   if (method !== 'item/started') return false;
   if (item.status && !['inProgress', 'in_progress', 'running'].includes(item.status)) return false;
   switch (item.type) {
-    case 'commandExecution': return add(session, item.id, `Running ${plainCommand(clean(item.command)) || 'command'}`, item.command);
+    case 'commandExecution': {
+      const plain = commandWork(clean(item.command));
+      const label = plain ? `${plain.doing} ${plain.subject}`.trim() : `Running ${plainCommand(clean(item.command)) || 'command'}`;
+      return add(session, item.id, label, item.command);
+    }
     case 'fileChange': return add(session, item.id, 'Editing files', (Array.isArray(item.changes) ? item.changes : []).map(c => c?.path ?? '').join('\n'));
-    case 'mcpToolCall': return add(session, item.id, `Using ${clean(item.tool).replace(/_/g, ' ') || 'tool'}`, `${item.server ?? ''} · ${item.tool ?? ''}`);
+    case 'mcpToolCall': return isBookkeeping(clean(item.tool)) ? false
+      : add(session, item.id, `Using ${clean(item.tool).replace(/_/g, ' ') || 'tool'}`, `${item.server ?? ''} · ${item.tool ?? ''}`);
     case 'webSearch': return add(session, item.id, 'Searching the web', item.query ?? '');
     default: return false;
   }
