@@ -122,7 +122,7 @@ export function memoryBackend(cloud, personId) {
     async pullLines(projectId, afterSeq = 0, limit = 500) {
       if (!canSee(projectId)) return [];
       return cloud.lines.filter((l) => l.projectId === projectId && l.seq > afterSeq)
-        .slice(0, limit).map((l) => ({ seq: l.seq, line: structuredClone(l.body) }));
+        .slice(0, limit).map((l) => ({ seq: l.seq, line: { ...structuredClone(l.body), by: l.byPerson } }));
     },
 
     async putCards(teamId, cards) {

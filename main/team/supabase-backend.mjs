@@ -108,8 +108,12 @@ export function supabaseBackend(client) {
 
     async pullLines(projectId, afterSeq = 0, limit = PAGE) {
       await myId();
-      const rows = must(await client.from('lines').select('seq,body').eq('project_id', projectId).gt('seq', afterSeq).order('seq').limit(limit), 'reading your team\'s changes');
-      return rows.map((r) => ({ seq: Number(r.seq), line: r.body }));
+      const rows = must(await client.from('lines').select('seq,body,by_person').eq('project_id', projectId).gt('seq', afterSeq).order('seq').limit(limit), 'reading your team\'s changes');
+      // WHO WROTE A LINE IS THE COLUMN THE DATABASE CHECKED, never the copy
+      // inside the line: row level security makes by_person the signed-in
+      // writer, while the body is whatever their Mac sent. A teammate who
+      // wrote somebody else's id into a body would otherwise be believed.
+      return rows.map((r) => ({ seq: Number(r.seq), line: { ...r.body, by: r.by_person } }));
     },
 
     // YOUR CARDS: one per thread worth showing the team (shared/thread-cards.mjs).

@@ -22,7 +22,16 @@ export const heldByAPerson = (item) => !!item?.assignee && item.assignee !== 'ag
 export function mayRunHere(item, product, me) {
   if (!isShared(product)) return true;
   if (!me) return false;
+  // A MESSAGE BETWEEN TWO PEOPLE NEVER RUNS AN AGENT, on either Mac. Turning
+  // one into work is "Hand it to an agent", which starts a new thread of your
+  // own; nothing a teammate writes into the shared record can start one here.
+  if (product?.team?.direct) return false;
   if (heldByAPerson(item)) return false;
+  // ONLY YOU PUT YOUR MAC IN CHARGE OF A ROW. A runner naming you that somebody
+  // else's line wrote is a teammate trying to start an agent on your Mac with
+  // their words, so it does not count.
+  const runnerBy = item?.wrote?.runner?.by;
+  if (item?.runner === me && runnerBy && runnerBy !== me) return false;
   return runnerOf(item, product) === me;
 }
 
