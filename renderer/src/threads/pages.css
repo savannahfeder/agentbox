@@ -58,6 +58,10 @@
 .th-pop .opts > button { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; }
 .th-pop .opts > button.on { background: rgba(255,255,255,.09); border-color: var(--text-faint); color: var(--text); }
 .th-pop .opts .th-pr, .th-pop .opts .th-urgent { margin-right: 0; }
+/* The rest of forty projects, behind one word. It is not a project, so it does
+   not wear a project's border: it reads as the way through to them. */
+.th-pop .opts > button.th-pop-more { border-color: transparent; color: var(--text-faint); padding-left: 4px; }
+.th-pop .opts > button.th-pop-more:hover { border-color: transparent; color: var(--text); }
 .th-pop .rule { height: 1px; background: var(--line); margin: 6px 0; }
 .th-pop .foot { display: flex; justify-content: space-between; align-items: center; padding: 6px 16px 2px; font-size: 12.5px; color: var(--text-faint); }
 .th-pop .foot button { background: none; border: 0; padding: 0; font: inherit; color: var(--text-dim); cursor: pointer; }
@@ -189,6 +193,9 @@
 .th-clear-acts { display: flex; align-items: center; gap: 14px; }
 .th-clear-key { font-size: 12.5px; color: var(--text-faint); }
 .th-clear-key kbd { font: 11px var(--mono); color: var(--text-dim); border: 1px solid var(--line); border-radius: var(--radius); padding: 1px 5px; margin-left: 4px; background: none; }
+/* A tab the filters emptied: the sentence IS the heading, so it carries the
+   gap the missing paragraph used to leave under it. */
+.th-clear-filtered h2 { margin-bottom: 22px; }
 
 /* ------------------------------------------------------------ in a browser tab */
 /* No title bar to clear in a tab, so the top inset matches the bottom one

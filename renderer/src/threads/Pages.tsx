@@ -13,7 +13,7 @@ import { PriorityIcon } from '../components/Priority';
 import { rowTitle } from '../list-rules';
 import { DONE } from '../done-word';
 import {
-  BOARD_COLUMNS, isDirect, isFiltered, teamEntries, teamKeeps, updatedWords,
+  BOARD_COLUMNS, hiddenWords, isDirect, isFiltered, projectChoices, sortedEntries, teamEntries, teamKeeps, updatedWords,
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
@@ -71,8 +71,8 @@ function useOutside(open: boolean, close: () => void) {
 
 /* ------------------------------------------------------------ the header */
 /** Search, New thread and the Display icon, at the right of the Inbox and Team headers. */
-export function HeaderActions({ page, display, onDisplay, products, onSearch, onCompose, shown, total }: {
-  page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[];
+export function HeaderActions({ page, display, onDisplay, products, items, onSearch, onCompose, shown, total }: {
+  page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[]; items?: WorkItem[];
   onSearch: () => void; onCompose: () => void; shown?: number; total?: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -84,7 +84,7 @@ export function HeaderActions({ page, display, onDisplay, products, onSearch, on
       <button type="button" className={`th-disp${open ? ' open' : ''}`} aria-label="View and filters" title="View and filters" onClick={() => setOpen((o) => !o)}>
         <SlidersIcon />{isFiltered(display) && <i />}
       </button>
-      {open && <DisplayMenu page={page} display={display} onDisplay={onDisplay} products={products} shown={shown} total={total} />}
+      {open && <DisplayMenu page={page} display={display} onDisplay={onDisplay} products={products} items={items} shown={shown} total={total} />}
     </span>
   </div>;
 }
@@ -92,10 +92,19 @@ export function HeaderActions({ page, display, onDisplay, products, onSearch, on
 const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
 /** View, sort, and the filters: priority, project and when it was updated. */
-export function DisplayMenu({ page, display, onDisplay, products, shown, total }: {
-  page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[]; shown?: number; total?: number;
+export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total }: {
+  page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[];
+  /** Her threads, to rank the projects by the one she used most recently. */
+  items?: WorkItem[];
+  shown?: number; total?: number;
 }) {
-  const projects = products.filter((p) => !isDirect(p) && !(p as { practice?: boolean }).practice);
+  // THE PROJECT FILTER, FOR SOMEBODY WITH FORTY PROJECTS (w-5a08121f99). The
+  // eight she used most recently, the rest behind one button, and an All
+  // projects chip so that "nothing picked means everything" is on the screen
+  // rather than discovered by clicking a chip and watching the list grow.
+  const [showAll, setShowAll] = useState(false);
+  const { shown: topProjects, rest: moreProjects } = projectChoices(products, items, { picked: display.projects });
+  const projects = showAll ? [...topProjects, ...moreProjects] : topProjects;
   const set = (patch: Partial<Display>) => onDisplay({ ...display, ...patch });
   const windows: [UpdatedWindow, string][] = [['today', 'Today'], ['week', 'This week'], ['any', 'Any time']];
   return <div className="th-pop" role="dialog" aria-label={page === 'inbox' ? 'Inbox view and filters' : 'Team view and filters'}>
@@ -111,8 +120,12 @@ export function DisplayMenu({ page, display, onDisplay, products, shown, total }
     <div className="line"><span className="lab">Priority</span><span className="opts">
       {PRIORITIES.map((p) => <button type="button" key={p.id} className={display.priorities.includes(p.id) ? 'on' : ''} onClick={() => set({ priorities: toggle(display.priorities, p.id) })}><PriorityMark id={p.id} />{p.label}</button>)}
     </span></div>
-    {page === 'inbox' && projects.length > 1 && <div className="line"><span className="lab">Project</span><span className="opts">
+    {page === 'inbox' && topProjects.length + moreProjects.length > 1 && <div className="line"><span className="lab">Project</span><span className="opts">
+      <button type="button" className={display.projects.length === 0 ? 'on' : ''} onClick={() => set({ projects: [] })}>All projects</button>
       {projects.map((p) => <button type="button" key={p.slug} className={display.projects.includes(p.slug) ? 'on' : ''} onClick={() => set({ projects: toggle(display.projects, p.slug) })}>{p.name}</button>)}
+      {moreProjects.length > 0 && <button type="button" className="th-pop-more" onClick={() => setShowAll(!showAll)}>
+        {showAll ? 'Show fewer' : `Show all ${topProjects.length + moreProjects.length}`}
+      </button>}
     </span></div>}
     <div className="line"><span className="lab">Updated</span><span className="opts">
       {windows.map(([w, label]) => <button type="button" key={w} className={display.updated === w ? 'on' : ''} onClick={() => set({ updated: w })}>{label}</button>)}
@@ -211,6 +224,29 @@ export function InboxClear({ running, scheduled, onView, onCompose }: {
     <div className="th-clear-acts">
       <button type="button" className="th-new" onClick={onCompose}><PenIcon />New thread</button>
       <span className="th-clear-key">or press <kbd>N</kbd></span>
+    </div>
+  </div>;
+}
+
+/**
+ * A TAB THAT IS ONLY EMPTY BECAUSE OF A FILTER (w-5a08121f99).
+ *
+ * Her report with a screenshot, 2026-10-01: "It says Nothing needs you, but
+ * that's not correct because it literally says needs you 13... if you're
+ * accidentally on a filter, you can think there's no work for you when there's
+ * actually a ton." Three filters live behind one icon, they are remembered
+ * between launches, and the page was reporting their work as her own inbox
+ * being clear.
+ *
+ * So: the whole number that is hidden, and the one button that undoes it. It
+ * sits where InboxClear sits, in the first row's place, so the page does not
+ * jump when the filter comes off and the rows arrive.
+ */
+export function FilteredEmpty({ view, hidden, onClear }: { view: TabView; hidden: number; onClear: () => void }) {
+  return <div className="th-clear th-clear-filtered">
+    <h2>{hiddenWords(view, hidden)}</h2>
+    <div className="th-clear-acts">
+      <button type="button" className="th-new" onClick={onClear}>Clear filters</button>
     </div>
   </div>;
 }
@@ -350,7 +386,10 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     {end && <div className="th-bar th-bar-end">{end}</div>}
     <div className="th-board">
     {BOARD_COLUMNS.map((col) => {
-      const rows = entries.filter((e) => e.state === col.state);
+      // EVERY COLUMN TAKES THE DISPLAY'S SORT, not just the list view
+      // (w-5a08121f99). `teamEntries` hands these back newest first, which is
+      // one answer to a question the menu asks per page.
+      const rows = sortedEntries(entries.filter((e) => e.state === col.state), display);
       return <div key={col.state}>
         {/* Your own board says what the tab says: what waits on you needs you. */}
         <div className="th-col-h"><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b></div>

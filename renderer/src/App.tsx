@@ -114,10 +114,10 @@ import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { TeamPage } from './team/TeamPage';
-import { EmptyTab, HeaderActions, InboxBoard, InboxClear, LiveContext, PeoplePicker, StateTabs } from './threads/Pages';
+import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, PeoplePicker, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, conversationWith, isDirect, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
+import { DEFAULT_DISPLAY, conversationWith, isDirect, nextTab, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing' | 'themes';
@@ -1965,11 +1965,26 @@ export default function App() {
   const peoplePicker = team
     ? <PeoplePicker everyone={everyone} picked={picked} me={team.me} onPick={setPicked} />
     : undefined;
-  // Each tab's number, theirs added in, before the Display's filters, the way
-  // yours have always been counted.
+  // EACH TAB'S NUMBER COUNTS WHAT THE FILTERS SHOW (w-5a08121f99). It counted
+  // the whole tab, so a filter that had emptied Needs you left the tab saying
+  // 13 over a page saying "Nothing needs you". Her words: "that's not correct
+  // because it literally says needs you 13". A tab's number is a promise about
+  // what clicking it shows, and the number she is missing is said in full by
+  // the empty state and by the Display menu's own "Showing 4 of 7".
+  const shownCount = useCallback((rows: WorkItem[]) => rows.filter(
+    (i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now),
+  ).length, [inboxDisplay, now]);
   const theirCount = useCallback((tab: string) => (withOthers
-    ? teammateRows(cards, { tab, picked, me: team?.me ?? null, display: DEFAULT_DISPLAY.inbox, products: snap?.products ?? [], now }).length : 0),
-  [withOthers, cards, picked, team?.me, snap?.products, now]);
+    ? teammateRows(cards, { tab, picked, me: team?.me ?? null, display: inboxDisplay, products: snap?.products ?? [], now }).length : 0),
+  [withOthers, cards, picked, team?.me, snap?.products, now, inboxDisplay]);
+  // WHAT THE FILTERS ARE HOLDING BACK on the tab she is standing on, which is
+  // only ever read where the page is otherwise empty: then every row of the tab
+  // is a row a filter took away.
+  const hiddenNow = (mineShown ? shownBox.length : 0) + (withOthers
+    ? teammateRows(cards, { tab: view, picked, me: team?.me ?? null, display: DEFAULT_DISPLAY.inbox, products: snap?.products ?? [], now }).length : 0);
+  // THE TABS A PRESS OF TAB MOVES ALONG: the list the bar is drawing, so there
+  // is no second copy of the order to fall out of step with it.
+  const stateTabOrder = useMemo(() => INBOX_TABS.map((t) => t.view), []);
   // The inbox as she sees it, whichever tab is up: her filter AND her display
   // menu. Finishing a task from inside it advances through THIS, never the
   // whole inbox, or the next task opened can be one she has hidden
@@ -3756,9 +3771,32 @@ export default function App() {
         window.dispatchEvent(new Event('task-terminal-toggle'));
         return;
       }
-      // Tab and Shift-Tab follow normal browser focus; field-level editors
-      // can still consume their own Tab before it reaches this listener.
-      if (e.key === 'Tab') return;
+      // TAB MOVES ALONG THE STATE TABS (her words, 2026-10-01: "When I'm on the
+      // main inbox screen, hitting Tab would cycle through the different
+      // states: Needs you, Running, Scheduled, Done, All"). Shift-Tab goes back,
+      // and both wrap.
+      //
+      // ONLY WHERE THOSE TABS ARE ON THE SCREEN WITH NOTHING OVER THEM: not
+      // from inside a field, not with a card or a menu open, not on an opened
+      // task (pinned next door in tab-does-nothing-on-an-open-task.test.mjs),
+      // not while a search is up, and not in board view, which draws no tabs.
+      // Everywhere else Tab goes on walking browser focus as it has since
+      // 2026-09-14, and a field-level editor still eats its own first.
+      if (e.key === 'Tab') {
+        const onTheTabs = !inInput && !modal && !focused && !focusedRepeat && !inFullScreen
+          && !settingsOpen && !teamShown && !openCard && !membersOpen
+          && search === null && inboxDisplay.view === 'list';
+        if (!onTheTabs) return;
+        // Built, not left alone: the browser's own focus walk would otherwise
+        // paint a ring on whatever it landed on behind the rotation.
+        e.preventDefault();
+        setHoveredId(null);
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        setMultiSel(new Set());
+        setView(nextTab(stateTabOrder, view, e.shiftKey) as View);
+        setSelected(0);
+        return;
+      }
       // ⌘1 to ⌘4, one per section, in the order the sidebar draws them. It was
       // ⌘⌥ and an arrow, but that chord was too long and collided with window
       // tiling apps, which moved the whole window.
@@ -3978,7 +4016,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside]);
+  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, membersOpen, inboxDisplay, stateTabOrder]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
@@ -4636,6 +4674,9 @@ export default function App() {
               display={inboxDisplay}
               onDisplay={setInboxDisplay}
               products={snap.products}
+              // The projects she uses most come first in the menu, which takes
+              // reading her threads (w-5a08121f99: about forty projects).
+              items={items}
               onSearch={openSearch}
               onCompose={() => setModal('compose')}
               shown={displayedBox.length + theirRows.length}
@@ -5011,11 +5052,11 @@ export default function App() {
                     view={view}
                     // Yours while you are on the page, and the picked teammates' added in.
                     counts={{
-                      inbox: (mineShown ? inbox.length : 0) + theirCount('inbox'),
-                      progress: (mineShown ? progress.length : 0) + theirCount('progress'),
-                      snoozed: (mineShown ? snoozed.length : 0) + theirCount('snoozed'),
-                      done: (mineShown ? done.length : 0) + theirCount('done'),
-                      all: (mineShown ? allOpen.length : 0) + theirCount('all'),
+                      inbox: (mineShown ? shownCount(inbox) : 0) + theirCount('inbox'),
+                      progress: (mineShown ? shownCount(progress) : 0) + theirCount('progress'),
+                      snoozed: (mineShown ? shownCount(snoozed) : 0) + theirCount('snoozed'),
+                      done: (mineShown ? shownCount(done) : 0) + theirCount('done'),
+                      all: (mineShown ? shownCount(allOpen) : 0) + theirCount('all'),
                     }}
                     needs={team ? needsWord(picked, team.me) : undefined}
                     end={peoplePicker}
@@ -5023,13 +5064,20 @@ export default function App() {
                   />
                 )}
                 {workspaceNavigation && emptyView && !theirRows.length ? (
-                  // "Nothing needs you" is about you alone; with a teammate
-                  // on the page the quiet line says it instead.
-                  view === 'inbox' && !withOthers
-                    ? run === null && <InboxClear running={progress.length} scheduled={snoozed.length}
-                        onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
-                        onCompose={() => setModal('compose')} />
-                    : <EmptyTab view={view} />
+                  // A FILTER IS READ FIRST, so it can never fall through to
+                  // "Nothing needs you" (w-5a08121f99). That sentence is a
+                  // statement about her inbox and the page was saying it about
+                  // her own filter, over a tab that still read 13.
+                  hiddenNow > 0
+                    ? <FilteredEmpty view={view} hidden={hiddenNow}
+                        onClear={() => setInboxDisplay({ ...inboxDisplay, priorities: [], projects: [], updated: 'any' })} />
+                    // "Nothing needs you" is about you alone; with a teammate
+                    // on the page the quiet line says it instead.
+                    : view === 'inbox' && !withOthers
+                      ? run === null && <InboxClear running={progress.length} scheduled={snoozed.length}
+                          onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
+                          onCompose={() => setModal('compose')} />
+                      : <EmptyTab view={view} />
                 ) : <List
                   table={workspaceNavigation && search === null}
                   products={snap.products}
@@ -5686,7 +5734,11 @@ export default function App() {
              would have the snooze card talking about ⌘K. */
           palette={modal === 'palette'}
           view={view}
-          tabs={tabOrder}
+          /* THE TABS THE WALK NAMES ARE THE TABS TAB MOVES ALONG. Its tour
+             tells somebody to press Tab and then says where that press lands,
+             so it has to read the rotation Tab actually takes rather than the
+             sidebar's shorter list (w-5a08121f99). */
+          tabs={stateTabOrder}
           look={look}
           onSetLook={setLook}
           /*
