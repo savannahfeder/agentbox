@@ -1737,7 +1737,9 @@ export function coach(
         // stop.
         : say(
           'Everything you just did is one key away. So is this: type tutorial.',
-          'Press ', '⌘K', ' then start your first real thread.',
+          // ⌘K finds commands; N starts a thread. The old line read as if ⌘K
+          // started one (a persona test, 2026-10-01).
+          'Press ', '⌘K', ' to find any command. Press N to start your first real thread.',
         );
     default:
       return null;
