@@ -62,6 +62,9 @@ beforeAll(async () => {
   // and a row of the outside store's own, which must stay put.
   before = createWorkItem(makeProduct(storeRoot, 'old-project'), { title: 'Written before the fix', kind: 'directive' }, { source: 'founder' });
   theirsDir = makeProduct(inherited, 'theirs');
+  // An older account left beside this one, as a config rewritten without its
+  // id leaves. The server must be told which account, never left to guess.
+  fs.mkdirSync(path.join(storeRoot, 'accounts', 'acct-older', 'old-thing'), { recursive: true });
   theirs = createWorkItem(theirsDir, { title: 'Not this copy\'s', kind: 'directive' }, { source: 'founder' });
   booted = await bootHeadless({ dataDir: dir, appDir: repoRoot, userDir: dir });
   product = booted.store.createProduct({ name: 'Checkout service' });
@@ -116,6 +119,7 @@ describe('a worker started by the headless copy', () => {
     expect(server).toBeTruthy();
     const handed = Object.values(server.env).filter((v) => v === storeRoot);
     expect(handed.length).toBeGreaterThan(0);
+    expect(server.env.STORE_ACCOUNT_ID).toBe(ACCOUNT);
   });
 
   it('finds the row the copy just made and can claim it', async () => {
