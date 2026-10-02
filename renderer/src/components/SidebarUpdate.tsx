@@ -2,13 +2,13 @@
 //
 // The one place the app says a newer Agentbox is waiting. It used to be a row
 // in the inbox, which scrolled under newer work; of three sidebar looks drawn
-// (a line in the foot, this card, an icon by the team's name) she picked the
-// card and had the row taken out. It appears exactly when ⌘K offers the
+// (a line in the foot, this card, an icon by the team's name) the card was
+// picked and the row taken out. It appears exactly when ⌘K offers the
 // restart (`announcesUpdate`), and pressing it is that same restart.
 //
 // THE ICON IS GREY. It was the accent on the first drawing, which on this skin
-// is a red-orange, and it read as "there's a bug". The card's border is what
-// makes it stand out; nothing here wears an alarm colour.
+// is a red-orange, and a red mark reads as something broken. The card's
+// border is what makes it stand out; nothing here wears an alarm colour.
 //
 // Shut, the sidebar has room for an icon only, so the card becomes its icon.
 

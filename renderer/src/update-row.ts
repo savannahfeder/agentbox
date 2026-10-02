@@ -3,8 +3,7 @@
 // It used to arrive as a row in the inbox (picked 2026-08-29 from four drawn
 // in designs//four-ways/index.html). Since 2026-10-01 (w-7a39dace23) it is a
 // card at the foot of the sidebar instead, components/SidebarUpdate.tsx, and
-// the row is gone: "remove the inbox item for updates, we'll use the sidebar
-// instead".
+// the row is gone. The sidebar is the one place the app announces it.
 //
 // `UPDATE_ID` and `isUpdateRow` stay because the write paths in App.tsx, the
 // list and the filter still name the made rows they refuse, and a row with

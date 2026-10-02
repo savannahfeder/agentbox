@@ -6,7 +6,7 @@
 // markup with an update ready as without one. Of three looks drawn (a line in
 // the foot, a card above it, an icon by the team's name) the card was picked,
 // the inbox row was taken out, and the icon's colour changed: the brand
-// red-orange read as "there's a bug", so it is grey.
+// red-orange reads as something broken, so it is grey.
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
@@ -62,8 +62,8 @@ describe('a waiting update in the sidebar', () => {
     expect(html).toMatch(/title="[^"]*The inbox reads faster[^"]*Fix sign-in[^"]*and 2 more/);
   });
 
-  // HER WORDS ON THE FIRST DRAWING: the red icon "makes me think there's a
-  // bug". The accent on this skin is #ee6018. Grey, never the accent.
+  // A red icon on the first drawing read as a bug report rather than news.
+  // The accent on this skin is #ee6018. Grey, never the accent.
   it('draws its icon grey, never in the accent colour', () => {
     for (const sel of ['.sb-update-card-title svg', '.workspace-navigation .sb-update-icon']) {
       const color = decls(sel).color;

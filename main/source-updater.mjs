@@ -7,9 +7,9 @@
 //
 // WHAT IT DOES. A few seconds after launch, and then every half hour, it runs
 // `git fetch` and asks whether the branch's upstream is ahead of the code this
-// process booted from. If it is, the state goes to `ready` and the same row the
-// installed app uses ("A new version is ready", main/updater.mjs and
-// renderer/src/update-row.ts) appears in the inbox, naming what changed.
+// process booted from. If it is, the state goes to `ready` and the sidebar
+// shows the "New version ready" card (renderer/src/components/SidebarUpdate.tsx),
+// which names what changed when pointed at.
 // Pressing Restart fast-forwards the folder, reinstalls packages only when
 // package.json or the lockfile changed, rebuilds the screens, and relaunches.
 // Nothing happens until that button is pressed.

@@ -10,7 +10,7 @@
 // app notices there is newer code and asks whether to restart onto it.
 //
 // So main/source-updater.mjs fetches the branch's upstream, and when it is
-// ahead offers the same "A new version is ready" row the installed app shows.
+// ahead the sidebar offers a restart, as it does for the installed app.
 // Pressing Restart fast-forwards, reinstalls packages only when they changed,
 // rebuilds the screens, and relaunches.
 //
