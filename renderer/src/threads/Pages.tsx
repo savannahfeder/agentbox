@@ -188,8 +188,8 @@ export function PeoplePicker({ everyone, picked, me, onPick }: {
 const CheckMark = () => <svg className="th-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
 
 /* ------------------------------------------------------------ an empty tab */
-/** AN EMPTY INBOX, DRAWN AGAIN FROM THE QUESTION IT ANSWERS (2026-10-01). She
- *  asked for this page redrawn from first principles. When nothing needs you,
+/** AN EMPTY INBOX, DRAWN AGAIN FROM THE QUESTION IT ANSWERS (2026-10-01),
+ *  from first principles. When nothing needs you,
  *  the page has three things to say: that you are clear, whether work is
  *  moving without you, and how to start the next thing. It sits where the
  *  first row would, under the tabs, left aligned with the titles, so the page

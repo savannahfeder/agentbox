@@ -1,6 +1,6 @@
-// ONE STATE RULE FOR TABS AND BOARDS (2026-10-01). Her note: the board said
-// Running for queued work the tab did not, "a discrepancy between Team and
-// Inbox, which should pretty much never happen". Your own threads now sit in
+// ONE STATE RULE FOR TABS AND BOARDS (2026-10-01). The board said Running for
+// queued work the tab did not, and Team and Inbox must never disagree like
+// that. Your own threads now sit in
 // the column whose tab lists them; queued and running share "In progress"; the
 // ones an agent is on right now carry a turning mark.
 import { it, expect } from 'vitest';

@@ -51,8 +51,8 @@ function SignIn({ error }: { error: string | null }) {
 function TeamSetup({ team, products, onDone, inviteFocus = false }: { team: TeamState; products: Product[]; onDone?: () => void; inviteFocus?: boolean }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  // WHO YOU INVITED, SAID BACK (persona test, 2026-10-01: "The field emptied,
-  // with no toast, no pending row... I can't tell if it worked").
+  // WHO YOU INVITED, SAID BACK (2026-10-01): an invite used to empty the field
+  // and show nothing else, so there was no way to tell it had worked.
   const [invited, setInvited] = useState<string[]>([]);
   // AN INVITE IS ASKED, NEVER TAKEN UP ON ITS OWN (review, 2026-10-01). Not
   // now hides it until the page is opened again.

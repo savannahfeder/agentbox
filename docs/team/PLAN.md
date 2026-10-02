@@ -31,7 +31,7 @@ company, filterable by person. Nothing in the sidebar shows who is busy.
   client herself.
 - Teammates run the team build from source for now.
 - Cloud is Supabase (the team already runs it elsewhere). No local Docker
-  Supabase: the Mac has 16 GB and other work runs on it. Tests use an
+  Supabase, to keep the development machine light. Tests use an
   in-process stand-in, and two copies on one Mac talk through a small local
   stand-in server (`cloud/dev-server.mjs`).
 - Superseded 2026-10-01: the team version now lives in the public repository,
@@ -76,9 +76,9 @@ All seven are built, on `main` of this repo. Proven against the hosted
 project, not a stand-in: `tests/team-live-two-macs-through-the-cloud.test.mjs`
 (needs `TEAM_SERVICE_KEY`) and `scripts/scratch/team-two-real-copies.mjs`, which
 runs two headless copies of the real app as two throwaway people, photographs
-both windows, and deletes everything it made. Electron was not launched on her
-Mac: it shares her running app's single-instance lock. What is NOT proven:
-Google sign-in itself, which waits on her OAuth client (the tests sign in with
+both windows, and deletes everything it made. A visible Electron window was
+not launched, because it would share the running app's single-instance lock.
+What is NOT proven: Google sign-in itself, which waits on the OAuth client (the tests sign in with
 a password the admin key creates).
 
 ## Founder's steps outside the code

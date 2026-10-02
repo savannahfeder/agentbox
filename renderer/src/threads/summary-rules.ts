@@ -12,8 +12,8 @@ import { shownToTeam } from '../../../shared/thread-cards.mjs';
 export const SUMMARY_FIELDS = ['problem', 'progress', 'solution'] as const;
 export type SummaryField = (typeof SUMMARY_FIELDS)[number];
 
-/** The four approved words, and only these. "In progress" (her note,
- *  2026-10-01) covers a thread an agent is on AND one waiting its turn: the
+/** The four approved words, and only these. "In progress"
+ *  (2026-10-01) covers a thread an agent is on AND one waiting its turn: the
  *  board had called queued work Running while the tab did not. The ones an
  *  agent is on right now carry a turning mark instead of a second word. */
 export const STATE_WORD: Record<ThreadStateWord, string> = {

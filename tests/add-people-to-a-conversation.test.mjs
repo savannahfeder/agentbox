@@ -1,5 +1,4 @@
-// ADDING PEOPLE TO A CONVERSATION (w-71e6af492d, asked for by the founder on
-// 2026-10-01).
+// ADDING PEOPLE TO A CONVERSATION (2026-10-01).
 //
 // Messages already go to a group, and each exact group has one conversation
 // (main/team/index.mjs directWith). What was missing was the way in from a

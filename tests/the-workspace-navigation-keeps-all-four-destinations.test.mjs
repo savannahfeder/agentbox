@@ -11,8 +11,8 @@
 //
 // What the sidebar is now, and what this file pins:
 //   - the team's mark and name at the top, with the collapse toggle beside
-//     them (her note, 2026-10-01: "better placed at the top, right next to the
-//     workspace or the company name, as is the standard"); collapsed, the mark
+//     them, at the top beside the company name as is standard (2026-10-01);
+//     collapsed, the mark
 //     itself is the toggle;
 //   - one list tab, Inbox, lit on every list view, since every list is a tab
 //     on the Inbox page, and not lit on the Team page, Settings or members;
@@ -121,7 +121,7 @@ describe('the foot of the sidebar', () => {
   });
 
   // Signed in with no team yet, both are offered and open the page that starts
-  // one (her note, 2026-10-01: "it's missing the invite team page").
+  // one, because without them there was no way to reach the invite page (2026-10-01).
   it('offers both to someone signed in who is on no team yet', () => {
     const html = draw({ team: signedInNoTeam, ...both });
     expect(html).toContain('aria-label="Invite people"');

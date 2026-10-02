@@ -125,7 +125,7 @@ export function mergeRows(mine: WorkItem[], theirs: ThreadCard[], sort: Display[
  * THE LOCK, WHERE IT TELLS YOU SOMETHING. On a thread of yours the team cannot
  * see, while a teammate is on the page beside you: that is when "they cannot
  * see this one" is news. On your page alone every row is yours, and nearly all
- * of them are private (1,211 of 1,211 on the store this was measured on), so a
+ * of them are private, so a
  * lock there would be on every line and say nothing.
  */
 export function privateMark(

@@ -86,7 +86,7 @@ it('reuses the same record for the next message between the same two people', as
   expect(maya.store.listProducts().filter((p) => p.team?.direct)).toHaveLength(1);
 });
 
-// ONE CONVERSATION PER PERSON (decided 2026-10-01 from six interviews): the
+// ONE CONVERSATION PER PERSON (decided 2026-10-01): the
 // next message goes on the end of the conversation the two already have, and
 // a reply from the other side lands in the same row, back in the inbox.
 it('continues the one conversation the two of them already have', async () => {

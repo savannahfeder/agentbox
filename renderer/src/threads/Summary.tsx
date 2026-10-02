@@ -1,7 +1,7 @@
 // A THREAD'S SUMMARY: its state and the button that opens it in the top bar,
 // the panel beside the conversation, and the card a teammate reads instead.
 //
-// Approved 2026-10-01 (w-e731ca9376, rounds 7 and 9). Every thread has one: its
+// Approved 2026-10-01. Every thread has one: its
 // properties, then three short lines (problem, progress, solution) that the
 // agent keeps current and the person can edit in place. There is no Edit
 // button. Clicking a line makes it a text box, and it saves as she types,
@@ -251,8 +251,8 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
   const onBoxKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     // Escape here closes the box and goes no further: the window's own Escape
     // would close the thread she is in the middle of writing on. It KEEPS what
-    // was typed, as the box has been saving all along: a persona pressed
-    // Escape, lost the words, and was still told "Edited by you".
+    // was typed, as the box has been saving all along. Escape used to throw the
+    // words away while the line still read "Edited by you".
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(); }
     else if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); finish(); }
   };
