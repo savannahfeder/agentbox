@@ -998,8 +998,18 @@ body {
 .workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body { flex-direction:column; gap:0; }
 /* `order` IS LOAD-BEARING. The conversation is FIRST in the document, because
    in every other layout it is the left or the only pane; turned into a column
-   without this the reply line lands above the page instead of under it. */
-.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body > .doc-pane { order:1; flex:1 1 auto !important; width:100%; min-height:0; }
+   without this the reply line lands above the page instead of under it.
+   THE PANE IS NOT A CHILD OF `.body`: ArtifactSurface portals it into a
+   `.artifact-host` (display:contents), so the rule has to go through it. It
+   was written as `.body > .doc-pane`, matched nothing, and a tall picture
+   then pushed the reply line off the bottom of the window (w-fe09f5794f). */
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body > .artifact-host > .doc-pane { order:1; flex:1 1 auto !important; width:100%; min-height:0; }
+/* A PICTURE IN FULL SCREEN IS SHOWN AT THE WINDOW'S WIDTH AND SCROLLS. Fitting
+   the whole of it, as the pane beside the conversation does, shrinks a long
+   design board to a strip down the middle of an empty window. It still never
+   grows past its own size. */
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .doc-pane.doc-image .doc-card { overflow-y:auto; }
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .doc-picture { flex:none; width:auto; height:auto; max-height:none; padding:16px; }
 .workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body > .list-pane {
   order:2; display:flex; flex-direction:column; flex:0 0 auto; min-width:0;
   background:transparent; border-radius:0; overflow:visible;
