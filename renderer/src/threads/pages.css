@@ -49,7 +49,6 @@
    background. New thread keeps its outline, because it is the thing you
    press. */
 .th-search { display: inline-flex; align-items: center; gap: 9px; height: 32px; padding: 0 10px; border: 0; border-radius: var(--radius); background: none; color: var(--text-faint); font: inherit; font-size: 13px; cursor: text; }
-.th-search kbd { margin-left: 2px; font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; }
 .th-new { height: 32px; padding: 0 13px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13.5px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 .th-new svg { color: var(--text-dim); }
 .th-new:hover, .th-disp:hover { background: var(--wash-strong); }
