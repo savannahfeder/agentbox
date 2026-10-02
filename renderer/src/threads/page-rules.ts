@@ -95,9 +95,27 @@ const RANK: Record<PriorityId, number> = { urgent: 0, high: 1, medium: 2, low: 3
 const byPriority = (a: Ranked, b: Ranked) =>
   RANK[priorityIdOf(a.priority)] - RANK[priorityIdOf(b.priority)] || b.updatedAt - a.updatedAt;
 const byUpdated = (a: Ranked, b: Ranked) => b.updatedAt - a.updatedAt;
-type Ranked = { priority?: number | null; updatedAt: number };
+type Ranked = { priority?: number | null; updatedAt: number; status?: string; wrote?: WorkItem['wrote'] };
 
-const order = (d: Display) => (d.sort === 'updated' ? byUpdated : byPriority);
+/**
+ * WHEN A THREAD WAS FINISHED: the moment its status was written as done, which
+ * the fold keeps per field. Not `updatedAt`, which a label or a late note moves:
+ * 8 of 734 finished threads on a real store were touched more than a day after
+ * they were done (2026-10-02). A row with no record of it, a teammate's card
+ * among them, falls back to when it last changed, and so does any row that is
+ * not finished.
+ */
+export const finishedAt = (r: Ranked): number => (r.status === 'done' && r.wrote?.status?.ts) || r.updatedAt;
+const byFinished = (a: Ranked, b: Ranked) => finishedAt(b) - finishedAt(a);
+
+// THE DONE TAB IS A HISTORY, NOT A QUEUE (w-c61f5bf497). Under Sort by Priority
+// it was a wall of Urgent rows in no order a reader could follow, and nothing
+// in it is waiting on a priority any more. So Done always runs newest finished
+// first, and every other tab keeps the Display's sort.
+const order = (d: Display, tab?: string) => (tab === 'done' ? byFinished : d.sort === 'updated' ? byUpdated : byPriority);
+
+/** The time column's heading: on Done it is when each thread was finished. */
+export const timeHeading = (tab?: string) => (tab === 'done' ? 'Done' : 'Updated');
 
 /**
  * The rows in the order the Display menu asked for.
@@ -115,15 +133,18 @@ const order = (d: Display) => (d.sort === 'updated' ? byUpdated : byPriority);
  * work would put them somewhere meaningless. `keeps` exempts them for the same
  * reason.
  */
-export function sorted<T extends Ranked & { product?: string }>(rows: T[], d: Display): T[] {
+export function sorted<T extends Ranked & { product?: string }>(rows: T[], d: Display, tab?: string): T[] {
   const mine = rows.filter((r) => r.product !== '');
-  if (mine.length === rows.length) return rows.slice().sort(order(d));
-  return [...rows.filter((r) => r.product === ''), ...mine.sort(order(d))];
+  if (mine.length === rows.length) return rows.slice().sort(order(d, tab));
+  return [...rows.filter((r) => r.product === ''), ...mine.sort(order(d, tab))];
 }
 
-/** The same order, for the board's cards, which carry a level and no project row. */
-export function sortedEntries(entries: BoardEntry[], d: Display): BoardEntry[] {
-  return entries.slice().sort(order(d));
+/** The same order, for the board's cards, which carry a level and no project
+ *  row. A card of yours is timed by its thread, so Done reads when it finished. */
+export function sortedEntries(entries: BoardEntry[], d: Display, column?: string): BoardEntry[] {
+  const by = order(d, column);
+  const timed = (e: BoardEntry): Ranked => (e.item ? { ...e, status: e.item.status, wrote: e.item.wrote } : e);
+  return entries.slice().sort((a, b) => by(timed(a), timed(b)));
 }
 
 /* ------------------------------------------------------- the tabs and Tab */
@@ -449,8 +470,9 @@ export function boardColumns({ items, products, display, now, stateOf, cards = [
     .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
     .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
   // EVERY COLUMN TAKES THE DISPLAY'S SORT, not just the list view
-  // (w-5a08121f99). `teamEntries` hands these back newest first.
-  return BOARD_COLUMNS.map((col) => ({ ...col, rows: sortedEntries(entries.filter((e) => e.state === col.state), display) }));
+  // (w-5a08121f99). `teamEntries` hands these back newest first. Except Done
+  // today, which runs newest finished first like the Done tab (w-c61f5bf497).
+  return BOARD_COLUMNS.map((col) => ({ ...col, rows: sortedEntries(entries.filter((e) => e.state === col.state), display, col.state) }));
 }
 
 /** Your threads on the board, in reading order. A teammate's card has no

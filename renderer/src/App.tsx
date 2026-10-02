@@ -1990,9 +1990,11 @@ export default function App() {
   }, [run?.step, inboxDisplay.view]);
   // Your own rows are on the page unless you took yourself off it.
   const mineShown = !team || picked.includes(team.me ?? '');
+  // The tab goes in too: Done runs newest finished first whatever the sort
+  // says (w-c61f5bf497, page-rules.ts).
   const displayedBox = useMemo(
-    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay) : []),
-    [shownBox, inboxDisplay, now, mineShown],
+    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay, view) : []),
+    [shownBox, inboxDisplay, now, mineShown, view],
   );
   // THE PICKED TEAMMATES' THREADS FOR THIS TAB, from the cards their Macs
   // publish, merged into your rows in the Display's order.
@@ -2001,7 +2003,7 @@ export default function App() {
     () => (withOthers ? teammateRows(cards, { tab: view, picked, me: team?.me ?? null, display: inboxDisplay, products: snap?.products ?? [], now }) : []),
     [withOthers, cards, view, picked, team?.me, inboxDisplay, snap?.products, now],
   );
-  const mixedRows = useMemo(() => (withOthers ? mergeRows(displayedBox, theirRows, inboxDisplay.sort) : null), [withOthers, displayedBox, theirRows, inboxDisplay.sort]);
+  const mixedRows = useMemo(() => (withOthers ? mergeRows(displayedBox, theirRows, view === 'done' ? 'done' : inboxDisplay.sort) : null), [withOthers, displayedBox, theirRows, inboxDisplay.sort, view]);
   // A teammate's thread opens as their card, over the page, and Back returns here.
   const openTeammateCard = useCallback((card: ThreadCard) => { setOpenCard(card); setTeamOpen(true); }, []);
   // HOVERING A FACE SAYS WHAT THEY ARE UP TO (w-0b54ee983f). Her words:
@@ -4772,6 +4774,7 @@ export default function App() {
               onCompose={() => setModal('compose')}
               shown={displayedBox.length + theirRows.length}
               total={(mineShown ? shownBox.length : 0) + theirRows.length}
+              tab={view}
             />
           )}
           {!workspaceNavigation && !focused && !settingsOpen && !inPractice && (

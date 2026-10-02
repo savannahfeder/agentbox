@@ -13,7 +13,7 @@ import { PriorityIcon } from '../components/Priority';
 import { notStarted, rowTitle } from '../list-rules';
 import { DONE } from '../done-word';
 import {
-  boardColumns, filteredEmptyWords, isDirect, isFiltered, projectChoices, updatedWords,
+  boardColumns, filteredEmptyWords, finishedAt, isDirect, isFiltered, projectChoices, timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
@@ -73,9 +73,9 @@ function useOutside(open: boolean, close: () => void) {
 
 /* ------------------------------------------------------------ the header */
 /** Search, New thread and the Display icon, at the right of the Inbox and Team headers. */
-export function HeaderActions({ page, display, onDisplay, products, items, onSearch, onCompose, shown, total }: {
+export function HeaderActions({ page, display, onDisplay, products, items, onSearch, onCompose, shown, total, tab }: {
   page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[]; items?: WorkItem[];
-  onSearch: () => void; onCompose: () => void; shown?: number; total?: number;
+  onSearch: () => void; onCompose: () => void; shown?: number; total?: number; tab?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useOutside(open, () => setOpen(false));
@@ -88,7 +88,7 @@ export function HeaderActions({ page, display, onDisplay, products, items, onSea
       <button type="button" className={`th-disp${open ? ' open' : ''}`} aria-label="View and filters" title="View and filters" onClick={() => setOpen((o) => !o)}>
         <SlidersIcon />{isFiltered(display) && <i />}
       </button>
-      {open && <DisplayMenu page={page} display={display} onDisplay={onDisplay} products={products} items={items} shown={shown} total={total} />}
+      {open && <DisplayMenu page={page} display={display} onDisplay={onDisplay} products={products} items={items} shown={shown} total={total} tab={tab} />}
     </span>
   </div>;
 }
@@ -96,8 +96,10 @@ export function HeaderActions({ page, display, onDisplay, products, items, onSea
 const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
 /** View, sort, and the filters: priority, project and when it was updated. */
-export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total }: {
+export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total, tab }: {
   page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[];
+  /** The tab the page is on, which Done's own order depends on. */
+  tab?: string;
   /** Her threads, to rank the projects by the one she used most recently. */
   items?: WorkItem[];
   shown?: number; total?: number;
@@ -119,6 +121,9 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
     <div className="line"><span className="lab">Sort by</span><span className="opts">
       <button type="button" className={display.sort === 'priority' ? 'on' : ''} onClick={() => set({ sort: 'priority' })}>Priority</button>
       <button type="button" className={display.sort === 'updated' ? 'on' : ''} onClick={() => set({ sort: 'updated' })}>Updated</button>
+      {/* Done ignores this, on purpose (w-c61f5bf497), and says so where the
+          choice is made rather than leaving the list to look broken. */}
+      {tab === 'done' && <span className="th-pop-note">Done runs newest first</span>}
     </span></div>
     <div className="rule" />
     <div className="line"><span className="lab">Priority</span><span className="opts">
@@ -286,9 +291,9 @@ export function EmptyTab({ view }: { view: TabView }) {
 }
 
 /* ------------------------------------------------------------ one thread's cells */
-export function TableHead({ person = false }: { person?: boolean }) {
+export function TableHead({ person = false, tab }: { person?: boolean; tab?: string }) {
   return <div className="row th-head"><span className="mark" aria-hidden="true" /><div className={`row-main th-grid${person ? ' with-person' : ''}`}>
-    <div>Thread</div><div>Project</div>{person && <div>Person</div>}<div>Priority</div><div className="num">Updated</div>
+    <div>Thread</div><div>Project</div>{person && <div>Person</div>}<div>Priority</div><div className="num">{timeHeading(tab)}</div>
   </div></div>;
 }
 
@@ -343,9 +348,12 @@ export function MessageTitle({ people, fromMe, text }: { people: string[]; fromM
  *  With a teammate on the page (w-05ff3d1438) it also carries the Person
  *  cell. Who can see the thread is said by one mark after its title, the lock
  *  or the people, and never by who else is on the page. */
-export function ThreadCells({ item, product, now, person }: {
+export function ThreadCells({ item, product, now, person, tab }: {
   item: WorkItem; product: Product | undefined; now: number; person?: ReactNode;
+  /** On Done the time is when the thread was finished, which is its order. */
+  tab?: string;
 }) {
+  const when = tab === 'done' ? finishedAt(item) : item.updatedAt;
   const liveIds = useContext(LiveContext);
   const team = useContext(TeamContext);
   // WHO SEES IT, AT A GLANCE AND ONE CLICK FROM CHANGING (2026-10-01). One
@@ -379,7 +387,7 @@ export function ThreadCells({ item, product, now, person }: {
   const said = messageLine(item, product, team?.me ?? null);
   if (said) {
     return <RowCells live={liveIds.has(item.id)} title={<MessageTitle people={said.people} fromMe={said.fromMe} text={said.text} />} where="Message" person={person}
-      priority={messagePriority(item)} updatedAt={item.updatedAt} now={now} action={action} />;
+      priority={messagePriority(item)} updatedAt={when} now={now} action={action} />;
   }
   // ONLY THE UNUSUAL CASE WEARS A MARK (2026-10-02). Shared with the team is
   // the default, so it carries nothing; the lock is on a thread only you can
@@ -389,7 +397,7 @@ export function ThreadCells({ item, product, now, person }: {
   // click at once, the way the Share button does.
   const lock = seen === 'private';
   return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} where={product?.name ?? ''} person={person}
-    priority={item.priority ?? 0} updatedAt={item.updatedAt} now={now} action={action} />;
+    priority={item.priority ?? 0} updatedAt={when} now={now} action={action} />;
 }
 
 /* ------------------------------------------------------------ the board */
