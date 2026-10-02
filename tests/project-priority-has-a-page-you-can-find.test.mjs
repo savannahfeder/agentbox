@@ -97,6 +97,43 @@ describe('where a dragged row lands, in one column', () => {
   });
 });
 
+// A PROJECT WITHOUT A PICTURE WEARS ITS COLOUR, NEVER THE SUNBURST. The burst
+// was the default mark, and it is also what the Agentbox brand looked like, so
+// every project in Settings wore the app's logo. Her call on the first draw of
+// this page: never show that logo, and use the composer's project colours here.
+describe('the mark beside a project', () => {
+  const mark = read('renderer/src/components/ProductMark.tsx');
+  const settings = read('renderer/src/components/Settings.tsx');
+  const page = read('renderer/src/components/ProjectPriority.tsx');
+
+  it('draws the project colour, from the one swatch rule the composer uses', () => {
+    expect(mark).toMatch(/projectSwatch\(/);
+    expect(mark).not.toMatch(/RAYS/);
+    expect(mark).not.toMatch(/<line\b/);
+  });
+
+  it('is handed the slug everywhere a project is listed, so the colour matches the composer', () => {
+    for (const src of [settings, page]) {
+      const marks = src.match(/<ProductMark\b[^>]*>/g) ?? [];
+      expect(marks.length).toBeGreaterThan(0);
+      for (const m of marks) expect(m).toMatch(/slug=\{/);
+    }
+  });
+
+  it('the sidebar corner shows the Agentbox icon when there is no team, and the team initial when there is', () => {
+    const nav = read('renderer/src/components/WorkspaceNavigation.tsx');
+    expect(nav).toMatch(/team\?\.team\?\.name\s*\?\s*<span className="th-mark"/);
+    expect(nav).toMatch(/<AppMark size=\{20\} \/>/);
+  });
+
+  it('the first-run screens show the Agentbox mark, not a project mark', () => {
+    for (const f of ['renderer/src/components/Onboarding.tsx', 'renderer/src/components/ModeScreen.tsx']) {
+      expect(read(f)).not.toMatch(/<ProductMark name=\{NAME\}/);
+      expect(read(f)).toMatch(/<AppMark\b/);
+    }
+  });
+});
+
 describe('the ways in', () => {
   const settings = read('renderer/src/components/Settings.tsx');
   const composer = read('renderer/src/threads/ThreadComposer.tsx');

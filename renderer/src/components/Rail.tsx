@@ -125,7 +125,7 @@ function RailHead({ product, onNotice }: { product: Product; onNotice: (text: st
           if (!out.ok) onNotice(out.error ?? 'That picture could not be used.');
         }}
       >
-        <ProductMark src={product.logo} name={product.name} />
+        <ProductMark src={product.logo} name={product.name} slug={product.slug} />
       </button>
       <input
         className="rail-product"

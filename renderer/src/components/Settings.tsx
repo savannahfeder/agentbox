@@ -1011,7 +1011,7 @@ function ProjectIcon({ project, onPick, onClear }: {
         title={project.logo ? 'Change this project’s picture' : 'Give this project a picture'}
         aria-label={project.logo ? `Change the picture for ${project.name}` : `Give ${project.name} a picture`}
       >
-        <ProductMark src={project.logo} name={project.name} size={26} />
+        <ProductMark src={project.logo} name={project.name} slug={project.slug} size={26} />
       </button>
       {project.logo && (
         <button
@@ -1168,7 +1168,7 @@ function ProjectsIndex({ projects, onOpen, onNew }: {
       <div className="proj-index">
         {shown.map((p) => (
           <button key={p.slug} type="button" className="proj-card" onClick={() => onOpen(p.slug)}>
-            <ProductMark src={p.logo} name={p.name} size={30} />
+            <ProductMark src={p.logo} name={p.name} slug={p.slug} size={30} />
             <span className="proj-card-text">
               <span className="proj-card-name">{p.name}</span>
               {/* THE FOLDER, which is the one thing that tells two projects of
@@ -1439,7 +1439,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               className="set-nav-item on"
               onClick={() => setPane({ project: current.slug })}
             >
-              <span className="set-nav-ico"><ProductMark src={current.logo} name={current.name} size={15} /></span>
+              <span className="set-nav-ico"><ProductMark src={current.logo} name={current.name} slug={current.slug} size={15} /></span>
               <span className="set-nav-label">{current.name}</span>
             </button>
           )}

@@ -30,7 +30,7 @@ import FolderPicker from './FolderPicker';
 import { DEFAULT_SKIN, SKINS, WALK_PICTURE, walkSkin, type Look as LookId, type SkinChoice } from '../skins';
 import { MatchMark } from './MatchMark';
 import { PRACTICE_NAME, PRACTICE_ROWS, PRACTICE_TASK } from '../../../shared/first-run-practice.mjs';
-import { ProductMark } from './ProductMark';
+import { AppMark } from './AppMark';
 import { SidebarIcon } from './SidebarIcon';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 
@@ -1780,7 +1780,7 @@ function Slab({ n, head, line, piece, onNext }: {
   }, [onNext]);
   return (
     <div className="fr-screen fr-screen-intro">
-      <div className="fr-brand"><ProductMark name={NAME} size={18} />{NAME}</div>
+      <div className="fr-brand"><AppMark size={22} />{NAME}</div>
       <IntroPiece kind={piece} />
       <div className="fr-corner">
         <div>
@@ -1820,7 +1820,7 @@ function Statement({ head, line, go, onNext }: {
   }, [onNext]);
   return (
     <div className="fr-screen">
-      <div className="fr-brand"><ProductMark name={NAME} size={18} />{NAME}</div>
+      <div className="fr-brand"><AppMark size={22} />{NAME}</div>
       <div className="fr-stack">
         <div className="fr-finish" role="status">
           <h1 className="fr-finish-head">{head}</h1>
@@ -2452,7 +2452,7 @@ export function Onboarding({
           nothing behind it, so `stepBack` answers null there and this is not
           drawn at all. */}
       {backWord}
-      <div className="fr-brand"><ProductMark name={NAME} size={18} />{NAME}</div>
+      <div className="fr-brand"><AppMark size={22} />{NAME}</div>
 
       {run.step === 'welcome' && (
         // CORNER TO CORNER, chosen out of eight welcomes. The
