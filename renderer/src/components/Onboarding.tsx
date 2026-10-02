@@ -928,15 +928,22 @@ function Ringed({
   // runs after every placement rather than inside the one that made it.
   useLayoutEffect(() => { settle(cardRef.current); lift(cardRef.current, geo); });
 
+  // AND THE FLOATING CARD DIMS WHAT IT FLOATS OVER (w-58c8f466e7). It drew
+  // the card alone, so at the ⌘K beat the words sat at full strength on top
+  // of the board's first cards: "the Command-K thing looks a little funky".
+  // There is no ring to leave a hole for, so the whole window is dimmed.
   if (!geo) {
     if (!adrift) return null;
     return (
-      <p
-        ref={cardRef}
-        className="fr-tether fr-adrift"
-        style={{ left: adrift.x, top: adrift.y, maxWidth: adrift.w }}
-        role="status"
-      ><Card say={say} beat={beat} pointed={pointed} knock={knock} /></p>
+      <>
+        <Veil box={null} />
+        <p
+          ref={cardRef}
+          className="fr-tether fr-adrift"
+          style={{ left: adrift.x, top: adrift.y, maxWidth: adrift.w }}
+          role="status"
+        ><Card say={say} beat={beat} pointed={pointed} knock={knock} /></p>
+      </>
     );
   }
   const pad = 10;
