@@ -12,6 +12,10 @@ function turnClosed(message) {
   return error;
 }
 
+// How long a finished background job may go without the agent waking for it
+// before the session is closed anyway. Measured wakes arrive in about a second.
+const WAKE_GRACE_MS = 2 * 60 * 1000;
+
 export function claudeStreamArgs(args) {
   const copy = [...args];
   const index = copy.indexOf('-p');
@@ -27,7 +31,16 @@ export function attachClaudeInput(child) {
   const controls = new Map();
   const seenUsers = new Set();
   const pending = new Map();
-  const closeInput = () => { closed = true; child.stdin.end(); };
+  // WHAT THE AGENT STARTED AND HAS NOT HEARD BACK FROM: a background command,
+  // a command Claude Code moved to the background past its time limit, a
+  // background helper. Claude Code lists them in `background_tasks_changed`
+  // and wakes the agent itself when one ends, but only while stdin is open. A
+  // result with any of these out is "I'll report once it finishes", not the
+  // end of the run, and closing there killed the suite it was waiting on
+  // (tests/an-agent-waiting-on-its-own-tests-does-not-come-back-to-you).
+  let waiting = [], wakeTimer = null;
+  const closeInput = () => { closed = true; clearTimeout(wakeTimer); child.stdin.end(); };
+  const mayClose = () => !held && atResult && !pending.size && !waiting.length;
   const fail = reason => {
     closed = true;
     for (const request of pending.values()) {
@@ -72,16 +85,28 @@ export function attachClaudeInput(child) {
         atResult = false;
         request.resolve({ accepted: true });
       }
+      if (event.type === 'system' && event.subtype === 'background_tasks_changed' && Array.isArray(event.tasks)) {
+        waiting = event.tasks;
+        // The last one ended between turns. Claude Code wakes the agent for
+        // it, and that turn's result closes as usual. The timer is only for a
+        // wake that never comes, so a session cannot sit open forever.
+        clearTimeout(wakeTimer);
+        if (!waiting.length && atResult && !closed) {
+          wakeTimer = setTimeout(() => { if (mayClose() && !closed) closeInput(); }, WAKE_GRACE_MS);
+          wakeTimer.unref?.();
+        }
+      }
       if (event.type === 'result') {
         atResult = true;
-        if (!held && !pending.size) closeInput();
+        if (mayClose()) closeInput();
       }
     }
   });
+  child.waitingOn = () => [...waiting];
   child.holdInput = value => {
     if (closed && value) throw Error('This session has ended. Open remote control again to resume it.');
     held = !!value;
-    if (!held && atResult && !pending.size) closeInput();
+    if (mayClose()) closeInput();
   };
   child.control = (request, timeoutMs = 30000) => new Promise((resolve, reject) => {
     if (closed || !child.stdin.writable) return reject(Error('The agent connection is closed.'));
