@@ -11,14 +11,21 @@
 // Inbox page (2026-10-01), Tab and Shift-Tab are how you move along them, and
 // the number keys jumped through a sidebar list that is no longer drawn. The
 // five tabs themselves hovered nothing at all.
+//
+// THEN, ON THE FIRST ROUND'S SCREENSHOTS: "Just show the Next tab. We don't
+// need to show people the previous tab shortcut. I prefer the way they show
+// Tab in their tutorial because it shows the icon on the keyboard as well as
+// the name "Tab". I prefer that it's uppercase." The plate and the shortcuts
+// page had drawn two lowercase caps, "tab" and "⇧ tab". Shift-Tab still goes
+// back; it is just not advertised.
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as nav from '../renderer/src/workspace-navigation.mjs';
-import { HINTS, capsFor } from '../renderer/src/hint-plate';
+import { HINTS, capsFor, capWord } from '../renderer/src/hint-plate';
 import { SHORTCUTS } from '../renderer/src/shortcuts';
-import { TEAM_TABS, TEAM_TAB_NAMES, coach, keyToken } from '../renderer/src/onboarding';
+import { TEAM_TABS, TEAM_TAB_NAMES, coach, keyName, keyToken } from '../renderer/src/onboarding';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -56,28 +63,43 @@ describe('Tab is offered where the number keys were', () => {
     expect(app).not.toContain("if (e.key === 'Tab' && modal !== 'compose')");
   });
 
-  it('is on the shortcuts page, with Shift-Tab going back', () => {
-    const row = SHORTCUTS.flatMap((g) => g.keys).find((k) => k.keys.includes('tab'));
-    expect(row?.keys).toEqual(['tab', '⇧tab']);
-    expect(row?.what).toMatch(/tab/i);
+  it('is on the shortcuts page as one ⇥ cap, next tab only', () => {
+    const rows = SHORTCUTS.flatMap((g) => g.keys);
+    const row = rows.find((k) => k.keys.includes('⇥'));
+    expect(row?.keys).toEqual(['⇥']);
+    expect(row?.what).toMatch(/next tab/i);
+    expect(row?.what).not.toMatch(/back/i);
   });
 
-  it('hovers on every tab along the top of the inbox', () => {
-    expect(HINTS['state-tab']).toEqual([
-      { key: 'tab', what: 'Next tab' },
-      { key: '⇧tab', what: 'Previous tab' },
-    ]);
+  it('hovers "Next tab" on every tab along the top of the inbox, and nothing about going back', () => {
+    expect(HINTS['state-tab']).toEqual([{ key: '⇥', what: 'Next tab' }]);
     const pages = code('renderer/src/threads/Pages.tsx');
     const tabs = pages.slice(pages.indexOf('export function StateTabs'), pages.indexOf('export function PeopleFilter'));
     expect(tabs).toContain('data-hint="state-tab"');
   });
 
-  it('draws tab as one cap and Shift-Tab as two, the way esc is one', () => {
-    expect(capsFor('tab')).toEqual(['tab']);
-    expect(capsFor('⇧tab')).toEqual(['⇧', 'tab']);
-    // The neighbours must not change.
+  it('offers Shift-Tab nowhere, on the plate or the page', () => {
+    const plateKeys = Object.values(HINTS).flat().map((l) => l.key);
+    const pageKeys = SHORTCUTS.flatMap((g) => g.keys.flatMap((k) => k.keys));
+    expect([...plateKeys, ...pageKeys].filter((k) => /⇧(tab|⇥)|^tab$/i.test(k))).toEqual([]);
+  });
+
+  it('draws ⇥ as one cap with "Tab" in it, the way the tutorial does', () => {
+    expect(capsFor('⇥')).toEqual(['⇥']);
+    expect(capWord('⇥')).toBe('Tab');
+    // The tutorial's own cap says the same word.
+    expect(keyName('⇥')).toBe(capWord('⇥'));
+    // The neighbours keep their bare caps.
+    expect(capWord('↵')).toBeNull();
+    expect(capWord('esc')).toBeNull();
+    expect(capWord('K')).toBeNull();
     expect(capsFor('esc')).toEqual(['esc']);
     expect(capsFor('⌘K')).toEqual(['⌘', 'K']);
+  });
+
+  it('puts the word inside the cap on the plate and on the shortcuts page', () => {
+    expect(code('renderer/src/components/HintPlate.tsx')).toMatch(/capWord\(glyph\)/);
+    expect(code('renderer/src/components/Settings.tsx')).toMatch(/capWord\(k\)/);
   });
 });
 

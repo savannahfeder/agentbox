@@ -140,10 +140,11 @@ export const SHORTCUTS: ShortcutGroup[] = [
       // case 'Enter' → setFocused(pointed)
       { keys: ['↵'], what: 'Open the task you are on.' },
       // App.tsx, `if (e.key === 'Tab')`: nextTab(stateTabOrder, view, shiftKey)
-      // walks the tabs along the top of the inbox, both ways, wrapping. It
-      // replaced ⌘1 to ⌘4 on 2026-10-02 (w-914b16eab6), which jumped through
-      // the sidebar's sections before those became these tabs.
-      { keys: ['tab', '⇧tab'], join: 'or', what: 'Move to the next tab along the top, or back one.' },
+      // walks the tabs along the top of the inbox, wrapping. It replaced ⌘1 to
+      // ⌘4 on 2026-10-02 (w-914b16eab6), which jumped through the sidebar's
+      // sections before those became these tabs. Shift-Tab goes back and is
+      // left unlisted on her word: "just show the Next tab".
+      { keys: ['⇥'], what: 'Move to the next tab along the top.' },
       // Escape in the focused branch: doc → task → list. In the list switch it
       // clears a selection and closes search.
       { keys: ['esc'], what: 'Go back one step: a file, then the task, then the list.' },

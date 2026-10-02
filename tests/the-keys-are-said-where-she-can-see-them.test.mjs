@@ -188,7 +188,7 @@ describe('Tab walks the tabs the Inbox draws', () => {
 
   it('wears the Tab plate on every state tab, and nothing on the sidebar’s Threads row', () => {
     expect(pages).toContain('key={t.view} data-hint="state-tab"');
-    expect(HINTS['state-tab'].map((l) => l.key)).toEqual(['tab', '⇧tab']);
+    expect(HINTS['state-tab'].map((l) => l.key)).toEqual(['⇥']);
     expect(nav1).not.toMatch(/data-tab="inbox" data-hint/);
     expect(app).not.toContain('className="tab-hint');
     expect(app).not.toContain('STRIP_HINTS');

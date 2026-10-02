@@ -72,11 +72,10 @@ const HANDLED = {
   'K': [[list, "case 'k': case 'K':"], [list, 'Math.max(0, selected - 1)']],
   '↑': [[list, "case 'ArrowUp':"]],
   '↵': [[list, "case 'Enter': if (!multiSel.size && pointed)"]],
-  // Tab and Shift-Tab walk the tabs along the top of the inbox. They replaced
-  // ⌘1 to ⌘4 on 2026-10-02 (w-914b16eab6), which went to a section of the
-  // sidebar before those sections became these tabs.
-  'tab': [[chords, "if (e.key === 'Tab') {"], [chords, 'setView(nextTab(stateTabOrder, view, e.shiftKey) as View);']],
-  '⇧tab': [[chords, "if (e.key === 'Tab') {"], [chords, 'setView(nextTab(stateTabOrder, view, e.shiftKey) as View);']],
+  // Tab walks the tabs along the top of the inbox. It replaced ⌘1 to ⌘4 on
+  // 2026-10-02 (w-914b16eab6), which went to a section of the sidebar before
+  // those sections became these tabs. Shift-Tab goes back but is not listed.
+  '⇥': [[chords, "if (e.key === 'Tab') {"], [chords, 'setView(nextTab(stateTabOrder, view, e.shiftKey) as View);']],
   'esc': [
     // One step back out: the document, then the task, then the list.
     [focused, "if (e.key === 'Escape') { if (escapeClosesDoc(openDoc)) closeArtifact(); else setFocused(null); }"],
@@ -433,7 +432,8 @@ describe('she can get to it from both places she looks', () => {
   // The caps are drawn with the app's own keycap, not a second picture of one.
   it('draws the app’s own keycap', () => {
     expect(css).toContain('.set-key-caps kbd {');
-    expect(settings).toContain('<kbd>{k}</kbd>');
+    // ⇥ carries its name inside the same cap, as the tutorial's does (w-914b16eab6).
+    expect(settings).toContain('<kbd>{k}{capWord(k) && <span className="fr-cap-word">{capWord(k)}</span>}</kbd>');
   });
 
   // THE PAGE HAS TWO LEFT EDGES AND ONLY TWO (w-1bc916a880, 2026-09-23). The

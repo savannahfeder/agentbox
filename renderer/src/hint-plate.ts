@@ -55,13 +55,21 @@ export interface HintLine {
 export function capsFor(key: string): string[] {
   if (key.length <= 1) return [key];
   // The words the app writes out for one physical key. Nothing else is
-  // multi-character and single-key. A word can sit at the end of a chord
-  // (⇧tab), and stays whole there too.
-  for (const word of ['esc', 'tab']) {
-    if (key === word) return [key];
-    if (key.endsWith(word)) return [...key.slice(0, -word.length), word];
-  }
+  // multi-character and single-key.
+  if (key === 'esc') return [key];
   return [...key];
+}
+
+/**
+ * THE NAME WRITTEN INSIDE A CAP BESIDE ITS GLYPH, or null for a cap that says
+ *  its own name. Only ⇥, which reads "⇥ Tab", the way the tutorial's cap does
+ *  (`keyName` in onboarding.ts, and a test holds the two to the same word).
+ *  Her words, 2026-10-02: "I prefer the way they show Tab in their tutorial
+ *  because it shows the icon on the keyboard as well as the name". ↵ keeps its
+ *  bare cap here; nobody asked for that one.
+ */
+export function capWord(glyph: string): string | null {
+  return glyph === '⇥' ? 'Tab' : null;
 }
 
 /**
@@ -79,13 +87,11 @@ export const HINTS: Record<string, HintLine[]> = {
   'new-task': [{ key: 'N', what: 'New thread' }],
   sidebar: [{ key: '\\', what: 'Show or hide the sidebar' }],
   // THE TABS ALONG THE TOP OF THE INBOX (Needs you, In progress, Later, Done,
-  // All). Tab and Shift-Tab walk them, so every tab wears the same plate.
-  // It replaced ⌘1 to ⌘4 on the sidebar's sections, 2026-10-02 (w-914b16eab6):
-  // "when i hover over them just like other shortcuts it should show these".
-  'state-tab': [
-    { key: 'tab', what: 'Next tab' },
-    { key: '⇧tab', what: 'Previous tab' },
-  ],
+  // All). Tab walks them, so every tab wears the same plate. It replaced ⌘1 to
+  // ⌘4 on the sidebar's sections, 2026-10-02 (w-914b16eab6). NEXT TAB ONLY:
+  // Shift-Tab still goes back, but "we don't need to show people the previous
+  // tab shortcut".
+  'state-tab': [{ key: '⇥', what: 'Next tab' }],
   // A task in the list. THE ONLY COMPONENT IN HERE THAT IS NOT A BUTTON, and
   // the reason it says three whole fragments rather than three bare caps: a row
   // carries no verb anywhere on it, so the caps alone would say nothing.
