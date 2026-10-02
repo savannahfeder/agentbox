@@ -308,6 +308,9 @@ export interface SupervisorStatus {
   // Items a tick will spawn as soon as a slot frees: waiting their turn, not
   // forgotten. The row says "queued" so the two are never confused.
   queued?: string[];
+  // Of those, the ones pushed with Run now from the three-dot menu: next to
+  // start, ahead of every project and tag (supervisor.runNow).
+  runNow?: string[];
   // Due later, so neither queued nor forgotten: a third state, and one the
   // user set on purpose.
   scheduled?: string[];
@@ -955,6 +958,7 @@ declare global {
       listFolders?(p?: { at?: string | null; showHidden?: boolean }): Promise<FolderListing>;
       folderExists?(p: { path: string }): Promise<{ exists: boolean }>;
       stopSession(p: { product: string; id: string }): Promise<WorkItem>;
+      runNow?(p: { product: string; id: string }): Promise<{ ok: boolean; reason?: 'running' | 'missing' }>;
       reopen(p: { product: string; id: string }): Promise<WorkItem>;
       // The user's standing instructions: one text, briefed to every session.
       instructionRead?(id: string): Promise<{text:string;defaultText:string;error?:string}>;

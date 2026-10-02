@@ -324,7 +324,7 @@ function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 // not the user's, and it is the part that was unnecessary. `filesFromRuns` stays,
 // because App.tsx still reads it to choose the design a card opens itself on.
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onHandToAgent, onAddPeople }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onHandToAgent, onAddPeople }: {
   previewSample?: string;
   /**
    * A MESSAGE FROM A PERSON IS NOT WORK UNTIL SHE SAYS SO. The one line under
@@ -422,6 +422,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onReplySend: (text: string, priority?: number, repeat?: RepeatRuleValue | null, sent?: SentDraft, mode?: AnswerMode | null, pick?: { model: string | null; effort: string | null }) => void;
   onReplyClose: () => void;
   onStop: () => void;
+  // Run now, the three-dot menu's row on a waiting task.
+  onRunNow?: () => void;
   // Only ever called on an agent row a reply cannot reach: brings the app that
   // session is running inside to the front.
   onReveal?: () => void;
@@ -929,6 +931,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
      and no code, so it is offered Mark done alone. NOTHING TO FINISH ON A
      FINISHED THREAD. */
   const canFinish = item.status !== 'done';
+  // RUN NOW is offered while the task is waiting its turn and has not been
+  // pushed yet: the supervisor's own queued list, so it never appears on a
+  // task nothing is going to start (resting, scheduled, leased elsewhere).
+  const waiting = !session && !!live.queued?.includes(item.id) && !live.runNow?.includes(item.id);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const threadMenu = (
     <ThreadMenu
@@ -938,6 +944,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       terminal={direct ? null : terminalOpen ? 'open' : 'closed'}
       onToggleTerminal={() => window.dispatchEvent(new Event('task-terminal-toggle'))}
       onFinish={canFinish ? onResolve : null}
+      onRunNow={waiting && onRunNow ? onRunNow : null}
     />
   );
 

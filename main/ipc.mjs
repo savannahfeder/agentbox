@@ -1098,6 +1098,12 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return store.answerItem(product, id, { status: 'blocked' });
   });
 
+  // Run now, from the three-dot menu on a waiting task (supervisor.runNow).
+  ipcMain.handle('zero:run-now', (_e, { product, id }) => {
+    if (isAgentRow(id)) return { ok: false, reason: 'missing' };
+    return supervisor.runNow(product, id);
+  });
+
   // Send a stopped/blocked item back to the queue; the fresh worker's brief
   // carries whatever the founder wrote on the item meanwhile.
   ipcMain.handle('zero:reopen', (_e, { product, id }) => {

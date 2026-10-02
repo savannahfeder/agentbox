@@ -3485,6 +3485,16 @@ export default function App() {
     await refresh();
   }, [refresh, showToast, working]);
 
+  // RUN NOW, from the three-dot menu on a waiting task (supervisor.runNow).
+  // The menu only offers it on a queued task, so the refusals are races: the
+  // task started, or left the store, between the menu drawing and the press.
+  const runNow = useCallback(async (item: WorkItem) => {
+    const r = await window.zero?.runNow?.({ product: item.product, id: item.id });
+    showToast(r?.ok ? 'Up next. It starts as soon as an agent is free.'
+      : r?.reason === 'running' ? 'Already running.' : 'This task is no longer waiting.');
+    await refresh();
+  }, [refresh, showToast]);
+
   // Unstick a stalled item: its answer's delivery mark is forgotten and a
   // fresh worker picks it up on the next tick, within seconds.
   const redeliver = useCallback(async (item: WorkItem) => {
@@ -4830,6 +4840,7 @@ export default function App() {
                   }}
                   onReplyClose={() => setModal(null)}
                   onStop={() => stopAgent(focused)}
+                  onRunNow={() => runNow(focused)}
                   onReveal={() => revealAgent(focused)}
                   // Remind me later and stop this task are neither of the two
                   // ways a task ends, and the card beside the bar names exactly
@@ -4846,6 +4857,7 @@ export default function App() {
                   // rule is the point of that file.
                   live={{
                     queued: snap.supervisor.queued,
+                    runNow: snap.supervisor.runNow,
                     paused: snap.supervisor.paused,
                     running: snap.supervisor.running.length,
                     capacity: snap.supervisor.capacity,

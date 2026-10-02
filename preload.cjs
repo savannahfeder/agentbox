@@ -84,6 +84,7 @@ contextBridge.exposeInMainWorld('zero', {
   // not decide (main/notify.mjs).
   notify: (arrivals) => ipcRenderer.invoke('zero:notify', { arrivals }),
   stopSession: (payload) => ipcRenderer.invoke('zero:stop-session', payload),
+  runNow: (payload) => ipcRenderer.invoke('zero:run-now', payload),
   reopen: (payload) => ipcRenderer.invoke('zero:reopen', payload),
   // Her standing instructions: the text every session is briefed with.
   instructionRead: (id) => ipcRenderer.invoke('zero:instruction-read', id),
