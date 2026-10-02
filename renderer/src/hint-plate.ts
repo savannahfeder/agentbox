@@ -133,7 +133,8 @@ export const HINTS: Record<string, HintLine[]> = {
   // that already shows its key carries no plate, so its line went with it.
   terminal: [{ key: '⌘J', what: 'Show or hide the terminal' }],
   // The Summary button printed its S on its face until w-5984544441; the key
-  // is said here now, the same as every other button in the corner.
+  // is said here now, the same as every other button in the corner. Since
+  // w-a3482b8c2c it hangs from the summary's rail and the icon that closes it.
   summary: [{ key: 'S', what: 'Show or hide the summary' }],
   back: [{ key: 'esc', what: 'Go back one level' }],
 };

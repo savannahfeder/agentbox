@@ -8,7 +8,7 @@
    0 in Ember Grid, and nothing is a rounded pill. The menus are the app's own
    `.prio-menu` rather than a second popover shape. */
 
-.focus-pane { --ts-panel-w: 352px; }
+.focus-pane { --ts-panel-w: 352px; --ts-rail-w: 48px; }
 
 /* the state's mark: filled when it waits on you, a ring when it waits on
    someone else, half filled while it runs, dashed while it is scheduled */
@@ -27,20 +27,19 @@
 .ts-lead { display: inline-flex; align-items: center; flex: none; white-space: nowrap; }
 .ts-lead .ts-st { width: 10px; height: 10px; margin-right: 8px; }
 .by-lead .ts-lead ~ .fm-said::before { content: '· '; }
+/* With the state said by the summary instead (w-a3482b8c2c), a running
+   thread's line opens on its run time, and the dot follows that. */
+.by-lead .live-span ~ .fm-said::before { content: '· '; }
 
-/* THE TOP BAR: the square Summary button with its key, then the square
-   three-dot button that opens the thread's menu. It rides in the corner socket,
-   which is display: contents, so this group is laid out by the corner row
-   itself, and it ends on the bar's right edge. The 2 points above and below
-   keep the row the 34 it was with the terminal and Done marks in it, so the
-   Summary button stays where it was approved (56..86 at 1440). */
+/* THE TOP BAR: the square three-dot button that opens the thread's menu, and
+   since w-a3482b8c2c nothing else (the Summary button moved onto the summary).
+   It rides in the corner socket, which is display: contents, so this group is
+   laid out by the corner row itself, and it ends on the bar's right edge. The
+   2 points above and below keep the row the 34 it was. */
 .ts-top { display: inline-flex; align-items: center; gap: 10px; margin: 2px 0; }
-.ts-sumbtn { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
-.ts-sumbtn:hover { color: var(--text); border-color: var(--line-strong); }
-.ts-sumbtn.on { background: var(--wash-strong); color: var(--text); border-color: var(--line-strong); }
 
-/* THE THREAD'S MENU (threads/ThreadMenu.tsx). The button is the Summary
-   button's square: its height, its hairline, its hover. The menu is the app's
+/* THE THREAD'S MENU (threads/ThreadMenu.tsx). A 30 point square with a
+   hairline, washing under the pointer. The menu is the app's
    own popover, `.th-menu` in pages.css, dropped from the button's right edge
    because the button is at the right of the window. */
 .ts-more-wrap { position: relative; display: inline-flex; }
@@ -78,6 +77,31 @@
    ran under the panel and the two drew over each other. */
 .focus-pane[data-summary="open"] > .task-terminal { margin-right: var(--ts-panel-w); }
 .focus-pane[data-summary="open"] { --keep-inset: max(32px, calc((100% - var(--ts-panel-w) - var(--read-w)) / 2 + 32px)); }
+
+/* THE RAIL, the summary folded (w-a3482b8c2c). Everything that gives up the
+   panel's width gives up the rail's instead, for the same reasons. */
+.focus-pane[data-summary="rail"] > .focus-scroll,
+.focus-pane[data-summary="rail"] > .focus-dock,
+.focus-pane[data-summary="rail"] > .keep-line,
+.focus-pane[data-summary="rail"] > .task-terminal { margin-right: var(--ts-rail-w); }
+.focus-pane[data-summary="rail"] { --keep-inset: max(32px, calc((100% - var(--ts-rail-w) - var(--read-w)) / 2 + 32px)); }
+/* One button the height of the pane. Its marks stand in a column from the top,
+   the panel's icon first; the strip washes under the pointer like the
+   panel's own fields, and has no pressed look because it is never pressed:
+   pressing it opens the panel and it is gone. */
+.ts-rail { position: absolute; top: 0; right: 0; bottom: 0; width: var(--ts-rail-w); box-sizing: border-box; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 22px; padding: 22px 0; margin: 0; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: none; font: inherit; color: var(--text-dim); cursor: pointer; transition: background-color .08s ease; }
+.ts-rail:hover, .ts-rail:focus-visible { background: var(--wash); outline: none; }
+.ts-rail-ic { display: grid; color: var(--text-faint); margin-bottom: 4px; }
+.ts-rail:hover .ts-rail-ic, .ts-rail:focus-visible .ts-rail-ic { color: var(--text); }
+.ts-rail-mark { display: grid; place-items: center; min-height: 16px; }
+.ts-rail .ts-st { margin: 0; }
+.ts-rail .ts-who { margin: 0; }
+.ts-rail .tm-av { margin: 0; }
+
+/* AND THE WAY BACK: the same icon, filled on its right, at the panel's top
+   right beside the title. Faint until the pointer is on it. */
+.ts-close { position: absolute; top: 22px; right: 20px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--tag-radius); background: none; color: var(--text-faint); cursor: pointer; }
+.ts-close:hover, .ts-close:focus-visible { background: var(--wash-strong); color: var(--text); outline: none; }
 /* No fill of its own: it sits beside the words rather than over them, and a
    fill would paint over the frame's corner marks. */
 .ts-panel { position: absolute; top: 0; right: 0; bottom: 0; width: var(--ts-panel-w); box-sizing: border-box; padding: 26px 28px 40px; border-left: 1px solid var(--line); background: none; overflow-y: auto; z-index: 2; }
