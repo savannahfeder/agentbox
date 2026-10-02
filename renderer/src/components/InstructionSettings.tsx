@@ -15,7 +15,10 @@ const rules:Section = {id:'rules',label:'General agent instructions',defaultText
 // One document since w-3dc46f3a67: the messages during a task and the last one
 // of every task were two boxes, and a real instructions file is mostly about
 // how agents write to the user anyway.
-const messages:Section = {id:'messages',label:'How agents write to you',defaultText:defaults.messages};
+// ONLY THE USER'S WORDS SINCE w-3ec9f07978. It opened on the app's own message
+// rules, which the inbox reads every message by, so editing them broke it.
+// Those ride on every run from the checkout now and never sit here.
+const messages:Section = {id:'messages',label:'How agents write to you',description:'Your own rules for how agents write to you. They go on top of the app’s built-in rules, which stay out of here because the inbox relies on them.',defaultText:''};
 // ADHD MODE (w-5737fe67cf). Its own file so edits to it never mix with the
 // user's own rules and are still there next time. Whether it rides at all is a
 // workspace setting, which is the switch on its section.

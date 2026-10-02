@@ -1,9 +1,8 @@
 // A THREAD SHARED WITH CHOSEN PEOPLE IS ON THEIR TEAM PAGE AND ON NOBODY ELSE'S.
 //
 // Until now a thread was Team or Private, so sharing anything shared it with
-// everyone (w-41ff964775, her words: "sharing your calendar within a company,
-// you don't necessarily want to share it with everyone, but you might want to
-// share it with your boss or some people"). A third choice, chosen people,
+// everyone (w-41ff964775). A person may want a thread seen by a few people,
+// a manager say, and not the whole company. A third choice, chosen people,
 // publishes a card that reaches exactly the people named on it.
 //
 // Measured here from both ends: the rule that builds the cards

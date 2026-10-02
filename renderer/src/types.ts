@@ -120,6 +120,11 @@ export interface Person {
   avatarUrl: string | null;
   /** On a team's member list: who owns it (and so may rename it and remove people). */
   role?: 'owner' | 'member';
+  /** A line they wrote about themselves, so a day in meetings is not read
+   *  off the Team page as idleness, and when it stops holding. Read it
+   *  through `saying` in team/status.tsx, never straight: one whose time has
+   *  passed is nothing, on the reading Mac's own clock. */
+  status?: { text: string; until: number | null } | null;
 }
 
 /** What every team call answers: the team as it now stands, or why not. */
@@ -519,9 +524,10 @@ export interface AgentConversation {
  * `idle` nothing has been asked yet, `checking` mid-question, `current` there
  * is nothing newer, `downloading` one is coming, `ready` it is on disk and the
  * restart is hers to press, `error` the last look failed, `unsupported` this
- * copy runs from source and cannot update itself at all.
+ * copy cannot update itself (and `error` says why), `installing` the restart
+ * was pressed on a copy run from source and it is rebuilding first.
  */
-export type UpdatePhase = 'idle' | 'checking' | 'current' | 'downloading' | 'ready' | 'error' | 'unsupported';
+export type UpdatePhase = 'idle' | 'checking' | 'current' | 'downloading' | 'ready' | 'installing' | 'error' | 'unsupported';
 
 export interface UpdateState {
   phase: UpdatePhase;
@@ -537,6 +543,14 @@ export interface UpdateState {
   // The one question the screens ask. Kept on the state so no screen has to
   // learn which phase strings mean "there is a button to press".
   ready: boolean;
+  // A COPY RUN FROM SOURCE (main/source-updater.mjs): that it is one, the
+  // newest change titles, how many changes there are in all, and whether the
+  // restart was pressed and it is rebuilding. Optional so fixtures written
+  // before them still type.
+  source?: boolean;
+  changes?: string[];
+  behind?: number | null;
+  installing?: boolean;
 }
 
 export interface Snapshot {
@@ -908,6 +922,7 @@ declare global {
       teamCreate(p: { name: string }): Promise<TeamCallResult>;
       teamAcceptInvite(p: { teamId: string }): Promise<TeamCallResult>;
       teamInvite(p: { email: string }): Promise<TeamCallResult>;
+      teamStatus(p: { text: string; hold: string }): Promise<TeamCallResult>;
       teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult>;
       teamSync(): Promise<TeamCallResult>;
       teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;
@@ -978,16 +993,11 @@ declare global {
       // itself, which is the only way the page hears about the chord at all.
       onApprovalAnswered?(fn: (a: { id: string; allow: boolean }) => void): () => void;
       badge?(count: number): Promise<void>;
-      // screenDetail is which set of theme pictures this screen wants, 'soft' or
-      // 'sharp' (main/screen-detail.mjs). It rides here rather than being
-      // pushed because the answer is needed on the first paint.
-      bootInfo?(): Promise<{ reloaded: boolean; builtAt: number; recovered?: string | null; screenDetail?: string }>;
+      bootInfo?(): Promise<{ reloaded: boolean; builtAt: number; recovered?: string | null }>;
       // Keeping Agentbox current (main/updater.mjs). Look again now, and restart
       // onto the version that already downloaded itself.
       updateCheck(): Promise<UpdateState>;
       updateInstall(): Promise<{ started: boolean }>;
-      // The window moved to a screen that wants the other set.
-      onScreenDetail?(fn: (s: { detail: string }) => void): () => void;
       // The wake sweep's one line: agents put back on the work the lid
       // interrupted, and how many are waiting on her because their session was
       // gone. Startup's version of it rides on bootInfo instead.

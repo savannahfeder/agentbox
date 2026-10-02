@@ -2,7 +2,7 @@
 //
 // The caret on the Send button (w-e731ca9376, approved 2026-10-01) offers
 // "Tomorrow morning" and "Monday morning", each with its moment on the right
-// ("Fri 8:00"), and "Pick a date and time". What is sent is a `runAt`, which
+// ("Fri 8:00"), and a box for a time in words. What is sent is a `runAt`, which
 // the store holds as a predicate rather than a timer, so the only thing this
 // card owns is which moment it means. The case that has to be pinned is Monday:
 // pressed ON a Monday it means the next one, seven days on, never "today at
@@ -11,7 +11,7 @@
 // Every date below is built in local time, the same way the card builds them,
 // so these hold in any timezone the suite runs in. 2026-10-01 is a Thursday.
 import { describe, it, expect } from 'vitest';
-import { tomorrowMorning, mondayMorning, laterHint, momentFromInput, inputValueOf } from '../renderer/src/threads/composer-rules.ts';
+import { tomorrowMorning, mondayMorning, laterHint } from '../renderer/src/threads/composer-rules.ts';
 
 const at = (y, mo, d, h = 0, mi = 0) => new Date(y, mo - 1, d, h, mi).getTime();
 
@@ -50,25 +50,5 @@ describe('the hint on the right of each row', () => {
   });
 });
 
-describe('Pick a date and time', () => {
-  const now = at(2026, 10, 1, 12);
-
-  it('reads the date input as local time', () => {
-    expect(momentFromInput('2026-10-03T09:30', now)).toBe(at(2026, 10, 3, 9, 30));
-  });
-
-  it('refuses a moment that has already passed', () => {
-    expect(momentFromInput('2026-10-01T11:59', now)).toBeNull();
-  });
-
-  it('refuses an empty or broken value', () => {
-    expect(momentFromInput('', now)).toBeNull();
-    expect(momentFromInput('tomorrow', now)).toBeNull();
-  });
-
-  it('opens on a value the input can show, and reads back the same moment', () => {
-    const t = at(2026, 10, 2, 8);
-    expect(inputValueOf(t)).toBe('2026-10-02T08:00');
-    expect(momentFromInput(inputValueOf(t), now)).toBe(t);
-  });
-});
+// "Pick a date and time" was a browser date field until 2026-10-02; it is now a
+// time typed in words, pinned in send-later-takes-a-time-in-words.test.mjs.

@@ -39,11 +39,9 @@ import { DONE } from './done-word';
  * to ⌘K. The deleted copy is in decisions.md, 08-23, verbatim. */
 export type Step =
   | 'welcome' | 'folder' | 'name'
-  //  IT SITS FOURTH, BEFORE THE INTRODUCTION, so the four screens after it are
-  //  already wearing the pick and the whole window repaints under the hand as
-  //  it is made. A picker at the end of the walk would have been a question
-  //  about a window somebody had already stopped looking at.
-  | 'look'
+  // THERE WAS A `look` BEAT HERE, the theme picker. The app has one look now,
+  // Light (w-9e434e8671), so there is nothing to pick. A walk saved at `look`
+  // resumes at `hand` (`liveStep`).
   // Three slabs, then the hand-off into the practice project. None of these
   // four is the app: they are words on a screen, which is the point of them.
   //
@@ -60,7 +58,7 @@ export type Step =
 /**
  * HOW MANY BEATS THE WALK HAS. It stays because the walk still has a
  * length and the tests still hold it to one. */
-export const N_BEATS = 20;
+export const N_BEATS = 19;
 
 /**
  * WHICH BEAT EACH SCREEN IS. One pair shares one: `working` and `open` are one
@@ -78,34 +76,31 @@ export const BEAT: Record<Step, number> = {
   // long it was. It went to four slabs on the morning of 2026-08-24 and back to
   // three that evening, when the sidebar note moved out of it.
   inbox: 4, away: 5, goal: 6,
-  // PICKING THE LOOK IS BEAT SEVEN, and it is a beat rather than a detour: it
-  // is a screen somebody presses through the same as the two before it. It was
-  // beat four until 2026-08-25, when it moved down to the practice round.
-  // THE COUNT DID NOT MOVE, because nothing was added or taken away: the four
-  // screens it stepped over each came up one and it took the seventh.
-  look: 7, hand: 8,
+  // The theme picker was beat seven until the app went to one look
+  // (w-9e434e8671). Everything after it came down one.
+  hand: 7,
   // WRITING ONE IS TWO BEATS SINCE 2026-10-01: the card opens, you see who it
   // is to, then you send it. Everything after shifted by one.
-  make: 9, who: 10, task: 11,
-  working: 12, open: 12, answer: 13,
+  make: 8, who: 9, task: 10,
+  working: 11, open: 11, answer: 12,
   // `clear` closes the two that are finished and `unblock` answers the one that
   // is not, which is the difference the product exists to teach. AND THE THREE
   // WAYS A ROW LEAVES THE INBOX ARE THREE BEATS. `clear` closes the two that
   // are finished, `snooze` puts off the one that is real work and not for
   // today, and `unblock` answers the one an agent is stopped on. The rail's
   // note beat that sat at thirteen is gone with the rail.
-  clear: 14, snooze: 15, unblock: 16,
+  clear: 13, snooze: 14, unblock: 15,
   // AND BEAT FIFTEEN IS THE TOUR OF THE OTHER TWO TABS. It is one beat even
   // though it takes three presses of Tab, the same way `working` and `open`
   // share beat ten: it is one thing happening, which is somebody being shown
   // where the work they just did has gone.
-  where: 17,
+  where: 16,
   // AND THE BOARD IS THE BEAT AFTER THE TOUR (2026-10-01). The tour says where
   // the work went; the board is the same work laid out by what is happening to
   // it, which is the one view the walk never opened. The walk has to show the
   // view somebody uses to see what a whole team is up to, not only the tabs.
-  board: 18,
-  command: 19, done: 20, landed: 20,
+  board: 17,
+  command: 18, done: 19, landed: 19,
 };
 
 export interface FirstRun {
@@ -840,42 +835,6 @@ export const COPY = {
   // the same reason `submit` does: there is only one thing to learn.
   back: 'Back',
 
-  /* ---------------------------- PICKING THE LOOK ------------------------- */
-  /* THE TILES ARE THE ONES SETTINGS ALREADY DRAWS, not a set made for this
-     screen. Each one wears the same three layers in the same order as the
-     window does, so a tile cannot drift from the theme it stands for, and
-     picking one repaints the window under the hand rather than promising
-     something for later.
-
-     AND THE LINE SAYS WHERE IT LIVES AFTERWARDS, which is the half about the
-     command bar: the rows are already there
-     (`lookRows` in palette-rows.ts, found by the word theme or by the
-     picture's own name), and nothing in the app had ever said so.
-  */
-  lookQ: `Pick how ${NAME} looks.`,
-  /* 
-  */
-  lookMore: 'Randomize my theme',
-  /* * THE SETTINGS SENTENCE THAT WAS CUT IS NOT BACK.
-
-     AND IT NOW SAYS WHAT TO TYPE, w-042c27ffcb, 2026-08-31.
-
-     THE ROW WAS ALWAYS THERE AND THAT IS THE POINT. Measured on the packaged
-     build under test: pressing ⌘K opens a list of THIRTY-FIVE rows, NINE
-     of them on the screen at once, and "Themes…" is the TWENTY-SECOND. Nothing
-     in those nine says theme, look, dark or light. So the old sentence sent her
-     to a bar and left her to scan thirteen rows past the fold for a word it
-     never gave her. Typing "theme" finds it at every beat of the walk, which is
-     why naming the word is the whole fix and no row was moved: the eight rows
-     above the fold are Reply, Close, Snooze and the rest of what she does all
-     day, and demoting those to surface a setting would be the worse trade.
-
-     "type theme" IS NOT JARGON AND IT IS NOT A METAPHOR. It is the literal
-     word, and the ⌘K row it lands on is called Themes.
-  */
-  lookClause: 'Press ⌘K and type theme to change it later.',
-  lookGo: 'Next',
-
   /* --------------------------- THE INTRODUCTION -------------------------- */
   /* A tester asked for the same thing: to meet the lesson before the app
      opens at all.
@@ -1562,10 +1521,9 @@ export function coach(
         //
         // IT SAID "or click Done on the row" FOR AN HOUR AND THAT WAS WORSE
         // THAN SAYING NOTHING. The chip at the row's right end was made a
-        // button to make the sentence true, and the founder caught it the same
-        // day: "you can't actually click Done in the app... I think it's sort
-        // of misleading users because you can't actually do that in the real
-        // app." She is right, and the reason is that the chip is drawn ONLY
+        // button to make the sentence true, and that was taken back the same
+        // day, because the tutorial must never teach a click the real app does
+        // not have. The chip is drawn ONLY
         // while the walk is on (`walk &&` in components/List.tsx). The tutorial
         // would have taught a control that exists nowhere else: somebody learns
         // to close by clicking, finishes the walk, and the button is gone.
@@ -2638,6 +2596,9 @@ function liveStep(step: unknown, madeSomething: boolean): Step {
   // The retired rail beat. Its rows were already staged, so the walk goes on
   // from the beat that clears them.
   if (step === 'note') return 'clear';
+  // The retired theme picker. The introduction before it is done, so the walk
+  // goes on from the hand-off into the practice project.
+  if (step === 'look') return 'hand';
   return madeSomething ? 'landed' : 'welcome';
 }
 
@@ -2687,13 +2648,7 @@ export function restartFirstRun(store: Store): void {
  *  drawing alternatives to the tether needs. */
 export const STEPS: Step[] = [
   'welcome', 'folder', 'name',
-  'inbox', 'away', 'goal',
-  // PICKING THE LOOK SITS HERE, LAST BEFORE THE PRACTICE ROUND.It was beat
-  // four, between the name and the introduction. This is the first of the two
-  // candidate places, and it is the better of them: everything after this
-  // screen is the real app, so the pick is spent on the whole practice round
-  // rather than on one card.
-  'look', 'hand',
+  'inbox', 'away', 'goal', 'hand',
   // WHO IT IS TO SITS BETWEEN OPENING THE CARD AND SENDING IT (2026-10-01),
   // because that is where it is on the card: To is its first line. The walk had
   // no beat for it at all, and it needs one: picking who a thread is to, and
@@ -2713,35 +2668,6 @@ export function nextStep(step: Step): Step | null {
   const i = STEPS.indexOf(step);
   if (i < 0 || i + 1 >= STEPS.length) return null;
   return STEPS[i + 1];
-}
-
-/**
- * THE SCREENS THAT WEAR THE WALK'S OWN PICTURE, which is every screen up to
- *  the picker and not the picker itself.
- *
- * IT IS READ OFF `STEPS` AND NOT WRITTEN OUT, because writing it out is what
- * broke it. App.tsx carried the literal list `welcome | folder | name`, which
- * was correct on 2026-08-24 when the picker was beat four and every screen
- * before it was one of those three. The three slabs of the introduction slid in
- * front of it and nothing extended the pin, so those three fell through to
- * whatever the store happened to hold. On a Mac that has never chosen anything
- * the seed makes that Gouache Valley and it looked fine; on a Mac that has
- * chosen, it is whatever was chosen, plain light for example. So on 2026-08-26
- * the theme changed in the middle of the walk: it started on the valley
- * picture and went to light mode on the first slab.
- *
- *  So the rule is stated once, as a position in the one list, and moving the
- *  picker again moves this with it.
- *
- *  THE PICKER ITSELF IS EXCLUDED AND THAT IS THE POINT OF IT. A screen that
- *  paints the default back while she presses tiles is a picker that does not
- *  work; the window repainting under her hand is the whole of what it is for.
- *  Everything AFTER the picker is the real app wearing what she just chose, and
- *  is nothing to do with this. */
-export function wearsTheWalksLook(step: Step): boolean {
-  const at = STEPS.indexOf(step);
-  const picker = STEPS.indexOf('look');
-  return at >= 0 && picker >= 0 && at < picker;
 }
 
 /**

@@ -173,5 +173,17 @@ for (const [where, makeWorld, enabled] of worlds) {
 
       await expect(w.theo.putCards(team.id, [{ ...card, people: [] }])).rejects.toThrow();
     });
+
+    // A STATUS LINE YOU WRITE YOURSELF (w-0b54ee983f).
+    it('carries a status line to the team and clears it again', async () => {
+      const until = Date.now() + 2 * 86_400_000;
+      await w.theo.setStatus({ text: 'At the Acme onsite, back Monday', until });
+      const mine = (people) => people.find((p) => p.id === w.theo.personId)?.status ?? null;
+      expect(mine(await w.maya.teamPeople(team.id))).toEqual({ text: 'At the Acme onsite, back Monday', until });
+      expect((await w.theo.me()).status.text).toBe('At the Acme onsite, back Monday');
+      expect(await w.jun.teamPeople(team.id)).toEqual([]);
+      await w.theo.setStatus({ text: '', until: null });
+      expect(mine(await w.maya.teamPeople(team.id))).toBeNull();
+    });
   });
 }

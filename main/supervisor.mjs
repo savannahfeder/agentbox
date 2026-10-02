@@ -1,6 +1,7 @@
 import { claudeActivity, codexActivity, currentActivity } from './agent-activity.mjs';
 import { taskRemoteControl } from './task-remote-control.mjs';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mjs';
+import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor } from './ship-queue.mjs';
 import { folderJob } from './task-folders-offthread.mjs';
 import { gitJob } from './git-change-offthread.mjs';
 import { queuedReplyText } from './live-replies.mjs';
@@ -310,6 +311,21 @@ export class Supervisor {
     // a file we SHIP is a default and belongs in the checkout, a file only she
     // writes belongs in her own folder. main.mjs carries the text across once.
     this.userDir = userDir;
+    // THE APP SHIPS A TASK THE AGENT MARKED READY, for a project a person
+    // turned that on for in this app's own data folder (main/ship-queue.mjs).
+    // With no such setting it never runs anything.
+    this.onShipped = () => {};
+    this.shipQueue = new ShipQueue({
+      store,
+      userDir,
+      folderFor: (item, product) => { try { return taskFolderPath(this.productFolder(product), item.id); } catch { return null; } },
+      isLive: (item) => this.sessions.has(item.id),
+      handBack: (item, reply) => {
+        const fresh = this.store.readItem?.(item.product, item.id) ?? item;
+        this.spawnWorker(fresh, { continuation: true, shipFailure: reply });
+      },
+      afterShip: () => this.onShipped(),
+    });
     this._compactionJobs = new Map();
     this.sessions = new Map(); // itemId -> {child, product, startedAt, tail, itemId}
     // Spawns waiting on their row's folder, and folders made for the spawn that
@@ -1733,7 +1749,37 @@ export class Supervisor {
     // attached to the reply that woke it.
     const files = product ? this.attachmentBlock({ ...item, body: '', result: '', note: '' }, product) : '';
     if (files) parts.push(files);
+    // A resumed session never saw the full brief's ship section if it began
+    // before the project shipped through the app, and her "merge it" is
+    // exactly when it needs it.
+    if (product && this.shipsThroughTheApp(product)) parts.push(this.shipBrief());
     return parts.join('\n');
+  }
+
+  /** Whether this Mac ships this project's tasks itself (main/ship-queue.mjs). */
+  shipsThroughTheApp(product) {
+    return !!shipScriptFor(product, readShipSettings(this.userDir));
+  }
+
+  // HOW A TASK SHIPS, when the app does it. The agent's last step is a label,
+  // not a push: a push or a move of another checkout from inside an agent
+  // session is what Claude Code's safety check refuses, and a refusal asks
+  // nobody, so the task just stopped.
+  shipBrief() {
+    return [
+      '',
+      '# How this task ships',
+      '',
+      `${Name} ships this project's work itself. When the work is done and its tests`,
+      'pass, commit it on your branch in your task folder, then add the label',
+      `\`${SHIP_LABEL}\` to this work item (update_work_item, keeping its other labels)`,
+      'and end your turn as usual. Whether to wait for approval first is set by the',
+      'instructions you were given, not by this.',
+      '',
+      `Do NOT push, do NOT merge into main, and do NOT touch any other folder. ${Name}`,
+      'merges the latest main into your branch, runs the tests, pushes, and updates',
+      'the app folder. If that fails you will be woken with its exact words.',
+    ].join('\n');
   }
 
   // WHAT A RESUMED WORKER IS TOLD, and why it is six lines rather than a brief.
@@ -1759,6 +1805,7 @@ export class Supervisor {
       const files = product ? this.attachmentBlock({ ...item, body: '', result: '', note: '' }, product) : '';
       if (files) parts.push(files);
     }
+    if (product && this.shipsThroughTheApp(product)) parts.push(this.shipBrief());
     return parts.join('\n');
   }
 
@@ -3550,6 +3597,8 @@ export class Supervisor {
     // is exactly when no session exit is coming to do this.
     this.parkOnATimer(now);
     const items = this.store.listItems(now);
+    // A task its agent marked ready goes out, one at a time, beside the tick.
+    try { this.shipQueue.tick(items, this.store.listProducts()); } catch (e) { console.warn('zero: the ship queue:', e.message); }
 
     // A session that died without exiting still holds its row. Stopping it
     // here lets the passes below put a fresh worker on the row.
@@ -4070,7 +4119,7 @@ export class Supervisor {
   // it did. It is here for the two resume paths only: a session belongs to the
   // harness that wrote it, and a thread id handed to the wrong CLI dies on
   // arrival with "No conversation found with session ID".
-  spawnPlan(item, product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE } = {}) {
+  spawnPlan(item, product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE, shipFailure = null } = {}) {
     // A ROW'S OWN CHAT. Her reply on a row goes back to the session that wrote
     // what she is replying to. Four guards, and each one falls back to the old
     // behaviour rather than to anything worse:
@@ -4143,6 +4192,10 @@ export class Supervisor {
     // cannot work out for itself is that it has moved.
     else if (forkFrom) prompt = this.forkBrief(item, { product, from: forkFrom.sourceId });
     else prompt = resumeId ? this.resumeBrief(item, { continuation, product }) : this.buildBrief(item, product, { continuation, engine });
+    // A BRANCH THE APP COULD NOT SHIP (main/ship-queue.mjs) goes back to the
+    // session that wrote it, and that is all it is told: it has everything
+    // else already. A fresh session gets its brief first.
+    if (shipFailure) prompt = resumeId || rowChat ? shipFailure : `${prompt}\n\n${shipFailure}`;
     // A project may override what its own sessions may do. Absent (the normal
     // case) means the workspace default, which is why this is a lookup with no
     // entry rather than a copy of the default written onto every project: a
@@ -4274,7 +4327,8 @@ export class Supervisor {
     // belongs: it is the only block here she did not necessarily write, so her
     // standing instructions and her project instructions both sit above it and
     // the framing line inside it says out loud that they win. Emptying the box
-    // in settings drops it entirely, which is the whole point of the box.
+    // in settings drops the user's own words; the app's rules stay
+    // (w-3ec9f07978), because the inbox reads every message by them.
     //
     // SINCE w-3dc46f3a67 THIS BLOCK IS BOTH MESSAGE DOCUMENTS, not just the
     // finishing half. The writing rules used to be spliced into the worker
@@ -4526,32 +4580,47 @@ export class Supervisor {
     return path.join(this.userDir, 'briefs', 'message-rules.md');
   }
 
+  // OURS AND THEIRS ARE TWO LAYERS, NOT ONE FILE (w-3ec9f07978). The shipped
+  // rules are what the inbox reads every message by: the bold first line the
+  // list clips at, the Options section the picker draws, the last message
+  // being the answer. A person editing those breaks their own inbox, so they
+  // ride from the checkout on every run and are never in the box. The box is
+  // only what the user wrote, and it rides above ours so their words win.
+  shippedMessageRules() {
+    try { return fs.readFileSync(this.messageRulesDefaultFile(), 'utf8').trim(); } catch { return ''; }
+  }
+
   // Read fresh at every spawn, never cached, like everything else she can edit
-  // while the fleet is running. An EMPTY file is not a missing one: emptying the
-  // box in settings is how she turns this off, so it means no message rules at
-  // all rather than "fall back to the shipped ones".
+  // while the fleet is running. Emptying the box takes the user's words out,
+  // never ours.
   messageRules() {
-    let text = null;
-    try { text = fs.readFileSync(this.messageRulesFile(), 'utf8'); } catch {}
-    if (text === null && this.messageRulesFile() !== this.messageRulesDefaultFile()) {
-      try { text = fs.readFileSync(this.messageRulesDefaultFile(), 'utf8'); } catch {}
+    let theirs = '';
+    if (this.messageRulesFile() !== this.messageRulesDefaultFile()) {
+      try { theirs = fs.readFileSync(this.messageRulesFile(), 'utf8').trim(); } catch {}
     }
-    if (text === null) return null;
-    const body = text.trim();
-    if (!body) return null;
-    // ONE framing line, for the same reason her project instructions carry one:
-    // a session has no other way to know that these particular words are the
-    // app's defaults rather than the founder's own, or that anything above them
+    const ours = this.shippedMessageRules();
+    // ONE framing line each, for the same reason her project instructions carry
+    // one: a session has no other way to know whose words these are, or which
     // wins where the two disagree.
-    return [
+    const blocks = [];
+    if (theirs) blocks.push([
+      'How the person reading this wants agents to write to them, in their own',
+      'words. Where these and the app\'s rules below disagree, these win.',
+      '',
+      '---',
+      '',
+      theirs,
+    ].join('\n'));
+    if (ours) blocks.push([
       'How to write to the person reading this, and how to finish, from the app',
       'they read it in. These are its defaults, so any instruction above this one',
       'outranks them.',
       '',
       '---',
       '',
-      body,
-    ].join('\n');
+      ours,
+    ].join('\n'));
+    return blocks.length ? blocks.join('\n\n') : null;
   }
 
   // ADHD MODE (w-5737fe67cf, 2026-09-25): a short set of writing rules that ride
@@ -4570,16 +4639,11 @@ export class Supervisor {
     return ['ADHD mode is on. Follow these rules as well.', '', body].join('\n');
   }
 
-  // What the settings box shows: her copy if she has one, otherwise the shipped
-  // text, so the box opens filled in on a machine she has never edited it on.
+  // What the settings box shows: the user's own words and nothing of ours
+  // (w-3ec9f07978), so it opens empty until they write something.
   readMessageRules() {
     try {
       return fs.readFileSync(this.messageRulesFile(), 'utf8');
-    } catch (err) {
-      if (err.code !== 'ENOENT') throw err;
-    }
-    try {
-      return fs.readFileSync(this.messageRulesDefaultFile(), 'utf8');
     } catch (err) {
       if (err.code === 'ENOENT') return '';
       throw err;
@@ -5616,7 +5680,7 @@ export class Supervisor {
     this._codexServers?.clear();
   }
 
-  spawnWorker(item, { continuation = false, resumeSessionId = null, profile: forcedProfile = null, engine: forcedEngine = null, remoteOnly = false } = {}) {
+  spawnWorker(item, { continuation = false, resumeSessionId = null, profile: forcedProfile = null, engine: forcedEngine = null, remoteOnly = false, shipFailure = null } = {}) {
     if (this._compactionJobs?.has(JSON.stringify([item.product, item.id]))) return;
     // ASKED ONCE, HERE, AND ANSWERED CLAUDE CODE ON EVERY MACHINE TODAY. See
     // `_engineFor` for the two independent reasons why. It is asked ahead of
@@ -5670,7 +5734,7 @@ export class Supervisor {
     if (this._folderFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly })) return;
     if (this._photoFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly })) return;
 
-    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine });
+    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine, shipFailure });
     const { args } = plan;
     // ONE RUN, ONE PAIR OF FILES. The MCP config and the settings used to be a
     // fixed name each in the temp folder, fine while every spawn wrote the
@@ -6457,6 +6521,7 @@ export class Supervisor {
       `Product: ${product.name} (slug: ${item.product})`,
       `Product docs live in: ${product.dir}`,
       product.repoPath ? `Product code repo (your cwd): ${product.repoPath}` : `No code repo is registered for this product.`,
+      this.shipsThroughTheApp(product) ? this.shipBrief() : '',
       `Work item id: ${item.id}`,
       `Title: ${item.title}`,
       item.body ? `\n${item.body}` : '',

@@ -80,12 +80,13 @@ describe('every surface that says a key says the same one', () => {
   it('the hover plate on a row', () => {
     expect(HINTS.row.map((l) => l.key)).toEqual(['↵', 'E', 'L']);
     expect(HINTS.row.find((l) => l.key === 'L').what).toBe('Schedule for later');
-    // S is not on this plate, and that is a rule rather than an omission: the
-    // Summary button in a thread's top bar prints its own key, the way the
-    // reply pill prints R, and a component that shows its key gets no plate.
-    for (const lines of Object.values(HINTS)) {
-      for (const line of lines) expect(line.key, `${line.what} is on S`).not.toBe('S');
+    // S is on no plate but the Summary button's own. The button used to print
+    // its S on its face; since keys are shown on hover and not on a button
+    // (w-5984544441), that plate is where S is said, and it is the only one.
+    for (const [name, lines] of Object.entries(HINTS)) {
+      for (const line of lines) if (name !== 'summary') expect(line.key, `${line.what} is on S`).not.toBe('S');
     }
+    expect(HINTS.summary).toEqual([{ key: 'S', what: 'Show or hide the summary' }]);
   });
 
   it('the chip drawn on a row while the tutorial is on', () => {

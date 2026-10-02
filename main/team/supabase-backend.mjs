@@ -3,11 +3,16 @@
 // client that is already signed in. Row level security on the server is what
 // actually keeps people apart; nothing here is trusted to.
 import { asPulled } from '../../shared/team-rules.mjs';
+import { cleanStatus } from '../../shared/team-status.mjs';
 
 const PAGE = 500;
 const PUSH_BATCH = 200;
 
-const personOut = (p) => p && ({ id: p.id, email: p.email, name: p.name, avatarUrl: p.avatar_url ?? null });
+const PERSON_COLS = 'id,email,name,avatar_url,status_text,status_until';
+const personOut = (p) => p && ({
+  id: p.id, email: p.email, name: p.name, avatarUrl: p.avatar_url ?? null,
+  status: p.status_text ? { text: p.status_text, until: p.status_until ? Date.parse(p.status_until) : null } : null,
+});
 
 function must({ data, error }, what) {
   if (error) throw new Error(`${what}: ${error.message}`);
@@ -30,8 +35,21 @@ export function supabaseBackend(client) {
 
     async me() {
       const id = await myId();
-      const rows = must(await client.from('people').select('id,email,name,avatar_url').eq('id', id).limit(1), 'reading you');
+      const rows = must(await client.from('people').select(PERSON_COLS).eq('id', id).limit(1), 'reading you');
       return personOut(rows[0]) ?? null;
+    },
+
+    // A line you wrote about yourself. The row filter is your own id and
+    // people_update_self says the same, so this can only ever be yours.
+    async setStatus({ text, until = null, personId: who = null } = {}) {
+      const me = await myId();
+      if (who && who !== me) throw new Error('refusing to write somebody else\'s status');
+      const clean = cleanStatus(text);
+      must(await client.from('people').update({
+        status_text: clean,
+        status_until: clean && until ? new Date(until).toISOString() : null,
+      }).eq('id', me), 'saving your status');
+      return clean ? { text: clean, until: clean && until ? until : null } : null;
     },
 
     // THE INVITES WAITING FOR YOU, to the email Google confirmed. Nothing is
@@ -76,7 +94,7 @@ export function supabaseBackend(client) {
       const ids = members.map((m) => m.person_id);
       if (!ids.length) return [];
       const roles = new Map(members.map((m) => [m.person_id, m.role]));
-      const people = must(await client.from('people').select('id,email,name,avatar_url').in('id', ids), 'reading your teammates');
+      const people = must(await client.from('people').select(PERSON_COLS).in('id', ids), 'reading your teammates');
       return people.map((p) => ({ ...personOut(p), role: roles.get(p.id) ?? 'member' }));
     },
 
@@ -205,6 +223,7 @@ export function supabaseBackend(client) {
       const channel = client.channel(`team-${Math.random().toString(36).slice(2)}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lines' }, () => onChange())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'thread_cards' }, () => onChange())
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'people' }, () => onChange())
         .subscribe();
       return () => { client.removeChannel(channel); };
     },

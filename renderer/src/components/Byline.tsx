@@ -26,7 +26,7 @@ function Said({ parts }: { parts: (string | null)[] }) {
   return <span className="fm-said">{kept.join(' · ')}</span>;
 }
 
-export function Byline({ item, facts, returned, lead, onAddPeople }: {
+export function Byline({ item, facts, returned, lead, stateShown, onAddPeople }: {
   item: WorkItem;
   facts: LiveFacts & WhereFacts & EngineFacts;
   /**
@@ -46,6 +46,12 @@ export function Byline({ item, facts, returned, lead, onAddPeople }: {
    *  Absent on a row with no thread state: an agent's own session, the
    *  trouble row, the update row. Those keep the line they had. */
   lead?: ReactNode;
+  /**
+   * THE STATE IS ON SCREEN ELSEWHERE (w-a3482b8c2c): the summary's rail or its
+   *  Status row is saying it, so the line carries no lead and drops whatever
+   *  would say the state in other words ("In your inbox", "Working"), exactly
+   *  as it does when it is led by the mark. */
+  stateShown?: boolean;
   /** Opens New thread with a conversation's people already in To. Only a
    *  conversation draws the control that calls it (../team/TeamFocus AddPeople),
    *  so passing it on a task page adds nothing to the line. */
@@ -84,7 +90,7 @@ export function Byline({ item, facts, returned, lead, onAddPeople }: {
     // The whole thing said at length, because a mark and three fragments is a
     // picture and a picture has to be captioned.
     <div className="focus-meta by-lead" aria-label={f.line} title={WHERE_LINE[f.where]}>
-      {lead ?? (f.stateWord && <span className="live-word">{f.stateWord}</span>)}
+      {lead ?? (!stateShown && f.stateWord && <span className="live-word">{f.stateWord}</span>)}
       {f.span && <span className="live-span">{f.span}</span>}
       {/* THE QUIET FACTS BEHIND IT. `age` is null while a run is up, so a
           running row carries one clock and not two — see `lastChange` in
@@ -96,7 +102,7 @@ export function Byline({ item, facts, returned, lead, onAddPeople }: {
       {/* AND SO DOES THE ROW THAT SAYS A NEW VERSION IS READY (w-86452550e5).
           Its clock is how long the download has been sitting on the disk
           waiting for her, which is the one fact "last moved" would get wrong. */}
-      {lead
+      {lead || stateShown
         ? <Said parts={stateLedParts(f, f.age ? `last moved ${f.age} ago` : null)} />
         : <Said parts={[f.project, f.whereWord, f.engineWord, f.age
           ? (isTroubleRow(item) ? `nothing has started for ${f.age}`

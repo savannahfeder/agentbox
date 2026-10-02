@@ -1,5 +1,5 @@
-// A THREAD'S SUMMARY: its state and the button that opens it in the top bar,
-// the panel beside the conversation, and the card a teammate reads instead.
+// A THREAD'S SUMMARY: its state, the panel beside the conversation, the rail
+// it folds to when closed, and the card a teammate reads instead.
 //
 // Approved 2026-10-01. Every thread has one: its
 // properties, then three short lines (problem, progress, solution) that the
@@ -19,8 +19,8 @@ import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityIdOf, priorityLabelOf, priorityValueOf, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName, type TeamView } from '../team/people';
 import {
-  STATE_WORD, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, lastEdit, linkCandidates, linkedThreads,
-  ownerName, readSummaryOpen, stateGlyph, statusChoices, type StateGlyph, type SummaryField,
+  STATE_WORD, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, lastEdit, ownerName,
+  readSummaryOpen, stateGlyph, statusChoices, type StateGlyph, type SummaryField,
 } from './summary-rules';
 import { VISIBILITY_WORD, chosenNames, whoSees, type Seen } from './summary-rules';
 import { findPeople, teammates } from './composer-rules';
@@ -49,8 +49,10 @@ function OnlyYouMark() {
   return <svg className="ts-who" width="13" height="12" viewBox="0 0 24 22" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="7" r="4" /><path d="M4.5 20.5c.8-4 3.8-6.3 7.5-6.3s6.7 2.3 7.5 6.3" /></svg>;
 }
 
-function PanelIcon() {
-  return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5" /><path d="M14.5 4.5v15" /></svg>;
+// The panel's mark: a window with its right side drawn off. Filled on that side
+// while the summary is open, so the icon that closes it says what it closes.
+function PanelIcon({ open = false }: { open?: boolean }) {
+  return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />{open && <rect x="14.5" y="4.5" width="6" height="15" fill="currentColor" stroke="none" opacity=".5" />}<path d="M14.5 4.5v15" /></svg>;
 }
 
 // Waiting is on you unless a person other than you holds it. The word is the
@@ -71,8 +73,8 @@ export function useSummaryOpen(): [boolean, () => void] {
 }
 
 /**
- * S opens and closes the summary, as the button says, whenever the cursor is
- * not in somewhere she types.
+ * S opens and closes the summary, as the button's hover plate says, whenever
+ * the cursor is not in somewhere she types.
  *
  * IT LISTENS FIRST AND STOPS THE KEY THERE, and that is now belt and braces
  * rather than the thing holding the app together.
@@ -120,43 +122,68 @@ export function ThreadStateMark({ item }: { item: WorkItem }) {
   return <span className="ts-lead"><Glyph kind={stateGlyph(state, waitsOnYou(item, team?.me ?? null))} />{STATE_WORD[state]}</span>;
 }
 
-/** The square Summary button with its key, for the top bar. */
-export function SummaryToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+/* -------------------------------------------------------------------- rail */
+
+/**
+ * THE SUMMARY, FOLDED (w-a3482b8c2c, 2026-10-02). While the summary is closed
+ * it leaves this 48 point strip on the right instead of vanishing, and the
+ * whole strip is the button that opens it again. It replaced the Summary
+ * button in the corner, which drew more attention than anything else in the
+ * thread and, open by default, wore a grey wash that read as a hover.
+ *
+ * It holds the thread's marks top to bottom: the panel's icon, the state,
+ * the priority, and on a team the owner's face and who sees it. Each says its
+ * word on hover. With a collapsed sidebar it mirrors the sidebar's own strip
+ * of icons on the left. S still opens it, as the hover plate says.
+ */
+export function SummaryRail({ item, team, onOpen }: { item: WorkItem; team: TeamView | null; onOpen: () => void }) {
+  const me = team?.me ?? null;
+  const state = threadState(item);
+  const prio = priorityIdOf(item.priority);
+  const byId = team?.byId ?? new Map<string, Person>();
+  const owner = ownerName(item, me, byId);
+  const ownerPerson = owner === 'You' ? (me ? byId.get(me) ?? null : null) : byId.get(item.createdBy ?? '') ?? null;
+  const visibility = whoSees(item, team?.state.since ?? null);
   return (
-    <button
-      type="button"
-      className={`ts-sumbtn${open ? ' on' : ''}`}
-      aria-pressed={open}
-      title={open ? 'Hide the summary · S' : 'Show the summary · S'}
-      onClick={onToggle}
-    >
-      <PanelIcon />Summary<kbd>S</kbd>
+    // The hint is on the icon, not the strip: a plate is placed off the box of
+    // what wears it, and a strip the pane's full height left it no room below,
+    // so it rose over the corner menu.
+    <button type="button" className="ts-rail" aria-label="Show the summary" title="Show the summary" onClick={onOpen}>
+      <span className="ts-rail-ic" data-hint="summary" data-hint-align="right"><PanelIcon /></span>
+      <span className="ts-rail-mark" title={STATE_WORD[state]}><Glyph kind={stateGlyph(state, waitsOnYou(item, me))} /></span>
+      <span className="ts-rail-mark" title={`${priorityLabelOf(prio)} priority`}><PriorityIcon id={prio} /></span>
+      {team && <span className="ts-rail-mark" title={`Owner: ${owner}`}><Face person={ownerPerson} me={owner === 'You'} /></span>}
+      {team && (
+        <span className="ts-rail-mark" title={`Visible to ${VISIBILITY_WORD[visibility]}`}>
+          {visibility === 'private' ? <OnlyYouMark /> : <SharedMark className="ts-who" />}
+        </span>
+      )}
     </button>
   );
 }
 
 /* ------------------------------------------------------------------- panel */
 
-type Field = SummaryField | 'priority' | 'visibility' | 'visibleTo' | 'blockedBy' | 'blocks';
+type Field = SummaryField | 'priority' | 'visibility' | 'visibleTo';
 type Pending = Partial<Record<Field, { value: unknown; ts: number }>>;
-type Menu = null | 'status' | 'priority' | 'visibility' | 'blockedBy' | 'blocks';
+type Menu = null | 'status' | 'priority' | 'visibility';
 
 const NOT_WRITTEN = 'Not written yet';
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 /**
- * The summary beside the conversation: properties, linked threads, a hairline,
- * then problem, progress and solution, each editable in place.
+ * The summary beside the conversation: the properties, a hairline, then the
+ * thread's name over problem, progress and solution, each line editable in
+ * place. The panel draws no "Blocked by" or "Blocks" (w-b38e975e2c); the row
+ * still carries them and a teammate's card still shows them.
  *
- * `items` is every thread this window holds, for the titles of linked threads
- * and for the menu that adds one. `team` is null on a Mac nobody has signed
- * into, where every thread is yours.
+ * `team` is null on a Mac nobody has signed into, where every thread is yours.
  */
-export function SummaryPanel({ item, items, team, onOpenItem, onFinish }: {
+export function SummaryPanel({ item, team, onFinish, onClose }: {
   item: WorkItem;
-  items: WorkItem[];
   team: TeamView | null;
-  onOpenItem?: (item: WorkItem) => void;
+  /** FOLD IT BACK TO THE RAIL, from the icon at the top of the summary (w-a3482b8c2c). */
+  onClose?: () => void;
   /**
    * CLOSE THIS THREAD, or null where there is nothing to close. The Status row
    * calls it; it is the same `markDone` E runs and the same one the three-dot
@@ -236,8 +263,6 @@ export function SummaryPanel({ item, items, team, onOpenItem, onFinish }: {
   const owner = ownerName(item, me, team?.byId ?? new Map());
   const ownerPerson = owner === 'You' ? null : team?.byId.get(item.createdBy ?? '') ?? null;
 
-  const direct = useMemo(() => new Set([...(team?.products.values() ?? [])].filter((p) => p.team?.direct === true).map((p) => p.slug)), [team]);
-
   /* --- the three lines ------------------------------------------------- */
   const stood = summaryOf({ ...item, ...Object.fromEntries(SUMMARY_FIELDS.filter((f) => pending[f]).map((f) => [f, pending[f]!.value])) });
   const written = (f: SummaryField) => typeof valueOf<unknown>(f) === 'string';
@@ -309,62 +334,15 @@ export function SummaryPanel({ item, items, team, onOpenItem, onFinish }: {
       pending: Object.fromEntries(SUMMARY_FIELDS.filter((f) => pending[f]).map((f) => [f, pending[f]!.ts])),
     });
 
-  /* --- the links ------------------------------------------------------- */
-  const linkRow = (field: 'blockedBy' | 'blocks', label: string) => {
-    const ids = (valueOf<string[] | undefined>(field) ?? []).filter((x) => typeof x === 'string');
-    const links = linkedThreads(ids, items, item.product);
-    const offer = menu === field ? linkCandidates(item, items, ids, { me, direct }) : [];
-    return (
-      <div className="ts-link-row" ref={holdMenu(field)}>
-        <span className="ts-label">{label}</span>
-        <span className="ts-link-values">
-          {links.map((l) => (
-            <span key={l.id} className="ts-link">
-              <button
-                type="button"
-                className={`ts-link-title${l.known ? '' : ' dim'}`}
-                disabled={!l.known || !onOpenItem}
-                title={l.known ? `Open ${l.title}` : UNSEEN_THREAD}
-                onClick={() => { const found = items.find((i) => i.id === l.id); if (found) onOpenItem?.(found); }}
-              >{l.title}</button>
-              <button type="button" className="ts-x" aria-label={`Remove ${l.title}`} title="Remove" onClick={() => void save({ [field]: ids.filter((x) => x !== l.id) })}>
-                <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" /></svg>
-              </button>
-            </span>
-          ))}
-          <button
-            type="button"
-            className={links.length ? 'ts-add' : 'ts-add ts-add-empty'}
-            aria-label={`Link a thread to ${label.toLowerCase()}`}
-            aria-expanded={menu === field}
-            onClick={() => setMenu(menu === field ? null : field)}
-          >
-            {links.length
-              ? <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M6 2v8M2 6h8" /></svg>
-              : <>None<Caret /></>}
-          </button>
-        </span>
-        {menu === field && (
-          <span className="prio-menu ts-menu ts-menu-wide" role="listbox" aria-label={label}>
-            <span className="ts-menu-head">Your open threads</span>
-            {offer.length === 0 && <span className="ts-menu-none">No other open threads</span>}
-            {offer.map((o) => (
-              <button key={`${o.product}:${o.id}`} type="button" role="option" className="prio-menu-row" onClick={() => { setMenu(null); void save({ [field]: [...ids, o.id] }); }}>
-                <span className="prio-menu-label">{o.label || o.title}</span>
-              </button>
-            ))}
-          </span>
-        )}
-      </div>
-    );
-  };
-
   return (
     <aside className="ts-panel" aria-label="Summary">
-      {/* WHICH THREAD THIS IS, by the name its row shows (list-rules.ts
-          rowTitle). Without it the panel was a list of properties about
-          nothing in particular. */}
-      <h2 className="ts-title">{rowTitle(item)}</h2>
+      {/* THE WAY BACK TO THE RAIL sits on the summary itself, beside its
+          title, rather than in the corner of the window (w-a3482b8c2c). */}
+      {onClose && (
+        <button type="button" className="ts-close" data-hint="summary" data-hint-align="right" title="Hide the summary" onClick={onClose}>
+          <PanelIcon open />
+        </button>
+      )}
       {/* CHANGEABLE LOOKS CHANGEABLE (2026-10-01). Status, Priority and Visible
           to are buttons that wash, point and show a caret under the pointer;
           Owner and Project are plain words with no hover at all. Owner stays
@@ -373,10 +351,9 @@ export function SummaryPanel({ item, items, team, onOpenItem, onFinish }: {
           ledger to another, and a menu here would have to invent that. */}
       <div className="ts-props">
         <span className="ts-label">Status</span>
-        {/* AND STATUS JOINED THEM THE SAME DAY, at her word: "I think it would
-            be intuitive for people to be able to drop down and mark it done.
-            I think that's better than our Mark Done button in the top-right
-            corner." `statusChoices` in ./summary-rules.ts says what it offers
+        {/* AND STATUS JOINED THEM THE SAME DAY: marking a thread done from a
+            dropdown on its Status row is more natural than the Mark Done
+            button in the corner. `statusChoices` in ./summary-rules.ts says what it offers
             and why that is one row; a finished thread has nothing to set, so
             the word stands on its own exactly as it did before.
 
@@ -504,14 +481,14 @@ export function SummaryPanel({ item, items, team, onOpenItem, onFinish }: {
         </span>
       </div>
 
-      <div className="ts-h">Linked</div>
-      <div className="ts-links">
-        {linkRow('blockedBy', 'Blocked by')}
-        {linkRow('blocks', 'Blocks')}
-      </div>
-
       <div className="ts-rule" />
 
+      {/* WHICH THREAD THIS IS, by the name its row shows (list-rules.ts
+          rowTitle), DIRECTLY ABOVE THE THREE LINES (w-b38e975e2c). She reads
+          the name, the problem, the progress and the solution in that order
+          and skips the properties, so the words are one block under the
+          hairline and the properties keep to themselves above it. */}
+      <h2 className="ts-title">{rowTitle(item)}</h2>
       {SUMMARY_FIELDS.map((f) => (
         <div className="ts-sec" key={f}>
           <div className="ts-h">{f === 'problem' ? 'Problem' : f === 'progress' ? 'Progress' : 'Solution'}</div>

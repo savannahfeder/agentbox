@@ -52,15 +52,16 @@ describe('the board is a beat of the walk', () => {
     expect(IN_PRACTICE).toContain('board');
   });
 
-  it('is its own beat, and the walk is twenty rather than nineteen', () => {
-    expect(BEAT.board).toBe(18);
-    expect(BEAT.command).toBe(19);
-    expect(BEAT.done).toBe(20);
-    expect(BEAT.landed).toBe(20);
-    expect(N_BEATS).toBe(20);
+  it('is its own beat, and the walk is nineteen rather than eighteen', () => {
+    expect(BEAT.where).toBe(16);
+    expect(BEAT.board).toBe(17);
+    expect(BEAT.command).toBe(18);
+    expect(BEAT.done).toBe(19);
+    expect(BEAT.landed).toBe(19);
+    expect(N_BEATS).toBe(19);
     // Nothing shares the board's number: `working`/`open` and `done`/`landed`
     // are the only pairs that double up, and this is not one of them.
-    const sharing = Object.entries(BEAT).filter(([, n]) => n === 18).map(([s]) => s);
+    const sharing = Object.entries(BEAT).filter(([, n]) => n === BEAT.board).map(([s]) => s);
     expect(sharing).toEqual(['board']);
   });
 });

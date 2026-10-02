@@ -344,3 +344,38 @@ describe('a project stays in its maker\'s team', () => {
     expect(still.team_id).toBe(team.id);
   });
 });
+
+// A STATUS LINE YOU WRITE YOURSELF (w-0b54ee983f). Two columns on the person
+// rather than a table, so people_read already decides who may read it. These
+// check that it does, and that the row cannot be written for somebody else.
+describe('a status line you write yourself', () => {
+  it('is read by a teammate and never by a stranger', async () => {
+    await as(MAYA, `update public.people set status_text = 'At the Acme onsite', status_until = now() + interval '2 days' where id = $1`, [MAYA]);
+    expect((await rows(THEO, `select status_text from public.people where id = $1`, [MAYA])).map((p) => p.status_text)).toEqual(['At the Acme onsite']);
+    expect(await rows(JUN, `select status_text from public.people where id = $1`, [MAYA])).toEqual([]);
+  });
+
+  // An update the policy's USING clause filters out changes nothing and
+  // raises nothing, so the guarantee to check is the value, not an error.
+  it('cannot be written onto a teammate', async () => {
+    const hit = await as(THEO, `update public.people set status_text = 'ha' where id = $1`, [MAYA]);
+    expect(hit.affectedRows ?? 0).toBe(0);
+    expect((await rows(MAYA, `select status_text from public.people where id = $1`, [MAYA]))[0].status_text).toBe('At the Acme onsite');
+  });
+
+  // The row stays yours at both ends: people_update_self carries WITH CHECK
+  // (20261001000500), so an update cannot leave the row owned by anyone else.
+  it('cannot be handed to somebody else by changing the id', async () => {
+    expect(await refused(THEO, `update public.people set id = $1 where id = $2`, [JUN, THEO])).toBe(true);
+  });
+
+  it('is kept to one line of eighty characters by the database too', async () => {
+    expect(await refused(MAYA, `update public.people set status_text = $2 where id = $1`, [MAYA, 'x'.repeat(81)])).toBe(true);
+    expect(await refused(MAYA, `update public.people set status_text = $2 where id = $1`, [MAYA, 'two\nlines'])).toBe(true);
+  });
+
+  it('is cleared by writing nothing', async () => {
+    await as(MAYA, `update public.people set status_text = null, status_until = null where id = $1`, [MAYA]);
+    expect((await rows(THEO, `select status_text from public.people where id = $1`, [MAYA]))[0].status_text).toBeNull();
+  });
+});

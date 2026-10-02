@@ -127,8 +127,10 @@ describe('three quarters, and no line down the middle', () => {
   it('leaves the light bar as the plain rule, with no way back to charcoal', () => {
     // It shipped as her instruction rather than as an option, and
     // `data-doc-bar="held"` existed for one round so the before and after could
-    // be one picture. She has seen it and answered the round.
-    expect(css).toContain(':root:not([data-theme="light"]) .doc-pane.doc-html {')
+    // be one picture. She has seen it and answered the round. The dark-only
+    // block that held charcoal outside a light window went with dark itself
+    // (one light look), so no rule may re-ink an html pane at all.
+    expect(css).not.toMatch(/\.doc-pane\.doc-html \{[^}]*--text:/)
     expect(css).not.toContain('[data-doc-bar="held"] .doc-pane')
     expect(src('main.tsx')).not.toContain('applyDocBar')
   })

@@ -238,10 +238,10 @@ describe('3. the scope is the practice band and nothing else', () => {
     expect(IN_PRACTICE).toEqual(COACHED);
   });
 
-  it('so the setup screens, the look, the slabs and the finish card are untouched', () => {
+  it('so the setup screens, the slabs and the finish card are untouched', () => {
     // She has to get through those, they draw no ring, and there is nothing on
     // them to wander into. `practising` is false for every one of them.
-    for (const step of ['welcome', 'folder', 'name', 'look', 'inbox', 'away', 'goal', 'hand', 'done', 'landed']) {
+    for (const step of ['welcome', 'folder', 'name', 'inbox', 'away', 'goal', 'hand', 'done', 'landed']) {
       expect(practising({ step, practice: 'practice' }), `${step} is held`).toBe(false);
     }
     for (const step of IN_PRACTICE) {
@@ -351,10 +351,11 @@ describe('5. what the app answers a stray click with', () => {
     expect(ring).not.toMatch(/stroke:/);
     expect(ring).not.toMatch(/fill/);
     // AND THE DEEPER VEIL IS THE SAME COLOUR, TURNED UP. Measured off the
-    // tokens rather than eyeballed: same rgb triple, more alpha, both themes.
+    // tokens rather than eyeballed: same rgb triple, more alpha. One pair, for
+    // the one look the app has.
     const tokens = [...cssCode.matchAll(/--fr-veil(-knock)?: rgba\(([^)]+)\);/g)]
       .map((m) => ({ knock: !!m[1], parts: m[2].split(',').map((n) => Number(n.trim())) }));
-    expect(tokens).toHaveLength(4);
+    expect(tokens).toHaveLength(2);
     for (let i = 0; i < tokens.length; i += 2) {
       const [rest, knock] = [tokens[i], tokens[i + 1]];
       expect(knock.knock).toBe(true);

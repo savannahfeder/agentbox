@@ -313,6 +313,24 @@ export class Store {
     return workItemsDisk.updateWorkItem(dir, id, { status }, { source: 'system' });
   }
 
+  // THE APP SHIPPED A TASK, OR COULD NOT (main/ship-queue.mjs). Both are the
+  // app's own words, so both go in as 'system', as a note: the reply field is
+  // hers. A failure reopens the row, and the queue hands the script's words
+  // straight to the agent that wrote the change.
+  shipped(slug, id, { sha, labels }) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const note = sha ? `Shipped to main as ${sha}.` : 'Shipped to main.';
+    return workItemsDisk.updateWorkItem(dir, id, { labels, note }, { source: 'system' });
+  }
+
+  shipFailed(slug, id, { note, labels }) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    workItemsDisk.updateWorkItem(dir, id, { labels, note }, { source: 'system' });
+    return workItemsDisk.updateWorkItem(dir, id, { status: 'open' }, { source: 'system' });
+  }
+
   releaseRunClaim(slug, id, run) {
     return this.modules.workItemsDisk.releaseRunClaim(this.productDir(slug), id, run);
   }

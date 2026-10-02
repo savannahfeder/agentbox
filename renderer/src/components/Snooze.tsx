@@ -8,6 +8,7 @@
 import { useMemo } from 'react';
 import type { WorkItem } from '../types';
 import { parseWhen } from '../format';
+import { scheduleSubtitle } from '../list-rules';
 import { SchedulePicker } from './SchedulePicker';
 
 interface Preset { label: string; ts: number }
@@ -50,7 +51,7 @@ export function Snooze({ item, count = 1, onPick, onNow, onClose }: {
   return (
     <SchedulePicker<number>
       title="Schedule"
-      subtitle={count > 1 ? `${count} items` : item.title}
+      subtitle={scheduleSubtitle(item, count)}
       placeholder="Try: 30m, 3h, 8am, tomorrow, next week"
       hintWhenRefused="Try 30m, 3h, 8am, tomorrow, or next week."
       options={options.map((option) => ({

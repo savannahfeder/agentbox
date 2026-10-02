@@ -1,8 +1,9 @@
-// EMBER'S ACCENTS ARE ON EVERY THEME, AND ONLY THE ACCENTS.
+// EMBER'S ACCENTS ARE ON THE ONE LOOK.
 //
-// w-3fc39983be: Ember's type goes on the small right-side details such as
-// times, while the original font stays everywhere else, so the main font is
-// still Avenir Next.
+// w-3fc39983be put Ember's mono on the small right-side details and left the
+// body in Avenir Next. w-9e434e8671 went further: the one light look wears
+// Ember Grid's type one to one, so the body is Geist too (pinned in full by
+// the-app-has-one-look-and-it-is-light).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,9 +27,8 @@ describe("Ember's accents", () => {
     expect(block).toMatch(/font-family: var\(--mono\); font-size: 11px; letter-spacing: \.06em; text-transform: uppercase;/);
   });
 
-  it('leave the main font alone: the body is still Avenir Next, and Geist body is Ember only', () => {
-    expect(styles).toContain("font-family: 'Avenir Next', 'Source Sans 3 Variable'");
-    expect(styles).toContain(`:root[data-skin="ember-grid"] body { font-family: 'Geist'`);
-    expect(nav).not.toMatch(/:root:root [^{]*\{[^}]*font-family: 'Geist'/);
+  it('set the body in Ember Grid’s Geist, with Ember’s own fallbacks', () => {
+    expect(styles).toContain("font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, sans-serif;");
+    expect(styles).not.toContain("font-family: 'Avenir Next', 'Source Sans 3 Variable'");
   });
 });

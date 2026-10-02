@@ -294,6 +294,10 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   // heading.
   const firstUrgent = view === 'inbox' && !ranked ? items.findIndex(isUrgentRow) : -1;
   const groups = dayGroups(items, (item, index) => {
+    // THE TABLE IS ONE GROUP. It draws no headings, and a group it cannot name
+    // still starts a new wrapper, so its first row had no row before it and
+    // drew no hairline: the line under an urgent row went missing.
+    if (table) return '';
     // CLOSED NAMES THE CONVERSATIONS DECLINED FOR NOW, so the way back is
     // a heading she can see rather than a row she has to remember.
     if (view === 'done' && isNotImportedRow(item)) return NOT_IMPORTED_HEADING;
@@ -449,7 +453,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                   // box and its keys, with the approved columns instead of a
                   // title over a summary.
                   <ThreadCells item={item} product={products.find((p) => p.slug === item.product)} now={Date.now()}
-                    person={withPerson ? personCell?.(team?.me ?? null) : undefined} withOthers={withPerson} />
+                    person={withPerson ? personCell?.(team?.me ?? null) : undefined} />
                 ) : <>
                 <div className="row-main">
                   {/* THE WRITTEN NAME, WHERE THERE IS ONE. `rowTitle` prefers
@@ -504,9 +508,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                       NOT AN OVERSIGHT (2026-10-01). It was made a button for an
                       hour, so that the walk's two row beats could say "or click
                       Done on the row" to the people who do not use shortcuts.
-                      The founder caught it the same day: "you can't actually
-                      click Done in the app... it's sort of misleading users
-                      because you can't actually do that in the real app."
+                      It was taken back the same day: the tutorial must never
+                      teach a click the real app does not have.
                       This chip is drawn ONLY while the walk is on, by the
                       `walk &&` guard right here, so a clickable one teaches a
                       control that disappears the moment the tutorial ends. The

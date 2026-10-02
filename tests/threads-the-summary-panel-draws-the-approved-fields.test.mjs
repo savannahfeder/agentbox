@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SummaryPanel, SummaryToggle, ThreadStateMark, TeammateCard, MessagePerson } from '../renderer/src/threads/Summary.tsx';
+import { SummaryPanel, ThreadStateMark, TeammateCard, MessagePerson } from '../renderer/src/threads/Summary.tsx';
 globalThis.React = React;
 
 const NOW = Date.now();
@@ -35,11 +35,10 @@ const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 // the state is drawn on its own now; the four words and their marks are the
 // same four.
 describe('the top bar', () => {
-  it('draws a square Summary button with its key, and the state word with its mark', () => {
-    const html = draw(React.createElement(SummaryToggle, { open: true, onToggle: () => {} }));
-    expect(text(html)).toBe('Summary S');
-    expect(html).toContain('aria-pressed="true"');
-    expect(html).toContain('<kbd>S</kbd>');
+  // The Summary button itself left the top bar on w-a3482b8c2c; the rail that
+  // replaced it is held by the-summary-folds-to-a-rail-and-the-header-stops-
+  // saying-waiting.test.mjs. The state word and its mark are still drawn here.
+  it('draws the state word with its mark', () => {
     const state = draw(React.createElement(ThreadStateMark, { item: item() }));
     expect(text(state)).toBe('Waiting');
     expect(state).toContain('ts-st');
@@ -58,10 +57,9 @@ describe('the panel', () => {
   it('lists the properties in the approved order', () => {
     expect(words).toMatch(/Status Waiting Owner You Project Northwind Priority High Visible to Team/);
   });
-  it('names linked threads by title and the one this Mac cannot see as such', () => {
-    expect(words).toMatch(/Linked Blocked by Sign in with Google/);
-    expect(words).toMatch(/Blocks A thread you cannot see/);
-  });
+  // Blocked by and Blocks left the panel on w-b38e975e2c; that test file
+  // (threads-the-summary-reads-properties-then-the-name-and-its-three-lines)
+  // pins their absence and the new order.
   it('then the three lines, with the stand-in dim until something is written', () => {
     expect(words).toMatch(/Problem Acme’s contract ends on the 14th/);
     expect(words).toMatch(/Progress Terms are drafted at 8% over last year\./);

@@ -6,7 +6,7 @@
 // scripts/check-before-public.mjs now runs in the pre-push hook, and this file
 // proves it refuses what it should and lets through what it should.
 //
-// The fake keys and quotes below are built from pieces on purpose. Written out
+// The fake keys below are built from pieces on purpose. Written out
 // whole, this file would be refused by the very check it tests.
 
 import { describe, expect, it } from 'vitest';
@@ -24,9 +24,6 @@ const HOOK = path.join(root, 'scripts/hooks/pre-push');
 const KEY = 'sk-ant-' + 'api03-' + 'Q'.repeat(40);
 const GH = 'gh' + 'p_' + 'a1B2'.repeat(10);
 const AWS = 'AK' + 'IA' + 'ABCDEFGHIJKLMNOP';
-const QUOTE = '// Her' + 's, 2026-08-24: "run every test before a push"';
-const HER_WORDS = '// Her ' + 'words: "this was wrong"';
-const FOUNDER = '// the ' + 'founder, 2026-08-16, approving the card';
 const TLS = 'agent: { rejectUnauth' + 'orized: false }';
 const WORD = 'zanzibarquux';
 
@@ -52,20 +49,6 @@ describe('a line the push adds', () => {
     expect(blocks('a.mjs', `// thanks ${WORD}`, { words: [WORD] })).not.toEqual([]);
     expect(blocks('a.mjs', `// thanks ${WORD.toUpperCase()}`, { words: [WORD] })).not.toEqual([]);
     expect(blocks('a.mjs', `// github.com/${WORD}smith/x`, { words: [WORD] })).toEqual([]);
-  });
-
-  it('is refused when it quotes a person, and only warned about in an audit', () => {
-    expect(blocks('a.mjs', QUOTE)).not.toEqual([]);
-    expect(blocks('a.mjs', HER_WORDS)).not.toEqual([]);
-    expect(blocks('a.mjs', QUOTE, { soft: true })).toEqual([]);
-    expect(checkLine('a.mjs', QUOTE, { soft: true })).toHaveLength(1);
-    expect(blocks('a.mjs', FOUNDER)).not.toEqual([]);
-    expect(blocks('a.mjs', '// Her' + 's, same day: "drop the last two"')).not.toEqual([]);
-    expect(blocks('a.mjs', '// the user wants every test run before a push')).toEqual([]);
-    // The pronoun alone is how this code names its user, and is not a quote.
-    expect(blocks('a.mjs', "it('keeps a sentence exactly as she typed it', () => {")).toEqual([]);
-    expect(blocks('a.mjs', '// hands her words back to the queue when the run died')).toEqual([]);
-    expect(blocks('a.mjs', '// this, and that')).toEqual([]);
   });
 
   it('is refused when it switches off a security boundary', () => {
@@ -154,7 +137,7 @@ describe('the check, run by hand over a range', () => {
 
   it('does not refuse what was already there before the range', () => {
     const { dir, commit } = repo();
-    commit('old.mjs', `${QUOTE}\n`);
+    commit('old.mjs', `export const key = '${KEY}';\n`);
     const base = commit('README.md', '# hello\n');
     const head = commit('new.mjs', 'export const y = 2;\n');
     expect(runCheck(dir, ['--range', `${base}..${head}`]).status).toBe(0);

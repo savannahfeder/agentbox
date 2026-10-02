@@ -81,45 +81,46 @@ describe('who gets it', () => {
   });
 });
 
-describe('turning it off', () => {
-  // Emptying the box in settings is the whole mechanism. It leaves an empty
-  // file rather than deleting one, so this must not read as "not set up yet"
-  // and fall back to the shipped text.
-  it('an emptied box removes it from every run', () => {
+describe('emptying the box', () => {
+  // CHANGED BY w-3ec9f07978. Emptying the box used to take every message rule
+  // out of every run, ours included, and ours are what the inbox reads a
+  // message by. Now it takes out only the user's own words.
+  it('takes out their words and keeps the app\'s rules', () => {
     shipDefault('Line one is the ask, in bold.');
     const s = supervisor();
+    s.writeMessageRules('MINE');
     s.writeMessageRules('');
-    expect(s.messageRules()).toBe(null);
-    expect(injected(s.spawnPlan(item(), product, {}).args)).toBe(undefined);
+    expect(s.messageRules()).not.toContain('MINE');
+    expect(injected(s.spawnPlan(item(), product, {}).args)).toContain('Line one is the ask, in bold.');
   });
 
   it('whitespace alone is empty', () => {
     shipDefault('Line one is the ask, in bold.');
     const s = supervisor();
     s.writeMessageRules('\n  \n');
-    expect(s.messageRules()).toBe(null);
+    expect(s.messageRules()).not.toMatch(/in their own\s+words/);
   });
 });
 
 describe('her copy against the shipped one', () => {
   // A packaged build cannot write to itself, so the default ships in the bundle
-  // and her edit lands in the writable data folder. Her copy wins.
+  // and her edit lands in the writable data folder. Her copy rides above ours
+  // and wins where they disagree (w-3ec9f07978: it no longer replaces it).
   it('her edit outranks the shipped text', () => {
     shipDefault('SHIPPED');
     const s = supervisor();
     s.writeMessageRules('MINE');
-    expect(s.messageRules()).toContain('MINE');
-    expect(s.messageRules()).not.toContain('SHIPPED');
+    const rules = s.messageRules();
+    expect(rules.indexOf('MINE')).toBeLessThan(rules.indexOf('SHIPPED'));
     expect(fs.readFileSync(path.join(dataDir, 'briefs', 'message-rules.md'), 'utf8')).toBe('MINE');
     // And nothing was written into the bundle.
     expect(fs.readFileSync(path.join(appDir, 'briefs', 'message-rules.md'), 'utf8')).toBe('SHIPPED');
   });
 
-  // The box has to open filled in on a machine she has never edited it on,
-  // otherwise it reads as a feature that was never turned on.
-  it('the settings box opens on the shipped text before she has edited it', () => {
+  // The box shows only what she wrote, so it opens empty (w-3ec9f07978).
+  it('the settings box opens empty before she has edited it', () => {
     shipDefault('SHIPPED');
-    expect(supervisor().readMessageRules()).toBe('SHIPPED');
+    expect(supervisor().readMessageRules()).toBe('');
   });
 
   it('the settings box opens on her own text after she has', () => {

@@ -44,10 +44,12 @@ const css = fs.readFileSync(new URL('../renderer/src/threads/summary.css', impor
 const src = fs.readFileSync(new URL('../renderer/src/threads/Summary.tsx', import.meta.url), 'utf8');
 
 describe('the panel opens with the thread’s name', () => {
-  it('says the name the row shows, the label, before anything else', () => {
+  // It opened the panel until w-b38e975e2c moved it under the properties,
+  // directly over Problem, so the words read as one block.
+  it('says the name the row shows, the label, after the properties and over the three lines', () => {
     const html = draw(item());
-    expect(html).toMatch(/^<aside[^>]*><h2 class="ts-title">Acme renewal terms<\/h2>/);
-    expect(text(html)).toMatch(/^Acme renewal terms Status In progress Owner You Project Northwind/);
+    expect(html).toContain('<h2 class="ts-title">Acme renewal terms</h2><div class="ts-sec">');
+    expect(text(html)).toMatch(/^Status In progress Owner You Project Northwind .* Acme renewal terms Problem/);
   });
   it('falls back to the title on a thread with no label', () => {
     expect(draw(item({ label: undefined }))).toContain('<h2 class="ts-title">Can you send Acme their renewal terms by Thursday? Their contract ends on the 14th.</h2>');
@@ -60,14 +62,14 @@ describe('the panel opens with the thread’s name', () => {
 describe('what you can change looks changeable, and what you cannot does not', () => {
   const html = draw(item());
   it('draws Priority and Visible to as buttons that carry a caret', () => {
-    for (const [from, to] of [['Priority', 'Visible to'], ['Visible to', 'Linked']]) {
+    for (const [from, to] of [['Priority', 'Visible to'], ['Visible to', 'Acme renewal terms']]) {
       const cell = between(html, from, to);
       expect(cell).toMatch(/<button[^>]*class="ts-prop-btn"/);
       expect(cell).toContain('ts-caret');
     }
   });
-  // AND STATUS JOINED THEM ON 2026-10-01, at her word: "I think it would be
-  // intuitive for people to be able to drop down and mark it done." It is a
+  // AND STATUS JOINED THEM ON 2026-10-01: a thread can be marked done from a
+  // dropdown on its Status row. It is a
   // button only where there is something to set and somebody to set it with,
   // which is what `onFinish` is; this file draws the panel without that prop,
   // so Status is a plain word here and stays below with Owner and Project.

@@ -36,6 +36,7 @@ export const REQUEST_CHANNELS = {
   teamLeave: 'zero:team-leave',
   teamCancelInvite: 'zero:team-cancel-invite',
   teamAcceptInvite: 'zero:team-accept-invite',
+  teamStatus: 'zero:team-status',
   teamShare: 'zero:team-share',
   teamSync: 'zero:team-sync',
   teamRoute: 'zero:team-route',
@@ -125,7 +126,6 @@ export const PUSH_CHANNELS = {
   onZoomPercent: 'zero:zoom-percent',
   onRecovered: 'zero:recovered',
   onOpenItem: 'zero:open-item',
-  onScreenDetail: 'zero:screen-detail',
   onEscapeBrowser: 'zero:escape-browser',
   onKeyInTheFile: 'zero:key-in-the-file',
 };

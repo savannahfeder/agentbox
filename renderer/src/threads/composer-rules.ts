@@ -12,6 +12,7 @@
 
 import { claudeModelRows, CODEX_OWN, DEFAULT_MODEL, engineModelPicked, type ModelChoice } from '../models';
 import { splitMessage } from '../message-split';
+import { parseWhen } from '../format';
 import { firstName } from '../team/company';
 import type { Person } from '../types';
 
@@ -172,24 +173,18 @@ export function laterHint(ts: number): string {
   return `${DAYS[d.getDay()]} ${d.getHours()}:${pad(d.getMinutes())}`;
 }
 
-/** A moment as an `<input type="datetime-local">` value, in local time. */
-export function inputValueOf(ts: number): string {
-  const d = new Date(ts);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 /**
- * What "Pick a date and time" means, or null. A moment already past is refused
- * rather than sent: the store would run it at once, and a card that says
- * "later" and starts now is a small lie about when an agent has it.
+ * What a time typed into Send later means, or null. It reads the same words the
+ * Schedule box on a thread reads ("3h", "fri 6pm", "tomorrow 3pm"), because a
+ * browser date field was the harder of the two to use
+ * (tests/send-later-takes-a-time-in-words.test.mjs). A moment already past is
+ * refused rather than sent: the store would run it at once, and a card that
+ * says "later" and starts now is a small lie about when an agent has it.
  */
-export function momentFromInput(value: string, now = Date.now()): number | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec((value ?? '').trim());
-  if (!m) return null;
-  const [, y, mo, d, h, mi] = m.map(Number);
-  const ts = new Date(y, mo - 1, d, h, mi, 0, 0).getTime();
-  if (!Number.isFinite(ts) || ts <= now) return null;
-  return ts;
+export function momentFromWords(text: string, now = Date.now()): { ts: number; hint: string } | null {
+  const when = parseWhen(text ?? '', now);
+  if (!when || when.ts <= now) return null;
+  return { ts: when.ts, hint: laterHint(when.ts) };
 }
 
 /* -------------------------------- message --------------------------------- */
@@ -270,8 +265,30 @@ export function placeholderFor(person: Person | null | undefined): string {
   return person ? `Message ${firstName(person)}` : 'What do you need done?';
 }
 
-export function onlyYouAnd(person: Person): string {
-  return `Only you and ${firstName(person)} see this.`;
+/**
+ * The bottom left of a message to a person, in the card and in the reply box.
+ *
+ * It used to read "Only you and Maya see this.", which repeated what was already
+ * on the screen: the To field one line above names the person, and a
+ * conversation's header names them again beside both faces. So the corner says
+ * the one thing neither of those says, that a message to a teammate is not a
+ * chat bubble but a thread landing in the inbox they already work out of.
+ *
+ * NOT EMPTY, EVER. Dropping the old line and leaving the corner bare is the one
+ * outcome ruled out: a bare corner here reads as a control that failed to draw.
+ *
+ * The possessive sits on the last name only: "Maya and Jun's inboxes".
+ */
+export function landsIn(names: readonly string[]): string {
+  if (!names.length) return '';
+  return `Goes to ${joinNames(names)}'s ${names.length > 1 ? 'inboxes' : 'inbox'}.`;
+}
+
+/** "Maya", "Maya and Jun", "Maya, Jun and Priya". The card, the reply box and
+ *  the line above all say a group of people the same way. */
+export function joinNames(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
 /* ------------------------------- visibility ------------------------------- */
@@ -280,9 +297,9 @@ export type Visibility = 'team' | 'people' | 'private';
 
 export const VISIBILITY_KEY = 'threads.composer.visibility';
 
-// THREE CHOICES SINCE w-41ff964775, her words: "you might only want certain
-// people to see what you're up to... you might want to share it with your boss
-// or some people". Chosen people sits between the two it already had, because
+// THREE CHOICES SINCE w-41ff964775: a person may want a thread seen by a few
+// people rather than by everyone or nobody. Chosen people sits between the
+// two it already had, because
 // that is where it sits in how much it shares.
 export const VISIBILITY_ROWS: ReadonlyArray<{ id: Visibility; label: string; line: string }> = [
   { id: 'team', label: 'Team', line: 'Teammates see its summary on the Team board.' },

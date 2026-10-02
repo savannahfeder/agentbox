@@ -35,7 +35,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { bylineFacts, stateLedParts } from '../renderer/src/byline.ts';
 import { Byline } from '../renderer/src/components/Byline.tsx';
-import { ThreadStateMark, SummaryToggle } from '../renderer/src/threads/Summary.tsx';
+import { ThreadStateMark } from '../renderer/src/threads/Summary.tsx';
 import * as summaryModule from '../renderer/src/threads/Summary.tsx';
 import { threadMenuRows, ThreadMenu, ThreadMenuList } from '../renderer/src/threads/ThreadMenu.tsx';
 globalThis.React = React;
@@ -128,23 +128,28 @@ describe('the state leads the line under the title, said once', () => {
     expect(css).toMatch(/\.by-lead \.ts-lead ~ \.fm-said::before \{ content: '· '; \}/);
   });
 
-  it('is handed the mark by the thread page, on every thread that has a state', () => {
+  // SAID ONCE, AND NOW ONCE ACROSS THE WHOLE THREAD (w-a3482b8c2c): the
+  // summary's rail and its Status row say the state, so the line only leads
+  // with it while neither is on screen.
+  it('is handed the mark by the thread page only while the summary cannot say it', () => {
     const focus = read('renderer/src/components/Focus.tsx');
-    expect(focus).toContain('lead={summarised ? <ThreadStateMark item={item} /> : null}');
+    expect(focus).toContain('lead={summarised && !summaryOffered ? <ThreadStateMark item={item} /> : null}');
   });
 });
 
-describe('the right side is the Summary button and the dots', () => {
-  it('no longer says the state at the right', () => {
-    expect(text(draw(React.createElement(SummaryToggle, { open: false, onToggle: () => {} })))).toBe('Summary S');
+// The Summary button left the corner on w-a3482b8c2c for the summary's own
+// rail, so the right side is the dots alone.
+describe('the right side is the dots', () => {
+  it('no longer says the state at the right, and has no Summary button', () => {
     expect(summaryModule.ThreadStatusAndToggle).toBeUndefined();
+    expect(summaryModule.SummaryToggle).toBeUndefined();
   });
 
-  it('portals the two of them into the corner and nothing else', () => {
+  it('portals the menu into the corner and nothing else', () => {
     const focus = prose(read('renderer/src/components/Focus.tsx'));
     const portals = focus.match(/createPortal\([^\n]*cornerHeaderTarget\)/g);
     expect(portals).toHaveLength(1);
-    expect(portals[0]).toMatch(/<SummaryToggle[\s\S]*\{threadMenu\}/);
+    expect(portals[0]).toMatch(/<span className="ts-top">\{threadMenu\}<\/span>/);
     expect(focus).not.toMatch(/doneButton|terminalHeaderTarget|done-mark/);
   });
 
@@ -197,7 +202,9 @@ describe('the right side is the Summary button and the dots', () => {
     expect(pages).toMatch(/\.th-menu \{[^}]*background: var\(--pop\);[^}]*border-radius: var\(--radius\)/);
     expect(pages).toMatch(/\.th-menu \.row-i:hover/);
     const css = prose(read('renderer/src/threads/summary.css'));
-    expect(css).toMatch(/\.ts-more \{[^}]*width: 30px; height: 30px;[^}]*border-radius: var\(--radius\)/);
+    // --tag-radius: the button is the Summary button's square, and both of
+    // them are tags, which are square in every theme.
+    expect(css).toMatch(/\.ts-more \{[^}]*width: 30px; height: 30px;[^}]*border-radius: var\(--tag-radius\)/);
     expect(css).not.toMatch(/border-radius: (1[0-9]|[2-9][0-9])px|50%\s*;[^}]*ts-more/);
   });
 });

@@ -162,9 +162,6 @@ number of running sessions. Agentbox keeps one order and uses it for both.
 | `Z` | Undo |
 | `⌘K` | Everything else |
 
-Fifteen skins, each in light and dark, from plain slate to woodblock and riso
-prints. Press `⌘K` and type "theme".
-
 ## Runs on the plan you already have
 
 <img src="docs/readme/engines.webp" alt="The app's icon wired to Claude Code on one side and Codex on the other" width="100%">

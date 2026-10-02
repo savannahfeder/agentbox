@@ -10,8 +10,8 @@
 // The fix, after two rounds with the founder: Settings > Projects is the
 // running order. A numbered list you can drag or nudge with buttons, where a
 // press on a row opens that project's page to rename it or change its rules.
-// It used to be two pages, Priority and All projects; she merged them ("Those
-// should be one thing, and it should be called projects"). A "Reorder" link in
+// It used to be two pages, Priority and All projects; they were merged into
+// one, called Projects. A "Reorder" link in
 // the composer's project menu and a ⌘K row both open it.
 
 import { describe, it, expect } from 'vitest';
@@ -102,8 +102,8 @@ describe('where a dragged row lands, in one column', () => {
 
 // A PROJECT WITHOUT A PICTURE WEARS ITS COLOUR, NEVER THE SUNBURST. The burst
 // was the default mark, and it is also what the Agentbox brand looked like, so
-// every project in Settings wore the app's logo. Her call on the first draw of
-// this page: never show that logo, and use the composer's project colours here.
+// every project in Settings wore the app's logo. The rule since: the sunburst
+// is never shown, and a project shows the composer's colour for it.
 describe('the mark beside a project', () => {
   const mark = read('renderer/src/components/ProductMark.tsx');
   const settings = read('renderer/src/components/Settings.tsx');

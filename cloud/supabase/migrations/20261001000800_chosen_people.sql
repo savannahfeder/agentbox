@@ -1,9 +1,8 @@
 -- A THREAD MAY BE SHARED WITH CHOSEN PEOPLE, NOT ONLY THE WHOLE TEAM.
 --
 -- w-41ff964775. Until now a thread was Team or Private, so sharing anything
--- shared it with everybody. Her words: "sharing your calendar within a company,
--- you don't necessarily want to share it with everyone, but you might want to
--- share it with your boss or some people."
+-- shared it with everybody. The rule: a person may want a thread seen by a
+-- few people (a manager, say) without showing it to the whole company.
 --
 -- A card now carries the people it is for, and NO LIST AT ALL is the whole
 -- team, which is what every card written before this migration says, so

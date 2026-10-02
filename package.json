@@ -58,6 +58,7 @@
     "fresh": "node scripts/fresh-user.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
     "check:public": "node scripts/check-before-public.mjs --all",
+    "ship": "node scripts/ship.mjs",
     "prepare": "node scripts/install-hooks.mjs",
     "serve": "node bin/agentbox.mjs",
     "prepack": "npm run build",

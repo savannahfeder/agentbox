@@ -9,6 +9,7 @@
 import { EventEmitter } from 'node:events';
 import crypto from 'node:crypto';
 import { asPulled } from '../../shared/team-rules.mjs';
+import { cleanStatus } from '../../shared/team-status.mjs';
 
 export function createMemoryCloud() {
   return {
@@ -30,7 +31,7 @@ export function createMemoryCloud() {
 // A sign-in, the way Supabase's trigger turns one into a person. Google
 // confirms the email; `confirmed: false` is somebody who never proved theirs.
 export function signUpMemory(cloud, { id = crypto.randomUUID(), email, name, avatarUrl = null, confirmed = true }) {
-  cloud.people.set(id, { id, email, name: name || String(email).split('@')[0], avatarUrl });
+  cloud.people.set(id, { id, email, name: name || String(email).split('@')[0], avatarUrl, status: null });
   if (!confirmed) (cloud.unconfirmed ??= new Set()).add(id);
   return id;
 }
@@ -55,6 +56,7 @@ export function memoryBackend(cloud, personId) {
     people: cloud.projectPeople.filter((pp) => pp.projectId === p.id).map((pp) => pp.personId),
   });
   const refuse = (what) => { throw new Error(`not allowed: ${what}`); };
+  const personOut = (p) => p && ({ id: p.id, email: p.email, name: p.name, avatarUrl: p.avatarUrl ?? null, status: p.status ?? null });
 
   return {
     kind: 'memory',
@@ -62,7 +64,20 @@ export function memoryBackend(cloud, personId) {
 
     async me() {
       const me = cloud.people.get(personId);
-      return me ? { ...me } : null;
+      return me ? personOut(me) : null;
+    },
+
+    // A line you wrote about yourself. Only ever your own: the database's
+    // people_update_self says the same thing, and the personId argument is
+    // here so a test can try to write somebody else's and be refused.
+    async setStatus({ text, until = null, personId: who = personId } = {}) {
+      if (who !== personId) refuse('write somebody else\'s status');
+      const me = cloud.people.get(personId);
+      if (!me) refuse('set a status before signing in');
+      const clean = cleanStatus(text);
+      me.status = clean ? { text: clean, until: until ?? null } : null;
+      cloud.events.emit('people', {});
+      return me.status;
     },
 
     async pendingInvites() {
@@ -103,7 +118,20 @@ export function memoryBackend(cloud, personId) {
     async teamPeople(teamId) {
       if (!myTeams().includes(teamId)) return [];
       const rows = cloud.members.filter((m) => m.teamId === teamId);
-      return rows.map((m) => ({ ...cloud.people.get(m.personId), role: m.role })).filter((p) => p.id);
+      return rows.map((m) => ({ ...personOut(cloud.people.get(m.personId)), role: m.role })).filter((p) => p.id);
+    },
+
+    // A line you wrote about yourself. Only ever your own: the database's
+    // people_update_self says the same thing, and the personId argument is
+    // here so a test can try to write somebody else's and be refused.
+    async setStatus({ text, until = null, personId: who = personId } = {}) {
+      if (who !== personId) refuse('write somebody else\'s status');
+      const me = cloud.people.get(personId);
+      if (!me) refuse('set a status before signing in');
+      const clean = cleanStatus(text);
+      me.status = clean ? { text: clean, until: until ?? null } : null;
+      cloud.events.emit('people', {});
+      return me.status;
     },
 
     // TEAM SETTINGS (2026-10-01), the same rules as 20261001000600_team_settings.sql.
@@ -212,7 +240,8 @@ export function memoryBackend(cloud, personId) {
       const fire = () => onChange();
       cloud.events.on('lines', fire);
       cloud.events.on('cards', fire);
-      return () => { cloud.events.off('lines', fire); cloud.events.off('cards', fire); };
+      cloud.events.on('people', fire);
+      return () => { cloud.events.off('lines', fire); cloud.events.off('cards', fire); cloud.events.off('people', fire); };
     },
   };
 }

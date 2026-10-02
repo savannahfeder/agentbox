@@ -139,14 +139,14 @@ describe('the selected row is underlined, and nothing else', () => {
     expect(css).toMatch(/\.row:hover \.subject \{ text-decoration-color: var\(--line-strong\)/);
   });
 
-  it('keeps the rule off the accent, in both themes', () => {
+  it('keeps the rule below full accent strength', () => {
     // At full accent it was "a little less strong colored, though still
-    // visible", and it competed with the unread blue, which is a different
-    // fact and the only colour this app really spends.
-    const light = css.slice(css.indexOf(':root {'), css.indexOf(':root[data-theme="dark"]'));
-    const dark = css.slice(css.indexOf(':root[data-theme="dark"]'));
-    expect(light).toMatch(/--underline: rgba\([^)]*0\.\d+\)/);
-    expect(dark.slice(0, dark.indexOf('}'))).toMatch(/--underline: rgba\([^)]*0\.\d+\)/);
+    // visible". Since the app went to one light look the rule is the brand
+    // orange, but a wash of it (under half), never the solid accent.
+    const light = css.slice(css.indexOf(':root {'));
+    const block = light.slice(0, light.indexOf('}'));
+    expect(block).toMatch(/--underline: rgba\(238, 96, 24, 0\.\d+\)/);
+    expect(block).not.toMatch(/--underline: var\(--accent\)/);
   });
 
   it('leaves no trace of the ten she turned down', () => {

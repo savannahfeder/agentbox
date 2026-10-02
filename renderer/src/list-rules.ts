@@ -554,6 +554,14 @@ export function rowTitle(i: {
   return (renamed && (i.title ?? '').trim()) || label;
 }
 
+// THE SCHEDULE BOX CALLS A THREAD WHAT THE LIST CALLS IT. It printed the raw
+// title, which on a thread started from a message is the whole first sentence
+// she typed, under the row she had just pressed showing its name
+// (tests/the-schedule-box-names-the-thread-not-the-prompt.test.mjs).
+export function scheduleSubtitle(i: Parameters<typeof rowTitle>[0], count = 1): string {
+  return count > 1 ? `${count} items` : rowTitle(i);
+}
+
 // THE ROW MUST NOT SAY THE SAME SENTENCE TWICE. On a message written as one
 // paragraph the title is now a label CUT FROM the body (message-split.ts), so
 // printing the body under it opened both lines with the same words. The summary

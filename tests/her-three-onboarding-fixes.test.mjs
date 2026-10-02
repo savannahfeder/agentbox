@@ -24,19 +24,11 @@ const onboardingCode = code(onboarding);
 const app = code(read('renderer/src/App.tsx'));
 const css = read('renderer/src/styles.css');
 
-describe('1. the theme step is at the end of the walk, by the practice round', () => {
-  it('sits after the whole introduction', () => {
-    // The chosen placement is just before the practice round.
-    const at = (s) => STEPS.indexOf(s);
-    expect(at('look')).toBeGreaterThan(at('goal'));
-    expect(at('look')).toBeGreaterThan(at('name'));
-  });
-
-  it('is the last screen before the practice round begins', () => {
+describe('1. the introduction hands straight to the practice round', () => {
+  it('goes from the last slab to the hand-off and from there into the practice round', () => {
     // `hand` is the hand-off card whose one button makes the practice project,
-    // and `make` is the first beat inside it. Nothing may come between the
-    // look and that pair or it is no longer just before the practice round.
-    expect(nextStep('look')).toBe('hand');
+    // and `make` is the first beat inside it.
+    expect(nextStep('goal')).toBe('hand');
     expect(nextStep('hand')).toBe('make');
     expect(IN_PRACTICE[0]).toBe('make');
   });
@@ -49,16 +41,14 @@ describe('1. the theme step is at the end of the walk, by the practice round', (
     expect(after.step).toBe('inbox');
   });
 
-  it('did not change how many beats the walk has', () => {
-    // Nothing was added and nothing was taken away, so the dots must still
-    // count the same walk. A moved screen that quietly changes the count is a
-    // walk that lies about how long it is.
-    // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out, which
-    // sits after all three of the beats below.
-    expect(N_BEATS).toBe(20);
-    expect(BEAT.look).toBe(7);
-    expect(BEAT.hand).toBe(8);
-    expect(BEAT.make).toBe(9);
+  it('counts the walk it runs', () => {
+    // A screen that quietly changes the count is a walk that lies about how
+    // long it is. Seventeen since the theme step went with the themes
+    // (w-9e434e8671).
+    expect(N_BEATS).toBe(19);
+    expect(BEAT.goal).toBe(6);
+    expect(BEAT.hand).toBe(7);
+    expect(BEAT.make).toBe(8);
   });
 
   it('gives every step a dot, in the order the walk runs, with none repeated out of place', () => {
@@ -75,11 +65,9 @@ describe('1. the theme step is at the end of the walk, by the practice round', (
 
   it('reads every Next off the one list, so moving a screen cannot skip it', () => {
     // The introduction's Next used to name the screen after it. That second
-    // copy broke twice on 08-24, and moving the look would have broken it a
-    // third time: INTRO ends at the hand-off and knows nothing about `look`.
+    // copy broke twice on 08-24.
     expect(onboardingCode).not.toMatch(/INTRO\[\s*slab\s*\+\s*1\s*\]/);
     expect(onboardingCode).toMatch(/onNext=\{\(\)\s*=>\s*go\(run\.step\)\}/);
-    expect(onboardingCode).toMatch(/onNext=\{\(\)\s*=>\s*go\('look'\)\}/);
   });
 });
 
@@ -217,7 +205,7 @@ describe('3. there is a quiet way out, and it asks them to stay', () => {
     expect(app).toMatch(/\{run && \(\s*<WayOut/);
     // Which is exactly the ten beats the practice band is up for, and not
     // one of the seven screens before them, nor the finish card.
-    for (const step of ['welcome', 'folder', 'name', 'look', 'inbox', 'away', 'goal', 'hand']) {
+    for (const step of ['welcome', 'folder', 'name', 'inbox', 'away', 'goal', 'hand']) {
       expect(IN_PRACTICE).not.toContain(step);
     }
     expect(IN_PRACTICE).not.toContain('done');
