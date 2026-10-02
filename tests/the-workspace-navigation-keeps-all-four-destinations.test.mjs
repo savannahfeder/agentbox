@@ -20,8 +20,10 @@
 //     Team page were one question on two pages, so the faces on the Inbox's
 //     tab bar pick whose threads are listed, and the sidebar keeps one list;
 //   - at the foot, Invite people (only when signed in to a team),
-//     Instructions, Settings, then the signed-in person's face, name and
-//     email. Team members was there too until 2026-10-01 (w-8415594d19), when
+//     Instructions, Settings, then the signed-in person's face, name and,
+//     under it, what they are up to (w-0b54ee983f, 2026-10-02; it was their
+//     email until then, and the email moved to Settings -> Team).
+//     Team members was there too until 2026-10-01 (w-8415594d19), when
 //     team management moved into Settings and Invite people became the
 //     shortcut into it: two rows opening one page is one row.
 // The promise that survives from the old file is the accessible one: in the
@@ -160,6 +162,11 @@ describe('the foot of the sidebar', () => {
     expect(html.indexOf('workspace-tabs')).toBeLessThan(html.indexOf('workspace-bottom'));
   });
 
+  // WITH NOWHERE TO OPEN, THE EMAIL STAYS. This is the row drawn without
+  // onAccount, so there is no account page to send anyone to and the second
+  // line is the only place the address appears. The row the app actually
+  // draws passes onAccount, and its second line is what you are up to
+  // instead: see your-own-row-says-what-you-are-up-to-not-your-email.
   it('shows the signed-in person, name and email, and the toggle sits at the top instead', () => {
     const html = draw({ team: onATeam });
     const row = html.slice(html.indexOf('class="th-me"'));

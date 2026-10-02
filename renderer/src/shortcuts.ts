@@ -145,6 +145,10 @@ export const SHORTCUTS: ShortcutGroup[] = [
       // before, but three keys was too many and the chord moved the whole
       // window, because a tiling app answers it first.
       { keys: ['⌘1', '⌘4'], join: 'to', what: 'Go straight to a section of the sidebar, counting from the top.' },
+      // case 'v': case 'V' → setInboxDisplay(flipView(inboxDisplay)), asked
+      // for by name (w-58c8f466e7). "List" and "Board" are the words the View
+      // and filters menu prints, so the sentence uses those.
+      { keys: ['V'], what: 'Switch between the list and the board.' },
       // Escape in the focused branch: doc → task → list. In the list switch it
       // clears a selection and closes search.
       { keys: ['esc'], what: 'Go back one step: a file, then the task, then the list.' },

@@ -182,28 +182,70 @@ img.tm-av { background: var(--bg-selected); }
   background: transparent; color: var(--text); font: inherit; font-size: 13.5px; border-radius: var(--radius); }
 .tm-status-field:focus { outline: none; }
 .tm-status-field::placeholder { color: var(--text-faint); }
-.tm-status-holds { flex: 0 0 auto; height: 30px; }
-.tm-status-write .tm-btn { height: 30px; margin-left: auto; }
+.tm-status-holds { flex: 1 1 100%; }
+.tm-status-write .tm-btn { margin-left: auto; }
 .tm-status-error { flex: 1 1 100%; color: var(--accent); font-size: 12.5px; }
 
-/* YOUR OWN ROW GROWS BY ONE LINE when there is something to say. main's row
-   is a fixed-height flex row (threads/pages.css), so without this the line
-   is laid out beside your name and runs out of the sidebar across the page.
-   The row is also what the writing box is positioned against. */
-.th-me { position: relative; }
-.th-me:has(.th-me-status) { flex-wrap: wrap; height: auto; align-items: flex-start; padding-bottom: 7px; }
-.th-me:has(.th-me-status) .th-me-btn { flex: 1 1 100%; }
+/* YOUR OWN ROW IS THE TWO LINES IT ALWAYS WAS: your name, and what you are
+   up to where your email used to be. Nothing is added, so nothing moves.
+   Your email is on Settings -> Team, which is where clicking your name goes.
 
-/* the line under your name in your own row at the foot of the sidebar */
-/* min-width:0, because a flex item's automatic minimum is its longest
-   unbreakable run, and this line never wraps: without it a long status
-   pushes the row wider than the sidebar and runs across the page. */
-.th-me-status { display: block; flex: 1 1 100%; min-width: 0; box-sizing: border-box; width: 100%; padding: 1px 0 0 31px; border: 0; background: none; text-align: left; cursor: pointer;
-  font: inherit; font-size: 11.5px; line-height: 16px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.th-me-status:hover { color: var(--text); }
-.th-me-status.nothing { color: var(--text-faint); }
+   EVERY RULE HERE IS SCOPED TO .workspace-navigation BECAUSE IT HAS TO
+   OUT-RANK TWO OF ITS RULES: `.workspace-navigation button` sizes every
+   button in the sidebar (13px, 36px tall, flex, padding), and
+   `.workspace-navigation .th-me-btn` sized this one as the whole row back
+   when it held the face too. A bare `.th-me-btn` loses to both, and the two
+   lines then stack to 74px inside a 46px row and fall out of the window. */
+.th-me { position: relative; }
+.th-me-text { display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
+  min-width: 0; flex: 1 1 auto; }
+
+/* YOUR FACE IS AS TALL AS THE TWO LINES BESIDE IT, top and bottom, rather
+   than a small square floating against the middle of them (her words,
+   2026-10-02). The two lines are 20 and 16, so 36 squares it off exactly.
+   The collapsed rail keeps the small one: there the face is an icon among
+   icons, and a 36px square would tower over them. */
+.workspace-navigation .th-me .tm-av { width: 36px; height: 36px; line-height: 34px; font-size: 11px; }
+.workspace-collapsed .workspace-navigation .th-me .tm-av { width: 22px; height: 22px; line-height: 20px; font-size: 9px; }
+
+/* 20 and 16 sit inside the row's 38px of content box, so the row keeps the
+   one height it has always had. */
+.workspace-navigation .th-me-text .th-me-btn { height: 20px; width: 100%; gap: 0; }
+.workspace-navigation .th-me-text .th-me-status { display: block; width: 100%; min-width: 0; height: auto;
+  box-sizing: border-box; padding: 0 8px; margin-left: -8px; border: 0; background: none;
+  font-size: 11.5px; line-height: 16px; color: var(--text-dim); text-align: left; cursor: pointer; }
+.workspace-navigation .th-me-text .th-me-status.nothing { color: var(--text-faint); }
+/* The underline is the affordance; a wash as well would be two of them. */
+.workspace-navigation .th-me-text .th-me-status:hover { background: none; }
+.workspace-navigation .th-me-text .th-me-status:focus-visible { outline: none; }
+
+/* THE DOTTED UNDERLINE IS THE APP'S SIGN FOR A VALUE YOU CAN CHANGE, and it
+   is text-decoration, never border-bottom: a border plus padding makes this
+   box taller than its neighbours and the row then lifts the text off the
+   baseline by a pixel. styles.css says never to reintroduce that. The ink
+   carries it rather than the button, so the underline is only ever as wide as
+   the words and stops where they are cut off. */
+.th-me-status-ink { display: inline-block; max-width: 100%; vertical-align: top; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: underline dotted transparent; text-decoration-thickness: 1px; text-underline-offset: 2px;
+  transition: color .14s, text-decoration-color .14s; }
+.th-me-status:hover .th-me-status-ink, .th-me-status:focus-visible .th-me-status-ink,
+.th-me-status[aria-expanded='true'] .th-me-status-ink { color: var(--text); text-decoration-color: var(--line-strong); }
 .workspace-collapsed .th-me-status { display: none; }
 
-.th-me-pop { position: absolute; left: calc(100% + 10px); bottom: 0; width: 420px; padding: 14px 16px 16px;
+/* The box you write in, above your row and lined up with it, so it reads as
+   belonging to the line it changes rather than floating beside the sidebar. */
+.th-me-pop { position: absolute; left: 0; bottom: calc(100% + 8px); width: 420px; padding: 13px 15px 15px;
   background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg); z-index: 40; }
+/* THE BOX IS DRAWN INSIDE THE SIDEBAR, so `.workspace-navigation button`
+   reaches into it and makes every control there 36px tall with the sidebar's
+   own padding and gap. The segment is 28px, so its selected block hung 8px
+   below the box it sits in. These hand the two components back their own
+   sizes; without them the sidebar wins on specificity. */
+.workspace-navigation .th-me-pop button { height: auto; gap: 0; padding: 0; border-radius: 0; }
+.workspace-navigation .th-me-pop .tm-seg button { height: 100%; padding: 0 10px;
+  font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.workspace-navigation .th-me-pop .tm-btn { height: 34px; padding: 0 14px; border: 1px solid var(--line-strong);
+  border-radius: var(--radius); font-size: 13px; }
+
 .th-me-pop-head { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 10px; }
