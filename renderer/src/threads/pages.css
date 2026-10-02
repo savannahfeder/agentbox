@@ -67,6 +67,7 @@
    not wear a project's border: it reads as the way through to them. */
 .th-pop .opts > button.th-pop-more { border-color: transparent; color: var(--text-faint); padding-left: 4px; }
 .th-pop .opts > button.th-pop-more:hover { border-color: transparent; color: var(--text); }
+.th-pop .opts > .th-pop-note { align-self: center; padding-left: 4px; font-size: 12px; color: var(--text-faint); white-space: nowrap; }
 .th-pop .rule { height: 1px; background: var(--line); margin: 6px 0; }
 .th-pop .foot { display: flex; justify-content: space-between; align-items: center; padding: 6px 16px 2px; font-size: 12.5px; color: var(--text-faint); }
 .th-pop .foot button { background: none; border: 0; padding: 0; font: inherit; color: var(--text-dim); cursor: pointer; }
