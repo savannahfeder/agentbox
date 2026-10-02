@@ -1,6 +1,7 @@
 import { claudeActivity, codexActivity, currentActivity } from './agent-activity.mjs';
 import { taskRemoteControl } from './task-remote-control.mjs';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mjs';
+import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor } from './ship-queue.mjs';
 import { folderJob } from './task-folders-offthread.mjs';
 import { gitJob } from './git-change-offthread.mjs';
 import { queuedReplyText } from './live-replies.mjs';
@@ -310,6 +311,21 @@ export class Supervisor {
     // a file we SHIP is a default and belongs in the checkout, a file only she
     // writes belongs in her own folder. main.mjs carries the text across once.
     this.userDir = userDir;
+    // THE APP SHIPS A TASK THE AGENT MARKED READY, for a project a person
+    // turned that on for in this app's own data folder (main/ship-queue.mjs).
+    // With no such setting it never runs anything.
+    this.onShipped = () => {};
+    this.shipQueue = new ShipQueue({
+      store,
+      userDir,
+      folderFor: (item, product) => { try { return taskFolderPath(this.productFolder(product), item.id); } catch { return null; } },
+      isLive: (item) => this.sessions.has(item.id),
+      handBack: (item, reply) => {
+        const fresh = this.store.readItem?.(item.product, item.id) ?? item;
+        this.spawnWorker(fresh, { continuation: true, shipFailure: reply });
+      },
+      afterShip: () => this.onShipped(),
+    });
     this._compactionJobs = new Map();
     this.sessions = new Map(); // itemId -> {child, product, startedAt, tail, itemId}
     // Spawns waiting on their row's folder, and folders made for the spawn that
@@ -1734,6 +1750,32 @@ export class Supervisor {
     const files = product ? this.attachmentBlock({ ...item, body: '', result: '', note: '' }, product) : '';
     if (files) parts.push(files);
     return parts.join('\n');
+  }
+
+  /** Whether this Mac ships this project's tasks itself (main/ship-queue.mjs). */
+  shipsThroughTheApp(product) {
+    return !!shipScriptFor(product, readShipSettings(this.userDir));
+  }
+
+  // HOW A TASK SHIPS, when the app does it. The agent's last step is a label,
+  // not a push: a push or a move of another checkout from inside an agent
+  // session is what Claude Code's safety check refuses, and a refusal asks
+  // nobody, so the task just stopped.
+  shipBrief() {
+    return [
+      '',
+      '# How this task ships',
+      '',
+      `${Name} ships this project's work itself. When the work is done and its tests`,
+      'pass, commit it on your branch in your task folder, then add the label',
+      `\`${SHIP_LABEL}\` to this work item (update_work_item, keeping its other labels)`,
+      'and end your turn as usual. Whether to wait for approval first is set by the',
+      'instructions you were given, not by this.',
+      '',
+      `Do NOT push, do NOT merge into main, and do NOT touch any other folder. ${Name}`,
+      'merges the latest main into your branch, runs the tests, pushes, and updates',
+      'the app folder. If that fails you will be woken with its exact words.',
+    ].join('\n');
   }
 
   // WHAT A RESUMED WORKER IS TOLD, and why it is six lines rather than a brief.
@@ -3550,6 +3592,8 @@ export class Supervisor {
     // is exactly when no session exit is coming to do this.
     this.parkOnATimer(now);
     const items = this.store.listItems(now);
+    // A task its agent marked ready goes out, one at a time, beside the tick.
+    try { this.shipQueue.tick(items, this.store.listProducts()); } catch (e) { console.warn('zero: the ship queue:', e.message); }
 
     // A session that died without exiting still holds its row. Stopping it
     // here lets the passes below put a fresh worker on the row.
@@ -4070,7 +4114,7 @@ export class Supervisor {
   // it did. It is here for the two resume paths only: a session belongs to the
   // harness that wrote it, and a thread id handed to the wrong CLI dies on
   // arrival with "No conversation found with session ID".
-  spawnPlan(item, product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE } = {}) {
+  spawnPlan(item, product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE, shipFailure = null } = {}) {
     // A ROW'S OWN CHAT. Her reply on a row goes back to the session that wrote
     // what she is replying to. Four guards, and each one falls back to the old
     // behaviour rather than to anything worse:
@@ -4143,6 +4187,10 @@ export class Supervisor {
     // cannot work out for itself is that it has moved.
     else if (forkFrom) prompt = this.forkBrief(item, { product, from: forkFrom.sourceId });
     else prompt = resumeId ? this.resumeBrief(item, { continuation, product }) : this.buildBrief(item, product, { continuation, engine });
+    // A BRANCH THE APP COULD NOT SHIP (main/ship-queue.mjs) goes back to the
+    // session that wrote it, and that is all it is told: it has everything
+    // else already. A fresh session gets its brief first.
+    if (shipFailure) prompt = resumeId || rowChat ? shipFailure : `${prompt}\n\n${shipFailure}`;
     // A project may override what its own sessions may do. Absent (the normal
     // case) means the workspace default, which is why this is a lookup with no
     // entry rather than a copy of the default written onto every project: a
@@ -5627,7 +5675,7 @@ export class Supervisor {
     this._codexServers?.clear();
   }
 
-  spawnWorker(item, { continuation = false, resumeSessionId = null, profile: forcedProfile = null, engine: forcedEngine = null, remoteOnly = false } = {}) {
+  spawnWorker(item, { continuation = false, resumeSessionId = null, profile: forcedProfile = null, engine: forcedEngine = null, remoteOnly = false, shipFailure = null } = {}) {
     if (this._compactionJobs?.has(JSON.stringify([item.product, item.id]))) return;
     // ASKED ONCE, HERE, AND ANSWERED CLAUDE CODE ON EVERY MACHINE TODAY. See
     // `_engineFor` for the two independent reasons why. It is asked ahead of
@@ -5681,7 +5729,7 @@ export class Supervisor {
     if (this._folderFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly })) return;
     if (this._photoFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly })) return;
 
-    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine });
+    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine, shipFailure });
     const { args } = plan;
     // ONE RUN, ONE PAIR OF FILES. The MCP config and the settings used to be a
     // fixed name each in the temp folder, fine while every spawn wrote the
@@ -6468,6 +6516,7 @@ export class Supervisor {
       `Product: ${product.name} (slug: ${item.product})`,
       `Product docs live in: ${product.dir}`,
       product.repoPath ? `Product code repo (your cwd): ${product.repoPath}` : `No code repo is registered for this product.`,
+      this.shipsThroughTheApp(product) ? this.shipBrief() : '',
       `Work item id: ${item.id}`,
       `Title: ${item.title}`,
       item.body ? `\n${item.body}` : '',
