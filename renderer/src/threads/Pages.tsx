@@ -113,8 +113,8 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
   const windows: [UpdatedWindow, string][] = [['today', 'Today'], ['week', 'This week'], ['any', 'Any time']];
   return <div className="th-pop" role="dialog" aria-label={page === 'inbox' ? 'Inbox view and filters' : 'Team view and filters'}>
     <div className="line"><span className="lab">View</span><span className="opts">
-      <button type="button" className={display.view === 'list' ? 'on' : ''} onClick={() => set({ view: 'list' })}><ListIcon />List</button>
-      <button type="button" className={display.view === 'board' ? 'on' : ''} onClick={() => set({ view: 'board' })}><BoardIcon />Board</button>
+      <button type="button" className={display.view === 'list' ? 'on' : ''} title="List (V)" onClick={() => set({ view: 'list' })}><ListIcon />List</button>
+      <button type="button" className={display.view === 'board' ? 'on' : ''} title="Board (V)" onClick={() => set({ view: 'board' })}><BoardIcon />Board</button>
     </span></div>
     <div className="line"><span className="lab">Sort by</span><span className="opts">
       <button type="button" className={display.sort === 'priority' ? 'on' : ''} onClick={() => set({ sort: 'priority' })}>Priority</button>

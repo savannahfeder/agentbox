@@ -28,7 +28,7 @@ interface Command {
   run: () => void;
 }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onStanding, onSettings, onShortcuts, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onStanding, onSettings, onShortcuts, panelUp, onTogglePanel, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -77,6 +77,10 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   keyHints: boolean;
   onSetKeyHints: (v: boolean) => void;
   onTogglePanel: () => void;
+  // List or board, and the way to flip it by name. Absent where V is dead
+  // (an open task, a search, the Team page), so the row is too.
+  boardUp?: boolean;
+  onFlipView?: () => void;
   // Task search, which also has the corner magnifier and `/`.
   onSearch: () => void;
   /**
@@ -280,6 +284,15 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       keyHint: '\\',
       run: onTogglePanel,
     },
+    // List or board, by name, for the hand that never learned V (w-58c8f466e7).
+    // Named for the view it takes you to, like the sidebar row above.
+    ...(onFlipView ? [{
+      id: 'flip-view',
+      label: boardUp ? 'Show as a list' : 'Show as a board',
+      keywords: 'view board list columns kanban switch toggle',
+      keyHint: 'V',
+      run: onFlipView,
+    }] : []),
     // The way out of the keyboard hints, and the way back in. Both, and this is
     // the ⌘K half.
     //
@@ -448,7 +461,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, onSetLook, staleFiles, updateReady, onInstallUpdate, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo]);
+  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, onSetLook, staleFiles, updateReady, onInstallUpdate, panelUp, onTogglePanel, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

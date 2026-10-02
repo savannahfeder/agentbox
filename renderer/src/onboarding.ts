@@ -1818,11 +1818,17 @@ export function coach(
        IT SAYS "YOUR TEAM" WITHOUT PROMISING ONE. On a Mac with nobody else the
        board is your own work in the same columns, which is worth knowing on its
        own; the sentence names the columns rather than the people, so it is true
-       either way. */
+       either way.
+
+       AND IT NAMES V, SINCE 2026-10-02 (w-58c8f466e7). The beat used to name
+       no key because there was none; V now flips list and board from the
+       inbox, so the card reads like every other beat, the key and then the
+       click. The beat still ends on the board being on the screen, which V
+       reaches in one press. */
     case 'board':
       return say(
         'The board is everything at once, in columns for what is happening to it.',
-        'Click View and filters at the top right, then Board.',
+        'Press ', 'V', ' or click View and filters, then Board.',
       );
     /* * AND IT SAYS WHAT THE LIST IS RATHER THAN NAMING THE SCREEN. Then the one key
        that leaves, because esc is also what ends the walk.

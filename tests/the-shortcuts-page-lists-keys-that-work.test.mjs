@@ -77,6 +77,10 @@ const HANDLED = {
   // this window ever sees it.
   '⌘1': [[chords, 'const slot = sidebarSlot(e);'], [chords, 'const want = order[slot - 1];']],
   '⌘4': [[chords, 'const slot = sidebarSlot(e);'], [chords, 'const want = order[slot - 1];']],
+  // List or board (w-58c8f466e7). Only in the list branch: inside an open task
+  // the board is behind it, and tests/v-switches-between-the-list-and-the-board
+  // pins that it stays dead there.
+  'V': [[list, "case 'v': case 'V':"], [list, 'setInboxDisplay(flipView(inboxDisplay))']],
   'esc': [
     // One step back out: the document, then the task, then the list.
     [focused, "if (e.key === 'Escape') { if (escapeClosesDoc(openDoc)) closeArtifact(); else setFocused(null); }"],
@@ -269,11 +273,17 @@ describe('the page stays a page and not a wall', () => {
   // So "In a task you have opened" carries seven and the page carries 21. The
   // budget is still a budget: the next key wanting a row has to make the same
   // argument, out loud, here.
+  //
+  // AND IT IS 22 SINCE 2026-10-02, FOR V. The argument: it was asked for by
+  // name ("I quite often switch between board and list view, can you give me
+  // a shortcut"), and a key nobody can find on the one page that promises to
+  // list every key is the nuisance this page exists to end. It went under the
+  // inbox, which had five rows and so stays inside the seven.
   it('is four groups, none of them longer than seven keys', () => {
     expect(SHORTCUTS).toHaveLength(4);
     for (const g of SHORTCUTS) expect(g.keys.length).toBeLessThanOrEqual(7);
     // Rows, not caps: everyKey() flattens the caps and a row can draw two.
-    expect(SHORTCUTS.reduce((n, g) => n + g.keys.length, 0)).toBeLessThanOrEqual(21);
+    expect(SHORTCUTS.reduce((n, g) => n + g.keys.length, 0)).toBeLessThanOrEqual(22);
   });
 
   it('groups by when the keys work, not by which handler runs them', () => {
