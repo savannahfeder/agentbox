@@ -25,9 +25,6 @@ import { EVERY } from '../instruction-scope';
 import type {Usage, WorkspaceSettings} from '../types';
 import { limitRows } from '../../../shared/usage.mjs';
 import { ago } from '../format';
-import { LOOKS, lookMeans, SKINS, TUNE_DEFAULT, TUNE_LIMITS, type Look, type SkinId, type SkinTune } from '../skins';
-import { readySkin } from '../look-switch';
-import { MatchMark } from './MatchMark';
 import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS, RULES_ALWAYS_APPLY } from '../modes';
 import { CODEX_MODES, CODEX_MODE_ORDER } from '../codex-modes';
 import { ProductMark } from './ProductMark';
@@ -51,7 +48,7 @@ import type { Product } from '../types';
  screen, which is shared with the single-person build, keeps no team code and
  the two codebases stay easy to compare. No pane handed in, no row.
 */
-type Pane = 'instructions' | 'general' | 'appearance' | 'shortcuts' | 'projects' | 'team' | { project: string };
+type Pane = 'instructions' | 'general' | 'shortcuts' | 'projects' | 'team' | { project: string };
 
 const paneKey = (p: Pane) => (typeof p === 'string' ? p : `project:${p.project}`);
 
@@ -189,49 +186,6 @@ function Picker<T extends string>({ label, value, options, onChange, title }: {
     </div>
   );
 }
-
-// A SLIDER, in this app's own clothes. The one control on this screen that has
-// no true/false answer: blur and darkness are matters of degree. The track and the thumb are drawn off the same tokens as the switch above
-// them rather than left to the platform, which draws a blue capsule that
-// belongs to macOS and to nothing else here.
-function Dial({ label, desc, value, min, max, step, format, onChange }: {
-  label: string; desc: string; value: number;
-  min: number; max: number; step: number;
-  format: (v: number) => string;
-  onChange: (v: number) => void;
-}) {
-  // The filled part of the track is a gradient stop rather than a second
-  // element, so the fill cannot drift out of step with the thumb.
-  const pct = ((value - min) / (max - min)) * 100;
-  return (
-    <div className="set-row set-dial-row">
-      <div className="set-row-text">
-        <div className="set-row-label">{label}</div>
-        <div className="set-row-desc">{desc}</div>
-      </div>
-      <div className="set-dial">
-        <input
-          type="range"
-          className="set-range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          aria-label={label}
-          style={{ '--fill': `${pct}%` } as React.CSSProperties}
-          onChange={(e) => onChange(Number(e.currentTarget.value))}
-        />
-        <span className="set-dial-val">{format(value)}</span>
-      </div>
-    </div>
-  );
-}
-
-// `look` is a theme or a picture and only a picture has dials, so this is the
-// one question the pane asks about it. Off SKINS, so a second picture needs no
-// edit here.
-const isSkin = (l: Look): l is SkinId => SKINS.some((sk) => sk.id === l);
-const skinLabel = (l: SkinId) => SKINS.find((sk) => sk.id === l)?.name ?? 'Picture';
 
 function Row({ label, desc, children }: {
   // `desc` takes a node, not just a string, so a row can put a line of its own
@@ -1120,17 +1074,7 @@ function ProjectTitle({ project, onRename }: {
 // agents work them, each row the door to that project's own page. It replaced
 // a plain index here and a separate Priority page (w-a514b58055).
 
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, onClose }: {
-  // ONE control for the three of them. Light, dark and each picture are one
-  // list, because a picture IS dark (skins.ts) and asking her to set a theme
-  // and then a background is two decisions for one choice.
-  look: Look;
-  onSetLook: (l: Look) => void;
-  // The dials on whichever picture is on. They only ever show under a picture,
-  // so there is no disabled control on this screen for her to wonder about.
-  tune: SkinTune;
-  onSetTune: (t: SkinTune) => void;
-  onResetTune: () => void;
+export function Settings({ keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, onClose }: {
   // Whether the app draws its keys when you point at something. On General,
   // where people look for it (w-5737fe67cf).
   keyHints: boolean;
@@ -1165,7 +1109,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // URL the window was opened with.
   const [pane, setPane] = useState<Pane>(() => {
     const want = startPane || new URLSearchParams(location.search).get('settings') || '';
-    if (want === 'instructions' || want === 'appearance' || want === 'general' || want === 'shortcuts' || want === 'projects') return want;
+    if (want === 'instructions' || want === 'general' || want === 'shortcuts' || want === 'projects') return want;
     // Priority was its own page for a round and is now the Projects page itself
     // (w-a514b58055), so the old name opens the page its content went to.
     if (want === 'priority') return 'projects';
@@ -1180,9 +1124,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
     // the same way the accounts name has since August rather than opening an
     // empty screen.
     if (want === 'accounts' || want === 'agents') return 'general';
-    // The page was renamed Themes (w-5737fe67cf); its id stays `appearance`
-    // so every old link still opens it, and the new name opens it too.
-    if (want === 'themes') return 'appearance';
+    // THERE IS NO THEMES PAGE: the app has one look (w-9e434e8671). An old
+    // link to it opens General rather than an empty screen.
+    if (want === 'themes' || want === 'appearance') return 'general';
     if (want.startsWith('project:')) return { project: want.slice('project:'.length) };
     return 'general';
   });
@@ -1291,7 +1235,6 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
    */
   const navRows: Array<[string, string]> = [
     ['general', 'General'],
-    ['appearance', 'Themes'],
     ['instructions', 'Instructions'],
     ...(teamPane ? [['team', 'Team'] as [string, string]] : []),
     /* * THE KEYS, WITH A DOOR OF THEIR OWN. It is last in this group because it is
@@ -1788,80 +1731,6 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               </Row>
             </Group>
 
-          </div>
-        )}
-
-        {model && pane === 'appearance' && (
-          <div className="set-inner">
-            <h1 className="set-title">Themes</h1>
-            <p className="set-lede">How the app looks. Also on ⌘K.</p>
-            {/* A theme is the one setting on this screen you judge by LOOKING at it, so the
-               picture is the control: it sits on the page, at a size worth looking at, and
-               the only edge on it is its own.
-             */}
-            <div className="look-row">
-              {LOOKS.map((l) => (
-                <button
-                  key={l.id}
-                  className={`look${look === l.id ? ' on' : ''}`}
-                  aria-pressed={look === l.id}
-                  onPointerEnter={() => void readySkin(lookMeans(l.id).skin)}
-                  onFocus={() => void readySkin(lookMeans(l.id).skin)}
-                  onClick={() => onSetLook(l.id)}
-                >
-                  <span className={`look-swatch ${l.id}`} aria-hidden="true">
-                    {l.id === 'match' && <MatchMark />}
-                    <span className="look-tick" aria-hidden="true">
-                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                        <path d="M1.6 5.7 4.2 8.3 9.4 2.7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </span>
-                  </span>
-                  <span className="look-name">{l.name}</span>
-                </button>
-              ))}
-            </div>
-            {/* THE DIALS, and only under a picture. Both move the window she is looking at
-               as she drags, because a theme you have to close a screen to see is a theme
-               you tune by memory.
-             */}
-            {isSkin(look) && (
-              <Group label={skinLabel(look)} note="Changes appear immediately and are saved for this theme.">
-                {TUNE_DEFAULT[look].panelOpacity !== undefined && <Dial label={look === 'orbital-glass' ? 'Panel tint' : 'Panel whiteness'} desc="Reduce the tint to let more of the background show through." value={tune.panelOpacity ?? TUNE_DEFAULT[look].panelOpacity!} {...TUNE_LIMITS.panelOpacity} format={(v) => `${Math.round(v * 100)}%`} onChange={(panelOpacity) => onSetTune({ ...tune, panelOpacity })} />}
-                <Dial
-                  label="Foreground blur"
-                  desc="Softens the glass behind your tasks."
-                  value={tune.blur}
-                  {...TUNE_LIMITS.blur}
-                  format={(v) => (v === 0 ? 'none' : `${v}px`)}
-                  onChange={(blur) => onSetTune({ ...tune, blur })}
-                />
-                <Dial label="Background blur" desc="Softens the whole backdrop, including behind the sidebar." value={tune.backgroundBlur ?? 0} {...TUNE_LIMITS.backgroundBlur} format={(v) => `${v}px`} onChange={(backgroundBlur) => onSetTune({ ...tune, backgroundBlur })} />
-                <Dial
-                  label="Darkness"
-                  desc="How far the picture is turned down under the app."
-                  value={tune.dim}
-                  {...TUNE_LIMITS.dim}
-                  format={(v) => `${Math.round(v * 100)}%`}
-                  onChange={(dim) => onSetTune({ ...tune, dim })}
-                />
-                <Row
-                  label="What it shipped with"
-                  desc={`Foreground blur ${TUNE_DEFAULT[look].blur}px, background blur ${TUNE_DEFAULT[look].backgroundBlur ?? 0}px, darkness ${Math.round(TUNE_DEFAULT[look].dim * 100)}%${TUNE_DEFAULT[look].panelOpacity !== undefined ? `, panel whiteness ${Math.round(TUNE_DEFAULT[look].panelOpacity! * 100)}%` : ''}.`}
-                >
-                  <button
-                    type="button"
-                    className="set-ghost"
-                    disabled={tune.panelOpacity === TUNE_DEFAULT[look].panelOpacity && (tune.backgroundBlur ?? 0) === (TUNE_DEFAULT[look].backgroundBlur ?? 0) && tune.blur === TUNE_DEFAULT[look].blur && tune.dim === TUNE_DEFAULT[look].dim}
-                    onClick={onResetTune}
-                  >
-                    Put it back
-                  </button>
-                </Row>
-              </Group>
-            )}
-            {/* The keyboard hints switch sat here until w-5737fe67cf and is on
-                General now, where people look for it. */}
           </div>
         )}
 
