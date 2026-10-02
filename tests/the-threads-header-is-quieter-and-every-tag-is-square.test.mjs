@@ -58,8 +58,12 @@ describe('every tag names it', () => {
       expect(rule(css, selector)).toMatch(/border-radius: var\(--tag-radius\)/);
     });
   }
-  it('the +N face chip too, which is the same shape', () => {
-    expect(rule(pages, '.th-more')).toMatch(/border-radius: var\(--tag-radius\)/);
+  // The +N face chip used to be pinned here too. It went with the face chips
+  // on 2026-10-01 (7b61442: the faces are one filter, named in words), and
+  // this case kept GitHub's run red over a rule that no longer exists. What is
+  // pinned now is that it stays gone, so a square rule is not owed to it.
+  it('the +N face chip is gone, so it owes no rule', () => {
+    expect(pages).not.toMatch(/\.th-more\b/);
   });
   it('but a card, a menu and a popover are not tags and keep their corner', () => {
     expect(rule(pages, '.th-card')).toMatch(/border-radius: var\(--radius\)/);
