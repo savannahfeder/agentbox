@@ -182,11 +182,15 @@ describe('the top of the sidebar', () => {
     expect(top).toContain('>Northwind</span>');
   });
 
-  it('falls back to the app name when there is no team', () => {
+  // With no team the corner names the app, so it wears the app's icon (the
+  // launch film's "On the grid" logo) rather than a letter (w-a514b58055).
+  it('falls back to the app name and the app icon when there is no team', () => {
     const html = draw();
     const top = html.slice(0, html.indexOf('workspace-tabs'));
     expect(top).toContain(`>${Name}</span>`);
-    expect(top).toContain(`>${Name.slice(0, 1).toUpperCase()}</span>`);
+    expect(top).toContain('th-mark-app');
+    expect(top).toMatch(/<img[^>]*class="product-mark app-mark"/);
+    expect(top).not.toContain(`>${Name.slice(0, 1).toUpperCase()}</span>`);
   });
 });
 

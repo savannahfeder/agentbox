@@ -148,7 +148,11 @@ describe('the second engine is off until she writes the moment she turned it on'
     expect(config.engineChoice).toBe(null);
     expect(engineChoiceSince(config)).toBe(null);
 
-    const { sup } = build({ ...config, claudeBin: CLAUDE_BIN, codexBin: CODEX_BIN, storeRoot: tempDir('engine-choice-store-') });
+    // claudeFound is pinned because loadConfig looks for the real Claude Code on
+    // this machine, and GitHub's runners have none, so the row fell back to
+    // Codex there for that reason alone (red on every push, 2026-10-01). What
+    // this test is about is the gate, on a Mac that has both.
+    const { sup } = build({ ...config, claudeFound: true, claudeBin: CLAUDE_BIN, codexBin: CODEX_BIN, storeRoot: tempDir('engine-choice-store-') });
     sup.store.listProducts = () => [{ slug: 'agentbox', dir: sup.config.storeRoot, repoPath: null }];
     expect(sup._engineFor(codexRowFrom(AUGUST))).toBe('claude');
 

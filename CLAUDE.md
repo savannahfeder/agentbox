@@ -12,7 +12,12 @@ current state; this file only holds the rules that are not obvious from them.
 - Name the test file after the behaviour, as a sentence
   (`a-reply-moves-the-agent-row.test.mjs`), and open it with a comment saying
   what broke and how you measured it.
-- Run the whole suite before you report anything: `npx vitest run`.
+- Before you report, run the tests for what you changed:
+  `npx vitest related --run <the files you changed>`. That is your own tests
+  plus every test that imports those files. Do not run the whole suite by
+  hand: several agents share one Mac, and the push hook and GitHub already do
+  it (GitHub runs the whole suite on every push; the hook runs it when a change
+  touches what every test depends on).
 
 ## NO WORKER EVER DRIVES THE USER'S OWN BROWSER
 

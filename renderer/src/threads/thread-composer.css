@@ -155,6 +155,15 @@
 .tc-row-label { flex: 1; min-width: 0; }
 .tc-row small { margin-left: auto; padding-left: 18px; color: var(--text-faint); font-size: 12px; }
 .tc-menu-head { display: block; padding: 7px 10px 4px; font: 10.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+/* The project menu's heading says the list is in priority order and carries the
+   way to change it. The link is in the accent and not shouted in capitals, so
+   it reads as a thing to press rather than as more of the heading. */
+.tc-menu-head.tc-head-split { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.tc-head-link {
+  font: inherit; font-size: 11.5px; letter-spacing: 0.02em; text-transform: none;
+  color: var(--accent); background: none; border: none; padding: 0; cursor: pointer;
+}
+.tc-head-link:hover { text-decoration: underline; text-underline-offset: 2px; }
 .tc-sep { display: block; height: 1px; background: var(--line); margin: 4px 6px; flex: none; }
 .tc-none { padding: 7px 10px; font-size: 12.5px; color: var(--text-faint); }
 

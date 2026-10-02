@@ -3618,6 +3618,15 @@ body {
    to lose. Full strength, unlike the drawn burst: the burst is dimmed because it
    is our placeholder, and the user's picture is not a placeholder. */
 img.product-mark { object-fit: cover; opacity: 1; }
+/* A project with no picture: its colour, as a square, full strength everywhere. */
+.product-mark.product-swatch { display: inline-grid; place-items: center; opacity: 1; }
+.product-swatch i { display: block; border-radius: var(--radius); }
+.rail .product-mark.product-swatch { opacity: 1; }
+/* The Agentbox icon is a finished picture, colours and all: never dimmed. */
+img.app-mark { opacity: 1; border-radius: 0; }
+/* The sidebar corner with no team: the icon is its own tile, so no plate under it. */
+.th-mark.th-mark-app { background: none; }
+.th-mark.th-mark-app img { display: block; }
 /* In the panel it is dimmer than anywhere else it appears, because here it is
    the only mark on the screen and a full-strength logo in an empty corner is a
    spot of ink the eye goes to first. */
@@ -5698,24 +5707,8 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 }
 .proj-index-find:focus { outline: none; border-color: var(--text-faint); }
 .proj-index-find::placeholder { color: var(--text-faint); }
-.proj-index { display: flex; flex-direction: column; gap: 2px; }
-.proj-card {
-  display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 10px;
-  border: none; background: none; font-family: inherit; text-align: left;
-  border-radius: var(--radius); cursor: pointer; color: var(--text);
-}
-.proj-card:hover { background: var(--bg-hover); }
-.proj-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.proj-card-name {
-  font-size: 14px; font-weight: 550; color: var(--text);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-/* The folder, which is the one thing that tells two projects of the same name
-   apart, and a real store has several pairs of those. */
-.proj-card-where {
-  font-size: 11.5px; color: var(--text-faint);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
+/* The rows themselves are components/projects-page.css: the list is also the
+   running order now (w-a514b58055). */
 
 /* THE WAY BACK OUT OF ONE PROJECT'S PAGE, now that the column no longer lists
    them. Quiet by default: it is a way back, not an action. */

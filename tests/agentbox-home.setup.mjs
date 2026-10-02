@@ -21,6 +21,13 @@ const home = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-home-'));
 // her real store. tests/app-home.mjs carries the measurement.
 setAppHome(home);
 
+// ONE CLOCK ZONE FOR EVERY RUN. The tests that check a time in words ("7:21 PM
+// today") are written in Pacific time, and passed only on a Mac set to it: on
+// GitHub's runners, which are on UTC, they read "2:21 AM today" and main was
+// red on every push (measured 2026-10-01, three tests in two files). Node
+// reads TZ whenever it changes, and this runs before each test file loads.
+process.env.TZ = 'America/Los_Angeles';
+
 afterAll(() => {
   try { fs.rmSync(home, { recursive: true, force: true }); } catch { /* best effort */ }
 });

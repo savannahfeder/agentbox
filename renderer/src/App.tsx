@@ -5198,6 +5198,10 @@ export default function App() {
           defaultProduct={productFilter}
           initial={composeInitial}
           onOpenConversation={openConversation}
+          // "Reorder" beside the project menu's heading: Settings on the
+          // Projects page, which is where the order is set. The draft is
+          // already saved, so closing loses nothing.
+          onReorderProjects={() => { setModal(null); setComposeInitial(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
           onClose={() => { setModal(null); setComposeInitial(null); }}
           onSent={async (made, how) => {
             setComposeInitial(null);
@@ -5572,6 +5576,7 @@ export default function App() {
           onStanding={() => setModal('standing')}
           onSettings={() => { setModal(null); setSettingsPane(null); setSettingsOpen(true); }}
           onShortcuts={() => { setModal(null); setSettingsPane('shortcuts'); setSettingsOpen(true); }}
+          onOpenProjects={() => { setModal(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
           onClose={() => setModal(null)}
         />
       )}
@@ -5619,6 +5624,13 @@ export default function App() {
           onResetTune={resetTune}
           startPane={settingsPane}
           onNewProject={() => setNewProject(true)}
+          // The Priority page: the same running order every project list
+          // reads, written the one way it is always written.
+          ranked={rankedProducts}
+          onSetOrder={async (slugs) => {
+            await (window.zero as any)?.setProductOrder?.({ order: slugs });
+            await refresh();
+          }}
           onClose={() => { setSettingsOpen(false); setSettingsPane(null); }}
         />
       )}

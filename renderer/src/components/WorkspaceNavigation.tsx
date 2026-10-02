@@ -6,6 +6,7 @@ import { Face } from '../team/people';
 import { Name } from '../../../shared/product-name.mjs';
 import { SidebarIcon } from './SidebarIcon';
 import { SidebarToggleIcon } from './SidebarToggleIcon';
+import { AppMark } from './AppMark';
 /** ONE NUMBER IN THE SIDEBAR, ON INBOX, AND IT IS DRAWN IN THE TAB'S OWN TYPE.
  *
  *  w-5f02e7b525. Only Inbox shows a number, like a classic email client, and of
@@ -60,6 +61,11 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   const inboxLit = !page && (['inbox', 'progress', 'snoozed', 'done', 'all'] as string[]).includes(view);
   const me = team?.signedIn ? team.me : null;
   const teamName = team?.team?.name ?? Name;
+  // A team wears its initial. With no team the corner names the app itself, so
+  // it wears the Agentbox icon rather than a letter A.
+  const mark = team?.team?.name
+    ? <span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span>
+    : <span className="th-mark th-mark-app" aria-hidden="true"><AppMark size={20} /></span>;
   return <aside className="workspace-navigation" aria-label="Workspace">
     {/* THE TOGGLE SITS BESIDE THE TEAM'S NAME, at the top, where sidebars keep
         it (2026-10-01). Collapsed, the mark itself is the way back
@@ -67,11 +73,11 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
     <div className="th-team" title={collapsed ? undefined : teamName}>
       {collapsed ? (
         <button type="button" className="workspace-toggle th-mark-btn" data-hint="sidebar" aria-label="Expand sidebar" title="Expand sidebar" onClick={onToggle}>
-          <span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span>
+          {mark}
           <span className="th-mark-open" aria-hidden="true"><SidebarToggleIcon collapsed /></span>
         </button>
       ) : <>
-        <span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span>
+        {mark}
         <span className="th-team-name">{teamName}</span>
         <button type="button" className="workspace-toggle th-toggle" data-hint="sidebar" data-hint-align="right" aria-label="Collapse sidebar" title="Collapse sidebar" onClick={onToggle}><SidebarToggleIcon collapsed={false} /></button>
       </>}

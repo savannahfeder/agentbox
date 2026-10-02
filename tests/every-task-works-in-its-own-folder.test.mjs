@@ -53,7 +53,28 @@ function repo() {
   return dir;
 }
 
-describe('the folder a task works in', () => {
+// EVERY TEST BELOW IS GIVEN 30 SECONDS, BECAUSE EVERY ONE OF THEM SPAWNS GIT.
+//
+// Measured on 2026-10-01 (w-3b347985c8): on a Mac with 8.9 to 10.0 GB of swap
+// in use, this file went red with "Test timed out in 5000ms", and WHICH test
+// died moved between runs: the supervisor's parking test in a full suite run,
+// and the second-ask test when the file ran alone minutes later. Nothing was
+// wrong with the code. The whole suite took 385s that day against the 25s it is
+// documented at, about 15x slow, and on an unloaded machine the slowest tests
+// here sit at 666ms, 571ms and 386ms. Multiply those by 15 and they are 10.0s,
+// 8.6s and 5.8s, all past vitest's default 5s. That is the whole failure, and
+// it explains why it moved: the three slowest tests all cross the line at
+// roughly the same amount of load, so load decides which one goes first.
+//
+// A timeout is the suite's guard against a hang, not a performance assertion,
+// and a suite whose red means "the Mac was busy" is worth nothing. 30s is what
+// the sibling file a-task-folder-is-never-pulled-out-from-under-an-agent
+// already takes for the same reason, and it is also what `until()` below needs:
+// that helper waits up to 20s and then throws its own clear message, which the
+// old 5s ceiling never let it reach.
+const ROOM_FOR_GIT = { timeout: 30_000 };
+
+describe('the folder a task works in', ROOM_FOR_GIT, () => {
   let dir;
   beforeEach(() => { dir = repo(); });
   afterEach(() => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} });
@@ -251,7 +272,7 @@ function supervisorOver(repoPath, rows = []) {
   return { sup, product, dir };
 }
 
-describe('the folder the supervisor runs a row in', () => {
+describe('the folder the supervisor runs a row in', ROOM_FOR_GIT, () => {
   let dir;
   const made = [];
   beforeEach(() => { dir = repo(); });
@@ -311,7 +332,7 @@ const until = async (check, ms = 20000) => {
   }
 };
 
-describe('a spawn that needs a new folder', () => {
+describe('a spawn that needs a new folder', ROOM_FOR_GIT, () => {
   let dir;
   const made = [];
   beforeEach(() => { dir = repo(); });
@@ -385,7 +406,7 @@ describe('a spawn that needs a new folder', () => {
 // commit, so the session comes back to exactly the files it left. Nothing is
 // deleted that git is not holding, the branch is never deleted, and an
 // accidental close costs the ten seconds it takes to make the folder again.
-describe('parking a closed task', () => {
+describe('parking a closed task', ROOM_FOR_GIT, () => {
   let dir;
   beforeEach(() => { dir = repo(); });
   afterEach(() => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} });

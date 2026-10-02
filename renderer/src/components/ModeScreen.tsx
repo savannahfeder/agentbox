@@ -26,7 +26,7 @@
 import type { PermissionMode } from '../types';
 import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS, RULES_ALWAYS_APPLY } from '../modes';
 import { COPY } from '../onboarding';
-import { ProductMark } from './ProductMark';
+import { AppMark } from './AppMark';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 
 export type ModeVariant = 'a' | 'b' | 'e';
@@ -102,7 +102,7 @@ export function ModeScreen({ variant, value, onPick }: {
 }) {
   return (
     <div className="fr-screen">
-      <div className="fr-brand"><ProductMark name={NAME} size={18} />{NAME}</div>
+      <div className="fr-brand"><AppMark size={22} />{NAME}</div>
 
       {/* A — A CARD OF ITS OWN, ALL FOUR. The strongest thing to show on a
           call, and the most expensive: it is a whole beat, and the beat is
