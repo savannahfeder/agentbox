@@ -9028,7 +9028,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
      has to tint it. */
   background: var(--film-strong);
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
+  border-radius: var(--tag-radius);
   box-shadow: var(--shadow-lg);
   /* THE BLUR IS 18px AND IT IS NOT THE THEME'S. `--skin-blur` is 2px, which is
      right for a pane the size of the nav column and useless under a plate 30
@@ -9084,7 +9084,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   font-weight: 600;
   color: var(--text-faint);
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
+  border-radius: var(--tag-radius);
   padding: 0 6px;
   line-height: 19px;
   min-width: 19px;
