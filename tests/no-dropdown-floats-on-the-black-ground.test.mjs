@@ -10,9 +10,9 @@
 // `--pop`, read by every menu. It is the window ground by default, which is
 // what those menus already were, so no other theme moved.
 //
-// `--pop` is declared in the base token block and resolves to the window
-// ground. The dark ground and the Ember Grid grey this was found on are gone
-// (the app has one light look now); the fence below still holds.
+// `--pop` is declared in the base token block (a look may only override a
+// token both themes already define, which tests/skin-choice.test.mjs pins) and
+// resolves to the window ground everywhere but here.
 //
 // This test is the fence: a menu added later that paints itself var(--bg)
 // fails here.
@@ -81,13 +81,19 @@ describe('the colour a dropdown floats on', () => {
     expect(offTheToken).toEqual([]);
   });
 
-  // The Ember Grid grey and the dark theme went when the app went to one light
-  // look, so the token is declared once, in the one token block, as the
-  // window's own ground. A second declaration would be an answer nobody asked for.
-  it('is the window ground, declared once', () => {
+  it('is the window ground by default, and this grey in ember-grid', () => {
     const base = styles.slice(styles.indexOf(':root {'));
     expect(base.slice(0, base.indexOf('\n}'))).toMatch(/--pop:\s*var\(--bg\)/);
-    expect(styles.match(/^\s*--pop:/gm)?.length ?? 0).toBe(1);
+    const ember = styles.slice(styles.indexOf(':root[data-skin="ember-grid"] {'));
+    expect(ember.slice(0, ember.indexOf('\n}'))).toMatch(/--pop:\s*#363431/);
+    // Three declarations and no more: light and dark both answer it (every
+    // colour token must, tests/theme-tokens.test.mjs), and this one look
+    // overrides it. A fourth would be a second answer nobody asked for.
+    expect(styles.match(/^\s*--pop:/gm)?.length ?? 0).toBe(3);
+  });
+
+  it('keeps the new thread card and the older menus on the same grey', () => {
+    expect(composer).toMatch(/--tc-pop:\s*var\(--pop\)/);
   });
 
   // On a grey menu a grey selected row is the same colour as the menu. Both

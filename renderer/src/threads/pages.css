@@ -49,7 +49,6 @@
    background. New thread keeps its outline, because it is the thing you
    press. */
 .th-search { display: inline-flex; align-items: center; gap: 9px; height: 32px; padding: 0 10px; border: 0; border-radius: var(--radius); background: none; color: var(--text-faint); font: inherit; font-size: 13px; cursor: text; }
-.th-search kbd { margin-left: 2px; font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; }
 .th-new { height: 32px; padding: 0 13px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13.5px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 .th-new svg { color: var(--text-dim); }
 .th-new:hover, .th-disp:hover { background: var(--wash-strong); }
@@ -57,7 +56,7 @@
 .th-disp.open { background: var(--wash-strong); color: var(--text); }
 .th-disp > i { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .th-pop { position: absolute; top: 40px; right: 0; z-index: 80; width: 470px; padding: 8px 0; display: flex; flex-direction: column; background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: 0 18px 50px rgba(0,0,0,.5); text-align: left; cursor: default; }
-:root .th-pop { background: var(--surface); }
+:root[data-theme="light"] .th-pop { background: var(--surface); }
 .th-pop .line { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 10px; padding: 7px 16px; }
 .th-pop .lab { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 .th-pop .opts { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -83,14 +82,34 @@
 .th-pr i:nth-child(1) { height: 5px; } .th-pr i:nth-child(2) { height: 8px; } .th-pr i:nth-child(3) { height: 11px; }
 .th-pr i.on { background: var(--text-dim); }
 .th-urgent { display: inline-grid; place-items: center; width: 12px; height: 12px; border-radius: var(--tag-radius); background: var(--accent); color: #1a1817; font: 700 9px var(--mono); margin-right: 8px; position: relative; top: 1px; flex: none; }
-.th-lock { display: inline-block; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
+/* THE ROW'S UNDERLINE RUNS THROUGH THESE MARKS (w-afb66e6661, 2026-10-02).
+   Her screenshot: an underlined title, then the people mark sitting in a gap in
+   the line, "which looks a little bit strange". A row's hover and selected
+   underline is a text-decoration on the title (styles.css, `.row .subject`),
+   and a decoration does not paint across an inline-BLOCK box: this file already
+   carries the same lesson for `.th-msg` and inline-flex. So all three marks are
+   plain inline, and the line is continuous from the first letter to the last
+   mark. */
+.th-lock { display: inline; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
 /* WHO SEES A ROW (2026-10-02): only the unusual case wears a mark. The lock on
    a thread only you can see, two people on one a few chosen people see, and
    nothing on one the whole team sees, which is the default. */
-.th-shared { display: inline-block; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
+.th-shared { display: inline; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
 /* AND HOW WIDELY (w-41ff964775): a thread only a few people see carries their
    count beside the mark, in the mark's own faint colour. */
-.th-shared-n { display: inline-block; margin-left: 3px; font: 10.5px var(--mono); color: var(--text-faint); vertical-align: 0; }
+.th-shared-n { display: inline; margin-left: 3px; font: 10.5px var(--mono); color: var(--text-faint); vertical-align: 0; }
+
+/* NOT STARTED, ON THE ROW (w-afb66e6661). Her ask: "some sort of tag, like
+   'not started', that makes it clearer". It is a box rather than more words in
+   the title, so the underline stops where the title does, and it is the only
+   thing on a row that says what Later holds: everything else there has a
+   moment, and this one is waiting for you. */
+.th-tag {
+  display: inline-block; margin-left: 10px; padding: 1px 6px;
+  border: 1px solid var(--line); border-radius: var(--tag-radius);
+  font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-faint); vertical-align: 1px;
+}
 
 /* ------------------------------------------------------------ the list as a table */
 .th-table .row.th-head { padding-top: 10px; padding-bottom: 8px; font: 10.5px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); cursor: default; }
@@ -129,7 +148,7 @@
 .th-scope.open { color: var(--text); }
 .th-dot { color: var(--text-faint); margin: 0 12px 0 8px; font: 11px var(--mono); }
 .th-menu { position: absolute; top: 36px; left: -12px; z-index: 80; min-width: 230px; max-height: 360px; overflow: auto; padding: 5px; display: flex; flex-direction: column; gap: 1px; background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: 0 18px 50px rgba(0,0,0,.5); letter-spacing: 0; text-transform: none; }
-:root .th-menu { background: var(--surface); }
+:root[data-theme="light"] .th-menu { background: var(--surface); }
 .th-menu .row-i { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: var(--radius); font-family: var(--font-ui, inherit); font-size: 13.5px; color: var(--text-dim); background: none; border: 0; text-align: left; cursor: pointer; }
 .th-menu .row-i:hover, .th-menu .row-i.on { background: rgba(255,255,255,.07); color: var(--text); }
 .th-menu .row-i .tm-av { width: 20px; height: 20px; line-height: 18px; font-size: 8px; }

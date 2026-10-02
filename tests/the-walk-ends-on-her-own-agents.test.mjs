@@ -154,11 +154,11 @@ describe('where it sits in the walk', () => {
   // introduction went in front of the app. It is still the last one, which is
   // the half of this that is hers.
   it('is on the finish card, which is the last dot', () => {
-    // Seventeen since the theme step went with the themes (w-9e434e8671).
-    expect(N_BEATS).toBe(17);
+    // Nineteen since 2026-10-01: who a thread is for, and the board, each became a beat of their own.
+    expect(N_BEATS).toBe(19);
     expect(BEAT.done).toBe(N_BEATS);
     expect(BEAT.landed).toBe(N_BEATS);
-    expect(BEAT.answer).toBe(11);
+    expect(BEAT.answer).toBe(12);
     // There is no beat of its own left for it to sit on.
     expect(BEAT.agents).toBeUndefined();
   });

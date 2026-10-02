@@ -1,5 +1,5 @@
-// A THREAD'S SUMMARY: its state and the button that opens it in the top bar,
-// the panel beside the conversation, and the card a teammate reads instead.
+// A THREAD'S SUMMARY: its state, the panel beside the conversation, the rail
+// it folds to when closed, and the card a teammate reads instead.
 //
 // Approved 2026-10-01. Every thread has one: its
 // properties, then three short lines (problem, progress, solution) that the
@@ -19,7 +19,7 @@ import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityIdOf, priorityLabelOf, priorityValueOf, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName, type TeamView } from '../team/people';
 import {
-  STATE_WORD, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, lastEdit, ownerName,
+  STATE_WORD, stateWordOf, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, lastEdit, ownerName,
   readSummaryOpen, stateGlyph, statusChoices, type StateGlyph, type SummaryField,
 } from './summary-rules';
 import { VISIBILITY_WORD, chosenNames, whoSees, type Seen } from './summary-rules';
@@ -49,8 +49,10 @@ function OnlyYouMark() {
   return <svg className="ts-who" width="13" height="12" viewBox="0 0 24 22" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="7" r="4" /><path d="M4.5 20.5c.8-4 3.8-6.3 7.5-6.3s6.7 2.3 7.5 6.3" /></svg>;
 }
 
-function PanelIcon() {
-  return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5" /><path d="M14.5 4.5v15" /></svg>;
+// The panel's mark: a window with its right side drawn off. Filled on that side
+// while the summary is open, so the icon that closes it says what it closes.
+function PanelIcon({ open = false }: { open?: boolean }) {
+  return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />{open && <rect x="14.5" y="4.5" width="6" height="15" fill="currentColor" stroke="none" opacity=".5" />}<path d="M14.5 4.5v15" /></svg>;
 }
 
 // Waiting is on you unless a person other than you holds it. The word is the
@@ -117,26 +119,45 @@ export function useSummaryShortcut(onToggle: () => void, enabled = true) {
 export function ThreadStateMark({ item }: { item: WorkItem }) {
   const team = useContext(TeamContext);
   const state = threadState(item);
-  return <span className="ts-lead"><Glyph kind={stateGlyph(state, waitsOnYou(item, team?.me ?? null))} />{STATE_WORD[state]}</span>;
+  return <span className="ts-lead"><Glyph kind={stateGlyph(state, waitsOnYou(item, team?.me ?? null))} />{stateWordOf(item, state)}</span>;
 }
 
+/* -------------------------------------------------------------------- rail */
+
 /**
- * The square Summary button, for the top bar. Its key, S, is said by the hover
- * plate (`hint-plate.ts`) and not printed on the button, like every other
- * button in the corner (w-5984544441).
+ * THE SUMMARY, FOLDED (w-a3482b8c2c, 2026-10-02). While the summary is closed
+ * it leaves this 48 point strip on the right instead of vanishing, and the
+ * whole strip is the button that opens it again. It replaced the Summary
+ * button in the corner, which drew more attention than anything else in the
+ * thread and, open by default, wore a grey wash that read as a hover.
+ *
+ * It holds the thread's marks top to bottom: the panel's icon, the state,
+ * the priority, and on a team the owner's face and who sees it. Each says its
+ * word on hover. With a collapsed sidebar it mirrors the sidebar's own strip
+ * of icons on the left. S still opens it, as the hover plate says.
  */
-export function SummaryToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+export function SummaryRail({ item, team, onOpen }: { item: WorkItem; team: TeamView | null; onOpen: () => void }) {
+  const me = team?.me ?? null;
+  const state = threadState(item);
+  const prio = priorityIdOf(item.priority);
+  const byId = team?.byId ?? new Map<string, Person>();
+  const owner = ownerName(item, me, byId);
+  const ownerPerson = owner === 'You' ? (me ? byId.get(me) ?? null : null) : byId.get(item.createdBy ?? '') ?? null;
+  const visibility = whoSees(item, team?.state.since ?? null);
   return (
-    <button
-      type="button"
-      className={`ts-sumbtn${open ? ' on' : ''}`}
-      aria-pressed={open}
-      data-hint="summary"
-      data-hint-align="right"
-      title={open ? 'Hide the summary' : 'Show the summary'}
-      onClick={onToggle}
-    >
-      <PanelIcon />Summary
+    // The hint is on the icon, not the strip: a plate is placed off the box of
+    // what wears it, and a strip the pane's full height left it no room below,
+    // so it rose over the corner menu.
+    <button type="button" className="ts-rail" aria-label="Show the summary" title="Show the summary" onClick={onOpen}>
+      <span className="ts-rail-ic" data-hint="summary" data-hint-align="right"><PanelIcon /></span>
+      <span className="ts-rail-mark" title={STATE_WORD[state]}><Glyph kind={stateGlyph(state, waitsOnYou(item, me))} /></span>
+      <span className="ts-rail-mark" title={`${priorityLabelOf(prio)} priority`}><PriorityIcon id={prio} /></span>
+      {team && <span className="ts-rail-mark" title={`Owner: ${owner}`}><Face person={ownerPerson} me={owner === 'You'} /></span>}
+      {team && (
+        <span className="ts-rail-mark" title={`Visible to ${VISIBILITY_WORD[visibility]}`}>
+          {visibility === 'private' ? <OnlyYouMark /> : <SharedMark className="ts-who" />}
+        </span>
+      )}
     </button>
   );
 }
@@ -158,9 +179,11 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stri
  *
  * `team` is null on a Mac nobody has signed into, where every thread is yours.
  */
-export function SummaryPanel({ item, team, onFinish }: {
+export function SummaryPanel({ item, team, onFinish, onClose }: {
   item: WorkItem;
   team: TeamView | null;
+  /** FOLD IT BACK TO THE RAIL, from the icon at the top of the summary (w-a3482b8c2c). */
+  onClose?: () => void;
   /**
    * CLOSE THIS THREAD, or null where there is nothing to close. The Status row
    * calls it; it is the same `markDone` E runs and the same one the three-dot
@@ -313,6 +336,13 @@ export function SummaryPanel({ item, team, onFinish }: {
 
   return (
     <aside className="ts-panel" aria-label="Summary">
+      {/* THE WAY BACK TO THE RAIL sits on the summary itself, beside its
+          title, rather than in the corner of the window (w-a3482b8c2c). */}
+      {onClose && (
+        <button type="button" className="ts-close" data-hint="summary" data-hint-align="right" title="Hide the summary" onClick={onClose}>
+          <PanelIcon open />
+        </button>
+      )}
       {/* CHANGEABLE LOOKS CHANGEABLE (2026-10-01). Status, Priority and Visible
           to are buttons that wash, point and show a caret under the pointer;
           Owner and Project are plain words with no hover at all. Owner stays
@@ -336,7 +366,7 @@ export function SummaryPanel({ item, team, onFinish }: {
         {onFinish && statusChoices(state).length ? (
           <span className="ts-value ts-menu-anchor" ref={holdMenu('status')}>
             <button type="button" className="ts-prop-btn" aria-haspopup="listbox" aria-expanded={menu === 'status'} title="Change the status" onClick={() => setMenu(menu === 'status' ? null : 'status')}>
-              <Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{STATE_WORD[state]}<Caret />
+              <Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{stateWordOf(item, state)}<Caret />
             </button>
             {menu === 'status' && (
               <span className="prio-menu ts-menu" role="listbox" aria-label="Status">
@@ -357,7 +387,7 @@ export function SummaryPanel({ item, team, onFinish }: {
             )}
           </span>
         ) : (
-          <span className="ts-value"><Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{STATE_WORD[state]}</span>
+          <span className="ts-value"><Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{stateWordOf(item, state)}</span>
         )}
         <span className="ts-label">Owner</span>
         <span className="ts-value">{ownerPerson && <Face person={ownerPerson} />}{owner}</span>

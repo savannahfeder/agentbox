@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SummaryPanel, SummaryToggle, ThreadStateMark, TeammateCard, MessagePerson } from '../renderer/src/threads/Summary.tsx';
+import { SummaryPanel, ThreadStateMark, TeammateCard, MessagePerson } from '../renderer/src/threads/Summary.tsx';
 globalThis.React = React;
 
 const NOW = Date.now();
@@ -35,14 +35,10 @@ const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 // the state is drawn on its own now; the four words and their marks are the
 // same four.
 describe('the top bar', () => {
-  it('draws a square Summary button whose key is said on hover, and the state word with its mark', () => {
-    // The S cap came off the button in w-5984544441: a key is said in the
-    // hover plate, never on the component.
-    const html = draw(React.createElement(SummaryToggle, { open: true, onToggle: () => {} }));
-    expect(text(html)).toBe('Summary');
-    expect(html).toContain('aria-pressed="true"');
-    expect(html).not.toContain('<kbd');
-    expect(html).toContain('data-hint="summary"');
+  // The Summary button itself left the top bar on w-a3482b8c2c; the rail that
+  // replaced it is held by the-summary-folds-to-a-rail-and-the-header-stops-
+  // saying-waiting.test.mjs. The state word and its mark are still drawn here.
+  it('draws the state word with its mark', () => {
     const state = draw(React.createElement(ThreadStateMark, { item: item() }));
     expect(text(state)).toBe('Waiting');
     expect(state).toContain('ts-st');

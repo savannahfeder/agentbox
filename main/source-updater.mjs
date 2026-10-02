@@ -50,6 +50,17 @@ const SAY = {
   offline: 'Could not reach GitHub.',
 };
 
+// A FILE THE BUILD WRITES IS NOT AN EDIT OF HERS (2026-10-02). `npm run build`
+// rewrites shared/*.generated.mjs with the version and date of the Claude Code
+// on this Mac, and the restart below runs that build. Counted as her changes,
+// they made every update after the first say "changes of your own" for good
+// (tests/a-build-does-not-stop-the-next-update.test.mjs).
+const isBuildOutput = (file) => /^shared\/[^/]+\.generated\.[cm]?[jt]s$/.test(file);
+// The status code is one or two letters and `gitIn` trims the output, which
+// takes the leading space off the first line, so it is matched, not sliced.
+const changedPaths = (porcelain) => String(porcelain ?? '').split('\n').filter(Boolean).map((l) => l.replace(/^[ MADRCUT?!]{1,2} /, '').replace(/^"|"$/g, ''));
+const theirEdits = (porcelain) => changedPaths(porcelain).filter((f) => !isBuildOutput(f));
+
 function gitIn(appDir) {
   return (args, { timeout = 30_000 } = {}) => new Promise((resolve) => {
     execFile('git', args, {
@@ -155,7 +166,7 @@ export function createSourceUpdater({
     const upstream = await git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
     if (upstream.code !== 0) return { why: SAY.noUpstream };
     const dirty = await git(['status', '--porcelain', '--untracked-files=no']);
-    if (dirty.code !== 0 || dirty.out) return { why: SAY.dirty };
+    if (dirty.code !== 0 || theirEdits(dirty.out).length) return { why: SAY.dirty };
     const ahead = await git(['merge-base', '--is-ancestor', 'HEAD', '@{u}']);
     if (ahead.code !== 0) return { why: SAY.diverged };
     const up = await git(['rev-parse', '@{u}']);
@@ -213,6 +224,11 @@ export function createSourceUpdater({
       return;
     }
     const head = await git(['rev-parse', 'HEAD']);
+    // What the last build stamped goes back first, so the fast-forward can
+    // never trip on it. The build below writes it again.
+    const stamped = await git(['status', '--porcelain', '--untracked-files=no']);
+    const buildOutput = stamped.code === 0 ? changedPaths(stamped.out).filter(isBuildOutput) : [];
+    if (buildOutput.length) await git(['checkout', '--', ...buildOutput]);
     if (head.out !== ok.up) {
       const merged = await git(['merge', '--ff-only', '--quiet', '@{u}']);
       if (merged.code !== 0) {

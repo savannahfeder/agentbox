@@ -50,8 +50,10 @@
   --find-match: color-mix(in srgb, var(--accent) 22%, transparent);
   --find-current: var(--accent);
   --find-current-ink: #ffffff;
-  /* WHAT A CONTROL'S FACE IS MADE OF: a card. It was the pane's own glass
-     under a picture, until the app went to one look (w-9e434e8671). */
+  /* WHAT A CONTROL'S FACE IS MADE OF: a card on a plain theme, the pane's own
+     glass under a picture. Overridden once, on `:root[data-skin]`, where the
+     whole reason is written down (search WHAT A CONTROL'S FACE IS MADE OF).
+  */
   --control-face: var(--surface);
   --control-face-line: transparent;
   --control-shadow: var(--shadow-sm);
@@ -136,6 +138,14 @@
   /* A light window keeps its paper under a change; see the rule at the foot of
      this file for why this is a token at all. */
   --code-ground: var(--doc-page);
+  /* THE GROUND AN HTML FILE HOLDS, IN EVERY THEME. An html page brings its own
+     colour inside a frame the app cannot see into, so its ground cannot follow
+     the window (the rule is written out in full above `.doc-pane`). It is a
+     token rather than a hex on `.doc-pane.doc-html` so that a light window, a
+     dark one and a photograph all answer it, and so an html file and a markdown
+     file are never two different grounds in the same window. Light holds dark's
+     own value here, which is the whole point of the token. */
+  --doc-page-held: #2e3136;
   /* THE MONO FAMILY INSIDE AN AGENT'S ITEM.It is a token pair rather than a
      rule so that both themes must answer it, which is the whole law of this
      block. THE LIGHT FILL IS NOT THE DRAWING'S 62% WHITE, and this is the one
@@ -153,10 +163,9 @@
   --work-fill: rgba(17, 25, 48, 0.043);
   --work-chip: rgba(17, 25, 48, 0.05);
   --work-blur: blur(18px) saturate(1.15);
-  /* THE BRAND ORANGE, the launch film's one colour and Ember Grid's accent,
-     kept when the app went to one light look (w-9e434e8671): the accent is
-     always this orange. The selected-row bar, link underlines and the asks-you
-     chip wear it too, the same four places Ember Grid did. */
+  /* THE BRAND ORANGE, Ember Grid's own, in Light too (w-9e434e8671): the
+     accent is always this orange. The selected-row bar, link underlines and
+     the asks-you chip wear it, as they do in Dark. */
   --accent: #ee6018;
   /* THE READING SURFACE IN THE SETUP PICTURE, and the only place in the app
      that paints paper rather than a theme surface. The values are the landing
@@ -204,8 +213,9 @@
   --mac-close: #ff5f57;
   --mac-min: #febc2e;
   --mac-zoom: #28c840;
-  /* The launch film's mono (w-3fc39983be) on the small right-side details.
-     The body is the film's Geist (see `body`), as in Ember Grid. */
+  /* Ember's mono on every theme (w-3fc39983be): Ember's type on the small
+     right-side details while the original font stays everywhere else. The body stays Avenir Next; only what reads var(--mono)
+     takes Geist Mono. Its @font-face sits with Ember's block below. */
   --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, monospace;
   /* Before this there were TEN different corner sizes on one opened task at the
      same time (13, 9, 8, 7, 6, 4, 20, two two-corner shapes and 50%), measured
@@ -227,20 +237,507 @@
      3px, and no skin may re-declare this one, which is what makes a tag
      square whatever is worn. */
   --tag-radius: 0px;
-  /* WHAT THE PICTURE THEMES USED TO OVERRIDE. The pictures are gone
-     (w-9e434e8671), but ordinary rules still name these four, so they stay at
-     their plain values: the ordinary card, no blur, the opaque writing surface. */
+  /* THE PICTURE THEMES ANSWER HERE TOO, with no picture (see skins.ts). A skin
+     is a second axis laid over dark, not a third theme, and these five tokens
+     are the whole of its surface. They are declared in BOTH themes and set to
+     nothing, for two reasons: the rules at the foot of this file may then name
+     them without carrying a raw colour, which is the one thing this file does
+     not allow; and a window with no skin resolves them to "no image, no veil,
+     the ordinary card, no blur", which is the app that was here before. */
+  --skin-image: none;
+  --skin-veil: none;
+  --skin-tint: none;
   --skin-pane: var(--surface);
   --skin-pane-line: transparent;
+  /* The corner marks and the rays behind inbox zero, which only Ember Grid
+     draws (workspace-navigation.css). */
+  --skin-tick: transparent;
+  --skin-rays: none;
   --skin-blur: 0px;
+  /* The opaque writing surface. With no skin on there is no photograph to
+     average, so it falls back to the card the app already had. */
   --skin-solid: var(--bg-raised);
+  /* How far a picture is turned down, the user's to set (skins.ts). It lives in the
+     plain themes too because --veil-lake is defined here, for the tile in
+     Settings that has to show the picture while the window is not wearing it. */
   --skin-dim: 0.63;
+  /* THE VEIL EMBER GRID AND THE WALK'S BACKDROP LAY OVER THEIR PICTURE. Named
+     for the Lake, the picture it was first fitted to; the Lake itself is gone
+     (w-9e434e8671), but Ember Grid, Gouache Valley and the walk's tile still
+     name this, and without it their whole background stack is dropped. */
+  --veil-lake: linear-gradient(rgba(32, 31, 28, var(--skin-dim, 0.63)), rgba(32, 31, 28, var(--skin-dim, 0.63)));
+  /* THE THEME TILES in Settings, and the second place in this file where a
+     colour is not a surface of the app. A tile showing light mode is light
+     while the window is dark: it depicts a theme rather than wearing one, so
+     it is the same in both, exactly like the chess set above. */
+  --look-light-page: #f8f8fa;
+  --look-light-card: #fefefe;
+  --look-light-line: rgba(17, 25, 48, 0.10);
+  --look-dark-page: #24262a;
+  --look-dark-card: #2e3136;
+  --look-dark-line: rgba(255, 255, 255, 0.12);
+  /* THE IDLE PAGE'S TILES, and the THIRD place in this file where a colour is
+     not a surface of the app. Every tile on that page is a photograph, so its
+     ink is white and its scrim is black in both themes, for the same reason the
+     theme tiles above are: the ground is the picture, not the window. Answered
+     in both blocks anyway, identically, because a token defined in one theme
+     silently draws nothing in the other.
+  */
+  --tile-name: #fff;
+  --tile-note: rgba(255, 255, 255, 0.66);
+  --tile-add-ink: rgba(255, 255, 255, 0.86);
+  --tile-bar-track: rgba(255, 255, 255, 0.16);
+  --tile-bar: rgba(255, 255, 255, 0.85);
+  --tile-scrim-near: rgba(10, 11, 14, 0.86);
+  --tile-scrim-mid: rgba(10, 11, 14, 0.42);
+  --tile-scrim-far: rgba(10, 11, 14, 0);
+  --tile-veil: rgba(8, 9, 12, 0.86);
+  --tile-veil-drop: rgba(8, 9, 12, 0.9);
+  --tile-drop-ink: rgba(255, 255, 255, 0.82);
+  --look-gouache-valley: url('./assets/gouache-valley.webp');
+  /* THE TILE IS THE THEME, not a picture of it: it names the very veil and the
+     very wash the window uses, so a tile cannot go stale against the theme it
+     stands for. Its hairline is the one thing lifted (0.10 to 0.18), because a
+     10% line survives at 1055px and disappears at 116.
+
+     --skin-dim is the user's dial (skins.ts), written onto the root element by the
+     sliders in Settings, so the tile darkens with the window as it moves. */
+  /* The photograph, cooled. Multiplied UNDER the veil, it is a gain of
+     0.66 / 0.82 / 1.00 per channel, which is the one thing a flat colour at one
+     alpha cannot say and the one thing the drawing plainly does say: its veil
+     lets the picture's blue through half again as far as its red. Without it
+     the sunrise comes back orange where the drawing's is slate.
+
+     THESE TWO ARE INHERITED, NOT FITTED TO THIS PICTURE, and that is a
+     statement rather than an omission. They were SOLVED against the drawing of
+     the Mountain theme, which was removed on 2026-08-18; there is no drawing
+     of this photograph, so re-fitting them would be tuning by eye, which is
+     the exact thing that cost four rounds. They stay until a decision says otherwise. */
+  --look-glass: rgba(255, 255, 255, 0.04);
+  --look-glass-line: rgba(255, 255, 255, 0.18);
+  /* Valley Haze's tile only. Its card is a white film with no hairline, so its
+     swatch cannot wear the shared glass and its line; this is the film at the
+     alpha the theme's own token block was measured at. A token rather than a
+     literal because the rules below the token blocks may not carry a bare
+     white, which tests/theme-tokens.test.mjs enforces. */
+  --look-glass-haze: rgba(255, 255, 255, 0.055);
+  /* The three light hazes' tiles. Each carries its own because a card on paper
+     has to lift off a ground that is already near white, so these are 0.41,
+     0.61 and 0.46 against the dark family's 0.055, and the difference between
+     them is visible even at tile size. */
+  --look-glass-frost: rgba(255, 255, 255, 0.453);
+  --look-glass-slate: rgba(255, 255, 255, 0.31);
 }
 
-/* The launch film's two faces, worn exactly as Ember Grid wore them: Geist
-   for the body, Geist Mono for every small uppercase label (`--mono`). */
+/* A PICTURE ANSWERS HERE TOO, WHICH IS WHAT MAKES "A SKIN IMPLIES DARK" TRUE IN
+   THE STYLESHEET AND NOT ONLY IN skins.ts.`lookMeans` has always honoured that,
+   turning a picture into { theme: dark, skin: lake } so the two halves cannot
+   disagree. The STYLESHEET did not: with `data-theme="light"` and
+   `data-skin="lake"` on the same root, the lake block below overrode
+   --text-dim, --text-faint, --bg and the lines, but not --text, so the
+   near-black light ink stayed on the photograph and every heading, name and
+   button went to nothing. MEASURED, 2026-08-21, on the built renderer with
+   `scripts/shot-last-screen.mjs`: the first run's headline at 1.01:1 and every
+   agent name at 1.31:1, while the description under each name, which is
+   --text-faint and IS overridden, sat at 6.76:1. Nothing a user can reach today
+   produced it, because `setLook` is the only writer of either key and it writes
+   both at once. This makes it impossible rather than merely unreached: any
+   window wearing a picture takes the whole dark token set first, and the
+   picture's own block layers over that. tests/theme-tokens.test.mjs holds it.
+   `:not([data-theme="light"])` IS NOT A HOLE IN THAT, IT IS THE SAME RULE SAID
+   PROPERLY, and it is what lets a picture be light at all. The bare
+   `:root[data-skin]` was written when every picture was a photograph, where the
+   danger is real and one-directional: near-black ink on a landscape cannot be
+   read, so a picture had to drag the dark set in behind it whatever the theme
+   key said. A wash you cannot see is not a landscape, and on a pale one the
+   danger runs the other way. So the decision moved to where it can be made per
+   picture, `light: true` in renderer/src/skins.ts, which `lookMeans` turns into
+   the theme key. THE PAIR STILL CANNOT DISAGREE, which is the whole of what the
+   paragraph above is protecting. `setLook` is still the only writer of either
+   key and still writes both at once, and `lookMeans` is still the only thing
+   that decides. A window is light here ONLY when the store says light, and the
+   store says light only for a picture whose own entry asked for it.
+   `:where(...)` AND NOT A BARE `:not(...)`, AND THAT IS NOT A STYLE CHOICE. It
+   shipped as a bare `:not` on 2026-09-04 and broke every dark picture in the
+   app for one commit.A bare `:not` counts toward specificity.
+   `:root[data-skin]` is (0,2,0) and so is every `:root[data-skin="<id>"]` block
+   below, which is exactly why those blocks win: same weight, later in the file.
+   Adding `:not([data-theme="light"])` made this selector (0,3,0), so THIS block
+   started beating all sixteen of them and every dark picture fell back to the
+   app's own grey. Measured in the built renderer: with Valley Haze on,
+   `--skin-image` computed to `none` and `--skin-pane` to `#2e3136`, which is
+   `--surface`. `:where` has zero specificity, so the selector is (0,2,0) again
+   and the per picture blocks are back to being later-and-equal.
+   tests/theme-tokens.test.mjs measures the specificity now rather than trusting
+   the shape.
+*/
+:root[data-theme="dark"],
+:root[data-skin]:where(:not([data-theme="light"])) {
+  --bg: #24262a;
+  --surface: #2e3136;
+  --bg-raised: #373a41;
+  /* Dark answers it the same way light does: a menu floats on the window's
+     own ground unless a look says otherwise (ember-grid does). */
+  --pop: var(--bg);
+  --bg-selected: #3a4049;
+  --bg-hover: #33363c;
+  --film-strong: rgba(255, 255, 255, 0.10);
+  --find-match: color-mix(in srgb, var(--accent) 22%, transparent);
+  --find-current: var(--accent);
+  --find-current-ink: #ffffff;
+  /* The same answer light gives, and said again here because every token this
+     app has is answered in both blocks (tests/theme-tokens.test.mjs). What
+     moves is the picture themes, one block down.
+  */
+  --control-face: var(--surface);
+  --control-face-line: transparent;
+  --control-shadow: var(--shadow-sm);
+  --text: #f0f1f3;
+  --text-dim: #b6bac2;
+  --text-faint: #979ca6;
+  /* DARK TAKES THE SAME STEP, BUT NOT ALL OF IT, AND THE FRACTION IS
+     DERIVED. Light and lake are left alone, so this is the only line that moves.
+     WHERE THE FRACTION COMES FROM, because no grey is chosen in this panel.
+     Lake is a look already approved as reading right, and in lake the heading sits
+     1.336 to 1 above a row. Dark at a WHOLE step sat at 1.46, further below its
+     own heading than any approved look. So dark walks the same ladder in
+     the same direction and stops where its heading-to-row distance meets
+     lake's: 0.755 of the step, 1.326 against lake's 1.336, which is as close as
+     8-bit hex gets while holding hue and chroma. Against the card the row goes
+     3.25 to 3.57. tests/the-sidebar-agents.test.mjs measures that equality, so
+     this cannot be nudged by eye without the test saying so.
+  */
+  --agent-ink: #818690;
+  --line: rgba(255, 255, 255, 0.10);
+  /* Three eighths, the same as the light block, so a picture theme (this
+     selector answers for every one of them) draws its row line at three
+     eighths of its own --line too. See the light block for the reasoning. */
+  --row-line: .375;
+  --line-strong: rgba(255, 255, 255, 0.19);
+  /* THE WALK'S RING AND ITS CARD. See the light block for the reasoning. These four
+     are what every shot on the round four page was taken with: the glow is the
+     cool light on both the ring and the card, the edge is what holds the card
+     now that the grey border is off it, the drop is the shadow under it, and
+     the veil is the dim over everything else. */
+  --fr-glow: rgba(196, 216, 255, 0.34);
+  /* The card wears the same light, wider and fainter: it is a spread round a
+     solid card rather than a stroke round a hole. */
+  --fr-card-glow: rgba(196, 216, 255, 0.15);
+  --fr-card-edge: rgba(255, 255, 255, 0.05);
+  --fr-card-drop: rgba(0, 0, 0, 0.46);
+  --fr-veil: rgba(6, 8, 12, 0.34);
+  --fr-veil-knock: rgba(6, 8, 12, 0.62);
+  --wash: rgba(255, 255, 255, 0.065);
+  --wash-strong: rgba(255, 255, 255, 0.13);
+  /* AN OPEN FILE IS THE APP'S OWN CARD, WHICH IS THE SAME THING LIGHT DOES.So
+     the light window is the specification and it was read rather than guessed
+     at (`scripts/shot-doc-ground.mjs`): light does NOT ground an open file on
+     the page behind the window, it grounds it on --surface, the same paper
+     every other card in the app is on. Dark answers with its own --surface.
+     WHAT WAS WRONG BEFORE, and it was saturation, not lightness. The slate that
+     shipped on 08-20 was #292f3a, which is --skin-solid, the colour MEASURED
+     OFF THE REPLY BOX IN THE LAKE PHOTOGRAPH. Measured on the running app: it
+     sat at saturation 17 on a window at saturation 8, so the open file was the
+     bluest surface in a grey window and read as a different material. Light
+     runs the other way, the file at saturation 0 on a window at 17, so the file
+     is the most neutral surface there. This value is saturation 8, the window's
+     own. The five that are dead: the photograph running through the file,
+     charcoal #1a191b, black, ink #101216, and the lake slate #292f3a. The slate
+     is NOT gone, it is back to being only what it was measured as, the colour
+     of the reply box inside the photograph.
+  */
+  --doc-page: #2e3136;
+  --doc-page-held: #2e3136;
+  --doc-wash: rgba(255, 255, 255, 0.07);
+  /* The same five, lifted for a dark ground. MEASURED against --doc-page
+     #2e3136: comment 4.67, minus 5.27, keyword 6.06, plus 6.58, capitalised
+     name 6.63, number 6.73, string 7.63. The comment and the minus were the
+     two that had to move; a comment is the longest thing on the screen and it
+     was the one below 4.5. In light, on #fefefe: comment 4.73, minus 4.67,
+     string and plus 5.00, number 5.16, capitalised name 5.46, keyword 5.69. */
+  --code-plus: #7bc98e;
+  --code-minus: #e28f82;
+  --code-plus-bed: rgba(123, 201, 142, 0.13);
+  --code-minus-bed: rgba(226, 143, 130, 0.12);
+  --code-live-bed: rgba(255, 255, 255, 0.055);
+  --code-com: #939bab;
+  --code-str: #9ed2ad;
+  --code-kw: #c5a3e6;
+  --code-num: #e0b27c;
+  --code-typ: #8fbdec;
+  /* BLACK UNDER A CHANGE, 2026-08-23. Not #000: the app's own darkest
+     ground is --bg #1a191b in the Lake and #131316 in plain dark, and a pure
+     black beside either reads as a hole rather than as a surface. This is one
+     step under the darker of the two, which is what an editor's own ground is
+     doing when it looks black. MEASURED against the ink on it, --text #ecedee:
+     15.9:1, and against the five code colours: comment 4.98, keyword 6.46,
+     minus 5.62, plus 7.02, number 7.18, string 8.14, capitalised name 7.07 —
+     every one of them above 4.5, which is what the dark set was solved for on
+     #2e3136 and is why they did not have to move. INHERITED BY ALL SIXTEEN
+     SKINS: the skin blocks layer over this one and none of them names it. */
+  --code-ground: #0e0f12;
+  /* Frosted, exactly the values the twenty drawings were made with. */
+  --work-fill: rgba(41, 47, 58, 0.55);
+  --work-chip: rgba(255, 255, 255, 0.07);
+  --work-blur: blur(18px) saturate(1.15);
+  --accent: #7aabff;
+  /* THE READING SURFACE IN THE SETUP PICTURE, and the only place in the app
+     that paints paper rather than a theme surface. The values are the landing
+     page's own (~/dd-landing/index.html), because the article Agentbox offers you
+     and the site that sold you Agentbox should be the same paper. They do NOT
+     follow the theme: a page you are reading is white on a dark Mac too, which
+     is the same reason the artifact page and the game screen are exempt above. */
+  --read-paper: #FAFBFC;
+  --read-ink: #15181E;
+  --read-body: #2A2F38;
+  --read-faint: #6B7280;
+  --read-rule: #E3E6EB;
+  --read-kicker: #3A55A4;
+  --read-ground: #0F1013;
+
+  --select-bar: #7aabff;
+  --on-solid: #24262a;
+  --chip-ask: #d8b44a;
+  --state-stopped: #e08a6c;
+  --underline: rgba(149, 188, 255, 0.68);
+  --chip-review: #7bc98e;
+  /* Lifted from #d97a6c, which measured 4.32:1 on the new card and was 5.88:1
+     on the old one: a lighter ground takes contrast off every ink. This value
+     clears 4.5 on every ground the text actually lands on — card 5.27:1, page
+     6.12:1, raised 4.60:1, hover 4.89:1 — and is 4.22:1 on --bg-selected, which
+     no red in this family clears without turning pink. --chip-bug carries 13px
+     error text (.connect-error), so it is measured, not assumed. Same hue, same
+     place; nothing red moved into the sidebar. */
+  --chip-bug: #e28f82;
+  --chip-blocked: #e28f82;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24), 0 6px 20px rgba(0, 0, 0, 0.22);
+  --shadow-md: 0 10px 32px rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.55);
+  --scrim: rgba(0, 0, 0, 0.45);
+  /* The chess set, and the one place in this file where a colour is not a
+     surface of the app. A chess board's SQUARES are the app's greys; its
+     PIECES are not, because a chess set does not change colour when the room
+     does. Same two values in both themes, each rimmed in the other, so either
+     man is legible on either square in either theme. Drawn as one solid glyph
+     with a stroke: the shelf tile's hollow-versus-solid pair works at 90px and
+     is nearly invisible at playing size on the dark theme. */
+  --chess-ivory: #f1f1f4;
+  --chess-ebony: #1b1d23;
+  /* THE THREE WINDOW BUTTONS, for the drawing of macOS System Settings on the
+     permission page (`.walk-mac`). Same reasoning as the chess men above and
+     the same shape of answer: macOS paints these three the same red, amber and
+     green whether the Mac is light or dark, so they are the same two-block
+     literal rather than a value that follows Agentbox's theme. Everything else in
+     that drawing IS a theme token, because the real System Settings follows the
+     system appearance and a picture of it should follow it too. */
+  --mac-close: #ff5f57;
+  --mac-min: #febc2e;
+  --mac-zoom: #28c840;
+  /* THE PICTURE THEMES ANSWER HERE TOO, with no picture (see skins.ts). A skin
+     is a second axis laid over dark, not a third theme, and these five tokens
+     are the whole of its surface. They are declared in BOTH themes and set to
+     nothing, for two reasons: the rules at the foot of this file may then name
+     them without carrying a raw colour, which is the one thing this file does
+     not allow; and a window with no skin resolves them to "no image, no veil,
+     the ordinary card, no blur", which is the app that was here before. */
+  --skin-image: none;
+  --skin-veil: none;
+  --skin-tint: none;
+  --skin-pane: var(--surface);
+  --skin-pane-line: transparent;
+  /* The corner marks and the rays behind inbox zero, which only Ember Grid
+     draws (workspace-navigation.css). */
+  --skin-tick: transparent;
+  --skin-rays: none;
+  --skin-blur: 0px;
+  /* The opaque writing surface. With no skin on there is no photograph to
+     average, so it falls back to the card the app already had. */
+  --skin-solid: var(--bg-raised);
+  /* How far a picture is turned down, the user's to set (skins.ts). It lives in the
+     plain themes too because --veil-lake is defined here, for the tile in
+     Settings that has to show the picture while the window is not wearing it. */
+  --skin-dim: 0.63;
+  /* THE VEIL EMBER GRID AND THE WALK'S BACKDROP LAY OVER THEIR PICTURE. Named
+     for the Lake, the picture it was first fitted to; the Lake itself is gone
+     (w-9e434e8671), but Ember Grid, Gouache Valley and the walk's tile still
+     name this, and without it their whole background stack is dropped. */
+  --veil-lake: linear-gradient(rgba(32, 31, 28, var(--skin-dim, 0.63)), rgba(32, 31, 28, var(--skin-dim, 0.63)));
+  /* THE THEME TILES in Settings, and the second place in this file where a
+     colour is not a surface of the app. A tile showing light mode is light
+     while the window is dark: it depicts a theme rather than wearing one, so
+     it is the same in both, exactly like the chess set above. */
+  --look-light-page: #f8f8fa;
+  --look-light-card: #fefefe;
+  --look-light-line: rgba(17, 25, 48, 0.10);
+  --look-dark-page: #24262a;
+  --look-dark-card: #2e3136;
+  --look-dark-line: rgba(255, 255, 255, 0.12);
+  /* THE IDLE PAGE'S TILES, and the THIRD place in this file where a colour is
+     not a surface of the app. Every tile on that page is a photograph, so its
+     ink is white and its scrim is black in both themes, for the same reason the
+     theme tiles above are: the ground is the picture, not the window. Answered
+     in both blocks anyway, identically, because a token defined in one theme
+     silently draws nothing in the other.
+  */
+  --tile-name: #fff;
+  --tile-note: rgba(255, 255, 255, 0.66);
+  --tile-add-ink: rgba(255, 255, 255, 0.86);
+  --tile-bar-track: rgba(255, 255, 255, 0.16);
+  --tile-bar: rgba(255, 255, 255, 0.85);
+  --tile-scrim-near: rgba(10, 11, 14, 0.86);
+  --tile-scrim-mid: rgba(10, 11, 14, 0.42);
+  --tile-scrim-far: rgba(10, 11, 14, 0);
+  --tile-veil: rgba(8, 9, 12, 0.86);
+  --tile-veil-drop: rgba(8, 9, 12, 0.9);
+  --tile-drop-ink: rgba(255, 255, 255, 0.82);
+  --look-gouache-valley: url('./assets/gouache-valley.webp');
+  /* THE TILE IS THE THEME, not a picture of it: it names the very veil and the
+     very wash the window uses, so a tile cannot go stale against the theme it
+     stands for. Its hairline is the one thing lifted (0.10 to 0.18), because a
+     10% line survives at 1055px and disappears at 116.
+
+     --skin-dim is the user's dial (skins.ts), written onto the root element by the
+     sliders in Settings, so the tile darkens with the window as it moves. */
+  /* The photograph, cooled. Multiplied UNDER the veil, it is a gain of
+     0.66 / 0.82 / 1.00 per channel, which is the one thing a flat colour at one
+     alpha cannot say and the one thing the drawing plainly does say: its veil
+     lets the picture's blue through half again as far as its red. Without it
+     the sunrise comes back orange where the drawing's is slate.
+
+     THESE TWO ARE INHERITED, NOT FITTED TO THIS PICTURE, and that is a
+     statement rather than an omission. They were SOLVED against the drawing of
+     the Mountain theme, which was removed on 2026-08-18; there is no drawing
+     of this photograph, so re-fitting them would be tuning by eye, which is
+     the exact thing that cost four rounds. They stay until a decision says otherwise. */
+  --look-glass: rgba(255, 255, 255, 0.04);
+  --look-glass-line: rgba(255, 255, 255, 0.18);
+  /* Valley Haze's tile only. Its card is a white film with no hairline, so its
+     swatch cannot wear the shared glass and its line; this is the film at the
+     alpha the theme's own token block was measured at. A token rather than a
+     literal because the rules below the token blocks may not carry a bare
+     white, which tests/theme-tokens.test.mjs enforces. */
+  --look-glass-haze: rgba(255, 255, 255, 0.055);
+  /* The three light hazes' tiles. Each carries its own because a card on paper
+     has to lift off a ground that is already near white, so these are 0.41,
+     0.61 and 0.46 against the dark family's 0.055, and the difference between
+     them is visible even at tile size. */
+  --look-glass-frost: rgba(255, 255, 255, 0.453);
+  --look-glass-slate: rgba(255, 255, 255, 0.31);
+}
+:root[data-skin="gouache-valley"] {
+  --skin-image: url('./assets/gouache-valley.webp');
+  --skin-veil: var(--veil-lake);
+  --skin-tint: none;
+  --skin-pane: rgba(60, 69, 81, 0.22);
+  --skin-pane-line: rgba(255, 255, 255, 0.11);
+  --skin-blur: 2px;
+  --skin-solid: #272d30;
+  --skin-dim: 0.745;
+  --text-dim: #cfd2d8;
+  --text-faint: #b3b8c2;
+  --agent-ink: #9a9fa8;
+  --line: rgba(255, 255, 255, 0.13);
+  --line-strong: rgba(255, 255, 255, 0.24);
+  --bg: #1a191b;
+}
+:root[data-skin-detail="soft"][data-skin="gouache-valley"] { --skin-image: url('./assets/gouache-valley-sm.webp'); }
+
+/* EMBER GRID, 2026-09-25 (w-b3e123a0af): the launch film's look, so somebody
+   who watched the film opens the app on the same screen: people who see the
+   video expect to find that theme in the app.
+
+   EVERY VALUE IS THE FILM'S, read out of its shared stylesheet and its ground,
+   because the film is what people will have seen. Ground #020202, panels #101010, hairlines
+   #2E2C2B, square corners, Geist and Geist Mono, one orange #EE6018.
+
+   THE PICTURE IS A DRAWING, NOT A FILE. The film's ground is a dot every 32px
+   at 5.5% white and one soft orange light up and to the right. It rides in
+   --skin-image as an SVG with no size of its own, so `cover` draws it at the
+   size of whatever it fills and the dots stay 32 real pixels apart on every
+   surface that paints a theme (body, Settings, the setup screens). No rule had
+   to learn a second image, and there is no small copy because there is no file.
+
+   THE ONE CHANGE FROM THE FILM IS THE FAINT GREY. The film labels its chrome
+   #5C5855, which is 2.7:1 on the panel: fine at 18px on a 1080p frame, too
+   faint at 11px in a window. The three greys here are the film's #8A8380
+   family walked up to 7.5, 4.8 and 3.3 to 1 on #101010, one step apart by the
+   ladder tests/the-note-she-asked-us-to-clean-up.test.mjs holds.
+
+   THE GROUND IS ASH, NOT THE FILM'S NEAR BLACK (w-fbcb316f08, option 2, Ash).
+   A near black theme is hard to read with any sun on the screen, and most dark
+   modes in other tools are slightly off black. A near black screen in daylight reflects the room over
+   the words, so the ground is lifted to a warm dark grey, #1A1817, and every
+   surface rides up with it by the same steps as before (panel +14, raised +21,
+   hover +20, selected +29, hairline +44, strong hairline +56). The ink
+   brightens with it so no text lost contrast: 14.9, 9.5, 6.3 and 4.1 to 1 on
+   the ground, against 14.0, 7.7, 5.0 and 3.4 before. Smoke, Charcoal and
+   Embers were the other grounds shown; they are in decisions.md, 2026-09-28,
+   and are not to be re-offered. */
 @font-face { font-family: 'Geist'; src: url('./assets/fonts/Geist-Variable.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
 @font-face { font-family: 'Geist Mono'; src: url('./assets/fonts/GeistMono-Variable.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
+:root[data-skin="ember-grid"] {
+  --skin-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%'><defs><pattern id='d' width='32' height='32' patternUnits='userSpaceOnUse'><circle cx='16' cy='16' r='1.15' fill='white' fill-opacity='0.055'/></pattern><radialGradient id='g' cx='0.72' cy='0.28' r='0.7'><stop offset='0' stop-color='%23EE6018' stop-opacity='0.075'/><stop offset='1' stop-color='%23EE6018' stop-opacity='0'/></radialGradient></defs><rect width='100%' height='100%' fill='%231A1817'/><rect width='100%' height='100%' fill='url(%23g)'/><rect width='100%' height='100%' fill='url(%23d)'/></svg>");
+  --skin-veil: var(--veil-lake);
+  --skin-tint: none;
+  /* MOSTLY SEE-THROUGH, option 4, like the sidebar (2026-09-26). The film's
+     panel was #101010 at 0.96, and the window read wrong, like a contrast
+     problem, where the sidebar did not. The sidebar has no panel at all, so the
+     card now lets the dotted ground through at 0.55 and its text sits on the
+     same ground the sidebar's does. The other four versions shown are in
+     decisions.md, 2026-09-26; do not re-offer them. */
+  --skin-pane: rgba(36, 34, 33, 0.55);
+  --skin-pane-line: #464443;
+  --skin-blur: 0px;
+  --skin-solid: #282625;
+  --skin-dim: 0;
+  /* The film's L-shaped corner marks, 12px long, 8px in from each corner. */
+  --skin-tick: #5c5855;
+  /* Inbox zero's backdrop, from the film's "0 terminals opened" card: the
+     brand's 24 rays in the one orange, fading in past the figure and out
+     toward the edge, over a faint orange glow. */
+  --skin-rays: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-500 -500 1000 1000'><defs><radialGradient id='f' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='490'><stop offset='0.26' stop-color='%23EE6018' stop-opacity='0'/><stop offset='0.34' stop-color='%23EE6018' stop-opacity='0.26'/><stop offset='1' stop-color='%23EE6018' stop-opacity='0'/></radialGradient><radialGradient id='g' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='380'><stop offset='0' stop-color='%23EE6018' stop-opacity='0.10'/><stop offset='1' stop-color='%23EE6018' stop-opacity='0'/></radialGradient></defs><circle r='380' fill='url(%23g)'/><g stroke='url(%23f)' stroke-width='1.3' stroke-linecap='round'><line x1='0.0' y1='-125.0' x2='0.0' y2='-480.0'/><line x1='32.4' y1='-120.7' x2='124.2' y2='-463.6'/><line x1='62.5' y1='-108.3' x2='240.0' y2='-415.7'/><line x1='88.4' y1='-88.4' x2='339.4' y2='-339.4'/><line x1='108.3' y1='-62.5' x2='415.7' y2='-240.0'/><line x1='120.7' y1='-32.4' x2='463.6' y2='-124.2'/><line x1='125.0' y1='-0.0' x2='480.0' y2='-0.0'/><line x1='120.7' y1='32.4' x2='463.6' y2='124.2'/><line x1='108.3' y1='62.5' x2='415.7' y2='240.0'/><line x1='88.4' y1='88.4' x2='339.4' y2='339.4'/><line x1='62.5' y1='108.3' x2='240.0' y2='415.7'/><line x1='32.4' y1='120.7' x2='124.2' y2='463.6'/><line x1='0.0' y1='125.0' x2='0.0' y2='480.0'/><line x1='-32.4' y1='120.7' x2='-124.2' y2='463.6'/><line x1='-62.5' y1='108.3' x2='-240.0' y2='415.7'/><line x1='-88.4' y1='88.4' x2='-339.4' y2='339.4'/><line x1='-108.3' y1='62.5' x2='-415.7' y2='240.0'/><line x1='-120.7' y1='32.4' x2='-463.6' y2='124.2'/><line x1='-125.0' y1='0.0' x2='-480.0' y2='0.0'/><line x1='-120.7' y1='-32.4' x2='-463.6' y2='-124.2'/><line x1='-108.3' y1='-62.5' x2='-415.7' y2='-240.0'/><line x1='-88.4' y1='-88.4' x2='-339.4' y2='-339.4'/><line x1='-62.5' y1='-108.3' x2='-240.0' y2='-415.7'/><line x1='-32.4' y1='-120.7' x2='-124.2' y2='-463.6'/></g></svg>");
+  --bg: #1a1817;
+  --surface: #282625;
+  --bg-raised: #2f2d2c;
+  --bg-selected: #373534;
+  /* WHAT A DROPDOWN FLOATS ON, AND IT IS NEVER THE BLACK GROUND (2026-10-01).
+     The rule: in this theme every dropdown sits on the same grey, and none is
+     drawn in the window's black. The new thread card's menus were already this
+     grey; every older menu read as a hole cut in the window. Only this theme
+     sets it, so each menu keeps its own fallback everywhere else. */
+  --pop: #363431;
+  --bg-hover: #2e2c2b;
+  --film-strong: rgba(255, 255, 255, 0.07);
+  /* A warm off white, brighter than the 09-26 ink now the ground is Ash, so
+     the words keep their contrast; the greys stay one ladder step apart. */
+  --text: #efebe7;
+  --text-dim: #c4bdb8;
+  --text-faint: #a09994;
+  --agent-ink: #7f7975;
+  --line: #464443;
+  --line-strong: #52504f;
+  --wash: rgba(255, 255, 255, 0.04);
+  --wash-strong: rgba(255, 255, 255, 0.08);
+  --doc-page: #282625;
+  --doc-page-held: #282625;
+  --code-ground: #22201f;
+  --work-fill: rgba(40, 38, 37, 0.9);
+  --accent: #ee6018;
+  --select-bar: #ee6018;
+  --underline: rgba(238, 96, 24, 0.6);
+  --chip-ask: #ee6018;
+  --on-solid: #1a1817;
+  --shadow-card: 0 40px 120px rgba(0, 0, 0, 0.7);
+  /* Darker than dark's 0.45: over rows this near black, a lighter scrim left
+     the new-task card reading as one more row rather than a card on top. */
+  --scrim: rgba(0, 0, 0, 0.72);
+  --radius: 0px;
+  --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, monospace;
+}
+:root[data-skin="ember-grid"] body { font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, sans-serif; }
+.look-swatch.ember-grid { background: radial-gradient(ellipse 70% 60% at 72% 28%, rgba(238, 96, 24, 0.14), rgba(238, 96, 24, 0) 70%), #1a1817; }
+.look-swatch.ember-grid::after { background: rgba(40, 38, 37, 0.96); border: 1px solid #464443; border-bottom: none; }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -284,11 +781,10 @@ html, body, #root { height: 100%; }
 *::-webkit-scrollbar-corner { background: transparent; }
 
 body {
-  /* EMBER GRID'S TYPE, EXACTLY (w-9e434e8671): the launch film's Geist, with
-     Ember's own fallbacks behind it. It was Avenir Next until the app went to
-     one light look and the type was asked to match Ember Grid one to one. The
-     weight and spacing Ember set on titles, tabs and rows sit at the foot of
-     workspace-navigation.css. */
+  /* EMBER GRID'S TYPE IN BOTH THEMES (w-9e434e8671): the launch film's Geist,
+     with Ember's own fallbacks, so Light and Dark set every word the same. It
+     was Avenir Next outside Ember Grid. The weights and spacing Ember set on
+     titles, tabs and rows apply to both too (foot of workspace-navigation.css). */
   font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 15.5px;
   background: var(--bg);
@@ -1923,6 +2419,53 @@ body {
   background: var(--bg-raised); border: 1px solid var(--line-strong); border-radius: var(--radius);
   box-shadow: var(--shadow-lg); padding: 12px 14px;
 }
+/* THE CARD WAS THE LAST OPAQUE SLAB IN A THEMED WINDOW (w-34b7b861b6,
+   2026-09-24). Every other floating surface in the app already wears the same
+   three lines -- the wash, the hairline, the blur behind it -- and this one
+   still painted --bg-raised flat over the picture. Themed windows should never
+   have completely opaque components, because they look visually poor.
+
+   Scoped to [data-skin] for the reason .list-pane and .set-nav are: in plain
+   light and dark there is nothing behind the card to see, --skin-blur is 0px,
+   and a backdrop-filter over a flat colour is only a slower way of drawing that
+   colour. On those two the card keeps --bg-raised and looks exactly as it did.
+
+   THE GHOSTS GO WITH IT. They are the queue behind the front card and they are
+   made of the same two tokens; leaving them opaque would draw two solid edges
+   above a card that had stopped being solid, which is worse than either.
+
+   IT IS NOT --skin-pane OVER --skin-blur, AND THAT IS THE POINT (2026-09-25).
+   It was for a day, which is what every other pane wears, and the content
+   behind the card showed through enough to make it harder to read.
+
+   The reason is that this card is not like the other panes.
+   `.list-pane` and `.set-nav` are glass over a PHOTOGRAPH, which has no
+   letterforms in it, so --skin-pane's 0.22 wash over a 2px blur is plenty.
+   This one floats over the live window: the inbox rows, an open conversation,
+   another agent's words. At 2px that text survives the blur and sits under
+   these words, and two columns of type on top of each other is unreadable
+   however pretty the glass is.
+
+   SO IT WEARS THE FIRST-RUN CARD'S GLASS INSTEAD, values and all, because that
+   card solved this exact problem and the result was approved. Its note is the
+   argument in full and worth reading; the half that matters here is that THE
+   BACKGROUND IS PAINTED, NOT ONLY BLURRED. A pure blur over live content goes
+   near-black in a dark stretch and near-white in a light one, so the card would
+   be legible against one row and not the next. `--bg-raised` at 62% holds a
+   floor under the contrast and the blur does the rest. The saturate keeps the
+   photograph's colour instead of letting the plate go grey.
+
+   IT IS STILL GLASS AND MUST STAY GLASS. 62% is see-through and the window can
+   be seen moving behind it. Do not answer a future legibility note by walking
+   this to 100%: that is the opaque slab rejected in the first place, and
+   the fix for "still hard to read" is more blur, not more paint. */
+:root[data-skin] .approval-card,
+:root[data-skin] .approval-ghost {
+  background: color-mix(in oklab, var(--bg-raised) 62%, transparent);
+  border-color: var(--skin-pane-line);
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+  backdrop-filter: blur(22px) saturate(1.25);
+}
 /* FOUR BLOCKS, IN A DELIBERATE ORDER (2026-09-24). The most important thing to
    see is what the command will do; the chat and its folder are lower in the
    hierarchy, and too many stacked lines of text made the card hard to process.
@@ -2032,6 +2575,13 @@ body {
   white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow-y: auto;
   user-select: text;
 }
+/* AND THE BLOCK INSIDE IT IS A FILM, NOT THE GROUND. `--bg` is the window's own
+   flat colour, so on a skin the command sat as a solid rectangle in the middle
+   of a card that had just become glass, which is the same fault one layer in.
+   --film-strong is a wash over whatever is behind it and keeps the step that
+   makes the command read as its own block. NOT --control-face: that token is a
+   WHITE film in every theme and only looks right on dark. */
+:root[data-skin] .approval-cmd { background: var(--film-strong); }
 .approval-actions { display: flex; gap: 8px; align-items: center; }
 .approval-actions button {
   font: inherit; font-size: 12.5px; font-weight: 600; border-radius: var(--radius);
@@ -2494,7 +3044,6 @@ body {
   display: flex;
   flex-direction: column;
 }
-.rail-empty { }
 
 .rail-head { display: flex; align-items: center; gap: 10px; }
 /* The default mark inherits the ink rather than carrying its own, so it is
@@ -3369,6 +3918,7 @@ img.app-mark { opacity: 1; border-radius: 0; }
   backdrop-filter: blur(var(--skin-blur));
   transition: border-color 0.14s;
 }
+:root[data-skin] .idle-field { border-color: var(--skin-pane-line); }
 .idle-field:hover { border-color: var(--text-faint); }
 .idle-ph { font-size: 15px; color: var(--text-faint); }
 /* The keycap is .dock-send's, which is the one that lives inside a card. */
@@ -4016,6 +4566,19 @@ img.app-mark { opacity: 1; border-radius: 0; }
   position: absolute; inset: 0; z-index: 30;
   display: flex; background: var(--bg);
 }
+/* THE SCREEN BELONGS TO THE THEME. Settings is a screen over the whole app, so
+   the inbox is still mounted behind it and it cannot go transparent. It takes the SAME three layers `body` takes, in the same order
+   with the same blend modes, so it is continuously the same photograph as the
+   window it opened from rather than a charcoal slab laid over it. No new token
+   and no second picture. */
+:root[data-skin] .settings-screen {
+  background-color: var(--bg);
+  background-image: var(--skin-veil), var(--skin-tint), var(--skin-image);
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: center, center, center;
+  background-size: cover, cover, cover;
+  background-blend-mode: normal, multiply, normal;
+}
 
 /* min-width: 0 is load-bearing, not tidiness. A flex item's default min-width
    is its min-content width, and the store path in the footer below is one
@@ -4025,6 +4588,18 @@ img.app-mark { opacity: 1; border-radius: 0; }
 .set-nav {
   flex: 0 0 236px; min-width: 0; display: flex; flex-direction: column; min-height: 0;
   padding: 14px 12px 10px; border-right: 1px solid var(--line);
+}
+/* It is the app's own glass, the same --skin-pane over --skin-blur every other
+   pane already wears, so the photograph carries through the column instead of
+   stopping at a hard edge. Scoped to [data-skin] because there is no glass to
+   see in light or dark, and a blur over a flat colour is only a slower way of
+   drawing that colour.
+*/
+:root[data-skin] .set-nav {
+  background: var(--skin-pane);
+  -webkit-backdrop-filter: blur(var(--skin-blur));
+  backdrop-filter: blur(var(--skin-blur));
+  border-right-color: var(--skin-pane-line);
 }
 /* Clear of the traffic lights: the window is frameless and this column runs to
    the top edge, so the title starts below where the buttons sit. */
@@ -4093,6 +4668,9 @@ img.app-mark { opacity: 1; border-radius: 0; }
    the left gap at 980 from 62px to 62px. A rule that does nothing is worse than
    no rule, because the next reader believes its comment. */
 .set-pane { flex: 1; min-width: 0; overflow-y: auto; background: var(--bg); position: relative; }
+/* The screen is the ground here and nothing inside it paints a second one, or
+   the photograph would show in the nav column and stop at the pane's edge. */
+:root[data-skin] .set-pane { background: transparent; }
 /* CENTRED IN THE PANE. Measured on the drawn screen, that pin put the column at
    96px of air on its left and 968px on its right in a 1920-wide window,
    and it got worse with every extra pixel of width: 1608px on the right at
@@ -4364,6 +4942,17 @@ img.app-mark { opacity: 1; border-radius: 0; }
 .set-keys-page .set-group-label { margin-top: 30px; }
 
 /* --- controls ------------------------------------------------------------ */
+/* The three defaults are answered in the light block at the top of this file,
+   beside every other colour token, because "light answers everything" is the
+   rule tests/theme-tokens.test.mjs holds. Only the override lives here. */
+:root[data-skin] {
+  --control-face: var(--skin-pane);
+  --control-face-line: var(--line-strong);
+  /* A TRANSPARENT SHADOW AND NOT `none`, because this value is composed into a
+     `box-shadow` list beside an inset edge below, and one `none` in a list
+     invalidates the whole declaration. */
+  --control-shadow: 0 0 0 0 transparent;
+}
 .set-sw {
   width: 38px; height: 22px; border-radius: 22px; flex: 0 0 auto; cursor: pointer;
   background: var(--wash-strong); border: 1px solid var(--line-strong);
@@ -4380,6 +4969,7 @@ img.app-mark { opacity: 1; border-radius: 0; }
   border-radius: 50%; background: var(--surface); box-shadow: var(--shadow-sm);
   transition: transform 0.15s;
 }
+:root[data-skin] .set-sw::after { background: var(--skin-solid); box-shadow: none; }
 /* THE SWITCH STOPS BEING iOS BLUE. --accent is the app's link ink, and on this
    page it was the only saturated thing on a grey screen: it read as a control
    borrowed from macOS rather than one of ours. On is the app's own text ink. */
@@ -4575,6 +5165,525 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 }
 .np-plus:hover, .np-plus:focus-visible { color: var(--text); background: var(--bg-hover); outline: none; }
 
+:root[data-skin] body {
+  background-image: var(--skin-veil), var(--skin-tint), var(--skin-image);
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: center, center, center;
+  background-size: cover, cover, cover;
+  /* Three layers, and the middle one is not a colour lying on the picture, it
+     is a per-channel gain applied to it. Background layers blend upwards, so
+     `multiply` here multiplies the tint into the photograph and the veil then
+     lies on the result in the ordinary way. This is the only way CSS can make
+     a veil that is weaker in blue than in red, which is what the drawing is. */
+  background-blend-mode: normal, multiply, normal;
+}
+
+/* THE INBOX CARD. Same shape, same shadow, same corner as always: what changes
+   is that the fill becomes a wash and the blur behind it does the separating.
+   The border is box-sizing: border-box like everything else, so the hairline
+   costs the list no width and nothing re-wraps. */
+:root[data-skin] .list-pane {
+  background: var(--skin-pane);
+  border: 1px solid var(--skin-pane-line);
+  -webkit-backdrop-filter: blur(var(--skin-blur));
+  backdrop-filter: blur(var(--skin-blur));
+}
+
+/* AND NO CARD AT ALL WHEN THE VIEW IS EMPTY. Written out here rather than
+   folded into the plain rule above the list, because the wash, the hairline and
+   the blur are three things the skin adds and all three have to go or the card
+   is still on the picture in outline.
+*/
+:root[data-skin] .list-pane.bare {
+  background: none;
+  border: 0;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* AN OPENED TASK, which is the whole window rather than a card (`.app.flat`).
+   Its pane is already transparent and its ground is `.app.flat` itself, so the
+   glass goes there instead. The hairline under the tabs and the one before the
+   panel are the only edges on that screen and they keep doing their job off
+   --line, which the skin has already lifted. */
+:root[data-skin] .app.flat {
+  background: var(--skin-pane);
+  -webkit-backdrop-filter: blur(var(--skin-blur));
+  backdrop-filter: blur(var(--skin-blur));
+}
+
+/* ONE TREATMENT, AND THE WHOLE OPENED TASK WEARS IT. THE INBOX KEEPS ITS
+   VARIANCE, by the same decision, and the card standing off a sharp
+   photograph IS the chosen theme. This is about the other screen, where
+   there is no card because there is no card on an opened task at all. It sat on
+   the photograph as a flat grey slab, and once everything around it went quiet
+   it was the only thing left wearing a different colour. On glass it is its
+   hairline, like every other control on this screen; what it loses is the "card
+   lifts to the page" focus signal, so focus-within takes one step up in the
+   skin's own language instead. That is the ONE judgement call in this block,
+   and it is one line to put back. The fade is kept, because the words still
+   have to stop rather than be cut off. It just stops being a painted band and
+   becomes a mask on the text, so the words go transparent against the same
+   ground instead of the ground changing colour underneath them. Nothing here is
+   reachable without a picture on, so the plain themes are untouched.
+*/
+:root[data-skin] .app.flat .list-pane {
+  border: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root[data-skin] .app.flat .focus-dock { background: transparent; }
+:root[data-skin] .app.flat .focus-dock::before { background: none; }
+:root[data-skin] .app.flat .focus-scroll {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), transparent);
+}
+:root[data-skin] .app.flat .dock-card { background: transparent; }
+:root[data-skin] .app.flat .dock-card:focus-within { background: var(--skin-pane); }
+
+/* That round's reasoning is kept in decisions.md rather than here, because the
+   question it was answering is closed. IT WAS THE LAST SLAB ON THE SCREEN.
+   The audit read it at 14% of the window, flat rgb(55, 58, 65), and the lake
+   frame and the plain dark frame were IDENTICAL there: the one surface the user
+   types into was the one place the theme did not reach. Opaque is not the
+   defect and never was — being the APP'S grey rather than the THEME'S was. THE
+   COLOUR IS THE REPLY BOX'S, MEASURED, AND THAT IS THE WHOLE OF IT. So
+   --skin-solid is no longer worked out from the theme's ground: it is the mean
+   colour of `.dock-card:focus-within` with its own words hidden, read off the
+   running app. rgb(41, 47, 58), 41 away from --bg's charcoal, blue leading red
+   by 17. The reading, the traps in taking it and what it replaced are in the
+   token's comment far above. NOTHING ELSE MOVED WITH IT, and that was part of
+   the same decision. The compose screen does NOT become the window. The backdrop
+   stays exactly what every other modal in the app stands on, the card is the
+   one thing this item changes, and the round that made the screen wear the
+   photograph is reverted; its reasoning is in decisions.md, 2026-08-19, and is
+   not to be re-offered. THE THREE REQUIREMENTS ARE THREE READINGS, not
+   opinions, and `scripts/shot-compose-skin.mjs` prints all three for every
+   candidate: COMPLETELY OPAQUE the card is shot twice, once with the inbox
+   behind it and once with every row hidden, and what MOVES between the two is
+   what is reading through. A flat fill moves 0.0% of the card, worst pixel 0.
+   Glass, the inbox card's own material, moves 21% with the worst pixel at 38 —
+   the user's own rows legible through the field being typed in, which is the
+   failure `.made` hit earlier on this item. MATCHES THE THEME it IS the reply
+   box's surface now rather than near it. `scripts/derive-skin-solid.mjs` reads both in the same
+   frame off the same build, each with its own contents hidden and its border
+   inset: the reply box comes to rgb(41, 47, 58) and this card comes to rgb(41,
+   47, 58), 0 apart. NOT PURE CHARCOAL --bg is rgb(26, 25, 27) at L 25.4. This
+   is 41 away from it and carries the lake's blue. NO BLUR AND NO WASH ON TOP.
+   Both are ways of half-showing what is behind, and the requirement is
+   completely opaque. A blur on an opaque fill also costs a compositing layer for an effect
+   that cannot be seen. ONE RULE, TWO CARDS: NewProject renders `modal compose
+   np-card`, so the new-project card is covered by this selector and cannot
+   drift away from the new-task card it was drawn as. Do not narrow this
+   selector to `.compose:not(.np-card)` without redrawing both. A flat fill is
+   also what makes the two agree for free: every earlier candidate that carried
+   the photograph gave the 232px card and the 104px card two different pictures.
+   THE PALETTE CAME NEXT, AND IT TAKES THE SAME TOKEN. Its own block is below.
+   It renders `modal compose rules-card`, so it is covered by this selector for
+   the same reason np-card is, and it took this token rather than a second idea,
+   exactly as the paragraph below said it would have to. THE REST OF THE MODALS
+   HAVE NOT MOVED. Settings and snooze were not in scope, and connect went
+   out with the cloud cut. The block at the top of this section still says why
+   they float over the app opaque, and they still wear the app's grey rather
+   than the theme's; if they are ever wanted on theme they take this same token,
+   not a new idea.
+*/
+:root[data-skin] .modal.compose {
+  /* The shorthand, so it also clears the background-image the reverted round
+     put here. `.modal`'s own fill is var(--bg-raised), a colour, and this is the
+     one line that replaces it. */
+  background: var(--skin-solid);
+  border-color: var(--skin-pane-line);
+}
+
+/* Measured by `scripts/audit-skin-screens.mjs` on the running build:
+   `div.modal.palette`, rgb(55, 58, 65), covering 22.7% of the window, and 22.1%
+   of that screen was byte-for-byte IDENTICAL to the app with no skin on at all.
+   Nothing was wrong with the palette; it had simply never been on the list,
+   which is the failure mode `tests/skin-grounds.test.mjs` exists to catch and
+   could not catch here, because the palette is not a ground of its own — it is
+   `.modal`, and `.modal` had an answer on file. ⌘K is a surface the user TYPES
+   into — the field at the top of it is the whole screen — so it is the same kind
+   of surface as the already approved card, and it gets the same answer rather
+   than a second one. No blur and no wash, for the reasons in that block. THE
+   FILL IS THE ONLY THING THAT MOVES. Not the backdrop, which is what every
+   modal in the app stands on, and not the rows, the keycaps or the input inside
+   it: those are small controls on a card, and the card is what was the slab.
+*/
+:root[data-skin] .modal.palette {
+  background: var(--skin-solid);
+  border-color: var(--skin-pane-line);
+}
+
+/* THE THEME PICKER'S TILES, in Settings. A theme is a picture now, so the
+   control that chooses one SHOWS it rather than naming it: three tiles, each
+   the page it stands for with that page's card on it.
+
+   Their colours are literals held as tokens and repeated identically in both
+   themes, for the same reason the chess set is: a tile depicting light mode
+   must be light while the window around it is dark, so it is content rather
+   than chrome and it does not answer the room. */
+.look-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 26px; }
+.look {
+  background: none; border: none; padding: 0; cursor: pointer; font: inherit;
+  display: flex; flex-direction: column; gap: 9px; align-items: flex-start;
+  width: 172px;
+}
+/* BIG ENOUGH TO BE A PICTURE. At 116x74 the photograph was a grey stamp and the
+   two flat tiles were indistinguishable rectangles, which is a picker you read
+   the captions of. At 172x112 the photograph is a photograph. */
+.look-swatch {
+  width: 172px; height: 112px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  position: relative; overflow: hidden;
+  display: block;
+  transition: border-color 0.14s, box-shadow 0.14s, transform 0.14s;
+  /* A TILE WEARS A 480px COPY, NOT THE WINDOW'S PICTURE. Every `.look-swatch.<id>`
+     below reads `var(--look-<id>)`, which on :root is the full 3456x2304 file,
+     up to 3.2 MB. Opening the picker or Settings decoded all of them at once to
+     paint 140px tiles, and that is the few seconds of tiles filling in. The
+     copies are made by `cwebp -q 82 -resize 480 0` from the full file. */
+  --look-gouache-valley: url('./assets/look-thumbs/gouache-valley.webp');
+}
+/* The card on the page, at a twelfth of the size and in the same proportion:
+   inset from three sides and running off the bottom, which is what the inbox
+   card does in the window. */
+.look-swatch::after {
+  content: ''; position: absolute;
+  left: 16px; right: 16px; top: 28px; bottom: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.look-swatch.light { background: var(--look-light-page); }
+.look-swatch.light::after { background: var(--look-light-card); border: 1px solid var(--look-light-line); border-bottom: none; }
+.look-swatch.dark { background: var(--look-dark-page); }
+.look-swatch.dark::after { background: var(--look-dark-card); border: 1px solid var(--look-dark-line); border-bottom: none; }
+/* MATCH MY SYSTEM, AND IT IS NOT A TILE CUT IN HALF.The reason was drawable
+   rather than a matter of taste: the tile was split down the middle and the
+   card was drawn straight across the seam, so a white card and a black card met
+   inside one rectangle. Nothing else in this app has an edge like that. So it
+   shows whichever of Light and Dark the Mac is on RIGHT NOW, which is also what
+   pressing it would actually give you, and the half circle in the corner is the
+   only thing that says it is the following one rather than a second Dark.
+   `data-machine` is written on the root beside `data-theme` (App.tsx) because
+   CSS cannot ask the Mac from inside a rule and the renderer already knows.
+*/
+:root[data-machine="light"] .look-swatch.match { background: var(--look-light-page); }
+:root[data-machine="light"] .look-swatch.match::after { background: var(--look-light-card); border: 1px solid var(--look-light-line); border-bottom: none; }
+:root[data-machine="dark"] .look-swatch.match,
+.look-swatch.match { background: var(--look-dark-page); }
+:root[data-machine="dark"] .look-swatch.match::after,
+.look-swatch.match::after { background: var(--look-dark-card); border: 1px solid var(--look-dark-line); border-bottom: none; }
+/* THE MARK HAS TO READ ON BOTH PHOTOGRAPHS, and its first cut did not: it took
+   `--look-dark-card` on a tile that IS the dark card, so it was invisible on the
+   only machine most people are on. It is drawn in the tile's own ink instead,
+   with a disc of the opposite behind it, which is the same trick the tick uses
+   two rules down. */
+.look-swatch.match .match-mark {
+  position: absolute; left: 9px; top: 9px; z-index: 2;
+  border-radius: 50%; padding: 3px;
+  color: var(--look-light-card);
+  background: color-mix(in oklab, var(--look-dark-page) 78%, transparent);
+}
+:root[data-machine="light"] .look-swatch.match .match-mark {
+  color: var(--look-dark-page);
+  background: color-mix(in oklab, var(--look-light-card) 80%, transparent);
+}
+
+.look-swatch.gouache-valley {
+  background: var(--veil-lake), var(--look-gouache-valley) center / cover no-repeat, var(--look-dark-page);
+  --skin-dim: 0.745;
+}
+.look-swatch.gouache-valley::after {
+  background: var(--look-glass);
+  border: 1px solid var(--look-glass-line);
+  border-bottom: none;
+  -webkit-backdrop-filter: blur(1px);
+  backdrop-filter: blur(1px);
+}
+
+/* ⌘K → Themes.SO IT IS THE ONE MODAL IN THIS APP WITH NO SCRIM, and that is the
+   whole design rather than an omission. --scrim over the window would dim the
+   theme this was opened to look at. The backdrop is transparent and is here
+   only to catch a click outside; the bar itself is docked at the bottom, where
+   it covers 175px of a 944px window and leaves the inbox card and the entire
+   sidebar on screen. Every other modal keeps its scrim: do not widen this.
+*/
+.themes-backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 0 0 16px;
+  background: none;
+  pointer-events: auto;
+}
+/* THE CARD IS THE APP'S CARD. Sharp corners and --line, like every other one,
+   and --skin-solid rather than --bg-raised because under a picture that token
+   IS the app's card averaged over that picture — the same opaque surface the
+   new-task card wears — and it falls back to --bg-raised when no picture is on,
+   so a plain window is byte for byte what it was.
+*/
+.theme-picker {
+  width: min(1060px, calc(100vw - 32px));
+  background: var(--skin-solid);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: var(--shadow-lg);
+  padding: 12px 0 16px;
+  position: relative;
+}
+/* THE LITTLE X, round four, 2026-08-23: an obvious way to close, such as an X
+   in the corner. Clicking away still closes, so the X is an addition to that
+   rather than a replacement for it.
+   ABSOLUTE, NOT IN THE HEADER ROW. On a narrow window the header wraps the
+   dials onto a second line, and an X that rode that row would wrap with them
+   and stop being in the corner. It costs the bar no height for the same reason.
+   IT IS FAINT UNTIL IT IS WANTED. This bar exists to be looked past, and the
+   only thing on it that should hold the eye is the picture behind it. It is now
+   16 at top 10 right 8, so it centres on the title line rather than floating
+   over it. SHRINKING THE BOX IS ONLY HALF OF "SMALLER": the glyph below carries
+   the other half.
+*/
+.theme-picker-x {
+  position: absolute; top: 10px; right: 8px;
+  display: grid; place-items: center;
+  width: 16px; height: 16px; padding: 0;
+  border: none; border-radius: var(--radius);
+  background: none; color: var(--text-faint); cursor: pointer;
+}
+/* THE STROKE IS THE HALF OF "SMALLER" THAT SHRINKING THE BOX DOES NOT DO.
+   The glyph was 11px drawn with a 1.5 stroke, which is 14% of its own width, a
+   heavier line than any type on this bar. An 18px box on that same stroke was
+   built and shot in session and still read as loud as the 22, because at this
+   size what the eye picks up is weight and not size. 8px at 1.2 is 15% thinner
+   AND smaller. A CSS stroke-width beats the presentation attribute in the JSX,
+   so the component keeps one X and this rule is the only thing that changes. */
+.theme-picker-x svg { width: 8px; height: 8px; }
+.theme-picker-x svg path { stroke-width: 1.2; }
+.theme-picker-x:hover { background: var(--wash); color: var(--text); }
+.theme-picker-x:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+/* THE RIGHT PADDING IS THE X's ROOM, AND IT IS NOT OPTIONAL. The X is
+   absolutely placed and therefore paints over this row whatever the DOM order
+   is, and the dials end at this row's right edge. Shot at 1710x944 before this
+   was widened: the X's box was 1352-1374 and the Darkness plus was 1350-1366,
+   so the one control on the bar most often reached for was under it and a
+   press on it closed the bar instead. 32 = the X's 16 plus its 8 of offset plus
+   8 of daylight. It was 40 while the X was 22. THERE IS A UNIT TEST ON THIS
+   ARITHMETIC; move the X and this number moves with it or the bug comes back. */
+.theme-picker-head {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 0 32px 10px 18px;
+}
+/* THE VOLUME DOWN, round five, approved as quiet. The title was 600
+   in the app's full text colour. The tiles are what this card is about, so the
+   word above them stops competing with them.
+*/
+.theme-picker-title { font-weight: 500; color: var(--text-dim); }
+/* THE BLUR AND DARKNESS DIALS, ON THE HEADER LINE. So this is the keys design's
+   readout, kept to the pixel, with the hairline turned into the control and
+   both dials on the bar from the moment it opens. THERE IS NO THUMB AND NO
+   TRACK CHROME ON PURPOSE. Round one was the app's .set-range slider on this
+   line and it was rejected; a thumb added here is that slider again in a
+   narrower box. They ride beside the title rather than in a row under the
+   tiles, and that is the whole reason they are affordable: a second row makes
+   this bar taller, and this bar exists to leave the screen behind it visible.
+   `margin-left: auto` pushes them to the right edge; on a narrow window the
+   header wraps them onto their own line rather than squashing the hint.
+*/
+.theme-dials {
+  flex-wrap: wrap; max-width: 100%;
+  margin-left: auto;
+  display: flex; align-items: center; gap: 20px;
+}
+/* THE LINE IS STILL 168px, which is the width the readout had while it was a
+   readout, so the approved thing is untouched. The minus and the plus are
+   OUTSIDE that: four columns now, glyph, label, value, glyph, with the line
+   spanning only the middle two. The dial is therefore 168 + two 16px glyphs +
+   two 6px gaps = 212px, and the room came out of the deleted hint line,
+   which was wider than that on its own.
+
+   ALIGNED ON THE BOX, NOT THE BASELINE. The label and value still share a
+   baseline with each other (.theme-dial-head does that); the glyphs are
+   centred against the whole two-row block instead, so a minus does not hang off
+   the top of a hairline. */
+.theme-dial {
+  display: grid;
+  /* FIVE COLUMNS, and the fifth is empty nearly all the time. It holds the way
+     back to this dial's own number, picked on 2026-08-25 out of six
+     places it could go. Reserving it rather than adding it on hover is the
+     whole point of the design: the glyph appearing shifts nothing. */
+  grid-template-columns: auto auto auto auto auto;
+  align-items: center;
+  gap: 0 6px;
+}
+/* THEY SIT ON THE WORD, NOT BESIDE THE WHOLE DIAL. Shot both ways at
+   1710x944: spanning both rows centres a glyph between the label and the
+   hairline, where a minus reads as an underscore floating under the word. On
+   row 1 the 16px box centres on the 15px text line and the pair brackets
+   "Blur 2px" the way it was drawn. */
+.theme-dial > .theme-dial-nudge.less { grid-column: 1; grid-row: 1; }
+.theme-dial > .theme-dial-label { grid-column: 2; grid-row: 1; }
+.theme-dial > .theme-dial-val { grid-column: 3; grid-row: 1; }
+.theme-dial > .theme-dial-nudge.more { grid-column: 4; grid-row: 1; }
+/* THE MINUS AND PLUS. SO IT IS TWO GLYPHS AND NOTHING ELSE. No border, no
+   background, no circle, no fill. At rest they are --text-faint, the same
+   weight as the label beside them, and they only take the app's text colour
+   under the pointer. That is the least a button can be while still saying it
+   can be pressed, and the whole reason this control got them is that a bare 2px
+   hairline said nothing. 16px SQUARE, which is smaller than the 24px a touch
+   target wants and right for a mouse on a bar whose type is 12.5px. The press
+   area is the square, not the glyph, so what the pointer aims at is bigger
+   than what the eye reads. THEY SPAN BOTH ROWS, so the two of them bracket the dial rather
+   than sitting on the label line with the hairline running underneath them.
+*/
+.theme-dial-nudge {
+  display: grid; place-items: center;
+  width: 16px; height: 16px; padding: 0;
+  border: none; border-radius: var(--radius);
+  background: none; font: inherit; font-size: 13px; line-height: 1;
+  color: var(--text-faint); cursor: pointer;
+  user-select: none;
+}
+.theme-dial-nudge:hover { background: var(--wash); color: var(--text); }
+.theme-dial-nudge:active { color: var(--accent); }
+.theme-dial-nudge:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+/* The word and the number share the line's own 168px, so the number sits over
+   the right end of the hairline exactly as it did before the glyphs arrived. */
+.theme-dial-label { font-size: 12.5px; color: var(--text-dim); }
+/* --text-dim, not --text, is round five's "quiet". The number is a readout
+   glanced at while dragging, not a heading. */
+.theme-dial-val {
+  font-size: 12.5px; color: var(--text-dim); text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* The button is invisible: no background, no border, no padding, and the 5px
+   gap above it is the gap the readout had when it was approved. */
+.theme-dial-track {
+  grid-column: 2 / 4; grid-row: 2;
+  position: relative;
+  display: block; width: 168px;
+  margin-top: 5px; padding: 0;
+  border: none; background: none;
+  cursor: pointer;
+}
+/* THE TARGET IS 17px TALL AND COSTS THE BAR NOTHING. A 2px pointer target is
+   not a target, and padding the button would have made the header line taller,
+   which is the one thing this bar may not spend. So the press area is a
+   pseudo-element hanging 7px above the line and 8px below it: 17px to aim at,
+   0px of layout. 8px is also the most it may hang downward — the header's own
+   bottom padding is 10px, so anything more starts covering the top edge of a
+   tile the user is trying to click. */
+.theme-dial-track::after { content: ''; position: absolute; inset: -7px 0 -8px; }
+.theme-dial-track:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
+.theme-dial-line {
+  display: block; height: 2px;
+  background: var(--wash-strong); border-radius: 1px; overflow: hidden;
+  transition: height 0.1s;
+}
+/* GREY, NOT --accent, and this change was picked by name. The app's
+   accent is a strong blue, and two filled bars of it ran across the top right
+   of a card whose whole job is to be looked past. */
+.theme-dial-line i { display: block; height: 100%; background: var(--text-dim); }
+/* Hover and drag thicken the line rather than growing a thumb: the only thing
+   this control has ever been is a line, and 3px is enough to say it is live
+   without the row moving (the track keeps its box; only the line inside grows,
+   and it grows downward off the same top edge). */
+.theme-dial-track:hover .theme-dial-line,
+.theme-dial.live .theme-dial-line { height: 3px; }
+/* A fifth column on the dial that is always there and almost always empty, so
+   the glyph arriving moves nothing. It arrives when the pointer is on THIS
+   dial and this dial is off its number, and it goes when the pointer leaves.
+   At rest the bar carries no reset anywhere on it, which is the bar
+   approved as quiet on 08-24.
+
+   VISIBILITY, NOT DISPLAY, so the reserved column keeps its width and the two
+   dials stay the same distance apart whether one is hovered or not. */
+.theme-dial > .theme-dial-late { grid-column: 5; grid-row: 1; }
+.theme-dial-late {
+  display: grid; place-items: center;
+  width: 16px; height: 16px; padding: 0;
+  border: none; border-radius: var(--radius);
+  background: none; color: var(--text-faint); cursor: pointer;
+  visibility: hidden;
+}
+.theme-dial.moved:hover .theme-dial-late,
+.theme-dial.moved:focus-within .theme-dial-late { visibility: visible; }
+.theme-dial-late:hover { background: var(--wash); color: var(--text); }
+.theme-dial-late:active { color: var(--accent); }
+.theme-dial-late:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+
+/* Twelve pictures plus light and dark is wider than any window, so it scrolls
+   sideways and the selected tile is scrolled to (ThemePicker.tsx). The
+   scrollbar is left alone rather than hidden: it is the only thing saying
+   there is more to the right. */
+.theme-picker-strip {
+  display: flex; gap: 12px;
+  overflow-x: auto; overflow-y: hidden;
+  /* 10px under the names, not 6. At 6 the descender of a name sat on the
+     card's own bottom edge, which reads as a clipped label. */
+  padding: 2px 18px 10px;
+  scroll-padding: 0 18px;
+}
+/* The Settings tile at 140x92 instead of 172x112. Round two of this item
+   measured that at 116x74 a photograph is a grey stamp and two flat themes are
+   the same rectangle, so this is the floor. */
+.theme-picker .look { width: 140px; gap: 7px; flex: 0 0 auto; }
+.theme-picker .look-swatch { width: 140px; height: 92px; }
+.theme-picker .look-swatch::after { left: 13px; right: 13px; top: 23px; }
+.theme-picker .look-name { font-size: 13px; }
+
+.look:hover .look-swatch { border-color: var(--line-strong); transform: translateY(-1px); }
+/* THE SELECTED TILE, and it is the thing that was called out. It used to carry a
+   2px accent glow ON TOP of a 1px accent border: a blue halo this app draws
+   nowhere else, on the only screen whose whole job is to look like the app.
+   What it wears now is exactly what every other chosen thing in the app wears —
+   .option.selected and .set-nav-item.on are both an accent
+   edge over the selected wash, and nothing in this app glows. The tick is the
+   only addition, because a photograph can hide a 1px edge and a plain colour
+   cannot. */
+.look.on .look-swatch { border-color: var(--accent); }
+.look.on { position: relative; }
+.look-tick {
+  position: absolute; top: 7px; right: 7px; z-index: 2;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); color: var(--on-solid);
+  display: grid; place-items: center;
+  opacity: 0; transform: scale(0.7);
+  transition: opacity 0.12s, transform 0.12s;
+}
+.look.on .look-tick { opacity: 1; transform: scale(1); }
+.look-name { font-size: 13.5px; color: var(--text-dim); }
+.look.on .look-name { color: var(--text); font-weight: 600; }
+
+/* The row is taller than a switch row because a slider needs a thumb's worth of
+   room above and below it before it stops feeling pinched. */
+.set-dial-row { min-height: 62px; }
+.set-dial { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; }
+.set-dial-val {
+  width: 46px; text-align: right; font-size: 12.5px; color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.set-range {
+  -webkit-appearance: none; appearance: none;
+  width: 168px; height: 20px; background: none; margin: 0; cursor: pointer;
+}
+.set-range:focus { outline: none; }
+/* The track is one gradient, with --fill written by the component, so the
+   filled part cannot drift out of step with the thumb the way a second element
+   would. Both engines' pseudo-elements get the same rule; they cannot be
+   combined into one selector because either name invalidates the whole list. */
+.set-range::-webkit-slider-runnable-track {
+  height: 4px; border-radius: var(--radius);
+  background: linear-gradient(to right, var(--accent) 0 var(--fill, 50%), var(--wash-strong) var(--fill, 50%) 100%);
+}
+.set-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 15px; height: 15px; border-radius: 50%; margin-top: -5.5px;
+  background: var(--film-strong); border: 1px solid var(--line-strong);
+  box-shadow: var(--control-shadow);
+  transition: border-color 0.12s;
+}
+.set-range:hover::-webkit-slider-thumb, .set-range:focus-visible::-webkit-slider-thumb { border-color: var(--accent); }
+
 /* The model word is the last clause in the footer, so its drawer hangs off the
    RIGHT of the word rather than the left: anchored left it ran past the card's
    own edge, which the priority and clock words never do because they sit at the
@@ -4592,6 +5701,20 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 .fr-screen {
   position: fixed; inset: 0; z-index: 300;
   background: var(--skin-solid);
+}
+/* THE THREE SETUP SCREENS WEAR THE DEFAULT PICTURE, like every other full surface
+   this app has. `--skin-solid` alone is a charcoal slab, and corner to corner was
+   picked over the photograph, not over a slab. Same three layers `body` and
+   `.settings-screen` take, in the same order with the same blend modes, so it is
+   continuously the same photograph as the window rather than a panel laid over
+   it. No new token and no second picture. */
+:root[data-skin] .fr-screen {
+  background-color: var(--bg);
+  background-image: var(--skin-veil), var(--skin-tint), var(--skin-image);
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: center, center, center;
+  background-size: cover, cover, cover;
+  background-blend-mode: normal, multiply, normal;
 }
 .fr-brand {
   position: fixed; left: 64px; top: 44px; z-index: 302;
@@ -4629,6 +5752,132 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 }
 .fr-go:hover { background: var(--wash); }
 .fr-go kbd { font: inherit; font-size: 12px; color: var(--text-faint); }
+
+/* WHAT WAS HERE AND WHY IT WENT. Eighteen tiles, six across and three down, on
+   a full screen photograph. Two things were wrong with it and both had already
+   been raised on the other row before this one shipped. THE DIM IS THE WALK'S
+   OWN AND IT WAS PICKED: the walk's veil was approved on 2026-08-24, out of four
+   treatments.
+*/
+.fr-screen-look {
+  display: block; padding: 0;
+  /* THE PRODUCT IS THE BACKGROUND, so the screen paints nothing of its own. The
+     photograph the other setup screens wear is what made this one a wallpaper. */
+  background: none;
+}
+:root[data-skin] .fr-screen-look { background: none; }
+/* THE APP UNDERNEATH, at the size of the window and wearing whatever is ticked.
+   Everything inside it is `.topbar`, `.tabs`, `.list-pane` and `.rail`, which are
+   the app's own and are not restyled here; this rule is only the frame they sit
+   in, and it is `.app`'s frame written out.
+
+   IT IS OPAQUE, AND THAT IS NOT A DETAIL. Shot without it, 2026-08-24: the real
+   inbox-zero page behind the walk showed straight through, so the tabs printed
+   twice on one line reading "Inbox Inbox Scheduled In progress In progress
+   Closed Closed", and the bottom third of the window was somebody else's screen.
+   The three layers are the same three `:root[data-skin] .fr-screen` takes, in the
+   same order with the same blend modes, so this is continuously the same
+   photograph as the window rather than a panel laid over it. */
+.fr-look-app {
+  position: absolute; inset: 0; overflow: hidden;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+}
+:root[data-skin] .fr-look-app {
+  background-color: var(--bg);
+  background-image: var(--skin-veil), var(--skin-tint), var(--skin-image);
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-position: center, center, center;
+  background-size: cover, cover, cover;
+  background-blend-mode: normal, multiply, normal;
+}
+/* The list has to fill the pane or the tile shows an inbox with a hole under it;
+   `.list-pane` is `flex: 1` inside `.body` and `.body` is `flex: 1` here. */
+.fr-look-app .rail { flex: 0 0 auto; }
+.fr-look-veil { position: absolute; inset: 0; background: var(--fr-veil); }
+/* THE CARD. Centred, and it is the only thing on this screen that wants reading. */
+.fr-look-mid {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(1060px, calc(100% - 96px));
+  box-sizing: border-box;
+  padding: 40px 44px 36px;
+  /* 12px IS `.fr-tether`'s CORNER, not a new one. This is the same object the
+     walk's coaching card is — a card floating free over the window with a
+     shadow under it and nothing holding its edges — so it takes the same shape
+     picked for that one.
+  */
+  border-radius: 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; align-items: center;
+}
+/* THE FOLDER LIST'S GLASS, REUSED (w-ec62ab6b38, 2026-09-28). The glass on the
+   "Which project should your agents work on first?" section worked, so it is
+   reused where possible, including this page. Same three values as
+   `.fr-card.fr-folders`. */
+:root[data-skin] .fr-look-mid {
+  background: var(--skin-pane);
+  border-color: var(--skin-pane-line);
+  -webkit-backdrop-filter: blur(var(--skin-blur)); backdrop-filter: blur(var(--skin-blur));
+}
+/* THE QUESTION IS THE LOUDEST THING ON THE CARD, and not the welcome's 46px:
+   the subject here is the four tiles under it. */
+.fr-look-q {
+  padding: 0; margin: 0 0 4px;
+  font-size: 30px; font-weight: 300; letter-spacing: -0.025em; color: var(--text);
+}
+/* FOUR, AND ONLY EVER FOUR.So this row never wraps and never grows; the sixteen
+   pictures are reached one at a time through Randomize my theme underneath it.
+*/
+.fr-look-row { justify-content: center; margin-top: 24px; flex-wrap: nowrap; }
+/* EVERY TILE IS THE INBOX IN THAT LOOK. The abstract card `.look-swatch::after`
+   draws is off on this screen, because a tile that IS the product has no use for
+   a drawing of one. The photographs are shot out of the running app by
+   scripts/shot-look-tiles.mjs and a test refuses a look without one. */
+.look-swatch.shot { background-size: cover; background-position: center top; }
+.look-swatch.shot::after { content: none; }
+
+/* THE PHOTOGRAPHS THE FOUR TILES WEAR. One per look, shot out of the running app
+   at 344x224 by scripts/shot-look-tiles.mjs with the practice project's rows in
+   it, never a real inbox: a picture of somebody's real work does not belong
+   inside a shipped binary.
+
+   THEY ARE THE ONE THING ON THIS SCREEN THAT CAN GO STALE, so
+   tests/the-look-is-picked-and-the-confetti-lands.test.mjs refuses a look in
+   LOOKS with no file here and a file here for a look that no longer exists.
+   Adding a picture means running the script; the test says so when you forget.
+
+   MATCH MY SYSTEM HAS NONE OF ITS OWN, on purpose: what it shows is whichever of
+   the two the Mac is on, so it borrows that photograph rather than inventing a
+   third. The `data-machine` rules are further up this file. */
+.look-swatch.shot.light { background-image: url('./assets/look-tiles/light.webp'); }
+.look-swatch.shot.dark { background-image: url('./assets/look-tiles/dark.webp'); }
+.look-swatch.shot.gouache-valley { background-image: url('./assets/look-tiles/gouache-valley.webp'); }
+/* The themes added after the tiles were first shot, which drew as a bare
+   gradient on the walk. Every tile was retaken off today's app on w-ec62ab6b38
+   by scripts/shot-the-look-tiles.mjs. */
+.look-swatch.shot.ember-grid { background: url('./assets/look-tiles/ember-grid.webp') center top / cover no-repeat; }
+.look-swatch.shot.ember-grid::after { content: none; }
+:root[data-machine="light"] .look-swatch.shot.match { background-image: url('./assets/look-tiles/light.webp'); }
+:root[data-machine="dark"] .look-swatch.shot.match,
+.look-swatch.shot.match { background-image: url('./assets/look-tiles/dark.webp'); }
+
+/* RANDOMIZE MY THEME. */
+.fr-look-more {
+  margin-top: 24px; padding: 0; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 14px; color: var(--text-dim);
+  border-bottom: 1px dotted var(--line-strong); line-height: 1.7;
+}
+.fr-look-more:hover { color: var(--text); }
+.fr-look-clause {
+  margin: 14px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-faint);
+  text-align: center;
+}
+/* NEXT SITS ON THE CARD, not in the corner of the window. On the other setup
+   screens the corner is the only place it could be; here the card is the thing
+   being read and a button 500 points away from it is a second place to look. */
+.fr-screen-look .fr-go { margin: 22px 0 0; }
 
 /* --- the introduction.THE WORDS ARE ON THE LEFT AND THE PRODUCT IS ON THE
    RIGHT.The headline is .fr-head, unchanged, so all five screens before the app
@@ -4678,6 +5927,25 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   border-radius: var(--radius);
   box-shadow: 0 0 0 1px var(--line), var(--shadow-lg);
 }
+/* AND UNDER A SKIN IT IS GLASS, NOT A SLAB, which is what the app already
+   does and this piece was not doing. `--bg` is opaque, so a piece of
+   the product drawn on it sat on the photograph as a flat dark rectangle with
+   the lake stopping dead at its edge, which is the one thing no other surface
+   in the app does. SO IT WEARS THE WINDOW'S OWN GLASS: --skin-pane,
+   --skin-pane-line and blur(--skin-blur), declared exactly as `:root[data-skin]
+   .list-pane` and `.app.flat` declare them 700 lines above. THE CARD INSIDE IT
+   KEEPS ITS OWN WASH, which is not an oversight: the inbox on a skin is a card
+   standing off a sharp photograph and that was picked. What changes is the
+   ground under the card, which is the window, and the window is glass. The
+   plain themes are untouched. They have no picture behind them, so transparency
+   there would only put the app's own grey through the app's own grey.
+*/
+:root[data-skin] .fr-piece {
+  background: var(--skin-pane);
+  box-shadow: 0 0 0 1px var(--skin-pane-line), var(--shadow-lg);
+  -webkit-backdrop-filter: blur(var(--skin-blur));
+  backdrop-filter: blur(var(--skin-blur));
+}
 /* A HEIGHT, RATHER THAN THE WHOLE WINDOW. The first cut ran the piece from
    104px to 210px off the foot and left 400 points of empty ground under three
    rows, which reads as an inbox that failed to load rather than an inbox with
@@ -4726,6 +5994,8 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 }
 .fr-piece-nav .workspace-tabs { padding-top: 6px; }
 .fr-piece-nav-foot { margin-top: auto; }
+.fr-look-app .body { padding-top: 50px; }
+.fr-look-app .fr-piece-nav { padding-bottom: 0; }
 
 /* WHERE THE AGENTS ON THE LAST CARD WERE READ FROM.One faint line under the
    switch carrying the real folder. It is the quietest thing on the card because
@@ -4921,6 +6191,11 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 }
 .fr-lede-link:hover { color: var(--text); }
 .fr-card.fr-folders { padding: 6px; border-radius: var(--radius); }
+:root[data-skin] .fr-card.fr-folders,
+:root[data-skin] .fr-card.fr-name-card {
+  background: var(--skin-pane);
+  -webkit-backdrop-filter: blur(var(--skin-blur)); backdrop-filter: blur(var(--skin-blur));
+}
 .fr-folders-label { padding: 9px 12px 7px; font-size: 12px; color: var(--text-faint); }
 .fr-folder {
   display: grid; grid-template-columns: 18px auto minmax(0, 1fr) auto 84px;
@@ -5452,6 +6727,40 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   position: relative;
   color: var(--text);
 }
+/* The one place the dark set is still written out, and it is the html half of
+   the rule above.
+
+   THE FIRST SELECTOR IS DARK AND THE LAKE, WHERE THIS BLOCK IS NOT A CHOICE:
+   both of those windows are dark already, and their own inks differ from dark's
+   in the lake's case, so the block goes on applying there exactly as it did and
+   neither theme moves by a pixel.
+
+   THE SECOND HALF IS THE ONE THE 2026-08-22 DECISION NARROWED. In a light window
+   the block used to apply too, which is what turned the whole side panel
+   charcoal there, bar included. It does not apply in a light window at all any
+   more, so the bar at the top of the side panel is white. Read the block near
+   the foot of this file headed A LIGHT WINDOW STOPS HOLDING A DARK BAR for the
+   rest of it, including the half of that request the app cannot give. These are the dark theme's own values verbatim, which is why
+   a dark window needs none of this: the pane inherits the identical thing from
+   :root. This block exists to override a LIGHT window only.
+
+   THE GROUND IS THE ONE THAT IS NAMED RATHER THAN TYPED. --doc-page-held is
+   answered by light, by dark and by every picture theme, so an html file lands
+   on the same paper a markdown file lands on in the same window. Typing dark's
+   hex here instead would put an html file on grey inside the lake while a
+   markdown file beside it sat on the lake's own slate. */
+:root:not([data-theme="light"]) .doc-pane.doc-html {
+  --text: #f0f1f3;
+  --text-dim: #b6bac2;
+  --text-faint: #979ca6;
+  --line: rgba(255, 255, 255, 0.10);
+  --line-strong: rgba(255, 255, 255, 0.19);
+  --bg-raised: #373a41;
+  --wash: rgba(255, 255, 255, 0.065);
+  --accent: #7aabff;
+  --doc-page: var(--doc-page-held);
+  --doc-wash: rgba(255, 255, 255, 0.07);
+}
 /* The divider: nothing to see until you reach for it, a 9px reach to hit. While
    a drag is under way the whole window takes the cursor, or crossing the
    document's own iframe changes it back halfway. THE LINE IS GONE, CHOSEN
@@ -5706,6 +7015,20 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   border-radius: var(--radius);
   box-shadow: var(--shadow-card);
   overflow: hidden;
+}
+/* With a picture on, the glass moves with the fill: the window goes back to
+   being the photograph and the card is the pane again, which is the inbox's
+   own arrangement (`:root[data-skin] .list-pane`). */
+:root[data-task-shape="card"][data-skin] .app.flat {
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root[data-task-shape="card"][data-skin] .app.flat .list-pane.pinned {
+  background: var(--skin-pane);
+  border: 1px solid var(--skin-pane-line);
+  -webkit-backdrop-filter: blur(var(--skin-blur));
+  backdrop-filter: blur(var(--skin-blur));
 }
 
 /* --- 5. THE WORDS TAKE THE WIDTH -----------------------------------------
@@ -6894,6 +8217,10 @@ a.set-ghost { text-decoration: none; display: inline-block; }
      describes, and it would also sit between the pointer and a row. */
   pointer-events: none;
 }
+/* Under a picture the app draws no shadow beneath a face you can see through:
+   a drop shadow around a transparent thing reads as a rendering fault rather
+   than as lift. Same trade `--control-shadow` already makes. */
+:root[data-skin] .hint-plate { box-shadow: none; }
 /* ON A LIGHT LOOK THE PLATE IS PALE GLASS, NOT A GREY TINT (w-517f37356a). On
    the lighter themes the shortcut hints were too dark and hard to see in many
    places. `--film-strong` is a DARK film on a
@@ -6910,7 +8237,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 
    The caps take `--line-strong`, on every look since w-5984544441. `--line` is
    6.5 to 9% ink on these looks, which drew a keycap with no edge at all. */
-:root .hint-plate {
+:root[data-theme="light"] .hint-plate {
   background: color-mix(in oklab, var(--bg-raised) 62%, transparent);
   -webkit-backdrop-filter: blur(22px) saturate(1.25);
   backdrop-filter: blur(22px) saturate(1.25);
@@ -6937,6 +8264,13 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   text-align: center;
 }
 .hint-what { font-size: 12px; color: var(--text-dim); }
+
+/* CHANGING THE LOOK (look-switch.ts). For the two frames the new look lands in,
+   nothing transitions, so every surface arrives together instead of rippling in
+   at fourteen different speeds. The window crossfades as one picture instead. */
+:root[data-look-switching] *,
+:root[data-look-switching] *::before,
+:root[data-look-switching] *::after { transition: none !important; }
 ::view-transition-old(root),
 ::view-transition-new(root) { animation-duration: 180ms; animation-timing-function: ease-out; }
 @media (prefers-reduced-motion: reduce) {

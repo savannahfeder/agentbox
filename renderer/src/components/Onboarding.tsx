@@ -1540,7 +1540,8 @@ function IntroPiece({ kind }: { kind: 'list' | 'ask' | 'empty' | 'progress' }) {
   );
 }
 
-/* THE THEME PICKER STOOD HERE. The app has one look, Light (w-9e434e8671). */
+/* THE THEME PICKER STOOD HERE. The walk no longer asks: Light, Dark and Match
+   system are chosen in Settings and in Command-K (w-9e434e8671). */
 
 /**
  * THE THREE INTRODUCTION SLABS, THE RULE, AND THE HAND-OFF.

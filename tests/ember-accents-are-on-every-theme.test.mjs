@@ -1,9 +1,8 @@
-// EMBER'S ACCENTS ARE ON THE ONE LOOK.
+// EMBER'S ACCENTS ARE ON EVERY THEME, AND ONLY THE ACCENTS.
 //
-// w-3fc39983be put Ember's mono on the small right-side details and left the
-// body in Avenir Next. w-9e434e8671 went further: the one light look wears
-// Ember Grid's type one to one, so the body is Geist too (pinned in full by
-// the-app-has-one-look-and-it-is-light).
+// w-3fc39983be: Ember's type goes on the small right-side details such as
+// times, while the original font stays everywhere else, so the main font is
+// still Avenir Next.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,8 +26,15 @@ describe("Ember's accents", () => {
     expect(block).toMatch(/font-family: var\(--mono\); font-size: 11px; letter-spacing: \.06em; text-transform: uppercase;/);
   });
 
-  it('set the body in Ember Grid’s Geist, with Ember’s own fallbacks', () => {
+  // w-9e434e8671: Light wears Ember Grid's type too, so the body is Geist in
+  // both themes and Light carries Ember's five weight and spacing rules.
+  it('set the body in Geist in both themes, with Ember Grid’s fallbacks', () => {
     expect(styles).toContain("font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, sans-serif;");
     expect(styles).not.toContain("font-family: 'Avenir Next', 'Source Sans 3 Variable'");
+    for (const rule of [
+      ':root:root .set-title { font-weight: 400; letter-spacing: -0.035em; }',
+      ':root:root .workspace-title { font-weight: 400; letter-spacing: -.03em; }',
+      ':root:root .row .subject { font-weight: 400; letter-spacing: -.01em; }',
+    ]) expect(nav).toContain(rule);
   });
 });

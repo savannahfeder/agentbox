@@ -69,6 +69,7 @@ export const REQUEST_CHANNELS = {
   updateInstall: 'zero:update-install',
   notify: 'zero:notify',
   stopSession: 'zero:stop-session',
+  runNow: 'zero:run-now',
   reopen: 'zero:reopen',
   instructionRead: 'zero:instruction-read',
   instructionWrite: 'zero:instruction-write',
@@ -126,6 +127,7 @@ export const PUSH_CHANNELS = {
   onZoomPercent: 'zero:zoom-percent',
   onRecovered: 'zero:recovered',
   onOpenItem: 'zero:open-item',
+  onScreenDetail: 'zero:screen-detail',
   onEscapeBrowser: 'zero:escape-browser',
   onKeyInTheFile: 'zero:key-in-the-file',
 };

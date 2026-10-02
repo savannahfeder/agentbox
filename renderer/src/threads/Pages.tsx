@@ -10,7 +10,7 @@ import type { Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } fro
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName } from '../team/people';
 import { PriorityIcon } from '../components/Priority';
-import { rowTitle } from '../list-rules';
+import { notStarted, rowTitle } from '../list-rules';
 import { DONE } from '../done-word';
 import {
   boardColumns, filteredEmptyWords, isDirect, isFiltered, projectChoices, updatedWords,
@@ -79,8 +79,10 @@ export function HeaderActions({ page, display, onDisplay, products, items, onSea
 }) {
   const [open, setOpen] = useState(false);
   const ref = useOutside(open, () => setOpen(false));
+  // NO "/" ON ITS FACE (w-facfc092e1): a shortcut shows on hover, through the
+  // hint plate, and is never printed on the control.
   return <div className="th-right">
-    <button type="button" className="th-search" data-hint="search" data-hint-text="span" onClick={onSearch} title="Search threads (/)" aria-label="Search threads"><SearchGlyph /><span>Search</span><kbd>/</kbd></button>
+    <button type="button" className="th-search" data-hint="search" data-hint-text="span" onClick={onSearch} title="Search threads (/)" aria-label="Search threads"><SearchGlyph /><span>Search</span></button>
     <button type="button" className="th-new" data-hint="new-task" onClick={onCompose} title="New thread (N)"><PenIcon />New thread</button>
     <span ref={(el) => { ref.current = el; }} style={{ position: 'relative', display: 'inline-flex' }}>
       <button type="button" className={`th-disp${open ? ' open' : ''}`} aria-label="View and filters" title="View and filters" onClick={() => setOpen((o) => !o)}>
@@ -144,7 +146,12 @@ export type TabView = View | 'all';
 export const INBOX_TABS: { view: TabView; label: string }[] = [
   { view: 'inbox', label: 'Needs you' },
   { view: 'progress', label: 'In progress' },
-  { view: 'snoozed', label: 'Scheduled' },
+  // LATER, NOT SCHEDULED (w-afb66e6661, 2026-10-02). The tab holds two kinds of
+  // thread that are not running: the ones with a moment to come back at, and
+  // the ones added to Later with no moment at all, which carry a NOT STARTED
+  // tag on their row. "Scheduled" was a promise of a time that half of them
+  // do not have.
+  { view: 'snoozed', label: 'Later' },
   { view: 'done', label: DONE.short },
   { view: 'all', label: 'All' },
 ];
@@ -268,7 +275,7 @@ const ClearMark = () => <svg className="th-clear-mark" width="22" height="22" vi
 export function EmptyTab({ view }: { view: TabView }) {
   const words: Partial<Record<TabView, string>> = {
     progress: 'Nothing is running.',
-    snoozed: 'Nothing is scheduled.',
+    snoozed: 'Nothing is waiting for later. "Add it to Later" on a new thread writes one down without starting it.',
     // A finished thread waits in Needs you until its owner closes it, which a
     // persona read as the app losing it.
     done: 'Nothing closed yet. A finished thread waits in Needs you until you close it.',
@@ -293,12 +300,14 @@ export function otherPerson(item: WorkItem, me: string | null): string | null {
 /** ONE ROW OF THE TABLE, FOR THE INBOX AND THE TEAM PAGE BOTH (2026-10-01).
  *  The Team page's list view is the same component as the Inbox's, with small
  *  differences only. So there is one set of cells, and the Team page only adds Person. */
-export function RowCells({ live = false, title, hidden = false, lock = false, shared = false, chosen = 0, where, person, priority, updatedAt, now, action }: {
+export function RowCells({ live = false, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, where, person, priority, updatedAt, now, action }: {
   /** An agent is on this thread right now: a turning mark before its name. */
   live?: boolean;
   title: ReactNode; hidden?: boolean; lock?: boolean; shared?: boolean; where: ReactNode; person?: ReactNode;
   /** How many people a thread shared with chosen people reaches; 0 for the team. */
   chosen?: number;
+  /** Added to Later and not started: the row says so in a tag (w-afb66e6661). */
+  held?: boolean;
   priority: number | null; updatedAt: number; now: number; action?: ReactNode;
 }) {
   const id = priority === null ? null : priorityIdOf(priority);
@@ -306,7 +315,7 @@ export function RowCells({ live = false, title, hidden = false, lock = false, sh
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
         people with a small count beside them for a thread only a few people
         see. The whole team, the default, carries nothing (2026-10-02). */}
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live && <StateGlyph state="running" live />}{title}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}</div>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live && <StateGlyph state="running" live />}{title}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{held && <span className="th-tag">Not started</span>}</div>
     <div className="th-cell-proj">{where}</div>
     {person !== undefined && <div className="th-cell-person">{person}</div>}
     <div className={`th-cell-prio${id === 'urgent' ? ' urgent' : ''}`}>{id && <><PriorityMark id={id} />{priorityLabelOf(id)}</>}</div>
@@ -378,7 +387,7 @@ export function ThreadCells({ item, product, now, person }: {
   // comes and goes with an unrelated control cannot be read. Both follow the
   // click at once, the way the Share button does.
   const lock = seen === 'private';
-  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={seen === 'people'} chosen={chosen} lock={lock} where={product?.name ?? ''} person={person}
+  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} where={product?.name ?? ''} person={person}
     priority={item.priority ?? 0} updatedAt={item.updatedAt} now={now} action={action} />;
 }
 

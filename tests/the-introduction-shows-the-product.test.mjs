@@ -283,9 +283,16 @@ describe('the walk teaches the goal', () => {
     expect(PRACTICE_NOTE).not.toMatch(/Goals/i);
   });
 
-  it('draws the introduction pieces on the app\'s own opaque ground', () => {
-    // There is no picture behind them, so transparency there is the app's own
-    // grey through the app's own grey.
+  it('makes the introduction pieces glass on a skin, the way the window is', () => {
+    // The piece was `background: var(--bg)`, which is opaque, so a picture of
+    // the app sat on the photograph as a flat rectangle. Under a skin it wears
+    // the same three declarations the inbox card and the opened task wear.
+    const glass = css.slice(css.indexOf(':root[data-skin] .fr-piece {'));
+    expect(glass.slice(0, 320)).toMatch(/background: var\(--skin-pane\)/);
+    expect(glass.slice(0, 320)).toMatch(/backdrop-filter: blur\(var\(--skin-blur\)\)/);
+    // AND THE PLAIN THEMES KEEP THEIR OPAQUE GROUND. There is no picture behind
+    // them, so transparency there is the app's own grey through the app's own
+    // grey.
     expect(css).toMatch(/\.fr-piece \{[^}]*background: var\(--bg\)/s);
   });
 });

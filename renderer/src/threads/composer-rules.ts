@@ -12,6 +12,7 @@
 
 import { claudeModelRows, CODEX_OWN, DEFAULT_MODEL, engineModelPicked, type ModelChoice } from '../models';
 import { splitMessage } from '../message-split';
+import { parseWhen } from '../format';
 import { firstName } from '../team/company';
 import type { Person } from '../types';
 
@@ -172,24 +173,18 @@ export function laterHint(ts: number): string {
   return `${DAYS[d.getDay()]} ${d.getHours()}:${pad(d.getMinutes())}`;
 }
 
-/** A moment as an `<input type="datetime-local">` value, in local time. */
-export function inputValueOf(ts: number): string {
-  const d = new Date(ts);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 /**
- * What "Pick a date and time" means, or null. A moment already past is refused
- * rather than sent: the store would run it at once, and a card that says
- * "later" and starts now is a small lie about when an agent has it.
+ * What a time typed into Send later means, or null. It reads the same words the
+ * Schedule box on a thread reads ("3h", "fri 6pm", "tomorrow 3pm"), because a
+ * browser date field was the harder of the two to use
+ * (tests/send-later-takes-a-time-in-words.test.mjs). A moment already past is
+ * refused rather than sent: the store would run it at once, and a card that
+ * says "later" and starts now is a small lie about when an agent has it.
  */
-export function momentFromInput(value: string, now = Date.now()): number | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec((value ?? '').trim());
-  if (!m) return null;
-  const [, y, mo, d, h, mi] = m.map(Number);
-  const ts = new Date(y, mo - 1, d, h, mi, 0, 0).getTime();
-  if (!Number.isFinite(ts) || ts <= now) return null;
-  return ts;
+export function momentFromWords(text: string, now = Date.now()): { ts: number; hint: string } | null {
+  const when = parseWhen(text ?? '', now);
+  if (!when || when.ts <= now) return null;
+  return { ts: when.ts, hint: laterHint(when.ts) };
 }
 
 /* -------------------------------- message --------------------------------- */

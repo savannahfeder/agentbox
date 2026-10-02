@@ -1,6 +1,6 @@
 // A read-only headless copy of her real inbox, at a fixed window size, with a
-// fresh load before the shutter. Lifted out of scripts/shot-skin.mjs
-// because the theme round needed the same boot fifteen times over and copying
+// hook to set the look before the shutter. Lifted out of scripts/shot-skin.mjs
+// because the theme round needs the same boot fifteen times over and copying
 // it fifteen times is how the two harnesses drift apart.
 import fs from 'node:fs';
 import http from 'node:http';
@@ -124,11 +124,19 @@ export async function openInbox({ dist, width = 1440, height = 944, snapshot }) 
   };
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  // A fresh load with the fonts in, before the shutter. THE APP HAS ONE LOOK,
-  // Light (w-9e434e8671), so there is nothing to put on: the argument older
-  // scripts still pass (`{ theme, skin }`) is accepted and ignored, and every
-  // preview is drawn in the look people actually open.
-  async function wear() {
+  // The look is set in localStorage and the page reloaded, because the app
+  // reads it once at boot. A photograph also has to be DECODED before the
+  // shutter or the shot is of the fallback colour.
+  // EMBER GRID IS THE DEFAULT, NOT PLAIN DARK (2026-10-01). A design preview
+  // drawn in a look nobody runs is a picture of a different app, and the
+  // pictures these scripts make are how a change gets judged. Ember Grid is
+  // the app's own DEFAULT_SKIN (renderer/src/skins.ts), so a preview that
+  // names no skin looks like the app people open. A script that genuinely
+  // wants another look still names it.
+  async function wear({ theme = 'dark', skin = 'ember-grid' } = {}) {
+    await goto(origin);
+    await evaluate(`localStorage.setItem('zero.theme', ${JSON.stringify(theme)})`);
+    await evaluate(`localStorage.setItem('zero.skin', ${JSON.stringify(skin)})`);
     await goto(origin);
     await evaluate(`(async () => { await document.fonts.ready; await new Promise(r => setTimeout(r, 400)); })()`);
     await wait(1500);

@@ -35,11 +35,10 @@ describe('the token: square tags, whatever theme or skin is worn', () => {
   it('and no skin or theme ever re-declares it, which is the whole point', () => {
     expect(styles.match(/--tag-radius:/g)).toHaveLength(1);
   });
-  // Ember Grid, which squared --radius to 0px, went with the other pictures
-  // when the app went to one light look, so the 3px corner is the only one.
   it('the app keeps the 3px corner everywhere else', () => {
     expect(styles).toMatch(/--radius:\s*3px/);
-    expect(styles.match(/--radius:\s*[^;]+;/g)).toHaveLength(1);
+    const ember = styles.slice(styles.indexOf(':root[data-skin="ember-grid"] {'));
+    expect(ember.slice(0, ember.indexOf('}'))).toMatch(/--radius:\s*0px/);
   });
 });
 
@@ -48,7 +47,7 @@ describe('every tag names it', () => {
     [pages, '.th-pop .opts > button'], // the Display menu's chips
     [pages, '.th-row-act'], // Share and Unshare at the end of a row
     [pages, '.th-urgent'],
-    [summary, '.ts-sumbtn'], // the Summary button
+    [summary, '.ts-close'], // the icon that folds the summary (the Summary button's heir, w-a3482b8c2c)
     [summary, '.ts-more'],
     [summary, '.ts-msgbtn'],
     [composer, '.tc-chip'], // the composer's Project, Priority and Visibility chips

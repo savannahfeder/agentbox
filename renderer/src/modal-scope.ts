@@ -53,7 +53,8 @@ export const BELONGS_TO_THE_APP: ReadonlySet<string> = new Set<ModalName>([
   // 'writing-rules' used to be here: the same Standing card, opened from the
   // Settings screen's Edit button. Both files are open fields on that page
   // now, so nothing opens it any more and the name is gone. So is 'themes',
-  // the theme picker, which went with the themes (w-9e434e8671).
+  // the picture picker: ⌘K offers Light, Dark and Match system as rows now
+  // (w-9e434e8671).
   // 'filter' is the menu under the corner's filter icon (w-aa3fa4cbf0). It is
   // about the box, never about a task.
   'compose', 'filter', 'palette', 'snooze', 'standing',

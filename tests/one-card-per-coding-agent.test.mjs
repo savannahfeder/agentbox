@@ -82,11 +82,19 @@ describe('nothing in the card is a black square', () => {
     // Translucent, and specifically not the opaque `--surface` that started it.
     expect(ruleFor('.set-ghost')).toMatch(/background:\s*var\(--film-strong\)/);
     expect(ruleFor('.set-ghost')).not.toMatch(/background:\s*var\(--surface\)/);
-    // The token sits in the one token block with every other colour token.
-    // The picture override (`:root[data-skin]`) and the dark values went when
-    // the app went to one light look, so the light block is the whole answer.
+    // The default sits in the light block with every other colour token, which
+    // is where tests/theme-tokens.test.mjs insists a token be answered, and the
+    // override sits with the controls it is for.
     expect(ruleFor(':root')).toMatch(/--control-face:\s*var\(--surface\)/);
-    expect(css.replace(/\/\*[\s\S]*?\*\//g, '')).not.toContain(':root[data-skin]');
+    // NOT `ruleFor` for the skin block: its escape is written
+    // `[.*+?^${}()|[\\]\\\\]`, which asks for one of those characters FOLLOWED
+    // BY a `\]` rather than escaping a bracket, so any selector with a `[` in
+    // it comes back empty. Harmless everywhere it has been used, and a trap
+    // here. Read for the block by name instead.
+    const skinBlock = css.slice(css.indexOf('\n:root[data-skin] {'));
+    expect(skinBlock.slice(0, skinBlock.indexOf('}'))).toMatch(/--control-face:\s*var\(--skin-pane\)/);
+    expect(css).toMatch(/--surface:\s*#2e3136/);
+    expect(css).toMatch(/--wash:\s*rgba\(255,\s*255,\s*255,\s*0\.065\)/);
   });
 
   it('builds every control in the card out of a film of white', () => {

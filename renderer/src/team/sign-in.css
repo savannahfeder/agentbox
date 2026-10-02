@@ -2,8 +2,9 @@
    one square card in the middle. The composer card's colours, the app's square
    corners, the accent spent once, on the button that signs you in. */
 .si-page { position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; padding: 40px 22px 22px; background: var(--bg); -webkit-app-region: drag; }
+:root[data-theme="dark"] .si-page { background: radial-gradient(120% 90% at 50% 0%, #2a2724 0%, #1c1a19 70%); }
 .si-card { width: 380px; max-width: 100%; padding: 34px 32px 26px; background: #2d2b29; border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: 0 24px 70px rgba(0,0,0,.45); -webkit-app-region: no-drag; }
-:root .si-card { background: var(--surface); }
+:root[data-theme="light"] .si-card { background: var(--surface); }
 .si-mark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: var(--radius); background: var(--accent); color: #1a1817; font: 600 14px var(--mono); margin: 0 0 22px; }
 .si-card h1 { margin: 0 0 8px; font-size: 20px; font-weight: 500; letter-spacing: -.015em; color: var(--text); }
 .si-lede { margin: 0 0 24px; font-size: 13.5px; line-height: 20px; color: var(--text-dim); }
@@ -16,7 +17,7 @@
 .si-form label { display: flex; flex-direction: column; gap: 6px; }
 .si-form label > span { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 .si-form input { height: 38px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: rgba(0,0,0,.18); color: var(--text); font: inherit; font-size: 14px; outline: none; transition: border-color .08s ease; }
-:root .si-form input { background: var(--bg); }
+:root[data-theme="light"] .si-form input { background: var(--bg); }
 .si-form input:hover { border-color: var(--text-faint); }
 .si-form input:focus { border-color: var(--accent); }
 .si-primary { width: 100%; height: 40px; margin-top: 6px; border: 0; border-radius: var(--radius); background: var(--accent); color: #1a1817; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: filter .08s ease; }

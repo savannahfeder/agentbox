@@ -110,6 +110,12 @@ export const WORK_ITEM_FIELDS = [
   'title', 'label', 'body', 'kind', 'labels', 'priority', 'parent',
   'status', 'result', 'note', 'answer', 'product', 'runAt', 'answeredThrough',
   'engine', 'model', 'effort',
+  // WHETHER THIS HAS BEEN STARTED AT ALL. 'later' is a thread written down and
+  // deliberately not begun: it waits for a person, not for a clock, and
+  // `isDue` below is where that becomes true of the whole app. 'now' is how it
+  // is started, and a thread without the field at all is an ordinary one that
+  // started the moment it was sent.
+  'start',
   // THE TEAM FIELDS. All four are about PEOPLE on a shared project, and a
   // private project never sets them, so a row without them reads as before.
   //   assignee  the person who has to act next, or 'agent' once a person has
@@ -372,6 +378,10 @@ function coerceField(field, value) {
     // that coerces to undefined is dropped by the fold, so without a falsy
     // sentinel a schedule could be set and never cleared.
     case 'runAt': return Number.isFinite(value) ? Math.trunc(value) : undefined;
+    // 'later' or 'now', and 'now' is the falsy sentinel for the same reason
+    // runAt keeps 0: a field that coerces to undefined is dropped by the fold,
+    // so without a real value for "started" nothing could ever clear it.
+    case 'start': return value === 'later' || value === 'now' ? value : undefined;
     // WHICH ANSWER A SESSION HAS ALREADY ACTED ON, as that answer's own ts.
     //
     // An answer had two states and the ledger recorded one. A worker finishes
@@ -611,8 +621,18 @@ function beats(incoming, held, field) {
 // the whole reason this is a predicate over the clock rather than a timer, and
 // it is what makes a schedule survive an app restart, a reboot, and a store
 // restored onto another machine (the founder's requirement, 2026-08-06).
+// AND A THREAD IN LATER WAITS FOR A PERSON RATHER THAN A CLOCK (w-afb66e6661).
+// "Add it to Later" on the card writes `start: 'later'`, which means exactly
+// what a future moment means and never arrives on its own: not claimable, no
+// session, not in the inbox. Pressing start on the thread writes 'now'.
 export function isDue(item, now = Date.now()) {
+  if (item?.start === 'later') return false;
   return !item?.runAt || item.runAt <= now;
+}
+
+/** Written down and deliberately not begun. */
+export function notStarted(item) {
+  return item?.start === 'later';
 }
 
 export function isClaimable(item, now = Date.now()) {

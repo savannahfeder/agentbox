@@ -200,8 +200,17 @@ describe('the whole path from the card to the rule', () => {
   });
 
   it('the compose branch carries both into composeRepeat', () => {
-    const app = read('renderer/src/App.tsx');
-    expect(app).toMatch(/composeRepeat\(\{\s*\n?\s*product: p\.product[^}]*engine: p\.engine[^}]*model: p\.model/s);
+    // THE SEND MOVED TO THE THREADS CARD, and the pair moved with it: the card
+    // builds `harness` out of the engine and model she picked and spreads it
+    // beside the rule. Read where the call is rather than where it was.
+    const card = read('renderer/src/threads/ThreadComposer.tsx');
+    const at = card.indexOf('api.composeRepeat({');
+    expect(at).toBeGreaterThan(-1);
+    const call = card.slice(at, at + 400);
+    expect(call).toContain('product: product.slug');
+    expect(call).toContain('rule: when.repeat');
+    expect(call).toContain('engine: harness.engine');
+    expect(call).toContain('model: harness.model');
   });
 
   it('a schedule set on an existing row carries the row\'s own pair', () => {

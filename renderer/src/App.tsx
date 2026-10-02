@@ -11,6 +11,8 @@ import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // followed by a refetch.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { readySkin, swapLook } from './look-switch';
 import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import { api } from './api';
 import { setClaudeModels } from './models';
@@ -30,7 +32,6 @@ import { type Place, placeIsSomewhere, readPlace, writePlace, writeScroll } from
 import { documentCandidates } from './message-artifacts';
 import { filesFromRuns } from './run-files';
 import { Rail } from './components/Rail';
-import { Compose } from './components/Compose';
 import { ThreadComposer } from './threads/ThreadComposer';
 import { proposeParent } from '../../shared/project-folder-check.mjs';
 import { NewProject } from './components/NewProject';
@@ -60,7 +61,7 @@ import { approvalReads } from './approval-card';
 // one it took went. Only the second is raised from here, because by the time
 // there is anything to confirm the card has closed.
 import { sentLine } from './compose-says';
-import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, maskedAncestors, parkedByAgent, replyClearsSchedule, statusForReply, stoppable, threadMasked, withdrawReply } from './list-rules';
+import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, maskedAncestors, notStarted, parkedByAgent, replyClearsSchedule, statusForReply, stoppable, threadMasked, withdrawReply } from './list-rules';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { opensATextField } from './keys';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
@@ -69,9 +70,11 @@ import { modalAfterLeavingATask } from './modal-scope';
 import { NOTHING_OVER_THE_APP, afterTheWalk, type OpenOverTheApp } from './walk-scope';
 import { splitMessage } from './message-split';
 import { parseQuery, searchItems } from './search';
+import { applyTheme, machineTheme, onMachineTheme, resolvePick, resolveTheme, THEME_KEY, type ThemePick } from './theme';
 import { hintScheduler, type HintScheduler } from './hint-timing';
 import { HINTS } from './hint-plate';
 import { HintPlate } from './components/HintPlate';
+import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, idleSkin, lookMeans, lookOf, resolveSkin, resolveSkinDetail, resolveTune, seedFirstRunLook, SKINS, storeTune, walkSkin, wornSkin, SKIN_KEY, TUNE_DEFAULT, TUNE_KEY, type Look, type SkinChoice, type SkinId, type SkinTune } from './skins';
 // THE SHAPE OF AN OPENED TASK IS STILL AN OPEN QUESTION. Six of them,
 // one attribute, and the whole file goes when she picks.
 import { resolveTaskShape, TASK_SHAPE_KEY, type TaskShape } from './task-shape';
@@ -603,8 +606,80 @@ export default function App() {
   // The one way to change it. The key, the button in the corner and the ⌘K
   // command all call THIS, so there is no second place for it to be confused in.
   const togglePanel = useCallback(() => setPanelUp((v) => !v), []);
-  // THERE IS NO LOOK STATE. The app has one look, Light (w-9e434e8671): no
-  // dark, no pictures, nothing to pick and nothing to store.
+  // Resolved once at mount and applied before the first paint below, so the
+  // window never flashes the other theme on the way in.
+  // IT HOLDS THE PICK, NOT THE COLOUR. `match` is one of the three things this
+  // can be, and it is resolved to light or dark at every paint below rather than
+  // frozen here, so a Mac that flips at sunset takes the window with it and the
+  // ticked tile still says Match my system.
+  const [theme, setTheme] = useState<ThemePick>(() => resolvePick(localStorage.getItem(THEME_KEY)));
+  // WHAT THE MAC SAYS RIGHT NOW, and it only matters while `theme` is `match`.
+  // A piece of state rather than a read at paint time because nothing else would
+  // tell React that the Mac changed its mind while the window was open.
+  const [machine, setMachine] = useState(() => resolveTheme('match'));
+  useEffect(() => onMachineTheme(setMachine), []);
+  // The picture over dark, on its own axis (skins.ts). Applied in main.tsx
+  // before the first paint; this is the same value read back so the controls
+  // can show which one is on.
+  const [skin, setSkin] = useState<SkinChoice>(() => resolveSkin(localStorage.getItem(SKIN_KEY)));
+  // WHAT SHE PICKS IS ONE THING. Light, Dark, or a picture — never a theme and
+  // a picture separately, because a picture IS dark, and two
+  // controls for one decision is the cognitive load the design law exists to
+  // refuse. Settings and ⌘K both call this and nothing else, so there is no
+  // second place for the two halves to disagree.
+  const look = lookOf(theme, skin);
+  // HER DIALS on the picture: blur and dim (skins.ts). They live beside the
+  // skin rather than inside it because they are hers to move and the skin is
+  // ours to ship, and because moving one has to repaint the window she is
+  // looking at, not the next one she opens.
+  const [tune, setTuneState] = useState<SkinTune>(() => {
+    const sk = resolveSkin(localStorage.getItem(SKIN_KEY));
+    // With no picture on there are no dials to show, but the state still needs
+    // a shape, so it borrows the first picture's. SKINS[0], not a name: the
+    // first picture was Mountain, it was removed, and a hard-coded id here is
+    // what would have broken.
+    return resolveTune(localStorage.getItem(TUNE_KEY), sk === 'none' ? SKINS[0].id : sk);
+  });
+  // The newest press wins: walking the strip with the arrow keys fires several
+  // switches before the first picture is decoded, and only the last may land.
+  const lookSeq = useRef(0);
+  // THE TILE SHE PRESSED, ticked on the press itself while its picture decodes,
+  // so a click always answers at once even when the window takes a beat.
+  const [pickedLook, setPickedLook] = useState<Look | null>(null);
+  const setLook = useCallback((next: Look) => {
+    const { theme: t, skin: s } = lookMeans(next);
+    // Stored at once, so what she pressed is kept even if the window closes
+    // before the picture is ready. The screen changes once it is (look-switch.ts).
+    localStorage.setItem(THEME_KEY, t); localStorage.setItem(SKIN_KEY, s);
+    const seq = ++lookSeq.current;
+    setPickedLook(next);
+    void readySkin(s).then(() => {
+      if (seq !== lookSeq.current) return;
+      swapLook(() => flushSync(() => {
+        setPickedLook(null);
+        setTheme(t); applyTheme(resolveTheme(t));
+        setSkin(s); applySkin(wornSkin(t, s, machineTheme()));
+        // Each picture carries its own dials, so arriving on one loads ITS numbers
+        // rather than leaving the last picture's blur on this one's photograph.
+        if (s !== 'none') {
+          const next = resolveTune(localStorage.getItem(TUNE_KEY), s);
+          setTuneState(next); applyTune(next);
+        }
+      }));
+    });
+  }, []);
+
+  const setTune = useCallback((next: SkinTune) => {
+    const sk = resolveSkin(localStorage.getItem(SKIN_KEY));
+    if (sk === 'none') return;
+    setTuneState(next);
+    applyTune(next);
+    localStorage.setItem(TUNE_KEY, storeTune(localStorage.getItem(TUNE_KEY), sk, next));
+  }, []);
+  const resetTune = useCallback(() => {
+    const sk = resolveSkin(localStorage.getItem(SKIN_KEY));
+    if (sk !== 'none') setTune(TUNE_DEFAULT[sk as SkinId]);
+  }, [setTune]);
   const [seen, setSeen] = useState<Set<string>>(() => new Set(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]')));
   // Batch selection (Superhuman: cmd-A, shift-select, then act on all).
   const [multiSel, setMultiSel] = useState<Set<string>>(new Set());
@@ -731,6 +806,24 @@ export default function App() {
     // A half-finished walk resumes where it stopped: the folder and name are
     // saved as answered, so reopening resumes.
     setRun(forcedRun.current ? { ...RUN_START, step: forcedRun.current } : readFirstRun(localStorage));
+    // AND THE LOOK IS WRITTEN DOWN HERE, on the one line that knows this Mac
+    // has never been used. Before this, only the three setup screens and inbox
+    // zero painted the lake and nothing was stored, so every other screen fell
+    // through to whatever the Mac preferred and a light Mac turned the walk
+    // white after the third screen.
+    //
+    // WHAT IT SEEDS IS PLAIN DARK, NOT A PICTURE. The `else` branch that used
+    // to sit under this line put Gouache Valley on any Mac that had chosen no
+    // picture, every time the walk ran, and that is how a look nobody
+    // picked reached the window. It is deleted, and so is the function behind
+    // it. A picture is something somebody chooses on the walk's look step now,
+    // and nothing else in the app chooses one for them.
+    //
+    // The state goes with it because both were read from localStorage at mount
+    // and neither is watching it, so writing the keys alone would only take
+    // effect on the next launch.
+    const seeded = seedFirstRunLook(localStorage, THEME_KEY);
+    if (seeded) { setTheme(seeded.theme); setSkin(seeded.skin); }
   }, [snap, run]);
 
   useEffect(() => { if (run) saveFirstRun(localStorage, run); }, [run]);
@@ -832,6 +925,11 @@ export default function App() {
   // size, and this is the one line that makes them the practice project's. It
   // is the app's own product filter, which every list in here already reads.
   const inPractice = practising(run);
+  // THE TWO BEATS THE NEW THREAD CARD IS OPEN FOR: the one about who the thread
+  // is for and the one that sends it. Both want the walk's own task in the box,
+  // the practice project under it and the label on the row it makes, so the
+  // card is told once rather than in three places that could disagree.
+  const walkCard = run?.step === 'who' || run?.step === 'task';
   // WHAT THE LISTS UNDERNEATH ARE SCOPED TO. Only the practice run: it has to
   // make the whole app the practice project's, the mask and the counts included.
   // Her own filter is not this. It narrows the box on screen and nothing else
@@ -852,7 +950,11 @@ export default function App() {
     if (!run) return;
     // BEAT FOUR IS THE REAL, EMPTY INBOX.
     if (run.step === 'make') { setFocused(null); setModal(null); setView('inbox'); }
-    if (run.step === 'task') setModal('compose');
+    // BOTH BEATS THE CARD IS OPEN FOR, not just the send. Somebody who quits
+    // the walk on the beat about who a thread is for comes back to a card
+    // telling them to click To, and without this there would be no card on the
+    // screen to click it on.
+    if (run.step === 'who' || run.step === 'task') setModal('compose');
     if (run.step === 'working') { setModal(null); setView('progress'); setSelected(0); }
     // AND IT COMES BACK TO HER INBOX RATHER THAN OPENING ITSELF.
     if (run.step === 'open') { setModal(null); setView('inbox'); setSelected(0); }
@@ -873,6 +975,11 @@ export default function App() {
     // would put the screen back on Inbox a moment after they left it. All this
     // does is make sure nothing is over the app when the tour starts.
     if (run.step === 'where') { setModal(null); setFocused(null); }
+    // THE BOARD BEAT IS DRIVEN NO HARDER THAN THE TOUR IS. The press that
+    // matters is inside the View and filters menu, which the person opens
+    // themselves, so all this does is make sure nothing is over the app and
+    // that they are on the Inbox, where the board lives.
+    if (run.step === 'board') { setModal(null); setFocused(null); setView('inbox'); }
     if (run.step === 'command') { setModal(null); setFocused(null); setView('inbox'); }
   }, [run?.step]);
 
@@ -882,8 +989,11 @@ export default function App() {
   // beat moves on whether she pressed C or clicked the plus, and it is the
   // app's behaviour she is learning rather than the walk's.
   useEffect(() => {
+    // THE CARD OPENING ENDS THE FIRST BEAT AND STARTS THE ONE ABOUT WHO IT IS
+    // FOR (2026-10-01). It used to go straight to the send; To is the card's
+    // first line and the walk never said a word about it.
     if (run?.step !== 'make' || modal !== 'compose') return;
-    setRun((r) => (r ? stepTo(r, 'task') : r));
+    setRun((r) => (r ? stepTo(r, 'who') : r));
   }, [run?.step, modal]);
 
   // AND SHE OPENS IT HERSELF. Beat six's second half ends when the row she was
@@ -1682,12 +1792,20 @@ export default function App() {
   // list that holds one while it is deferred: the Your agents tab that used to
   // carry it as well is gone. A row she deferred has to be somewhere she can
   // reach it, or the only way back is waiting for the moment.
+  //
+  // AND SINCE w-afb66e6661 IT HOLDS A THIRD THING, which is why the tab is
+  // called Later: a thread added to Later has no moment at all. It waits for a
+  // person, so it sorts after everything with a clock rather than before it.
+  const whenShown = useCallback(
+    (i: WorkItem) => (notStarted(i) ? Number.MAX_SAFE_INTEGER : hiddenAt(i)),
+    [hiddenAt],
+  );
   const snoozed = useMemo(() => [
-    ...items.filter((i) => hiddenAt(i) > now
+    ...items.filter((i) => (notStarted(i) || hiddenAt(i) > now)
       && i.status !== 'done'
       && (!scope || i.product === scope)),
     ...agentList.filter((r) => (r.runAt ?? 0) > now),
-  ].sort((a, b) => hiddenAt(a) - hiddenAt(b)), [items, agentList, hiddenAt, scope, now]);
+  ].sort((a, b) => whenShown(a) - whenShown(b)), [items, agentList, hiddenAt, whenShown, scope, now]);
 
   // Repeating tasks. They are RULES, on their own channel, which is why nothing
   // in the item list rules has to know they exist. They are read up here, ahead
@@ -1733,7 +1851,7 @@ export default function App() {
     // row snoozed there are three to see, and the third is where the row she
     // put off went, which is the same lesson as the other two.
     if (tabOrder.some((v) => v !== 'inbox' && !toured.current.has(v))) return;
-    setRun((r) => (r ? stepTo(r, 'command') : r));
+    setRun((r) => (r ? stepTo(r, 'board') : r));
   }, [view, run?.step, tabOrder]);
 
 
@@ -1859,6 +1977,16 @@ export default function App() {
     if (displayPage === 'team') setTeamDisplayRaw(d); else setMineDisplayRaw(d);
     writeDisplay(displayPage, d);
   }, [displayPage]);
+  // AND THE TUTORIAL'S BOARD BEAT ENDS WHEN THE BOARD IS REALLY ON THE SCREEN,
+  // read off the view the page is drawn in rather than off a click: the press
+  // is two deep, inside the View and filters menu, and the beat is about the
+  // board rather than about either press that reaches it. It reads the derived
+  // `inboxDisplay` rather than either half, so it ends on the board whichever
+  // page the walk is standing on.
+  useEffect(() => {
+    if (run?.step !== 'board' || inboxDisplay.view !== 'board') return;
+    setRun((r) => (r ? stepTo(r, 'command') : r));
+  }, [run?.step, inboxDisplay.view]);
   // Your own rows are on the page unless you took yourself off it.
   const mineShown = !team || picked.includes(team.me ?? '');
   const displayedBox = useMemo(
@@ -2628,6 +2756,9 @@ export default function App() {
       // The startup sweep ran before this page existed, so its one line was
       // held for it. It outranks the reload line: a reload she pressed herself
       // needs no telling, and agents coming back off a crash does.
+      // Which set of theme pictures this screen wants, before anything else in
+      // here: a toast that returns early must not take the wallpaper with it.
+      applySkinDetail(resolveSkinDetail(info?.screenDetail));
       // BEFORE ANY RETURN, because this is what puts her back where she was and
       // the two early exits below are about what to SAY. Read once here rather
       // than asked for again: the main process clears the flag as it hands it
@@ -2697,6 +2828,10 @@ export default function App() {
     showToast(`Opening a demo inbox with ${out.rows ?? 0} rows in it. Yours keeps running.${note}`);
   }, [showToast]);
 
+  // She dragged the window onto the other screen, or unplugged one. The picture
+  // does not change, only which copy of it is painted, so there is nothing to
+  // say about it and nothing to store: the attribute is the whole of the state.
+  useEffect(() => window.zero?.onScreenDetail?.((s) => applySkinDetail(resolveSkinDetail(s?.detail))), []);
 
   // FROM A TASK IT ADVANCES, FROM THE LIST IT DOES NOT. The rule and what it
   // cost her are in ./advance; what is here is only which state answers "was a
@@ -3402,8 +3537,13 @@ export default function App() {
     // name a move that did not happen. What actually changed is that work can
     // start on it again.
     const allParked = list.every((i) => parkedByAgent(i, Date.now()));
-    const one = allParked ? 'Running again' : 'Back in the inbox';
-    showToast(list.length > 1 ? `${list.length} ${allParked ? 'running again' : 'back in the inbox'}` : one);
+    // A thread in Later was never in the inbox and never ran, so neither of
+    // those words is true of it: it is starting for the first time.
+    const allHeld = list.every((i) => notStarted(i));
+    const one = allHeld ? 'Started' : allParked ? 'Running again' : 'Back in the inbox';
+    showToast(list.length > 1
+      ? `${list.length} ${allHeld ? 'started' : allParked ? 'running again' : 'back in the inbox'}`
+      : one);
     // The old localStorage snoozes are still honored on read, so a row deferred
     // before this shipped needs clearing there too or it would not come back.
     setSnoozes((s) => {
@@ -3412,8 +3552,14 @@ export default function App() {
       return next;
     });
     for (const item of list) await writeMoment(item, 0);
+    // AND A THREAD IN LATER IS STARTED BY THE SAME PRESS (w-afb66e6661). It has
+    // no moment to clear; what it has is `start`, and 'now' is what makes the
+    // supervisor see it. The undo puts it back in Later.
+    const wasHeld = list.filter((i) => notStarted(i));
+    for (const item of wasHeld) await api.threadEdit(item.product, item.id, { start: 'now' });
     pushUndo({ label: 'Scheduled again', undoes: 'put that schedule back', run: async () => {
       for (const item of list) await writeMoment(item, prior.get(item.id) ?? 0);
+      for (const item of wasHeld) await api.threadEdit(item.product, item.id, { start: 'later' });
       refresh();
     } });
     refresh();
@@ -3484,6 +3630,16 @@ export default function App() {
       : 'Stopped before it started. Back in your inbox. Reply to redirect it.');
     await refresh();
   }, [refresh, showToast, working]);
+
+  // RUN NOW, from the three-dot menu on a waiting task (supervisor.runNow).
+  // The menu only offers it on a queued task, so the refusals are races: the
+  // task started, or left the store, between the menu drawing and the press.
+  const runNow = useCallback(async (item: WorkItem) => {
+    const r = await window.zero?.runNow?.({ product: item.product, id: item.id });
+    showToast(r?.ok ? 'Up next. It starts as soon as an agent is free.'
+      : r?.reason === 'running' ? 'Already running.' : 'This task is no longer waiting.');
+    await refresh();
+  }, [refresh, showToast]);
 
   // Unstick a stalled item: its answer's delivery mark is forgotten and a
   // fresh worker picks it up on the next tick, within seconds.
@@ -4148,8 +4304,129 @@ export default function App() {
     return items.filter((i) => i.status === 'done' && !isCleanRun(i) && i.updatedAt >= start.getTime()).length;
   }, [items]);
 
-  // THE SETUP SCREENS AND INBOX ZERO USED TO PIN DARK AND A PICTURE here. The
-  // app has one look, Light (w-9e434e8671), so every screen wears it.
+  // THE IDLE PAGE ALWAYS WEARS THE PICTURE, WHATEVER MODE THE APP IS IN.
+  //
+  // It is the first and only exception to "mode follows the machine", and it
+  // is one page wide. Nothing is written to localStorage: her stored look is
+  // untouched and comes straight back when the page goes.
+  //
+  // WHY IT PINS ON THE GROUND AND NOT ON `inboxZero`. A modal floating over
+  // this page is still this page, so pressing C must not flip the whole window
+  // to light behind the compose card. Settings is the one thing that does lift
+  // the pin, because the theme picker lives there and a picker showing Light
+  // over a dark window is a control arguing with itself.
+  //
+  // THE SETUP SCREENS WEAR THE PICTURE, AND THEY HAVE TO BE TOLD TO.
+  //
+  // Corner to corner was picked in round two OVER THE LAKE, and 5e2c6ee gave
+  // `.fr-screen` the photograph to match. But it gave it under
+  // `:root[data-skin]`, which is on only while a picture is SWITCHED ON, and on
+  // a first run nothing has switched one on: `resolveSkin(null)` is 'none'.
+  //
+  // It looked right anyway, by accident, for exactly as long as nobody tried it
+  // with a real inbox. A brand new store has nothing in it, so `idlePinned`
+  // below was already pinning the lake and the welcome inherited it. HER window
+  // had rows: Claude Code agents land in the inbox and in no other list, while
+  // the walk only counts PROJECTS, so an empty store and a full inbox happen at
+  // the same time. The pin was off and the welcome came up as a charcoal slab,
+  // #373a41.
+  //
+  // So the walk pins the picture itself rather than hoping to inherit one. Only
+  // the three SETUP screens, which are full surfaces of their own; the steps
+  // after them are tethered over the real app, and that app is hers to look
+  // however she has set it.
+  // AND THE PIN STOPS AT THE PICKER, WHICH IS THE LAST SCREEN BEFORE THE
+  // PRACTICE ROUND. `look` is excluded on purpose: a screen that pins the
+  // default while she presses tiles is a picker that does not work, and the
+  // window repainting under her hand is the whole of what that screen is for.
+  //
+  // THIS LINE USED TO NAME THREE STEPS AND THAT IS THE BUG SHE PHOTOGRAPHED ON
+  // 2026-08-26. It read `welcome || folder || name`, which was every screen
+  // before the picker while the picker was beat four. Moving the picker to beat
+  // seven on 08-25 slid the introduction's three slabs in front of it and left
+  // them pinning nothing, so they fell through to whatever the store holds. On
+  // a Mac that has never chosen, the first-run seed makes that Gouache Valley
+  // and the fault is invisible; on one that has chosen, it is plain light.
+  //
+  // So the question is asked of the step ORDER now (`wearsTheWalksLook`,
+  // onboarding.ts) rather than of three names, and moving the picker again
+  // moves this with it.
+  //
+  // AND THEN IT WENT (w-9e434e8671): the walk has no picker any more, so its
+  // setup screens wear the chosen look, Light or Dark, like the rest of it.
+  const firstRunPinned = false;
+  // AND THE INBOX ZERO PIN IS OFF FOR THE WHOLE OF THE WALK (`run === null`).
+  //
+  // IT STARTED AS ONE STEP AND IT WAS NOT ENOUGH. On 08-24 this read
+  // `!pickingLook`, off a measurement of the picker: pressing a tile moved
+  // `zero.skin` and the tile's own tick and did NOT move the window, because
+  // the app behind the walk is an empty inbox and this pin was painting the
+  // default back over the choice on every render. A picker whose picture does
+  // not change is a picture of a picker.
+  //
+  // Two faults wore that one sentence. The harness that took the page pressed
+  // Light and then failed to press back (scripts/shot-the-built-walk.mjs, and
+  // it throws now rather than carrying on). And this line: the pin is not only
+  // on the picker screen, it is on every beat of the practice round where the
+  // inbox happens to be empty, which is beats 9, 10 and 17 to 19. So somebody
+  // who picked Light walked a tutorial that went dark on five screens and light
+  // on six, and somebody who picked one of the other fifteen photographs saw
+  // Gouache Valley on those five.
+  //
+  // THE EARLIER DECISION IS NARROWED BY A LATER ONE, and `skin ===
+  // 'none'` is the whole of the narrowing.
+  //
+  // So the two halves of the rule split exactly here. A PICTURE she picked
+  // is remembered at inbox zero, because a picture is the nice theme, and
+  // swapping it for a different picture is the app forgetting. Turning that
+  // off too would be this clause, and nothing else.
+  //
+  // AND THEN IT WENT (w-9e434e8671). With three choices, Light, Dark and Match
+  // system, a pin to plain dark at inbox zero would show a theme nobody can
+  // pick, so inbox zero wears the chosen look like every other page.
+  const idlePinned = false;
+  // IT IS THIS PAGE ONLY, and nothing here reaches the inbox, the walk or the
+  // setup screens.
+  useEffect(() => {
+    // TWO PINS, TWO RULES. Both live in skins.ts, one function each, so the
+    // two screens cannot drift apart.
+    //
+    // The theme is pinned dark in both, because a picture is dark and because
+    // inbox zero is a dark screen either way.
+    if (firstRunPinned) {
+      // THE WALK OPENS ON A PICTURE, hers if she has one and Gouache Valley if
+      // she has not. NOTHING IS WRITTEN HERE: the moment the picker opens, her
+      // stored look is back, which is what keeps the earlier fault fixed.
+      const pinned: SkinChoice = walkSkin(skin);
+      applyTheme('dark');
+      applySkin(pinned);
+      if (pinned !== 'none') applyTune(resolveTune(localStorage.getItem(TUNE_KEY), pinned));
+      return;
+    }
+    if (idlePinned) {
+      // THE IDLE PAGE PAINTS THE PICTURE THAT IS ON, and nothing when none is.
+      // An earlier decision, unchanged by this row.
+      const pinned: SkinChoice = idleSkin(skin);
+      applyTheme('dark');
+      applySkin(pinned);
+      if (pinned !== 'none') applyTune(resolveTune(localStorage.getItem(TUNE_KEY), pinned));
+      return;
+    }
+    applyTheme(resolveTheme(theme));
+    // WHICH WAY THE MAC IS POINTING, written on the root so the Match my system
+    // tile can draw it. A rule cannot ask the Mac and the renderer already knows,
+    // so this is the one place the answer crosses over into the stylesheet. It is
+    // written unconditionally, because the tile is on the screen in Settings and
+    // in ⌘K whatever the window is currently wearing.
+    document.documentElement.setAttribute('data-machine', machine);
+    // Match system on a dark Mac is Dark, which is Ember Grid (skins.ts).
+    const worn = wornSkin(theme, skin, machine);
+    applySkin(worn);
+    if (worn !== 'none') applyTune(resolveTune(localStorage.getItem(TUNE_KEY), worn));
+    // `machine` is in the list because on Match my system it is half the answer:
+    // without it the effect never re-runs when macOS flips and the window stays
+    // on whichever it was at launch.
+  }, [idlePinned, firstRunPinned, theme, skin, machine]);
 
   // THE SAME SCREEN, held for the beat it takes ⌘R to put her back where she
   // was, so the reload never shows her the inbox on its way to the task. Its
@@ -4168,7 +4445,8 @@ export default function App() {
   // `!modal` used to sit in this condition, so pressing C or Cmd+K at inbox zero
   // swapped the whole page out for the ordinary list, and an ordinary list with
   // an empty inbox drew that sentence behind her card. The idle page stays up
-  // under the overlay now.
+  // under the overlay now, which is the call `idlePinned` above already makes
+  // about the theme for exactly the same reason.
   // THE TEAM VERSION KEEPS ITS TABS ON AN EMPTY INBOX (2026-10-01): the
   // categories must stay on screen even with nothing in them. So the
   // whole-page zero is only the old layout's; the new one draws its zero under
@@ -4470,8 +4748,8 @@ export default function App() {
             })}
           />}
           {/* AND THE SOCKET A THREAD'S OWN CONTROLS ARE TELEPORTED INTO: the
-              Summary button and the thread's menu, which holds the code, the
-              terminal and Done (w-e731ca9376, 2026-10-01). They are drawn by
+              thread's menu, which holds the code, the terminal and Done
+              (w-e731ca9376, 2026-10-01). They are drawn by
               Focus because only Focus knows which of them this thread has, and
               they land here because the corner is where a task's own controls
               live. */}
@@ -4830,6 +5108,7 @@ export default function App() {
                   }}
                   onReplyClose={() => setModal(null)}
                   onStop={() => stopAgent(focused)}
+                  onRunNow={() => runNow(focused)}
                   onReveal={() => revealAgent(focused)}
                   // Remind me later and stop this task are neither of the two
                   // ways a task ends, and the card beside the bar names exactly
@@ -4846,6 +5125,7 @@ export default function App() {
                   // rule is the point of that file.
                   live={{
                     queued: snap.supervisor.queued,
+                    runNow: snap.supervisor.runNow,
                     paused: snap.supervisor.paused,
                     running: snap.supervisor.running.length,
                     capacity: snap.supervisor.capacity,
@@ -4995,15 +5275,28 @@ export default function App() {
           on the undo pile exactly as the old card's send did below. The draft
           is read FIRST, before the card clears it, because it is the only copy
           an undo can hand back. */}
-      {modal === 'compose' && run?.step !== 'task' && (
+      {modal === 'compose' && (
         <ThreadComposer
           products={rankedProducts}
           items={items}
           engines={snap.engines?.choices}
           codexModels={codexModels}
           codexModelDefault={codexModelDefault}
-          defaultProduct={productFilter}
-          initial={composeInitial}
+          // THE TUTORIAL SENDS ITS TASK INTO THE PRACTICE PROJECT, so the card
+          // opens on that project rather than on whatever was last used.
+          defaultProduct={walkCard ? (run!.practice ?? run!.product) : productFilter}
+          /* THE WALK'S OWN TASK, ALREADY WRITTEN. The beat is about pressing
+             send, not about thinking of something to ask, so the words are in
+             the box when the card opens. `scripted` is what lets this one task
+             into the practice project and what stamps the label the supervisor
+             reads; everything else about the card is the card anybody uses. */
+          initial={walkCard ? { body: `${TASK_TITLE}\n\n${TASK_BODY}` } : composeInitial}
+          scripted={walkCard ? { labels: [FIRST_RUN_LABEL] } : null}
+          // AND THE BEAT ABOUT WHO IT IS FOR ENDS WHEN THE LIST IS REALLY OPEN,
+          // the way every other beat ends on the thing it asked for happening.
+          onOpenMenu={(which) => {
+            if (which === 'to' && runRef.current?.step === 'who') setRun((r) => (r ? stepTo(r, 'task') : r));
+          }}
           onOpenConversation={openConversation}
           // "Reorder" beside the project menu's heading: Settings on the
           // Projects page, which is where the order is set. The draft is
@@ -5014,6 +5307,16 @@ export default function App() {
             setComposeInitial(null);
             const sent = readComposeDraft();
             setModal(null);
+            // THE TUTORIAL'S OWN TASK, AND IT LEAVES NO TOAST AND NO UNDO.
+            // The walk goes on from here with the ringed sentence beside the
+            // row, and an undo key nobody has been taught yet, over a walk it
+            // would strand somebody in the middle of, is not a way back. The
+            // `sent` event is what moves the beat on.
+            if (runRef.current?.step === 'task') {
+              if (made?.id) fire({ t: 'sent', item: made.id, at: Date.now() });
+              await refresh();
+              return;
+            }
             if (how?.kind === 'message') {
               const firsts = (how.toMany ?? [how.to ?? '']).map((id) => team?.byId.get(id)?.name?.split(/\s+/)[0]).filter(Boolean) as string[];
               const said = firsts.length > 1 ? `${firsts.slice(0, -1).join(', ')} and ${firsts[firsts.length - 1]}` : firsts[0];
@@ -5042,6 +5345,7 @@ export default function App() {
             showToast(sentLine({
               to: to ?? slug,
               when: how?.runAt ? whenLabel({ runAt: how.runAt, repeat: null }) : null,
+              held: how?.start === 'later',
             }), made?.id ? { product: made.product, id: made.id } : undefined);
             // SHOW WHERE IT WENT (2026-10-01: a new thread looked as if it
             // was never made, since it was not in the inbox). A thread sent to an agent is not
@@ -5049,7 +5353,7 @@ export default function App() {
             // tab moves to where it did land, Running or Scheduled, so she
             // sees the row arrive instead of an unchanged page.
             if (workspaceNavigation && !teamOpen && !focused && (['inbox', 'progress', 'snoozed'] as View[]).includes(view)) {
-              setView(how?.runAt && how.runAt > Date.now() ? 'snoozed' : 'progress');
+              setView((how?.runAt && how.runAt > Date.now()) || how?.start === 'later' ? 'snoozed' : 'progress');
               setSelected(0);
               setMultiSel(new Set());
             }
@@ -5057,143 +5361,12 @@ export default function App() {
           }}
         />
       )}
-      {/* THE FIRST RUN'S EXAMPLE TASK KEEPS THE OLD CARD. The walk types its
-          task into that card's field and points its tether at that card's
-          Start it, and its send carries the first-run label, so it is left
-          exactly as it was until the walk is redrawn for the new card. */}
-      {modal === 'compose' && run?.step === 'task' && (
-        <Compose
-          products={rankedProducts}
-          /*
-           * WHICH CODING AGENTS THIS MAC REALLY OFFERS, off the
-             snapshot, because `Supervisor#engineChoices` is the one place that
-             asks the capability gate and a card that asked the machine itself
-             would offer her a choice the supervisor is about to refuse. One
-             entry on every Mac until she opens the gate, and then the card draws
-             no engine clause at all — the same card she has always had. */
-          engineChoices={snap.engines?.choices}
-          workspaceEngine={snap.engines?.workspace}
-          /*
-           * AND WHAT CODEX CALLS ITS MODELS, read once on mount rather than off
-             the snapshot: it costs a 199KB parse (main/codex-models.mjs) and a
-             picker must not be the reason that happens every few seconds while
-             she is typing. Empty on every Mac without a choice. */
-          codexModels={codexModels}
-          codexModelDefault={codexModelDefault}
-          onSend={async (p) => {
-            const to = snap.products.find((x) => x.slug === p.product)?.name;
-            // THE CARD AS IT STANDS, read before anything is written, because
-            // Compose clears the draft the moment the send stands and this is
-            // the only copy left to hand back on a Z (noteNewTask above).
-            const sent = readComposeDraft();
-            // A repeating task is a rule, so it does not go down the compose
-            // path at all. If the rule is refused the composer STAYS OPEN with
-            // the draft in it: a refused schedule that also eats what the user
-            // typed is two failures, and the second one is the expensive one.
-            if (p.repeat) {
-              let rule: { id?: string } | null = null;
-              try {
-                // BOTH WORDS PICKED IN THE SAME SENTENCE. The card sends
-                // them beside the rule and this branch used to name neither, so
-                // she could visibly choose Codex on "every morning" and every
-                // run went to the workspace default (main/repeats.mjs).
-                rule = await api.composeRepeat({
-                  product: p.product, title: p.title, body: p.body, priority: p.priority, rule: p.repeat,
-                  engine: p.engine, model: p.model,
-                });
-              } catch (err) {
-                showToast(`Not set: ${(err as Error).message}`);
-                // false = the send did not stand, so the card keeps her draft.
-                // It stays open with the words in it (above); clearing the
-                // draft underneath it would put the loss one Escape away.
-                return false;
-              }
-              setModal(null);
-              // A rule is undone by ending it, which is the same thing the
-              // rule's own card does. Z has to mean the same on both sides of
-              // that switch or it means nothing.
-              if (rule?.id) {
-                // `canceled` one L, the same as the schedule label above. See
-                // the note there for why.
-                noteNewTask(`Repeating task canceled: ${clipToSentence(p.title, TOAST_TITLE)}`, 'cancel that repeating task', sent, async () => {
-                  await api.endRepeat({ product: p.product, id: rule!.id! });
-                  setRepeats(await api.repeats());
-                });
-              }
-              showToast(`Repeating → ${to} · Z to undo`);
-              await refresh();
-              return;
-            }
-            // THE FIRST RUN'S EXAMPLE TASK IS A REAL ROW WITH NO SESSION BEHIND
-            // IT.The label is the whole of the difference: it goes into the
-            // store like anything else, and the supervisor never spawns fresh
-            // work on a row carrying it, because the app answers it two seconds
-            // later out of the folder she chose (onboarding.ts,
-            // main/first-run.mjs).
-            const firstRunTask = runRef.current?.step === 'task';
-            const made = await api.compose(firstRunTask ? { ...p, labels: [FIRST_RUN_LABEL] } : p);
-            setModal(null);
-            if (made?.id && firstRunTask) {
-              fire({ t: 'sent', item: made.id, at: Date.now() });
-              // NO TOAST AND NO UNDO ON THIS ONE. is the exact sentence she
-              // reported as untrue, and an undo key she has not been taught
-              // yet, over a walk it would strand her in the middle of, is not a
-              // way back. Everything from here is the ringed sentence beside
-              // the row.
-              await refresh();
-              return;
-            }
-            if (made?.id) {
-              noteNewTask(`Withdrawn: ${clipToSentence(p.title, TOAST_TITLE)}`, 'take back the task you just made', sent, async () => {
-                await api.answer({ product: p.product, id: made.id, status: 'done' });
-              });
-            }
-            // This is the same toast in the same place; it is the sentence that
-            // changed. "Queued" is a word about our machinery and the arrow was
-            // punctuation standing in for a verb, and neither said the thing
-            // she was looking for.
-            //
-            // A task she asked to start later must SAY it is not starting now,
-            // or the line is a small lie about an agent already having it. And
-            // it says Z out loud, because a way back she cannot see is one she
-            // will not take: the fault was pressing Z here and being answered
-            // by something else. ./compose-says.ts owns the
-            // wording, so the sentence has a test rather than only a reviewer.
-            // AND THE TOAST IS THE WAY INTO THE TASK IT IS ABOUT. The refresh
-            // below is what puts the new row in the window, and it is awaited
-            // before anybody can realistically click, so the lookup at click
-            // time finds it. See the note on `toast` for why the id travels
-            // rather than a closure.
-            showToast(sentLine({
-              to: to ?? p.product,
-              when: p.runAt ? whenLabel({ runAt: p.runAt, repeat: null }) : null,
-            }), made?.id ? { product: p.product, id: made.id } : undefined);
-            await refresh();
-          }}
-          hidden={snap.supervisor.hiddenProducts ?? []}
-          onReorder={async (slugs) => {
-            await (window.zero as any)?.setProductOrder?.({ order: slugs });
-            await refresh();
-          }}
-          onHide={async (slug, hide) => {
-            await (window.zero as any)?.setProductHidden?.({ product: slug, hidden: hide });
-            const name = snap.products.find((p) => p.slug === slug)?.name ?? slug;
-            showToast(hide ? `${name} hidden from the composer` : `${name} shown again`);
-            await refresh();
-          }}
-          // DOOR A, the chosen design. The card opens OVER this one and this one stays
-          // mounted, so the task she is halfway through writing survives making
-          // the project she wants to send it to.
-          onNewProject={() => setNewProject(true)}
-          selectProject={pickProject}
-          // HER FIRST TASK, ALREADY WRITTEN AND TYPING ITSELF IN.The typing is
-          // the first half; the tether pointing at Start it is the second.
-          prefill={run?.step === 'task'
-            ? { title: TASK_TITLE, body: TASK_BODY, product: run.practice ?? run.product }
-            : undefined}
-          onClose={() => setModal(null)}
-        />
-      )}
+      {/* THE OLD COMPOSE CARD IS GONE FROM HERE (2026-10-01). The walk kept it
+          for one round, because the new card refuses a task into the practice
+          project and the walk's task is the one exception; the new card takes
+          a `scripted` prop for that now, so the tutorial opens the same card
+          everybody else opens. Her words: "the tutorial is using the wrong
+          component here, we no longer use this". */}
       {modal === 'palette' && (
         <Palette
           onFirstRun={walkAgain}
@@ -5204,6 +5377,8 @@ export default function App() {
           products={rankedProducts}
           supervisorPaused={snap.supervisor.paused}
           batch={multiSel.size > 0}
+          look={look}
+          onSetLook={(l) => { setLook(l); setModal(null); }}
           staleFiles={snap.restartNeeded?.files ?? []}
           /*
            * A newer Agentbox that has already downloaded itself. The palette is
@@ -5395,8 +5570,13 @@ export default function App() {
           usageReadings={snap.usageByEngine ?? (snap.usage ? [snap.usage] : [])}
           now={now}
           onSectionChange={setSettingsPage}
+          look={pickedLook ?? look}
+          onSetLook={setLook}
           keyHints={keyHints}
           onSetKeyHints={setHints}
+          tune={tune}
+          onSetTune={setTune}
+          onResetTune={resetTune}
           startPane={settingsPane}
           onNewProject={() => setNewProject(true)}
           // The Priority page: the same running order every project list
