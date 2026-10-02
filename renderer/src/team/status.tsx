@@ -115,8 +115,25 @@ export function StatusComposer({ person, now, onDone }: { person: Person; now: n
   </div>;
 }
 
-/** The line under your name in your own row at the foot of the sidebar. The
- *  name above it still opens your account; this opens the box you write in. */
+/** The line under your name in your own row at the foot of the sidebar.
+ *
+ *  IT SITS WHERE YOUR EMAIL USED TO. Her words, 2026-10-02: the first attempt
+ *  "takes up space", "makes everything move" and looks "pretty wonky". It did
+ *  all three, because it was a THIRD line: the row is a fixed height until a
+ *  status forces it open, so the corner jumped the moment you wrote one and
+ *  jumped back when it lapsed. Taking the email's place instead costs nothing
+ *  and moves nothing — the row is the same two lines it always was. Your email
+ *  is still on Settings → Team ("Signed in as ..."), which is where this row
+ *  already takes you when you click your name.
+ *
+ *  THE WAY IN IS A DOTTED UNDERLINE ON HOVER, not an icon. A pencil at the
+ *  row's right edge was drawn first and she turned it down: it overlapped the
+ *  pane beside the sidebar, and "I'm not sure I like that approach". The
+ *  dotted underline is the app's own sign for a value you can change
+ *  (.compose-word, and the thread composer's clauses). It is text-decoration
+ *  and never border-bottom: a border plus padding makes the box taller than
+ *  its neighbours and a centred flex row then lifts the text off the
+ *  baseline, which is the 1px stagger styles.css warns about. */
 export function SidebarStatus({ me, now, collapsed }: { me: Person; now: number; collapsed: boolean }) {
   const [open, setOpen] = useState(false);
   const said = saying(me, now);
@@ -125,7 +142,7 @@ export function SidebarStatus({ me, now, collapsed }: { me: Person; now: number;
   return <>
     <button type="button" className={`th-me-status${said ? '' : ' nothing'}`} aria-expanded={open}
       aria-label="Say what you are up to" title="Say what you are up to" onClick={() => setOpen(!open)}>
-      {said ? `${said.text}${held ? ` · ${held}` : ''}` : 'Say what you are up to'}
+      <span className="th-me-status-ink">{said ? `${said.text}${held ? ` \u00b7 ${held}` : ''}` : 'Say what you are up to'}</span>
     </button>
     {open && <div className="th-me-pop">
       <div className="th-me-pop-head">What are you up to?</div>

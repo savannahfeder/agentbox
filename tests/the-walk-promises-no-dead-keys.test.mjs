@@ -248,11 +248,23 @@ describe('the coaching card promises no dead key either', () => {
   // IT WAS S UNTIL 2026-10-01: S had come to mean the summary inside a thread
   // as well, so one letter taught two things and the walk taught the one the
   // app no longer did. The count did not move.
-  it('names eight keys and no others', () => {
+  //
+  // NINE SINCE 2026-10-02: the board beat names B, which was added to the app
+  // for that switch when it was asked for (w-58c8f466e7; it was V for one
+  // ship). Its handler is the next test in this block.
+  it('names nine keys and no others', () => {
     // The tour printed ⌘ and a number from 2026-09-23 until 2026-10-02
     // (w-914b16eab6); it prints ⇥ at every stop now, so the list is exact again.
     const said = [...new Set([...keys, ...tourKeys])];
-    expect(said.sort()).toEqual(['1', 'N', 'E', 'L', '↵', '⌘K', '⌘↵', '⇥'].sort());
+    expect(said.sort()).toEqual(['1', 'N', 'E', 'L', 'B', '↵', '⌘K', '⌘↵', '⇥'].sort());
+  });
+
+  it('B flips the inbox to the board, which is what the board beat says', () => {
+    // The beat ends when the board is on the screen, so the key has to set the
+    // view the page is drawn in, from the list with nothing open.
+    const list = app.slice(app.indexOf('      switch (e.key) {', app.indexOf('    const onKey = (e: KeyboardEvent) => {')));
+    expect(list).toContain("case 'b': case 'B':");
+    expect(list).toContain('setInboxDisplay(flipView(inboxDisplay))');
   });
 
   it('⇥ rotates the tabs, which is what beat fifteen says three times', () => {

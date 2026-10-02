@@ -70,9 +70,11 @@ describe('rowSharing: who sees a row, as the inbox says it', () => {
 });
 
 describe('the row', () => {
-  it('marks a thread the team can see with a small people mark after its title, and offers Unshare', () => {
+  // Since 2026-10-02 the team, being the default, wears no mark at all
+  // (tests/a-thread-the-whole-team-sees-wears-no-mark.test.mjs).
+  it('draws nothing after the title of a thread the team can see, and offers Unshare', () => {
     const html = draw(row({ createdAt: SINCE + DAY }));
-    expect(html).toMatch(/th-cell-title[^>]*>Acme renewal terms<svg class="th-shared"/);
+    expect(html).toMatch(/th-cell-title[^>]*>Acme renewal terms<\/div>/);
     expect(html).toMatch(/<button[^>]*class="th-row-act"[^>]*>.*Unshare<\/button>/);
   });
   // A private thread wears the LOCK here rather than nothing: the mark is

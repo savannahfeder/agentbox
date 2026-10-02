@@ -28,6 +28,10 @@ export const DEFAULT_DISPLAY: Record<PageId, Display> = {
   team: { view: 'board', sort: 'priority', priorities: [], projects: [], updated: 'any' },
 };
 
+// V FLIPS THE VIEW AND NOTHING ELSE (w-58c8f466e7): the sort and every filter
+// stay, because the list and the board are the same threads in two shapes.
+export const flipView = (d: Display): Display => ({ ...d, view: d.view === 'board' ? 'list' : 'board' });
+
 // THE TEAM BOARD SORTED BY UPDATED UNTIL 2026-10-02, and a saved team display
 // carried that default with it, so the board never ran by priority. A display
 // saved since then carries `v: 2`; one without it that says Updated was the old

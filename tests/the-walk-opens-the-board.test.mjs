@@ -84,10 +84,12 @@ describe('what the board card says', () => {
     expect(line).toContain('board');
   });
 
-  it('names no key, because the app has no shortcut that opens the menu', () => {
-    // A card naming a cap invented to keep the other cards' shape is the dead
-    // key tests/the-walk-promises-no-dead-keys.test.mjs refuses.
-    expect(say.key).toBeNull();
+  it('names B, the key that flips the inbox to the board', () => {
+    // It named no key until 2026-10-02, because there was none. B was added
+    // when it was asked for (w-58c8f466e7; V for one ship before that); the
+    // handler is pinned in tests/b-switches-between-the-list-and-the-board.test.mjs,
+    // so this is not the dead key tests/the-walk-promises-no-dead-keys.test.mjs refuses.
+    expect(say.key).toBe('B');
   });
 
   it('does not promise a team to somebody who has none', () => {

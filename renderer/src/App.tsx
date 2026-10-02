@@ -116,7 +116,7 @@ import { TeamPage } from './team/TeamPage';
 import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, PeopleFilter, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, boardColumns, boardWalk, conversationWith, isDirect, nextTab, pageFor, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
+import { DEFAULT_DISPLAY, boardColumns, boardWalk, conversationWith, flipView, isDirect, nextTab, pageFor, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
@@ -4076,6 +4076,14 @@ export default function App() {
         // N does the same as C: the letter she reached for (w-fb9051e597).
         case 'c': case 'C': case 'n': case 'N': e.preventDefault(); setModal('compose'); break;
         case 'z': case 'Z': undo(); break;
+        // B FLIPS LIST AND BOARD (w-58c8f466e7): "I quite often switch between
+        // board and list view". B for board; it shipped as V first and that
+        // read as "a weird one". Only where the list or the board is what is
+        // on the screen; a search, the Team page and an open card draw
+        // something else.
+        case 'b': case 'B':
+          if (search === null && !teamShown && !openCard) { e.preventDefault(); setInboxDisplay(flipView(inboxDisplay)); setSelected(0); }
+          break;
         case 'Escape':
           if (multiSel.size) setMultiSel(new Set());
           // Search with the field unfocused, which is what she is left in after
@@ -4087,7 +4095,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, stateTabOrder]);
+  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
@@ -5378,6 +5386,10 @@ export default function App() {
           onInstallUpdate={() => { setModal(null); void api.updateInstall(); }}
           panelUp={panelUp}
           onTogglePanel={() => { setModal(null); togglePanel(); }}
+          boardUp={inboxDisplay.view === 'board'}
+          onFlipView={!inFullScreen && search === null && !teamShown && !openCard
+            ? () => { setModal(null); setInboxDisplay(flipView(inboxDisplay)); setSelected(0); }
+            : undefined}
           keyHints={keyHints}
           onSetKeyHints={(v) => { setModal(null); setHints(v); }}
           onSearch={openSearch}

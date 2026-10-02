@@ -55,10 +55,16 @@ describe('the panel reads properties first, then the name and its three lines', 
   // Her pick after three rounds of full-window shots (light Geist at 16 to
   // 24px, and six other styles): 16px light. Not 24 light, which she liked
   // and found too big, and not the 16px medium it started as.
-  it('sets the name in Geist light at 16px', () => {
+  //
+  // Then 2026-10-02 (w-5391bb330f): light read too thin against the lines
+  // under it, and she asked for one or two weights up. Shown full-window in
+  // Dark at 300, 400, 500 and 600, she picked 500. Still 16px: only the
+  // weight moved.
+  it('sets the name in Geist medium at 16px', () => {
     const rule = css.match(/\.ts-title \{[^}]*\}/)[0];
     expect(rule).toMatch(/font-size: 16px/);
-    expect(rule).toMatch(/font-weight: 300/);
+    expect(rule).toMatch(/font-weight: 500/);
+    expect(rule).not.toMatch(/font-weight: (300|400|600)/);
     expect(rule).not.toMatch(/font-family/);
   });
 });
