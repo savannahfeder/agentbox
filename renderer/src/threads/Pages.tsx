@@ -13,7 +13,7 @@ import { PriorityIcon } from '../components/Priority';
 import { rowTitle } from '../list-rules';
 import { DONE } from '../done-word';
 import {
-  BOARD_COLUMNS, filteredEmptyWords, isDirect, isFiltered, projectChoices, sortedEntries, teamEntries, teamKeeps, updatedWords,
+  boardColumns, filteredEmptyWords, isDirect, isFiltered, projectChoices, updatedWords,
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
@@ -399,18 +399,15 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   const who = picked ?? (me ? [me] : []);
   const withOthers = who.some((p) => p !== me);
   const since = team?.state.since ?? null;
-  const entries = teamEntries({ items: me && !who.includes(me) ? [] : items, products, cards: cards.filter((c) => who.includes(c.personId)), me, now, since, stateOf, live: liveIds, allMine: true })
-    .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
-    .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
+  // One copy of what the board holds and in what order, which App.tsx also
+  // walks with J and K (`boardColumns`, page-rules.ts).
+  const columns = boardColumns({ items, products, display, now, stateOf, cards, picked, me, since, live: liveIds });
   const sharing = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since } : null);
   return <div className="list hm-me">
     {end && <div className="th-bar th-bar-end">{end}</div>}
     <div className="th-board">
-    {BOARD_COLUMNS.map((col) => {
-      // EVERY COLUMN TAKES THE DISPLAY'S SORT, not just the list view
-      // (w-5a08121f99). `teamEntries` hands these back newest first, which is
-      // one answer to a question the menu asks per page.
-      const rows = sortedEntries(entries.filter((e) => e.state === col.state), display);
+    {columns.map((col) => {
+      const rows = col.rows;
       return <div key={col.state}>
         {/* Your own board says what the tab says: what waits on you needs you. */}
         <div className="th-col-h"><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b></div>
