@@ -1,16 +1,15 @@
 // THE WORKER CALLS THE PERSON "YOU", NEVER "SHE" OR "HE".
 //
 // Measured 2026-10-01 on the team build: a tester, a man, read his own worker
-// write "Re-claiming the row, and checking git for the original test she
-// mentions." The briefs were written for one founder. In the team version
+// call him "she" while it picked his task back up. The briefs were written for one founder. In the team version
 // anyone on a team is the person a worker works for, so the brief says so
 // near the top, in one plain rule, and says it whether or not the install
 // gives the worker store tools (the two halves of the brief are fenced, and a
 // rule inside one fence would reach only half the workers).
 //
 // AND THE WORDS HANDED TO IT ON A REPLY MUST NOT CONTRADICT THE RULE. That
-// tester's line came on the turn after his reply, which the supervisor hands
-// over as "What she said:" (`replyBrief`). The turn prompts, the picture block,
+// tester's line came on the turn after his reply, which the supervisor used to
+// introduce with a heading that said "she" (`replyBrief`). The turn prompts, the picture block,
 // the conversation transcript and the store tools' own descriptions are the
 // app's own words to a worker, so they say "they" too.
 

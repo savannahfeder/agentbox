@@ -13,10 +13,9 @@
 // changes the record on screen, which is why this is a handoff to the
 // composer and not a write.
 //
-// AND IT IS NOT THERE WHEN THERE IS NOBODY TO ADD (the founder, 2026-10-01:
-// "it should only have that Add people button if there are more people in the
-// company to add. Otherwise it's cleaner if it just doesn't show that at
-// all."). A two person company, or a group that is already everyone, gets no
+// AND IT IS NOT THERE WHEN THERE IS NOBODY TO ADD (2026-10-01): the Add people
+// button shows only when the company holds somebody else to add, because a
+// button that can do nothing is clutter. A two person company, or a group that is already everyone, gets no
 // control, because pressing it could only ever open a card with the same
 // people in it.
 //

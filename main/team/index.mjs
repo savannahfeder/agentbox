@@ -224,8 +224,8 @@ export function createTeamService({
       return state;
     },
 
-    // TEAM SETTINGS (2026-10-01): her words, "the invite team page and the team
-    // settings I had mentioned". The database decides who may (owners rename,
+    // TEAM SETTINGS (2026-10-01): an invite page and team settings beside it.
+    // The database decides who may (owners rename,
     // remove and cancel; anyone leaves); these only ask it and say what it said.
     async renameTeam(name) {
       if (!backend || !state.team) throw new Error('start or join a team first');

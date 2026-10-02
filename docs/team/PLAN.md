@@ -35,7 +35,8 @@ company, filterable by person. Nothing in the sidebar shows who is busy.
   Supabase: the Mac has 16 GB and other work runs on it. Tests use an
   in-process stand-in, and two copies on one Mac talk through a small local
   stand-in server (`cloud/dev-server.mjs`).
-- This repository never pushes to the public one, and nothing pulls the public
+- Superseded 2026-10-01: the team version now lives in the public repository,
+  with its history. Until then: this repository never pushed to the public one, and nothing pulled the public
   one in automatically.
 
 ## How it works

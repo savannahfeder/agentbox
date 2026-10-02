@@ -20,8 +20,8 @@ export interface Display {
   updated: UpdatedWindow;
 }
 
-// Her words: "your page should, by default, be in list view" and "the team page
-// should, by default, be in board view", and either is remembered once changed.
+// Your own page opens as a list and the team page as a board, by default, and
+// either is remembered once changed.
 export const DEFAULT_DISPLAY: Record<PageId, Display> = {
   inbox: { view: 'list', sort: 'priority', priorities: [], projects: [], updated: 'any' },
   team: { view: 'board', sort: 'updated', priorities: [], projects: [], updated: 'any' },

@@ -17,10 +17,11 @@ import { signInWithGoogle } from './sign-in.mjs';
 // else. Electron sets defaultApp only when run from a checkout.
 export const isPackagedElectron = () => !!process.versions?.electron && !process.defaultApp;
 
-// The hosted project's address and public key. They are meant to ship inside
-// the app (row level security, not secrecy, is what protects the data), so
-// they live in the repository; AGENTBOX_TEAM_CONFIG points at another file
-// from a checkout only.
+// The hosted project's address and public key, from cloud/team.config.json.
+// Row level security, not secrecy, is what protects the data, but the file is
+// still kept out of the repository (it is ignored), so a public checkout runs
+// as the single-person app; cloud/team.config.example.json shows its shape.
+// AGENTBOX_TEAM_CONFIG points at another file from a checkout only.
 export function loadCloudConfig(appDir, { packaged = isPackagedElectron() } = {}) {
   const file = (!packaged && process.env.AGENTBOX_TEAM_CONFIG) || path.join(appDir, 'cloud', 'team.config.json');
   try {

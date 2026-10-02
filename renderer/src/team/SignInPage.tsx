@@ -1,7 +1,7 @@
 // THE SIGN-IN PAGE, AND WHAT SIGNING OUT LANDS ON (2026-10-01).
 //
-// Her words: "we were trying to get this to a point of complete viability, so
-// it needs a real sign-in page and a real sign-out page." Signing in used to
+// A team version people can actually use needs a real sign-in page and a real
+// sign-out page. Signing in used to
 // be one Google button inside the Team page, and signing out left the whole
 // app standing with nobody in it. Now a team build with nobody signed in shows
 // this page over the whole window: Google first, then email and password, and

@@ -1,6 +1,5 @@
-// A REAL SIGN-IN PAGE AND A REAL SIGN-OUT (2026-10-01). Her words: "we were
-// trying to get this to a point of complete viability, so it needs a real
-// sign-in page and a real sign-out page." Email and password beside Google,
+// A REAL SIGN-IN PAGE AND A REAL SIGN-OUT (2026-10-01). A team version people
+// can actually use needs both. Email and password beside Google,
 // a page over the whole window while nobody is signed in, and signing out
 // landing on it.
 import { it, expect, describe } from 'vitest';

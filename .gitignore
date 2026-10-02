@@ -90,3 +90,10 @@ scripts/scratch/
 # seeds that from here when the data folder has none, and `standingInstructions`
 # treats a missing file as no instructions at all.
 briefs/founder.md
+
+# THE TEAM CLOUD'S ADDRESS AND KEY ARE NOT SOURCE EITHER.
+#
+# `cloud/team.config.json` points the team version at one hosted project. It
+# lives only on the machines that run that version; a checkout without it is
+# the single-person app. `cloud/team.config.example.json` shows the shape.
+cloud/team.config.json

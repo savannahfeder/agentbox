@@ -81,8 +81,8 @@ function TeamSetup({ team, products, onDone, inviteFocus = false }: { team: Team
   </div>;
 }
 
-/** TEAM SETTINGS (2026-10-01): her words, "the invite team page and the team
- *  settings I had mentioned". The team's name, its people, the invites still
+/** TEAM SETTINGS (2026-10-01): an invite page and team settings beside it.
+ *  The team's name, its people, the invites still
  *  out, and leaving. The owner renames, removes and cancels; anyone leaves.
  *  The database is what enforces it; this only hides what would be refused. */
 function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEmail, busy, run, onDone }: {

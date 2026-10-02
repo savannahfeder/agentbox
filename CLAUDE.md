@@ -42,20 +42,22 @@ tokens stay out of it. `scripts/check-before-public.mjs` runs before every push
 to it and refuses one that carries any of them; `npm run check:public` audits
 the whole tree.
 
-## THIS CHECKOUT IS THE PRIVATE TEAM REPOSITORY, NOT THE PUBLIC ONE
+## THE TEAM VERSION IS PART OF THIS REPOSITORY (2026-10-01)
 
-`origin` is `Astral-Agent/agentbox-team`, private. It is the public repository
-plus the team version (shared projects, teammates, the Team page), which stays
-private until the founder decides to open it. The plan is `docs/team/PLAN.md`.
+The team version (shared projects, teammates, the Team page) used to live in a
+separate private repository. It was merged in here with its history, so this
+is the one app and the one source of truth. The plan is `docs/team/PLAN.md`.
 
-- `upstream` is the public `savannahfeder/agentbox`. Its push URL is disabled on
-  purpose. Never re-enable it and never push team code there.
-- Nothing pulls the public repo in automatically; this version may be
-  maintained on its own. If public changes are wanted, merge them by hand
-  (`git fetch upstream && git merge upstream/main`), never rebase.
+- The team cloud's address and key, `cloud/team.config.json`, are never
+  committed (it is ignored, and `tests/the-team-cloud-key-stays-out-of-the-repository`
+  checks it). Machines that run the team version keep their own copy; without
+  it the app is the single-person app. `cloud/team.config.example.json` shows
+  the shape.
+- A branch cut from the old private repository's history will not line up with
+  this one: the merge rewrote those commits to take the key file out. Move it
+  across with
+  `git rebase --onto refs/remotes/origin/main $(git merge-base <branch> 5ff1b688195c90508ecb8abdc7355e028226e729) <branch>`,
+  where that sha is the old team history's last commit.
 - Keep team code in its own files (`main/team/`, `renderer/src/team/`,
   `shared/team-*.mjs`, `cloud/`, `tests/team-*.test.mjs`) where that is
-  natural, so the two codebases stay easy to compare.
-- The section above about nothing personal still applies here: this code is
-  meant to become public later.
-- Work on branches named `agentbox/<work item id>`; `main` here is the team build.
+  natural.

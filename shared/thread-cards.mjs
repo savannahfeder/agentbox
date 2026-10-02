@@ -5,8 +5,8 @@
 // the owner and a teammate are always shown the same words.
 //
 //   threadState  one of four states and only four: waiting, running,
-//                scheduled, done. Her words: "status should be one of the
-//                predefined states", never "needs your pick".
+//                scheduled, done. A status is always one of those
+//                predefined states, never "needs your pick".
 //   summaryOf    problem, progress and solution. The agent keeps them
 //                current (update_work_item); until it has written one, the
 //                ask and the latest word on the thread stand in, so a new

@@ -46,8 +46,7 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   // Whether the Team page is up, which lights its tab and darkens the others.
   teamPage?: boolean;
   // THE FOOT OF THE SIDEBAR (approved 2026-10-01): invite people, the team's
-  // members, settings, and you. Her words: "move it into the sidebar, along with
-  // settings, team members, invite people, your profile".
+  // members, settings, and you, all in the sidebar rather than on a page.
   team?: TeamState | null; onInvite?: () => void; onMembers?: () => void;
   view: View; collapsed: boolean; onToggle: () => void; onView: (view: View) => void; onSearch: () => void; onCompose: () => void;
 }) {
