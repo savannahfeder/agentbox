@@ -171,6 +171,13 @@
 .th-col-h[draggable="true"] { cursor: grab; user-select: none; border-radius: var(--radius); margin: 0 -6px; padding: 0 6px; }
 .th-col-h[draggable="true"]:hover { background: var(--wash); color: var(--text); }
 .th-board.dragging .th-col-h { cursor: grabbing; }
+/* The handle: six dots at the heading's right end, out of sight until the
+   pointer is over the column, faint there, and full only on the heading you
+   would grab. Never drawn mid-drag, when it would only be noise. */
+.th-col-grip { margin-left: auto; flex: none; color: var(--text-faint); opacity: 0; transition: opacity .12s ease; }
+.th-col:hover .th-col-grip { opacity: .7; }
+.th-col-h:hover .th-col-grip { opacity: 1; color: var(--text-dim); }
+.th-board.dragging .th-col-grip { opacity: 0; }
 .th-col.lifted { opacity: .35; }
 .th-card .t { font-size: 14px; line-height: 20px; color: var(--text); margin: 0 0 14px; }
 .th-card .t.hidden { color: var(--text-dim); }

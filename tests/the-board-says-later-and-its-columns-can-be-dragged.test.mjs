@@ -16,7 +16,10 @@ import { readFileSync } from 'node:fs';
 import {
   BOARD_COLUMNS, DEFAULT_COLUMN_ORDER, boardColumns, boardWalk, moveColumn, readColumnOrder, writeColumnOrder,
 } from '../renderer/src/threads/page-rules.ts';
-import { INBOX_TABS } from '../renderer/src/threads/Pages.tsx';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { INBOX_TABS, InboxBoard } from '../renderer/src/threads/Pages.tsx';
+globalThis.React = React;
 
 const NOW = Date.UTC(2026, 9, 2, 17);
 const products = [{ slug: 'p', name: 'P' }];
@@ -107,6 +110,27 @@ describe('remembering the order', () => {
     const s = memory();
     s.setItem('threads.board.columns', JSON.stringify(['done', 'gone', 'done', 'running']));
     expect(readColumnOrder(s)).toEqual(['done', 'running', 'waiting', 'scheduled']);
+  });
+});
+
+// "Just add some indication that it is draggable. For instance, oftentimes
+// when you hover over a column and it's draggable, a little drag icon comes up
+// subtly." The first round had only a grab cursor over the heading, which you
+// see only once you are already on it.
+describe('a column says it can be moved', () => {
+  const draw = (props) => renderToStaticMarkup(React.createElement(InboxBoard, {
+    items, products, display, now: NOW, stateOf: (i) => i._state, onOpenItem: () => {}, ...props,
+  }));
+  it('every heading carries the drag handle when the board can be reordered', () => {
+    expect(draw({ onReorderColumns: () => {} }).match(/class="th-col-grip"/g)).toHaveLength(4);
+  });
+  it('and none when it cannot, so the handle never promises a drag that does nothing', () => {
+    expect(draw({})).not.toContain('th-col-grip');
+  });
+  it('the handle shows only while the pointer is over the column, and faintly', () => {
+    const css = readFileSync(new URL('../renderer/src/threads/pages.css', import.meta.url), 'utf8');
+    expect(css).toMatch(/\.th-col-grip\s*\{[^}]*opacity:\s*0[;\s]/);
+    expect(css).toMatch(/\.th-col:hover \.th-col-grip\s*\{[^}]*opacity:/);
   });
 });
 
