@@ -138,6 +138,9 @@ export const SHORTCUTS: ShortcutGroup[] = [
       { keys: ['J', '↓'], join: 'or', what: 'Move down the list.' },
       // case 'k': case 'K': case 'ArrowUp' → selected - 1
       { keys: ['K', '↑'], join: 'or', what: 'Move up the list.' },
+      // case 'ArrowLeft': case 'ArrowRight' → boardSideways (w-23fc91bff5).
+      // "Board" is the word the View and filters menu prints.
+      { keys: ['←', '→'], what: 'Move to the next column on the board.' },
       // case 'Enter' → setFocused(pointed)
       { keys: ['↵'], what: 'Open the task you are on.' },
       // sidebarSlot(e) in workspace-navigation.mjs: ⌘ and a number, one per

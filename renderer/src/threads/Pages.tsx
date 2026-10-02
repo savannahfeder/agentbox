@@ -13,7 +13,7 @@ import { PriorityIcon } from '../components/Priority';
 import { notStarted, rowTitle } from '../list-rules';
 import { DONE } from '../done-word';
 import {
-  boardColumns, filteredEmptyWords, isDirect, isFiltered, projectChoices, updatedWords,
+  boardColumns, DEFAULT_COLUMN_ORDER, filteredEmptyWords, isDirect, isFiltered, moveColumn, projectChoices, updatedWords,
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
@@ -398,11 +398,15 @@ export function ThreadCells({ item, product, now, person }: {
  *  you pick them, your teammates' (w-05ff3d1438). Every thread of yours is on
  *  it, the private ones included; with a teammate in view, those wear a lock
  *  and every card names its person. `end` is the faces, over the board. */
-export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, end }: {
+export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, end, selected, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number; onOpenItem: (item: WorkItem) => void;
   /** The column each thread sits in, by the Inbox tabs' rule (App.tsx). */
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
   cards?: ThreadCard[]; picked?: string[]; onOpenCard?: (card: ThreadCard) => void; end?: ReactNode;
+  /** The thread the keyboard is on (App.tsx's `current`), drawn as selected. */
+  selected?: WorkItem | null;
+  /** The columns left to right, and where a dragged order goes to be kept. */
+  columnOrder?: ThreadStateWord[]; onReorderColumns?: (order: ThreadStateWord[]) => void;
 }) {
   const liveIds = useContext(LiveContext);
   const team = useContext(TeamContext);
@@ -410,23 +414,54 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   const who = picked ?? (me ? [me] : []);
   const withOthers = who.some((p) => p !== me);
   const since = team?.state.since ?? null;
+  // A COLUMN BEING DRAGGED MOVES AS YOU DRAG IT (w-23fc91bff5): the others
+  // make room under the pointer, and letting go keeps that order. Let go
+  // anywhere else and the board goes back the way it was.
+  const [dragging, setDragging] = useState<ThreadStateWord | null>(null);
+  const [preview, setPreview] = useState<ThreadStateWord[] | null>(null);
+  const shown = preview ?? columnOrder;
   // One copy of what the board holds and in what order, which App.tsx also
   // walks with J and K (`boardColumns`, page-rules.ts).
-  const columns = boardColumns({ items, products, display, now, stateOf, cards, picked, me, since, live: liveIds });
+  const columns = boardColumns({ items, products, display, now, stateOf, cards, picked, me, since, live: liveIds, order: shown });
   const sharing = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since } : null);
+  const isSelected = (it: WorkItem | null) => !!it && !!selected && it.id === selected.id && it.product === selected.product;
+  // The keyboard's card stays on the screen as J, K and the arrows move it,
+  // and only when it moves, so a refresh never scrolls the board out from
+  // under the pointer.
+  const boardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    boardRef.current?.querySelector('.th-card.selected')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }, [selected?.id, selected?.product]);
+  const endDrag = () => { setDragging(null); setPreview(null); };
   return <div className="list hm-me">
     {end && <div className="th-bar th-bar-end">{end}</div>}
-    <div className="th-board">
+    <div className={`th-board${dragging ? ' dragging' : ''}`} ref={boardRef}>
     {columns.map((col) => {
       const rows = col.rows;
-      return <div key={col.state}>
-        {/* Your own board says what the tab says: what waits on you needs you. */}
-        <div className="th-col-h"><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b></div>
+      return <div key={col.state} className={`th-col${dragging === col.state ? ' lifted' : ''}`}
+        onDragOver={(e) => {
+          if (!dragging) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          if (col.state !== dragging) setPreview(moveColumn(shown, dragging, col.state));
+        }}
+        onDrop={(e) => { if (!dragging) return; e.preventDefault(); onReorderColumns?.(shown); endDrag(); }}>
+        {/* Your own board says what the tab says: what waits on you needs you.
+            The heading is the handle: grab it to move the whole column. */}
+        <div className="th-col-h" draggable={!!onReorderColumns} title={onReorderColumns ? 'Drag to move this column' : undefined}
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('application/x-agentbox-column', col.state);
+            const column = e.currentTarget.parentElement;
+            if (column) e.dataTransfer.setDragImage(column, e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+            setDragging(col.state);
+          }}
+          onDragEnd={endDrag}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b></div>
         {rows.length === 0 && <div className="th-col-empty">Nothing here.</div>}
         {/* A card says who can see it the way a row does: the lock on what
             only you can see, the people mark on what a few chosen people
             can, and nothing on what the whole team can, the default. */}
-        {rows.map((e) => <button type="button" key={e.key} className="th-card" onClick={() => (e.item ? onOpenItem(e.item) : e.card && onOpenCard?.(e.card))}>
+        {rows.map((e) => <button type="button" key={e.key} className={`th-card${isSelected(e.item) ? ' selected' : ''}`} onClick={() => (e.item ? onOpenItem(e.item) : e.card && onOpenCard?.(e.card))}>
           <div className="t">{e.message ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} /> : e.title}
             {e.item && !e.message && sharing(e.item) === 'people' && <SharedMark label="Visible to the people on it" />}
             {e.item && !e.message && sharing(e.item) === 'private' && <LockMark />}
