@@ -24,7 +24,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { racedWithAnotherPush, notReadyToShip } from './lib/ship-rules.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// THE FOLDER IT SHIPS IS THE ONE IT RUNS IN. `npm run ship` runs in the
+// package root, so a person or agent in a worktree ships that worktree as
+// before; Agentbox runs the copy in the app folder (which only ever
+// fast-forwards to the remote) against a task's folder, so a branch cannot
+// change the code that ships it (main/ship-queue.mjs).
+const root = (() => { try { return execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: process.cwd(), encoding: 'utf8' }).trim(); } catch { return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'); } })();
 const PUBLIC = 'origin';
 const ATTEMPTS = 3;
 
