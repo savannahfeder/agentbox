@@ -80,7 +80,7 @@ import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, idleSkin, lookMean
 import { resolveTaskShape, TASK_SHAPE_KEY, type TaskShape } from './task-shape';
 import { ComposeIcon } from './components/ComposeIcon';
 import { WorkspaceNavigation } from './components/WorkspaceNavigation';
-import { searchFieldInStrip, sidebarSlot, workspaceDestinations, workspaceNavigationShown, workspacePageTitle } from './workspace-navigation.mjs';
+import { searchFieldInStrip, workspaceDestinations, workspaceNavigationShown, workspacePageTitle } from './workspace-navigation.mjs';
 import { SettingsIcon } from './components/SettingsIcon';
 import { UsagePill } from './components/UsagePill';
 import { engineWordFor } from './byline';
@@ -416,7 +416,8 @@ export default function App() {
   //
   // WHAT WAS ACTUALLY HAPPENING. The plate is measured off the element's live
   // box. She pointed at a row, then used the KEYBOARD, and the list under the
-  // pointer was replaced: pressing ⌘2 swaps the whole list for another one, and
+  // pointer was replaced: pressing ⌘2 (Tab, since 2026-10-02) swaps the whole
+  // list for another one, and
   // typing in search re-renders it. The row she had been pointing at was then
   // detached from the document, and a detached element's box is all zeros, so
   // the plate placed itself at 0,0 and was clamped to the window's own margin.
@@ -3877,25 +3878,9 @@ export default function App() {
         setSelected(0);
         return;
       }
-      // ⌘1 to ⌘4, one per section, in the order the sidebar draws them. It was
-      // ⌘⌥ and an arrow, but that chord was too long and collided with window
-      // tiling apps, which moved the whole window.
-      const slot = sidebarSlot(e);
-      if (slot && !inInput && !modal && !inFullScreen) {
-        const order = tabOrder;
-        // A number past the end of a list that is three long today does
-        // nothing at all rather than wrapping round to the first.
-        const want = order[slot - 1];
-        if (!want) return;
-        e.preventDefault();
-        setHoveredId(null);
-        (document.activeElement as HTMLElement | null)?.blur?.();
-        closeSearch();
-        setMultiSel(new Set());
-        setView(want);
-        setSelected(0);
-        return;
-      }
+      // NO ⌘1 TO ⌘4 (w-914b16eab6, 2026-10-02). They went straight to a
+      // section of the sidebar until the sections became the tabs above, which
+      // Tab walks. They were removed on her word, not left as a second way in.
       // cmd-A: select everything in the current list for batch action. It
       // works from inside a focused task too (dropping back to the list),
       // and pressing it again with everything selected clears the selection.
@@ -3913,9 +3898,9 @@ export default function App() {
       // along with the hint column the drawer drew and the ⌘K key hints. ⌘K
       // still reaches every level by name, which is the route she actually
       // used. The chord is not merely unadvertised; it does not fire, so ⌘1..4
-      // is free again, AND SINCE 2026-09-23 IT IS SPENT: ⌘1 to ⌘4 go to the
-      // four sections of the sidebar, handled above by `sidebarSlot`. What must
-      // never come back is the PRIORITY reading of those keys. Modifier chords belong to the menu and the OS (cmd-R
+      // is free again. It went to the sidebar's sections from 2026-09-23 to
+      // 2026-10-02 and that is gone too, for Tab. What must never come back is
+      // the PRIORITY reading of those keys. Modifier chords belong to the menu and the OS (cmd-R
       // reload, cmd-C copy); a single-letter shortcut must never fire
       // underneath one.
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -4619,12 +4604,9 @@ export default function App() {
         ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">{openCard ? 'Threads' : 'Team'}</h1> : <h1 className="workspace-title">Threads</h1>)) : (
         <nav
           className="tabs"
-          /* NO HINT ON THIS NAV. It carried one while the keys were ⌘⌥ and an
-             arrow, which moved BETWEEN the four and so belonged to the strip.
-             ⌘1 to ⌘4 go straight to a section, so the hint is on each TAB now,
-             and the tabs she actually sees are the sidebar's
-             (WorkspaceNavigation). This older strip is the layout without the
-             sidebar and it draws no hint at all rather than a stale one. */
+          /* NO HINT ON THIS NAV. This older strip is the layout without the
+             sidebar; the tabs she actually sees are the Inbox page's own
+             (StateTabs in threads/Pages.tsx), and those wear the Tab hint. */
         >
           <>
           {/* It left the corner because the corner was crowded once the ⌘ mark went

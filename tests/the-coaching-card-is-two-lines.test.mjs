@@ -156,7 +156,8 @@ describe('2. a key is drawn with its name when the glyph says nothing', () => {
 
   it('names nothing that already says its own name', () => {
     // ⌘1 to ⌘4 joined this list on w-ec62ab6b38 (2026-09-28): "the cmd 2
-    // says it twice".
+    // says it twice". The walk no longer draws them (w-914b16eab6), and they
+    // stay here so a chord that comes back is still not named twice.
     for (const cap of ['C', 'E', 'S', '1', '⌘K', '⌘↵', '⌘1', '⌘2', '⌘3', '⌘4']) {
       expect(keyName(cap), cap).toBeNull();
     }
@@ -171,16 +172,13 @@ describe('2. a key is drawn with its name when the glyph says nothing', () => {
     const tour = ['inbox', 'snoozed', 'progress', 'done']
       .map((view) => coach('where', 0, { view }));
     expect(tour).toHaveLength(4);
-    // THE CAP IS THE DESTINATION'S OWN NUMBER SINCE 2026-09-23, so it is no
-    // longer one glyph for all four stops: ⌘⌥ and an arrow moved BETWEEN the
-    // tabs, and ⌘1 to ⌘4 go straight to one. What has to stay true is that
-    // whatever cap the card prints is named, because a bare ⌘3 says nothing
-    // out loud.
-    // The cap is the glyph alone since w-ec62ab6b38 (2026-09-28): the word
-    // under it repeated the key.
+    // THE CAP IS ⇥ AT EVERY STOP AGAIN SINCE 2026-10-02 (w-914b16eab6). From
+    // 2026-09-23 it was the destination's own number, ⌘1 to ⌘4; those keys are
+    // gone and Tab walks the tabs. So every stop prints ⇥, and ⇥ is named Tab
+    // inside its cap, because the glyph alone is what she could not read.
     for (const card of tour) {
-      expect(card.key).toMatch(/^⌘[1-4]$/);
-      expect(keyName(card.key)).toBeNull();
+      expect(card.key).toBe('⇥');
+      expect(keyName(card.key)).toBe('Tab');
     }
   });
 

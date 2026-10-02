@@ -38,7 +38,8 @@ describe('Tab on an opened task', () => {
   const gate = app.slice(app.indexOf("if (e.key === 'Tab') {"), app.indexOf("if (e.key === 'Tab') {") + 700);
   for (const part of ['!focused', '!focusedRepeat', '!inFullScreen']) expect(gate).toContain(part);
   expect(gate).toContain('if (!onTheTabs) return;');
-  expect(app).toContain('if (slot && !inInput && !modal && !inFullScreen)');
+  // ⌘1 to ⌘4 went on 2026-10-02 (w-914b16eab6), so Tab is the only key here.
+  expect(app).not.toContain('sidebarSlot');
  });
 
  it('hands the press back to the browser there rather than swallowing it', () => {

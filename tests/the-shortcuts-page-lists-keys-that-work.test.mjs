@@ -21,8 +21,8 @@
 // ../renderer/src/shortcuts.ts without somebody finding its handler cannot
 // reach her screen.
 //
-// AND THE OMISSIONS ARE PINNED TOO. ⌘1..4 (priority) was removed on purpose
-// and the handler no longer fires; two stale tooltips still advertise it. G
+// AND THE OMISSIONS ARE PINNED TOO. ⌘1..4 was removed on purpose, first as
+// priority and then (2026-10-02) as the sidebar's sections, for Tab. G
 // and B are real but gated on an empty inbox. Any of the three would be an
 // easy, plausible, wrong addition, so each has a test saying no.
 
@@ -72,11 +72,11 @@ const HANDLED = {
   'K': [[list, "case 'k': case 'K':"], [list, 'Math.max(0, selected - 1)']],
   '↑': [[list, "case 'ArrowUp':"]],
   '↵': [[list, "case 'Enter': if (!multiSel.size && pointed)"]],
-  // ⌘ and a number, one per section. It was ⌘⌥ and an arrow until 2026-09-23:
-  // three keys was too many, and window tiling apps answer that chord before
-  // this window ever sees it.
-  '⌘1': [[chords, 'const slot = sidebarSlot(e);'], [chords, 'const want = order[slot - 1];']],
-  '⌘4': [[chords, 'const slot = sidebarSlot(e);'], [chords, 'const want = order[slot - 1];']],
+  // Tab and Shift-Tab walk the tabs along the top of the inbox. They replaced
+  // ⌘1 to ⌘4 on 2026-10-02 (w-914b16eab6), which went to a section of the
+  // sidebar before those sections became these tabs.
+  'tab': [[chords, "if (e.key === 'Tab') {"], [chords, 'setView(nextTab(stateTabOrder, view, e.shiftKey) as View);']],
+  '⇧tab': [[chords, "if (e.key === 'Tab') {"], [chords, 'setView(nextTab(stateTabOrder, view, e.shiftKey) as View);']],
   'esc': [
     // One step back out: the document, then the task, then the list.
     [focused, "if (e.key === 'Escape') { if (escapeClosesDoc(openDoc)) closeArtifact(); else setFocused(null); }"],
@@ -182,18 +182,11 @@ describe('what the page refuses to say', () => {
   // The chord does not fire. Two tooltips in Compose.tsx and Focus.tsx still
   // print it and are simply wrong; a shortcuts page repeating them would
   // promote a stale tooltip into a promise.
-  it('does not offer ⌘1 to ⌘4 for PRIORITY, which is the meaning she removed', () => {
-    // The chord is alive again and means something else entirely since
-    // 2026-09-23: it goes to a section of the sidebar, and the page lists it
-    // that way. What must never come back is the priority reading of it, so
-    // this checks the WORDS beside the cap rather than the cap itself.
-    const said = SHORTCUTS.flatMap((g) => g.keys)
-      .filter((k) => k.keys.some((c) => /^⌘[1-4]$/.test(c)))
-      .map((k) => k.what.toLowerCase())
-      .join(' ');
-    expect(said).not.toContain('priority');
-    expect(said).not.toContain('urgent');
-    expect(said).toContain('section');
+  it('does not offer ⌘1 to ⌘4 at all, for priority or for sections', () => {
+    // Priority was the first meaning and was removed on purpose. From
+    // 2026-09-23 the chord went to a section of the sidebar, and that went on
+    // 2026-10-02 (w-914b16eab6) for Tab. Neither may come back unexamined.
+    expect(everyKey().filter((c) => /^⌘[1-4]$/.test(c))).toEqual([]);
     expect(app.replace(/^\s*\/\/ ?/gm, '').replace(/\s+/g, ' ')).toContain('it does not fire, so ⌘1..4 is free again');
   });
 

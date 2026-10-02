@@ -138,17 +138,18 @@ describe('search stands at the head of the tab row', () => {
     expect(css).toMatch(/\.tabs \{[^}]*gap: 26px/s);
   });
 
-  it('keeps the strip free of a hint slot of its own, and puts the section key on the Inbox tab', () => {
+  it('keeps the strip free of a hint slot of its own, and puts the tab key on the Inbox’s own tabs', () => {
     // The strip's hint slot is gone (w-2f7fac6027). The magnifier wears the
     // search hint like any other button (the-hint-plate pins that), and the
     // nav around it carries none.
     expect(app).not.toContain('className="tab-hint');
     expect(app).not.toContain('STRIP_HINTS');
     expect(tabNav).toMatch(/aria-label="Search threads"[\s\S]{0,200}onClick=\{openSearch\}/);
-    // The sections hint moved onto each TAB when the keys became ⌘1 to ⌘4.
-    // approved 2026-10-01 (w-e731ca9376): Inbox is the only section tab left
-    // in the sidebar, so it is the one that wears it.
-    expect(nav).toMatch(/data-tab="inbox" data-hint=\{sectionHint\(1\)\}/);
+    // The sections hint sat on the sidebar's Inbox tab while the keys were ⌘1
+    // to ⌘4. Those keys went on 2026-10-02 (w-914b16eab6); Tab walks the tabs
+    // on the Inbox page, so those tabs wear the hint and the sidebar row none.
+    expect(nav).not.toMatch(/data-tab="inbox" data-hint/);
+    expect(read('renderer/src/threads/Pages.tsx')).toContain('data-hint="state-tab"');
   });
 });
 

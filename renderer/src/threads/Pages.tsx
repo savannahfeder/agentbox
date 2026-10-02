@@ -171,7 +171,8 @@ export function StateTabs({ view, counts, onView, needs, end }: {
   view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string; end?: ReactNode;
 }) {
   return <div className="th-bar"><div className="tm-tabs">
-    {INBOX_TABS.map((t) => <button type="button" key={t.view} className={`tm-tab${view === t.view ? ' on' : ''}`} onClick={() => onView(t.view)}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
+    {/* Every tab wears the Tab plate (hint-plate.ts, 'state-tab'). */}
+    {INBOX_TABS.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${view === t.view ? ' on' : ''}`} onClick={() => onView(t.view)}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
   </div>{end}</div>;
 }
 

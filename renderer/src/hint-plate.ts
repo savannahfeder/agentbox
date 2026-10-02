@@ -55,8 +55,12 @@ export interface HintLine {
 export function capsFor(key: string): string[] {
   if (key.length <= 1) return [key];
   // The words the app writes out for one physical key. Nothing else is
-  // multi-character and single-key.
-  if (key === 'esc') return [key];
+  // multi-character and single-key. A word can sit at the end of a chord
+  // (⇧tab), and stays whole there too.
+  for (const word of ['esc', 'tab']) {
+    if (key === word) return [key];
+    if (key.endsWith(word)) return [...key.slice(0, -word.length), word];
+  }
   return [...key];
 }
 
@@ -74,19 +78,14 @@ export const HINTS: Record<string, HintLine[]> = {
   // "Thread" is the app's word for a row since w-ec62ab6b38.
   'new-task': [{ key: 'N', what: 'New thread' }],
   sidebar: [{ key: '\\', what: 'Show or hide the sidebar' }],
-  // ONE PER TAB, NOT ONE FOR THE STRIP. While the keys were ⌘⌥ and an arrow
-  // they moved BETWEEN the four, so they belonged to the nav and not to any one
-  // of them. ⌘1 to ⌘4 go straight to a section, so each tab now says its own
-  // number and the plate lands under the tab she is pointing at.
-  //
-  // THE NUMBER IS THE POSITION AND THE LABEL IS NOT WRITTEN HERE. Scheduled
-  // comes and goes with whether anything is deferred (`workspaceDestinations`),
-  // so the fourth tab is Closed on most days and the third on some. The tab
-  // knows which slot it is drawn in; `sectionHint` below turns that into the id.
-  'section-1': [{ key: '⌘1', what: 'Go to this section' }],
-  'section-2': [{ key: '⌘2', what: 'Go to this section' }],
-  'section-3': [{ key: '⌘3', what: 'Go to this section' }],
-  'section-4': [{ key: '⌘4', what: 'Go to this section' }],
+  // THE TABS ALONG THE TOP OF THE INBOX (Needs you, In progress, Later, Done,
+  // All). Tab and Shift-Tab walk them, so every tab wears the same plate.
+  // It replaced ⌘1 to ⌘4 on the sidebar's sections, 2026-10-02 (w-914b16eab6):
+  // "when i hover over them just like other shortcuts it should show these".
+  'state-tab': [
+    { key: 'tab', what: 'Next tab' },
+    { key: '⇧tab', what: 'Previous tab' },
+  ],
   // A task in the list. THE ONLY COMPONENT IN HERE THAT IS NOT A BUTTON, and
   // the reason it says three whole fragments rather than three bare caps: a row
   // carries no verb anywhere on it, so the caps alone would say nothing.
@@ -193,13 +192,4 @@ export function placeHint(
     : (text ? text.left - inset : comp.left);
   const left = Math.max(HINT_MARGIN, Math.min(wanted, viewport.width - plate.width - HINT_MARGIN));
   return { top: Math.round(top), left: Math.round(left), rose };
-}
-
-/**
- * THE HINT ID FOR THE TAB DRAWN IN THIS SLOT, counting from one, or undefined
- *  past the fourth. A fifth section would need a fifth key before it could have
- *  a hint, and saying nothing is the honest answer until it does.
- */
-export function sectionHint(slot: number): string | undefined {
-  return slot >= 1 && slot <= 4 ? `section-${slot}` : undefined;
 }

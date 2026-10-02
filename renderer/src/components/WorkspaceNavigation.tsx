@@ -1,4 +1,3 @@
-import { sectionHint } from '../hint-plate';
 import type { ReactNode } from 'react';
 import { SettingsIcon } from './SettingsIcon';
 import type { TeamState, View } from '../types';
@@ -93,7 +92,7 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
       </>}
     </div>
     <nav className="workspace-tabs" aria-label="Threads">
-      <button data-tab="inbox" data-hint={sectionHint(1)} data-hint-text="span" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label="Threads" aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `Threads · ${waitingDescription}` : collapsed ? 'Threads' : undefined} onClick={() => onView('inbox')}><SidebarIcon view="inbox" /><span>Threads</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
+      <button data-tab="inbox" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label="Threads" aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `Threads · ${waitingDescription}` : collapsed ? 'Threads' : undefined} onClick={() => onView('inbox')}><SidebarIcon view="inbox" /><span>Threads</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
       {/* THERE IS NO TEAM TAB (w-05ff3d1438, 2026-10-01). The Team page and
           the Inbox were one question on two pages, so they are one page: the
           faces at the end of the Inbox's tab bar pick whose threads are on

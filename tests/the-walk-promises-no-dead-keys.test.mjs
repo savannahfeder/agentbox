@@ -249,15 +249,10 @@ describe('the coaching card promises no dead key either', () => {
   // as well, so one letter taught two things and the walk taught the one the
   // app no longer did. The count did not move.
   it('names eight keys and no others', () => {
-    // ⌘ AND A NUMBER, and WHICH numbers depends on the strip: the tour prints
-    // the destination's own slot, and Scheduled is only there some of the time.
-    // So the fixed part of the list is checked exactly, and the section keys are
-    // checked for being section keys.
+    // The tour printed ⌘ and a number from 2026-09-23 until 2026-10-02
+    // (w-914b16eab6); it prints ⇥ at every stop now, so the list is exact again.
     const said = [...new Set([...keys, ...tourKeys])];
-    const sections = said.filter((k) => /^⌘[1-4]$/.test(k));
-    expect(said.filter((k) => !/^⌘[1-4]$/.test(k)).sort())
-      .toEqual(['1', 'N', 'E', 'L', '↵', '⌘K', '⌘↵'].sort());
-    expect(sections.length).toBeGreaterThan(0);
+    expect(said.sort()).toEqual(['1', 'N', 'E', 'L', '↵', '⌘K', '⌘↵', '⇥'].sort());
   });
 
   it('⇥ rotates the tabs, which is what beat fifteen says three times', () => {
@@ -272,8 +267,10 @@ describe('the coaching card promises no dead key either', () => {
     expect(rotate).toContain('workspaceDestinations({ scheduledCount, view })');
     expect(workspaceDestinations({ scheduledCount: 0 }).map(([key]) => key)).toEqual(['inbox', 'progress', 'done']);
     expect(workspaceDestinations({ scheduledCount: 1 }).map(([key]) => key)).toEqual(['inbox', 'progress', 'snoozed', 'done']);
-    expect(app).toContain('const want = order[slot - 1];');
-    expect(app).toContain("if (slot && !inInput && !modal && !inFullScreen)");
+    // And Tab itself rotates the Inbox's tabs (the number keys that stood in
+    // for it went on 2026-10-02, w-914b16eab6).
+    expect(app).toContain('setView(nextTab(stateTabOrder, view, e.shiftKey) as View);');
+    expect(app).not.toContain('const want = order[slot - 1];');
     // And each tab carries the mark the ring sits on, or the beat points at
     // nothing. Measured the hard way once already, one beat up: a card that
     // describes something invisible is this whole round's fault.

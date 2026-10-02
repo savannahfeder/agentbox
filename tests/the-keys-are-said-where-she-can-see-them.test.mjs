@@ -23,8 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rowKeys } from '../renderer/src/list-rules';
-import { HINTS, capsFor, sectionHint } from '../renderer/src/hint-plate';
-import { workspaceDestinations } from '../renderer/src/workspace-navigation.mjs';
+import { HINTS, capsFor } from '../renderer/src/hint-plate';
 import { DONE } from '../renderer/src/done-word';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -138,7 +137,8 @@ describe('the hint is drawn on the row the keys act on', () => {
     expect(down.slice(0, 400)).toContain('setHoveredId(null)');
     const up = listSwitch.slice(listSwitch.indexOf("case 'k': case 'K':"));
     expect(up.slice(0, 400)).toContain('setHoveredId(null)');
-    expect(app).toMatch(/if \(slot && !inInput && !modal && !inFullScreen\) \{[\s\S]{0,400}setHoveredId\(null\);/);
+    // Tab swaps the whole list for the next tab's, so it lets go of the row too.
+    expect(app).toMatch(/if \(e\.key === 'Tab'\) \{[\s\S]{0,700}setHoveredId\(null\);/);
   });
 
   it('gives ⌘K the same row, so the menu cannot mean a different task', () => {
@@ -177,43 +177,21 @@ describe('the hint is drawn on the row the keys act on', () => {
   });
 });
 
-describe('⌘ and a number go to a section', () => {
-  it('reads the sidebar’s own list, which is what the hint claims', () => {
-    const tab = app.slice(app.indexOf('const slot = sidebarSlot(e);'));
-    // THE ROTATION IS `tabOrder`, ONE MEMO, SINCE 2026-08-24. It was written
-    // out inline here and the walk kept a second copy of the same order; the
-    // snooze beat put a Scheduled tab on the screen and the second copy was
-    // wrong the same afternoon. Both read this now.
-    expect(tab.slice(0, 700)).toMatch(/const order = tabOrder;/);
-    // AND SINCE 2026-09-21 THAT MEMO IS THE SIDEBAR'S OWN LIST. Scheduled comes
-    // and goes with what is in it, so the rotation is read off the same
-    // function that draws the tabs rather than written out a third time.
-    expect(app).toMatch(/const tabOrder = useMemo<View\[\]>\([\s\S]*?workspaceDestinations\(\{ scheduledCount, view \}\)/);
-    for (const [order, keys] of [
-      [workspaceDestinations({ scheduledCount: 0 }), ['inbox', 'progress', 'done']],
-      [workspaceDestinations({ scheduledCount: 2 }), ['inbox', 'progress', 'snoozed', 'done']],
-    ]) expect(order.map(([key]) => key)).toEqual(keys);
-    expect(tab.slice(0, 700)).toContain("const slot = sidebarSlot(e);");
+describe('Tab walks the tabs the Inbox draws', () => {
+  // ⌘1 TO ⌘4 WENT TO A SECTION OF THE SIDEBAR from 2026-09-23 and were removed
+  // on 2026-10-02 (w-914b16eab6), once In progress, Later and Done had become
+  // tabs on the Inbox page. Tab walks those, and the hint says so on each one.
+  it('reads the strip’s own list, which is what the hint claims', () => {
+    expect(app).toMatch(/const stateTabOrder = useMemo\(\(\) => INBOX_TABS\.map\(\(t\) => t\.view\)/);
+    expect(app).toContain('setView(nextTab(stateTabOrder, view, e.shiftKey) as View);');
   });
 
-  it('wears ⌘1 on the Inbox tab, the one section the sidebar still draws', () => {
-    // It was on the nav while the keys were ⌘⌥ and an arrow, because those
-    // moved BETWEEN the four and belonged to no single tab. ⌘1 to ⌘4 go
-    // straight to a section, so each sidebar tab said its own number.
-    //
-    // approved 2026-10-01 (w-e731ca9376): In progress, Scheduled and Done left
-    // the sidebar and became tabs on the Inbox page, so Inbox is the only
-    // section tab the sidebar draws and it says ⌘1. The keys ⌘2 to ⌘4 still run
-    // through `tabOrder` above, and the state tabs do not wear their hints.
-    expect(nav1).toMatch(/data-tab="inbox" data-hint=\{sectionHint\(1\)\}/);
-    expect(nav1).not.toContain('sectionHint(slot + 1)');
+  it('wears the Tab plate on every state tab, and nothing on the sidebar’s Threads row', () => {
+    expect(pages).toContain('key={t.view} data-hint="state-tab"');
+    expect(HINTS['state-tab'].map((l) => l.key)).toEqual(['tab', '⇧tab']);
+    expect(nav1).not.toMatch(/data-tab="inbox" data-hint/);
     expect(app).not.toContain('className="tab-hint');
     expect(app).not.toContain('STRIP_HINTS');
-    for (const slot of [1, 2, 3, 4]) {
-      expect(HINTS[sectionHint(slot)].map((l) => l.key)).toEqual([`⌘${slot}`]);
-    }
-    // A fifth section would need a fifth key before it could have a hint.
-    expect(sectionHint(5)).toBeUndefined();
   });
 });
 
@@ -231,19 +209,14 @@ describe('only a component that does not already show its key carries a hint', (
       // The row writes its own as a spread, because it is only worn in the
       // inbox and only off an ordinary row.
       for (const m of file.matchAll(/data-hint(?:="|': ')([a-z-]+)/g)) worn.add(m[1]);
-      // A section tab gets its id from `sectionHint(n)` rather than writing it
-      // out, so the id is read off the slot it names.
-      for (const m of file.matchAll(/data-hint=\{sectionHint\((\d)\)\}/g)) worn.add(sectionHint(Number(m[1])));
     }
-    // Every id worn is one the list knows. That half is unchanged.
+    // Every id worn is one the list knows.
     for (const id of worn) expect(Object.keys(HINTS), `${id} is worn but has no line`).toContain(id);
-    // And every id the list knows is worn, with one exception the redesign
-    // made. approved 2026-10-01 (w-e731ca9376): the sidebar lost its In
-    // progress, Scheduled and Done tabs, which were the ones wearing ⌘2 to ⌘4.
-    // The keys still run, so their lines stay, but nothing wears them until
-    // the Inbox page's state tabs do. Anything else unworn is a dead line.
+    // And every id the list knows is worn. The unworn ⌘2 to ⌘4 lines that were
+    // allowed here went with those keys (w-914b16eab6); the state tabs wear
+    // the Tab line instead. Anything unworn is a dead line.
     const unworn = Object.keys(HINTS).filter((id) => !worn.has(id));
-    for (const id of unworn) expect(['section-2', 'section-3', 'section-4'], `${id} is a line nothing wears`).toContain(id);
+    expect(unworn).toEqual([]);
   });
 
   it('says nothing on the four she named', () => {
