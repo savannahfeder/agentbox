@@ -74,7 +74,7 @@ export interface ThreadSent {
 type MenuKey = 'to' | 'model' | 'project' | 'priority' | 'visibility' | 'later';
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, onClose, onSent, onOpenConversation, onReorderProjects,
+  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onClose, onSent, onOpenConversation, onReorderProjects,
 }: {
   products: Product[];
   items: WorkItem[];
@@ -87,6 +87,23 @@ export function ThreadComposer({
   defaultProduct?: string | null;
   /** Who it is to (a teammate's id) and words to start from, for a card opened from somewhere. */
   initial?: { to?: string; also?: string[]; body?: string } | null;
+  /**
+   * THE TUTORIAL'S OWN EXAMPLE TASK, and nothing else ever sets this.
+   *
+   * The walk types one task into this card and the app answers it a couple of
+   * seconds later out of a pre-written line, with no session behind it
+   * (main/first-run.mjs). Two things follow, and both are why the walk needed a
+   * card of its own until now:
+   *
+   *  - IT MAY BE SENT INTO THE PRACTICE PROJECT. Every other task there is
+   *    refused, because nothing in that project would pick it up and a tester
+   *    hit exactly that. The walk's task is the one with something waiting for
+   *    it, and `scripted` is how the card tells them apart with no guessing.
+   *  - IT CARRIES A LABEL. The supervisor never spawns fresh work on a row
+   *    wearing it. The label is passed in rather than imported, so this card
+   *    knows nothing about the walk beyond "somebody scripted this one".
+   */
+  scripted?: { labels: string[] } | null;
   /** Picking someone you already talk to opens that conversation instead,
    *  carrying whatever was typed into its reply box (2026-10-01: a strip of
    *  the last few lines reads badly for a conversation that is hundreds of
@@ -303,7 +320,7 @@ export function ThreadComposer({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const message = threadMessage(text, person ? [] : attachments);
-  const refusal = person ? null : practiceRefusal(product);
+  const refusal = person ? null : practiceRefusal(product, { scripted: !!scripted });
   const canSend = !sending && (person ? !!text.trim() : !!message && !!product && !refusal);
 
   const sendTask = async (when: { runAt?: number; repeat?: { every: 'day' | 'weekday' | 'week'; on?: number; at: string } } = {}) => {
@@ -335,6 +352,8 @@ export function ThreadComposer({
           ...(when.runAt ? { runAt: when.runAt } : {}),
           ...harness,
           ...(team ? sharingFields(visibility, chosenHere) : {}),
+          // The tutorial's own task, and only ever that one. See `scripted`.
+          ...(scripted ? { labels: scripted.labels } : {}),
         });
         onSent(made, { kind: 'task', product: product.slug, title: message.title, ...(when.runAt ? { runAt: when.runAt } : {}) });
       }

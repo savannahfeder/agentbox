@@ -700,8 +700,10 @@ describe('the wire between the two halves', () => {
     const app = read('../renderer/src/App.tsx');
     expect(app).toMatch(/api\.firstRunPractice\(\)/);
     expect(app).toMatch(/api\.firstRunPracticeEnd\(\)/);
-    // And the practice project is what the compose card is addressed to, or
-    // the one task they send themselves lands in their own project.
-    expect(app).toMatch(/product: run\.practice \?\? run\.product/);
+    // And the practice project is what the card is addressed to, or the one
+    // task they send themselves lands in their own project. The walk opens the
+    // real new thread card since 2026-10-01, and that card is told which
+    // project to open on rather than being handed a prefill with one inside it.
+    expect(app).toMatch(/defaultProduct=\{run\?\.step === 'task' \? \(run\.practice \?\? run\.product\) : productFilter\}/);
   });
 });

@@ -32,7 +32,6 @@ import { type Place, placeIsSomewhere, readPlace, writePlace, writeScroll } from
 import { documentCandidates } from './message-artifacts';
 import { filesFromRuns } from './run-files';
 import { Rail } from './components/Rail';
-import { Compose } from './components/Compose';
 import { ThreadComposer } from './threads/ThreadComposer';
 import { proposeParent } from '../../shared/project-folder-check.mjs';
 import { NewProject } from './components/NewProject';
@@ -5196,15 +5195,23 @@ export default function App() {
           on the undo pile exactly as the old card's send did below. The draft
           is read FIRST, before the card clears it, because it is the only copy
           an undo can hand back. */}
-      {modal === 'compose' && run?.step !== 'task' && (
+      {modal === 'compose' && (
         <ThreadComposer
           products={rankedProducts}
           items={items}
           engines={snap.engines?.choices}
           codexModels={codexModels}
           codexModelDefault={codexModelDefault}
-          defaultProduct={productFilter}
-          initial={composeInitial}
+          // THE TUTORIAL SENDS ITS TASK INTO THE PRACTICE PROJECT, so the card
+          // opens on that project rather than on whatever was last used.
+          defaultProduct={run?.step === 'task' ? (run.practice ?? run.product) : productFilter}
+          /* THE WALK'S OWN TASK, ALREADY WRITTEN. The beat is about pressing
+             send, not about thinking of something to ask, so the words are in
+             the box when the card opens. `scripted` is what lets this one task
+             into the practice project and what stamps the label the supervisor
+             reads; everything else about the card is the card anybody uses. */
+          initial={run?.step === 'task' ? { body: `${TASK_TITLE}\n\n${TASK_BODY}` } : composeInitial}
+          scripted={run?.step === 'task' ? { labels: [FIRST_RUN_LABEL] } : null}
           onOpenConversation={openConversation}
           // "Reorder" beside the project menu's heading: Settings on the
           // Projects page, which is where the order is set. The draft is
@@ -5215,6 +5222,16 @@ export default function App() {
             setComposeInitial(null);
             const sent = readComposeDraft();
             setModal(null);
+            // THE TUTORIAL'S OWN TASK, AND IT LEAVES NO TOAST AND NO UNDO.
+            // The walk goes on from here with the ringed sentence beside the
+            // row, and an undo key nobody has been taught yet, over a walk it
+            // would strand somebody in the middle of, is not a way back. The
+            // `sent` event is what moves the beat on.
+            if (runRef.current?.step === 'task') {
+              if (made?.id) fire({ t: 'sent', item: made.id, at: Date.now() });
+              await refresh();
+              return;
+            }
             if (how?.kind === 'message') {
               const firsts = (how.toMany ?? [how.to ?? '']).map((id) => team?.byId.get(id)?.name?.split(/\s+/)[0]).filter(Boolean) as string[];
               const said = firsts.length > 1 ? `${firsts.slice(0, -1).join(', ')} and ${firsts[firsts.length - 1]}` : firsts[0];
@@ -5258,143 +5275,12 @@ export default function App() {
           }}
         />
       )}
-      {/* THE FIRST RUN'S EXAMPLE TASK KEEPS THE OLD CARD. The walk types its
-          task into that card's field and points its tether at that card's
-          Start it, and its send carries the first-run label, so it is left
-          exactly as it was until the walk is redrawn for the new card. */}
-      {modal === 'compose' && run?.step === 'task' && (
-        <Compose
-          products={rankedProducts}
-          /*
-           * WHICH CODING AGENTS THIS MAC REALLY OFFERS, off the
-             snapshot, because `Supervisor#engineChoices` is the one place that
-             asks the capability gate and a card that asked the machine itself
-             would offer her a choice the supervisor is about to refuse. One
-             entry on every Mac until she opens the gate, and then the card draws
-             no engine clause at all — the same card she has always had. */
-          engineChoices={snap.engines?.choices}
-          workspaceEngine={snap.engines?.workspace}
-          /*
-           * AND WHAT CODEX CALLS ITS MODELS, read once on mount rather than off
-             the snapshot: it costs a 199KB parse (main/codex-models.mjs) and a
-             picker must not be the reason that happens every few seconds while
-             she is typing. Empty on every Mac without a choice. */
-          codexModels={codexModels}
-          codexModelDefault={codexModelDefault}
-          onSend={async (p) => {
-            const to = snap.products.find((x) => x.slug === p.product)?.name;
-            // THE CARD AS IT STANDS, read before anything is written, because
-            // Compose clears the draft the moment the send stands and this is
-            // the only copy left to hand back on a Z (noteNewTask above).
-            const sent = readComposeDraft();
-            // A repeating task is a rule, so it does not go down the compose
-            // path at all. If the rule is refused the composer STAYS OPEN with
-            // the draft in it: a refused schedule that also eats what the user
-            // typed is two failures, and the second one is the expensive one.
-            if (p.repeat) {
-              let rule: { id?: string } | null = null;
-              try {
-                // BOTH WORDS PICKED IN THE SAME SENTENCE. The card sends
-                // them beside the rule and this branch used to name neither, so
-                // she could visibly choose Codex on "every morning" and every
-                // run went to the workspace default (main/repeats.mjs).
-                rule = await api.composeRepeat({
-                  product: p.product, title: p.title, body: p.body, priority: p.priority, rule: p.repeat,
-                  engine: p.engine, model: p.model,
-                });
-              } catch (err) {
-                showToast(`Not set: ${(err as Error).message}`);
-                // false = the send did not stand, so the card keeps her draft.
-                // It stays open with the words in it (above); clearing the
-                // draft underneath it would put the loss one Escape away.
-                return false;
-              }
-              setModal(null);
-              // A rule is undone by ending it, which is the same thing the
-              // rule's own card does. Z has to mean the same on both sides of
-              // that switch or it means nothing.
-              if (rule?.id) {
-                // `canceled` one L, the same as the schedule label above. See
-                // the note there for why.
-                noteNewTask(`Repeating task canceled: ${clipToSentence(p.title, TOAST_TITLE)}`, 'cancel that repeating task', sent, async () => {
-                  await api.endRepeat({ product: p.product, id: rule!.id! });
-                  setRepeats(await api.repeats());
-                });
-              }
-              showToast(`Repeating → ${to} · Z to undo`);
-              await refresh();
-              return;
-            }
-            // THE FIRST RUN'S EXAMPLE TASK IS A REAL ROW WITH NO SESSION BEHIND
-            // IT.The label is the whole of the difference: it goes into the
-            // store like anything else, and the supervisor never spawns fresh
-            // work on a row carrying it, because the app answers it two seconds
-            // later out of the folder she chose (onboarding.ts,
-            // main/first-run.mjs).
-            const firstRunTask = runRef.current?.step === 'task';
-            const made = await api.compose(firstRunTask ? { ...p, labels: [FIRST_RUN_LABEL] } : p);
-            setModal(null);
-            if (made?.id && firstRunTask) {
-              fire({ t: 'sent', item: made.id, at: Date.now() });
-              // NO TOAST AND NO UNDO ON THIS ONE. is the exact sentence she
-              // reported as untrue, and an undo key she has not been taught
-              // yet, over a walk it would strand her in the middle of, is not a
-              // way back. Everything from here is the ringed sentence beside
-              // the row.
-              await refresh();
-              return;
-            }
-            if (made?.id) {
-              noteNewTask(`Withdrawn: ${clipToSentence(p.title, TOAST_TITLE)}`, 'take back the task you just made', sent, async () => {
-                await api.answer({ product: p.product, id: made.id, status: 'done' });
-              });
-            }
-            // This is the same toast in the same place; it is the sentence that
-            // changed. "Queued" is a word about our machinery and the arrow was
-            // punctuation standing in for a verb, and neither said the thing
-            // she was looking for.
-            //
-            // A task she asked to start later must SAY it is not starting now,
-            // or the line is a small lie about an agent already having it. And
-            // it says Z out loud, because a way back she cannot see is one she
-            // will not take: the fault was pressing Z here and being answered
-            // by something else. ./compose-says.ts owns the
-            // wording, so the sentence has a test rather than only a reviewer.
-            // AND THE TOAST IS THE WAY INTO THE TASK IT IS ABOUT. The refresh
-            // below is what puts the new row in the window, and it is awaited
-            // before anybody can realistically click, so the lookup at click
-            // time finds it. See the note on `toast` for why the id travels
-            // rather than a closure.
-            showToast(sentLine({
-              to: to ?? p.product,
-              when: p.runAt ? whenLabel({ runAt: p.runAt, repeat: null }) : null,
-            }), made?.id ? { product: p.product, id: made.id } : undefined);
-            await refresh();
-          }}
-          hidden={snap.supervisor.hiddenProducts ?? []}
-          onReorder={async (slugs) => {
-            await (window.zero as any)?.setProductOrder?.({ order: slugs });
-            await refresh();
-          }}
-          onHide={async (slug, hide) => {
-            await (window.zero as any)?.setProductHidden?.({ product: slug, hidden: hide });
-            const name = snap.products.find((p) => p.slug === slug)?.name ?? slug;
-            showToast(hide ? `${name} hidden from the composer` : `${name} shown again`);
-            await refresh();
-          }}
-          // DOOR A, the chosen design. The card opens OVER this one and this one stays
-          // mounted, so the task she is halfway through writing survives making
-          // the project she wants to send it to.
-          onNewProject={() => setNewProject(true)}
-          selectProject={pickProject}
-          // HER FIRST TASK, ALREADY WRITTEN AND TYPING ITSELF IN.The typing is
-          // the first half; the tether pointing at Start it is the second.
-          prefill={run?.step === 'task'
-            ? { title: TASK_TITLE, body: TASK_BODY, product: run.practice ?? run.product }
-            : undefined}
-          onClose={() => setModal(null)}
-        />
-      )}
+      {/* THE OLD COMPOSE CARD IS GONE FROM HERE (2026-10-01). The walk kept it
+          for one round, because the new card refuses a task into the practice
+          project and the walk's task is the one exception; the new card takes
+          a `scripted` prop for that now, so the tutorial opens the same card
+          everybody else opens. Her words: "the tutorial is using the wrong
+          component here, we no longer use this". */}
       {modal === 'palette' && (
         <Palette
           onFirstRun={walkAgain}

@@ -171,10 +171,15 @@ describe('the click each card names is a real one', () => {
   it('points at the button the ring is round, on the two beats that ring a button', () => {
     expect(loud(coach('make', 0))).toContain('click New thread');
     expect(ANCHOR.make[0]).toBe('button[aria-label="New thread"]');
-    expect(loud(coach('task', 0))).toContain('click Start it');
-    expect(ANCHOR.task[0]).toBe('.modal.compose .dock-send');
-    // The compose card's own button really says those words.
-    expect(read('renderer/src/components/Compose.tsx')).toContain('Start it');
+    // THE REAL NEW THREAD CARD SINCE 2026-10-01, which says Send rather than
+    // Start it. The walk had kept the retired one-line card for a round and the
+    // founder caught it: "the tutorial is using the wrong component here, we no
+    // longer use this."
+    expect(loud(coach('task', 0))).toContain('click Send');
+    expect(ANCHOR.task[0]).toBe('.tc-card .tc-send-main');
+    // The card's own button really says that word, in the element the ring is
+    // drawn round.
+    expect(read('renderer/src/threads/ThreadComposer.tsx')).toMatch(/className="tc-send-main"[\s\S]{0,400}Send/);
   });
 
   it('points at the row on the two beats that ring a row', () => {

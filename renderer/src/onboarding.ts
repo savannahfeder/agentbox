@@ -1409,10 +1409,15 @@ export function coach(
     /* * AND THE GREY LINE IS GONE FROM THIS BEAT.
     */
     // AND IT NAMES THE BUTTON TOO (2026-10-01). Same round and same reason as
-    // `make` above: the compose card's own button says "Start it", it is the
-    // thing the ring is round, and ⌘↵ is the least guessable cap in the walk.
+    // `make` above: the card's own button is the thing the ring is round, and
+    // ⌘↵ is the least guessable cap in the walk.
+    //
+    // THE WORD IS "SEND" AND NOT "START IT" SINCE THE WALK MOVED TO THE REAL
+    // CARD (2026-10-01). The one-line card it used to open said Start it; the
+    // new thread card is drawn as an email and its button says Send, so the
+    // sentence says what is written on the button somebody is looking at.
     case 'task':
-      return say('', 'Press ', '⌘↵', ' or click Start it.');
+      return say('', 'Press ', '⌘↵', ' or click Send.');
     case 'working':
       return sinceSent >= SLOW_AFTER_MS
         ? say('Your agent is running.',
@@ -2168,7 +2173,12 @@ export const ANCHOR: Partial<Record<Step, string[]>> = {
   // tutorial drew no card at all. A persona test sat on that blank screen for
   // over thirty seconds.
   make: ['button[aria-label="New thread"]', '.th-right button[data-hint="new-task"]', 'button.th-new'],
-  task: ['.modal.compose .dock-send'],
+  // THE NEW THREAD CARD'S OWN SEND (2026-10-01). It was `.modal.compose
+  // .dock-send`, the retired one-line card, which the walk kept for one round
+  // after the rest of the app moved: "the tutorial is using the wrong
+  // component here, we no longer use this". The card is `.tc-card` now and its
+  // send is `.tc-send-main`, beside the caret that opens Send later.
+  task: ['.tc-card .tc-send-main'],
   // THE ROW, AND ONLY THE ROW. The walk hands its own item's row in front of
   // this one; this is the fallback for the moment before that row is drawn.
   // AND THE RUNNING TAB WHEN THE ROW IS NOT IN THE LIST (2026-10-01). The team
