@@ -249,9 +249,9 @@ describe('the coaching card promises no dead key either', () => {
   // as well, so one letter taught two things and the walk taught the one the
   // app no longer did. The count did not move.
   //
-  // NINE SINCE 2026-10-02: the board beat names V, which was added to the app
-  // for that switch when it was asked for (w-58c8f466e7). Its handler is the
-  // last test in this block.
+  // NINE SINCE 2026-10-02: the board beat names B, which was added to the app
+  // for that switch when it was asked for (w-58c8f466e7; it was V for one
+  // ship). Its handler is the next test in this block.
   it('names nine keys and no others', () => {
     // ⌘ AND A NUMBER, and WHICH numbers depends on the strip: the tour prints
     // the destination's own slot, and Scheduled is only there some of the time.
@@ -260,15 +260,15 @@ describe('the coaching card promises no dead key either', () => {
     const said = [...new Set([...keys, ...tourKeys])];
     const sections = said.filter((k) => /^⌘[1-4]$/.test(k));
     expect(said.filter((k) => !/^⌘[1-4]$/.test(k)).sort())
-      .toEqual(['1', 'N', 'E', 'L', 'V', '↵', '⌘K', '⌘↵'].sort());
+      .toEqual(['1', 'N', 'E', 'L', 'B', '↵', '⌘K', '⌘↵'].sort());
     expect(sections.length).toBeGreaterThan(0);
   });
 
-  it('V flips the inbox to the board, which is what the board beat says', () => {
+  it('B flips the inbox to the board, which is what the board beat says', () => {
     // The beat ends when the board is on the screen, so the key has to set the
     // view the page is drawn in, from the list with nothing open.
     const list = app.slice(app.indexOf('      switch (e.key) {', app.indexOf('    const onKey = (e: KeyboardEvent) => {')));
-    expect(list).toContain("case 'v': case 'V':");
+    expect(list).toContain("case 'b': case 'B':");
     expect(list).toContain('setInboxDisplay(flipView(inboxDisplay))');
   });
 

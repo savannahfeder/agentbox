@@ -1,21 +1,23 @@
-// V SWITCHES BETWEEN THE LIST AND THE BOARD (w-58c8f466e7, 2026-10-02).
+// B SWITCHES BETWEEN THE LIST AND THE BOARD (w-58c8f466e7, 2026-10-02).
 //
 // Asked for in so many words: "I quite often switch between board and list
 // view, can you give me a shortcut to do so?" The switch lived two clicks
 // deep, as the first row of the View and filters menu, and no key reached it:
 // the tutorial's own board card was pinned as naming no key "because the app
-// has no shortcut that opens the menu". Measured before the change: no `case
-// 'v'` anywhere in App.tsx's key handler, no V on the shortcuts page, and no
-// row for it in ⌘K.
+// has no shortcut that opens the menu". Measured before the change: no key
+// for it anywhere in App.tsx's key handler, on the shortcuts page, or in ⌘K.
 //
-// V because the menu it replaces is headed View, and because it was free: B
-// was a real key once (gated on an empty inbox) and is pinned dead by the
-// shortcuts page's own test, so it is not brought back for this.
+// IT SHIPPED AS V FIRST, the same day, after the menu's View heading. That
+// came back as "V feels like a weird one. Any other options that are more
+// intuitive?", and B (for board) was the pick. B had been a real key once,
+// gated on an empty inbox, and the shortcuts page's test kept it from coming
+// back unexamined; this is the examination, and that guard now pins that V is
+// gone rather than that B is.
 //
 // WHAT THIS FILE HOLDS. One press flips the view and keeps every filter; it
-// works where the list or the board is on the screen and nowhere else; ⌘V is
-// still paste; and the three places that teach keys (the shortcuts page, ⌘K
-// and the tutorial's board card) all name it.
+// works where the list or the board is on the screen and nowhere else; ⌘B is
+// not taken by it; V no longer does it; and the three places that teach keys
+// (the shortcuts page, ⌘K and the tutorial's board card) all name B.
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
@@ -63,16 +65,17 @@ describe('one press flips the view', () => {
   });
 });
 
-describe('where V works', () => {
+describe('where B works', () => {
   it('is answered in the list, by flipping the display the page is drawn in', () => {
-    expect(list).toContain("case 'v': case 'V':");
+    expect(list).toContain("case 'b': case 'B':");
     expect(list).toContain('setInboxDisplay(flipView(inboxDisplay))');
   });
 
   it('does nothing with a search up, on the Team page, or on an open card', () => {
     // Each of those draws something other than the list or the board, so a
     // flip there would change a screen she cannot see.
-    const branch = list.slice(list.indexOf("case 'v': case 'V':"), list.indexOf('break;', list.indexOf("case 'v': case 'V':")));
+    const at = list.indexOf("case 'b': case 'B':");
+    const branch = list.slice(at, list.indexOf('break;', at));
     expect(branch).toContain('search === null');
     expect(branch).toContain('!teamShown');
     expect(branch).toContain('!openCard');
@@ -81,10 +84,14 @@ describe('where V works', () => {
   it('does nothing inside an open task', () => {
     // THE CASE THAT MUST NOT MATCH. The board is behind the task, so a flip
     // there is invisible until she backs out and finds the page changed.
-    expect(focused).not.toMatch(/'v'|'V'/);
+    expect(focused).not.toMatch(/'b'|'B'/);
   });
 
-  it('leaves ⌘V to paste', () => {
+  it('is no longer V, which it was for one ship', () => {
+    expect(list).not.toContain("case 'v': case 'V':");
+  });
+
+  it('leaves ⌘B alone', () => {
     // Every modifier chord returns before the list switch is reached.
     const guard = app.indexOf('      if (e.metaKey || e.ctrlKey || e.altKey) return;', HANDLER);
     expect(guard).toBeGreaterThan(HANDLER);
@@ -92,39 +99,47 @@ describe('where V works', () => {
   });
 
   it('opens no text field, so it has no keystroke to swallow', () => {
-    expect(opensATextField('v')).toBe(false);
+    expect(opensATextField('b')).toBe(false);
   });
 });
 
 describe('everywhere that teaches keys names it', () => {
   it('is on the shortcuts page, under the inbox, in one short sentence', () => {
     const inbox = SHORTCUTS.find((g) => g.label === 'In your inbox');
-    const row = inbox.keys.find((k) => k.keys.includes('V'));
+    const row = inbox.keys.find((k) => k.keys.includes('B'));
     expect(row).toBeTruthy();
     expect(row.what.toLowerCase()).toContain('list');
     expect(row.what.toLowerCase()).toContain('board');
+    expect(SHORTCUTS.flatMap((g) => g.keys).some((k) => k.keys.includes('V'))).toBe(false);
   });
 
-  it('is a row in ⌘K with V beside it', () => {
-    expect(palette).toMatch(/id: 'flip-view',[\s\S]{0,200}keyHint: 'V',/);
+  it('is a row in ⌘K with B beside it', () => {
+    expect(palette).toMatch(/id: 'flip-view',[\s\S]{0,200}keyHint: 'B',/);
     expect(palette).toContain("boardUp ? 'Show as a list' : 'Show as a board'");
+  });
+
+  it('is on the List and Board buttons when you point at them', () => {
+    const pages = read('renderer/src/threads/Pages.tsx');
+    expect(pages).toContain('title="List (B)"');
+    expect(pages).toContain('title="Board (B)"');
   });
 
   it('is named on the tutorial’s board card, beside the click', () => {
     const say = coach('board', 0);
-    expect(say.key).toBe('V');
+    expect(say.key).toBe('B');
     const line = `${say.lead}${say.key}${say.tail}`.toLowerCase();
     expect(line).toContain('view and filters');
     expect(line).toContain('board');
   });
 
   it('is the one key the board card lets through', () => {
-    // The walk swallows any key that is not the card's own. V must reach the
-    // app on this card, and a neighbouring letter must still be held.
-    expect(wrongPress('V', { key: 'v' })).toBe(false);
-    expect(wrongPress('V', { key: 'V' })).toBe(false);
-    expect(wrongPress('V', { key: 'b' })).toBe(true);
-    // ⌘V is not an answer to the walk at all, right or wrong.
-    expect(wrongPress('V', { key: 'v', metaKey: true })).toBe(false);
+    // The walk swallows any key that is not the card's own. B must reach the
+    // app on this card, and a neighbouring letter, V among them, must still be
+    // held.
+    expect(wrongPress('B', { key: 'b' })).toBe(false);
+    expect(wrongPress('B', { key: 'B' })).toBe(false);
+    expect(wrongPress('B', { key: 'v' })).toBe(true);
+    // ⌘B is not an answer to the walk at all, right or wrong.
+    expect(wrongPress('B', { key: 'b', metaKey: true })).toBe(false);
   });
 });

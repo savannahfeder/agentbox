@@ -78,9 +78,9 @@ const HANDLED = {
   '⌘1': [[chords, 'const slot = sidebarSlot(e);'], [chords, 'const want = order[slot - 1];']],
   '⌘4': [[chords, 'const slot = sidebarSlot(e);'], [chords, 'const want = order[slot - 1];']],
   // List or board (w-58c8f466e7). Only in the list branch: inside an open task
-  // the board is behind it, and tests/v-switches-between-the-list-and-the-board
+  // the board is behind it, and tests/b-switches-between-the-list-and-the-board
   // pins that it stays dead there.
-  'V': [[list, "case 'v': case 'V':"], [list, 'setInboxDisplay(flipView(inboxDisplay))']],
+  'B': [[list, "case 'b': case 'B':"], [list, 'setInboxDisplay(flipView(inboxDisplay))']],
   'esc': [
     // One step back out: the document, then the task, then the list.
     [focused, "if (e.key === 'Escape') { if (escapeClosesDoc(openDoc)) closeArtifact(); else setFocused(null); }"],
@@ -204,13 +204,17 @@ describe('what the page refuses to say', () => {
   // Both WERE real keys and both did nothing at all on almost every screen: G
   // needed the games built in AND an empty inbox, B needed an empty inbox. The
   // page never listed them, and the keys and everything behind them are now
-  // deleted, so there is nothing to list. This test stays: it is the guard
-  // against either letter coming back unexamined.
-  it('does not offer the two keys that were gated on an empty inbox', () => {
+  // deleted. This test stays: it is the guard against a letter coming back
+  // unexamined.
+  //
+  // B CAME BACK EXAMINED, 2026-10-02 (w-58c8f466e7): it switches between the
+  // list and the board, everywhere the list is, and it is on the page. What
+  // stays pinned is that the empty-inbox gate did not come back with it.
+  it('does not offer the keys that were gated on an empty inbox', () => {
     expect(everyKey()).not.toContain('G');
-    expect(everyKey()).not.toContain('B');
     expect(list).not.toContain("snap?.config.games");
-    expect(list).not.toContain("case 'b': case 'B':");
+    const at = list.indexOf("case 'b': case 'B':");
+    expect(list.slice(at, list.indexOf('break;', at))).not.toMatch(/\.length === 0|!list\.length/);
   });
 
   // 1, 2 and I answer a Codex conversation's import row and are dead on every
@@ -274,7 +278,7 @@ describe('the page stays a page and not a wall', () => {
   // budget is still a budget: the next key wanting a row has to make the same
   // argument, out loud, here.
   //
-  // AND IT IS 22 SINCE 2026-10-02, FOR V. The argument: it was asked for by
+  // AND IT IS 22 SINCE 2026-10-02, FOR B (V for one ship). The argument: it was asked for by
   // name ("I quite often switch between board and list view, can you give me
   // a shortcut"), and a key nobody can find on the one page that promises to
   // list every key is the nuisance this page exists to end. It went under the

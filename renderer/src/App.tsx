@@ -4091,11 +4091,12 @@ export default function App() {
         // N does the same as C: the letter she reached for (w-fb9051e597).
         case 'c': case 'C': case 'n': case 'N': e.preventDefault(); setModal('compose'); break;
         case 'z': case 'Z': undo(); break;
-        // V FLIPS LIST AND BOARD (w-58c8f466e7): "I quite often switch between
-        // board and list view". The menu it skips is headed View. Only where
-        // the list or the board is what is on the screen; a search, the Team
-        // page and an open card draw something else.
-        case 'v': case 'V':
+        // B FLIPS LIST AND BOARD (w-58c8f466e7): "I quite often switch between
+        // board and list view". B for board; it shipped as V first and that
+        // read as "a weird one". Only where the list or the board is what is
+        // on the screen; a search, the Team page and an open card draw
+        // something else.
+        case 'b': case 'B':
           if (search === null && !teamShown && !openCard) { e.preventDefault(); setInboxDisplay(flipView(inboxDisplay)); setSelected(0); }
           break;
         case 'Escape':
