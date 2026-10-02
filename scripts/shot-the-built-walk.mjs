@@ -748,14 +748,31 @@ const WATCH = `(() => {
 })()`;
 
 const out = { beats: [] };
+// WHAT WAS PICKED ON THE LOOK STEP, filled in when that step is driven and
+// empty before it. Every beat after it is held to this.
+//
+// THE THEME AND NOT THE PICTURE, and that is not laziness. An empty inbox is
+// the inbox-zero surface and it pins the default picture whatever the app is
+// set to, which is a deliberate design decision and is still right. So the
+// skin legitimately differs between a beat with rows and a beat without, and
+// the thing that must NEVER differ is light against dark.
+const PICKED = { theme: null, skin: null };
 
 const beat = async (name, what) => {
   const flood = await evaluate(`(() => { const n = (window.__K__ || []).length; const k = [...new Set(window.__K__ || [])].slice(-4); window.__K__ = []; return JSON.stringify({ n, k }); })()`).catch(() => 'n/a');
   console.log('  keys since last beat:', flood);
   const m = await evaluate(MEASURE);
   if (m.err) console.log('  !! page error:', m.err);
-  // ONE LOOK (w-9e434e8671): no beat may come up wearing a theme or a picture.
-  if (m.theme || m.skin) throw new Error(`${name} is wearing ${m.theme}/${m.skin}, and the app has one look`);
+  if (PICKED.theme && m.theme !== PICKED.theme) {
+    throw new Error(`${name} is in ${m.theme} and the look step picked ${PICKED.theme}`);
+  }
+  // AND THE PICTURE TOO, which is the other half of her sentence: somebody who
+  // picked one of the sixteen photographs was shown Gouache Valley on the five
+  // beats with an empty inbox. The pin is off inside the walk now, so the skin
+  // must not move either.
+  if (PICKED.skin && m.skin !== PICKED.skin) {
+    throw new Error(`${name} is wearing ${m.skin} and the look step picked ${PICKED.skin}`);
+  }
   const kb = await shot(name);
   out.beats.push({ name, what, kb, ...m });
   console.log(`  ${name.padEnd(28)} ${m.screen.padEnd(15)} ${m.theme}${m.skin ? '/' + m.skin : ''}${m.out ? `  way out at ${m.out.x},${m.out.y}` : ''}`);
@@ -778,8 +795,35 @@ const until = async (expr, ms = 12_000) => {
 
 // ------------------------------------------------------------------------ //
 await goto(origin);
-// A REAL FIRST RUN, not a Mac that is already set up: nothing is stored.
+// AND IT SEEDS NO LOOK. It used to write the lake into both keys here, which is
+// exactly what `seedFirstRunLook` does on a real first run — so the app's own
+// seed never ran and every shot of the walk was of a Mac that had already been
+// set up. She changed the default that evening and the harness would have gone
+// on photographing the old one.
 await evaluate(`(() => { localStorage.clear(); return true; })()`);
+// AND WHAT THE MAC WAS ALREADY WEARING, WHICH IS THE STATE THE FAULT LIVES IN.
+// Cleared, this is a fresh install: `seedFirstRunLook` fires, writes Gouache
+// Valley into both keys, and every screen of the walk inherits it whether it
+// pins anything or not. That is why this harness has never once photographed
+// her bug.
+//
+// SHE IS NOT ON A FRESH INSTALL. She reaches the walk from ⌘K's "Run the
+// onboarding again", on a store months old that has already chosen a look, so
+// the seed does not fire and never should. WAS=light is that Mac: set up, plain
+// light, no picture. WAS=<skin id> is the other case, somebody already wearing
+// one of the sixteen. Default is the fresh install, so every existing shot is
+// taken exactly as it was before.
+const WAS = process.env.WAS ?? null;
+if (WAS) {
+  const theme = WAS === 'light' || WAS === 'dark' ? WAS : 'dark';
+  const skin = WAS === 'light' || WAS === 'dark' ? 'none' : WAS;
+  await evaluate(`(() => {
+    localStorage.setItem('zero.theme', ${JSON.stringify('')} + ${JSON.stringify(theme)});
+    localStorage.setItem('zero.skin', ${JSON.stringify(skin)});
+    return true;
+  })()`);
+  console.log('the Mac was already :', theme + (skin === 'none' ? '' : '/' + skin));
+}
 await goto(origin + (process.env.NOVEIL === '1' ? '/?noveil=1' : (process.env.NOCOACH7 === '1' ? '/?nocoach7=1' : '')));
 await evaluate(`(async () => { await document.fonts.ready; })()`);
 await evaluate(WATCH);
@@ -817,8 +861,19 @@ if (process.env.CONTROL === '1') {
 
 console.log('\n=== 1 to 3: the setup screens ===');
 const first = await beat('01-welcome', 'the welcome, corner to corner');
-// EVERY SCREEN IS LIGHT NOW (w-9e434e8671): no theme attribute, no picture.
-if (first.theme || first.skin) throw new Error(`the walk opened wearing ${first.theme}/${first.skin}, and the app has one look`);
+// AND EVERY SCREEN FROM HERE TO THE PICKER IS HELD TO THIS ONE. The hold used
+// to start AFTER the picker, so the six screens before it were the one stretch
+// of the walk nothing checked, and that is precisely where the fault was: the
+// walk started on the valley theme and switched to light mode on the first
+// introduction slab.
+//
+// The walk may change its look ONCE, on the screen whose whole purpose is that,
+// and the change has to be one the user made. Anything else is the app arguing
+// with itself in front of them.
+PICKED.theme = first.theme;
+PICKED.skin = first.skin;
+console.log('  the walk opens in  :', first.theme + (first.skin ? '/' + first.skin : ''));
+if (!first.skin) throw new Error(`the walk opened on ${first.theme} with no picture on it`);
 
 // This script used to photograph the way out here, on the welcome, because it
 // used to be on every screen. It is photographed on the first practice beat
@@ -860,8 +915,147 @@ await key('Enter'); await wait(800);
 // THE SIDEBAR SLAB WAS THIRD FOR ONE DAY AND WAS MOVED OUT. It is beat
 // seventeen now, `17-your-goals-live-here` below.
 await beat('06-leave-no-agent-waiting-on-you', 'the last slab, which is the positioning said early');
-// THE THEME PICKER WAS DRIVEN HERE, beat seven. The app has one look
-// (w-9e434e8671), so the last slab hands straight to the practice project.
+await key('Enter'); await wait(800);
+
+// THE MOUSE RULE HAD A SCREEN HERE AND IT WAS CUT. The old shot was
+// 07-put-the-mouse-down.
+//
+// SO IT IS DRIVEN HERE, AFTER THE INTRODUCTION AND BEFORE THE HAND-OFF, which
+// is the first of the two places it could go. It was between the name and the
+// introduction until this morning.
+//
+// FOUR TILES NOW, NOT EIGHTEEN, so there are three shots rather than two and the
+// middle one is new. The row is the picture being shown plus Dark, Light and
+// Match my system, and the sixteen pictures are reached through Randomize my
+// theme. That makes the button a thing this harness has to press, because a
+// randomiser nobody drives is a claim rather than a feature.
+console.log('\n=== 7: pick how it looks, last before the practice round ===');
+// THE PICKER OPENS ON WHAT THE SIX SCREENS BEFORE IT WERE WEARING, and this is
+// the line that says so. It is checked BEFORE the hold is released, so a picker
+// that snaps back to the store on arrival stops the run rather than being
+// photographed. That snap is the second half of the bug: extending the pin
+// alone would have moved the flip from beat four to beat seven.
+//
+// Then the hold comes off, because the next three shots are of tiles being
+// pressed and the window is meant to move under them.
+await beat('07a-pick-how-agentbox-looks', 'four tiles, on the default');
+const openedOn = { theme: PICKED.theme, skin: PICKED.skin };
+PICKED.theme = null;
+PICKED.skin = null;
+const lookOpened = await evaluate(`(() => {
+  const on = document.querySelector('.look.on .look-name');
+  return {
+    lit: on ? on.textContent : null,
+    skin: document.documentElement.getAttribute('data-skin'),
+    tiles: [...document.querySelectorAll('.look .look-name')].map((n) => n.textContent),
+    behind: document.querySelectorAll('.fr-look-app .list-pane .row').length,
+  };
+})()`);
+console.log('     on      :', JSON.stringify(lookOpened));
+if (lookOpened.tiles.length !== 4) throw new Error(`the row is meant to be four tiles, it is ${lookOpened.tiles.length}`);
+if (!lookOpened.behind) throw new Error('there is no app behind the card, so the step is a wallpaper again');
+// AND THE TICKED TILE IS THE PICTURE THE WINDOW IS ACTUALLY SHOWING. This is
+// the half that painting could never have fixed: with the pin extended and
+// nothing else, the picker still read the store on arrival and opened white
+// with Light ticked. Truthful, and a flip. The tick and the window agree here
+// or the run stops.
+if (lookOpened.skin !== openedOn.skin) {
+  throw new Error(`the picker opened wearing ${lookOpened.skin} and the six screens before it wore ${openedOn.skin}`);
+}
+// RANDOMIZE, AND READ THE WINDOW BACK. If `data-skin` does not move, the button
+// is a picture of a button.
+await evaluate(`document.querySelector('.fr-look-more').click()`);
+await wait(700);
+await beat('07b-a-different-picture', 'Randomize pressed: a new picture, on the tile and on the window');
+const rolled = await evaluate(`(() => ({
+  lit: (document.querySelector('.look.on .look-name') || {}).textContent || null,
+  skin: document.documentElement.getAttribute('data-skin'),
+  stored: localStorage.getItem('zero.skin'),
+}))()`);
+console.log('     rolled  :', JSON.stringify(rolled));
+if (rolled.skin === lookOpened.skin) throw new Error('Randomize my theme did not move the window');
+// AND A PLAIN THEME, which is the other half of the row and the only press that
+// takes the photograph off altogether.
+await evaluate(`(() => { const t = [...document.querySelectorAll('.look')].find((b) => b.textContent.trim().startsWith('Light')); if (t) t.click(); return !!t; })()`);
+await wait(700);
+await beat('07c-and-the-window-changes', 'Light pressed, and the whole screen wearing it');
+console.log('     after   :', JSON.stringify(await evaluate(`(() => ({
+  lit: (document.querySelector('.look.on .look-name') || {}).textContent || null,
+  theme: document.documentElement.getAttribute('data-theme'),
+  skin: document.documentElement.getAttribute('data-skin'),
+  stored: localStorage.getItem('zero.theme'),
+}))()`)));
+// AND BACK TO A PICTURE, because the rest of the walk is the app somebody chose
+// and not a picture of some other theme.
+//
+// THIS IS THE LINE THAT PUT HER TUTORIAL IN LIGHT MODE.
+//
+// It used to look for a tile whose name starts with "Gouache Valley", and after
+// Randomize was pressed six lines above there is no such tile: the first slot
+// holds whichever of the sixteen came out of the bag, and the other three are
+// Dark, Light and Match my system. `find` returned undefined, `if (t)` skipped
+// the click WITHOUT SAYING SO, and the walk carried the Light press from 07c
+// through every beat after it. Beats 9, 10 and 17 to 19 looked right anyway,
+// because an empty inbox pins dark and the picture whatever the app is set to,
+// so it was exactly the six tutorial beats with rows on them that came out
+// white. That is the block of white screens in the middle of her page.
+//
+// So it presses THE FIRST TILE, which is the picture slot whatever picture is
+// in it, and then reads the window back and throws. A restore that can fail
+// silently is how a whole page of screens gets taken in the wrong theme.
+//
+// KEEP=light WALKS THE REST IN LIGHT INSTEAD, and it is not a curiosity: it is
+// the exact machine she photographed. Her page of nineteen was taken with Light
+// left on by accident, and the answer she wants to see is that a walk in Light
+// is light on EVERY beat rather than white on six and dark on five. So this run
+// leaves the Light press standing rather than pressing back, and `beat` holds
+// all nineteen to it the same way.
+const KEEP = process.env.KEEP ?? 'picture';
+await evaluate(KEEP === 'light'
+  ? `(() => { const t = [...document.querySelectorAll('.look')].find((b) => b.textContent.trim().startsWith('Light')); if (t) t.click(); return !!t; })()`
+  : `(() => { const t = document.querySelector('.look'); if (t) t.click(); return !!t; })()`);
+await wait(700);
+const restored = await evaluate(`(() => ({
+  lit: (document.querySelector('.look.on .look-name') || {}).textContent || null,
+  theme: document.documentElement.getAttribute('data-theme'),
+  skin: document.documentElement.getAttribute('data-skin'),
+  stored: localStorage.getItem('zero.theme'),
+}))()`);
+console.log('     back to :', JSON.stringify(restored));
+if (KEEP === 'light') {
+  if (restored.theme !== 'light') throw new Error(`KEEP=light did not leave the window in light: ${JSON.stringify(restored)}`);
+} else if (restored.theme !== 'dark' || !restored.skin) {
+  throw new Error(`the look step did not go back to a picture: ${JSON.stringify(restored)}`);
+}
+/*
+ * AND `SKIN=lake` PINS THE PICTURE FOR THE REST OF THE WALK. WHY THIS EXISTS, because it looks like a convenience and is not:
+   the beat above PRESSES Randomize, deliberately, and then keeps whichever of
+   the sixteen came out of the bag. That is right for a run photographing the
+   walk once. It is WRONG the moment the same walk is run twice to lay one card
+   beside another, because then every picture is different and the comparison
+   is of wallpapers rather than cards. The chosen card is GLASS, whose whole
+   question is how the photograph reads THROUGH it, so a different photograph
+   per run is exactly the confound that would make the comparison worthless.
+   IT IS SET AFTER THE PICKER AND READ BACK, never assumed. `zero.skin` is the
+   key the app itself stores it under (`skins.ts`), and the picker is already
+   shut by the time this runs, so nothing on screen contradicts it. */
+if (process.env.SKIN) {
+  await evaluate(`(() => {
+    localStorage.setItem('zero.skin', ${JSON.stringify(process.env.SKIN)});
+    document.documentElement.setAttribute('data-skin', ${JSON.stringify(process.env.SKIN)});
+    return true;
+  })()`);
+  await wait(500);
+  const pinned = await evaluate(`document.documentElement.getAttribute('data-skin')`);
+  if (pinned !== process.env.SKIN) throw new Error(`SKIN=${process.env.SKIN} did not take: the window is wearing ${pinned}`);
+  restored.skin = pinned;
+  console.log('     pinned  :', pinned);
+}
+// WHAT THE REST OF THE WALK HAS TO BE WEARING. Read once, here, off the window
+// rather than off what we think we pressed, and every beat after this is held
+// to it by `beat` itself.
+PICKED.theme = restored.theme;
+PICKED.skin = restored.skin;
 await key('Enter'); await wait(900);
 
 console.log('\n=== 8: into the practice project ===');
@@ -1444,6 +1638,21 @@ const wrote = async (when) => {
   console.log('  writes ' + when + ':', log);
 };
 await wrote('while the card is up');
+
+// AND THE LAST TWO BEATS ARE HELD TOO, WHEN A PICTURE WAS PICKED.
+//
+// Beats 20 and 21 are the user's own project on their own empty inbox, which is
+// the inbox-zero surface.
+//
+// KEEP=light STILL RELEASES, and that is the inbox-zero design decision doing
+// what it is meant to. Plain Light with no picture on is the case that decision
+// covers, so that walk lands on the dark photograph on purpose. Turning that off
+// as well would be one clause in App.tsx, and this line is where the run would
+// stop releasing.
+if (KEEP === 'light') {
+  PICKED.theme = null;
+  PICKED.skin = null;
+}
 
 console.log('\n=== 20: landing in her own project, with the confetti ===');
 await evaluate(`(() => { const b = document.querySelector('.fr-finish-go'); if (b) b.click(); return !!b; })()`);

@@ -94,23 +94,31 @@ const block = (head) => {
   const i = bare.indexOf(head);
   return bare.slice(i, bare.indexOf('}', i));
 };
-// The ink set, and the pixel the rail actually composites onto, read out of the
-// finished pictures: designs/2026-08-19-sidebar-agents-round-four/measured.json.
-// Dark and the lake picture were measured here too until the app went to one
-// light look; light is the only theme left.
+// The three ink sets, and the pixel each rail actually composites onto. The
+// backdrops are read back out of the finished pictures rather than taken from
+// the theme's flat --bg, because the lake is a photograph behind a veil:
+// designs/2026-08-19-sidebar-agents-round-four/measured.json.
 const THEMES = [
   ['light', ':root {', '#fefefe'],
+  ['dark', ':root[data-theme="dark"]', '#2e3136'],
+  // The Lake was measured here too, until it went with the other pictures
+  // (w-9e434e8671).
 ];
-const inkOf = (selector, name) => {
+const inkOf = (selector, name, fallback) => {
   const m = block(selector).match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i'));
-  return m ? m[1] : undefined;
+  return m ? m[1] : fallback;
 };
 
-const inkSet = (look, selector) => ({
-  dim: inkOf(selector, 'text-dim'),
-  faint: inkOf(selector, 'text-faint'),
-  agent: inkOf(selector, 'agent-ink'),
-});
+const inkSet = (look, selector) => {
+  // Lake sets only two of the three, and inherits --text-dim's neighbour from
+  // dark, so each theme is read with dark underneath it as the app cascades it.
+  const under = look === 'lake' ? ':root[data-theme="dark"]' : selector;
+  return {
+    dim: inkOf(selector, 'text-dim', inkOf(under, 'text-dim')),
+    faint: inkOf(selector, 'text-faint', inkOf(under, 'text-faint')),
+    agent: inkOf(selector, 'agent-ink', inkOf(under, 'agent-ink')),
+  };
+};
 // How far along the app's own fade a row's grey has walked. 1 is a whole step,
 // the same distance that already separates --text-dim from --text-faint.
 const stepFraction = (look, selector) => {
@@ -129,11 +137,15 @@ describe('the grey the rows are written in is walked, never chosen', () => {
     // and no new colour is picked, which is what "never tune a grey by eye"
     // means where it is enforceable.
     //
-    // Light walks a whole step, because that is what read right (2026-08-20).
+    // WHAT CHANGED ON 2026-08-20, and why this is a range now rather than a
+    // point. Light and lake stayed at a whole step because they read right. Dark
+    // stops short of one, at the place the next test pins, so the fraction is
+    // still measured rather than chosen.
     it(`${look}: walks the app's own step, and never past the end of it`, () => {
       const n = stepFraction(look, selector);
+      expect(n).toBeGreaterThan(0.5);
       expect(n).toBeLessThanOrEqual(1.005);
-      expect(Math.abs(n - 1)).toBeLessThan(0.05);
+      if (look !== 'dark') expect(Math.abs(n - 1)).toBeLessThan(0.05);
     });
 
     it(`${look}: holds the hue and the chroma while it fades`, () => {
@@ -142,6 +154,15 @@ describe('the grey the rows are written in is walked, never chosen', () => {
       expect(Math.abs(c.h - b.h)).toBeLessThan(3);
     });
   }
+
+  // WHERE DARK'S SHORT STEP COMES FROM: it was matched to the Lake's
+  // heading-to-row distance, 1.336 to 1. The Lake is gone (w-9e434e8671), so
+  // that number is held directly.
+  it('dark leaves its heading by the distance it was matched to', () => {
+    const d = inkSet('dark', ':root[data-theme="dark"]');
+    expect(Math.abs(ratio(d.faint, d.agent) - 1.336)).toBeLessThan(0.02);
+    expect(stepFraction('dark', ':root[data-theme="dark"]')).toBeLessThan(1);
+  });
 });
 
 describe('the heading leads, which is the whole of what she asked for', () => {
@@ -149,16 +170,17 @@ describe('the heading leads, which is the whole of what she asked for', () => {
   // colour, 1.00 to 1. The chosen fix, option 3: leave the heading alone and
   // drop the rows out of its way.
   for (const [look, selector, page] of THEMES) {
-    const faint = inkOf(selector, 'text-faint');
-    const agent = inkOf(selector, 'agent-ink');
+    const under = look === 'lake' ? ':root[data-theme="dark"]' : selector;
+    const faint = inkOf(selector, 'text-faint', inkOf(under, 'text-faint'));
+    const agent = inkOf(selector, 'agent-ink', inkOf(under, 'agent-ink'));
 
     it(`${look}: the heading is stronger against the page than a row is`, () => {
       expect(ratio(faint, page)).toBeGreaterThan(ratio(agent, page));
       expect(ratio(faint, agent)).toBeGreaterThan(1.3);
     });
 
-    // THE FLOOR, AND IT IS THE ONE NUMBER WORTH GUARDING. Measured at 2.73 on
-    // light, which was always the thinnest of the themes it shipped with: a third
+    // THE FLOOR, AND IT IS THE ONE NUMBER WORTH GUARDING. Measured on the three
+    // themes: 2.73 light, 3.57 dark, 4.40 lake. Light is the thin one: a third
     // step down lands at 1.73, which was drawn and judged unreadable. This
     // stops a later session taking that step.
     it(`${look}: a row is still readable against the page`, () => {

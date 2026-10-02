@@ -117,8 +117,8 @@ describe('6. snoozing, which is the third way a row leaves the inbox', () => {
   it('is a beat of the walk, inside the practice project', () => {
     expect(IN_PRACTICE).toContain('snooze');
     expect(COACHED).toContain('snooze');
-    // Thirteen since the theme step went with the themes (w-9e434e8671).
-    expect(BEAT.snooze).toBe(13);
+    // Fourteen since w-ec62ab6b38 (2026-09-28) took the note beat out.
+    expect(BEAT.snooze).toBe(14);
     // Between closing the finished ones and answering the stopped one, which is
     // the order the three shapes of row are in the list.
     expect(BEAT.clear).toBeLessThan(BEAT.snooze);

@@ -165,15 +165,14 @@ describe('the key reaches the box from anywhere', () => {
     expect(css).toContain('::highlight(find-current)');
   });
 
-  // Picked out of four options: the accent, so it follows the app's own accent
-  // (the brand orange, since the app went to one light look). The three turned
-  // down are in decisions.md; pinned so none comes back by accident. One look,
-  // so each token is declared once.
-  it('paints them in the accent, declared once in the one look', () => {
+  // Picked out of four options, drawn on a light theme and on dark: the accent
+  // blue, so it follows every theme's own blue. The three turned down are in
+  // decisions.md; pinned so none comes back by accident.
+  it('paints them in the accent blue she picked, in light and dark alike', () => {
     const tokens = css.match(/--find-(match|current|current-ink):[^;]+;/g) ?? [];
-    expect(tokens).toHaveLength(3);
-    expect(tokens.filter((t) => t === '--find-current: var(--accent);')).toHaveLength(1);
-    expect(tokens.filter((t) => t === '--find-match: color-mix(in srgb, var(--accent) 22%, transparent);')).toHaveLength(1);
+    expect(tokens).toHaveLength(6);
+    expect(tokens.filter((t) => t === '--find-current: var(--accent);')).toHaveLength(2);
+    expect(tokens.filter((t) => t === '--find-match: color-mix(in srgb, var(--accent) 22%, transparent);')).toHaveLength(2);
     expect(css).not.toContain('#ff9632');
   });
 

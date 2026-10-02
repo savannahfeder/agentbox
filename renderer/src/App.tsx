@@ -11,6 +11,8 @@ import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // followed by a refetch.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { readySkin, swapLook } from './look-switch';
 import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import { api } from './api';
 import { setClaudeModels } from './models';
@@ -69,9 +71,11 @@ import { modalAfterLeavingATask } from './modal-scope';
 import { NOTHING_OVER_THE_APP, afterTheWalk, type OpenOverTheApp } from './walk-scope';
 import { splitMessage } from './message-split';
 import { parseQuery, searchItems } from './search';
+import { applyTheme, machineTheme, onMachineTheme, resolvePick, resolveTheme, THEME_KEY, type ThemePick } from './theme';
 import { hintScheduler, type HintScheduler } from './hint-timing';
 import { HINTS } from './hint-plate';
 import { HintPlate } from './components/HintPlate';
+import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, idleSkin, lookMeans, lookOf, resolveSkin, resolveSkinDetail, resolveTune, seedFirstRunLook, SKINS, storeTune, walkSkin, wornSkin, SKIN_KEY, TUNE_DEFAULT, TUNE_KEY, type Look, type SkinChoice, type SkinId, type SkinTune } from './skins';
 // THE SHAPE OF AN OPENED TASK IS STILL AN OPEN QUESTION. Six of them,
 // one attribute, and the whole file goes when she picks.
 import { resolveTaskShape, TASK_SHAPE_KEY, type TaskShape } from './task-shape';
@@ -98,7 +102,7 @@ import {
   mayOpenInbox, noCodingAgent, practising, restartFirstRun, snoozeRefused, tutorialRun,
   waitingId, waitingIndex,
   finishFirstRun, forcedStep, readFirstRun, walkRows,
-  saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, whyNotMade, type FirstRun,
+  saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, wearsTheWalksLook, whyNotMade, type FirstRun,
 } from './onboarding';
 import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from './priority';
 import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
@@ -603,8 +607,80 @@ export default function App() {
   // The one way to change it. The key, the button in the corner and the ⌘K
   // command all call THIS, so there is no second place for it to be confused in.
   const togglePanel = useCallback(() => setPanelUp((v) => !v), []);
-  // THERE IS NO LOOK STATE. The app has one look, Light (w-9e434e8671): no
-  // dark, no pictures, nothing to pick and nothing to store.
+  // Resolved once at mount and applied before the first paint below, so the
+  // window never flashes the other theme on the way in.
+  // IT HOLDS THE PICK, NOT THE COLOUR. `match` is one of the three things this
+  // can be, and it is resolved to light or dark at every paint below rather than
+  // frozen here, so a Mac that flips at sunset takes the window with it and the
+  // ticked tile still says Match my system.
+  const [theme, setTheme] = useState<ThemePick>(() => resolvePick(localStorage.getItem(THEME_KEY)));
+  // WHAT THE MAC SAYS RIGHT NOW, and it only matters while `theme` is `match`.
+  // A piece of state rather than a read at paint time because nothing else would
+  // tell React that the Mac changed its mind while the window was open.
+  const [machine, setMachine] = useState(() => resolveTheme('match'));
+  useEffect(() => onMachineTheme(setMachine), []);
+  // The picture over dark, on its own axis (skins.ts). Applied in main.tsx
+  // before the first paint; this is the same value read back so the controls
+  // can show which one is on.
+  const [skin, setSkin] = useState<SkinChoice>(() => resolveSkin(localStorage.getItem(SKIN_KEY)));
+  // WHAT SHE PICKS IS ONE THING. Light, Dark, or a picture — never a theme and
+  // a picture separately, because a picture IS dark, and two
+  // controls for one decision is the cognitive load the design law exists to
+  // refuse. Settings and ⌘K both call this and nothing else, so there is no
+  // second place for the two halves to disagree.
+  const look = lookOf(theme, skin);
+  // HER DIALS on the picture: blur and dim (skins.ts). They live beside the
+  // skin rather than inside it because they are hers to move and the skin is
+  // ours to ship, and because moving one has to repaint the window she is
+  // looking at, not the next one she opens.
+  const [tune, setTuneState] = useState<SkinTune>(() => {
+    const sk = resolveSkin(localStorage.getItem(SKIN_KEY));
+    // With no picture on there are no dials to show, but the state still needs
+    // a shape, so it borrows the first picture's. SKINS[0], not a name: the
+    // first picture was Mountain, it was removed, and a hard-coded id here is
+    // what would have broken.
+    return resolveTune(localStorage.getItem(TUNE_KEY), sk === 'none' ? SKINS[0].id : sk);
+  });
+  // The newest press wins: walking the strip with the arrow keys fires several
+  // switches before the first picture is decoded, and only the last may land.
+  const lookSeq = useRef(0);
+  // THE TILE SHE PRESSED, ticked on the press itself while its picture decodes,
+  // so a click always answers at once even when the window takes a beat.
+  const [pickedLook, setPickedLook] = useState<Look | null>(null);
+  const setLook = useCallback((next: Look) => {
+    const { theme: t, skin: s } = lookMeans(next);
+    // Stored at once, so what she pressed is kept even if the window closes
+    // before the picture is ready. The screen changes once it is (look-switch.ts).
+    localStorage.setItem(THEME_KEY, t); localStorage.setItem(SKIN_KEY, s);
+    const seq = ++lookSeq.current;
+    setPickedLook(next);
+    void readySkin(s).then(() => {
+      if (seq !== lookSeq.current) return;
+      swapLook(() => flushSync(() => {
+        setPickedLook(null);
+        setTheme(t); applyTheme(resolveTheme(t));
+        setSkin(s); applySkin(wornSkin(t, s, machineTheme()));
+        // Each picture carries its own dials, so arriving on one loads ITS numbers
+        // rather than leaving the last picture's blur on this one's photograph.
+        if (s !== 'none') {
+          const next = resolveTune(localStorage.getItem(TUNE_KEY), s);
+          setTuneState(next); applyTune(next);
+        }
+      }));
+    });
+  }, []);
+
+  const setTune = useCallback((next: SkinTune) => {
+    const sk = resolveSkin(localStorage.getItem(SKIN_KEY));
+    if (sk === 'none') return;
+    setTuneState(next);
+    applyTune(next);
+    localStorage.setItem(TUNE_KEY, storeTune(localStorage.getItem(TUNE_KEY), sk, next));
+  }, []);
+  const resetTune = useCallback(() => {
+    const sk = resolveSkin(localStorage.getItem(SKIN_KEY));
+    if (sk !== 'none') setTune(TUNE_DEFAULT[sk as SkinId]);
+  }, [setTune]);
   const [seen, setSeen] = useState<Set<string>>(() => new Set(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]')));
   // Batch selection (Superhuman: cmd-A, shift-select, then act on all).
   const [multiSel, setMultiSel] = useState<Set<string>>(new Set());
@@ -731,6 +807,24 @@ export default function App() {
     // A half-finished walk resumes where it stopped: the folder and name are
     // saved as answered, so reopening resumes.
     setRun(forcedRun.current ? { ...RUN_START, step: forcedRun.current } : readFirstRun(localStorage));
+    // AND THE LOOK IS WRITTEN DOWN HERE, on the one line that knows this Mac
+    // has never been used. Before this, only the three setup screens and inbox
+    // zero painted the lake and nothing was stored, so every other screen fell
+    // through to whatever the Mac preferred and a light Mac turned the walk
+    // white after the third screen.
+    //
+    // WHAT IT SEEDS IS PLAIN DARK, NOT A PICTURE. The `else` branch that used
+    // to sit under this line put Gouache Valley on any Mac that had chosen no
+    // picture, every time the walk ran, and that is how a look nobody
+    // picked reached the window. It is deleted, and so is the function behind
+    // it. A picture is something somebody chooses on the walk's look step now,
+    // and nothing else in the app chooses one for them.
+    //
+    // The state goes with it because both were read from localStorage at mount
+    // and neither is watching it, so writing the keys alone would only take
+    // effect on the next launch.
+    const seeded = seedFirstRunLook(localStorage, THEME_KEY);
+    if (seeded) { setTheme(seeded.theme); setSkin(seeded.skin); }
   }, [snap, run]);
 
   useEffect(() => { if (run) saveFirstRun(localStorage, run); }, [run]);
@@ -2628,6 +2722,9 @@ export default function App() {
       // The startup sweep ran before this page existed, so its one line was
       // held for it. It outranks the reload line: a reload she pressed herself
       // needs no telling, and agents coming back off a crash does.
+      // Which set of theme pictures this screen wants, before anything else in
+      // here: a toast that returns early must not take the wallpaper with it.
+      applySkinDetail(resolveSkinDetail(info?.screenDetail));
       // BEFORE ANY RETURN, because this is what puts her back where she was and
       // the two early exits below are about what to SAY. Read once here rather
       // than asked for again: the main process clears the flag as it hands it
@@ -2697,6 +2794,10 @@ export default function App() {
     showToast(`Opening a demo inbox with ${out.rows ?? 0} rows in it. Yours keeps running.${note}`);
   }, [showToast]);
 
+  // She dragged the window onto the other screen, or unplugged one. The picture
+  // does not change, only which copy of it is painted, so there is nothing to
+  // say about it and nothing to store: the attribute is the whole of the state.
+  useEffect(() => window.zero?.onScreenDetail?.((s) => applySkinDetail(resolveSkinDetail(s?.detail))), []);
 
   // FROM A TASK IT ADVANCES, FROM THE LIST IT DOES NOT. The rule and what it
   // cost her are in ./advance; what is here is only which state answers "was a
@@ -4148,8 +4249,126 @@ export default function App() {
     return items.filter((i) => i.status === 'done' && !isCleanRun(i) && i.updatedAt >= start.getTime()).length;
   }, [items]);
 
-  // THE SETUP SCREENS AND INBOX ZERO USED TO PIN DARK AND A PICTURE here. The
-  // app has one look, Light (w-9e434e8671), so every screen wears it.
+  // THE IDLE PAGE ALWAYS WEARS THE PICTURE, WHATEVER MODE THE APP IS IN.
+  //
+  // It is the first and only exception to "mode follows the machine", and it
+  // is one page wide. Nothing is written to localStorage: her stored look is
+  // untouched and comes straight back when the page goes.
+  //
+  // WHY IT PINS ON THE GROUND AND NOT ON `inboxZero`. A modal floating over
+  // this page is still this page, so pressing C must not flip the whole window
+  // to light behind the compose card. Settings is the one thing that does lift
+  // the pin, because the theme picker lives there and a picker showing Light
+  // over a dark window is a control arguing with itself.
+  //
+  // THE SETUP SCREENS WEAR THE PICTURE, AND THEY HAVE TO BE TOLD TO.
+  //
+  // Corner to corner was picked in round two OVER THE LAKE, and 5e2c6ee gave
+  // `.fr-screen` the photograph to match. But it gave it under
+  // `:root[data-skin]`, which is on only while a picture is SWITCHED ON, and on
+  // a first run nothing has switched one on: `resolveSkin(null)` is 'none'.
+  //
+  // It looked right anyway, by accident, for exactly as long as nobody tried it
+  // with a real inbox. A brand new store has nothing in it, so `idlePinned`
+  // below was already pinning the lake and the welcome inherited it. HER window
+  // had rows: Claude Code agents land in the inbox and in no other list, while
+  // the walk only counts PROJECTS, so an empty store and a full inbox happen at
+  // the same time. The pin was off and the welcome came up as a charcoal slab,
+  // #373a41.
+  //
+  // So the walk pins the picture itself rather than hoping to inherit one. Only
+  // the three SETUP screens, which are full surfaces of their own; the steps
+  // after them are tethered over the real app, and that app is hers to look
+  // however she has set it.
+  // AND THE PIN STOPS AT THE PICKER, WHICH IS THE LAST SCREEN BEFORE THE
+  // PRACTICE ROUND. `look` is excluded on purpose: a screen that pins the
+  // default while she presses tiles is a picker that does not work, and the
+  // window repainting under her hand is the whole of what that screen is for.
+  //
+  // THIS LINE USED TO NAME THREE STEPS AND THAT IS THE BUG SHE PHOTOGRAPHED ON
+  // 2026-08-26. It read `welcome || folder || name`, which was every screen
+  // before the picker while the picker was beat four. Moving the picker to beat
+  // seven on 08-25 slid the introduction's three slabs in front of it and left
+  // them pinning nothing, so they fell through to whatever the store holds. On
+  // a Mac that has never chosen, the first-run seed makes that Gouache Valley
+  // and the fault is invisible; on one that has chosen, it is plain light.
+  //
+  // So the question is asked of the step ORDER now (`wearsTheWalksLook`,
+  // onboarding.ts) rather than of three names, and moving the picker again
+  // moves this with it.
+  const firstRunPinned = run !== null && wearsTheWalksLook(run.step);
+  // AND THE INBOX ZERO PIN IS OFF FOR THE WHOLE OF THE WALK (`run === null`).
+  //
+  // IT STARTED AS ONE STEP AND IT WAS NOT ENOUGH. On 08-24 this read
+  // `!pickingLook`, off a measurement of the picker: pressing a tile moved
+  // `zero.skin` and the tile's own tick and did NOT move the window, because
+  // the app behind the walk is an empty inbox and this pin was painting the
+  // default back over the choice on every render. A picker whose picture does
+  // not change is a picture of a picker.
+  //
+  // Two faults wore that one sentence. The harness that took the page pressed
+  // Light and then failed to press back (scripts/shot-the-built-walk.mjs, and
+  // it throws now rather than carrying on). And this line: the pin is not only
+  // on the picker screen, it is on every beat of the practice round where the
+  // inbox happens to be empty, which is beats 9, 10 and 17 to 19. So somebody
+  // who picked Light walked a tutorial that went dark on five screens and light
+  // on six, and somebody who picked one of the other fifteen photographs saw
+  // Gouache Valley on those five.
+  //
+  // THE EARLIER DECISION IS NARROWED BY A LATER ONE, and `skin ===
+  // 'none'` is the whole of the narrowing.
+  //
+  // So the two halves of the rule split exactly here. A PICTURE she picked
+  // is remembered at inbox zero, because a picture is the nice theme, and
+  // swapping it for a different picture is the app forgetting. Turning that
+  // off too would be this clause, and nothing else.
+  //
+  // AND THEN IT WENT (w-9e434e8671). With three choices, Light, Dark and Match
+  // system, a pin to plain dark at inbox zero would show a theme nobody can
+  // pick, so inbox zero wears the chosen look like every other page.
+  const idlePinned = false;
+  // IT IS THIS PAGE ONLY, and nothing here reaches the inbox, the walk or the
+  // setup screens.
+  useEffect(() => {
+    // TWO PINS, TWO RULES. Both live in skins.ts, one function each, so the
+    // two screens cannot drift apart.
+    //
+    // The theme is pinned dark in both, because a picture is dark and because
+    // inbox zero is a dark screen either way.
+    if (firstRunPinned) {
+      // THE WALK OPENS ON A PICTURE, hers if she has one and Gouache Valley if
+      // she has not. NOTHING IS WRITTEN HERE: the moment the picker opens, her
+      // stored look is back, which is what keeps the earlier fault fixed.
+      const pinned: SkinChoice = walkSkin(skin);
+      applyTheme('dark');
+      applySkin(pinned);
+      if (pinned !== 'none') applyTune(resolveTune(localStorage.getItem(TUNE_KEY), pinned));
+      return;
+    }
+    if (idlePinned) {
+      // THE IDLE PAGE PAINTS THE PICTURE THAT IS ON, and nothing when none is.
+      // An earlier decision, unchanged by this row.
+      const pinned: SkinChoice = idleSkin(skin);
+      applyTheme('dark');
+      applySkin(pinned);
+      if (pinned !== 'none') applyTune(resolveTune(localStorage.getItem(TUNE_KEY), pinned));
+      return;
+    }
+    applyTheme(resolveTheme(theme));
+    // WHICH WAY THE MAC IS POINTING, written on the root so the Match my system
+    // tile can draw it. A rule cannot ask the Mac and the renderer already knows,
+    // so this is the one place the answer crosses over into the stylesheet. It is
+    // written unconditionally, because the tile is on the screen in Settings and
+    // in ⌘K whatever the window is currently wearing.
+    document.documentElement.setAttribute('data-machine', machine);
+    // Match system on a dark Mac is Dark, which is Ember Grid (skins.ts).
+    const worn = wornSkin(theme, skin, machine);
+    applySkin(worn);
+    if (worn !== 'none') applyTune(resolveTune(localStorage.getItem(TUNE_KEY), worn));
+    // `machine` is in the list because on Match my system it is half the answer:
+    // without it the effect never re-runs when macOS flips and the window stays
+    // on whichever it was at launch.
+  }, [idlePinned, firstRunPinned, theme, skin, machine]);
 
   // THE SAME SCREEN, held for the beat it takes ⌘R to put her back where she
   // was, so the reload never shows her the inbox on its way to the task. Its
@@ -4168,7 +4387,8 @@ export default function App() {
   // `!modal` used to sit in this condition, so pressing C or Cmd+K at inbox zero
   // swapped the whole page out for the ordinary list, and an ordinary list with
   // an empty inbox drew that sentence behind her card. The idle page stays up
-  // under the overlay now.
+  // under the overlay now, which is the call `idlePinned` above already makes
+  // about the theme for exactly the same reason.
   // THE TEAM VERSION KEEPS ITS TABS ON AN EMPTY INBOX (2026-10-01): the
   // categories must stay on screen even with nothing in them. So the
   // whole-page zero is only the old layout's; the new one draws its zero under
@@ -5204,6 +5424,8 @@ export default function App() {
           products={rankedProducts}
           supervisorPaused={snap.supervisor.paused}
           batch={multiSel.size > 0}
+          look={look}
+          onSetLook={(l) => { setLook(l); setModal(null); }}
           staleFiles={snap.restartNeeded?.files ?? []}
           /*
            * A newer Agentbox that has already downloaded itself. The palette is
@@ -5395,8 +5617,13 @@ export default function App() {
           usageReadings={snap.usageByEngine ?? (snap.usage ? [snap.usage] : [])}
           now={now}
           onSectionChange={setSettingsPage}
+          look={pickedLook ?? look}
+          onSetLook={setLook}
           keyHints={keyHints}
           onSetKeyHints={setHints}
+          tune={tune}
+          onSetTune={setTune}
+          onResetTune={resetTune}
           startPane={settingsPane}
           onNewProject={() => setNewProject(true)}
           // The Priority page: the same running order every project list
@@ -5545,6 +5772,8 @@ export default function App() {
              so it has to read the rotation Tab actually takes rather than the
              sidebar's shorter list (w-5a08121f99). */
           tabs={stateTabOrder}
+          look={look}
+          onSetLook={setLook}
           /*
            * THE LAST CARD FILES INTO A PROJECT, so it needs the list to find
              the one this walk made (w-7fd38422b5, 2026-08-27). It takes only

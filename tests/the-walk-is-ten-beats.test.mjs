@@ -28,8 +28,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 describe('the ten beats, in her order', () => {
   it('starts on the plus and not on the palette', () => {
     // Beat four used to open the palette over an empty app. AND THE PLUS IS
-    // REACHED THROUGH THE INTRODUCTION NOW. Naming the project opens the first
-    // slab, and the practice project is what opens the plus.
+    // REACHED THROUGH THE INTRODUCTION AND THE LOOK NOW. Naming the project
+    // opens the first slab, the look is the last screen before the hand-off,
+    // and the practice project is what opens the plus.
     const made = advance({ ...START, step: 'name' }, { t: 'made', product: 'p' });
     expect(made.step).toBe('inbox');
     const practising = advance({ ...made, step: 'hand' }, { t: 'practice', product: 'practice', examples: [] });
@@ -51,13 +52,13 @@ describe('the ten beats, in her order', () => {
     // It was the tenth and last beat until 2026-08-22, when the ending grew a
     // beat behind it. It is still late in the walk, which is the half of this
     // she asked for: "The Command K bar is not the best place to start."
-    // Sixteen since the theme step went with the themes (w-9e434e8671).
-    expect(BEAT.command).toBe(16);
+    // Seventeen since w-ec62ab6b38 (2026-09-28) took the note beat out.
+    expect(BEAT.command).toBe(17);
     // AND THE BEAT IN FRONT OF IT IS THE TOUR OF THE OTHER TWO TABS, added
     // 2026-08-24. ⌘K used to follow the empty inbox straight away; now the walk
     // shows where the work went first, so an empty inbox means something by the
     // time the palette comes up.
-    expect(BEAT.where).toBe(15);
+    expect(BEAT.where).toBe(16);
     // THE SIDEBAR NOTE BEAT IS GONE. It rang the project rail, which is no
     // longer drawn anywhere, so the beat drew nothing (w-ec62ab6b38, 2026-09-28).
     expect(BEAT.note).toBeUndefined();
@@ -77,8 +78,8 @@ describe('the ten beats, in her order', () => {
     // The import spent a day as the eighth beat and a few hours as a screen of
     // its own at the end; it is part of the card now, so there is no beat
     // after this one.
-    // Seventeen since the theme step went with the themes (w-9e434e8671).
-    expect(BEAT.done).toBe(17);
+    // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out.
+    expect(BEAT.done).toBe(18);
     expect(BEAT.command).toBeLessThan(BEAT.done);
     expect(BEAT.agents).toBeUndefined();
   });
@@ -128,8 +129,8 @@ describe('the ten beats, in her order', () => {
   });
 
   it('counts every beat it renders, and renders every beat it counts', () => {
-    // Seventeen since the theme step went with the themes (w-9e434e8671).
-    expect(N_BEATS).toBe(17);
+    // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out.
+    expect(N_BEATS).toBe(18);
     for (const step of COACHED) expect(coach(step, 0)).not.toBeNull();
     expect(new Set(Object.values(BEAT)).size).toBe(N_BEATS);
     for (const step of COACHED) expect(forcedStep(step)).toBe(step);

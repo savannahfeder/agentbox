@@ -43,13 +43,14 @@ describe('the hairline between rows', () => {
     expect(readers, 'only the row hairline reads --row-line').toBe(1);
   });
 
-  it('draws at three eighths, declared once in the one look', () => {
-    // Dark and the picture themes went when the app went to one light look,
-    // so the light token block is the only place it is declared. A second
-    // declaration is a second value nobody asked for.
+  it('draws at three eighths in light and in dark, and no picture theme says otherwise', () => {
     expect(rowLine(':root')).toBe(0.375);
+    expect(rowLine(':root[data-theme="dark"]')).toBe(0.375);
+    // The dark block also answers for :root[data-skin], so every picture theme
+    // inherits the half. A theme block re-declaring it is a second value
+    // nobody asked for.
     const declared = [...css.matchAll(/^\s*--row-line:/gm)].length;
-    expect(declared, '--row-line is declared exactly once').toBe(1);
+    expect(declared, '--row-line is declared exactly twice, light and dark').toBe(2);
   });
 
   it('leaves the line under the heading alone', () => {

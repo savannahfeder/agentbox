@@ -993,11 +993,16 @@ declare global {
       // itself, which is the only way the page hears about the chord at all.
       onApprovalAnswered?(fn: (a: { id: string; allow: boolean }) => void): () => void;
       badge?(count: number): Promise<void>;
-      bootInfo?(): Promise<{ reloaded: boolean; builtAt: number; recovered?: string | null }>;
+      // screenDetail is which set of theme pictures this screen wants, 'soft' or
+      // 'sharp' (main/screen-detail.mjs). It rides here rather than being
+      // pushed because the answer is needed on the first paint.
+      bootInfo?(): Promise<{ reloaded: boolean; builtAt: number; recovered?: string | null; screenDetail?: string }>;
       // Keeping Agentbox current (main/updater.mjs). Look again now, and restart
       // onto the version that already downloaded itself.
       updateCheck(): Promise<UpdateState>;
       updateInstall(): Promise<{ started: boolean }>;
+      // The window moved to a screen that wants the other set.
+      onScreenDetail?(fn: (s: { detail: string }) => void): () => void;
       // The wake sweep's one line: agents put back on the work the lid
       // interrupted, and how many are waiting on her because their session was
       // gone. Startup's version of it rides on bootInfo instead.

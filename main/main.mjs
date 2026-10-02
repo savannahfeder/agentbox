@@ -1,7 +1,7 @@
 // The app: the agent inbox. Electron shell around a keyboard-first renderer, a
 // file-derived store, and a supervisor of headless sessions.
 
-import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, shell, session, safeStorage } from 'electron';
+import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, screen as electronScreen, shell, session, safeStorage } from 'electron';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mjs';
 import { loadCloudConfig, supabaseSession } from './team/session.mjs';
@@ -12,6 +12,7 @@ import { configDir, loadConfig } from './config.mjs';
 import { installMenu, applyZoom, requestFind } from './menu.mjs';
 import { zoomDeltaFor } from './zoom-keys.mjs';
 import { copySelection } from './copy-selection.mjs';
+import { screenDetailFor } from './screen-detail.mjs';
 import { Store } from './store.mjs';
 import { storeRootEnv } from './store/home.mjs';
 import { Supervisor } from './supervisor.mjs';
@@ -556,9 +557,7 @@ async function createWindow() {
     minWidth: 980,
     minHeight: 600,
     title: NAME,
-    // The light frame's own `--bg`, so the moment before the page paints is
-    // the same colour as the page (w-9e434e8671). It was dark.
-    backgroundColor: '#f8f8fa',
+    backgroundColor: '#1a1a1c',
     titleBarStyle: 'hiddenInset',
     webPreferences: {
       preload: path.join(appDir, 'preload.cjs'),
@@ -566,6 +565,38 @@ async function createWindow() {
       nodeIntegration: false,
       webviewTag: true, // the inbox-zero browser
     },
+  });
+
+  // WHICH PICTURE SET THIS WINDOW IS ON, and a shout when it changes.
+  // main/screen-detail.mjs has the rule and the reasoning; this is the wiring.
+  // The initial answer rides bootInfo rather than being pushed, for the same
+  // reason everything else there does: a push races the renderer's first
+  // effects and would be dropped by the page it is for. After that, the two
+  // things that can change the answer are the window moving to another screen
+  // and a screen changing under it, and both are watched here. Nothing is sent
+  // unless the answer actually flips, so dragging a window around does not
+  // spray IPC at the page.
+  const currentScreenDetail = () => {
+    try { return screenDetailFor(electronScreen.getDisplayMatching(window.getBounds())); }
+    catch { return 'sharp'; }
+  };
+  let lastScreenDetail = currentScreenDetail();
+  const tellScreenDetail = () => {
+    if (!window || window.isDestroyed()) return;
+    const next = currentScreenDetail();
+    if (next === lastScreenDetail) return;
+    lastScreenDetail = next;
+    window.webContents.send('zero:screen-detail', { detail: next });
+  };
+  window.on('move', tellScreenDetail);
+  window.on('moved', tellScreenDetail);
+  electronScreen.on('display-metrics-changed', tellScreenDetail);
+  electronScreen.on('display-added', tellScreenDetail);
+  electronScreen.on('display-removed', tellScreenDetail);
+  window.on('closed', () => {
+    electronScreen.removeListener('display-metrics-changed', tellScreenDetail);
+    electronScreen.removeListener('display-added', tellScreenDetail);
+    electronScreen.removeListener('display-removed', tellScreenDetail);
   });
 
   // The junk browser's session presents as plain Chrome. Electron's default
@@ -791,6 +822,7 @@ async function createWindow() {
   ipcMain.handle('zero:boot-info', () => {
     const info = {
       reloaded: reloadRequested, builtAt: builtAt(), recovered: pendingRecovery,
+      screenDetail: currentScreenDetail(),
     };
     reloadRequested = false;
     pendingRecovery = null;

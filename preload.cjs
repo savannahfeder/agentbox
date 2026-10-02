@@ -211,6 +211,15 @@ contextBridge.exposeInMainWorld('zero', {
     ipcRenderer.on('zero:open-item', handler);
     return () => ipcRenderer.removeListener('zero:open-item', handler);
   },
+  // The window moved to a screen that wants the other set of theme pictures.
+  // Only main can see which physical display a window is on, and only main can
+  // read a display's density without page zoom folded into it, so this is the
+  // only way the page can know. It fires on a change, never on every drag.
+  onScreenDetail: (fn) => {
+    const handler = (_e, payload) => fn(payload);
+    ipcRenderer.on('zero:screen-detail', handler);
+    return () => ipcRenderer.removeListener('zero:screen-detail', handler);
+  },
   onEscapeBrowser: (fn) => {
     const handler = () => fn();
     ipcRenderer.on('zero:escape-browser', handler);

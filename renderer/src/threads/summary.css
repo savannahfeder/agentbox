@@ -55,7 +55,7 @@
 .workspace-layout > .topbar:has(.ts-more-menu) { z-index: 3; }
 .ts-more-menu .ts-more-row { width: 100%; white-space: nowrap; }
 .ts-more-menu .ts-more-row:focus-visible { outline: none; background: rgba(255,255,255,.07); color: var(--text); }
-:root .ts-more-menu .ts-more-row:focus-visible { background: var(--wash-strong); }
+:root[data-theme="light"] .ts-more-menu .ts-more-row:focus-visible { background: var(--wash-strong); }
 .ts-more-label { flex: 1; }
 .ts-more-menu kbd { margin-left: 18px; font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; padding: 0; }
 /* The figures on the code row are the ones that closed the line under the

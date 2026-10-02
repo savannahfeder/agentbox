@@ -39,6 +39,12 @@ describe('the change goes black to its top edge', () => {
     expect(head[head.length - 1]).toBe(card[card.length - 1]);
   });
 
+  it('sets that ground once and lets all sixteen skins inherit it', () => {
+    // Written in the dark block and nowhere else. Sixteen skins sit under it
+    // and every one of them would otherwise need its own line.
+    expect(css.match(/--code-ground:\s*#0e0f12/g) ?? []).toHaveLength(1);
+  });
+
   it('leaves the markdown and page headers alone, which is her sentence', () => {
     // The bare rule that every artifact's header takes still says --doc-page,
     // and nothing narrows it to doc-md or doc-html: a markdown file and a page
@@ -51,9 +57,6 @@ describe('the change goes black to its top edge', () => {
     // --code-ground falls back to the pane's own page colour at the root, so
     // the black is a property of a dark window and not of the artifact. She
     // approved the five colours on white and a black slab was not among them.
-    // The dark window (and its black ground) went when the app went to one
-    // light look, so this is the only declaration.
     expect(css).toMatch(/--code-ground:\s*var\(--doc-page\)/);
-    expect(css.match(/--code-ground:/g) ?? []).toHaveLength(1);
   });
 });

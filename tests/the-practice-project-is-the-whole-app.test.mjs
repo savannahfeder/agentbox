@@ -495,11 +495,12 @@ describe('the introduction, in front of the app', () => {
   it('is four screens and every one of them counts', () => {
     // FIVE UNTIL 2026-08-24.
     expect(INTRO).toEqual(['inbox', 'away', 'goal', 'hand']);
-    // Seventeen since the theme step went with the themes (w-9e434e8671).
-    expect(N_BEATS).toBe(17);
+    // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out.
+    expect(N_BEATS).toBe(18);
     // THE THREE SLABS COME STRAIGHT AFTER THE THREE SETUP SCREENS, and the
-    // hand-off straight after the last slab.
-    expect(INTRO.map((s) => BEAT[s])).toEqual([4, 5, 6, 7]);
+    // theme picker is between the last slab and the hand-off.
+    expect(INTRO.map((s) => BEAT[s])).toEqual([4, 5, 6, 8]);
+    expect(BEAT.look).toBe(7);
   });
 
   it('is three slabs of words, and each one has something to say', () => {
@@ -597,10 +598,10 @@ describe('the introduction, in front of the app', () => {
     // landing. Every screen in the walk that Enter carries takes this, and one
     // that does not is a screen that eats the press that opened it.
     // FIVE since w-ec62ab6b38 (2026-09-28): the rebuilt folder list takes Enter too.
-    // FOUR since w-9e434e8671: the theme picker and its row of arrows are gone.
+    // SIX since w-ec62ab6b38 (2026-09-28): the theme row's left and right arrows are armed the same way.
     const src = fs.readFileSync(new URL('../renderer/src/components/Onboarding.tsx', import.meta.url), 'utf8');
     expect(src.match(/setTimeout\(\(\) => window\.addEventListener\('keydown', on\), 0\)/g) ?? [])
-      .toHaveLength(4);
+      .toHaveLength(6);
   });
 });
 
