@@ -53,10 +53,12 @@ describe('the Summary button says its key on hover, not on its face', () => {
     expect(summary).toMatch(/if \(e\.key !== 's' && e\.key !== 'S'\) return;/);
   });
 
-  it('leaves the row\'s own S alone, which schedules rather than shows a summary', () => {
-    // The same letter means something else in the list, and that plate must
-    // not have been rewritten along with this one.
-    expect(HINTS.row.find((l) => l.key === 'S').what).toBe('Schedule for later');
+  it('leaves the row\'s plate alone, where L schedules', () => {
+    // Scheduling moved from S to L everywhere (tests/s-means-the-summary-and-
+    // l-means-later.test.mjs), and the row's plate must not have been rewritten
+    // along with this one.
+    expect(HINTS.row.find((l) => l.key === 'L').what).toBe('Schedule for later');
+    expect(HINTS.row.some((l) => l.key === 'S')).toBe(false);
   });
 });
 
