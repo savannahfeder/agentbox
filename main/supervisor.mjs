@@ -1749,6 +1749,10 @@ export class Supervisor {
     // attached to the reply that woke it.
     const files = product ? this.attachmentBlock({ ...item, body: '', result: '', note: '' }, product) : '';
     if (files) parts.push(files);
+    // A resumed session never saw the full brief's ship section if it began
+    // before the project shipped through the app, and her "merge it" is
+    // exactly when it needs it.
+    if (product && this.shipsThroughTheApp(product)) parts.push(this.shipBrief());
     return parts.join('\n');
   }
 
@@ -1801,6 +1805,7 @@ export class Supervisor {
       const files = product ? this.attachmentBlock({ ...item, body: '', result: '', note: '' }, product) : '';
       if (files) parts.push(files);
     }
+    if (product && this.shipsThroughTheApp(product)) parts.push(this.shipBrief());
     return parts.join('\n');
   }
 
