@@ -56,6 +56,10 @@ function walkIt() {
   // three rows already waiting in it, and archived when the walk ends.
   s = advance(s, { t: 'practice', product: 'practice', examples: EXAMPLE_IDS });
   at('practising');
+  // WRITING ONE IS TWO BEATS SINCE 2026-10-01. The card opens on who the
+  // thread is for, which the walk never used to say a word about, and the beat
+  // ends when the To list is really open (App.tsx, `onOpenMenu`).
+  s = stepTo(s, 'who');                                 at('who it is for');
   s = stepTo(s, 'task');                                at('composing');
   s = advance(s, { t: 'sent', item: 'w-first', at: 1_000 }); at('it is running');
   s = advance(s, { t: 'answered' });                    at('it came back');
@@ -73,6 +77,7 @@ function walkIt() {
   // times Tab is pressed inside it: the card is a function of the view and the
   // step does not move until the walk is back on an empty inbox.
   s = stepTo(s, 'where');                               at('where it all went');
+  s = stepTo(s, 'board');                               at('the board');
   s = stepTo(s, 'command');                             at('the palette');
   s = stepTo(s, 'done');                                at('the finish card');
   s = advance(s, { t: 'finish' });                      at('landed');
@@ -128,18 +133,21 @@ describe('the walk, start to finish', () => {
     // TEN AND SEVENTEEN since w-9e434e8671: the theme step went with the
     // themes.
     //
+    // ELEVEN AND NINETEEN since 2026-10-01: who a thread is for, and the
+    // board, each became a beat of their own, so both pairs came up two.
+    //
     // `where` IS ONE BEAT AND ONE STEP even though it takes three presses of
     // Tab. The presses move the VIEW, not the step, which is exactly why the
     // card cannot get out of step with the screen it is describing.
     const beats = seen.map((m) => m.step).filter((s, i, all) => s !== all[i - 1]);
     const times = new Map();
     for (const s of beats) times.set(BEAT[s], (times.get(BEAT[s]) ?? 0) + 1);
-    const twice = new Set([10, 17]);
+    const twice = new Set([BEAT.working, BEAT.done]);
     for (const [dot, n] of times) {
       expect(n, `dot ${dot} was on screen ${n} times`).toBe(twice.has(dot) ? 2 : 1);
     }
-    expect(beats.filter((s) => BEAT[s] === 10)).toEqual(['working', 'open']);
-    expect(beats.filter((s) => BEAT[s] === 17)).toEqual(['done', 'landed']);
+    expect(beats.filter((s) => BEAT[s] === BEAT.working)).toEqual(['working', 'open']);
+    expect(beats.filter((s) => BEAT[s] === BEAT.done)).toEqual(['done', 'landed']);
   });
 
   it('still knows the folder and the name it was given at the start', () => {

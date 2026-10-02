@@ -196,6 +196,22 @@ export function parseWhen(raw: string, now = Date.now()): { ts: number; label: s
     return stamp2(d.getTime(), now);
   }
 
+  // TOMORROW OR TODAY WITH A CLOCK ON IT, the first thing a person types into
+  // Send later (tests/send-later-takes-a-time-in-words.test.mjs). "Today" names
+  // the day, so an hour already gone is refused rather than rolled on to
+  // tomorrow the way a bare "9am" is.
+  const dayAt = text.match(/^(tomorrow|tmrw|tmr|today)\s+(?:at\s+)?(.+)$/);
+  if (dayAt) {
+    const at = timeOf(dayAt[2]);
+    if (!at || !/^\d{1,2}(?::\d{2})?\s*(?:am|pm)?$/.test(dayAt[2])) return null;
+    const [hour, minute] = at.split(':').map(Number);
+    const d = new Date(now);
+    if (dayAt[1] !== 'today') d.setDate(d.getDate() + 1);
+    d.setHours(hour, minute, 0, 0);
+    if (d.getTime() <= now) return null;
+    return stamp2(d.getTime(), now);
+  }
+
   // Filler words a person types around the grammar that already works:
   // "in 30 minutes", "in an hour", "next monday".
   text = text.replace(/^in /, '');

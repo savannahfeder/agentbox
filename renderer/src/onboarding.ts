@@ -47,18 +47,18 @@ export type Step =
   //
   // AND THE SIDEBAR NOTE IS NOT ONE OF THEM.
   | 'inbox' | 'away' | 'goal' | 'hand'
-  | 'make' | 'task' | 'working' | 'open' | 'answer'
+  | 'make' | 'who' | 'task' | 'working' | 'open' | 'answer'
   // THERE WAS A `note` BEAT HERE, pointing at the project rail's notes panel.
   // The rail is retired on every screen, so the beat drew no ring and no card
   // and only Enter moved it on: a silent screen in the middle of the tutorial.
   // It went with w-ec62ab6b38 (2026-09-28). A walk saved at `note` resumes at
   // `clear` (`liveStep`).
-  | 'clear' | 'snooze' | 'unblock' | 'where' | 'command' | 'done' | 'landed';
+  | 'clear' | 'snooze' | 'unblock' | 'where' | 'board' | 'command' | 'done' | 'landed';
 
 /**
  * HOW MANY BEATS THE WALK HAS. It stays because the walk still has a
  * length and the tests still hold it to one. */
-export const N_BEATS = 17;
+export const N_BEATS = 19;
 
 /**
  * WHICH BEAT EACH SCREEN IS. One pair shares one: `working` and `open` are one
@@ -79,21 +79,28 @@ export const BEAT: Record<Step, number> = {
   // The theme picker was beat seven until the app went to one look
   // (w-9e434e8671). Everything after it came down one.
   hand: 7,
-  make: 8, task: 9,
-  working: 10, open: 10, answer: 11,
+  // WRITING ONE IS TWO BEATS SINCE 2026-10-01: the card opens, you see who it
+  // is to, then you send it. Everything after shifted by one.
+  make: 8, who: 9, task: 10,
+  working: 11, open: 11, answer: 12,
   // `clear` closes the two that are finished and `unblock` answers the one that
   // is not, which is the difference the product exists to teach. AND THE THREE
   // WAYS A ROW LEAVES THE INBOX ARE THREE BEATS. `clear` closes the two that
   // are finished, `snooze` puts off the one that is real work and not for
   // today, and `unblock` answers the one an agent is stopped on. The rail's
   // note beat that sat at thirteen is gone with the rail.
-  clear: 12, snooze: 13, unblock: 14,
+  clear: 13, snooze: 14, unblock: 15,
   // AND BEAT FIFTEEN IS THE TOUR OF THE OTHER TWO TABS. It is one beat even
   // though it takes three presses of Tab, the same way `working` and `open`
   // share beat ten: it is one thing happening, which is somebody being shown
   // where the work they just did has gone.
-  where: 15,
-  command: 16, done: 17, landed: 17,
+  where: 16,
+  // AND THE BOARD IS THE BEAT AFTER THE TOUR (2026-10-01). The tour says where
+  // the work went; the board is the same work laid out by what is happening to
+  // it, which is the one view the walk never opened. The walk has to show the
+  // view somebody uses to see what a whole team is up to, not only the tabs.
+  board: 17,
+  command: 18, done: 19, landed: 19,
 };
 
 export interface FirstRun {
@@ -463,7 +470,21 @@ export function walkRows<T extends { id: string }>(rows: T[], run: FirstRun | nu
   //
   // The directive the project's making composed is still filtered out, because
   // this keeps a named set rather than dropping the filter.
-  if (run.step === 'where') {
+  //
+  // AND THE BOARD IS THE SAME WORK ONE LAYER UP (2026-10-01), so it keeps the
+  // same set. The board beat was added without a branch here, so it fell
+  // through to the single-row filter at the bottom and kept `run.item` alone:
+  // the one thread the walk wrote, which by this beat is closed. So the card
+  // saying "everything at once, in columns for what is happening to it" stood
+  // over a board holding one closed row, with the staged three the tour had
+  // just shown missing from it. A sentence promising a view of everything over
+  // a screen showing one thing is the same fault as a counter that ends before
+  // the steps do.
+  //
+  // The two beats keep ONE set because they are one lesson at two altitudes:
+  // a board that hides what the tab before it showed teaches that the board
+  // hides things.
+  if (run.step === 'where' || run.step === 'board') {
     const keep = new Set([...run.examples, run.item].filter(Boolean) as string[]);
     return rows.filter((r) => keep.has(r.id));
   }
@@ -1367,11 +1388,41 @@ export function coach(
       return say('A thread is a job you hand to an agent.', 'Press ', 'N', ' or click New thread to write your first one.');
     /* * AND THE GREY LINE IS GONE FROM THIS BEAT.
     */
+    /* * WHO THE THREAD IS FOR, which is the card's first line and was the
+       biggest thing the walk never said (2026-10-01). THE WALK MUST TEACH
+       PICKING WHO A THREAD IS TO, and that messages go to people as well as to
+       agents: both halves, because a walk that only ever addresses an agent
+       teaches that the other half does not exist.
+
+       THE QUIET LINE CARRIES THE HALF THE SCREEN CANNOT SHOW. On a Mac with no
+       teammates the list is one row, Agent, because the People half of it is
+       drawn only once there is somebody to draw (threads/ThreadComposer.tsx).
+       So the sentence says both, and the list shows whichever is true of the
+       Mac it is on. It is not a promise about this screen; it is what the card
+       does, and it starts being visible the day somebody joins.
+
+       AND IT OPENS THE LIST RATHER THAN CHANGING ANYTHING. The beat ends when
+       the list is open, not when a different recipient is picked: the walk's
+       task is for an agent, and a tutorial that quietly re-addressed it would
+       then have to explain itself. Looking is the lesson.
+
+       AND IT IS THE ONE BEAT IN THE WALK WITH NO KEY, because the app has no
+       key for To: the row is a button and that is the whole of how it opens.
+       The loud line is therefore the click alone, with no cap, rather than a
+       cap invented to keep the shape of the other cards. */
+    case 'who':
+      return say('Every thread goes to an agent, or to a person on your team.',
+        'Click To at the top of the card to see who it can go to.');
     // AND IT NAMES THE BUTTON TOO (2026-10-01). Same round and same reason as
-    // `make` above: the compose card's own button says "Start it", it is the
-    // thing the ring is round, and ⌘↵ is the least guessable cap in the walk.
+    // `make` above: the card's own button is the thing the ring is round, and
+    // ⌘↵ is the least guessable cap in the walk.
+    //
+    // THE WORD IS "SEND" AND NOT "START IT" SINCE THE WALK MOVED TO THE REAL
+    // CARD (2026-10-01). The one-line card it used to open said Start it; the
+    // new thread card is drawn as an email and its button says Send, so the
+    // sentence says what is written on the button somebody is looking at.
     case 'task':
-      return say('', 'Press ', '⌘↵', ' or click Start it.');
+      return say('', 'Press ', '⌘↵', ' or click Send.');
     case 'working':
       return sinceSent >= SLOW_AFTER_MS
         ? say('Your agent is running.',
@@ -1749,7 +1800,31 @@ export function coach(
        ANCHOR.command has the palette's own list in front of the button now, so the card
        comes back the moment the palette is up.
 
-       AND IT SAYS WHAT THE LIST IS RATHER THAN NAMING THE SCREEN. Then the one key
+    /* * THE BOARD, which is the same work stood up in columns (2026-10-01).
+       THE WALK MUST OPEN THE BOARD, because seeing what a whole team is up to
+       is the question the board answers and no tab does.
+
+       IT FOLLOWS THE TOUR BECAUSE IT ANSWERS THE SAME QUESTION ONE LAYER UP.
+       The tour walks the tabs and says where each thing went; the board is all
+       of it at once, sorted by what is happening to it, which is the view
+       somebody with a team opens in the morning.
+
+       ONE CARD FOR TWO PRESSES, which is unlike the beats around it and is the
+       honest shape here: the board is not a tab, it is a choice inside the View
+       and filters menu, so getting to it really is a button and then a row. The
+       ring does not need telling which half it is on, because `ANCHOR.board`
+       prefers the open menu and falls back to the button that opens it.
+
+       IT SAYS "YOUR TEAM" WITHOUT PROMISING ONE. On a Mac with nobody else the
+       board is your own work in the same columns, which is worth knowing on its
+       own; the sentence names the columns rather than the people, so it is true
+       either way. */
+    case 'board':
+      return say(
+        'The board is everything at once, in columns for what is happening to it.',
+        'Click View and filters at the top right, then Board.',
+      );
+    /* * AND IT SAYS WHAT THE LIST IS RATHER THAN NAMING THE SCREEN. Then the one key
        that leaves, because esc is also what ends the walk.
     */
     case 'command':
@@ -2093,7 +2168,7 @@ export const HELD_EVENTS = ['pointerdown', 'mousedown', 'mouseup', 'click', 'dbl
 
 /* * * THE STEPS THAT ARE NOT A SCREEN.
 */
-export const COACHED: Step[] = ['make', 'task', 'working', 'open', 'answer', 'clear', 'snooze', 'unblock', 'where', 'command'];
+export const COACHED: Step[] = ['make', 'who', 'task', 'working', 'open', 'answer', 'clear', 'snooze', 'unblock', 'where', 'board', 'command'];
 
 /**
  * What the tether points AT, per step, as a CSS selector into the real app.
@@ -2126,7 +2201,16 @@ export const ANCHOR: Partial<Record<Step, string[]>> = {
   // tutorial drew no card at all. A persona test sat on that blank screen for
   // over thirty seconds.
   make: ['button[aria-label="New thread"]', '.th-right button[data-hint="new-task"]', 'button.th-new'],
-  task: ['.modal.compose .dock-send'],
+  // THE CARD'S FIRST LINE, which is who the thread is for. The row is a button
+  // that opens the list of everyone it could go to, and that list is the whole
+  // of the beat.
+  who: ['.tc-card .tc-to-menu', '.tc-card .tc-word'],
+  // THE NEW THREAD CARD'S OWN SEND (2026-10-01). It was `.modal.compose
+  // .dock-send`, the retired one-line card, which the walk kept for one round
+  // after the rest of the app moved: "the tutorial is using the wrong
+  // component here, we no longer use this". The card is `.tc-card` now and its
+  // send is `.tc-send-main`, beside the caret that opens Send later.
+  task: ['.tc-card .tc-send-main'],
   // THE ROW, AND ONLY THE ROW. The walk hands its own item's row in front of
   // this one; this is the fallback for the moment before that row is drawn.
   // AND THE RUNNING TAB WHEN THE ROW IS NOT IN THE LIST (2026-10-01). The team
@@ -2180,6 +2264,13 @@ export const ANCHOR: Partial<Record<Step, string[]>> = {
   // Running, Scheduled, Done and All tabs over the list. The sidebar there
   // carries Inbox and Team only, so ringing it pointed at the wrong thing.
   where: ['.th-bar .tm-tabs', '.workspace-navigation .workspace-tabs', '.tabs'],
+  // THE BOARD, IN ORDER OF PREFERENCE, the same shape as `snooze` and
+  // `unblock`: the thing that is only on the screen part of the time wins while
+  // it is there. The View and filters button is where the board lives, and the
+  // menu it opens is what the second half of the sentence points at, so the
+  // ring follows the press from the button to the menu without the beat having
+  // to know which half it is on.
+  board: ['.th-pop', '.th-right .th-disp'],
   // THE PALETTE FIRST, THEN THE KEY THAT OPENS IT. Same order-of-preference
   // shape as `snooze` and `unblock` above: the thing that is only on the screen
   // part of the time wins while it is there. Before this the only anchor was
@@ -2558,8 +2649,13 @@ export function restartFirstRun(store: Store): void {
 export const STEPS: Step[] = [
   'welcome', 'folder', 'name',
   'inbox', 'away', 'goal', 'hand',
-  'make', 'task', 'working', 'open', 'answer',
-  'clear', 'snooze', 'unblock', 'where', 'command', 'done', 'landed',
+  // WHO IT IS TO SITS BETWEEN OPENING THE CARD AND SENDING IT (2026-10-01),
+  // because that is where it is on the card: To is its first line. The walk had
+  // no beat for it at all, and it needs one: picking who a thread is to, and
+  // that a thread can go to a person as well as to an agent, is the thing the
+  // walk was silent about.
+  'make', 'who', 'task', 'working', 'open', 'answer',
+  'clear', 'snooze', 'unblock', 'where', 'board', 'command', 'done', 'landed',
 ];
 
 /**
@@ -2588,7 +2684,7 @@ export const SLAB_OF: Partial<Record<Step, number>> = { inbox: 0, away: 1, goal:
  *  NOT in here, because by then the practice project is gone and the inbox
  *  behind the card is their own. */
 export const IN_PRACTICE: Step[] = [
-  'make', 'task', 'working', 'open', 'answer', 'clear', 'snooze', 'unblock', 'where', 'command',
+  'make', 'who', 'task', 'working', 'open', 'answer', 'clear', 'snooze', 'unblock', 'where', 'board', 'command',
 ];
 
 /** Whether the practice band is on the screen right now. */

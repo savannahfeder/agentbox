@@ -48,8 +48,8 @@ describe('2. nothing counts the walk on screen any more', () => {
   it('keeps the numbering, because the order of the walk is still a real claim', () => {
     // What went is the drawing, not the beats. Renaming it is the whole of how
     // a later session is stopped from reading `DOT` and drawing one again.
-    // Seventeen since the theme step went with the themes (w-9e434e8671).
-    expect(N_BEATS).toBe(17);
+    // Nineteen since 2026-10-01: who a thread is for, and the board, each became a beat of their own.
+    expect(N_BEATS).toBe(19);
     expect(new Set(Object.values(BEAT)).size).toBe(N_BEATS);
     expect(onboarding).not.toMatch(/export const DOT\b/);
     expect(onboarding).toMatch(/export const BEAT: Record<Step, number>/);
@@ -79,8 +79,9 @@ describe('3. the way out is on the tutorial, and the harness looks at it', () =>
     const way = walk.slice(walk.indexOf('export function WayOut'), walk.indexOf('THE DOTS ARE GONE'));
     expect(way).toMatch(/!practising\(run\)/);
     // Ten beats, from making the first task to ⌘K, and nothing before them.
-    // Ten, not eleven, since w-ec62ab6b38 (2026-09-28) took the note beat out.
-    expect(IN_PRACTICE).toHaveLength(10);
+    // Ten, not eleven, since w-ec62ab6b38 (2026-09-28) took the note beat out,
+    // and eleven again since 2026-10-01, when who a thread is for became a beat.
+    expect(IN_PRACTICE).toHaveLength(12);
     expect(IN_PRACTICE[0]).toBe('make');
     expect(IN_PRACTICE.at(-1)).toBe('command');
     for (const step of STEPS.filter((s) => BEAT[s] < BEAT.make)) {

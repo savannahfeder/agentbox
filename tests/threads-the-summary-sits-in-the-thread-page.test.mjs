@@ -23,11 +23,13 @@ describe('the top bar', () => {
   // Since w-e731ca9376 (2026-10-01) the state leads the line under the title
   // and Done is a row in the thread's menu, so the corner holds the Summary
   // button and then the menu's dots.
-  it('portals the Summary button into the corner, before the thread’s menu', () => {
+  // The Summary button left the corner on w-a3482b8c2c: the summary opens from
+  // its own rail and closes from beside its title, and the state leads the
+  // line under the title only while neither of those is there to say it.
+  it('portals only the thread’s menu into the corner', () => {
     const portal = focus.slice(focus.indexOf('createPortal(<span className="ts-top">'));
-    expect(portal.indexOf('<SummaryToggle')).toBeGreaterThan(-1);
-    expect(portal.indexOf('<SummaryToggle')).toBeLessThan(portal.indexOf('{threadMenu}'));
-    expect(focus).toContain('lead={summarised ? <ThreadStateMark item={item} /> : null}');
+    expect(portal.startsWith('createPortal(<span className="ts-top">{threadMenu}</span>, cornerHeaderTarget)')).toBe(true);
+    expect(focus).toContain('lead={summarised && !summaryOffered ? <ThreadStateMark item={item} /> : null}');
   });
   it('toggles with S only while focus is out of a text field', () => {
     expect(summary).toMatch(/useSummaryShortcut/);
@@ -45,7 +47,8 @@ describe('the panel', () => {
     expect(scroll).toBeLessThan(dock);
   });
   it('narrows the conversation and the dock by its own width, and scrolls on its own', () => {
-    expect(focus).toMatch(/data-summary=\{summaryShown \? 'open' : undefined\}/);
+    // 'rail' while it is folded (w-a3482b8c2c), which narrows them by the rail's width instead.
+    expect(focus).toMatch(/data-summary=\{summaryShown \? 'open' : summaryOffered \? 'rail' : undefined\}/);
     expect(css).toMatch(/\.focus-pane\[data-summary="open"\] > \.focus-scroll,\s*\.focus-pane\[data-summary="open"\] > \.focus-dock \{ margin-right: var\(--ts-panel-w\); \}/);
     expect(css).toMatch(/\.ts-panel \{[^}]*overflow-y: auto/);
   });

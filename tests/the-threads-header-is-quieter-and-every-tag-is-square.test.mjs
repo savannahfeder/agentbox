@@ -48,7 +48,7 @@ describe('every tag names it', () => {
     [pages, '.th-pop .opts > button'], // the Display menu's chips
     [pages, '.th-row-act'], // Share and Unshare at the end of a row
     [pages, '.th-urgent'],
-    [summary, '.ts-sumbtn'], // the Summary button
+    [summary, '.ts-close'], // the icon that folds the summary (the Summary button's heir, w-a3482b8c2c)
     [summary, '.ts-more'],
     [summary, '.ts-msgbtn'],
     [composer, '.tc-chip'], // the composer's Project, Priority and Visibility chips

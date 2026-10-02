@@ -45,7 +45,7 @@ describe('1. the introduction hands straight to the practice round', () => {
     // A screen that quietly changes the count is a walk that lies about how
     // long it is. Seventeen since the theme step went with the themes
     // (w-9e434e8671).
-    expect(N_BEATS).toBe(17);
+    expect(N_BEATS).toBe(19);
     expect(BEAT.goal).toBe(6);
     expect(BEAT.hand).toBe(7);
     expect(BEAT.make).toBe(8);

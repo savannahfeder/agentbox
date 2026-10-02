@@ -33,6 +33,25 @@ const KEEP = 4000;
 
 export const shipSettingsFile = (userDir) => path.join(userDir, 'ship.json');
 
+// WHICH "READY" EACH TASK HAS ALREADY BEEN SHIPPED FOR, by the moment its
+// label was written. Taking the label off is not enough: a label the person
+// put on outranks the app on the ledger, so the app's removal is ignored, and
+// on the first real run that shipped a task and then ran it twice more
+// (2026-10-02). A new label carries a new moment and ships again.
+const handledFile = (userDir) => path.join(userDir, 'ship-handled.json');
+const keyOf = (item) => `${item.product}/${item.id}`;
+const markedAt = (item) => item.wrote?.labels?.ts ?? item.updatedAt ?? 0;
+function readHandled(userDir) {
+  try { const raw = JSON.parse(fs.readFileSync(handledFile(userDir), 'utf8')); return raw && typeof raw === 'object' ? raw : {}; } catch { return {}; }
+}
+function writeHandled(userDir, all) {
+  try {
+    const tmp = `${handledFile(userDir)}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, `${JSON.stringify(all)}\n`);
+    fs.renameSync(tmp, handledFile(userDir));
+  } catch { /* the label removal still covers the ordinary case */ }
+}
+
 /** `{ [projectSlug]: { script: 'scripts/ship.mjs' } }`, or `{}`. */
 export function readShipSettings(userDir) {
   try {
@@ -63,10 +82,10 @@ export const withoutShipLabel = (item) => labelsOf(item).filter((l) => l !== SHI
  * Only a row of a project that ships, marked `ship`, with no session on it
  * (an agent still working may yet commit), and with a task folder to ship from.
  */
-export function nextToShip(items, products, settings, { isLive = () => false, folderFor }) {
+export function nextToShip(items, products, settings, { isLive = () => false, folderFor, handled = {} }) {
   const bySlug = new Map(products.map((p) => [p.slug, p]));
   const ready = items
-    .filter((i) => wantsShipping(i) && i.status !== 'done' && !isLive(i))
+    .filter((i) => wantsShipping(i) && i.status !== 'done' && !isLive(i) && !(markedAt(i) <= (handled[keyOf(i)] ?? -1)))
     .map((item) => {
       const product = bySlug.get(item.product);
       const script = product ? shipScriptFor(product, settings) : null;
@@ -74,7 +93,7 @@ export function nextToShip(items, products, settings, { isLive = () => false, fo
       return script && cwd && fs.existsSync(cwd) ? { item, product, script, cwd } : null;
     })
     .filter(Boolean);
-  ready.sort((a, b) => (a.item.wrote?.labels?.ts ?? a.item.updatedAt) - (b.item.wrote?.labels?.ts ?? b.item.updatedAt));
+  ready.sort((a, b) => markedAt(a.item) - markedAt(b.item));
   return ready[0] ?? null;
 }
 
@@ -140,8 +159,10 @@ export class ShipQueue {
     if (this.busy) return null;
     const settings = readShipSettings(this.userDir);
     if (!Object.keys(settings).length) return null;
-    const next = nextToShip(items, products, settings, { isLive: this.isLive, folderFor: this.folderFor });
+    const next = nextToShip(items, products, settings, { isLive: this.isLive, folderFor: this.folderFor, handled: readHandled(this.userDir) });
     if (!next) return null;
+    // Marked handled BEFORE the run, so a slow ship is never started twice.
+    writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(next.item)]: markedAt(next.item) });
     this.busy = this.ship(next).finally(() => { this.busy = null; });
     return this.busy;
   }
@@ -150,7 +171,9 @@ export class ShipQueue {
     this.log.info?.(`zero: shipping ${item.id} from ${cwd}`);
     const { code, out } = await this.run(script, cwd);
     try {
-      if (code === 0) {
+      // Already on main: there is nothing to fix, so nobody is woken.
+      const already = /There is nothing to ship/.test(out);
+      if (code === 0 || already) {
         this.store.shipped(product.slug, item.id, { sha: shippedSha(out), labels: withoutShipLabel(item) });
         this.afterShip();
       } else {
