@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  ANCHOR, BEAT, COACHED, IN_PRACTICE, N_BEATS, STEPS, coach,
+  ANCHOR, BEAT, COACHED, IN_PRACTICE, N_BEATS, STEPS, coach, walkRows,
 } from '../renderer/src/onboarding.ts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -98,6 +98,50 @@ describe('what the board card says', () => {
     expect(line).not.toContain('everyone');
     expect(line).not.toContain('your team');
     expect(line).not.toContain('teammate');
+  });
+});
+
+describe('the board the beat opens has the work on it', () => {
+  // HOW THIS WAS FOUND. Shooting the beat headless
+  // (scripts/scratch/shot-w8fed-board.mjs) drew an empty board, which sent me
+  // to `walkRows`. The empty board itself is the harness and not the app: a
+  // headless run has no main process, so the practice project's rows are never
+  // seeded, and the shipped `where` beat draws an empty list there too. That
+  // was measured rather than assumed, by pointing the same probe at `where`.
+  //
+  // THE FAULT UNDER IT IS REAL. The board beat was added with no branch in
+  // `walkRows`, so it fell through to `r.id === run.item` and kept one row: the
+  // thread the walk wrote, which by this beat is closed. The tour beat one step
+  // earlier keeps the staged three AND that thread. So the board showed less
+  // than the tab tour just had, while its card promised everything at once.
+  const rows = [
+    { id: 'ex-1' }, { id: 'ex-2' }, { id: 'ex-3' },
+    { id: 'hers' },
+    // The directive that making the project composed. It stays out of both
+    // beats, which is what keeping a named set rather than dropping the filter
+    // buys.
+    { id: 'made-the-project' },
+  ];
+  const run = (step) => ({ step, examples: ['ex-1', 'ex-2', 'ex-3'], item: 'hers' });
+
+  it('shows the staged examples and her own thread, not that thread alone', () => {
+    const ids = walkRows(rows, run('board')).map((r) => r.id);
+    expect(ids).toEqual(['ex-1', 'ex-2', 'ex-3', 'hers']);
+  });
+
+  it('shows exactly what the tour before it showed, one layer up', () => {
+    // The boundary either side: the tour says where each thing went, the board
+    // is the same things sorted by what is happening to them. A different set
+    // in the two beats would teach that the board hides something.
+    const tour = walkRows(rows, run('where')).map((r) => r.id);
+    const board = walkRows(rows, run('board')).map((r) => r.id);
+    expect(board).toEqual(tour);
+  });
+
+  it('still keeps the project-making directive out', () => {
+    // THE CASE THAT MUST NOT MATCH. Widening this beat to every row is the
+    // easy wrong fix, and it would put a row she never saw on the board.
+    expect(walkRows(rows, run('board')).map((r) => r.id)).not.toContain('made-the-project');
   });
 });
 

@@ -475,7 +475,21 @@ export function walkRows<T extends { id: string }>(rows: T[], run: FirstRun | nu
   //
   // The directive the project's making composed is still filtered out, because
   // this keeps a named set rather than dropping the filter.
-  if (run.step === 'where') {
+  //
+  // AND THE BOARD IS THE SAME WORK ONE LAYER UP (2026-10-01), so it keeps the
+  // same set. The board beat was added without a branch here, so it fell
+  // through to the single-row filter at the bottom and kept `run.item` alone:
+  // the one thread the walk wrote, which by this beat is closed. So the card
+  // saying "everything at once, in columns for what is happening to it" stood
+  // over a board holding one closed row, with the staged three the tour had
+  // just shown missing from it. A sentence promising a view of everything over
+  // a screen showing one thing is the same fault as a counter that ends before
+  // the steps do.
+  //
+  // The two beats keep ONE set because they are one lesson at two altitudes:
+  // a board that hides what the tab before it showed teaches that the board
+  // hides things.
+  if (run.step === 'where' || run.step === 'board') {
     const keep = new Set([...run.examples, run.item].filter(Boolean) as string[]);
     return rows.filter((r) => keep.has(r.id));
   }
@@ -1416,9 +1430,10 @@ export function coach(
     /* * AND THE GREY LINE IS GONE FROM THIS BEAT.
     */
     /* * WHO THE THREAD IS FOR, which is the card's first line and was the
-       biggest thing the walk never said (2026-10-01). Her note: "we're missing
-       important stuff like: selecting who it's to etc. and sending messages to
-       both people and agents."
+       biggest thing the walk never said (2026-10-01). THE WALK MUST TEACH
+       PICKING WHO A THREAD IS TO, and that messages go to people as well as to
+       agents: both halves, because a walk that only ever addresses an agent
+       teaches that the other half does not exist.
 
        THE QUIET LINE CARRIES THE HALF THE SCREEN CANNOT SHOW. On a Mac with no
        teammates the list is one row, Agent, because the People half of it is
@@ -2681,9 +2696,9 @@ export const STEPS: Step[] = [
   'look', 'hand',
   // WHO IT IS TO SITS BETWEEN OPENING THE CARD AND SENDING IT (2026-10-01),
   // because that is where it is on the card: To is its first line. The walk had
-  // no beat for it at all, and the founder named the gap: "we're missing
-  // important stuff like: selecting who it's to etc. and sending messages to
-  // both people and agents".
+  // no beat for it at all, and it needs one: picking who a thread is to, and
+  // that a thread can go to a person as well as to an agent, is the thing the
+  // walk was silent about.
   'make', 'who', 'task', 'working', 'open', 'answer',
   'clear', 'snooze', 'unblock', 'where', 'board', 'command', 'done', 'landed',
 ];

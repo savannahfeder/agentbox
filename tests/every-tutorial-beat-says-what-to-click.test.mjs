@@ -189,9 +189,9 @@ describe('the click each card names is a real one', () => {
     expect(read('renderer/src/threads/ThreadComposer.tsx')).toMatch(/className="tc-send-main"[\s\S]{0,400}Send/);
   });
 
-  // WHO THE THREAD IS FOR (2026-10-01). The beat she asked for: "we're missing
-  // important stuff like: selecting who it's to etc. and sending messages to
-  // both people and agents." It rings the To row and the list it opens, and
+  // WHO THE THREAD IS FOR (2026-10-01). THE WALK MUST TEACH PICKING WHO A
+  // THREAD IS TO, and that a thread goes to a person as well as to an agent.
+  // It rings the To row and the list it opens, and
   // says both halves, because on a Mac with no teammates the list draws Agent
   // alone and the People half appears the day somebody joins.
   it('points at the To row, and names an agent and a person', () => {
