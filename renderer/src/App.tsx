@@ -117,7 +117,7 @@ import { TeamPage } from './team/TeamPage';
 import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, PeopleFilter, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, conversationWith, isDirect, nextTab, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
+import { DEFAULT_DISPLAY, conversationWith, isDirect, nextTab, pageFor, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing' | 'themes';
@@ -1928,8 +1928,12 @@ export default function App() {
   // THE DISPLAY MENU'S FILTERS AND SORT, on top of the box (approved
   // 2026-10-01). Remembered per page; the Inbox is a list by default and the
   // Team a board.
-  const [inboxDisplay, setInboxDisplayRaw] = useState<Display>(() => readDisplay('inbox'));
-  const setInboxDisplay = useCallback((d: Display) => { setInboxDisplayRaw(d); writeDisplay('inbox', d); }, []);
+  // BOTH HALVES ARE KEPT, and which one the page is on follows the faces
+  // (`pageFor`, below). Your own threads open as a list and a page with the
+  // team on it opens as a board, which is what the approved design said and
+  // what the one page stopped doing.
+  const [mineDisplay, setMineDisplayRaw] = useState<Display>(() => readDisplay('inbox'));
+  const [teamDisplay, setTeamDisplayRaw] = useState<Display>(() => readDisplay('team'));
   // WHOSE THREADS ARE ON THE PAGE (w-05ff3d1438): the faces at the end of the
   // tab bar. The Inbox and the Team page were one question on two pages; this
   // is the one page, and it opens as yours. Remembered between launches.
@@ -1942,6 +1946,12 @@ export default function App() {
   const picked = useMemo(() => normalizePicked(pickedRaw, team?.me ?? null, everyone.map((p) => p.id)), [pickedRaw, team?.me, everyone]);
   const setPicked = useCallback((next: string[]) => { setPickedRaw(next); writePicked(next); setSelected(0); }, []);
   const withOthers = !!team && othersInView(picked, team.me);
+  const displayPage = pageFor(withOthers);
+  const inboxDisplay = withOthers ? teamDisplay : mineDisplay;
+  const setInboxDisplay = useCallback((d: Display) => {
+    if (displayPage === 'team') setTeamDisplayRaw(d); else setMineDisplayRaw(d);
+    writeDisplay(displayPage, d);
+  }, [displayPage]);
   // Your own rows are on the page unless you took yourself off it.
   const mineShown = !team || picked.includes(team.me ?? '');
   const displayedBox = useMemo(

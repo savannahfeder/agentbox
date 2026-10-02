@@ -89,7 +89,7 @@
 .tc-bar { display: flex; align-items: center; gap: 8px; padding: 12px 14px 12px 18px; border-top: 1px solid var(--tc-hair); position: relative; }
 .tc-chip {
   display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px;
-  border: 1px solid var(--line); border-radius: var(--radius); background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line); border-radius: var(--tag-radius); background: rgba(255, 255, 255, 0.03);
   color: var(--text-dim); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer;
 }
 .tc-chip:hover, .tc-chip.open, .tc-chip:focus-visible { color: var(--text); border-color: var(--line-strong); outline: none; }
@@ -108,7 +108,7 @@
 .tc-pr i.on { background: var(--text-dim); }
 .tc-urgent {
   display: inline-grid; place-items: center; flex: none; width: 12px; height: 12px;
-  border-radius: var(--radius); background: var(--accent); color: var(--on-solid, #1a1817); font: 700 9px var(--mono);
+  border-radius: var(--tag-radius); background: var(--accent); color: var(--on-solid, #1a1817); font: 700 9px var(--mono);
 }
 
 .tc-icon {

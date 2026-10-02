@@ -315,18 +315,18 @@ export function MessageTitle({ people, fromMe, text }: { people: string[]; fromM
 
 /** The cells of one row in the inbox's table: thread, project (or who a message is from), priority, updated.
  *  With a teammate on the page (w-05ff3d1438) it also carries the Person
- *  cell, and a thread of yours the team cannot see wears the lock in place of
- *  the people mark. */
-export function ThreadCells({ item, product, now, person, withOthers = false }: {
-  item: WorkItem; product: Product | undefined; now: number; person?: ReactNode; withOthers?: boolean;
+ *  cell. Who can see the thread is said by one mark after its title, the lock
+ *  or the people, and never by who else is on the page. */
+export function ThreadCells({ item, product, now, person }: {
+  item: WorkItem; product: Product | undefined; now: number; person?: ReactNode;
 }) {
   const liveIds = useContext(LiveContext);
   const team = useContext(TeamContext);
-  // WHO SEES IT, AT A GLANCE AND ONE CLICK FROM CHANGING (2026-10-01). A
-  // people mark after the title of a thread the team can see and nothing on
-  // the rest, which is most of her rows, so the mark only ever means one
-  // thing. Hovering the row offers Share or Unshare at its end. Her click
-  // shows at once; the row catches up when the store's next snapshot does.
+  // WHO SEES IT, AT A GLANCE AND ONE CLICK FROM CHANGING (2026-10-01). One
+  // mark after the title, always: the people on a thread the team can see,
+  // the lock on one only you can see. Hovering the row offers Share or
+  // Unshare at its end. The click shows at once; the row catches up when the
+  // store's next snapshot does.
   const sharing = rowSharing(item, product, team ? { me: team.me, since: team.state.since ?? null } : null);
   const [chosen, setChosen] = useState<'team' | 'private' | null>(null);
   useEffect(() => { setChosen(null); }, [item.visibility]);
@@ -352,12 +352,13 @@ export function ThreadCells({ item, product, now, person, withOthers = false }: 
     return <RowCells live={liveIds.has(item.id)} title={<MessageTitle people={said.people} fromMe={said.fromMe} text={said.text} />} where="Message" person={person}
       priority={messagePriority(item)} updatedAt={item.updatedAt} now={now} action={action} />;
   }
-  // A LOCK, ONCE A TEAMMATE IS ON THE PAGE (w-05ff3d1438): then "they cannot
-  // see this one" is the news, so the lock marks it and the people mark,
-  // which would be on every other row, steps aside.
-  // It follows her click at once, the way the Share button does.
-  const lock = withOthers && seen === 'private';
-  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={!withOthers && seen === 'team'} lock={lock} where={product?.name ?? ''} person={person}
+  // ONE MARK, ALWAYS THE SAME ONE. The lock on a thread only you can see, the
+  // people mark on one the team can see, and neither depends on whose faces
+  // are lit at the top of the page: a mark that comes and goes with an
+  // unrelated control cannot be read. Both follow the click at once, the way
+  // the Share button does.
+  const lock = seen === 'private';
+  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={seen === 'team'} lock={lock} where={product?.name ?? ''} person={person}
     priority={item.priority ?? 0} updatedAt={item.updatedAt} now={now} action={action} />;
 }
 
@@ -396,12 +397,13 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
         {/* Your own board says what the tab says: what waits on you needs you. */}
         <div className="th-col-h"><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b></div>
         {rows.length === 0 && <div className="th-col-empty">Nothing here.</div>}
-        {/* On your board alone, the people mark on what the team can see. With
-            a teammate beside you, the lock on what they cannot. */}
+        {/* A card says who can see it the way a row does: the lock on what
+            only you can see, the people mark on what the team can, both of
+            them always. */}
         {rows.map((e) => <button type="button" key={e.key} className="th-card" onClick={() => (e.item ? onOpenItem(e.item) : e.card && onOpenCard?.(e.card))}>
           <div className="t">{e.message ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} /> : e.title}
-            {e.item && !e.message && !withOthers && sharing(e.item) === 'team' && <SharedMark label="Visible to the team" />}
-            {e.item && !e.message && withOthers && sharing(e.item) === 'private' && <LockMark />}
+            {e.item && !e.message && sharing(e.item) === 'team' && <SharedMark label="Visible to the team" />}
+            {e.item && !e.message && sharing(e.item) === 'private' && <LockMark />}
           </div>
           <div className="m">{e.live && <StateGlyph state="running" live />}{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project}</span>
             {withOthers && <Face person={e.ownerId ? team?.byId.get(e.ownerId) ?? null : null} me={e.ownerId === me} />}</div>

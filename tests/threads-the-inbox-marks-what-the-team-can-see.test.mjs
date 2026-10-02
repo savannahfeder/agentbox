@@ -75,10 +75,13 @@ describe('the row', () => {
     expect(html).toMatch(/th-cell-title[^>]*>Acme renewal terms<svg class="th-shared"/);
     expect(html).toMatch(/<button[^>]*class="th-row-act"[^>]*>.*Unshare<\/button>/);
   });
-  it('draws nothing on a thread only you can see, and offers Share', () => {
+  // A private thread wears the LOCK here rather than nothing: the mark is
+  // unconditional now. Its own rule is pinned in
+  // tests/a-private-thread-always-wears-the-lock.test.mjs.
+  it('draws the lock on a thread only you can see, and offers Share', () => {
     const html = draw(row());
     expect(html).not.toContain('th-shared');
-    expect(html).not.toContain('th-lock');
+    expect(html).toContain('th-lock');
     expect(html).toMatch(/<button[^>]*class="th-row-act"[^>]*>.*Share<\/button>/);
     expect(text(html)).not.toContain('Unshare');
   });
@@ -105,8 +108,11 @@ describe('the hover', () => {
     expect(css).toMatch(/\.th-row-act \{[^}]*opacity: 0/);
     expect(css).toMatch(/\.th-table \.row:hover \.th-row-act, \.th-row-act:focus-visible \{[^}]*opacity: 1/);
   });
+  // SQUARE MEANS SQUARE: --radius is 3px in both themes, so every tag in the
+  // app was rounded except under the Ember Grid skin. Tags name --tag-radius
+  // now, which no skin re-declares.
   it('is square', () => {
-    expect(css).toMatch(/\.th-row-act \{[^}]*border-radius: var\(--radius\)/);
+    expect(css).toMatch(/\.th-row-act \{[^}]*border-radius: var\(--tag-radius\)/);
   });
   it('does not open the thread underneath', () => {
     expect(pages).toMatch(/className="th-row-act"[\s\S]{0,200}e\.stopPropagation\(\)/);
