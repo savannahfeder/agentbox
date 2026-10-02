@@ -32,6 +32,7 @@ import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS, RULES_ALWAYS_APPLY } from '../mo
 import { CODEX_MODES, CODEX_MODE_ORDER } from '../codex-modes';
 import { ProductMark } from './ProductMark';
 import { SHORTCUTS } from '../shortcuts';
+import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';
 import { TaskTerminal } from './TaskTerminal';
@@ -605,7 +606,7 @@ function KeyRow({ keys, join, what }: { keys: string[]; join?: 'or' | 'to'; what
         {keys.map((k, i) => (
           <Fragment key={k}>
             {i > 0 && join && <span className="set-key-join">{join}</span>}
-            <kbd>{k}</kbd>
+            <kbd>{k}{capWord(k) && <span className="fr-cap-word">{capWord(k)}</span>}</kbd>
           </Fragment>
         ))}
       </div>

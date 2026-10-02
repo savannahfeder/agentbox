@@ -73,11 +73,13 @@ describe('the row', () => {
 // the 2 beside the people mark was "like a pixel below where it should be".
 // Measured in the built app (scripts/scratch/measure-w-61c7f4a224.mjs, ink
 // from the font's metrics and the mark's paths): the digit's middle sat 1.33px
-// below the mark's, at vertical-align 0. Raised by 1.5px it sits within 0.2px.
+// below the mark's, at vertical-align 0. Raised by 1.5px it sat 0.17px above
+// level, and side by side at normal size that read as too high, while 0 read
+// as too low: "can you have one placed in between?" So 0.75px, halfway.
 describe('the count beside the people mark', () => {
   const css = fs.readFileSync(new URL('../renderer/src/threads/pages.css', import.meta.url), 'utf8');
-  it('is raised to sit level with the mark, not on the text baseline', () => {
-    expect(css).toMatch(/\.th-shared-n \{[^}]*vertical-align: 1\.5px/);
+  it('is raised halfway between the baseline (too low) and 1.5px (too high)', () => {
+    expect(css).toMatch(/\.th-shared-n \{[^}]*vertical-align: 0\.75px/);
   });
   it('the mark itself stays where it was', () => {
     expect(css).toMatch(/\.th-shared \{[^}]*vertical-align: -1px/);

@@ -64,32 +64,11 @@ export function searchFieldInStrip({ searching = false, workspaceNavigation = fa
   return !(workspaceNavigation && focused && !settingsOpen);
 }
 
-// WHICH SECTION A KEY ASKS FOR, COUNTING FROM ONE. 0 means this key is not one
-// of ours.
-//
-// IT WAS ⌘⌥↑ AND ⌘⌥↓ UNTIL 2026-09-23 AND BOTH WERE DROPPED, for two reasons
-// that are each enough on their own: three keys is too many, and that chord is
-// taken by window-tiling apps, which move the window around the screen. A
-// shortcut that moves the WINDOW while the user is trying to move between
-// sections is worse than no shortcut, and nothing in this app can see that
-// collision happen.
-//
-// SO IT IS ⌘1 TO ⌘4, WHICH IS TWO KEYS AND GOES STRAIGHT THERE. One key is too
-// little and three too many, and the common move is jumping between Inbox and
-// In progress. Cycling makes that two presses in one direction and three in
-// the other, and the count changes when Scheduled appears and disappears. ⌘1
-// and ⌘2 are always the same two keys for the same two places.
-//
-// ⌘1..⌘4 ARE FREE AND THIS IS NOT A COLLISION. They used to set priority and
-// that was removed; shortcuts.ts already carries the note saying
-// the handler no longer fires.
-//
-// IT IS THE POSITION IN THE LIST, NOT THE NAME. `workspaceDestinations` drops
-// Scheduled when nothing is deferred, so ⌘3 is Scheduled on a day she has
-// something scheduled and Closed on a day she has not. That is the same list
-// the sidebar is drawing, in the same order, so the number always means the
-// row she can see in that position.
-export function sidebarSlot(e) {
-  if (!e.metaKey || e.altKey || e.ctrlKey || e.shiftKey || e.repeat || e.defaultPrevented) return 0;
-  return /^[1-4]$/.test(e.key) ? Number(e.key) : 0;
-}
+// THERE IS NO SECTION KEY ANY MORE (w-914b16eab6, 2026-10-02). ⌘1 to ⌘4 went
+// straight to a section of the sidebar from 2026-09-23, and before that it was
+// ⌘⌥ and an arrow, which a window-tiling app caught first. In progress, Later
+// and Done became tabs on the Inbox page on 2026-10-01, and Tab and Shift-Tab
+// move along those (App.tsx, `nextTab` in threads/page-rules). The number keys
+// were removed on her word rather than left jumping through a sidebar list that
+// is no longer drawn.
+// tests/tab-moves-along-the-tabs-and-the-number-keys-are-gone.test.mjs.

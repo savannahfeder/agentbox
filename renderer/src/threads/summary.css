@@ -100,8 +100,15 @@
 
 /* AND THE WAY BACK: the same icon, filled on its right, at the panel's top
    right beside the title. Faint until the pointer is on it. */
-.ts-close { position: absolute; top: 22px; right: 20px; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--tag-radius); background: none; color: var(--text-faint); cursor: pointer; }
+.ts-close { position: absolute; top: 22px; right: 20px; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--tag-radius); background: none; color: var(--text-faint); cursor: pointer; }
 .ts-close:hover, .ts-close:focus-visible { background: var(--wash-strong); color: var(--text); outline: none; }
+/* SINCE THE NAME MOVED UNDER THE HAIRLINE the Status row is what sits level
+   with the icon, and its button ran the panel's full width, so it painted over
+   the icon and took the pointer: hovering the icon lit the Status dropdown and
+   the summary could not be closed (w-febaf7b3d8). The z-index gives the icon
+   the pointer; this stops the Status wash 8px short of it. Only the Status
+   row: the rows below are clear of the icon and keep the full width. */
+.ts-close + .ts-props > .ts-value:nth-child(2) { margin-right: 36px; }
 /* No fill of its own: it sits beside the words rather than over them, and a
    fill would paint over the frame's corner marks. */
 .ts-panel { position: absolute; top: 0; right: 0; bottom: 0; width: var(--ts-panel-w); box-sizing: border-box; padding: 26px 28px 40px; border-left: 1px solid var(--line); background: none; overflow-y: auto; z-index: 2; }

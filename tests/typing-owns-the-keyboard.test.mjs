@@ -58,7 +58,9 @@ describe('what Tab still means', () => {
     expect(gate).toContain('if (!onTheTabs) return;');
     // A press that is not ours is still the browser's, untouched.
     expect(gate.indexOf('if (!onTheTabs) return;')).toBeLessThan(gate.indexOf('e.preventDefault()'));
-    expect(app).toContain('if (slot && !inInput && !modal && !inFullScreen)');
+    // ⌘1 to ⌘4 carried the same guard until they were removed (w-914b16eab6,
+    // 2026-10-02); tab-moves-along-the-tabs-and-the-number-keys-are-gone pins that.
+    expect(app).not.toContain('sidebarSlot');
   });
   it('cycles the permission modes in the reply box, ON the box', () => {
     // It is answered on the textarea, so the press has already done its work by

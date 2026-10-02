@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { capsFor, placeHint, type HintLine } from '../hint-plate';
+import { capsFor, capWord, placeHint, type HintLine } from '../hint-plate';
 
 /**
  * THE KEY HINT, DRAWN BESIDE THE THING IT BELONGS TO.
@@ -66,7 +66,7 @@ export function HintPlate({ lines, comp, align, text }: {
             {capsFor(line.key).map((glyph, i) => (
               // The index is in the key because a chord can repeat a glyph
               // and nothing here re-orders.
-              <kbd key={`${glyph}-${i}`}>{glyph}</kbd>
+              <kbd key={`${glyph}-${i}`}>{glyph}{capWord(glyph) && <span className="fr-cap-word">{capWord(glyph)}</span>}</kbd>
             ))}
           </span>
           <span className="hint-what">{line.what}</span>

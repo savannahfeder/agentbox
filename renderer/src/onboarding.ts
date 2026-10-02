@@ -13,7 +13,7 @@
 // This module is the part with no React in it, so the walk can be tested
 // without a window.
 
-import { PRACTICE_NAME, PRACTICE_TASK } from '../../shared/first-run-practice.mjs';
+import { PRACTICE_BACKDROP, PRACTICE_NAME, PRACTICE_TASK } from '../../shared/first-run-practice.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { DONE } from './done-word';
 
@@ -151,6 +151,12 @@ export interface FirstRun {
    *  used to be the agents screen that did it, and that screen is at the end of
    *  the walk now. */
   examples: string[];
+  /**
+   * THE REST OF THE PRACTICE TEAM'S WORK (w-58c8f466e7), in
+   *  `PRACTICE_BACKDROP` order, so the tour and the board have something in
+   *  every column. Optional because a walk saved before it existed has none,
+   *  and that walk simply draws what it drew before. */
+  backdrop?: string[];
 }
 
 export const START: FirstRun = {
@@ -196,7 +202,7 @@ export type Event =
   | { t: 'noFolder' }
   | { t: 'name'; name: string }
   | { t: 'made'; product: string }
-  | { t: 'practice'; product: string; examples: string[] }
+  | { t: 'practice'; product: string; examples: string[]; backdrop?: string[] }
   | { t: 'sent'; item: string; at: number }
   | { t: 'answered' }
   | { t: 'staged'; examples: string[] }
@@ -248,7 +254,7 @@ export function advance(s: FirstRun, e: Event): FirstRun {
       // off the screen until the beat that clears them. The old walk staged
       // them mid-flight because they went into the person's own project and
       // could not be there a moment sooner than they were needed.
-      return { ...s, practice: e.product, examples: e.examples, step: 'make' };
+      return { ...s, practice: e.product, examples: e.examples, backdrop: e.backdrop ?? [], step: 'make' };
     case 'sent':
       return { ...s, item: e.item, sentAt: e.at, step: 'working' };
     // AND IT DOES NOT OPEN ITSELF.
@@ -484,8 +490,21 @@ export function walkRows<T extends { id: string }>(rows: T[], run: FirstRun | nu
   // The two beats keep ONE set because they are one lesson at two altitudes:
   // a board that hides what the tab before it showed teaches that the board
   // hides things.
-  if (run.step === 'where' || run.step === 'board') {
-    const keep = new Set([...run.examples, run.item].filter(Boolean) as string[]);
+  //
+  // AND BOTH CARRY THE REST OF THE PRACTICE TEAM'S WORK SINCE 2026-10-02
+  // (w-58c8f466e7). By here every staged row has been closed, put off or
+  // answered, so the board opened with nothing waiting on you and the tabs
+  // held one row each: "there's no value if we go into the board view and
+  // there's nothing on the page." The tour leaves out the rows that need you,
+  // because its first card says the inbox is now empty.
+  //
+  // AND THE ⌘K BEAT KEEPS THE BOARD'S SET. Pressing B ends the board beat, so
+  // the screen the board card promised used to empty itself one frame after
+  // it appeared, under the very next card.
+  if (run.step === 'where' || run.step === 'board' || run.step === 'command') {
+    const backdrop = (run.backdrop ?? [])
+      .filter((_, i) => run.step !== 'where' || PRACTICE_BACKDROP[i]?.state !== 'needs');
+    const keep = new Set([...(run.examples ?? []), run.item, ...backdrop].filter(Boolean) as string[]);
     return rows.filter((r) => keep.has(r.id));
   }
   return rows.filter((r) => r.id === run.item);
@@ -1313,10 +1332,10 @@ export function nextTab(tabs: readonly string[] | undefined, view: string | unde
  *  more" belongs to the Inbox alone, because coming back is the only hop that
  *  ends the tour, and which hop that is depends on the strip.
  *
- *  NO "AGAIN" ANY MORE (w-ec62ab6b38). It was one key, Tab, pressed again and
- *  again. Each hop is its own key now, ⌘2 then ⌘3 then ⌘4, so "Press ⌘3 again"
- *  named a key she had not pressed yet. Coming back is ⌘1, also new, so it
- *  loses "once more" too. */
+ *  NO "AGAIN". From w-ec62ab6b38 each hop was its own key, ⌘2 then ⌘3 then
+ *  ⌘4, so "again" named a key she had not pressed yet, and it was taken out.
+ *  Since w-914b16eab6 (2026-10-02) every hop is Tab once more; the sentences
+ *  stay without "again" because each one names the tab it lands on. */
 /**
  * THE TEAM LAYOUT'S STATE TABS, in the order threads/Pages.tsx draws them
  *  (`INBOX_TABS` there; a test holds the two lists together). Those buttons
@@ -1676,12 +1695,11 @@ export function coach(
          back. Not one word changed on the ordinary walk; what changed is that a
          strip in any other shape now gets sentences that match it.
       */
-      // THE CAP IS THE DESTINATION'S OWN NUMBER, and it is looked up for the
-      // same reason the sentence below it is: Scheduled is drawn only some of
-      // the time, so the tab that comes next is in a different position on
-      // different days and a cap written out here would send her to the wrong
-      // one. `tabCap` reads the same list the ring and the press obey.
-      const cap = tabCap(ctx.tabs ?? [], nextTab(ctx.tabs, ctx.view));
+      // THE CAP IS TAB, WHEREVER SHE IS STANDING (w-914b16eab6, 2026-10-02).
+      // It was the destination's own number, ⌘2 to ⌘4, while those keys went
+      // to a section of the sidebar. They are gone; Tab moves along the tabs,
+      // and the sentence below still names where the press lands.
+      const cap = '⇥';
       // AND THE TAB'S NAME FOR SOMEBODY WHO CLICKS (2026-10-01). The tour is now
       // walked by people who have never used a shortcut, and the ringed tab is
       // clickable, so where the strip has names on it the card says the name.
@@ -1820,15 +1838,15 @@ export function coach(
        own; the sentence names the columns rather than the people, so it is true
        either way.
 
-       AND IT NAMES V, SINCE 2026-10-02 (w-58c8f466e7). The beat used to name
-       no key because there was none; V now flips list and board from the
-       inbox, so the card reads like every other beat, the key and then the
-       click. The beat still ends on the board being on the screen, which V
-       reaches in one press. */
+       AND IT NAMES B, SINCE 2026-10-02 (w-58c8f466e7). The beat used to name
+       no key because there was none; B (for board, V for one ship before
+       that) now flips list and board from the inbox, so the card reads like
+       every other beat, the key and then the click. The beat still ends on
+       the board being on the screen, which B reaches in one press. */
     case 'board':
       return say(
         'The board is everything at once, in columns for what is happening to it.',
-        'Press ', 'V', ' or click View and filters, then Board.',
+        'Press ', 'B', ' or click View and filters, then Board.',
       );
     /* * AND IT SAYS WHAT THE LIST IS RATHER THAN NAMING THE SCREEN. Then the one key
        that leaves, because esc is also what ends the walk.
@@ -1905,13 +1923,9 @@ export const BREATHE_AFTER_MS = 4_000;
  *  answer worth giving. The five are the walk's own: C, ⌘↵, ↵, E and ⌘K. */
 export function keyToken(e: { key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean }): string | null {
   const k = e.key ?? '';
-  // ⌘ AND A NUMBER, one per section. It was ⌘⌥ and an arrow until 2026-09-23,
-  // when three keys proved too many and the chord was caught by a
-  // window-tiling app before it ever reached this window. The walk teaches ⌘2,
-  // because the tour's next stop is always the section under the one she is on
-  // and In progress is the second row; the cap is written out rather than
-  // computed so the walk cannot promise a key the handler does not run.
-  if (e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey && /^[1-4]$/.test(k)) return `⌘${k}`;
+  // NO ⌘ AND A NUMBER (w-914b16eab6, 2026-10-02). The tour taught ⌘2 while
+  // the number keys went to a section of the sidebar; those keys are gone and
+  // the tour teaches Tab, below.
   const cmd = !!e.metaKey || !!e.ctrlKey;
   if (cmd && k === 'Enter') return '⌘↵';
   if (cmd && k.toLowerCase() === 'k') return '⌘K';
@@ -1957,22 +1971,8 @@ export function keyToken(e: { key: string; metaKey?: boolean; ctrlKey?: boolean;
 */
 export const KEY_NAMES: Readonly<Record<string, string>> = {
   '⇥': 'Tab',
-  // ⌘1 TO ⌘4 CARRY NO WORD (w-ec62ab6b38, 2026-09-28). The cap drew "⌘2
-  // Command–2", which is the same key said twice. The glyphs read on their own, the way ⌘K's cap already does.
   '↵': 'Return',
 };
-
-/**
- * THE CAP FOR A TAB, counting from one in the order the sidebar draws them.
- *
- *  Falls back to the first, which is the only honest answer for a tab that is
- *  not in the list at all: the walk would rather send somebody to their inbox
- *  than print a key that goes nowhere.
- */
-export function tabCap(tabs: readonly string[], dest: string): string {
-  const at = tabs.indexOf(dest);
-  return at >= 0 && at < 4 ? `⌘${at + 1}` : '⌘1';
-}
 
 /**
  * The word that goes inside the cap beside the glyph, or null for a cap that

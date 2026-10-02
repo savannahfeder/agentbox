@@ -23,6 +23,12 @@ import { useLayoutEffect, type RefObject } from 'react';
 
 const EDGE = 8; // kept clear between a menu and the window's edge
 const GAP = 8; // between the word and its menu, the same as the CSS
+// THE TOP EDGE IS LOWER. The window's top 44pt is the title bar band that
+// `hiddenInset` keeps: no press or hover there reaches the page (styles.css,
+// `.find-bar`). The project menu rose from the reply box, was pinned 8px from
+// the top, and Agentbox Team sat in that band where it could not be picked
+// (w-b4e97f344e, 2026-10-02). So a menu stops EDGE below the band instead.
+const TOP = 44 + EDGE;
 
 export type Sides = { left: number; right: number };
 
@@ -51,9 +57,9 @@ export function fitMenu(menu: HTMLElement, room = window.innerHeight, sides?: Si
     s.left = `${Math.round(left - anchor.left)}px`;
     s.right = 'auto';
   }
-  if (box.top >= EDGE && box.bottom <= room - EDGE) return;
+  if (box.top >= TOP && box.bottom <= room - EDGE) return;
   const below = room - anchor.bottom - GAP - EDGE;
-  const above = anchor.top - GAP - EDGE;
+  const above = anchor.top - GAP - TOP;
   const tall = box.height;
   const down = below >= tall || (above < tall && below >= above);
   if (down) { s.top = `calc(100% + ${GAP}px)`; s.bottom = 'auto'; }

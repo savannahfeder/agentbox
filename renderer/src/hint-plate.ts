@@ -61,6 +61,18 @@ export function capsFor(key: string): string[] {
 }
 
 /**
+ * THE NAME WRITTEN INSIDE A CAP BESIDE ITS GLYPH, or null for a cap that says
+ *  its own name. Only ⇥, which reads "⇥ Tab", the way the tutorial's cap does
+ *  (`keyName` in onboarding.ts, and a test holds the two to the same word).
+ *  Her words, 2026-10-02: "I prefer the way they show Tab in their tutorial
+ *  because it shows the icon on the keyboard as well as the name". ↵ keeps its
+ *  bare cap here; nobody asked for that one.
+ */
+export function capWord(glyph: string): string | null {
+  return glyph === '⇥' ? 'Tab' : null;
+}
+
+/**
  * EVERY COMPONENT THAT CARRIES A HINT, BY THE `data-hint` IT WEARS.
  *
  *  A component opts in by writing `data-hint="<id>"` on itself; the id is
@@ -74,19 +86,12 @@ export const HINTS: Record<string, HintLine[]> = {
   // "Thread" is the app's word for a row since w-ec62ab6b38.
   'new-task': [{ key: 'N', what: 'New thread' }],
   sidebar: [{ key: '\\', what: 'Show or hide the sidebar' }],
-  // ONE PER TAB, NOT ONE FOR THE STRIP. While the keys were ⌘⌥ and an arrow
-  // they moved BETWEEN the four, so they belonged to the nav and not to any one
-  // of them. ⌘1 to ⌘4 go straight to a section, so each tab now says its own
-  // number and the plate lands under the tab she is pointing at.
-  //
-  // THE NUMBER IS THE POSITION AND THE LABEL IS NOT WRITTEN HERE. Scheduled
-  // comes and goes with whether anything is deferred (`workspaceDestinations`),
-  // so the fourth tab is Closed on most days and the third on some. The tab
-  // knows which slot it is drawn in; `sectionHint` below turns that into the id.
-  'section-1': [{ key: '⌘1', what: 'Go to this section' }],
-  'section-2': [{ key: '⌘2', what: 'Go to this section' }],
-  'section-3': [{ key: '⌘3', what: 'Go to this section' }],
-  'section-4': [{ key: '⌘4', what: 'Go to this section' }],
+  // THE TABS ALONG THE TOP OF THE INBOX (Needs you, In progress, Later, Done,
+  // All). Tab walks them, so every tab wears the same plate. It replaced ⌘1 to
+  // ⌘4 on the sidebar's sections, 2026-10-02 (w-914b16eab6). NEXT TAB ONLY:
+  // Shift-Tab still goes back, but "we don't need to show people the previous
+  // tab shortcut".
+  'state-tab': [{ key: '⇥', what: 'Next tab' }],
   // A task in the list. THE ONLY COMPONENT IN HERE THAT IS NOT A BUTTON, and
   // the reason it says three whole fragments rather than three bare caps: a row
   // carries no verb anywhere on it, so the caps alone would say nothing.
@@ -193,13 +198,4 @@ export function placeHint(
     : (text ? text.left - inset : comp.left);
   const left = Math.max(HINT_MARGIN, Math.min(wanted, viewport.width - plate.width - HINT_MARGIN));
   return { top: Math.round(top), left: Math.round(left), rose };
-}
-
-/**
- * THE HINT ID FOR THE TAB DRAWN IN THIS SLOT, counting from one, or undefined
- *  past the fourth. A fifth section would need a fifth key before it could have
- *  a hint, and saying nothing is the honest answer until it does.
- */
-export function sectionHint(slot: number): string | undefined {
-  return slot >= 1 && slot <= 4 ? `section-${slot}` : undefined;
 }

@@ -77,7 +77,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   keyHints: boolean;
   onSetKeyHints: (v: boolean) => void;
   onTogglePanel: () => void;
-  // List or board, and the way to flip it by name. Absent where V is dead
+  // List or board, and the way to flip it by name. Absent where B is dead
   // (an open task, a search, the Team page), so the row is too.
   boardUp?: boolean;
   onFlipView?: () => void;
@@ -284,13 +284,13 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       keyHint: '\\',
       run: onTogglePanel,
     },
-    // List or board, by name, for the hand that never learned V (w-58c8f466e7).
+    // List or board, by name, for the hand that never learned B (w-58c8f466e7).
     // Named for the view it takes you to, like the sidebar row above.
     ...(onFlipView ? [{
       id: 'flip-view',
       label: boardUp ? 'Show as a list' : 'Show as a board',
       keywords: 'view board list columns kanban switch toggle',
-      keyHint: 'V',
+      keyHint: 'B',
       run: onFlipView,
     }] : []),
     // The way out of the keyboard hints, and the way back in. Both, and this is

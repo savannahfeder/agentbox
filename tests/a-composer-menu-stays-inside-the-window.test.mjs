@@ -43,9 +43,8 @@ it('turns a dropping menu upward when it would leave the bottom of the window', 
   fitMenu(m, 740, WIDE);
   expect(m.style.bottom).toBe('calc(100% + 8px)');
   expect(m.style.top).toBe('auto');
-  expect(m.style.maxHeight).toBe('');
   const box = m.getBoundingClientRect();
-  expect(box.top).toBeGreaterThanOrEqual(8);
+  expect(box.top).toBeGreaterThanOrEqual(44);
   expect(box.bottom).toBeLessThanOrEqual(740 - 8);
 });
 
@@ -63,6 +62,24 @@ it('drops a rising menu that would leave the top of the window', () => {
   fitMenu(m, 900, WIDE);
   expect(m.style.top).toBe('calc(100% + 8px)');
   expect(m.getBoundingClientRect().top).toBeGreaterThanOrEqual(8);
+});
+
+// The project menu rose from the reply box, ran out of room, and was pinned
+// 8px from the window top. Its first rows sat in the title bar band, where no
+// press or hover reaches the page, so Agentbox Team could not be picked
+// (w-b4e97f344e, 2026-10-02). A menu stops below that band, not at the edge.
+it('keeps a rising menu below the title bar band, where clicks never land', () => {
+  const m = menu({ word: 600, tall: 800, drops: false });
+  fitMenu(m, 900, WIDE);
+  expect(m.style.overflowY).toBe('auto');
+  expect(m.getBoundingClientRect().top).toBeGreaterThanOrEqual(44);
+});
+
+it('moves a menu that fits but starts inside the title bar band', () => {
+  const m = menu({ word: 230, tall: 200, drops: false });
+  expect(m.getBoundingClientRect().top).toBeLessThan(44);
+  fitMenu(m, 900, WIDE);
+  expect(m.getBoundingClientRect().top).toBeGreaterThanOrEqual(44);
 });
 
 it('slides a drawer back inside a narrowed pane when its word starts the line', () => {

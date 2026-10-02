@@ -21,8 +21,8 @@
 // ../renderer/src/shortcuts.ts without somebody finding its handler cannot
 // reach her screen.
 //
-// AND THE OMISSIONS ARE PINNED TOO. ⌘1..4 (priority) was removed on purpose
-// and the handler no longer fires; two stale tooltips still advertise it. G
+// AND THE OMISSIONS ARE PINNED TOO. ⌘1..4 was removed on purpose, first as
+// priority and then (2026-10-02) as the sidebar's sections, for Tab. G
 // and B are real but gated on an empty inbox. Any of the three would be an
 // easy, plausible, wrong addition, so each has a test saying no.
 
@@ -75,15 +75,14 @@ const HANDLED = {
   '←': [[list, "case 'ArrowLeft': case 'ArrowRight':"], [list, 'boardSideways(boardCols, selected,']],
   '→': [[list, "case 'ArrowLeft': case 'ArrowRight':"], [list, 'boardSideways(boardCols, selected,']],
   '↵': [[list, "case 'Enter': if (!multiSel.size && pointed)"]],
-  // ⌘ and a number, one per section. It was ⌘⌥ and an arrow until 2026-09-23:
-  // three keys was too many, and window tiling apps answer that chord before
-  // this window ever sees it.
-  '⌘1': [[chords, 'const slot = sidebarSlot(e);'], [chords, 'const want = order[slot - 1];']],
-  '⌘4': [[chords, 'const slot = sidebarSlot(e);'], [chords, 'const want = order[slot - 1];']],
+  // Tab walks the tabs along the top of the inbox. It replaced ⌘1 to ⌘4 on
+  // 2026-10-02 (w-914b16eab6), which went to a section of the sidebar before
+  // those sections became these tabs. Shift-Tab goes back but is not listed.
+  '⇥': [[chords, "if (e.key === 'Tab') {"], [chords, 'setView(nextTab(stateTabOrder, view, e.shiftKey) as View);']],
   // List or board (w-58c8f466e7). Only in the list branch: inside an open task
-  // the board is behind it, and tests/v-switches-between-the-list-and-the-board
+  // the board is behind it, and tests/b-switches-between-the-list-and-the-board
   // pins that it stays dead there.
-  'V': [[list, "case 'v': case 'V':"], [list, 'setInboxDisplay(flipView(inboxDisplay))']],
+  'B': [[list, "case 'b': case 'B':"], [list, 'setInboxDisplay(flipView(inboxDisplay))']],
   'esc': [
     // One step back out: the document, then the task, then the list.
     [focused, "if (e.key === 'Escape') { if (escapeClosesDoc(openDoc)) closeArtifact(); else setFocused(null); }"],
@@ -189,31 +188,28 @@ describe('what the page refuses to say', () => {
   // The chord does not fire. Two tooltips in Compose.tsx and Focus.tsx still
   // print it and are simply wrong; a shortcuts page repeating them would
   // promote a stale tooltip into a promise.
-  it('does not offer ⌘1 to ⌘4 for PRIORITY, which is the meaning she removed', () => {
-    // The chord is alive again and means something else entirely since
-    // 2026-09-23: it goes to a section of the sidebar, and the page lists it
-    // that way. What must never come back is the priority reading of it, so
-    // this checks the WORDS beside the cap rather than the cap itself.
-    const said = SHORTCUTS.flatMap((g) => g.keys)
-      .filter((k) => k.keys.some((c) => /^⌘[1-4]$/.test(c)))
-      .map((k) => k.what.toLowerCase())
-      .join(' ');
-    expect(said).not.toContain('priority');
-    expect(said).not.toContain('urgent');
-    expect(said).toContain('section');
+  it('does not offer ⌘1 to ⌘4 at all, for priority or for sections', () => {
+    // Priority was the first meaning and was removed on purpose. From
+    // 2026-09-23 the chord went to a section of the sidebar, and that went on
+    // 2026-10-02 (w-914b16eab6) for Tab. Neither may come back unexamined.
+    expect(everyKey().filter((c) => /^⌘[1-4]$/.test(c))).toEqual([]);
     expect(app.replace(/^\s*\/\/ ?/gm, '').replace(/\s+/g, ' ')).toContain('it does not fire, so ⌘1..4 is free again');
   });
 
   // Both WERE real keys and both did nothing at all on almost every screen: G
   // needed the games built in AND an empty inbox, B needed an empty inbox. The
   // page never listed them, and the keys and everything behind them are now
-  // deleted, so there is nothing to list. This test stays: it is the guard
-  // against either letter coming back unexamined.
-  it('does not offer the two keys that were gated on an empty inbox', () => {
+  // deleted. This test stays: it is the guard against a letter coming back
+  // unexamined.
+  //
+  // B CAME BACK EXAMINED, 2026-10-02 (w-58c8f466e7): it switches between the
+  // list and the board, everywhere the list is, and it is on the page. What
+  // stays pinned is that the empty-inbox gate did not come back with it.
+  it('does not offer the keys that were gated on an empty inbox', () => {
     expect(everyKey()).not.toContain('G');
-    expect(everyKey()).not.toContain('B');
     expect(list).not.toContain("snap?.config.games");
-    expect(list).not.toContain("case 'b': case 'B':");
+    const at = list.indexOf("case 'b': case 'B':");
+    expect(list.slice(at, list.indexOf('break;', at))).not.toMatch(/\.length === 0|!list\.length/);
   });
 
   // 1, 2 and I answer a Codex conversation's import row and are dead on every
@@ -277,7 +273,7 @@ describe('the page stays a page and not a wall', () => {
   // budget is still a budget: the next key wanting a row has to make the same
   // argument, out loud, here.
   //
-  // AND IT IS 22 SINCE 2026-10-02, FOR V. The argument: it was asked for by
+  // AND IT IS 22 SINCE 2026-10-02, FOR B (V for one ship). The argument: it was asked for by
   // name ("I quite often switch between board and list view, can you give me
   // a shortcut"), and a key nobody can find on the one page that promises to
   // list every key is the nuisance this page exists to end. It went under the
@@ -460,7 +456,8 @@ describe('she can get to it from both places she looks', () => {
   // The caps are drawn with the app's own keycap, not a second picture of one.
   it('draws the app’s own keycap', () => {
     expect(css).toContain('.set-key-caps kbd {');
-    expect(settings).toContain('<kbd>{k}</kbd>');
+    // ⇥ carries its name inside the same cap, as the tutorial's does (w-914b16eab6).
+    expect(settings).toContain('<kbd>{k}{capWord(k) && <span className="fr-cap-word">{capWord(k)}</span>}</kbd>');
   });
 
   // THE PAGE HAS TWO LEFT EDGES AND ONLY TWO (w-1bc916a880, 2026-09-23). The
