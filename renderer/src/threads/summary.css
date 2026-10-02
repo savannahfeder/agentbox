@@ -190,6 +190,6 @@
 .ts-tk-state { display: inline-flex; align-items: center; margin-left: auto; color: var(--text-dim); }
 .ts-ticket-private .ts-tk-lead { margin-bottom: 4px; }
 
-/* "Message Maya": their face and the words, square, for the top bar */
+/* "Message <name>": their face and the words, square, for the top bar */
 .ts-msgbtn { display: inline-flex; align-items: center; gap: 9px; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
 .ts-msgbtn:hover { background: var(--wash-strong); }

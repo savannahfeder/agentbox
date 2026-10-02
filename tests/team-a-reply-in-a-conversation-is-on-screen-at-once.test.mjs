@@ -1,11 +1,11 @@
 // A REPLY TO A PERSON IS ON THE SCREEN WHEN YOU SEND IT.
 //
-// Found 2026-10-01 (w-2ad23ca814) messaging a test teammate: "when I hit send,
-// there was a strange delay after sending it where I didn't see it." Measured
-// in the code: a reply on a row with no agent running goes through
-// `deferCommit`, which holds the write for UNDO_GRACE_MS (3 seconds) so Z can
-// take it back, and the conversation is drawn off the ledger. So for three
-// seconds the reply box had closed and her words were nowhere. The running-
+// Found 2026-10-01 messaging a teammate: a sent reply vanished for a moment
+// before it appeared. Measured in the code: a reply on a row with no agent
+// running goes through `deferCommit`, which holds the write for UNDO_GRACE_MS
+// (3 seconds) so Z can take it back, and the conversation is drawn off the
+// ledger. So for three seconds the reply box had closed and the words were
+// nowhere. The running-
 // agent path already drew a held message at once (`sending`, w-1ef03d6f27);
 // a conversation with a person now does the same.
 

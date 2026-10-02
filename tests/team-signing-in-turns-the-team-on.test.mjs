@@ -94,9 +94,10 @@ describe('signing in', () => {
     expect(theo.service.state().people.map((p) => p.name).sort()).toEqual(['Maya', 'Theo']);
   });
 
-  // Photographed 2026-09-30 on two real copies: Theo joined after Maya had
-  // signed in, and his answer reached her window as "A" from "Someone",
-  // because her copy read the team's people once and never again.
+  // Found 2026-09-30 with two copies of the app: a teammate who joined after
+  // the first person had signed in had their answer drawn as "A" from
+  // "Someone", because the first copy read the team's people once and never
+  // again.
   it('learns a teammate who joins after you signed in, on the next sync', async () => {
     await maya.service.signIn();
     await maya.service.createTeam('Northwind');

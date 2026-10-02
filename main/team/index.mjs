@@ -340,10 +340,10 @@ export function createTeamService({
         }
         product = products().find((p) => p.dir === made.dir) ?? { slug: made.slug, dir: made.dir };
       }
-      // ONE CONVERSATION PER PERSON (decided 2026-10-01, from six interviews
-      // across the people this is for: five of six expected to click a name and
-      // see what was said before, and "subject lines between two coworkers feel
-      // like filing Jira tickets"). So a message goes on the end of the
+      // ONE CONVERSATION PER PERSON (decided 2026-10-01 from user research:
+      // people expect to click a name and see what was said before, and a
+      // subject line on every message between two coworkers makes talking
+      // feel like filing tickets). So a message goes on the end of the
       // conversation the two of you already have, reopened if it was put away,
       // and only the first message ever starts one. Work stays in threads; this
       // is talk.

@@ -33,14 +33,14 @@ describe('the ledger carries a name of its own', () => {
 
   it('lets an agent name a row whose title is HERS, which is the whole point', () => {
     const item = foldWorkItems([
-      line({ title: 'I feel like the inbox is a little bit messy. For instance:' }, { ts: 1, source: 'founder' }),
-      line({ label: 'Inbox row titles' }, { ts: 2, source: 'agent' }),
+      line({ title: 'I think the weekly report is getting a bit long. For example:' }, { ts: 1, source: 'founder' }),
+      line({ label: 'Weekly report length' }, { ts: 2, source: 'agent' }),
     ]).get('w-1');
     // Her title is untouched: she still reads her own words when she opens it.
-    expect(item.title).toBe('I feel like the inbox is a little bit messy. For instance:');
+    expect(item.title).toBe('I think the weekly report is getting a bit long. For example:');
     // And the name the list draws is ours.
-    expect(item.label).toBe('Inbox row titles');
-    expect(rowTitle(item)).toBe('Inbox row titles');
+    expect(item.label).toBe('Weekly report length');
+    expect(rowTitle(item)).toBe('Weekly report length');
   });
 
   it('still refuses an agent the TITLE, so nothing here weakened the fold', () => {
@@ -76,7 +76,7 @@ describe('which rows the app offers to name', () => {
   // (tests/a-thread-keeps-the-name-you-gave-it.test.mjs, w-c141733b61).
   const row = (over = {}) => ({
     status: 'open',
-    title: 'I feel like the inbox is a little bit messy. For instance:',
+    title: 'I think the weekly report is getting a bit long. For example:',
     ...over,
   });
 
@@ -94,7 +94,7 @@ describe('which rows the app offers to name', () => {
 
   it('IS IDEMPOTENT: a named row whose content has not moved is never named again', () => {
     const named = row({
-      label: 'Inbox row titles',
+      label: 'Weekly report length',
       wrote: { title: { ts: 10, source: 'founder' }, label: { ts: 20, source: 'agent' } },
     });
     expect(wantsName(named)).toBe(false);
@@ -108,7 +108,7 @@ describe('which rows the app offers to name', () => {
   // threads to it. A named row is never named again.
   it('does NOT name it again when she answers, however the thread moves', () => {
     const answered = row({
-      label: 'Inbox row titles',
+      label: 'Weekly report length',
       wrote: {
         title: { ts: 10, source: 'founder' },
         label: { ts: 20, source: 'agent' },
@@ -185,11 +185,11 @@ describe('the row is findable by either name', () => {
     const { searchItems } = await import('../renderer/src/search');
     const items = [{
       id: 'w-1',
-      title: 'I feel like the inbox is a little bit messy. For instance:',
-      label: 'Inbox row titles',
+      title: 'I think the weekly report is getting a bit long. For example:',
+      label: 'Weekly report length',
       status: 'open',
     }];
-    expect(searchItems(items, 'inbox row titles').map((h) => h.item.id)).toEqual(['w-1']);
-    expect(searchItems(items, 'a little bit messy').map((h) => h.item.id)).toEqual(['w-1']);
+    expect(searchItems(items, 'weekly report length').map((h) => h.item.id)).toEqual(['w-1']);
+    expect(searchItems(items, 'getting a bit long').map((h) => h.item.id)).toEqual(['w-1']);
   });
 });

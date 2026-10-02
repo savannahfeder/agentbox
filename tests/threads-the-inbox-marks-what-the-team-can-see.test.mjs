@@ -1,12 +1,12 @@
 // THE INBOX MARKS WHAT THE TEAM CAN SEE, AND SHARES A THREAD IN ONE CLICK.
 //
-// Reported by the founder on the team build (w-e731ca9376, 2026-10-01): none
-// of her threads was on the Team page, and nothing in her inbox said so or
-// offered a way to change it. Every thread from before she joined stays hers
-// unless she shares it (shared/thread-cards.mjs shownToTeam), and she has
+// Found on the team build (2026-10-01): a person's threads could all be
+// missing from the Team page, and nothing in the inbox said so or offered a
+// way to change it. Every thread from before you joined stays yours unless you
+// share it (shared/thread-cards.mjs shownToTeam), and a store can hold
 // hundreds of them, so the inbox now says it with the least ink that works:
 //   - a small people mark after the title of a thread the team can see, and
-//     nothing at all on the rest (most of her rows), so the mark means one
+//     nothing at all on the rest (usually most rows), so the mark means one
 //     thing and the list stays quiet;
 //   - hovering a row shows Share or Unshare at its right end, in place of
 //     when it was updated, and one click writes 'team' or 'private' through

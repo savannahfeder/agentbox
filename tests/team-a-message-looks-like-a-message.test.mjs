@@ -1,8 +1,8 @@
 // A MESSAGE FROM A PERSON LOOKS LIKE A MESSAGE, ON THE LIST AND ON THE BOARD.
 //
-// Found 2026-10-01 (w-2ad23ca814) messaging a test teammate: "I don't see a
-// message from Riley here or in the board view... it should be more
-// identifiable as a message... at least I should see her profile." Measured:
+// Found 2026-10-01: a message from a teammate was on neither the Inbox list
+// nor the board in a form anyone would read as a message, and the sender's
+// face was hard to find. Measured:
 //   - on the Inbox board, `teamEntries` skipped every conversation (`isDirect`)
 //     and every row someone else made, so a message to her was on no column;
 //   - on the list, who it was from sat at the far right as a small face in the
@@ -97,8 +97,8 @@ describe('drawn', () => {
   it('draws the same on a board card', () => {
     expect(pages).toMatch(/e\.message \? <MessageTitle/);
   });
-  // THE UNDERLINE REACHES A MESSAGE ROW (her note, 2026-10-01: hovering a
-  // message row showed no underline, and the selected one none either). The
+  // THE UNDERLINE REACHES A MESSAGE ROW (2026-10-01: hovering a message row
+  // showed no underline, and the selected one none either). The
   // row's highlight is `text-decoration` on `.subject` (styles.css), and a
   // decoration never propagates into an inline-flex or inline-block box, which
   // is what `.th-msg` was. In a row it is plain inline, so the name and the

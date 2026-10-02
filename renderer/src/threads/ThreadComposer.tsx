@@ -89,8 +89,8 @@ export function ThreadComposer({
   initial?: { to?: string; also?: string[]; body?: string } | null;
   /** Picking someone you already talk to opens that conversation instead,
    *  carrying whatever was typed into its reply box (2026-10-01: a strip of
-   *  the last few lines "looks pretty unappealing" for a conversation that is
-   *  hundreds of lines long). */
+   *  the last few lines reads badly for a conversation that is hundreds of
+   *  lines long). */
   onOpenConversation?: (item: WorkItem, draft: string) => void;
   onClose: () => void;
   /** Called once the send stands, BEFORE the draft is cleared, so the caller can still read it for an undo. */
@@ -105,8 +105,8 @@ export function ThreadComposer({
   // A teammate who leaves the team while the card is open takes the To with them.
   useEffect(() => { if (to !== 'agent' && !person) setTo('agent'); }, [to, person]);
   const [query, setQuery] = useState('');
-  // MORE THAN ONE PERSON (2026-10-01: "say you're sending messages to three
-  // people at once"). `to` is the first person; `also` is everyone added after.
+  // MORE THAN ONE PERSON (2026-10-01): one message can go to several people
+  // at once. `to` is the first person; `also` is everyone added after.
   // One conversation belongs to exactly that group (main/team/index.mjs).
   const [also, setAlso] = useState<string[]>(() => initial?.also ?? []);
   const [adding, setAdding] = useState(false);
@@ -142,7 +142,7 @@ export function ThreadComposer({
 
   /* --------------------------- visibility ------------------------------- */
   // EVERY NEW THREAD STARTS AS TEAM, AND WHO SEES IT IS CHOSEN FOR THAT THREAD.
-  // Her words: visibility is "determined by the nature of the task". It was
+  // Visibility follows what the task is, not where it lives. It was
   // remembered per project for a while, and a tester then found the next
   // thread silently Private; nothing carries over now.
   const [visibility, setVisibility] = useState<Visibility>('team');

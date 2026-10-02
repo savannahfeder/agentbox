@@ -1,6 +1,6 @@
-// A MESSAGE FROM A TEAMMATE IS SORTED BY HOW URGENT IT IS (w-2ad23ca814,
-// asked for 2026-10-01: "it would be nice if the agent categorized priority,
-// read the messages and categorized them for me in terms of priority").
+// A MESSAGE FROM A TEAMMATE IS SORTED BY HOW URGENT IT IS (2026-10-01): the
+// agent reads each message and gives it a priority, so the reader does not
+// have to.
 //
 // A message is made with priority 0 and nothing ever moved it, so the inbox's
 // priority sort could not tell "the checkout page is down" from "thanks!". Now

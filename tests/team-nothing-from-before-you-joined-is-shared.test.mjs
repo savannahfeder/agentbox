@@ -1,7 +1,7 @@
 // NOTHING FROM BEFORE YOU JOINED IS SHARED UNLESS YOU SHARE IT (2026-10-01).
-// She is moving her own store, hundreds of threads written for nobody but her,
-// onto the team version. The first sign-in must not put a summary of every one
-// of them on the team's board.
+// Someone who moves an existing store onto the team version may bring hundreds
+// of threads written for nobody but themselves. The first sign-in must not put
+// a summary of every one of them on the team's board.
 import { it, expect, describe } from 'vitest';
 import { cardsFor, shownToTeam } from '../shared/thread-cards.mjs';
 import { memorySyncState } from '../main/team/sync.mjs';

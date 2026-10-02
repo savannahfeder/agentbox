@@ -1,7 +1,7 @@
 /* THE INBOX AND TEAM PAGES, the sidebar and the header (approved 2026-10-01,
-   w-e731ca9376, rounds 5 to 9). Ported from the drawings she approved
-   (scripts/scratch/draw-round6..9.mjs). Square shapes only: "our pattern is
-   really square". Never a class called .run, which the app's run history owns. */
+   rounds 5 to 9). Ported from the approved drawings
+   (scripts/scratch/draw-round6..9.mjs). Square shapes only, the app's pattern.
+   Never a class called .run, which the app's run history owns. */
 
 /* ------------------------------------------------------------ the sidebar */
 /* The mark, the nav icons and your face share one centre line, open or shut:
@@ -142,14 +142,13 @@
 .th-back { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px 0 6px; margin-left: -6px; border: 0; border-radius: var(--radius); background: none; color: var(--text-dim); font: inherit; font-size: 13.5px; cursor: pointer; }
 .th-back:hover { background: var(--wash); color: var(--text); }
 
-/* ------------------------------------------------------------ hover (her note, 2026-10-01) */
-/* "When I hover over something, it responds with a typical pattern, such as
-   changing the background color slightly." Rows, tabs, pickers and the header
+/* ------------------------------------------------------------ hover (2026-10-01) */
+/* Anything under the pointer answers it the usual way, such as a slight
+   change of background. Rows, tabs, pickers and the header
    all answer the pointer now; the sidebar already did. */
-/* ROWS ANSWER WITH THE UNDERLINE, AS THE OLD APP DID (her note, 2026-10-01:
-   "when I had a particular thread selected, it would change the underline
-   rather than the background color... it worked really well when I hovered
-   and tried to navigate up and down"). Hover is the faint underline and the
+/* ROWS ANSWER WITH THE UNDERLINE, AS THE OLD APP DID (2026-10-01): the
+   selected thread changed its underline, not its background, which worked
+   well with the pointer and when moving up and down. Hover is the faint underline and the
    selected row the accent one (styles.css, `.row .subject`): one idea, two
    weights, so the pointer and the keys never light two different rows the
    same way. Buttons, tabs and pickers keep their background hover. */
@@ -176,7 +175,7 @@
 
 /* ------------------------------------------------------------ in a browser tab */
 /* No title bar to clear in a tab, so the top inset matches the bottom one
-   (her note, 2026-10-01: "the padding at the bottom feels good"). The desktop
+   (2026-10-01: the bottom padding was already right). The desktop
    window keeps its 40px: the traffic lights sit there and that band eats
    clicks. */
 :root[data-shell="tab"] .app.workspace-layout { padding-top: 22px; }

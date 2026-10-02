@@ -98,10 +98,10 @@ export const isDirect = (p: Product | undefined | null) => !!(p as { team?: { di
  * people control off every other page, and null where the only person in it
  * is you, because there is nothing there to add to.
  *
- * AND NULL WHEN THE COMPANY HOLDS NOBODY WHO IS NOT ALREADY HERE (the founder,
- * 2026-10-01: "it should only have that Add people button if there are more
- * people in the company to add. Otherwise it's cleaner if it just doesn't show
- * that at all."). A two person company, or a group that is already everyone,
+ * AND NULL WHEN THE COMPANY HOLDS NOBODY WHO IS NOT ALREADY HERE (2026-10-01).
+ * The Add people button shows only when there is someone left in the company
+ * to add; otherwise it is cleaner not to show it at all. A two person company,
+ * or a group that is already everyone,
  * has nothing the control could do: it would open a card holding exactly the
  * people on screen. Somebody who is in the conversation and has since left the
  * company is not room either, which is why this counts the company against
@@ -140,8 +140,8 @@ export function rowSharing(
 }
 
 /**
- * WHAT A MESSAGE ROW SAYS (w-2ad23ca814: "it should be more identifiable as a
- * message... at least I should see her profile"). Who else is in the
+ * WHAT A MESSAGE ROW SAYS, so it reads plainly as a message and shows who it
+ * is with. Who else is in the
  * conversation, whether the newest message is mine, and its first line. Null
  * on anything that is not a conversation.
  */
@@ -194,9 +194,9 @@ export interface BoardEntry {
  * (so they open), your teammates' from their cards (so they show their
  * summary), done ones only from today. Messages between two people never.
  */
-// `stateOf` IS THE TABS' OWN RULE, handed in by App.tsx (her note, 2026-10-01:
-// the board said Running for work the tab did not, "a discrepancy between Team
-// and Inbox, which should pretty much never happen"). Your own threads sit in
+// `stateOf` IS THE TABS' OWN RULE, handed in by App.tsx (2026-10-01: the board
+// said Running for work the tab did not, and Team and Inbox should never
+// disagree). Your own threads sit in
 // the column whose tab lists them; `threadState` is only the fallback for a row
 // no tab lists. `live` is the set an agent is on right now.
 export function teamEntries({ items, products, cards, me, now, since = null, stateOf, live, allMine = false }: {
@@ -236,7 +236,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     // more than they are on anyone else's (shared/thread-cards.mjs). One you
     // made private stays, with its lock, so you can see it is hidden.
     // ON YOUR OWN PAGE EVERY ONE OF YOURS STAYS (w-05ff3d1438): leaving them
-    // out is how 1,211 of her threads went missing from the board.
+    // out is how threads once went missing from the board.
     if (!allMine && item.visibility !== 'private' && !shownToTeam(item, since)) continue;
     const state = stateOf?.(item) ?? threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
@@ -248,8 +248,8 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
   }
   for (const card of cards) {
     if (card.personId === me) continue;
-    // A PRIVATE THREAD IS NOT ON THE BOARD AT ALL (decided 2026-10-01, from six
-    // interviews: "a lock gets noticed"). Cards are no longer published for
+    // A PRIVATE THREAD IS NOT ON THE BOARD AT ALL (decided 2026-10-01): a lock
+    // on the board draws attention to it. Cards are no longer published for
     // them; one left over from before is skipped here.
     if (!card.visible) continue;
     if (card.state === 'done' && !(card.updatedAt >= today)) continue;

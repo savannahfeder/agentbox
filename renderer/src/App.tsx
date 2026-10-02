@@ -2022,8 +2022,8 @@ export default function App() {
   }, [snap?.supervisor.running, run?.step, run?.item, run?.product, run?.sentAt]);
   // THE THREADS AN AGENT IS ON RIGHT NOW: the turning mark (threads/Pages.tsx).
   const liveIds = useMemo(() => new Set(runningRows.map((r) => r.itemId)), [runningRows]);
-  // ONE RULE FOR WHERE A THREAD SITS, THE TABS' OWN (her note, 2026-10-01: the
-  // board said Running for queued work the tab did not). Needs you wins, then
+  // ONE RULE FOR WHERE A THREAD SITS, THE TABS' OWN (2026-10-01: the board
+  // said Running for queued work the tab did not). Needs you wins, then
   // In progress, Scheduled and Done, exactly as the tabs list them.
   const tabState = useMemo(() => {
     const m = new Map<string, ThreadStateWord>();
@@ -3193,8 +3193,8 @@ export default function App() {
     // text. The fallback is the body, for a caller that does not carry a
     // draft.
     //
-    // A REPLY IN A CONVERSATION IS ON THE SCREEN WHEN SHE SENDS IT (w-2ad23ca814:
-    // "a strange delay after sending it where I didn't see it"). The write
+    // A REPLY IN A CONVERSATION IS ON THE SCREEN WHEN SHE SENDS IT, with no
+    // gap after sending where it is nowhere to be seen. The write
     // below waits out the three seconds Z can take it back, and the thread is
     // drawn off the ledger, so the words were nowhere for those three seconds.
     // A message to a person is held in `sending` like one to a running agent;
@@ -3222,8 +3222,8 @@ export default function App() {
     // handed in rather than read off `item.engine`, which is what she MARKED
     // and may be a row from before the gate; this is what will really pick it
     // up.
-    // A REPLY IN A CONVERSATION STAYS IN THE CONVERSATION (persona test,
-    // 2026-10-01: sending to Bea "kicked me out to search").
+    // A REPLY IN A CONVERSATION STAYS IN THE CONVERSATION (2026-10-01):
+    // sending a message to a person must not jump to another page.
     const stay = staysOnTheTask(item, text, engine) || talking;
     if (stay) setFollowing({ product: item.product, id: item.id });
     await deferCommit(item, async () => {
@@ -4369,8 +4369,8 @@ export default function App() {
   // an empty inbox drew that sentence behind her card. The idle page stays up
   // under the overlay now, which is the call `idlePinned` above already makes
   // about the theme for exactly the same reason.
-  // THE TEAM VERSION KEEPS ITS TABS ON AN EMPTY INBOX (2026-10-01): her words,
-  // "it's supposed to show those categories... but I don't see them". So the
+  // THE TEAM VERSION KEEPS ITS TABS ON AN EMPTY INBOX (2026-10-01): the
+  // categories must stay on screen even with nothing in them. So the
   // whole-page zero is only the old layout's; the new one draws its zero under
   // the tabs, in the list's place (threads/Pages.tsx, InboxClear).
   const inboxEmpty = !workspaceNavigation && view === 'inbox' && inbox.length === 0 && !focused && !settingsOpen && search === null;
@@ -5226,8 +5226,8 @@ export default function App() {
               to: to ?? slug,
               when: how?.runAt ? whenLabel({ runAt: how.runAt, repeat: null }) : null,
             }), made?.id ? { product: made.product, id: made.id } : undefined);
-            // SHOW WHERE IT WENT (her bug, 2026-10-01: "it doesn't actually
-            // create it in the inbox"). A thread sent to an agent is not
+            // SHOW WHERE IT WENT (2026-10-01: a new thread looked as if it
+            // was never made, since it was not in the inbox). A thread sent to an agent is not
             // waiting on her, so it never lands in Needs you. On the Inbox the
             // tab moves to where it did land, Running or Scheduled, so she
             // sees the row arrive instead of an unchanged page.

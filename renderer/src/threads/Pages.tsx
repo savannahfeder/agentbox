@@ -241,10 +241,9 @@ export function otherPerson(item: WorkItem, me: string | null): string | null {
   return people.find((p) => p !== me) ?? (item.createdBy && item.createdBy !== me ? item.createdBy : null);
 }
 
-/** ONE ROW OF THE TABLE, FOR THE INBOX AND THE TEAM PAGE BOTH. Her words on
- *  2026-10-01: "The team page in list view should be the same component...
- *  with maybe some slight differences, such as an extra column for the
- *  person". So there is one set of cells, and the Team page only adds Person. */
+/** ONE ROW OF THE TABLE, FOR THE INBOX AND THE TEAM PAGE BOTH (2026-10-01).
+ *  The Team page's list view is the same component as the Inbox's, with small
+ *  differences only. So there is one set of cells, and the Team page only adds Person. */
 export function RowCells({ live = false, title, hidden = false, lock = false, shared = false, where, person, priority, updatedAt, now, action }: {
   /** An agent is on this thread right now: a turning mark before its name. */
   live?: boolean;
@@ -307,8 +306,8 @@ export function ThreadCells({ item, product, now, person, withOthers = false }: 
       <SharedMark className="th-row-act-mark" />{seen === 'team' ? 'Unshare' : 'Share'}
     </button>
   ) : undefined;
-  // A CONVERSATION WITH A PERSON READS LIKE A MESSAGE (w-2ad23ca814: "at least
-  // I should see her profile"): their face and name lead the row, then the
+  // A CONVERSATION WITH A PERSON READS LIKE A MESSAGE, showing who it is
+  // with: their face and name lead the row, then the
   // newest message, the way a chat list does. Every other row keeps its title.
   const said = messageLine(item, product, team?.me ?? null);
   if (said) {

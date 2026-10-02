@@ -1,13 +1,12 @@
 // THE SUMMARY PANEL, THE TOP BAR'S STATE AND BUTTON, AND A TEAMMATE'S CARD
 // DRAW THE APPROVED FIELDS AND NOTHING NEW.
 //
-// Approved 2026-10-01 (w-e731ca9376, round 9, c1-summary-open.png and
-// c2-teammate.png). Her words on the teammate's card: "It should contain the
-// same information as the summary task... it shouldn't have new information."
-// So the card is pinned to exactly the summary's fields, and a private card is
-// pinned to saying only "Private thread", whose it is and its state. The status
-// is one of four words and only four (never "Needs your pick", which round 7
-// drew and she turned down). Drawn with react-dom/server, so these are the
+// Approved 2026-10-01 after nine design rounds. The rule for the teammate's
+// card: it carries the same information as the thread's summary and nothing
+// new. So the card is pinned to exactly the summary's fields, and a private
+// card is pinned to saying only "Private thread", whose it is and its state.
+// The status is one of four words and only four (never "Needs your pick",
+// which an earlier round drew and was turned down). Drawn with react-dom/server, so these are the
 // real components and not a copy of their markup.
 import { describe, it, expect } from 'vitest';
 import React from 'react';

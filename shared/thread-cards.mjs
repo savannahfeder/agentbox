@@ -12,7 +12,7 @@
 //                ask and the latest word on the thread stand in, so a new
 //                thread is never a blank summary.
 //   cardsFor     every thread worth showing the team, as a card: the summary
-//                and nothing more ("it shouldn't have new information"). A
+//                and nothing more; a card never adds information. A
 //                private thread publishes no card at all (decided 2026-10-01
 //                from user research): not a wordless one, not a count.
 

@@ -385,8 +385,8 @@
 }
 
 /* A compact arrow shares the title line; metadata stays below the title.
-   ONE POINT UP (w-e731ca9376, 2026-10-01): "The back button looks like it is a
-   couple of pixels too low". Measured in the built renderer at 1440 with the
+   ONE POINT UP (2026-10-01): the back arrow sat a couple of pixels too low.
+   Measured in the built renderer at 1440 with the
    title at 17px: at top 0 the chevron's ink top sat 1.6 points under the top
    of the title's capitals and its centre 0.45 under theirs. At -1 the ink top
    is 0.6 under and the centre 0.55 over, so it sits on the title's first line

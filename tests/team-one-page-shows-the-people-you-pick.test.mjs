@@ -1,18 +1,17 @@
 // THE INBOX AND THE TEAM PAGE ARE ONE PAGE, AND THE FACES PICK WHOSE THREADS IT SHOWS.
 //
-// Reported on the team build (w-05ff3d1438, 2026-10-01): two pages answered one
-// question. The Inbox had the state tabs (Needs you, In progress, Scheduled)
-// and the Team page did not; the Team page had the person and the Inbox did
-// not, and seeing your team meant finding a picker. Her rule: the inbox is the
-// team page filtered to you. So there is one page with the Inbox's tabs, and a
-// small row of faces at the end of the tab bar picks whose threads are on it.
-// You are picked by default. Past four faces the rest fold into "+N".
+// Found on the team build (2026-10-01): two pages answered one question. The
+// Inbox had the state tabs (Needs you, In progress, Scheduled) and the Team
+// page did not; the Team page had the person and the Inbox did not, and seeing
+// your team meant finding a picker. The rule now: the inbox is the team page
+// filtered to you. So there is one page with the Inbox's tabs, and a small row
+// of faces at the end of the tab bar picks whose threads are on it. You are
+// picked by default. Past four faces the rest fold into "+N".
 //
-// And the second half of the report: her own threads were missing from the
-// Team page because they were private. Measured on her store the same day:
-// 1,211 open threads, every one from before she joined and none shared, so the
-// board showed none of them. Your own threads are now always on your page, and
-// when a teammate is in view the ones they cannot see carry a lock.
+// The second half: your own threads were missing from the Team page because
+// they were private. A store whose open threads all predate joining, with none
+// shared, showed an empty board. Your own threads are now always on your page,
+// and when a teammate is in view the ones they cannot see carry a lock.
 import { describe, it, expect } from 'vitest';
 import {
   facesShown, normalizePicked, togglePicked, needsWord, teammateRows, mergeRows, privateMark,

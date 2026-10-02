@@ -294,8 +294,8 @@ const storeOf = (store?: KeyStore): KeyStore | null =>
 // REMEMBERED PER PROJECT (2026-10-01). A Private pick used to follow her to
 // every next thread, so teammates quietly stopped seeing work in projects she
 // never meant to hide (a persona test caught it). People who keep some work
-// quiet keep it quiet by project ("anything in Board or Exec is always
-// private"), so the choice sticks to the project it was made in, and every
+// quiet tend to keep it quiet by whole project, so the choice sticks to the
+// project it was made in, and every
 // other project still starts at Team.
 const visibilityKey = (project?: string | null) => (project ? `${VISIBILITY_KEY}.${project}` : VISIBILITY_KEY);
 

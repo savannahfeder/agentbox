@@ -34,12 +34,12 @@ export function Byline({ item, facts, returned, lead, onAddPeople }: {
    *  words; the chip beside it does, exactly as it did before. */
   returned?: boolean;
   /**
-   * THE THREAD'S STATE, FIRST ON THE LINE (w-e731ca9376, 2026-10-01): its mark
-   *  and one of the four words, drawn by threads/Summary.tsx and handed over
-   *  whole. Her words on the bar it replaced: "Running seems redundant with
-   *  Working... I find the visual associated with Running actually rather
-   *  useful." So this takes the place of the live word, and the line then
-   *  drops whatever would say the state a second time (`stateLedParts`).
+   * THE THREAD'S STATE, FIRST ON THE LINE (2026-10-01): its mark and one of
+   *  the four words, drawn by threads/Summary.tsx and handed over whole. On
+   *  the bar it replaced, Running said the same thing as Working, though the
+   *  Running mark itself was useful. So this takes the place of the live
+   *  word, and the line then drops whatever would say the state a second
+   *  time (`stateLedParts`).
    *
    *  The change figures and the Done mark that used to close this line are in
    *  the thread's menu at the right of the bar now (threads/ThreadMenu.tsx).

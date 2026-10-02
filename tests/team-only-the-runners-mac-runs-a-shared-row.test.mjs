@@ -110,8 +110,8 @@ describe('the supervisor on Theo\'s Mac', () => {
       if (before === undefined) delete process.env.AGENTBOX_PERSON_ID; else process.env.AGENTBOX_PERSON_ID = before;
     }
   });
-  // Photographed 2026-09-30 in Theo's real window: the task Maya gave him read
-  // "Queued" on his inbox row, a promise that an agent was about to start it.
+  // Found 2026-09-30: a task one teammate handed to another read "Queued" on the
+  // receiver's inbox row, a promise that an agent was about to start it.
   // Nothing runs a row a person holds, so nothing may say it is waiting its turn.
   it('says nothing is queued that will not run here', () => {
     const before = process.env.AGENTBOX_PERSON_ID;

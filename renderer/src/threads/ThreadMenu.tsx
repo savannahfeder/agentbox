@@ -1,10 +1,9 @@
 // THE THREAD'S MENU: the square three-dot button at the right of the top bar,
 // beside the Summary button, and the small menu it opens.
 //
-// Her words on the bar it replaced (w-e731ca9376, 2026-10-01): "This area is a
-// bit cluttered. I wonder if things like viewing the code, opening the
-// terminal, and marking done would be better placed in maybe a little
-// three-dot menu." Measured before, at 1440: the terminal mark at 1091..1125,
+// The bar it replaced (2026-10-01) was cluttered, so viewing the code,
+// opening the terminal and marking done moved into a small three-dot menu.
+// Measured before, at 1440: the terminal mark at 1091..1125,
 // the state word, the Summary button at 1219..1340, the Done mark at
 // 1364..1398, and the change figures hanging under them. Now the bar's right
 // side is the Summary button and these dots, and the three verbs are rows.

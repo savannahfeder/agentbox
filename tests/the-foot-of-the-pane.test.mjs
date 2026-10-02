@@ -170,10 +170,9 @@ describe('the Done mark she picked', () => {
     expect(css).not.toContain('.dm-');
   });
 
-  // THE MARK IS A ROW NOW (w-e731ca9376, 2026-10-01). Her words on the bar it
-  // sat in: "This area is a bit cluttered... viewing the code, opening the
-  // terminal, and marking done would be better placed in maybe a little
-  // three-dot menu." So Done is the last row of the thread's menu, it keeps
+  // THE MARK IS A ROW NOW (2026-10-01). The bar it sat in was cluttered:
+  // viewing the code, opening the terminal and marking done fit better in a
+  // small three-dot menu. So Done is the last row of the thread's menu, it keeps
   // its two ticks as the row's mark, and it sits beside the terminal's row
   // drawn at the same stroke, which is what sharing the terminal's class used
   // to guarantee.

@@ -1,7 +1,6 @@
 # Agentbox for teams: the build
 
-Status: approved by the founder on 2026-09-30 (work item w-e731ca9376), design
-in the Agentbox product store at `designs/w-e731ca9376/team.html`. This file is
+Status: approved on 2026-09-30. This file is
 the handoff between sessions building it. Keep it current: tick what landed,
 say what is next.
 
@@ -84,9 +83,10 @@ a password the admin key creates).
 
 ## Founder's steps outside the code
 
-- Supabase project `agentbox-team` in the Astral org, password saved to
-  `~/.agentbox-team-db-password` (she was given these steps on 2026-09-30).
+- A hosted Supabase project; its address and key live in
+  cloud/team.config.json on each machine, which is never committed (steps
+  written up on 2026-09-30).
 - Google sign-in client, in the morning: steps go in the morning summary.
   The consent screen must be published, or every teammate added as a test
-  user, or Google refuses everyone but her.
-- Each teammate needs read access to Astral-Agent/agentbox-team on GitHub.
+  user, or Google refuses everyone but the account that made it.
+- Each teammate needs a copy of cloud/team.config.json.

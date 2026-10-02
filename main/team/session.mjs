@@ -99,8 +99,8 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       return supabaseBackend(c);
     },
 
-    // EMAIL AND PASSWORD, beside Google (2026-10-01: "it needs a real sign-in
-    // page"). Google stays the first way in; this is the one that works
+    // EMAIL AND PASSWORD, beside Google (2026-10-01: the team version needs
+    // a real sign-in page). Google stays the first way in; this is the one that works
     // before a team has set Google up, and for anyone who would rather not.
     async signInWithPassword(email, password) {
       if (!configured) throw new Error('this build has no team cloud configured');

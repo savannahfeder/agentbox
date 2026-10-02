@@ -1,7 +1,7 @@
 // THE TEAM PAGE IS THE STATE OF THE COMPANY: EVERY OPEN TASK, ONE LINE EACH.
 //
-// Approved 2026-09-30 (w-e731ca9376) after two rounds: not grouped by project
-// ("there could be 200 tasks in any project"), not one line per person, but
+// Settled 2026-09-30 after two rounds: not grouped by project (a project can
+// hold hundreds of tasks, so groups do not scan), not one line per person, but
 // every open task in the company, newest movement first, filterable by state
 // and by person. A teammate's private task is a blank line: who and what
 // state, never its title or project. These pin the list the page draws

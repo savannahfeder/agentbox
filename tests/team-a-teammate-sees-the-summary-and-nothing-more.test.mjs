@@ -1,8 +1,7 @@
 // A TEAMMATE SEES THE SUMMARY AND NOTHING MORE.
 //
-// Her words on the teammate's card, 2026-10-01: "It should contain the same
-// information as the summary task... it shouldn't have new information." Each
-// Mac publishes one card per thread (shared/thread-cards.mjs). A private
+// The rule for the teammate's card, 2026-10-01: it carries the same
+// information as the thread's summary and nothing new. Each Mac publishes one card per thread (shared/thread-cards.mjs). A private
 // thread's card says who and in what state, never a word of it. Messages
 // between two people are never carded. States are the four predefined ones.
 import { describe, it, expect } from 'vitest';

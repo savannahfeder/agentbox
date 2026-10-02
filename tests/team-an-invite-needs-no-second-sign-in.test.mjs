@@ -2,8 +2,8 @@
 //
 // The team setup page told a person waiting for an invite to sign out and in
 // again, which was true until the sync learned to take up a late invite on its
-// own (2026-09-30). Signing out of the test login she was given to try the team
-// version would also have left her unable to sign back in before Google is on.
+// own (2026-09-30). Signing out would also have left anyone on a login without
+// Google sign-in unable to get back in, since Google sign-in is not on yet.
 import { it, expect } from 'vitest';
 import fs from 'node:fs';
 

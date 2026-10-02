@@ -1,12 +1,12 @@
 // WHAT A THREAD SAYS TO SOMEONE WHO IS NOT A PROGRAMMER.
 //
-// Testers who are not programmers (a PM, an office manager) read the activity
-// lines as noise or worse. Four lines they were handed, verbatim: "I'll claim
-// the work item first.", "Looked up a tool, claim work item", "Running cat
-// README.md; echo ---; cat package.json", "leave the row open, since you wrote
-// it".
+// Someone who is not a programmer reads the activity lines as noise or worse.
+// Four lines of the kind a thread used to draw: "I'll claim the work item
+// first.", "Looked up a tool, claim work item", "Running cat README.md; echo
+// ---; cat package.json", "leave the row open, since you wrote it". Each one is
+// either the app's own bookkeeping or a shell command drawn as it was typed.
 //
-// MEASURED over 3,344 real session traces written between 2026-09-20 and
+// MEASURED over 3,344 session traces written between 2026-09-20 and
 // 2026-10-01, 55,500 tool lines in all:
 //
 //   Bash                     31,878  57%
