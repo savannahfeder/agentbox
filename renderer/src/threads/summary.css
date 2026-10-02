@@ -136,7 +136,9 @@
 .ts-panel .prio-menu.ts-menu-wide { left: 82px; right: -9px; min-width: 0; max-height: 280px; overflow-y: auto; }
 .ts-menu .prio-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* and each choice in them answers the pointer the way the field that opened it did */
-.ts-panel .ts-menu .prio-menu-row:hover, .ts-panel .ts-menu .prio-menu-row:focus-visible { background: var(--wash); color: var(--text); outline: none; }
+/* The same answer the new thread card's rows give (--wash-strong), now that
+   both menus float on the same grey: on --pop a 4% film was not visible. */
+.ts-panel .ts-menu .prio-menu-row:hover, .ts-panel .ts-menu .prio-menu-row:focus-visible { background: var(--wash-strong); color: var(--text); outline: none; }
 .ts-menu .ts-who { margin-right: 0; }
 .ts-menu-head { display: block; padding: 6px 9px 4px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 .ts-menu-none { display: block; padding: 6px 9px 8px; font-size: 13px; color: var(--text-faint); }

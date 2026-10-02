@@ -191,7 +191,10 @@ describe('the right side is the Summary button and the dots', () => {
     const menu = read('renderer/src/threads/ThreadMenu.tsx');
     expect(menu).toMatch(/className="th-menu ts-more-menu"/);
     const pages = prose(read('renderer/src/threads/pages.css'));
-    expect(pages).toMatch(/\.th-menu \{[^}]*background: #363431;[^}]*border-radius: var\(--radius\)/);
+    // The grey is the app's one dropdown colour now (--pop, styles.css), not
+    // a literal here: the founder asked for every menu to float on the same
+    // one (2026-10-01, w-41ff964775).
+    expect(pages).toMatch(/\.th-menu \{[^}]*background: var\(--pop\);[^}]*border-radius: var\(--radius\)/);
     expect(pages).toMatch(/\.th-menu \.row-i:hover/);
     const css = prose(read('renderer/src/threads/summary.css'));
     expect(css).toMatch(/\.ts-more \{[^}]*width: 30px; height: 30px;[^}]*border-radius: var\(--radius\)/);

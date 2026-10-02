@@ -33,6 +33,11 @@
   --bg-raised: #f1f3f6;
   --bg-selected: #eaeef7;
   --bg-hover: #f6f7fa;
+  /* WHAT A DROPDOWN FLOATS ON. Every menu in the app reads this one token, so
+     they move together; it is the window's own ground here, which is what each
+     of them painted itself before the token existed. A look may override it,
+     and ember-grid does, to a grey that is never the black ground. */
+  --pop: var(--bg);
   /* A FILM ONE STEP BRIGHTER THAN `--wash`, for the row that is live. It is a
      token and not a literal for the reason every other colour here is: a raw
      `rgba(255,255,255,.1)` is invisible on the light theme, which is the exact
@@ -375,6 +380,9 @@
   --bg: #24262a;
   --surface: #2e3136;
   --bg-raised: #373a41;
+  /* Dark answers it the same way light does: a menu floats on the window's
+     own ground unless a look says otherwise (ember-grid does). */
+  --pop: var(--bg);
   --bg-selected: #3a4049;
   --bg-hover: #33363c;
   --film-strong: rgba(255, 255, 255, 0.10);
@@ -1249,6 +1257,14 @@
   --surface: #282625;
   --bg-raised: #2f2d2c;
   --bg-selected: #373534;
+  /* WHAT A DROPDOWN FLOATS ON, AND IT IS NEVER THE BLACK GROUND (the founder,
+     2026-10-01: "we should never have a black component like this... when you
+     click something, you get a dropdown and it's that same gray idea. The
+     black looks really bad so we should get rid of it entirely for any cases
+     in this amber grid theme"). The new thread card's menus were already this
+     grey; every older menu read as a hole cut in the window. Only this theme
+     sets it, so each menu keeps its own fallback everywhere else. */
+  --pop: #363431;
   --bg-hover: #2e2c2b;
   --film-strong: rgba(255, 255, 255, 0.07);
   /* A warm off white, brighter than the 09-26 ink now the ground is Ash, so
@@ -2882,7 +2898,7 @@ body {
 .slash-menu {
   position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; z-index: 60;
   padding: 4px;
-  background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   animation: prio-in 0.13s cubic-bezier(0.2, 0.8, 0.3, 1);
   /* IT HOLDS FOURTEEN ROWS NOW, not six, so it can be taller than the card it
@@ -3265,7 +3281,7 @@ body {
 .prio-menu {
   position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 60;
   min-width: 168px; padding: 4px;
-  background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   display: flex; flex-direction: column; gap: 1px;
   animation: prio-in 0.13s cubic-bezier(0.2, 0.8, 0.3, 1);
@@ -3277,7 +3293,10 @@ body {
   background: none; border: none; border-radius: var(--radius);
   padding: 6px 9px; cursor: pointer; text-align: left; width: 100%;
 }
-.prio-menu-row.cursor { background: var(--bg-selected); color: var(--text); }
+/* THE ROW UNDER THE KEYBOARD, as a film of light rather than a named grey: on
+   the dropdown's own grey (--pop) a selected-grey row was the same colour as
+   the menu it sat in, so nothing showed where the keyboard was. */
+.prio-menu-row.cursor { background: var(--wash-strong); color: var(--text); }
 .prio-menu-label { flex: 1; }
 /* The level it is already on, so the drawer says where you are as well as
    where you can go. */
@@ -3317,7 +3336,7 @@ body {
   position: absolute; top: calc(100% + 8px); left: 0; z-index: 60;
   width: 272px; padding: 4px;
   max-height: calc(100vh - 32px); overflow-y: auto;
-  background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   display: flex; flex-direction: column; gap: 1px;
   animation: prio-in 0.13s cubic-bezier(0.2, 0.8, 0.3, 1);
@@ -4147,7 +4166,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
   position: absolute; top: calc(100% + 8px); left: 0; z-index: 60;
   width: 420px; max-width: 78vw; padding: 4px 4px 8px;
   max-height: calc(100vh - 32px); overflow-y: auto;
-  background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   display: block;
   animation: prio-in 0.13s cubic-bezier(0.2, 0.8, 0.3, 1);
@@ -5028,7 +5047,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .repeat-menu {
   position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 60;
   min-width: 210px; padding: 4px;
-  background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   display: flex; flex-direction: column; gap: 1px;
   animation: prio-in 0.13s cubic-bezier(0.2, 0.8, 0.3, 1);
@@ -8891,7 +8910,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 .set-picker-menu {
   position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
   min-width: 100%; padding: 4px;
-  background: var(--bg); border: 1px solid var(--line-strong);
+  background: var(--pop); border: 1px solid var(--line-strong);
   border-radius: var(--radius); box-shadow: var(--shadow-lg);
   display: flex; flex-direction: column; gap: 1px;
   animation: prio-in 0.13s cubic-bezier(0.2, 0.8, 0.3, 1);

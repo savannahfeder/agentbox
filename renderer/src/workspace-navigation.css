@@ -198,7 +198,7 @@
 .instr-scope-word:hover, .instr-scope-word[aria-expanded="true"] { text-decoration-color:var(--text); }
 .instr-scope-arrow { width:14px; height:14px; flex:none; color:var(--text-dim); }
 .instr-scope-menu { position:absolute; left:-8px; top:calc(100% + 8px); z-index:20; min-width:220px; max-height:360px; overflow-y:auto;
-  padding:5px; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow-card);
+  padding:5px; border:1px solid var(--line); border-radius:var(--radius); background:var(--pop); box-shadow:var(--shadow-card);
   font-size:13px; font-weight:400; letter-spacing:0; }
 .instr-scope-menu button { display:block; width:100%; text-align:left; font:inherit; color:var(--text-dim); background:none; border:0; border-radius:var(--radius); padding:7px 10px; cursor:pointer; }
 .instr-scope-menu button:hover, .instr-scope-menu button[aria-checked="true"] { background:var(--wash); color:var(--text); }
@@ -242,7 +242,7 @@
 .instr-part-head .instruction-restore-link { font:inherit; font-size:12px; background:none; border:none; padding:0; color:var(--text-faint); cursor:pointer; }
 .instr-part-head .instruction-restore-link:hover:not(:disabled) { color:var(--text); }
 .instruction-restore-menu { position:absolute; top:calc(100% + 8px); right:0; z-index:20; min-width:260px; max-height:320px; overflow-y:auto;
- border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow-card); padding:6px; }
+ border:1px solid var(--line); border-radius:var(--radius); background:var(--pop); box-shadow:var(--shadow-card); padding:6px; }
 .instr-part-head .instruction-restore-menu button { display:flex; width:100%; gap:16px; justify-content:space-between; align-items:baseline;
  font:inherit; font-size:12px; background:transparent; cursor:pointer;
  border:none; border-radius:var(--radius); padding:8px 10px; text-align:left; color:var(--text); }
