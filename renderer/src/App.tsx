@@ -5570,7 +5570,7 @@ export default function App() {
           onStanding={() => setModal('standing')}
           onSettings={() => { setModal(null); setSettingsPane(null); setSettingsOpen(true); }}
           onShortcuts={() => { setModal(null); setSettingsPane('shortcuts'); setSettingsOpen(true); }}
-          onProjects={() => { setModal(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
+          onOpenProjects={() => { setModal(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
           onClose={() => setModal(null)}
         />
       )}

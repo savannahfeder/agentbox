@@ -28,7 +28,7 @@ interface Command {
   run: () => void;
 }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, onSetLook, onThemes, staleFiles = [], updateReady = null, onInstallUpdate, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onProjects, onNewProject, onStanding, onSettings, onShortcuts, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, onSetLook, onThemes, staleFiles = [], updateReady = null, onInstallUpdate, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onStanding, onSettings, onShortcuts, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -63,7 +63,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   order?: string[];
   onRankFirst: (slug: string) => void;
   /** Settings, opened on the Projects page, where the running order is set. */
-  onProjects?: () => void;
+  onOpenProjects?: () => void;
   // Door B: the new project card. The palette no longer names a project
   // itself; it opens the one card that does.
   onNewProject: () => void;
@@ -137,12 +137,12 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // naming: put this project at the top. Everything finer is the Projects
     // page in Settings, where the whole order is visible at once, and the
     // first row here is the door to it.
-    ...(onProjects ? [{
+    ...(onOpenProjects ? [{
       id: 'projects-page',
       label: 'Projects…',
       hint: 'which goes first, names and rules',
       keywords: 'priority order rank reorder sort first top priorities rename project settings',
-      run: onProjects,
+      run: onOpenProjects,
     }] : []),
     ...products.map((p, i) => ({
       id: `rank-${p.slug}`,
@@ -449,7 +449,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onProjects, onStanding, onSettings, onShortcuts, look, onSetLook, onThemes, staleFiles, updateReady, onInstallUpdate, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo]);
+  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, onSetLook, onThemes, staleFiles, updateReady, onInstallUpdate, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

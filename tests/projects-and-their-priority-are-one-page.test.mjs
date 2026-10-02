@@ -179,7 +179,7 @@ describe('the ways in', () => {
 
   it('the app opens Settings on Projects from both, and saves through setProductOrder', () => {
     expect(app).toMatch(/onReorderProjects=\{[^\n]*setSettingsPane\('projects'\)/);
-    expect(app).toMatch(/onProjects=\{[^\n]*setSettingsPane\('projects'\)/);
+    expect(app).toMatch(/onOpenProjects=\{[^\n]*setSettingsPane\('projects'\)/);
     expect(app).not.toMatch(/setSettingsPane\('priority'\)/);
     expect(app).toMatch(/onSetOrder=\{/);
   });
