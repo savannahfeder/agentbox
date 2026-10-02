@@ -20,6 +20,7 @@ import { providerCommand } from '../../../shared/provider-commands.mjs';
 
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TeamContext, firstName } from '../team/people';
+import { joinNames, landsIn } from '../threads/composer-rules';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -79,7 +80,7 @@ import type { PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
-import { isUpdateRow, SAY as UPDATE_SAY } from '../update-row';
+import { isUpdateRow } from '../update-row';
 import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
@@ -323,7 +324,7 @@ function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 // not the user's, and it is the part that was unnecessary. `filesFromRuns` stays,
 // because App.tsx still reads it to choose the design a card opens itself on.
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onInstallUpdate, items, onHandToAgent, onAddPeople }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, items, onHandToAgent, onAddPeople }: {
   previewSample?: string;
   /**
    * EVERY THREAD THE WINDOW HOLDS, for the summary's linked titles and the
@@ -350,10 +351,6 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    *  drawn here and teleported there. */
   cornerHeaderTarget?: HTMLElement | null;
   item: WorkItem;
-  /**
-   * Quit and come back on the new version. Only the update row has it, and
-   * only it draws the button that calls it. */
-  onInstallUpdate?: () => void;
   // WHAT AGENTS ARE ALLOWED TO DO RIGHT NOW, so the reply footer can print it
   // whether or not this message has changed it. Claude Code prints its own
   // mode in the status bar the whole time; this is the same fact.
@@ -510,8 +507,13 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const talkOthers = talkTeam && teamCtx
     ? [...new Set([...(talkTeam.people ?? []), ...(talkTeam.sharedBy ? [talkTeam.sharedBy] : [])])].filter((p) => p !== teamCtx.me).map((id) => teamCtx.byId.get(id) ?? null).filter((p): p is NonNullable<typeof p> => !!p)
     : [];
-  const join = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] ?? '');
-  const talkName = direct && teamCtx ? (talkOthers.length > 1 ? join(talkOthers.map((p) => firstName(p))) : firstName(talkPerson)) : null;
+  // Everyone this conversation is with, first names, in the order the record
+  // holds them. The reply box joins them and says where a reply lands, so it is
+  // handed the names rather than a sentence (../threads/composer-rules.ts).
+  const talkNames = direct && teamCtx
+    ? (talkOthers.length > 1 ? talkOthers.map((p) => firstName(p)) : [firstName(talkPerson)].filter(Boolean))
+    : null;
+  const talkName = talkNames?.length ? joinNames(talkNames) : null;
   const talkFull = talkOthers.length > 1 ? talkOthers.map((p) => p.name).join(', ') : talkPerson?.name || talkName;
   const summarised = !agent && !made && !direct;
   const [summaryOpen, toggleSummary] = useSummaryOpen();
@@ -1478,17 +1480,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               the one below: there is nobody on the other end of it. A box that
               looks like it sends is the failure this codebase cares about most.
               What to do instead is in the message itself, per cause.
-
-             THE NEW VERSION GETS A BUTTON IN THAT SLOT INSTEAD, because unlike the trouble
-             row it has exactly one thing to do, and a button in the app is the expected
-             way to do it. Closing the row is still E
-             and still costs her nothing: the update is downloaded and Settings keeps it.
            */}
-          {update ? (
-            <button className="dock-pill" onClick={() => onInstallUpdate?.()}>
-              <span className="dock-pill-text">{UPDATE_SAY.restart}</span>
-            </button>
-          ) : trouble ? null : replyBlocked ? (
+          {update || trouble ? null : replyBlocked ? (
             /*
              * NO REPLY BOX ON AN AGENT A REPLY CANNOT CLEAR. It is frozen on a
                box asking to approve something, and a message queues behind that
@@ -1509,7 +1502,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkName : null} stop={stopButton} />
+            <DockComposer item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} onSend={onReplySend} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
@@ -1731,9 +1724,9 @@ function ModePicker({ value, options, label, onChange }: {
 
 function DockComposer({ item, runningMode, runningEngine, codexModels = [], codexModelDefault = null, onSend, onClose, onNotice, stop, openModel = false, talkTo = null }: {
   item: WorkItem;
-  /** On a conversation with a person, their first name: the box replies to
-   *  them, and nothing about an agent, a priority or a model is offered. */
-  talkTo?: string | null;
+  /** On a conversation with a person, everyone's first name: the box replies
+   *  to them, and nothing about an agent, a priority or a model is offered. */
+  talkTo?: string[] | null;
   runningMode?: PermissionMode;
   /**
    * WHICH CODING AGENT THIS ROW'S NEXT SEND WILL REACH, for the slash menu and
@@ -1775,7 +1768,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // reply box is pinned to stays the agent's.
   useEffect(() => {
     const box = document.querySelector<HTMLTextAreaElement>('.dock-input');
-    if (box) box.placeholder = talkTo ? `Reply to ${talkTo}` : 'What should the agent do next?';
+    if (box) box.placeholder = talkTo?.length ? `Reply to ${joinNames(talkTo)}` : 'What should the agent do next?';
   });
   // The draft outlives the dock. Tab away, click elsewhere, even restart the
   // app: coming back to this item finds your words where you left them. A
@@ -2308,7 +2301,13 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             sentence about a thing that is not happening. What is left is the
             send button, which is the whole act. */}
         <span className="compose-clauses">
-          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo ? <span className="dim">{`Only you${talkTo.includes(' and ') ? ', ' : ' and '}${talkTo} see this.`}</span> : <>
+          {/* WHERE IT GOES, NOT WHO SEES IT (w-a8e752a9f2). The conversation's
+              own header already reads "MESSAGES · MAYA GAVE YOU THIS" with both
+              faces beside it, so "Only you and Maya see this." was the second
+              place on the screen saying the same thing. It is replaced rather
+              than deleted: a bare corner here reads as a control that failed
+              to draw, so the slot always carries a line. */}
+          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo?.length ? <span className="dim">{landsIn(talkTo)}</span> : <>
           <PriorityPicker
             variant="word"
             value={shown}

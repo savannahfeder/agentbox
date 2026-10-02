@@ -145,11 +145,14 @@ describe('her own writing is read from her folder and not from the checkout', ()
       .toBe('WHAT AN AGENT COMMITTED');
   });
 
+  // Since w-3ec9f07978 hers rides ABOVE ours rather than instead of it: ours
+  // are what the inbox reads a message by, so they stay.
   it('does the same for the rules about how agents write to her', () => {
     inCheckout('message-rules.md', 'OURS');
     writeInstruction(hers, 'messages', 'No em dashes.');
-    expect(supervisor().messageRules()).toContain('No em dashes.');
-    expect(supervisor().messageRules()).not.toContain('OURS');
+    const rules = supervisor().messageRules();
+    expect(rules).toContain('No em dashes.');
+    expect(rules.indexOf('No em dashes.')).toBeLessThan(rules.indexOf('OURS'));
   });
 
   it('a checkout that loses her file does not take her rules with it', () => {
@@ -173,14 +176,15 @@ describe('what we ship still comes from the checkout', () => {
     expect(readSystemTemplate(checkout, hers)).toBe('MINE');
   });
 
-  it('falls back to the shipped message rules, which is what the two paths were for', () => {
-    // The two sides were the same file while both were the checkout, so the
-    // fallback below could never run in development and editing the box
-    // overwrote the default.
+  it('briefs the shipped message rules from the checkout, never through her box', () => {
+    // The two sides were the same file while both were the checkout, so
+    // editing the box overwrote the default. Since w-3ec9f07978 the box never
+    // shows ours at all.
     inCheckout('message-rules.md', 'HOW TO WRITE TO HER');
     const sup = supervisor();
     expect(sup.messageRulesFile()).not.toBe(sup.messageRulesDefaultFile());
-    expect(sup.readMessageRules()).toBe('HOW TO WRITE TO HER');
+    expect(sup.readMessageRules()).toBe('');
+    expect(sup.messageRules()).toContain('HOW TO WRITE TO HER');
     sup.writeMessageRules('HOW I WANT IT');
     expect(sup.readMessageRules()).toBe('HOW I WANT IT');
     expect(fs.readFileSync(path.join(checkout, 'briefs', 'message-rules.md'), 'utf8')).toBe('HOW TO WRITE TO HER');
@@ -270,13 +274,18 @@ describe('the two message documents are joined once', () => {
   // has never touched the finishing ones. Dropping the half she never edited
   // would quietly stop every task ending the way it does today, so the shipped
   // text comes across as the second half.
-  it('takes the shipped ending rules when she never wrote her own', () => {
+  //
+  // REVERSED BY w-3ec9f07978. Copying our ending into her file is what filled
+  // the box with the app's machinery. The shipped ending rides on every run
+  // from the checkout now, so leaving it out of her file loses nothing.
+  it('does not copy the shipped ending rules into hers', () => {
     writeInstructionAt(hers, 'writing-rules.md', 'Open with what happened.');
     inCheckout('message-rules.md', 'THE SHIPPED ENDING');
     joinMessageRules(checkout, hers);
     const text = readInstruction(hers, 'messages').text;
     expect(text).toContain('Open with what happened.');
-    expect(text).toContain(defaults.messages.trim().slice(0, 60));
+    expect(text).not.toContain('THE SHIPPED ENDING');
+    expect(text).not.toContain(defaults.messages.trim().slice(0, 60));
   });
 
   // The fresh install, and the reason this is not just "copy both files": with

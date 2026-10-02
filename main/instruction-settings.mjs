@@ -30,9 +30,14 @@ function fileFor(id) {
  if (!Object.hasOwn(files,id)) throw new Error('Unknown instruction section');
  return files[id];
 }
+// WHAT THE BOX OPENS ON when the user has written nothing. The message rules
+// box starts empty like the general one (w-3ec9f07978): the app's own message
+// rules are not the user's to edit, because the inbox reads every message by
+// them, so they ride on every run from the checkout and never sit in the box.
+const boxDefault=(id)=>(id==='rules'||id==='messages') ? '' : defaults[id];
 export function readInstruction(appDir,id,shippedDir=appDir) {
  const file=fileFor(id);
- const defaultText=id==='rules' ? '' : defaults[id];
+ const defaultText=boxDefault(id);
  let text=defaultText;
  try {text=fs.readFileSync(path.join(appDir,'briefs',file),'utf8');} catch(e) {if(e.code!=='ENOENT') throw e; if(id==='system') text=readSystemTemplate(shippedDir,appDir);}
  return {text,defaultText};
@@ -79,13 +84,13 @@ export function readVersion(appDir,id,ts) {
  if(!Number.isFinite(at)) throw new Error('Unknown version');
  return {text:fs.readFileSync(path.join(historyDir(appDir,id),`${at}.md`),'utf8')};
 }
-function keepVersion(appDir,id,now=Date.now()) {
+function keepVersion(appDir,id,now=Date.now(),always=false) {
  try {
   const live=path.join(appDir,'briefs',fileFor(id));
   let stat,text;
   try {stat=fs.statSync(live); text=fs.readFileSync(live,'utf8');}
   catch(e) {if(e.code!=='ENOENT') throw e; return;}
-  if(now-stat.mtimeMs<QUIET_MS) return;
+  if(!always&&now-stat.mtimeMs<QUIET_MS) return;
   const ts=Math.floor(stat.mtimeMs);
   const have=listVersions(appDir,id);
   if(have.some(v=>v.ts===ts)) return;
@@ -179,22 +184,60 @@ export function carryHerBriefsAcross(fromDir,toDir) {
  * release's default reaching them. Same rule as `carryHerBriefsAcross` above:
  * never freeze our own text into the user's folder.
  *
+ * IT READS ONLY THE USER'S FOLDER, AND ADDS NOTHING OF OURS (w-3ec9f07978).
+ * It used to fall back to the checkout's copies and to put the shipped ending
+ * under whatever it found. In this repository `writing-rules.md` ships 16,000
+ * characters long, so every fresh copy run from source joined our two files
+ * and saved them as the user's, and the box showed nothing but our machinery.
+ * The shipped ending rides on every run anyway now (`messageRules` in the
+ * supervisor), so there is nothing of ours left to carry.
+ *
  * Never throws, never overwrites. Returns what it joined, or null.
  */
 export function joinMessageRules(shippedDir,toDir) {
  try {
   const target=path.join(toDir,'briefs',files.messages);
   if(fs.existsSync(target)) return null;
-  const read=(dir,name)=>{try {return fs.readFileSync(path.join(dir,'briefs',name),'utf8');} catch {return null;}};
-  const either=(name)=>read(toDir,name) ?? read(shippedDir,name);
-  const [writing,finishing]=WAS_MESSAGES.map((name)=>(either(name) ?? '').trim());
+  const read=(name)=>{try {return fs.readFileSync(path.join(toDir,'briefs',name),'utf8');} catch {return null;}};
+  const [writing,finishing]=WAS_MESSAGES.map((name)=>(read(name) ?? '').trim());
   if(!writing && !finishing) return null;
-  const ending=finishing || defaults.messages.trim();
-  const joined=[writing,ending].filter(Boolean).join('\n\n');
+  const joined=[writing,finishing].filter(Boolean).join('\n\n');
   writeInstruction(toDir,'messages',`${joined}\n`);
-  return {writing:writing.length,ending:ending.length,total:joined.length+1};
+  return {writing:writing.length,ending:finishing.length,total:joined.length+1};
  } catch(e) {
   console.warn(`${nameSlug}: could not join the message rules: ${e.message}`);
   return null;
+ }
+}
+
+/**
+ * A MESSAGE BOX THAT HOLDS ONLY OUR TEXT IS NOT THE USER'S, ONCE (w-3ec9f07978).
+ *
+ * The old join above wrote the checkout's writing rules and ending rules into
+ * the user's folder as if they had typed them, so their box opened on 21,743
+ * characters of the app's own rules. A file whose text is EXACTLY one of the
+ * things we ship, alone or joined the way the old join joined them, is set
+ * aside: kept as a restore point and removed, so the box opens empty and our
+ * rules reach the run from the checkout as they should.
+ *
+ * Exact only. One line of the user's own makes the whole file theirs, and
+ * nothing here tries to cut it apart. Never throws. Returns whether it acted.
+ */
+export function setAsideShippedMessageRules(shippedDir,toDir) {
+ try {
+  const target=path.join(toDir,'briefs',files.messages);
+  if(path.resolve(shippedDir)===path.resolve(toDir)||!fs.existsSync(target)) return false;
+  const read=(name)=>{try {return fs.readFileSync(path.join(shippedDir,'briefs',name),'utf8').trim();} catch {return '';}};
+  const writing=read(WAS_MESSAGES[0]);
+  const endings=[...new Set([read(files.messages),defaults.messages.trim()])].filter(Boolean);
+  const ours=new Set([...endings,...endings.map((e)=>[writing,e].filter(Boolean).join('\n\n'))]);
+  const text=fs.readFileSync(target,'utf8').trim();
+  if(!text||!ours.has(text)) return false;
+  keepVersion(toDir,'messages',Date.now(),true);
+  fs.rmSync(target,{force:true});
+  return true;
+ } catch(e) {
+  console.warn(`${nameSlug}: could not set aside the shipped message rules: ${e.message}`);
+  return false;
  }
 }

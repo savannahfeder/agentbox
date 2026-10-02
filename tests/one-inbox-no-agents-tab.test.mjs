@@ -85,11 +85,10 @@ describe('the dock hides the reply box only where a message is swallowed', () =>
     // The permission box is still the only thing that takes the box away from
     // an AGENT. The row that says her tasks are not running has no reply box
     // either, and that is not a gate on the agent: there is no session behind
-    // that row at all. The row that says a new version is ready takes the slot
-    // for its one button instead, and for the same reason: there is no session
-    // and no ledger behind it either.
-    expect(focus).toMatch(/\) : trouble \? null : replyBlocked \? \(/);
-    expect(focus).toMatch(/\{update \? \(/);
+    // that row at all. Nor does a made update row, if one is ever opened; the
+    // new version is announced in the sidebar now (w-7a39dace23), so its
+    // button left this slot.
+    expect(focus).toMatch(/\{update \|\| trouble \? null : replyBlocked \? \(/);
   });
 
   it('keeps the box sentence for the one that has a box', () => {

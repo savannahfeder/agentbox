@@ -18,7 +18,7 @@ import { storeRootEnv } from './store/home.mjs';
 import { Supervisor } from './supervisor.mjs';
 import { startCodexWatch } from './codex-watch.mjs';
 import { registerIpc } from './ipc.mjs';
-import { carryHerBriefsAcross, joinMessageRules } from './instruction-settings.mjs';
+import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules } from './instruction-settings.mjs';
 import * as approvals from './approvals.mjs';
 import { recoveryToast } from '../shared/recovery.mjs';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mjs';
@@ -27,6 +27,7 @@ import { openFreshUser } from './fresh-user.mjs';
 import { installCrashReports, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mjs';
 import { createAnalytics } from './analytics.mjs';
 import { createUpdater } from './updater.mjs';
+import { createSourceUpdater } from './source-updater.mjs';
 import { installNotifier } from './notify.mjs';
 import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mjs';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mjs';
@@ -197,6 +198,9 @@ try {
   // supervisor exists, so nothing has read the new name yet.
   const joined = joinMessageRules(appDir, userDir);
   if (joined) console.log(`zero: joined the message rules into one file, ${joined.total} characters`);
+  // AND A BOX THAT AN OLDER JOIN FILLED WITH ONLY OUR TEXT IS EMPTIED, ONCE
+  // (w-3ec9f07978). Kept as a restore point; our rules ride from the checkout.
+  if (setAsideShippedMessageRules(appDir, userDir)) console.log('zero: the message rules box held only the shipped rules; set aside as a restore point');
 } catch (err) {
   console.warn(`zero: could not carry her instructions into ${userDir}: ${err.message}`);
 }
@@ -608,9 +612,17 @@ async function createWindow() {
   // `pushUpdate` is filled in on the next line, because the updater has to
   // exist before the IPC surface that reports it and the IPC surface is what
   // knows how to reach the window.
+  //
+  // AND A COPY RUN FROM SOURCE watches its git branch instead of a release
+  // feed (main/source-updater.mjs), because that is how teammates run the team
+  // build and their updates are pushes to main, not releases.
   let pushUpdate = () => {};
-  const updater = createUpdater({
+  const updater = app.isPackaged ? createUpdater({
     app,
+    onChanged: () => pushUpdate(),
+  }) : createSourceUpdater({
+    app,
+    appDir,
     onChanged: () => pushUpdate(),
   });
 

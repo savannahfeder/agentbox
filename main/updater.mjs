@@ -64,7 +64,8 @@ const EVERY_MS = 6 * 60 * 60 * 1000;
  * Electron app, a network, or a packaged build.
  */
 export function describe(state) {
-  const { phase, currentVersion, newVersion, percent, error, checkedAt, readyAt } = state;
+  const { phase, currentVersion, newVersion, percent, error, checkedAt, readyAt, source, changes, behind } = state;
+  const installing = phase === 'installing';
   return {
     phase,
     currentVersion,
@@ -79,10 +80,18 @@ export function describe(state) {
     // every other row's right end answers "how old is this". Built off the
     // clock instead it would read "now" forever, which is the app looking busy
     // about something that has been sitting on the disk since lunchtime.
-    readyAt: phase === 'ready' ? (readyAt ?? null) : null,
+    readyAt: phase === 'ready' || installing ? (readyAt ?? null) : null,
     // The one question every screen actually asks. A screen should not have to
     // learn which phase strings mean "there is a button to press".
     ready: phase === 'ready',
+    // A COPY RUN FROM SOURCE (main/source-updater.mjs) says three more things:
+    // that it is one, what changed (newest first, at most five titles, and how
+    // many there are in all), and that the button was pressed and it is
+    // rebuilding, which takes long enough that the row has to say so.
+    source: !!source,
+    changes: Array.isArray(changes) ? changes : [],
+    behind: typeof behind === 'number' ? behind : null,
+    installing,
   };
 }
 

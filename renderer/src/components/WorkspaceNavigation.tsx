@@ -7,6 +7,8 @@ import { Name } from '../../../shared/product-name.mjs';
 import { SidebarIcon } from './SidebarIcon';
 import { SidebarToggleIcon } from './SidebarToggleIcon';
 import { AppMark } from './AppMark';
+import { SidebarUpdate } from './SidebarUpdate';
+import { changeLines } from '../update-row';
 /** ONE NUMBER IN THE SIDEBAR, ON INBOX, AND IT IS DRAWN IN THE TAB'S OWN TYPE.
  *
  *  w-5f02e7b525. Only Inbox shows a number, like a classic email client, and of
@@ -38,7 +40,9 @@ import { AppMark } from './AppMark';
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount }: {
+export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, update = null, onUpdate }: {
+  // A NEW VERSION WAITING (SidebarUpdate.tsx). Null when there is none.
+  update?: { installing: boolean; changes?: string[]; behind?: number | null; error?: string | null } | null; onUpdate?: () => void;
   page?: string | null; inboxCount?: number; scheduledCount?: number; usage?: ReactNode; onSettings?: () => void; onInstructions?: () => void;
   // THE TEAM TAB. No people and no counts here: approved 2026-09-30, a list of
   // who is busy is not worth seeing all the time, and the Team page is where
@@ -95,7 +99,9 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
           it. `onTeam` is still the sign-in link at the foot. */}
     </nav>
     <div className="workspace-bottom">
+      {update && onUpdate && !collapsed && <SidebarUpdate collapsed={false} installing={update.installing} changes={changeLines(update)} error={update.error ?? null} onRestart={onUpdate} />}
       <div className="workspace-utilities th-side-foot">
+        {update && onUpdate && collapsed && <SidebarUpdate collapsed installing={update.installing} changes={changeLines(update)} onRestart={onUpdate} />}
         {/* Shown to anyone signed in, on a team or not (2026-10-01: the
             invite page and team settings must always be reachable). With no
             team yet, both open the page that starts one. */}
