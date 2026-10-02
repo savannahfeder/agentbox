@@ -127,7 +127,13 @@ export async function openInbox({ dist, width = 1440, height = 944, snapshot }) 
   // The look is set in localStorage and the page reloaded, because the app
   // reads it once at boot. A photograph also has to be DECODED before the
   // shutter or the shot is of the fallback colour.
-  async function wear({ theme = 'dark', skin = 'none' } = {}) {
+  // EMBER GRID IS THE DEFAULT, NOT PLAIN DARK (her note, 2026-10-01, on a
+  // preview drawn in plain dark: "when it is showing design previews, it
+  // should always use the Ember grid theme... I don't want us to" use the
+  // standard dark mode. It is the app's own DEFAULT_SKIN (renderer/src/skins.ts),
+  // so a preview that names no skin should look like the app people open.
+  // A script that genuinely wants another look still names it.
+  async function wear({ theme = 'dark', skin = 'ember-grid' } = {}) {
     await goto(origin);
     await evaluate(`localStorage.setItem('zero.theme', ${JSON.stringify(theme)})`);
     await evaluate(`localStorage.setItem('zero.skin', ${JSON.stringify(skin)})`);
