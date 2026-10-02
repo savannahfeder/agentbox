@@ -40,7 +40,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, productRankScore } from '../shared/rank.mjs';
 import { isCleanRun, ruleIdOf } from '../shared/repeats.mjs';
-import { agentSpokeSince, answerSettled, answerTs } from '../shared/answers.mjs';
+import { agentSpokeSince, answerSettled, answerTs, stoppedByHer } from '../shared/answers.mjs';
 import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
 import { linkAccountTooling, toolingLine } from './account-tooling.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
@@ -71,7 +71,7 @@ import { isEffort, isEffortWord } from '../shared/effort-levels.mjs';
 // for every row on every machine, including one she marked `codex` in August.
 import {
   engineFor, engineLabel, engineChoiceSince, engineChoiceOnRowIsStale,
-  availableEngines, isEngine, modelForEngine,
+  availableEngines, isEngine, modelForEngine, homeEngine,
   ENGINE_CHOICE_ENABLED, DEFAULT_ENGINE, ENGINE_IDS,
 } from '../shared/engines.mjs';
 // SAYING_CAP LIVES THERE AND NOT HERE. It was a module-private const in this
@@ -1096,11 +1096,11 @@ export class Supervisor {
 
   /**
    * Whether this Mac has the harness at all, which is a different question
-   *  from whether it has a free slot. Claude Code is always the answer for
-   *  itself: the app refuses to open an inbox without it and says so in its own
-   *  words (main/claude-bin.mjs), so a second sentence here would be noise. */
+   *  from whether it has a free slot. Claude Code answers yes for itself unless
+   *  this Mac runs on Codex alone: with neither, the app refuses to open an
+   *  inbox and says so in its own words, so a second sentence here is noise. */
   _engineCanRun(engine) {
-    return engineOf(engine) === DEFAULT_ENGINE ? true : !!this.config.codexBin;
+    return engineOf(engine) === DEFAULT_ENGINE ? this._homeEngine() === DEFAULT_ENGINE : !!this.config.codexBin;
   }
 
   /**
@@ -2271,7 +2271,7 @@ export class Supervisor {
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0];
     if (!next) return;
     this._naming = true;
-    nameRow(next, { claudeBin: this.config?.claudeBin })
+    nameRow(next, { claudeBin: this.config?.claudeBin, codexBin: this.config?.codexBin, engine: this._homeEngine() })
       .then((label) => {
         if (label) this.store.nameItem(next.product, next.id, label);
       })
@@ -3551,6 +3551,11 @@ export class Supervisor {
       // behind the clause outlives them: blocked means a session stopped until
       // something outside it changed, and her reply IS that change.
       if (i.status !== 'open' && i.status !== 'blocked') return false;
+      // BUT NOT A ROW SHE STOPPED, on the reply she sent before stopping it.
+      // The kill hands that reply back to the queue, and this used to start a
+      // fresh run on it ten seconds after her stop, on a row sitting in her
+      // inbox. Her stop is the newest thing she said; a later reply wakes it.
+      if (stoppedByHer(i)) return false;
       return true;
     };
 
@@ -3789,10 +3794,10 @@ export class Supervisor {
       if (!autonomous.has(product.slug)) continue;
       if ([...this.sessions.values()].some((s) => s.product === product.slug)) continue;
       if (now - (this.lastDigestTry[product.slug] ?? 0) < DIGEST_RETRY_MS) continue;
-      // A DIGEST IS A CLAUDE CODE SESSION. It carries a synthetic row with no
-      // engine on it, so `_engineFor` answers the default and the slot it needs
-      // is the default engine's -- never a Codex slot that could not run it.
-      if (!this._hasSlotFor(DEFAULT_ENGINE)) break;
+      // A DIGEST RUNS ON THIS MAC'S HOME ENGINE: Claude Code, or Codex on a Mac
+      // with nothing else. It carries a synthetic row with no engine on it, so
+      // the slot it checks and the engine `spawnDigest` forces are one answer.
+      if (!this._hasSlotFor(this._homeEngine())) break;
       const owed = this._digestOwed(items, product.slug, now);
       if (!owed) continue;
       this.lastDigestTry[product.slug] = now;
@@ -3931,7 +3936,7 @@ export class Supervisor {
         'was spent and what went live, if anything. Where nothing happened in',
         'some lane that matters, saying so plainly is worth more than padding.',
       ].join('\n'),
-    }, { engine: DEFAULT_ENGINE });
+    }, { engine: this._homeEngine() });
   }
 
   // A founder reply that lands while a session runs must not die with it: the
@@ -4604,7 +4609,7 @@ export class Supervisor {
       : this.config;
     const ranOn = engineFor(item, {
       config,
-      found: { codex: !!this.config.codexBin },
+      found: this._enginesFound(),
       // THE OPT-IN, AND THE ONLY EXPRESSION IN THE APP THAT PRODUCES THE TOKEN.
       // Derived from the same value the staleness rule reads, so the permission
       // and the moment cannot come apart: there is no way to open the gate
@@ -4646,8 +4651,25 @@ export class Supervisor {
    * no second boolean anywhere that could disagree with it.
    */
   engineChoices() {
+    // A Mac with only Codex is offered Codex whether or not the gate is open:
+    // one engine is not a choice, so there is nothing for the gate to hold.
+    if (this._homeEngine() !== DEFAULT_ENGINE) return availableEngines(this._enginesFound());
     if (!this.engineChoiceOpened()) return availableEngines();
-    return availableEngines({ codex: !!this.config.codexBin });
+    return availableEngines(this._enginesFound());
+  }
+
+  /**
+   * WHICH CODING AGENTS ARE ON THIS MAC, as the shape `shared/engines.mjs`
+   *  reads. `claude` is false only when the search said it is not here
+   *  (main/config.mjs `claudeFound`); a config that never said leaves it true,
+   *  which is what it always meant. */
+  _enginesFound() {
+    return { claude: this.config.claudeFound !== false, codex: !!this.config.codexBin };
+  }
+
+  /** What runs when nobody chose: Claude Code, or Codex on a Mac without it. */
+  _homeEngine() {
+    return homeEngine(this._enginesFound());
   }
 
   /**

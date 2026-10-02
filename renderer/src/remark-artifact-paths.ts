@@ -25,9 +25,18 @@
 // before, 1,844 agent messages: 41 named an audio or video file and 15 a
 // markdown document, and all 56 drew as dead text. The pane opens markdown
 // itself, and Focus draws a player for a sound or a film (ArtifactMedia).
+import { defaultUrlTransform } from 'react-markdown';
+
+// Local file links are handled by the app's click handler, never navigated to
+// by the browser. Keep all of markdown's other protocol restrictions.
+export function artifactUrlTransform(url: string): string {
+  return /^file:\/\//i.test(url) ? url : defaultUrlTransform(url);
+}
+
 const MEDIA_EXT = 'mp3|wav|m4a|aac|ogg|mp4|mov|m4v|webm';
 const EXT = `html?|pdf|png|jpe?g|gif|webp|svg|csv|md|markdown|${MEDIA_EXT}`;
 const PATH = new RegExp(String.raw`(?<![\w./:@~-])(?:\.\/)?[\w-][\w./-]*\.(?:${EXT})\b`, 'gi');
+const QUOTED = new RegExp(String.raw`["“]([^"”\r\n]+\.(?:${EXT}))["”]|['‘]([^'’\r\n]+\.(?:${EXT}))['’]`, 'gi');
 
 const MEDIA = new RegExp(String.raw`\.(?:${MEDIA_EXT})$`, 'i');
 
@@ -102,9 +111,31 @@ type Hit = { at: number; text: string; url: string };
 
 function pieces(text: string, dir: string): Node[] {
   const hits: Hit[] = [];
-  for (const m of text.matchAll(PATH)) hits.push({ at: m.index ?? 0, text: m[0], url: m[0] });
+  const quoted: { start: number; end: number }[] = [];
+  for (const m of text.matchAll(QUOTED)) {
+    const name = m[1] ?? m[2];
+    const at = m.index! + 1;
+    // Even an outside path must be consumed whole, or its last word becomes
+    // a misleading relative link. Quotes themselves remain ordinary text.
+    quoted.push({ start: at, end: at + name.length });
+    if (!/^(?:~\/|\/|\.?\/?[\w-])[\w ./()-]*$/u.test(name)) continue;
+    const full = /^(?:~\/|\/)/.test(name);
+    let url = full ? productPath(name, dir) : name;
+    // "Downloads as <quoted filename>" explicitly names its folder. Do not
+    // add Downloads to the general filename search or infer it across sentences.
+    const home = dir.match(/^\/(?:Users|home)\/[^/]+/)?.[0];
+    if (!full && !name.includes('/') && home && /\bDownloads(?: folder)?\s+as\s*$/i.test(text.slice(0, m.index))) {
+      url = `file://${home}/Downloads/${encodeURIComponent(name)}`;
+    }
+    if (url) hits.push({ at, text: name, url });
+  }
+  const inQuote = (at: number) => quoted.some(q => at >= q.start && at < q.end);
+  for (const m of text.matchAll(PATH)) {
+    if (!inQuote(m.index!)) hits.push({ at: m.index!, text: m[0], url: m[0] });
+  }
   if (dir) {
     for (const m of text.matchAll(FULL)) {
+      if (inQuote(m.index!)) continue;
       const rel = productPath(m[0], dir);
       if (rel) hits.push({ at: m.index ?? 0, text: m[0], url: rel });
     }

@@ -82,7 +82,7 @@ const preload = read('preload.cjs');
  *  tests/settings-says-whether-claude-code-is-connected.test.mjs uses. */
 const block = settings.slice(
   settings.indexOf('/* --------------------- IS CLAUDE CODE CONNECTED OR NOT'),
-  settings.indexOf('/* --------------------------- project instructions'),
+  settings.indexOf('/* ---------------------------- the mark, changed'),
 );
 
 /**

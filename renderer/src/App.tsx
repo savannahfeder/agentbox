@@ -16,7 +16,7 @@ import { readySkin, swapLook } from './look-switch';
 import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, View, WorkItem } from './types';
 import { api } from './api';
 import { setClaudeModels } from './models';
-import { advanceAfter, type Advance } from './advance';
+import { advanceAfter, nextAfterAdvance, type Advance } from './advance';
 import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
 import { isTroubleRow, troubleRow } from './trouble-row';
@@ -26,7 +26,7 @@ import type { PendingSaid } from './item-thread';
 import { DocPane, type OpenDoc } from './components/DocPane';
 import { docKind, EVEN_SPLIT, escapeClosesDoc, escapeInTheFileClosesIt, focusIsInTheFile, readSplit, writeSplit } from './doc-pane';
 import { changeOwnsKey } from './code-keys';
-import { askStillStands, nextUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO } from './undo-window';
+import { askStillStands, nextUndo, shownAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO } from './undo-window';
 import { whatTheFileSentUp } from '../../shared/artifact-keys.mjs';
 import { type Place, placeIsSomewhere, readPlace, writePlace, writeScroll } from './where-she-was';
 import { documentCandidates } from './message-artifacts';
@@ -99,13 +99,13 @@ import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   finishedCleared, firstRunNeeded, inboxCleared, laterCleared, laterId, laterIndex,
-  mayOpenInbox, practising, restartFirstRun, snoozeRefused, tutorialRun,
+  mayOpenInbox, noCodingAgent, practising, restartFirstRun, snoozeRefused, tutorialRun,
   waitingId, waitingIndex,
   finishFirstRun, forcedStep, readFirstRun, walkRows,
   saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, wearsTheWalksLook, whyNotMade, type FirstRun,
 } from './onboarding';
 import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from './priority';
-import { NO_FILTER, filterMenu, filterTags, isFiltering, matchesBoxFilter, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
+import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
 import { BoxFilter } from './components/BoxFilter';
 import { itemPriority, moveProduct, productRankScore } from '../../shared/rank.mjs';
 import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
@@ -640,6 +640,8 @@ export default function App() {
     undoes: string;
     run: () => Promise<void>;
     restore?: () => Restored;
+    /** The row this puts back, which a Z opens once it has run (./undo-window, `shownAfterUndo`). */
+    brings?: WorkItem;
   };
   const [undoStack, setUndoStack] = useState<Array<Undoable & { at: number }>>([]);
   /**
@@ -832,8 +834,12 @@ export default function App() {
       // answer, or when this Mac shows signs of Claude Code that the search
       // could not turn into a path. Any of those means nothing may be said.
       const sure = s.ok !== false && s.workspace?.claudeCertain === true;
+      // AND CODEX IS ENOUGH ON ITS OWN. The card shuts the inbox only when we
+      // are sure of both: no Claude Code, and no Codex either.
+      const codexSure = s.ok !== false && s.workspace?.codexCertain === true;
       setClaude({
-        missing: sure && !s.workspace?.claudeFound,
+        missing: sure && !s.workspace?.claudeFound
+          && noCodingAgent({ found: false, certain: true }, { found: !!s.workspace?.codexFound, certain: codexSure }),
         url: s.workspace?.claudeInstallUrl || 'https://code.claude.com/docs/en/setup',
       });
     }).catch(() => { /* the walk does not end because a setting did not read */ });
@@ -849,8 +855,9 @@ export default function App() {
   // entitled to act on, and shutting somebody out of their own app on an answer
   // we could not establish would be worse than the line she complained about.
   const recheckClaude = useCallback(async () => {
-    const r = await api.recheckClaude();
-    const missing = r.certain && !r.found;
+    // Both searches, because whichever one they just installed opens the door.
+    const [r, codex] = await Promise.all([api.recheckClaude(), api.recheckCodex()]);
+    const missing = noCodingAgent(r, codex);
     setClaude({ missing, url: r.url });
     return missing;
   }, []);
@@ -1824,12 +1831,11 @@ export default function App() {
     : view === 'snoozed' ? snoozed
       : view === 'progress' ? progress
         : done;
-  const shownBox = useMemo(
-    () => (isFiltering(boxFilter)
-      ? wholeBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || matchesBoxFilter(i, boxFilter))
-      : wholeBox),
-    [wholeBox, boxFilter],
-  );
+  const shownBox = useMemo(() => filterBox(wholeBox, boxFilter), [wholeBox, boxFilter]);
+  // The inbox as she sees it, whichever tab is up. Finishing a task from inside
+  // it advances through THIS, never the whole inbox, or the next task opened
+  // can be one her filter hides (w-27759abd33).
+  const shownInbox = useMemo(() => filterBox(inbox, boxFilter), [inbox, boxFilter]);
   const list = search !== null ? (hits ?? []).map((h) => h.item) : shownBox;
   const boxFilterMenu = useMemo(
     () => (modal === 'filter' ? filterMenu(wholeBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i)), boxFilter, snap?.products ?? []) : null),
@@ -2362,9 +2368,9 @@ export default function App() {
     setView('inbox');
     // Pointed at the row she was just reading, which is where it now sits with
     // its answer on it, rather than at the top of a list she did not ask for.
-    const at = inbox.findIndex((i) => i.id === following.id && i.product === following.product);
+    const at = shownInbox.findIndex((i) => i.id === following.id && i.product === following.product);
     setSelected(at >= 0 ? at : 0);
-  }, [focused, following, inbox]);
+  }, [focused, following, shownInbox]);
 
   // She clicked the banner, so open the row it was about. It lands her on the
   // card rather than on whatever the cursor was left on, which is the whole
@@ -2600,9 +2606,9 @@ export default function App() {
   // cost her are in ./advance; what is here is only which state answers "was a
   // task open when she acted", and that is `focused`.
   const noteAdvance = useCallback((item: WorkItem) => {
-    const index = inbox.findIndex((i) => i.id === item.id);
+    const index = shownInbox.findIndex((i) => i.id === item.id);
     advanceRef.current = advanceAfter({ fromTask: !!focused, index, id: item.id });
-  }, [inbox, focused]);
+  }, [shownInbox, focused]);
 
   // AND EVERY WAY A ROW LEAVES HER INBOX CLOSES THE TASK THROUGH HERE.
   //
@@ -2741,7 +2747,7 @@ export default function App() {
     }
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, status: 'done' });
-      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'open' }); } });
+      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'open' }); } });
     }, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`);
   }, [deferCommit, closeAgentRow, closeTroubleRow, closeUpdateRow, snap?.supervisor.spawnTrouble?.since, snap?.update?.newVersion, run, showToast, pushUndo]);
 
@@ -2778,7 +2784,7 @@ export default function App() {
         // user-visible strings held one, and they are the four undo labels, the
         // two stop toasts and the resume toast. Everything else was comment
         // prose, which she never reads.
-        pushUndo({ label: 'Approval withdrawn, back in your inbox', undoes: 'take back that approval and stop the agent', run: async () => {
+        pushUndo({ label: 'Approval withdrawn, back in your inbox', undoes: 'take back that approval and stop the agent', brings: item, run: async () => {
           await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
           await api.answer({ product: item.product, id: item.id, answer: '(withdrawn)', status: 'open' });
         } });
@@ -3149,7 +3155,7 @@ export default function App() {
     const status = statusForReply(item.status);
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, answer: `Option ${option.n}: ${option.text}`, ...(status ? { status } : {}) });
-      pushUndo({ label: `Option ${option.n} withdrawn, back in your inbox`, undoes: `take back option ${option.n}`, run: async () => {
+      pushUndo({ label: `Option ${option.n} withdrawn, back in your inbox`, undoes: `take back option ${option.n}`, brings: item, run: async () => {
         await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
         // Back exactly where the pick found it, the same one write a typed
         // reply's undo makes. Hardcoding 'open' was right while a pick could
@@ -3527,10 +3533,15 @@ export default function App() {
       return;
     }
     undoAskRef.current = null;
+    // The close that put this row away also queued the step onto the next task.
+    // If that step has not been taken yet, it must not be taken now, or it
+    // would open the next task straight over the row this Z brings back.
+    advanceRef.current = null;
     setUndoStack(rest);
     await last.run();
     const restored = last.restore?.();
     const item = restoredItem(restored ?? null);
+    const shown = shownAfterUndo(restored, last.brings);
     // Say what the undo actually did, AND WHERE THE WORDS WENT, because the two
     // boxes are different places and she has to be told which one to look in. A
     // bare "Undone" left her hunting for a task Z had silently pulled out of
@@ -3544,8 +3555,11 @@ export default function App() {
     // A withdrawn reply reopens where she was writing it, words and all. A
     // withdrawn new task reopens the card instead: there is no thread to go to,
     // and the whole point of the press was to add a sentence to what was written.
-    if (item) { setFocused(item); markSeen(item); }
-    else if (restored) { setFocused(null); setModal('compose'); }
+    // AND A ROW IT PUT BACK IS OPENED, the same as a Z inside the grace window
+    // opens it. It used to be announced and left in the list, while she stayed
+    // on whatever the close had moved her to (w-7eb39d3c97).
+    if (shown.open) { setFocused(shown.open); markSeen(shown.open); }
+    else if (shown.compose) { setFocused(null); setModal('compose'); }
   }, [undoStack, refresh, showToast, markSeen]);
 
   /* ------------------------------- keyboard ------------------------------- */
@@ -3952,11 +3966,9 @@ export default function App() {
     const pending = advanceRef.current;
     if (!pending || view !== 'inbox' || focused) return;
     advanceRef.current = null;
-    const remaining = inbox.filter((i) => i.id !== pending.excludeId);
-    const index = Math.min(pending.index, remaining.length - 1);
-    const next = remaining[index];
-    if (next) { setFocused(next); markSeen(next); setSelected(index); }
-  }, [inbox, view, focused, markSeen]);
+    const next = nextAfterAdvance(shownInbox, pending);
+    if (next) { setFocused(next.item); markSeen(next.item); setSelected(next.index); }
+  }, [shownInbox, view, focused, markSeen]);
 
   /* -------------------------------- render -------------------------------- */
   // (Hooks live ABOVE the boot return: below it, React counts them

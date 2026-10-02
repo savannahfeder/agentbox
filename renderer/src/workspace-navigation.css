@@ -189,31 +189,75 @@
 .usage-sidebar-percent { margin-left: auto; opacity: .65; }
 .workspace-collapsed .workspace-usage { display: none; }
 @media(max-width:700px) { .workspace-usage { display: none; } }
-.instruction-tabs { display:flex; gap:6px; flex-wrap:wrap; margin:24px 0 32px; }
-.instruction-tabs button, .instruction-editor-head button { font:inherit; font-size:12px; color:var(--text-dim); border:1px solid var(--line); border-radius:var(--radius); background:transparent; padding:8px 12px; cursor:pointer; }
-.instruction-tabs button[aria-pressed="true"] { background:var(--wash); color:var(--text); }
-.instruction-editor-head { display:flex; align-items:center; justify-content:space-between; gap:16px; }
-.instruction-editor-head h2 { font-size:16px; font-weight:500; margin:0; }
-.instruction-editor-head button:disabled { opacity:.4; cursor:default; }
+/* THE INSTRUCTIONS PAGE IS ONE PAGE (w-4cbcd888ae, 2026-10-01). Picked from
+   three drawn in the real app: a heading that says who the page is for, a
+   short list of sections on the left, and one card holding every section as a
+   page you read. It is wider than the other settings pages because what it
+   shows is documents, not rows. */
+.set-inner.instructions-page { max-width:1200px; }
+/* THE HEADING IS THE SWITCH. A dotted underline did not read as something to
+   click, so the words carry a solid underline and an arrow after them. */
+.instr-lead { font-size:20px; font-weight:600; letter-spacing:-.012em; margin:0 0 24px; color:var(--text); }
+.instr-scope { position:relative; display:inline-block; }
+.instr-scope-word { display:inline-flex; align-items:center; gap:6px; font:inherit; color:var(--text); background:none; border:0; padding:0; cursor:pointer;
+  text-decoration: underline solid var(--text-faint); text-decoration-thickness:1.5px; text-underline-offset:5px; }
+.instr-scope-word:hover, .instr-scope-word[aria-expanded="true"] { text-decoration-color:var(--text); }
+.instr-scope-arrow { width:14px; height:14px; flex:none; color:var(--text-dim); }
+.instr-scope-menu { position:absolute; left:-8px; top:calc(100% + 8px); z-index:20; min-width:220px; max-height:360px; overflow-y:auto;
+  padding:5px; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow-card);
+  font-size:13px; font-weight:400; letter-spacing:0; }
+.instr-scope-menu button { display:block; width:100%; text-align:left; font:inherit; color:var(--text-dim); background:none; border:0; border-radius:var(--radius); padding:7px 10px; cursor:pointer; }
+.instr-scope-menu button:hover, .instr-scope-menu button[aria-checked="true"] { background:var(--wash); color:var(--text); }
+.instr-scope-menu hr { border:0; border-top:1px solid var(--line); margin:5px 4px; }
+/* The sections down the left, and the card. The left column is there on a
+   project too, empty, so switching does not move the card. */
+.instr-body { display:grid; grid-template-columns:220px minmax(0,1fr); gap:24px; align-items:start; }
+.instr-toc button { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.instr-toc { position:sticky; top:0; display:flex; flex-direction:column; gap:2px; }
+.instr-toc button { font:inherit; font-size:13px; text-align:left; color:var(--text-dim); background:none; border:0; border-radius:var(--radius); padding:7px 10px; cursor:pointer; }
+.instr-toc button:hover { background:var(--wash); color:var(--text); }
+.instr-card { border:1px solid var(--line); border-radius:var(--radius); background:var(--film-strong); }
+.instr-part { padding:16px 26px 22px; scroll-margin-top:16px; }
+.instr-part + .instr-part { border-top:1px solid var(--line); }
+.instr-part-head { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:30px; }
+.instr-part-head h2 { font-size:14px; font-weight:600; margin:0; }
+.instr-part-tools { display:flex; align-items:center; gap:14px; margin-left:auto; }
+.instr-edit { font:inherit; font-size:12px; color:var(--text-dim); border:1px solid var(--line); border-radius:var(--radius); background:transparent; padding:5px 11px; cursor:pointer; }
+.instr-edit:hover:not(:disabled), .instr-edit[aria-pressed="true"] { color:var(--text); background:var(--wash); }
+.instr-edit:disabled { opacity:.4; cursor:default; }
+.instr-part-desc { font-size:13px; line-height:1.6; color:var(--text-faint); margin:8px 0 4px; max-width:75ch; }
+/* What she wrote, the way it will read. */
+.instr-md { font-size:13.5px; line-height:1.65; color:var(--text-dim); user-select:text; overflow-wrap:anywhere; }
+.instr-md > :first-child { margin-top:8px; }
+.instr-md > :last-child { margin-bottom:0; }
+.instr-md h1, .instr-md h2, .instr-md h3 { color:var(--text); font-weight:600; letter-spacing:-.01em; margin:20px 0 8px; }
+.instr-md h1 { font-size:20px; } .instr-md h2 { font-size:18px; } .instr-md h3 { font-size:15px; }
+.instr-md p { margin:0 0 10px; max-width:78ch; }
+.instr-md ul, .instr-md ol { margin:0 0 10px; padding-left:20px; }
+.instr-md li { margin:3px 0; }
+.instr-md strong { color:var(--text); font-weight:600; }
+.instr-md code { font-family:var(--mono); font-size:12px; }
+.instr-md pre { font-family:var(--mono); font-size:12px; line-height:1.7; background:var(--wash); border:1px solid var(--line); border-radius:var(--radius); padding:12px 14px; margin:6px 0 12px; overflow-x:auto; }
+.instr-md a { color:var(--text); }
+.instr-card-ours { margin-top:24px; background:var(--wash); }
 /* RESTORE IS A LINK IN THE CORNER, NOT A BUTTON IN THE WAY (w-94b3af4e70,
    2026-09-28). Option C of four drawings, chosen because it is clean. It opens
    the user's own earlier versions of the box,
    newest first, with the original at the foot of the list. */
 .instruction-restore { position:relative; }
-.instruction-editor-head .instruction-restore-link { border:none; padding:0; color:var(--text-faint); }
-.instruction-editor-head .instruction-restore-link:hover:not(:disabled) { color:var(--text); }
+.instr-part-head .instruction-restore-link { font:inherit; font-size:12px; background:none; border:none; padding:0; color:var(--text-faint); cursor:pointer; }
+.instr-part-head .instruction-restore-link:hover:not(:disabled) { color:var(--text); }
 .instruction-restore-menu { position:absolute; top:calc(100% + 8px); right:0; z-index:20; min-width:260px; max-height:320px; overflow-y:auto;
  border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow-card); padding:6px; }
-.instruction-editor-head .instruction-restore-menu button { display:flex; width:100%; gap:16px; justify-content:space-between; align-items:baseline;
+.instr-part-head .instruction-restore-menu button { display:flex; width:100%; gap:16px; justify-content:space-between; align-items:baseline;
+ font:inherit; font-size:12px; background:transparent; cursor:pointer;
  border:none; border-radius:var(--radius); padding:8px 10px; text-align:left; color:var(--text); }
-.instruction-editor-head .instruction-restore-menu button:hover:not(:disabled) { background:var(--wash); }
+.instr-part-head .instruction-restore-menu button:hover:not(:disabled) { background:var(--wash); }
 .instruction-restore-size { color:var(--text-faint); font-size:11px; white-space:nowrap; }
-.instruction-editor-head .instruction-restore-menu button.instruction-restore-original { border-top:1px solid var(--line); border-radius:0; margin-top:4px; padding-top:12px; }
+.instr-part-head .instruction-restore-menu button.instruction-restore-original { border-top:1px solid var(--line); border-radius:0; margin-top:4px; padding-top:12px; }
 .instruction-restore-empty { font-size:12px; line-height:1.5; color:var(--text-faint); padding:8px 10px; max-width:240px; }
 .instruction-undo { font:inherit; font-size:11px; color:var(--text-dim); background:transparent; border:none; padding:0; text-decoration:underline; cursor:pointer; }
-.instruction-editor p { font-size:13px; line-height:1.6; color:var(--text-faint); margin:12px 0 20px; max-width:75ch; }
-/* THE INSTRUCTIONS PAGE, AS APPROVED (w-3dc46f3a67, 2026-09-23): option 2,
-   Card. One raised card per section, and inside it a writing surface.
+/* THE WRITING SURFACE, behind Edit (and straight away on an empty section).
 
    NO GRIP AND NO MONOSPACE. The default textarea, with its resize grip, felt
    almost like raw HTML. The grip is a browser default nothing else in
@@ -232,51 +276,30 @@
      hover     the same panel at full strength, so the pointer finds its edges
                before the click.
      focus     an accent down the left edge, with the caret in it. The caret is
-               there the moment the page opens (../components/InstructionSettings).
+               there the moment Edit is pressed (../components/InstructionSettings).
 
    The accent rides in the padding rather than outside it, so nothing shifts
-   between the three states: only colour moves. */
-
-/* THE APPROVED CARD: one per section, holding the head, what the section
-   governs and the writing surface, so a section reads as one thing on the page
-   rather than as a form spread down it. */
-.instruction-editor { margin-top:8px; padding:26px 28px 22px; border:1px solid var(--line); border-radius:var(--radius); background:var(--skin-pane,var(--surface)); box-shadow:var(--shadow-card); }
-/* The panel sits DEEPER than the card it is on, or the two surfaces read as one
-   and the place to type disappears again. */
-/* NO MAX-WIDTH (w-5737fe67cf). It was 74ch, so the box stopped short of the
-   Reset button on the same card and the components were not right-aligned.
-   Everything on the card now ends at the card's padding. */
-.instruction-editor textarea { display:block; resize:none; width:100%; min-height:400px;
+   between the three states: only colour moves. It grows with what is in it, so
+   the page and the writing surface hold the same text at the same length. */
+.instr-part textarea { display:block; resize:none; width:100%; min-height:220px; margin-top:10px; field-sizing:content;
   padding:16px 18px; border:0; border-left:2px solid transparent; border-radius:var(--radius);
   background:var(--wash); color:var(--text); caret-color:var(--text);
   font:14px/1.75 inherit; font-family:inherit;
   transition:background .12s ease, border-color .12s ease; }
-.instruction-editor textarea:hover { background:color-mix(in srgb, var(--wash) 100%, var(--text) 4%); }
-.instruction-editor textarea:focus { outline:none; background:color-mix(in srgb, var(--wash) 100%, var(--text) 4%); border-left-color:var(--underline); }
-.instruction-editor textarea::placeholder { color:var(--text-faint); }
+.instr-part textarea:hover { background:color-mix(in srgb, var(--wash) 100%, var(--text) 4%); }
+.instr-part textarea:focus { outline:none; background:color-mix(in srgb, var(--wash) 100%, var(--text) 4%); border-left-color:var(--underline); }
+.instr-part textarea::placeholder { color:var(--text-faint); }
 /* Saving, saved, and the errors a person can act on. Empty the rest of the
    time: an idle line here is the page explaining itself. */
 .instruction-save { font-size:11px; color:var(--text-faint); margin-top:14px; min-height:14px; }
-/* ADHD MODE (w-5737fe67cf): the switch row on the "How agents write to you"
-   card, and its rules in a box under hers while it is on. No plate and no
-   padding of their own, so the switch and the box end on the card's edge like
-   the Reset button above them. */
-.instruction-toggle { display:flex; align-items:center; justify-content:space-between; gap:24px; margin:0 0 20px; }
-.instruction-toggle-label { font-size:14px; color:var(--text); }
-.instruction-toggle-desc { font-size:13px; color:var(--text-faint); margin-top:4px; }
-.instruction-toggle .set-sw { flex:none; }
-.instruction-sub { margin-top:28px; }
-.instruction-sub .instruction-editor-head { margin-bottom:12px; }
-.instruction-sub h3 { font-size:14px; font-weight:500; margin:0; }
-.instruction-sub textarea { min-height:160px; }
-/* The app's own brief is ours, so its card is flat where hers is raised. */
-.instruction-advanced .instruction-editor { background:var(--wash); box-shadow:none; }
+/* ADHD MODE: its switch sits where Edit sits on the others, and its rules show
+   only while it is on. */
+.instr-part-tools .set-sw { flex:none; }
 /* The app's own task brief, behind a line she has to open (w-3dc46f3a67). It is
    quieter than the two boxes above it because it is ours and not hers. */
 .instruction-advanced { margin-top:40px; border-top:1px solid var(--line); padding-top:20px; }
 .instruction-advanced-toggle { font:inherit; font-size:12px; color:var(--text-faint); border:0; background:transparent; padding:0; cursor:pointer; }
 .instruction-advanced-toggle:hover { color:var(--text-dim); }
-.instruction-advanced .instruction-editor { margin-top:24px; }
 
 :root .workspace-layout > .settings-embedded { background: transparent; }
 

@@ -271,9 +271,9 @@ export function engineLabel(id) {
  * `found` is a map of id to boolean. An engine whose binary is not on the
  * machine is not offered, because a picker that offers something that cannot
  * run is a picker that hands her a session that dies on arrival. Claude Code
- * is always in the list even when it was not found: the app already refuses to
- * open an inbox without it and says so in its own words (main/claude-bin.mjs),
- * and a second sentence here saying the same thing differently is noise.
+ * is in the list even when it was not found, UNLESS Codex was: a Mac with only
+ * Codex is offered only Codex (`homeEngine` below). With neither, the app
+ * refuses to open an inbox and says so in its own words.
  *
  * UNGATED, AND THE INVARIANT IS THEREFORE SCOPED TO ROUTING. Say it plainly,
  * because the file must not claim more than the code delivers: this function,
@@ -296,7 +296,21 @@ export function engineLabel(id) {
  * holds the caller list exactly, so the next one has to argue for itself here.
  */
 export function availableEngines(found = {}) {
-  return ENGINES.filter((e) => e.id === DEFAULT_ENGINE || found[e.id]);
+  const home = homeEngine(found);
+  return ENGINES.filter((e) => e.id === home || (e.id !== DEFAULT_ENGINE && found[e.id]));
+}
+
+/**
+ * WHAT RUNS WHEN NOBODY HAS CHOSEN, ON THIS MAC. Claude Code, unless this Mac
+ * has said for certain that Claude Code is not here and Codex is. The app needs
+ * one of the two, not both, so a Mac with only Codex runs everything on Codex.
+ *
+ * `found.claude` has to be an explicit `false`. A caller that never asked
+ * (every call written before this, and every test config) leaves it undefined,
+ * and that reads as Claude Code being here, which is what it always meant.
+ */
+export function homeEngine(found = {}) {
+  return found.claude === false && found.codex ? 'codex' : DEFAULT_ENGINE;
 }
 
 /** Whether there is a choice to make at all. One engine is not a choice. */
@@ -334,6 +348,9 @@ export function engineChoiceExists(found = {}) {
  * token FROM that same value, so in her app the two cannot come apart.
  */
 export function engineFor(item, { config = {}, found = {}, enabled } = {}) {
+  // ONE ENGINE ON THE MAC IS NOT A CHOICE, so the gate has nothing to guard.
+  // Without Claude Code, a row marked `claude` would only die on arrival.
+  if (homeEngine(found) !== DEFAULT_ENGINE) return homeEngine(found);
   if (enabled !== ENGINE_CHOICE_ENABLED) return DEFAULT_ENGINE;
   const wanted = isEngine(item?.engine) && !engineChoiceOnRowIsStale(item, config) ? item.engine : null;
   const fallback = isEngine(config?.engine) && !engineDefaultIsStale(config) ? config.engine : DEFAULT_ENGINE;
