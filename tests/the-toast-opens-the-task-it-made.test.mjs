@@ -20,7 +20,9 @@ describe('the toast can carry a way in', () => {
   });
 
   it('is handed the row a new task was filed as', () => {
-    expect(app).toContain('made?.id ? { product: p.product, id: made.id } : undefined');
+    // The send moved into the threads card, so the handler holds `made` and
+    // nothing else: the row it was filed as, by id, read at click time.
+    expect(app).toContain('made?.id ? { product: made.product, id: made.id } : undefined');
   });
 
   it('opens that row, marks it seen and clears itself', () => {
