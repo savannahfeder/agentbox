@@ -39,12 +39,11 @@ export function stateGlyph(state: ThreadStateWord, waitingOnYou: boolean): State
  * WHAT THE STATUS ROW LETS SOMEBODY SET, which since 2026-10-01 is a menu
  * rather than a word to read.
  *
- * HER WORDS, and the whole of why this exists: "I think it would be intuitive
- * for people to be able to drop down and mark it done. I think that's better
- * than our Mark Done button in the top-right corner. It's okay if there's some
- * redundancy because it's such a critical action, but I don't think we should
- * have those in the inbox thread on that page." The round before this one had
- * tried putting a Done button on the inbox ROW and she turned it down: closing
+ * THE RULE, and the whole of why this exists: marking a thread done from a
+ * dropdown on its Status row is more natural than the Mark Done button in the
+ * corner. Some redundancy is fine for an action this important, but none of it
+ * belongs on the inbox. The round before this one had tried putting a Done
+ * button on the inbox ROW and it was turned down: closing
  * is something you do to a thread you have opened, not something you reach for
  * going down a list.
  *

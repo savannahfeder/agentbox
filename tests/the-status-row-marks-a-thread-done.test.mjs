@@ -5,20 +5,12 @@
 // cannot clear their inbox: E closes a thread, the hover plate names E and
 // refuses the pointer on purpose, and Mark done is a row in the three-dot menu
 // inside an opened thread. The first answer was a Done button on the inbox row
-// itself, and the founder turned it down (2026-10-01):
+// itself, and that was turned down (2026-10-01). The rule: marking done is
+// rarely done from the inbox, so it belongs to the opened thread, as a dropdown
+// on its Status row. Some redundancy with the Mark Done button is fine for an
+// action this important; buttons on the inbox row are not.
 //
-//   "My thinking is that you really don't mark something done often from the
-//    inbox itself so putting that on the inbox item isn't great. We have it as
-//    something you can do for the task itself.
-//
-//    I would also like to address the status here. I think it would be
-//    intuitive for people to be able to drop down and mark it done. I think
-//    that's better than our Mark Done button in the top-right corner. It's okay
-//    if there's some redundancy because it's such a critical action, but I
-//    don't think we should have those in the inbox thread on that page. I would
-//    disagree with the premise of building buttons for those."
-//
-// So the mouse route is on the THREAD, in the panel she pointed at, and the
+// So the mouse route is on the THREAD, in its Status row, and the
 // inbox row keeps nothing to press. Both halves are pinned here, because the
 // one that will quietly come back is a button on the row.
 //
@@ -132,10 +124,8 @@ describe('it is the one action, not a second one', () => {
 });
 
 describe('and the inbox row still has nothing to press', () => {
-  // HER RULE, AND THE ONE THING MOST LIKELY TO BE UNDONE BY ACCIDENT: "you
-  // really don't mark something done often from the inbox itself so putting
-  // that on the inbox item isn't great... I would disagree with the premise of
-  // building buttons for those."
+  // THE RULE MOST LIKELY TO BE UNDONE BY ACCIDENT: marking done is rarely done
+  // from the inbox, so the inbox row carries no buttons for it.
   it('draws no Done or Later button in a row', () => {
     expect(list).not.toMatch(/onClick=\{[^}]*markDone/);
     expect(list).not.toMatch(/onClick=\{[^}]*openSnooze/);

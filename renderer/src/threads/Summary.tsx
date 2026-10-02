@@ -373,10 +373,9 @@ export function SummaryPanel({ item, items, team, onOpenItem, onFinish }: {
           ledger to another, and a menu here would have to invent that. */}
       <div className="ts-props">
         <span className="ts-label">Status</span>
-        {/* AND STATUS JOINED THEM THE SAME DAY, at her word: "I think it would
-            be intuitive for people to be able to drop down and mark it done.
-            I think that's better than our Mark Done button in the top-right
-            corner." `statusChoices` in ./summary-rules.ts says what it offers
+        {/* AND STATUS JOINED THEM THE SAME DAY: marking a thread done from a
+            dropdown on its Status row is more natural than the Mark Done
+            button in the corner. `statusChoices` in ./summary-rules.ts says what it offers
             and why that is one row; a finished thread has nothing to set, so
             the word stands on its own exactly as it did before.
 

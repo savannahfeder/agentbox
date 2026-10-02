@@ -1511,10 +1511,9 @@ export function coach(
         //
         // IT SAID "or click Done on the row" FOR AN HOUR AND THAT WAS WORSE
         // THAN SAYING NOTHING. The chip at the row's right end was made a
-        // button to make the sentence true, and the founder caught it the same
-        // day: "you can't actually click Done in the app... I think it's sort
-        // of misleading users because you can't actually do that in the real
-        // app." She is right, and the reason is that the chip is drawn ONLY
+        // button to make the sentence true, and that was taken back the same
+        // day, because the tutorial must never teach a click the real app does
+        // not have. The chip is drawn ONLY
         // while the walk is on (`walk &&` in components/List.tsx). The tutorial
         // would have taught a control that exists nowhere else: somebody learns
         // to close by clicking, finishes the walk, and the button is gone.

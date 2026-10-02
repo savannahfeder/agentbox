@@ -10,8 +10,8 @@
 // The fix, after two rounds with the founder: Settings > Projects is the
 // running order. A numbered list you can drag or nudge with buttons, where a
 // press on a row opens that project's page to rename it or change its rules.
-// It used to be two pages, Priority and All projects; she merged them ("Those
-// should be one thing, and it should be called projects"). A "Reorder" link in
+// It used to be two pages, Priority and All projects; they were merged into
+// one, called Projects. A "Reorder" link in
 // the composer's project menu and a ⌘K row both open it.
 
 import { describe, it, expect } from 'vitest';

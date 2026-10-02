@@ -1,9 +1,8 @@
 // SETTINGS > PROJECTS: every project, in the order the agents work them.
 //
 // ONE PAGE, NOT TWO. Projects and their priority were two pages for a round,
-// and the founder merged them: "When I change the project priority, I should
-// also be able to change the name and things like that. Those should be one
-// thing, and it should be called projects." So the list IS the running order,
+// and they were merged: changing a project's priority and changing its name
+// belong in one place, called Projects. So the list IS the running order,
 // and each row is still the door to that project's own page, where its name,
 // picture and rules are changed.
 //

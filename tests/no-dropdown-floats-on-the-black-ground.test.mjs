@@ -1,11 +1,8 @@
 // A DROPDOWN NEVER FLOATS ON THE BLACK GROUND.
 //
-// The founder, on the summary panel's Visible to menu (2026-10-01,
-// w-41ff964775): "we should never have a black component like this. We want to
-// treat it the same way as in the modal in the second image: when you click
-// something, you get a dropdown and it's that same gray idea. The black looks
-// really bad so we should get rid of it entirely for any cases in this amber
-// grid theme."
+// Found on the summary panel's Visible to menu (2026-10-01, w-41ff964775).
+// The rule: in this theme every dropdown sits on the same grey as the new
+// thread card's menus, and none is drawn in the window's black.
 //
 // The new thread card's menus were already a grey (#363431). Every older menu
 // painted itself `var(--bg)`, the window's own near-black, so it read as a

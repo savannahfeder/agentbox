@@ -66,8 +66,8 @@ describe('what you can change looks changeable, and what you cannot does not', (
       expect(cell).toContain('ts-caret');
     }
   });
-  // AND STATUS JOINED THEM ON 2026-10-01, at her word: "I think it would be
-  // intuitive for people to be able to drop down and mark it done." It is a
+  // AND STATUS JOINED THEM ON 2026-10-01: a thread can be marked done from a
+  // dropdown on its Status row. It is a
   // button only where there is something to set and somebody to set it with,
   // which is what `onFinish` is; this file draws the panel without that prop,
   // so Status is a plain word here and stays below with Owner and Project.

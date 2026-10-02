@@ -4,8 +4,8 @@
 // Neither of them uses a keyboard shortcut for anything. Every practice beat
 // told them to press a letter and nothing on any card said where to click, so
 // the walk reads as a riddle to the half of its audience that has never pressed
-// E to archive anything. The founder's words on the round: "every step must
-// also say what to click, for people who will not remember keys."
+// E to archive anything. The rule: every step also says what to click, for
+// people who will not remember keys.
 //
 // THE RULE THIS FILE HOLDS. If a card names a key, the same line names
 // something on the screen to click. Two beats are exceptions and both are
@@ -92,11 +92,10 @@ const NO_CLICK = {
   // THE TWO BEATS THAT RING A ROW, AND THE EXCEPTION THAT COST THE MOST TO
   // LEARN. Both said "or click Done on the row" and "or click Later on the row"
   // for an hour on 2026-10-01, and the chip they pointed at was made a button
-  // to make them true. The founder caught it the same day: "you can't actually
-  // click Done in the app... I think it's sort of misleading users because you
-  // can't actually do that in the real app."
+  // to make them true. That was taken back the same day: the tutorial must
+  // never teach a click the real app does not have.
   //
-  // She is right, and the reason is worth writing down because the next session
+  // The reason is worth writing down because the next session
   // will want to add the clause back. That chip is drawn ONLY while the walk is
   // on (the `walk &&` guard in components/List.tsx), so a tutorial teaching a
   // click there teaches a button that is gone the moment the walk ends. From
@@ -242,9 +241,8 @@ describe('the chip on the row says a key and promises nothing else', () => {
   // IT WAS A BUTTON FOR AN HOUR ON 2026-10-01 AND THIS IS THE GUARD AGAINST
   // THAT COMING BACK. The two cards said "or click Done on the row" and "or
   // click Later on the row", and the chip was made clickable so they would be
-  // true. The founder's words the same day: "you can't actually click Done in
-  // the app... I think it's sort of misleading users because you can't actually
-  // do that in the real app."
+  // true. It was taken back the same day, because the tutorial must never teach
+  // a click the real app does not have.
   //
   // The chip is drawn only under the `walk &&` guard asserted here, so anything
   // clickable in that slot is a control that exists in the tutorial and in no

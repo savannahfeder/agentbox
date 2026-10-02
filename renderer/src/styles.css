@@ -1257,11 +1257,9 @@
   --surface: #282625;
   --bg-raised: #2f2d2c;
   --bg-selected: #373534;
-  /* WHAT A DROPDOWN FLOATS ON, AND IT IS NEVER THE BLACK GROUND (the founder,
-     2026-10-01: "we should never have a black component like this... when you
-     click something, you get a dropdown and it's that same gray idea. The
-     black looks really bad so we should get rid of it entirely for any cases
-     in this amber grid theme"). The new thread card's menus were already this
+  /* WHAT A DROPDOWN FLOATS ON, AND IT IS NEVER THE BLACK GROUND (2026-10-01).
+     The rule: in this theme every dropdown sits on the same grey, and none is
+     drawn in the window's black. The new thread card's menus were already this
      grey; every older menu read as a hole cut in the window. Only this theme
      sets it, so each menu keeps its own fallback everywhere else. */
   --pop: #363431;

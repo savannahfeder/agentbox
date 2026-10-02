@@ -504,9 +504,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                       NOT AN OVERSIGHT (2026-10-01). It was made a button for an
                       hour, so that the walk's two row beats could say "or click
                       Done on the row" to the people who do not use shortcuts.
-                      The founder caught it the same day: "you can't actually
-                      click Done in the app... it's sort of misleading users
-                      because you can't actually do that in the real app."
+                      It was taken back the same day: the tutorial must never
+                      teach a click the real app does not have.
                       This chip is drawn ONLY while the walk is on, by the
                       `walk &&` guard right here, so a clickable one teaches a
                       control that disappears the moment the tutorial ends. The

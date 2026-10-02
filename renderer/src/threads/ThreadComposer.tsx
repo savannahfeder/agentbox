@@ -147,8 +147,8 @@ export function ThreadComposer({
   // Visibility follows what the task is, not where it lives. It was
   // remembered per project for a while, and a tester then found the next
   // thread silently Private; nothing carries over now.
-  // AND IT MAY BE A FEW PEOPLE RATHER THAN THE TEAM (w-41ff964775): "you might
-  // only want certain people to see what you're up to". Chosen people opens the
+  // AND IT MAY BE A FEW PEOPLE RATHER THAN THE TEAM (w-41ff964775). Chosen
+  // people opens the
   // same picker the To field uses, and the pick stands only while somebody is
   // on the list; with nobody on it the thread is sent Private, because that is
   // who can see it (composer-rules.ts `sharingFields`).

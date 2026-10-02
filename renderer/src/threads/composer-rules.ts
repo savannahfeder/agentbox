@@ -302,9 +302,9 @@ export type Visibility = 'team' | 'people' | 'private';
 
 export const VISIBILITY_KEY = 'threads.composer.visibility';
 
-// THREE CHOICES SINCE w-41ff964775, her words: "you might only want certain
-// people to see what you're up to... you might want to share it with your boss
-// or some people". Chosen people sits between the two it already had, because
+// THREE CHOICES SINCE w-41ff964775: a person may want a thread seen by a few
+// people rather than by everyone or nobody. Chosen people sits between the
+// two it already had, because
 // that is where it sits in how much it shares.
 export const VISIBILITY_ROWS: ReadonlyArray<{ id: Visibility; label: string; line: string }> = [
   { id: 'team', label: 'Team', line: 'Teammates see its summary on the Team board.' },
