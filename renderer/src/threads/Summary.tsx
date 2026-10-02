@@ -71,8 +71,8 @@ export function useSummaryOpen(): [boolean, () => void] {
 }
 
 /**
- * S opens and closes the summary, as the button says, whenever the cursor is
- * not in somewhere she types.
+ * S opens and closes the summary, as the button's hover plate says, whenever
+ * the cursor is not in somewhere she types.
  *
  * IT LISTENS FIRST AND STOPS THE KEY THERE, and that is now belt and braces
  * rather than the thing holding the app together.
@@ -120,17 +120,23 @@ export function ThreadStateMark({ item }: { item: WorkItem }) {
   return <span className="ts-lead"><Glyph kind={stateGlyph(state, waitsOnYou(item, team?.me ?? null))} />{STATE_WORD[state]}</span>;
 }
 
-/** The square Summary button with its key, for the top bar. */
+/**
+ * The square Summary button, for the top bar. Its key, S, is said by the hover
+ * plate (`hint-plate.ts`) and not printed on the button, like every other
+ * button in the corner (w-5984544441).
+ */
 export function SummaryToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   return (
     <button
       type="button"
       className={`ts-sumbtn${open ? ' on' : ''}`}
       aria-pressed={open}
-      title={open ? 'Hide the summary · S' : 'Show the summary · S'}
+      data-hint="summary"
+      data-hint-align="right"
+      title={open ? 'Hide the summary' : 'Show the summary'}
       onClick={onToggle}
     >
-      <PanelIcon />Summary<kbd>S</kbd>
+      <PanelIcon />Summary
     </button>
   );
 }

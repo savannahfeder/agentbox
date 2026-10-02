@@ -132,6 +132,9 @@ export const HINTS: Record<string, HintLine[]> = {
   // done, in the thread's menu, which prints E beside its words. A component
   // that already shows its key carries no plate, so its line went with it.
   terminal: [{ key: '⌘J', what: 'Show or hide the terminal' }],
+  // The Summary button printed its S on its face until w-5984544441; the key
+  // is said here now, the same as every other button in the corner.
+  summary: [{ key: 'S', what: 'Show or hide the summary' }],
   back: [{ key: 'esc', what: 'Go back one level' }],
 };
 

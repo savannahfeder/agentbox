@@ -38,7 +38,6 @@
 .ts-sumbtn { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
 .ts-sumbtn:hover { color: var(--text); border-color: var(--line-strong); }
 .ts-sumbtn.on { background: var(--wash-strong); color: var(--text); border-color: var(--line-strong); }
-.ts-sumbtn kbd { font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; padding: 0; }
 
 /* THE THREAD'S MENU (threads/ThreadMenu.tsx). The button is the Summary
    button's square: its height, its hairline, its hover. The menu is the app's
