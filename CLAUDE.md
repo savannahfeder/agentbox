@@ -41,9 +41,10 @@ It is gitignored. A script that proves one change runs once; move it up into
 
 ## Nothing personal is committed
 
-This repository is public. Conversations, quotes of the people who use it,
-screenshots or recordings of real sessions, account ids, home paths, keys and
-tokens stay out of it. `scripts/check-before-public.mjs` runs before every push
+This repository is public. Names of the people who use it, pasted
+conversations, screenshots or recordings of real sessions, account ids, home
+paths, keys and tokens stay out of it. Quoting feedback in a comment is fine
+as long as it names nobody and carries nothing private. `scripts/check-before-public.mjs` runs before every push
 to it and refuses one that carries any of them; `npm run check:public` audits
 the whole tree.
 
