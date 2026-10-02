@@ -58,7 +58,10 @@ describe(`a plan ${NAME} can read`, () => {
     layPlan(path.join(home, '.claude.json'), 'default_claude_pro');
     const config = loadConfig(appDir, { home });
     expect(config.maxConcurrentSessions).toBe(1);
-    expect(config.planSlotsFrom).toBe('Pro');
+    // The plan is named only when it is what made the number smaller. A machine
+    // that already allows one (GitHub's runners do, which kept this red on every
+    // push on 2026-10-01) was not lowered by the plan, so nothing is named.
+    expect(config.planSlotsFrom).toBe(machineSlots().slots > 1 ? 'Pro' : null);
   });
 
   // The cap is one number applied per account, so a Max account and a smaller

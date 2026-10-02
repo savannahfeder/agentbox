@@ -6812,8 +6812,10 @@ function captureStream(session, line) {
       session.result = String(obj.result ?? '');
       session.resultIsError = !!obj.is_error;
       // A run cannot end with helpers still out. Cleared here as well as on
-      // exit so the number can never outlive the thing it counts.
-      session.helperIds?.clear();
+      // exit so the number can never outlive the thing it counts. Unless
+      // something is still out in the background: then this was a turn
+      // ending, not the run, and the session stays open for it.
+      if (!session.child?.waitingOn?.().length) session.helperIds?.clear();
     }
     noteClaimAnswer(session, obj);
     countHelpers(session, obj);
