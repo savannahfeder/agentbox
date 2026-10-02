@@ -4470,8 +4470,8 @@ export default function App() {
             })}
           />}
           {/* AND THE SOCKET A THREAD'S OWN CONTROLS ARE TELEPORTED INTO: the
-              Summary button and the thread's menu, which holds the code, the
-              terminal and Done (w-e731ca9376, 2026-10-01). They are drawn by
+              thread's menu, which holds the code, the terminal and Done
+              (w-e731ca9376, 2026-10-01). They are drawn by
               Focus because only Focus knows which of them this thread has, and
               they land here because the corner is where a task's own controls
               live. */}
