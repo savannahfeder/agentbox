@@ -116,7 +116,7 @@ import { TeamPage } from './team/TeamPage';
 import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, PeopleFilter, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, boardColumns, boardWalk, conversationWith, flipView, isDirect, nextTab, pageFor, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
+import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationWith, flipView, isDirect, nextTab, pageFor, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
@@ -1978,6 +1978,10 @@ export default function App() {
     if (displayPage === 'team') setTeamDisplayRaw(d); else setMineDisplayRaw(d);
     writeDisplay(displayPage, d);
   }, [displayPage]);
+  // THE BOARD'S COLUMNS IN THE ORDER YOU DRAGGED THEM TO (w-23fc91bff5). Held
+  // here, not in the board, because J, K and the arrows walk the same order.
+  const [columnOrder, setColumnOrderRaw] = useState<ThreadStateWord[]>(() => readColumnOrder());
+  const setColumnOrder = useCallback((order: ThreadStateWord[]) => { setColumnOrderRaw(order); writeColumnOrder(order); }, []);
   // AND THE TUTORIAL'S BOARD BEAT ENDS WHEN THE BOARD IS REALLY ON THE SCREEN,
   // read off the view the page is drawn in rather than off a click: the press
   // is two deep, inside the View and filters menu, and the beat is about the
@@ -2064,7 +2068,7 @@ export default function App() {
   const liveIds = useMemo(() => new Set(runningRows.map((r) => r.itemId)), [runningRows]);
   // ONE RULE FOR WHERE A THREAD SITS, THE TABS' OWN (2026-10-01: the board
   // said Running for queued work the tab did not). Needs you wins, then
-  // In progress, Scheduled and Done, exactly as the tabs list them.
+  // In progress, Later and Done, exactly as the tabs list them.
   const tabState = useMemo(() => {
     const m = new Map<string, ThreadStateWord>();
     for (const i of done) m.set(i.id, 'done');
@@ -2080,13 +2084,31 @@ export default function App() {
   // halfway down a full board, because a card from another column was not in
   // it (2026-10-02, tests/the-board-walks-in-the-order-it-is-drawn.test.mjs).
   const onBoard = search === null && inboxDisplay.view === 'board';
-  const boardOrder = useMemo(
-    () => (onBoard ? boardWalk(boardColumns({ items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards, picked: team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds })) : null),
-    [onBoard, items, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds],
+  // The columns themselves are kept too, for the left and right arrows
+  // (`boardSideways`), and they come in the order you dragged them to.
+  const boardCols = useMemo(
+    () => (onBoard ? boardColumns({ items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards, picked: team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds, order: columnOrder }) : null),
+    [onBoard, items, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds, columnOrder],
   );
+  const boardOrder = useMemo(() => (boardCols ? boardWalk(boardCols) : null), [boardCols]);
   const list = search !== null ? (hits ?? []).map((h) => h.item) : boardOrder ?? displayedBox;
 
   const current: WorkItem | undefined = list[Math.min(selected, Math.max(0, list.length - 1))];
+  // A DROPPED COLUMN LEAVES THE KEYBOARD ON THE SAME THREAD. `selected` is a
+  // place in the walk, and moving a column moves every place after it, so the
+  // highlight jumped to another card on the drop (photographed 2026-10-02).
+  const keepOnReorder = useRef<WorkItem | null>(null);
+  const reorderColumns = useCallback((order: ThreadStateWord[]) => {
+    keepOnReorder.current = current ?? null;
+    setColumnOrder(order);
+  }, [current, setColumnOrder]);
+  useEffect(() => {
+    const k = keepOnReorder.current;
+    if (!k || !boardOrder) return;
+    keepOnReorder.current = null;
+    const i = boardOrder.findIndex((x) => x.id === k.id && x.product === k.product);
+    if (i >= 0) setSelected(i);
+  }, [boardOrder]);
   // THE ROW THE ROW-KEYS ACT ON. The pointer's row when it is on one, and the
   // keyboard's row otherwise. This is the half of that is not a drawing: the
   // hint is printed on the row under the pointer, so pressing the key it
@@ -4051,6 +4073,18 @@ export default function App() {
           setSelected(next);
           break;
         }
+        // ACROSS THE BOARD (w-23fc91bff5): "I can't really do that in board
+        // view. I typically have to click". To the card level with this one in
+        // the next column over (`boardSideways`). Dead in the list, which has
+        // no columns. Not H and L: L is Later, here as in the list.
+        case 'ArrowLeft': case 'ArrowRight':
+          if (boardCols) {
+            e.preventDefault();
+            setHoveredId(null);
+            if (multiSel.size) setMultiSel(new Set());
+            setSelected(boardSideways(boardCols, selected, e.key === 'ArrowLeft' ? -1 : 1));
+          }
+          break;
         case 'Enter': if (!multiSel.size && pointed) { setFocused(pointed); markSeen(pointed); } break;
         case 'e': case 'E':
           e.preventDefault();
@@ -4097,7 +4131,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder]);
+  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, boardCols]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
@@ -5139,7 +5173,10 @@ export default function App() {
                   <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine}
                     cards={cards} picked={team ? picked : undefined} end={peoplePicker}
                     onOpenCard={openTeammateCard}
-                    onOpenItem={(item) => { setFocused(item); markSeen(item); }} />
+                    selected={current} columnOrder={columnOrder} onReorderColumns={reorderColumns}
+                    // A click puts the keyboard where the click was, so J
+                    // and the arrows carry on from that card on the way back.
+                    onOpenItem={(item) => { const i = list.indexOf(item); if (i >= 0) setSelected(i); setFocused(item); markSeen(item); }} />
                 ) : <>
                 {workspaceNavigation && search === null && (
                   <StateTabs

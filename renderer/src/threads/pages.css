@@ -164,6 +164,23 @@
 .th-col-h b { font-weight: 400; color: var(--text-faint); margin-left: 8px; }
 .th-card { display: block; width: 100%; text-align: left; font: inherit; background: rgba(255,255,255,.035); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 15px 13px; margin: 0 0 10px; cursor: pointer; }
 .th-card:hover { border-color: var(--line-strong); background: rgba(255,255,255,.05); }
+/* THE CARD THE KEYBOARD IS ON (w-23fc91bff5). The list's selected row is
+   underlined in --underline; a card has no single line to underline, so its
+   edge takes that colour instead: the same ink for the same idea. */
+.th-card.selected, .th-card.selected:hover { border-color: var(--underline); box-shadow: inset 0 0 0 1px var(--underline); background: rgba(255,255,255,.05); }
+/* A COLUMN MOVES BY ITS HEADING. The heading says it can be grabbed, and the
+   column being carried fades where it will land while the others make room. */
+.th-col-h[draggable="true"] { cursor: grab; user-select: none; border-radius: var(--radius); margin: 0 -6px; padding: 0 6px; }
+.th-col-h[draggable="true"]:hover { background: var(--wash); color: var(--text); }
+.th-board.dragging .th-col-h { cursor: grabbing; }
+/* The handle: six dots at the heading's right end, out of sight until the
+   pointer is over the column, faint there, and full only on the heading you
+   would grab. Never drawn mid-drag, when it would only be noise. */
+.th-col-grip { margin-left: auto; flex: none; color: var(--text-faint); opacity: 0; transition: opacity .12s ease; }
+.th-col:hover .th-col-grip { opacity: .7; }
+.th-col-h:hover .th-col-grip { opacity: 1; color: var(--text-dim); }
+.th-board.dragging .th-col-grip { opacity: 0; }
+.th-col.lifted { opacity: .35; }
 .th-card .t { font-size: 14px; line-height: 20px; color: var(--text); margin: 0 0 14px; }
 .th-card .t.hidden { color: var(--text-dim); }
 
