@@ -44,9 +44,9 @@ import type { Product } from '../types';
 */
 // 'agents' is gone from this union with the pane itself; the name is still
 // accepted at the door above and resolves to 'general'.
-/* * TEAM IS A PANE HERE NOW (w-8415594d19, 2026-10-01), her words: "Team
- management should be a page in Settings". The sidebar used to carry a Team
- members page of its own beside Invite people, which was the same door twice.
+/* * TEAM IS A PANE HERE NOW (w-8415594d19, 2026-10-01). Team management
+ belongs in Settings. The sidebar used to carry a Team members page of its own
+ beside Invite people, which was the same door twice.
  The pane's CONTENT is handed in as `teamPane` rather than imported, so this
  screen, which is shared with the single-person build, keeps no team code and
  the two codebases stay easy to compare. No pane handed in, no row.

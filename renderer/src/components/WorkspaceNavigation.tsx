@@ -49,12 +49,10 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   // THE FOOT OF THE SIDEBAR (approved 2026-10-01): invite people, settings,
   // and you, all in the sidebar rather than on a page.
   //
-  // TEAM MEMBERS LEFT IT ON 2026-10-01 16:35, her words: "getting rid of the
-  // team members page in the sidebar and only leaving Invite People. Team
-  // management should be a page in Settings, and this should route to that as
-  // a shortcut." So the two team rows were one door twice. `onInvite` is that
-  // shortcut and `onAccount` is your own row, which opens the same Settings
-  // pane without the cursor in the email box.
+  // TEAM MEMBERS LEFT IT ON 2026-10-01: team management is a pane in Settings
+  // and this row routes to it as a shortcut, because the two team rows here
+  // were one door twice. `onInvite` is that shortcut and `onAccount` is your
+  // own row, which opens the same pane without the cursor in the email box.
   team?: TeamState | null; onInvite?: () => void; onAccount?: () => void;
   view: View; collapsed: boolean; onToggle: () => void; onView: (view: View) => void; onSearch: () => void; onCompose: () => void;
 }) {

@@ -1,9 +1,8 @@
 // A DESIGN PREVIEW IS DRAWN IN EMBER GRID, NEVER IN PLAIN DARK.
 //
-// Her words, 2026-10-01, on a preview of the Settings team pane (w-8415594d19)
-// that was shot in the standard dark theme: "when it is showing design
-// previews, it should always use the Ember grid theme... I don't want us to"
-// use the standard dark mode.
+// Settled 2026-10-01, after a preview of the Settings team pane (w-8415594d19)
+// was shot in the standard dark theme and sent for review: design previews
+// always use Ember Grid, never the standard dark mode.
 //
 // The pictures agents send are the only way anyone judges a change, so a
 // preview in a look nobody runs is a picture of a different app. Ember Grid is

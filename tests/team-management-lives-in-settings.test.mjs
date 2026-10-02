@@ -1,8 +1,8 @@
 // TEAM MANAGEMENT MOVED INTO SETTINGS (w-8415594d19, 2026-10-01).
 //
-// Her words, 16:35: "getting rid of the team members page in the sidebar and
-// only leaving Invite People. Team management should be a page in Settings,
-// and this should route to that as a shortcut."
+// The rule: the Team members page leaves the sidebar, Invite people stays,
+// and team management is a page in Settings that Invite people routes to as a
+// shortcut.
 //
 // So the foot of the sidebar had two team buttons where it now has one. What a
 // later edit could silently undo, and what this file pins:
