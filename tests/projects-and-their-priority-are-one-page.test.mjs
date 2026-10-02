@@ -102,8 +102,8 @@ describe('where a dragged row lands, in one column', () => {
 
 // A PROJECT WITHOUT A PICTURE WEARS ITS COLOUR, NEVER THE SUNBURST. The burst
 // was the default mark, and it is also what the Agentbox brand looked like, so
-// every project in Settings wore the app's logo. Her call on the first draw of
-// this page: never show that logo, and use the composer's project colours here.
+// every project in Settings wore the app's logo. The rule since: the sunburst
+// is never shown, and a project shows the composer's colour for it.
 describe('the mark beside a project', () => {
   const mark = read('renderer/src/components/ProductMark.tsx');
   const settings = read('renderer/src/components/Settings.tsx');

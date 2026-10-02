@@ -19,6 +19,22 @@ current state; this file only holds the rules that are not obvious from them.
   it (GitHub runs the whole suite on every push; the hook runs it when a change
   touches what every test depends on).
 
+## SHIPPING IS ONE COMMAND: `npm run ship`
+
+Several agents work this repository at once, so the order of operations is not
+a matter of taste. Work on a branch `agentbox/<item id>` in a worktree, commit
+there, and ship with `npm run ship`: it fetches, merges main if it moved, runs
+the tests for what changed, and pushes, doing the whole lot again if somebody
+pushed first. The pre-push hook still runs the suite and the public check; the
+command is the order, not a way around the gates.
+
+Local `main` only ever points at something that is on the public `main`. Moving
+it onto a branch is refused (`scripts/hooks/reference-transaction`), because a
+fast-forward writes no commit and so walked straight past the commit guards: on
+2026-10-01 that left a commit living in the folder the app runs from and
+nowhere else. That folder follows the public main on its own:
+`git fetch origin && git merge --ff-only refs/remotes/origin/main`.
+
 ## NO WORKER EVER DRIVES THE USER'S OWN BROWSER
 
 Claude Code can attach a session to the browser a person is signed into with

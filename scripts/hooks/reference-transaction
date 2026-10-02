@@ -1,0 +1,72 @@
+#!/bin/sh
+# LOCAL main ONLY EVER POINTS AT SOMETHING THAT IS ON THE PUBLIC main (w-57034cf3c0).
+#
+# WHAT HAPPENED, 2026-10-01. The folder the app runs from was found one commit
+# ahead of the public repository: that commit sat on its local main and nowhere
+# else, so the running app was code no push had ever carried. The two guards
+# beside this one could not catch it. pre-commit refuses a COMMIT in the primary
+# worktree and pre-merge-commit refuses a MERGE COMMIT there; a fast-forward is
+# neither. It moves a ref and writes no commit, so `git merge --ff-only <branch>`
+# walks past both in silence, which is also what the instructions of the day told
+# agents to do.
+#
+# So the rule is about the REF rather than about which checkout anyone is
+# standing in: refs/heads/main may only point at a commit that is already on
+# refs/remotes/origin/main. Fetch, then fast-forward, is the one way it moves.
+# Everything else goes through `npm run ship`, which pushes to the public
+# repository first and lets main follow what came back.
+#
+# WHAT THIS MUST NEVER TOUCH, and each one is pinned in
+# tests/local-main-only-moves-to-what-is-shipped.test.mjs:
+#   - a repository with no refs/remotes/origin/main (a fresh init, a fork, a
+#     tarball) has nothing to compare against and is left alone completely;
+#   - every ref that is not refs/heads/main, including every fetch, which writes
+#     refs/remotes and is the commonest transaction there is;
+#   - a person who means it: AGENTBOX_MOVE_MAIN=1 goes through. A guard with no
+#     way past it is turned off wholesale the first time it is wrong, and
+#     core.hooksPath is one line away in any case. This is a rail, not a lock.
+#
+# Git runs this for every ref transaction and hands the state as $1. Only
+# "prepared" can still be refused; "committed" and "aborted" are reports.
+
+set -u
+
+[ "${1:-}" = "prepared" ] || exit 0
+[ "${AGENTBOX_MOVE_MAIN:-}" = "1" ] && exit 0
+
+zero='0000000000000000000000000000000000000000'
+blocked=''
+
+# Every line is "<old> <new> <ref>". The whole of stdin has to be read whatever
+# happens, or git sees a closed pipe on a transaction this hook meant to allow.
+while read -r old new ref; do
+  [ "$ref" = 'refs/heads/main' ] || continue
+  [ "$old" = "$new" ] && continue
+  [ "$new" = "$zero" ] && continue                       # a deletion is not a move onto unshipped work
+  git rev-parse --verify --quiet refs/remotes/origin/main >/dev/null 2>&1 || continue
+  git merge-base --is-ancestor "$new" refs/remotes/origin/main >/dev/null 2>&1 && continue
+  blocked="$new"
+done
+
+[ -n "$blocked" ] || exit 0
+
+short=$(git rev-parse --short "$blocked" 2>/dev/null || echo "$blocked")
+
+echo >&2
+echo "  ================================================================" >&2
+echo "  main MAY ONLY POINT AT WHAT IS ON THE PUBLIC main. NOT MOVED." >&2
+echo "  ================================================================" >&2
+echo >&2
+echo "  $short is not on origin/main, so moving main onto it would leave" >&2
+echo "  this folder running code no push has carried and nobody else has." >&2
+echo >&2
+echo "  Ship it instead, from the worktree the work is in:" >&2
+echo "    npm run ship" >&2
+echo >&2
+echo "  Then let this folder follow what came back:" >&2
+echo "    git fetch origin && git merge --ff-only refs/remotes/origin/main" >&2
+echo >&2
+echo "  If you mean it anyway: AGENTBOX_MOVE_MAIN=1 <your command>" >&2
+echo >&2
+
+exit 1

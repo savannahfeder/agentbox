@@ -98,8 +98,12 @@ describe('a board column under Sort by Priority', () => {
 
 describe('where the order is applied', () => {
   it('every column of the board asks for it, not just the list', () => {
+    // The board draws `boardColumns` (page-rules.ts since 2026-10-02, so J and
+    // K can walk the same order), and every column there goes through the
+    // Display the page is drawn with.
     const board = pages.slice(pages.indexOf('export function InboxBoard'));
-    // The column's own rows, through the Display the page is drawn with.
-    expect(board).toContain('sortedEntries(entries.filter((e) => e.state === col.state), display)');
+    expect(board).toContain('boardColumns({ items, products, display,');
+    const rules = src('threads', 'page-rules.ts');
+    expect(rules.slice(rules.indexOf('export function boardColumns'))).toContain('sortedEntries(entries.filter((e) => e.state === col.state), display)');
   });
 });

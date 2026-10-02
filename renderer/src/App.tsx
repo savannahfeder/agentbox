@@ -113,7 +113,7 @@ import { TeamPage } from './team/TeamPage';
 import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, PeopleFilter, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, conversationWith, isDirect, nextTab, pageFor, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
+import { DEFAULT_DISPLAY, boardColumns, boardWalk, conversationWith, isDirect, nextTab, pageFor, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
@@ -1915,7 +1915,6 @@ export default function App() {
     () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay),
     [inbox, boxFilter, inboxDisplay, now],
   );
-  const list = search !== null ? (hits ?? []).map((h) => h.item) : displayedBox;
   const boxFilterMenu = useMemo(
     () => (modal === 'filter' ? filterMenu(wholeBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i)), boxFilter, snap?.products ?? []) : null),
     [modal, wholeBox, boxFilter, snap?.products],
@@ -1944,6 +1943,17 @@ export default function App() {
     return m;
   }, [inbox, progress, snoozed, done]);
   const stateOfMine = useCallback((i: WorkItem) => tabState.get(i.id) ?? null, [tabState]);
+  // J AND K WALK WHAT IS ON THE SCREEN. On the board that is the board's own
+  // reading order, down each column and on to the next (`boardColumns`, the
+  // same call InboxBoard draws). Walking the tab's list instead stopped J
+  // halfway down a full board, because a card from another column was not in
+  // it (2026-10-02, tests/the-board-walks-in-the-order-it-is-drawn.test.mjs).
+  const onBoard = search === null && inboxDisplay.view === 'board';
+  const boardOrder = useMemo(
+    () => (onBoard ? boardWalk(boardColumns({ items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards, picked: team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds })) : null),
+    [onBoard, items, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds],
+  );
+  const list = search !== null ? (hits ?? []).map((h) => h.item) : boardOrder ?? displayedBox;
 
   const current: WorkItem | undefined = list[Math.min(selected, Math.max(0, list.length - 1))];
   // THE ROW THE ROW-KEYS ACT ON. The pointer's row when it is on one, and the

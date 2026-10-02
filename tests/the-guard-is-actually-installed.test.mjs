@@ -30,9 +30,12 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * The hooks the two guards are built from. `pre-push` is not one of them; it is
- *  an older, separate thing and this file does not speak for it. */
-const REQUIRED = ['pre-commit', 'post-checkout', 'pre-merge-commit'];
+ * The hooks the guards are built from. `reference-transaction` joined them on
+ * 2026-10-02: the other three guard commits, and a fast-forward is not a commit,
+ * so local main could still be moved onto work no push had carried.
+ * `pre-push` is not one of them; it is an older, separate thing and this file
+ * does not speak for it. */
+const REQUIRED = ['pre-commit', 'post-checkout', 'pre-merge-commit', 'reference-transaction'];
 
 const git = (...args) =>
   execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
