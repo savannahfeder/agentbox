@@ -53,10 +53,12 @@ function ruleBody(selector) {
  *  backwards on a light one. `--film-strong` keeps the intent and drops the
  *  assumption: a film that CONTRASTS with the backdrop, either way round.
  */
-const SWEPT = ['.set-step button', '.set-seg button.on', '.set-ghost', '.set-range::-webkit-slider-thumb'];
+// The slider thumb (`.set-range`) went with the theme picker when the app
+// went to one light look, so three are left to hold.
+const SWEPT = ['.set-step button', '.set-seg button.on', '.set-ghost'];
 
 describe('no control is left painted with the white film', () => {
-  it('paints all four off the theme tint', () => {
+  it('paints all three off the theme tint', () => {
     for (const selector of SWEPT) {
       const body = ruleBody(selector);
       expect(body, selector).not.toBeNull();
@@ -96,12 +98,13 @@ describe('the picker never paints itself white', () => {
     }
   });
 
-  // THE TOKEN ITSELF, both ways round, so this test fails if somebody redefines
-  // `--film-strong` as a white film and quietly reintroduces the defect.
-  it('keeps --film-strong a tint of the theme in both directions', () => {
-    const light = css.slice(0, css.indexOf('[data-theme="dark"]'));
+  // THE TOKEN ITSELF, so this test fails if somebody redefines `--film-strong`
+  // as a white film and quietly reintroduces the defect. There is one look
+  // now, light, and its token block is the only place the token is declared.
+  it('keeps --film-strong a dark tint of the light theme, never a white film', () => {
+    const light = ruleBody(':root');
+    expect(light).not.toBeNull();
     expect(light).toMatch(/--film-strong:\s*rgba\(17,\s*25,\s*48/);
-    // And on the dark side it is the light film, which is correct there.
-    expect(css).toMatch(/--film-strong:\s*rgba\(255,\s*255,\s*255/);
+    expect(css).not.toMatch(/--film-strong:\s*rgba\(255,\s*255,\s*255/);
   });
 });

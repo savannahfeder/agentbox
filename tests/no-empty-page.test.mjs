@@ -94,21 +94,10 @@ describe('an empty view draws no card either', () => {
     expect(app).toMatch(/bareView \? ' bare' : ''/);
   });
 
-  it('takes the fill and the shadow off that pane in a plain theme', () => {
+  it('takes the fill and the shadow off that pane', () => {
     const rule = css.match(/\n\.list-pane\.bare \{[^}]*\}/)?.[0];
     expect(rule, 'styles.css no longer has the bare pane rule').toBeTruthy();
     expect(rule).toMatch(/background: none;/);
     expect(rule).toMatch(/box-shadow: none;/);
-  });
-
-  // The skinned pane adds a wash, a hairline and a blur, and it outranks a bare
-  // class, so its twin is written out beside it. A blurred nothing is still a
-  // rectangle you can see the edges of.
-  it('takes the wash, the hairline and the blur off it under a picture', () => {
-    const rule = css.match(/:root\[data-skin\] \.list-pane\.bare \{[^}]*\}/)?.[0];
-    expect(rule, 'styles.css no longer has the skinned bare pane rule').toBeTruthy();
-    expect(rule).toMatch(/background: none;/);
-    expect(rule).toMatch(/border: 0;/);
-    expect(rule).toMatch(/backdrop-filter: none;/);
   });
 });

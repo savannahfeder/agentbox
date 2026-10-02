@@ -35,10 +35,11 @@ describe('the token: square tags, whatever theme or skin is worn', () => {
   it('and no skin or theme ever re-declares it, which is the whole point', () => {
     expect(styles.match(/--tag-radius:/g)).toHaveLength(1);
   });
+  // Ember Grid, which squared --radius to 0px, went with the other pictures
+  // when the app went to one light look, so the 3px corner is the only one.
   it('the app keeps the 3px corner everywhere else', () => {
     expect(styles).toMatch(/--radius:\s*3px/);
-    const ember = styles.slice(styles.indexOf(':root[data-skin="ember-grid"] {'));
-    expect(ember.slice(0, ember.indexOf('}'))).toMatch(/--radius:\s*0px/);
+    expect(styles.match(/--radius:\s*[^;]+;/g)).toHaveLength(1);
   });
 });
 

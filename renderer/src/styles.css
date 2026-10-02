@@ -50,10 +50,8 @@
   --find-match: color-mix(in srgb, var(--accent) 22%, transparent);
   --find-current: var(--accent);
   --find-current-ink: #ffffff;
-  /* WHAT A CONTROL'S FACE IS MADE OF: a card on a plain theme, the pane's own
-     glass under a picture. Overridden once, on `:root[data-skin]`, where the
-     whole reason is written down (search WHAT A CONTROL'S FACE IS MADE OF).
-  */
+  /* WHAT A CONTROL'S FACE IS MADE OF: a card. It was the pane's own glass
+     under a picture, until the app went to one look (w-9e434e8671). */
   --control-face: var(--surface);
   --control-face-line: transparent;
   --control-shadow: var(--shadow-sm);
@@ -138,14 +136,6 @@
   /* A light window keeps its paper under a change; see the rule at the foot of
      this file for why this is a token at all. */
   --code-ground: var(--doc-page);
-  /* THE GROUND AN HTML FILE HOLDS, IN EVERY THEME. An html page brings its own
-     colour inside a frame the app cannot see into, so its ground cannot follow
-     the window (the rule is written out in full above `.doc-pane`). It is a
-     token rather than a hex on `.doc-pane.doc-html` so that a light window, a
-     dark one and a photograph all answer it, and so an html file and a markdown
-     file are never two different grounds in the same window. Light holds dark's
-     own value here, which is the whole point of the token. */
-  --doc-page-held: #2e3136;
   /* THE MONO FAMILY INSIDE AN AGENT'S ITEM.It is a token pair rather than a
      rule so that both themes must answer it, which is the whole law of this
      block. THE LIGHT FILL IS NOT THE DRAWING'S 62% WHITE, and this is the one

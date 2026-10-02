@@ -131,8 +131,9 @@ describe('what the plate is made of is not a colour of its own', () => {
     // --film-strong is a dark film on light, so the plate drew as a grey smudge
     // with grey words. It borrows the approval card's glass there instead:
     // --bg-raised at 62%, see-through, so it is never the plain white slab the
-    // rule above forbids.
-    const light = css.match(/:root\[data-theme="light"\] \.hint-plate \{[^}]*\}/s);
+    // rule above forbids. Light is the app's one look now, so the rule is
+    // scoped to `:root` rather than to a light theme attribute.
+    const light = css.match(/\n:root \.hint-plate \{[^}]*\}/s);
     expect(light, 'no light .hint-plate rule').toBeTruthy();
     expect(light[0]).toContain('background: color-mix(in oklab, var(--bg-raised) 62%, transparent)');
     expect(light[0]).toContain('blur(22px)');
@@ -146,10 +147,6 @@ describe('what the plate is made of is not a colour of its own', () => {
     // else in this app has one.
     expect(css).not.toContain('.hint-tail');
     expect(rule[0]).not.toContain('::after');
-  });
-
-  it('drops its shadow under a picture, where the face is see-through', () => {
-    expect(css).toMatch(/:root\[data-skin\] \.hint-plate \{ box-shadow: none; \}/);
   });
 
   it('never takes the pointer', () => {

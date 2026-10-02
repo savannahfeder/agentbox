@@ -50,9 +50,7 @@ function walkIt() {
   s = stepTo(s, 'away');                                at('what a task is');
   // THE SIDEBAR NOTE IS NOT A SLAB.
   s = stepTo(s, 'goal');                                at('what the job is');
-  // NO MOUSE RULE HERE ANY MORE. Everything after it is the real app, so the
-  // pick is spent on the whole practice round rather than on one card.
-  s = stepTo(s, 'look');                                at('picked a look');
+  // NO MOUSE RULE HERE ANY MORE, AND NO THEME STEP SINCE w-9e434e8671.
   s = stepTo(s, 'hand');                                at('into practice');
   // THE PRACTICE PROJECT IS REAL AND IT IS NOT THEIRS. Made here, with the
   // three rows already waiting in it, and archived when the walk ends.
@@ -127,18 +125,21 @@ describe('the walk, start to finish', () => {
     // ELEVEN AND EIGHTEEN since w-ec62ab6b38 (2026-09-28): the note beat went
     // with the rail it pointed at.
     //
+    // TEN AND SEVENTEEN since w-9e434e8671: the theme step went with the
+    // themes.
+    //
     // `where` IS ONE BEAT AND ONE STEP even though it takes three presses of
     // Tab. The presses move the VIEW, not the step, which is exactly why the
     // card cannot get out of step with the screen it is describing.
     const beats = seen.map((m) => m.step).filter((s, i, all) => s !== all[i - 1]);
     const times = new Map();
     for (const s of beats) times.set(BEAT[s], (times.get(BEAT[s]) ?? 0) + 1);
-    const twice = new Set([11, 18]);
+    const twice = new Set([10, 17]);
     for (const [dot, n] of times) {
       expect(n, `dot ${dot} was on screen ${n} times`).toBe(twice.has(dot) ? 2 : 1);
     }
-    expect(beats.filter((s) => BEAT[s] === 11)).toEqual(['working', 'open']);
-    expect(beats.filter((s) => BEAT[s] === 18)).toEqual(['done', 'landed']);
+    expect(beats.filter((s) => BEAT[s] === 10)).toEqual(['working', 'open']);
+    expect(beats.filter((s) => BEAT[s] === 17)).toEqual(['done', 'landed']);
   });
 
   it('still knows the folder and the name it was given at the start', () => {

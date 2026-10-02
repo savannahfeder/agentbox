@@ -26,9 +26,11 @@ describe("Ember's accents", () => {
     expect(block).toMatch(/font-family: var\(--mono\); font-size: 11px; letter-spacing: \.06em; text-transform: uppercase;/);
   });
 
-  it('leave the main font alone: the body is still Avenir Next, and Geist body is Ember only', () => {
+  // The Ember Grid picture, the one place the body wore Geist, is gone with the
+  // other pictures, so no rule anywhere sets the body in Geist now.
+  it('leave the main font alone: the body is still Avenir Next, and nothing sets it in Geist', () => {
     expect(styles).toContain("font-family: 'Avenir Next', 'Source Sans 3 Variable'");
-    expect(styles).toContain(`:root[data-skin="ember-grid"] body { font-family: 'Geist'`);
+    expect(styles).not.toMatch(/\bbody \{[^}]*font-family: 'Geist'/);
     expect(nav).not.toMatch(/:root:root [^{]*\{[^}]*font-family: 'Geist'/);
   });
 });

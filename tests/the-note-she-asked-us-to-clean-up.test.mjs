@@ -139,8 +139,9 @@ describe('the note is low-key, in the panel\u2019s own greys', () => {
     const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
     return (x + 0.05) / (y + 0.05);
   };
-  // Every block that declares an ink ladder of its own: the two base themes and
-  // all sixteen skins.
+  // Every block that declares an ink ladder of its own. Since the app went to
+  // one light look that is the one `:root` token block; the two base themes and
+  // sixteen skins it used to be are gone.
   const ladders = [...bare.matchAll(/(:root[^{]*)\{([^}]*)\}/g)]
     .map((m) => ({ sel: m[1].trim(), body: m[2] }))
     .filter((b) => /--text-dim:/.test(b.body) && /--agent-ink:/.test(b.body));
@@ -170,8 +171,8 @@ describe('the note is low-key, in the panel\u2019s own greys', () => {
     }
   });
 
-  it('steps emphasis over text over a finished line, in every look', () => {
-    expect(ladders.length).toBeGreaterThan(3);
+  it('steps emphasis over text over a finished line, in the one look', () => {
+    expect(ladders.map((b) => b.sel)).toEqual([':root']);
     for (const b of ladders) {
       const [dim, faint, agent] = ['text-dim', 'text-faint', 'agent-ink'].map((n) => pick(b.body, n));
       expect([dim, faint, agent].every(Boolean), b.sel).toBe(true);
