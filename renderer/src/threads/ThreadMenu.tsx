@@ -23,7 +23,7 @@
 // only places it under the dots.
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 
-export type ThreadMenuRowId = 'code' | 'terminal' | 'done';
+export type ThreadMenuRowId = 'run' | 'code' | 'terminal' | 'done';
 export interface ThreadMenuRow { id: ThreadMenuRowId; label: string; key: string | null }
 
 /**
@@ -31,13 +31,21 @@ export interface ThreadMenuRow { id: ThreadMenuRowId; label: string; key: string
  * is null where the thread has none, else whether it is open now, so the row
  * says what pressing it will do: a row called Open terminal that closed an open
  * one would be lying (TaskTerminal.tsx says the same of ⌘K's row).
+ *
+ * RUN NOW comes first and only on a task that is waiting its turn and has not
+ * been pushed already (w-87ff499077). Raising a task's tag could not start it:
+ * a project's place in the order outweighs any tag, and only Urgent could take
+ * a running slot. This row is the one-time "this task, now" that was missing;
+ * supervisor.runNow says what it does.
  */
-export function threadMenuRows({ change, terminal, finish }: {
+export function threadMenuRows({ change, terminal, finish, runNow = false }: {
   change: boolean;
   terminal: 'open' | 'closed' | null;
   finish: boolean;
+  runNow?: boolean;
 }): ThreadMenuRow[] {
   const rows: ThreadMenuRow[] = [];
+  if (runNow) rows.push({ id: 'run', label: 'Run now', key: null });
   if (change) rows.push({ id: 'code', label: 'View code changes', key: null });
   if (terminal) rows.push({ id: 'terminal', label: terminal === 'open' ? 'Hide terminal' : 'Open terminal', key: '⌘J' });
   if (finish) rows.push({ id: 'done', label: 'Mark done', key: 'E' });
@@ -58,7 +66,11 @@ function TerminalMark() {
 function DoneMark() {
   return <svg {...mark}><path d="m3 13 3.6 3.6L13.4 9" /><path d="m10.6 13 3.6 3.6L21 9" /></svg>;
 }
-const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { code: CodeMark, terminal: TerminalMark, done: DoneMark };
+/** A play mark with a bar in front of it: start this one, ahead of the line. */
+function RunMark() {
+  return <svg {...mark}><path d="M5 5v14" /><path d="m9 5 10 7-10 7z" /></svg>;
+}
+const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { run: RunMark, code: CodeMark, terminal: TerminalMark, done: DoneMark };
 
 /** Three square dots, because every shape in this skin is square. */
 function Dots() {
@@ -92,7 +104,7 @@ export function ThreadMenuList({ rows, change, onPick }: {
 
 /* ----------------------------------------------------------------- button */
 
-export function ThreadMenu({ change = null, onViewChange, terminal = null, onToggleTerminal, onFinish = null }: {
+export function ThreadMenu({ change = null, onViewChange, terminal = null, onToggleTerminal, onFinish = null, onRunNow = null }: {
   /** The change figures, or null when this run changed no code. */
   change?: ReactNode | null;
   onViewChange?: () => void;
@@ -100,8 +112,10 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
   onToggleTerminal?: () => void;
   /** Null on a thread that is already done. */
   onFinish?: (() => void) | null;
+  /** Non-null only on a task that is waiting its turn and not yet pushed. */
+  onRunNow?: (() => void) | null;
 }) {
-  const rows = threadMenuRows({ change: !!change, terminal, finish: !!onFinish });
+  const rows = threadMenuRows({ change: !!change, terminal, finish: !!onFinish, runNow: !!onRunNow });
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -163,7 +177,8 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
 
   const pick = (id: ThreadMenuRowId) => {
     close(id === 'terminal');
-    if (id === 'code') onViewChange?.();
+    if (id === 'run') onRunNow?.();
+    else if (id === 'code') onViewChange?.();
     else if (id === 'terminal') onToggleTerminal?.();
     else onFinish?.();
   };

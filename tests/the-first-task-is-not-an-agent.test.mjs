@@ -405,13 +405,30 @@ describe('the answer, written to a real store', () => {
 describe('the wiring, which is the half a pure test cannot see', () => {
   const app = src('App.tsx');
 
+  // THE WALK OPENS THE REAL NEW THREAD CARD SINCE 2026-10-01, so the wiring
+  // moved with it. It used to open a card of its own, the retired one-line
+  // Compose, which stamped the label inside App.tsx's own `onSend`. The founder
+  // caught the difference on screen: "the tutorial is using the wrong component
+  // here, we no longer use this." The claims below are unchanged; what moved is
+  // where they are kept.
+  //
+  // THE LABEL IS PASSED INTO THE CARD, NOT IMPORTED BY IT. `scripted` is the
+  // card's whole knowledge of the walk: it carries the labels to stamp and it
+  // is what lets this one task into the practice project, which every other
+  // task there is refused (compose-says.ts practiceRefusal).
   it('composes the example task with the mark on it', () => {
-    expect(app).toMatch(/api\.compose\(firstRunTask \? \{ \.\.\.p, labels: \[FIRST_RUN_LABEL\] \} : p\)/);
+    // `walkCard` is the two beats the card is open for, who it is to and the
+    // send, so the task, the project and the label are decided in one place.
+    expect(app).toMatch(/const walkCard = run\?\.step === 'who' \|\| run\?\.step === 'task';/);
+    expect(app).toMatch(/scripted=\{walkCard \? \{ labels: \[FIRST_RUN_LABEL\] \} : null\}/);
+    const card = src('threads', 'ThreadComposer.tsx');
+    expect(card).toMatch(/\.\.\.\(scripted \? \{ labels: scripted\.labels \} : \{\}\)/);
+    expect(card).toMatch(/practiceRefusal\(product, \{ scripted: !!scripted \}\)/);
   });
 
   it('says nothing about a queue and offers no undo on it', () => {
-    const send = app.slice(app.indexOf('onSend={async (p) => {'));
-    const branch = send.slice(send.indexOf('if (made?.id && firstRunTask)'), send.indexOf('if (made?.id) {'));
+    const sent = app.slice(app.indexOf('onSent={async (made, how) => {'));
+    const branch = sent.slice(sent.indexOf("if (runRef.current?.step === 'task')"), sent.indexOf("if (how?.kind === 'message')"));
     expect(branch).not.toMatch(/showToast/);
     expect(branch).not.toMatch(/noteNewTask/);
     expect(branch).toMatch(/fire\(\{ t: 'sent'/);

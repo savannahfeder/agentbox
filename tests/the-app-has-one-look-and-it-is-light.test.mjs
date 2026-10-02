@@ -73,8 +73,8 @@ describe('the walk has no picker step', () => {
     expect(nextStep('goal')).toBe('hand');
   });
 
-  it('counts seventeen beats with no gap where the picker was', () => {
-    expect(N_BEATS).toBe(17);
+  it('counts nineteen beats with no gap where the picker was', () => {
+    expect(N_BEATS).toBe(19);
     expect(BEAT.goal).toBe(6);
     expect(BEAT.hand).toBe(7);
     expect(Math.max(...Object.values(BEAT))).toBe(N_BEATS);

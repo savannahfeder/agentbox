@@ -48,7 +48,9 @@ import type { RunningSession, WorkItem } from './types';
 // hardest part to keep. The run may have opened a pull request or may have done
 // nothing whatsoever; nothing on this side can tell, and a word that guessed
 // would be worse than the silence it replaces.
-export type LiveState = 'working' | 'queued' | 'paused' | 'silent' | 'idle';
+// `next` is a queued task she pushed with Run now (w-87ff499077): still
+// waiting, but first in line, and the word changing is how the press shows.
+export type LiveState = 'working' | 'next' | 'queued' | 'paused' | 'silent' | 'idle';
 
 export interface LiveLine {
   state: LiveState;
@@ -61,6 +63,8 @@ export interface LiveFacts {
   session?: RunningSession | null;
   /** `supervisor.queued`: the ids a tick will spawn as soon as a slot frees. */
   queued?: string[];
+  /** `supervisor.runNow`: the queued ids she pushed with Run now. */
+  runNow?: string[];
   /** `supervisor.stalled`: a worker died on it. The stalled bar owns this. */
   stalled?: boolean;
   /**
@@ -125,6 +129,7 @@ export function shortWord(state: LiveState, helpers = 0): string {
     return helpers === 1 ? '1 Subagent Working' : `${helpers} Subagents Working`;
   }
   if (state === 'working') return 'Working';
+  if (state === 'next') return 'Up next';
   if (state === 'queued') return 'Queued';
   if (state === 'paused') return 'Paused';
   // "NOTHING CAME BACK", AND THE PLAINNESS IS THE POINT.
@@ -189,7 +194,7 @@ export function cameBackEmpty(
 
 export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null {
   const {
-    session = null, queued = [], stalled = false, paused = false, silent = null,
+    session = null, queued = [], runNow = [], stalled = false, paused = false, silent = null,
     inProgress = false, scheduledUntil = 0, now = Date.now(),
   } = facts;
 
@@ -268,6 +273,13 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   }
 
   if (!inProgress) return null;
+
+  if (queued.includes(item.id) && runNow.includes(item.id)) {
+    return {
+      state: 'next',
+      line: 'Up next. It starts as soon as an agent is free, and if every agent is busy the least important one is paused to make room.',
+    };
+  }
 
   if (queued.includes(item.id)) {
     return {

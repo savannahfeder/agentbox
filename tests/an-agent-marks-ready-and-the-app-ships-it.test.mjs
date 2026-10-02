@@ -209,3 +209,91 @@ describe('what the agent is told', async () => {
     expect(b).not.toMatch(/How this task ships/);
   });
 });
+
+describe('what a resumed agent is told', async () => {
+  // Measured 2026-10-02, the first afternoon this ran: two tasks she answered
+  // "merge it" and "build it and ship" were resumed with only her words, the
+  // short prompt a resumed session gets, so neither learned the new way to
+  // ship and both would have pushed by hand and been refused again.
+  const { Store } = await import('../main/store.mjs');
+  const { Supervisor } = await import('../main/supervisor.mjs');
+  async function resumed({ on }) {
+    const root = path.join(tmp, 'store2');
+    const dir = path.join(root, 'team');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify({ schemaVersion: 1, id: 'team', name: 'Team', repoPath: repo }));
+    if (on) fs.writeFileSync(path.join(userDir, 'ship.json'), JSON.stringify(settings));
+    const config = { accountRoot: root, storeRoot: root, products: [], personalProducts: [], accountId: 'nobody', claudeBin: '/nonexistent' };
+    const store = await new Store(config).init();
+    const sup = new Supervisor(config, store, root, path.join(tmp, 'data2'), userDir);
+    sup._saveState = () => {};
+    const made = store.fileItem('team', { title: 'Fix it', kind: 'task', body: 'Fix it.' });
+    const item = { ...store.readItem('team', made.id, Date.now()), answer: 'merge it' };
+    const product = store.listProducts()[0];
+    return [sup.replyBrief(item, { product }), sup.resumeBrief(item, { continuation: true, product })];
+  }
+
+  it('is how to ship, on a project that ships through the app, whichever way it was woken', async () => {
+    for (const prompt of await resumed({ on: true })) {
+      expect(prompt).toMatch(/# How this task ships/);
+      expect(prompt).toMatch(/Do NOT push/);
+    }
+  });
+
+  it('is nothing new on a project that does not', async () => {
+    for (const prompt of await resumed({ on: false })) expect(prompt).not.toMatch(/How this task ships/);
+  });
+});
+
+describe('a task is shipped once per time it is marked ready', () => {
+  // Measured on the first real run, 2026-10-02: the label was put on as the
+  // person (who outranks the app on the ledger), so the app's write taking it
+  // off was ignored. The task shipped as 4a85def, then the next two ticks ran
+  // the script again ("There is nothing to ship") and woke its agent twice.
+  const store = () => ({ shipped() {}, shipFailed() {} });
+  const on = () => fs.writeFileSync(path.join(userDir, 'ship.json'), JSON.stringify(settings));
+
+  it('does not ship again while the label it already handled is still there', async () => {
+    on();
+    let runs = 0;
+    const q = new ShipQueue({ store: store(), userDir, folderFor, isLive: () => false, run: async () => { runs += 1; return { code: 0, out: 'ship: shipped abc1234.' }; } });
+    const marked = row('w-a', { wrote: { labels: { ts: 100, source: 'founder' } } });
+    await q.tick([marked], products());
+    expect(q.tick([marked], products())).toBeNull();
+    expect(runs).toBe(1);
+  });
+
+  it('remembers that across a restart of the app', async () => {
+    on();
+    let runs = 0;
+    const run = async () => { runs += 1; return { code: 0, out: '' }; };
+    const marked = row('w-a', { wrote: { labels: { ts: 100, source: 'founder' } } });
+    await new ShipQueue({ store: store(), userDir, folderFor, isLive: () => false, run }).tick([marked], products());
+    expect(new ShipQueue({ store: store(), userDir, folderFor, isLive: () => false, run }).tick([marked], products())).toBeNull();
+    expect(runs).toBe(1);
+  });
+
+  it('ships again when it is marked ready again', async () => {
+    on();
+    let runs = 0;
+    const q = new ShipQueue({ store: store(), userDir, folderFor, isLive: () => false, run: async () => { runs += 1; return { code: 1, out: 'red' }; } });
+    await q.tick([row('w-a', { wrote: { labels: { ts: 100 } } })], products());
+    await q.tick([row('w-a', { wrote: { labels: { ts: 200 } } })], products());
+    expect(runs).toBe(2);
+  });
+});
+
+describe('a branch that is already on main', () => {
+  it('is noted as already shipped and wakes nobody', async () => {
+    fs.writeFileSync(path.join(userDir, 'ship.json'), JSON.stringify(settings));
+    const calls = []; const handed = [];
+    const q = new ShipQueue({
+      store: { shipped: (...a) => calls.push(['shipped', ...a]), shipFailed: (...a) => calls.push(['shipFailed', ...a]) },
+      userDir, folderFor, isLive: () => false, handBack: (i) => handed.push(i.id),
+      run: async () => ({ code: 1, out: '\nship: There is nothing to ship: this branch has no commits that origin/main does not already have.\n' }),
+    });
+    await q.tick([row('w-a')], products());
+    expect(calls.map((c) => c[0])).toEqual(['shipped']);
+    expect(handed).toEqual([]);
+  });
+});

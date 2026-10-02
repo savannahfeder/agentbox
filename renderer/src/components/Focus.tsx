@@ -85,7 +85,7 @@ import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
 } from './Priority';
-import { SummaryPanel, SummaryToggle, ThreadStateMark, useSummaryOpen, useSummaryShortcut } from '../threads/Summary';
+import { SummaryPanel, SummaryRail, ThreadStateMark, useSummaryOpen, useSummaryShortcut } from '../threads/Summary';
 import { ThreadMenu } from '../threads/ThreadMenu';
 import { engineModelLabel } from '../models';
 
@@ -324,7 +324,7 @@ function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 // not the user's, and it is the part that was unnecessary. `filesFromRuns` stays,
 // because App.tsx still reads it to choose the design a card opens itself on.
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onHandToAgent, onAddPeople }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onHandToAgent, onAddPeople }: {
   previewSample?: string;
   /**
    * A MESSAGE FROM A PERSON IS NOT WORK UNTIL SHE SAYS SO. The one line under
@@ -340,8 +340,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   artifactView?: 'beside' | 'focus';
   onOpenArtifact?: (src: string, mode: 'beside' | 'focus') => void;
   headerTarget?: HTMLElement | null;
-  /** THE SOCKET IN THE CORNER: the Summary button and the thread's menu
-   *  (w-e731ca9376, 2026-10-01). Only Focus knows whether this thread changed
+  /** THE SOCKET IN THE CORNER: the thread's menu (w-e731ca9376, 2026-10-01;
+   *  the Summary button beside it moved onto the summary on w-a3482b8c2c).
+   *  Only Focus knows whether this thread changed
    *  code, has a terminal or can still be finished, which is why the menu is
    *  drawn here and teleported there. */
   cornerHeaderTarget?: HTMLElement | null;
@@ -422,6 +423,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onReplySend: (text: string, priority?: number, repeat?: RepeatRuleValue | null, sent?: SentDraft, mode?: AnswerMode | null, pick?: { model: string | null; effort: string | null }) => void;
   onReplyClose: () => void;
   onStop: () => void;
+  // Run now, the three-dot menu's row on a waiting task.
+  onRunNow?: () => void;
   // Only ever called on an agent row a reply cannot reach: brings the app that
   // session is running inside to the front.
   onReveal?: () => void;
@@ -478,8 +481,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // frozen on a permission prompt, and that is now the only one without a box.
   const replyBlocked = agent ? replyIsSwallowed(agent) : false;
 
-  // THE THREAD'S SUMMARY (approved 2026-10-01, w-e731ca9376): the state and a
-  // Summary button in the top bar, and the panel beside the conversation.
+  // THE THREAD'S SUMMARY (approved 2026-10-01, w-e731ca9376): the panel beside
+  // the conversation, folded to a rail when closed (w-a3482b8c2c).
   //
   // NOT ON A MESSAGE FROM A PERSON. A message between two people lives in a
   // record of its own (main/team/projects.mjs makeDirect), is not work, and is
@@ -894,7 +897,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         // rather than by inventing a second definition of under way.
         inProgress: stoppable,
       }}
-      lead={summarised ? <ThreadStateMark item={item} /> : null}
+      /* THE STATE IS SAID ONCE (w-a3482b8c2c). The rail says it while the
+         summary is closed and the Status row while it is open, so the line
+         under the title leads with it only when neither is on screen, which
+         is while a document fills the thread. */
+      lead={summarised && !summaryOffered ? <ThreadStateMark item={item} /> : null}
+      stateShown={summarised && summaryOffered}
       /* ADD PEOPLE, beside the faces (w-71e6af492d). A conversation only: the
          control decides that for itself off the record on screen, so nothing
          here has to ask again. */
@@ -929,6 +937,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
      and no code, so it is offered Mark done alone. NOTHING TO FINISH ON A
      FINISHED THREAD. */
   const canFinish = item.status !== 'done';
+  // RUN NOW is offered while the task is waiting its turn and has not been
+  // pushed yet: the supervisor's own queued list, so it never appears on a
+  // task nothing is going to start (resting, scheduled, leased elsewhere).
+  const waiting = !session && !!live.queued?.includes(item.id) && !live.runNow?.includes(item.id);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const threadMenu = (
     <ThreadMenu
@@ -938,6 +950,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       terminal={direct ? null : terminalOpen ? 'open' : 'closed'}
       onToggleTerminal={() => window.dispatchEvent(new Event('task-terminal-toggle'))}
       onFinish={canFinish ? onResolve : null}
+      onRunNow={waiting && onRunNow ? onRunNow : null}
     />
   );
 
@@ -1000,7 +1013,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // away with the words. An earlier cut of folded state into the className and
   // turned that guard off silently.
   return (
-    <div className="focus-pane" data-summary={summaryShown ? 'open' : undefined}>
+    <div className="focus-pane" data-summary={summaryShown ? 'open' : summaryOffered ? 'rail' : undefined}>
     {/* THERE IS NO WAY-OUT CONTROL ON AN OPENED TASK ANY MORE.
 
         Both faults were real and both are measured on this row. With a
@@ -1042,11 +1055,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         setting and there is nothing left to choose: the place, the size and
         the height are all settled. w-7bc66fced1. */}
     {headerTarget ? createPortal(<>{backButton}{bandLine}</>, headerTarget) : bandLine}
-    {/* THE CORNER: THE SUMMARY BUTTON AND THE THREAD'S MENU, and nothing
-        else (w-e731ca9376, 2026-10-01). The way into the summary stays in the
-        top bar however far down the conversation she has read; the state that
-        stood beside it is first on the line under the title now. */}
-    {cornerHeaderTarget && createPortal(<span className="ts-top">{summaryOffered && <SummaryToggle open={summaryOpen} onToggle={toggleSummary} />}{threadMenu}</span>, cornerHeaderTarget)}
+    {/* THE CORNER: THE THREAD'S MENU, and nothing else. The Summary button
+        that stood beside it (w-e731ca9376) moved onto the summary itself on
+        w-a3482b8c2c: the rail opens it, the icon beside its title closes it. */}
+    {cornerHeaderTarget && createPortal(<span className="ts-top">{threadMenu}</span>, cornerHeaderTarget)}
     <div className="focus-scroll" ref={scrollRef}>
     <div className="focus">
       {/* ONE LEFT EDGE FOR EVERY WORD, the list's rule applied here: the title, the meta
@@ -1532,7 +1544,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     {/* `onFinish` is the SAME ONE the three-dot menu's Mark done row takes
         (`canFinish ? onResolve : null` above), so the Status row's Done and
         that row and E are one action with one undo and one toast. */}
-    {summaryShown && <SummaryPanel item={item} team={teamCtx} onFinish={canFinish ? onResolve : null} />}
+    {summaryShown && <SummaryPanel item={item} team={teamCtx} onFinish={canFinish ? onResolve : null} onClose={toggleSummary} />}
+    {summaryOffered && !summaryOpen && <SummaryRail item={item} team={teamCtx} onOpen={toggleSummary} />}
     {!direct && <TaskTerminal key={`${item.product}:${item.id}`} product={item.product} id={item.id} onOpenChange={setTerminalOpen}/>}
     </div>
   );
