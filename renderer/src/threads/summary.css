@@ -73,6 +73,11 @@
 /* A pane with its own band (no top bar to portal into) narrows that too, and
    the band's inset is reckoned against the narrower column. */
 .focus-pane[data-summary="open"] > .keep-line { margin-right: var(--ts-panel-w); }
+/* So does the thread's terminal, in both placements (w-0ecaecb7ab): at the
+   bottom it narrows like the dock, and at the side, where it is pinned at
+   right 0, the margin moves it in to stand left of the panel. Without this it
+   ran under the panel and the two drew over each other. */
+.focus-pane[data-summary="open"] > .task-terminal { margin-right: var(--ts-panel-w); }
 .focus-pane[data-summary="open"] { --keep-inset: max(32px, calc((100% - var(--ts-panel-w) - var(--read-w)) / 2 + 32px)); }
 /* No fill of its own: it sits beside the words rather than over them, and a
    fill would paint over the frame's corner marks. */
