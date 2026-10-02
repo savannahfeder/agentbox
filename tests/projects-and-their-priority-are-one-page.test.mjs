@@ -1,4 +1,4 @@
-// PROJECT PRIORITY HAS A PAGE YOU CAN FIND, AND THE PROJECT MENU POINTS AT IT.
+// PROJECTS AND THEIR PRIORITY ARE ONE PAGE, AND THE PROJECT MENU POINTS AT IT.
 //
 // What broke: the only way to set which project the agents work on first was
 // dragging chips inside the old composer's project menu. The threads composer
@@ -7,9 +7,12 @@
 // Measured by reading the threads build: `setProductOrder` was reachable only
 // from the old composer (first-run walk only) and the ⌘K "Rank X first" rows.
 //
-// The fix: a "Project priority" page in Settings, a numbered list you can drag
-// or nudge with buttons, a "Reorder" link in the composer's project menu that
-// opens it, and a ⌘K row that does the same.
+// The fix, after two rounds with the founder: Settings > Projects is the
+// running order. A numbered list you can drag or nudge with buttons, where a
+// press on a row opens that project's page to rename it or change its rules.
+// It used to be two pages, Priority and All projects; she merged them ("Those
+// should be one thing, and it should be called projects"). A "Reorder" link in
+// the composer's project menu and a ⌘K row both open it.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -104,7 +107,7 @@ describe('where a dragged row lands, in one column', () => {
 describe('the mark beside a project', () => {
   const mark = read('renderer/src/components/ProductMark.tsx');
   const settings = read('renderer/src/components/Settings.tsx');
-  const page = read('renderer/src/components/ProjectPriority.tsx');
+  const page = read('renderer/src/components/ProjectsPage.tsx');
 
   it('draws the project colour, from the one swatch rule the composer uses', () => {
     expect(mark).toMatch(/projectSwatch\(/);
@@ -140,16 +143,27 @@ describe('the ways in', () => {
   const palette = read('renderer/src/components/Palette.tsx');
   const app = read('renderer/src/App.tsx');
 
-  it('Settings has a Priority row under Projects that opens the page', () => {
-    expect(settings).toMatch(/onClick=\{\(\) => setPane\('priority'\)\}/);
-    expect(settings).toMatch(/<span className="set-nav-label">Priority<\/span>/);
-    expect(settings).toMatch(/<ProjectPriority\b/);
-    // The Priority row comes before All projects in the nav.
-    expect(settings.indexOf("setPane('priority')")).toBeLessThan(settings.indexOf('>All projects<'));
+  // ONE PAGE, CALLED PROJECTS. There was a Priority row beside All projects for
+  // a round; she merged them.
+  it('Settings has one Projects row, and no separate Priority page', () => {
+    expect(settings).toMatch(/<span className="set-nav-label">Projects<\/span>/);
+    expect(settings).not.toMatch(/set-nav-label">Priority</);
+    expect(settings).not.toMatch(/>All projects</);
+    expect(settings).not.toMatch(/setPane\('priority'\)/);
+    expect(settings).toMatch(/<ProjectsPage\b[\s\S]{0,200}onSetOrder=\{onSetOrder\}/);
   });
 
-  it('?settings=priority opens it, like every other page name', () => {
-    expect(settings).toMatch(/want === 'priority'\) return want/);
+  it('an old ?settings=priority link lands on Projects', () => {
+    expect(settings).toMatch(/if \(want === 'priority'\) return 'projects';/);
+  });
+
+  it('the order and the way into each project are the same rows', () => {
+    const page = read('renderer/src/components/ProjectsPage.tsx');
+    // A press that does not travel opens the project; one that does, moves it.
+    expect(page).toMatch(/if \(!travelled\) \{ onOpen\(slug\); return; \}/);
+    expect(page).toMatch(/commit\(slug, placeBefore\(full, slug/);
+    // Enter opens it from the keyboard too.
+    expect(page).toMatch(/e\.key === 'Enter'[^\n]*onOpen\(p\.slug\)/);
   });
 
   it('the composer project menu says it is in priority order and links to the page', () => {
@@ -158,13 +172,15 @@ describe('the ways in', () => {
     expect(composer).toMatch(/>Reorder</);
   });
 
-  it('⌘K has a row for it', () => {
-    expect(palette).toMatch(/label: 'Project priority…'/);
+  it('⌘K has a Projects row that priority finds', () => {
+    expect(palette).toMatch(/label: 'Projects…'/);
+    expect(palette).toMatch(/keywords: 'priority order/);
   });
 
-  it('the app opens Settings on that page from both, and saves through setProductOrder', () => {
-    expect(app).toMatch(/onReorderProjects=\{/);
-    expect(app).toMatch(/setSettingsPane\('priority'\)/);
+  it('the app opens Settings on Projects from both, and saves through setProductOrder', () => {
+    expect(app).toMatch(/onReorderProjects=\{[^\n]*setSettingsPane\('projects'\)/);
+    expect(app).toMatch(/onProjects=\{[^\n]*setSettingsPane\('projects'\)/);
+    expect(app).not.toMatch(/setSettingsPane\('priority'\)/);
     expect(app).toMatch(/onSetOrder=\{/);
   });
 });

@@ -5193,8 +5193,9 @@ export default function App() {
           initial={composeInitial}
           onOpenConversation={openConversation}
           // "Reorder" beside the project menu's heading: Settings on the
-          // Priority page. The draft is already saved, so closing loses nothing.
-          onReorderProjects={() => { setModal(null); setComposeInitial(null); setTeamOpen(false); setSettingsPane('priority'); setSettingsOpen(true); }}
+          // Projects page, which is where the order is set. The draft is
+          // already saved, so closing loses nothing.
+          onReorderProjects={() => { setModal(null); setComposeInitial(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
           onClose={() => { setModal(null); setComposeInitial(null); }}
           onSent={async (made, how) => {
             setComposeInitial(null);
@@ -5569,7 +5570,7 @@ export default function App() {
           onStanding={() => setModal('standing')}
           onSettings={() => { setModal(null); setSettingsPane(null); setSettingsOpen(true); }}
           onShortcuts={() => { setModal(null); setSettingsPane('shortcuts'); setSettingsOpen(true); }}
-          onProjectPriority={() => { setModal(null); setTeamOpen(false); setSettingsPane('priority'); setSettingsOpen(true); }}
+          onProjects={() => { setModal(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
           onClose={() => setModal(null)}
         />
       )}

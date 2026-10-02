@@ -34,7 +34,7 @@ import { SHORTCUTS } from '../shortcuts';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';
 import { TaskTerminal } from './TaskTerminal';
-import { ProjectPriority } from './ProjectPriority';
+import { ProjectsPage } from './ProjectsPage';
 import type { Product } from '../types';
 
 /* * THERE IS NO ACCOUNTS PANE ANY MORE. It is a group on the Agents page now, next to the
@@ -43,7 +43,7 @@ import type { Product } from '../types';
 */
 // 'agents' is gone from this union with the pane itself; the name is still
 // accepted at the door above and resolves to 'general'.
-type Pane = 'instructions' | 'general' | 'appearance' | 'shortcuts' | 'projects' | 'priority' | { project: string };
+type Pane = 'instructions' | 'general' | 'appearance' | 'shortcuts' | 'projects' | { project: string };
 
 const paneKey = (p: Pane) => (typeof p === 'string' ? p : `project:${p.project}`);
 
@@ -1108,81 +1108,9 @@ function ProjectTitle({ project, onRename }: {
 /* --------------------------------- screen --------------------------------- */
 
 /* ------------------------------ all her projects --------------------------- */
-// A PAGE FOR THE PROJECTS, BECAUSE THE COLUMN HAD BECOME A LIST OF THEM.
-//
-// With dozens of projects, the nav column drew every one of them under a
-// heading it had scrolled past, so what the user actually saw was five
-// settings pages followed by dozens of unexplained names. The heading was
-// doing all the work of saying what they were, and it was off the screen.
-//
-// THIS IS NOT THE "ALL PROJECTS" TABLE THAT WAS TURNED DOWN. This one is a
-// plain index of names.
-//
-// EACH ROW IS THE WAY INTO THAT PROJECT'S OWN PAGE and nothing else, which is
-// the rule the nav rows already follow. Renaming, pictures and settings all
-// live on the page it opens.
-//
-// THE FILTER IS THERE BECAUSE DOZENS IS PAST READING. It is not a search
-// over anything clever: it matches the name and the folder, which are the two
-// things she would type.
-function ProjectsIndex({ projects, onOpen, onNew }: {
-  projects: ProjectSettings[];
-  onOpen: (slug: string) => void;
-  onNew?: () => void;
-}) {
-  const [filter, setFilter] = useState('');
-  const needle = filter.trim().toLowerCase();
-  const shown = needle
-    ? projects.filter((p) => p.name.toLowerCase().includes(needle)
-      || p.slug.toLowerCase().includes(needle)
-      || (p.dir ?? '').toLowerCase().includes(needle))
-    : projects;
-
-  // THE STATE IN WORDS, and there is one state left to say. This read paused,
-  // else personal, else autonomous; pausing one project and personal projects
-  // are both gone (w-d19d6d387c). Null on an ordinary project, which is nearly
-  // all of them, and then the row is just a name.
-  const flag = (p: ProjectSettings) => (p.autonomous ? 'on its own' : null);
-
-  return (
-    <>
-      <h1 className="set-title">Projects</h1>
-      <p className="set-lede">
-        {projects.length === 1 ? 'One project.' : `${projects.length} projects.`} Open one to change its picture, its rules and how its agents run.
-      </p>
-      <div className="proj-index-top">
-        <input
-          className="proj-index-find"
-          type="search"
-          value={filter}
-          placeholder="Find a project"
-          aria-label="Find a project"
-          onChange={(e) => setFilter(e.target.value)}
-        />
-        {onNew && <button type="button" className="set-ghost" onClick={onNew}>New project</button>}
-      </div>
-      {!projects.length && <div className="set-nav-empty">No projects yet.</div>}
-      {!!projects.length && !shown.length && (
-        <div className="set-nav-empty">Nothing here matches “{filter.trim()}”.</div>
-      )}
-      <div className="proj-index">
-        {shown.map((p) => (
-          <button key={p.slug} type="button" className="proj-card" onClick={() => onOpen(p.slug)}>
-            <ProductMark src={p.logo} name={p.name} slug={p.slug} size={30} />
-            <span className="proj-card-text">
-              <span className="proj-card-name">{p.name}</span>
-              {/* THE FOLDER, which is the one thing that tells two projects of
-                  the same name apart, and a real store has several pairs of those. */}
-              <span className="proj-card-where">{shortPath(p.dir)}</span>
-            </span>
-            {p.running > 0 && <span className="set-nav-flag">{p.running} running</span>}
-            {flag(p) && <span className="set-nav-flag">{flag(p)}</span>}
-          </button>
-        ))}
-      </div>
-    </>
-  );
-}
+// THE PROJECTS PAGE is ./ProjectsPage.tsx: every project in the order the
+// agents work them, each row the door to that project's own page. It replaced
+// a plain index here and a separate Priority page (w-a514b58055).
 
 export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, onClose }: {
   // ONE control for the three of them. Light, dark and each picture are one
@@ -1226,7 +1154,10 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // URL the window was opened with.
   const [pane, setPane] = useState<Pane>(() => {
     const want = startPane || new URLSearchParams(location.search).get('settings') || '';
-    if (want === 'instructions' || want === 'appearance' || want === 'general' || want === 'shortcuts' || want === 'projects' || want === 'priority') return want;
+    if (want === 'instructions' || want === 'appearance' || want === 'general' || want === 'shortcuts' || want === 'projects') return want;
+    // Priority was its own page for a round and is now the Projects page itself
+    // (w-a514b58055), so the old name opens the page its content went to.
+    if (want === 'priority') return 'projects';
     // The page moved into Agents, so the old name lands where its content went.
     // ?settings=accounts still opens the account rows, wherever they live.). An
     // old link is not somebody's mistake. AND AGENTS ITSELF JOINED THEM ON
@@ -1402,26 +1333,17 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               The count is on the row because it is the fact that decides whether
               opening it is worth doing, and because a nav row reading "Projects"
               with nothing beside it is the heading again.
+
+              CALLED PROJECTS, AND IT IS ALSO WHERE THE ORDER IS SET. Priority was
+              its own row for a round; the founder merged the two into one page
+              and named it Projects (w-a514b58055).
            */}
-          {/* WHICH PROJECT GOES FIRST, BY NAME. The order was only ever set by
-              dragging chips in the old composer, which most people never
-              found. First under Projects because it is the one thing here
-              about all of them at once. */}
-          {onSetOrder && (
-            <button
-              type="button"
-              className={`set-nav-item ${pane === 'priority' ? 'on' : ''}`}
-              onClick={() => setPane('priority')}
-            >
-              <span className="set-nav-label">Priority</span>
-            </button>
-          )}
           <button
             type="button"
             className={`set-nav-item ${pane === 'projects' ? 'on' : ''}`}
             onClick={() => setPane('projects')}
           >
-            <span className="set-nav-label">All projects</span>
+            <span className="set-nav-label">Projects</span>
             {!!projects.length && <span className="set-nav-flag">{projects.length}</span>}
           </button>
           {/* AND WHERE YOU ARE, when you are inside one. Opening a project used
@@ -1469,18 +1391,14 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
         {/* The Shortcuts page is excluded: it reads nothing off the main
             process, so "Reading settings…" over it would be the app waiting
             for an answer it does not need. */}
-        {!model && pane !== 'shortcuts' && pane !== 'instructions' && pane !== 'priority' && <div className="set-inner"><div className="set-lede">Reading settings…</div></div>}
-
-        {pane === 'priority' && onSetOrder && (
-          <div className="set-inner">
-            <ProjectPriority ranked={ranked} onSetOrder={onSetOrder} />
-          </div>
-        )}
+        {!model && pane !== 'shortcuts' && pane !== 'instructions' && <div className="set-inner"><div className="set-lede">Reading settings…</div></div>}
 
         {model && pane === 'projects' && (
           <div className="set-inner">
-            <ProjectsIndex
-              projects={projects}
+            <ProjectsPage
+              ranked={ranked}
+              details={projects}
+              onSetOrder={onSetOrder}
               onOpen={(slug) => setPane({ project: slug })}
               onNew={onNewProject}
             />
@@ -1965,7 +1883,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
              */}
             <button type="button" className="set-crumb" onClick={() => setPane('projects')}>
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M10 3.5L5.5 8l4.5 4.5" /></svg>
-              <span>All projects</span>
+              <span>Projects</span>
             </button>
             {/* THE SAME TWO THINGS AS THE SIDEBAR ROW, at the size of a title.
                 The name is edited in the sidebar, and the mark is changed here,

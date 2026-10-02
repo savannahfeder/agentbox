@@ -5701,24 +5701,8 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 }
 .proj-index-find:focus { outline: none; border-color: var(--text-faint); }
 .proj-index-find::placeholder { color: var(--text-faint); }
-.proj-index { display: flex; flex-direction: column; gap: 2px; }
-.proj-card {
-  display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 10px;
-  border: none; background: none; font-family: inherit; text-align: left;
-  border-radius: var(--radius); cursor: pointer; color: var(--text);
-}
-.proj-card:hover { background: var(--bg-hover); }
-.proj-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.proj-card-name {
-  font-size: 14px; font-weight: 550; color: var(--text);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-/* The folder, which is the one thing that tells two projects of the same name
-   apart, and a real store has several pairs of those. */
-.proj-card-where {
-  font-size: 11.5px; color: var(--text-faint);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
+/* The rows themselves are components/projects-page.css: the list is also the
+   running order now (w-a514b58055). */
 
 /* THE WAY BACK OUT OF ONE PROJECT'S PAGE, now that the column no longer lists
    them. Quiet by default: it is a way back, not an action. */

@@ -1,4 +1,4 @@
-/* Settings > Project priority (./ProjectPriority.tsx). Every class is `pp-`.
+/* Settings > Projects (./ProjectsPage.tsx). Every class is `pp-`.
 
    DRAWN IN THE INBOX'S OWN IDIOM (threads/pages.css, styles.css .row): a head in
    small mono capitals, rows with nothing filled, hairlines BETWEEN rows, the
@@ -15,7 +15,7 @@
   border-bottom: 1px solid var(--line);
 }
 .pp-head-name { flex: 1; padding-left: 32px; }
-.pp-head-move { width: 132px; text-align: right; }
+.pp-head-move { width: 132px; text-align: right; margin-right: 30px; }
 
 .pp-list { position: relative; list-style: none; margin: 0; padding: 0; }
 
@@ -24,7 +24,7 @@
   display: flex; align-items: center; gap: 14px;
   padding: 15px 4px;
   color: var(--text);
-  cursor: grab; touch-action: none; user-select: none;
+  cursor: pointer; touch-action: none; user-select: none;
   outline: none;
   transition: background-color .4s ease;
 }
@@ -50,8 +50,24 @@
 
 .pp-row .product-mark { flex: none; }
 
+/* The name, and the folder under it in the inbox's quiet mono, because the
+   folder is what tells two projects of the same name apart. */
+.pp-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pp-where {
+  font: 11.5px/16px var(--mono); color: var(--text-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pp-flag {
+  flex: none; font: 10.5px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-faint);
+}
+/* The row is a door: a chevron at its end says so, brighter under the pointer. */
+.pp-open { flex: none; width: 16px; height: 16px; color: var(--text-faint); opacity: .5; transition: opacity .12s; }
+.pp-open svg { width: 16px; height: 16px; display: block; }
+.pp-row:hover .pp-open { opacity: 1; }
+.pp-row.can-move .pp-rank { cursor: grab; }
 .pp-name {
-  flex: 1; min-width: 0;
+  min-width: 0;
   font-size: 14px; line-height: 20px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   text-decoration: underline solid transparent 1.5px; text-underline-offset: 4px;
