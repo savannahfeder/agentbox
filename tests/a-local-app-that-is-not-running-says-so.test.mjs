@@ -116,6 +116,21 @@ it('draws only the picked look, a short log, with no switch left between looks',
  expect(css).not.toMatch(/local-status\[data-look/);
 });
 
+// Beside a card the hairline that holds a page is drawn on the page itself
+// (.doc-view), not on the pane. The status covers the page while it connects
+// and replaces it when nothing runs, so it took the edge with it and sat on the
+// card as a flat block. It wears the same edge, in the page's own colour,
+// wherever the page does.
+it('keeps the hairline round the panel while it connects and when nothing runs',()=>{
+ const css=fs.readFileSync(new URL('../renderer/src/workspace-navigation.css',import.meta.url),'utf8');
+ for(const where of ['.workspace-layout .inline-artifact .doc-html','.workspace-layout[data-artifact-layout="beside"] .doc-html']) {
+  expect(css).toContain(`${where} .doc-view { border:1px solid var(--line)`);
+  expect(css).toContain(`${where} .local-status`);
+ }
+ expect(css).toMatch(/\.local-status\s*\{[^}]*\}[\s\S]*border:1px solid var\(--frame-line\)/);
+ expect(css).toMatch(/\.preview-frame\s*\{[^}]*--frame-line:\s*var\(--line\)/);
+});
+
 it('leaves design files on the quiet skeleton, with no words added to it',()=>{
  const loading=fs.readFileSync(new URL('../renderer/src/components/PreviewLoading.tsx',import.meta.url),'utf8');
  expect(loading).not.toContain('Try again');

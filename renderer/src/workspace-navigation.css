@@ -838,6 +838,15 @@ body {
   position:absolute; inset:0; z-index:1; display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start;
   padding:72px 64px; text-align:left; background:var(--skin-solid,var(--surface)); color:var(--text); overflow:hidden;
 }
+/* THE EDGE A PAGE WEARS. Beside a card, and inline, the hairline that holds a
+   page is drawn on the page itself (.doc-view above), so a status covering the
+   page, or standing in for it when nothing runs, took the edge away and sat on
+   the card as a flat block. It wears the same line in the same places, in the
+   page's colour, taken on the frame before the status swaps to the window's
+   own tokens, so the edge does not move when the app appears. */
+.preview-frame { --frame-line: var(--line); }
+.workspace-layout .inline-artifact .doc-html .local-status,
+.workspace-layout[data-artifact-layout="beside"] .doc-html .local-status { border:1px solid var(--frame-line); border-radius:var(--radius); }
 .local-status-clock {font-family:var(--mono); font-variant-numeric:tabular-nums; color:var(--text-dim);}
 .local-status-dot {flex:none; width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 45%,transparent); animation:local-status-pulse 1.6s ease-out infinite;}
 .local-status[data-state="down"] .local-status-dot {background:transparent; box-shadow:inset 0 0 0 1.2px var(--text-faint); animation:none;}
