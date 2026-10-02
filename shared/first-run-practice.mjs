@@ -234,6 +234,97 @@ export const PRACTICE_ROWS = [
 ];
 
 /**
+ * THE REST OF THE PRACTICE TEAM'S WORK, for the beats that show the whole of it.
+ *
+ *  ADDED 2026-10-02 (w-58c8f466e7). By the tab tour and the board, every row
+ *  above has been closed, put off or answered, so the board opened on an empty
+ *  Needs you column, a bare In progress and a Done column holding the lot, and
+ *  the list tabs held one row each. Asked for in so many words: "there's no
+ *  value if we go into the board view and there's nothing on the page. The
+ *  same applies to the list view: it's really hard to understand."
+ *
+ *  So these are written into the practice project with the rows above and kept
+ *  off the screen by `walkRows` until the tour. Each `state` is the column it
+ *  lands in, read off the row by the app's own rules and not by this file:
+ *
+ *  * `needs`: an agent finished, or stopped on a question. Needs you. Only on
+ *    the board, never in the tour, because the tour opens on "Your inbox is
+ *    now empty" and these would make that untrue.
+ *  * `working`: sent and not finished. In progress.
+ *  * `scheduled`: set for tomorrow morning. Scheduled.
+ *
+ *  None is finished, so "Everything you finished is kept here" stays true of
+ *  the Closed tab. */
+export const PRACTICE_BACKDROP = [
+  {
+    state: 'needs',
+    kind: 'task',
+    title: 'Booked the train for the offsite.',
+    body: 'Book train tickets for the team to the offsite on Thursday morning.',
+    trace: [
+      '[Read] Offsite plan.docx',
+      '[Read] Team contacts.xlsx',
+      'Twelve people, all leaving from the city on Thursday morning.',
+      '[Write] Train booking.pdf',
+    ],
+    result: 'Twelve seats on the 8:10 on Thursday, all in one carriage. The tickets are in the offsite folder.',
+    agoMs: 9 * 60_000,
+  },
+  {
+    state: 'needs',
+    kind: 'question',
+    title: 'Should the welcome pack go out Monday or Wednesday?',
+    body: 'Send the welcome pack to the two new starters, and check the day with me first.',
+    trace: [
+      '[Read] Welcome pack.docx',
+      '[Read] Team calendar.ics',
+      'One starter begins on Monday and the other on Wednesday.',
+    ],
+    result: [
+      'One new starter begins Monday and the other Wednesday. Sending both on Monday means nobody waits.',
+      '',
+      '## Options',
+      '1. Monday, for both (recommended)',
+      '2. On each person\'s first day',
+    ].join('\n'),
+    agoMs: 26 * 60_000,
+  },
+  {
+    state: 'working',
+    kind: 'task',
+    title: 'Write the agenda for the offsite.',
+    body: 'Write the agenda for the offsite: two days, with time for the planning session on day one.',
+    trace: [
+      '[Read] Offsite plan.docx',
+      '[Read] Notes from last offsite.docx',
+      'Day one is mostly planning. Working out where lunch and the walk fit.',
+    ],
+    agoMs: 4 * 60_000,
+  },
+  {
+    state: 'working',
+    kind: 'task',
+    title: 'Compare three caterers for the team dinner.',
+    body: 'Find three caterers who can do dinner for twelve and compare price and menus.',
+    trace: [
+      '[Read] Restaurant bookings.pdf',
+      'Two caterers so far. Checking whether the third does vegetarian menus.',
+    ],
+    agoMs: 11 * 60_000,
+  },
+  {
+    state: 'scheduled',
+    kind: 'task',
+    title: 'Send everyone the offsite reminder.',
+    body: 'Send the whole team a reminder about the offsite, with the train time and the agenda.',
+    trace: [],
+    agoMs: 40 * 60_000,
+    // Tomorrow morning, counted from when the practice project is made.
+    inMs: 18 * 3_600_000,
+  },
+];
+
+/**
  * THE WALK'S OWN TASK, AS A CONVERSATION. The person sends it at beat nine and
  *  opens it at beat eleven, and until 2026-08-24 what they opened was the words
  *  "Nothing has been said here yet." under the title: the row had a result and

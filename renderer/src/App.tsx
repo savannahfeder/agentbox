@@ -5772,7 +5772,7 @@ export default function App() {
             // land in the project they made, which is where the walk used to
             // happen anyway. A first run that stops dead on its eighth screen
             // is worse than one that practises in the wrong place.
-            let made: { slug: string; examples: string[] } | null = null;
+            let made: { slug: string; examples: string[]; backdrop?: string[] } | null = null;
             try { made = await api.firstRunPractice(); } catch { made = null; }
             const slug = made?.slug ?? null;
             if (slug) {
@@ -5780,7 +5780,7 @@ export default function App() {
               setPickProject(slug);
             }
             await refresh();
-            fire({ t: 'practice', product: slug ?? '', examples: made?.examples ?? [] });
+            fire({ t: 'practice', product: slug ?? '', examples: made?.examples ?? [], backdrop: made?.backdrop ?? [] });
           }}
           /*
            * AND REACHING THIS CARD IS BEING SHOWN AROUND. The

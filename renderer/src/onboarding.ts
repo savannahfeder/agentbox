@@ -13,7 +13,7 @@
 // This module is the part with no React in it, so the walk can be tested
 // without a window.
 
-import { PRACTICE_NAME, PRACTICE_TASK } from '../../shared/first-run-practice.mjs';
+import { PRACTICE_BACKDROP, PRACTICE_NAME, PRACTICE_TASK } from '../../shared/first-run-practice.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { DONE } from './done-word';
 
@@ -151,6 +151,12 @@ export interface FirstRun {
    *  used to be the agents screen that did it, and that screen is at the end of
    *  the walk now. */
   examples: string[];
+  /**
+   * THE REST OF THE PRACTICE TEAM'S WORK (w-58c8f466e7), in
+   *  `PRACTICE_BACKDROP` order, so the tour and the board have something in
+   *  every column. Optional because a walk saved before it existed has none,
+   *  and that walk simply draws what it drew before. */
+  backdrop?: string[];
 }
 
 export const START: FirstRun = {
@@ -196,7 +202,7 @@ export type Event =
   | { t: 'noFolder' }
   | { t: 'name'; name: string }
   | { t: 'made'; product: string }
-  | { t: 'practice'; product: string; examples: string[] }
+  | { t: 'practice'; product: string; examples: string[]; backdrop?: string[] }
   | { t: 'sent'; item: string; at: number }
   | { t: 'answered' }
   | { t: 'staged'; examples: string[] }
@@ -248,7 +254,7 @@ export function advance(s: FirstRun, e: Event): FirstRun {
       // off the screen until the beat that clears them. The old walk staged
       // them mid-flight because they went into the person's own project and
       // could not be there a moment sooner than they were needed.
-      return { ...s, practice: e.product, examples: e.examples, step: 'make' };
+      return { ...s, practice: e.product, examples: e.examples, backdrop: e.backdrop ?? [], step: 'make' };
     case 'sent':
       return { ...s, item: e.item, sentAt: e.at, step: 'working' };
     // AND IT DOES NOT OPEN ITSELF.
@@ -484,8 +490,21 @@ export function walkRows<T extends { id: string }>(rows: T[], run: FirstRun | nu
   // The two beats keep ONE set because they are one lesson at two altitudes:
   // a board that hides what the tab before it showed teaches that the board
   // hides things.
-  if (run.step === 'where' || run.step === 'board') {
-    const keep = new Set([...run.examples, run.item].filter(Boolean) as string[]);
+  //
+  // AND BOTH CARRY THE REST OF THE PRACTICE TEAM'S WORK SINCE 2026-10-02
+  // (w-58c8f466e7). By here every staged row has been closed, put off or
+  // answered, so the board opened with nothing waiting on you and the tabs
+  // held one row each: "there's no value if we go into the board view and
+  // there's nothing on the page." The tour leaves out the rows that need you,
+  // because its first card says the inbox is now empty.
+  //
+  // AND THE ⌘K BEAT KEEPS THE BOARD'S SET. Pressing B ends the board beat, so
+  // the screen the board card promised used to empty itself one frame after
+  // it appeared, under the very next card.
+  if (run.step === 'where' || run.step === 'board' || run.step === 'command') {
+    const backdrop = (run.backdrop ?? [])
+      .filter((_, i) => run.step !== 'where' || PRACTICE_BACKDROP[i]?.state !== 'needs');
+    const keep = new Set([...(run.examples ?? []), run.item, ...backdrop].filter(Boolean) as string[]);
     return rows.filter((r) => keep.has(r.id));
   }
   return rows.filter((r) => r.id === run.item);

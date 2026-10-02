@@ -729,7 +729,12 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // somebody mid-walk. They land in an empty practice inbox and the beat that
     // clears them is skipped, exactly as beat thirteen already behaves.
     try { rows = store.stagePracticeRows(made.slug); } catch { rows = { ids: [] }; }
-    return { ...made, examples: rows.ids };
+    // AND THE REST OF THE PRACTICE TEAM'S WORK, so the tour and the board have
+    // something in every column (w-58c8f466e7). Its own try: a store that will
+    // not take these still leaves the walk its four rows.
+    let backdrop = { ids: [] };
+    try { backdrop = store.stagePracticeBackdrop(made.slug); } catch { backdrop = { ids: [] }; }
+    return { ...made, examples: rows.ids, backdrop: backdrop.ids };
   });
 
   // AND TAKING IT BACK OFF THE SCREEN. `sweepPractice` rather than the one

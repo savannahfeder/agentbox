@@ -12,7 +12,7 @@ import { answerFor, describeFor } from './first-run.mjs';
 import { checkProjectFolder } from '../shared/project-folder-check.mjs';
 import { EXAMPLES, stampsFor } from '../shared/first-run-examples.mjs';
 import {
-  PRACTICE_ANSWER, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
+  PRACTICE_ANSWER, PRACTICE_BACKDROP, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
   PRACTICE_TASK_TRACE,
 } from '../shared/first-run-practice.mjs';
 import { NOTE_NAME } from './rail-note.mjs';
@@ -829,6 +829,47 @@ export class Store {
       // rather than only what it concluded.
       this.writePracticeTrace(slug, created.id, row.trace, ran);
       workItemsDisk.updateWorkItem(dir, created.id, { result: row.result }, { source: 'agent', now: finished });
+      ids.push(created.id);
+    }
+    return { ids };
+  }
+
+  /**
+   * THE REST OF THE PRACTICE TEAM'S WORK, so the tour and the board are not
+   * empty (w-58c8f466e7). The copy, and which column each row lands in, is
+   * `PRACTICE_BACKDROP` in shared/first-run-practice.mjs. The ids come back in
+   * its order, which is how `walkRows` knows which one is which.
+   *
+   *  The column is the app's own reading of the row, so each is written in the
+   *  shape that reads that way and nothing marks it: a finished one has a
+   *  result, a working one is her ask with a run and no result yet, and the
+   *  scheduled one is her ask with a time in the future, set as hers. */
+  stagePracticeBackdrop(slug, { now = Date.now(), label = 'first-run' } = {}) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const ids = [];
+    for (const row of PRACTICE_BACKDROP) {
+      const at = stampsFor(row, now);
+      const created = workItemsDisk.createWorkItem(
+        dir,
+        { title: row.title, kind: row.kind, priority: 5, labels: ['founder', label] },
+        { source: 'system', now: at.hers },
+      );
+      workItemsDisk.updateWorkItem(
+        dir, created.id,
+        { title: row.title, body: row.body, ...(row.state === 'scheduled' ? { runAt: now + (row.inMs ?? 0) } : {}) },
+        { source: 'founder', now: at.hers },
+      );
+      if (row.state !== 'scheduled') {
+        this.appendPracticeRun(slug, created.id, at.hers);
+        this.writePracticeTrace(slug, created.id, row.trace, at.hers + 1_000);
+      }
+      if (row.state === 'needs') {
+        workItemsDisk.updateWorkItem(
+          dir, created.id, { result: row.result },
+          { source: 'agent', now: at.hers + 1_000 + row.trace.length * 9_000 + 1_000 },
+        );
+      }
       ids.push(created.id);
     }
     return { ids };
