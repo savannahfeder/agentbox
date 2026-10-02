@@ -82,14 +82,34 @@
 .th-pr i:nth-child(1) { height: 5px; } .th-pr i:nth-child(2) { height: 8px; } .th-pr i:nth-child(3) { height: 11px; }
 .th-pr i.on { background: var(--text-dim); }
 .th-urgent { display: inline-grid; place-items: center; width: 12px; height: 12px; border-radius: var(--tag-radius); background: var(--accent); color: #1a1817; font: 700 9px var(--mono); margin-right: 8px; position: relative; top: 1px; flex: none; }
-.th-lock { display: inline-block; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
+/* THE ROW'S UNDERLINE RUNS THROUGH THESE MARKS (w-afb66e6661, 2026-10-02).
+   Her screenshot: an underlined title, then the people mark sitting in a gap in
+   the line, "which looks a little bit strange". A row's hover and selected
+   underline is a text-decoration on the title (styles.css, `.row .subject`),
+   and a decoration does not paint across an inline-BLOCK box: this file already
+   carries the same lesson for `.th-msg` and inline-flex. So all three marks are
+   plain inline, and the line is continuous from the first letter to the last
+   mark. */
+.th-lock { display: inline; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
 /* WHO SEES A ROW (2026-10-01): two people after the title of a thread the team
    can see, and nothing on the rest, which is most of an older inbox. */
-.th-shared { display: inline-block; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
+.th-shared { display: inline; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
 /* AND HOW WIDELY (w-41ff964775): a thread only a few people see carries their
    count beside the same mark, in the mark's own faint colour, so team and
    chosen people differ without a second glyph to learn. */
-.th-shared-n { display: inline-block; margin-left: 3px; font: 10.5px var(--mono); color: var(--text-faint); vertical-align: 0; }
+.th-shared-n { display: inline; margin-left: 3px; font: 10.5px var(--mono); color: var(--text-faint); vertical-align: 0; }
+
+/* NOT STARTED, ON THE ROW (w-afb66e6661). Her ask: "some sort of tag, like
+   'not started', that makes it clearer". It is a box rather than more words in
+   the title, so the underline stops where the title does, and it is the only
+   thing on a row that says what Later holds: everything else there has a
+   moment, and this one is waiting for you. */
+.th-tag {
+  display: inline-block; margin-left: 10px; padding: 1px 6px;
+  border: 1px solid var(--line); border-radius: var(--tag-radius);
+  font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-faint); vertical-align: 1px;
+}
 
 /* ------------------------------------------------------------ the list as a table */
 .th-table .row.th-head { padding-top: 10px; padding-bottom: 8px; font: 10.5px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); cursor: default; }

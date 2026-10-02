@@ -19,7 +19,7 @@ import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityIdOf, priorityLabelOf, priorityValueOf, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName, type TeamView } from '../team/people';
 import {
-  STATE_WORD, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, lastEdit, ownerName,
+  STATE_WORD, stateWordOf, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, lastEdit, ownerName,
   readSummaryOpen, stateGlyph, statusChoices, type StateGlyph, type SummaryField,
 } from './summary-rules';
 import { VISIBILITY_WORD, chosenNames, whoSees, type Seen } from './summary-rules';
@@ -119,7 +119,7 @@ export function useSummaryShortcut(onToggle: () => void, enabled = true) {
 export function ThreadStateMark({ item }: { item: WorkItem }) {
   const team = useContext(TeamContext);
   const state = threadState(item);
-  return <span className="ts-lead"><Glyph kind={stateGlyph(state, waitsOnYou(item, team?.me ?? null))} />{STATE_WORD[state]}</span>;
+  return <span className="ts-lead"><Glyph kind={stateGlyph(state, waitsOnYou(item, team?.me ?? null))} />{stateWordOf(item, state)}</span>;
 }
 
 /* -------------------------------------------------------------------- rail */
@@ -366,7 +366,7 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
         {onFinish && statusChoices(state).length ? (
           <span className="ts-value ts-menu-anchor" ref={holdMenu('status')}>
             <button type="button" className="ts-prop-btn" aria-haspopup="listbox" aria-expanded={menu === 'status'} title="Change the status" onClick={() => setMenu(menu === 'status' ? null : 'status')}>
-              <Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{STATE_WORD[state]}<Caret />
+              <Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{stateWordOf(item, state)}<Caret />
             </button>
             {menu === 'status' && (
               <span className="prio-menu ts-menu" role="listbox" aria-label="Status">
@@ -387,7 +387,7 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
             )}
           </span>
         ) : (
-          <span className="ts-value"><Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{STATE_WORD[state]}</span>
+          <span className="ts-value"><Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{stateWordOf(item, state)}</span>
         )}
         <span className="ts-label">Owner</span>
         <span className="ts-value">{ownerPerson && <Face person={ownerPerson} />}{owner}</span>

@@ -21,6 +21,10 @@ export const THREAD_STATES = ['waiting', 'running', 'scheduled', 'done'];
 /** Which of the four states a thread is in. */
 export function threadState(item, now = Date.now()) {
   if (item.status === 'done') return 'done';
+  // A thread in Later is not running and nobody has to act on it, which is the
+  // scheduled family. It has no moment, so what it SAYS is "Not started"
+  // (threadStateWords in the window); the four card states are unchanged.
+  if (item.start === 'later') return 'scheduled';
   if (Number.isFinite(item.runAt) && item.runAt > now) return 'scheduled';
   if (item.status === 'claimed' && item.claim && !item.claimExpired) return 'running';
   // Sent to an agent and not yet picked up: it is about to run, nobody has to

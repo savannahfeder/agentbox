@@ -63,6 +63,8 @@ export interface ThreadSent {
   title?: string;
   /** A Send later moment, when there was one. */
   runAt?: number;
+  /** 'later' when it went to Later rather than to a moment (w-afb66e6661). */
+  start?: 'later';
   /** The repeating rule's id, so ending it can be the undo. */
   ruleId?: string;
   /** Everyone a message went to, when it went to more than one person. */
@@ -327,7 +329,7 @@ export function ThreadComposer({
   const refusal = person ? null : practiceRefusal(product, { scripted: !!scripted });
   const canSend = !sending && (person ? !!text.trim() : !!message && !!product && !refusal);
 
-  const sendTask = async (when: { runAt?: number; repeat?: { every: 'day' | 'weekday' | 'week'; on?: number; at: string } } = {}) => {
+  const sendTask = async (when: { runAt?: number; start?: 'later'; repeat?: { every: 'day' | 'weekday' | 'week'; on?: number; at: string } } = {}) => {
     if (!canSend || !product || !message) return;
     setSending(true);
     setError(null);
@@ -354,12 +356,16 @@ export function ThreadComposer({
         const made = await api.compose({
           product: product.slug, title: message.title, body: body || undefined, kind: 'directive', priority,
           ...(when.runAt ? { runAt: when.runAt } : {}),
+          // ADD IT TO LATER: the thread is written down and nothing starts it
+          // until she does (w-afb66e6661). The one row on this menu with no
+          // clock in it, and the only one that answers "I am not ready yet".
+          ...(when.start ? { start: when.start } : {}),
           ...harness,
           ...(team ? sharingFields(visibility, chosenHere) : {}),
           // The tutorial's own task, and only ever that one. See `scripted`.
           ...(scripted ? { labels: scripted.labels } : {}),
         });
-        onSent(made, { kind: 'task', product: product.slug, title: message.title, ...(when.runAt ? { runAt: when.runAt } : {}) });
+        onSent(made, { kind: 'task', product: product.slug, title: message.title, ...(when.runAt ? { runAt: when.runAt } : {}), ...(when.start ? { start: when.start } : {}) });
       }
       clearComposeDraft();
     } catch (err) {
@@ -592,6 +598,9 @@ export function ThreadComposer({
     <div className="tc-menu tc-rise tc-right tc-wide" role="menu" aria-label="Send later" onKeyDown={menuKeys}>
       {laterPage === 'list' ? (<>
         <span className="tc-menu-head">Send later</span>
+        <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => sendTask({ start: 'later' })}>
+          <ClockIcon /><span className="tc-row-label">Add it to Later</span>
+        </button>
         <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => sendTask({ runAt: tomorrow })}>
           <ClockIcon /><span className="tc-row-label">Tomorrow morning</span><small>{laterHint(tomorrow)}</small>
         </button>
