@@ -70,8 +70,12 @@ describe('a task Carla typed as one line', () => {
     const { events } = itemThread(hers, [trace]);
     const subjects = events.filter((e) => e.kind === 'work').map((e) => e.subject);
     expect(subjects.some((s) => /\bw-[0-9a-f]{10}\b/.test(s))).toBe(false);
-    // The step is still there, so nothing she could check against is lost.
-    expect(events.some((e) => e.kind === 'work' && e.verb === 'claim work item')).toBe(true);
+    // THE CLAIM IS NOT DRAWN AT ALL SINCE w-0bd0d8b2ef. This line used to
+    // demand the step survive with its id blanked; the newer rule is that
+    // taking a thread and writing its status back are the app talking to
+    // itself and are not activity. Blanking the id still holds for every store
+    // step that IS drawn (reading a document, filing a question).
+    expect(events.some((e) => e.kind === 'work' && e.verb === 'claim work item')).toBe(false);
   });
 });
 

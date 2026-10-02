@@ -496,7 +496,12 @@ function gitNames(sub, rest, cwd, home) {
     const refs = args.filter((a) => a && !NOT_A_REF.has(a));
     return refs.length ? [refs[refs.length - 1]] : [];
   }
-  return args.filter(looksLikeAFile).map((a) => shortPath(a, cwd, home));
+  const files = args.filter(looksLikeAFile).map((a) => shortPath(a, cwd, home));
+  // A HISTORY COMMAND OFTEN NAMES SOMETHING THAT IS NOT A PATH, and it is the
+  // point of the line: `git log --grep w-4ac1af8c99` is a search for one
+  // thread. The value a flag carried survives when no file does.
+  if (files.length) return files;
+  return args.length ? [args[0]] : [];
 }
 
 // The leading quote survives on a line the trace cut mid-string.
