@@ -54,7 +54,10 @@ export function announcesUpdate(
   at: { walking: boolean; closed: string },
 ): boolean {
   if (at.walking) return false;
-  if (!state?.ready) return false;
+  // WHILE IT REBUILDS THE ROW STAYS. On a copy run from source the restart
+  // takes about a minute, and a row that vanished the moment Restart was
+  // pressed would read as the press doing nothing.
+  if (!state?.ready && !state?.installing) return false;
   return !(at.closed && at.closed === (state.newVersion ?? ''));
 }
 
@@ -66,7 +69,20 @@ export const SAY = {
   ready: `A new version of ${NAME} is ready`,
   how: `Restart ${NAME} when you are ready. It has already downloaded, restarting takes a few seconds and puts you back where you were.`,
   restart: 'Restart to update',
+  // A COPY RUN FROM SOURCE rebuilds before it comes back, so "a few seconds"
+  // would be untrue there (main/source-updater.mjs).
+  howSource: `Restart ${NAME} when you are ready. The new code has already downloaded. Restarting rebuilds the app first, takes about a minute, and puts you back where you were.`,
+  installing: `Updating. ${NAME} restarts by itself in about a minute.`,
+  changed: 'What changed:',
+  retry: 'The last try did not finish, so nothing restarted. Pressing Restart tries again.',
 } as const;
+
+/** The label the row wears while it rebuilds, so the button can say so. */
+const INSTALLING = 'installing';
+
+export function updateInstalling(item: { labels?: string[] } | null | undefined): boolean {
+  return !!item?.labels?.includes(INSTALLING);
+}
 
 /**
  * Which versions, when there are two of them to name. Undefined rather than a
@@ -87,7 +103,21 @@ export function versionLine(state: UpdateState | null | undefined): string | nul
  *  what a version number is. */
 export function updateBody(state: UpdateState | null | undefined): string {
   const v = versionLine(state);
-  return v ? `${SAY.how}\n\n${v}` : SAY.how;
+  if (!state?.source) return v ? `${SAY.how}\n\n${v}` : SAY.how;
+  // A COPY RUN FROM SOURCE says what changed, because its versions are commit
+  // ids and a commit id tells a person nothing. The titles are the commits'
+  // own first lines, newest first.
+  const parts: string[] = [SAY.howSource];
+  if (state.error) parts.push(`${SAY.retry} ${state.error}`);
+  const changes = state.changes ?? [];
+  if (changes.length) {
+    const more = (state.behind ?? changes.length) - changes.length;
+    const list = changes.map((c) => `- ${c}`);
+    if (more > 0) list.push(`- and ${more} more`);
+    parts.push(`${SAY.changed}\n\n${list.join('\n')}`);
+  }
+  if (v) parts.push(v);
+  return parts.join('\n\n');
 }
 
 /**
@@ -111,7 +141,7 @@ export function updateRow(state: UpdateState | null | undefined, now = Date.now(
     title: SAY.ready,
     body: updateBody(state),
     kind: 'update',
-    labels: [],
+    labels: state?.installing ? [INSTALLING] : [],
     priority: 5,
     epoch: 0,
     claim: null,

@@ -200,6 +200,17 @@ export const api = {
           // the moment she reads it.
           ready: { phase: 'ready', newVersion: '0.2.0', percent: 100, ready: true, readyAt: Date.now() - 62 * 60_000 },
           downloading: { phase: 'downloading', newVersion: '0.2.0', percent: 47 },
+          // A copy run from source (main/source-updater.mjs): versions are
+          // commit ids, and the row lists what changed.
+          source: {
+            phase: 'ready', ready: true, source: true, currentVersion: '5c6afa7', newVersion: '9e1b204',
+            changes: ['Teammates get a restart prompt when main moves', 'The Team page loads faster', 'Sign-in retries once on a slow network'],
+            behind: 4, percent: null, readyAt: Date.now() - 12 * 60_000,
+          },
+          installing: {
+            phase: 'installing', ready: false, installing: true, source: true, currentVersion: '5c6afa7', newVersion: '9e1b204',
+            changes: ['Teammates get a restart prompt when main moves'], behind: 1, readyAt: Date.now() - 12 * 60_000,
+          },
           current: { phase: 'current' },
           error: { phase: 'error', error: 'Could not reach the internet.' },
         };

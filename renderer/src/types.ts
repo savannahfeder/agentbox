@@ -514,9 +514,10 @@ export interface AgentConversation {
  * `idle` nothing has been asked yet, `checking` mid-question, `current` there
  * is nothing newer, `downloading` one is coming, `ready` it is on disk and the
  * restart is hers to press, `error` the last look failed, `unsupported` this
- * copy runs from source and cannot update itself at all.
+ * copy cannot update itself (and `error` says why), `installing` the restart
+ * was pressed on a copy run from source and it is rebuilding first.
  */
-export type UpdatePhase = 'idle' | 'checking' | 'current' | 'downloading' | 'ready' | 'error' | 'unsupported';
+export type UpdatePhase = 'idle' | 'checking' | 'current' | 'downloading' | 'ready' | 'installing' | 'error' | 'unsupported';
 
 export interface UpdateState {
   phase: UpdatePhase;
@@ -532,6 +533,14 @@ export interface UpdateState {
   // The one question the screens ask. Kept on the state so no screen has to
   // learn which phase strings mean "there is a button to press".
   ready: boolean;
+  // A COPY RUN FROM SOURCE (main/source-updater.mjs): that it is one, the
+  // newest change titles, how many changes there are in all, and whether the
+  // restart was pressed and it is rebuilding. Optional so fixtures written
+  // before them still type.
+  source?: boolean;
+  changes?: string[];
+  behind?: number | null;
+  installing?: boolean;
 }
 
 export interface Snapshot {

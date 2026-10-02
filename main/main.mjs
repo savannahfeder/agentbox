@@ -27,6 +27,7 @@ import { openFreshUser } from './fresh-user.mjs';
 import { installCrashReports, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mjs';
 import { createAnalytics } from './analytics.mjs';
 import { createUpdater } from './updater.mjs';
+import { createSourceUpdater } from './source-updater.mjs';
 import { installNotifier } from './notify.mjs';
 import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mjs';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mjs';
@@ -608,9 +609,17 @@ async function createWindow() {
   // `pushUpdate` is filled in on the next line, because the updater has to
   // exist before the IPC surface that reports it and the IPC surface is what
   // knows how to reach the window.
+  //
+  // AND A COPY RUN FROM SOURCE watches its git branch instead of a release
+  // feed (main/source-updater.mjs), because that is how teammates run the team
+  // build and their updates are pushes to main, not releases.
   let pushUpdate = () => {};
-  const updater = createUpdater({
+  const updater = app.isPackaged ? createUpdater({
     app,
+    onChanged: () => pushUpdate(),
+  }) : createSourceUpdater({
+    app,
+    appDir,
     onChanged: () => pushUpdate(),
   });
 

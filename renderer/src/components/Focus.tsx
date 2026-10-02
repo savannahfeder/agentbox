@@ -79,7 +79,7 @@ import type { PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
-import { isUpdateRow, SAY as UPDATE_SAY } from '../update-row';
+import { isUpdateRow, updateInstalling, SAY as UPDATE_SAY } from '../update-row';
 import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
@@ -1485,8 +1485,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
              and still costs her nothing: the update is downloaded and Settings keeps it.
            */}
           {update ? (
-            <button className="dock-pill" onClick={() => onInstallUpdate?.()}>
-              <span className="dock-pill-text">{UPDATE_SAY.restart}</span>
+            <button className="dock-pill" disabled={updateInstalling(item)} onClick={() => onInstallUpdate?.()}>
+              {updateInstalling(item)
+                ? <span className="dock-pill-text">{UPDATE_SAY.installing}</span>
+                : <span className="dock-pill-text">{UPDATE_SAY.restart}</span>}
             </button>
           ) : trouble ? null : replyBlocked ? (
             /*
