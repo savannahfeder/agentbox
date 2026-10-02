@@ -137,7 +137,8 @@ describe('what the plate is made of is not a colour of its own', () => {
     expect(light[0]).toContain('background: color-mix(in oklab, var(--bg-raised) 62%, transparent)');
     expect(light[0]).toContain('blur(22px)');
     expect(light[0]).not.toContain('--control-face');
-    expect(css).toMatch(/:root\[data-theme="light"\] \.hint-caps kbd \{ border-color: var\(--line-strong\); \}/);
+    // The caps take --line-strong on every look since w-5984544441, light included.
+    expect(css).toMatch(/\n\.hint-caps kbd \{[^}]*border: 1px solid var\(--line-strong\)/);
   });
 
   it('has no arrow, no tail and no pointer', () => {
