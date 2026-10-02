@@ -18,7 +18,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   threadMessage, projectsOffered, startingProject, teammates, findPeople,
-  placeholderFor, onlyYouAnd, readVisibility, writeVisibility, VISIBILITY_KEY, projectSwatch,
+  placeholderFor, landsIn, readVisibility, writeVisibility, VISIBILITY_KEY, projectSwatch,
 } from '../renderer/src/threads/composer-rules.ts';
 import { splitMessage } from '../renderer/src/message-split.ts';
 
@@ -122,7 +122,10 @@ describe('To', () => {
   it('asks an agent what needs doing and a person by their first name', () => {
     expect(placeholderFor(null)).toBe('What do you need done?');
     expect(placeholderFor(people[1])).toBe('Message Maya');
-    expect(onlyYouAnd(people[1])).toBe('Only you and Maya see this.');
+    // The corner under the words says where the message goes, not who sees
+    // it: the To field one line above already names them (w-a8e752a9f2).
+    // tests/a-message-to-a-person-says-where-it-lands.test.mjs holds the rest.
+    expect(landsIn(['Maya'])).toBe("Goes to Maya's inbox.");
   });
 });
 

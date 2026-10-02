@@ -50,7 +50,7 @@ import { repeatPresets } from '../components/When';
 import { fitMenu } from '../keep-in-window';
 import {
   allModels, findPeople, harnessFields, inputValueOf, laterHint, momentFromInput, mondayMorning, moreCount,
-  onlyYouAnd, placeholderFor, projectsOffered, projectSwatch, recentModels, sameModel,
+  joinNames, landsIn, placeholderFor, projectsOffered, projectSwatch, recentModels, sameModel,
   startingProject, teammates, threadMessage, tomorrowMorning, VISIBILITY_ROWS,
   type Harness, type ModelPick, type Visibility,
 } from './composer-rules';
@@ -646,7 +646,13 @@ export function ThreadComposer({
 
         {person ? (
           <div className="tc-bar">
-            <span className="tc-only">{extra.length ? `Only you, ${names} see this.` : onlyYouAnd(person)}</span>
+            {/* WHERE IT GOES, NOT WHO SEES IT (w-a8e752a9f2). "Only you and
+                Maya see this." sat directly under a To field reading Maya, so
+                it was the second place on the card saying the same thing. The
+                corner keeps a line, because an empty one she has rejected
+                already, and the line now says the thing the card does not: a
+                message to a teammate becomes a thread in their inbox. */}
+            <span className="tc-only">{landsIn(group.map((p) => firstName(p)))}</span>
             <span className="tc-send solo">
               <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title="Send · ⌘↵">
                 Send <kbd>⌘↵</kbd>
@@ -736,10 +742,3 @@ const RepeatIcon = () => (
     <path d="M17 3l3 3-3 3" /><path d="M4 11V9a3 3 0 0 1 3-3h13M7 21l-3-3 3-3" /><path d="M20 13v2a3 3 0 0 1-3 3H4" />
   </svg>
 );
-
-/** "Bea", "Bea and Carla", "Bea, Carla and Dev". */
-function joinNames(names: string[]): string {
-  if (names.length <= 1) return names[0] ?? '';
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-}
-
