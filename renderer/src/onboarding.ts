@@ -49,7 +49,7 @@ export type Step =
   //
   // AND THE SIDEBAR NOTE IS NOT ONE OF THEM.
   | 'inbox' | 'away' | 'goal' | 'hand'
-  | 'make' | 'task' | 'working' | 'open' | 'answer'
+  | 'make' | 'who' | 'task' | 'working' | 'open' | 'answer'
   // THERE WAS A `note` BEAT HERE, pointing at the project rail's notes panel.
   // The rail is retired on every screen, so the beat drew no ring and no card
   // and only Enter moved it on: a silent screen in the middle of the tutorial.
@@ -60,7 +60,7 @@ export type Step =
 /**
  * HOW MANY BEATS THE WALK HAS. It stays because the walk still has a
  * length and the tests still hold it to one. */
-export const N_BEATS = 18;
+export const N_BEATS = 19;
 
 /**
  * WHICH BEAT EACH SCREEN IS. One pair shares one: `working` and `open` are one
@@ -84,21 +84,23 @@ export const BEAT: Record<Step, number> = {
   // THE COUNT DID NOT MOVE, because nothing was added or taken away: the four
   // screens it stepped over each came up one and it took the seventh.
   look: 7, hand: 8,
-  make: 9, task: 10,
-  working: 11, open: 11, answer: 12,
+  // WRITING ONE IS TWO BEATS SINCE 2026-10-01: the card opens, you see who it
+  // is to, then you send it. Everything after shifted by one.
+  make: 9, who: 10, task: 11,
+  working: 12, open: 12, answer: 13,
   // `clear` closes the two that are finished and `unblock` answers the one that
   // is not, which is the difference the product exists to teach. AND THE THREE
   // WAYS A ROW LEAVES THE INBOX ARE THREE BEATS. `clear` closes the two that
   // are finished, `snooze` puts off the one that is real work and not for
   // today, and `unblock` answers the one an agent is stopped on. The rail's
   // note beat that sat at thirteen is gone with the rail.
-  clear: 13, snooze: 14, unblock: 15,
+  clear: 14, snooze: 15, unblock: 16,
   // AND BEAT FIFTEEN IS THE TOUR OF THE OTHER TWO TABS. It is one beat even
   // though it takes three presses of Tab, the same way `working` and `open`
   // share beat ten: it is one thing happening, which is somebody being shown
   // where the work they just did has gone.
-  where: 16,
-  command: 17, done: 18, landed: 18,
+  where: 17,
+  command: 18, done: 19, landed: 19,
 };
 
 export interface FirstRun {
@@ -1408,6 +1410,30 @@ export function coach(
       return say('A thread is a job you hand to an agent.', 'Press ', 'N', ' or click New thread to write your first one.');
     /* * AND THE GREY LINE IS GONE FROM THIS BEAT.
     */
+    /* * WHO THE THREAD IS FOR, which is the card's first line and was the
+       biggest thing the walk never said (2026-10-01). Her note: "we're missing
+       important stuff like: selecting who it's to etc. and sending messages to
+       both people and agents."
+
+       THE QUIET LINE CARRIES THE HALF THE SCREEN CANNOT SHOW. On a Mac with no
+       teammates the list is one row, Agent, because the People half of it is
+       drawn only once there is somebody to draw (threads/ThreadComposer.tsx).
+       So the sentence says both, and the list shows whichever is true of the
+       Mac it is on. It is not a promise about this screen; it is what the card
+       does, and it starts being visible the day somebody joins.
+
+       AND IT OPENS THE LIST RATHER THAN CHANGING ANYTHING. The beat ends when
+       the list is open, not when a different recipient is picked: the walk's
+       task is for an agent, and a tutorial that quietly re-addressed it would
+       then have to explain itself. Looking is the lesson.
+
+       AND IT IS THE ONE BEAT IN THE WALK WITH NO KEY, because the app has no
+       key for To: the row is a button and that is the whole of how it opens.
+       The loud line is therefore the click alone, with no cap, rather than a
+       cap invented to keep the shape of the other cards. */
+    case 'who':
+      return say('Every thread goes to an agent, or to a person on your team.',
+        'Click To at the top of the card to see who it can go to.');
     // AND IT NAMES THE BUTTON TOO (2026-10-01). Same round and same reason as
     // `make` above: the card's own button is the thing the ring is round, and
     // ⌘↵ is the least guessable cap in the walk.
@@ -2140,7 +2166,7 @@ export const HELD_EVENTS = ['pointerdown', 'mousedown', 'mouseup', 'click', 'dbl
 
 /* * * THE STEPS THAT ARE NOT A SCREEN.
 */
-export const COACHED: Step[] = ['make', 'task', 'working', 'open', 'answer', 'clear', 'snooze', 'unblock', 'where', 'command'];
+export const COACHED: Step[] = ['make', 'who', 'task', 'working', 'open', 'answer', 'clear', 'snooze', 'unblock', 'where', 'command'];
 
 /**
  * What the tether points AT, per step, as a CSS selector into the real app.
@@ -2173,6 +2199,10 @@ export const ANCHOR: Partial<Record<Step, string[]>> = {
   // tutorial drew no card at all. A persona test sat on that blank screen for
   // over thirty seconds.
   make: ['button[aria-label="New thread"]', '.th-right button[data-hint="new-task"]', 'button.th-new'],
+  // THE CARD'S FIRST LINE, which is who the thread is for. The row is a button
+  // that opens the list of everyone it could go to, and that list is the whole
+  // of the beat.
+  who: ['.tc-card .tc-to-menu', '.tc-card .tc-word'],
   // THE NEW THREAD CARD'S OWN SEND (2026-10-01). It was `.modal.compose
   // .dock-send`, the retired one-line card, which the walk kept for one round
   // after the rest of the app moved: "the tutorial is using the wrong
@@ -2613,7 +2643,12 @@ export const STEPS: Step[] = [
   // screen is the real app, so the pick is spent on the whole practice round
   // rather than on one card.
   'look', 'hand',
-  'make', 'task', 'working', 'open', 'answer',
+  // WHO IT IS TO SITS BETWEEN OPENING THE CARD AND SENDING IT (2026-10-01),
+  // because that is where it is on the card: To is its first line. The walk had
+  // no beat for it at all, and the founder named the gap: "we're missing
+  // important stuff like: selecting who it's to etc. and sending messages to
+  // both people and agents".
+  'make', 'who', 'task', 'working', 'open', 'answer',
   'clear', 'snooze', 'unblock', 'where', 'command', 'done', 'landed',
 ];
 
@@ -2672,7 +2707,7 @@ export const SLAB_OF: Partial<Record<Step, number>> = { inbox: 0, away: 1, goal:
  *  NOT in here, because by then the practice project is gone and the inbox
  *  behind the card is their own. */
 export const IN_PRACTICE: Step[] = [
-  'make', 'task', 'working', 'open', 'answer', 'clear', 'snooze', 'unblock', 'where', 'command',
+  'make', 'who', 'task', 'working', 'open', 'answer', 'clear', 'snooze', 'unblock', 'where', 'command',
 ];
 
 /** Whether the practice band is on the screen right now. */

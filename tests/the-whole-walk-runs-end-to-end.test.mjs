@@ -58,6 +58,10 @@ function walkIt() {
   // three rows already waiting in it, and archived when the walk ends.
   s = advance(s, { t: 'practice', product: 'practice', examples: EXAMPLE_IDS });
   at('practising');
+  // WRITING ONE IS TWO BEATS SINCE 2026-10-01. The card opens on who the
+  // thread is for, which the walk never used to say a word about, and the beat
+  // ends when the To list is really open (App.tsx, `onOpenMenu`).
+  s = stepTo(s, 'who');                                 at('who it is for');
   s = stepTo(s, 'task');                                at('composing');
   s = advance(s, { t: 'sent', item: 'w-first', at: 1_000 }); at('it is running');
   s = advance(s, { t: 'answered' });                    at('it came back');
@@ -127,18 +131,22 @@ describe('the walk, start to finish', () => {
     // ELEVEN AND EIGHTEEN since w-ec62ab6b38 (2026-09-28): the note beat went
     // with the rail it pointed at.
     //
+    // AND TWELVE AND NINETEEN since 2026-10-01, when who a thread is for became
+    // a beat of its own between opening the card and sending it. Both pairs
+    // moved down by one; neither changed what it is.
+    //
     // `where` IS ONE BEAT AND ONE STEP even though it takes three presses of
     // Tab. The presses move the VIEW, not the step, which is exactly why the
     // card cannot get out of step with the screen it is describing.
     const beats = seen.map((m) => m.step).filter((s, i, all) => s !== all[i - 1]);
     const times = new Map();
     for (const s of beats) times.set(BEAT[s], (times.get(BEAT[s]) ?? 0) + 1);
-    const twice = new Set([11, 18]);
+    const twice = new Set([12, 19]);
     for (const [dot, n] of times) {
       expect(n, `dot ${dot} was on screen ${n} times`).toBe(twice.has(dot) ? 2 : 1);
     }
-    expect(beats.filter((s) => BEAT[s] === 11)).toEqual(['working', 'open']);
-    expect(beats.filter((s) => BEAT[s] === 18)).toEqual(['done', 'landed']);
+    expect(beats.filter((s) => BEAT[s] === 12)).toEqual(['working', 'open']);
+    expect(beats.filter((s) => BEAT[s] === 19)).toEqual(['done', 'landed']);
   });
 
   it('still knows the folder and the name it was given at the start', () => {

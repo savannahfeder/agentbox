@@ -124,11 +124,14 @@ describe('every practice beat names something to click', () => {
     it(`${name} says what to click as well as what to press`, () => {
       const step = name.split(' ')[0];
       if (!say.key) {
-        // A card with no key asks for no press, so there is nothing to offer a
-        // mouse route to. Only the two beats above are allowed to be in this
-        // state, and `snooze (picking)` is the picker itself, which is a list
-        // of times to click and names no key by design.
-        expect(['working', 'snooze', 'command'], `${name} asks for nothing`).toContain(step);
+        // A card with no key either asks for nothing at all, or asks for a
+        // click on something the app has no key for. `who` is the second kind
+        // and the only one: To is a button on the card and there is no
+        // shortcut that opens it, so the loud line is the click alone rather
+        // than a cap invented to keep the other cards' shape. The first kind is
+        // the running beat and the picker, which are lists to choose from.
+        expect(['working', 'who', 'snooze', 'command'], `${name} asks for nothing`).toContain(step);
+        if (step === 'who') expect(loud(say).toLowerCase(), `${name} names no click`).toContain('click');
         return;
       }
       if (NO_CLICK[step] && (say.key === 'esc' || step === 'working' || step === 'clear' || step === 'snooze')) {
@@ -180,6 +183,19 @@ describe('the click each card names is a real one', () => {
     // The card's own button really says that word, in the element the ring is
     // drawn round.
     expect(read('renderer/src/threads/ThreadComposer.tsx')).toMatch(/className="tc-send-main"[\s\S]{0,400}Send/);
+  });
+
+  // WHO THE THREAD IS FOR (2026-10-01). The beat she asked for: "we're missing
+  // important stuff like: selecting who it's to etc. and sending messages to
+  // both people and agents." It rings the To row and the list it opens, and
+  // says both halves, because on a Mac with no teammates the list draws Agent
+  // alone and the People half appears the day somebody joins.
+  it('points at the To row, and names an agent and a person', () => {
+    const say = coach('who', 0);
+    expect(say.key).toBeNull();
+    expect(loud(say)).toBe('Click To at the top of the card to see who it can go to.');
+    expect(say.quiet).toBe('Every thread goes to an agent, or to a person on your team.');
+    expect(ANCHOR.who).toEqual(['.tc-card .tc-to-menu', '.tc-card .tc-word']);
   });
 
   it('points at the row on the two beats that ring a row', () => {

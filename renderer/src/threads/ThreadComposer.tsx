@@ -74,7 +74,7 @@ export interface ThreadSent {
 type MenuKey = 'to' | 'model' | 'project' | 'priority' | 'visibility' | 'later';
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onClose, onSent, onOpenConversation, onReorderProjects,
+  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onOpenConversation, onReorderProjects,
 }: {
   products: Product[];
   items: WorkItem[];
@@ -104,6 +104,8 @@ export function ThreadComposer({
    *    knows nothing about the walk beyond "somebody scripted this one".
    */
   scripted?: { labels: string[] } | null;
+  /** Called with a menu's name the moment it opens. The tutorial listens for `to`. */
+  onOpenMenu?: (which: MenuKey) => void;
   /** Picking someone you already talk to opens that conversation instead,
    *  carrying whatever was typed into its reply box (2026-10-01: a strip of
    *  the last few lines reads badly for a conversation that is hundreds of
@@ -228,7 +230,11 @@ export function ThreadComposer({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const toggle = (key: MenuKey) => {
-    setOpen((o) => (o === key ? null : key));
+    // WHICH LIST WAS OPENED, for the one caller that needs to know: the
+    // tutorial's beat about who a thread is for ends when the To list is really
+    // open, the way every other beat ends on the thing it asked for actually
+    // happening rather than on a Next. Nothing else passes this.
+    setOpen((o) => { const next = o === key ? null : key; if (next) onOpenMenu?.(next); return next; });
     setModelPage('recent');
     setLaterPage('list');
     // Who sees it opens on its three rows, even if the picker was last open.

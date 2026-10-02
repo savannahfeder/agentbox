@@ -938,6 +938,11 @@ export default function App() {
   // size, and this is the one line that makes them the practice project's. It
   // is the app's own product filter, which every list in here already reads.
   const inPractice = practising(run);
+  // THE TWO BEATS THE NEW THREAD CARD IS OPEN FOR: the one about who the thread
+  // is for and the one that sends it. Both want the walk's own task in the box,
+  // the practice project under it and the label on the row it makes, so the
+  // card is told once rather than in three places that could disagree.
+  const walkCard = run?.step === 'who' || run?.step === 'task';
   // WHAT THE LISTS UNDERNEATH ARE SCOPED TO. Only the practice run: it has to
   // make the whole app the practice project's, the mask and the counts included.
   // Her own filter is not this. It narrows the box on screen and nothing else
@@ -958,7 +963,11 @@ export default function App() {
     if (!run) return;
     // BEAT FOUR IS THE REAL, EMPTY INBOX.
     if (run.step === 'make') { setFocused(null); setModal(null); setView('inbox'); }
-    if (run.step === 'task') setModal('compose');
+    // BOTH BEATS THE CARD IS OPEN FOR, not just the send. Somebody who quits
+    // the walk on the beat about who a thread is for comes back to a card
+    // telling them to click To, and without this there would be no card on the
+    // screen to click it on.
+    if (run.step === 'who' || run.step === 'task') setModal('compose');
     if (run.step === 'working') { setModal(null); setView('progress'); setSelected(0); }
     // AND IT COMES BACK TO HER INBOX RATHER THAN OPENING ITSELF.
     if (run.step === 'open') { setModal(null); setView('inbox'); setSelected(0); }
@@ -988,8 +997,11 @@ export default function App() {
   // beat moves on whether she pressed C or clicked the plus, and it is the
   // app's behaviour she is learning rather than the walk's.
   useEffect(() => {
+    // THE CARD OPENING ENDS THE FIRST BEAT AND STARTS THE ONE ABOUT WHO IT IS
+    // FOR (2026-10-01). It used to go straight to the send; To is the card's
+    // first line and the walk never said a word about it.
     if (run?.step !== 'make' || modal !== 'compose') return;
-    setRun((r) => (r ? stepTo(r, 'task') : r));
+    setRun((r) => (r ? stepTo(r, 'who') : r));
   }, [run?.step, modal]);
 
   // AND SHE OPENS IT HERSELF. Beat six's second half ends when the row she was
@@ -5204,14 +5216,19 @@ export default function App() {
           codexModelDefault={codexModelDefault}
           // THE TUTORIAL SENDS ITS TASK INTO THE PRACTICE PROJECT, so the card
           // opens on that project rather than on whatever was last used.
-          defaultProduct={run?.step === 'task' ? (run.practice ?? run.product) : productFilter}
+          defaultProduct={walkCard ? (run!.practice ?? run!.product) : productFilter}
           /* THE WALK'S OWN TASK, ALREADY WRITTEN. The beat is about pressing
              send, not about thinking of something to ask, so the words are in
              the box when the card opens. `scripted` is what lets this one task
              into the practice project and what stamps the label the supervisor
              reads; everything else about the card is the card anybody uses. */
-          initial={run?.step === 'task' ? { body: `${TASK_TITLE}\n\n${TASK_BODY}` } : composeInitial}
-          scripted={run?.step === 'task' ? { labels: [FIRST_RUN_LABEL] } : null}
+          initial={walkCard ? { body: `${TASK_TITLE}\n\n${TASK_BODY}` } : composeInitial}
+          scripted={walkCard ? { labels: [FIRST_RUN_LABEL] } : null}
+          // AND THE BEAT ABOUT WHO IT IS FOR ENDS WHEN THE LIST IS REALLY OPEN,
+          // the way every other beat ends on the thing it asked for happening.
+          onOpenMenu={(which) => {
+            if (which === 'to' && runRef.current?.step === 'who') setRun((r) => (r ? stepTo(r, 'task') : r));
+          }}
           onOpenConversation={openConversation}
           // "Reorder" beside the project menu's heading: Settings on the
           // Projects page, which is where the order is set. The draft is

@@ -495,8 +495,9 @@ describe('the introduction, in front of the app', () => {
   it('is four screens and every one of them counts', () => {
     // FIVE UNTIL 2026-08-24.
     expect(INTRO).toEqual(['inbox', 'away', 'goal', 'hand']);
-    // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out.
-    expect(N_BEATS).toBe(18);
+    // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out, and
+    // nineteen since 2026-10-01, when who a thread is for became its own beat.
+    expect(N_BEATS).toBe(19);
     // THE THREE SLABS COME STRAIGHT AFTER THE THREE SETUP SCREENS, and the
     // theme picker is between the last slab and the hand-off.
     expect(INTRO.map((s) => BEAT[s])).toEqual([4, 5, 6, 8]);
@@ -704,6 +705,6 @@ describe('the wire between the two halves', () => {
     // task they send themselves lands in their own project. The walk opens the
     // real new thread card since 2026-10-01, and that card is told which
     // project to open on rather than being handed a prefill with one inside it.
-    expect(app).toMatch(/defaultProduct=\{run\?\.step === 'task' \? \(run\.practice \?\? run\.product\) : productFilter\}/);
+    expect(app).toMatch(/defaultProduct=\{walkCard \? \(run!\.practice \?\? run!\.product\) : productFilter\}/);
   });
 });

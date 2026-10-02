@@ -417,7 +417,10 @@ describe('the wiring, which is the half a pure test cannot see', () => {
   // is what lets this one task into the practice project, which every other
   // task there is refused (compose-says.ts practiceRefusal).
   it('composes the example task with the mark on it', () => {
-    expect(app).toMatch(/scripted=\{run\?\.step === 'task' \? \{ labels: \[FIRST_RUN_LABEL\] \} : null\}/);
+    // `walkCard` is the two beats the card is open for, who it is to and the
+    // send, so the task, the project and the label are decided in one place.
+    expect(app).toMatch(/const walkCard = run\?\.step === 'who' \|\| run\?\.step === 'task';/);
+    expect(app).toMatch(/scripted=\{walkCard \? \{ labels: \[FIRST_RUN_LABEL\] \} : null\}/);
     const card = src('threads', 'ThreadComposer.tsx');
     expect(card).toMatch(/\.\.\.\(scripted \? \{ labels: scripted\.labels \} : \{\}\)/);
     expect(card).toMatch(/practiceRefusal\(product, \{ scripted: !!scripted \}\)/);
