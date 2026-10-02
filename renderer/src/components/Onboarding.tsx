@@ -1752,9 +1752,15 @@ function Look({ look, onPick, onNext }: {
  *  2026-08-24 and is what round two did. It is written up on `IntroPiece` above,
  *  including why a session took it off and why that was a misreading.
  *
- * the sentence in one corner and the way on in the other. */
-function Slab({ n, head, line, piece, onNext }: {
-  n: number; head: string; line: string;
+ * the sentence in one corner and the way on in the other.
+ *
+ * AND NO COUNTER IN FRONT OF THE HEADING SINCE 2026-10-01. It printed "3 OF 3"
+ * on this screen and the walk then showed the theme picker and the tutorial
+ * card, so the number was the only thing on the screen saying how much was
+ * left and it was wrong by two. The whole of why is in `COPY.introNext`'s
+ * neighbour in onboarding.ts. */
+function Slab({ head, line, piece, onNext }: {
+  head: string; line: string;
   piece: 'list' | 'ask' | 'empty' | 'progress'; onNext: () => void;
 }) {
   // ENTER CARRIES THE WHOLE WALK, the same rule every setup screen keeps: a
@@ -1784,7 +1790,6 @@ function Slab({ n, head, line, piece, onNext }: {
       <IntroPiece kind={piece} />
       <div className="fr-corner">
         <div>
-          <div className="fr-intro-on">{COPY.introOn(n, COPY.intro.length)}</div>
           <h1 className="fr-head">{head}</h1>
           <p className="fr-intro-line">{line}</p>
         </div>
@@ -2219,7 +2224,6 @@ export function Onboarding({
     const it = COPY.intro[slab];
     return (
       <Slab
-        n={slab + 1}
         head={it.head}
         line={it.line}
         piece={it.piece}

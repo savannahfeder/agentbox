@@ -621,7 +621,7 @@ export function waitingId(run: FirstRun | null, waitingAt: number): string | nul
  *
  *  It is only ever the walk's own staged rows, and only while the walk is on.
  *
- *  ONE SENTENCE IN ONE PLACE for the stopped row, because E and S say the same
+ *  ONE SENTENCE IN ONE PLACE for the stopped row, because E and L say the same
  *  thing about it and two wordings of it is two lessons. It names the row the
  *  way the beat that is coming names it, so the toast and the card agree. */
 const STOPPED_REFUSAL = 'That one is an agent stopped, waiting on you. Open it and answer it.';
@@ -634,15 +634,16 @@ export function closingRefused(
 ): string | null {
   if (!run || run.step === 'landed') return null;
   if (id === waitingId(run, waitingAt)) return STOPPED_REFUSAL;
-  if (id === laterId(run, laterAt)) return 'That one is not finished. Press S to deal with it later.';
+  if (id === laterId(run, laterAt)) return 'That one is not finished. Press L to deal with it later.';
   return null;
 }
 
 /**
- * AND THE SAME FOR S, on the one row it is also wrong on. Snoozing the stopped
- *  row takes it out of the inbox exactly as closing it does, and takes the same
- *  beat with it. S IS RIGHT on the row that is not for today, which is why that
- *  one is absent here and present above. */
+ * AND THE SAME FOR L, on the one row it is also wrong on. Scheduling the
+ *  stopped row takes it out of the inbox exactly as closing it does, and takes
+ *  the same beat with it. L IS RIGHT on the row that is not for today, which is
+ *  why that one is absent here and present above. The key was S until
+ *  2026-10-01, when S became the summary everywhere; nothing else here moved. */
 export function snoozeRefused(
   run: FirstRun | null,
   id: string,
@@ -918,11 +919,28 @@ export const COPY = {
      the whole lesson is to get to inbox zero. */
   pieceEmpty: 'Nothing is waiting on you.',
   pieceAgents: 'Active agents',
-  // HOW FAR THROUGH THE INTRODUCTION, COUNTED OFF THE LIST ITSELF. It was
-  // `${n} of 4` with the 4 typed out, which is a second copy of the length of
-  // `intro` kept in step with it by nothing; the same shape broke the Next
-  // button on 08-24 and is what this round took the fourth slab back out of.
-  introOn: (n: number, of: number) => `${n} of ${of}`,
+  /* * AND THERE IS NO COUNTER ON THESE SCREENS ANY MORE (2026-10-01).
+
+     IT SAID "3 OF 3" AND THEN THE WALK CARRIED ON FOR TWELVE MORE SCREENS. A PM
+     and an office manager both walked it on 2026-10-01: the third slab reads 3
+     of 3, and the next thing after it is the theme picker, and the thing after
+     that is a card headed "This is the tutorial." A counter that ends before the
+     steps do is worse than no counter, because it is the one thing on the screen
+     somebody trusts to tell them how much is left.
+
+     IT WAS `${n} of ${COPY.intro.length}`, so it was honest about what it was
+     counting, which was the three introduction slabs. Nobody reading it knows
+     that: on the screen it is a number over a heading, and what it looks like
+     it is counting is the walk.
+
+     SO IT IS GONE RATHER THAN RE-COUNTED, and the choice was between those two.
+     Re-counting means every screen the walk shows, which is eighteen beats, and
+     the walk's own numbering (`BEAT`) deliberately draws nothing: a walk that
+     opens by saying it is eighteen long is a walk nobody starts. Any counter
+     drawn on a prefix of it ends before the steps do, which is the fault itself.
+     Three screens with a Next button on each do not need a tally anyway.
+
+     `introNext` stays: the button is how anybody gets off the screen. */
   introNext: 'Next',
 
   /* * THE MOUSE RULE IS DELETED, AND IT IS NOT COMING BACK AS A LINE SOMEWHERE ELSE.
@@ -1390,8 +1408,11 @@ export function coach(
       return say('A thread is a job you hand to an agent.', 'Press ', 'N', ' or click New thread to write your first one.');
     /* * AND THE GREY LINE IS GONE FROM THIS BEAT.
     */
+    // AND IT NAMES THE BUTTON TOO (2026-10-01). Same round and same reason as
+    // `make` above: the compose card's own button says "Start it", it is the
+    // thing the ring is round, and ⌘↵ is the least guessable cap in the walk.
     case 'task':
-      return say('', 'Press ', '⌘↵', ' to start it.');
+      return say('', 'Press ', '⌘↵', ' or click Start it.');
     case 'working':
       return sinceSent >= SLOW_AFTER_MS
         ? say('Your agent is running.',
@@ -1399,9 +1420,12 @@ export function coach(
         : say('Your agent is running.', 'It comes back in a few seconds.');
     /* * THREE "IT"S AND NOT ONE NOUN.
     */
+    // AND THE ROW IS THE CLICK (2026-10-01). The ring is round the row itself,
+    // so clicking it is already allowed and already opens it; the card simply
+    // had not said so.
     case 'open':
       return say('Your agent worked on its own, and this row is what it sent back.',
-        'Press ', '↵', ' to open it.');
+        'Press ', '↵', ' or click the row to open it.');
     /* * AND THE REQUESTED SENTENCE.
 
        So the grey line goes, the instruction stays exactly as it was because it is the
@@ -1419,8 +1443,15 @@ export function coach(
     // the next line that grows is caught by the walk rather than by somebody
     // looking at a picture. What the line said is in the quiet line instead: a
     // task ending one of two ways IS closing it or replying to it.
+    // AND THE REPLY HALF NAMES THE BOX (2026-10-01). "Reply to it" is a thing
+    // to do and not a thing to click, and the ring is round the box, so the
+    // card now points at it in words. CLOSING HAS NO BUTTON ON THIS SCREEN and
+    // the card does not invent one: Mark done is a row inside the menu beside
+    // Summary, which is two clicks behind a three-dot button, and naming it
+    // would make this the longest line in the walk. The mouse route on this
+    // beat is replying, which is the half somebody is here to learn.
     case 'answer':
-      return say('Every thread ends one of two ways.', 'Reply to it, or press ', 'E', ' to close it.');
+      return say('Every thread ends one of two ways.', 'Click the box below to reply, or press ', 'E', ' to close it.');
     // THE THREE ARE EXAMPLES AND THE CARD HAS TO SAY SO.
     //
     // The old line was 'Three of these are waiting on you.' over 'Clear them.
@@ -1472,6 +1503,28 @@ export function coach(
         ctx.left === 1
           ? 'This one is finished too.'
           : 'This one is finished. Z brings back anything you close.',
+        // AND THIS BEAT NAMES NO CLICK, WHICH IS THE ONE PLACE THE ROUND OF
+        // 2026-10-01 COULD NOT GO. Every other beat now says what to click as
+        // well as what to press, because every other beat rings something the
+        // app really answers a click on. This one ringed a row, and a row
+        // answers a click by OPENING, not by closing.
+        //
+        // IT SAID "or click Done on the row" FOR AN HOUR AND THAT WAS WORSE
+        // THAN SAYING NOTHING. The chip at the row's right end was made a
+        // button to make the sentence true, and the founder caught it the same
+        // day: "you can't actually click Done in the app... I think it's sort
+        // of misleading users because you can't actually do that in the real
+        // app." She is right, and the reason is that the chip is drawn ONLY
+        // while the walk is on (`walk &&` in components/List.tsx). The tutorial
+        // would have taught a control that exists nowhere else: somebody learns
+        // to close by clicking, finishes the walk, and the button is gone.
+        //
+        // THE REAL GAP IS IN THE APP AND NOT IN THIS SENTENCE. From the list
+        // there is no way to close a thread with the mouse at all: the hover
+        // plate is `pointer-events: none` on purpose (components/HintPlate.tsx)
+        // and Mark done is a row in the three-dot menu inside an opened thread
+        // (threads/ThreadMenu.tsx). Until the app grows one, the honest card is
+        // the key alone. Same for `snooze` below.
         'Press ', 'E', ' to close it.',
         { caps: 2 },
       );
@@ -1501,8 +1554,16 @@ export function coach(
       return ctx.picking
         ? say('Pick when it should come back.', 'It leaves your inbox until then and comes back on its own.')
         : say(
+          // L, NOT S, SINCE 2026-10-01. S had come to mean the summary inside a
+          // thread and still opened this picker everywhere else, so one letter
+          // taught two things; the walk teaches the one the app now answers.
+          //
+          // AND NO CLICK NAMED HERE EITHER, for the reason written out on
+          // `clear` above: the row's chip is drawn only while the walk is on,
+          // so a card telling somebody to click Later would teach a button that
+          // is gone the moment the tutorial ends.
           'Real work, but not for today. An empty inbox is the goal.',
-          'Press ', 'S', ' to deal with it later.',
+          'Press ', 'L', ' to deal with it later.',
           // AND THE THIRD LINE IS FOLDED IN RATHER THAN DROPPED.
         );
     // AND THE ONE THAT IS LEFT IS THE POINT. Half of this beat is in the list
@@ -1526,8 +1587,10 @@ export function coach(
     case 'unblock':
       return ctx.opened
         ? say(
+          // AND THE STRIP IS THE CLICK (2026-10-01). The ring is round the
+          // strip of options, so the first of them is already clickable.
           'Your agent gave you three answers to pick from.',
-          'Press ', '1', ' to send the one it recommends.',
+          'Press ', '1', ' or click the first answer to send it.',
         )
         /*
          * AND THE WARNING IS IN THE QUIET LINE.
@@ -1545,7 +1608,7 @@ export function coach(
         // for good" is on this card.
         : say(
           'An agent is stopped here. Closing it leaves it stopped for good.',
-          'Press ', '↵', ' to open it.',
+          'Press ', '↵', ' or click the row to open it.',
         );
     // AND CLEARING THEM GOES STRAIGHT ON TO ⌘K. The finish card says the same
     // thing two beats later, where it is the end and where it is true. THE
@@ -1733,6 +1796,14 @@ export function coach(
     */
     case 'command':
       return ctx.palette
+        // AND THIS HALF NAMES NO CLICK, WHICH IS THE ONE EXCEPTION IN THE WALK
+        // (2026-10-01). Every other beat now says what to click as well as what
+        // to press; here there is nothing honest to point at. The ring is round
+        // the palette itself, so the only things inside it are the field and the
+        // command rows, and "click a row" would run one of eighty commands
+        // instead of closing the list. esc is not a shortcut anybody has to
+        // remember, which is the whole worry this round is about: it is the key
+        // every window on the Mac closes on.
         ? say(
           `Every command in ${NAME} is in this list.`,
           'Press ', 'esc', ' to close it.',
@@ -1748,7 +1819,18 @@ export function coach(
           'Everything you just did is one key away. So is this: type tutorial.',
           // ⌘K finds commands; N starts a thread. The old line read as if ⌘K
           // started one (a persona test, 2026-10-01).
-          'Press ', '⌘K', ' to find any command, or N to start your first real thread.',
+          //
+          // AND IT NAMES THE BUTTON, WHICH IS THE LAST BEAT THAT DID NOT
+          // (2026-10-01). ⌘K is the least guessable press in the walk and this
+          // is the beat that exists to teach it, so a card that names only the
+          // chord is the beat failing at its one job for anybody who does not
+          // use shortcuts. The ⌘ button in the corner is inside the ring
+          // (`ANCHOR.command`) and opens the same list. "to find any command"
+          // comes out to pay for it: the other half of this beat already says
+          // `Every command in ${NAME} is in this list.` over the open list, and
+          // the loud line has to stay ONE sentence
+          // (tests/the-coaching-card-is-two-lines.test.mjs).
+          'Press ', '⌘K', ' or click the ⌘ button, or N for your first real thread.',
         );
     default:
       return null;

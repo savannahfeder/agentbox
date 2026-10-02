@@ -103,8 +103,17 @@ export const HINTS: Record<string, HintLine[]> = {
     // sidebar still says Closed while this says Mark done; whichever merges
     // second makes them agree. Do not put "Close" back.
     { key: 'E', what: 'Mark done' },
-    { key: 'S', what: 'Schedule for later' },
+    // L, NOT S, SINCE 2026-10-01. S opens the summary inside a thread and
+    // opened the schedule picker here, so the plate and the thread's own top
+    // bar printed one letter for two different things. Scheduling is L
+    // everywhere now: this plate, the shortcuts page, ⌘K and the walk.
+    { key: 'L', what: 'Schedule for later' },
   ],
+  // AND S IS NOT ON THIS PLATE, BECAUSE THE SUMMARY BUTTON PRINTS IT. S means
+  // the summary everywhere in the app now (threads/Summary.tsx); the button in
+  // a thread's top bar wears its own S the way the reply pill wears R, and a
+  // component that already shows its key gets no plate. The shortcuts page
+  // lists it.
   // THE CORNER OF THE TOP BAR, AND THESE THREE WERE MISSING AT FIRST: hovering
   // them showed no shortcut at all.
   //

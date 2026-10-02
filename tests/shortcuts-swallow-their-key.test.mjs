@@ -1,5 +1,11 @@
 // A single-key shortcut that opens a text field must swallow its own keystroke.
 //
+// THE KEY IS L SINCE 2026-10-01 AND EVERYTHING BELOW IS ABOUT THE KEY, NOT THE
+// LETTER. S used to open the schedule picker and it also toggled the summary
+// panel inside a thread, so one letter meant two things and a tester met both
+// in a minute; scheduling moved to L (for later), which nothing else uses. The
+// story below is still the story: it is about whatever letter opens the picker.
+//
 // S opened the schedule picker without calling preventDefault, so the "s" that
 // opened it was typed into the input the picker had just focused. She typed her
 // time on top of that stray character, the grammar could not read "stomorrow",
@@ -11,8 +17,8 @@
 //
 // The first version of this test checked each `case` branch for a
 // preventDefault, and PASSED while the bug was still live, because there are
-// two branches that open the picker (the focus-mode one at `e.key === 's'` and
-// the list one at `case 's'`) and it only understood the second syntax. That is
+// two branches that open the picker (the focus-mode one at `e.key === 'l'` and
+// the list one at `case 'l'`) and it only understood the second syntax. That is
 // the whole argument for the guard it now checks: the rule is applied once, to
 // the key, before any branch runs, so a new shortcut cannot reintroduce this by
 // being written in a shape nobody thought to grep for.
@@ -47,11 +53,15 @@ function handlerBounds() {
 
 describe('single-key shortcuts', () => {
   it('knows which keys open a text field', () => {
-    expect(opensATextField('s')).toBe(true);
-    expect(opensATextField('S')).toBe(true);
+    expect(opensATextField('l')).toBe(true);
+    expect(opensATextField('L')).toBe(true);
     expect(opensATextField('r')).toBe(true);
     expect(opensATextField('c')).toBe(true);
     expect(opensATextField('g')).toBe(false);
+    // AND S IS NOT IN THE SET ANY MORE, which is the half worth pinning: it
+    // opens the summary panel, which has no field in it, so swallowing the
+    // press would be a rule applied to a key that does not need it.
+    expect(opensATextField('s')).toBe(false);
   });
 
   it('the guard exists, and runs before any branch that opens one', () => {
@@ -75,7 +85,7 @@ describe('single-key shortcuts', () => {
       .map((m) => m.index)
       .filter((at) => at > start && at < end);
 
-    expect(openers.length).toBeGreaterThan(2); // both s branches, plus r, c and /
+    expect(openers.length).toBeGreaterThan(2); // both L branches, plus r, c and /
     expect(openers.filter((at) => at < guardAt)).toEqual([]);
   });
 
@@ -92,7 +102,8 @@ describe('single-key shortcuts', () => {
   // every search she starts begins with a stray slash in it and returns
   // nothing.
   it('the keys the guard covers are the ones the branches actually use', () => {
-    // N opens the same new task box as C (w-fb9051e597).
-    expect([...OPENS_A_TEXT_FIELD].sort()).toEqual(['/', 'c', 'n', 'r', 's']);
+    // N opens the same new task box as C (w-fb9051e597). L replaced S on
+    // 2026-10-01 when S became the summary's key everywhere in the app.
+    expect([...OPENS_A_TEXT_FIELD].sort()).toEqual(['/', 'c', 'l', 'n', 'r']);
   });
 });

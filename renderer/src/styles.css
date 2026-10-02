@@ -1936,6 +1936,12 @@ body {
    The baseline look won out of five. Buttons, so a
    click answers as the key does.
 */
+/* THE RESET IS BACK ON THE IMPORT ROW'S SLOT AND NOT ON `button.row-key`
+   (2026-10-01). It was widened for an hour so the walk's chip could be a button
+   too, and the walk's chip is a label again: it is drawn only while the
+   tutorial is on, so a clickable one teaches a control the real app does not
+   have. The import row's Yes and No are the only row keys anybody can press
+   with a mouse. */
 .row-end .import-keys .row-key {
   background: none; border: 0; padding: 0; margin: 0; font: inherit; cursor: pointer;
   display: inline-flex; align-items: center;
@@ -6701,14 +6707,14 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 
 /* --- the introduction.THE WORDS ARE ON THE LEFT AND THE PRODUCT IS ON THE
    RIGHT.The headline is .fr-head, unchanged, so all five screens before the app
-   are one screen with different words on it. What is added is the count, the
-   line under the headline, and .fr-piece below.
+   are one screen with different words on it. What is added is the line under
+   the headline and .fr-piece below.
+
+   THE COUNT USED TO BE THE FIRST THING IN THAT CORNER AND IT IS DELETED
+   (2026-10-01). It read "3 OF 3" with two screens still to come. The rule and
+   the measurement are in onboarding.ts beside `introNext`; the style goes with
+   it so there is nothing left to hang a new counter on by accident.
 */
-.fr-intro-on {
-  margin: 0 0 18px;
-  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--text-faint);
-}
 /* Wider than .fr-head's 19ch because this is a sentence rather than a title,
    and narrower than the window because a line of body text that runs the whole
    width of a 1700 point screen is not read, it is skimmed. */

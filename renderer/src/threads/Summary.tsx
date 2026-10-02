@@ -20,7 +20,7 @@ import { PRIORITIES, priorityIdOf, priorityLabelOf, priorityValueOf, type Priori
 import { Face, TeamContext, firstName, type TeamView } from '../team/people';
 import {
   STATE_WORD, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, lastEdit, linkCandidates, linkedThreads,
-  ownerName, readSummaryOpen, stateGlyph, type StateGlyph, type SummaryField,
+  ownerName, readSummaryOpen, stateGlyph, statusChoices, type StateGlyph, type SummaryField,
 } from './summary-rules';
 import { VISIBILITY_WORD, chosenNames, whoSees, type Seen } from './summary-rules';
 import { findPeople, teammates } from './composer-rules';
@@ -74,13 +74,19 @@ export function useSummaryOpen(): [boolean, () => void] {
  * S opens and closes the summary, as the button says, whenever the cursor is
  * not in somewhere she types.
  *
- * IT LISTENS FIRST AND STOPS THE KEY THERE. The window's own handler (App.tsx)
- * reads S inside an open task as "put this off", and both firing on one press
- * would open the schedule picker over the panel she just asked for. The
- * approved top bar prints S on the Summary button, so on a thread that has a
- * summary the key is the summary's. Snoozing is still on S in the list, and in
- * the palette everywhere. A thread with no summary (a message, a running
- * agent) does not call this, so S there still snoozes.
+ * IT LISTENS FIRST AND STOPS THE KEY THERE, and that is now belt and braces
+ * rather than the thing holding the app together.
+ *
+ * S MEANT TWO THINGS FOR A DAY AND IT IS ONE AGAIN (2026-10-01). The window's
+ * own handler (App.tsx) read S as "put this off", in the list and inside an
+ * open task, while the approved top bar printed S on the Summary button; both
+ * fired on one press and this hook winning was the only reason the schedule
+ * picker did not open over the panel somebody had just asked for. An office
+ * manager testing the app met both meanings inside a minute. So scheduling
+ * moved to L everywhere (the list, an open thread, the hint plate, ⌘K, the
+ * shortcuts page and the walk) and S is the summary's alone, on every screen
+ * in the app. This hook still listens in the capture phase, because a hook
+ * that stops its own key is the right shape whatever else is bound.
  */
 export function useSummaryShortcut(onToggle: () => void, enabled = true) {
   useEffect(() => {
@@ -133,7 +139,7 @@ export function SummaryToggle({ open, onToggle }: { open: boolean; onToggle: () 
 
 type Field = SummaryField | 'priority' | 'visibility' | 'visibleTo' | 'blockedBy' | 'blocks';
 type Pending = Partial<Record<Field, { value: unknown; ts: number }>>;
-type Menu = null | 'priority' | 'visibility' | 'blockedBy' | 'blocks';
+type Menu = null | 'status' | 'priority' | 'visibility' | 'blockedBy' | 'blocks';
 
 const NOT_WRITTEN = 'Not written yet';
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -146,11 +152,17 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stri
  * and for the menu that adds one. `team` is null on a Mac nobody has signed
  * into, where every thread is yours.
  */
-export function SummaryPanel({ item, items, team, onOpenItem }: {
+export function SummaryPanel({ item, items, team, onOpenItem, onFinish }: {
   item: WorkItem;
   items: WorkItem[];
   team: TeamView | null;
   onOpenItem?: (item: WorkItem) => void;
+  /**
+   * CLOSE THIS THREAD, or null where there is nothing to close. The Status row
+   * calls it; it is the same `markDone` E runs and the same one the three-dot
+   * menu's Mark done row takes, handed down from Focus. Null leaves the Status
+   * row a plain word. */
+  onFinish?: (() => void) | null;
 }) {
   const me = team?.me ?? null;
 
@@ -353,15 +365,53 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
           rowTitle). Without it the panel was a list of properties about
           nothing in particular. */}
       <h2 className="ts-title">{rowTitle(item)}</h2>
-      {/* CHANGEABLE LOOKS CHANGEABLE (2026-10-01). Priority and Visible to are
-          buttons that wash, point and show a caret under the pointer; Status,
+      {/* CHANGEABLE LOOKS CHANGEABLE (2026-10-01). Status, Priority and Visible
+          to are buttons that wash, point and show a caret under the pointer;
           Owner and Project are plain words with no hover at all. Owner stays
           read-only because people here get messages, never tasks. Project
           does because nothing in the store moves a thread from one project's
           ledger to another, and a menu here would have to invent that. */}
       <div className="ts-props">
         <span className="ts-label">Status</span>
-        <span className="ts-value"><Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{STATE_WORD[state]}</span>
+        {/* AND STATUS JOINED THEM THE SAME DAY, at her word: "I think it would
+            be intuitive for people to be able to drop down and mark it done.
+            I think that's better than our Mark Done button in the top-right
+            corner." `statusChoices` in ./summary-rules.ts says what it offers
+            and why that is one row; a finished thread has nothing to set, so
+            the word stands on its own exactly as it did before.
+
+            IT RUNS `markDone`, THE SAME FUNCTION E AND THE MENU RUN. It is
+            handed in from Focus as `onFinish`, which is the prop the three-dot
+            menu's Mark done row already takes, so the undo, the toast and the
+            move to the next thread are one behaviour and not three. Writing
+            `status: 'done'` through `save` here would have been a second way
+            to close a thread with its own rules. */}
+        {onFinish && statusChoices(state).length ? (
+          <span className="ts-value ts-menu-anchor" ref={holdMenu('status')}>
+            <button type="button" className="ts-prop-btn" aria-haspopup="listbox" aria-expanded={menu === 'status'} title="Change the status" onClick={() => setMenu(menu === 'status' ? null : 'status')}>
+              <Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{STATE_WORD[state]}<Caret />
+            </button>
+            {menu === 'status' && (
+              <span className="prio-menu ts-menu" role="listbox" aria-label="Status">
+                {statusChoices(state).map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="option"
+                    aria-selected={false}
+                    className="prio-menu-row"
+                    onClick={() => { setMenu(null); onFinish(); }}
+                  >
+                    <Glyph kind={c.glyph} />
+                    <span className="prio-menu-label">{c.word}</span>
+                  </button>
+                ))}
+              </span>
+            )}
+          </span>
+        ) : (
+          <span className="ts-value"><Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{STATE_WORD[state]}</span>
+        )}
         <span className="ts-label">Owner</span>
         <span className="ts-value">{ownerPerson && <Face person={ownerPerson} />}{owner}</span>
         <span className="ts-label">Project</span>

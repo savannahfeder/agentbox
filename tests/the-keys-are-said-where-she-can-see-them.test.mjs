@@ -53,10 +53,18 @@ const tabNav = () => {
 };
 
 describe('the row prints the keys it really has', () => {
-  it('gives the inbox reply and close, which is the drawing she picked', () => {
+  // AND LATER IS ON AN INBOX ROW TOO SINCE 2026-10-01. These words are only
+  // ever drawn while the tutorial is on (`walkRowKeys` narrows them to the
+  // beat's own key and List.tsx draws them under a `walk &&` guard), and the
+  // tutorial's scheduling beat asks for L on an inbox row. Without this entry
+  // that beat drew a card naming a key and left nothing on the row to click.
+  // L really does open the picker in the inbox, which is the rule this whole
+  // file keeps.
+  it('gives the inbox reply, close and later, which are the keys it really has', () => {
     expect(rowKeys('inbox')).toEqual([
       { key: 'R', word: 'Reply' },
       { key: 'E', word: DONE.short },
+      { key: 'L', word: 'Later' },
     ]);
   });
 
@@ -73,7 +81,7 @@ describe('the row prints the keys it really has', () => {
     expect(listSwitch).toMatch(/case 'e': case 'E':[\s\S]{0,400}view === 'snoozed'\) unsnooze/);
     expect(rowKeys('snoozed')).toEqual([
       { key: 'E', word: 'Back to inbox' },
-      { key: 'S', word: 'Remind me' },
+      { key: 'L', word: 'Remind me' },
     ]);
   });
 
@@ -92,10 +100,17 @@ describe('the row prints the keys it really has', () => {
     }
   });
 
-  it('prints S only where the reminder picker opens', () => {
-    expect(listSwitch).toMatch(/case 's': case 'S':[\s\S]{0,400}view === 'inbox' \|\| view === 'snoozed'/);
-    const withS = ['inbox', 'snoozed', 'progress', 'done'].filter((v) => rowKeys(v).some((k) => k.key === 'S'));
-    expect(withS).toEqual(['snoozed']);
+  // L, NOT S, SINCE 2026-10-01, AND IT IS BOTH VIEWS THE PICKER OPENS IN. The
+  // key moved because S also toggled the summary inside a thread, so one letter
+  // meant two things; the claim is unchanged, which is that the row only prints
+  // the key where the handler really answers it. The handler's own condition is
+  // `view === 'inbox' || view === 'snoozed'`, so both of those print it and the
+  // other two print nothing.
+  it('prints L only where the reminder picker opens, and never S', () => {
+    expect(listSwitch).toMatch(/case 'l': case 'L':[\s\S]{0,400}view === 'inbox' \|\| view === 'snoozed'/);
+    const views = ['inbox', 'snoozed', 'progress', 'done'];
+    expect(views.filter((v) => rowKeys(v).some((k) => k.key === 'L'))).toEqual(['inbox', 'snoozed']);
+    expect(views.filter((v) => rowKeys(v).some((k) => k.key === 'S'))).toEqual([]);
   });
 });
 

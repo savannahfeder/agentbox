@@ -500,6 +500,19 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                       because the question is the row and the two answers are
                       the whole of what she does with it. The baseline look was
                       picked out of five. */}
+                  {/* AND IT IS A LABEL, NOT A BUTTON, WHICH IS A DECISION AND
+                      NOT AN OVERSIGHT (2026-10-01). It was made a button for an
+                      hour, so that the walk's two row beats could say "or click
+                      Done on the row" to the people who do not use shortcuts.
+                      The founder caught it the same day: "you can't actually
+                      click Done in the app... it's sort of misleading users
+                      because you can't actually do that in the real app."
+                      This chip is drawn ONLY while the walk is on, by the
+                      `walk &&` guard right here, so a clickable one teaches a
+                      control that disappears the moment the tutorial ends. The
+                      app has no click route to close a thread from the list at
+                      all; until it does, this says the key and nothing else,
+                      and so do the two cards (`coach` in onboarding.ts). */}
                   {walk && keysFor(item.id).length ? (
                     <span className="row-keys">
                       {keysFor(item.id).map((k) => (

@@ -92,7 +92,11 @@ describe('the ten beats, in her order', () => {
     expect(coach('open', 0)).toEqual({
       // THREE "IT"S AND NOT ONE NOUN, until 2026-08-28.
       quiet: 'Your agent worked on its own, and this row is what it sent back.',
-      lead: 'Press ', key: '↵', tail: ' to open it.',
+      // AND IT NAMES THE ROW AS SOMETHING TO CLICK SINCE 2026-10-01. The ring
+      // is round the row, so clicking it was already allowed and already opened
+      // it; the card simply had not said so, and two testers who use no
+      // shortcuts read every beat of this walk as a riddle.
+      lead: 'Press ', key: '↵', tail: ' or click the row to open it.',
     });
   });
 
@@ -100,7 +104,13 @@ describe('the ten beats, in her order', () => {
     // Her sentence names two ways out and the reply box is the one with
     // something to point at. The button is not coming back to suit the walk.
     expect(ANCHOR.answer).toEqual(['.focus-dock .dock-card', '.focus-dock']);
-    expect(coach('answer', 0).lead).toBe('Reply to it, or press ');
+    // AND IT POINTS AT THE BOX IN WORDS SINCE 2026-10-01. "Reply to it" is a
+    // thing to do and not a thing to click, and the ring is already round the
+    // box, so the card now names it. Closing has no button on this screen and
+    // the card does not invent one: Mark done is a row inside a menu behind a
+    // three-dot button, and naming it would make this the longest line in the
+    // walk. The mouse route on this beat is replying.
+    expect(coach('answer', 0).lead).toBe('Click the box below to reply, or press ');
     expect(coach('answer', 0).key).toBe('E');
   });
 

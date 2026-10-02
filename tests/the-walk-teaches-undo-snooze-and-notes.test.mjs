@@ -125,17 +125,27 @@ describe('6. snoozing, which is the third way a row leaves the inbox', () => {
     expect(BEAT.snooze).toBeLessThan(BEAT.unblock);
   });
 
-  it('names S, which is the app\'s own key, and says why an empty inbox matters', () => {
+  // L, NOT S, SINCE 2026-10-01. S also toggled the summary inside a thread, so
+  // the app said one letter for two things and this beat taught the half the
+  // app was about to stop answering. L is "later" and nothing else uses it.
+  it('names L, which is the app\'s own key, and says why an empty inbox matters', () => {
     const say = coach('snooze', 0);
-    expect(say.key).toBe('S');
+    expect(say.key).toBe('L');
     // THE GOAL IS IN THE QUIET LINE SINCE 2026-08-28. It was 'An empty inbox
     // is the goal. Putting something off is how you get there honestly.' on a
     // third line; the idea survives in five words above the key, where
-    // somebody deciding whether to press S is already looking.
+    // somebody deciding whether to press L is already looking.
     expect(say.quiet).toMatch(/empty inbox/i);
     expect(say.why).toBeUndefined();
     // The app really binds it, so nothing was added to make this beat work.
-    expect(app).toMatch(/e\.key === 's' \|\| e\.key === 'S'/);
+    expect(app).toMatch(/e\.key === 'l' \|\| e\.key === 'L'/);
+    // AND IT NAMES NO CLICK, WHICH IS THE ONE BEAT OF THE 2026-10-01 ROUND
+    // THAT COULD NOT HAVE ONE. It said "or click Later on the row" for an hour,
+    // with the row's chip made into a button to match; the chip is drawn only
+    // while the walk is on, so that taught a control the real app does not
+    // have. The whole of it is in
+    // tests/every-tutorial-beat-says-what-to-click.test.mjs.
+    expect(`${say.lead}${say.tail}`).not.toContain('click');
   });
 
   it('has a second sentence for the picker that opens over the row', () => {

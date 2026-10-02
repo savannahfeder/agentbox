@@ -40,6 +40,9 @@ const settings = read('renderer/src/components/Settings.tsx');
 const palette = read('renderer/src/components/Palette.tsx');
 const compose = read('renderer/src/components/Compose.tsx');
 const focus = read('renderer/src/components/Focus.tsx');
+// The summary panel owns S in its own capture-phase listener (2026-10-01), so
+// that row's handler is here rather than in App.tsx.
+const summary = read('renderer/src/threads/Summary.tsx');
 const mainProc = read('main/main.mjs');
 const css = read('renderer/src/styles.css');
 
@@ -111,7 +114,21 @@ const HANDLED = {
     // same key, so it is checked as well.
     [list, "if (view === 'snoozed') unsnooze("],
   ],
-  'S': [[focused, "e.key === 's' || e.key === 'S') openSnooze(focused)"], [list, "case 's': case 'S':"]],
+  // L, NOT S, SINCE 2026-10-01. S opened this picker in the list AND toggled
+  // the summary inside a thread, so the page taught one letter for two
+  // different things and an office manager testing the app met both inside a
+  // minute. One meaning per letter: L is later, S is the summary.
+  'L': [[focused, "e.key === 'l' || e.key === 'L') openSnooze(focused)"], [list, "case 'l': case 'L':"]],
+  // AND S IS THE ONE ROW ON THE PAGE WHOSE HANDLER IS NOT IN App.tsx. The
+  // summary owns its key in its own component, in the capture phase, which is
+  // why it beat the window's handler for the day they were both bound. The
+  // claim the page makes is "S shows or hides the summary", so the evidence is
+  // that hook: the key it reads, and the toggle it calls.
+  'S': [
+    [summary, "if (e.key !== 's' && e.key !== 'S') return;"],
+    [summary, 'if (!e.repeat) onToggle();'],
+    [summary, "window.addEventListener('keydown', onKey, true);"],
+  ],
   'Z': [[focused, "e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }"], [list, "case 'z': case 'Z': undo(); break;"]],
   '⌘A': [
     [chords, "e.key.toLowerCase() === 'a' && !inInput && !modal"],
@@ -235,11 +252,28 @@ describe('the page stays a page and not a wall', () => {
   // SHORTER carrying two more rows, by cutting every sentence to one and giving
   // them a measure (measured on the built page at 1440 by 1100, 1354 points
   // before and 1149 after).
-  it('is four groups, none of them longer than six keys', () => {
+  // AND THE NUMBERS WENT UP BY ONE ON 2026-10-01, WHICH IS THE DECISION THE
+  // PARAGRAPH ABOVE ASKS FOR RATHER THAN AN EDIT AROUND IT.
+  //
+  // S changed meaning that day. It had opened the schedule picker, and the
+  // approved thread top bar prints S on the Summary button, so the one letter
+  // did two things and a tester met both inside a minute. Scheduling moved to
+  // L, which is the row this page already had, reworded. What was NOT already
+  // here is S, and leaving it off is the worse of the two faults this file
+  // weighs: somebody who learned S as "put this off" and finds a summary panel
+  // instead comes to this page to find out what S is, and the page is the one
+  // place in the app that promises to answer that. A nuisance is a missing key;
+  // a page that lists a key which does nothing is much worse, and neither of
+  // those is "the page is one row longer".
+  //
+  // So "In a task you have opened" carries seven and the page carries 21. The
+  // budget is still a budget: the next key wanting a row has to make the same
+  // argument, out loud, here.
+  it('is four groups, none of them longer than seven keys', () => {
     expect(SHORTCUTS).toHaveLength(4);
-    for (const g of SHORTCUTS) expect(g.keys.length).toBeLessThanOrEqual(6);
+    for (const g of SHORTCUTS) expect(g.keys.length).toBeLessThanOrEqual(7);
     // Rows, not caps: everyKey() flattens the caps and a row can draw two.
-    expect(SHORTCUTS.reduce((n, g) => n + g.keys.length, 0)).toBeLessThanOrEqual(20);
+    expect(SHORTCUTS.reduce((n, g) => n + g.keys.length, 0)).toBeLessThanOrEqual(21);
   });
 
   it('groups by when the keys work, not by which handler runs them', () => {

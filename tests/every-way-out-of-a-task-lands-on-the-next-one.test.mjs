@@ -93,8 +93,13 @@ describe('a reminder in particular', () => {
   // returns null for that. This is only that the picker cannot be handed a row
   // she was not on: from inside a task it is opened on `focused` and on
   // nothing else.
+  // L, NOT S, SINCE 2026-10-01, and the excerpt is the only thing about this
+  // that changed. S opened this picker here AND toggled the summary panel on
+  // the same screen, so one letter meant two things; scheduling is L
+  // everywhere now. The claim being made is unchanged: the picker is opened on
+  // the task being read and on nothing else.
   it('opens on the task she is reading, so the row it advances past is hers', () => {
-    expect(app).toContain("else if (e.key === 's' || e.key === 'S') openSnooze(focused);");
+    expect(app).toContain("else if (e.key === 'l' || e.key === 'L') openSnooze(focused);");
   });
 });
 

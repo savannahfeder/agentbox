@@ -513,7 +513,12 @@ describe('the introduction, in front of the app', () => {
       expect(slab.line).not.toMatch(/[.,]/);
       expect(slab.line.length).toBeGreaterThan(40);
     }
-    expect(COPY.introOn(1, COPY.intro.length)).toBe('1 of 3');
+    // AND NO COUNT OVER THEM SINCE 2026-10-01. It read '3 of 3' on the third
+    // slab with the theme picker and the tutorial card still to come, so the
+    // one number on the screen was wrong about how much was left. The whole
+    // reason, and the rest of the pins, are in
+    // tests/the-introduction-shows-the-product.test.mjs.
+    expect(COPY.introOn).toBeUndefined();
   });
 
   // AND IT DOES NOT TELL ANYBODY TO WALK AWAY.The true version is the one the

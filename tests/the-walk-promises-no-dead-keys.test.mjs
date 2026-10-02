@@ -243,8 +243,11 @@ describe('the coaching card promises no dead key either', () => {
     .map((view) => coach('where', 0, { view })?.key)
     .filter(Boolean);
 
-  // EIGHT SINCE 2026-08-24, when the snooze beat went in.S is the app's own key
-  // for it (App.tsx), so nothing was added to make this beat work either.
+  // EIGHT SINCE 2026-08-24, when the snooze beat went in. L is the app's own
+  // key for it (App.tsx), so nothing was added to make this beat work either.
+  // IT WAS S UNTIL 2026-10-01: S had come to mean the summary inside a thread
+  // as well, so one letter taught two things and the walk taught the one the
+  // app no longer did. The count did not move.
   it('names eight keys and no others', () => {
     // ⌘ AND A NUMBER, and WHICH numbers depends on the strip: the tour prints
     // the destination's own slot, and Scheduled is only there some of the time.
@@ -253,7 +256,7 @@ describe('the coaching card promises no dead key either', () => {
     const said = [...new Set([...keys, ...tourKeys])];
     const sections = said.filter((k) => /^⌘[1-4]$/.test(k));
     expect(said.filter((k) => !/^⌘[1-4]$/.test(k)).sort())
-      .toEqual(['1', 'N', 'E', 'S', '↵', '⌘K', '⌘↵'].sort());
+      .toEqual(['1', 'N', 'E', 'L', '↵', '⌘K', '⌘↵'].sort());
     expect(sections.length).toBeGreaterThan(0);
   });
 

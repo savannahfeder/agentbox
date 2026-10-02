@@ -1542,7 +1542,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     {/* THE SUMMARY, beside the conversation and the dock rather than inside
         either: both give up its width (`data-summary` above, summary.css), so
         the words narrow instead of running under it, and it scrolls on its own. */}
-    {summaryShown && <SummaryPanel item={item} items={items ?? ownItems} team={teamCtx} onOpenItem={onOpenItem} />}
+    {/* `onFinish` is the SAME ONE the three-dot menu's Mark done row takes
+        (`canFinish ? onResolve : null` above), so the Status row's Done and
+        that row and E are one action with one undo and one toast. */}
+    {summaryShown && <SummaryPanel item={item} items={items ?? ownItems} team={teamCtx} onOpenItem={onOpenItem} onFinish={canFinish ? onResolve : null} />}
     {!direct && <TaskTerminal key={`${item.product}:${item.id}`} product={item.product} id={item.id} onOpenChange={setTerminalOpen}/>}
     </div>
   );

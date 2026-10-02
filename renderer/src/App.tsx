@@ -3964,7 +3964,12 @@ export default function App() {
         // the top bar is on this screen too and its tooltip says "New task
         // (N)", so the key is already advertised here.
         else if (e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }
-        else if (e.key === 's' || e.key === 'S') openSnooze(focused);
+        // L, NOT S, SINCE 2026-10-01. S was the schedule picker here and the
+        // summary panel on the same screen (threads/Summary.tsx listens first
+        // and eats it), so the two fought over one letter and a persona test
+        // hit both in a minute. L is for later and it is the only key that
+        // schedules anywhere in the app.
+        else if (e.key === 'l' || e.key === 'L') openSnooze(focused);
         else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }
         else if (/^[1-9]$/.test(e.key)) pickOption(focused, Number(e.key));
         return;
@@ -4012,9 +4017,10 @@ export default function App() {
         case '1': if (!multiSel.size && pointed && isImportRow(pointed)) { e.preventDefault(); void answerImport(pointed, 'yes'); } break;
         case '2': if (!multiSel.size && pointed && isImportRow(pointed)) { e.preventDefault(); void answerImport(pointed, 'no'); } break;
         case 'i': case 'I': if (!multiSel.size && pointed && view === 'done' && isNotImportedRow(pointed)) { e.preventDefault(); void answerImport(pointed, 'yes'); } break;
-        // S swallows its own keystroke up at the guard, not here: this branch
+        // L swallows its own keystroke up at the guard, not here: this branch
         // and the focus-mode one both open the picker (renderer/src/keys.ts).
-        case 's': case 'S':
+        // It was S until 2026-10-01; see the focus-mode branch above.
+        case 'l': case 'L':
           if (multiSel.size) openSnooze(selectable.filter((i) => multiSel.has(i.id)));
           else if (pointed && (view === 'inbox' || view === 'snoozed')) openSnooze(pointed);
           break;
@@ -5422,7 +5428,7 @@ export default function App() {
                 ...(view !== 'snoozed'
                   ? [{ id: 'done', label: `Close (${n} selected)`, keyHint: 'E', run: () => { setModal(null); batchDone(multiSel); } }]
                   : []),
-                { id: 'snooze', label: `Remind Me (Snooze ${n} selected)`, keyHint: 'S', run: () => openSnooze(sel) },
+                { id: 'snooze', label: `Remind Me (Snooze ${n} selected)`, keyHint: 'L', run: () => openSnooze(sel) },
                 ...(sel.some((i) => dueAt(i) > Date.now())
                   ? [{ id: 'unsnooze', label: `Back to Inbox (${n} selected)`, run: () => unsnooze(sel) }]
                   : []),
@@ -5499,7 +5505,7 @@ export default function App() {
                     run: () => unsnooze(target),
                   }]
                 : []),
-              { id: 'snooze', label: 'Remind Me (Snooze)', keyHint: 'S', run: () => openSnooze(target) },
+              { id: 'snooze', label: 'Remind Me (Snooze)', keyHint: 'L', run: () => openSnooze(target) },
               // THE FIRST PLACE SHE LOOKED. It asked `supervisor.running`, so on
               // a task she had just composed there was no Stop in ⌘K at all —
               // and, because nothing was running, the one agent command that DID

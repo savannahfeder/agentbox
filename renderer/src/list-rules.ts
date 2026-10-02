@@ -646,7 +646,8 @@ export const REST_HEADING = 'Everything else';
 //   R      replies, INBOX ONLY (`view === 'inbox'` in the switch)
 //   E      closes in the inbox, and in Scheduled it wakes instead, which is
 //          why the word changes rather than the key
-//   S      the reminder picker, inbox and Scheduled
+//   L      the reminder picker, inbox and Scheduled. It was S until
+//          2026-10-01, when S became the summary everywhere in the app.
 //
 // The words are the app's own, taken off the ⌘K rows for the same actions, so
 // the hint teaches the vocabulary the rest of the app uses.
@@ -662,8 +663,13 @@ export function rowKeys(view: string, batch = false): RowKey[] {
   // sidebar said Closed and the key meant done, and "closed" was not the right
   // word. One pair now feeds the
   // button, this hint, the palette and the tab.
-  if (view === 'inbox') return [{ key: 'R', word: 'Reply' }, { key: 'E', word: DONE.short }];
-  if (view === 'snoozed') return [{ key: 'E', word: 'Back to inbox' }, { key: 'S', word: 'Remind me' }];
+  // AND THE INBOX CARRIES LATER AS WELL (2026-10-01). L really does schedule a
+  // row in the inbox, and the walk's snooze beat asks for it on an inbox row,
+  // so without this line that beat drew a card naming a key and no chip on the
+  // row to click. It was never S here: S means the summary now, in every place
+  // in the app that says a key.
+  if (view === 'inbox') return [{ key: 'R', word: 'Reply' }, { key: 'E', word: DONE.short }, { key: 'L', word: 'Later' }];
+  if (view === 'snoozed') return [{ key: 'E', word: 'Back to inbox' }, { key: 'L', word: 'Remind me' }];
   return [{ key: '⏎', word: 'Open' }];
 }
 

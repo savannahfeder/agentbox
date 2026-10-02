@@ -284,8 +284,12 @@ describe('4. ALSO names only what a card says out loud', () => {
     // Which lives in the docked reply surface, the one selector left here.
     expect(focus).toMatch(/className="focus-dock"/);
     // And the answer beat still names replying, which is now what it rings.
+    // THE WORD IS LOWER CASE SINCE 2026-10-01, because the sentence no longer
+    // opens on it: it reads "Click the box below to reply, or press E to close
+    // it", which names the box for the people who do not use shortcuts. What is
+    // being checked is unchanged, which is that the card names replying at all.
     const answer = coach('answer', 0, {});
-    expect(`${answer.quiet} ${answer.lead}${answer.tail}`).toMatch(/Reply/);
+    expect(`${answer.quiet} ${answer.lead}${answer.tail}`).toMatch(/reply/i);
   });
 
   it('every beat named has an anchor of its own, so ALSO only ever adds', () => {

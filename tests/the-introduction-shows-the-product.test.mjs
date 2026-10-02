@@ -32,12 +32,31 @@ describe('the introduction shows the product', () => {
     // Three different pieces, not the same one three times: they are three
     // features and the picture is what says which.
     expect(new Set(COPY.intro.map((s) => s.piece)).size).toBe(3);
-    // AND THE COUNT IS TAKEN OFF THE LIST, NEVER TYPED OUT. It was `${n} of 4`
-    // with the four written in, which is the same second-copy-of-a-list that
-    // broke the Next button and the tab tour on 08-24. Adding or removing a slab
-    // now moves the count by itself.
-    expect(COPY.introOn(1, COPY.intro.length)).toBe('1 of 3');
-    expect(view).toContain('COPY.introOn(n, COPY.intro.length)');
+  });
+
+  // AND THERE IS NO COUNT ON THESE SCREENS AT ALL SINCE 2026-10-01, which is
+  // the one pin in this file that a change deliberately reversed.
+  //
+  // WHAT THIS TEST USED TO ASSERT: `COPY.introOn(1, COPY.intro.length)` is
+  // '1 of 3', and the view calls it with the list's own length rather than a
+  // typed-out 3. Both of those were true and the screen was still wrong. A PM
+  // and an office manager each walked the whole thing on 2026-10-01 and both
+  // read "3 OF 3" on the third slab, after which the walk showed the theme
+  // picker and then a card headed "This is the tutorial.", and then twelve more
+  // beats. The number was honest about the three slabs and nobody reading it
+  // can tell that is what it was counting.
+  //
+  // So the counter is deleted rather than re-based, because every number that
+  // could go there is a count of a PREFIX of an eighteen-beat walk and ends
+  // before the steps do. What is pinned now is its absence, in all three
+  // places it could come back: the copy, the view and the stylesheet.
+  it('puts no counter in front of the heading, because any count of it ends early', () => {
+    expect(COPY.introOn).toBeUndefined();
+    expect(view).not.toContain('introOn');
+    expect(view).not.toContain('fr-intro-on');
+    expect(css).not.toContain('.fr-intro-on');
+    // The Next button is untouched: it is how anybody gets off the screen.
+    expect(COPY.introNext).toBe('Next');
   });
 
   it('draws each piece out of the app\'s own classes rather than an image', () => {
