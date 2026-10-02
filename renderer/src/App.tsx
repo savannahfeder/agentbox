@@ -1340,6 +1340,19 @@ export default function App() {
     await refreshRef.current?.();
   }, []);
 
+  // A RELOAD WRITES WHAT IS HELD BEFORE IT HAPPENS (w-47218417a5). The window
+  // above lives only in this page, so ⌘R inside it used to throw the close or
+  // answer away and the thread came back to her inbox untouched. main asks
+  // before it reloads and waits for this to finish (main/write-before-reload.mjs).
+  // `pagehide` covers the window closing or the app quitting, where nobody
+  // asks: the write's first step leaves for main before the page goes.
+  useEffect(() => {
+    const off = window.zero?.onWriteHeld?.(flushPending);
+    const onHide = () => { void flushPending(); };
+    window.addEventListener('pagehide', onHide);
+    return () => { off?.(); window.removeEventListener('pagehide', onHide); };
+  }, [flushPending]);
+
   const refresh = useCallback(async () => setSnap(await api.snapshot()), []);
   const refreshRef = useRef<() => Promise<void>>();
   refreshRef.current = refresh;
