@@ -85,24 +85,23 @@ describe('it is stored as itself, not frozen into a colour', () => {
 });
 
 // 2026-09-14: legacy storage remains readable, but the option is retired.
-describe('system matching is no longer offered', () => {
-  it('is absent from the catalog and command menu', () => {
-    expect(LOOKS.map((l) => l.id)).not.toContain('match');
-    for (const look of ['dark', 'light', 'match', 'lake']) {
-      expect(lookRows(look).some((r) => r.to === 'match')).toBe(false);
+// MATCH SYSTEM IS OFFERED AGAIN (w-9e434e8671): the three choices are Light,
+// Dark (Ember Grid) and Match system, in Settings and in Command-K.
+describe('system matching is one of the three choices', () => {
+  it('is in the catalog and the command menu', () => {
+    expect(LOOKS.map((l) => l.id)).toEqual(['light', 'ember-grid', 'match']);
+    for (const look of ['ember-grid', 'light', 'match']) {
+      expect(lookRows(look).filter((r) => r.to === 'match').map((r) => r.id)).toEqual(['theme-match']);
     }
   });
 
-  it('does not put a second row under the word she types most', () => {
-    // Her fix on: typing "dark" finds exactly one row. A second row under it is
-    // the choice she should not have to make correctly at speed. The toggle row
-    // owns those two words and is meant to. What must not exist is a SECOND row
-    // carrying them, which is what the Match my system row did when its
-    // keywords were first written.
-    for (const look of ['dark', 'light', 'match', 'lake']) {
-      for (const word of ['dark', 'light']) {
-        const rows = lookRows(look).filter((r) => r.keywords.includes(word));
-        expect(rows.map((r) => r.id), `${look} / ${word}`).toEqual(['theme']);
+  it('puts one row under "dark" and one under "light", never the Match row', () => {
+    // Typing "dark" must land on one row; a second under the same word is the
+    // choice she should not have to make correctly at speed.
+    for (const look of ['ember-grid', 'light', 'match']) {
+      for (const [word, id] of [['dark', 'theme-dark'], ['light', 'theme-light']]) {
+        const rows = lookRows(look).filter((r) => r.label.toLowerCase().includes(word));
+        expect(rows.map((r) => r.id), `${look} / ${word}`).toEqual([id]);
       }
     }
   });
@@ -138,11 +137,9 @@ describe('the window is told a colour, never the pick', () => {
     // tile beside it.
     const mark = read('renderer/src/components/MatchMark.tsx');
     expect(mark).toMatch(/class(Name)?="match-mark"/);
-    for (const src of [
-      'renderer/src/components/Settings.tsx',
-      'renderer/src/components/ThemePicker.tsx',
-      'renderer/src/components/Onboarding.tsx',
-    ]) {
+    // Settings is the one place with tiles now; the picker modal and the walk's
+    // picker are gone (w-9e434e8671).
+    for (const src of ['renderer/src/components/Settings.tsx']) {
       expect(read(src), `${src} draws no mark on the match tile`).toMatch(/l\.id === 'match' && <MatchMark \/>/);
     }
   });
