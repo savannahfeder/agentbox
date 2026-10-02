@@ -8,7 +8,7 @@
 // (tests/team-one-page-shows-the-people-you-pick.test.mjs).
 import type { Person, Product, ThreadCard, WorkItem } from '../types';
 import { priorityIdOf, type PriorityId } from '../priority';
-import { rowSharing, type Display } from './page-rules';
+import { finishedAt, rowSharing, type Display } from './page-rules';
 
 const KEY = 'threads.people';
 
@@ -105,13 +105,15 @@ const RANK: Record<PriorityId, number> = { urgent: 0, high: 1, medium: 2, low: 3
  * ONE TABLE, YOURS AND THEIRS. Yours arrive already in the order the tab keeps
  * them, and that order is never broken. Theirs fall in by the same sort: by
  * Updated, newest first across everyone; by Priority, a card goes ahead of the
- * first of yours that is less urgent.
+ * first of yours that is less urgent. On the Done tab ('done') by when each
+ * finished, newest first; a card says only when it last changed, so that
+ * stands in for it.
  */
-export function mergeRows(mine: WorkItem[], theirs: ThreadCard[], sort: Display['sort']): MixedRow[] {
-  const updated = sort === 'updated';
+export function mergeRows(mine: WorkItem[], theirs: ThreadCard[], sort: Display['sort'] | 'done'): MixedRow[] {
+  const updated = sort !== 'priority';
   const cards = theirs.slice().sort((a, b) => (updated ? 0 : RANK[priorityIdOf(a.priority)] - RANK[priorityIdOf(b.priority)]) || b.updatedAt - a.updatedAt);
   const ahead = (c: ThreadCard, i: WorkItem) => (updated
-    ? c.updatedAt > i.updatedAt
+    ? c.updatedAt > (sort === 'done' ? finishedAt(i) : i.updatedAt)
     : RANK[priorityIdOf(c.priority)] < RANK[priorityIdOf(i.priority)]);
   const out: MixedRow[] = [];
   let k = 0;

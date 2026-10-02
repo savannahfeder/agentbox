@@ -71,6 +71,9 @@ const HANDLED = {
   '↓': [[list, "case 'ArrowDown':"]],
   'K': [[list, "case 'k': case 'K':"], [list, 'Math.max(0, selected - 1)']],
   '↑': [[list, "case 'ArrowUp':"]],
+  // Across the board's columns (w-23fc91bff5), and only on the board.
+  '←': [[list, "case 'ArrowLeft': case 'ArrowRight':"], [list, 'boardSideways(boardCols, selected,']],
+  '→': [[list, "case 'ArrowLeft': case 'ArrowRight':"], [list, 'boardSideways(boardCols, selected,']],
   '↵': [[list, "case 'Enter': if (!multiSel.size && pointed)"]],
   // Tab walks the tabs along the top of the inbox. It replaced ⌘1 to ⌘4 on
   // 2026-10-02 (w-914b16eab6), which went to a section of the sidebar before
@@ -275,11 +278,18 @@ describe('the page stays a page and not a wall', () => {
   // a shortcut"), and a key nobody can find on the one page that promises to
   // list every key is the nuisance this page exists to end. It went under the
   // inbox, which had five rows and so stays inside the seven.
+  //
+  // AND 23 SINCE LATER THE SAME DAY, FOR ← AND → ON THE BOARD (w-23fc91bff5).
+  // The argument: asked for in so many words ("I can't really do that in
+  // board view. I typically have to click"), and the arrows are the one way
+  // across the board's columns, so without the row nobody learns the board
+  // can be walked at all. It fills the inbox group to exactly seven, so the
+  // next inbox key has to make room rather than add.
   it('is four groups, none of them longer than seven keys', () => {
     expect(SHORTCUTS).toHaveLength(4);
     for (const g of SHORTCUTS) expect(g.keys.length).toBeLessThanOrEqual(7);
     // Rows, not caps: everyKey() flattens the caps and a row can draw two.
-    expect(SHORTCUTS.reduce((n, g) => n + g.keys.length, 0)).toBeLessThanOrEqual(22);
+    expect(SHORTCUTS.reduce((n, g) => n + g.keys.length, 0)).toBeLessThanOrEqual(23);
   });
 
   it('groups by when the keys work, not by which handler runs them', () => {

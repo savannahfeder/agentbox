@@ -95,9 +95,27 @@ const RANK: Record<PriorityId, number> = { urgent: 0, high: 1, medium: 2, low: 3
 const byPriority = (a: Ranked, b: Ranked) =>
   RANK[priorityIdOf(a.priority)] - RANK[priorityIdOf(b.priority)] || b.updatedAt - a.updatedAt;
 const byUpdated = (a: Ranked, b: Ranked) => b.updatedAt - a.updatedAt;
-type Ranked = { priority?: number | null; updatedAt: number };
+type Ranked = { priority?: number | null; updatedAt: number; status?: string; wrote?: WorkItem['wrote'] };
 
-const order = (d: Display) => (d.sort === 'updated' ? byUpdated : byPriority);
+/**
+ * WHEN A THREAD WAS FINISHED: the moment its status was written as done, which
+ * the fold keeps per field. Not `updatedAt`, which a label or a late note moves:
+ * 8 of 734 finished threads on a real store were touched more than a day after
+ * they were done (2026-10-02). A row with no record of it, a teammate's card
+ * among them, falls back to when it last changed, and so does any row that is
+ * not finished.
+ */
+export const finishedAt = (r: Ranked): number => (r.status === 'done' && r.wrote?.status?.ts) || r.updatedAt;
+const byFinished = (a: Ranked, b: Ranked) => finishedAt(b) - finishedAt(a);
+
+// THE DONE TAB IS A HISTORY, NOT A QUEUE (w-c61f5bf497). Under Sort by Priority
+// it was a wall of Urgent rows in no order a reader could follow, and nothing
+// in it is waiting on a priority any more. So Done always runs newest finished
+// first, and every other tab keeps the Display's sort.
+const order = (d: Display, tab?: string) => (tab === 'done' ? byFinished : d.sort === 'updated' ? byUpdated : byPriority);
+
+/** The time column's heading: on Done it is when each thread was finished. */
+export const timeHeading = (tab?: string) => (tab === 'done' ? 'Done' : 'Updated');
 
 /**
  * The rows in the order the Display menu asked for.
@@ -115,15 +133,18 @@ const order = (d: Display) => (d.sort === 'updated' ? byUpdated : byPriority);
  * work would put them somewhere meaningless. `keeps` exempts them for the same
  * reason.
  */
-export function sorted<T extends Ranked & { product?: string }>(rows: T[], d: Display): T[] {
+export function sorted<T extends Ranked & { product?: string }>(rows: T[], d: Display, tab?: string): T[] {
   const mine = rows.filter((r) => r.product !== '');
-  if (mine.length === rows.length) return rows.slice().sort(order(d));
-  return [...rows.filter((r) => r.product === ''), ...mine.sort(order(d))];
+  if (mine.length === rows.length) return rows.slice().sort(order(d, tab));
+  return [...rows.filter((r) => r.product === ''), ...mine.sort(order(d, tab))];
 }
 
-/** The same order, for the board's cards, which carry a level and no project row. */
-export function sortedEntries(entries: BoardEntry[], d: Display): BoardEntry[] {
-  return entries.slice().sort(order(d));
+/** The same order, for the board's cards, which carry a level and no project
+ *  row. A card of yours is timed by its thread, so Done reads when it finished. */
+export function sortedEntries(entries: BoardEntry[], d: Display, column?: string): BoardEntry[] {
+  const by = order(d, column);
+  const timed = (e: BoardEntry): Ranked => (e.item ? { ...e, status: e.item.status, wrote: e.item.wrote } : e);
+  return entries.slice().sort((a, b) => by(timed(a), timed(b)));
 }
 
 /* ------------------------------------------------------- the tabs and Tab */
@@ -415,12 +436,50 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
   return out.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+// LATER, AS THE TAB SAYS (w-23fc91bff5). The tab was renamed from Scheduled on
+// w-afb66e6661 and this column kept the old word, one screen away from it.
 export const BOARD_COLUMNS: { state: ThreadStateWord; label: string }[] = [
   { state: 'waiting', label: 'Waiting' },
   { state: 'running', label: 'In progress' },
-  { state: 'scheduled', label: 'Scheduled' },
+  { state: 'scheduled', label: 'Later' },
   { state: 'done', label: 'Done today' },
 ];
+
+/* ------------------------------------------- the columns, in your order */
+// THE COLUMNS ARE YOURS TO ORDER (w-23fc91bff5): "make the columns in the board
+// draggable so you can move them around to reorder your board as desired".
+// One order for the board, remembered on this Mac, and handed to
+// `boardColumns` so what is drawn and what J, K and the arrows walk agree.
+export const DEFAULT_COLUMN_ORDER: ThreadStateWord[] = BOARD_COLUMNS.map((c) => c.state);
+const COLUMN_KEY = 'threads.board.columns';
+
+/** The saved order, made whole: a column it does not know is dropped and a
+ *  column it is missing goes back at the end, so no column is ever lost. */
+export function readColumnOrder(store: Pick<Storage, 'getItem'> | null = typeof localStorage === 'undefined' ? null : localStorage): ThreadStateWord[] {
+  try {
+    const saved = JSON.parse(store?.getItem(COLUMN_KEY) ?? 'null');
+    if (!Array.isArray(saved)) return DEFAULT_COLUMN_ORDER;
+    const known = [...new Set(saved.filter((s): s is ThreadStateWord => DEFAULT_COLUMN_ORDER.includes(s)))];
+    return [...known, ...DEFAULT_COLUMN_ORDER.filter((s) => !known.includes(s))];
+  } catch {
+    return DEFAULT_COLUMN_ORDER;
+  }
+}
+
+export function writeColumnOrder(order: ThreadStateWord[], store: Pick<Storage, 'setItem'> | null = typeof localStorage === 'undefined' ? null : localStorage) {
+  try { store?.setItem(COLUMN_KEY, JSON.stringify(order)); } catch { /* private mode */ }
+}
+
+/** A column dropped on another takes that column's place: moving right it
+ *  lands after it, moving left before it, which is where the eye put it. */
+export function moveColumn(order: ThreadStateWord[], from: string, to: string): ThreadStateWord[] {
+  const a = order.indexOf(from as ThreadStateWord);
+  const b = order.indexOf(to as ThreadStateWord);
+  if (a < 0 || b < 0 || a === b) return order.slice();
+  const next = order.filter((s) => s !== from);
+  next.splice(b, 0, from as ThreadStateWord);
+  return next;
+}
 
 /** The Team's own filters: one person (or everyone) and one project (or all). */
 export function teamKeeps(e: BoardEntry, { person, projectName }: { person: string | null; projectName: string | null }, d: Display, now: number): boolean {
@@ -439,24 +498,53 @@ export function teamKeeps(e: BoardEntry, { person, projectName }: { person: stri
  * to walk the current tab's list, which a card from another column is not in,
  * so J stopped with the board still full (2026-10-02).
  */
-export function boardColumns({ items, products, display, now, stateOf, cards = [], picked, me, since = null, live }: {
+export function boardColumns({ items, products, display, now, stateOf, cards = [], picked, me, since = null, live, order = DEFAULT_COLUMN_ORDER }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number;
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
   cards?: ThreadCard[]; picked?: string[]; me: string | null; since?: number | null; live?: Set<string>;
+  /** The columns left to right, as you dragged them (`readColumnOrder`). */
+  order?: ThreadStateWord[];
 }): { state: ThreadStateWord; label: string; rows: BoardEntry[] }[] {
   const who = picked ?? (me ? [me] : []);
   const entries = teamEntries({ items: me && !who.includes(me) ? [] : items, products, cards: cards.filter((c) => who.includes(c.personId)), me, now, since, stateOf, live, allMine: true })
     .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
     .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
   // EVERY COLUMN TAKES THE DISPLAY'S SORT, not just the list view
-  // (w-5a08121f99). `teamEntries` hands these back newest first.
-  return BOARD_COLUMNS.map((col) => ({ ...col, rows: sortedEntries(entries.filter((e) => e.state === col.state), display) }));
+  // (w-5a08121f99). `teamEntries` hands these back newest first. Except Done
+  // today, which runs newest finished first like the Done tab (w-c61f5bf497).
+  return order.flatMap((state) => BOARD_COLUMNS.filter((c) => c.state === state))
+    .map((col) => ({ ...col, rows: sortedEntries(entries.filter((e) => e.state === col.state), display, col.state) }));
 }
 
 /** Your threads on the board, in reading order. A teammate's card has no
  *  thread of yours behind it, so J and K pass over it. */
 export function boardWalk(columns: { rows: BoardEntry[] }[]): WorkItem[] {
   return columns.flatMap((c) => c.rows).flatMap((e) => (e.item ? [e.item] : []));
+}
+
+/**
+ * THE LEFT AND RIGHT ARROWS ON THE BOARD (w-23fc91bff5): from the card the
+ * keyboard is on (`index` in `boardWalk`) to the card level with it in the
+ * nearest column that has a thread of yours in it, or the last card there if
+ * that column is shorter. At either edge it stays put. Returns an index in
+ * `boardWalk`, which is what App.tsx's `selected` counts.
+ */
+export function boardSideways(columns: { rows: BoardEntry[] }[], index: number, dir: 1 | -1): number {
+  const mine = columns.map((c) => c.rows.flatMap((e) => (e.item ? [e.item] : [])));
+  let start = 0;
+  for (let c = 0; c < mine.length; c++) {
+    const row = index - start;
+    if (row >= 0 && row < mine[c].length) {
+      for (let n = c + dir; n >= 0 && n < mine.length; n += dir) {
+        if (!mine[n].length) continue;
+        const before = mine.slice(0, n).reduce((sum, col) => sum + col.length, 0);
+        return before + Math.min(row, mine[n].length - 1);
+      }
+      return index;
+    }
+    start += mine[c].length;
+  }
+  return index;
 }
 
 
