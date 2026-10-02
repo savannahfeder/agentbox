@@ -836,6 +836,62 @@
 .artifact-thumbnail > .preview-loading {transition:none;}
 .preview-loading[data-delayed="true"] .preview-skeleton {visibility:hidden;}
 
+/* A LOCAL APP SAYS WHAT IT IS DOING (LocalPreviewStatus.tsx). The design-file
+   skeleton read as an empty card on a dark theme, and a port nothing listens on
+   looked exactly like one still loading. This is drawn in the chrome's own
+   vocabulary rather than as a dialog: the status in the spaced mono capitals
+   the row times and section labels use, the address in the title face at the
+   film's 400 weight, the one accent only on a live state, and a square
+   hairline button in the same capitals. All tokens, so every theme dresses it.
+   It is a short log, read top to bottom like a terminal: what it tried, for how
+   long, and where it stands now, left aligned and high in the pane. That look
+   was picked over two others (w-cf58256de2); they are in the product's
+   decisions log and are not to be brought back. */
+/* The window's own colours, taken above the pane: `.doc-pane.doc-html` swaps in
+   a neutral dark set for a page's frame, which turned the one orange blue and
+   the warm greys cool. A custom property is resolved where it is declared, so
+   these hold the theme's values all the way down. */
+body {
+  --window-accent: var(--accent); --window-text: var(--text); --window-text-dim: var(--text-dim);
+  --window-text-faint: var(--text-faint); --window-line: var(--line); --window-line-strong: var(--line-strong);
+}
+.local-status {
+  --accent: var(--window-accent); --text: var(--window-text); --text-dim: var(--window-text-dim);
+  --text-faint: var(--window-text-faint); --line: var(--window-line); --line-strong: var(--window-line-strong);
+  position:absolute; inset:0; z-index:1; display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start;
+  padding:72px 64px; text-align:left; background:var(--skin-solid,var(--surface)); color:var(--text); overflow:hidden;
+}
+/* THE EDGE A PAGE WEARS. Beside a card, and inline, the hairline that holds a
+   page is drawn on the page itself (.doc-view above), so a status covering the
+   page, or standing in for it when nothing runs, took the edge away and sat on
+   the card as a flat block. It wears the same line in the same places, in the
+   page's colour, taken on the frame before the status swaps to the window's
+   own tokens, so the edge does not move when the app appears. */
+.preview-frame { --frame-line: var(--line); }
+.workspace-layout .inline-artifact .doc-html .local-status,
+.workspace-layout[data-artifact-layout="beside"] .doc-html .local-status { border:1px solid var(--frame-line); border-radius:var(--radius); }
+.local-status-clock {font-family:var(--mono); font-variant-numeric:tabular-nums; color:var(--text-dim);}
+.local-status-dot {flex:none; width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 45%,transparent); animation:local-status-pulse 1.6s ease-out infinite;}
+.local-status[data-state="down"] .local-status-dot {background:transparent; box-shadow:inset 0 0 0 1.2px var(--text-faint); animation:none;}
+.local-status-host {font-size:30px; font-weight:400; letter-spacing:-.03em; line-height:1.05; color:var(--text); overflow-wrap:anywhere;}
+.local-status-detail {max-width:30em; font-size:14px; line-height:1.55; color:var(--text-dim);}
+.local-status-retry {
+  position:relative; z-index:1; padding:9px 18px; border:1px solid var(--line-strong); border-radius:var(--radius); background:transparent;
+  color:var(--text); font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; cursor:pointer;
+}
+.local-status-retry:hover {border-color:var(--accent); color:var(--accent);}
+@keyframes local-status-pulse {0% {box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 45%,transparent);} 100% {box-shadow:0 0 0 7px transparent;}}
+.local-status-log {width:min(460px,100%); margin-top:28px; border-top:1px solid var(--line);}
+.local-status-line {
+  display:grid; grid-template-columns:18px 1fr auto; align-items:center; padding:11px 0; border-bottom:1px solid var(--line);
+  font-family:var(--mono); font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint);
+}
+.local-status-mark {color:var(--text-faint);}
+.local-status-now {color:var(--text);}
+.local-status-detail {margin-top:20px;}
+.local-status-retry {margin-top:24px;}
+@media (prefers-reduced-motion:reduce) {.local-status-dot {animation:none;}}
+
 /* Muted warm-gray navigation over Peach Haze's dimmed photograph.
 
    The reported fault was eye strain reading this sidebar over Peach Haze, and

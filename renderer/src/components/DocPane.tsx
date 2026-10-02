@@ -4,6 +4,8 @@ import type {FocusControlStyle} from '../focus-control';
 import {usePreviewReveal} from '../preview-reveal';
 import {PreviewLoading} from './PreviewLoading';
 import { isLocalPreview, type ArtifactMode } from '../artifact-layout';
+import { previewShows, previewStatus, useLocalPreview } from '../local-preview';
+import { LocalPreviewStatus } from './LocalPreviewStatus';
 // THE DOCUMENT PANE. The right half of the window is the file itself.
 //
 // The look is settled and is not a question any more.
@@ -105,7 +107,14 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   // An html page is served from its own origin so its pictures load; see
   // main/doc-scheme.mjs for why file:// could not.
   const [url, setUrl] = useState<string | null>(null);
-  const [frameReady, revealFrame] = usePreviewReveal(url);
+  // A local address is asked whether anything is there before the frame is
+  // believed (../local-preview.ts). `attempt` gives the frame a fresh start.
+  const app = useLocalPreview(url);
+  // The key, not the address: a marker on the address would reach the app.
+  const frameKey = url && app.local ? `${url} ${app.attempt}` : url;
+  const [loaded, revealFrame] = usePreviewReveal(frameKey);
+  const frameReady = app.local ? previewShows(loaded, app.phase) : loaded;
+  const liveStatus = app.local && url ? previewStatus(app.phase, url, app.waited) : null;
   // The change a run made, when the artifact is one.
   const [change, setChange] = useState<Change | null>(null);
   // Which file inside a change she is standing on, so the mark in this header
@@ -260,15 +269,19 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
           // same-origin with it while the app stays out of reach. Without it
           // the frame is opaque and Chromium refuses every local picture in the
           // page, which is exactly what she was looking at.
+          // A local address nothing answers draws no frame at all, only the
+          // words saying so: behind a refusal the frame holds an error page.
           resolved ? (url
             ? <div className="preview-frame" aria-busy={!frameReady}>
-              <PreviewLoading ready={frameReady} />
-              <iframe
-                key={url} onLoad={revealFrame} onError={() => setFailed("This preview could not be loaded.")}
+              {app.local
+                ? !frameReady && <LocalPreviewStatus status={liveStatus} onRetry={app.retry} />
+                : <PreviewLoading ready={frameReady} />}
+              {(!app.local || app.phase !== 'down') && <iframe
+                key={frameKey} onLoad={revealFrame} onError={() => setFailed("This preview could not be loaded.")}
                 style={{opacity:frameReady ? 1 : 0}}
                 className="doc-view" src={url}
                 sandbox="allow-scripts allow-same-origin" title={crumb.join('/')}
-              /></div>
+              />}</div>
             : <div className="doc-missing">Quit and reopen {NAME} to see this page's pictures.</div>) : <PreviewLoading />
         ) : text === null ? (
           <PreviewLoading />
