@@ -11,6 +11,20 @@ export const PRACTICE_TASK_TRACE: string[];
 /** The practice project's sidebar note, written to its `pinned.md` and drawn
  *  beside the third introduction slab. */
 export const PRACTICE_NOTE: string;
+/** The rest of the practice team's work, drawn from the tab tour onward so
+ *  the list and the board are not empty. `state` is the column it lands in. */
+export const PRACTICE_BACKDROP: {
+  state: 'needs' | 'working' | 'scheduled';
+  kind: string;
+  title: string;
+  body: string;
+  trace: string[];
+  /** Only on the `needs` rows: what the agent handed back. */
+  result?: string;
+  agoMs: number;
+  /** Only on the `scheduled` row: how long after staging it is set to run. */
+  inMs?: number;
+}[];
 export const PRACTICE_ROWS: {
   kind: string;
   title: string;

@@ -485,6 +485,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const NAMED = {
   Enter: { code: 'Enter', vk: 13 }, Escape: { code: 'Escape', vk: 27 },
   ArrowDown: { code: 'ArrowDown', vk: 40 }, ArrowUp: { code: 'ArrowUp', vk: 38 },
+  Tab: { code: 'Tab', vk: 9 },
 };
 const key = async (k, mods = 0) => {
   const enter = k === 'Enter';
@@ -1387,21 +1388,26 @@ console.log('\n=== 17: where it all went ===');
 await until(`(() => { const q = document.querySelector('.fr-quiet'); return !!q && q.textContent.startsWith('Great!'); })()`, 8000);
 await wait(600);
 await beat('17a-your-inbox-is-empty', 'inbox zero, and the ring on the tab the next press goes to');
-// ⌘1 TO ⌘4, NOT TAB. Tab stopped moving between views on 2026-09-23, and the
-// tour rings the sidebar's rows since w-ec62ab6b38. The order is the sidebar's:
-// In progress, Scheduled, Closed, then back to Inbox.
-await key('2', 4); await wait(1200);
+// TAB AGAIN, NOT ⌘1 TO ⌘4 (w-914b16eab6, 2026-10-02). The number keys went
+// with the sidebar's sections; Tab walks the tabs along the top of the inbox,
+// in the order they are drawn, and the beats below are the first three stops.
+await key('Tab'); await wait(1200);
 // FOUR TABS SINCE THE SNOOZE BEAT WENT IN. Snoozing a row gives the app a
 // Scheduled tab it did not have a minute earlier, and the tour has to say what
 // it is like it says what the other two are. Driving this is how the four was
 // found: three presses used to land back on the inbox and now they land on
 // Closed, and the walk stood still at the end of its own tour.
 await beat('17b-the-agent-is-working', 'In progress, holding the agent she answered rather than closed');
-await key('3', 4); await wait(1200);
-await beat('17c-the-one-you-put-off', 'Scheduled, holding the row she snoozed rather than closed');
-await key('4', 4); await wait(1200);
-await beat('17d-everything-you-finished', 'Closed, holding her own task and the two she closed');
-await key('1', 4); await wait(1600);
+await key('Tab'); await wait(1200);
+await beat('17c-the-one-you-put-off', 'the next tab along, holding the row she snoozed or the one still working');
+await key('Tab'); await wait(1200);
+await beat('17d-everything-you-finished', 'Done, holding her own task and the two she closed');
+// Then on round to the Inbox, however many tabs are left after Done.
+for (let i = 0; i < 4; i++) {
+  const home = await evaluate(`(() => { const q = document.querySelector('.fr-quiet'); return !!q && q.textContent.startsWith('Everything you just did'); })()`);
+  if (home) break;
+  await key('Tab'); await wait(1200);
+}
 
 console.log('\n=== 18: ⌘K, over an empty inbox with an agent running ===');
 await until(`(() => { const q = document.querySelector('.fr-quiet'); return !!q && q.textContent.startsWith('Everything you just did'); })()`, 8000);

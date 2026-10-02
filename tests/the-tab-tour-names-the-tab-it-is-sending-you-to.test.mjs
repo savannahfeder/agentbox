@@ -102,7 +102,8 @@ describe('3. the sentence is chosen by destination, not by position', () => {
     for (const tabs of strips) {
       for (const view of ['inbox', 'snoozed', 'progress', 'done']) {
         const card = coach('where', 0, { view, tabs });
-        expect(card.key, `${view} on ${tabs}`).toMatch(/^⌘[1-4]$/);
+        // Tab at every stop since w-914b16eab6 (2026-10-02).
+        expect(card.key, `${view} on ${tabs}`).toBe('⇥');
         expect(card.tail.trim().length, `${view} on ${tabs}`).toBeGreaterThan(0);
         expect(card.tail.endsWith('.'), `${view} on ${tabs}`).toBe(true);
       }
@@ -122,11 +123,13 @@ describe('4. one copy of where the press goes, used by the ring and the words', 
     // The rotation the key handler runs. If this line moves, the walk's idea of
     // the next tab has to move with it, which is the whole reason there is one
     // function rather than two lists.
-    // ⌘1 to ⌘4 go straight to a slot rather than rotating, since 2026-09-23.
-    // The walk's idea of where the next press lands has to be that same list,
-    // which is why there is one function rather than two.
-    expect(read('renderer/src/App.tsx')).toContain('const want = order[slot - 1];');
-    expect(read('renderer/src/App.tsx')).toContain('setView(want);');
+    // ⌘1 to ⌘4 went straight to a slot from 2026-09-23 and were removed on
+    // 2026-10-02 (w-914b16eab6). Tab rotates the strip's own list again, and
+    // the walk is handed that same list.
+    const app = read('renderer/src/App.tsx');
+    expect(app).toContain('setView(nextTab(stateTabOrder, view, e.shiftKey) as View);');
+    expect(app).toContain('tabs={stateTabOrder}');
+    expect(app).not.toContain('const want = order[slot - 1];');
   });
 
   it('leaves no second copy of the rotation in the walk component', () => {
