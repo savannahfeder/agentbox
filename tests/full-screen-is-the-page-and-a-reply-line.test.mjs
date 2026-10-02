@@ -54,7 +54,9 @@ it('shows the dock of the pane that is already there, and nothing new',()=>{
 // without this puts the reply line ABOVE the page, which is what it did.
 it('puts the reply line under the page and not over it',()=>{
  const css=read('workspace-navigation.css');
- expect(css).toContain(`${FOCUS} > .body > .doc-pane { order:1;`);
+ // Through the host the pane is portalled into: `.body > .doc-pane` matched
+ // nothing, which this line used to pin (see a-tall-picture-in-full-screen…).
+ expect(css).toContain(`${FOCUS} > .body > .artifact-host > .doc-pane { order:1;`);
  expect(css).toContain(`${FOCUS} > .body > .list-pane {\n  order:2;`);
 });
 

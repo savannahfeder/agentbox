@@ -26,7 +26,7 @@
 // own keyword: that list at full length was clutter, and the picker is the
 // thing that replaced it.
 
-import { skinName, lookMeans, type Look } from './skins';
+import { type Look } from './skins';
 
 /* ------------------------------- matching -------------------------------- */
 
@@ -94,7 +94,6 @@ export type LookRow = {
   hint: string;
   keywords: string;
   to?: Look;
-  opens?: 'themes';
 };
 
 // THE TOGGLE IS ALWAYS ONE ROW AND ALWAYS SAYS WHERE IT LANDS. A picture is
@@ -108,51 +107,17 @@ export type LookRow = {
 // row her return key hits.
 const TOGGLE_KEYWORDS = 'light mode dark mode appearance colours colors';
 
+// THREE ROWS, ONE PER CHOICE (w-9e434e8671): Light, Dark (which is Ember
+// Grid) and Match system, the same three Settings' Themes page offers. The one
+// already on says so in its hint. Every row answers to "theme", so typing it
+// lists all three; "light", "dark" and "system" each find their own.
 export function lookRows(look: Look): LookRow[] {
-  const rows: LookRow[] = [];
-  const wearing = look !== 'light' && look !== 'dark' && look !== 'match';
-
-  // THE PICKER, FIRST, AND THE ONLY WAY TO A PICTURE FROM HERE.It is first so
-  // that "theme" and "themes" put it under her return key.
-  //
-  // It carries every word the sixteen picture rows used to answer to, so the
-  // hand that types "wallpaper" still lands somewhere rather than on nothing.
-  rows.push({
-    id: 'theme-picker',
-    label: 'Themes…',
-    hint: 'all of them at once, without leaving this screen',
-    keywords: 'theme themes background picture photo wallpaper appearance skin look',
-    opens: 'themes',
-  });
-
-  // Off a picture the toggle still goes to light, because the picture already
-  // IS dark and "switch to dark" would be a row that does nothing visible.
-  const to: Look = lookMeans(look).theme === 'light' ? 'valley-haze' : 'frost-haze';
-  rows.push({
-    id: 'theme',
-    label: to === 'valley-haze' ? 'Switch to dark' : 'Switch to light',
-    hint: 'themes',
-    keywords: TOGGLE_KEYWORDS,
-    to,
-  });
-
-  // The way back to plain dark, which the toggle no longer offers from here.
-  // Found by "theme" and by the picture's own name, never by "dark": that word
-  // belongs to the toggle above, and two rows under it is the choice she should
-  // not have to make correctly at speed.
-  if (wearing) {
-    rows.push({
-      id: 'theme-off',
-      label: `Turn off ${skinName(look)}`,
-      hint: 'back to plain dark, no picture',
-      keywords: 'theme background picture photo wallpaper appearance',
-      to: 'dark',
-    });
-  }
-
-  // AND NO ROW PER PICTURE. See the head of this file: the picker above is
-  // where a picture is chosen now.
-  return rows;
+  const on = (id: Look) => (look === id ? 'on now' : 'theme');
+  return [
+    { id: 'theme-light', label: 'Theme: Light', hint: on('light'), keywords: `${TOGGLE_KEYWORDS} theme themes light`, to: 'light' },
+    { id: 'theme-dark', label: 'Theme: Dark', hint: on('ember-grid'), keywords: `${TOGGLE_KEYWORDS} theme themes dark ember`, to: 'ember-grid' },
+    { id: 'theme-match', label: 'Theme: Match system', hint: on('match'), keywords: 'theme themes match system mac automatic appearance', to: 'match' },
+  ];
 }
 
 /* ------------------------- when nothing comes back ------------------------ */

@@ -118,21 +118,8 @@ describe('the theme lab is gone', () => {
     const ids = [...list.matchAll(/^ {2}\{ id: '([a-z0-9-]+)'/gm)].map((m) => m[1]);
     // September 21: the user supplied a new background for Peach Haze.
     // September 25: Ember Grid, the launch film's look (w-b3e123a0af).
-    expect(ids).toHaveLength(14);
-    // THE THREE HAZES LEAD AND THAT IS HER INSTRUCTION, 2026-09-04: "put all
-    // those themes up front after the basic dark/light." LOOKS draws Light, Dark
-    // and Match my system before this list, so first here is what "up front"
-    // means. This assertion is the order, not just the membership, because the
-    // order is the thing she asked for and nothing else would catch it moving.
-    // 2026-09-28, w-2ff620f13b: "Move ember grid to the first position in
-    // terms of themes." Ember leads and the three hazes follow it.
-    expect(ids.slice(0, 4)).toEqual(['ember-grid', 'valley-haze', 'frost-haze', 'slate-haze']);
-    // And the photographs follow, still led by the Lake, which was first for as
-    // long as there were only photographs.
-    expect(ids[7]).toBe('peach-haze-2');
-    expect(ids).not.toContain('peach-haze');
-    expect(ids[4]).toBe('lake');
-    expect(ids).toContain('gouache-valley');
-    expect(ids).not.toContain('orbit-rings');
+    // w-9e434e8671: the choices became Light, Dark and Match system, and Dark
+    // is Ember Grid, so Ember Grid is the one picture theme that ships.
+    expect(ids).toEqual(['ember-grid']);
   });
 });

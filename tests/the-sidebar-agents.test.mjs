@@ -101,7 +101,8 @@ const block = (head) => {
 const THEMES = [
   ['light', ':root {', '#fefefe'],
   ['dark', ':root[data-theme="dark"]', '#2e3136'],
-  ['lake', ':root[data-skin="lake"] {', '#333846'],
+  // The Lake was measured here too, until it went with the other pictures
+  // (w-9e434e8671).
 ];
 const inkOf = (selector, name, fallback) => {
   const m = block(selector).match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, 'i'));
@@ -154,17 +155,12 @@ describe('the grey the rows are written in is walked, never chosen', () => {
     });
   }
 
-  // WHERE DARK'S SHORT STEP COMES FROM, so it is derived and not a nudge. Lake
-  // was judged to read right in the same review that found dark did not. In
-  // lake the heading sits 1.336 to 1 above a row. Dark at a whole step sat at
-  // 1.46, further below its own heading than any approved look, and that gap
-  // is what read as inactive. So dark walks the same
-  // ladder and stops where its heading-to-row distance matches lake's. Move
-  // dark's grey by eye and this fails.
-  it('dark leaves its heading by the same distance lake does', () => {
+  // WHERE DARK'S SHORT STEP COMES FROM: it was matched to the Lake's
+  // heading-to-row distance, 1.336 to 1. The Lake is gone (w-9e434e8671), so
+  // that number is held directly.
+  it('dark leaves its heading by the distance it was matched to', () => {
     const d = inkSet('dark', ':root[data-theme="dark"]');
-    const l = inkSet('lake', ':root[data-skin="lake"] {');
-    expect(Math.abs(ratio(d.faint, d.agent) - ratio(l.faint, l.agent))).toBeLessThan(0.02);
+    expect(Math.abs(ratio(d.faint, d.agent) - 1.336)).toBeLessThan(0.02);
     expect(stepFraction('dark', ':root[data-theme="dark"]')).toBeLessThan(1);
   });
 });

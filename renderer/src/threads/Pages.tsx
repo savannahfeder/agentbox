@@ -10,10 +10,10 @@ import type { Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } fro
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName } from '../team/people';
 import { PriorityIcon } from '../components/Priority';
-import { rowTitle } from '../list-rules';
+import { notStarted, rowTitle } from '../list-rules';
 import { DONE } from '../done-word';
 import {
-  BOARD_COLUMNS, filteredEmptyWords, isDirect, isFiltered, projectChoices, sortedEntries, teamEntries, teamKeeps, updatedWords,
+  boardColumns, filteredEmptyWords, isDirect, isFiltered, projectChoices, updatedWords,
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
@@ -30,8 +30,9 @@ const ListIcon = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="non
 const BoardIcon = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3.5" y="4" width="5" height="16" rx="1" /><rect x="10.5" y="4" width="5" height="11" rx="1" /><rect x="17.5" y="4" width="3" height="7" rx="1" /></svg>;
 export const PeopleIcon = () => <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="9" cy="9" r="3.2" /><path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5" /><path d="M15.5 6.2a3 3 0 0 1 0 5.6M17.5 14.8c1.8.6 3 2.1 3.4 4.7" /></svg>;
 export const LockMark = () => <svg className="th-lock" width="11" height="12" viewBox="0 0 11 12" fill="none" stroke="currentColor" strokeWidth="1.2" aria-label="Private"><rect x="1.5" y="5.5" width="8" height="6" rx="1" /><path d="M3.5 5.5V3.8a2 2 0 0 1 4 0v1.7" /></svg>;
-/** Two people: the team can see this thread. After the title on the inbox rows
- *  the team can see and on nothing else, and beside "Team" in the summary.
+/** Two people: others can see this thread. After the title of a row only a
+ *  few chosen people see (the whole team, the default, carries no mark),
+ *  inside the Share button, and beside "Team" in the summary.
  *  `label` names it for a screen reader where no word stands beside it. */
 export function SharedMark({ className = 'th-shared', label }: { className?: string; label?: string }) {
   return <svg className={className} width="14" height="12" viewBox="2 4 20 17" fill="none" stroke="currentColor" strokeWidth="1.7"
@@ -78,8 +79,10 @@ export function HeaderActions({ page, display, onDisplay, products, items, onSea
 }) {
   const [open, setOpen] = useState(false);
   const ref = useOutside(open, () => setOpen(false));
+  // NO "/" ON ITS FACE (w-facfc092e1): a shortcut shows on hover, through the
+  // hint plate, and is never printed on the control.
   return <div className="th-right">
-    <button type="button" className="th-search" data-hint="search" data-hint-text="span" onClick={onSearch} title="Search threads (/)" aria-label="Search threads"><SearchGlyph /><span>Search</span><kbd>/</kbd></button>
+    <button type="button" className="th-search" data-hint="search" data-hint-text="span" onClick={onSearch} title="Search threads (/)" aria-label="Search threads"><SearchGlyph /><span>Search</span></button>
     <button type="button" className="th-new" data-hint="new-task" onClick={onCompose} title="New thread (N)"><PenIcon />New thread</button>
     <span ref={(el) => { ref.current = el; }} style={{ position: 'relative', display: 'inline-flex' }}>
       <button type="button" className={`th-disp${open ? ' open' : ''}`} aria-label="View and filters" title="View and filters" onClick={() => setOpen((o) => !o)}>
@@ -143,7 +146,12 @@ export type TabView = View | 'all';
 export const INBOX_TABS: { view: TabView; label: string }[] = [
   { view: 'inbox', label: 'Needs you' },
   { view: 'progress', label: 'In progress' },
-  { view: 'snoozed', label: 'Scheduled' },
+  // LATER, NOT SCHEDULED (w-afb66e6661, 2026-10-02). The tab holds two kinds of
+  // thread that are not running: the ones with a moment to come back at, and
+  // the ones added to Later with no moment at all, which carry a NOT STARTED
+  // tag on their row. "Scheduled" was a promise of a time that half of them
+  // do not have.
+  { view: 'snoozed', label: 'Later' },
   { view: 'done', label: DONE.short },
   { view: 'all', label: 'All' },
 ];
@@ -267,7 +275,7 @@ const ClearMark = () => <svg className="th-clear-mark" width="22" height="22" vi
 export function EmptyTab({ view }: { view: TabView }) {
   const words: Partial<Record<TabView, string>> = {
     progress: 'Nothing is running.',
-    snoozed: 'Nothing is scheduled.',
+    snoozed: 'Nothing is waiting for later. "Add it to Later" on a new thread writes one down without starting it.',
     // A finished thread waits in Needs you until its owner closes it, which a
     // persona read as the app losing it.
     done: 'Nothing closed yet. A finished thread waits in Needs you until you close it.',
@@ -292,20 +300,22 @@ export function otherPerson(item: WorkItem, me: string | null): string | null {
 /** ONE ROW OF THE TABLE, FOR THE INBOX AND THE TEAM PAGE BOTH (2026-10-01).
  *  The Team page's list view is the same component as the Inbox's, with small
  *  differences only. So there is one set of cells, and the Team page only adds Person. */
-export function RowCells({ live = false, title, hidden = false, lock = false, shared = false, chosen = 0, where, person, priority, updatedAt, now, action }: {
+export function RowCells({ live = false, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, where, person, priority, updatedAt, now, action }: {
   /** An agent is on this thread right now: a turning mark before its name. */
   live?: boolean;
   title: ReactNode; hidden?: boolean; lock?: boolean; shared?: boolean; where: ReactNode; person?: ReactNode;
   /** How many people a thread shared with chosen people reaches; 0 for the team. */
   chosen?: number;
+  /** Added to Later and not started: the row says so in a tag (w-afb66e6661). */
+  held?: boolean;
   priority: number | null; updatedAt: number; now: number; action?: ReactNode;
 }) {
   const id = priority === null ? null : priorityIdOf(priority);
   return <div className={`row-main th-grid${person !== undefined ? ' with-person' : ''}`}>
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
-        people alone for the whole team, and a small count beside them for a
-        thread only a few people see. No second glyph to learn. */}
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live && <StateGlyph state="running" live />}{title}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}</div>
+        people with a small count beside them for a thread only a few people
+        see. The whole team, the default, carries nothing (2026-10-02). */}
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live && <StateGlyph state="running" live />}{title}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{held && <span className="th-tag">Not started</span>}</div>
     <div className="th-cell-proj">{where}</div>
     {person !== undefined && <div className="th-cell-person">{person}</div>}
     <div className={`th-cell-prio${id === 'urgent' ? ' urgent' : ''}`}>{id && <><PriorityMark id={id} />{priorityLabelOf(id)}</>}</div>
@@ -370,13 +380,14 @@ export function ThreadCells({ item, product, now, person }: {
     return <RowCells live={liveIds.has(item.id)} title={<MessageTitle people={said.people} fromMe={said.fromMe} text={said.text} />} where="Message" person={person}
       priority={messagePriority(item)} updatedAt={item.updatedAt} now={now} action={action} />;
   }
-  // ONE MARK, ALWAYS THE SAME ONE. The lock on a thread only you can see, the
-  // people mark on one the team or chosen people can see, and neither depends
-  // on whose faces are lit at the top of the page: a mark that comes and goes
-  // with an unrelated control cannot be read. Both follow the click at once,
-  // the way the Share button does.
+  // ONLY THE UNUSUAL CASE WEARS A MARK (2026-10-02). Shared with the team is
+  // the default, so it carries nothing; the lock is on a thread only you can
+  // see, and the people mark with its count on one a few chosen people see.
+  // Neither depends on whose faces are lit at the top of the page: a mark that
+  // comes and goes with an unrelated control cannot be read. Both follow the
+  // click at once, the way the Share button does.
   const lock = seen === 'private';
-  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={seen === 'team' || seen === 'people'} chosen={chosen} lock={lock} where={product?.name ?? ''} person={person}
+  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} where={product?.name ?? ''} person={person}
     priority={item.priority ?? 0} updatedAt={item.updatedAt} now={now} action={action} />;
 }
 
@@ -399,29 +410,25 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   const who = picked ?? (me ? [me] : []);
   const withOthers = who.some((p) => p !== me);
   const since = team?.state.since ?? null;
-  const entries = teamEntries({ items: me && !who.includes(me) ? [] : items, products, cards: cards.filter((c) => who.includes(c.personId)), me, now, since, stateOf, live: liveIds, allMine: true })
-    .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
-    .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
+  // One copy of what the board holds and in what order, which App.tsx also
+  // walks with J and K (`boardColumns`, page-rules.ts).
+  const columns = boardColumns({ items, products, display, now, stateOf, cards, picked, me, since, live: liveIds });
   const sharing = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since } : null);
   return <div className="list hm-me">
     {end && <div className="th-bar th-bar-end">{end}</div>}
     <div className="th-board">
-    {BOARD_COLUMNS.map((col) => {
-      // EVERY COLUMN TAKES THE DISPLAY'S SORT, not just the list view
-      // (w-5a08121f99). `teamEntries` hands these back newest first, which is
-      // one answer to a question the menu asks per page.
-      const rows = sortedEntries(entries.filter((e) => e.state === col.state), display);
+    {columns.map((col) => {
+      const rows = col.rows;
       return <div key={col.state}>
         {/* Your own board says what the tab says: what waits on you needs you. */}
         <div className="th-col-h"><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b></div>
         {rows.length === 0 && <div className="th-col-empty">Nothing here.</div>}
         {/* A card says who can see it the way a row does: the lock on what
-            only you can see, the people mark on what the team or chosen
-            people can, both of them always. */}
+            only you can see, the people mark on what a few chosen people
+            can, and nothing on what the whole team can, the default. */}
         {rows.map((e) => <button type="button" key={e.key} className="th-card" onClick={() => (e.item ? onOpenItem(e.item) : e.card && onOpenCard?.(e.card))}>
           <div className="t">{e.message ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} /> : e.title}
-            {e.item && !e.message && (sharing(e.item) === 'team' || sharing(e.item) === 'people')
-              && <SharedMark label={shownToPeople(e.item).length ? 'Visible to the people on it' : 'Visible to the team'} />}
+            {e.item && !e.message && sharing(e.item) === 'people' && <SharedMark label="Visible to the people on it" />}
             {e.item && !e.message && sharing(e.item) === 'private' && <LockMark />}
           </div>
           <div className="m">{e.live && <StateGlyph state="running" live />}{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project}</span>

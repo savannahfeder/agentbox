@@ -41,7 +41,7 @@
 // neither list.
 
 /** Every value `modal` can hold. Kept here so the two lists below are total. */
-export const EVERY_MODAL = ['compose', 'filter', 'palette', 'reply', 'snooze', 'standing', 'themes'] as const;
+export const EVERY_MODAL = ['compose', 'filter', 'palette', 'reply', 'snooze', 'standing'] as const;
 
 export type ModalName = (typeof EVERY_MODAL)[number];
 
@@ -52,14 +52,12 @@ export const BELONGS_TO_A_TASK: ReadonlySet<string> = new Set<ModalName>(['reply
 export const BELONGS_TO_THE_APP: ReadonlySet<string> = new Set<ModalName>([
   // 'writing-rules' used to be here: the same Standing card, opened from the
   // Settings screen's Edit button. Both files are open fields on that page
-  // now, so nothing opens it any more and the name is gone. 'themes' is the
-  // theme picker. It floats over the app and is opened from ⌘K, which floats
-  // too. It is emphatically not about the task under it: its whole purpose is
-  // to let her judge a theme against whatever the window is showing, so
-  // leaving a task while it is open must leave it exactly where it is.
+  // now, so nothing opens it any more and the name is gone. So is 'themes',
+  // the picture picker: ⌘K offers Light, Dark and Match system as rows now
+  // (w-9e434e8671).
   // 'filter' is the menu under the corner's filter icon (w-aa3fa4cbf0). It is
   // about the box, never about a task.
-  'compose', 'filter', 'palette', 'snooze', 'standing', 'themes',
+  'compose', 'filter', 'palette', 'snooze', 'standing',
 ]);
 
 /**

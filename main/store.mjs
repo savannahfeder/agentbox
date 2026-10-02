@@ -313,6 +313,24 @@ export class Store {
     return workItemsDisk.updateWorkItem(dir, id, { status }, { source: 'system' });
   }
 
+  // THE APP SHIPPED A TASK, OR COULD NOT (main/ship-queue.mjs). Both are the
+  // app's own words, so both go in as 'system', as a note: the reply field is
+  // hers. A failure reopens the row, and the queue hands the script's words
+  // straight to the agent that wrote the change.
+  shipped(slug, id, { sha, labels }) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const note = sha ? `Shipped to main as ${sha}.` : 'Shipped to main.';
+    return workItemsDisk.updateWorkItem(dir, id, { labels, note }, { source: 'system' });
+  }
+
+  shipFailed(slug, id, { note, labels }) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    workItemsDisk.updateWorkItem(dir, id, { labels, note }, { source: 'system' });
+    return workItemsDisk.updateWorkItem(dir, id, { status: 'open' }, { source: 'system' });
+  }
+
   releaseRunClaim(slug, id, run) {
     return this.modules.workItemsDisk.releaseRunClaim(this.productDir(slug), id, run);
   }
@@ -409,13 +427,15 @@ export class Store {
   // person's own words; on the summary the later write wins either way
   // (SHARED_FIELDS in shared/work-items.mjs).
   threadEdit(slug, id, patch) {
-    const fields = ['problem', 'progress', 'solution', 'visibility', 'visibleTo', 'priority', 'blockedBy', 'blocks'];
+    // `start` is how a thread leaves Later: the summary and the thread page
+    // both write 'now' on it, which is what makes `isDue` true again.
+    const fields = ['problem', 'progress', 'solution', 'visibility', 'visibleTo', 'priority', 'blockedBy', 'blocks', 'start'];
     const allowed = Object.fromEntries(Object.entries(patch ?? {}).filter(([k]) => fields.includes(k)));
     if (!Object.keys(allowed).length) throw new Error('nothing to change');
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, allowed, { source: 'founder' });
   }
 
-  composeItem(slug, { title, body, kind = 'directive', priority = 0, labels, runAt, engine, model, effort, assignee, due, people, visibility, visibleTo }) {
+  composeItem(slug, { title, body, kind = 'directive', priority = 0, labels, runAt, start, engine, model, effort, assignee, due, people, visibility, visibleTo }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     // The 'founder' label is the human-in-the-loop marker: only items the
@@ -434,6 +454,9 @@ export class Store {
       title,
       ...(body ? { body } : {}),
       ...(runAt ? { runAt: Math.max(0, Math.trunc(runAt)) } : {}),
+      // "Add it to Later" on the card: the thread exists now and starts when
+      // she says, which is the one answer on that menu with no clock in it.
+      ...(start === 'later' ? { start: 'later' } : {}),
       // WHICH MODEL SHE CHOSE FOR THIS ONE, on founder authority like the rest
       // of her content (2026-08-26).It is a Claude Code alias, and the spawn
       // hands it to `--model`.

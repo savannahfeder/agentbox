@@ -97,22 +97,24 @@ describe('her sequence: write a task, send it, hit Z', () => {
 
 describe('the wiring, which is the half a pure test cannot see', () => {
   const app = src('App.tsx');
+  // THE WIRING MOVED WITH THE CARD. The send itself is the threads composer's
+  // now (`sendTask` in ThreadComposer.tsx); App.tsx keeps the half that is
+  // about the way back, in `onSent`. What is asserted is unchanged: a task is
+  // made, a way back is pushed, and the words of the card survive long enough
+  // for Z to put them back.
+  const composer = src('threads/ThreadComposer.tsx');
 
   it('sending a task leaves a way back on the undo stack', () => {
-    // Before this, `await api.compose(p)` stood alone and Z reached past it.
-    // The call gained an argument on, because the first run's own example task
-    // is composed with a label on it; what is asserted here is unchanged,
-    // which is that the ordinary send is followed by a way back.
-    expect(app).toMatch(/const made = await api\.compose\(/);
+    expect(composer).toMatch(/const made = await api\.compose\(/);
     expect(app).toMatch(/if \(made\?\.id\) \{\s*\n\s*noteNewTask\(/);
   });
 
-  it('reads the card BEFORE the write, because Compose clears it after', () => {
-    const send = app.slice(app.indexOf('onSend={async (p) => {'));
-    const readAt = send.indexOf('readComposeDraft()');
-    const writeAt = send.indexOf('await api.compose(');
-    expect(readAt).toBeGreaterThan(-1);
-    expect(writeAt).toBeGreaterThan(readAt);
+  it('reads the card BEFORE it is cleared, because the undo puts those words back', () => {
+    // The card hands the task over and only then throws the draft away, so the
+    // `readComposeDraft()` in `onSent` still sees what she typed.
+    const send = composer.slice(composer.indexOf('const sendTask ='));
+    expect(app).toMatch(/onSent=\{async \(made, how\) => \{\s*\n[^}]*readComposeDraft\(\)/);
+    expect(send.indexOf('clearComposeDraft()')).toBeGreaterThan(send.indexOf('onSent(made,'));
   });
 
   it('withdrawing stops the worker as well as closing the row', () => {
@@ -121,11 +123,11 @@ describe('the wiring, which is the half a pure test cannot see', () => {
     expect(ipc).toMatch(/if \(status === 'done'\) supervisor\.stopSession\(id\)/);
     // 2026-09-27: the second argument is the plain phrase a late Z asks with,
     // "press Z again to take back the task you just made" (renderer/src/undo-window.ts).
-    expect(app).toMatch(/noteNewTask\(`Withdrawn: \$\{clipToSentence\(p\.title, TOAST_TITLE\)\}`, 'take back the task you just made', sent, async \(\) => \{\s*\n\s*await api\.answer\(\{ product: p\.product, id: made\.id, status: 'done' \}\)/);
+    expect(app).toMatch(/noteNewTask\(`Withdrawn: \$\{clipToSentence\(made\.title, TOAST_TITLE\)\}`, 'take back the task you just made', sent, async \(\) => \{\s*\n\s*await api\.answer\(\{ product: made\.product, id: made\.id, status: 'done' \}\)/);
   });
 
   it('a repeating task is undoable too, or Z means two different things on one card', () => {
-    expect(app).toMatch(/await api\.endRepeat\(\{ product: p\.product, id: rule!\.id! \}\)/);
+    expect(app).toMatch(/await api\.endRepeat\(\{ product: slug, id: how\.ruleId! \}\)/);
   });
 
   it('says Z out loud on the toast, because a way back she cannot see is one she will not take', () => {
@@ -139,7 +141,7 @@ describe('the wiring, which is the half a pure test cannot see', () => {
     // asserts that and stops holding the words hostage.
     expect(app).toMatch(/showToast\(sentLine\(\{/);
     expect(sentLine({ to: 'Kestrel' })).toContain('Z to undo');
-    expect(app).toMatch(/Repeating → \$\{to\} · Z to undo/);
+    expect(app).toMatch(/Repeating → \$\{to \?\? slug\} · Z to undo/);
   });
 
   it('sends her back to the card, not to a thread that does not exist', () => {

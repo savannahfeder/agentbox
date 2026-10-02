@@ -211,15 +211,18 @@
 .tc-vis-menu { min-width: 330px; }
 .tc-row .tc-pr, .tc-row .tc-urgent { margin: 0 2px 0 1px; }
 
-/* Pick a date and time: the field and its button, under the row that opened them. */
-.tc-pick { display: flex; align-items: center; gap: 8px; padding: 4px 10px 8px 35px; }
-.tc-date {
+/* A time in words: the clock where the rows above keep theirs, the box, and
+   once it reads, the moment it means as the button that sends then. */
+.tc-pick { display: flex; align-items: center; gap: 10px; padding: 4px 10px 6px; }
+.tc-pick > svg { color: var(--text-faint); flex: none; }
+.tc-when {
   flex: 1; min-width: 0; height: 28px; box-sizing: border-box; padding: 0 8px;
   font: inherit; font-size: 13px; color: var(--text);
   background: none; border: 1px solid var(--line); border-radius: var(--radius); outline: none;
 }
-.tc-date:focus { border-color: var(--line-strong); }
-:root[data-skin] .tc-date, :root[data-theme="dark"] .tc-date { color-scheme: dark; }
+.tc-when::placeholder { color: var(--text-faint); }
+.tc-when:focus { border-color: var(--line-strong); }
+.tc-when-no { color: var(--text-faint); font-size: 12px; white-space: nowrap; }
 .tc-schedule {
   height: 28px; padding: 0 11px; font: inherit; font-size: 13px; color: var(--text);
   background: none; border: 1px solid var(--line-strong); border-radius: var(--radius); cursor: pointer;

@@ -5,8 +5,8 @@ import {AgentUpdates} from './components/AgentUpdates';
 import '@fontsource-variable/source-sans-3';
 import './styles.css';
 import './workspace-navigation.css';
-import { applyTheme, resolveTheme, THEME_KEY } from './theme';
-import { applySkin, applyTune, normalizeSavedLook, resolveSkin, resolveTune, SKIN_KEY, TUNE_KEY } from './skins';
+import { applyTheme, machineTheme, resolvePick, resolveTheme, THEME_KEY } from './theme';
+import { applySkin, applyTune, normalizeSavedLook, resolveSkin, resolveTune, SKIN_KEY, TUNE_KEY, wornSkin } from './skins';
 // The shape an opened task is, while that is still an open question on.
 // Same reason as the theme above: it moves the header and the width of the
 // words, so a frame drawn before it lands is a reflow.
@@ -43,7 +43,8 @@ applyTheme(resolveTheme(localStorage.getItem(THEME_KEY)));
 // every candidate into "no picture", so she would pick one, reload, and be
 // back on plain dark with no idea why.
 const paintTheLook = () => {
-  const startingSkin = resolveSkin(localStorage.getItem(SKIN_KEY));
+  // Match system on a dark Mac is Dark, which is Ember Grid (skins.ts).
+  const startingSkin = wornSkin(resolvePick(localStorage.getItem(THEME_KEY)), resolveSkin(localStorage.getItem(SKIN_KEY)), machineTheme());
   applySkin(startingSkin);
   // And her dials with it, in the same breath and for the same reason: the
   // stylesheet's own numbers are the ones she overruled, so painting once with

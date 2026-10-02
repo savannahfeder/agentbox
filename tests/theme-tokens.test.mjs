@@ -292,21 +292,13 @@ describe('an html file holds one dark in every theme, and markdown does not', ()
     // than carrying a hex. The regression this catches: an html file and a
     // markdown file sitting on two different grounds inside the same window.
     expect(html).toMatch(/--doc-page:\s*var\(--doc-page-held\)/);
-    for (const sel of [':root', ':root[data-theme="dark"]', ':root[data-skin="lake"]']) {
+    // Light, the dark set under it, and Dark itself, which is Ember Grid. The
+    // Lake that used to be checked here went with the other pictures
+    // (w-9e434e8671).
+    for (const sel of [':root', ':root[data-theme="dark"]', ':root[data-skin="ember-grid"]']) {
       expect(block(sel), sel + ' does not answer --doc-page-held')
         .toMatch(/--doc-page-held:\s*[^;]+;/);
     }
-    // THE LAKE TAKES THE APP'S CARD TOO, WHICH WAS THE PICK AND THE SAME RULE
-    // LIGHT AND DARK TAKE.Both are named rather than typed, so the lake cannot
-    // drift from the surface its own cards are on; the lake block layers over
-    // the dark token set, so this resolves to #2e3136.
-    const lake = block(':root[data-skin="lake"]');
-    expect(lake.match(/--doc-page:\s*([^;]+);/)[1].trim()).toBe('var(--surface)');
-    expect(lake.match(/--doc-page-held:\s*([^;]+);/)[1].trim()).toBe('var(--surface)');
-    // The slate was considered and not picked. It stays the reply
-    // box's colour and it never comes back as the ground under a file.
-    expect(lake).not.toMatch(/--doc-page(-held)?:\s*var\(--skin-solid\)/);
-    expect(lake).toMatch(/--skin-solid:\s*#292f3a/);
   });
 
   it('grounds a light window on a light page, which is the whole of her fix', () => {
@@ -428,7 +420,7 @@ describe('a window wearing a picture takes the dark ink', () => {
       .find((l) => l.includes(':root[data-theme="dark"]'))
       .filter((s) => s.startsWith(':root'));
     expect(listed.length, 'the dark block should list exactly its two selectors').toBe(2);
-    const skinBlock = weigh(':root[data-skin="lake"]');
+    const skinBlock = weigh(':root[data-skin="ember-grid"]');
     for (const sel of listed) {
       expect(weigh(sel), `${sel} outweighs a picture's own block, so the picture cannot win`)
         .toBeLessThanOrEqual(skinBlock);
@@ -439,8 +431,8 @@ describe('a window wearing a picture takes the dark ink', () => {
   // to the set comparison above to catch by accident.
   it('gives a picture --text and not only the dims and faints', () => {
     expect(dark.has('--text')).toBe(true);
-    const lake = definedIn(':root[data-skin="lake"]');
-    expect(lake.has('--text-faint'), 'lake still sets its own faint').toBe(true);
-    expect(lake.has('--text'), 'lake does not need to restate --text').toBe(false);
+    // Dark is Ember Grid, the one picture left, and it sets the whole ladder.
+    const ember = definedIn(':root[data-skin="ember-grid"]');
+    for (const t of ['--text', '--text-dim', '--text-faint']) expect(ember.has(t), `Ember sets ${t}`).toBe(true);
   });
 });

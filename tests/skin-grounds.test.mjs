@@ -267,40 +267,12 @@ describe('the new-task card, which is the one she came back about twice', () => 
     expect(paints(rule.body, 'background-image'), 'the picture is back on the card she asked to be opaque').toBeFalsy();
     expect(paints(rule.body, 'background-attachment')).toBeFalsy();
     // The fill itself must be a plain colour. An rgba with an alpha under 1 is
-    // the same defect wearing the right variable name.
-    const solid = tokenOf('lake', '--skin-solid');
-    expect(solid, 'the lake theme defines no --skin-solid').toBeTruthy();
+    // the same defect wearing the right variable name. Ember Grid, which is
+    // Dark, is the one picture left (w-9e434e8671); the Lake's own colour checks
+    // went with the Lake.
+    const solid = tokenOf('ember-grid', '--skin-solid');
+    expect(solid, 'Ember Grid defines no --skin-solid').toBeTruthy();
     expect(solid, `--skin-solid is ${solid}, which is not fully opaque`).toMatch(/^#[0-9a-fA-F]{6}$/);
-  });
-
-  // NOT PURE CHARCOAL. --bg is what the card wore before this item and it read
-  // as pure black. This is the required distance from it, in the only units it
-  // can be checked in.
-  it('is not the charcoal she asked it not to be', () => {
-    const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-    const solid = rgb(tokenOf('lake', '--skin-solid'));
-    const bg = rgb(tokenOf('lake', '--bg'));
-    const away = Math.hypot(...solid.map((v, i) => v - bg[i]));
-    expect(away, `--skin-solid is ${Math.round(away)} from --bg; that is the charcoal she rejected`).toBeGreaterThan(25);
-    // And it carries the lake rather than being a neutral grey: the picture's
-    // blue leads its red, which is the whole reason the window is slate.
-    expect(solid[2] - solid[0], '--skin-solid has no blue in it, so it is a grey and not this theme').toBeGreaterThan(8);
-  });
-
-  // MATCHES THE THEME, which was settled to mean one exact thing: it IS the
-  // colour of the reply box. The harness
-  // opens that box in this theme, hides its contents, and records the mean
-  // colour of the surface. If the photograph is ever replaced, or the reply
-  // box's own wash changes, this fails until the script is run again, which is
-  // the point — the colour is a measurement of that surface.
-  it('still matches the reply box it was measured off', () => {
-    const rec = JSON.parse(fs.readFileSync(path.join(root, 'tests/measurements/skin-solid/derive-skin-solid.json'), 'utf8'));
-    expect(tokenOf('lake', '--skin-solid').toLowerCase()).toBe(rec.solidHex.toLowerCase());
-    // And the recording has to be of the right surface. A run that measured the
-    // collapsed "Reply…" pill, or an unfocused box, would be measuring the bare
-    // photograph, because the skin leaves the box transparent in both states.
-    expect(rec.source, 'the reading is not of .dock-card:focus-within').toMatch(/dock-card:focus-within/);
-    expect(rec.computedFill, 'the box was not wearing the wash when it was read').toMatch(/^rgba\(/);
   });
 
   // AND THE CARD ACTUALLY LANDS ON IT. The token being right is not the same as
@@ -332,8 +304,9 @@ describe('the new-task card, which is the one she came back about twice', () => 
   const skinSrc = fs.readFileSync(path.join(root, 'renderer/src/skins.ts'), 'utf8');
   const shippedSkins = [...skinSrc.split('export const SKINS')[1].split('\n];')[0]
     .matchAll(/\{ id: '([^']+)'/g)].map((m) => m[1]).filter((i) => i !== 'lake');
-  it('has more than one picture theme, so the loop below is not empty', () => {
-    expect(shippedSkins.length).toBeGreaterThan(1);
+  // One picture ships now, Ember Grid, which is Dark (w-9e434e8671).
+  it('has a picture theme, so the loop below is not empty', () => {
+    expect(shippedSkins).toEqual(['ember-grid']);
   });
   // A DRAWN GROUND HAS NO PHOTOGRAPH TO READ A REPLY BOX OFF. Ember
   // Grid (w-b3e123a0af) puts the box on a solid panel over a flat near-black, so

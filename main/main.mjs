@@ -639,6 +639,9 @@ async function createWindow() {
   // Codex card.
   answerApproval = ipc.answerApproval;
   updater.start();
+  // A task the app just shipped moved main: look now rather than in half an
+  // hour, so the restart is offered while she still remembers the task.
+  supervisor.onShipped = () => { try { updater.check?.(); } catch {} };
   app.on('before-quit', () => updater.stop());
 
   // Cmd+Y / Cmd+N answer the oldest approval card from ANYWHERE, including

@@ -18,6 +18,15 @@ import { previewText } from './format';
 import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
 
+/**
+ * WRITTEN DOWN AND DELIBERATELY NOT BEGUN (w-afb66e6661): "Add it to Later" on
+ * the new thread card. The authority is `notStarted` in shared/work-items.mjs,
+ * which is what stops a worker pulling it; this is the window's typed copy of
+ * the same one-line fact, kept here because every list in the window already
+ * reads its rules from this file.
+ */
+export const notStarted = (i: Pick<InboxItem, 'start'> | null | undefined): boolean => i?.start === 'later';
+
 /* ------------------------------- the inbox ------------------------------- */
 // What has a claim on her attention right now. Pulled out of App.tsx so it can
 // be stated once and tested, because it was wrong in a way nobody could see:
@@ -45,6 +54,8 @@ export interface InboxItem {
   result?: string;
   answeredThrough?: number;
   runAt?: number;
+  /** 'later' while a thread sits in Later, written down and not begun. */
+  start?: 'later' | 'now';
   updatedAt?: number;
   wrote?: Record<string, { ts: number; source: string } | undefined>;
 }
@@ -161,6 +172,10 @@ export function belongsInInbox(
   i: InboxItem,
   { deliveredThrough = 0, hiddenUntil = 0, now = Date.now() } = {},
 ): boolean {
+  // ADDED TO LATER AND NOT STARTED (w-afb66e6661). It is written down on
+  // purpose and waits for a person rather than a clock, so it is in Later and
+  // nowhere else. Not a deferral: there is no moment to come back at.
+  if (notStarted(i)) return false;
   if (hiddenUntil > now) return false;    // she put it away herself
   // One run of a repeating task that a worker EXPLICITLY marked clean. This is
   // the only place in the app where finishing hides something, so it is keyed on a
@@ -236,6 +251,9 @@ export function belongsInProgress(
   i: InboxItem,
   { deferredUntil = 0, now = Date.now() } = {},
 ): boolean {
+  // Nothing is coming on a thread nobody has started: In progress promises a
+  // worker, and this one is waiting for you to say go (w-afb66e6661).
+  if (notStarted(i)) return false;
   if (deferredUntil > now) return false;
   if (i.status === 'claimed') return true;
   // The promise this list makes has been kept: a session acted on her answer
@@ -552,6 +570,14 @@ export function rowTitle(i: {
   const ours = i.wrote?.label;
   const renamed = !!theirs && !!ours && theirs.source === 'founder' && theirs.ts > ours.ts;
   return (renamed && (i.title ?? '').trim()) || label;
+}
+
+// THE SCHEDULE BOX CALLS A THREAD WHAT THE LIST CALLS IT. It printed the raw
+// title, which on a thread started from a message is the whole first sentence
+// she typed, under the row she had just pressed showing its name
+// (tests/the-schedule-box-names-the-thread-not-the-prompt.test.mjs).
+export function scheduleSubtitle(i: Parameters<typeof rowTitle>[0], count = 1): string {
+  return count > 1 ? `${count} items` : rowTitle(i);
 }
 
 // THE ROW MUST NOT SAY THE SAME SENTENCE TWICE. On a message written as one

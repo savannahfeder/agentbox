@@ -25,8 +25,14 @@ export interface Display {
 // either is remembered once changed.
 export const DEFAULT_DISPLAY: Record<PageId, Display> = {
   inbox: { view: 'list', sort: 'priority', priorities: [], projects: [], updated: 'any' },
-  team: { view: 'board', sort: 'updated', priorities: [], projects: [], updated: 'any' },
+  team: { view: 'board', sort: 'priority', priorities: [], projects: [], updated: 'any' },
 };
+
+// THE TEAM BOARD SORTED BY UPDATED UNTIL 2026-10-02, and a saved team display
+// carried that default with it, so the board never ran by priority. A display
+// saved since then carries `v: 2`; one without it that says Updated was the old
+// default speaking, and reads as Priority.
+const DISPLAY_VERSION = 2;
 
 /**
  * WHICH OF THE TWO REMEMBERED DISPLAYS THE ONE PAGE IS ON.
@@ -49,7 +55,8 @@ export function readDisplay(page: PageId, store: Pick<Storage, 'getItem'> | null
     const d = JSON.parse(raw);
     return {
       view: d.view === 'board' || d.view === 'list' ? d.view : DEFAULT_DISPLAY[page].view,
-      sort: d.sort === 'updated' || d.sort === 'priority' ? d.sort : DEFAULT_DISPLAY[page].sort,
+      sort: page === 'team' && d.sort === 'updated' && d.v !== DISPLAY_VERSION ? 'priority'
+        : d.sort === 'updated' || d.sort === 'priority' ? d.sort : DEFAULT_DISPLAY[page].sort,
       priorities: Array.isArray(d.priorities) ? d.priorities.filter((p: unknown) => ['urgent', 'high', 'medium', 'low'].includes(p as string)) : [],
       projects: Array.isArray(d.projects) ? d.projects.filter((p: unknown) => typeof p === 'string') : [],
       updated: d.updated === 'today' || d.updated === 'week' ? d.updated : 'any',
@@ -60,7 +67,7 @@ export function readDisplay(page: PageId, store: Pick<Storage, 'getItem'> | null
 }
 
 export function writeDisplay(page: PageId, d: Display, store: Pick<Storage, 'setItem'> | null = typeof localStorage === 'undefined' ? null : localStorage) {
-  try { store?.setItem(KEY(page), JSON.stringify(d)); } catch { /* private mode */ }
+  try { store?.setItem(KEY(page), JSON.stringify({ ...d, v: DISPLAY_VERSION })); } catch { /* private mode */ }
 }
 
 /** Whether any filter is on, which is what puts the dot on the Display icon. */
@@ -162,7 +169,7 @@ export function nextTab<T extends string>(order: readonly T[], current: string, 
 export function filteredEmptyWords(view: TabName | string, hidden: number): { head: string; line: string } {
   const head = {
     progress: 'Nothing in your filter is running',
-    snoozed: 'Nothing in your filter is scheduled',
+    snoozed: 'Nothing in your filter is in Later',
     done: 'Nothing in your filter is closed',
     all: 'No threads match your filter',
   }[view as string] ?? 'Nothing in your filter needs you';
@@ -419,6 +426,33 @@ export function teamKeeps(e: BoardEntry, { person, projectName }: { person: stri
   if (d.updated === 'today' && !(e.updatedAt >= startOfDay(now))) return false;
   if (d.updated === 'week' && !(e.updatedAt >= now - 7 * 86_400_000)) return false;
   return true;
+}
+
+/**
+ * THE BOARD, COLUMN BY COLUMN, IN THE ORDER IT IS DRAWN. InboxBoard draws
+ * exactly this, and App.tsx walks it with J and K (`boardWalk`), so the keys go
+ * where the eye goes: down a column, then on to the top of the next. They used
+ * to walk the current tab's list, which a card from another column is not in,
+ * so J stopped with the board still full (2026-10-02).
+ */
+export function boardColumns({ items, products, display, now, stateOf, cards = [], picked, me, since = null, live }: {
+  items: WorkItem[]; products: Product[]; display: Display; now: number;
+  stateOf?: (item: WorkItem) => ThreadStateWord | null;
+  cards?: ThreadCard[]; picked?: string[]; me: string | null; since?: number | null; live?: Set<string>;
+}): { state: ThreadStateWord; label: string; rows: BoardEntry[] }[] {
+  const who = picked ?? (me ? [me] : []);
+  const entries = teamEntries({ items: me && !who.includes(me) ? [] : items, products, cards: cards.filter((c) => who.includes(c.personId)), me, now, since, stateOf, live, allMine: true })
+    .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
+    .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
+  // EVERY COLUMN TAKES THE DISPLAY'S SORT, not just the list view
+  // (w-5a08121f99). `teamEntries` hands these back newest first.
+  return BOARD_COLUMNS.map((col) => ({ ...col, rows: sortedEntries(entries.filter((e) => e.state === col.state), display) }));
+}
+
+/** Your threads on the board, in reading order. A teammate's card has no
+ *  thread of yours behind it, so J and K pass over it. */
+export function boardWalk(columns: { rows: BoardEntry[] }[]): WorkItem[] {
+  return columns.flatMap((c) => c.rows).flatMap((e) => (e.item ? [e.item] : []));
 }
 
 

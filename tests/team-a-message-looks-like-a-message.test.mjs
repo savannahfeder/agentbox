@@ -114,6 +114,9 @@ describe('drawn', () => {
 
   it('asks the board for messages on the Inbox', () => {
     // Your own page's board (w-05ff3d1438) is the one that asks for all of yours.
-    expect(pages).toMatch(/teamEntries\(\{[^}]*allMine: true \}\)/);
+    // It asks through `boardColumns` (page-rules.ts), which the board draws.
+    const rules = fs.readFileSync(new URL('../renderer/src/threads/page-rules.ts', import.meta.url), 'utf8');
+    expect(rules).toMatch(/teamEntries\(\{[^}]*allMine: true \}\)/);
+    expect(pages).toContain('boardColumns(');
   });
 });

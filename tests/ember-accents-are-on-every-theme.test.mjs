@@ -26,9 +26,15 @@ describe("Ember's accents", () => {
     expect(block).toMatch(/font-family: var\(--mono\); font-size: 11px; letter-spacing: \.06em; text-transform: uppercase;/);
   });
 
-  it('leave the main font alone: the body is still Avenir Next, and Geist body is Ember only', () => {
-    expect(styles).toContain("font-family: 'Avenir Next', 'Source Sans 3 Variable'");
-    expect(styles).toContain(`:root[data-skin="ember-grid"] body { font-family: 'Geist'`);
-    expect(nav).not.toMatch(/:root:root [^{]*\{[^}]*font-family: 'Geist'/);
+  // w-9e434e8671: Light wears Ember Grid's type too, so the body is Geist in
+  // both themes and Light carries Ember's five weight and spacing rules.
+  it('set the body in Geist in both themes, with Ember Grid’s fallbacks', () => {
+    expect(styles).toContain("font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, sans-serif;");
+    expect(styles).not.toContain("font-family: 'Avenir Next', 'Source Sans 3 Variable'");
+    for (const rule of [
+      ':root:root .set-title { font-weight: 400; letter-spacing: -0.035em; }',
+      ':root:root .workspace-title { font-weight: 400; letter-spacing: -.03em; }',
+      ':root:root .row .subject { font-weight: 400; letter-spacing: -.01em; }',
+    ]) expect(nav).toContain(rule);
   });
 });

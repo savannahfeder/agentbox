@@ -892,46 +892,6 @@ body {
 .local-status-retry {margin-top:24px;}
 @media (prefers-reduced-motion:reduce) {.local-status-dot {animation:none;}}
 
-/* Muted warm-gray navigation over Peach Haze's dimmed photograph.
-
-   The reported fault was eye strain reading this sidebar over Peach Haze, and
-   narrowed down it was the top-left corner specifically: Search and Inbox were
-   very hard to read where the rest of the column was fine.
-
-   THE FIX IS IN `assets/peach-haze-2.webp`, NOT IN THIS FILE, AND NOTHING MAY
-   BE DRAWN OVER THIS COLUMN. Three ways of drawing over it were built,
-   measured clear of AA on all ten labels and photographed whole-window on
-   2026-09-22: a blurred scrim (worst label 4.60), a dark frosted panel (4.99),
-   a pale panel in the theme's dark ink (5.82). All three were rejected on
-   sight as unnatural, too dark or too light. The numbers were never the
-   problem. Do not rebuild one of them.
-
-   What was actually wrong was the picture. Its left edge is a steady grey
-   around 135 of 255 all the way down, EXCEPT its top fifth, which climbs to
-   192, and Search and Inbox sit in exactly that band while the rest of the
-   column never did. So the picture now carries its own grey up over that band:
-   content from further down the same column, mirrored about y=25% and
-   feathered out by y=32% and x=36%. It is a haze with no features up there, so
-   the join cannot be seen; the left column measures a flat 130 to 146 from the
-   top corner to the foot, biggest step between neighbouring bands 3.
-
-   THE TEXT COLOURS BELOW ARE CHOSEN AND ARE NOT A LEVER. Against the rgb(141,143,142)
-   the corner used to show, pure white measures 3.31, so no text colour ever
-   passed there. The labels still sit between 2.2 and 2.9, under AA, which was
-   accepted on the grounds that the theme looking right matters more
-   here than clearing the measure. The
-   corner went 1.40 to 2.33 and now matches the rest of the column instead of
-   being the worst of it, and evenness top to bottom went 1.43 to 0.67. */
-:root[data-skin="peach-haze-2"] .workspace-navigation {
-  --text: #c6bfbc;
-  --text-dim: #b7b0ad;
-  --text-faint: #afa9a6;
-  --line: rgba(225, 217, 212, .15);
-  --wash: rgba(225, 217, 212, .07);
-  --underline: #c6bfbc;
-  color: var(--text);
-}
-
 /* AND THE CORNER HAS TO STAY THE CORNER AT EVERY WINDOW SHAPE. The edit above
    was approved on condition that it works at every screen size.
 
@@ -960,26 +920,6 @@ body {
    3:2 or at any shape wider than it. Only the THIRD layer is the
    photograph. The first is the veil and the second the tint, both flat, so
    they keep centre and have to be restated or the shorthand resets them. */
-@media (max-aspect-ratio: 3/2) {
-  :root[data-skin="peach-haze-2"] body::before,
-  :root[data-skin="peach-haze-2"] .settings-screen::before {
-    background-position: center, center, left center;
-  }
-}
-
-:root[data-skin="orbital-glass"] .workspace-layout::before {
-  box-shadow:inset 0 1px 0 rgba(230,242,255,.18),inset 1px 0 0 rgba(200,218,240,.08),0 8px 24px rgba(7,16,28,.04);
-}
-:root[data-skin="orbital-glass"] .workspace-navigation {
-  --text:#c6bfbc;--text-dim:#b7b0ad;--text-faint:#afa9a6;
-}
-
-/* Keep the planet at the far right of the composition, outside the reading
-   focus. Extend the backdrop canvas rather than exposing an empty image edge. */
-:root[data-skin="orbital-glass"] body::before,
-:root[data-skin="orbital-glass"] .settings-screen::before {
-  right: calc(-28vw - 2 * var(--skin-background-blur, 0px));
-}
 
 /* ═══ THE REPLY LINE ALONG THE FOOT ═══, option A, chosen 2026-09-21. In full screen the pane is already mounted with
    the real thread, the real options strip and the real composer in it, and it
@@ -998,8 +938,18 @@ body {
 .workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body { flex-direction:column; gap:0; }
 /* `order` IS LOAD-BEARING. The conversation is FIRST in the document, because
    in every other layout it is the left or the only pane; turned into a column
-   without this the reply line lands above the page instead of under it. */
-.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body > .doc-pane { order:1; flex:1 1 auto !important; width:100%; min-height:0; }
+   without this the reply line lands above the page instead of under it.
+   THE PANE IS NOT A CHILD OF `.body`: ArtifactSurface portals it into a
+   `.artifact-host` (display:contents), so the rule has to go through it. It
+   was written as `.body > .doc-pane`, matched nothing, and a tall picture
+   then pushed the reply line off the bottom of the window (w-fe09f5794f). */
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body > .artifact-host > .doc-pane { order:1; flex:1 1 auto !important; width:100%; min-height:0; }
+/* A PICTURE IN FULL SCREEN IS SHOWN AT THE WINDOW'S WIDTH AND SCROLLS. Fitting
+   the whole of it, as the pane beside the conversation does, shrinks a long
+   design board to a strip down the middle of an empty window. It still never
+   grows past its own size. */
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .doc-pane.doc-image .doc-card { overflow-y:auto; }
+.workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) .doc-picture { flex:none; width:auto; height:auto; max-height:none; padding:16px; }
 .workspace-layout[data-artifact-layout="focus"]:not(.workspace-settings) > .body > .list-pane {
   order:2; display:flex; flex-direction:column; flex:0 0 auto; min-width:0;
   background:transparent; border-radius:0; overflow:visible;
@@ -1089,3 +1039,13 @@ body {
 :root:root .idle-key { font-family: var(--mono); font-weight: 400; }
 :root[data-skin="ember-grid"] .workspace-title { font-weight: 400; letter-spacing: -.03em; }
 :root[data-skin="ember-grid"] .row .subject { font-weight: 400; letter-spacing: -.01em; }
+
+/* EMBER GRID'S TYPE IN LIGHT TOO (w-9e434e8671). Geist sets lighter than Avenir
+   Next, so Ember took these down to 400 and tightened them. `:root:root` has
+   the same specificity as Ember's selectors, so Light wears exactly what Dark
+   does. */
+:root:root .set-title { font-weight: 400; letter-spacing: -0.035em; }
+:root:root .idle-zero { font-weight: 400; }
+:root:root .workspace-navigation .workspace-tab.active { font-weight: 400; }
+:root:root .workspace-title { font-weight: 400; letter-spacing: -.03em; }
+:root:root .row .subject { font-weight: 400; letter-spacing: -.01em; }

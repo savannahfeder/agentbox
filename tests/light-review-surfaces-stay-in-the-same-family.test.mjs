@@ -3,11 +3,7 @@
 import {it,expect} from 'vitest';
 import {readFileSync} from 'node:fs';
 const css=readFileSync(new URL('../renderer/src/components/direct-review.css',import.meta.url),'utf8');
-it('gives both light picture themes a shared review material',()=>{
- expect(css).toContain('[data-skin="frost-haze"]');
- expect(css).toContain('[data-skin="slate-haze"]');
- expect(css.match(/background:var\(--review-material\)/g)?.length).toBeGreaterThanOrEqual(2);
-});
+// The Frost and Slate case went with those two pictures (w-9e434e8671).
 it('limits the fully clear variation to text documents',()=>{
  expect(css).toContain('[data-text-review="clear"] .doc-pane.doc-md .doc-card');
  expect(css).not.toContain('[data-text-review="clear"] .doc-pane.doc-html');

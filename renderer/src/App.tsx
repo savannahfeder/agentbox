@@ -32,7 +32,6 @@ import { type Place, placeIsSomewhere, readPlace, writePlace, writeScroll } from
 import { documentCandidates } from './message-artifacts';
 import { filesFromRuns } from './run-files';
 import { Rail } from './components/Rail';
-import { Compose } from './components/Compose';
 import { ThreadComposer } from './threads/ThreadComposer';
 import { proposeParent } from '../../shared/project-folder-check.mjs';
 import { NewProject } from './components/NewProject';
@@ -43,7 +42,6 @@ import { RepeatFocus } from './components/RepeatFocus';
 import { Palette } from './components/Palette';
 import { Standing, STANDING } from './components/Standing';
 import { Settings } from './components/Settings';
-import { ThemePicker } from './components/ThemePicker';
 import { Snooze } from './components/Snooze';
 /* The line, the toast and the dot on the cog were the other three drawn for that round and
  are gone; their copy is in decisions.md and their photographs on
@@ -63,7 +61,7 @@ import { approvalReads } from './approval-card';
 // one it took went. Only the second is raised from here, because by the time
 // there is anything to confirm the card has closed.
 import { sentLine } from './compose-says';
-import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, maskedAncestors, parkedByAgent, replyClearsSchedule, statusForReply, stoppable, threadMasked, withdrawReply } from './list-rules';
+import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, maskedAncestors, notStarted, parkedByAgent, replyClearsSchedule, statusForReply, stoppable, threadMasked, withdrawReply } from './list-rules';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { opensATextField } from './keys';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
@@ -72,11 +70,11 @@ import { modalAfterLeavingATask } from './modal-scope';
 import { NOTHING_OVER_THE_APP, afterTheWalk, type OpenOverTheApp } from './walk-scope';
 import { splitMessage } from './message-split';
 import { parseQuery, searchItems } from './search';
-import { applyTheme, onMachineTheme, resolvePick, resolveTheme, THEME_KEY, type ThemePick } from './theme';
+import { applyTheme, machineTheme, onMachineTheme, resolvePick, resolveTheme, THEME_KEY, type ThemePick } from './theme';
 import { hintScheduler, type HintScheduler } from './hint-timing';
 import { HINTS } from './hint-plate';
 import { HintPlate } from './components/HintPlate';
-import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, idleSkin, lookMeans, lookOf, resolveSkin, resolveSkinDetail, resolveTune, seedFirstRunLook, SKINS, storeTune, walkSkin, SKIN_KEY, TUNE_DEFAULT, TUNE_KEY, type Look, type SkinChoice, type SkinId, type SkinTune } from './skins';
+import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, idleSkin, lookMeans, lookOf, resolveSkin, resolveSkinDetail, resolveTune, seedFirstRunLook, SKINS, storeTune, walkSkin, wornSkin, SKIN_KEY, TUNE_DEFAULT, TUNE_KEY, type Look, type SkinChoice, type SkinId, type SkinTune } from './skins';
 // THE SHAPE OF AN OPENED TASK IS STILL AN OPEN QUESTION. Six of them,
 // one attribute, and the whole file goes when she picks.
 import { resolveTaskShape, TASK_SHAPE_KEY, type TaskShape } from './task-shape';
@@ -103,7 +101,7 @@ import {
   mayOpenInbox, noCodingAgent, practising, restartFirstRun, snoozeRefused, tutorialRun,
   waitingId, waitingIndex,
   finishFirstRun, forcedStep, readFirstRun, walkRows,
-  saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, wearsTheWalksLook, whyNotMade, type FirstRun,
+  saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, whyNotMade, type FirstRun,
 } from './onboarding';
 import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from './priority';
 import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
@@ -118,10 +116,10 @@ import { TeamPage } from './team/TeamPage';
 import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, PeopleFilter, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, conversationWith, isDirect, nextTab, pageFor, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
+import { DEFAULT_DISPLAY, boardColumns, boardWalk, conversationWith, isDirect, nextTab, pageFor, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 
-type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing' | 'themes';
+type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
 
 // WHAT AN UNDO HANDS BACK, and where it belongs on the screen. A withdrawn
 // reply belongs to a thread, so undoing it opens that thread with the user's
@@ -660,7 +658,7 @@ export default function App() {
       swapLook(() => flushSync(() => {
         setPickedLook(null);
         setTheme(t); applyTheme(resolveTheme(t));
-        setSkin(s); applySkin(s);
+        setSkin(s); applySkin(wornSkin(t, s, machineTheme()));
         // Each picture carries its own dials, so arriving on one loads ITS numbers
         // rather than leaving the last picture's blur on this one's photograph.
         if (s !== 'none') {
@@ -927,6 +925,11 @@ export default function App() {
   // size, and this is the one line that makes them the practice project's. It
   // is the app's own product filter, which every list in here already reads.
   const inPractice = practising(run);
+  // THE TWO BEATS THE NEW THREAD CARD IS OPEN FOR: the one about who the thread
+  // is for and the one that sends it. Both want the walk's own task in the box,
+  // the practice project under it and the label on the row it makes, so the
+  // card is told once rather than in three places that could disagree.
+  const walkCard = run?.step === 'who' || run?.step === 'task';
   // WHAT THE LISTS UNDERNEATH ARE SCOPED TO. Only the practice run: it has to
   // make the whole app the practice project's, the mask and the counts included.
   // Her own filter is not this. It narrows the box on screen and nothing else
@@ -947,7 +950,11 @@ export default function App() {
     if (!run) return;
     // BEAT FOUR IS THE REAL, EMPTY INBOX.
     if (run.step === 'make') { setFocused(null); setModal(null); setView('inbox'); }
-    if (run.step === 'task') setModal('compose');
+    // BOTH BEATS THE CARD IS OPEN FOR, not just the send. Somebody who quits
+    // the walk on the beat about who a thread is for comes back to a card
+    // telling them to click To, and without this there would be no card on the
+    // screen to click it on.
+    if (run.step === 'who' || run.step === 'task') setModal('compose');
     if (run.step === 'working') { setModal(null); setView('progress'); setSelected(0); }
     // AND IT COMES BACK TO HER INBOX RATHER THAN OPENING ITSELF.
     if (run.step === 'open') { setModal(null); setView('inbox'); setSelected(0); }
@@ -968,6 +975,11 @@ export default function App() {
     // would put the screen back on Inbox a moment after they left it. All this
     // does is make sure nothing is over the app when the tour starts.
     if (run.step === 'where') { setModal(null); setFocused(null); }
+    // THE BOARD BEAT IS DRIVEN NO HARDER THAN THE TOUR IS. The press that
+    // matters is inside the View and filters menu, which the person opens
+    // themselves, so all this does is make sure nothing is over the app and
+    // that they are on the Inbox, where the board lives.
+    if (run.step === 'board') { setModal(null); setFocused(null); setView('inbox'); }
     if (run.step === 'command') { setModal(null); setFocused(null); setView('inbox'); }
   }, [run?.step]);
 
@@ -977,8 +989,11 @@ export default function App() {
   // beat moves on whether she pressed C or clicked the plus, and it is the
   // app's behaviour she is learning rather than the walk's.
   useEffect(() => {
+    // THE CARD OPENING ENDS THE FIRST BEAT AND STARTS THE ONE ABOUT WHO IT IS
+    // FOR (2026-10-01). It used to go straight to the send; To is the card's
+    // first line and the walk never said a word about it.
     if (run?.step !== 'make' || modal !== 'compose') return;
-    setRun((r) => (r ? stepTo(r, 'task') : r));
+    setRun((r) => (r ? stepTo(r, 'who') : r));
   }, [run?.step, modal]);
 
   // AND SHE OPENS IT HERSELF. Beat six's second half ends when the row she was
@@ -1777,12 +1792,20 @@ export default function App() {
   // list that holds one while it is deferred: the Your agents tab that used to
   // carry it as well is gone. A row she deferred has to be somewhere she can
   // reach it, or the only way back is waiting for the moment.
+  //
+  // AND SINCE w-afb66e6661 IT HOLDS A THIRD THING, which is why the tab is
+  // called Later: a thread added to Later has no moment at all. It waits for a
+  // person, so it sorts after everything with a clock rather than before it.
+  const whenShown = useCallback(
+    (i: WorkItem) => (notStarted(i) ? Number.MAX_SAFE_INTEGER : hiddenAt(i)),
+    [hiddenAt],
+  );
   const snoozed = useMemo(() => [
-    ...items.filter((i) => hiddenAt(i) > now
+    ...items.filter((i) => (notStarted(i) || hiddenAt(i) > now)
       && i.status !== 'done'
       && (!scope || i.product === scope)),
     ...agentList.filter((r) => (r.runAt ?? 0) > now),
-  ].sort((a, b) => hiddenAt(a) - hiddenAt(b)), [items, agentList, hiddenAt, scope, now]);
+  ].sort((a, b) => whenShown(a) - whenShown(b)), [items, agentList, hiddenAt, whenShown, scope, now]);
 
   // Repeating tasks. They are RULES, on their own channel, which is why nothing
   // in the item list rules has to know they exist. They are read up here, ahead
@@ -1828,7 +1851,7 @@ export default function App() {
     // row snoozed there are three to see, and the third is where the row she
     // put off went, which is the same lesson as the other two.
     if (tabOrder.some((v) => v !== 'inbox' && !toured.current.has(v))) return;
-    setRun((r) => (r ? stepTo(r, 'command') : r));
+    setRun((r) => (r ? stepTo(r, 'board') : r));
   }, [view, run?.step, tabOrder]);
 
 
@@ -1954,6 +1977,16 @@ export default function App() {
     if (displayPage === 'team') setTeamDisplayRaw(d); else setMineDisplayRaw(d);
     writeDisplay(displayPage, d);
   }, [displayPage]);
+  // AND THE TUTORIAL'S BOARD BEAT ENDS WHEN THE BOARD IS REALLY ON THE SCREEN,
+  // read off the view the page is drawn in rather than off a click: the press
+  // is two deep, inside the View and filters menu, and the beat is about the
+  // board rather than about either press that reaches it. It reads the derived
+  // `inboxDisplay` rather than either half, so it ends on the board whichever
+  // page the walk is standing on.
+  useEffect(() => {
+    if (run?.step !== 'board' || inboxDisplay.view !== 'board') return;
+    setRun((r) => (r ? stepTo(r, 'command') : r));
+  }, [run?.step, inboxDisplay.view]);
   // Your own rows are on the page unless you took yourself off it.
   const mineShown = !team || picked.includes(team.me ?? '');
   const displayedBox = useMemo(
@@ -2010,7 +2043,6 @@ export default function App() {
     () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay),
     [inbox, boxFilter, inboxDisplay, now],
   );
-  const list = search !== null ? (hits ?? []).map((h) => h.item) : displayedBox;
   const boxFilterMenu = useMemo(
     () => (modal === 'filter' ? filterMenu(wholeBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i)), boxFilter, snap?.products ?? []) : null),
     [modal, wholeBox, boxFilter, snap?.products],
@@ -2039,6 +2071,17 @@ export default function App() {
     return m;
   }, [inbox, progress, snoozed, done]);
   const stateOfMine = useCallback((i: WorkItem) => tabState.get(i.id) ?? null, [tabState]);
+  // J AND K WALK WHAT IS ON THE SCREEN. On the board that is the board's own
+  // reading order, down each column and on to the next (`boardColumns`, the
+  // same call InboxBoard draws). Walking the tab's list instead stopped J
+  // halfway down a full board, because a card from another column was not in
+  // it (2026-10-02, tests/the-board-walks-in-the-order-it-is-drawn.test.mjs).
+  const onBoard = search === null && inboxDisplay.view === 'board';
+  const boardOrder = useMemo(
+    () => (onBoard ? boardWalk(boardColumns({ items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards, picked: team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds })) : null),
+    [onBoard, items, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds],
+  );
+  const list = search !== null ? (hits ?? []).map((h) => h.item) : boardOrder ?? displayedBox;
 
   const current: WorkItem | undefined = list[Math.min(selected, Math.max(0, list.length - 1))];
   // THE ROW THE ROW-KEYS ACT ON. The pointer's row when it is on one, and the
@@ -3494,8 +3537,13 @@ export default function App() {
     // name a move that did not happen. What actually changed is that work can
     // start on it again.
     const allParked = list.every((i) => parkedByAgent(i, Date.now()));
-    const one = allParked ? 'Running again' : 'Back in the inbox';
-    showToast(list.length > 1 ? `${list.length} ${allParked ? 'running again' : 'back in the inbox'}` : one);
+    // A thread in Later was never in the inbox and never ran, so neither of
+    // those words is true of it: it is starting for the first time.
+    const allHeld = list.every((i) => notStarted(i));
+    const one = allHeld ? 'Started' : allParked ? 'Running again' : 'Back in the inbox';
+    showToast(list.length > 1
+      ? `${list.length} ${allHeld ? 'started' : allParked ? 'running again' : 'back in the inbox'}`
+      : one);
     // The old localStorage snoozes are still honored on read, so a row deferred
     // before this shipped needs clearing there too or it would not come back.
     setSnoozes((s) => {
@@ -3504,8 +3552,14 @@ export default function App() {
       return next;
     });
     for (const item of list) await writeMoment(item, 0);
+    // AND A THREAD IN LATER IS STARTED BY THE SAME PRESS (w-afb66e6661). It has
+    // no moment to clear; what it has is `start`, and 'now' is what makes the
+    // supervisor see it. The undo puts it back in Later.
+    const wasHeld = list.filter((i) => notStarted(i));
+    for (const item of wasHeld) await api.threadEdit(item.product, item.id, { start: 'now' });
     pushUndo({ label: 'Scheduled again', undoes: 'put that schedule back', run: async () => {
       for (const item of list) await writeMoment(item, prior.get(item.id) ?? 0);
+      for (const item of wasHeld) await api.threadEdit(item.product, item.id, { start: 'later' });
       refresh();
     } });
     refresh();
@@ -3576,6 +3630,16 @@ export default function App() {
       : 'Stopped before it started. Back in your inbox. Reply to redirect it.');
     await refresh();
   }, [refresh, showToast, working]);
+
+  // RUN NOW, from the three-dot menu on a waiting task (supervisor.runNow).
+  // The menu only offers it on a queued task, so the refusals are races: the
+  // task started, or left the store, between the menu drawing and the press.
+  const runNow = useCallback(async (item: WorkItem) => {
+    const r = await window.zero?.runNow?.({ product: item.product, id: item.id });
+    showToast(r?.ok ? 'Up next. It starts as soon as an agent is free.'
+      : r?.reason === 'running' ? 'Already running.' : 'This task is no longer waiting.');
+    await refresh();
+  }, [refresh, showToast]);
 
   // Unstick a stalled item: its answer's delivery mark is forgotten and a
   // fresh worker picks it up on the next tick, within seconds.
@@ -4287,7 +4351,10 @@ export default function App() {
   // So the question is asked of the step ORDER now (`wearsTheWalksLook`,
   // onboarding.ts) rather than of three names, and moving the picker again
   // moves this with it.
-  const firstRunPinned = run !== null && wearsTheWalksLook(run.step);
+  //
+  // AND THEN IT WENT (w-9e434e8671): the walk has no picker any more, so its
+  // setup screens wear the chosen look, Light or Dark, like the rest of it.
+  const firstRunPinned = false;
   // AND THE INBOX ZERO PIN IS OFF FOR THE WHOLE OF THE WALK (`run === null`).
   //
   // IT STARTED AS ONE STEP AND IT WAS NOT ENOUGH. On 08-24 this read
@@ -4313,8 +4380,11 @@ export default function App() {
   // is remembered at inbox zero, because a picture is the nice theme, and
   // swapping it for a different picture is the app forgetting. Turning that
   // off too would be this clause, and nothing else.
-  const idlePinned = run === null && skin === 'none'
-    && view === 'inbox' && inbox.length === 0 && !focused && !settingsOpen && search === null;
+  //
+  // AND THEN IT WENT (w-9e434e8671). With three choices, Light, Dark and Match
+  // system, a pin to plain dark at inbox zero would show a theme nobody can
+  // pick, so inbox zero wears the chosen look like every other page.
+  const idlePinned = false;
   // IT IS THIS PAGE ONLY, and nothing here reaches the inbox, the walk or the
   // setup screens.
   useEffect(() => {
@@ -4349,8 +4419,10 @@ export default function App() {
     // written unconditionally, because the tile is on the screen in Settings and
     // in ⌘K whatever the window is currently wearing.
     document.documentElement.setAttribute('data-machine', machine);
-    applySkin(skin);
-    if (skin !== 'none') applyTune(resolveTune(localStorage.getItem(TUNE_KEY), skin));
+    // Match system on a dark Mac is Dark, which is Ember Grid (skins.ts).
+    const worn = wornSkin(theme, skin, machine);
+    applySkin(worn);
+    if (worn !== 'none') applyTune(resolveTune(localStorage.getItem(TUNE_KEY), worn));
     // `machine` is in the list because on Match my system it is half the answer:
     // without it the effect never re-runs when macOS flips and the window stays
     // on whichever it was at launch.
@@ -4676,8 +4748,8 @@ export default function App() {
             })}
           />}
           {/* AND THE SOCKET A THREAD'S OWN CONTROLS ARE TELEPORTED INTO: the
-              Summary button and the thread's menu, which holds the code, the
-              terminal and Done (w-e731ca9376, 2026-10-01). They are drawn by
+              thread's menu, which holds the code, the terminal and Done
+              (w-e731ca9376, 2026-10-01). They are drawn by
               Focus because only Focus knows which of them this thread has, and
               they land here because the corner is where a task's own controls
               live. */}
@@ -4947,10 +5019,8 @@ export default function App() {
                 />
               ) : focused ? (
                 <Focus
-                  // The summary panel reads the live rows for its linked
-                  // threads, and a message from a person can be handed to an
-                  // agent from its page.
-                  items={items}
+                  // A message from a person can be handed to an agent from
+                  // its page.
                   onHandToAgent={handToAgent}
                   onAddPeople={addPeopleToConversation}
                   headerTarget={workspaceNavigation ? taskHeader : null}
@@ -5038,6 +5108,7 @@ export default function App() {
                   }}
                   onReplyClose={() => setModal(null)}
                   onStop={() => stopAgent(focused)}
+                  onRunNow={() => runNow(focused)}
                   onReveal={() => revealAgent(focused)}
                   // Remind me later and stop this task are neither of the two
                   // ways a task ends, and the card beside the bar names exactly
@@ -5054,6 +5125,7 @@ export default function App() {
                   // rule is the point of that file.
                   live={{
                     queued: snap.supervisor.queued,
+                    runNow: snap.supervisor.runNow,
                     paused: snap.supervisor.paused,
                     running: snap.supervisor.running.length,
                     capacity: snap.supervisor.capacity,
@@ -5203,15 +5275,28 @@ export default function App() {
           on the undo pile exactly as the old card's send did below. The draft
           is read FIRST, before the card clears it, because it is the only copy
           an undo can hand back. */}
-      {modal === 'compose' && run?.step !== 'task' && (
+      {modal === 'compose' && (
         <ThreadComposer
           products={rankedProducts}
           items={items}
           engines={snap.engines?.choices}
           codexModels={codexModels}
           codexModelDefault={codexModelDefault}
-          defaultProduct={productFilter}
-          initial={composeInitial}
+          // THE TUTORIAL SENDS ITS TASK INTO THE PRACTICE PROJECT, so the card
+          // opens on that project rather than on whatever was last used.
+          defaultProduct={walkCard ? (run!.practice ?? run!.product) : productFilter}
+          /* THE WALK'S OWN TASK, ALREADY WRITTEN. The beat is about pressing
+             send, not about thinking of something to ask, so the words are in
+             the box when the card opens. `scripted` is what lets this one task
+             into the practice project and what stamps the label the supervisor
+             reads; everything else about the card is the card anybody uses. */
+          initial={walkCard ? { body: `${TASK_TITLE}\n\n${TASK_BODY}` } : composeInitial}
+          scripted={walkCard ? { labels: [FIRST_RUN_LABEL] } : null}
+          // AND THE BEAT ABOUT WHO IT IS FOR ENDS WHEN THE LIST IS REALLY OPEN,
+          // the way every other beat ends on the thing it asked for happening.
+          onOpenMenu={(which) => {
+            if (which === 'to' && runRef.current?.step === 'who') setRun((r) => (r ? stepTo(r, 'task') : r));
+          }}
           onOpenConversation={openConversation}
           // "Reorder" beside the project menu's heading: Settings on the
           // Projects page, which is where the order is set. The draft is
@@ -5222,6 +5307,16 @@ export default function App() {
             setComposeInitial(null);
             const sent = readComposeDraft();
             setModal(null);
+            // THE TUTORIAL'S OWN TASK, AND IT LEAVES NO TOAST AND NO UNDO.
+            // The walk goes on from here with the ringed sentence beside the
+            // row, and an undo key nobody has been taught yet, over a walk it
+            // would strand somebody in the middle of, is not a way back. The
+            // `sent` event is what moves the beat on.
+            if (runRef.current?.step === 'task') {
+              if (made?.id) fire({ t: 'sent', item: made.id, at: Date.now() });
+              await refresh();
+              return;
+            }
             if (how?.kind === 'message') {
               const firsts = (how.toMany ?? [how.to ?? '']).map((id) => team?.byId.get(id)?.name?.split(/\s+/)[0]).filter(Boolean) as string[];
               const said = firsts.length > 1 ? `${firsts.slice(0, -1).join(', ')} and ${firsts[firsts.length - 1]}` : firsts[0];
@@ -5250,6 +5345,7 @@ export default function App() {
             showToast(sentLine({
               to: to ?? slug,
               when: how?.runAt ? whenLabel({ runAt: how.runAt, repeat: null }) : null,
+              held: how?.start === 'later',
             }), made?.id ? { product: made.product, id: made.id } : undefined);
             // SHOW WHERE IT WENT (2026-10-01: a new thread looked as if it
             // was never made, since it was not in the inbox). A thread sent to an agent is not
@@ -5257,7 +5353,7 @@ export default function App() {
             // tab moves to where it did land, Running or Scheduled, so she
             // sees the row arrive instead of an unchanged page.
             if (workspaceNavigation && !teamOpen && !focused && (['inbox', 'progress', 'snoozed'] as View[]).includes(view)) {
-              setView(how?.runAt && how.runAt > Date.now() ? 'snoozed' : 'progress');
+              setView((how?.runAt && how.runAt > Date.now()) || how?.start === 'later' ? 'snoozed' : 'progress');
               setSelected(0);
               setMultiSel(new Set());
             }
@@ -5265,143 +5361,12 @@ export default function App() {
           }}
         />
       )}
-      {/* THE FIRST RUN'S EXAMPLE TASK KEEPS THE OLD CARD. The walk types its
-          task into that card's field and points its tether at that card's
-          Start it, and its send carries the first-run label, so it is left
-          exactly as it was until the walk is redrawn for the new card. */}
-      {modal === 'compose' && run?.step === 'task' && (
-        <Compose
-          products={rankedProducts}
-          /*
-           * WHICH CODING AGENTS THIS MAC REALLY OFFERS, off the
-             snapshot, because `Supervisor#engineChoices` is the one place that
-             asks the capability gate and a card that asked the machine itself
-             would offer her a choice the supervisor is about to refuse. One
-             entry on every Mac until she opens the gate, and then the card draws
-             no engine clause at all — the same card she has always had. */
-          engineChoices={snap.engines?.choices}
-          workspaceEngine={snap.engines?.workspace}
-          /*
-           * AND WHAT CODEX CALLS ITS MODELS, read once on mount rather than off
-             the snapshot: it costs a 199KB parse (main/codex-models.mjs) and a
-             picker must not be the reason that happens every few seconds while
-             she is typing. Empty on every Mac without a choice. */
-          codexModels={codexModels}
-          codexModelDefault={codexModelDefault}
-          onSend={async (p) => {
-            const to = snap.products.find((x) => x.slug === p.product)?.name;
-            // THE CARD AS IT STANDS, read before anything is written, because
-            // Compose clears the draft the moment the send stands and this is
-            // the only copy left to hand back on a Z (noteNewTask above).
-            const sent = readComposeDraft();
-            // A repeating task is a rule, so it does not go down the compose
-            // path at all. If the rule is refused the composer STAYS OPEN with
-            // the draft in it: a refused schedule that also eats what the user
-            // typed is two failures, and the second one is the expensive one.
-            if (p.repeat) {
-              let rule: { id?: string } | null = null;
-              try {
-                // BOTH WORDS PICKED IN THE SAME SENTENCE. The card sends
-                // them beside the rule and this branch used to name neither, so
-                // she could visibly choose Codex on "every morning" and every
-                // run went to the workspace default (main/repeats.mjs).
-                rule = await api.composeRepeat({
-                  product: p.product, title: p.title, body: p.body, priority: p.priority, rule: p.repeat,
-                  engine: p.engine, model: p.model,
-                });
-              } catch (err) {
-                showToast(`Not set: ${(err as Error).message}`);
-                // false = the send did not stand, so the card keeps her draft.
-                // It stays open with the words in it (above); clearing the
-                // draft underneath it would put the loss one Escape away.
-                return false;
-              }
-              setModal(null);
-              // A rule is undone by ending it, which is the same thing the
-              // rule's own card does. Z has to mean the same on both sides of
-              // that switch or it means nothing.
-              if (rule?.id) {
-                // `canceled` one L, the same as the schedule label above. See
-                // the note there for why.
-                noteNewTask(`Repeating task canceled: ${clipToSentence(p.title, TOAST_TITLE)}`, 'cancel that repeating task', sent, async () => {
-                  await api.endRepeat({ product: p.product, id: rule!.id! });
-                  setRepeats(await api.repeats());
-                });
-              }
-              showToast(`Repeating → ${to} · Z to undo`);
-              await refresh();
-              return;
-            }
-            // THE FIRST RUN'S EXAMPLE TASK IS A REAL ROW WITH NO SESSION BEHIND
-            // IT.The label is the whole of the difference: it goes into the
-            // store like anything else, and the supervisor never spawns fresh
-            // work on a row carrying it, because the app answers it two seconds
-            // later out of the folder she chose (onboarding.ts,
-            // main/first-run.mjs).
-            const firstRunTask = runRef.current?.step === 'task';
-            const made = await api.compose(firstRunTask ? { ...p, labels: [FIRST_RUN_LABEL] } : p);
-            setModal(null);
-            if (made?.id && firstRunTask) {
-              fire({ t: 'sent', item: made.id, at: Date.now() });
-              // NO TOAST AND NO UNDO ON THIS ONE. is the exact sentence she
-              // reported as untrue, and an undo key she has not been taught
-              // yet, over a walk it would strand her in the middle of, is not a
-              // way back. Everything from here is the ringed sentence beside
-              // the row.
-              await refresh();
-              return;
-            }
-            if (made?.id) {
-              noteNewTask(`Withdrawn: ${clipToSentence(p.title, TOAST_TITLE)}`, 'take back the task you just made', sent, async () => {
-                await api.answer({ product: p.product, id: made.id, status: 'done' });
-              });
-            }
-            // This is the same toast in the same place; it is the sentence that
-            // changed. "Queued" is a word about our machinery and the arrow was
-            // punctuation standing in for a verb, and neither said the thing
-            // she was looking for.
-            //
-            // A task she asked to start later must SAY it is not starting now,
-            // or the line is a small lie about an agent already having it. And
-            // it says Z out loud, because a way back she cannot see is one she
-            // will not take: the fault was pressing Z here and being answered
-            // by something else. ./compose-says.ts owns the
-            // wording, so the sentence has a test rather than only a reviewer.
-            // AND THE TOAST IS THE WAY INTO THE TASK IT IS ABOUT. The refresh
-            // below is what puts the new row in the window, and it is awaited
-            // before anybody can realistically click, so the lookup at click
-            // time finds it. See the note on `toast` for why the id travels
-            // rather than a closure.
-            showToast(sentLine({
-              to: to ?? p.product,
-              when: p.runAt ? whenLabel({ runAt: p.runAt, repeat: null }) : null,
-            }), made?.id ? { product: p.product, id: made.id } : undefined);
-            await refresh();
-          }}
-          hidden={snap.supervisor.hiddenProducts ?? []}
-          onReorder={async (slugs) => {
-            await (window.zero as any)?.setProductOrder?.({ order: slugs });
-            await refresh();
-          }}
-          onHide={async (slug, hide) => {
-            await (window.zero as any)?.setProductHidden?.({ product: slug, hidden: hide });
-            const name = snap.products.find((p) => p.slug === slug)?.name ?? slug;
-            showToast(hide ? `${name} hidden from the composer` : `${name} shown again`);
-            await refresh();
-          }}
-          // DOOR A, the chosen design. The card opens OVER this one and this one stays
-          // mounted, so the task she is halfway through writing survives making
-          // the project she wants to send it to.
-          onNewProject={() => setNewProject(true)}
-          selectProject={pickProject}
-          // HER FIRST TASK, ALREADY WRITTEN AND TYPING ITSELF IN.The typing is
-          // the first half; the tether pointing at Start it is the second.
-          prefill={run?.step === 'task'
-            ? { title: TASK_TITLE, body: TASK_BODY, product: run.practice ?? run.product }
-            : undefined}
-          onClose={() => setModal(null)}
-        />
-      )}
+      {/* THE OLD COMPOSE CARD IS GONE FROM HERE (2026-10-01). The walk kept it
+          for one round, because the new card refuses a task into the practice
+          project and the walk's task is the one exception; the new card takes
+          a `scripted` prop for that now, so the tutorial opens the same card
+          everybody else opens. Her words: "the tutorial is using the wrong
+          component here, we no longer use this". */}
       {modal === 'palette' && (
         <Palette
           onFirstRun={walkAgain}
@@ -5414,7 +5379,6 @@ export default function App() {
           batch={multiSel.size > 0}
           look={look}
           onSetLook={(l) => { setLook(l); setModal(null); }}
-          onThemes={() => setModal('themes')}
           staleFiles={snap.restartNeeded?.files ?? []}
           /*
            * A newer Agentbox that has already downloaded itself. The palette is
@@ -5595,30 +5559,6 @@ export default function App() {
           onClose={() => setModal(null)}
         />
       )}
-      {/* THE THEME PICKER, opened from ⌘K (w-a863b48784). It draws AFTER the
-          palette so that ⌘K's own backdrop is gone by the time it appears, and
-          it carries no scrim of its own, because a dimmed window is a window
-          wearing a theme she cannot see. */}
-      {modal === 'themes' && (
-        <ThemePicker
-          look={pickedLook ?? look}
-          onSetLook={setLook}
-          /* * THE SAME DIALS SETTINGS HAS, and the same three functions. One state, two
-             screens: dragging here and dragging in Settings write the same stored numbers
-             for the same picture.
-          */
-          tune={tune}
-          onSetTune={setTune}
-          /*
-           * THE WAY HOME IS NOT PASSED IN. "needs a button
-             to reset to presets/defaults on a theme", and out of six places
-             she took the one INSIDE each dial, under the pointer. So a reset
-             on this bar is a dial putting its own number back, and it reads
-             the same TUNE_DEFAULT table `resetTune` writes. Settings still
-             gets `resetTune`: that pane's reset is one row for both numbers. */
-          onClose={() => setModal(null)}
-        />
-      )}
       {/* SETTINGS, as a screen over everything. Not inside the modal stack:
           its own General pane opens the standing-instructions box, and a single
           state for both would have that box close the screen it was opened
@@ -5785,8 +5725,6 @@ export default function App() {
              so it has to read the rotation Tab actually takes rather than the
              sidebar's shorter list (w-5a08121f99). */
           tabs={stateTabOrder}
-          look={look}
-          onSetLook={setLook}
           /*
            * THE LAST CARD FILES INTO A PROJECT, so it needs the list to find
              the one this walk made (w-7fd38422b5, 2026-08-27). It takes only

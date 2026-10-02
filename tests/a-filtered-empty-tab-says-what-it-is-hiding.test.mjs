@@ -44,7 +44,9 @@ describe('what a filtered empty tab says', () => {
 
   it('names every tab in its heading, and never claims the inbox itself is clear', () => {
     expect(filteredEmptyWords('progress', 10).head).toBe('Nothing in your filter is running');
-    expect(filteredEmptyWords('snoozed', 3).head).toBe('Nothing in your filter is scheduled');
+    // The tab is Later since w-afb66e6661: it holds threads with a moment and
+    // threads with none, so its empty line names the tab rather than a clock.
+    expect(filteredEmptyWords('snoozed', 3).head).toBe('Nothing in your filter is in Later');
     expect(filteredEmptyWords('done', 11).head).toBe('Nothing in your filter is closed');
     expect(filteredEmptyWords('all', 26).head).toBe('No threads match your filter');
     for (const tab of ['inbox', 'progress', 'snoozed', 'done', 'all']) {

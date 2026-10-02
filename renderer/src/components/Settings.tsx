@@ -1825,7 +1825,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                as she drags, because a theme you have to close a screen to see is a theme
                you tune by memory.
              */}
-            {isSkin(look) && (
+            {/* Dark is Ember Grid, which has no picture to blur or dim, so the
+                dials no longer show for any of the three (w-9e434e8671). */}
+            {isSkin(look) && look !== 'ember-grid' && (
               <Group label={skinLabel(look)} note="Changes appear immediately and are saved for this theme.">
                 {TUNE_DEFAULT[look].panelOpacity !== undefined && <Dial label={look === 'orbital-glass' ? 'Panel tint' : 'Panel whiteness'} desc="Reduce the tint to let more of the background show through." value={tune.panelOpacity ?? TUNE_DEFAULT[look].panelOpacity!} {...TUNE_LIMITS.panelOpacity} format={(v) => `${Math.round(v * 100)}%`} onChange={(panelOpacity) => onSetTune({ ...tune, panelOpacity })} />}
                 <Dial

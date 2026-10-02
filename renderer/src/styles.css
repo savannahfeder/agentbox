@@ -163,7 +163,10 @@
   --work-fill: rgba(17, 25, 48, 0.043);
   --work-chip: rgba(17, 25, 48, 0.05);
   --work-blur: blur(18px) saturate(1.15);
-  --accent: #3b7dfb;
+  /* THE BRAND ORANGE, Ember Grid's own, in Light too (w-9e434e8671): the
+     accent is always this orange. The selected-row bar, link underlines and
+     the asks-you chip wear it, as they do in Dark. */
+  --accent: #ee6018;
   /* THE READING SURFACE IN THE SETUP PICTURE, and the only place in the app
      that paints paper rather than a theme surface. The values are the landing
      page's own (~/dd-landing/index.html), because the article Agentbox offers you
@@ -178,11 +181,11 @@
   --read-kicker: #3A55A4;
   --read-ground: #0F1013;
 
-  --select-bar: #9aa4b8;
+  --select-bar: var(--accent);
   --on-solid: #fdfdfe;
-  --chip-ask: #a8770d;
+  --chip-ask: var(--accent);
   --state-stopped: #c0503c;
-  --underline: rgba(59, 125, 251, 0.45);
+  --underline: rgba(238, 96, 24, 0.45);
   --chip-review: #2f7d4e;
   --chip-bug: #c0503c;
   --chip-blocked: #c0503c;
@@ -258,6 +261,11 @@
      plain themes too because --veil-lake is defined here, for the tile in
      Settings that has to show the picture while the window is not wearing it. */
   --skin-dim: 0.63;
+  /* THE VEIL EMBER GRID AND THE WALK'S BACKDROP LAY OVER THEIR PICTURE. Named
+     for the Lake, the picture it was first fitted to; the Lake itself is gone
+     (w-9e434e8671), but Ember Grid, Gouache Valley and the walk's tile still
+     name this, and without it their whole background stack is dropped. */
+  --veil-lake: linear-gradient(rgba(32, 31, 28, var(--skin-dim, 0.63)), rgba(32, 31, 28, var(--skin-dim, 0.63)));
   /* THE THEME TILES in Settings, and the second place in this file where a
      colour is not a surface of the app. A tile showing light mode is light
      while the window is dark: it depicts a theme rather than wearing one, so
@@ -286,25 +294,7 @@
   --tile-veil: rgba(8, 9, 12, 0.86);
   --tile-veil-drop: rgba(8, 9, 12, 0.9);
   --tile-drop-ink: rgba(255, 255, 255, 0.82);
-  --look-lake: url('./assets/lake.webp');
-  --look-ice: url('./assets/ice.webp');
-  --look-ice-river: url('./assets/ice-river.webp');
-  --look-lake-harbour: url('./assets/lake-harbour.webp');
-  --look-pixel-ridge: url('./assets/pixel-ridge.webp');
-  --look-pixel-orbit: url('./assets/pixel-orbit.webp');
-  --look-woodblock-sea: url('./assets/woodblock-sea.webp');
-  --look-riso-hills: url('./assets/riso-hills.webp');
   --look-gouache-valley: url('./assets/gouache-valley.webp');
-  --look-vector-dunes: url('./assets/vector-dunes.webp');
-  --look-watercolour-mist: url('./assets/watercolour-mist.webp');
-  --look-orbit-rings: url('./assets/orbit-rings.webp');
-  --look-moon-pines: url('./assets/moon-pines.webp');
-  --look-cel-dusk: url('./assets/cel-dusk.webp');
-  --look-pixel-harbour: url('./assets/pixel-harbour.webp');
-  --look-lino-coast: url('./assets/lino-coast.webp');
-  --look-valley-haze: url('./assets/valley-haze.webp');
-  --look-frost-haze: url('./assets/frost-haze.webp');
-  --look-slate-haze: url('./assets/slate-haze.webp');
   /* THE TILE IS THE THEME, not a picture of it: it names the very veil and the
      very wash the window uses, so a tile cannot go stale against the theme it
      stands for. Its hairline is the one thing lifted (0.10 to 0.18), because a
@@ -312,7 +302,6 @@
 
      --skin-dim is the user's dial (skins.ts), written onto the root element by the
      sliders in Settings, so the tile darkens with the window as it moves. */
-  --veil-lake: linear-gradient(rgba(32, 31, 28, var(--skin-dim, 0.63)), rgba(32, 31, 28, var(--skin-dim, 0.63)));
   /* The photograph, cooled. Multiplied UNDER the veil, it is a gain of
      0.66 / 0.82 / 1.00 per channel, which is the one thing a flat colour at one
      alpha cannot say and the one thing the drawing plainly does say: its veil
@@ -324,7 +313,6 @@
      the Mountain theme, which was removed on 2026-08-18; there is no drawing
      of this photograph, so re-fitting them would be tuning by eye, which is
      the exact thing that cost four rounds. They stay until a decision says otherwise. */
-  --tint-lake: linear-gradient(rgb(168, 209, 255), rgb(168, 209, 255));
   --look-glass: rgba(255, 255, 255, 0.04);
   --look-glass-line: rgba(255, 255, 255, 0.18);
   /* Valley Haze's tile only. Its card is a white film with no hairline, so its
@@ -570,6 +558,11 @@
      plain themes too because --veil-lake is defined here, for the tile in
      Settings that has to show the picture while the window is not wearing it. */
   --skin-dim: 0.63;
+  /* THE VEIL EMBER GRID AND THE WALK'S BACKDROP LAY OVER THEIR PICTURE. Named
+     for the Lake, the picture it was first fitted to; the Lake itself is gone
+     (w-9e434e8671), but Ember Grid, Gouache Valley and the walk's tile still
+     name this, and without it their whole background stack is dropped. */
+  --veil-lake: linear-gradient(rgba(32, 31, 28, var(--skin-dim, 0.63)), rgba(32, 31, 28, var(--skin-dim, 0.63)));
   /* THE THEME TILES in Settings, and the second place in this file where a
      colour is not a surface of the app. A tile showing light mode is light
      while the window is dark: it depicts a theme rather than wearing one, so
@@ -598,25 +591,7 @@
   --tile-veil: rgba(8, 9, 12, 0.86);
   --tile-veil-drop: rgba(8, 9, 12, 0.9);
   --tile-drop-ink: rgba(255, 255, 255, 0.82);
-  --look-lake: url('./assets/lake.webp');
-  --look-ice: url('./assets/ice.webp');
-  --look-ice-river: url('./assets/ice-river.webp');
-  --look-lake-harbour: url('./assets/lake-harbour.webp');
-  --look-pixel-ridge: url('./assets/pixel-ridge.webp');
-  --look-pixel-orbit: url('./assets/pixel-orbit.webp');
-  --look-woodblock-sea: url('./assets/woodblock-sea.webp');
-  --look-riso-hills: url('./assets/riso-hills.webp');
   --look-gouache-valley: url('./assets/gouache-valley.webp');
-  --look-vector-dunes: url('./assets/vector-dunes.webp');
-  --look-watercolour-mist: url('./assets/watercolour-mist.webp');
-  --look-orbit-rings: url('./assets/orbit-rings.webp');
-  --look-moon-pines: url('./assets/moon-pines.webp');
-  --look-cel-dusk: url('./assets/cel-dusk.webp');
-  --look-pixel-harbour: url('./assets/pixel-harbour.webp');
-  --look-lino-coast: url('./assets/lino-coast.webp');
-  --look-valley-haze: url('./assets/valley-haze.webp');
-  --look-frost-haze: url('./assets/frost-haze.webp');
-  --look-slate-haze: url('./assets/slate-haze.webp');
   /* THE TILE IS THE THEME, not a picture of it: it names the very veil and the
      very wash the window uses, so a tile cannot go stale against the theme it
      stands for. Its hairline is the one thing lifted (0.10 to 0.18), because a
@@ -624,7 +599,6 @@
 
      --skin-dim is the user's dial (skins.ts), written onto the root element by the
      sliders in Settings, so the tile darkens with the window as it moves. */
-  --veil-lake: linear-gradient(rgba(32, 31, 28, var(--skin-dim, 0.63)), rgba(32, 31, 28, var(--skin-dim, 0.63)));
   /* The photograph, cooled. Multiplied UNDER the veil, it is a gain of
      0.66 / 0.82 / 1.00 per channel, which is the one thing a flat colour at one
      alpha cannot say and the one thing the drawing plainly does say: its veil
@@ -636,7 +610,6 @@
      the Mountain theme, which was removed on 2026-08-18; there is no drawing
      of this photograph, so re-fitting them would be tuning by eye, which is
      the exact thing that cost four rounds. They stay until a decision says otherwise. */
-  --tint-lake: linear-gradient(rgb(168, 209, 255), rgb(168, 209, 255));
   --look-glass: rgba(255, 255, 255, 0.04);
   --look-glass-line: rgba(255, 255, 255, 0.18);
   /* Valley Haze's tile only. Its card is a white film with no hairline, so its
@@ -651,227 +624,6 @@
      them is visible even at tile size. */
   --look-glass-frost: rgba(255, 255, 255, 0.453);
   --look-glass-slate: rgba(255, 255, 255, 0.31);
-}
-
-/* THE ONE PICTURE THEME. It arrived as the second of two and is now the only
-   one: Mountain was removed on 2026-08-18, and its rule stood
-   immediately above this comment. That page uses exactly one picture,
-   landing/plates/A-faithful-high.jpg, so that was the one. The measurement is
-   the point. The 1920x1280 plate carries an acutance of 2.91
-   at the width the window paints it; the shipped webp, blown up 1.75x by the
-   mill, carried 2.45 — the upscale had thrown away MORE detail than it put
-   back, so the file on screen was softer than its own source. gpt-image-2 was
-   handed that plate and asked for the same photograph at 3072x2048, and that
-   file measures 4.49. Through the mill at scale 1 (no upscale to undo, unsharp
-   only) it is 4.58 at 1440, 387 KB. Read by scripts/measure-photo-detail.mjs,
-   all three at the same width so a bigger file cannot win for free.
-   `scripts/skin-image-gpt.mjs lake` in the product's docs is the call. EVERY
-   TOKEN BELOW EXCEPT THE BLUR WAS MOUNTAIN'S, and removing Mountain does not
-   make them this picture's to re-fit. The veil, the tint and the dim were
-   SOLVED against the drawing of Mountain (the derivation is the long comment
-   above, and it is kept for exactly this reason); there is no drawing of this
-   photograph to solve against. Inheriting the solution is a visible decision;
-   inventing a second one by eye is the mistake that cost four rounds. THE
-   BLUR IS CHOSEN AND ONLY THIS PICTURE'S. The ladder is NOT linear: everything
-   visible happens between 0 and 3, and 3 through 16 measure within half a point
-   of each other.
-*/
-:root[data-skin="lake"] {
-  --skin-image: url('./assets/lake.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: var(--tint-lake);
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  /* 2, not 3: set after living with the merged theme. */
-  --skin-blur: 2px;
-  /* THE OPAQUE WRITING SURFACE. It is one colour and one colour only: the
-     colour of the reply box on an opened task, measured. IT IS READ, NOT
-     PICKED, WHICH IS THIS THEME'S STANDING RULE.
-     `scripts/derive-skin-solid.mjs` opens a task in this theme, opens the reply
-     box and puts the caret in it, hides everything INSIDE the box so its words
-     cannot pull the average around, insets past the hairline, and takes the
-     mean colour of what is left. Measured on the built renderer at 1180x860,
-     the box 716x144: the reply box, the surface alone rgb(41, 47, 58) L 46.4 <-
-     --skin-solid the same box with words in it rgb(48, 54, 66) L 53.9 pure
-     charcoal, --bg rgb(26, 25, 27) L 25.4 41 away from charcoal in rgb, with
-     blue leading red by 17, which is the lake's own slate rather than a grey.
-     WHAT THIS REPLACED, so nobody re-derives it: rounds one to three worked the
-     colour out from the theme's ground instead, the whole window averaged and
-     wearing --skin-pane, which came to rgb(45, 49, 60) at L 49.3. Same wash,
-     but over the average of the picture rather than over the band of it the
-     reply box actually sits on, and that band is darker. Three values, and each
-     was reviewed. The story is in decisions.md, 2026-08-19. TWO TRAPS
-     IN MEASURING IT, both of which read the bare photograph and call it the
-     box's colour. At rest the box is a collapsed "Reply…" pill and this theme leaves
-     it transparent, so it has to be OPENED. And headless Chrome does not hand
-     the page focus on its own, so `:focus-within` never matches and the wash
-     never paints. The script asserts both rather than assuming them. RE-DERIVE
-     IT IF THE PHOTOGRAPH CHANGES OR IF THE REPLY BOX'S OWN WASH DOES. It is a
-     measurement of that file and that rule, so either makes it stale; the
-     script prints the replacement and tests/skin-grounds.test.mjs holds the
-     token to the reading recorded in shots/skin-solid/derive-skin-solid.json.
-  */
-  --skin-solid: #292f3a;
-  /* AN OPEN FILE IN THE LAKE IS ON THE APP'S OWN CARD, WHICH IS THE SAME RULE
-     LIGHT AND DARK TAKE. It is named rather than typed so it cannot drift from
-     the surface above it: the lake block layers over the dark token set, so
-     --surface here is dark's #2e3136, and that is exactly the colour shown as
-     `ground/lake-new-grey.png`. THE SLATE IS NOT GONE AND IT IS NOT
-     DEAD. --skin-solid above is still the colour measured off the reply box in
-     this photograph and the reply box still wears it. What moved is only the
-     ground under an open FILE, which is a card and not a part of the picture.
-     Do not put var(--skin-solid) back here; it was reviewed and not picked.
-  */
-  --doc-page: var(--surface);
-  --doc-page-held: var(--surface);
-  --skin-dim: 0.63;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-
-/* THE CHOSEN FOUR, 2026-08-21. They came out of the theme lab and into the app
-   as chosen, so these four blocks are what the lab's generated CSS was,
-   written down. WHAT EACH ONE INHERITS FROM THE LAKE, AND WHY IT IS NOT
-   LAZINESS. The veil colour and the pane are the Lake's because they were
-   FITTED against the original drawing (the derivation is in the long comment above)
-   and there is no drawing of any of these pictures to fit against. Re-solving
-   them by eye is the thing that cost four rounds. WHAT IS EACH PICTURE'S OWN.
-   --skin-dim, because a single alpha fitted to one photograph makes a darker
-   picture mud and a lighter one loud: each of these was SCANNED over its whole
-   range and set to the value whose luminance BEHIND THE INBOX CARD lands on the
-   Lake's 0.0274 (scripts/measure-theme-pictures.mjs). And --skin-solid, the
-   opaque writing surface, which is READ off that theme's own reply box and
-   never picked (scripts/derive-skin-solid.mjs, SKIN=<id>). NO TINT. --tint-lake
-   is a per-channel gain solved to cool ONE photograph. Laid over eleven
-   deliberately different pictures it would make them the same picture, so these
-   carry none and are the colour they were drawn in. THE EIGHT BELOW LAKE
-   HARBOUR ARE NOT PHOTOGRAPHS. They are round four of the theme lab, where the
-   MEDIUM was the variable: pixel art, a woodblock print, a risograph, gouache,
-   watercolour, a low poly render, flat vector. ICE VAULT WAS DELETED IN THE SAME
-   ROUND as too much and must not come back. ICE IS DARKER BEHIND THE
-   CARD THAN THE OTHER THREE ON PURPOSE. At its floor it lands at 0.0127
-   against the Lake's 0.0274, because it is a picture of a shadowed cave, and
-   it was picked as a clean, minimal dark ice river. The dial in
-   Settings still moves it.
-*/
-:root[data-skin="ice"] {
-  --skin-image: url('./assets/ice.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #242628;
-  --skin-dim: 0.85;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-
-:root[data-skin="ice-river"] {
-  --skin-image: url('./assets/ice-river.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #202a32;
-  --skin-dim: 0.735;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-
-:root[data-skin="lake-harbour"] {
-  --skin-image: url('./assets/lake-harbour.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #283039;
-  --skin-dim: 0.68;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-
-:root[data-skin="pixel-ridge"] {
-  --skin-image: url('./assets/pixel-ridge.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #24282e;
-  --skin-dim: 0.77;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-:root[data-skin="pixel-orbit"] {
-  --skin-image: url('./assets/pixel-orbit.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #212438;
-  --skin-dim: 0.195;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-:root[data-skin="woodblock-sea"] {
-  --skin-image: url('./assets/woodblock-sea.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #272c2f;
-  --skin-dim: 0.84;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-:root[data-skin="riso-hills"] {
-  --skin-image: url('./assets/riso-hills.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #2a3035;
-  --skin-dim: 0.85;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
 }
 :root[data-skin="gouache-valley"] {
   --skin-image: url('./assets/gouache-valley.webp');
@@ -889,323 +641,7 @@
   --line-strong: rgba(255, 255, 255, 0.24);
   --bg: #1a191b;
 }
-:root[data-skin="vector-dunes"] {
-  --skin-image: url('./assets/vector-dunes.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #272b32;
-  --skin-dim: 0.775;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-:root[data-skin="watercolour-mist"] {
-  --skin-image: url('./assets/watercolour-mist.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #2e3033;
-  --skin-dim: 0.85;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-:root[data-skin="orbit-rings"] {
-  --skin-image: url('./assets/orbit-rings.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #2a2b3b;
-  --skin-dim: 0;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-:root[data-skin="moon-pines"] {
-  --skin-image: url('./assets/moon-pines.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #232a2f;
-  --skin-dim: 0;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-:root[data-skin="cel-dusk"] {
-  --skin-image: url('./assets/cel-dusk.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #1f2633;
-  --skin-dim: 0;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-:root[data-skin="pixel-harbour"] {
-  --skin-image: url('./assets/pixel-harbour.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #131d36;
-  --skin-dim: 0;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-:root[data-skin="lino-coast"] {
-  --skin-image: url('./assets/lino-coast.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(60, 69, 81, 0.22);
-  --skin-pane-line: rgba(255, 255, 255, 0.11);
-  --skin-blur: 2px;
-  --skin-solid: #232628;
-  --skin-dim: 0.85;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-/* VALLEY HAZE, 2026-09-03. THE PICTURE IN THE REFERENCE SHOT WAS NOT A FILE. It was drawn
-   by an earlier agent's page (designs//inbox-rows/index.html), which puts a
-   screenshot of this app wearing Gouache Valley behind the window and runs
-   `blur(40px) saturate(1.06) brightness(.66)` over it. All three are baked into
-   the asset by scripts/make-valley-haze.mjs, in Chrome, because none of them is
-   a thing a token can say: --skin-blur is a backdrop-filter on the CARD, the
-   picture on `body` is always sharp, and a veil is one flat alpha and cannot
-   multiply. TWO VALUES DIFFER FROM EVERY OTHER PICTURE AND BOTH ARE READ OFF
-   THE REFERENCE SCREENSHOT (attachments/mtm8o9m6-lj9w31-pasted-4052.png) rather than
-   carried over. Sampled in two places that hold no letterform, the card's right
-   padding against the rail beside it and the card's left gutter against the
-   window's left margin: outside the card 37, 34, 34 and 27, 31, 34 inside it
-   50, 47, 48 and 40, 44, 48 Both say the same thing, a lift of 13 / 13 / 14 on
-   two grounds ten values apart, which is a WHITE wash at alpha 0.059 / 0.058 /
-   0.063 and not the slate at 0.22 the other fifteen wear. 0.055 predicts 49.0 /
-   49.2 / 49.2 against those, and the gap to the sampled 50 / 47 / 48 is the size
-   of the file's own colour profile: the window's traffic lights, which are
-   constants, read 36, 193, 56 where the stylesheet says 40, 200, 64.
-   --skin-pane-line is transparent because the reference has no hairline on the card. Over a sharp
-   photograph a card with no edge dissolves, which is why the other fifteen draw
-   one; over a wash this soft the 5.5% step IS the edge, and drawing a line as
-   well is the one thing on screen that would not be in the reference.
-   --skin-solid IS THE SCRIPT'S ANSWER NOW, not the screenshot's. The round that
-   wrote this block could not build the renderer and estimated #303032 off the
-   picture instead, leaving a note here that a real run would replace it. The
-   run happened on 2026-09-03 (SKIN=valley-haze node
-   scripts/derive-skin-solid.mjs renderer/dist) and read #292d30, seven values
-   darker: the estimate sampled the wash where the INBOX card sits and the reply
-   box sits 400px lower, down a picture that still has a sky at the top of it
-   even at 40px of blur. shots/skin-solid/derive-skin-solid-valley-haze.json is
-   that reading and tests/skin-grounds.test.mjs holds this token to it. THAT
-   SCRIPT IS FLAKY ON THIS MACHINE AND IT IS NOT THIS THEME'S FAULT. About half
-   its runs die on "the reply box is not focused", on Gouache Valley as readily
-   as on this one, because headless Chrome does not always hand the page focus
-   before the assert. Rerun it. The readings it does produce are identical run
-   to run.
-*/
-:root[data-skin="valley-haze"] {
-  --skin-image: url('./assets/valley-haze.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(255, 255, 255, 0.055);
-  --skin-pane-line: transparent;
-  --skin-blur: 2px;
-  --skin-solid: #292d30;
-  --skin-dim: 0;
-  --text-dim: #cfd2d8;
-  --text-faint: #b3b8c2;
-  --agent-ink: #9a9fa8;
-  --line: rgba(255, 255, 255, 0.13);
-  --line-strong: rgba(255, 255, 255, 0.24);
-  --bg: #1a191b;
-}
-
-/* The width is measured: renderer/src/skins.ts carries the table. THE ATTRIBUTE
-   IS SET BY main/screen-detail.mjs THROUGH bootInfo, NOT BY A MEDIA QUERY. A
-   query on width measures the window, which the user resizes, and a query on
-   resolution measures devicePixelRatio, which carries any page zoom. Only
-   the main process can see the display's own density and whether it is the
-   built-in panel, so only the main process can answer this. Overriding
-   --skin-image and nothing else is deliberate: every other token in a skin
-   block is a colour read off the full-size picture, and the small copy is the
-   same picture, so the same colours are still right.
-*/
-:root[data-skin-detail="soft"][data-skin="lake"] { --skin-image: url('./assets/lake-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="ice"] { --skin-image: url('./assets/ice-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="ice-river"] { --skin-image: url('./assets/ice-river-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="lake-harbour"] { --skin-image: url('./assets/lake-harbour-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="pixel-ridge"] { --skin-image: url('./assets/pixel-ridge-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="pixel-orbit"] { --skin-image: url('./assets/pixel-orbit-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="woodblock-sea"] { --skin-image: url('./assets/woodblock-sea-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="riso-hills"] { --skin-image: url('./assets/riso-hills-sm.webp'); }
 :root[data-skin-detail="soft"][data-skin="gouache-valley"] { --skin-image: url('./assets/gouache-valley-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="vector-dunes"] { --skin-image: url('./assets/vector-dunes-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="watercolour-mist"] { --skin-image: url('./assets/watercolour-mist-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="orbit-rings"] { --skin-image: url('./assets/orbit-rings-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="moon-pines"] { --skin-image: url('./assets/moon-pines-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="cel-dusk"] { --skin-image: url('./assets/cel-dusk-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="pixel-harbour"] { --skin-image: url('./assets/pixel-harbour-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="lino-coast"] { --skin-image: url('./assets/lino-coast-sm.webp'); }
-/* User-supplied peach/sage/mauve wash. Keep its colors intact; the warm
-   translucent pane provides a quiet reading surface above it. */
-:root[data-skin="peach-haze-2"] {
-  --skin-image: url('./assets/peach-haze-2.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(255, 250, 246, var(--skin-panel-opacity, .2));
-  --skin-pane-line: transparent;
-  --skin-blur: 0px;
-  --skin-solid: #9a8e8a;
-  --skin-dim: .35;
-  --bg: #cbbeba;
-  --surface: #f8f2ee;
-  --text: #302b33;
-  --text-dim: #514650;
-  --text-faint: #625563;
-  /* A FINISHED LINE HAS TO BE A STEP AWAY FROM A FAINT ONE, and at #665968 it
-     was not: the contrast between this and `--text-faint` was 1.065, where the
-     rail's ladder needs more than 1.2, so the two greys read as one. It failed
-     tests/the-note-she-asked-us-to-clean-up.test.mjs from the moment this skin
-     was muted, and the red refused every push to main for a day. Lightened to
-     sit 1.288 from `--text-faint`, which is the same step this block already
-     has between `--text-dim` and `--text-faint` (1.281), so the two rungs match
-     rather than one being invented. Hue is untouched..
-  */
-  --agent-ink: #736578;
-  --line: rgba(65, 45, 65, .09);
-  --line-strong: rgba(65, 45, 65, .18);
-  --wash: rgba(79, 53, 81, .07);
-  --bg-hover: rgba(255, 250, 246, .35);
-  --code-ground: var(--skin-solid);
-}
-.look-swatch.peach-haze-2 { background: url('./assets/look-thumbs/peach-haze-2.webp') center / cover no-repeat; }
-.look-swatch.peach-haze-2::after { background: rgba(255, 250, 246, .2); border: none; }
-:root[data-skin-detail="soft"][data-skin="peach-haze-2"] { --skin-image: url('./assets/peach-haze-2-sm.webp'); }
-
-/* Cooled toward blue, from Ice River. Wash 203, 218, 235, the strongest colour
-   of the three and the only one you would call a hue rather than a paper. */
-:root[data-skin="frost-haze"] {
-  --skin-image: url('./assets/frost-haze.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(255, 255, 255, 0.453);
-  --skin-pane-line: transparent;
-  --skin-blur: 2px;
-  --skin-solid: #e3ebf5;
-  --skin-dim: 0;
-  --text-dim: #454d5f;
-  --text-faint: #676d86;
-  --agent-ink: #8a90ab;
-  --line: rgba(17, 25, 48, 0.070);
-  --line-strong: rgba(17, 25, 48, 0.150);
-  --bg: #d1e0ef;
-}
-
-/* The three in between. Wash 176, 158 and 142; card 210, 180 and 172. */
-
-:root[data-skin="slate-haze"] {
-  --skin-image: url('./assets/slate-haze.webp');
-  --skin-veil: var(--veil-lake);
-  --skin-tint: none;
-  --skin-pane: rgba(255, 255, 255, 0.31);
-  --skin-pane-line: transparent;
-  --skin-blur: 2px;
-  --skin-solid: #afbac4;
-  --code-ground: var(--skin-solid);
-  --skin-dim: 0;
-  --text-dim: #192436;
-  --text-faint: #2b3545;
-  --agent-ink: #3a4657;
-  --line: rgba(17, 25, 48, 0.089);
-  --line-strong: rgba(17, 25, 48, 0.192);
-  --bg: #92a0af;
-}
-
-/* NINE MORE IN THE MID BAND, 2026-09-04.With the six already here (Clay, Umber,
-   Plum, Olive, Ocean, Pewter) that is fifteen, and the pale and light-mid rows
-   came out in the same session because the choice is no longer between bands.
-   THE BAND IS 152 TO 188 AND BOTH ENDS ARE BOUNDED BY SOMETHING REAL. Below it
-   the card approaches the dead band where neither ink clears 4.5:1 (card 110 to
-   133, a wash around 120). Above it, it stops being mid and becomes the row
-   just passed over. So these spread the HUE WHEEL inside a narrow lightness
-   range rather than spreading lightness: at this depth colour is the thing you
-   can tell apart, and fifteen mid greys six values apart would be one option
-   printed fifteen times. Printed by scripts/make-haze.mjs, not typed. TOKENS=1
-   reprints any of them.
-*/
-
-:root[data-skin-detail="soft"][data-skin="valley-haze"] { --skin-image: url('./assets/valley-haze-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="frost-haze"] { --skin-image: url('./assets/frost-haze-sm.webp'); }
-:root[data-skin-detail="soft"][data-skin="slate-haze"] { --skin-image: url('./assets/slate-haze-sm.webp'); }
-
-:root[data-skin="orbital-glass"] {
-  --skin-tint: none;
-  --skin-veil: var(--veil-lake);
-  --skin-pane-line: rgba(215,225,244,.10);
-  --skin-solid: #3c3945;
-  --bg: #171c29;
-  --surface: #252c3c;
-  --text: #cfccd0;
-  --text-dim: #bab7be;
-  /* THE LADDER, SPACED SO THE THREE RUNGS READ AS THREE. This skin arrived with
-     dim, faint and finished within 1.14 and 1.05 of each other, which is one
-     grey wearing three names; tests/the-note-she-asked-us-to-clean-up.test.mjs
-     asks for a step above 1.2, and its red refused every push to main for a
-     day. Both rungs are now 1.28, matching what the other skins already do, and
-     each colour keeps its own hue: only the luminance moved..
-  */
-  --text-faint: #a4a1a9;
-  --agent-ink: #908d97;
-  --line: rgba(215,225,244,.07);
-  --line-strong: rgba(215,225,244,.15);
-  --wash: rgba(200,214,235,.07);
-  --bg-hover: rgba(200,214,235,.10);
-  --code-ground: var(--skin-solid);
-  --skin-image: url('./assets/orbit-rings.webp');
-  --skin-pane: rgba(215,225,244,calc(var(--skin-panel-opacity,.16) * .18));
-  --skin-blur:30px;
-  --skin-dim:.3;
-}
-
-.look-swatch.orbital-glass {background:url('./assets/look-thumbs/orbit-rings.webp') center/cover no-repeat}
-.look-swatch.orbital-glass::after {background:rgba(215,225,244,.03);border:1px solid #d7e1f41a}
-
-:root[data-skin-detail="soft"][data-skin="orbital-glass"] { --skin-image: url('./assets/orbit-rings-sm.webp'); }
 
 /* EMBER GRID, 2026-09-25 (w-b3e123a0af): the launch film's look, so somebody
    who watched the film opens the app on the same screen: people who see the
@@ -1345,14 +781,11 @@ html, body, #root { height: 100%; }
 *::-webkit-scrollbar-corner { background: transparent; }
 
 body {
-  /* Avenir Next, matched against the design mockups letter by letter
-     (2026-08-12): single-storey g with an open tail, a straight-tailed y, a
-     small-bowled double-storey a, and digits whose 1 has an angled flag and no
-     foot. It is a macOS system face, so it costs no bundle and no download, and
-     the app is a Mac app. Source Sans stays behind it as the fallback that was
-     here before, so a machine without Avenir renders the old face rather than
-     Times. */
-  font-family: 'Avenir Next', 'Source Sans 3 Variable', -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  /* EMBER GRID'S TYPE IN BOTH THEMES (w-9e434e8671): the launch film's Geist,
+     with Ember's own fallbacks, so Light and Dark set every word the same. It
+     was Avenir Next outside Ember Grid. The weights and spacing Ember set on
+     titles, tabs and rows apply to both too (foot of workspace-navigation.css). */
+  font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 15.5px;
   background: var(--bg);
   color: var(--text);
@@ -3611,7 +3044,6 @@ body {
   display: flex;
   flex-direction: column;
 }
-.rail-empty { }
 
 .rail-head { display: flex; align-items: center; gap: 10px; }
 /* The default mark inherits the ink rather than carrying its own, so it is
@@ -5912,25 +5344,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
      up to 3.2 MB. Opening the picker or Settings decoded all of them at once to
      paint 140px tiles, and that is the few seconds of tiles filling in. The
      copies are made by `cwebp -q 82 -resize 480 0` from the full file. */
-  --look-lake: url('./assets/look-thumbs/lake.webp');
-  --look-ice: url('./assets/look-thumbs/ice.webp');
-  --look-ice-river: url('./assets/look-thumbs/ice-river.webp');
-  --look-lake-harbour: url('./assets/look-thumbs/lake-harbour.webp');
-  --look-pixel-ridge: url('./assets/look-thumbs/pixel-ridge.webp');
-  --look-pixel-orbit: url('./assets/look-thumbs/pixel-orbit.webp');
-  --look-woodblock-sea: url('./assets/look-thumbs/woodblock-sea.webp');
-  --look-riso-hills: url('./assets/look-thumbs/riso-hills.webp');
   --look-gouache-valley: url('./assets/look-thumbs/gouache-valley.webp');
-  --look-vector-dunes: url('./assets/look-thumbs/vector-dunes.webp');
-  --look-watercolour-mist: url('./assets/look-thumbs/watercolour-mist.webp');
-  --look-orbit-rings: url('./assets/look-thumbs/orbit-rings.webp');
-  --look-moon-pines: url('./assets/look-thumbs/moon-pines.webp');
-  --look-cel-dusk: url('./assets/look-thumbs/cel-dusk.webp');
-  --look-pixel-harbour: url('./assets/look-thumbs/pixel-harbour.webp');
-  --look-lino-coast: url('./assets/look-thumbs/lino-coast.webp');
-  --look-valley-haze: url('./assets/look-thumbs/valley-haze.webp');
-  --look-frost-haze: url('./assets/look-thumbs/frost-haze.webp');
-  --look-slate-haze: url('./assets/look-thumbs/slate-haze.webp');
 }
 /* The card on the page, at a twelfth of the size and in the same proportion:
    inset from three sides and running off the bottom, which is what the inbox
@@ -5975,106 +5389,6 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   color: var(--look-dark-page);
   background: color-mix(in oklab, var(--look-light-card) 80%, transparent);
 }
-/* The tile wears the same three layers in the same order as the window, so it
-   cannot go stale against the theme it stands for. */
-.look-swatch.lake {
-  background: var(--veil-lake), var(--tint-lake), var(--look-lake) center / cover no-repeat, var(--look-dark-page);
-  background-blend-mode: normal, multiply, normal;
-}
-.look-swatch.lake::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  /* 1px, not 5. The window blurs 2px across 1055px; the same proportion at
-     172px is a fraction of one, and a tile that blurs more than the theme does
-     is a picture of a different theme. */
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-/* Every picture theme. The tile carries the picture itself, so it cannot drift
-   from the theme it stands for. Each one wears its own solved dim. */
-.look-swatch.ice {
-  background: var(--veil-lake), var(--look-ice) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0.85;
-}
-.look-swatch.ice::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-
-.look-swatch.ice-river {
-  background: var(--veil-lake), var(--look-ice-river) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0.735;
-}
-.look-swatch.ice-river::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-
-.look-swatch.lake-harbour {
-  background: var(--veil-lake), var(--look-lake-harbour) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0.68;
-}
-.look-swatch.lake-harbour::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-.look-swatch.pixel-ridge {
-  background: var(--veil-lake), var(--look-pixel-ridge) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0.77;
-}
-.look-swatch.pixel-ridge::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-
-.look-swatch.pixel-orbit {
-  background: var(--veil-lake), var(--look-pixel-orbit) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0.195;
-}
-.look-swatch.pixel-orbit::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-
-.look-swatch.woodblock-sea {
-  background: var(--veil-lake), var(--look-woodblock-sea) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0.84;
-}
-.look-swatch.woodblock-sea::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-
-.look-swatch.riso-hills {
-  background: var(--veil-lake), var(--look-riso-hills) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0.85;
-}
-.look-swatch.riso-hills::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
 
 .look-swatch.gouache-valley {
   background: var(--veil-lake), var(--look-gouache-valley) center / cover no-repeat, var(--look-dark-page);
@@ -6087,122 +5401,6 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   -webkit-backdrop-filter: blur(1px);
   backdrop-filter: blur(1px);
 }
-
-.look-swatch.vector-dunes {
-  background: var(--veil-lake), var(--look-vector-dunes) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0.775;
-}
-.look-swatch.vector-dunes::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-
-.look-swatch.watercolour-mist {
-  background: var(--veil-lake), var(--look-watercolour-mist) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0.85;
-}
-.look-swatch.watercolour-mist::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-
-.look-swatch.orbit-rings {
-  background: var(--veil-lake), var(--look-orbit-rings) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0;
-}
-.look-swatch.orbit-rings::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-
-.look-swatch.moon-pines {
-  background: var(--veil-lake), var(--look-moon-pines) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0;
-}
-.look-swatch.moon-pines::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-
-.look-swatch.cel-dusk {
-  background: var(--veil-lake), var(--look-cel-dusk) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0;
-}
-.look-swatch.cel-dusk::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-
-.look-swatch.pixel-harbour {
-  background: var(--veil-lake), var(--look-pixel-harbour) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0;
-}
-.look-swatch.pixel-harbour::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-
-.look-swatch.lino-coast {
-  background: var(--veil-lake), var(--look-lino-coast) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0.85;
-}
-.look-swatch.lino-coast::after {
-  background: var(--look-glass);
-  border: 1px solid var(--look-glass-line);
-  border-bottom: none;
-  -webkit-backdrop-filter: blur(1px);
-  backdrop-filter: blur(1px);
-}
-
-/* The one swatch whose glass is not the shared one: this theme's card is a
-   white wash with no hairline (its token block says why), so a tile drawing the
-   0.18 line every other tile draws would advertise an edge the window does not
-   have. */
-.look-swatch.valley-haze {
-  background: var(--veil-lake), var(--look-valley-haze) center / cover no-repeat, var(--look-dark-page);
-  --skin-dim: 0;
-}
-.look-swatch.valley-haze::after {
-  background: var(--look-glass-haze);
-  border: none;
-}
-
-/* THE THREE LIGHT ONES. Their tile sits on the LIGHT page, not the dark one,
-   which is the only place in this stylesheet a swatch has ever had to make that
-   choice. Their card is a white film like the rest of the family's, just a much
-   heavier one, because a card on paper has to lift off a ground that is already
-   near white. Each carries its own, unlike the dark six, since here the
-   difference between them is 0.41 and 0.61 and that is visible even on a tile. */
-
-.look-swatch.frost-haze {
-  background: var(--look-frost-haze) center / cover no-repeat, var(--look-light-page);
-  --skin-dim: 0;
-}
-.look-swatch.frost-haze::after { background: var(--look-glass-frost); border: none; }
-
-.look-swatch.slate-haze {
-  background: var(--look-slate-haze) center / cover no-repeat, var(--look-light-page);
-  --skin-dim: 0;
-}
-.look-swatch.slate-haze::after { background: var(--look-glass-slate); border: none; }
 
 /* ⌘K → Themes.SO IT IS THE ONE MODAL IN THIS APP WITH NO SCRIM, and that is the
    whole design rather than an omission. --scrim over the window would dim the
@@ -6655,35 +5853,12 @@ a.set-ghost { text-decoration: none; display: inline-block; }
    third. The `data-machine` rules are further up this file. */
 .look-swatch.shot.light { background-image: url('./assets/look-tiles/light.webp'); }
 .look-swatch.shot.dark { background-image: url('./assets/look-tiles/dark.webp'); }
-.look-swatch.shot.lake { background-image: url('./assets/look-tiles/lake.webp'); }
-.look-swatch.shot.ice { background-image: url('./assets/look-tiles/ice.webp'); }
-.look-swatch.shot.ice-river { background-image: url('./assets/look-tiles/ice-river.webp'); }
-.look-swatch.shot.lake-harbour { background-image: url('./assets/look-tiles/lake-harbour.webp'); }
-.look-swatch.shot.pixel-ridge { background-image: url('./assets/look-tiles/pixel-ridge.webp'); }
-.look-swatch.shot.pixel-orbit { background-image: url('./assets/look-tiles/pixel-orbit.webp'); }
-.look-swatch.shot.woodblock-sea { background-image: url('./assets/look-tiles/woodblock-sea.webp'); }
-.look-swatch.shot.riso-hills { background-image: url('./assets/look-tiles/riso-hills.webp'); }
 .look-swatch.shot.gouache-valley { background-image: url('./assets/look-tiles/gouache-valley.webp'); }
-.look-swatch.shot.vector-dunes { background-image: url('./assets/look-tiles/vector-dunes.webp'); }
-.look-swatch.shot.watercolour-mist { background-image: url('./assets/look-tiles/watercolour-mist.webp'); }
-.look-swatch.shot.orbit-rings { background-image: url('./assets/look-tiles/orbit-rings.webp'); }
-.look-swatch.shot.moon-pines { background-image: url('./assets/look-tiles/moon-pines.webp'); }
-.look-swatch.shot.cel-dusk { background-image: url('./assets/look-tiles/cel-dusk.webp'); }
-.look-swatch.shot.pixel-harbour { background-image: url('./assets/look-tiles/pixel-harbour.webp'); }
-.look-swatch.shot.lino-coast { background-image: url('./assets/look-tiles/lino-coast.webp'); }
-/* CUT FROM THE REFERENCE SCREENSHOT OF THIS THEME, which is the only picture of this
-   window that exists and is exactly what every other tile here is: the app
-   wearing the look, not the photograph on its own. */
-.look-swatch.shot.valley-haze { background-image: url('./assets/look-tiles/valley-haze.webp'); }
-.look-swatch.shot.frost-haze { background-image: url('./assets/look-tiles/frost-haze.webp'); }
-.look-swatch.shot.slate-haze { background-image: url('./assets/look-tiles/slate-haze.webp'); }
 /* The themes added after the tiles were first shot, which drew as a bare
    gradient on the walk. Every tile was retaken off today's app on w-ec62ab6b38
    by scripts/shot-the-look-tiles.mjs. */
 .look-swatch.shot.ember-grid { background: url('./assets/look-tiles/ember-grid.webp') center top / cover no-repeat; }
-.look-swatch.shot.orbital-glass { background: url('./assets/look-tiles/orbital-glass.webp') center top / cover no-repeat; }
-.look-swatch.shot.peach-haze-2 { background: url('./assets/look-tiles/peach-haze-2.webp') center top / cover no-repeat; }
-.look-swatch.shot.ember-grid::after, .look-swatch.shot.orbital-glass::after, .look-swatch.shot.peach-haze-2::after { content: none; }
+.look-swatch.shot.ember-grid::after { content: none; }
 :root[data-machine="light"] .look-swatch.shot.match { background-image: url('./assets/look-tiles/light.webp'); }
 :root[data-machine="dark"] .look-swatch.shot.match,
 .look-swatch.shot.match { background-image: url('./assets/look-tiles/dark.webp'); }
@@ -8780,9 +7955,6 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   height: 1px;
   background: var(--line);
 }
-
-/* Slate code thumbnails use the same paper as the full diff. */
-:root[data-skin="slate-haze"] .artifact-thumbnail[data-kind="code"] { background:var(--code-ground); }
 
 /* One quiet current-action disclosure. Hover reveals affordance, never content;
    click, Enter and Space work equally, and touch always sees the chevron. */

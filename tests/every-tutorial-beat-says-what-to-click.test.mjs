@@ -123,11 +123,18 @@ describe('every practice beat names something to click', () => {
     it(`${name} says what to click as well as what to press`, () => {
       const step = name.split(' ')[0];
       if (!say.key) {
-        // A card with no key asks for no press, so there is nothing to offer a
-        // mouse route to. Only the two beats above are allowed to be in this
-        // state, and `snooze (picking)` is the picker itself, which is a list
-        // of times to click and names no key by design.
-        expect(['working', 'snooze', 'command'], `${name} asks for nothing`).toContain(step);
+        // A card with no key either asks for nothing at all, or asks for a
+        // click on something the app has no key for. `who` is the second kind
+        // and the only one: To is a button on the card and there is no
+        // shortcut that opens it, so the loud line is the click alone rather
+        // than a cap invented to keep the other cards' shape. The first kind is
+        // the running beat and the picker, which are lists to choose from.
+        expect(['working', 'who', 'board', 'snooze', 'command'], `${name} asks for nothing`).toContain(step);
+        // `who` and `board` are the click-only beats: the app has no shortcut
+        // that opens the To row or the View and filters menu, so their loud
+        // lines are the click alone rather than a cap invented to keep the
+        // other cards' shape.
+        if (step === 'who' || step === 'board') expect(loud(say).toLowerCase(), `${name} names no click`).toContain('click');
         return;
       }
       if (NO_CLICK[step] && (say.key === 'esc' || step === 'working' || step === 'clear' || step === 'snooze')) {
@@ -170,10 +177,28 @@ describe('the click each card names is a real one', () => {
   it('points at the button the ring is round, on the two beats that ring a button', () => {
     expect(loud(coach('make', 0))).toContain('click New thread');
     expect(ANCHOR.make[0]).toBe('button[aria-label="New thread"]');
-    expect(loud(coach('task', 0))).toContain('click Start it');
-    expect(ANCHOR.task[0]).toBe('.modal.compose .dock-send');
-    // The compose card's own button really says those words.
-    expect(read('renderer/src/components/Compose.tsx')).toContain('Start it');
+    // THE REAL NEW THREAD CARD SINCE 2026-10-01, which says Send rather than
+    // Start it. The walk had kept the retired one-line card for a round and the
+    // founder caught it: "the tutorial is using the wrong component here, we no
+    // longer use this."
+    expect(loud(coach('task', 0))).toContain('click Send');
+    expect(ANCHOR.task[0]).toBe('.tc-card .tc-send-main');
+    // The card's own button really says that word, in the element the ring is
+    // drawn round.
+    expect(read('renderer/src/threads/ThreadComposer.tsx')).toMatch(/className="tc-send-main"[\s\S]{0,400}Send/);
+  });
+
+  // WHO THE THREAD IS FOR (2026-10-01). THE WALK MUST TEACH PICKING WHO A
+  // THREAD IS TO, and that a thread goes to a person as well as to an agent.
+  // It rings the To row and the list it opens, and
+  // says both halves, because on a Mac with no teammates the list draws Agent
+  // alone and the People half appears the day somebody joins.
+  it('points at the To row, and names an agent and a person', () => {
+    const say = coach('who', 0);
+    expect(say.key).toBeNull();
+    expect(loud(say)).toBe('Click To at the top of the card to see who it can go to.');
+    expect(say.quiet).toBe('Every thread goes to an agent, or to a person on your team.');
+    expect(ANCHOR.who).toEqual(['.tc-card .tc-to-menu', '.tc-card .tc-word']);
   });
 
   it('points at the row on the two beats that ring a row', () => {

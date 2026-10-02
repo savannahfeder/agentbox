@@ -1,4 +1,4 @@
-import { resolveTheme, THEME_KEY, type ThemeChoice } from './theme';
+import { THEME_KEY, type ThemeChoice } from './theme';
 
 // The picture themes, and which one the window is wearing.
 //
@@ -93,70 +93,14 @@ export const SKINS: Skin[] = [
   // come into the app and find that theme. So the values are the film's own, read out of its shared stylesheet. NOT A
   // PHOTOGRAPH: its picture is an inline drawing of a dot grid and one orange
   // light, so it ships no image file and has no small copy.
-  { id: 'ember-grid', name: 'Ember Grid', note: 'The launch film’s look. A warm dark grey, a faint dot grid, square corners and one orange.' },
+  { id: 'ember-grid', name: 'Dark', note: 'The launch film’s look. A warm dark grey, a faint dot grid, square corners and one orange.' },
 
-  // THE THREE HAZES COME NEXT, AND THAT IS A DECISION RATHER THAN A DEFAULT.
-  // They were first placed up front, right after the basic dark and light.
-  // That ordering was later superseded: LOOKS now leads with this list
-  // in order, so leading here is the whole of "up front": Settings' tiles, the
-  // walk's look step and the Command-K rows all move at once.
-  //
-  // THEY ARE NOT PHOTOGRAPHS, WHICH IS WHY THEY GROUP. Measured, that is a
-  // spread of 4 to 7 over an 8x5 grid of the picture, where an ordinary
-  // photograph reads 25 to 40.
-  //
-  // THIRTY FIVE WERE BUILT AND THESE THREE WERE KEPT, over five rounds on that
-  // row. The other thirty two are deleted: FAMILY in scripts/make-haze.mjs keeps
-  // every recipe and decisions.md keeps every token block, so any of them is a
-  // minute away, but every one of them was reviewed and passed on.
-  //
-  // Valley Haze was requested from a reference picture. Frost and Slate are
-  // LIGHT, which no picture in this app could be before them; `light: true`
-  // and the Skin type above carry that story.
-  { id: 'valley-haze', name: 'Valley Haze', note: 'The gouache valley, thrown out of focus. A blurred warm wash, edge to edge.' },
-  { id: 'frost-haze', name: 'Frost Haze', note: 'Paper cooled toward blue. Light, with a cold edge to it.', light: true },
-  { id: 'slate-haze', name: 'Slate Haze', note: 'A cool mid ground with a pale card on it. Between the two ends.', light: true },
-
-  // THEN THE FIFTEEN PHOTOGRAPHS, in the order they were picked across rounds
-  // three, four and five.
-  { id: 'lake', name: 'Lake', note: 'The landing page\u2019s photograph, in dark mode.' },
-  // FROM ROUND THREE: Ice, Ice River, Ice Vault and Lake Harbor were chosen.
-  // Ice Vault was later removed. Its picture, its token block, its tile and its measured ground were all
-  // deleted with it, and it is NEVER re-offered as a candidate.
-  { id: 'ice', name: 'Ice', note: 'Blue daylight entering a glacier cave from the right.' },
-  { id: 'pixel-ridge', name: 'Pixel Ridge', note: 'Pixel art. Flat ridges into a low sun, pixel conifers on the near cliff.' },
-  // Keep the winning background's stored key so saved adjustments survive the rename.
-  { id: 'peach-haze-2', name: 'Peach Haze', note: 'A diagonal peach glow across a sage and mauve wash.', light: true },
-  // September 21: explicitly re-approved as a new glass treatment; the retired ID stays retired.
-  { id: 'orbital-glass', name: 'Orbital Glass', note: 'A ringed planet through clear glass, with quiet gray text.' },
-  { id: 'pixel-orbit', name: 'Pixel Orbit', note: 'Pixel art. A ringed planet low over a dark plain.' },
-  { id: 'woodblock-sea', name: 'Woodblock Sea', note: 'A Japanese woodblock print. Pines on a headland, the sun on the water.' },
-  { id: 'riso-hills', name: 'Riso Hills', note: 'A two colour risograph print in blue and coral ink.' },
-  { id: 'gouache-valley', name: 'Gouache Valley', note: 'A painted animation background in gouache. A valley and a still river.' },
-  { id: 'watercolour-mist', name: 'Watercolor Mist', note: 'A wet on wet watercolour. Five washes of mountain into mist.' },
-  // THE FIVE FROM ROUND FIVE, in the order chosen: Orbit Rings, Moon Pines,
-  // Cel Dusk, Pixel Harbor and Lino Coast. Round five's subject was a picture
-  // DRAWN DARK, so four of these five wear almost no veil and arrive in their
-  // own colour.
-  //
-  // LINO COAST SHIPS AGAINST THE RECOMMENDATION AND THAT IS FINE. The round
-  // five write-up called it the one that does not work, 0.0021 chroma against
-  // the Lake's 0.0216, near enough to plain dark mode to read as no theme. It
-  // was chosen anyway. Do not quietly drop it or "fix" it by brightening the file.
-  //
-  // ORBIT RINGS IS THE ONE PICTURE THAT DOES NOT COME BACK. Two decisions
-  // disagree about it, and the later one wins until it is revisited.
-  //
-  // IT IS ALSO WHAT PUTS AN EXISTING WINDOW BACK ON PLAIN DARK. `resolveSkin`
-  // answers 'none' for any id not in this array, and a store can still hold
-  // `zero.skin` = orbit-rings. Restoring the list with this line in it would
-  // paint the removed picture straight back onto that app the moment the build
-  // opened.
-  //
-  // The photograph, the CSS rule and the swatch are all still here. Putting the
-  // line below back is the whole of undoing this. { id: 'orbit-rings', name:
-  // 'Orbit Rings', note: 'Airbrushed cover art. A ringed giant rising over a
-  // dark moon.
+  // TWO THEMES AND MATCH SYSTEM (w-9e434e8671). Dark IS Ember Grid; Light is
+  // the plain light theme; Match system follows the Mac between the two. The
+  // hazes and the photographs are gone: a store that still names one is moved
+  // onto Light or Dark by `normalizeSavedLook`. Gouache Valley's picture stays
+  // behind the walk's setup screens (`WALK_PICTURE`), but it is not a theme
+  // anybody can pick.
 ];
 
 // THE THEME LAB IS GONE. `registerLabSkins` used to append candidate pictures
@@ -201,46 +145,50 @@ export function lookOf(theme: 'light' | 'dark' | 'match', skin: SkinChoice): Loo
  * fourth step — and a second copy of a list kept in step with the first by
  * nothing is the fault that broke the introduction's Next button and the tab
  * tour on the same day. */
-// Haze defaults lead; plain surfaces remain available at the end.
+// THREE CHOICES (w-9e434e8671): Light, Dark (Ember Grid) and Match system,
+// in that order, in Settings, in Command-K and on the walk.
 export const LOOKS: Array<{ id: Look; name: string }> = [
-  ...SKINS.map((sk) => ({ id: sk.id as Look, name: sk.name })),
   { id: 'light', name: 'Light' },
-  { id: 'dark', name: 'Dark' },
+  { id: 'ember-grid', name: 'Dark' },
+  { id: 'match', name: 'Match system' },
 ];
 
+// The pictures that were light. Anybody still wearing one lands on Light.
+const LIGHT_PICTURES = ['frost-haze', 'slate-haze', 'peach-haze', 'peach-haze-2'];
+
 /**
- * Resolve old preferences once before the first paint. Explicit plain themes
- * remain plain. The retired system picker migrates to the current Haze mode. */
+ * Resolve old preferences once before the first paint, onto one of the three
+ * choices. An empty store gets the default, Dark. Light and Match system are
+ * kept. Plain dark and every dark picture become Dark, which is Ember Grid.
+ * A light picture becomes Light. */
 export function normalizeSavedLook(store: {
   getItem(k: string): string | null;
   setItem(k: string, v: string): void;
-}, system: ThemeChoice = resolveTheme('match')): void {
+}): void {
   const theme = store.getItem(THEME_KEY);
   const skin = store.getItem(SKIN_KEY);
-  // Background 1 was retired when the user selected background 2.
-  if (skin === 'peach-haze') {
-    store.setItem(THEME_KEY, 'light');
-    store.setItem(SKIN_KEY, 'peach-haze-2');
-    return;
-  }
-  // A BRAND NEW MAC GETS THE DEFAULT, WHATEVER ITS OWN LIGHT OR DARK SAYS.
-  // This runs before `seedFirstRunLook`, so without this line an empty store
-  // was answered by the haze pair below and the default never reached anyone.
-  // The ember theme is the default (w-3fc39983be).
-  if (theme === null && skin === null) {
-    const look = lookMeans(DEFAULT_SKIN);
-    store.setItem(THEME_KEY, look.theme);
-    store.setItem(SKIN_KEY, String(look.skin));
-    return;
-  }
-  const retired = ['ice-river', 'lake-harbour', 'moon-pines', 'cel-dusk', 'pixel-harbour', 'vector-dunes', 'lino-coast'];
-  if (theme === 'match' || skin === null || retired.includes(skin)) {
-    const mode = theme === 'match' ? system : resolveTheme(theme);
-    const selected = skin && resolveSkin(skin) !== 'none' ? lookMeans(skin)
-      : lookMeans(mode === 'light' ? 'frost-haze' : 'valley-haze');
-    store.setItem(THEME_KEY, selected.theme);
-    store.setItem(SKIN_KEY, selected.skin);
-  }
+  const put = (look: Look) => {
+    const l = lookMeans(look);
+    if (theme !== l.theme) store.setItem(THEME_KEY, l.theme);
+    if (skin !== l.skin) store.setItem(SKIN_KEY, String(l.skin));
+  };
+  // A BRAND NEW MAC GETS THE DEFAULT, WHATEVER ITS OWN LIGHT OR DARK SAYS
+  // (w-3fc39983be).
+  if (theme === null && skin === null) return put(DEFAULT_SKIN);
+  if (skin && LIGHT_PICTURES.includes(skin)) return put('light');
+  if (skin && skin !== 'none') return put('ember-grid');
+  if (theme === 'light') return put('light');
+  if (theme === 'match') return put('match');
+  put('ember-grid');
+}
+
+/**
+ * WHAT THE WINDOW WEARS FOR A STORED CHOICE, once the Mac has had its say.
+ * Match system on a dark Mac is Dark, and Dark is Ember Grid, so the picture
+ * comes on with it; on a light Mac it is plain Light. */
+export function wornSkin(theme: 'light' | 'dark' | 'match', skin: SkinChoice, machine: ThemeChoice): SkinChoice {
+  if (theme === 'match') return machine === 'dark' ? DEFAULT_SKIN : 'none';
+  return skin;
 }
 
 export function lookMeans(look: Look): { theme: 'light' | 'dark' | 'match'; skin: SkinChoice } {

@@ -1,6 +1,7 @@
 import { claudeActivity, codexActivity, currentActivity } from './agent-activity.mjs';
 import { taskRemoteControl } from './task-remote-control.mjs';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mjs';
+import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor } from './ship-queue.mjs';
 import { folderJob } from './task-folders-offthread.mjs';
 import { gitJob } from './git-change-offthread.mjs';
 import { queuedReplyText } from './live-replies.mjs';
@@ -310,6 +311,21 @@ export class Supervisor {
     // a file we SHIP is a default and belongs in the checkout, a file only she
     // writes belongs in her own folder. main.mjs carries the text across once.
     this.userDir = userDir;
+    // THE APP SHIPS A TASK THE AGENT MARKED READY, for a project a person
+    // turned that on for in this app's own data folder (main/ship-queue.mjs).
+    // With no such setting it never runs anything.
+    this.onShipped = () => {};
+    this.shipQueue = new ShipQueue({
+      store,
+      userDir,
+      folderFor: (item, product) => { try { return taskFolderPath(this.productFolder(product), item.id); } catch { return null; } },
+      isLive: (item) => this.sessions.has(item.id),
+      handBack: (item, reply) => {
+        const fresh = this.store.readItem?.(item.product, item.id) ?? item;
+        this.spawnWorker(fresh, { continuation: true, shipFailure: reply });
+      },
+      afterShip: () => this.onShipped(),
+    });
     this._compactionJobs = new Map();
     this.sessions = new Map(); // itemId -> {child, product, startedAt, tail, itemId}
     // Spawns waiting on their row's folder, and folders made for the spawn that
@@ -448,6 +464,15 @@ export class Supervisor {
     // slot we just made — which is a kill that cost her a session and bought
     // her nothing.
     this._preempted = new Map();
+    // TASKS SHE PUSHED WITH "RUN NOW", from the three-dot menu on a waiting
+    // task (`runNow` below). itemId -> { product, at, started }.
+    //
+    // In memory only, for the reason `_resumeQueue` gives: this is her intent
+    // right now, and a push that survived a restart would jump a task she
+    // asked for hours ago over everything filed since. The entry stays while
+    // the pushed task runs, so a second push cannot pause the first, and goes
+    // the moment that run ends (`_settleRunNow`).
+    this._runNow = new Map();
     // Rows the toast has already spoken about. In memory only: a restart is a
     // sweep she has not been told about yet, so it gets to speak once.
     this._announcedRecovery = new Set();
@@ -915,7 +940,15 @@ export class Supervisor {
   // she would have lost a running worker for nothing. So the candidate list is
   // scoped to the engine the urgent row is going to spawn on, and a full fleet
   // on the OTHER engine is simply not this row's problem.
+  //
+  // A ROW SHE PUSHED WITH "RUN NOW" TAKES A SLOT TOO, by the same door and with
+  // the same promise that what it pauses comes back as itself. Two things are
+  // different, both because she asked for this row by name, this minute: it
+  // may pause anything that is not itself pushed, whatever its project or tag,
+  // and the empty-runs rule below does not apply to it.
   _preemptFor(item, items, engine = DEFAULT_ENGINE) {
+    const pushed = this._runNow.has(item.id);
+    if (pushed) return this._takeSlotFor(item, items, engine, (victim) => !this._runNow.has(victim.id));
     if (!isUrgent(item)) return null;
     // A ROW WORKERS KEEP LEAVING ALONE MAY NOT KILL ANYTHING.
     //
@@ -934,12 +967,24 @@ export class Supervisor {
     // answer restores the interrupt immediately — which is the case that
     // matters most, an Urgent row she has just replied to.
     if (this._emptyRuns(item) > 1) return null;
+    // STRICTLY lower. Equal scores do not interrupt each other: two Urgent
+    // rows in the same product would otherwise take turns killing each
+    // other for as long as they both existed. Nor does it pause a row she
+    // pushed with Run now, which she asked for by name.
+    const want = this._score(item);
+    return this._takeSlotFor(item, items, engine,
+      (victim) => this._score(victim) < want && !this._runNow.has(victim.id));
+  }
+
+  // The half of an interruption both doors share: pick the session to pause,
+  // pause it, and hold it out of the queue until `item` is running.
+  // `mayTake(victim)` is the door's own rule about whom it may pause.
+  _takeSlotFor(item, items, engine, mayTake) {
     // A slot taken for a row that cannot take it is a kill that buys her
     // nothing. The queue's own guards cover the answered case; this covers a
     // lease somebody else still holds, which would refuse this worker the
     // claim whatever we killed to make room for it.
     if (this.claimHeldElsewhere(item)) return null;
-    const want = this._score(item);
     const candidates = [];
     for (const session of this.sessions.values()) {
       const id = session.itemId;
@@ -954,10 +999,7 @@ export class Supervisor {
       // since been archived. We cannot score it and we cannot resume it onto
       // anything, so it is left alone.
       if (!victim) continue;
-      // STRICTLY lower. Equal scores do not interrupt each other: two Urgent
-      // rows in the same product would otherwise take turns killing each
-      // other for as long as they both existed.
-      if (this._score(victim) >= want) continue;
+      if (!mayTake(victim)) continue;
       const rec = this._liveSessions[id];
       // The two halves of "the work is kept". Without the record there is no
       // session id to resume; without the transcript the CLI's --resume exits
@@ -1003,9 +1045,50 @@ export class Supervisor {
       const done = this.sessions.has(rec.forItem)
         || !target
         || (target.status !== 'open' && target.status !== 'claimed')
-        || !isUrgent(target)
+        || (!isUrgent(target) && !this._runNow.has(target.id))
         || now - rec.at > PREEMPTION_HOLD_MS;
       if (done) this._preempted.delete(id);
+    }
+  }
+
+  /**
+   * RUN THIS ONE NOW: the three-dot menu's row on a waiting task.
+   *
+   * Her tag on a task could not do this. A project's place in her order is
+   * worth a hundred times any tag (shared/rank.mjs), so an Urgent task in a
+   * lower project waited behind a Low one in a higher project and could not
+   * interrupt it either; lowering the other tasks only reordered the waiting
+   * line, never a running one. So this is not a priority at all. It is a
+   * one-time push: the task goes to the front of the line, and if every slot
+   * on its engine is full the tick pauses the least important running task to
+   * make room (`_preemptFor`), which comes back as its own session afterwards.
+   * The task's tag and everything else's order are left exactly as they were.
+   */
+  runNow(product, id) {
+    const item = this.store.listItems(Date.now()).find((i) => i.id === id && i.product === product);
+    if (!item) return { ok: false, reason: 'missing' };
+    if (this.sessions.has(id)) return { ok: false, reason: 'running' };
+    this._runNow.set(id, { product, at: Date.now(), started: false });
+    // Asking for a row by name outranks a rest the fleet earned on it, the
+    // same way `resumeItems` treats it.
+    if (this._fruitless[`${product}:${id}`]) {
+      delete this._fruitless[`${product}:${id}`];
+      this._saveState();
+    }
+    this.onChange?.();
+    this.wake();
+    return { ok: true };
+  }
+
+  // A push lasts while its task runs, so a second push cannot pause the first,
+  // and ends with that run. One that never starts ends when the row stops being
+  // open work: finished, archived, or gone.
+  _settleRunNow(items) {
+    for (const [id, rec] of [...this._runNow]) {
+      const item = items.find((i) => i.id === id && i.product === rec.product);
+      if (!item || (item.status !== 'open' && item.status !== 'claimed')) { this._runNow.delete(id); continue; }
+      if (this.sessions.has(id)) rec.started = true;
+      else if (rec.started) this._runNow.delete(id);
     }
   }
 
@@ -1733,7 +1816,37 @@ export class Supervisor {
     // attached to the reply that woke it.
     const files = product ? this.attachmentBlock({ ...item, body: '', result: '', note: '' }, product) : '';
     if (files) parts.push(files);
+    // A resumed session never saw the full brief's ship section if it began
+    // before the project shipped through the app, and her "merge it" is
+    // exactly when it needs it.
+    if (product && this.shipsThroughTheApp(product)) parts.push(this.shipBrief());
     return parts.join('\n');
+  }
+
+  /** Whether this Mac ships this project's tasks itself (main/ship-queue.mjs). */
+  shipsThroughTheApp(product) {
+    return !!shipScriptFor(product, readShipSettings(this.userDir));
+  }
+
+  // HOW A TASK SHIPS, when the app does it. The agent's last step is a label,
+  // not a push: a push or a move of another checkout from inside an agent
+  // session is what Claude Code's safety check refuses, and a refusal asks
+  // nobody, so the task just stopped.
+  shipBrief() {
+    return [
+      '',
+      '# How this task ships',
+      '',
+      `${Name} ships this project's work itself. When the work is done and its tests`,
+      'pass, commit it on your branch in your task folder, then add the label',
+      `\`${SHIP_LABEL}\` to this work item (update_work_item, keeping its other labels)`,
+      'and end your turn as usual. Whether to wait for approval first is set by the',
+      'instructions you were given, not by this.',
+      '',
+      `Do NOT push, do NOT merge into main, and do NOT touch any other folder. ${Name}`,
+      'merges the latest main into your branch, runs the tests, pushes, and updates',
+      'the app folder. If that fails you will be woken with its exact words.',
+    ].join('\n');
   }
 
   // WHAT A RESUMED WORKER IS TOLD, and why it is six lines rather than a brief.
@@ -1759,6 +1872,7 @@ export class Supervisor {
       const files = product ? this.attachmentBlock({ ...item, body: '', result: '', note: '' }, product) : '';
       if (files) parts.push(files);
     }
+    if (product && this.shipsThroughTheApp(product)) parts.push(this.shipBrief());
     return parts.join('\n');
   }
 
@@ -3308,6 +3422,9 @@ export class Supervisor {
       })),
       stalled,
       queued,
+      // Waiting tasks she pushed with Run now that have not started yet, so
+      // the task can say it is next rather than merely queued.
+      runNow: [...this._runNow].filter(([id, r]) => !r.started && !this.sessions.has(id)).map(([id]) => id),
       scheduled,
       // ROWS WHOSE LAST RUN ENDED WITHOUT SAYING ANYTHING. The row says so.
       // See `_silentRows`.
@@ -3550,6 +3667,8 @@ export class Supervisor {
     // is exactly when no session exit is coming to do this.
     this.parkOnATimer(now);
     const items = this.store.listItems(now);
+    // A task its agent marked ready goes out, one at a time, beside the tick.
+    try { this.shipQueue.tick(items, this.store.listProducts()); } catch (e) { console.warn('zero: the ship queue:', e.message); }
 
     // A session that died without exiting still holds its row. Stopping it
     // here lets the passes below put a fresh worker on the row.
@@ -3570,7 +3689,9 @@ export class Supervisor {
 
     // Before anything is resumed or spawned: has the urgent row we interrupted
     // something FOR actually got its slot? Every hold this clears is a row that
-    // becomes resumable again on the passes below, in this same tick.
+    // becomes resumable again on the passes below, in this same tick. A push
+    // whose run has ended is settled first, since it no longer holds anything.
+    this._settleRunNow(items);
     this._settlePreemptions(items, now);
 
     // Interrupted sessions the last sweep could not fit in a slot. Ahead of
@@ -3764,6 +3885,11 @@ export class Supervisor {
       // two answered rows on a full fleet was never reached at all. Measured as
       // a failing test before this line existed.
       (b.command ? 1 : 0) - (a.command ? 1 : 0)
+      // THEN WHAT SHE PUSHED WITH RUN NOW, ahead of every project and tag,
+      // the earliest push first. Sorting first is also what gives it this
+      // tick's one interruption on its engine (`spent` below).
+      || (this._runNow.has(b.item.id) ? 1 : 0) - (this._runNow.has(a.item.id) ? 1 : 0)
+      || (this._runNow.get(a.item.id)?.at ?? 0) - (this._runNow.get(b.item.id)?.at ?? 0)
       || this._score(b.item) - this._score(a.item)
       // The tie-break, and the only thing left of "continuations go first".
       || (b.continuation ? 1 : 0) - (a.continuation ? 1 : 0)
@@ -3867,6 +3993,7 @@ export class Supervisor {
     // next tick: the row we interrupted becomes resumable in the same pass
     // that spawns the row we interrupted it for, and waiting a tick to notice
     // would leave a slot standing empty for fifteen seconds.
+    this._settleRunNow(items);
     this._settlePreemptions(items, now);
 
     // The digest: NOT a schedule, an INVARIANT. So
@@ -4070,7 +4197,7 @@ export class Supervisor {
   // it did. It is here for the two resume paths only: a session belongs to the
   // harness that wrote it, and a thread id handed to the wrong CLI dies on
   // arrival with "No conversation found with session ID".
-  spawnPlan(item, product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE } = {}) {
+  spawnPlan(item, product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE, shipFailure = null } = {}) {
     // A ROW'S OWN CHAT. Her reply on a row goes back to the session that wrote
     // what she is replying to. Four guards, and each one falls back to the old
     // behaviour rather than to anything worse:
@@ -4143,6 +4270,10 @@ export class Supervisor {
     // cannot work out for itself is that it has moved.
     else if (forkFrom) prompt = this.forkBrief(item, { product, from: forkFrom.sourceId });
     else prompt = resumeId ? this.resumeBrief(item, { continuation, product }) : this.buildBrief(item, product, { continuation, engine });
+    // A BRANCH THE APP COULD NOT SHIP (main/ship-queue.mjs) goes back to the
+    // session that wrote it, and that is all it is told: it has everything
+    // else already. A fresh session gets its brief first.
+    if (shipFailure) prompt = resumeId || rowChat ? shipFailure : `${prompt}\n\n${shipFailure}`;
     // A project may override what its own sessions may do. Absent (the normal
     // case) means the workspace default, which is why this is a lookup with no
     // entry rather than a copy of the default written onto every project: a
@@ -5627,7 +5758,7 @@ export class Supervisor {
     this._codexServers?.clear();
   }
 
-  spawnWorker(item, { continuation = false, resumeSessionId = null, profile: forcedProfile = null, engine: forcedEngine = null, remoteOnly = false } = {}) {
+  spawnWorker(item, { continuation = false, resumeSessionId = null, profile: forcedProfile = null, engine: forcedEngine = null, remoteOnly = false, shipFailure = null } = {}) {
     if (this._compactionJobs?.has(JSON.stringify([item.product, item.id]))) return;
     // ASKED ONCE, HERE, AND ANSWERED CLAUDE CODE ON EVERY MACHINE TODAY. See
     // `_engineFor` for the two independent reasons why. It is asked ahead of
@@ -5681,7 +5812,7 @@ export class Supervisor {
     if (this._folderFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly })) return;
     if (this._photoFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly })) return;
 
-    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine });
+    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine, shipFailure });
     const { args } = plan;
     // ONE RUN, ONE PAIR OF FILES. The MCP config and the settings used to be a
     // fixed name each in the temp folder, fine while every spawn wrote the
@@ -6468,6 +6599,7 @@ export class Supervisor {
       `Product: ${product.name} (slug: ${item.product})`,
       `Product docs live in: ${product.dir}`,
       product.repoPath ? `Product code repo (your cwd): ${product.repoPath}` : `No code repo is registered for this product.`,
+      this.shipsThroughTheApp(product) ? this.shipBrief() : '',
       `Work item id: ${item.id}`,
       `Title: ${item.title}`,
       item.body ? `\n${item.body}` : '',

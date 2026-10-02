@@ -49,7 +49,7 @@ import { engineThisMacOffers, readLastEngine, writeLastEngine } from '../engines
 import { repeatPresets } from '../components/When';
 import { fitMenu } from '../keep-in-window';
 import {
-  allModels, findPeople, harnessFields, inputValueOf, laterHint, momentFromInput, mondayMorning, moreCount,
+  allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayMorning, moreCount,
   joinNames, landsIn, placeholderFor, projectsOffered, projectSwatch, recentModels, sameModel,
   sharingFields, startingProject, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   type Harness, type ModelPick, type Visibility,
@@ -63,6 +63,8 @@ export interface ThreadSent {
   title?: string;
   /** A Send later moment, when there was one. */
   runAt?: number;
+  /** 'later' when it went to Later rather than to a moment (w-afb66e6661). */
+  start?: 'later';
   /** The repeating rule's id, so ending it can be the undo. */
   ruleId?: string;
   /** Everyone a message went to, when it went to more than one person. */
@@ -74,7 +76,7 @@ export interface ThreadSent {
 type MenuKey = 'to' | 'model' | 'project' | 'priority' | 'visibility' | 'later';
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, onClose, onSent, onOpenConversation, onReorderProjects,
+  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onOpenConversation, onReorderProjects,
 }: {
   products: Product[];
   items: WorkItem[];
@@ -87,6 +89,25 @@ export function ThreadComposer({
   defaultProduct?: string | null;
   /** Who it is to (a teammate's id) and words to start from, for a card opened from somewhere. */
   initial?: { to?: string; also?: string[]; body?: string } | null;
+  /**
+   * THE TUTORIAL'S OWN EXAMPLE TASK, and nothing else ever sets this.
+   *
+   * The walk types one task into this card and the app answers it a couple of
+   * seconds later out of a pre-written line, with no session behind it
+   * (main/first-run.mjs). Two things follow, and both are why the walk needed a
+   * card of its own until now:
+   *
+   *  - IT MAY BE SENT INTO THE PRACTICE PROJECT. Every other task there is
+   *    refused, because nothing in that project would pick it up and a tester
+   *    hit exactly that. The walk's task is the one with something waiting for
+   *    it, and `scripted` is how the card tells them apart with no guessing.
+   *  - IT CARRIES A LABEL. The supervisor never spawns fresh work on a row
+   *    wearing it. The label is passed in rather than imported, so this card
+   *    knows nothing about the walk beyond "somebody scripted this one".
+   */
+  scripted?: { labels: string[] } | null;
+  /** Called with a menu's name the moment it opens. The tutorial listens for `to`. */
+  onOpenMenu?: (which: MenuKey) => void;
   /** Picking someone you already talk to opens that conversation instead,
    *  carrying whatever was typed into its reply box (2026-10-01: a strip of
    *  the last few lines reads badly for a conversation that is hundreds of
@@ -203,20 +224,23 @@ export function ThreadComposer({
   const [open, setOpen] = useState<MenuKey | null>(null);
   const [modelPage, setModelPage] = useState<'recent' | 'all'>('recent');
   const [laterPage, setLaterPage] = useState<'list' | 'repeat'>('list');
-  const [picking, setPicking] = useState(false);
-  const [pickAt, setPickAt] = useState(() => inputValueOf(tomorrowMorning()));
+  const [laterText, setLaterText] = useState('');
   const anchors = useRef<Partial<Record<MenuKey, HTMLElement | null>>>({});
   const anchor = (key: MenuKey) => (el: HTMLElement | null) => { anchors.current[key] = el; };
   const textRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const toggle = (key: MenuKey) => {
-    setOpen((o) => (o === key ? null : key));
+    // WHICH LIST WAS OPENED, for the one caller that needs to know: the
+    // tutorial's beat about who a thread is for ends when the To list is really
+    // open, the way every other beat ends on the thing it asked for actually
+    // happening rather than on a Next. Nothing else passes this.
+    setOpen((o) => { const next = o === key ? null : key; if (next) onOpenMenu?.(next); return next; });
     setModelPage('recent');
     setLaterPage('list');
     // Who sees it opens on its three rows, even if the picker was last open.
     setVisPage('rows');
-    setPicking(false);
+    setLaterText('');
     setQuery('');
   };
   // A pick puts the caret back in the message, where she was going anyway. An
@@ -253,19 +277,18 @@ export function ThreadComposer({
     if (!open) return;
     const menu = anchors.current[open]?.querySelector<HTMLElement>(':scope > .tc-menu');
     if (menu) fitMenu(menu);
-  }, [query, picking]);
+  }, [query, laterText]);
 
   const menuKeys = (e: React.KeyboardEvent<HTMLElement>) => {
     const t = e.target as HTMLElement;
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close('trigger'); return; }
-    // The date field keeps its own arrows: they step the day and the hour.
-    if (t instanceof HTMLInputElement && t.type === 'datetime-local') return;
     const rows = [...e.currentTarget.querySelectorAll<HTMLElement>('[data-item]:not([disabled])')];
     const at = rows.indexOf(document.activeElement as HTMLElement);
     if (e.key === 'ArrowDown') { e.preventDefault(); rows[(at + 1) % rows.length]?.focus(); return; }
     if (e.key === 'ArrowUp') { e.preventDefault(); rows[at <= 0 ? rows.length - 1 : at - 1]?.focus(); return; }
-    // Typing on a row of the To menu types into "Find a person".
-    const find = e.currentTarget.querySelector<HTMLInputElement>('.tc-find');
+    // Typing on a row of the To menu types into "Find a person", and on a row
+    // of Send later into the time box.
+    const find = e.currentTarget.querySelector<HTMLInputElement>('.tc-find, .tc-when');
     if (find && t !== find && e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) find.focus();
   };
   const hover = (e: React.PointerEvent<HTMLElement>) => {
@@ -303,10 +326,10 @@ export function ThreadComposer({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const message = threadMessage(text, person ? [] : attachments);
-  const refusal = person ? null : practiceRefusal(product);
+  const refusal = person ? null : practiceRefusal(product, { scripted: !!scripted });
   const canSend = !sending && (person ? !!text.trim() : !!message && !!product && !refusal);
 
-  const sendTask = async (when: { runAt?: number; repeat?: { every: 'day' | 'weekday' | 'week'; on?: number; at: string } } = {}) => {
+  const sendTask = async (when: { runAt?: number; start?: 'later'; repeat?: { every: 'day' | 'weekday' | 'week'; on?: number; at: string } } = {}) => {
     if (!canSend || !product || !message) return;
     setSending(true);
     setError(null);
@@ -333,10 +356,16 @@ export function ThreadComposer({
         const made = await api.compose({
           product: product.slug, title: message.title, body: body || undefined, kind: 'directive', priority,
           ...(when.runAt ? { runAt: when.runAt } : {}),
+          // ADD IT TO LATER: the thread is written down and nothing starts it
+          // until she does (w-afb66e6661). The one row on this menu with no
+          // clock in it, and the only one that answers "I am not ready yet".
+          ...(when.start ? { start: when.start } : {}),
           ...harness,
           ...(team ? sharingFields(visibility, chosenHere) : {}),
+          // The tutorial's own task, and only ever that one. See `scripted`.
+          ...(scripted ? { labels: scripted.labels } : {}),
         });
-        onSent(made, { kind: 'task', product: product.slug, title: message.title, ...(when.runAt ? { runAt: when.runAt } : {}) });
+        onSent(made, { kind: 'task', product: product.slug, title: message.title, ...(when.runAt ? { runAt: when.runAt } : {}), ...(when.start ? { start: when.start } : {}) });
       }
       clearComposeDraft();
     } catch (err) {
@@ -564,34 +593,38 @@ export function ThreadComposer({
   const now = Date.now();
   const tomorrow = tomorrowMorning(now);
   const monday = mondayMorning(now);
-  const pickedAt = momentFromInput(pickAt, now);
+  const typedAt = momentFromWords(laterText, now);
   const laterMenu = (
     <div className="tc-menu tc-rise tc-right tc-wide" role="menu" aria-label="Send later" onKeyDown={menuKeys}>
       {laterPage === 'list' ? (<>
         <span className="tc-menu-head">Send later</span>
+        <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => sendTask({ start: 'later' })}>
+          <ClockIcon /><span className="tc-row-label">Add it to Later</span>
+        </button>
         <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => sendTask({ runAt: tomorrow })}>
           <ClockIcon /><span className="tc-row-label">Tomorrow morning</span><small>{laterHint(tomorrow)}</small>
         </button>
         <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => sendTask({ runAt: monday })}>
           <ClockIcon /><span className="tc-row-label">Monday morning</span><small>{laterHint(monday)}</small>
         </button>
-        <button type="button" data-item className={`tc-row ${picking ? 'on' : ''}`} onPointerEnter={hover} onClick={() => setPicking((p) => !p)}>
-          <ClockIcon /><span className="tc-row-label">Pick a date and time</span>
-        </button>
-        {picking && (
-          <span className="tc-pick">
-            <input
-              type="datetime-local"
-              className="tc-date"
-              value={pickAt}
-              min={inputValueOf(now)}
-              autoFocus
-              onChange={(e) => setPickAt(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && pickedAt) { e.preventDefault(); sendTask({ runAt: pickedAt }); } }}
-            />
-            <button type="button" data-item className="tc-schedule" disabled={!pickedAt} onClick={() => pickedAt && sendTask({ runAt: pickedAt })}>Schedule</button>
-          </span>
-        )}
+        {/* A TIME IN WORDS, where a browser date field used to be: the same
+            grammar as the Schedule box on a thread. Typing on any row above
+            lands here (menuKeys). */}
+        <span className="tc-pick">
+          <ClockIcon />
+          <input
+            data-item
+            className="tc-when"
+            placeholder="Or type: 3h, fri 6pm, tomorrow 9am"
+            aria-label="Send at a time you type"
+            value={laterText}
+            onChange={(e) => setLaterText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && typedAt) { e.preventDefault(); sendTask({ runAt: typedAt.ts }); } }}
+          />
+          {laterText.trim() && (typedAt
+            ? <button type="button" data-item className="tc-schedule" onClick={() => sendTask({ runAt: typedAt.ts })}>{typedAt.hint}</button>
+            : <small className="tc-when-no">Not a time yet</small>)}
+        </span>
         <span className="tc-sep" />
         <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => setLaterPage('repeat')}>
           <RepeatIcon /><span className="tc-row-label">Repeat it</span>
