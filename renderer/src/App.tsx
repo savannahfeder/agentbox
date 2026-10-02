@@ -113,6 +113,7 @@ import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
 import { Face, TeamContext, firstName, teamView } from './team/people';
+import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, PeopleFilter, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
@@ -1969,10 +1970,16 @@ export default function App() {
   const mixedRows = useMemo(() => (withOthers ? mergeRows(displayedBox, theirRows, inboxDisplay.sort) : null), [withOthers, displayedBox, theirRows, inboxDisplay.sort]);
   // A teammate's thread opens as their card, over the page, and Back returns here.
   const openTeammateCard = useCallback((card: ThreadCard) => { setOpenCard(card); setTeamOpen(true); }, []);
+  // HOVERING A FACE SAYS WHAT THEY ARE UP TO (w-0b54ee983f). Her words:
+  // "I presumed that if I hovered over or clicked on them, it would show
+  // something." These rows are the last faces in the app, so the card the
+  // Team board's face chips were going to carry hangs here instead.
   const personCell = useCallback((id: string | null) => {
     const p = id ? team?.byId.get(id) ?? null : null;
-    return <><Face person={p} me={id === team?.me} />{id === team?.me ? 'You' : firstName(p)}</>;
-  }, [team]);
+    return <FaceHover person={p} me={id === team?.me} now={now}>
+      <Face person={p} me={id === team?.me} />{id === team?.me ? 'You' : firstName(p)}
+    </FaceHover>;
+  }, [team, now]);
   const peoplePicker = team
     ? <PeopleFilter everyone={everyone} picked={picked} me={team.me} onPick={setPicked} />
     : undefined;

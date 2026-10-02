@@ -9,6 +9,7 @@ import { SidebarToggleIcon } from './SidebarToggleIcon';
 import { AppMark } from './AppMark';
 import { SidebarUpdate } from './SidebarUpdate';
 import { changeLines } from '../update-row';
+import { SidebarStatus } from '../team/status';
 /** ONE NUMBER IN THE SIDEBAR, ON INBOX, AND IT IS DRAWN IN THE TAB'S OWN TYPE.
  *
  *  w-5f02e7b525. Only Inbox shows a number, like a classic email client, and of
@@ -114,7 +115,7 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
         {/* Your own row opens the page with your account on it, so clicking
             your own name always does something. */}
         {me ? (onAccount
-          ? <button type="button" className="th-me-btn" aria-label="Your account" title={collapsed ? 'Your account' : undefined} onClick={onAccount}><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></button>
+          ? <><button type="button" className="th-me-btn" aria-label="Your account" title={collapsed ? 'Your account' : undefined} onClick={onAccount}><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></button><SidebarStatus me={me} now={Date.now()} collapsed={collapsed} /></>
           : <><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></>)
           : team?.configured && onTeam ? <button type="button" className="th-me-signin" aria-label="Sign in to your team" onClick={onTeam}>Sign in to your team</button>
             : <span />}

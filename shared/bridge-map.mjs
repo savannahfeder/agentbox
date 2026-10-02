@@ -36,6 +36,7 @@ export const REQUEST_CHANNELS = {
   teamLeave: 'zero:team-leave',
   teamCancelInvite: 'zero:team-cancel-invite',
   teamAcceptInvite: 'zero:team-accept-invite',
+  teamStatus: 'zero:team-status',
   teamShare: 'zero:team-share',
   teamSync: 'zero:team-sync',
   teamRoute: 'zero:team-route',

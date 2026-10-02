@@ -17,11 +17,14 @@ import { listSharedProjects, joinSharedProject, markShared, makeDirect } from '.
 import { firstSentence } from '../../shared/thread-cards.mjs';
 import { cardsFor } from '../../shared/thread-cards.mjs';
 import fs from 'node:fs';
+import { hasLapsed, holdEnds } from '../../shared/team-status.mjs';
 
 const EMPTY = { configured: false, started: false, signedIn: false, me: null, team: null, invites: [], sent: [], people: [], cards: [], lastSyncAt: null, error: null };
 
 export function createTeamService({
   session, store, disk, accountRoot, stateFile, onChange = () => {}, log = () => {}, intervalMs = 5000, startRetryMs = 1500,
+  // The clock, so a test can move past the moment a status runs out.
+  now = Date.now,
 }) {
   let state = { ...EMPTY, configured: !!session?.configured };
   let backend = null;
@@ -37,6 +40,15 @@ export function createTeamService({
 
   function products() {
     try { return store.listProducts(); } catch { return []; }
+  }
+
+  // A status the owner set has run out: wipe it where it is stored, so old
+  // text does not sit in the cloud. Everyone who READS it already saw it go,
+  // on their own clock (shared/team-status.mjs); this is the tidying.
+  async function clearLapsedStatus() {
+    if (!backend || !hasLapsed(state.me?.status, now())) return;
+    await backend.setStatus({ text: null, until: null });
+    set({ me: { ...state.me, status: null } });
   }
 
   // THE MESSAGE RECORD OF EXACTLY TWO PEOPLE, made by one of them (see
@@ -96,19 +108,28 @@ export function createTeamService({
   async function syncNow() {
     if (!sync) return null;
     if (pending) return pending;
-    pending = (async () => {
+    // THE BODY WAITS A MICROTASK, SO `pending` IS SET BEFORE ANY OF IT RUNS.
+    // Written as `pending = (async () => {...})()` the body's synchronous
+    // prefix runs BEFORE the assignment, so `pending` was still null while it
+    // ran. That was harmless until a pass wrote to the cloud: clearing a
+    // lapsed status makes the memory cloud emit, the emit calls back into
+    // syncNow, the guard is still null, and it recurses until the stack ends.
+    // Measured on the first run of the lapse test: a stack overflow, every
+    // frame this function.
+    pending = Promise.resolve().then(async () => {
       try {
         // An invite sent after this person signed in shows up here, not at
         // their next sign-in. It is offered, never taken up.
         if (!state.team) await refreshTeam();
+        await clearLapsedStatus();
         const report = await sync.syncOnce();
         // The people are read again on every pass, with the activity, so a
         // teammate who joined after this Mac signed in has a name and a face
         // on the first line of theirs that arrives here.
-        const [cards, people] = state.team
-          ? await Promise.all([backend.listCards(), backend.teamPeople(state.team.id)])
-          : [[], []];
-        set({ lastSyncAt: Date.now(), error: null, cards, people });
+        const [cards, people, me] = state.team
+          ? await Promise.all([backend.listCards(), backend.teamPeople(state.team.id), backend.me()])
+          : [[], [], state.me];
+        set({ lastSyncAt: Date.now(), error: null, cards, people, me: me ?? state.me });
         if (report.joined.length || report.pulled) log(`team: joined ${report.joined.length}, pulled ${report.pulled}, pushed ${report.pushed}`);
         if (report.notJoined) log(`team: left ${report.notJoined} shared project(s) unjoined, this Mac already holds the most it takes on by itself`);
         return report;
@@ -118,7 +139,7 @@ export function createTeamService({
       } finally {
         pending = null;
       }
-    })();
+    });
     return pending;
   }
 
@@ -233,6 +254,15 @@ export function createTeamService({
       if (!clean) throw new Error('a team needs a name');
       await backend.renameTeam(state.team.id, clean);
       await refreshTeam();
+      return state;
+    },
+
+    // A line you write about yourself, held until the end of today, tomorrow
+    // or this week, or until you clear it. Saying nothing clears it.
+    async setStatus({ text, hold = 'open' } = {}) {
+      if (!backend) throw new Error('sign in first');
+      const status = await backend.setStatus({ text, until: holdEnds(hold, now()) });
+      set({ me: { ...state.me, status } });
       return state;
     },
 

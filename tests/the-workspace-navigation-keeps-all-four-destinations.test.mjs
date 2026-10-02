@@ -209,10 +209,14 @@ describe('every control keeps its name in either width', () => {
       onInstructions: noop, onSettings: noop, inboxCount: 2,
     });
     const buttons = html.match(/<button[^>]*>/g);
-    // Inbox, Invite people, Instructions, Settings, the toggle, and your own
+    // Inbox, Invite people, Instructions, Settings, the toggle and your own
     // row (it opens your account). Team left with w-05ff3d1438, and Team
     // members with w-8415594d19.
-    expect(buttons).toHaveLength(6);
+    //
+    // The seventh when the sidebar is open is the line under your name, which
+    // opens the box you say what you are up to in (w-0b54ee983f). A collapsed
+    // sidebar is icons only and that line is words, so it is not drawn there.
+    expect(buttons).toHaveLength(collapsed ? 6 : 7);
     for (const b of buttons) expect(b).toMatch(/aria-label="[^"]+"/);
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
   });

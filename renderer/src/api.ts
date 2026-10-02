@@ -452,6 +452,8 @@ export const api = {
   async teamRemoveMember(personId: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRemoveMember({ personId })); },
   async teamLeave(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamLeave()); },
   async teamCancelInvite(email: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamCancelInvite({ email })); },
+  // A line you write about yourself. Saying nothing clears it.
+  async teamStatus(p: { text: string; hold: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamStatus(p)); },
   async teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamShare(p)); },
   async teamSync(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSync()); },
   // A task somebody gave you: to an agent (on your Mac), keep it, or hand it back.

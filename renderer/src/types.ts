@@ -120,6 +120,11 @@ export interface Person {
   avatarUrl: string | null;
   /** On a team's member list: who owns it (and so may rename it and remove people). */
   role?: 'owner' | 'member';
+  /** A line they wrote about themselves, so a day in meetings is not read
+   *  off the Team page as idleness, and when it stops holding. Read it
+   *  through `saying` in team/status.tsx, never straight: one whose time has
+   *  passed is nothing, on the reading Mac's own clock. */
+  status?: { text: string; until: number | null } | null;
 }
 
 /** What every team call answers: the team as it now stands, or why not. */
@@ -917,6 +922,7 @@ declare global {
       teamCreate(p: { name: string }): Promise<TeamCallResult>;
       teamAcceptInvite(p: { teamId: string }): Promise<TeamCallResult>;
       teamInvite(p: { email: string }): Promise<TeamCallResult>;
+      teamStatus(p: { text: string; hold: string }): Promise<TeamCallResult>;
       teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult>;
       teamSync(): Promise<TeamCallResult>;
       teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;

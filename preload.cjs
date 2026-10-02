@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('zero', {
   teamRemoveMember: (payload) => ipcRenderer.invoke('zero:team-remove-member', payload),
   teamLeave: () => ipcRenderer.invoke('zero:team-leave'),
   teamCancelInvite: (payload) => ipcRenderer.invoke('zero:team-cancel-invite', payload),
+  teamStatus: (payload) => ipcRenderer.invoke('zero:team-status', payload),
   teamShare: (payload) => ipcRenderer.invoke('zero:team-share', payload),
   teamSync: () => ipcRenderer.invoke('zero:team-sync'),
   teamRoute: (payload) => ipcRenderer.invoke('zero:team-route', payload),
