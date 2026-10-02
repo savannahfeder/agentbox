@@ -96,8 +96,9 @@
    nothing on one the whole team sees, which is the default. */
 .th-shared { display: inline; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
 /* AND HOW WIDELY (w-41ff964775): a thread only a few people see carries their
-   count beside the mark, in the mark's own faint colour. */
-.th-shared-n { display: inline; margin-left: 3px; font: 10.5px var(--mono); color: var(--text-faint); vertical-align: 0; }
+   count beside the mark, in the mark's own faint colour. Raised 1.5px: on the
+   baseline the digit's middle sat 1.33px below the mark's (2026-10-02). */
+.th-shared-n { display: inline; margin-left: 3px; font: 10.5px var(--mono); color: var(--text-faint); vertical-align: 1.5px; }
 
 /* NOT STARTED, ON THE ROW (w-afb66e6661). Her ask: "some sort of tag, like
    'not started', that makes it clearer". It is a box rather than more words in

@@ -15,6 +15,7 @@
 // Hovering a row still offers Share / Unshare, with its own small mark inside
 // the button, so the way to change it is unchanged.
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ThreadCells, InboxBoard } from '../renderer/src/threads/Pages.tsx';
@@ -65,6 +66,21 @@ describe('the row', () => {
     expect(t).toContain('th-shared');
     expect(t).toMatch(/<span class="th-shared-n"[^>]*>2<\/span>/);
     expect(t).not.toContain('th-lock');
+  });
+});
+
+// THE COUNT SITS LEVEL WITH THE MARK (2026-10-02). Feedback on the shipped row:
+// the 2 beside the people mark was "like a pixel below where it should be".
+// Measured in the built app (scripts/scratch/measure-w-61c7f4a224.mjs, ink
+// from the font's metrics and the mark's paths): the digit's middle sat 1.33px
+// below the mark's, at vertical-align 0. Raised by 1.5px it sits within 0.2px.
+describe('the count beside the people mark', () => {
+  const css = fs.readFileSync(new URL('../renderer/src/threads/pages.css', import.meta.url), 'utf8');
+  it('is raised to sit level with the mark, not on the text baseline', () => {
+    expect(css).toMatch(/\.th-shared-n \{[^}]*vertical-align: 1\.5px/);
+  });
+  it('the mark itself stays where it was', () => {
+    expect(css).toMatch(/\.th-shared \{[^}]*vertical-align: -1px/);
   });
 });
 
