@@ -48,7 +48,10 @@ describe('every token exists in both themes', () => {
     // that changed between themes would be a bug rather than a feature. Both
     // are deliberately inherited rather than restated; everything else must be
     // answered.
-    const SHARED = new Set(['--mono', '--radius']);
+    // --tag-radius joined them for a sharper version of the same reason: a tag
+    // is square in every theme AND under every skin, so it is declared exactly
+    // once and re-declaring it anywhere is the bug.
+    const SHARED = new Set(['--mono', '--radius', '--tag-radius']);
     const missing = [...light].filter((t) => !dark.has(t) && !SHARED.has(t));
     expect(missing).toEqual([]);
   });

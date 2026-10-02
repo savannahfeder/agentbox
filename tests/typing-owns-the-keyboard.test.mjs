@@ -47,9 +47,17 @@ const focus = src('components', 'Focus.tsx');
 const compose = src('components', 'Compose.tsx');
 
 // 2026-09-14: native Tab focus replaces the former global swallow.
+// 2026-10-01 (w-5a08121f99): and on the Inbox's own list Tab moves along the
+// state tabs again, because she asked for it back. That is a narrower rule than
+// the one dropped in September, and this file pins the narrow part: the press
+// may not leave a field she is typing in.
 describe('what Tab still means', () => {
-  it('does not navigate the sidebar while typing', () => {
-    expect(app).toContain("if (e.key === 'Tab') return;");
+  it('does not move the tabs while typing', () => {
+    const gate = app.slice(app.indexOf("if (e.key === 'Tab') {"), app.indexOf("if (e.key === 'Tab') {") + 700);
+    expect(gate).toContain('const onTheTabs = !inInput');
+    expect(gate).toContain('if (!onTheTabs) return;');
+    // A press that is not ours is still the browser's, untouched.
+    expect(gate.indexOf('if (!onTheTabs) return;')).toBeLessThan(gate.indexOf('e.preventDefault()'));
     expect(app).toContain('if (slot && !inInput && !modal && !inFullScreen)');
   });
   it('cycles the permission modes in the reply box, ON the box', () => {

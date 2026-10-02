@@ -449,7 +449,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                   // box and its keys, with the approved columns instead of a
                   // title over a summary.
                   <ThreadCells item={item} product={products.find((p) => p.slug === item.product)} now={Date.now()}
-                    person={withPerson ? personCell?.(team?.me ?? null) : undefined} withOthers={withPerson} />
+                    person={withPerson ? personCell?.(team?.me ?? null) : undefined} />
                 ) : <>
                 <div className="row-main">
                   {/* THE WRITTEN NAME, WHERE THERE IS ONE. `rowTitle` prefers

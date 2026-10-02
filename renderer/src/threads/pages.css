@@ -42,8 +42,14 @@
 
 /* ------------------------------------------------------------ the header */
 .th-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-.th-search { display: inline-flex; align-items: center; gap: 9px; width: 240px; height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-faint); font: inherit; font-size: 13px; cursor: text; }
-.th-search kbd { margin-left: auto; font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; }
+/* SEARCH IS NOT A BOX. Search, New thread and Display were three outlined
+   rectangles in a row, and the run of them was overwhelming. Search is the one
+   that is not an action, so it loses its border and its 240px block and
+   answers the pointer the way the app's other quiet controls do, with a
+   background. New thread keeps its outline, because it is the thing you
+   press. */
+.th-search { display: inline-flex; align-items: center; gap: 9px; height: 32px; padding: 0 10px; border: 0; border-radius: var(--radius); background: none; color: var(--text-faint); font: inherit; font-size: 13px; cursor: text; }
+.th-search kbd { margin-left: 2px; font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; }
 .th-new { height: 32px; padding: 0 13px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13.5px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
 .th-new svg { color: var(--text-dim); }
 .th-new:hover, .th-disp:hover { background: var(--wash-strong); }
@@ -55,9 +61,13 @@
 .th-pop .line { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 10px; padding: 7px 16px; }
 .th-pop .lab { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 .th-pop .opts { display: flex; flex-wrap: wrap; gap: 5px; }
-.th-pop .opts > button { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; }
+.th-pop .opts > button { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; }
 .th-pop .opts > button.on { background: rgba(255,255,255,.09); border-color: var(--text-faint); color: var(--text); }
 .th-pop .opts .th-pr, .th-pop .opts .th-urgent { margin-right: 0; }
+/* The rest of forty projects, behind one word. It is not a project, so it does
+   not wear a project's border: it reads as the way through to them. */
+.th-pop .opts > button.th-pop-more { border-color: transparent; color: var(--text-faint); padding-left: 4px; }
+.th-pop .opts > button.th-pop-more:hover { border-color: transparent; color: var(--text); }
 .th-pop .rule { height: 1px; background: var(--line); margin: 6px 0; }
 .th-pop .foot { display: flex; justify-content: space-between; align-items: center; padding: 6px 16px 2px; font-size: 12.5px; color: var(--text-faint); }
 .th-pop .foot button { background: none; border: 0; padding: 0; font: inherit; color: var(--text-dim); cursor: pointer; }
@@ -72,7 +82,7 @@
 .th-pr i { display: block; width: 3px; background: var(--line-strong); border-radius: 1px; }
 .th-pr i:nth-child(1) { height: 5px; } .th-pr i:nth-child(2) { height: 8px; } .th-pr i:nth-child(3) { height: 11px; }
 .th-pr i.on { background: var(--text-dim); }
-.th-urgent { display: inline-grid; place-items: center; width: 12px; height: 12px; border-radius: 3px; background: var(--accent); color: #1a1817; font: 700 9px var(--mono); margin-right: 8px; position: relative; top: 1px; flex: none; }
+.th-urgent { display: inline-grid; place-items: center; width: 12px; height: 12px; border-radius: var(--tag-radius); background: var(--accent); color: #1a1817; font: 700 9px var(--mono); margin-right: 8px; position: relative; top: 1px; flex: none; }
 .th-lock { display: inline-block; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
 /* WHO SEES A ROW (2026-10-01): two people after the title of a thread the team
    can see, and nothing on the rest, which is most of an older inbox. */
@@ -101,7 +111,7 @@
    row. It takes the time's place rather than adding a column, the time comes
    back when the pointer leaves, and a row with nothing to share keeps its
    time. Square, quiet, and the one thing on the row that does not open it. */
-.th-row-act { position: absolute; right: -9px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity .08s ease; }
+.th-row-act { position: absolute; right: -9px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity .08s ease; }
 .th-table .row:hover .th-row-act, .th-row-act:focus-visible { opacity: 1; pointer-events: auto; }
 .th-table .row:hover .has-act .th-when, .has-act:focus-within .th-when { visibility: hidden; }
 .th-row-act:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
@@ -176,8 +186,8 @@
 .th-table .row:not(.th-head) { cursor: pointer; }
 .tm-tab { transition: color .08s ease; }
 .tm-tab:hover { color: var(--text); }
-.th-search { transition: border-color .08s ease, color .08s ease; }
-.th-search:hover { border-color: var(--line-strong); color: var(--text-dim); }
+.th-search { transition: background-color .08s ease, color .08s ease; }
+.th-search:hover { background: var(--wash-strong); color: var(--text-dim); }
 .th-scope { padding: 0 6px; margin: 0 -6px; border-radius: var(--radius); }
 .th-scope:hover { color: var(--text); background: var(--wash); }
 .th-pop .opts > button:hover { border-color: var(--line-strong); color: var(--text); }
@@ -193,6 +203,9 @@
 .th-clear-acts { display: flex; align-items: center; gap: 14px; }
 .th-clear-key { font-size: 12.5px; color: var(--text-faint); }
 .th-clear-key kbd { font: 11px var(--mono); color: var(--text-dim); border: 1px solid var(--line); border-radius: var(--radius); padding: 1px 5px; margin-left: 4px; background: none; }
+/* A tab the filters emptied: the sentence IS the heading, so it carries the
+   gap the missing paragraph used to leave under it. */
+.th-clear-filtered h2 { margin-bottom: 22px; }
 
 /* ------------------------------------------------------------ in a browser tab */
 /* No title bar to clear in a tab, so the top inset matches the bottom one
@@ -230,21 +243,22 @@
 .th-cell-title .th-st.live { margin-right: 8px; top: 1px; }
 .th-card .m .th-st.live { margin-right: 8px; top: 0; }
 
-/* WHOSE THREADS: the faces at the right end of the tab bar (w-05ff3d1438).
-   Lit is on the page, faint is not; the row never grows past four marks. */
-.th-people { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; }
-.th-face { position: relative; display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--radius); background: none; cursor: pointer; opacity: .42; filter: grayscale(1); transition: opacity .12s ease, filter .12s ease, box-shadow .12s ease; }
-.th-face .tm-av { width: 22px; height: 22px; line-height: 20px; font-size: 8.5px; }
-.th-face:hover { opacity: .85; filter: none; }
-.th-face.on { opacity: 1; filter: none; box-shadow: 0 0 0 1px var(--text-faint); }
-.th-face:focus-visible { outline: none; box-shadow: 0 0 0 1.5px var(--accent); }
-.th-more { width: auto; min-width: 24px; padding: 0 5px; font: 500 10.5px/24px var(--mono); color: var(--text-dim); border: 1px solid var(--line); filter: none; opacity: .8; }
-.th-more:hover, .th-more.open { opacity: 1; color: var(--text); border-color: var(--line-strong); }
-.th-more.on { opacity: 1; color: var(--text); box-shadow: none; border-color: var(--text-faint); }
-.th-more-wrap { position: relative; display: inline-flex; }
+/* WHOSE THREADS: one filter at the right end of the tab bar (w-57034cf3c0).
+   Four face chips and a "+N" stood here and read as clutter; this says who in
+   words and opens the same list. */
+.th-pf-wrap { position: relative; display: inline-flex; margin-left: auto; }
+.th-pf { height: 26px; padding: 0 9px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim);
+  font: inherit; font-size: 12.5px; white-space: nowrap;
+  transition: border-color .08s ease, color .08s ease, background .08s ease; }
+.th-pf svg:first-child { width: 15px; height: 15px; color: var(--text-faint); }
+.th-pf svg:last-child { color: var(--text-faint); }
+.th-pf:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash); }
+.th-pf.open { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
+.th-pf:focus-visible { outline: none; border-color: var(--text-faint); color: var(--text); }
 .th-people-menu { left: auto; right: 0; top: 32px; }
 .th-people-menu .th-check { margin-left: auto; color: var(--text-dim); }
-/* Over the board there are no tabs, so the faces sit alone at the right. */
+/* Over the board there are no tabs, so the filter sits alone at the right. */
 .th-bar-end { justify-content: flex-end; padding-bottom: 0; }
 /* A teammate's row has no select box: nothing on this Mac can act on it. */
 .th-their-row .mark { visibility: hidden; }
