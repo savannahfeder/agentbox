@@ -20,7 +20,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hiddenWords, keeps } from '../renderer/src/threads/page-rules.ts';
+import { filteredEmptyWords, keeps } from '../renderer/src/threads/page-rules.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const src = (...p) => fs.readFileSync(path.join(here, '..', 'renderer', 'src', ...p), 'utf8');
@@ -28,25 +28,38 @@ const app = src('App.tsx');
 const pages = src('threads', 'Pages.tsx');
 
 describe('what a filtered empty tab says', () => {
-  it('names the tab and the whole number hidden, in her own words', () => {
-    expect(hiddenWords('inbox', 13)).toBe('Your filters hide all 13 threads that need you.');
+  // THE HEADING IS THE GOOD HALF AND THE NUMBER IS A LINE UNDER IT. The first
+  // cut put the whole of it in the heading, 18 point and alone on the page, and
+  // she read it as a telling-off: "This feels almost like a punishment in terms
+  // of the harsh text." One screen covers two moments, a filter left on by
+  // accident and a filter you just finished, and from here they look the same.
+  // So the heading says the half that is true and welcome in both.
+  it('leads with the half that is good news, in the shape of "Nothing needs you"', () => {
+    expect(filteredEmptyWords('inbox', 13).head).toBe('Nothing in your filter needs you');
   });
 
-  it('says it for every tab, never "Nothing needs you"', () => {
-    expect(hiddenWords('progress', 10)).toBe('Your filters hide all 10 threads in progress.');
-    expect(hiddenWords('snoozed', 3)).toBe('Your filters hide all 3 scheduled threads.');
-    expect(hiddenWords('done', 11)).toBe('Your filters hide all 11 threads you closed.');
-    expect(hiddenWords('all', 26)).toBe('Your filters hide all 26 of your threads.');
+  it('keeps the whole number, quietly, in a second line', () => {
+    expect(filteredEmptyWords('inbox', 13).line).toBe('13 more threads are behind your filters.');
   });
 
-  it('counts one thread as a thread rather than as "all 1"', () => {
-    expect(hiddenWords('inbox', 1)).toBe('Your filters hide the one thread that needs you.');
-    expect(hiddenWords('snoozed', 1)).toBe('Your filters hide the one scheduled thread.');
+  it('names every tab in its heading, and never claims the inbox itself is clear', () => {
+    expect(filteredEmptyWords('progress', 10).head).toBe('Nothing in your filter is running');
+    expect(filteredEmptyWords('snoozed', 3).head).toBe('Nothing in your filter is scheduled');
+    expect(filteredEmptyWords('done', 11).head).toBe('Nothing in your filter is closed');
+    expect(filteredEmptyWords('all', 26).head).toBe('No threads match your filter');
+    for (const tab of ['inbox', 'progress', 'snoozed', 'done', 'all']) {
+      expect(filteredEmptyWords(tab, 9).head).not.toBe('Nothing needs you');
+    }
+  });
+
+  it('counts one thread as a thread rather than as "1 more threads"', () => {
+    expect(filteredEmptyWords('inbox', 1).line).toBe('One more thread is behind your filters.');
   });
 
   it('carries no em dash, which is the one punctuation mark she rejects', () => {
     for (const tab of ['inbox', 'progress', 'snoozed', 'done', 'all']) {
-      expect(hiddenWords(tab, 4)).not.toContain('—');
+      const { head, line } = filteredEmptyWords(tab, 4);
+      expect(head + line).not.toContain('—');
     }
   });
 });
@@ -56,9 +69,22 @@ describe('the component that draws it', () => {
 
   it('exists, and offers the one button that undoes it', () => {
     expect(pages).toContain('export function FilteredEmpty');
-    expect(block).toContain('hiddenWords(');
+    expect(block).toContain('filteredEmptyWords(');
     expect(block).toContain('Clear filters');
     expect(block).toContain('onClear');
+  });
+
+  it('reads as the inbox-zero screen next door, not as a warning', () => {
+    // Same three parts and the same class as InboxClear: a heading, a quiet
+    // line, then the action. Plus the one small reward she asked for, which is
+    // a tick and not an animation: "It shouldn't be visually super
+    // stimulating, but it could be nicer than this."
+    expect(block).toContain('className="th-clear th-clear-filtered"');
+    expect(block).toContain('<ClearMark />');
+    expect(block).toContain('<h2>{head}</h2>');
+    expect(block).toContain('<p>{line}</p>');
+    expect(block.indexOf('<h2>')).toBeLessThan(block.indexOf('<p>'));
+    expect(pages).toContain('const ClearMark =');
   });
 
   it('is what an emptied tab draws, above the unfiltered empty states', () => {

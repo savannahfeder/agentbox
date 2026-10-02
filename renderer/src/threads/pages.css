@@ -203,9 +203,12 @@
 .th-clear-acts { display: flex; align-items: center; gap: 14px; }
 .th-clear-key { font-size: 12.5px; color: var(--text-faint); }
 .th-clear-key kbd { font: 11px var(--mono); color: var(--text-dim); border: 1px solid var(--line); border-radius: var(--radius); padding: 1px 5px; margin-left: 4px; background: none; }
-/* A tab the filters emptied: the sentence IS the heading, so it carries the
-   gap the missing paragraph used to leave under it. */
-.th-clear-filtered h2 { margin-bottom: 22px; }
+/* A tab the filters emptied. It reads as the inbox-zero screen next door, not
+   as a warning: a small tick, a short heading, the number quiet underneath.
+   Her note on the first cut, which put the whole sentence in the heading:
+   "This feels almost like a punishment in terms of the harsh text." */
+.th-clear-mark { display: block; color: var(--accent); opacity: .55; margin: 0 0 14px -1px; }
+.th-clear-filtered p { color: var(--text-faint); }
 
 /* ------------------------------------------------------------ in a browser tab */
 /* No title bar to clear in a tab, so the top inset matches the bottom one

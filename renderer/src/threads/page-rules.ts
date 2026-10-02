@@ -141,22 +141,35 @@ export function nextTab<T extends string>(order: readonly T[], current: string, 
 /**
  * WHAT A TAB THE FILTERS HAVE EMPTIED SAYS INSTEAD OF "NOTHING NEEDS YOU".
  *
- * "Nothing needs you" was drawn over a tab still reading 13, because a filter
- * had emptied the page, and a forgotten filter reads as an empty inbox when
- * there is a pile of work behind it. So the whole number is in the sentence,
- * and the tab is named in plain words rather than by its label, which would
- * read as a heading.
+ * Her report with a screenshot: "It says Nothing needs you, but that's not
+ * correct because it literally says needs you 13... if you're accidentally on a
+ * filter, you can think there's no work for you when there's actually a ton."
+ *
+ * IT IS TWO SENTENCES, NOT ONE (her second note, 2026-10-01). The first cut of
+ * this put the whole of it in the heading: "Your filters hide all 37 threads
+ * that need you", 18 point, as the only thing on the page. She read it as
+ * telling her off. "It's also nice to be finished with the inbox tasks in your
+ * filter. This doesn't really give us a feeling of any reward... This feels
+ * almost like a punishment in terms of the harsh text."
+ *
+ * She is right, and the reason is that one screen covers two moments. You left
+ * a filter on by accident, or you just finished everything in it, and from the
+ * app's side those look identical. So the heading says the half that is true of
+ * both and is good news in either, in the same shape as "Nothing needs you"
+ * next door, and the number moves into a quiet line under it where it informs
+ * rather than accuses.
  */
-export function hiddenWords(view: TabName | string, hidden: number): string {
-  const one = hidden === 1;
-  const n = one ? 'the one thread' : `all ${hidden} threads`;
-  switch (view) {
-    case 'progress': return `Your filters hide ${n} in progress.`;
-    case 'snoozed': return one ? 'Your filters hide the one scheduled thread.' : `Your filters hide all ${hidden} scheduled threads.`;
-    case 'done': return `Your filters hide ${n} you closed.`;
-    case 'all': return one ? 'Your filters hide your one thread.' : `Your filters hide all ${hidden} of your threads.`;
-    default: return `Your filters hide ${n} that need${one ? 's' : ''} you.`;
-  }
+export function filteredEmptyWords(view: TabName | string, hidden: number): { head: string; line: string } {
+  const head = {
+    progress: 'Nothing in your filter is running',
+    snoozed: 'Nothing in your filter is scheduled',
+    done: 'Nothing in your filter is closed',
+    all: 'No threads match your filter',
+  }[view as string] ?? 'Nothing in your filter needs you';
+  const line = hidden === 1
+    ? 'One more thread is behind your filters.'
+    : `${hidden} more threads are behind your filters.`;
+  return { head, line };
 }
 
 /**

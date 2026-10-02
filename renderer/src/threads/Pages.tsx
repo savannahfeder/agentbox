@@ -13,7 +13,7 @@ import { PriorityIcon } from '../components/Priority';
 import { rowTitle } from '../list-rules';
 import { DONE } from '../done-word';
 import {
-  BOARD_COLUMNS, hiddenWords, isDirect, isFiltered, projectChoices, sortedEntries, teamEntries, teamKeeps, updatedWords,
+  BOARD_COLUMNS, filteredEmptyWords, isDirect, isFiltered, projectChoices, sortedEntries, teamEntries, teamKeeps, updatedWords,
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
@@ -246,13 +246,22 @@ export function InboxClear({ running, scheduled, onView, onCompose }: {
  * jump when the filter comes off and the rows arrive.
  */
 export function FilteredEmpty({ view, hidden, onClear }: { view: TabView; hidden: number; onClear: () => void }) {
+  const { head, line } = filteredEmptyWords(view, hidden);
   return <div className="th-clear th-clear-filtered">
-    <h2>{hiddenWords(view, hidden)}</h2>
+    <ClearMark />
+    <h2>{head}</h2>
+    <p>{line}</p>
     <div className="th-clear-acts">
       <button type="button" className="th-new" onClick={onClear}>Clear filters</button>
     </div>
   </div>;
 }
+
+/** THE ONE QUIET REWARD ON THIS PAGE. Her words: it "shouldn't be visually
+ *  super stimulating, but it could be nicer than this". So: a small tick, the
+ *  accent at half strength, one line of space above the heading. It says this
+ *  view is clear, which is true whether you cleared it or never filled it. */
+const ClearMark = () => <svg className="th-clear-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="square" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5" /></svg>;
 
 /** The other tabs, empty: one quiet line where the rows would be. */
 export function EmptyTab({ view }: { view: TabView }) {
