@@ -1,9 +1,9 @@
 // TAB MOVES ALONG THE STATE TABS, AND SHIFT-TAB BACK.
 //
-// Her words, 2026-10-01: "When I'm on the main inbox screen, hitting Tab would
-// cycle through the different states: Needs you, Running, Scheduled, Done,
-// All." Tab had been handed to the browser since 2026-09-14, so it walked DOM
-// focus around the page and painted a ring on whatever it landed on.
+// Asked for 2026-10-01: on the main threads page, Tab cycles the states, Needs
+// you, In progress, Scheduled, Done, All. Tab had been handed to the browser
+// since 2026-09-14, so it walked DOM focus around the page and painted a ring
+// on whatever it landed on.
 //
 // The rotation is the list the tab bar is actually drawing (INBOX_TABS), not a
 // second list written out in the key handler: that is the fault this repo has

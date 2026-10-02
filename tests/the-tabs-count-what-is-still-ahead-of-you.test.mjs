@@ -1,10 +1,10 @@
 // A TAB CARRIES A NUMBER ONLY WHERE THE NUMBER CHANGES WHAT YOU DO.
 //
-// The strip read WAITING 10, IN PROGRESS 16, SCHEDULED 4, DONE 1036, ALL 31 on
-// a real inbox on 2026-10-01, and it was not liked. Done 1036 is the archive
-// counting itself: it is the same four digits every day, it is never anything
-// to act on, and it was the widest thing on the row. All 31 is the other three
-// added up, which nobody needs read back to them.
+// Reviewed 2026-10-01 on a store of 1070 threads, where the strip read WAITING
+// 10, IN PROGRESS 16, SCHEDULED 4, DONE 1036, ALL 31. Done 1036 is the archive
+// counting itself: the same four digits every day, never anything to act on,
+// and the widest thing on the row. All 31 is the other three added up, which
+// nobody needs read back to them.
 //
 // So the number stays on the three tabs that are still ahead of you, Waiting,
 // In progress and Scheduled, and only while there is something in them. Done

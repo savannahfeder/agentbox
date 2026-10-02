@@ -233,10 +233,10 @@ export function InboxClear({ running, scheduled, onView, onCompose }: {
 /**
  * A TAB THAT IS ONLY EMPTY BECAUSE OF A FILTER (w-5a08121f99).
  *
- * Her report with a screenshot, 2026-10-01: "It says Nothing needs you, but
- * that's not correct because it literally says needs you 13... if you're
- * accidentally on a filter, you can think there's no work for you when there's
- * actually a ton." Three filters live behind one icon, they are remembered
+ * "Nothing needs you" was drawn over a tab still reading 13, because a filter
+ * had emptied the page. Somebody who has forgotten a filter is on reads that as
+ * an empty inbox when there is a pile of work behind it. Three filters live
+ * behind one icon, they are remembered
  * between launches, and the page was reporting their work as her own inbox
  * being clear.
  *

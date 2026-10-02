@@ -1967,10 +1967,9 @@ export default function App() {
     : undefined;
   // EACH TAB'S NUMBER COUNTS WHAT THE FILTERS SHOW (w-5a08121f99). It counted
   // the whole tab, so a filter that had emptied Needs you left the tab saying
-  // 13 over a page saying "Nothing needs you". Her words: "that's not correct
-  // because it literally says needs you 13". A tab's number is a promise about
-  // what clicking it shows, and the number she is missing is said in full by
-  // the empty state and by the Display menu's own "Showing 4 of 7".
+  // 13 over a page saying "Nothing needs you". A tab's number is a promise
+  // about what clicking it shows, and the number a filter is holding back is
+  // said in full by the empty state and by the Display menu's "Showing 4 of 7".
   const shownCount = useCallback((rows: WorkItem[]) => rows.filter(
     (i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now),
   ).length, [inboxDisplay, now]);
@@ -3771,10 +3770,9 @@ export default function App() {
         window.dispatchEvent(new Event('task-terminal-toggle'));
         return;
       }
-      // TAB MOVES ALONG THE STATE TABS (her words, 2026-10-01: "When I'm on the
-      // main inbox screen, hitting Tab would cycle through the different
-      // states: Needs you, Running, Scheduled, Done, All"). Shift-Tab goes back,
-      // and both wrap.
+      // TAB MOVES ALONG THE STATE TABS: on the threads page it cycles Needs
+      // you, In progress, Scheduled, Done and All. Shift-Tab goes back, and
+      // both wrap.
       //
       // ONLY WHERE THOSE TABS ARE ON THE SCREEN WITH NOTHING OVER THEM: not
       // from inside a field, not with a card or a menu open, not on an opened

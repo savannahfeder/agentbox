@@ -1,14 +1,13 @@
 // AN EMPTY TAB THAT IS ONLY EMPTY BECAUSE OF A FILTER HAS TO SAY SO.
 //
-// Her report, 2026-10-01, with a screenshot: "It says Nothing needs you, but
-// that's not correct because it literally says needs you 13... if you're
-// accidentally on a filter, you can think there's no work for you when there's
-// actually a ton."
+// Reported 2026-10-01: the page drew "Nothing needs you" over a tab that still
+// read 13, because a filter had emptied it. Somebody who has forgotten a filter
+// is on reads that as an empty inbox when there is a pile of work behind it.
 //
 // Two things were wrong at once and both are fixed here.
 //
-//   THE PAGE LIED. "Nothing needs you" is a statement about her inbox, and the
-//   page said it about her filter. It is now kept for an inbox that is really
+//   THE PAGE LIED. "Nothing needs you" is a statement about the inbox, and the
+//   page said it about a filter. It is now kept for an inbox that is really
 //   clear; a filter that has emptied the tab says what it is hiding and offers
 //   one button to undo it.
 //

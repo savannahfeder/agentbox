@@ -1,17 +1,16 @@
-// FORTY PROJECTS IS A WALL OF CHIPS, SO THE FILTER SHOWS THE EIGHT SHE USES.
+// FORTY PROJECTS IS A WALL OF CHIPS, SO THE FILTER SHOWS THE EIGHT IN USE.
 //
-// Measured off her own screenshot of the Display menu (2026-10-01): 37 project
-// chips in nine rows, taller than the rest of the menu put together, with
-// Keystone and Mithril and three things called Daydream sitting at the same
-// size as the project she had open. Her words: the menu "becomes a wall".
+// Measured on a store with about forty projects (2026-10-01): the Display menu
+// drew 37 project chips in nine rows, taller than the rest of the menu put
+// together, every one the same size as the project actually open.
 //
 // So: the projects with the most recent threads first, eight of them, and
 // "Show all 40" underneath. And an explicit "All projects" choice that is lit
 // when nothing is picked, because "nothing selected means everything" was
-// something she had to discover by clicking a chip and watching the list grow.
+// otherwise something to discover by clicking a chip and watching the list grow.
 //
-// A PICKED PROJECT IS NEVER BEHIND "SHOW ALL". She can pick one, close the
-// menu, and open it an hour later; a chip that is on and out of sight is the
+// A PICKED PROJECT IS NEVER BEHIND "SHOW ALL". One can be picked, the menu
+// closed, and opened an hour later; a chip that is on and out of sight is the
 // same silent filter this work item exists to stop.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';

@@ -1,17 +1,16 @@
 // SORT BY PRIORITY HAD TO ACTUALLY SORT BY PRIORITY.
 //
-// Her words with a screenshot of her own board, 2026-10-01: "In any of the
-// sections, it should be sorted by priority, but based on my screenshot, it's
-// not." The Display menu said Priority, and the columns ran Medium, Low, High,
-// Medium, High.
+// Reported 2026-10-01: the Display menu said Priority and the board's columns
+// ran Medium, Low, High, Medium, High. A section that promises priority order
+// has to be in one.
 //
 // Two reasons, both here:
 //
 //   `sorted` DID NOTHING ON PRIORITY. It sorted on Updated and returned the
 //   rows untouched otherwise, trusting "the app's own ranking". That ranking is
-//   `byRunningOrder(score)`, where a product's place in her running order is
-//   worth a hundred item points, so an Urgent thread in her fourth project sits
-//   under a Low one in her first. That is the right order for the fleet picking
+//   `byRunningOrder(score)`, where a product's place in the running order is
+//   worth a hundred item points, so an Urgent thread in the fourth project sits
+//   under a Low one in the first. That is the right order for the fleet picking
 //   what to run next. It is not what the word Priority on a menu promises.
 //
 //   THE BOARD NEVER ASKED. `teamEntries` ended on `b.updatedAt - a.updatedAt`

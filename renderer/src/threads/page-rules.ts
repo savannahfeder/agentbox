@@ -65,9 +65,8 @@ export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>
 }
 
 // URGENT, HIGH, MEDIUM, LOW, newest first inside a level. One comparator, read
-// by the list and by every column of the board, because her report was that
-// they disagreed (w-5a08121f99: "In any of the sections, it should be sorted by
-// priority, but based on my screenshot, it's not").
+// by the list and by every column of the board, because the two disagreed: a
+// section promising priority order was not in one (w-5a08121f99).
 const RANK: Record<PriorityId, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
 const byPriority = (a: Ranked, b: Ranked) =>
   RANK[priorityIdOf(a.priority)] - RANK[priorityIdOf(b.priority)] || b.updatedAt - a.updatedAt;
@@ -83,8 +82,8 @@ const order = (d: Display) => (d.sort === 'updated' ? byUpdated : byPriority);
  * arrived in the app's own ranking. That ranking is `byRunningOrder(score)` in
  * App.tsx, where a product's place in her running order is worth a hundred item
  * points: it is the order the fleet takes work in, and it is not what the word
- * Priority on a menu promises. She filed a screenshot of a board running
- * Medium, Low, High, Medium.
+ * Priority on a menu promises. A board was reported running Medium, Low, High,
+ * Medium under that heading.
  *
  * The two rows the app makes itself stay at the top of either sort. They belong
  * to no project (`product` is empty, trouble-row.ts and update-row.ts) because
@@ -108,8 +107,7 @@ export function sortedEntries(entries: BoardEntry[], d: Display): BoardEntry[] {
 export type TabName = 'inbox' | 'progress' | 'snoozed' | 'done' | 'all';
 
 /**
- * WHERE A PRESS OF TAB LANDS (her words, 2026-10-01: "When I'm on the main
- * inbox screen, hitting Tab would cycle through the different states").
+ * WHERE A PRESS OF TAB LANDS: on the threads page, Tab cycles the states.
  *
  * `order` is handed in rather than written down here, so there is one list of
  * tabs and it is the one the bar is drawing (INBOX_TABS in Pages.tsx). A second
@@ -130,11 +128,11 @@ export function nextTab<T extends string>(order: readonly T[], current: string, 
 /**
  * WHAT A TAB THE FILTERS HAVE EMPTIED SAYS INSTEAD OF "NOTHING NEEDS YOU".
  *
- * Her report with a screenshot: "It says Nothing needs you, but that's not
- * correct because it literally says needs you 13... if you're accidentally on a
- * filter, you can think there's no work for you when there's actually a ton."
- * So the whole number is in the sentence, and the tab is named in the words she
- * would use for it rather than by its label, which would read as a heading.
+ * "Nothing needs you" was drawn over a tab still reading 13, because a filter
+ * had emptied the page, and a forgotten filter reads as an empty inbox when
+ * there is a pile of work behind it. So the whole number is in the sentence,
+ * and the tab is named in plain words rather than by its label, which would
+ * read as a heading.
  */
 export function hiddenWords(view: TabName | string, hidden: number): string {
   const one = hidden === 1;
@@ -151,9 +149,9 @@ export function hiddenWords(view: TabName | string, hidden: number): string {
 /**
  * THE PROJECTS THE DISPLAY MENU OFFERS, MOST RECENTLY USED FIRST.
  *
- * She has about forty. Measured off her own screenshot (2026-10-01): 37 chips
- * in nine rows, taller than the rest of the menu put together. So eight, ranked
- * by the newest thread in each, and the rest behind one button.
+ * A store with about forty projects drew 37 chips in nine rows, taller than the
+ * rest of the menu put together. So eight, ranked by the newest thread in each,
+ * and the rest behind one button.
  *
  * A PICKED PROJECT IS NEVER IN `rest`. A chip that is on and out of sight is
  * the same silent filter the honest empty state exists to stop.
