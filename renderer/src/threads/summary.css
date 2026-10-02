@@ -108,11 +108,12 @@
 
 /* THE THREAD'S NAME, the row's own (list-rules.ts rowTitle), under the
    hairline and directly over the three lines, so the words read as one block
-   (w-b38e975e2c). Light at 16px, her pick from full-window shots of 16 to
-   24px: the weight sets it apart from the lines under it, not the size.
+   (w-b38e975e2c). 16px, her pick from full-window shots of 16 to 24px: the
+   weight sets it apart from the lines under it, not the size. Medium since
+   w-5391bb330f, picked from 300 to 600 in Dark; light read too thin.
    Three lines at most; the conversation beside it has the rest. Read-only,
    so it answers no hover. */
-.ts-title { margin: 0 0 20px; font-size: 16px; font-weight: 300; line-height: 22px; letter-spacing: -.01em; color: var(--text); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ts-title { margin: 0 0 20px; font-size: 16px; font-weight: 500; line-height: 22px; letter-spacing: -.01em; color: var(--text); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 .ts-props { display: grid; grid-template-columns: 92px minmax(0, 1fr); row-gap: 14px; font-size: 13.5px; line-height: 20px; margin: 0 0 26px; }
 .ts-label { color: var(--text-faint); font-size: 13px; }
