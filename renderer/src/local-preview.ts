@@ -48,7 +48,7 @@ export type LocalStatus = {
   clock: string;
 };
 
-function clockOf(ms: number): string {
+export function clockOf(ms: number): string {
   const s = Math.floor(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
@@ -61,10 +61,22 @@ export function previewStatus(phase: LocalPreviewPhase, url: string, waitedMs: n
     return { state: 'down', label: 'Not running', host, detail: 'Nothing is answering here. It opens by itself once the app starts.', retry: true, clock };
   }
   if (waitedMs >= SLOW_AFTER_MS) {
-    return { state: 'slow', label: 'Still connecting', host, detail: 'It is slow to answer. This keeps trying.', retry: true, clock };
+    return { state: 'slow', label: 'Still trying', host, detail: 'It is slow to answer. This keeps trying.', retry: true, clock };
   }
   if (waitedMs >= WORDS_AFTER_MS) return { state: 'connecting', label: 'Connecting', host, detail: 'Waiting for the app to answer.', retry: false, clock };
   return null;
+}
+
+/**
+ * Whether the wait clock keeps counting. It runs for as long as she is
+ * waiting, because a clock stuck at 0:08 on a long wait says nothing. It stops
+ * once nothing is there (that state has no clock), and a minute after the app
+ * answered, by which point the frame has drawn and the status is long gone, so
+ * an open pane is not redrawn twice a second for as long as it stays open.
+ */
+export function clockKeepsRunning(phase: LocalPreviewPhase, waitedMs: number): boolean {
+  if (phase === 'down') return false;
+  return phase !== 'up' || waitedMs < 60_000;
 }
 
 /** The frame is shown only once it has loaded AND the address has answered. */
@@ -99,7 +111,7 @@ export function useLocalPreview(url: string | null) {
       const tick = () => {
         const waited = Date.now() - started;
         setWaited(waited);
-        if (live && waited < SLOW_AFTER_MS) clock = setTimeout(tick, 500);
+        if (live && clockKeepsRunning(phaseRef.current, waited)) clock = setTimeout(tick, 500);
       };
       clock = setTimeout(tick, 500);
     };
@@ -112,7 +124,7 @@ export function useLocalPreview(url: string | null) {
       // An app that has just started gets a fresh frame, because the one
       // mounted while it was down holds an error page, and a fresh wait, so
       // it is not called slow for the time it spent not running.
-      if (phaseRef.current === 'down' && next !== 'down') { setAttempt((n) => n + 1); startClock(); }
+      if (phaseRef.current === 'down' && next !== 'down') { setAttempt((n) => n + 1); phaseRef.current = next; startClock(); }
       phaseRef.current = next;
       setPhase(next);
       if (next !== 'up') timer = setTimeout(check, RECHECK_MS);

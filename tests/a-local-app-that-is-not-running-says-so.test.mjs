@@ -12,7 +12,7 @@
 // the app opens by itself the moment it starts.
 import {it,expect,vi} from 'vitest';
 import fs from 'node:fs';
-import {probeLocalPreview,previewStatus,previewShows,WORDS_AFTER_MS,SLOW_AFTER_MS} from '../renderer/src/local-preview';
+import {probeLocalPreview,previewStatus,previewShows,clockKeepsRunning,WORDS_AFTER_MS,SLOW_AFTER_MS} from '../renderer/src/local-preview';
 
 it('calls an address up when anything answers it, even a page it cannot read',async()=>{
  const fetchFn=vi.fn(async()=>({type:'opaque',status:0}));
@@ -57,6 +57,19 @@ it('says it is still trying, and offers Try again, once the wait is long',()=>{
  expect(previewStatus('checking','http://localhost:3300/',75_000).clock).toBe('1:15');
 });
 
+// The first build stopped its clock at eight seconds, so a long wait sat on
+// 0:08 forever. The long wait is the case this whole change is for.
+it('keeps the wait clock counting for as long as it is still trying',()=>{
+ for(const t of [SLOW_AFTER_MS,30_000,10*60_000]) {
+  expect(clockKeepsRunning('checking',t)).toBe(true);
+  expect(clockKeepsRunning('slow',t)).toBe(true);
+ }
+ expect(clockKeepsRunning('up',SLOW_AFTER_MS)).toBe(true);
+ // Stops where there is nothing left to time.
+ expect(clockKeepsRunning('down',0)).toBe(false);
+ expect(clockKeepsRunning('up',60_000)).toBe(false);
+});
+
 it('says plainly when nothing is running there, at once, with a way to try again',()=>{
  const s=previewStatus('down','http://localhost:3300/',0);
  expect(s.state).toBe('down');
@@ -89,6 +102,18 @@ it('wires the check into the pane, drops the frame while nothing answers, and of
  expect(pane).toContain('<LocalPreviewStatus status={liveStatus} onRetry={app.retry} />');
  const view=fs.readFileSync(new URL('../renderer/src/components/LocalPreviewStatus.tsx',import.meta.url),'utf8');
  expect(view).toContain('Try again');
+});
+
+// Three looks were drawn and one was picked, the log. The other two and the
+// switch between them come out, because anything still switchable is a choice
+// someone has to make again.
+it('draws only the picked look, a short log, with no switch left between looks',()=>{
+ const view=fs.readFileSync(new URL('../renderer/src/components/LocalPreviewStatus.tsx',import.meta.url),'utf8');
+ expect(view).toContain('local-status-log');
+ expect(view).not.toContain('data-look');
+ expect(view).not.toContain('localStorage');
+ const css=fs.readFileSync(new URL('../renderer/src/workspace-navigation.css',import.meta.url),'utf8');
+ expect(css).not.toMatch(/local-status\[data-look/);
 });
 
 it('leaves design files on the quiet skeleton, with no words added to it',()=>{
