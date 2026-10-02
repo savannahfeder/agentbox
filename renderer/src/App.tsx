@@ -472,12 +472,13 @@ export default function App() {
   // THE TEAM PAGE, a page like Settings: it takes the main area and leaves the
   // header and the sidebar where they are.
   const [teamOpen, setTeamOpen] = useState(() => new URLSearchParams(location.search).has('team'));
-  // TEAM MEMBERS AND INVITING, from the foot of the sidebar: the team's setup page.
-  const [membersOpen, setMembersOpen] = useState(false);
   // A TEAMMATE'S THREAD, opened from the Team board: its card, never its conversation.
   const [openCard, setOpenCard] = useState<ThreadCard | null>(null);
-  // Invite people and Team members open the same page; this says which, so the
-  // sidebar lights the one pressed and Invite puts the cursor in the email box.
+  // THERE IS NO MEMBERS PAGE ANY MORE (w-8415594d19, 2026-10-01). Team
+  // management is a pane in Settings, so the sidebar's two team rows are one
+  // row that opens it. This is all that is left of them: whether the email box
+  // on that pane takes the cursor, which is what makes Invite people a
+  // shortcut rather than another way to reach Settings.
   const [inviteFocus, setInviteFocus] = useState(false);
   // WHAT THE COMPOSER OPENS WITH, when something hands it a start: "Hand it to
   // an agent" on a message from a person turns that message into a thread.
@@ -1984,7 +1985,7 @@ export default function App() {
   );
   const mixedRows = useMemo(() => (withOthers ? mergeRows(displayedBox, theirRows, inboxDisplay.sort) : null), [withOthers, displayedBox, theirRows, inboxDisplay.sort]);
   // A teammate's thread opens as their card, over the page, and Back returns here.
-  const openTeammateCard = useCallback((card: ThreadCard) => { setMembersOpen(false); setOpenCard(card); setTeamOpen(true); }, []);
+  const openTeammateCard = useCallback((card: ThreadCard) => { setOpenCard(card); setTeamOpen(true); }, []);
   const personCell = useCallback((id: string | null) => {
     const p = id ? team?.byId.get(id) ?? null : null;
     return <><Face person={p} me={id === team?.me} />{id === team?.me ? 'You' : firstName(p)}</>;
@@ -4440,10 +4441,17 @@ export default function App() {
        */}
       {reviewLab && <div className="review-lab-controls"><span>Review exploration</span><select aria-label="Focus controls" value={focusControlStyle} onChange={e=>setFocusControlStyle(e.target.value as FocusControlStyle)}><option value="text">Focus · Text only</option><option value="corners">Focus · Frame corners + label</option><option value="corners-icon">Focus · Frame corners button</option><option value="corners-bare">Focus · Bare frame corners</option><option value="layout">Focus · Workspace layout</option></select><select aria-label="Review file type" value={artifactPreviewSample} onChange={e=>{setArtifactPreviewSample(e.target.value);setOpenDoc(null);}}><option value="code">Code</option><option value="design">Design</option><option value="notes">Text</option><option value="multiple">All three</option></select><select aria-label="Review actions" value={reviewStyle} onChange={e=>setReviewStyle(e.target.value)}><option value="header-balanced-open">1 · Balanced · open only</option><option value="header-tools-open">2 · Compact · open only</option><option value="header-card-only">3 · Clickable card · no controls</option><option value="header-feedback-only">4 · Clickable card · feedback tools</option><option value="header-balanced">Compare · all controls</option></select>{artifactPreviewSample !== "code" &&<select aria-label="Text surface" value={textReviewStyle} onChange={e=>setTextReviewStyle(e.target.value)}><option value="clear">Text · Fully transparent</option><option value="glass">Text · Matched glass</option></select>}</div>}
       {!reviewLab && api.isFixtures && new URLSearchParams(location.search).has('artifactTweaks') && <div className="artifact-tweaks"><select aria-label="Design toolbar" value={designToolbar} onChange={e => setDesignToolbar(e.target.value)}><option value="floating">Floating bar</option><option value="corner">Corner controls</option><option value="edge">Top edge</option><option value="always">Always visible</option></select>{focused && <select aria-label="Sample artifact" value={artifactPreviewSample} onChange={e => { setArtifactPreviewSample(e.target.value); setOpenDoc(null); }}><option value="multiple">Multiple artifacts</option><option value="design">Design sample</option><option value="code">Code sample</option><option value="notes">Notes sample</option></select>}</div>}
-      {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? 'settings' : teamShown && membersOpen ? (inviteFocus ? 'invite' : 'members') : null} teamPage={teamOpen && !settingsOpen && !membersOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
-        onInvite={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setInviteFocus(true); setMembersOpen(true); setTeamOpen(true); }}
-        onMembers={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setInviteFocus(false); setMembersOpen(true); setTeamOpen(true); }}
-        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setMembersOpen(false); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setMembersOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
+      {/* INVITE PEOPLE IS A SHORTCUT INTO SETTINGS (w-8415594d19, 2026-10-01).
+          Her words: "Team management should be a page in Settings, and this
+          should route to that as a shortcut." So the sidebar lights Invite
+          people, not Settings, while that pane is the one up. The rule is that
+          the lit row names the pane you are on, which is why a project page
+          lights Settings (`settingsPage` reports `projects` for it) and the
+          team pane lights its own shortcut. */}
+      {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? (settingsPage === 'team' ? 'invite' : 'settings') : null} teamPage={teamOpen && !settingsOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
+        onInvite={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsOpen(true); }}
+        onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsOpen(true); }}
+        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
           only part of our own document lying over the file, so a pointer
           brought up there wakes the marks that a pointer moving across the
@@ -4534,7 +4542,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">{membersOpen ? 'Team members' : openCard ? 'Threads' : 'Team'}</h1> : <h1 className="workspace-title">Threads</h1>)) : (
+        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">{openCard ? 'Threads' : 'Team'}</h1> : <h1 className="workspace-title">Threads</h1>)) : (
         <nav
           className="tabs"
           /* NO HINT ON THIS NAV. It carried one while the keys were ⌘⌥ and an
@@ -4835,9 +4843,9 @@ export default function App() {
             {/* THE TEAM BOARD IS GONE (w-05ff3d1438): its people are on the
                 Inbox, picked by the faces in its tab bar. What is left here is
                 a teammate's thread opened from the Inbox, and, until you are
-                signed in and on a team, or on Team members or Invite people,
-                the setup page. */}
-            {snap?.team?.signedIn && snap.team.team && !membersOpen && openCard ? (
+                signed in and on a team, the sign-in page. Managing the team
+                moved into Settings (w-8415594d19). */}
+            {snap?.team?.signedIn && snap.team.team && openCard ? (
               <div className="tm-team-pane th-pane">
                 {openCard && (
                   /* A TEAMMATE'S THREAD (approved round 9): one card with the
@@ -4862,7 +4870,7 @@ export default function App() {
                 )}
               </div>
             ) : (
-              <TeamPage team={snap?.team} products={snap?.products ?? []} inviteFocus={inviteFocus} />
+              <TeamPage team={snap?.team} />
             )}
           </main>
         </div>
@@ -5631,7 +5639,12 @@ export default function App() {
             await (window.zero as any)?.setProductOrder?.({ order: slugs });
             await refresh();
           }}
-          onClose={() => { setSettingsOpen(false); setSettingsPane(null); }}
+          /* TEAM MANAGEMENT, handed to Settings rather than imported by it
+             (w-8415594d19): the Settings screen is shared with the build that
+             has no team in it, and this keeps the team's code in the team's
+             files. No team cloud, no pane and no Team row. */
+          teamPane={snap?.team?.configured ? <TeamPage team={snap?.team} inviteFocus={inviteFocus} /> : undefined}
+          onClose={() => { setSettingsOpen(false); setSettingsPane(null); setSettingsPage(null); }}
         />
       )}
       {/* HER CLAUDE CODE AGENTS, BROUGHT IN FROM ⌘K (w-7fd38422b5).

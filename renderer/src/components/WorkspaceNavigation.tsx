@@ -38,7 +38,7 @@ import { AppMark } from './AppMark';
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onMembers }: {
+export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount }: {
   page?: string | null; inboxCount?: number; scheduledCount?: number; usage?: ReactNode; onSettings?: () => void; onInstructions?: () => void;
   // THE TEAM TAB. No people and no counts here: approved 2026-09-30, a list of
   // who is busy is not worth seeing all the time, and the Team page is where
@@ -46,9 +46,16 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   hasTeam?: boolean; onTeam?: () => void;
   // Whether the Team page is up, which lights its tab and darkens the others.
   teamPage?: boolean;
-  // THE FOOT OF THE SIDEBAR (approved 2026-10-01): invite people, the team's
-  // members, settings, and you, all in the sidebar rather than on a page.
-  team?: TeamState | null; onInvite?: () => void; onMembers?: () => void;
+  // THE FOOT OF THE SIDEBAR (approved 2026-10-01): invite people, settings,
+  // and you, all in the sidebar rather than on a page.
+  //
+  // TEAM MEMBERS LEFT IT ON 2026-10-01 16:35, her words: "getting rid of the
+  // team members page in the sidebar and only leaving Invite People. Team
+  // management should be a page in Settings, and this should route to that as
+  // a shortcut." So the two team rows were one door twice. `onInvite` is that
+  // shortcut and `onAccount` is your own row, which opens the same Settings
+  // pane without the cursor in the email box.
+  team?: TeamState | null; onInvite?: () => void; onAccount?: () => void;
   view: View; collapsed: boolean; onToggle: () => void; onView: (view: View) => void; onSearch: () => void; onCompose: () => void;
 }) {
   // The Team page is a page like Settings: while it is up no list tab is lit.
@@ -95,7 +102,6 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
             invite page and team settings must always be reachable). With no
             team yet, both open the page that starts one. */}
         {me && onInvite && <button aria-label="Invite people" aria-current={page === 'invite' ? 'page' : undefined} title={collapsed ? 'Invite people' : undefined} onClick={onInvite}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="10" cy="8.5" r="3.5"/><path d="M3.5 20c.7-3.4 3.3-5.3 6.5-5.3 1.4 0 2.6.3 3.7.9"/><path d="M18 14v6M15 17h6"/></svg><span>Invite people</span></button>}
-        {me && onMembers && <button aria-label="Team members" aria-current={page === 'members' ? 'page' : undefined} title={collapsed ? 'Team members' : undefined} onClick={onMembers}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/><circle cx="9.5" cy="11" r="2.2"/><path d="M5.8 16.5c.5-1.6 1.9-2.5 3.7-2.5s3.2.9 3.7 2.5M15 10h3M15 13h3"/></svg><span>Team members</span></button>}
         {onInstructions && <button aria-label="Instructions" aria-current={page === 'instructions' ? 'page' : undefined} title="Instructions for every agent" onClick={onInstructions}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 16h6"/></svg><span>Instructions</span></button>}
         {onSettings && <button aria-label="Settings" aria-current={page === 'settings' ? 'page' : undefined} title="Settings" onClick={onSettings}><SettingsIcon/><span>Settings</span></button>}
       </div>
@@ -103,8 +109,8 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
       <div className="th-me">
         {/* Your own row opens the page with your account on it, so clicking
             your own name always does something. */}
-        {me ? (onMembers
-          ? <button type="button" className="th-me-btn" aria-label="Your account" title={collapsed ? 'Your account' : undefined} onClick={onMembers}><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></button>
+        {me ? (onAccount
+          ? <button type="button" className="th-me-btn" aria-label="Your account" title={collapsed ? 'Your account' : undefined} onClick={onAccount}><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></button>
           : <><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></>)
           : team?.configured && onTeam ? <button type="button" className="th-me-signin" aria-label="Sign in to your team" onClick={onTeam}>Sign in to your team</button>
             : <span />}

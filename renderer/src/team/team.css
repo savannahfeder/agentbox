@@ -118,6 +118,13 @@ img.tm-av { background: var(--bg-selected); }
 
 /* signing in, starting a team, inviting, and sharing projects */
 .tm-setup { padding: 28px var(--row-r) 40px var(--text-x); max-width: 640px; }
+/* INSIDE SETTINGS (w-8415594d19) the pane is already a column with a width and
+   a margin of its own, so the page's own padding only pushed every field 32px
+   right of the title above it. One indent, not two. */
+.set-pane .tm-setup { padding: 0; max-width: none; }
+/* The lede above it is the pane's, so the first row needs the air the page's
+   own top padding used to give it. */
+.set-pane .tm-setup > :first-child { margin-top: 10px; }
 .tm-setup h2 { margin: 0 0 6px; font-size: 18px; line-height: 24px; font-weight: 400; letter-spacing: -.02em; color: var(--text); }
 .tm-setup p { margin: 0 0 18px; color: var(--text-faint); font-size: 13.5px; line-height: 20px; }
 .tm-setup .tm-error { color: var(--accent); }

@@ -17,6 +17,7 @@
 // failure a settings screen can have.
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel } from '../types';
 import { api, RESTART_NOTE } from '../api';
 import { InstructionSettings, sizeLabel } from './InstructionSettings';
@@ -43,7 +44,14 @@ import type { Product } from '../types';
 */
 // 'agents' is gone from this union with the pane itself; the name is still
 // accepted at the door above and resolves to 'general'.
-type Pane = 'instructions' | 'general' | 'appearance' | 'shortcuts' | 'projects' | { project: string };
+/* * TEAM IS A PANE HERE NOW (w-8415594d19, 2026-10-01), her words: "Team
+ management should be a page in Settings". The sidebar used to carry a Team
+ members page of its own beside Invite people, which was the same door twice.
+ The pane's CONTENT is handed in as `teamPane` rather than imported, so this
+ screen, which is shared with the single-person build, keeps no team code and
+ the two codebases stay easy to compare. No pane handed in, no row.
+*/
+type Pane = 'instructions' | 'general' | 'appearance' | 'shortcuts' | 'projects' | 'team' | { project: string };
 
 const paneKey = (p: Pane) => (typeof p === 'string' ? p : `project:${p.project}`);
 
@@ -1112,7 +1120,7 @@ function ProjectTitle({ project, onRename }: {
 // agents work them, each row the door to that project's own page. It replaced
 // a plain index here and a separate Priority page (w-a514b58055).
 
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, onClose }: {
+export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, onClose }: {
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
@@ -1144,6 +1152,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // (App's `rankedProducts`), and the write. Absent means no Priority row.
   ranked?: Product[];
   onSetOrder?: (slugs: string[]) => void | Promise<void>;
+  /** Team management, handed in by whoever has the team's state. Absent on a
+   *  build with no team cloud, and then there is no Team row either. */
+  teamPane?: ReactNode;
   onClose: () => void;
 }) {
   const [model, setModel] = useState<SettingsModel | null>(null);
@@ -1158,6 +1169,10 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
     // Priority was its own page for a round and is now the Projects page itself
     // (w-a514b58055), so the old name opens the page its content went to.
     if (want === 'priority') return 'projects';
+    // ?settings=team, and the Invite people shortcut in the sidebar foot. On a
+    // build with no team cloud there is nothing to draw, so it lands on
+    // General rather than on an empty screen.
+    if (want === 'team') return teamPane ? 'team' : 'general';
     // The page moved into Agents, so the old name lands where its content went.
     // ?settings=accounts still opens the account rows, wherever they live.). An
     // old link is not somebody's mistake. AND AGENTS ITSELF JOINED THEM ON
@@ -1177,7 +1192,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // "I'm stuck in settings" (w-69e7f56362) happened the first time.
   useEffect(() => {
     onSectionChange?.(
-      pane === 'instructions' || pane === 'shortcuts' || pane === 'projects' ? pane
+      pane === 'instructions' || pane === 'shortcuts' || pane === 'projects' || pane === 'team' ? pane
         : typeof pane === 'object' ? 'projects'
           : null,
     );
@@ -1266,6 +1281,26 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
      every Mac with the gate shut. */
   const engineRows = w?.engineChoices ?? [];
   const twoEngines = engineRows.length > 1;
+  /** THE WORKSPACE GROUP IN THE NAV COLUMN.
+   *
+   *  Team is in it, and not under Projects, because a team owns the whole
+   *  workspace rather than one project. It is before Shortcuts for the reason
+   *  on Shortcuts below: that one is a page you read once, so it stays last.
+   *  With no team cloud in the build there is no pane to open, so there is no
+   *  row either.
+   */
+  const navRows: Array<[string, string]> = [
+    ['general', 'General'],
+    ['appearance', 'Themes'],
+    ['instructions', 'Instructions'],
+    ...(teamPane ? [['team', 'Team'] as [string, string]] : []),
+    /* * THE KEYS, WITH A DOOR OF THEIR OWN. It is last in this group because it is
+       a page you read once, not a setting you come back to, and it is in this group
+       rather than under Projects because the keys are the app's, not any one
+       project's.
+    */
+    ['shortcuts', 'Shortcuts'],
+  ];
   // THE CODEX MODEL LIST WAS READ HERE and is not read any more
   // (w-12081d32cc): the card asks which model a run goes out on, so neither
   // card on this screen draws a Model row. `engineModelChoices` still keeps
@@ -1291,22 +1326,12 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               second pane that no longer exists is a door into a wall. The
               `agents` name itself still resolves, one level up, so a link
               anybody saved still opens the page its content went to. */}
-          {([
-            ['general', 'General'],
-            ['appearance', 'Themes'],
-            ['instructions', 'Instructions'],
-            /* * THE KEYS, WITH A DOOR OF THEIR OWN. It is last in this group because it is
-               a page you read once, not a setting you come back to, and it is in this group
-               rather than under Projects because the keys are the app's, not any one
-               project's.
-            */
-            ['shortcuts', 'Shortcuts'],
-          ] as const).map(([id, label]) => (
+          {navRows.map(([id, label]) => (
             <button
               key={id}
               type="button"
               className={`set-nav-item ${pane === id ? 'on' : ''}`}
-              onClick={() => setPane(id)}
+              onClick={() => setPane(id as Pane)}
             >
               <span className="set-nav-label">{label}</span>
               {/* The account count that used to sit beside the Accounts row is
@@ -1387,11 +1412,24 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
            using one can reach it; only a window reloaded with ⌘R onto a newer build in
            development can. A real failure to save still shows here.
          */}
-        {error && error !== RESTART_NOTE && pane !== 'shortcuts' && <div className="set-error">{error}</div>}
+        {error && error !== RESTART_NOTE && pane !== 'shortcuts' && pane !== 'team' && <div className="set-error">{error}</div>}
         {/* The Shortcuts page is excluded: it reads nothing off the main
             process, so "Reading settings…" over it would be the app waiting
-            for an answer it does not need. */}
-        {!model && pane !== 'shortcuts' && pane !== 'instructions' && <div className="set-inner"><div className="set-lede">Reading settings…</div></div>}
+            for an answer it does not need. Team is excluded for the same
+            reason: nothing on it comes out of the settings file. */}
+        {!model && pane !== 'shortcuts' && pane !== 'instructions' && pane !== 'team' && <div className="set-inner"><div className="set-lede">Reading settings…</div></div>}
+
+        {/* TEAM MANAGEMENT (w-8415594d19): the page that used to sit in the
+            sidebar, drawn here. It does not wait on `model`, because nothing on
+            it comes from the settings file; the team's state arrives with the
+            pane itself. */}
+        {pane === 'team' && teamPane && (
+          <div className="set-inner">
+            <h1 className="set-title">Team</h1>
+            <p className="set-lede">Who is on your team, who has been invited, and the team's name. Everyone sees a short summary of your threads unless you mark one private.</p>
+            {teamPane}
+          </div>
+        )}
 
         {model && pane === 'projects' && (
           <div className="set-inner">
