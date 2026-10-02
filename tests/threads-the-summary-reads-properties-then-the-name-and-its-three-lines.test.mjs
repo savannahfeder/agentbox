@@ -36,6 +36,7 @@ const items = [item(), item({ id: 'w-google', label: 'Sign in with Google' })];
 const draw = (it) => renderToStaticMarkup(React.createElement(SummaryPanel, { item: it, items, team: null }));
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const src = fs.readFileSync(new URL('../renderer/src/threads/Summary.tsx', import.meta.url), 'utf8');
+const css = fs.readFileSync(new URL('../renderer/src/threads/summary.css', import.meta.url), 'utf8');
 
 describe('the panel reads properties first, then the name and its three lines', () => {
   const html = draw(item());
@@ -50,6 +51,15 @@ describe('the panel reads properties first, then the name and its three lines', 
   });
   it('draws the name once', () => {
     expect(html.match(/class="ts-title"/g)).toHaveLength(1);
+  });
+  // Her pick after three rounds of full-window shots (light Geist at 16 to
+  // 24px, and six other styles): 16px light. Not 24 light, which she liked
+  // and found too big, and not the 16px medium it started as.
+  it('sets the name in Geist light at 16px', () => {
+    const rule = css.match(/\.ts-title \{[^}]*\}/)[0];
+    expect(rule).toMatch(/font-size: 16px/);
+    expect(rule).toMatch(/font-weight: 300/);
+    expect(rule).not.toMatch(/font-family/);
   });
 });
 
