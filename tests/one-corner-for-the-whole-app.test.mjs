@@ -74,7 +74,10 @@ describe('one corner for the whole app', () => {
 
   it('leaves no loose number anywhere in the stylesheet', () => {
     const loose = radiiIn(css).filter(
-      (v) => v !== 'var(--radius)' && v !== '0' && !NOT_A_CORNER.includes(v) &&
+      // --tag-radius is the second token, for tags (square in every theme,
+      // tests/the-threads-header-is-quieter-and-every-tag-is-square.test.mjs).
+      // It is still a token, not a loose number, so it passes here.
+      (v) => v !== 'var(--radius)' && v !== 'var(--tag-radius)' && v !== '0' && !NOT_A_CORNER.includes(v) &&
              v !== '0 0 var(--radius) var(--radius)' && v !== 'var(--radius) var(--radius) 0 0',
     )
     // If this fails it prints the offenders, which is the whole point.
