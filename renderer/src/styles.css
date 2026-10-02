@@ -204,8 +204,8 @@
   --mac-close: #ff5f57;
   --mac-min: #febc2e;
   --mac-zoom: #28c840;
-  /* The launch film's mono (w-3fc39983be) on the small right-side details. The
-     body stays Avenir Next; only what reads var(--mono) takes Geist Mono. */
+  /* The launch film's mono (w-3fc39983be) on the small right-side details.
+     The body is the film's Geist (see `body`), as in Ember Grid. */
   --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, monospace;
   /* Before this there were TEN different corner sizes on one opened task at the
      same time (13, 9, 8, 7, 6, 4, 20, two two-corner shapes and 50%), measured
@@ -237,8 +237,8 @@
   --skin-dim: 0.63;
 }
 
-/* The launch film's two faces. Geist Mono is every small uppercase label
-   (`--mono`); the body stays Avenir Next. */
+/* The launch film's two faces, worn exactly as Ember Grid wore them: Geist
+   for the body, Geist Mono for every small uppercase label (`--mono`). */
 @font-face { font-family: 'Geist'; src: url('./assets/fonts/Geist-Variable.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
 @font-face { font-family: 'Geist Mono'; src: url('./assets/fonts/GeistMono-Variable.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
 
@@ -284,14 +284,12 @@ html, body, #root { height: 100%; }
 *::-webkit-scrollbar-corner { background: transparent; }
 
 body {
-  /* Avenir Next, matched against the design mockups letter by letter
-     (2026-08-12): single-storey g with an open tail, a straight-tailed y, a
-     small-bowled double-storey a, and digits whose 1 has an angled flag and no
-     foot. It is a macOS system face, so it costs no bundle and no download, and
-     the app is a Mac app. Source Sans stays behind it as the fallback that was
-     here before, so a machine without Avenir renders the old face rather than
-     Times. */
-  font-family: 'Avenir Next', 'Source Sans 3 Variable', -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  /* EMBER GRID'S TYPE, EXACTLY (w-9e434e8671): the launch film's Geist, with
+     Ember's own fallbacks behind it. It was Avenir Next until the app went to
+     one light look and the type was asked to match Ember Grid one to one. The
+     weight and spacing Ember set on titles, tabs and rows sit at the foot of
+     workspace-navigation.css. */
+  font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 15.5px;
   background: var(--bg);
   color: var(--text);

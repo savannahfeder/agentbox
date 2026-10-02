@@ -124,10 +124,35 @@ describe('the brand orange is the accent', () => {
     expect(token('--underline').replace(/\s/g, '')).toBe('rgba(238,96,24,0.45)');
   });
 
-  it('leaves the fonts as they were: Avenir Next body, Geist Mono labels', () => {
-    expect(token('--mono')).toMatch(/^'Geist Mono'/);
+});
+
+// EMBER GRID'S TYPE, ONE TO ONE. Asked for after the first build kept Light's
+// Avenir Next body. Measured on the built app against the build before this
+// change wearing Ember Grid: all 63 text elements on the inbox and Settings
+// matched in family, size, weight and letter-spacing. These are the rules that
+// produce that, copied from Ember's block at Ember's specificity.
+describe('the type is Ember Grid’s, exactly', () => {
+  const nav = () => read('renderer/src/workspace-navigation.css').replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('sets the body in Geist with Ember’s fallbacks, and the labels in Geist Mono', () => {
     const css = read('renderer/src/styles.css').replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(css).toMatch(/font-family:\s*'Avenir Next'/);
+    expect(css).toMatch(/\nbody \{[^}]*font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, sans-serif;/);
+    expect(token('--mono')).toBe(`'Geist Mono', ui-monospace, "SF Mono", Menlo, monospace`);
+  });
+
+  it('carries the five weight and spacing rules Ember set, at Ember’s specificity', () => {
+    for (const rule of [
+      ':root:root .set-title { font-weight: 400; letter-spacing: -0.035em; }',
+      ':root:root .idle-zero { font-weight: 400; }',
+      ':root:root .workspace-navigation .workspace-tab.active { font-weight: 400; }',
+      ':root:root .workspace-title { font-weight: 400; letter-spacing: -.03em; }',
+      ':root:root .row .subject { font-weight: 400; letter-spacing: -.01em; }',
+    ]) expect(nav()).toContain(rule);
+  });
+
+  it('names Geist in one rule only, the body, as Ember did (loading the face aside)', () => {
+    const all = cssFiles.map((f) => read(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/@font-face\s*\{[^}]*\}/g, '')).join('\n');
+    expect(all.match(/font-family:\s*'Geist'[^;]*/g) ?? []).toHaveLength(1);
   });
 });
 

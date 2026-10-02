@@ -957,3 +957,14 @@ body {
 :root:root .workspace-running { font-family: var(--mono); }
 :root:root .idle-zero-say { font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
 :root:root .idle-key { font-family: var(--mono); font-weight: 400; }
+
+/* EMBER GRID'S TYPE, ONE TO ONE (w-9e434e8671). Geist sets lighter than Avenir
+   Next, so Ember Grid took these down to 400 and tightened them, and the one
+   light look wears exactly what Ember did. `:root:root` holds the specificity
+   Ember's `:root[data-skin="ember-grid"]` had, so nothing that lost to them
+   before wins now. */
+:root:root .set-title { font-weight: 400; letter-spacing: -0.035em; }
+:root:root .idle-zero { font-weight: 400; }
+:root:root .workspace-navigation .workspace-tab.active { font-weight: 400; }
+:root:root .workspace-title { font-weight: 400; letter-spacing: -.03em; }
+:root:root .row .subject { font-weight: 400; letter-spacing: -.01em; }
