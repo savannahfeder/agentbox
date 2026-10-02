@@ -4,7 +4,8 @@ import type {FocusControlStyle} from '../focus-control';
 import {usePreviewReveal} from '../preview-reveal';
 import {PreviewLoading} from './PreviewLoading';
 import { isLocalPreview, type ArtifactMode } from '../artifact-layout';
-import { previewShows, previewWords, useLocalPreview } from '../local-preview';
+import { previewShows, previewStatus, useLocalPreview } from '../local-preview';
+import { LocalPreviewStatus } from './LocalPreviewStatus';
 // THE DOCUMENT PANE. The right half of the window is the file itself.
 //
 // The look is settled and is not a question any more.
@@ -113,7 +114,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   const frameKey = url && app.local ? `${url} ${app.attempt}` : url;
   const [loaded, revealFrame] = usePreviewReveal(frameKey);
   const frameReady = app.local ? previewShows(loaded, app.phase) : loaded;
-  const liveWords = app.local && url ? previewWords(app.phase, url, app.waited) : null;
+  const liveStatus = app.local && url ? previewStatus(app.phase, url, app.waited) : null;
   // The change a run made, when the artifact is one.
   const [change, setChange] = useState<Change | null>(null);
   // Which file inside a change she is standing on, so the mark in this header
@@ -272,7 +273,9 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
           // words saying so: behind a refusal the frame holds an error page.
           resolved ? (url
             ? <div className="preview-frame" aria-busy={!frameReady}>
-              <PreviewLoading ready={frameReady} words={liveWords} stopped={app.local && app.phase === 'down'} onRetry={app.retry} />
+              {app.local
+                ? !frameReady && <LocalPreviewStatus status={liveStatus} onRetry={app.retry} />
+                : <PreviewLoading ready={frameReady} />}
               {(!app.local || app.phase !== 'down') && <iframe
                 key={frameKey} onLoad={revealFrame} onError={() => setFailed("This preview could not be loaded.")}
                 style={{opacity:frameReady ? 1 : 0}}

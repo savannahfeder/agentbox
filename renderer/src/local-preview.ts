@@ -37,20 +37,33 @@ function hostOf(url: string): string {
   try { return new URL(url).host; } catch { return url; }
 }
 
-/** What the pane says, or null for the quiet skeleton alone. */
-export function previewWords(phase: LocalPreviewPhase, url: string, waitedMs: number): { title: string; detail?: string; retry: boolean } | null {
+export type LocalStatus = {
+  state: 'connecting' | 'slow' | 'down';
+  /** The short status, drawn in the chrome's spaced capitals. */
+  label: string;
+  host: string;
+  detail: string;
+  retry: boolean;
+  /** How long it has waited, m:ss, because not knowing that is what cost her. */
+  clock: string;
+};
+
+function clockOf(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/** What the pane says about a local address, or null while it stays quiet. */
+export function previewStatus(phase: LocalPreviewPhase, url: string, waitedMs: number): LocalStatus | null {
   const host = hostOf(url);
+  const clock = clockOf(waitedMs);
   if (phase === 'down') {
-    return {
-      title: `Nothing is running at ${host}`,
-      detail: 'The app that should be here is not running. It opens here by itself if it starts.',
-      retry: true,
-    };
+    return { state: 'down', label: 'Not running', host, detail: 'Nothing is answering here. It opens by itself once the app starts.', retry: true, clock };
   }
   if (waitedMs >= SLOW_AFTER_MS) {
-    return { title: `${host} is slow to answer`, detail: 'Still trying. It shows here as soon as it is ready.', retry: true };
+    return { state: 'slow', label: 'Still connecting', host, detail: 'It is slow to answer. This keeps trying.', retry: true, clock };
   }
-  if (waitedMs >= WORDS_AFTER_MS) return { title: `Opening ${host}`, retry: false };
+  if (waitedMs >= WORDS_AFTER_MS) return { state: 'connecting', label: 'Connecting', host, detail: 'Waiting for the app to answer.', retry: false, clock };
   return null;
 }
 

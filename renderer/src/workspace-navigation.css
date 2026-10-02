@@ -813,20 +813,101 @@
 .artifact-thumbnail > .preview-loading {transition:none;}
 .preview-loading[data-delayed="true"] .preview-skeleton {visibility:hidden;}
 
-/* A LOCAL APP SAYS WHAT IT IS DOING IN WORDS (local-preview.ts). The skeleton
-   alone read as an empty card on a dark theme, and a port nothing listens on
-   looked exactly like one still loading. The words sit over the skeleton,
-   centred, at reading contrast; with nothing running the skeleton goes and the
-   words and Try again are all that is left. */
-.preview-loading {position:relative;}
-.preview-words {position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:32px; text-align:center;}
-.preview-words-title {display:flex; align-items:center; gap:10px; color:var(--text); font-size:15px; font-weight:500;}
-.preview-words-detail {max-width:34em; color:var(--text-dim); font-size:13.5px; line-height:1.5;}
-.preview-words-pulse {width:7px; height:7px; border-radius:50%; background:var(--text-dim); animation:preview-skeleton-breathe 1.2s ease-in-out infinite;}
-.preview-words-retry {pointer-events:auto; margin-top:10px; padding:6px 14px; border:1px solid var(--line-strong); border-radius:var(--radius); background:var(--wash); color:var(--text); font:inherit; font-size:13px; cursor:pointer;}
-.preview-words-retry:hover {border-color:var(--text-faint);}
-.preview-loading[data-stopped="true"] {opacity:1;}
-@media (prefers-reduced-motion:reduce) {.preview-words-pulse {animation:none;}}
+/* A LOCAL APP SAYS WHAT IT IS DOING (LocalPreviewStatus.tsx). The design-file
+   skeleton read as an empty card on a dark theme, and a port nothing listens on
+   looked exactly like one still loading. This is drawn in the chrome's own
+   vocabulary rather than as a dialog: the status in the spaced mono capitals
+   the row times and section labels use, the address in the title face at the
+   film's 400 weight, the one accent only on a live state, and a square
+   hairline button in the same capitals. All tokens, so every theme dresses it.
+   Three looks are on trial; `data-look` picks one until she does. */
+/* The window's own colours, taken above the pane: `.doc-pane.doc-html` swaps in
+   a neutral dark set for a page's frame, which turned the one orange blue and
+   the warm greys cool. A custom property is resolved where it is declared, so
+   these hold the theme's values all the way down. */
+body {
+  --window-accent: var(--accent); --window-text: var(--text); --window-text-dim: var(--text-dim);
+  --window-text-faint: var(--text-faint); --window-line: var(--line); --window-line-strong: var(--line-strong);
+}
+.local-status {
+  --accent: var(--window-accent); --text: var(--window-text); --text-dim: var(--window-text-dim);
+  --text-faint: var(--window-text-faint); --line: var(--window-line); --line-strong: var(--window-line-strong);
+  position:absolute; inset:0; z-index:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:48px; text-align:center; background:var(--skin-solid,var(--surface)); color:var(--text); overflow:hidden;
+}
+.local-status-label {display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--text-faint);}
+.local-status-sep {opacity:.6;}
+.local-status-clock {font-family:var(--mono); font-variant-numeric:tabular-nums; color:var(--text-dim);}
+.local-status-dot {flex:none; width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 45%,transparent); animation:local-status-pulse 1.6s ease-out infinite;}
+.local-status[data-state="down"] .local-status-dot {background:transparent; box-shadow:inset 0 0 0 1.2px var(--text-faint); animation:none;}
+.local-status-host {font-size:44px; font-weight:400; letter-spacing:-.03em; line-height:1.05; color:var(--text); overflow-wrap:anywhere;}
+.local-status-detail {max-width:30em; font-size:14px; line-height:1.55; color:var(--text-dim);}
+.local-status-retry {
+  position:relative; z-index:1; padding:9px 18px; border:1px solid var(--line-strong); border-radius:var(--radius); background:transparent;
+  color:var(--text); font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; cursor:pointer;
+}
+.local-status-retry:hover {border-color:var(--accent); color:var(--accent);}
+@keyframes local-status-pulse {0% {box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 45%,transparent);} 100% {box-shadow:0 0 0 7px transparent;}}
+@keyframes local-status-sweep {0% {background-position:-48px 0, 0 0;} 100% {background-position:calc(100% + 48px) 0, 0 0;}}
+@keyframes local-status-turn {to {transform:translate(-50%,-50%) rotate(360deg);}}
+
+/* PLATE. The address large, the status above it, and a hairline under it that
+   an orange segment sweeps along while it connects; nothing moves once it is
+   known to be down. The film's corner marks hold the empty pane. */
+.local-status[data-look="plate"] {
+  background:
+    linear-gradient(var(--skin-tick,var(--line)),var(--skin-tick,var(--line))) left 16px top 16px / 12px 1px no-repeat,
+    linear-gradient(var(--skin-tick,var(--line)),var(--skin-tick,var(--line))) left 16px top 16px / 1px 12px no-repeat,
+    linear-gradient(var(--skin-tick,var(--line)),var(--skin-tick,var(--line))) right 16px top 16px / 12px 1px no-repeat,
+    linear-gradient(var(--skin-tick,var(--line)),var(--skin-tick,var(--line))) right 16px top 16px / 1px 12px no-repeat,
+    linear-gradient(var(--skin-tick,var(--line)),var(--skin-tick,var(--line))) left 16px bottom 16px / 12px 1px no-repeat,
+    linear-gradient(var(--skin-tick,var(--line)),var(--skin-tick,var(--line))) left 16px bottom 16px / 1px 12px no-repeat,
+    linear-gradient(var(--skin-tick,var(--line)),var(--skin-tick,var(--line))) right 16px bottom 16px / 12px 1px no-repeat,
+    linear-gradient(var(--skin-tick,var(--line)),var(--skin-tick,var(--line))) right 16px bottom 16px / 1px 12px no-repeat,
+    var(--skin-solid,var(--surface));
+}
+.local-status[data-look="plate"] .local-status-host {margin-top:20px;}
+.local-status[data-look="plate"] .local-status-host::after {
+  content:''; display:block; width:180px; height:1px; margin:26px auto 0;
+  background:linear-gradient(var(--accent),var(--accent)) no-repeat, var(--line);
+  background-size:48px 1px, 100% 1px; animation:local-status-sweep 1.8s cubic-bezier(.5,0,.5,1) infinite;
+}
+.local-status[data-look="plate"][data-state="down"] .local-status-host::after {background:var(--line); animation:none;}
+.local-status[data-look="plate"] .local-status-detail {margin-top:22px;}
+.local-status[data-look="plate"] .local-status-retry {margin-top:28px;}
+
+/* CONSOLE. A short log, read top to bottom like a terminal: what it tried,
+   for how long, and where it stands now. Left aligned, high in the pane. */
+.local-status[data-look="console"] {align-items:flex-start; justify-content:flex-start; padding:72px 64px; text-align:left;}
+.local-status[data-look="console"] .local-status-host {font-size:30px;}
+.local-status-log {width:min(460px,100%); margin-top:28px; border-top:1px solid var(--line);}
+.local-status-line {
+  display:grid; grid-template-columns:18px 1fr auto; align-items:center; padding:11px 0; border-bottom:1px solid var(--line);
+  font-family:var(--mono); font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--text-faint);
+}
+.local-status-mark {color:var(--text-faint);}
+.local-status-now {color:var(--text);}
+.local-status[data-look="console"][data-state="down"] .local-status-now {color:var(--text);}
+.local-status[data-look="console"] .local-status-detail {margin-top:20px;}
+.local-status[data-look="console"] .local-status-retry {margin-top:24px;}
+
+/* RAYS. The brand's rays from inbox zero behind the address, turning slowly
+   while it connects and going still and grey once nothing is there. */
+.local-status[data-look="rays"] {isolation:isolate;}
+.local-status[data-look="rays"]::before {
+  content:''; position:absolute; z-index:-1; left:50%; top:50%; width:560px; height:560px; transform:translate(-50%,-50%);
+  background:var(--skin-rays,radial-gradient(circle,color-mix(in srgb,var(--accent) 14%,transparent),transparent 62%)) center / contain no-repeat;
+  opacity:.9; animation:local-status-turn 48s linear infinite;
+}
+.local-status[data-look="rays"][data-state="down"]::before {opacity:.3; filter:grayscale(1); animation:none;}
+.local-status[data-look="rays"] .local-status-host {order:0; font-size:34px;}
+.local-status[data-look="rays"] .local-status-label {order:1; margin-top:16px;}
+.local-status[data-look="rays"] .local-status-detail {order:2; margin-top:14px;}
+.local-status[data-look="rays"] .local-status-retry {order:3; margin-top:26px; background:var(--skin-solid,var(--surface));}
+
+@media (prefers-reduced-motion:reduce) {
+  .local-status-dot, .local-status[data-look="plate"] .local-status-host::after, .local-status[data-look="rays"]::before {animation:none;}
+}
 
 /* Muted warm-gray navigation over Peach Haze's dimmed photograph.
 
