@@ -649,9 +649,9 @@ export function ThreadComposer({
             {/* WHERE IT GOES, NOT WHO SEES IT (w-a8e752a9f2). "Only you and
                 Maya see this." sat directly under a To field reading Maya, so
                 it was the second place on the card saying the same thing. The
-                corner keeps a line, because an empty one she has rejected
-                already, and the line now says the thing the card does not: a
-                message to a teammate becomes a thread in their inbox. */}
+                corner keeps a line rather than going bare, and that line now
+                says the thing the card does not: a message to a teammate
+                becomes a thread in their inbox. */}
             <span className="tc-only">{landsIn(group.map((p) => firstName(p)))}</span>
             <span className="tc-send solo">
               <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title="Send · ⌘↵">

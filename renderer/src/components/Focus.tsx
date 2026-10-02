@@ -2302,8 +2302,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
               own header already reads "MESSAGES · MAYA GAVE YOU THIS" with both
               faces beside it, so "Only you and Maya see this." was the second
               place on the screen saying the same thing. It is replaced rather
-              than deleted: an empty corner here is the one thing she has
-              already turned down. */}
+              than deleted: a bare corner here reads as a control that failed
+              to draw, so the slot always carries a line. */}
           {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo?.length ? <span className="dim">{landsIn(talkTo)}</span> : <>
           <PriorityPicker
             variant="word"

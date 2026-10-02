@@ -273,14 +273,14 @@ export function placeholderFor(person: Person | null | undefined): string {
 /**
  * The bottom left of a message to a person, in the card and in the reply box.
  *
- * It used to read "Only you and Maya see this.", which she asked for twice and
- * then asked to be rid of: the To field one line above already names Maya, and
- * a conversation's header names her again beside both faces. So the corner says
+ * It used to read "Only you and Maya see this.", which repeated what was already
+ * on the screen: the To field one line above names the person, and a
+ * conversation's header names them again beside both faces. So the corner says
  * the one thing neither of those says, that a message to a teammate is not a
  * chat bubble but a thread landing in the inbox they already work out of.
  *
- * NOT EMPTY, EVER. Removing the old line and leaving the corner bare is the one
- * outcome she has already rejected (decisions.md, round 8).
+ * NOT EMPTY, EVER. Dropping the old line and leaving the corner bare is the one
+ * outcome ruled out: a bare corner here reads as a control that failed to draw.
  *
  * The possessive sits on the last name only: "Maya and Jun's inboxes".
  */

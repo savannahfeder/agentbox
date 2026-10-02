@@ -1,16 +1,15 @@
 // THE BOTTOM LEFT OF A MESSAGE TO A PERSON (w-a8e752a9f2, 2026-10-01).
 //
-// Two pieces of her feedback on the same corner, and neither was built:
+// Two rules meet on this one corner, and together they settle what goes in it:
 //
 //  - "Only you and Maya see this" is implied in a direct message and wastes
 //    space. Measured in the real renderer before this change: the new message
 //    card reads TO / Theo Park one line above it, and the conversation's own
 //    header reads MESSAGES · MAYA GAVE YOU THIS with both faces beside it. The
-//    sentence is the third place on the screen saying the same thing.
-//  - The bottom left of a message to a person must not then sit EMPTY. She has
-//    said that twice (decisions.md, round 8: "bring back 'Only you and Maya see
-//    this.' since the corner was empty"), so removing the line without putting
-//    anything there is the one outcome that is wrong.
+//    sentence was the third place on the screen saying the same thing.
+//  - The bottom left of a message to a person must not then sit EMPTY. A bare
+//    corner there reads as a control that failed to draw, so dropping the line
+//    without putting anything in its place is the one outcome ruled out.
 //
 // So the corner says the thing the card does NOT already say: where the message
 // goes. A message to a teammate is not a chat bubble, it becomes a thread in
@@ -48,7 +47,7 @@ describe('where a message to a person lands', () => {
   });
 });
 
-describe('the line she asked to be rid of', () => {
+describe('the line that was removed', () => {
   const files = [
     'renderer/src/components/Focus.tsx',
     'renderer/src/threads/ThreadComposer.tsx',
