@@ -49,8 +49,14 @@ function aMac(cloud, personId) {
   return { accountRoot, service, personId };
 }
 
+// A session the team app started carries its person's AGENTBOX_PERSON_ID, and
+// "before anyone signs in" would then see lines stamped "by" that no Mac here
+// wrote (red on every run from inside the team app, 2026-10-01). The tests start
+// from nobody and put back whatever the shell had.
+const shellPersonId = process.env.AGENTBOX_PERSON_ID;
 let cloud, maya, theo;
 beforeEach(() => {
+  delete process.env.AGENTBOX_PERSON_ID;
   disk._internals.forgetFolds();
   cloud = createMemoryCloud();
   maya = aMac(cloud, signUpMemory(cloud, { email: 'maya@northwind.test', name: 'Maya' }));
@@ -59,6 +65,8 @@ beforeEach(() => {
 afterEach(async () => {
   await maya.service.signOut();
   await theo.service.signOut();
+  if (shellPersonId === undefined) delete process.env.AGENTBOX_PERSON_ID;
+  else process.env.AGENTBOX_PERSON_ID = shellPersonId;
 });
 
 describe('before anyone signs in', () => {

@@ -228,8 +228,15 @@ const codexRow = () => {
  *  line that decides, so overriding it is overriding exactly the decision. */
 const onCodex = (sup) => { sup._engineFor = () => 'codex'; return sup; };
 
-beforeEach(() => { spawns.length = 0; appServers.length = 0; });
+// A session the team app started carries AGENTBOX_PERSON_ID, and the
+// supervisor hands it on to the store server, so the env below gained a fifth
+// key and went red on every run from inside the team app (2026-10-01). These
+// tests are about a worker nobody is signed in on; the shell's value comes back
+// afterwards.
+const shellPersonId = process.env.AGENTBOX_PERSON_ID;
+beforeEach(() => { spawns.length = 0; appServers.length = 0; delete process.env.AGENTBOX_PERSON_ID; });
 afterAll(() => {
+  if (shellPersonId !== undefined) process.env.AGENTBOX_PERSON_ID = shellPersonId;
   for (const dir of dirs) {
     try { rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ }
   }

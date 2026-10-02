@@ -101,7 +101,11 @@ async function workerWithLines({ requireMcpServer = 'agentbox' } = {}) {
     threadParams: () => workerThreadParams({ cwd: '/w' }),
     turnParams: { input: [] },
     requireMcpServer,
-    mcpReadyMs: 50,
+    // No test here waits for this to run out. At 50 ms it ran out first on a
+    // loaded Mac (a 384 s suite inside the pre-push hook, 2026-10-01), and "the
+    // store server did not start" landed in lines before the test could say it
+    // had. Long enough never to race, short of the real 30 s.
+    mcpReadyMs: 10_000,
   });
   worker.stderr.on('data', (line) => lines.push(String(line)));
   for (let i = 0; i < 8; i += 1) await new Promise((r) => { setImmediate(r); });
