@@ -27,6 +27,18 @@ export const DEFAULT_DISPLAY: Record<PageId, Display> = {
   team: { view: 'board', sort: 'updated', priorities: [], projects: [], updated: 'any' },
 };
 
+/**
+ * WHICH OF THE TWO REMEMBERED DISPLAYS THE ONE PAGE IS ON.
+ *
+ * The Inbox and the Team page became one page (w-05ff3d1438), and the page
+ * read the inbox's display and nothing else, so the team's board default
+ * above could never be reached: lighting a teammate's face left you in the
+ * list. There is one page now, so "per page" is read as "per audience". Each
+ * half remembers what was last chosen for it, which is why this is a lookup
+ * and not an effect that forces board on and overrules a choice.
+ */
+export const pageFor = (withOthers: boolean): PageId => (withOthers ? 'team' : 'inbox');
+
 const KEY = (page: PageId) => `threads.display.${page}`;
 
 export function readDisplay(page: PageId, store: Pick<Storage, 'getItem'> | null = typeof localStorage === 'undefined' ? null : localStorage): Display {

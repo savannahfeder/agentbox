@@ -35,7 +35,7 @@
    keep the row the 34 it was with the terminal and Done marks in it, so the
    Summary button stays where it was approved (56..86 at 1440). */
 .ts-top { display: inline-flex; align-items: center; gap: 10px; margin: 2px 0; }
-.ts-sumbtn { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+.ts-sumbtn { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
 .ts-sumbtn:hover { color: var(--text); border-color: var(--line-strong); }
 .ts-sumbtn.on { background: var(--wash-strong); color: var(--text); border-color: var(--line-strong); }
 .ts-sumbtn kbd { font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; padding: 0; }
@@ -45,7 +45,7 @@
    own popover, `.th-menu` in pages.css, dropped from the button's right edge
    because the button is at the right of the window. */
 .ts-more-wrap { position: relative; display: inline-flex; }
-.ts-more { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim); cursor: pointer; }
+.ts-more { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; color: var(--text-dim); cursor: pointer; }
 .ts-more:hover, .ts-more[aria-expanded="true"] { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .ts-more:focus-visible { outline: 2px solid var(--underline); outline-offset: 2px; }
 .th-menu.ts-more-menu { top: calc(100% + 6px); left: auto; right: 0; min-width: 264px; }
@@ -191,5 +191,5 @@
 .ts-ticket-private .ts-tk-lead { margin-bottom: 4px; }
 
 /* "Message <name>": their face and the words, square, for the top bar */
-.ts-msgbtn { display: inline-flex; align-items: center; gap: 9px; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
+.ts-msgbtn { display: inline-flex; align-items: center; gap: 9px; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
 .ts-msgbtn:hover { background: var(--wash-strong); }

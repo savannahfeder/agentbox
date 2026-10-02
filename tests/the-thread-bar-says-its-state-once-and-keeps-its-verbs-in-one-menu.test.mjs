@@ -194,7 +194,9 @@ describe('the right side is the Summary button and the dots', () => {
     expect(pages).toMatch(/\.th-menu \{[^}]*background: #363431;[^}]*border-radius: var\(--radius\)/);
     expect(pages).toMatch(/\.th-menu \.row-i:hover/);
     const css = prose(read('renderer/src/threads/summary.css'));
-    expect(css).toMatch(/\.ts-more \{[^}]*width: 30px; height: 30px;[^}]*border-radius: var\(--radius\)/);
+    // --tag-radius: the button is the Summary button's square, and both of
+    // them are tags, which are square in every theme.
+    expect(css).toMatch(/\.ts-more \{[^}]*width: 30px; height: 30px;[^}]*border-radius: var\(--tag-radius\)/);
     expect(css).not.toMatch(/border-radius: (1[0-9]|[2-9][0-9])px|50%\s*;[^}]*ts-more/);
   });
 });

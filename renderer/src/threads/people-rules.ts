@@ -122,17 +122,24 @@ export function mergeRows(mine: WorkItem[], theirs: ThreadCard[], sort: Display[
 }
 
 /**
- * THE LOCK, WHERE IT TELLS YOU SOMETHING. On a thread of yours the team cannot
- * see, while a teammate is on the page beside you: that is when "they cannot
- * see this one" is news. On your page alone every row is yours, and nearly all
- * of them are private, so a
- * lock there would be on every line and say nothing.
+ * THE LOCK, ON EVERY THREAD ONLY YOU CAN SEE.
+ *
+ * It used to be drawn only while a teammate's threads were on the page, on the
+ * reasoning that a lock on every line says nothing. The cost of that was
+ * worse: the same row said "only you can see this" or said nothing depending
+ * on which faces were lit at the top of the page, so the mark could not be
+ * read at all. It is unconditional now, and so is the people mark that says
+ * the opposite, so a row carries exactly one of them and always the same one.
+ *
+ * `withOthers` is kept and ignored on purpose: every caller passes what it
+ * knows, and the next reader of one of them should see that the answer no
+ * longer turns on it.
  */
 export function privateMark(
   item: Pick<WorkItem, 'visibility' | 'createdAt' | 'createdBy' | 'agent'>,
   product: Product | undefined | null,
   team: { me: string | null; since?: number | null } | null,
-  withOthers: boolean,
+  _withOthers?: boolean,
 ): boolean {
-  return withOthers && rowSharing(item, product, team) === 'private';
+  return rowSharing(item, product, team) === 'private';
 }

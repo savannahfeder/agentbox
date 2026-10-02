@@ -221,6 +221,14 @@
      ONE line to change every corner in the app.
   */
   --radius: 3px;
+  /* A TAG IS SQUARE IN EVERY THEME. The chips in the Display menu, the Share
+     button at the end of a row, the composer's chips and the Summary button
+     all took --radius, which is 3px here and 0 only under the Ember Grid
+     skin, so they were rounded in every theme but one. This is a SECOND token
+     on purpose: cards, menus, fields and the app's other corners keep their
+     3px, and no skin may re-declare this one, which is what makes a tag
+     square whatever is worn. */
+  --tag-radius: 0px;
   /* THE PICTURE THEMES ANSWER HERE TOO, with no picture (see skins.ts). A skin
      is a second axis laid over dark, not a third theme, and these five tokens
      are the whole of its surface. They are declared in BOTH themes and set to
