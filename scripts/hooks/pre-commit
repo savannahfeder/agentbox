@@ -10,8 +10,11 @@
 # Both halves are needed together: the branch block and the commit block.
 #
 # This costs nothing real. Work belongs in a throwaway worktree
-# (briefs/worker.md), and merging is `git push . HEAD:refs/heads/main` from that
-# worktree, which moves the ref and commits nothing here.
+# (briefs/worker.md), and it leaves that worktree by being SHIPPED: `npm run
+# ship` pushes it to the public main, and this folder fast-forwards to what
+# comes back. Moving local main onto a branch by hand is refused as well now,
+# by scripts/hooks/reference-transaction, because a fast-forward writes no
+# commit and walked past this hook in silence.
 #
 # Only the PRIMARY worktree is guarded. Every linked worktree commits freely,
 # which is where all the work is supposed to be happening anyway.
@@ -33,7 +36,7 @@ echo "  Your edits are safe. Take them to a worktree and commit there:" >&2
 echo "    git worktree add -b <branch> /private/tmp/<your item id> main" >&2
 echo "    cd /private/tmp/<your item id>" >&2
 echo >&2
-echo "  Merge from there with: git push . HEAD:refs/heads/main" >&2
+echo "  Ship from there with:  npm run ship" >&2
 echo "  Then delete it:        git worktree remove /private/tmp/<your item id>" >&2
 echo >&2
 
