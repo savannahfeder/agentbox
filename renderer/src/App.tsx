@@ -4928,10 +4928,8 @@ export default function App() {
                 />
               ) : focused ? (
                 <Focus
-                  // The summary panel reads the live rows for its linked
-                  // threads, and a message from a person can be handed to an
-                  // agent from its page.
-                  items={items}
+                  // A message from a person can be handed to an agent from
+                  // its page.
                   onHandToAgent={handToAgent}
                   onAddPeople={addPeopleToConversation}
                   headerTarget={workspaceNavigation ? taskHeader : null}

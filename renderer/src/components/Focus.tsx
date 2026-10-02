@@ -323,13 +323,8 @@ function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 // not the user's, and it is the part that was unnecessary. `filesFromRuns` stays,
 // because App.tsx still reads it to choose the design a card opens itself on.
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onInstallUpdate, items, onHandToAgent, onAddPeople }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onInstallUpdate, onHandToAgent, onAddPeople }: {
   previewSample?: string;
-  /**
-   * EVERY THREAD THE WINDOW HOLDS, for the summary's linked titles and the
-   *  menu that adds a link. Optional because App.tsx does not hand it over yet;
-   *  until it does, the summary reads the snapshot once for itself. */
-  items?: WorkItem[];
   /**
    * A MESSAGE FROM A PERSON IS NOT WORK UNTIL SHE SAYS SO. The one line under
    *  the latest message on a message thread calls this to make it a task for
@@ -518,17 +513,6 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const summaryOffered = summarised && !openDoc;
   const summaryShown = summaryOffered && summaryOpen;
   useSummaryShortcut(toggleSummary, summaryOffered);
-  // The window's threads, read once for the panel when App.tsx has not handed
-  // them over (see `items` above). Only while the panel is up, and once per
-  // thread, so a closed panel costs nothing.
-  const [ownItems, setOwnItems] = useState<WorkItem[]>([]);
-  useEffect(() => {
-    if (items || !summaryShown) return undefined;
-    let live = true;
-    void api.snapshot().then((s) => { if (live) setOwnItems(s?.items ?? []); }).catch(() => {});
-    return () => { live = false; };
-  }, [items, summaryShown, item.product, item.id]);
-
   // THE MODEL, IN THE REPLY BOX AND NOT THE HEADER. The folded box says which
   // model picks up what she sends next, at its right end, and pressing the word
   // opens the box with the model drawer already open: the same drawer and the
@@ -1542,7 +1526,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     {/* THE SUMMARY, beside the conversation and the dock rather than inside
         either: both give up its width (`data-summary` above, summary.css), so
         the words narrow instead of running under it, and it scrolls on its own. */}
-    {summaryShown && <SummaryPanel item={item} items={items ?? ownItems} team={teamCtx} onOpenItem={onOpenItem} />}
+    {summaryShown && <SummaryPanel item={item} team={teamCtx} />}
     {!direct && <TaskTerminal key={`${item.product}:${item.id}`} product={item.product} id={item.id} onOpenChange={setTerminalOpen}/>}
     </div>
   );

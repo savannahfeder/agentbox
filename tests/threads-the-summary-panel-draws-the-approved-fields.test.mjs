@@ -58,10 +58,9 @@ describe('the panel', () => {
   it('lists the properties in the approved order', () => {
     expect(words).toMatch(/Status Waiting Owner You Project Northwind Priority High Visible to Team/);
   });
-  it('names linked threads by title and the one this Mac cannot see as such', () => {
-    expect(words).toMatch(/Linked Blocked by Sign in with Google/);
-    expect(words).toMatch(/Blocks A thread you cannot see/);
-  });
+  // Blocked by and Blocks left the panel on w-b38e975e2c; that test file
+  // (threads-the-summary-reads-properties-then-the-name-and-its-three-lines)
+  // pins their absence and the new order.
   it('then the three lines, with the stand-in dim until something is written', () => {
     expect(words).toMatch(/Problem Acme’s contract ends on the 14th/);
     expect(words).toMatch(/Progress Terms are drafted at 8% over last year\./);

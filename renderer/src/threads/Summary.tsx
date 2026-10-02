@@ -19,8 +19,7 @@ import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityIdOf, priorityLabelOf, priorityValueOf, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName, type TeamView } from '../team/people';
 import {
-  STATE_WORD, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, lastEdit, linkCandidates, linkedThreads,
-  ownerName, readSummaryOpen, stateGlyph, type StateGlyph, type SummaryField,
+  STATE_WORD, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, lastEdit, ownerName, readSummaryOpen, stateGlyph, type StateGlyph, type SummaryField,
 } from './summary-rules';
 import { VISIBILITY_WORD, chosenNames, whoSees, type Seen } from './summary-rules';
 import { findPeople, teammates } from './composer-rules';
@@ -131,26 +130,24 @@ export function SummaryToggle({ open, onToggle }: { open: boolean; onToggle: () 
 
 /* ------------------------------------------------------------------- panel */
 
-type Field = SummaryField | 'priority' | 'visibility' | 'visibleTo' | 'blockedBy' | 'blocks';
+type Field = SummaryField | 'priority' | 'visibility' | 'visibleTo';
 type Pending = Partial<Record<Field, { value: unknown; ts: number }>>;
-type Menu = null | 'priority' | 'visibility' | 'blockedBy' | 'blocks';
+type Menu = null | 'priority' | 'visibility';
 
 const NOT_WRITTEN = 'Not written yet';
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 /**
- * The summary beside the conversation: properties, linked threads, a hairline,
- * then problem, progress and solution, each editable in place.
+ * The summary beside the conversation: the properties, a hairline, then the
+ * thread's name over problem, progress and solution, each line editable in
+ * place. The panel draws no "Blocked by" or "Blocks" (w-b38e975e2c); the row
+ * still carries them and a teammate's card still shows them.
  *
- * `items` is every thread this window holds, for the titles of linked threads
- * and for the menu that adds one. `team` is null on a Mac nobody has signed
- * into, where every thread is yours.
+ * `team` is null on a Mac nobody has signed into, where every thread is yours.
  */
-export function SummaryPanel({ item, items, team, onOpenItem }: {
+export function SummaryPanel({ item, team }: {
   item: WorkItem;
-  items: WorkItem[];
   team: TeamView | null;
-  onOpenItem?: (item: WorkItem) => void;
 }) {
   const me = team?.me ?? null;
 
@@ -224,8 +221,6 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
   const owner = ownerName(item, me, team?.byId ?? new Map());
   const ownerPerson = owner === 'You' ? null : team?.byId.get(item.createdBy ?? '') ?? null;
 
-  const direct = useMemo(() => new Set([...(team?.products.values() ?? [])].filter((p) => p.team?.direct === true).map((p) => p.slug)), [team]);
-
   /* --- the three lines ------------------------------------------------- */
   const stood = summaryOf({ ...item, ...Object.fromEntries(SUMMARY_FIELDS.filter((f) => pending[f]).map((f) => [f, pending[f]!.value])) });
   const written = (f: SummaryField) => typeof valueOf<unknown>(f) === 'string';
@@ -297,62 +292,8 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
       pending: Object.fromEntries(SUMMARY_FIELDS.filter((f) => pending[f]).map((f) => [f, pending[f]!.ts])),
     });
 
-  /* --- the links ------------------------------------------------------- */
-  const linkRow = (field: 'blockedBy' | 'blocks', label: string) => {
-    const ids = (valueOf<string[] | undefined>(field) ?? []).filter((x) => typeof x === 'string');
-    const links = linkedThreads(ids, items, item.product);
-    const offer = menu === field ? linkCandidates(item, items, ids, { me, direct }) : [];
-    return (
-      <div className="ts-link-row" ref={holdMenu(field)}>
-        <span className="ts-label">{label}</span>
-        <span className="ts-link-values">
-          {links.map((l) => (
-            <span key={l.id} className="ts-link">
-              <button
-                type="button"
-                className={`ts-link-title${l.known ? '' : ' dim'}`}
-                disabled={!l.known || !onOpenItem}
-                title={l.known ? `Open ${l.title}` : UNSEEN_THREAD}
-                onClick={() => { const found = items.find((i) => i.id === l.id); if (found) onOpenItem?.(found); }}
-              >{l.title}</button>
-              <button type="button" className="ts-x" aria-label={`Remove ${l.title}`} title="Remove" onClick={() => void save({ [field]: ids.filter((x) => x !== l.id) })}>
-                <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" /></svg>
-              </button>
-            </span>
-          ))}
-          <button
-            type="button"
-            className={links.length ? 'ts-add' : 'ts-add ts-add-empty'}
-            aria-label={`Link a thread to ${label.toLowerCase()}`}
-            aria-expanded={menu === field}
-            onClick={() => setMenu(menu === field ? null : field)}
-          >
-            {links.length
-              ? <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M6 2v8M2 6h8" /></svg>
-              : <>None<Caret /></>}
-          </button>
-        </span>
-        {menu === field && (
-          <span className="prio-menu ts-menu ts-menu-wide" role="listbox" aria-label={label}>
-            <span className="ts-menu-head">Your open threads</span>
-            {offer.length === 0 && <span className="ts-menu-none">No other open threads</span>}
-            {offer.map((o) => (
-              <button key={`${o.product}:${o.id}`} type="button" role="option" className="prio-menu-row" onClick={() => { setMenu(null); void save({ [field]: [...ids, o.id] }); }}>
-                <span className="prio-menu-label">{o.label || o.title}</span>
-              </button>
-            ))}
-          </span>
-        )}
-      </div>
-    );
-  };
-
   return (
     <aside className="ts-panel" aria-label="Summary">
-      {/* WHICH THREAD THIS IS, by the name its row shows (list-rules.ts
-          rowTitle). Without it the panel was a list of properties about
-          nothing in particular. */}
-      <h2 className="ts-title">{rowTitle(item)}</h2>
       {/* CHANGEABLE LOOKS CHANGEABLE (2026-10-01). Priority and Visible to are
           buttons that wash, point and show a caret under the pointer; Status,
           Owner and Project are plain words with no hover at all. Owner stays
@@ -454,14 +395,14 @@ export function SummaryPanel({ item, items, team, onOpenItem }: {
         </span>
       </div>
 
-      <div className="ts-h">Linked</div>
-      <div className="ts-links">
-        {linkRow('blockedBy', 'Blocked by')}
-        {linkRow('blocks', 'Blocks')}
-      </div>
-
       <div className="ts-rule" />
 
+      {/* WHICH THREAD THIS IS, by the name its row shows (list-rules.ts
+          rowTitle), DIRECTLY ABOVE THE THREE LINES (w-b38e975e2c). She reads
+          the name, the problem, the progress and the solution in that order
+          and skips the properties, so the words are one block under the
+          hairline and the properties keep to themselves above it. */}
+      <h2 className="ts-title">{rowTitle(item)}</h2>
       {SUMMARY_FIELDS.map((f) => (
         <div className="ts-sec" key={f}>
           <div className="ts-h">{f === 'problem' ? 'Problem' : f === 'progress' ? 'Progress' : 'Solution'}</div>

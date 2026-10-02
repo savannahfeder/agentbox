@@ -44,10 +44,12 @@ const css = fs.readFileSync(new URL('../renderer/src/threads/summary.css', impor
 const src = fs.readFileSync(new URL('../renderer/src/threads/Summary.tsx', import.meta.url), 'utf8');
 
 describe('the panel opens with the thread’s name', () => {
-  it('says the name the row shows, the label, before anything else', () => {
+  // It opened the panel until w-b38e975e2c moved it under the properties,
+  // directly over Problem, so the words read as one block.
+  it('says the name the row shows, the label, after the properties and over the three lines', () => {
     const html = draw(item());
-    expect(html).toMatch(/^<aside[^>]*><h2 class="ts-title">Acme renewal terms<\/h2>/);
-    expect(text(html)).toMatch(/^Acme renewal terms Status In progress Owner You Project Northwind/);
+    expect(html).toContain('<h2 class="ts-title">Acme renewal terms</h2><div class="ts-sec">');
+    expect(text(html)).toMatch(/^Status In progress Owner You Project Northwind .* Acme renewal terms Problem/);
   });
   it('falls back to the title on a thread with no label', () => {
     expect(draw(item({ label: undefined }))).toContain('<h2 class="ts-title">Can you send Acme their renewal terms by Thursday? Their contract ends on the 14th.</h2>');
@@ -60,7 +62,7 @@ describe('the panel opens with the thread’s name', () => {
 describe('what you can change looks changeable, and what you cannot does not', () => {
   const html = draw(item());
   it('draws Priority and Visible to as buttons that carry a caret', () => {
-    for (const [from, to] of [['Priority', 'Visible to'], ['Visible to', 'Linked']]) {
+    for (const [from, to] of [['Priority', 'Visible to'], ['Visible to', 'Acme renewal terms']]) {
       const cell = between(html, from, to);
       expect(cell).toMatch(/<button[^>]*class="ts-prop-btn"/);
       expect(cell).toContain('ts-caret');
