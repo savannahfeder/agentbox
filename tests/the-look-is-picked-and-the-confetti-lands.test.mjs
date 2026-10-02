@@ -93,7 +93,7 @@ describe('picking how it looks is a step of the walk', () => {
     expect(BEAT.look).toBeGreaterThan(BEAT[INTRO[0]]);
     expect(BEAT.look).toBeLessThan(BEAT.make);
     // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out.
-    expect(N_BEATS).toBe(19);
+    expect(N_BEATS).toBe(20);
   });
 
   it('draws Settings own tiles off one list, not a second copy of them', () => {

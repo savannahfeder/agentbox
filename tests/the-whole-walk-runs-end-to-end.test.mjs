@@ -79,6 +79,7 @@ function walkIt() {
   // times Tab is pressed inside it: the card is a function of the view and the
   // step does not move until the walk is back on an empty inbox.
   s = stepTo(s, 'where');                               at('where it all went');
+  s = stepTo(s, 'board');                               at('the board');
   s = stepTo(s, 'command');                             at('the palette');
   s = stepTo(s, 'done');                                at('the finish card');
   s = advance(s, { t: 'finish' });                      at('landed');
@@ -141,12 +142,12 @@ describe('the walk, start to finish', () => {
     const beats = seen.map((m) => m.step).filter((s, i, all) => s !== all[i - 1]);
     const times = new Map();
     for (const s of beats) times.set(BEAT[s], (times.get(BEAT[s]) ?? 0) + 1);
-    const twice = new Set([12, 19]);
+    const twice = new Set([12, 20]);
     for (const [dot, n] of times) {
       expect(n, `dot ${dot} was on screen ${n} times`).toBe(twice.has(dot) ? 2 : 1);
     }
     expect(beats.filter((s) => BEAT[s] === 12)).toEqual(['working', 'open']);
-    expect(beats.filter((s) => BEAT[s] === 19)).toEqual(['done', 'landed']);
+    expect(beats.filter((s) => BEAT[s] === 20)).toEqual(['done', 'landed']);
   });
 
   it('still knows the folder and the name it was given at the start', () => {

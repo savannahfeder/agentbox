@@ -130,8 +130,12 @@ describe('every practice beat names something to click', () => {
         // shortcut that opens it, so the loud line is the click alone rather
         // than a cap invented to keep the other cards' shape. The first kind is
         // the running beat and the picker, which are lists to choose from.
-        expect(['working', 'who', 'snooze', 'command'], `${name} asks for nothing`).toContain(step);
-        if (step === 'who') expect(loud(say).toLowerCase(), `${name} names no click`).toContain('click');
+        expect(['working', 'who', 'board', 'snooze', 'command'], `${name} asks for nothing`).toContain(step);
+        // `who` and `board` are the click-only beats: the app has no shortcut
+        // that opens the To row or the View and filters menu, so their loud
+        // lines are the click alone rather than a cap invented to keep the
+        // other cards' shape.
+        if (step === 'who' || step === 'board') expect(loud(say).toLowerCase(), `${name} names no click`).toContain('click');
         return;
       }
       if (NO_CLICK[step] && (say.key === 'esc' || step === 'working' || step === 'clear' || step === 'snooze')) {

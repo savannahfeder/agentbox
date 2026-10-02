@@ -55,12 +55,12 @@ export type Step =
   // and only Enter moved it on: a silent screen in the middle of the tutorial.
   // It went with w-ec62ab6b38 (2026-09-28). A walk saved at `note` resumes at
   // `clear` (`liveStep`).
-  | 'clear' | 'snooze' | 'unblock' | 'where' | 'command' | 'done' | 'landed';
+  | 'clear' | 'snooze' | 'unblock' | 'where' | 'board' | 'command' | 'done' | 'landed';
 
 /**
  * HOW MANY BEATS THE WALK HAS. It stays because the walk still has a
  * length and the tests still hold it to one. */
-export const N_BEATS = 19;
+export const N_BEATS = 20;
 
 /**
  * WHICH BEAT EACH SCREEN IS. One pair shares one: `working` and `open` are one
@@ -100,7 +100,12 @@ export const BEAT: Record<Step, number> = {
   // share beat ten: it is one thing happening, which is somebody being shown
   // where the work they just did has gone.
   where: 17,
-  command: 18, done: 19, landed: 19,
+  // AND THE BOARD IS THE BEAT AFTER THE TOUR (2026-10-01). The tour says where
+  // the work went; the board is the same work laid out by what is happening to
+  // it, which is the one view the walk never opened. The walk has to show the
+  // view somebody uses to see what a whole team is up to, not only the tabs.
+  board: 18,
+  command: 19, done: 20, landed: 20,
 };
 
 export interface FirstRun {
@@ -1822,7 +1827,31 @@ export function coach(
        ANCHOR.command has the palette's own list in front of the button now, so the card
        comes back the moment the palette is up.
 
-       AND IT SAYS WHAT THE LIST IS RATHER THAN NAMING THE SCREEN. Then the one key
+    /* * THE BOARD, which is the same work stood up in columns (2026-10-01).
+       THE WALK MUST OPEN THE BOARD, because seeing what a whole team is up to
+       is the question the board answers and no tab does.
+
+       IT FOLLOWS THE TOUR BECAUSE IT ANSWERS THE SAME QUESTION ONE LAYER UP.
+       The tour walks the tabs and says where each thing went; the board is all
+       of it at once, sorted by what is happening to it, which is the view
+       somebody with a team opens in the morning.
+
+       ONE CARD FOR TWO PRESSES, which is unlike the beats around it and is the
+       honest shape here: the board is not a tab, it is a choice inside the View
+       and filters menu, so getting to it really is a button and then a row. The
+       ring does not need telling which half it is on, because `ANCHOR.board`
+       prefers the open menu and falls back to the button that opens it.
+
+       IT SAYS "YOUR TEAM" WITHOUT PROMISING ONE. On a Mac with nobody else the
+       board is your own work in the same columns, which is worth knowing on its
+       own; the sentence names the columns rather than the people, so it is true
+       either way. */
+    case 'board':
+      return say(
+        'The board is everything at once, in columns for what is happening to it.',
+        'Click View and filters at the top right, then Board.',
+      );
+    /* * AND IT SAYS WHAT THE LIST IS RATHER THAN NAMING THE SCREEN. Then the one key
        that leaves, because esc is also what ends the walk.
     */
     case 'command':
@@ -2166,7 +2195,7 @@ export const HELD_EVENTS = ['pointerdown', 'mousedown', 'mouseup', 'click', 'dbl
 
 /* * * THE STEPS THAT ARE NOT A SCREEN.
 */
-export const COACHED: Step[] = ['make', 'who', 'task', 'working', 'open', 'answer', 'clear', 'snooze', 'unblock', 'where', 'command'];
+export const COACHED: Step[] = ['make', 'who', 'task', 'working', 'open', 'answer', 'clear', 'snooze', 'unblock', 'where', 'board', 'command'];
 
 /**
  * What the tether points AT, per step, as a CSS selector into the real app.
@@ -2262,6 +2291,13 @@ export const ANCHOR: Partial<Record<Step, string[]>> = {
   // Running, Scheduled, Done and All tabs over the list. The sidebar there
   // carries Inbox and Team only, so ringing it pointed at the wrong thing.
   where: ['.th-bar .tm-tabs', '.workspace-navigation .workspace-tabs', '.tabs'],
+  // THE BOARD, IN ORDER OF PREFERENCE, the same shape as `snooze` and
+  // `unblock`: the thing that is only on the screen part of the time wins while
+  // it is there. The View and filters button is where the board lives, and the
+  // menu it opens is what the second half of the sentence points at, so the
+  // ring follows the press from the button to the menu without the beat having
+  // to know which half it is on.
+  board: ['.th-pop', '.th-right .th-disp'],
   // THE PALETTE FIRST, THEN THE KEY THAT OPENS IT. Same order-of-preference
   // shape as `snooze` and `unblock` above: the thing that is only on the screen
   // part of the time wins while it is there. Before this the only anchor was
@@ -2649,7 +2685,7 @@ export const STEPS: Step[] = [
   // important stuff like: selecting who it's to etc. and sending messages to
   // both people and agents".
   'make', 'who', 'task', 'working', 'open', 'answer',
-  'clear', 'snooze', 'unblock', 'where', 'command', 'done', 'landed',
+  'clear', 'snooze', 'unblock', 'where', 'board', 'command', 'done', 'landed',
 ];
 
 /**
@@ -2707,7 +2743,7 @@ export const SLAB_OF: Partial<Record<Step, number>> = { inbox: 0, away: 1, goal:
  *  NOT in here, because by then the practice project is gone and the inbox
  *  behind the card is their own. */
 export const IN_PRACTICE: Step[] = [
-  'make', 'who', 'task', 'working', 'open', 'answer', 'clear', 'snooze', 'unblock', 'where', 'command',
+  'make', 'who', 'task', 'working', 'open', 'answer', 'clear', 'snooze', 'unblock', 'where', 'board', 'command',
 ];
 
 /** Whether the practice band is on the screen right now. */

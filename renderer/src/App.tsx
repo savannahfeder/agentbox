@@ -988,6 +988,11 @@ export default function App() {
     // would put the screen back on Inbox a moment after they left it. All this
     // does is make sure nothing is over the app when the tour starts.
     if (run.step === 'where') { setModal(null); setFocused(null); }
+    // THE BOARD BEAT IS DRIVEN NO HARDER THAN THE TOUR IS. The press that
+    // matters is inside the View and filters menu, which the person opens
+    // themselves, so all this does is make sure nothing is over the app and
+    // that they are on the Inbox, where the board lives.
+    if (run.step === 'board') { setModal(null); setFocused(null); setView('inbox'); }
     if (run.step === 'command') { setModal(null); setFocused(null); setView('inbox'); }
   }, [run?.step]);
 
@@ -1865,7 +1870,7 @@ export default function App() {
     // row snoozed there are three to see, and the third is where the row she
     // put off went, which is the same lesson as the other two.
     if (tabOrder.some((v) => v !== 'inbox' && !toured.current.has(v))) return;
-    setRun((r) => (r ? stepTo(r, 'command') : r));
+    setRun((r) => (r ? stepTo(r, 'board') : r));
   }, [view, run?.step, tabOrder]);
 
 
@@ -1969,6 +1974,14 @@ export default function App() {
   // Team a board.
   const [inboxDisplay, setInboxDisplayRaw] = useState<Display>(() => readDisplay('inbox'));
   const setInboxDisplay = useCallback((d: Display) => { setInboxDisplayRaw(d); writeDisplay('inbox', d); }, []);
+  // AND THE TUTORIAL'S BOARD BEAT ENDS WHEN THE BOARD IS REALLY ON THE SCREEN,
+  // read off the view the inbox is drawn in rather than off a click: the press
+  // is two deep, inside the View and filters menu, and the beat is about the
+  // board rather than about either press that reaches it.
+  useEffect(() => {
+    if (run?.step !== 'board' || inboxDisplay.view !== 'board') return;
+    setRun((r) => (r ? stepTo(r, 'command') : r));
+  }, [run?.step, inboxDisplay.view]);
   // WHOSE THREADS ARE ON THE PAGE (w-05ff3d1438): the faces at the end of the
   // tab bar. The Inbox and the Team page were one question on two pages; this
   // is the one page, and it opens as yours. Remembered between launches.

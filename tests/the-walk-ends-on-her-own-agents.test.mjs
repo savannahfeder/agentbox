@@ -156,7 +156,7 @@ describe('where it sits in the walk', () => {
   it('is on the finish card, which is the last dot', () => {
     // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out, and
     // nineteen since 2026-10-01, when who a thread is for became its own beat.
-    expect(N_BEATS).toBe(19);
+    expect(N_BEATS).toBe(20);
     expect(BEAT.done).toBe(N_BEATS);
     expect(BEAT.landed).toBe(N_BEATS);
     expect(BEAT.answer).toBe(13);

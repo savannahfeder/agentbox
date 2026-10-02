@@ -54,7 +54,7 @@ describe('the ten beats, in her order', () => {
     // she asked for: "The Command K bar is not the best place to start."
     // Seventeen since w-ec62ab6b38 (2026-09-28) took the note beat out, and
     // eighteen since 2026-10-01, when who a thread is for became its own beat.
-    expect(BEAT.command).toBe(18);
+    expect(BEAT.command).toBe(19);
     // AND THE BEAT IN FRONT OF IT IS THE TOUR OF THE OTHER TWO TABS, added
     // 2026-08-24. ⌘K used to follow the empty inbox straight away; now the walk
     // shows where the work went first, so an empty inbox means something by the
@@ -80,7 +80,7 @@ describe('the ten beats, in her order', () => {
     // its own at the end; it is part of the card now, so there is no beat
     // after this one.
     // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out.
-    expect(BEAT.done).toBe(19);
+    expect(BEAT.done).toBe(20);
     expect(BEAT.command).toBeLessThan(BEAT.done);
     expect(BEAT.agents).toBeUndefined();
   });
@@ -131,7 +131,7 @@ describe('the ten beats, in her order', () => {
 
   it('counts every beat it renders, and renders every beat it counts', () => {
     // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out.
-    expect(N_BEATS).toBe(19);
+    expect(N_BEATS).toBe(20);
     for (const step of COACHED) expect(coach(step, 0)).not.toBeNull();
     expect(new Set(Object.values(BEAT)).size).toBe(N_BEATS);
     for (const step of COACHED) expect(forcedStep(step)).toBe(step);

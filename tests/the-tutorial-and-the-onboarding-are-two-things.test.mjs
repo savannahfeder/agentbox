@@ -272,7 +272,7 @@ describe('2. the two of them are two things, and a stranger can tell them apart'
     // who it is for and then the send, which the walk never used to say.
     expect(IN_PRACTICE).toEqual([
       'make', 'who', 'task', 'working', 'open', 'answer',
-      'clear', 'snooze', 'unblock', 'where', 'command',
+      'clear', 'snooze', 'unblock', 'where', 'board', 'command',
     ]);
     // And the band that says nothing in here is real is on the screen for all
     // of them, in the tutorial exactly as in the onboarding.

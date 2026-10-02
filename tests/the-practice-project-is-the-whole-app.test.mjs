@@ -497,7 +497,7 @@ describe('the introduction, in front of the app', () => {
     expect(INTRO).toEqual(['inbox', 'away', 'goal', 'hand']);
     // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out, and
     // nineteen since 2026-10-01, when who a thread is for became its own beat.
-    expect(N_BEATS).toBe(19);
+    expect(N_BEATS).toBe(20);
     // THE THREE SLABS COME STRAIGHT AFTER THE THREE SETUP SCREENS, and the
     // theme picker is between the last slab and the hand-off.
     expect(INTRO.map((s) => BEAT[s])).toEqual([4, 5, 6, 8]);

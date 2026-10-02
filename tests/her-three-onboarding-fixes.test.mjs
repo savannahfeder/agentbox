@@ -55,7 +55,7 @@ describe('1. the theme step is at the end of the walk, by the practice round', (
     // walk that lies about how long it is.
     // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out, which
     // sits after all three of the beats below.
-    expect(N_BEATS).toBe(19);
+    expect(N_BEATS).toBe(20);
     expect(BEAT.look).toBe(7);
     expect(BEAT.hand).toBe(8);
     expect(BEAT.make).toBe(9);
