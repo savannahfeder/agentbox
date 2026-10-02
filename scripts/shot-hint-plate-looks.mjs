@@ -39,7 +39,8 @@ const LOOKS = [
 ];
 const TARGETS = [
   { name: 'row', sel: '[data-hint="row"]' },
-  { name: 'tab', sel: '.workspace-tab[data-hint]' },
+  // The Inbox page's own tabs, which wear the Tab plate since w-914b16eab6.
+  { name: 'tab', sel: '.tm-tab[data-hint]' },
 ];
 
 const h = await openInbox({ dist, snapshot });

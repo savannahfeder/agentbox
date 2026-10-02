@@ -225,8 +225,9 @@ describe('the click each card names is a real one', () => {
   // strip at all, and then there is no tab on the screen to name.
   it('names no tab when it has not been given the strip words, rather than guessing one', () => {
     const bare = coach('where', 0, { view: 'inbox', tabs: ['inbox', 'progress', 'done'] });
-    expect(bare.key).toBe('⌘2');
-    expect(loud(bare)).toBe('Press ⌘2 to see where it all went.');
+    // Tab, not ⌘2, since w-914b16eab6 (2026-10-02).
+    expect(bare.key).toBe('⇥');
+    expect(loud(bare)).toBe('Press ⇥ to see where it all went.');
     expect(loud(bare)).not.toContain('click');
   });
 

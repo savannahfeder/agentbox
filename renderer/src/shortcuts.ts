@@ -52,11 +52,10 @@
 //
 // WHAT IS DELIBERATELY NOT HERE, so nobody adds it back as an oversight:
 //
-// ⌘1..4 for PRIORITY. It was removed deliberately and that handler no longer
-// fires. The chord itself is alive again and means something else entirely
-// now: it goes to a section of the sidebar, and it is listed
-// above. Two tooltips in Compose.tsx and Focus.tsx still advertise the old
-// priority meaning and are now doubly wrong; they are not this file's to fix.
+// ⌘1..4, for PRIORITY or for anything else. Priority was removed deliberately
+// and that handler no longer fires. The chord then went to a section of the
+// sidebar until 2026-10-02, and that is gone as well: Tab moves along the tabs
+// now and is listed above.
 //
 //   Y, N and I on a row in the list. Real since w-9741ed0e0b, but they answer
 //   a Codex conversation's import row and are dead on every other row in the
@@ -140,11 +139,12 @@ export const SHORTCUTS: ShortcutGroup[] = [
       { keys: ['K', '↑'], join: 'or', what: 'Move up the list.' },
       // case 'Enter' → setFocused(pointed)
       { keys: ['↵'], what: 'Open the task you are on.' },
-      // sidebarSlot(e) in workspace-navigation.mjs: ⌘ and a number, one per
-      // section, in the order the sidebar draws them. It was ⌘⌥ and an arrow
-      // before, but three keys was too many and the chord moved the whole
-      // window, because a tiling app answers it first.
-      { keys: ['⌘1', '⌘4'], join: 'to', what: 'Go straight to a section of the sidebar, counting from the top.' },
+      // App.tsx, `if (e.key === 'Tab')`: nextTab(stateTabOrder, view, shiftKey)
+      // walks the tabs along the top of the inbox, wrapping. It replaced ⌘1 to
+      // ⌘4 on 2026-10-02 (w-914b16eab6), which jumped through the sidebar's
+      // sections before those became these tabs. Shift-Tab goes back and is
+      // left unlisted on her word: "just show the Next tab".
+      { keys: ['⇥'], what: 'Move to the next tab along the top.' },
       // case 'b': case 'B' → setInboxDisplay(flipView(inboxDisplay)), asked
       // for by name (w-58c8f466e7). "List" and "Board" are the words the View
       // and filters menu prints, so the sentence uses those.
