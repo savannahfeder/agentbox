@@ -17,28 +17,22 @@
 .th-mark-btn:hover .th-mark, .th-mark-btn:focus-visible .th-mark { visibility: hidden; }
 .th-side-foot { display: flex; flex-direction: column; gap: 2px; }
 
-/* A NEW VERSION WAITING (components/SidebarUpdate.tsx). Three looks drawn for
-   her to pick from. Accent on the icon or the edge only, never a fill of
-   alarm colour, which the sidebar does not carry. */
-.workspace-navigation .sb-update-line { color: var(--text); }
-.workspace-navigation .sb-update-line svg { color: var(--accent); }
-.workspace-navigation .sb-update-line[data-installing] { color: var(--text-dim); cursor: default; }
-.workspace-navigation .sb-update-line[data-installing] svg { animation: sb-update-spin 1.4s linear infinite; }
+/* A NEW VERSION WAITING (components/SidebarUpdate.tsx). A card above the
+   foot; shut, an icon. The icon is grey: the accent here is a red-orange and
+   read as a bug. The border is what makes the card stand out. */
 @keyframes sb-update-spin { to { transform: rotate(360deg); } }
 
 .sb-update-card { margin: 0 0 14px; padding: 12px 12px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); display: flex; flex-direction: column; gap: 6px; }
 .sb-update-card-title { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text); }
-.sb-update-card-title svg { width: 16px; height: 16px; color: var(--accent); flex: none; }
+.sb-update-card-title svg { width: 16px; height: 16px; color: var(--text-dim); flex: none; }
 .sb-update-card[data-installing] .sb-update-card-title svg { animation: sb-update-spin 1.4s linear infinite; }
 .sb-update-card p { margin: 0; font-size: 12px; line-height: 1.45; color: var(--text-faint); }
 .workspace-navigation .sb-update-card button { margin-top: 4px; height: 30px; width: 100%; justify-content: center; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--wash); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
 .workspace-navigation .sb-update-card button:hover { background: var(--wash-strong); }
 
-.workspace-navigation .sb-update-mark { flex: none; width: 26px; height: 26px; padding: 0; display: grid; place-items: center; border: 1px solid var(--accent); border-radius: var(--radius); background: none; color: var(--accent); cursor: pointer; }
-.workspace-navigation .sb-update-mark svg { width: 15px; height: 15px; }
-.workspace-navigation .sb-update-mark:hover { background: var(--wash); }
-.workspace-navigation .sb-update-mark[data-installing] { border-color: var(--line-strong); color: var(--text-dim); cursor: default; }
-.workspace-navigation .sb-update-mark[data-installing] svg { animation: sb-update-spin 1.4s linear infinite; }
+.workspace-navigation .sb-update-icon { color: var(--text-dim); border: 1px solid var(--line-strong); }
+.workspace-navigation .sb-update-icon[data-installing] { cursor: default; }
+.workspace-navigation .sb-update-icon[data-installing] svg { animation: sb-update-spin 1.4s linear infinite; }
 .th-me { display: flex; align-items: center; gap: 9px; height: 46px; padding: 8px 0 0 8px; margin-top: 8px; border-top: 1px solid var(--line); font-size: 13.5px; color: var(--text); min-width: 0; box-sizing: border-box; }
 .th-me .tm-av { width: 22px; height: 22px; line-height: 20px; font-size: 9px; flex: none; }
 .workspace-collapsed .th-me > span:nth-child(2), .workspace-collapsed .th-me-signin { display: none; }

@@ -79,7 +79,7 @@ import type { PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
-import { isUpdateRow, updateInstalling, SAY as UPDATE_SAY } from '../update-row';
+import { isUpdateRow } from '../update-row';
 import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
@@ -323,7 +323,7 @@ function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 // not the user's, and it is the part that was unnecessary. `filesFromRuns` stays,
 // because App.tsx still reads it to choose the design a card opens itself on.
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onInstallUpdate, items, onHandToAgent, onAddPeople }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onReopen, onSnooze, onReveal, onOpenItem, onNotice, items, onHandToAgent, onAddPeople }: {
   previewSample?: string;
   /**
    * EVERY THREAD THE WINDOW HOLDS, for the summary's linked titles and the
@@ -350,10 +350,6 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    *  drawn here and teleported there. */
   cornerHeaderTarget?: HTMLElement | null;
   item: WorkItem;
-  /**
-   * Quit and come back on the new version. Only the update row has it, and
-   * only it draws the button that calls it. */
-  onInstallUpdate?: () => void;
   // WHAT AGENTS ARE ALLOWED TO DO RIGHT NOW, so the reply footer can print it
   // whether or not this message has changed it. Claude Code prints its own
   // mode in the status bar the whole time; this is the same fact.
@@ -1478,19 +1474,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               the one below: there is nobody on the other end of it. A box that
               looks like it sends is the failure this codebase cares about most.
               What to do instead is in the message itself, per cause.
-
-             THE NEW VERSION GETS A BUTTON IN THAT SLOT INSTEAD, because unlike the trouble
-             row it has exactly one thing to do, and a button in the app is the expected
-             way to do it. Closing the row is still E
-             and still costs her nothing: the update is downloaded and Settings keeps it.
            */}
-          {update ? (
-            <button className="dock-pill" disabled={updateInstalling(item)} onClick={() => onInstallUpdate?.()}>
-              {updateInstalling(item)
-                ? <span className="dock-pill-text">{UPDATE_SAY.installing}</span>
-                : <span className="dock-pill-text">{UPDATE_SAY.restart}</span>}
-            </button>
-          ) : trouble ? null : replyBlocked ? (
+          {update || trouble ? null : replyBlocked ? (
             /*
              * NO REPLY BOX ON AN AGENT A REPLY CANNOT CLEAR. It is frozen on a
                box asking to approve something, and a message queues behind that

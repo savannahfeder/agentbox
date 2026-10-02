@@ -268,61 +268,43 @@ describe('how the screens reach it', () => {
   });
 });
 
-/* ---------------------------- it arrives as a row -------------------------- */
-// So the news lands in the list like everything else in this product, built by
-// `updateRow` and dropped into the inbox by App.tsx. What these pin is the part
-// that is easy to break quietly later: the row is not in any ledger, so every
-// verb that writes has to leave it alone, and the three announcements that
-// were not picked have to stay deleted.
-describe('a ready update arrives in her inbox as a row', () => {
+/* ------------------------- it shows in the sidebar ------------------------- */
+// It arrived as a row in the inbox until 2026-10-01 (w-7a39dace23), when the
+// card at the foot of the sidebar was picked and the row was taken out: "remove
+// the inbox item for updates, we'll use the sidebar instead". What these pin is
+// that the row stays gone, along with everything that only existed for it, and
+// that the three announcements not picked in w-86452550e5 stay deleted.
+describe('a ready update shows in the sidebar, never as a row in the inbox', () => {
   const app = read('renderer/src/App.tsx');
   const row = read('renderer/src/update-row.ts');
-  const list = read('renderer/src/components/List.tsx');
   const focus = read('renderer/src/components/Focus.tsx');
 
-  it('says the same sentence in the row and in the pane', () => {
-    // The row's title is the pane's heading, and the row's second line is the
-    // pane's first paragraph. One message, or she reads half of it in the list
-    // and a different one when she opens it.
-    expect(row).toContain('ready: `A new version of ${NAME} is ready`');
-    expect(row).toContain('Restart ${NAME} when you are ready.');
-    expect(row).toContain("restart: 'Restart to update'");
+  it('builds no inbox row for it', () => {
+    expect(row).not.toContain('export function updateRow');
+    expect(app).not.toContain('updateRow(');
+    expect(app).not.toContain('updateItem');
+  });
+
+  // Closing the row hid one version. With no row there is nothing to close,
+  // so the version string it kept and the undo that put it back are gone too.
+  it('has no close of its own left behind', () => {
+    expect(app).not.toContain('zero.updateClosed');
+    expect(app).not.toContain('closeUpdateRow');
+  });
+
+  it('has no restart button left on an opened thread', () => {
+    expect(focus).not.toContain('UPDATE_SAY');
+    expect(focus).not.toContain('onInstallUpdate');
+  });
+
+  it('hands the sidebar the same answer ⌘K reads', () => {
+    expect(app).toContain("update={announcesUpdate(snap?.update, { walking, closed: '' })");
   });
 
   it('exists only when there is really something to install', () => {
     expect(announcesUpdate({ ready: false, newVersion: null }, { walking: false, closed: '' })).toBe(false);
     expect(announcesUpdate(null, { walking: false, closed: '' })).toBe(false);
     expect(announcesUpdate({ ready: true, newVersion: '0.2.0' }, { walking: false, closed: '' })).toBe(true);
-  });
-
-  // The version she has already pressed E on. It hides the row and nothing
-  // else; see the block below on saying no.
-  it('stays away for the one version she closed, and comes back for the next', () => {
-    expect(announcesUpdate({ ready: true, newVersion: '0.2.0' }, { walking: false, closed: '0.2.0' })).toBe(false);
-    expect(announcesUpdate({ ready: true, newVersion: '0.3.0' }, { walking: false, closed: '0.2.0' })).toBe(true);
-  });
-
-  it('is dated when the download finished, not when it was drawn', () => {
-    expect(row).toContain('state?.readyAt ?? now');
-  });
-
-  // No ledger has a row called `update` in it, so a write against it would go
-  // nowhere and quietly look like it worked.
-  it('is refused by every verb that would write to a ledger', () => {
-    const guards = app.match(/if \(item\.agent \|\| isTroubleRow\(item\) \|\| isUpdateRow\(item\)\) return;/g) ?? [];
-    expect(guards.length).toBeGreaterThanOrEqual(6);
-  });
-
-  // It cannot be ticked into a batch either, for the same reason, so it wears
-  // the rule at its left edge instead of a select box.
-  it('wears the made-row rule rather than a select box', () => {
-    expect(list).toContain('isTroubleRow(item) || isUpdateRow(item)');
-    expect(list).toContain("id === TROUBLE_ID || id === UPDATE_ID ? all.filter((k) => k.key !== 'R')");
-  });
-
-  it('opens with the restart on it and no reply box', () => {
-    expect(focus).toContain('const update = isUpdateRow(item);');
-    expect(focus).toContain('{UPDATE_SAY.restart}');
   });
 
   // THE THREE THAT WERE NOT PICKED. Keeping any of them switchable is a
@@ -338,37 +320,16 @@ describe('a ready update arrives in her inbox as a row', () => {
   });
 });
 
-/* --------------------------- saying no to it ------------------------------ */
-// So the whole of "reject" is closing the ROW, which is one version string in
-// the renderer, and this is what it is NOT allowed to be. There is no dismiss
-// verb over the bridge and no dismiss on the updater, because the update is not
-// a message that can be thrown away: it is a file on the disk, and the row is
-// only the app mentioning it. If a later round ever adds `updateDismiss` to the
-// preload, this fails, and it should: the state would then live in the main
-// process, where Settings reads it, and a rejected update could go missing from
-// the one screen it is meant to survive on.
-describe('saying no to the row never loses the update', () => {
-  const app = read('renderer/src/App.tsx');
+/* ------------------------ nothing throws it away -------------------------- */
+// There is no dismiss verb over the bridge and no dismiss on the updater,
+// because the update is not a message that can be thrown away: it is code on
+// the disk, and the sidebar is only the app mentioning it.
+describe('nothing loses the update', () => {
   const settings = read('renderer/src/components/Settings.tsx');
 
   it('has nothing over the bridge that could throw an update away', () => {
     expect(preload).not.toContain('update-dismiss');
     expect(updater).not.toContain('dismiss');
-  });
-
-  // The close lives in the renderer's own head and hides the ROW only. Settings
-  // reads `state.phase`, which no close can reach.
-  it('gates the row and not the state behind it', () => {
-    expect(app).toContain("localStorage.setItem('zero.updateClosed', version)");
-    expect(read('renderer/src/api.ts')).not.toContain('updateClosed');
-    expect(settings).not.toContain('updateClosed');
-  });
-
-  // A NEWER VERSION IS NEW NEWS. The close is kept against the version she
-  // closed, so it stops matching the moment a later one comes down.
-  it('comes back when a newer version arrives', () => {
-    expect(app).toContain('announcesUpdate(u, { walking, closed: updateClosed })');
-    expect(announcesUpdate({ ready: true, newVersion: '0.3.0' }, { walking: false, closed: '0.2.0' })).toBe(true);
   });
 
   // SETTINGS NO LONGER CARRIES AN UPDATES GROUP (w-5737fe67cf, the update
@@ -397,7 +358,7 @@ describe('nothing about a new version reaches the walk', () => {
 
   // The download is already on the disk. Nothing is thrown away here and
   // nothing waits on another check: the walk ends and the row is in the list.
-  it('is waiting in her inbox the moment the walk is over', () => {
+  it('is waiting in the sidebar the moment the walk is over', () => {
     expect(announcesUpdate(ready, { walking: false, closed: '' })).toBe(true);
   });
 

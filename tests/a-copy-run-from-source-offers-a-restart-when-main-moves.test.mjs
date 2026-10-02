@@ -25,7 +25,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createSourceUpdater } from '../main/source-updater.mjs';
-import { announcesUpdate, updateBody, updateRow, updateInstalling, SAY } from '../renderer/src/update-row.ts';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { announcesUpdate, SAY } from '../renderer/src/update-row.ts';
+import { SidebarUpdate } from '../renderer/src/components/SidebarUpdate.tsx';
 
 const git = (cwd, ...args) => execFileSync('git', args, {
   cwd,
@@ -257,38 +260,24 @@ describe('the restart', () => {
   });
 });
 
-describe('what the row says for a copy run from source', () => {
+describe('what the sidebar is told for a copy run from source', () => {
   const ready = {
     phase: 'ready', ready: true, source: true, currentVersion: 'abc1234', newVersion: 'def5678',
     changes: ['The inbox reads faster', 'Fix the sign-in page'], behind: 2, readyAt: 1, error: null,
   };
 
-  it('names what changed, and says a restart rebuilds and takes about a minute', () => {
-    const body = updateBody(ready);
-    expect(body).toMatch(/about a minute/);
-    expect(body).toContain('The inbox reads faster');
-    expect(body).toContain('Fix the sign-in page');
-    expect(body).not.toMatch(/few seconds/);
-  });
-
-  it('counts the changes it did not list', () => {
-    expect(updateBody({ ...ready, behind: 9 })).toMatch(/and 7 more/);
-  });
-
-  it('keeps the installed app\'s wording for the installed app', () => {
-    expect(updateBody({ phase: 'ready', ready: true, currentVersion: '0.1.7', newVersion: '0.1.8' })).toMatch(/few seconds/);
-  });
-
-  it('says what went wrong on the last try', () => {
-    expect(updateBody({ ...ready, error: 'The new code would not build: boom' })).toContain('would not build: boom');
-  });
-
-  it('keeps the row up while it rebuilds, so pressing Restart does not look like nothing happened', () => {
+  it('keeps the card up while it rebuilds, so pressing Restart does not look like nothing happened', () => {
     const installing = { ...ready, phase: 'installing', ready: false, installing: true };
     expect(announcesUpdate(installing, { walking: false, closed: '' })).toBe(true);
-    expect(updateInstalling(updateRow(installing))).toBe(true);
-    expect(updateInstalling(updateRow(ready))).toBe(false);
     expect(SAY.installing).toMatch(/Updating/);
+  });
+
+  it('carries a failed restart back to the card, which says it and offers the button again', () => {
+    const html = renderToStaticMarkup(createElement(SidebarUpdate, {
+      collapsed: false, installing: false, error: 'The new code would not build: boom', onRestart() {},
+    }));
+    expect(html).toContain('would not build: boom');
+    expect(html).toContain('Restart to update');
   });
 
   it('still shows nothing when there is nothing to install', () => {

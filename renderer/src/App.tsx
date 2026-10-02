@@ -49,8 +49,7 @@ import { Snooze } from './components/Snooze';
  are gone; their copy is in decisions.md and their photographs on
  `astral/w-86452550e5-looks`.
 */
-import { announcesUpdate, isUpdateRow, updateRow } from './update-row';
-import { sidebarUpdateLook } from './components/SidebarUpdate';
+import { announcesUpdate, isUpdateRow } from './update-row';
 // Inbox zero is `IdlePage`.
 import { IdlePage } from './components/IdlePage';
 import { ago, itemOptions, offerIsLive, parseRepeat } from './format';
@@ -739,19 +738,6 @@ export default function App() {
      since gone (she withdrew it with Z) simply does not answer the click.
   */
   const [toast, setToast] = useState<{ text: string; goes?: { product: string; id: string } } | null>(null);
-  /* * THE VERSION WHOSE ROW SHE HAS CLOSED. Closing hides the ROW and nothing else. The
-     download stays on the disk, Settings > General still says "Restart to update", and ⌘K
-     still carries it. A NEWER version brings a new row, because the string stored here
-     stops matching, which is the same rule the trouble row closes under. Kept the way that
-     row keeps its own, so a ⌘R does not undo her close.
-  */
-  const [updateClosed, setUpdateClosed] = useState<string>(() => {
-    try { return localStorage.getItem('zero.updateClosed') || ''; } catch { return ''; }
-  });
-  const setUpdateClosedAt = useCallback((version: string) => {
-    setUpdateClosed(version);
-    try { localStorage.setItem('zero.updateClosed', version); } catch { /* private mode: it just comes back */ }
-  }, []);
   // Dev aid, the same shape again: ?modes=a,b,e draws one of the three unbuilt
   // treatments of the permission question (./components/ModeScreen.tsx), so it
   // can be photographed inside the real app rather than redrawn beside it.
@@ -1515,26 +1501,12 @@ export default function App() {
     return troubleRow(t, items);
   }, [snap?.supervisor.spawnTrouble, items, troubleClosed]);
 
-  // AND THE ROW THAT SAYS A NEWER AGENTBOX IS ALREADY ON THE DISK. Built the same
-  // way and for the same reason: a row was picked over a line, a toast and a
-  // dot on the cog, because an inbox is what this product is and an
-  // announcement that lands anywhere else is the one exception a user would
-  // have to learn. It exists only in `ready`; nothing about checking, downloading or
-  // failing is her business, and all of that is on the Settings page for
-  // anybody who goes looking.
-  //
-  // AND IT WAITS FOR THE WALK TO END.The rule is `announcesUpdate` in
-  // ./update-row.ts, where the reason is written down and where ⌘K reads it
-  // too.
-  const updateItem = useMemo(() => {
-    const u = snap?.update;
-    if (!announcesUpdate(u, { walking, closed: updateClosed })) return null;
-    return updateRow(u);
-  }, [snap?.update, updateClosed, walking]);
+  // A NEWER AGENTBOX IS NOT A ROW. It was one until 2026-10-01; it is a card in
+  // the sidebar now (components/SidebarUpdate.tsx, w-7a39dace23).
 
   const selectable = useMemo(
-    () => [...items, ...agentRows, ...(troubleItem ? [troubleItem] : []), ...(updateItem ? [updateItem] : [])],
-    [items, agentRows, troubleItem, updateItem],
+    () => [...items, ...agentRows, ...(troubleItem ? [troubleItem] : [])],
+    [items, agentRows, troubleItem],
   );
 
   const inboxCandidates = useMemo(() => items.filter((i) => {
@@ -1649,9 +1621,9 @@ export default function App() {
     // order still holds, because `rows` is already sorted and filter keeps it.
     const urgent = rest.filter(isUrgentRow);
     const ordinary = urgent.length ? rest.filter((i) => !isUrgentRow(i)) : rest;
-    const top = [...(troubleItem ? [troubleItem] : []), ...(updateItem ? [updateItem] : []), ...fresh];
+    const top = [...(troubleItem ? [troubleItem] : []), ...fresh];
     return [...top, ...urgent, ...ordinary];
-  }, [inboxCandidates, liveRows, agentList, agentMode, score, now, pendingId, troubleItem, updateItem, seen]);
+  }, [inboxCandidates, liveRows, agentList, agentMode, score, now, pendingId, troubleItem, seen]);
 
   // BEAT EIGHT ENDS WHEN THE INBOX IS EMPTY, and both ways of ending a task get
   // there: closing one takes it out of the list, and replying to one puts her
@@ -2889,19 +2861,6 @@ export default function App() {
     }, 'Closed: what is not running');
   }, [deferCommit, setTroubleClosedAt, troubleClosed, pushUndo]);
 
-  // It hides the ROW, for this version only. The download is untouched,
-  // Settings > General still offers the restart, ⌘K still carries it, and a
-  // newer version brings a new row because the version stored against the
-  // close stops matching. Nothing in Agentbox discards an update, and there is
-  // deliberately no verb for it.
-  const closeUpdateRow = useCallback(async (item: WorkItem, version: string) => {
-    const was = updateClosed;
-    await deferCommit(item, async () => {
-      setUpdateClosedAt(version);
-      pushUndo({ label: 'Back in your inbox: the new version', undoes: 'put the new version back in your inbox', run: async () => { setUpdateClosedAt(was); } });
-    }, 'Closed. The update is still in Settings');
-  }, [deferCommit, setUpdateClosedAt, updateClosed, pushUndo]);
-
   const markDone = useCallback(async (item: WorkItem) => {
     // AND DURING THE WALK, TWO OF ITS OWN ROWS SAY NO AND SAY WHY. One of them
     // is an agent stopped waiting on you, which is the move the walk is there
@@ -2923,17 +2882,11 @@ export default function App() {
       if (since) await closeTroubleRow(item, since);
       return;
     }
-    // AND SO DOES THE NEW VERSION, and closing it costs her nothing at all: the
-    // update is downloaded either way and Settings keeps the button.
-    if (isUpdateRow(item)) {
-      await closeUpdateRow(item, snap?.update?.newVersion ?? '');
-      return;
-    }
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, status: 'done' });
       pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'open' }); } });
     }, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`);
-  }, [deferCommit, closeAgentRow, closeTroubleRow, closeUpdateRow, snap?.supervisor.spawnTrouble?.since, snap?.update?.newVersion, run, showToast, pushUndo]);
+  }, [deferCommit, closeAgentRow, closeTroubleRow, snap?.supervisor.spawnTrouble?.since, run, showToast, pushUndo]);
 
   const resolve = useCallback(async (item: WorkItem) => {
     // The palette's Approve. Question: send the recommended option. Review:
@@ -2948,10 +2901,6 @@ export default function App() {
     // to close in a ledger, so this hands it to the one thing that is true of
     // it, which puts the row away.
     if (isTroubleRow(item)) { await markDone(item); return; }
-    // THE NEW VERSION HAS EXACTLY ONE THING TO APPROVE and it is the restart,
-    // which is the only sentence on the row. Approve is a named ⌘K command and
-    // nothing else reaches here, so no stray key can quit the app on her.
-    if (isUpdateRow(item)) { void api.updateInstall(); return; }
     const options = itemOptions(item);
     const recommended = options.find((o) => o.recommended) ?? options[0];
     const isProposal = item.status === 'open' && item.kind !== 'question' && item.kind !== 'review'
@@ -3425,10 +3374,6 @@ export default function App() {
     // real move and it is one letter away, so the toast names it.
     const rows = Array.isArray(item) ? item : [item];
     if (rows.some(isTroubleRow)) { showToast('Nothing to put off here. Press E to close it until something else stops.'); return; }
-    // AND THE NEW VERSION CANNOT BE PUT OFF EITHER, for the same reason: there
-    // is no row on disk to carry a moment. Closing it is the real move, so the
-    // toast names it and names what closing costs, which is nothing.
-    if (rows.some(isUpdateRow)) { showToast('Nothing to put off here. Press E to close it. The update stays in Settings.'); return; }
     const held = rows
       .map((i) => snoozeRefused(run, i.id, WAITING_AT))
       .find((why): why is string => !!why);
@@ -4436,9 +4381,8 @@ export default function App() {
       {reviewLab && <div className="review-lab-controls"><span>Review exploration</span><select aria-label="Focus controls" value={focusControlStyle} onChange={e=>setFocusControlStyle(e.target.value as FocusControlStyle)}><option value="text">Focus · Text only</option><option value="corners">Focus · Frame corners + label</option><option value="corners-icon">Focus · Frame corners button</option><option value="corners-bare">Focus · Bare frame corners</option><option value="layout">Focus · Workspace layout</option></select><select aria-label="Review file type" value={artifactPreviewSample} onChange={e=>{setArtifactPreviewSample(e.target.value);setOpenDoc(null);}}><option value="code">Code</option><option value="design">Design</option><option value="notes">Text</option><option value="multiple">All three</option></select><select aria-label="Review actions" value={reviewStyle} onChange={e=>setReviewStyle(e.target.value)}><option value="header-balanced-open">1 · Balanced · open only</option><option value="header-tools-open">2 · Compact · open only</option><option value="header-card-only">3 · Clickable card · no controls</option><option value="header-feedback-only">4 · Clickable card · feedback tools</option><option value="header-balanced">Compare · all controls</option></select>{artifactPreviewSample !== "code" &&<select aria-label="Text surface" value={textReviewStyle} onChange={e=>setTextReviewStyle(e.target.value)}><option value="clear">Text · Fully transparent</option><option value="glass">Text · Matched glass</option></select>}</div>}
       {!reviewLab && api.isFixtures && new URLSearchParams(location.search).has('artifactTweaks') && <div className="artifact-tweaks"><select aria-label="Design toolbar" value={designToolbar} onChange={e => setDesignToolbar(e.target.value)}><option value="floating">Floating bar</option><option value="corner">Corner controls</option><option value="edge">Top edge</option><option value="always">Always visible</option></select>{focused && <select aria-label="Sample artifact" value={artifactPreviewSample} onChange={e => { setArtifactPreviewSample(e.target.value); setOpenDoc(null); }}><option value="multiple">Multiple artifacts</option><option value="design">Design sample</option><option value="code">Code sample</option><option value="notes">Notes sample</option></select>}</div>}
       {workspaceNavigation && <WorkspaceNavigation
-        update={announcesUpdate(snap?.update, { walking, closed: '' }) ? { installing: !!snap?.update?.installing } : null}
+        update={announcesUpdate(snap?.update, { walking, closed: '' }) ? { installing: !!snap?.update?.installing, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
         onUpdate={() => { void api.updateInstall(); }}
-        updateLook={sidebarUpdateLook(new URLSearchParams(window.location.search).get('updateLook'))}
         page={settingsOpen ? 'settings' : teamShown && membersOpen ? (inviteFocus ? 'invite' : 'members') : null} teamPage={teamOpen && !settingsOpen && !membersOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
         onInvite={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setInviteFocus(true); setMembersOpen(true); setTeamOpen(true); }}
         onMembers={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setInviteFocus(false); setMembersOpen(true); setTeamOpen(true); }}
@@ -4823,8 +4767,8 @@ export default function App() {
           the app counting out loud while she waits. */}
 
       {/* NOTHING ABOUT A NEW VERSION STANDS HERE. A line under the header was
-          one of the four drawn for w-86452550e5; the row in the inbox is the one
-          picked, and it is built in `updateItem` above. */}
+          one of the four drawn for w-86452550e5; it lives in the sidebar
+          (components/SidebarUpdate.tsx). */}
 
       {/* THE TEAM PAGE takes the body's place the way Settings does: drawn
           beside it, with the body hidden while it is up. */}
@@ -4946,11 +4890,6 @@ export default function App() {
                   artifactView={openDoc ? artifactView : undefined}
                   onOpenArtifact={(src, mode) => { setArtifactReturnBeside(false); setArtifactMode(mode); setOpenDoc({product: focused.product, src}); }}
                   item={focused}
-                  /*
-                   * The one button the update row carries. Same call the
-                     Settings page makes, so there is one way to install and not
-                     two (w-86452550e5). */
-                  onInstallUpdate={() => { void api.updateInstall(); }}
                   resumeAt={resumeAt}
                   onScrolled={(top) => {
                     const at = Date.now();
