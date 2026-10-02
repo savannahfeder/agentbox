@@ -20,6 +20,17 @@ export const STATE_WORD: Record<ThreadStateWord, string> = {
   waiting: 'Waiting', running: 'In progress', scheduled: 'Scheduled', done: 'Done',
 };
 
+/**
+ * THE WORD A THREAD SHOWS, which is the state's word unless the thread has no
+ * moment at all (w-afb66e6661). A thread added to Later is in the scheduled
+ * family, because nothing is running and nobody has to act, but "Scheduled"
+ * promises a time it does not have. It reads "Not started", the same words as
+ * the tag on its row and as the line that starts it.
+ */
+export function stateWordOf(item: Pick<WorkItem, 'start'>, state: ThreadStateWord): string {
+  return item?.start === 'later' ? 'Not started' : STATE_WORD[state];
+}
+
 export type StateGlyph = 'need' | 'wait' | 'run' | 'sched' | 'done';
 
 /**

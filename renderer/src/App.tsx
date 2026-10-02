@@ -60,7 +60,7 @@ import { approvalReads } from './approval-card';
 // one it took went. Only the second is raised from here, because by the time
 // there is anything to confirm the card has closed.
 import { sentLine } from './compose-says';
-import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, maskedAncestors, parkedByAgent, replyClearsSchedule, statusForReply, stoppable, threadMasked, withdrawReply } from './list-rules';
+import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, maskedAncestors, notStarted, parkedByAgent, replyClearsSchedule, statusForReply, stoppable, threadMasked, withdrawReply } from './list-rules';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { opensATextField } from './keys';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
@@ -1682,12 +1682,20 @@ export default function App() {
   // list that holds one while it is deferred: the Your agents tab that used to
   // carry it as well is gone. A row she deferred has to be somewhere she can
   // reach it, or the only way back is waiting for the moment.
+  //
+  // AND SINCE w-afb66e6661 IT HOLDS A THIRD THING, which is why the tab is
+  // called Later: a thread added to Later has no moment at all. It waits for a
+  // person, so it sorts after everything with a clock rather than before it.
+  const whenShown = useCallback(
+    (i: WorkItem) => (notStarted(i) ? Number.MAX_SAFE_INTEGER : hiddenAt(i)),
+    [hiddenAt],
+  );
   const snoozed = useMemo(() => [
-    ...items.filter((i) => hiddenAt(i) > now
+    ...items.filter((i) => (notStarted(i) || hiddenAt(i) > now)
       && i.status !== 'done'
       && (!scope || i.product === scope)),
     ...agentList.filter((r) => (r.runAt ?? 0) > now),
-  ].sort((a, b) => hiddenAt(a) - hiddenAt(b)), [items, agentList, hiddenAt, scope, now]);
+  ].sort((a, b) => whenShown(a) - whenShown(b)), [items, agentList, hiddenAt, whenShown, scope, now]);
 
   // Repeating tasks. They are RULES, on their own channel, which is why nothing
   // in the item list rules has to know they exist. They are read up here, ahead
@@ -3402,8 +3410,13 @@ export default function App() {
     // name a move that did not happen. What actually changed is that work can
     // start on it again.
     const allParked = list.every((i) => parkedByAgent(i, Date.now()));
-    const one = allParked ? 'Running again' : 'Back in the inbox';
-    showToast(list.length > 1 ? `${list.length} ${allParked ? 'running again' : 'back in the inbox'}` : one);
+    // A thread in Later was never in the inbox and never ran, so neither of
+    // those words is true of it: it is starting for the first time.
+    const allHeld = list.every((i) => notStarted(i));
+    const one = allHeld ? 'Started' : allParked ? 'Running again' : 'Back in the inbox';
+    showToast(list.length > 1
+      ? `${list.length} ${allHeld ? 'started' : allParked ? 'running again' : 'back in the inbox'}`
+      : one);
     // The old localStorage snoozes are still honored on read, so a row deferred
     // before this shipped needs clearing there too or it would not come back.
     setSnoozes((s) => {
@@ -3412,8 +3425,14 @@ export default function App() {
       return next;
     });
     for (const item of list) await writeMoment(item, 0);
+    // AND A THREAD IN LATER IS STARTED BY THE SAME PRESS (w-afb66e6661). It has
+    // no moment to clear; what it has is `start`, and 'now' is what makes the
+    // supervisor see it. The undo puts it back in Later.
+    const wasHeld = list.filter((i) => notStarted(i));
+    for (const item of wasHeld) await api.threadEdit(item.product, item.id, { start: 'now' });
     pushUndo({ label: 'Scheduled again', undoes: 'put that schedule back', run: async () => {
       for (const item of list) await writeMoment(item, prior.get(item.id) ?? 0);
+      for (const item of wasHeld) await api.threadEdit(item.product, item.id, { start: 'later' });
       refresh();
     } });
     refresh();
@@ -5042,6 +5061,7 @@ export default function App() {
             showToast(sentLine({
               to: to ?? slug,
               when: how?.runAt ? whenLabel({ runAt: how.runAt, repeat: null }) : null,
+              held: how?.start === 'later',
             }), made?.id ? { product: made.product, id: made.id } : undefined);
             // SHOW WHERE IT WENT (2026-10-01: a new thread looked as if it
             // was never made, since it was not in the inbox). A thread sent to an agent is not
@@ -5049,7 +5069,7 @@ export default function App() {
             // tab moves to where it did land, Running or Scheduled, so she
             // sees the row arrive instead of an unchanged page.
             if (workspaceNavigation && !teamOpen && !focused && (['inbox', 'progress', 'snoozed'] as View[]).includes(view)) {
-              setView(how?.runAt && how.runAt > Date.now() ? 'snoozed' : 'progress');
+              setView((how?.runAt && how.runAt > Date.now()) || how?.start === 'later' ? 'snoozed' : 'progress');
               setSelected(0);
               setMultiSel(new Set());
             }

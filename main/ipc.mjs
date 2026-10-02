@@ -669,13 +669,13 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     supervisor.wake();
   }));
 
-  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, labels, engine, model, effort, assignee, due, visibility, visibleTo }) => {
+  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo }) => {
     const out = store.composeItem(product, {
       // HOW HARD IT THINKS rides through unjudged: the store keeps any word
       // shaped like a level, and the spawn is the gate that knows each
       // engine's real list (`Supervisor#spawnPlan` for Claude Code,
       // `codexEffortRefusal` for Codex).
-      title, body, kind, priority, runAt, labels, effort,
+      title, body, kind, priority, runAt, start, labels, effort,
       // WHO DOES IT, when it is a person (the team version): the teammate it
       // goes to and the day it is due, and the two of you as the conversation,
       // so a reply can hand it back. An agent's row carries none of these.
@@ -703,7 +703,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // 2026-08-24, median 7.0 seconds and up to 15.0 before the spawn was even
     // attempted. A row scheduled for later is not woken for, because it is not
     // due; the timer is what serves those.
-    if (!runAt || runAt <= Date.now()) supervisor.wake();
+    // Nothing to wake for a thread added to Later: it starts when she says.
+    if (start !== 'later' && (!runAt || runAt <= Date.now())) supervisor.wake();
     return out;
   });
 

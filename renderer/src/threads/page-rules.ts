@@ -169,7 +169,7 @@ export function nextTab<T extends string>(order: readonly T[], current: string, 
 export function filteredEmptyWords(view: TabName | string, hidden: number): { head: string; line: string } {
   const head = {
     progress: 'Nothing in your filter is running',
-    snoozed: 'Nothing in your filter is scheduled',
+    snoozed: 'Nothing in your filter is in Later',
     done: 'Nothing in your filter is closed',
     all: 'No threads match your filter',
   }[view as string] ?? 'Nothing in your filter needs you';

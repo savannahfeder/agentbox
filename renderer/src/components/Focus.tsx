@@ -1293,11 +1293,21 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
          On a finished row none of them apply and the row is not drawn at all, which is the
          screen that was measured and the whole 51px.
        */}
-      {(((scheduledUntil ?? 0) > 0 && !!onUnschedule)
+      {((item.start === 'later' && !!onUnschedule)
+        || ((scheduledUntil ?? 0) > 0 && !!onUnschedule)
         || (!!agent && !agentTakesReply && !!onReveal)
         || (!agent && item.status === 'blocked' && !session)) && (
       <div className="focus-actions">
-        {(scheduledUntil ?? 0) > 0 && onUnschedule && (
+        {/* ADDED TO LATER (w-afb66e6661): it has no moment to read back, so
+            the line says the one thing there is to say and the press starts
+            it. Same button, same place as the one below. */}
+        {item.start === 'later' && onUnschedule && (
+          <button className="focus-unschedule" onClick={onUnschedule}>
+            start it now
+            <span className="dim">{' · '}not started yet</span>
+          </button>
+        )}
+        {item.start !== 'later' && (scheduledUntil ?? 0) > 0 && onUnschedule && (
           // The two cases want different words because the button does two
           // different things. A row SHE scheduled is somewhere else and comes
           // back; a row an agent parked is already right here in her inbox, so

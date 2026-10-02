@@ -31,6 +31,11 @@ export interface WorkItem {
   // The moment before which nothing happens to this item: it cannot be claimed,
   // it will not start, and it is not in the inbox. 0 or absent is unscheduled.
   runAt?: number;
+  // Whether this has been started at all (w-afb66e6661). 'later' is a thread
+  // written down and deliberately not begun: it waits for a person rather than
+  // a clock, lives in Later, and nothing runs on it. 'now' is how it is
+  // started; absent is an ordinary thread that began when it was sent.
+  start?: 'later' | 'now';
   // Which model this runs on, when she chose one on the card: a Claude Code
   // alias, depending on the engine beside it. The two vocabularies do not
   // overlap, which is why the pair only means anything read together
@@ -909,7 +914,7 @@ declare global {
       answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null }): Promise<WorkItem>;
       setProductOrder(p: { order: string[] }): Promise<unknown>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
-      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
+      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
       // The team version (main/team/index.mjs through main/ipc.mjs).
       teamSignIn(): Promise<TeamCallResult>;
       teamSignOut(): Promise<TeamCallResult>;
@@ -1039,6 +1044,8 @@ export type FolderListing = {
 /** What a person may change on a thread from its summary (main/store.mjs threadEdit). */
 export type ThreadEditPatch = Partial<{
   problem: string; progress: string; solution: string;
+  /** 'now' is how a thread leaves Later and starts (w-afb66e6661). */
+  start: 'later' | 'now';
   visibility: 'team' | 'people' | 'private'; visibleTo: string[]; priority: number;
   blockedBy: string[]; blocks: string[];
 }>;
