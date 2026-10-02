@@ -114,7 +114,7 @@ import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { TeamPage } from './team/TeamPage';
-import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, PeoplePicker, StateTabs } from './threads/Pages';
+import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, PeopleFilter, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
 import { DEFAULT_DISPLAY, conversationWith, isDirect, nextTab, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
@@ -1963,7 +1963,7 @@ export default function App() {
     return <><Face person={p} me={id === team?.me} />{id === team?.me ? 'You' : firstName(p)}</>;
   }, [team]);
   const peoplePicker = team
-    ? <PeoplePicker everyone={everyone} picked={picked} me={team.me} onPick={setPicked} />
+    ? <PeopleFilter everyone={everyone} picked={picked} me={team.me} onPick={setPicked} />
     : undefined;
   // EACH TAB'S NUMBER COUNTS WHAT THE FILTERS SHOW (w-5a08121f99). It counted
   // the whole tab, so a filter that had emptied Needs you left the tab saying

@@ -1,12 +1,12 @@
-// THE INBOX AND THE TEAM PAGE ARE ONE PAGE, AND THE FACES PICK WHOSE THREADS IT SHOWS.
+// THE INBOX AND THE TEAM PAGE ARE ONE PAGE, AND A FILTER PICKS WHOSE THREADS IT SHOWS.
 //
 // Found on the team build (2026-10-01): two pages answered one question. The
 // Inbox had the state tabs (Needs you, In progress, Scheduled) and the Team
 // page did not; the Team page had the person and the Inbox did not, and seeing
 // your team meant finding a picker. The rule now: the inbox is the team page
-// filtered to you. So there is one page with the Inbox's tabs, and a small row
-// of faces at the end of the tab bar picks whose threads are on it. You are
-// picked by default. Past four faces the rest fold into "+N".
+// filtered to you. So there is one page with the Inbox's tabs, and a filter at
+// the end of the tab bar picks whose threads are on it. You are picked by
+// default.
 //
 // The second half: your own threads were missing from the Team page because
 // they were private. A store whose open threads all predate joining, with none
@@ -14,7 +14,7 @@
 // and when a teammate is in view the ones they cannot see carry a lock.
 import { describe, it, expect } from 'vitest';
 import {
-  facesShown, normalizePicked, togglePicked, needsWord, teammateRows, mergeRows, privateMark,
+  normalizePicked, togglePicked, needsWord, teammateRows, mergeRows, privateMark,
   readPicked, writePicked,
 } from '../renderer/src/threads/people-rules.ts';
 import { teamEntries } from '../renderer/src/threads/page-rules.ts';
@@ -58,24 +58,10 @@ describe('togglePicked: a face is a switch', () => {
   });
 });
 
-describe('facesShown: four faces, then +N', () => {
-  it('shows nothing at all when you are alone on the team', () => expect(facesShown([me], [ME], ME)).toEqual({ faces: [], more: 0 }));
-  it('shows everyone up to four, you first', () => {
-    const out = facesShown([theo, maya, me, ana], [ME], ME);
-    expect(ids(out.faces)).toEqual([ME, 'p-ana', 'p-maya', 'p-theo']);
-    expect(out.more).toBe(0);
-  });
-  it('at five, three faces and +2, so the row never grows past four marks', () => {
-    const out = facesShown([theo, maya, me, ana, bo], [ME], ME);
-    expect(out.faces).toHaveLength(3);
-    expect(out.more).toBe(2);
-  });
-  it('a picked teammate keeps their face out of the fold', () => {
-    const out = facesShown([theo, maya, me, ana, bo, cy], [ME, 'p-theo'], ME);
-    expect(ids(out.faces)).toEqual([ME, 'p-theo', 'p-ana']);
-    expect(out.more).toBe(3);
-  });
-});
+// The row of faces this file used to pin is gone (w-57034cf3c0): it read as
+// clutter at the end of the tab bar and is one filter now, whose word has its
+// own test in the-people-filter-says-whose-threads. What is left here is the
+// part that did not change: who is picked, and what their threads do on the page.
 
 describe('needsWord: the first tab says whose attention it is', () => {
   it('Needs you when the page is yours alone', () => expect(needsWord([ME], ME)).toBe('Needs you'));

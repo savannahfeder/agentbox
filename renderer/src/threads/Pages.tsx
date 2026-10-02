@@ -17,7 +17,7 @@ import {
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
-import { facesShown, togglePicked } from './people-rules';
+import { togglePicked, whoseWord } from './people-rules';
 import { api } from '../api';
 import './pages.css';
 
@@ -147,56 +147,58 @@ export const INBOX_TABS: { view: TabView; label: string }[] = [
   { view: 'all', label: 'All' },
 ];
 
+/**
+ * A TAB CARRIES A NUMBER ONLY WHERE THE NUMBER CHANGES WHAT YOU DO (w-57034cf3c0).
+ * The strip read DONE 1036 on a real inbox: the archive counting itself, the
+ * same four digits every day, and the widest thing on the row. All is the other
+ * three added up. Both are words now, and the three tabs that are still ahead of
+ * you keep their number while there is something in them. A zero is not drawn
+ * either: an empty tab says so by being empty.
+ */
+const COUNTED: TabView[] = ['inbox', 'progress', 'snoozed'];
+
 /** `needs` renames the first tab (Waiting, once a teammate is on the page);
- *  `end` is what sits at the bar's right end, the faces. */
+ *  `end` is what sits at the bar's right end, the people filter. */
 export function StateTabs({ view, counts, onView, needs, end }: {
   view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string; end?: ReactNode;
 }) {
   return <div className="th-bar"><div className="tm-tabs">
-    {INBOX_TABS.map((t) => <button type="button" key={t.view} className={`tm-tab${view === t.view ? ' on' : ''}`} onClick={() => onView(t.view)}>{t.view === 'inbox' && needs ? needs : t.label}{counts[t.view] !== undefined && <b>{counts[t.view]}</b>}</button>)}
+    {INBOX_TABS.map((t) => <button type="button" key={t.view} className={`tm-tab${view === t.view ? ' on' : ''}`} onClick={() => onView(t.view)}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
   </div>{end}</div>;
 }
 
 /* ------------------------------------------------------------ whose threads */
 /**
- * THE FACES THAT PICK WHOSE THREADS ARE ON THE PAGE (w-05ff3d1438). At the
- * right end of the tab bar, you first. A face is a switch: lit when that
- * person's threads are on the page, faint when not. Past four people the rest
- * fold into "+N", which opens everyone as a list. Nothing is drawn for a
- * person alone on a team, or for nobody signed in.
+ * ONE FILTER AT THE END OF THE TAB BAR (w-57034cf3c0). Up to four face chips
+ * and a "+N" stood here and read as clutter on the one row that has to stay
+ * quiet. This says whose threads the page is showing in words, and opens the
+ * same list: Just you, Everyone, then each person with a tick. Nothing is drawn
+ * for a person alone on a team, or for nobody signed in.
  */
-export function PeoplePicker({ everyone, picked, me, onPick }: {
+export function PeopleFilter({ everyone, picked, me, onPick }: {
   everyone: Person[]; picked: string[]; me: string | null; onPick: (picked: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useOutside(open, () => setOpen(false));
-  const { faces, more } = facesShown(everyone, picked, me);
-  if (!faces.length) return null;
+  if (everyone.filter((p) => p.id !== me).length === 0) return null;
   const name = (p: Person) => (p.id === me ? 'You' : p.name || p.email || 'Someone');
-  const face = (p: Person) => {
-    const on = picked.includes(p.id);
-    return <button type="button" key={p.id} className={`th-face${on ? ' on' : ''}`} aria-pressed={on}
-      title={on ? `${name(p)}: shown. Click to hide.` : `Show ${p.id === me ? 'your' : `${firstName(p)}’s`} threads`}
-      onClick={() => onPick(togglePicked(picked, p.id, me))}><Face person={p} me={p.id === me} /></button>;
-  };
   const sorted = [...everyone.filter((p) => p.id === me), ...everyone.filter((p) => p.id !== me).sort((a, b) => name(a).localeCompare(name(b)))];
-  const hiddenPicked = more > 0 && picked.some((id) => !faces.some((f) => f.id === id));
-  return <div className="th-people" role="group" aria-label="Whose threads are shown">
-    {faces.map(face)}
-    {more > 0 && <span ref={(el) => { ref.current = el; }} className="th-more-wrap">
-      <button type="button" className={`th-face th-more${open ? ' open' : ''}${hiddenPicked ? ' on' : ''}`} aria-haspopup="listbox" aria-expanded={open}
-        title={`${more} more`} onClick={() => setOpen(!open)}>+{more}</button>
-      {open && <div className="th-menu th-people-menu" role="listbox" aria-multiselectable="true">
-        <button type="button" className="row-i" onClick={() => { onPick(me ? [me] : picked); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Just you</button>
-        <button type="button" className="row-i" onClick={() => { onPick(sorted.map((p) => p.id)); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Everyone</button>
-        <span className="sep" />
-        {sorted.map((p) => <button type="button" key={p.id} role="option" aria-selected={picked.includes(p.id)} className={`row-i${picked.includes(p.id) ? ' on' : ''}`}
-          onClick={() => onPick(togglePicked(picked, p.id, me))}>
-          <Face person={p} me={p.id === me} />{name(p)}{picked.includes(p.id) && <CheckMark />}
-        </button>)}
-      </div>}
-    </span>}
-  </div>;
+  return <span className="th-pf-wrap" ref={(el) => { ref.current = el; }}>
+    <button type="button" className={`th-pf${open ? ' open' : ''}`} aria-haspopup="listbox" aria-expanded={open}
+      title="Whose threads are shown" onClick={() => setOpen(!open)}>
+      <PeopleIcon /><span className="w">{whoseWord(everyone, picked, me)}</span>
+      <svg width="9" height="6" viewBox="0 0 9 6" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="m1 1.5 3.5 3L8 1.5" /></svg>
+    </button>
+    {open && <div className="th-menu th-people-menu" role="listbox" aria-multiselectable="true">
+      <button type="button" className="row-i" onClick={() => { onPick(me ? [me] : picked); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Just you</button>
+      <button type="button" className="row-i" onClick={() => { onPick(sorted.map((p) => p.id)); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Everyone</button>
+      <span className="sep" />
+      {sorted.map((p) => <button type="button" key={p.id} role="option" aria-selected={picked.includes(p.id)} className={`row-i${picked.includes(p.id) ? ' on' : ''}`}
+        onClick={() => onPick(togglePicked(picked, p.id, me))}>
+        <Face person={p} me={p.id === me} />{name(p)}{picked.includes(p.id) && <CheckMark />}
+      </button>)}
+    </div>}
+  </span>;
 }
 const CheckMark = () => <svg className="th-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
 

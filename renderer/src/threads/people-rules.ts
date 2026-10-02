@@ -43,24 +43,26 @@ export function togglePicked(picked: string[], id: string, _me: string | null): 
 
 export const othersInView = (picked: string[], me: string | null) => picked.some((p) => p !== me);
 
-/**
- * THE FACES DRAWN, AT MOST FOUR MARKS. You first, then whoever is picked, then
- * the rest by name. Past four people, three faces and "+N", so the row never
- * grows with the team. Alone on a team there is nobody to pick and nothing is
- * drawn.
- */
-export function facesShown(everyone: Person[], picked: string[], me: string | null, max = 4): { faces: Person[]; more: number } {
-  if (everyone.filter((p) => p.id !== me).length === 0) return { faces: [], more: 0 };
-  const byName = (a: Person, b: Person) => (a.name || a.email || '').localeCompare(b.name || b.email || '');
-  const mine = everyone.filter((p) => p.id === me);
-  const others = everyone.filter((p) => p.id !== me);
-  const ordered = [...mine, ...others.filter((p) => picked.includes(p.id)).sort(byName), ...others.filter((p) => !picked.includes(p.id)).sort(byName)];
-  if (ordered.length <= max) return { faces: ordered, more: 0 };
-  return { faces: ordered.slice(0, max - 1), more: ordered.length - (max - 1) };
-}
-
 /** The first tab: Needs you on your own page, Waiting once anyone else is on it. */
 export const needsWord = (picked: string[], me: string | null) => (othersInView(picked, me) ? 'Waiting' : 'Needs you');
+
+/**
+ * WHOSE THREADS ARE ON THE PAGE, IN ONE PHRASE (w-57034cf3c0). The bar used to
+ * end in up to four face chips and a "+N", which is five things to read at the
+ * end of the one row that has to stay quiet, and which say nothing at a glance
+ * that a phrase does not say better. One filter stands there now, and this is
+ * the word in it: Everyone, Just you, You and Maya, You and 2 others.
+ */
+export function whoseWord(everyone: Person[], picked: string[], me: string | null): string {
+  const first = (p: Person) => (p.name || p.email || 'Someone').split(/[\s@]/)[0];
+  const shown = everyone.filter((p) => picked.includes(p.id));
+  if (everyone.length > 1 && shown.length === everyone.length) return 'Everyone';
+  const others = shown.filter((p) => p.id !== me);
+  if (!others.length) return 'Just you';
+  const youToo = me !== null && picked.includes(me);
+  if (others.length === 1) return youToo ? `You and ${first(others[0])}` : first(others[0]);
+  return youToo ? `You and ${others.length} others` : `${others.length} people`;
+}
 
 type Tab = 'inbox' | 'progress' | 'snoozed' | 'done' | 'all';
 const TAB_STATE: Record<Tab, (s: ThreadCard['state']) => boolean> = {

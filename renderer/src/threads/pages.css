@@ -233,21 +233,22 @@
 .th-cell-title .th-st.live { margin-right: 8px; top: 1px; }
 .th-card .m .th-st.live { margin-right: 8px; top: 0; }
 
-/* WHOSE THREADS: the faces at the right end of the tab bar (w-05ff3d1438).
-   Lit is on the page, faint is not; the row never grows past four marks. */
-.th-people { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; }
-.th-face { position: relative; display: inline-grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--radius); background: none; cursor: pointer; opacity: .42; filter: grayscale(1); transition: opacity .12s ease, filter .12s ease, box-shadow .12s ease; }
-.th-face .tm-av { width: 22px; height: 22px; line-height: 20px; font-size: 8.5px; }
-.th-face:hover { opacity: .85; filter: none; }
-.th-face.on { opacity: 1; filter: none; box-shadow: 0 0 0 1px var(--text-faint); }
-.th-face:focus-visible { outline: none; box-shadow: 0 0 0 1.5px var(--accent); }
-.th-more { width: auto; min-width: 24px; padding: 0 5px; font: 500 10.5px/24px var(--mono); color: var(--text-dim); border: 1px solid var(--line); filter: none; opacity: .8; }
-.th-more:hover, .th-more.open { opacity: 1; color: var(--text); border-color: var(--line-strong); }
-.th-more.on { opacity: 1; color: var(--text); box-shadow: none; border-color: var(--text-faint); }
-.th-more-wrap { position: relative; display: inline-flex; }
+/* WHOSE THREADS: one filter at the right end of the tab bar (w-57034cf3c0).
+   Four face chips and a "+N" stood here and read as clutter; this says who in
+   words and opens the same list. */
+.th-pf-wrap { position: relative; display: inline-flex; margin-left: auto; }
+.th-pf { height: 26px; padding: 0 9px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim);
+  font: inherit; font-size: 12.5px; white-space: nowrap;
+  transition: border-color .08s ease, color .08s ease, background .08s ease; }
+.th-pf svg:first-child { width: 15px; height: 15px; color: var(--text-faint); }
+.th-pf svg:last-child { color: var(--text-faint); }
+.th-pf:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash); }
+.th-pf.open { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
+.th-pf:focus-visible { outline: none; border-color: var(--text-faint); color: var(--text); }
 .th-people-menu { left: auto; right: 0; top: 32px; }
 .th-people-menu .th-check { margin-left: auto; color: var(--text-dim); }
-/* Over the board there are no tabs, so the faces sit alone at the right. */
+/* Over the board there are no tabs, so the filter sits alone at the right. */
 .th-bar-end { justify-content: flex-end; padding-bottom: 0; }
 /* A teammate's row has no select box: nothing on this Mac can act on it. */
 .th-their-row .mark { visibility: hidden; }
