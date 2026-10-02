@@ -131,13 +131,15 @@ describe('what the plate is made of is not a colour of its own', () => {
     // --film-strong is a dark film on light, so the plate drew as a grey smudge
     // with grey words. It borrows the approval card's glass there instead:
     // --bg-raised at 62%, see-through, so it is never the plain white slab the
-    // rule above forbids.
-    const light = css.match(/:root\[data-theme="light"\] \.hint-plate \{[^}]*\}/s);
+    // rule above forbids. Light is the app's one look now, so the rule is
+    // scoped to `:root` rather than to a light theme attribute.
+    const light = css.match(/\n:root \.hint-plate \{[^}]*\}/s);
     expect(light, 'no light .hint-plate rule').toBeTruthy();
     expect(light[0]).toContain('background: color-mix(in oklab, var(--bg-raised) 62%, transparent)');
     expect(light[0]).toContain('blur(22px)');
     expect(light[0]).not.toContain('--control-face');
-    expect(css).toMatch(/:root\[data-theme="light"\] \.hint-caps kbd \{ border-color: var\(--line-strong\); \}/);
+    // The caps take --line-strong on every look since w-5984544441, light included.
+    expect(css).toMatch(/\n\.hint-caps kbd \{[^}]*border: 1px solid var\(--line-strong\)/);
   });
 
   it('has no arrow, no tail and no pointer', () => {
@@ -145,10 +147,6 @@ describe('what the plate is made of is not a colour of its own', () => {
     // else in this app has one.
     expect(css).not.toContain('.hint-tail');
     expect(rule[0]).not.toContain('::after');
-  });
-
-  it('drops its shadow under a picture, where the face is see-through', () => {
-    expect(css).toMatch(/:root\[data-skin\] \.hint-plate \{ box-shadow: none; \}/);
   });
 
   it('never takes the pointer', () => {
@@ -160,10 +158,14 @@ describe('every line says a key the app really has', () => {
   // The same rule shortcuts.ts keeps: a hint that prints a key the handler does
   // not run is worse than no hint at all.
 
-  it('runs C, E, S and the terminal chord', () => {
+  // L, NOT S, ON THE ROW SINCE 2026-10-01. S opened the schedule picker here
+  // and toggled the summary inside a thread, so the plate and the thread's own
+  // top bar printed one letter for two different things. Scheduling is L
+  // everywhere now and S belongs to the summary.
+  it('runs C, E, L and the terminal chord', () => {
     expect(app).toMatch(/case 'c': case 'C': case 'n': case 'N': e\.preventDefault\(\); setModal\('compose'\);/);
     expect(HINTS['new-task'][0].key).toBe('N');
-    expect(HINTS.row.map((l) => l.key)).toEqual(['↵', 'E', 'S']);
+    expect(HINTS.row.map((l) => l.key)).toEqual(['↵', 'E', 'L']);
     expect(HINTS.terminal[0].key).toBe('⌘J');
     expect(HINTS.back[0].key).toBe('esc');
   });

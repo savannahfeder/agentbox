@@ -107,32 +107,22 @@ describe('signing and notarisation', () => {
     }
   });
 
-  // The logo is the app's own ProductMark, so the icon script computes the rays
-  // rather than owning a second copy of them. This is the test that stops the
-  // two drifting: change the mark and the icon must move with it, or this fails
-  // and says so.
-  it('draws the icon from the same rays as the mark in the sidebar', () => {
-    const mark = fs.readFileSync(path.join(repo, 'renderer/src/components/ProductMark.tsx'), 'utf8');
+  // The logo is the "On the grid" icon from the launch film, one file that the
+  // app icon, the in-app mark and the README all draw. This is the test that
+  // stops them drifting: a second copy of the logo anywhere fails it. It
+  // replaced a test that pinned the old sunburst's geometry, which the founder
+  // retired (w-a514b58055).
+  it('draws the icon, the mark in the app and the README from one logo file', () => {
+    const svg = path.join(repo, 'renderer/src/assets/agentbox-icon.svg');
     const icon = fs.readFileSync(path.join(repo, 'scripts/make-icon.mjs'), 'utf8');
+    const mark = fs.readFileSync(path.join(repo, 'renderer/src/components/AppMark.tsx'), 'utf8');
 
-    // The four numbers that ARE the drawing: the two inner radii and the two
-    // outer ones, alternating ray by ray.
-    const geometry = (src) => {
-      const inner = src.match(/inner\s*=\s*i % 2 === 0 \? ([\d.]+) : ([\d.]+)/);
-      const outer = src.match(/outer\s*=\s*i % 2 === 0 \? ([\d.]+) : ([\d.]+)/);
-      const rays = src.match(/RAYS\s*=\s*(\d+)/);
-      return { inner: inner?.slice(1, 3), outer: outer?.slice(1, 3), rays: rays?.[1] };
-    };
-
-    const a = geometry(mark);
-    expect(a.rays).toBe('24');
-    expect(a.inner).toEqual(['5.6', '6.4']);
-    expect(geometry(icon)).toEqual(a);
-
-    // And the same stroke, in the same proportion to the same 24 unit grid.
-    expect(mark).toContain('strokeWidth="1.4"');
-    expect(icon).toContain('1.4 * k');
-    expect(icon).toContain('GRID = 24');
+    expect(icon).toContain("'renderer', 'src', 'assets', 'agentbox-icon.svg'");
+    expect(mark).toContain("'../assets/agentbox-icon.svg?url'");
+    expect(fs.readFileSync(svg).equals(fs.readFileSync(path.join(repo, 'docs/readme/icon.svg')))).toBe(true);
+    // And the sunburst is drawn nowhere any more.
+    expect(icon).not.toMatch(/RAYS/);
+    expect(mark).not.toMatch(/RAYS/);
   });
 
   // Rule 6: an approval closes the option set. The mark was picked, so the four

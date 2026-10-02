@@ -35,6 +35,41 @@ export function stateGlyph(state: ThreadStateWord, waitingOnYou: boolean): State
   return 'done';
 }
 
+/**
+ * WHAT THE STATUS ROW LETS SOMEBODY SET, which since 2026-10-01 is a menu
+ * rather than a word to read.
+ *
+ * THE RULE, and the whole of why this exists: marking a thread done from a
+ * dropdown on its Status row is more natural than the Mark Done button in the
+ * corner. Some redundancy is fine for an action this important, but none of it
+ * belongs on the inbox. The round before this one had tried putting a Done
+ * button on the inbox ROW and it was turned down: closing
+ * is something you do to a thread you have opened, not something you reach for
+ * going down a list.
+ *
+ * ONE ENTRY, AND THAT IS THE POINT RATHER THAN A STUB. Three of the four words
+ * are facts about what is happening to a thread and not choices: In progress is
+ * an agent holding it, Waiting is nobody holding it, and Scheduled is a moment
+ * somebody picked in the picker, which is a second step and a different
+ * gesture. Done is the one a person SETS, so it is the one the menu offers. A
+ * menu row that cannot be chosen is the dead key this codebase keeps refusing.
+ *
+ * AND NOTHING AT ALL ON A FINISHED THREAD. Un-finishing one exists only as the
+ * undo of closing it (Z, and the toast that offers it), so a "Back to inbox"
+ * row here would be a new action invented to fill a menu out.
+ */
+export interface StatusChoice {
+  /** The patch this row makes, named for what it does rather than for a field. */
+  id: 'done';
+  word: string;
+  glyph: StateGlyph;
+}
+
+export function statusChoices(state: ThreadStateWord): StatusChoice[] {
+  if (state === 'done') return [];
+  return [{ id: 'done', word: STATE_WORD.done, glyph: 'done' }];
+}
+
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;

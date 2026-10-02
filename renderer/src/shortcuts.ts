@@ -172,6 +172,11 @@ export const SHORTCUTS: ShortcutGroup[] = [
       // (w-ef92663cb1). It landed after this list last changed, so it was
       // missing here at first.
       { keys: ['⌘J'], what: 'Show or hide this task’s terminal.' },
+      // threads/Summary.tsx, `useSummaryShortcut`: it listens in the capture
+      // phase and stops the key there, so S belongs to the summary on a thread
+      // that has one. It is under THIS heading and not the one below because it
+      // is the one key in the app that works only inside an open thread.
+      { keys: ['S'], what: 'Show or hide the summary.' },
     ],
   },
   {
@@ -183,8 +188,13 @@ export const SHORTCUTS: ShortcutGroup[] = [
       // focused branch: 'e' → markDone. List switch: inbox → markDone,
       // snoozed → unsnooze. It never approves anything.
       { keys: ['E'], what: 'Close the task and take it out of your inbox.' },
-      // focused branch and list switch: 's' → openSnooze
-      { keys: ['S'], what: 'Put the task off until a time you pick.' },
+      // focused branch and list switch: 'l' → openSnooze. IT WAS S UNTIL
+      // 2026-10-01 AND THAT IS THE WHOLE OF WHY IT MOVED. S had come to mean
+      // the summary inside a thread and still meant the schedule picker in the
+      // list, so this page taught one letter for two different things and an
+      // office manager testing the app met both inside a minute. One meaning
+      // per letter: S is the summary, L is later.
+      { keys: ['L'], what: 'Put the task off until a time you pick.' },
       // focused branch and list switch: 'z' → undo
       { keys: ['Z'], what: 'Undo the last thing you did.' },
       // (meta||ctrl) && 'a' && !inInput && !modal → tick the whole list

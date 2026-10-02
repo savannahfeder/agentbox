@@ -6,6 +6,10 @@ import { Face } from '../team/people';
 import { Name } from '../../../shared/product-name.mjs';
 import { SidebarIcon } from './SidebarIcon';
 import { SidebarToggleIcon } from './SidebarToggleIcon';
+import { AppMark } from './AppMark';
+import { SidebarUpdate } from './SidebarUpdate';
+import { changeLines } from '../update-row';
+import { SidebarStatus } from '../team/status';
 /** ONE NUMBER IN THE SIDEBAR, ON INBOX, AND IT IS DRAWN IN THE TAB'S OWN TYPE.
  *
  *  w-5f02e7b525. Only Inbox shows a number, like a classic email client, and of
@@ -37,7 +41,9 @@ import { SidebarToggleIcon } from './SidebarToggleIcon';
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onMembers }: {
+export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, update = null, onUpdate }: {
+  // A NEW VERSION WAITING (SidebarUpdate.tsx). Null when there is none.
+  update?: { installing: boolean; changes?: string[]; behind?: number | null; error?: string | null } | null; onUpdate?: () => void;
   page?: string | null; inboxCount?: number; scheduledCount?: number; usage?: ReactNode; onSettings?: () => void; onInstructions?: () => void;
   // THE TEAM TAB. No people and no counts here: approved 2026-09-30, a list of
   // who is busy is not worth seeing all the time, and the Team page is where
@@ -45,9 +51,14 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   hasTeam?: boolean; onTeam?: () => void;
   // Whether the Team page is up, which lights its tab and darkens the others.
   teamPage?: boolean;
-  // THE FOOT OF THE SIDEBAR (approved 2026-10-01): invite people, the team's
-  // members, settings, and you, all in the sidebar rather than on a page.
-  team?: TeamState | null; onInvite?: () => void; onMembers?: () => void;
+  // THE FOOT OF THE SIDEBAR (approved 2026-10-01): invite people, settings,
+  // and you, all in the sidebar rather than on a page.
+  //
+  // TEAM MEMBERS LEFT IT ON 2026-10-01: team management is a pane in Settings
+  // and this row routes to it as a shortcut, because the two team rows here
+  // were one door twice. `onInvite` is that shortcut and `onAccount` is your
+  // own row, which opens the same pane without the cursor in the email box.
+  team?: TeamState | null; onInvite?: () => void; onAccount?: () => void;
   view: View; collapsed: boolean; onToggle: () => void; onView: (view: View) => void; onSearch: () => void; onCompose: () => void;
 }) {
   // The Team page is a page like Settings: while it is up no list tab is lit.
@@ -60,6 +71,11 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   const inboxLit = !page && (['inbox', 'progress', 'snoozed', 'done', 'all'] as string[]).includes(view);
   const me = team?.signedIn ? team.me : null;
   const teamName = team?.team?.name ?? Name;
+  // A team wears its initial. With no team the corner names the app itself, so
+  // it wears the Agentbox icon rather than a letter A.
+  const mark = team?.team?.name
+    ? <span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span>
+    : <span className="th-mark th-mark-app" aria-hidden="true"><AppMark size={20} /></span>;
   return <aside className="workspace-navigation" aria-label="Workspace">
     {/* THE TOGGLE SITS BESIDE THE TEAM'S NAME, at the top, where sidebars keep
         it (2026-10-01). Collapsed, the mark itself is the way back
@@ -67,11 +83,11 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
     <div className="th-team" title={collapsed ? undefined : teamName}>
       {collapsed ? (
         <button type="button" className="workspace-toggle th-mark-btn" data-hint="sidebar" aria-label="Expand sidebar" title="Expand sidebar" onClick={onToggle}>
-          <span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span>
+          {mark}
           <span className="th-mark-open" aria-hidden="true"><SidebarToggleIcon collapsed /></span>
         </button>
       ) : <>
-        <span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span>
+        {mark}
         <span className="th-team-name">{teamName}</span>
         <button type="button" className="workspace-toggle th-toggle" data-hint="sidebar" data-hint-align="right" aria-label="Collapse sidebar" title="Collapse sidebar" onClick={onToggle}><SidebarToggleIcon collapsed={false} /></button>
       </>}
@@ -84,12 +100,13 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
           it. `onTeam` is still the sign-in link at the foot. */}
     </nav>
     <div className="workspace-bottom">
+      {update && onUpdate && !collapsed && <SidebarUpdate collapsed={false} installing={update.installing} changes={changeLines(update)} error={update.error ?? null} onRestart={onUpdate} />}
       <div className="workspace-utilities th-side-foot">
+        {update && onUpdate && collapsed && <SidebarUpdate collapsed installing={update.installing} changes={changeLines(update)} onRestart={onUpdate} />}
         {/* Shown to anyone signed in, on a team or not (2026-10-01: the
             invite page and team settings must always be reachable). With no
             team yet, both open the page that starts one. */}
         {me && onInvite && <button aria-label="Invite people" aria-current={page === 'invite' ? 'page' : undefined} title={collapsed ? 'Invite people' : undefined} onClick={onInvite}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="10" cy="8.5" r="3.5"/><path d="M3.5 20c.7-3.4 3.3-5.3 6.5-5.3 1.4 0 2.6.3 3.7.9"/><path d="M18 14v6M15 17h6"/></svg><span>Invite people</span></button>}
-        {me && onMembers && <button aria-label="Team members" aria-current={page === 'members' ? 'page' : undefined} title={collapsed ? 'Team members' : undefined} onClick={onMembers}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/><circle cx="9.5" cy="11" r="2.2"/><path d="M5.8 16.5c.5-1.6 1.9-2.5 3.7-2.5s3.2.9 3.7 2.5M15 10h3M15 13h3"/></svg><span>Team members</span></button>}
         {onInstructions && <button aria-label="Instructions" aria-current={page === 'instructions' ? 'page' : undefined} title="Instructions for every agent" onClick={onInstructions}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 16h6"/></svg><span>Instructions</span></button>}
         {onSettings && <button aria-label="Settings" aria-current={page === 'settings' ? 'page' : undefined} title="Settings" onClick={onSettings}><SettingsIcon/><span>Settings</span></button>}
       </div>
@@ -97,8 +114,8 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
       <div className="th-me">
         {/* Your own row opens the page with your account on it, so clicking
             your own name always does something. */}
-        {me ? (onMembers
-          ? <button type="button" className="th-me-btn" aria-label="Your account" title={collapsed ? 'Your account' : undefined} onClick={onMembers}><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></button>
+        {me ? (onAccount
+          ? <><button type="button" className="th-me-btn" aria-label="Your account" title={collapsed ? 'Your account' : undefined} onClick={onAccount}><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></button><SidebarStatus me={me} now={Date.now()} collapsed={collapsed} /></>
           : <><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></>)
           : team?.configured && onTeam ? <button type="button" className="th-me-signin" aria-label="Sign in to your team" onClick={onTeam}>Sign in to your team</button>
             : <span />}

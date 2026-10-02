@@ -40,6 +40,9 @@ const terminal = read('renderer/src/components/TaskTerminal.tsx');
 const focus = read('renderer/src/components/Focus.tsx');
 // The header's right end and the Inbox page's state tabs (approved 2026-10-01).
 const pages = read('renderer/src/threads/Pages.tsx');
+// The thread's Summary button, which printed its S on its face until
+// w-5984544441 and says it in a plate now.
+const summary = read('renderer/src/threads/Summary.tsx');
 
 // The list's own key switch, which is the only place the row keys are run.
 // Everything above it belongs to modals, chords and full-screen reading.
@@ -53,10 +56,18 @@ const tabNav = () => {
 };
 
 describe('the row prints the keys it really has', () => {
-  it('gives the inbox reply and close, which is the drawing she picked', () => {
+  // AND LATER IS ON AN INBOX ROW TOO SINCE 2026-10-01. These words are only
+  // ever drawn while the tutorial is on (`walkRowKeys` narrows them to the
+  // beat's own key and List.tsx draws them under a `walk &&` guard), and the
+  // tutorial's scheduling beat asks for L on an inbox row. Without this entry
+  // that beat drew a card naming a key and left nothing on the row to click.
+  // L really does open the picker in the inbox, which is the rule this whole
+  // file keeps.
+  it('gives the inbox reply, close and later, which are the keys it really has', () => {
     expect(rowKeys('inbox')).toEqual([
       { key: 'R', word: 'Reply' },
       { key: 'E', word: DONE.short },
+      { key: 'L', word: 'Later' },
     ]);
   });
 
@@ -73,7 +84,7 @@ describe('the row prints the keys it really has', () => {
     expect(listSwitch).toMatch(/case 'e': case 'E':[\s\S]{0,400}view === 'snoozed'\) unsnooze/);
     expect(rowKeys('snoozed')).toEqual([
       { key: 'E', word: 'Back to inbox' },
-      { key: 'S', word: 'Remind me' },
+      { key: 'L', word: 'Remind me' },
     ]);
   });
 
@@ -92,10 +103,17 @@ describe('the row prints the keys it really has', () => {
     }
   });
 
-  it('prints S only where the reminder picker opens', () => {
-    expect(listSwitch).toMatch(/case 's': case 'S':[\s\S]{0,400}view === 'inbox' \|\| view === 'snoozed'/);
-    const withS = ['inbox', 'snoozed', 'progress', 'done'].filter((v) => rowKeys(v).some((k) => k.key === 'S'));
-    expect(withS).toEqual(['snoozed']);
+  // L, NOT S, SINCE 2026-10-01, AND IT IS BOTH VIEWS THE PICKER OPENS IN. The
+  // key moved because S also toggled the summary inside a thread, so one letter
+  // meant two things; the claim is unchanged, which is that the row only prints
+  // the key where the handler really answers it. The handler's own condition is
+  // `view === 'inbox' || view === 'snoozed'`, so both of those print it and the
+  // other two print nothing.
+  it('prints L only where the reminder picker opens, and never S', () => {
+    expect(listSwitch).toMatch(/case 'l': case 'L':[\s\S]{0,400}view === 'inbox' \|\| view === 'snoozed'/);
+    const views = ['inbox', 'snoozed', 'progress', 'done'];
+    expect(views.filter((v) => rowKeys(v).some((k) => k.key === 'L'))).toEqual(['inbox', 'snoozed']);
+    expect(views.filter((v) => rowKeys(v).some((k) => k.key === 'S'))).toEqual([]);
   });
 });
 
@@ -209,7 +227,7 @@ describe('⌘ and a number go to a section', () => {
 describe('only a component that does not already show its key carries a hint', () => {
   it('wears a data-hint for every id the list knows, and knows every id worn', () => {
     const worn = new Set();
-    for (const file of [app, list, nav1, terminal, focus, pages]) {
+    for (const file of [app, list, nav1, terminal, focus, pages, summary]) {
       // The row writes its own as a spread, because it is only worn in the
       // inbox and only off an ordinary row.
       for (const m of file.matchAll(/data-hint(?:="|': ')([a-z-]+)/g)) worn.add(m[1]);

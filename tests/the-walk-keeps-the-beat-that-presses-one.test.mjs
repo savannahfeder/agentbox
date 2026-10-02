@@ -54,7 +54,10 @@ describe('the row an agent is stopped on cannot be closed while the walk is on',
     expect(why).not.toMatch(/inbox zero|beat|onboarding|item/i);
   });
 
-  it('refuses S on it too, because putting it off empties the inbox the same way', () => {
+  // L, NOT S, SINCE 2026-10-01: S became the summary's key everywhere in the
+  // app and scheduling moved to L. Nothing about these refusals changed but the
+  // letter the sentence names.
+  it('refuses L on it too, because putting it off empties the inbox the same way', () => {
     expect(snoozeRefused(walk('clear'), IDS[WAITING_AT], WAITING_AT)).toBeTruthy();
   });
 
@@ -65,10 +68,10 @@ describe('the row an agent is stopped on cannot be closed while the walk is on',
     }
   });
 
-  it('refuses E on the not-for-today row and points at S, which is its own beat', () => {
+  it('refuses E on the not-for-today row and points at L, which is its own beat', () => {
     expect(closingRefused(walk('clear'), IDS[LATER_AT], WAITING_AT, LATER_AT))
-      .toBe('That one is not finished. Press S to deal with it later.');
-    // And S is right on that one, so it is not refused.
+      .toBe('That one is not finished. Press L to deal with it later.');
+    // And L is right on that one, so it is not refused.
     expect(snoozeRefused(walk('clear'), IDS[LATER_AT], WAITING_AT)).toBe(null);
   });
 

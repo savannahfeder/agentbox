@@ -62,19 +62,18 @@ function ruleFor(sel) {
 describe('one corner for the whole app', () => {
   it('defines the corner exactly once, as 3px', () => {
     expect(css).toMatch(/--radius:\s*3px;/)
-    // ONE THEME MAY SQUARE IT, AND ONLY TO ZERO. Ember Grid is the launch film's
-    // look (w-b3e123a0af) and the film's corners are square, so its token block
-    // turns the same one number to 0px. Every corner still follows the token;
-    // a theme that wanted some other size would be a second corner, and fails.
-    const grid = css.slice(css.indexOf(':root[data-skin="ember-grid"] {'))
-    const elsewhere = css.replace(grid.slice(0, grid.indexOf('\n}')), '')
-    expect(grid.slice(0, grid.indexOf('\n}'))).toMatch(/--radius:\s*0px;/)
-    expect(elsewhere.match(/--radius:\s*[^;]+;/g)).toHaveLength(1)
+    // Ember Grid, the one theme that squared it to 0px, went with the other
+    // pictures when the app went to one light look, so the token is declared
+    // exactly once. A second declaration would be a second corner, and fails.
+    expect(css.match(/--radius:\s*[^;]+;/g)).toHaveLength(1)
   })
 
   it('leaves no loose number anywhere in the stylesheet', () => {
     const loose = radiiIn(css).filter(
-      (v) => v !== 'var(--radius)' && v !== '0' && !NOT_A_CORNER.includes(v) &&
+      // --tag-radius is the second token, for tags (square in every theme,
+      // tests/the-threads-header-is-quieter-and-every-tag-is-square.test.mjs).
+      // It is still a token, not a loose number, so it passes here.
+      (v) => v !== 'var(--radius)' && v !== 'var(--tag-radius)' && v !== '0' && !NOT_A_CORNER.includes(v) &&
              v !== '0 0 var(--radius) var(--radius)' && v !== 'var(--radius) var(--radius) 0 0',
     )
     // If this fails it prints the offenders, which is the whole point.

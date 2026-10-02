@@ -1,9 +1,7 @@
 // CHOOSING WHO SEES A THREAD: THE TEAM, A FEW PEOPLE, OR NOBODY.
 //
-// w-41ff964775, her words: "some people might want to be quieter, or you might
-// only want certain people to see what you're up to. Sharing your calendar
-// within a company, you don't necessarily want to share it with everyone, but
-// you might want to share it with your boss or some people."
+// w-41ff964775. Some people want to be quieter, and some want a thread seen by
+// a few people (a manager, say) without showing it to the whole company.
 //
 // Three choices now, in the composer's Who sees it menu and the summary
 // panel's Visible to, and Chosen people opens the same people picker the To

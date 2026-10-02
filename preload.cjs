@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('zero', {
   teamRemoveMember: (payload) => ipcRenderer.invoke('zero:team-remove-member', payload),
   teamLeave: () => ipcRenderer.invoke('zero:team-leave'),
   teamCancelInvite: (payload) => ipcRenderer.invoke('zero:team-cancel-invite', payload),
+  teamStatus: (payload) => ipcRenderer.invoke('zero:team-status', payload),
   teamShare: (payload) => ipcRenderer.invoke('zero:team-share', payload),
   teamSync: () => ipcRenderer.invoke('zero:team-sync'),
   teamRoute: (payload) => ipcRenderer.invoke('zero:team-route', payload),
@@ -209,15 +210,6 @@ contextBridge.exposeInMainWorld('zero', {
     const handler = (_e, payload) => fn(payload);
     ipcRenderer.on('zero:open-item', handler);
     return () => ipcRenderer.removeListener('zero:open-item', handler);
-  },
-  // The window moved to a screen that wants the other set of theme pictures.
-  // Only main can see which physical display a window is on, and only main can
-  // read a display's density without page zoom folded into it, so this is the
-  // only way the page can know. It fires on a change, never on every drag.
-  onScreenDetail: (fn) => {
-    const handler = (_e, payload) => fn(payload);
-    ipcRenderer.on('zero:screen-detail', handler);
-    return () => ipcRenderer.removeListener('zero:screen-detail', handler);
   },
   onEscapeBrowser: (fn) => {
     const handler = () => fn();

@@ -630,6 +630,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:team-remove-member', teamCall(({ personId }) => team.removeMember(personId)));
   ipcMain.handle('zero:team-leave', teamCall(() => team.leaveTeam()));
   ipcMain.handle('zero:team-cancel-invite', teamCall(({ email }) => team.cancelInvite(email)));
+  // A line you write about yourself, so a day in meetings is not read off
+  // the Team page as idleness.
+  ipcMain.handle('zero:team-status', teamCall(({ text, hold }) => team.setStatus({ text, hold })));
   ipcMain.handle('zero:team-share', teamCall(({ product, visibility, people }) => team.share(product, { visibility, people })));
   ipcMain.handle('zero:team-sync', teamCall(() => team.syncNow()));
   // A MESSAGE TO A PERSON (approved 2026-10-01: people get messages, never

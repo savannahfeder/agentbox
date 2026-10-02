@@ -7,13 +7,13 @@
 // Team page were one question on two pages, so the faces at the end of the
 // Inbox's tab bar now pick whose threads are on it.
 import { useState } from 'react';
-import type { Person, Product, TeamCallResult, TeamState } from '../types';
+import type { Person, TeamCallResult, TeamState } from '../types';
 import { api } from '../api';
 import { Face } from './people';
 
 
-export function TeamPage({ team, products, inviteFocus = false }: {
-  team: TeamState | null | undefined; products: Product[];
+export function TeamPage({ team, inviteFocus = false }: {
+  team: TeamState | null | undefined;
   /** Opened from Invite people: the email box has the cursor. */
   inviteFocus?: boolean;
 }) {
@@ -22,7 +22,7 @@ export function TeamPage({ team, products, inviteFocus = false }: {
   // THE COMPANY LIST THAT STOOD HERE IS GONE (w-05ff3d1438): whose threads you
   // see is picked by the faces on the Inbox now, so this page only ever sets
   // the team up.
-  return <TeamSetup team={team} products={products} inviteFocus={inviteFocus} />;
+  return <TeamSetup team={team} inviteFocus={inviteFocus} />;
 }
 
 function useCall() {
@@ -48,7 +48,7 @@ function SignIn({ error }: { error: string | null }) {
   </div>;
 }
 
-function TeamSetup({ team, products, onDone, inviteFocus = false }: { team: TeamState; products: Product[]; onDone?: () => void; inviteFocus?: boolean }) {
+function TeamSetup({ team, onDone, inviteFocus = false }: { team: TeamState; onDone?: () => void; inviteFocus?: boolean }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   // WHO YOU INVITED, SAID BACK (2026-10-01): an invite used to empty the field

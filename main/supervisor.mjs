@@ -4274,7 +4274,8 @@ export class Supervisor {
     // belongs: it is the only block here she did not necessarily write, so her
     // standing instructions and her project instructions both sit above it and
     // the framing line inside it says out loud that they win. Emptying the box
-    // in settings drops it entirely, which is the whole point of the box.
+    // in settings drops the user's own words; the app's rules stay
+    // (w-3ec9f07978), because the inbox reads every message by them.
     //
     // SINCE w-3dc46f3a67 THIS BLOCK IS BOTH MESSAGE DOCUMENTS, not just the
     // finishing half. The writing rules used to be spliced into the worker
@@ -4526,32 +4527,47 @@ export class Supervisor {
     return path.join(this.userDir, 'briefs', 'message-rules.md');
   }
 
+  // OURS AND THEIRS ARE TWO LAYERS, NOT ONE FILE (w-3ec9f07978). The shipped
+  // rules are what the inbox reads every message by: the bold first line the
+  // list clips at, the Options section the picker draws, the last message
+  // being the answer. A person editing those breaks their own inbox, so they
+  // ride from the checkout on every run and are never in the box. The box is
+  // only what the user wrote, and it rides above ours so their words win.
+  shippedMessageRules() {
+    try { return fs.readFileSync(this.messageRulesDefaultFile(), 'utf8').trim(); } catch { return ''; }
+  }
+
   // Read fresh at every spawn, never cached, like everything else she can edit
-  // while the fleet is running. An EMPTY file is not a missing one: emptying the
-  // box in settings is how she turns this off, so it means no message rules at
-  // all rather than "fall back to the shipped ones".
+  // while the fleet is running. Emptying the box takes the user's words out,
+  // never ours.
   messageRules() {
-    let text = null;
-    try { text = fs.readFileSync(this.messageRulesFile(), 'utf8'); } catch {}
-    if (text === null && this.messageRulesFile() !== this.messageRulesDefaultFile()) {
-      try { text = fs.readFileSync(this.messageRulesDefaultFile(), 'utf8'); } catch {}
+    let theirs = '';
+    if (this.messageRulesFile() !== this.messageRulesDefaultFile()) {
+      try { theirs = fs.readFileSync(this.messageRulesFile(), 'utf8').trim(); } catch {}
     }
-    if (text === null) return null;
-    const body = text.trim();
-    if (!body) return null;
-    // ONE framing line, for the same reason her project instructions carry one:
-    // a session has no other way to know that these particular words are the
-    // app's defaults rather than the founder's own, or that anything above them
+    const ours = this.shippedMessageRules();
+    // ONE framing line each, for the same reason her project instructions carry
+    // one: a session has no other way to know whose words these are, or which
     // wins where the two disagree.
-    return [
+    const blocks = [];
+    if (theirs) blocks.push([
+      'How the person reading this wants agents to write to them, in their own',
+      'words. Where these and the app\'s rules below disagree, these win.',
+      '',
+      '---',
+      '',
+      theirs,
+    ].join('\n'));
+    if (ours) blocks.push([
       'How to write to the person reading this, and how to finish, from the app',
       'they read it in. These are its defaults, so any instruction above this one',
       'outranks them.',
       '',
       '---',
       '',
-      body,
-    ].join('\n');
+      ours,
+    ].join('\n'));
+    return blocks.length ? blocks.join('\n\n') : null;
   }
 
   // ADHD MODE (w-5737fe67cf, 2026-09-25): a short set of writing rules that ride
@@ -4570,16 +4586,11 @@ export class Supervisor {
     return ['ADHD mode is on. Follow these rules as well.', '', body].join('\n');
   }
 
-  // What the settings box shows: her copy if she has one, otherwise the shipped
-  // text, so the box opens filled in on a machine she has never edited it on.
+  // What the settings box shows: the user's own words and nothing of ours
+  // (w-3ec9f07978), so it opens empty until they write something.
   readMessageRules() {
     try {
       return fs.readFileSync(this.messageRulesFile(), 'utf8');
-    } catch (err) {
-      if (err.code !== 'ENOENT') throw err;
-    }
-    try {
-      return fs.readFileSync(this.messageRulesDefaultFile(), 'utf8');
     } catch (err) {
       if (err.code === 'ENOENT') return '';
       throw err;
@@ -6812,8 +6823,10 @@ function captureStream(session, line) {
       session.result = String(obj.result ?? '');
       session.resultIsError = !!obj.is_error;
       // A run cannot end with helpers still out. Cleared here as well as on
-      // exit so the number can never outlive the thing it counts.
-      session.helperIds?.clear();
+      // exit so the number can never outlive the thing it counts. Unless
+      // something is still out in the background: then this was a turn
+      // ending, not the run, and the session stays open for it.
+      if (!session.child?.waitingOn?.().length) session.helperIds?.clear();
     }
     noteClaimAnswer(session, obj);
     countHelpers(session, obj);

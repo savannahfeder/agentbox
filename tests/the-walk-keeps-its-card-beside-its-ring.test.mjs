@@ -122,7 +122,13 @@ describe('the ⌘K beat', () => {
     // other half of this beat is only read by somebody who pressed.
     expect(shut.quiet).toContain('type tutorial');
     // w-ec62ab6b38 (2026-09-28): her word for a row is thread now, not task.
-    expect(`${shut.lead}${shut.tail}`).toBe('Press  to find any command, or N to start your first real thread.');
+    // AND IT NAMES THE ⌘ BUTTON SINCE 2026-10-01. ⌘K is the least guessable
+    // press in the walk and this is the beat that exists to teach it, so a card
+    // naming only the chord fails at its one job for anybody who does not use
+    // shortcuts. The button is inside this beat's ring and opens the same list.
+    // "to find any command" paid for it: the other half of this beat already
+    // says what the list is, and the loud line has to stay one sentence.
+    expect(`${shut.lead}${shut.tail}`).toBe('Press  or click the ⌘ button, or N for your first real thread.');
     expect(shut.key).toBe('⌘K');
   });
 

@@ -130,7 +130,66 @@ refuse() {
   exit 1
 }
 
-echo "pre-push: running the whole suite before this leaves your Mac..."
+# A PUSH RUNS THE TESTS FOR WHAT IT CHANGED, NOT ALL OF THEM (2026-10-01).
+#
+# Running all 618 files on every push, with several agents pushing at once,
+# took 170 to 1964 seconds against about 25 on a quiet Mac, and agents spent
+# most of their run waiting here. GitHub runs the whole suite on every push to
+# the public repo, so this runs `vitest related` on the files the push carries:
+# their own tests and every test that imports them. The whole suite still runs
+# here when the push touches what every test depends on, when what changed
+# cannot be told, or when AGENTBOX_PUSH_FULL_SUITE is set.
+full_because=""
+changed=""
+remote_name="${1:-origin}"
+if [ -n "${AGENTBOX_PUSH_FULL_SUITE:-}" ]; then
+  full_because="AGENTBOX_PUSH_FULL_SUITE is set"
+else
+  while read -r _local_ref local_sha _remote_ref remote_sha; do
+    [ -z "${local_sha:-}" ] && continue
+    case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+    base=""
+    case "${remote_sha:-0}" in
+      *[!0]*)
+        if git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then base="$remote_sha"; fi ;;
+      *)
+        # A new branch: measure it from where it left the remote's main.
+        if main_sha=$(git rev-parse -q --verify "refs/remotes/$remote_name/main" 2>/dev/null); then
+          base=$(git merge-base "$local_sha" "$main_sha" 2>/dev/null) || base=""
+        fi ;;
+    esac
+    if [ -z "$base" ]; then
+      full_because="what this push changes cannot be told from here"
+      break
+    fi
+    if [ -n "$(git diff --name-only --diff-filter=D "$base" "$local_sha" | grep -E '\.(mjs|cjs|js|jsx|ts|tsx)$')" ]; then
+      full_because="it deletes code something else may import"
+      break
+    fi
+    changed="$changed
+$(git diff --name-only --diff-filter=d "$base" "$local_sha")"
+  done <<EOF
+$refs
+EOF
+fi
+changed=$(printf '%s\n' "$changed" | sed '/^$/d' | sort -u)
+if [ -z "$full_because" ] && printf '%s\n' "$changed" | grep -qE '^(package(-lock)?\.json|vitest\.config\.mjs|tests/agentbox-home\.setup\.mjs|tests/app-home\.mjs|scripts/hooks/)'; then
+  full_because="it changes what every test depends on"
+fi
+code=$(printf '%s\n' "$changed" | grep -E '\.(mjs|cjs|js|jsx|ts|tsx|json|css|html)$' || true)
+
+if [ -n "$full_because" ]; then
+  runargs="run"
+  echo "pre-push: running the whole suite, because $full_because..."
+elif [ -z "$code" ]; then
+  echo "pre-push: this push changes no code, so there is nothing to test here."
+  echo "GitHub runs the whole suite on it after the push."
+  exit 0
+else
+  runargs="related --run --passWithNoTests $(printf '%s\n' "$code" | tr '\n' ' ')"
+  echo "pre-push: running the tests for the $(printf '%s\n' "$code" | wc -l | tr -d ' ') file(s) this push changes."
+  echo "GitHub runs the whole suite on it after the push."
+fi
 started=$(date +%s)
 
 # The json report rides along with the readable one so the retry below knows
@@ -138,7 +197,8 @@ started=$(date +%s)
 report="${TMPDIR:-/tmp}/zero-pre-push-$$.json"
 trap 'rm -f "$report"' EXIT INT TERM
 
-if node_modules/.bin/vitest run --reporter=basic --reporter=json --outputFile.json="$report"; then
+# shellcheck disable=SC2086 # runargs is a word list on purpose
+if node_modules/.bin/vitest $runargs --reporter=basic --reporter=json --outputFile.json="$report"; then
   echo "pre-push: green in $(( $(date +%s) - started ))s. Pushing."
   exit 0
 fi
@@ -149,10 +209,11 @@ echo ""
 if [ -z "$red" ]; then
   # No file was named, which is what an unhandled worker error looks like. We
   # cannot retry a file we cannot name, so the whole suite runs once more.
-  echo "  Something went red without naming a file, so the suite is running"
+  echo "  Something went red without naming a file, so the same run is going"
   echo "  once more before this is called a failure."
   echo ""
-  if node_modules/.bin/vitest run --reporter=basic; then
+  # shellcheck disable=SC2086
+  if node_modules/.bin/vitest $runargs --reporter=basic; then
     echo ""
     echo "pre-push: green on the second run, in $(( $(date +%s) - started ))s total."
     echo "The first run died on the machine, not on the code. Pushing."

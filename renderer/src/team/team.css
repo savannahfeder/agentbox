@@ -118,6 +118,13 @@ img.tm-av { background: var(--bg-selected); }
 
 /* signing in, starting a team, inviting, and sharing projects */
 .tm-setup { padding: 28px var(--row-r) 40px var(--text-x); max-width: 640px; }
+/* INSIDE SETTINGS (w-8415594d19) the pane is already a column with a width and
+   a margin of its own, so the page's own padding only pushed every field 32px
+   right of the title above it. One indent, not two. */
+.set-pane .tm-setup { padding: 0; max-width: none; }
+/* The lede above it is the pane's, so the first row needs the air the page's
+   own top padding used to give it. */
+.set-pane .tm-setup > :first-child { margin-top: 10px; }
 .tm-setup h2 { margin: 0 0 6px; font-size: 18px; line-height: 24px; font-weight: 400; letter-spacing: -.02em; color: var(--text); }
 .tm-setup p { margin: 0 0 18px; color: var(--text-faint); font-size: 13.5px; line-height: 20px; }
 .tm-setup .tm-error { color: var(--accent); }
@@ -148,3 +155,55 @@ img.tm-av { background: var(--bg-selected); }
 .tm-line-act { margin-left: 14px; flex: none; height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim); font: inherit; font-size: 12.5px; cursor: pointer; }
 .tm-line-act:hover:not(:disabled) { border-color: var(--line-strong); color: var(--text); background: var(--wash); }
 .tm-leave-ask { font-size: 13.5px; color: var(--text-dim); margin-right: 6px; }
+
+/* A STATUS LINE YOU WRITE YOURSELF (w-0b54ee983f). Two homes, because the
+   other two went while this was being built: the Team board was deleted
+   (w-05ff3d1438) and the face chips went with it (w-57034cf3c0). What is
+   left is the row at the foot of the sidebar, where you write it, and the
+   card on hovering a face, which the inbox rows still draw. */
+
+.tm-status-held { flex: 0 0 auto; margin-left: 16px; font: 11.5px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); }
+
+/* hovering a face: who they are, and what they said. --bg and not --card:
+   --card is see-through in some skins and the page read through it. */
+.tm-face-card { position: fixed; z-index: 60; display: block; width: max-content; max-width: 280px;
+  padding: 9px 12px 10px; background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--radius);
+  box-shadow: var(--shadow-lg); text-align: left; cursor: default; font-weight: 400; }
+/* both are spans so the card can live in a portal; they still stack. */
+.tm-face-card-who { display: block; font-size: 13px; line-height: 18px; color: var(--text); white-space: nowrap; }
+.tm-face-card-said { display: block; margin-top: 3px; font-size: 13px; line-height: 18px; color: var(--text-dim); white-space: normal; }
+.tm-face-card-said.nothing { color: var(--text-faint); }
+.tm-face-card-said .tm-status-held { display: block; margin: 3px 0 0; }
+.tm-face-hover { position: relative; display: inline-flex; align-items: center; gap: inherit; }
+
+/* writing one */
+.tm-status-write { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.tm-status-field { flex: 1 1 100%; box-sizing: border-box; height: 34px; padding: 0 10px; border: 1px solid var(--text-dim);
+  background: transparent; color: var(--text); font: inherit; font-size: 13.5px; border-radius: var(--radius); }
+.tm-status-field:focus { outline: none; }
+.tm-status-field::placeholder { color: var(--text-faint); }
+.tm-status-holds { flex: 0 0 auto; height: 30px; }
+.tm-status-write .tm-btn { height: 30px; margin-left: auto; }
+.tm-status-error { flex: 1 1 100%; color: var(--accent); font-size: 12.5px; }
+
+/* YOUR OWN ROW GROWS BY ONE LINE when there is something to say. main's row
+   is a fixed-height flex row (threads/pages.css), so without this the line
+   is laid out beside your name and runs out of the sidebar across the page.
+   The row is also what the writing box is positioned against. */
+.th-me { position: relative; }
+.th-me:has(.th-me-status) { flex-wrap: wrap; height: auto; align-items: flex-start; padding-bottom: 7px; }
+.th-me:has(.th-me-status) .th-me-btn { flex: 1 1 100%; }
+
+/* the line under your name in your own row at the foot of the sidebar */
+/* min-width:0, because a flex item's automatic minimum is its longest
+   unbreakable run, and this line never wraps: without it a long status
+   pushes the row wider than the sidebar and runs across the page. */
+.th-me-status { display: block; flex: 1 1 100%; min-width: 0; box-sizing: border-box; width: 100%; padding: 1px 0 0 31px; border: 0; background: none; text-align: left; cursor: pointer;
+  font: inherit; font-size: 11.5px; line-height: 16px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.th-me-status:hover { color: var(--text); }
+.th-me-status.nothing { color: var(--text-faint); }
+.workspace-collapsed .th-me-status { display: none; }
+
+.th-me-pop { position: absolute; left: calc(100% + 10px); bottom: 0; width: 420px; padding: 14px 16px 16px;
+  background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg); z-index: 40; }
+.th-me-pop-head { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 10px; }

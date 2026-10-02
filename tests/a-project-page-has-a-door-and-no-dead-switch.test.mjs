@@ -134,13 +134,12 @@ describe('the door to a project', () => {
 
   // With no Projects row, a project page lights Settings, which is where it lives.
   it('lights Settings while any project page is open', () => {
-    expect(settings).toContain("pane === 'projects' ? pane");
+    expect(settings).toContain("pane === 'projects' || pane === 'team' ? pane");
     expect(settings).toContain("typeof pane === 'object' ? 'projects'");
-    // Settings is asked first, so a project page lights Settings whatever else
-    // is true. The members page joined the same prop on 2026-10-01
-    // (w-e731ca9376), after Settings, so it cannot steal the light from it.
-    // Invite people and Team members open the same page and light their own row.
-    expect(app).toContain("page={settingsOpen ? 'settings' : teamShown && membersOpen ? (inviteFocus ? 'invite' : 'members') : null}");
+    // A project page lights Settings, because `settingsPage` reports
+    // `projects` for it and the only pane that lights another row is Team
+    // (w-8415594d19, 2026-10-01), which Invite people is the shortcut to.
+    expect(app).toContain("page={settingsOpen ? (settingsPage === 'team' ? 'invite' : 'settings') : null}");
   });
 
   it('titles the page it lands on', () => {

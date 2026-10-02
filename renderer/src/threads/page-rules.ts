@@ -25,8 +25,26 @@ export interface Display {
 // either is remembered once changed.
 export const DEFAULT_DISPLAY: Record<PageId, Display> = {
   inbox: { view: 'list', sort: 'priority', priorities: [], projects: [], updated: 'any' },
-  team: { view: 'board', sort: 'updated', priorities: [], projects: [], updated: 'any' },
+  team: { view: 'board', sort: 'priority', priorities: [], projects: [], updated: 'any' },
 };
+
+// THE TEAM BOARD SORTED BY UPDATED UNTIL 2026-10-02, and a saved team display
+// carried that default with it, so the board never ran by priority. A display
+// saved since then carries `v: 2`; one without it that says Updated was the old
+// default speaking, and reads as Priority.
+const DISPLAY_VERSION = 2;
+
+/**
+ * WHICH OF THE TWO REMEMBERED DISPLAYS THE ONE PAGE IS ON.
+ *
+ * The Inbox and the Team page became one page (w-05ff3d1438), and the page
+ * read the inbox's display and nothing else, so the team's board default
+ * above could never be reached: lighting a teammate's face left you in the
+ * list. There is one page now, so "per page" is read as "per audience". Each
+ * half remembers what was last chosen for it, which is why this is a lookup
+ * and not an effect that forces board on and overrules a choice.
+ */
+export const pageFor = (withOthers: boolean): PageId => (withOthers ? 'team' : 'inbox');
 
 const KEY = (page: PageId) => `threads.display.${page}`;
 
@@ -37,7 +55,8 @@ export function readDisplay(page: PageId, store: Pick<Storage, 'getItem'> | null
     const d = JSON.parse(raw);
     return {
       view: d.view === 'board' || d.view === 'list' ? d.view : DEFAULT_DISPLAY[page].view,
-      sort: d.sort === 'updated' || d.sort === 'priority' ? d.sort : DEFAULT_DISPLAY[page].sort,
+      sort: page === 'team' && d.sort === 'updated' && d.v !== DISPLAY_VERSION ? 'priority'
+        : d.sort === 'updated' || d.sort === 'priority' ? d.sort : DEFAULT_DISPLAY[page].sort,
       priorities: Array.isArray(d.priorities) ? d.priorities.filter((p: unknown) => ['urgent', 'high', 'medium', 'low'].includes(p as string)) : [],
       projects: Array.isArray(d.projects) ? d.projects.filter((p: unknown) => typeof p === 'string') : [],
       updated: d.updated === 'today' || d.updated === 'week' ? d.updated : 'any',
@@ -48,7 +67,7 @@ export function readDisplay(page: PageId, store: Pick<Storage, 'getItem'> | null
 }
 
 export function writeDisplay(page: PageId, d: Display, store: Pick<Storage, 'setItem'> | null = typeof localStorage === 'undefined' ? null : localStorage) {
-  try { store?.setItem(KEY(page), JSON.stringify(d)); } catch { /* private mode */ }
+  try { store?.setItem(KEY(page), JSON.stringify({ ...d, v: DISPLAY_VERSION })); } catch { /* private mode */ }
 }
 
 /** Whether any filter is on, which is what puts the dot on the Display icon. */
@@ -65,10 +84,130 @@ export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>
   return true;
 }
 
-/** The rows in the order the Display menu asked for. Priority keeps the app's own ranking. */
-export function sorted<T extends Pick<WorkItem, 'updatedAt'>>(rows: T[], d: Display): T[] {
-  if (d.sort !== 'updated') return rows;
-  return rows.slice().sort((a, b) => b.updatedAt - a.updatedAt);
+// URGENT, HIGH, MEDIUM, LOW, newest first inside a level. One comparator, read
+// by the list and by every column of the board, because the two disagreed: a
+// section promising priority order was not in one (w-5a08121f99).
+const RANK: Record<PriorityId, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+const byPriority = (a: Ranked, b: Ranked) =>
+  RANK[priorityIdOf(a.priority)] - RANK[priorityIdOf(b.priority)] || b.updatedAt - a.updatedAt;
+const byUpdated = (a: Ranked, b: Ranked) => b.updatedAt - a.updatedAt;
+type Ranked = { priority?: number | null; updatedAt: number };
+
+const order = (d: Display) => (d.sort === 'updated' ? byUpdated : byPriority);
+
+/**
+ * The rows in the order the Display menu asked for.
+ *
+ * PRIORITY USED TO MEAN "LEAVE THEM ALONE", on the grounds that the list
+ * arrived in the app's own ranking. That ranking is `byRunningOrder(score)` in
+ * App.tsx, where a product's place in her running order is worth a hundred item
+ * points: it is the order the fleet takes work in, and it is not what the word
+ * Priority on a menu promises. A board was reported running Medium, Low, High,
+ * Medium under that heading.
+ *
+ * The two rows the app makes itself stay at the top of either sort. They belong
+ * to no project (`product` is empty, trouble-row.ts and update-row.ts) because
+ * they are about every project at once, so ranking them against one project's
+ * work would put them somewhere meaningless. `keeps` exempts them for the same
+ * reason.
+ */
+export function sorted<T extends Ranked & { product?: string }>(rows: T[], d: Display): T[] {
+  const mine = rows.filter((r) => r.product !== '');
+  if (mine.length === rows.length) return rows.slice().sort(order(d));
+  return [...rows.filter((r) => r.product === ''), ...mine.sort(order(d))];
+}
+
+/** The same order, for the board's cards, which carry a level and no project row. */
+export function sortedEntries(entries: BoardEntry[], d: Display): BoardEntry[] {
+  return entries.slice().sort(order(d));
+}
+
+/* ------------------------------------------------------- the tabs and Tab */
+
+export type TabName = 'inbox' | 'progress' | 'snoozed' | 'done' | 'all';
+
+/**
+ * WHERE A PRESS OF TAB LANDS: on the threads page, Tab cycles the states.
+ *
+ * `order` is handed in rather than written down here, so there is one list of
+ * tabs and it is the one the bar is drawing (INBOX_TABS in Pages.tsx). A second
+ * copy written out in the key handler is the fault this repo has already had:
+ * a Scheduled tab appeared on screen and three presses of Tab landed on a stop
+ * with no tab under it.
+ *
+ * It wraps at both ends, and a view the bar is not drawing lands on the first
+ * tab rather than nowhere.
+ */
+export function nextTab<T extends string>(order: readonly T[], current: string, back = false): T | 'inbox' {
+  if (!order.length) return 'inbox';
+  const at = order.indexOf(current as T);
+  if (at < 0) return order[0];
+  return order[(at + (back ? -1 : 1) + order.length) % order.length];
+}
+
+/**
+ * WHAT A TAB THE FILTERS HAVE EMPTIED SAYS INSTEAD OF "NOTHING NEEDS YOU".
+ *
+ * Her report with a screenshot: "It says Nothing needs you, but that's not
+ * correct because it literally says needs you 13... if you're accidentally on a
+ * filter, you can think there's no work for you when there's actually a ton."
+ *
+ * IT IS TWO SENTENCES, NOT ONE (her second note, 2026-10-01). The first cut of
+ * this put the whole of it in the heading: "Your filters hide all 37 threads
+ * that need you", 18 point, as the only thing on the page. She read it as
+ * telling her off. "It's also nice to be finished with the inbox tasks in your
+ * filter. This doesn't really give us a feeling of any reward... This feels
+ * almost like a punishment in terms of the harsh text."
+ *
+ * She is right, and the reason is that one screen covers two moments. You left
+ * a filter on by accident, or you just finished everything in it, and from the
+ * app's side those look identical. So the heading says the half that is true of
+ * both and is good news in either, in the same shape as "Nothing needs you"
+ * next door, and the number moves into a quiet line under it where it informs
+ * rather than accuses.
+ */
+export function filteredEmptyWords(view: TabName | string, hidden: number): { head: string; line: string } {
+  const head = {
+    progress: 'Nothing in your filter is running',
+    snoozed: 'Nothing in your filter is scheduled',
+    done: 'Nothing in your filter is closed',
+    all: 'No threads match your filter',
+  }[view as string] ?? 'Nothing in your filter needs you';
+  const line = hidden === 1
+    ? 'One more thread is behind your filters.'
+    : `${hidden} more threads are behind your filters.`;
+  return { head, line };
+}
+
+/**
+ * THE PROJECTS THE DISPLAY MENU OFFERS, MOST RECENTLY USED FIRST.
+ *
+ * A store with about forty projects drew 37 chips in nine rows, taller than the
+ * rest of the menu put together. So eight, ranked by the newest thread in each,
+ * and the rest behind one button.
+ *
+ * A PICKED PROJECT IS NEVER IN `rest`. A chip that is on and out of sight is
+ * the same silent filter the honest empty state exists to stop.
+ */
+export function projectChoices(
+  products: Product[],
+  items: Pick<WorkItem, 'product' | 'updatedAt' | 'agent'>[],
+  { picked = [], limit = 8 }: { picked?: string[]; limit?: number } = {},
+): { shown: Product[]; rest: Product[] } {
+  const last = new Map<string, number>();
+  for (const i of items) {
+    if (i.agent) continue;
+    const was = last.get(i.product) ?? 0;
+    if (i.updatedAt > was) last.set(i.product, i.updatedAt);
+  }
+  const ranked = products
+    .filter((p) => !isDirect(p) && !(p as { practice?: boolean }).practice)
+    .sort((a, b) => (last.get(b.slug) ?? 0) - (last.get(a.slug) ?? 0) || a.name.localeCompare(b.name));
+  const on = ranked.filter((p) => picked.includes(p.slug));
+  const off = ranked.filter((p) => !picked.includes(p.slug));
+  const ordered = [...on, ...off];
+  const keep = Math.max(limit, on.length);
+  return { shown: ordered.slice(0, keep), rest: ordered.slice(keep) };
 }
 
 /** "Updated", in plain words: "just now", "6 min ago", "4 hours ago", "Yesterday", "Sep 28". */
@@ -287,6 +426,33 @@ export function teamKeeps(e: BoardEntry, { person, projectName }: { person: stri
   if (d.updated === 'today' && !(e.updatedAt >= startOfDay(now))) return false;
   if (d.updated === 'week' && !(e.updatedAt >= now - 7 * 86_400_000)) return false;
   return true;
+}
+
+/**
+ * THE BOARD, COLUMN BY COLUMN, IN THE ORDER IT IS DRAWN. InboxBoard draws
+ * exactly this, and App.tsx walks it with J and K (`boardWalk`), so the keys go
+ * where the eye goes: down a column, then on to the top of the next. They used
+ * to walk the current tab's list, which a card from another column is not in,
+ * so J stopped with the board still full (2026-10-02).
+ */
+export function boardColumns({ items, products, display, now, stateOf, cards = [], picked, me, since = null, live }: {
+  items: WorkItem[]; products: Product[]; display: Display; now: number;
+  stateOf?: (item: WorkItem) => ThreadStateWord | null;
+  cards?: ThreadCard[]; picked?: string[]; me: string | null; since?: number | null; live?: Set<string>;
+}): { state: ThreadStateWord; label: string; rows: BoardEntry[] }[] {
+  const who = picked ?? (me ? [me] : []);
+  const entries = teamEntries({ items: me && !who.includes(me) ? [] : items, products, cards: cards.filter((c) => who.includes(c.personId)), me, now, since, stateOf, live, allMine: true })
+    .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
+    .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
+  // EVERY COLUMN TAKES THE DISPLAY'S SORT, not just the list view
+  // (w-5a08121f99). `teamEntries` hands these back newest first.
+  return BOARD_COLUMNS.map((col) => ({ ...col, rows: sortedEntries(entries.filter((e) => e.state === col.state), display) }));
+}
+
+/** Your threads on the board, in reading order. A teammate's card has no
+ *  thread of yours behind it, so J and K pass over it. */
+export function boardWalk(columns: { rows: BoardEntry[] }[]): WorkItem[] {
+  return columns.flatMap((c) => c.rows).flatMap((e) => (e.item ? [e.item] : []));
 }
 
 

@@ -36,9 +36,15 @@ it.each(['5', '0', 'Tab', 'ArrowLeft', 'a'])('leaves %s alone', (key) => {
   expect(sidebarSlot({ key, metaKey: true })).toBe(0);
 });
 
-it('hands Tab to the browser and guards editing, dialogs and opened tasks', () => {
+// TAB IS THE STATE TABS' KEY AGAIN SINCE 2026-10-01 (w-5a08121f99), and it is
+// still not the sidebar's: the two keys do different things and this test is
+// about the numbers. ⌘1 to ⌘4 run through `tabOrder`, the sidebar's own list;
+// Tab moves along the tabs the Inbox draws, and hands the press to the browser
+// everywhere else, which is the half this line has always been pinning.
+it('leaves Tab to the tabs and guards editing, dialogs and opened tasks', () => {
   const app = readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-  expect(app).toContain("if (e.key === 'Tab') return;");
+  expect(app).toContain("if (e.key === 'Tab') {");
+  expect(app).toContain('if (!onTheTabs) return;');
   expect(app).toContain('if (slot && !inInput && !modal && !inFullScreen)');
   expect(app).not.toContain("if (e.key === 'Tab' && modal !== 'compose')");
 });

@@ -12,7 +12,28 @@ current state; this file only holds the rules that are not obvious from them.
 - Name the test file after the behaviour, as a sentence
   (`a-reply-moves-the-agent-row.test.mjs`), and open it with a comment saying
   what broke and how you measured it.
-- Run the whole suite before you report anything: `npx vitest run`.
+- Before you report, run the tests for what you changed:
+  `npx vitest related --run <the files you changed>`. That is your own tests
+  plus every test that imports those files. Do not run the whole suite by
+  hand: several agents share one Mac, and the push hook and GitHub already do
+  it (GitHub runs the whole suite on every push; the hook runs it when a change
+  touches what every test depends on).
+
+## SHIPPING IS ONE COMMAND: `npm run ship`
+
+Several agents work this repository at once, so the order of operations is not
+a matter of taste. Work on a branch `agentbox/<item id>` in a worktree, commit
+there, and ship with `npm run ship`: it fetches, merges main if it moved, runs
+the tests for what changed, and pushes, doing the whole lot again if somebody
+pushed first. The pre-push hook still runs the suite and the public check; the
+command is the order, not a way around the gates.
+
+Local `main` only ever points at something that is on the public `main`. Moving
+it onto a branch is refused (`scripts/hooks/reference-transaction`), because a
+fast-forward writes no commit and so walked straight past the commit guards: on
+2026-10-01 that left a commit living in the folder the app runs from and
+nowhere else. That folder follows the public main on its own:
+`git fetch origin && git merge --ff-only refs/remotes/origin/main`.
 
 ## NO WORKER EVER DRIVES THE USER'S OWN BROWSER
 
@@ -36,9 +57,10 @@ It is gitignored. A script that proves one change runs once; move it up into
 
 ## Nothing personal is committed
 
-This repository is public. Conversations, quotes of the people who use it,
-screenshots or recordings of real sessions, account ids, home paths, keys and
-tokens stay out of it. `scripts/check-before-public.mjs` runs before every push
+This repository is public. Names of the people who use it, pasted
+conversations, screenshots or recordings of real sessions, account ids, home
+paths, keys and tokens stay out of it. Quoting feedback in a comment is fine
+as long as it names nobody and carries nothing private. `scripts/check-before-public.mjs` runs before every push
 to it and refuses one that carries any of them; `npm run check:public` audits
 the whole tree.
 

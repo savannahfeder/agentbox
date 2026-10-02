@@ -17,8 +17,6 @@
   --tc-pop: var(--bg-selected);
   --tc-hair: var(--line);
 }
-:root[data-skin] .tc-card { --tc-modal: var(--skin-solid, var(--bg-raised)); }
-:root[data-skin="ember-grid"] .tc-card { --tc-modal: #2d2b29; --tc-pop: var(--pop); --tc-hair: #3b3937; }
 
 /* One raised surface over a lighter veil, centred a little above the middle
    the way the old card was (styles.css, .compose-backdrop). */
@@ -89,7 +87,7 @@
 .tc-bar { display: flex; align-items: center; gap: 8px; padding: 12px 14px 12px 18px; border-top: 1px solid var(--tc-hair); position: relative; }
 .tc-chip {
   display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px;
-  border: 1px solid var(--line); border-radius: var(--radius); background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line); border-radius: var(--tag-radius); background: rgba(255, 255, 255, 0.03);
   color: var(--text-dim); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer;
 }
 .tc-chip:hover, .tc-chip.open, .tc-chip:focus-visible { color: var(--text); border-color: var(--line-strong); outline: none; }
@@ -108,7 +106,7 @@
 .tc-pr i.on { background: var(--text-dim); }
 .tc-urgent {
   display: inline-grid; place-items: center; flex: none; width: 12px; height: 12px;
-  border-radius: var(--radius); background: var(--accent); color: var(--on-solid, #1a1817); font: 700 9px var(--mono);
+  border-radius: var(--tag-radius); background: var(--accent); color: var(--on-solid, #1a1817); font: 700 9px var(--mono);
 }
 
 .tc-icon {
@@ -155,6 +153,15 @@
 .tc-row-label { flex: 1; min-width: 0; }
 .tc-row small { margin-left: auto; padding-left: 18px; color: var(--text-faint); font-size: 12px; }
 .tc-menu-head { display: block; padding: 7px 10px 4px; font: 10.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+/* The project menu's heading says the list is in priority order and carries the
+   way to change it. The link is in the accent and not shouted in capitals, so
+   it reads as a thing to press rather than as more of the heading. */
+.tc-menu-head.tc-head-split { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.tc-head-link {
+  font: inherit; font-size: 11.5px; letter-spacing: 0.02em; text-transform: none;
+  color: var(--accent); background: none; border: none; padding: 0; cursor: pointer;
+}
+.tc-head-link:hover { text-decoration: underline; text-underline-offset: 2px; }
 .tc-sep { display: block; height: 1px; background: var(--line); margin: 4px 6px; flex: none; }
 .tc-none { padding: 7px 10px; font-size: 12.5px; color: var(--text-faint); }
 
@@ -210,7 +217,6 @@
   background: none; border: 1px solid var(--line); border-radius: var(--radius); outline: none;
 }
 .tc-date:focus { border-color: var(--line-strong); }
-:root[data-skin] .tc-date, :root[data-theme="dark"] .tc-date { color-scheme: dark; }
 .tc-schedule {
   height: 28px; padding: 0 11px; font: inherit; font-size: 13px; color: var(--text);
   background: none; border: 1px solid var(--line-strong); border-radius: var(--radius); cursor: pointer;

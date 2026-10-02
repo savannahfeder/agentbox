@@ -16,13 +16,18 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const settings = read('renderer/src/components/Settings.tsx');
+// THE PAGE MOVED INTO ITS OWN FILE when it took over the running order too
+// (w-a514b58055): Projects and Priority are one page now, called Projects.
+// Every promise below still holds there.
+const pageFile = read('renderer/src/components/ProjectsPage.tsx');
+const pageOf = () => pageFile.slice(pageFile.indexOf('export function ProjectsPage('));
 
 describe('the column stops being a list of projects', () => {
   // THE DEFECT, STATED AS THE THING IT DID. Every project was a row here.
   it('draws one door and not one row per project', () => {
     const nav = settings.slice(settings.indexOf('<div className="set-nav-scroll">'), settings.indexOf('<div className="set-pane">'));
     expect(nav).not.toContain('projects.map(');
-    expect(nav).toContain('All projects');
+    expect(nav).toContain('<span className="set-nav-label">Projects</span>');
     expect(nav).toContain("setPane('projects')");
   });
 
@@ -53,7 +58,8 @@ describe('the column stops being a list of projects', () => {
 
 describe('the page itself', () => {
   it('exists, and is reachable from a link as well as a press', () => {
-    expect(settings).toContain('function ProjectsIndex(');
+    expect(pageFile).toContain('export function ProjectsPage(');
+    expect(settings).toContain('<ProjectsPage');
     expect(settings).toContain("pane === 'projects'");
     expect(settings).toContain("want === 'projects'");
   });
@@ -61,7 +67,7 @@ describe('the page itself', () => {
   // THIRTY-SIX IS PAST READING, so the page filters. It matches the name and the
   // folder, which are the two things she would type.
   it('can be filtered by name and by folder', () => {
-    const page = settings.slice(settings.indexOf('function ProjectsIndex('), settings.indexOf('export function Settings('));
+    const page = pageOf();
     expect(page).toContain('p.name.toLowerCase().includes(needle)');
     expect(page).toContain('p.slug.toLowerCase().includes(needle)');
     expect(page).toContain("(p.dir ?? '').toLowerCase().includes(needle)");
@@ -70,7 +76,7 @@ describe('the page itself', () => {
   // THE FOLDER IS DRAWN, because it is the one thing that tells two projects of
   // the same name apart, and her store has several such pairs.
   it('shows each project’s folder under its name', () => {
-    const page = settings.slice(settings.indexOf('function ProjectsIndex('), settings.indexOf('export function Settings('));
+    const page = pageOf();
     expect(page).toContain('shortPath(p.dir)');
   });
 
@@ -79,18 +85,19 @@ describe('the page itself', () => {
   // (w-d19d6d387c, 2026-09-22). One question and a null after it, so a row
   // still cannot end up carrying two words side by side.
   it('says a project’s state in one word at most', () => {
-    const page = settings.slice(settings.indexOf('function ProjectsIndex('), settings.indexOf('export function Settings('));
+    const page = pageOf();
     const flag = page.slice(page.indexOf('const flag ='), page.indexOf('return ('));
     expect(flag).toContain('on its own');
     expect(flag.match(/\?/g)).toHaveLength(1);
     expect(flag).toContain(": null)");
   });
 
-  // A ROW NAVIGATES AND DOES NOTHING ELSE, which is the rule she set on: "the
-  // sidebar is illogical." Renaming and pictures stay on the page it opens.
-  it('opens the project and does nothing else', () => {
-    const page = settings.slice(settings.indexOf('function ProjectsIndex('), settings.indexOf('export function Settings('));
-    expect(page).toContain('onClick={() => onOpen(p.slug)}');
+  // A PRESS ON A ROW OPENS THE PROJECT. Renaming and pictures stay on the page
+  // it opens. Since the merge (w-a514b58055) a row can also be dragged into a
+  // new place, which is the order and not an edit of the project.
+  it('opens the project, and edits nothing on it from the list', () => {
+    const page = pageOf();
+    expect(page).toContain('onOpen(slug)');
     expect(page).not.toContain('onRename');
     expect(page).not.toContain('ProjectIcon');
   });
@@ -103,7 +110,7 @@ describe('the way back', () => {
     expect(settings).toContain('className="set-crumb"');
     const crumb = settings.slice(settings.indexOf('className="set-crumb"'));
     expect(crumb.slice(0, 300)).toContain("setPane('projects')");
-    expect(crumb.slice(0, 300)).toContain('All projects');
+    expect(crumb.slice(0, 300)).toContain('<span>Projects</span>');
   });
 
   // A project that disappears while its page is open lands on the list rather
@@ -117,8 +124,12 @@ describe('the way back', () => {
   // name pointing at nothing.
   it('is styled', () => {
     const css = read('renderer/src/styles.css');
-    for (const name of ['.proj-index', '.proj-card', '.proj-card-where', '.proj-index-find', '.set-crumb']) {
+    for (const name of ['.proj-index-top', '.proj-index-find', '.set-crumb']) {
       expect(css).toContain(name);
+    }
+    const page = read('renderer/src/components/projects-page.css');
+    for (const name of ['.pp-row', '.pp-where', '.pp-flag', '.pp-rank', '.pp-acts']) {
+      expect(page).toContain(name);
     }
   });
 });

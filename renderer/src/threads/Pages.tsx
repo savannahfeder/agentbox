@@ -13,11 +13,11 @@ import { PriorityIcon } from '../components/Priority';
 import { rowTitle } from '../list-rules';
 import { DONE } from '../done-word';
 import {
-  BOARD_COLUMNS, isDirect, isFiltered, teamEntries, teamKeeps, updatedWords,
+  boardColumns, filteredEmptyWords, isDirect, isFiltered, projectChoices, updatedWords,
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
-import { facesShown, togglePicked } from './people-rules';
+import { togglePicked, whoseWord } from './people-rules';
 import { shownToPeople } from '../../../shared/thread-cards.mjs';
 import { api } from '../api';
 import './pages.css';
@@ -72,8 +72,8 @@ function useOutside(open: boolean, close: () => void) {
 
 /* ------------------------------------------------------------ the header */
 /** Search, New thread and the Display icon, at the right of the Inbox and Team headers. */
-export function HeaderActions({ page, display, onDisplay, products, onSearch, onCompose, shown, total }: {
-  page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[];
+export function HeaderActions({ page, display, onDisplay, products, items, onSearch, onCompose, shown, total }: {
+  page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[]; items?: WorkItem[];
   onSearch: () => void; onCompose: () => void; shown?: number; total?: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -85,7 +85,7 @@ export function HeaderActions({ page, display, onDisplay, products, onSearch, on
       <button type="button" className={`th-disp${open ? ' open' : ''}`} aria-label="View and filters" title="View and filters" onClick={() => setOpen((o) => !o)}>
         <SlidersIcon />{isFiltered(display) && <i />}
       </button>
-      {open && <DisplayMenu page={page} display={display} onDisplay={onDisplay} products={products} shown={shown} total={total} />}
+      {open && <DisplayMenu page={page} display={display} onDisplay={onDisplay} products={products} items={items} shown={shown} total={total} />}
     </span>
   </div>;
 }
@@ -93,10 +93,19 @@ export function HeaderActions({ page, display, onDisplay, products, onSearch, on
 const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
 /** View, sort, and the filters: priority, project and when it was updated. */
-export function DisplayMenu({ page, display, onDisplay, products, shown, total }: {
-  page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[]; shown?: number; total?: number;
+export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total }: {
+  page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[];
+  /** Her threads, to rank the projects by the one she used most recently. */
+  items?: WorkItem[];
+  shown?: number; total?: number;
 }) {
-  const projects = products.filter((p) => !isDirect(p) && !(p as { practice?: boolean }).practice);
+  // THE PROJECT FILTER, FOR SOMEBODY WITH FORTY PROJECTS (w-5a08121f99). The
+  // eight she used most recently, the rest behind one button, and an All
+  // projects chip so that "nothing picked means everything" is on the screen
+  // rather than discovered by clicking a chip and watching the list grow.
+  const [showAll, setShowAll] = useState(false);
+  const { shown: topProjects, rest: moreProjects } = projectChoices(products, items, { picked: display.projects });
+  const projects = showAll ? [...topProjects, ...moreProjects] : topProjects;
   const set = (patch: Partial<Display>) => onDisplay({ ...display, ...patch });
   const windows: [UpdatedWindow, string][] = [['today', 'Today'], ['week', 'This week'], ['any', 'Any time']];
   return <div className="th-pop" role="dialog" aria-label={page === 'inbox' ? 'Inbox view and filters' : 'Team view and filters'}>
@@ -112,8 +121,12 @@ export function DisplayMenu({ page, display, onDisplay, products, shown, total }
     <div className="line"><span className="lab">Priority</span><span className="opts">
       {PRIORITIES.map((p) => <button type="button" key={p.id} className={display.priorities.includes(p.id) ? 'on' : ''} onClick={() => set({ priorities: toggle(display.priorities, p.id) })}><PriorityMark id={p.id} />{p.label}</button>)}
     </span></div>
-    {page === 'inbox' && projects.length > 1 && <div className="line"><span className="lab">Project</span><span className="opts">
+    {page === 'inbox' && topProjects.length + moreProjects.length > 1 && <div className="line"><span className="lab">Project</span><span className="opts">
+      <button type="button" className={display.projects.length === 0 ? 'on' : ''} onClick={() => set({ projects: [] })}>All projects</button>
       {projects.map((p) => <button type="button" key={p.slug} className={display.projects.includes(p.slug) ? 'on' : ''} onClick={() => set({ projects: toggle(display.projects, p.slug) })}>{p.name}</button>)}
+      {moreProjects.length > 0 && <button type="button" className="th-pop-more" onClick={() => setShowAll(!showAll)}>
+        {showAll ? 'Show fewer' : `Show all ${topProjects.length + moreProjects.length}`}
+      </button>}
     </span></div>}
     <div className="line"><span className="lab">Updated</span><span className="opts">
       {windows.map(([w, label]) => <button type="button" key={w} className={display.updated === w ? 'on' : ''} onClick={() => set({ updated: w })}>{label}</button>)}
@@ -135,56 +148,58 @@ export const INBOX_TABS: { view: TabView; label: string }[] = [
   { view: 'all', label: 'All' },
 ];
 
+/**
+ * A TAB CARRIES A NUMBER ONLY WHERE THE NUMBER CHANGES WHAT YOU DO (w-57034cf3c0).
+ * The strip read DONE 1036 on a real inbox: the archive counting itself, the
+ * same four digits every day, and the widest thing on the row. All is the other
+ * three added up. Both are words now, and the three tabs that are still ahead of
+ * you keep their number while there is something in them. A zero is not drawn
+ * either: an empty tab says so by being empty.
+ */
+const COUNTED: TabView[] = ['inbox', 'progress', 'snoozed'];
+
 /** `needs` renames the first tab (Waiting, once a teammate is on the page);
- *  `end` is what sits at the bar's right end, the faces. */
+ *  `end` is what sits at the bar's right end, the people filter. */
 export function StateTabs({ view, counts, onView, needs, end }: {
   view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string; end?: ReactNode;
 }) {
   return <div className="th-bar"><div className="tm-tabs">
-    {INBOX_TABS.map((t) => <button type="button" key={t.view} className={`tm-tab${view === t.view ? ' on' : ''}`} onClick={() => onView(t.view)}>{t.view === 'inbox' && needs ? needs : t.label}{counts[t.view] !== undefined && <b>{counts[t.view]}</b>}</button>)}
+    {INBOX_TABS.map((t) => <button type="button" key={t.view} className={`tm-tab${view === t.view ? ' on' : ''}`} onClick={() => onView(t.view)}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
   </div>{end}</div>;
 }
 
 /* ------------------------------------------------------------ whose threads */
 /**
- * THE FACES THAT PICK WHOSE THREADS ARE ON THE PAGE (w-05ff3d1438). At the
- * right end of the tab bar, you first. A face is a switch: lit when that
- * person's threads are on the page, faint when not. Past four people the rest
- * fold into "+N", which opens everyone as a list. Nothing is drawn for a
- * person alone on a team, or for nobody signed in.
+ * ONE FILTER AT THE END OF THE TAB BAR (w-57034cf3c0). Up to four face chips
+ * and a "+N" stood here and read as clutter on the one row that has to stay
+ * quiet. This says whose threads the page is showing in words, and opens the
+ * same list: Just you, Everyone, then each person with a tick. Nothing is drawn
+ * for a person alone on a team, or for nobody signed in.
  */
-export function PeoplePicker({ everyone, picked, me, onPick }: {
+export function PeopleFilter({ everyone, picked, me, onPick }: {
   everyone: Person[]; picked: string[]; me: string | null; onPick: (picked: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useOutside(open, () => setOpen(false));
-  const { faces, more } = facesShown(everyone, picked, me);
-  if (!faces.length) return null;
+  if (everyone.filter((p) => p.id !== me).length === 0) return null;
   const name = (p: Person) => (p.id === me ? 'You' : p.name || p.email || 'Someone');
-  const face = (p: Person) => {
-    const on = picked.includes(p.id);
-    return <button type="button" key={p.id} className={`th-face${on ? ' on' : ''}`} aria-pressed={on}
-      title={on ? `${name(p)}: shown. Click to hide.` : `Show ${p.id === me ? 'your' : `${firstName(p)}’s`} threads`}
-      onClick={() => onPick(togglePicked(picked, p.id, me))}><Face person={p} me={p.id === me} /></button>;
-  };
   const sorted = [...everyone.filter((p) => p.id === me), ...everyone.filter((p) => p.id !== me).sort((a, b) => name(a).localeCompare(name(b)))];
-  const hiddenPicked = more > 0 && picked.some((id) => !faces.some((f) => f.id === id));
-  return <div className="th-people" role="group" aria-label="Whose threads are shown">
-    {faces.map(face)}
-    {more > 0 && <span ref={(el) => { ref.current = el; }} className="th-more-wrap">
-      <button type="button" className={`th-face th-more${open ? ' open' : ''}${hiddenPicked ? ' on' : ''}`} aria-haspopup="listbox" aria-expanded={open}
-        title={`${more} more`} onClick={() => setOpen(!open)}>+{more}</button>
-      {open && <div className="th-menu th-people-menu" role="listbox" aria-multiselectable="true">
-        <button type="button" className="row-i" onClick={() => { onPick(me ? [me] : picked); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Just you</button>
-        <button type="button" className="row-i" onClick={() => { onPick(sorted.map((p) => p.id)); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Everyone</button>
-        <span className="sep" />
-        {sorted.map((p) => <button type="button" key={p.id} role="option" aria-selected={picked.includes(p.id)} className={`row-i${picked.includes(p.id) ? ' on' : ''}`}
-          onClick={() => onPick(togglePicked(picked, p.id, me))}>
-          <Face person={p} me={p.id === me} />{name(p)}{picked.includes(p.id) && <CheckMark />}
-        </button>)}
-      </div>}
-    </span>}
-  </div>;
+  return <span className="th-pf-wrap" ref={(el) => { ref.current = el; }}>
+    <button type="button" className={`th-pf${open ? ' open' : ''}`} aria-haspopup="listbox" aria-expanded={open}
+      title="Whose threads are shown" onClick={() => setOpen(!open)}>
+      <PeopleIcon /><span className="w">{whoseWord(everyone, picked, me)}</span>
+      <svg width="9" height="6" viewBox="0 0 9 6" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="m1 1.5 3.5 3L8 1.5" /></svg>
+    </button>
+    {open && <div className="th-menu th-people-menu" role="listbox" aria-multiselectable="true">
+      <button type="button" className="row-i" onClick={() => { onPick(me ? [me] : picked); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Just you</button>
+      <button type="button" className="row-i" onClick={() => { onPick(sorted.map((p) => p.id)); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Everyone</button>
+      <span className="sep" />
+      {sorted.map((p) => <button type="button" key={p.id} role="option" aria-selected={picked.includes(p.id)} className={`row-i${picked.includes(p.id) ? ' on' : ''}`}
+        onClick={() => onPick(togglePicked(picked, p.id, me))}>
+        <Face person={p} me={p.id === me} />{name(p)}{picked.includes(p.id) && <CheckMark />}
+      </button>)}
+    </div>}
+  </span>;
 }
 const CheckMark = () => <svg className="th-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
 
@@ -215,6 +230,38 @@ export function InboxClear({ running, scheduled, onView, onCompose }: {
     </div>
   </div>;
 }
+
+/**
+ * A TAB THAT IS ONLY EMPTY BECAUSE OF A FILTER (w-5a08121f99).
+ *
+ * "Nothing needs you" was drawn over a tab still reading 13, because a filter
+ * had emptied the page. Somebody who has forgotten a filter is on reads that as
+ * an empty inbox when there is a pile of work behind it. Three filters live
+ * behind one icon, they are remembered
+ * between launches, and the page was reporting their work as her own inbox
+ * being clear.
+ *
+ * So: the whole number that is hidden, and the one button that undoes it. It
+ * sits where InboxClear sits, in the first row's place, so the page does not
+ * jump when the filter comes off and the rows arrive.
+ */
+export function FilteredEmpty({ view, hidden, onClear }: { view: TabView; hidden: number; onClear: () => void }) {
+  const { head, line } = filteredEmptyWords(view, hidden);
+  return <div className="th-clear th-clear-filtered">
+    <ClearMark />
+    <h2>{head}</h2>
+    <p>{line}</p>
+    <div className="th-clear-acts">
+      <button type="button" className="th-new" onClick={onClear}>Clear filters</button>
+    </div>
+  </div>;
+}
+
+/** THE ONE QUIET REWARD ON THIS PAGE. Her words: it "shouldn't be visually
+ *  super stimulating, but it could be nicer than this". So: a small tick, the
+ *  accent at half strength, one line of space above the heading. It says this
+ *  view is clear, which is true whether you cleared it or never filled it. */
+const ClearMark = () => <svg className="th-clear-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="square" aria-hidden="true"><path d="m4 12.5 5 5L20 6.5" /></svg>;
 
 /** The other tabs, empty: one quiet line where the rows would be. */
 export function EmptyTab({ view }: { view: TabView }) {
@@ -283,21 +330,20 @@ export function MessageTitle({ people, fromMe, text }: { people: string[]; fromM
 
 /** The cells of one row in the inbox's table: thread, project (or who a message is from), priority, updated.
  *  With a teammate on the page (w-05ff3d1438) it also carries the Person
- *  cell, and a thread of yours the team cannot see wears the lock in place of
- *  the people mark. */
-export function ThreadCells({ item, product, now, person, withOthers = false }: {
-  item: WorkItem; product: Product | undefined; now: number; person?: ReactNode; withOthers?: boolean;
+ *  cell. Who can see the thread is said by one mark after its title, the lock
+ *  or the people, and never by who else is on the page. */
+export function ThreadCells({ item, product, now, person }: {
+  item: WorkItem; product: Product | undefined; now: number; person?: ReactNode;
 }) {
   const liveIds = useContext(LiveContext);
   const team = useContext(TeamContext);
-  // WHO SEES IT, AT A GLANCE AND ONE CLICK FROM CHANGING (2026-10-01). A
-  // people mark after the title of a thread the team can see and nothing on
-  // the rest, which is most of her rows, so the mark only ever means one
-  // thing. Hovering the row offers Share or Unshare at its end. Her click
-  // shows at once; the row catches up when the store's next snapshot does.
-  // A thread shared with chosen people is shared too (w-41ff964775): the mark
-  // is the same and a count beside it says how few. Unshare takes it away from
-  // whoever had it, the team or those people.
+  // WHO SEES IT, AT A GLANCE AND ONE CLICK FROM CHANGING (2026-10-01). One
+  // mark after the title, always: the people on a thread the team or chosen
+  // people can see, the lock on one only you can see. A thread shared with
+  // chosen people (w-41ff964775) carries the same people mark and a count
+  // beside it says how few. Hovering the row offers Share or Unshare at its
+  // end. The click shows at once; the row catches up when the store's next
+  // snapshot does.
   const sharing = rowSharing(item, product, team ? { me: team.me, since: team.state.since ?? null } : null);
   const [flipped, setFlipped] = useState<'team' | 'private' | null>(null);
   useEffect(() => { setFlipped(null); }, [item.visibility, item.visibleTo]);
@@ -324,13 +370,13 @@ export function ThreadCells({ item, product, now, person, withOthers = false }: 
     return <RowCells live={liveIds.has(item.id)} title={<MessageTitle people={said.people} fromMe={said.fromMe} text={said.text} />} where="Message" person={person}
       priority={messagePriority(item)} updatedAt={item.updatedAt} now={now} action={action} />;
   }
-  // A LOCK, ONCE A TEAMMATE IS ON THE PAGE (w-05ff3d1438): then "they cannot
-  // see this one" is the news, so the lock marks it and the people mark,
-  // which would be on every other row, steps aside.
-  // It follows her click at once, the way the Share button does.
-  const lock = withOthers && seen === 'private';
-  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={!withOthers && (seen === 'team' || seen === 'people')} chosen={withOthers ? 0 : chosen}
-    lock={lock} where={product?.name ?? ''} person={person}
+  // ONE MARK, ALWAYS THE SAME ONE. The lock on a thread only you can see, the
+  // people mark on one the team or chosen people can see, and neither depends
+  // on whose faces are lit at the top of the page: a mark that comes and goes
+  // with an unrelated control cannot be read. Both follow the click at once,
+  // the way the Share button does.
+  const lock = seen === 'private';
+  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={seen === 'team' || seen === 'people'} chosen={chosen} lock={lock} where={product?.name ?? ''} person={person}
     priority={item.priority ?? 0} updatedAt={item.updatedAt} now={now} action={action} />;
 }
 
@@ -353,27 +399,27 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   const who = picked ?? (me ? [me] : []);
   const withOthers = who.some((p) => p !== me);
   const since = team?.state.since ?? null;
-  const entries = teamEntries({ items: me && !who.includes(me) ? [] : items, products, cards: cards.filter((c) => who.includes(c.personId)), me, now, since, stateOf, live: liveIds, allMine: true })
-    .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
-    .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
+  // One copy of what the board holds and in what order, which App.tsx also
+  // walks with J and K (`boardColumns`, page-rules.ts).
+  const columns = boardColumns({ items, products, display, now, stateOf, cards, picked, me, since, live: liveIds });
   const sharing = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since } : null);
   return <div className="list hm-me">
     {end && <div className="th-bar th-bar-end">{end}</div>}
     <div className="th-board">
-    {BOARD_COLUMNS.map((col) => {
-      const rows = entries.filter((e) => e.state === col.state);
+    {columns.map((col) => {
+      const rows = col.rows;
       return <div key={col.state}>
         {/* Your own board says what the tab says: what waits on you needs you. */}
         <div className="th-col-h"><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b></div>
         {rows.length === 0 && <div className="th-col-empty">Nothing here.</div>}
-        {/* On your board alone, the people mark on what the team can see, or
-            on the few people it was shared with. With a teammate beside you,
-            the lock on what they cannot see. */}
+        {/* A card says who can see it the way a row does: the lock on what
+            only you can see, the people mark on what the team or chosen
+            people can, both of them always. */}
         {rows.map((e) => <button type="button" key={e.key} className="th-card" onClick={() => (e.item ? onOpenItem(e.item) : e.card && onOpenCard?.(e.card))}>
           <div className="t">{e.message ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} /> : e.title}
-            {e.item && !e.message && !withOthers && (sharing(e.item) === 'team' || sharing(e.item) === 'people')
+            {e.item && !e.message && (sharing(e.item) === 'team' || sharing(e.item) === 'people')
               && <SharedMark label={shownToPeople(e.item).length ? 'Visible to the people on it' : 'Visible to the team'} />}
-            {e.item && !e.message && withOthers && sharing(e.item) === 'private' && <LockMark />}
+            {e.item && !e.message && sharing(e.item) === 'private' && <LockMark />}
           </div>
           <div className="m">{e.live && <StateGlyph state="running" live />}{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project}</span>
             {withOthers && <Face person={e.ownerId ? team?.byId.get(e.ownerId) ?? null : null} me={e.ownerId === me} />}</div>

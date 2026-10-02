@@ -136,7 +136,8 @@ describe('the state leads the line under the title, said once', () => {
 
 describe('the right side is the Summary button and the dots', () => {
   it('no longer says the state at the right', () => {
-    expect(text(draw(React.createElement(SummaryToggle, { open: false, onToggle: () => {} })))).toBe('Summary S');
+    // Just the word: its S is said on hover since w-5984544441.
+    expect(text(draw(React.createElement(SummaryToggle, { open: false, onToggle: () => {} })))).toBe('Summary');
     expect(summaryModule.ThreadStatusAndToggle).toBeUndefined();
   });
 
@@ -197,7 +198,9 @@ describe('the right side is the Summary button and the dots', () => {
     expect(pages).toMatch(/\.th-menu \{[^}]*background: var\(--pop\);[^}]*border-radius: var\(--radius\)/);
     expect(pages).toMatch(/\.th-menu \.row-i:hover/);
     const css = prose(read('renderer/src/threads/summary.css'));
-    expect(css).toMatch(/\.ts-more \{[^}]*width: 30px; height: 30px;[^}]*border-radius: var\(--radius\)/);
+    // --tag-radius: the button is the Summary button's square, and both of
+    // them are tags, which are square in every theme.
+    expect(css).toMatch(/\.ts-more \{[^}]*width: 30px; height: 30px;[^}]*border-radius: var\(--tag-radius\)/);
     expect(css).not.toMatch(/border-radius: (1[0-9]|[2-9][0-9])px|50%\s*;[^}]*ts-more/);
   });
 });

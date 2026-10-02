@@ -86,40 +86,9 @@ it('opens that row without answering or dismissing the approval', () => {
   expect(body).not.toContain('setAnswered');
 });
 
-// GLASS YOU CAN READ THROUGH IS NOT THE SAME AS GLASS. She came back on
-// 2026-09-25: "can you make the background a little more blurred? i can see the
-// content in its bckground of the card which makes it a little harder to read."
-//
-// This card is the one pane that floats over the live window rather than over a
-// photograph, so --skin-pane over --skin-blur (0.22 of wash over 2px) left her
-// inbox rows legible underneath these words. It wears the first-run card's
-// glass now, which is the app's existing answer to exactly this and which she
-// approved when that card shipped.
-it('wears glass she can read through on a skin, not a flat fill', () => {
-  const css = read('styles.css');
-  const rule = css.match(/:root\[data-skin\] \.approval-card,\s*\n:root\[data-skin\] \.approval-ghost \{([^}]+)\}/);
-  expect(rule, 'the approval card has lost its skin rule').toBeTruthy();
-  // PAINTED AS WELL AS BLURRED. A pure blur over live content goes near-black
-  // on a dark stretch and near-white on a light one, so the card would be
-  // legible against one row and not the next.
-  expect(rule[1]).toContain('color-mix(in oklab, var(--bg-raised) 62%, transparent)');
-  expect(rule[1]).toContain('backdrop-filter: blur(22px) saturate(1.25)');
-  expect(rule[1]).toContain('border-color: var(--skin-pane-line)');
-  // AND STILL GLASS. If this ever reaches 100% the card is the opaque slab she
-  // rejected in the first place, which is the tempting wrong answer to any
-  // future "still hard to read".
-  expect(rule[1]).not.toMatch(/background:\s*var\(--bg-raised\)\s*;/);
-  const mix = rule[1].match(/var\(--bg-raised\) (\d+)%/);
-  expect(Number(mix[1])).toBeLessThan(100);
-  // The block inside it is a film over the card, not the window's own ground,
-  // or the card is glass with a solid rectangle in the middle of it.
-  expect(css).toContain(':root[data-skin] .approval-cmd { background: var(--film-strong); }');
-  // NOT --control-face, which is a white film in every theme and only looks
-  // right on dark.
-  expect(css).not.toContain('.approval-cmd { background: var(--control-face)');
-});
-
-it('leaves plain light and dark exactly as they were', () => {
+// The glass this card wore under a picture theme went with the pictures when
+// the app went to one light look; the plain card below is the only card now.
+it('keeps the plain card its fill and hairline', () => {
   const css = read('styles.css');
   const base = css.match(/\n\.approval-card \{([^}]+)\}/)[1];
   // Unscoped, the card keeps the fill and the hairline it has always had:

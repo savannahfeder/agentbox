@@ -1,7 +1,7 @@
 // The app: the agent inbox. Electron shell around a keyboard-first renderer, a
 // file-derived store, and a supervisor of headless sessions.
 
-import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, screen as electronScreen, shell, session, safeStorage } from 'electron';
+import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, shell, session, safeStorage } from 'electron';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mjs';
 import { loadCloudConfig, supabaseSession } from './team/session.mjs';
@@ -12,13 +12,12 @@ import { configDir, loadConfig } from './config.mjs';
 import { installMenu, applyZoom, requestFind } from './menu.mjs';
 import { zoomDeltaFor } from './zoom-keys.mjs';
 import { copySelection } from './copy-selection.mjs';
-import { screenDetailFor } from './screen-detail.mjs';
 import { Store } from './store.mjs';
 import { storeRootEnv } from './store/home.mjs';
 import { Supervisor } from './supervisor.mjs';
 import { startCodexWatch } from './codex-watch.mjs';
 import { registerIpc } from './ipc.mjs';
-import { carryHerBriefsAcross, joinMessageRules } from './instruction-settings.mjs';
+import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules } from './instruction-settings.mjs';
 import * as approvals from './approvals.mjs';
 import { recoveryToast } from '../shared/recovery.mjs';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mjs';
@@ -27,6 +26,7 @@ import { openFreshUser } from './fresh-user.mjs';
 import { installCrashReports, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mjs';
 import { createAnalytics } from './analytics.mjs';
 import { createUpdater } from './updater.mjs';
+import { createSourceUpdater } from './source-updater.mjs';
 import { installNotifier } from './notify.mjs';
 import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mjs';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mjs';
@@ -197,6 +197,9 @@ try {
   // supervisor exists, so nothing has read the new name yet.
   const joined = joinMessageRules(appDir, userDir);
   if (joined) console.log(`zero: joined the message rules into one file, ${joined.total} characters`);
+  // AND A BOX THAT AN OLDER JOIN FILLED WITH ONLY OUR TEXT IS EMPTIED, ONCE
+  // (w-3ec9f07978). Kept as a restore point; our rules ride from the checkout.
+  if (setAsideShippedMessageRules(appDir, userDir)) console.log('zero: the message rules box held only the shipped rules; set aside as a restore point');
 } catch (err) {
   console.warn(`zero: could not carry her instructions into ${userDir}: ${err.message}`);
 }
@@ -553,7 +556,9 @@ async function createWindow() {
     minWidth: 980,
     minHeight: 600,
     title: NAME,
-    backgroundColor: '#1a1a1c',
+    // The light frame's own `--bg`, so the moment before the page paints is
+    // the same colour as the page (w-9e434e8671). It was dark.
+    backgroundColor: '#f8f8fa',
     titleBarStyle: 'hiddenInset',
     webPreferences: {
       preload: path.join(appDir, 'preload.cjs'),
@@ -561,38 +566,6 @@ async function createWindow() {
       nodeIntegration: false,
       webviewTag: true, // the inbox-zero browser
     },
-  });
-
-  // WHICH PICTURE SET THIS WINDOW IS ON, and a shout when it changes.
-  // main/screen-detail.mjs has the rule and the reasoning; this is the wiring.
-  // The initial answer rides bootInfo rather than being pushed, for the same
-  // reason everything else there does: a push races the renderer's first
-  // effects and would be dropped by the page it is for. After that, the two
-  // things that can change the answer are the window moving to another screen
-  // and a screen changing under it, and both are watched here. Nothing is sent
-  // unless the answer actually flips, so dragging a window around does not
-  // spray IPC at the page.
-  const currentScreenDetail = () => {
-    try { return screenDetailFor(electronScreen.getDisplayMatching(window.getBounds())); }
-    catch { return 'sharp'; }
-  };
-  let lastScreenDetail = currentScreenDetail();
-  const tellScreenDetail = () => {
-    if (!window || window.isDestroyed()) return;
-    const next = currentScreenDetail();
-    if (next === lastScreenDetail) return;
-    lastScreenDetail = next;
-    window.webContents.send('zero:screen-detail', { detail: next });
-  };
-  window.on('move', tellScreenDetail);
-  window.on('moved', tellScreenDetail);
-  electronScreen.on('display-metrics-changed', tellScreenDetail);
-  electronScreen.on('display-added', tellScreenDetail);
-  electronScreen.on('display-removed', tellScreenDetail);
-  window.on('closed', () => {
-    electronScreen.removeListener('display-metrics-changed', tellScreenDetail);
-    electronScreen.removeListener('display-added', tellScreenDetail);
-    electronScreen.removeListener('display-removed', tellScreenDetail);
   });
 
   // The junk browser's session presents as plain Chrome. Electron's default
@@ -608,9 +581,17 @@ async function createWindow() {
   // `pushUpdate` is filled in on the next line, because the updater has to
   // exist before the IPC surface that reports it and the IPC surface is what
   // knows how to reach the window.
+  //
+  // AND A COPY RUN FROM SOURCE watches its git branch instead of a release
+  // feed (main/source-updater.mjs), because that is how teammates run the team
+  // build and their updates are pushes to main, not releases.
   let pushUpdate = () => {};
-  const updater = createUpdater({
+  const updater = app.isPackaged ? createUpdater({
     app,
+    onChanged: () => pushUpdate(),
+  }) : createSourceUpdater({
+    app,
+    appDir,
     onChanged: () => pushUpdate(),
   });
 
@@ -810,7 +791,6 @@ async function createWindow() {
   ipcMain.handle('zero:boot-info', () => {
     const info = {
       reloaded: reloadRequested, builtAt: builtAt(), recovered: pendingRecovery,
-      screenDetail: currentScreenDetail(),
     };
     reloadRequested = false;
     pendingRecovery = null;

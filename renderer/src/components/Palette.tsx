@@ -13,8 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Product, View } from '../types';
 import { commandKeys } from '../palette-keys';
-import { emptyLine, lookRows, matchesQuery, rankMatches } from '../palette-rows';
-import { type Look } from '../skins';
+import { emptyLine, matchesQuery, rankMatches } from '../palette-rows';
 import { NAME } from '../../../shared/product-name.mjs';
 
 interface Command {
@@ -28,18 +27,12 @@ interface Command {
   run: () => void;
 }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, onSetLook, onThemes, staleFiles = [], updateReady = null, onInstallUpdate, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onNewProject, onStanding, onSettings, onShortcuts, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], staleFiles = [], updateReady = null, onInstallUpdate, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onStanding, onSettings, onShortcuts, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
   // Rows are ticked, so every item-acting command means "these ones".
   batch?: boolean;
-  // Which of the three she is on, and the one way to change it. A picture is a
-  // theme here, not a setting on top of one (skins.ts), so the palette offers
-  // all of them by name and there is no second path for light and dark.
-  look: Look;
-  onSetLook: (look: Look) => void;
-  onThemes: () => void;
   // Main-process files that changed since this process read them. The banner
   // that used to announce these is gone; the fact lives here, where it costs
   // nothing to ignore.
@@ -62,6 +55,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   onResume: () => void;
   order?: string[];
   onRankFirst: (slug: string) => void;
+  /** Settings, opened on the Projects page, where the running order is set. */
+  onOpenProjects?: () => void;
   // Door B: the new project card. The palette no longer names a project
   // itself; it opens the one card that does.
   onNewProject: () => void;
@@ -132,8 +127,16 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // and does not come back.
     // The standing rank. A running order is not something to type your way
     // through one step at a time, so the palette offers only the move worth
-    // naming: put this project at the top. Everything finer is the drag in the
-    // composer, where the whole order is visible at once.
+    // naming: put this project at the top. Everything finer is the Projects
+    // page in Settings, where the whole order is visible at once, and the
+    // first row here is the door to it.
+    ...(onOpenProjects ? [{
+      id: 'projects-page',
+      label: 'Projects…',
+      hint: 'which goes first, names and rules',
+      keywords: 'priority order rank reorder sort first top priorities rename project settings',
+      run: onOpenProjects,
+    }] : []),
     ...products.map((p, i) => ({
       id: `rank-${p.slug}`,
       label: `Rank ${p.name} first`,
@@ -155,23 +158,6 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     { id: 'view-inbox', label: 'Inbox', run: () => onView('inbox') },
     { id: 'view-progress', label: 'In progress', run: () => onView('progress') },
     { id: 'view-done', label: 'Closed', run: () => onView('done') },
-    // APPEARANCE: the picker, the light/dark toggle, and the two ways to a look
-    // that is neither. EVERY ONE OF THEM lives in ../palette-rows, with the
-    // reasons they are shaped this way. They are pure so a test can type
-    // "dark" into every look and check something comes back, which is the whole
-    // of the bug: on a picture, nothing did.
-    //
-    // Light and dark live here rather than on a button in the corner.
-    //
-    // THE PICKER ROW USED TO BE ASSEMBLED HERE while its neighbours were
-    // assembled next door, and the sixteen picture rows sat under it.
-    ...lookRows(look).map((r) => ({
-      id: r.id,
-      label: r.label,
-      hint: r.hint,
-      keywords: r.keywords,
-      run: r.opens === 'themes' ? onThemes : () => onSetLook(r.to!),
-    })),
     // A NEW AGENTBOX, ALREADY ON THE DISK. Above the stale-files row on purpose:
     // that one is about a build somebody is making on this Mac right now, and
     // this one is about the app everybody has. It is only ever here when the
@@ -439,7 +425,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onStanding, onSettings, onShortcuts, look, onSetLook, onThemes, staleFiles, updateReady, onInstallUpdate, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo]);
+  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, staleFiles, updateReady, onInstallUpdate, panelUp, onTogglePanel, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

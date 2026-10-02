@@ -11,8 +11,6 @@ import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // followed by a refetch.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
-import { readySkin, swapLook } from './look-switch';
 import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import { api } from './api';
 import { setClaudeModels } from './models';
@@ -43,13 +41,12 @@ import { RepeatFocus } from './components/RepeatFocus';
 import { Palette } from './components/Palette';
 import { Standing, STANDING } from './components/Standing';
 import { Settings } from './components/Settings';
-import { ThemePicker } from './components/ThemePicker';
 import { Snooze } from './components/Snooze';
 /* The line, the toast and the dot on the cog were the other three drawn for that round and
  are gone; their copy is in decisions.md and their photographs on
  `astral/w-86452550e5-looks`.
 */
-import { announcesUpdate, isUpdateRow, updateRow } from './update-row';
+import { announcesUpdate, isUpdateRow } from './update-row';
 // Inbox zero is `IdlePage`.
 import { IdlePage } from './components/IdlePage';
 import { ago, itemOptions, offerIsLive, parseRepeat } from './format';
@@ -72,11 +69,9 @@ import { modalAfterLeavingATask } from './modal-scope';
 import { NOTHING_OVER_THE_APP, afterTheWalk, type OpenOverTheApp } from './walk-scope';
 import { splitMessage } from './message-split';
 import { parseQuery, searchItems } from './search';
-import { applyTheme, onMachineTheme, resolvePick, resolveTheme, THEME_KEY, type ThemePick } from './theme';
 import { hintScheduler, type HintScheduler } from './hint-timing';
 import { HINTS } from './hint-plate';
 import { HintPlate } from './components/HintPlate';
-import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, idleSkin, lookMeans, lookOf, resolveSkin, resolveSkinDetail, resolveTune, seedFirstRunLook, SKINS, storeTune, walkSkin, SKIN_KEY, TUNE_DEFAULT, TUNE_KEY, type Look, type SkinChoice, type SkinId, type SkinTune } from './skins';
 // THE SHAPE OF AN OPENED TASK IS STILL AN OPEN QUESTION. Six of them,
 // one attribute, and the whole file goes when she picks.
 import { resolveTaskShape, TASK_SHAPE_KEY, type TaskShape } from './task-shape';
@@ -103,7 +98,7 @@ import {
   mayOpenInbox, noCodingAgent, practising, restartFirstRun, snoozeRefused, tutorialRun,
   waitingId, waitingIndex,
   finishFirstRun, forcedStep, readFirstRun, walkRows,
-  saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, wearsTheWalksLook, whyNotMade, type FirstRun,
+  saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, whyNotMade, type FirstRun,
 } from './onboarding';
 import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from './priority';
 import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
@@ -113,14 +108,15 @@ import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
 import { Face, TeamContext, firstName, teamView } from './team/people';
+import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
-import { EmptyTab, HeaderActions, InboxBoard, InboxClear, LiveContext, PeoplePicker, StateTabs } from './threads/Pages';
+import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, PeopleFilter, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, conversationWith, isDirect, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
+import { DEFAULT_DISPLAY, boardColumns, boardWalk, conversationWith, isDirect, nextTab, pageFor, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 
-type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing' | 'themes';
+type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
 
 // WHAT AN UNDO HANDS BACK, and where it belongs on the screen. A withdrawn
 // reply belongs to a thread, so undoing it opens that thread with the user's
@@ -472,12 +468,13 @@ export default function App() {
   // THE TEAM PAGE, a page like Settings: it takes the main area and leaves the
   // header and the sidebar where they are.
   const [teamOpen, setTeamOpen] = useState(() => new URLSearchParams(location.search).has('team'));
-  // TEAM MEMBERS AND INVITING, from the foot of the sidebar: the team's setup page.
-  const [membersOpen, setMembersOpen] = useState(false);
   // A TEAMMATE'S THREAD, opened from the Team board: its card, never its conversation.
   const [openCard, setOpenCard] = useState<ThreadCard | null>(null);
-  // Invite people and Team members open the same page; this says which, so the
-  // sidebar lights the one pressed and Invite puts the cursor in the email box.
+  // THERE IS NO MEMBERS PAGE ANY MORE (w-8415594d19, 2026-10-01). Team
+  // management is a pane in Settings, so the sidebar's two team rows are one
+  // row that opens it. This is all that is left of them: whether the email box
+  // on that pane takes the cursor, which is what makes Invite people a
+  // shortcut rather than another way to reach Settings.
   const [inviteFocus, setInviteFocus] = useState(false);
   // WHAT THE COMPOSER OPENS WITH, when something hands it a start: "Hand it to
   // an agent" on a message from a person turns that message into a thread.
@@ -606,80 +603,8 @@ export default function App() {
   // The one way to change it. The key, the button in the corner and the ⌘K
   // command all call THIS, so there is no second place for it to be confused in.
   const togglePanel = useCallback(() => setPanelUp((v) => !v), []);
-  // Resolved once at mount and applied before the first paint below, so the
-  // window never flashes the other theme on the way in.
-  // IT HOLDS THE PICK, NOT THE COLOUR. `match` is one of the three things this
-  // can be, and it is resolved to light or dark at every paint below rather than
-  // frozen here, so a Mac that flips at sunset takes the window with it and the
-  // ticked tile still says Match my system.
-  const [theme, setTheme] = useState<ThemePick>(() => resolvePick(localStorage.getItem(THEME_KEY)));
-  // WHAT THE MAC SAYS RIGHT NOW, and it only matters while `theme` is `match`.
-  // A piece of state rather than a read at paint time because nothing else would
-  // tell React that the Mac changed its mind while the window was open.
-  const [machine, setMachine] = useState(() => resolveTheme('match'));
-  useEffect(() => onMachineTheme(setMachine), []);
-  // The picture over dark, on its own axis (skins.ts). Applied in main.tsx
-  // before the first paint; this is the same value read back so the controls
-  // can show which one is on.
-  const [skin, setSkin] = useState<SkinChoice>(() => resolveSkin(localStorage.getItem(SKIN_KEY)));
-  // WHAT SHE PICKS IS ONE THING. Light, Dark, or a picture — never a theme and
-  // a picture separately, because a picture IS dark, and two
-  // controls for one decision is the cognitive load the design law exists to
-  // refuse. Settings and ⌘K both call this and nothing else, so there is no
-  // second place for the two halves to disagree.
-  const look = lookOf(theme, skin);
-  // HER DIALS on the picture: blur and dim (skins.ts). They live beside the
-  // skin rather than inside it because they are hers to move and the skin is
-  // ours to ship, and because moving one has to repaint the window she is
-  // looking at, not the next one she opens.
-  const [tune, setTuneState] = useState<SkinTune>(() => {
-    const sk = resolveSkin(localStorage.getItem(SKIN_KEY));
-    // With no picture on there are no dials to show, but the state still needs
-    // a shape, so it borrows the first picture's. SKINS[0], not a name: the
-    // first picture was Mountain, it was removed, and a hard-coded id here is
-    // what would have broken.
-    return resolveTune(localStorage.getItem(TUNE_KEY), sk === 'none' ? SKINS[0].id : sk);
-  });
-  // The newest press wins: walking the strip with the arrow keys fires several
-  // switches before the first picture is decoded, and only the last may land.
-  const lookSeq = useRef(0);
-  // THE TILE SHE PRESSED, ticked on the press itself while its picture decodes,
-  // so a click always answers at once even when the window takes a beat.
-  const [pickedLook, setPickedLook] = useState<Look | null>(null);
-  const setLook = useCallback((next: Look) => {
-    const { theme: t, skin: s } = lookMeans(next);
-    // Stored at once, so what she pressed is kept even if the window closes
-    // before the picture is ready. The screen changes once it is (look-switch.ts).
-    localStorage.setItem(THEME_KEY, t); localStorage.setItem(SKIN_KEY, s);
-    const seq = ++lookSeq.current;
-    setPickedLook(next);
-    void readySkin(s).then(() => {
-      if (seq !== lookSeq.current) return;
-      swapLook(() => flushSync(() => {
-        setPickedLook(null);
-        setTheme(t); applyTheme(resolveTheme(t));
-        setSkin(s); applySkin(s);
-        // Each picture carries its own dials, so arriving on one loads ITS numbers
-        // rather than leaving the last picture's blur on this one's photograph.
-        if (s !== 'none') {
-          const next = resolveTune(localStorage.getItem(TUNE_KEY), s);
-          setTuneState(next); applyTune(next);
-        }
-      }));
-    });
-  }, []);
-
-  const setTune = useCallback((next: SkinTune) => {
-    const sk = resolveSkin(localStorage.getItem(SKIN_KEY));
-    if (sk === 'none') return;
-    setTuneState(next);
-    applyTune(next);
-    localStorage.setItem(TUNE_KEY, storeTune(localStorage.getItem(TUNE_KEY), sk, next));
-  }, []);
-  const resetTune = useCallback(() => {
-    const sk = resolveSkin(localStorage.getItem(SKIN_KEY));
-    if (sk !== 'none') setTune(TUNE_DEFAULT[sk as SkinId]);
-  }, [setTune]);
+  // THERE IS NO LOOK STATE. The app has one look, Light (w-9e434e8671): no
+  // dark, no pictures, nothing to pick and nothing to store.
   const [seen, setSeen] = useState<Set<string>>(() => new Set(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]')));
   // Batch selection (Superhuman: cmd-A, shift-select, then act on all).
   const [multiSel, setMultiSel] = useState<Set<string>>(new Set());
@@ -738,19 +663,6 @@ export default function App() {
      since gone (she withdrew it with Z) simply does not answer the click.
   */
   const [toast, setToast] = useState<{ text: string; goes?: { product: string; id: string } } | null>(null);
-  /* * THE VERSION WHOSE ROW SHE HAS CLOSED. Closing hides the ROW and nothing else. The
-     download stays on the disk, Settings > General still says "Restart to update", and ⌘K
-     still carries it. A NEWER version brings a new row, because the string stored here
-     stops matching, which is the same rule the trouble row closes under. Kept the way that
-     row keeps its own, so a ⌘R does not undo her close.
-  */
-  const [updateClosed, setUpdateClosed] = useState<string>(() => {
-    try { return localStorage.getItem('zero.updateClosed') || ''; } catch { return ''; }
-  });
-  const setUpdateClosedAt = useCallback((version: string) => {
-    setUpdateClosed(version);
-    try { localStorage.setItem('zero.updateClosed', version); } catch { /* private mode: it just comes back */ }
-  }, []);
   // Dev aid, the same shape again: ?modes=a,b,e draws one of the three unbuilt
   // treatments of the permission question (./components/ModeScreen.tsx), so it
   // can be photographed inside the real app rather than redrawn beside it.
@@ -819,24 +731,6 @@ export default function App() {
     // A half-finished walk resumes where it stopped: the folder and name are
     // saved as answered, so reopening resumes.
     setRun(forcedRun.current ? { ...RUN_START, step: forcedRun.current } : readFirstRun(localStorage));
-    // AND THE LOOK IS WRITTEN DOWN HERE, on the one line that knows this Mac
-    // has never been used. Before this, only the three setup screens and inbox
-    // zero painted the lake and nothing was stored, so every other screen fell
-    // through to whatever the Mac preferred and a light Mac turned the walk
-    // white after the third screen.
-    //
-    // WHAT IT SEEDS IS PLAIN DARK, NOT A PICTURE. The `else` branch that used
-    // to sit under this line put Gouache Valley on any Mac that had chosen no
-    // picture, every time the walk ran, and that is how a look nobody
-    // picked reached the window. It is deleted, and so is the function behind
-    // it. A picture is something somebody chooses on the walk's look step now,
-    // and nothing else in the app chooses one for them.
-    //
-    // The state goes with it because both were read from localStorage at mount
-    // and neither is watching it, so writing the keys alone would only take
-    // effect on the next launch.
-    const seeded = seedFirstRunLook(localStorage, THEME_KEY);
-    if (seeded) { setTheme(seeded.theme); setSkin(seeded.skin); }
   }, [snap, run]);
 
   useEffect(() => { if (run) saveFirstRun(localStorage, run); }, [run]);
@@ -1514,26 +1408,12 @@ export default function App() {
     return troubleRow(t, items);
   }, [snap?.supervisor.spawnTrouble, items, troubleClosed]);
 
-  // AND THE ROW THAT SAYS A NEWER AGENTBOX IS ALREADY ON THE DISK. Built the same
-  // way and for the same reason: a row was picked over a line, a toast and a
-  // dot on the cog, because an inbox is what this product is and an
-  // announcement that lands anywhere else is the one exception a user would
-  // have to learn. It exists only in `ready`; nothing about checking, downloading or
-  // failing is her business, and all of that is on the Settings page for
-  // anybody who goes looking.
-  //
-  // AND IT WAITS FOR THE WALK TO END.The rule is `announcesUpdate` in
-  // ./update-row.ts, where the reason is written down and where ⌘K reads it
-  // too.
-  const updateItem = useMemo(() => {
-    const u = snap?.update;
-    if (!announcesUpdate(u, { walking, closed: updateClosed })) return null;
-    return updateRow(u);
-  }, [snap?.update, updateClosed, walking]);
+  // A NEWER AGENTBOX IS NOT A ROW. It was one until 2026-10-01; it is a card in
+  // the sidebar now (components/SidebarUpdate.tsx, w-7a39dace23).
 
   const selectable = useMemo(
-    () => [...items, ...agentRows, ...(troubleItem ? [troubleItem] : []), ...(updateItem ? [updateItem] : [])],
-    [items, agentRows, troubleItem, updateItem],
+    () => [...items, ...agentRows, ...(troubleItem ? [troubleItem] : [])],
+    [items, agentRows, troubleItem],
   );
 
   const inboxCandidates = useMemo(() => items.filter((i) => {
@@ -1648,9 +1528,9 @@ export default function App() {
     // order still holds, because `rows` is already sorted and filter keeps it.
     const urgent = rest.filter(isUrgentRow);
     const ordinary = urgent.length ? rest.filter((i) => !isUrgentRow(i)) : rest;
-    const top = [...(troubleItem ? [troubleItem] : []), ...(updateItem ? [updateItem] : []), ...fresh];
+    const top = [...(troubleItem ? [troubleItem] : []), ...fresh];
     return [...top, ...urgent, ...ordinary];
-  }, [inboxCandidates, liveRows, agentList, agentMode, score, now, pendingId, troubleItem, updateItem, seen]);
+  }, [inboxCandidates, liveRows, agentList, agentMode, score, now, pendingId, troubleItem, seen]);
 
   // BEAT EIGHT ENDS WHEN THE INBOX IS EMPTY, and both ways of ending a task get
   // there: closing one takes it out of the list, and replying to one puts her
@@ -1955,8 +1835,12 @@ export default function App() {
   // THE DISPLAY MENU'S FILTERS AND SORT, on top of the box (approved
   // 2026-10-01). Remembered per page; the Inbox is a list by default and the
   // Team a board.
-  const [inboxDisplay, setInboxDisplayRaw] = useState<Display>(() => readDisplay('inbox'));
-  const setInboxDisplay = useCallback((d: Display) => { setInboxDisplayRaw(d); writeDisplay('inbox', d); }, []);
+  // BOTH HALVES ARE KEPT, and which one the page is on follows the faces
+  // (`pageFor`, below). Your own threads open as a list and a page with the
+  // team on it opens as a board, which is what the approved design said and
+  // what the one page stopped doing.
+  const [mineDisplay, setMineDisplayRaw] = useState<Display>(() => readDisplay('inbox'));
+  const [teamDisplay, setTeamDisplayRaw] = useState<Display>(() => readDisplay('team'));
   // WHOSE THREADS ARE ON THE PAGE (w-05ff3d1438): the faces at the end of the
   // tab bar. The Inbox and the Team page were one question on two pages; this
   // is the one page, and it opens as yours. Remembered between launches.
@@ -1969,6 +1853,12 @@ export default function App() {
   const picked = useMemo(() => normalizePicked(pickedRaw, team?.me ?? null, everyone.map((p) => p.id)), [pickedRaw, team?.me, everyone]);
   const setPicked = useCallback((next: string[]) => { setPickedRaw(next); writePicked(next); setSelected(0); }, []);
   const withOthers = !!team && othersInView(picked, team.me);
+  const displayPage = pageFor(withOthers);
+  const inboxDisplay = withOthers ? teamDisplay : mineDisplay;
+  const setInboxDisplay = useCallback((d: Display) => {
+    if (displayPage === 'team') setTeamDisplayRaw(d); else setMineDisplayRaw(d);
+    writeDisplay(displayPage, d);
+  }, [displayPage]);
   // Your own rows are on the page unless you took yourself off it.
   const mineShown = !team || picked.includes(team.me ?? '');
   const displayedBox = useMemo(
@@ -1984,19 +1874,39 @@ export default function App() {
   );
   const mixedRows = useMemo(() => (withOthers ? mergeRows(displayedBox, theirRows, inboxDisplay.sort) : null), [withOthers, displayedBox, theirRows, inboxDisplay.sort]);
   // A teammate's thread opens as their card, over the page, and Back returns here.
-  const openTeammateCard = useCallback((card: ThreadCard) => { setMembersOpen(false); setOpenCard(card); setTeamOpen(true); }, []);
+  const openTeammateCard = useCallback((card: ThreadCard) => { setOpenCard(card); setTeamOpen(true); }, []);
+  // HOVERING A FACE SAYS WHAT THEY ARE UP TO (w-0b54ee983f). Her words:
+  // "I presumed that if I hovered over or clicked on them, it would show
+  // something." These rows are the last faces in the app, so the card the
+  // Team board's face chips were going to carry hangs here instead.
   const personCell = useCallback((id: string | null) => {
     const p = id ? team?.byId.get(id) ?? null : null;
-    return <><Face person={p} me={id === team?.me} />{id === team?.me ? 'You' : firstName(p)}</>;
-  }, [team]);
+    return <FaceHover person={p} me={id === team?.me} now={now}>
+      <Face person={p} me={id === team?.me} />{id === team?.me ? 'You' : firstName(p)}
+    </FaceHover>;
+  }, [team, now]);
   const peoplePicker = team
-    ? <PeoplePicker everyone={everyone} picked={picked} me={team.me} onPick={setPicked} />
+    ? <PeopleFilter everyone={everyone} picked={picked} me={team.me} onPick={setPicked} />
     : undefined;
-  // Each tab's number, theirs added in, before the Display's filters, the way
-  // yours have always been counted.
+  // EACH TAB'S NUMBER COUNTS WHAT THE FILTERS SHOW (w-5a08121f99). It counted
+  // the whole tab, so a filter that had emptied Needs you left the tab saying
+  // 13 over a page saying "Nothing needs you". A tab's number is a promise
+  // about what clicking it shows, and the number a filter is holding back is
+  // said in full by the empty state and by the Display menu's "Showing 4 of 7".
+  const shownCount = useCallback((rows: WorkItem[]) => rows.filter(
+    (i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now),
+  ).length, [inboxDisplay, now]);
   const theirCount = useCallback((tab: string) => (withOthers
-    ? teammateRows(cards, { tab, picked, me: team?.me ?? null, display: DEFAULT_DISPLAY.inbox, products: snap?.products ?? [], now }).length : 0),
-  [withOthers, cards, picked, team?.me, snap?.products, now]);
+    ? teammateRows(cards, { tab, picked, me: team?.me ?? null, display: inboxDisplay, products: snap?.products ?? [], now }).length : 0),
+  [withOthers, cards, picked, team?.me, snap?.products, now, inboxDisplay]);
+  // WHAT THE FILTERS ARE HOLDING BACK on the tab she is standing on, which is
+  // only ever read where the page is otherwise empty: then every row of the tab
+  // is a row a filter took away.
+  const hiddenNow = (mineShown ? shownBox.length : 0) + (withOthers
+    ? teammateRows(cards, { tab: view, picked, me: team?.me ?? null, display: DEFAULT_DISPLAY.inbox, products: snap?.products ?? [], now }).length : 0);
+  // THE TABS A PRESS OF TAB MOVES ALONG: the list the bar is drawing, so there
+  // is no second copy of the order to fall out of step with it.
+  const stateTabOrder = useMemo(() => INBOX_TABS.map((t) => t.view), []);
   // The inbox as she sees it, whichever tab is up: her filter AND her display
   // menu. Finishing a task from inside it advances through THIS, never the
   // whole inbox, or the next task opened can be one she has hidden
@@ -2005,7 +1915,6 @@ export default function App() {
     () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay),
     [inbox, boxFilter, inboxDisplay, now],
   );
-  const list = search !== null ? (hits ?? []).map((h) => h.item) : displayedBox;
   const boxFilterMenu = useMemo(
     () => (modal === 'filter' ? filterMenu(wholeBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i)), boxFilter, snap?.products ?? []) : null),
     [modal, wholeBox, boxFilter, snap?.products],
@@ -2034,6 +1943,17 @@ export default function App() {
     return m;
   }, [inbox, progress, snoozed, done]);
   const stateOfMine = useCallback((i: WorkItem) => tabState.get(i.id) ?? null, [tabState]);
+  // J AND K WALK WHAT IS ON THE SCREEN. On the board that is the board's own
+  // reading order, down each column and on to the next (`boardColumns`, the
+  // same call InboxBoard draws). Walking the tab's list instead stopped J
+  // halfway down a full board, because a card from another column was not in
+  // it (2026-10-02, tests/the-board-walks-in-the-order-it-is-drawn.test.mjs).
+  const onBoard = search === null && inboxDisplay.view === 'board';
+  const boardOrder = useMemo(
+    () => (onBoard ? boardWalk(boardColumns({ items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards, picked: team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds })) : null),
+    [onBoard, items, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds],
+  );
+  const list = search !== null ? (hits ?? []).map((h) => h.item) : boardOrder ?? displayedBox;
 
   const current: WorkItem | undefined = list[Math.min(selected, Math.max(0, list.length - 1))];
   // THE ROW THE ROW-KEYS ACT ON. The pointer's row when it is on one, and the
@@ -2708,9 +2628,6 @@ export default function App() {
       // The startup sweep ran before this page existed, so its one line was
       // held for it. It outranks the reload line: a reload she pressed herself
       // needs no telling, and agents coming back off a crash does.
-      // Which set of theme pictures this screen wants, before anything else in
-      // here: a toast that returns early must not take the wallpaper with it.
-      applySkinDetail(resolveSkinDetail(info?.screenDetail));
       // BEFORE ANY RETURN, because this is what puts her back where she was and
       // the two early exits below are about what to SAY. Read once here rather
       // than asked for again: the main process clears the flag as it hands it
@@ -2780,10 +2697,6 @@ export default function App() {
     showToast(`Opening a demo inbox with ${out.rows ?? 0} rows in it. Yours keeps running.${note}`);
   }, [showToast]);
 
-  // She dragged the window onto the other screen, or unplugged one. The picture
-  // does not change, only which copy of it is painted, so there is nothing to
-  // say about it and nothing to store: the attribute is the whole of the state.
-  useEffect(() => window.zero?.onScreenDetail?.((s) => applySkinDetail(resolveSkinDetail(s?.detail))), []);
 
   // FROM A TASK IT ADVANCES, FROM THE LIST IT DOES NOT. The rule and what it
   // cost her are in ./advance; what is here is only which state answers "was a
@@ -2888,19 +2801,6 @@ export default function App() {
     }, 'Closed: what is not running');
   }, [deferCommit, setTroubleClosedAt, troubleClosed, pushUndo]);
 
-  // It hides the ROW, for this version only. The download is untouched,
-  // Settings > General still offers the restart, ⌘K still carries it, and a
-  // newer version brings a new row because the version stored against the
-  // close stops matching. Nothing in Agentbox discards an update, and there is
-  // deliberately no verb for it.
-  const closeUpdateRow = useCallback(async (item: WorkItem, version: string) => {
-    const was = updateClosed;
-    await deferCommit(item, async () => {
-      setUpdateClosedAt(version);
-      pushUndo({ label: 'Back in your inbox: the new version', undoes: 'put the new version back in your inbox', run: async () => { setUpdateClosedAt(was); } });
-    }, 'Closed. The update is still in Settings');
-  }, [deferCommit, setUpdateClosedAt, updateClosed, pushUndo]);
-
   const markDone = useCallback(async (item: WorkItem) => {
     // AND DURING THE WALK, TWO OF ITS OWN ROWS SAY NO AND SAY WHY. One of them
     // is an agent stopped waiting on you, which is the move the walk is there
@@ -2922,17 +2822,11 @@ export default function App() {
       if (since) await closeTroubleRow(item, since);
       return;
     }
-    // AND SO DOES THE NEW VERSION, and closing it costs her nothing at all: the
-    // update is downloaded either way and Settings keeps the button.
-    if (isUpdateRow(item)) {
-      await closeUpdateRow(item, snap?.update?.newVersion ?? '');
-      return;
-    }
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, status: 'done' });
       pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'open' }); } });
     }, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`);
-  }, [deferCommit, closeAgentRow, closeTroubleRow, closeUpdateRow, snap?.supervisor.spawnTrouble?.since, snap?.update?.newVersion, run, showToast, pushUndo]);
+  }, [deferCommit, closeAgentRow, closeTroubleRow, snap?.supervisor.spawnTrouble?.since, run, showToast, pushUndo]);
 
   const resolve = useCallback(async (item: WorkItem) => {
     // The palette's Approve. Question: send the recommended option. Review:
@@ -2947,10 +2841,6 @@ export default function App() {
     // to close in a ledger, so this hands it to the one thing that is true of
     // it, which puts the row away.
     if (isTroubleRow(item)) { await markDone(item); return; }
-    // THE NEW VERSION HAS EXACTLY ONE THING TO APPROVE and it is the restart,
-    // which is the only sentence on the row. Approve is a named ⌘K command and
-    // nothing else reaches here, so no stray key can quit the app on her.
-    if (isUpdateRow(item)) { void api.updateInstall(); return; }
     const options = itemOptions(item);
     const recommended = options.find((o) => o.recommended) ?? options[0];
     const isProposal = item.status === 'open' && item.kind !== 'question' && item.kind !== 'review'
@@ -3424,10 +3314,6 @@ export default function App() {
     // real move and it is one letter away, so the toast names it.
     const rows = Array.isArray(item) ? item : [item];
     if (rows.some(isTroubleRow)) { showToast('Nothing to put off here. Press E to close it until something else stops.'); return; }
-    // AND THE NEW VERSION CANNOT BE PUT OFF EITHER, for the same reason: there
-    // is no row on disk to carry a moment. Closing it is the real move, so the
-    // toast names it and names what closing costs, which is nothing.
-    if (rows.some(isUpdateRow)) { showToast('Nothing to put off here. Press E to close it. The update stays in Settings.'); return; }
     const held = rows
       .map((i) => snoozeRefused(run, i.id, WAITING_AT))
       .find((why): why is string => !!why);
@@ -3810,9 +3696,31 @@ export default function App() {
         window.dispatchEvent(new Event('task-terminal-toggle'));
         return;
       }
-      // Tab and Shift-Tab follow normal browser focus; field-level editors
-      // can still consume their own Tab before it reaches this listener.
-      if (e.key === 'Tab') return;
+      // TAB MOVES ALONG THE STATE TABS: on the threads page it cycles Needs
+      // you, In progress, Scheduled, Done and All. Shift-Tab goes back, and
+      // both wrap.
+      //
+      // ONLY WHERE THOSE TABS ARE ON THE SCREEN WITH NOTHING OVER THEM: not
+      // from inside a field, not with a card or a menu open, not on an opened
+      // task (pinned next door in tab-does-nothing-on-an-open-task.test.mjs),
+      // not while a search is up, and not in board view, which draws no tabs.
+      // Everywhere else Tab goes on walking browser focus as it has since
+      // 2026-09-14, and a field-level editor still eats its own first.
+      if (e.key === 'Tab') {
+        const onTheTabs = !inInput && !modal && !focused && !focusedRepeat && !inFullScreen
+          && !settingsOpen && !teamShown && !openCard
+          && search === null && inboxDisplay.view === 'list';
+        if (!onTheTabs) return;
+        // Built, not left alone: the browser's own focus walk would otherwise
+        // paint a ring on whatever it landed on behind the rotation.
+        e.preventDefault();
+        setHoveredId(null);
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        setMultiSel(new Set());
+        setView(nextTab(stateTabOrder, view, e.shiftKey) as View);
+        setSelected(0);
+        return;
+      }
       // ⌘1 to ⌘4, one per section, in the order the sidebar draws them. It was
       // ⌘⌥ and an arrow, but that chord was too long and collided with window
       // tiling apps, which moved the whole window.
@@ -3964,7 +3872,12 @@ export default function App() {
         // the top bar is on this screen too and its tooltip says "New task
         // (N)", so the key is already advertised here.
         else if (e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }
-        else if (e.key === 's' || e.key === 'S') openSnooze(focused);
+        // L, NOT S, SINCE 2026-10-01. S was the schedule picker here and the
+        // summary panel on the same screen (threads/Summary.tsx listens first
+        // and eats it), so the two fought over one letter and a persona test
+        // hit both in a minute. L is for later and it is the only key that
+        // schedules anywhere in the app.
+        else if (e.key === 'l' || e.key === 'L') openSnooze(focused);
         else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }
         else if (/^[1-9]$/.test(e.key)) pickOption(focused, Number(e.key));
         return;
@@ -4012,9 +3925,10 @@ export default function App() {
         case '1': if (!multiSel.size && pointed && isImportRow(pointed)) { e.preventDefault(); void answerImport(pointed, 'yes'); } break;
         case '2': if (!multiSel.size && pointed && isImportRow(pointed)) { e.preventDefault(); void answerImport(pointed, 'no'); } break;
         case 'i': case 'I': if (!multiSel.size && pointed && view === 'done' && isNotImportedRow(pointed)) { e.preventDefault(); void answerImport(pointed, 'yes'); } break;
-        // S swallows its own keystroke up at the guard, not here: this branch
+        // L swallows its own keystroke up at the guard, not here: this branch
         // and the focus-mode one both open the picker (renderer/src/keys.ts).
-        case 's': case 'S':
+        // It was S until 2026-10-01; see the focus-mode branch above.
+        case 'l': case 'L':
           if (multiSel.size) openSnooze(selectable.filter((i) => multiSel.has(i.id)));
           else if (pointed && (view === 'inbox' || view === 'snoozed')) openSnooze(pointed);
           break;
@@ -4032,7 +3946,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside]);
+  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, stateTabOrder]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
@@ -4234,121 +4148,8 @@ export default function App() {
     return items.filter((i) => i.status === 'done' && !isCleanRun(i) && i.updatedAt >= start.getTime()).length;
   }, [items]);
 
-  // THE IDLE PAGE ALWAYS WEARS THE PICTURE, WHATEVER MODE THE APP IS IN.
-  //
-  // It is the first and only exception to "mode follows the machine", and it
-  // is one page wide. Nothing is written to localStorage: her stored look is
-  // untouched and comes straight back when the page goes.
-  //
-  // WHY IT PINS ON THE GROUND AND NOT ON `inboxZero`. A modal floating over
-  // this page is still this page, so pressing C must not flip the whole window
-  // to light behind the compose card. Settings is the one thing that does lift
-  // the pin, because the theme picker lives there and a picker showing Light
-  // over a dark window is a control arguing with itself.
-  //
-  // THE SETUP SCREENS WEAR THE PICTURE, AND THEY HAVE TO BE TOLD TO.
-  //
-  // Corner to corner was picked in round two OVER THE LAKE, and 5e2c6ee gave
-  // `.fr-screen` the photograph to match. But it gave it under
-  // `:root[data-skin]`, which is on only while a picture is SWITCHED ON, and on
-  // a first run nothing has switched one on: `resolveSkin(null)` is 'none'.
-  //
-  // It looked right anyway, by accident, for exactly as long as nobody tried it
-  // with a real inbox. A brand new store has nothing in it, so `idlePinned`
-  // below was already pinning the lake and the welcome inherited it. HER window
-  // had rows: Claude Code agents land in the inbox and in no other list, while
-  // the walk only counts PROJECTS, so an empty store and a full inbox happen at
-  // the same time. The pin was off and the welcome came up as a charcoal slab,
-  // #373a41.
-  //
-  // So the walk pins the picture itself rather than hoping to inherit one. Only
-  // the three SETUP screens, which are full surfaces of their own; the steps
-  // after them are tethered over the real app, and that app is hers to look
-  // however she has set it.
-  // AND THE PIN STOPS AT THE PICKER, WHICH IS THE LAST SCREEN BEFORE THE
-  // PRACTICE ROUND. `look` is excluded on purpose: a screen that pins the
-  // default while she presses tiles is a picker that does not work, and the
-  // window repainting under her hand is the whole of what that screen is for.
-  //
-  // THIS LINE USED TO NAME THREE STEPS AND THAT IS THE BUG SHE PHOTOGRAPHED ON
-  // 2026-08-26. It read `welcome || folder || name`, which was every screen
-  // before the picker while the picker was beat four. Moving the picker to beat
-  // seven on 08-25 slid the introduction's three slabs in front of it and left
-  // them pinning nothing, so they fell through to whatever the store holds. On
-  // a Mac that has never chosen, the first-run seed makes that Gouache Valley
-  // and the fault is invisible; on one that has chosen, it is plain light.
-  //
-  // So the question is asked of the step ORDER now (`wearsTheWalksLook`,
-  // onboarding.ts) rather than of three names, and moving the picker again
-  // moves this with it.
-  const firstRunPinned = run !== null && wearsTheWalksLook(run.step);
-  // AND THE INBOX ZERO PIN IS OFF FOR THE WHOLE OF THE WALK (`run === null`).
-  //
-  // IT STARTED AS ONE STEP AND IT WAS NOT ENOUGH. On 08-24 this read
-  // `!pickingLook`, off a measurement of the picker: pressing a tile moved
-  // `zero.skin` and the tile's own tick and did NOT move the window, because
-  // the app behind the walk is an empty inbox and this pin was painting the
-  // default back over the choice on every render. A picker whose picture does
-  // not change is a picture of a picker.
-  //
-  // Two faults wore that one sentence. The harness that took the page pressed
-  // Light and then failed to press back (scripts/shot-the-built-walk.mjs, and
-  // it throws now rather than carrying on). And this line: the pin is not only
-  // on the picker screen, it is on every beat of the practice round where the
-  // inbox happens to be empty, which is beats 9, 10 and 17 to 19. So somebody
-  // who picked Light walked a tutorial that went dark on five screens and light
-  // on six, and somebody who picked one of the other fifteen photographs saw
-  // Gouache Valley on those five.
-  //
-  // THE EARLIER DECISION IS NARROWED BY A LATER ONE, and `skin ===
-  // 'none'` is the whole of the narrowing.
-  //
-  // So the two halves of the rule split exactly here. A PICTURE she picked
-  // is remembered at inbox zero, because a picture is the nice theme, and
-  // swapping it for a different picture is the app forgetting. Turning that
-  // off too would be this clause, and nothing else.
-  const idlePinned = run === null && skin === 'none'
-    && view === 'inbox' && inbox.length === 0 && !focused && !settingsOpen && search === null;
-  // IT IS THIS PAGE ONLY, and nothing here reaches the inbox, the walk or the
-  // setup screens.
-  useEffect(() => {
-    // TWO PINS, TWO RULES. Both live in skins.ts, one function each, so the
-    // two screens cannot drift apart.
-    //
-    // The theme is pinned dark in both, because a picture is dark and because
-    // inbox zero is a dark screen either way.
-    if (firstRunPinned) {
-      // THE WALK OPENS ON A PICTURE, hers if she has one and Gouache Valley if
-      // she has not. NOTHING IS WRITTEN HERE: the moment the picker opens, her
-      // stored look is back, which is what keeps the earlier fault fixed.
-      const pinned: SkinChoice = walkSkin(skin);
-      applyTheme('dark');
-      applySkin(pinned);
-      if (pinned !== 'none') applyTune(resolveTune(localStorage.getItem(TUNE_KEY), pinned));
-      return;
-    }
-    if (idlePinned) {
-      // THE IDLE PAGE PAINTS THE PICTURE THAT IS ON, and nothing when none is.
-      // An earlier decision, unchanged by this row.
-      const pinned: SkinChoice = idleSkin(skin);
-      applyTheme('dark');
-      applySkin(pinned);
-      if (pinned !== 'none') applyTune(resolveTune(localStorage.getItem(TUNE_KEY), pinned));
-      return;
-    }
-    applyTheme(resolveTheme(theme));
-    // WHICH WAY THE MAC IS POINTING, written on the root so the Match my system
-    // tile can draw it. A rule cannot ask the Mac and the renderer already knows,
-    // so this is the one place the answer crosses over into the stylesheet. It is
-    // written unconditionally, because the tile is on the screen in Settings and
-    // in ⌘K whatever the window is currently wearing.
-    document.documentElement.setAttribute('data-machine', machine);
-    applySkin(skin);
-    if (skin !== 'none') applyTune(resolveTune(localStorage.getItem(TUNE_KEY), skin));
-    // `machine` is in the list because on Match my system it is half the answer:
-    // without it the effect never re-runs when macOS flips and the window stays
-    // on whichever it was at launch.
-  }, [idlePinned, firstRunPinned, theme, skin, machine]);
+  // THE SETUP SCREENS AND INBOX ZERO USED TO PIN DARK AND A PICTURE here. The
+  // app has one look, Light (w-9e434e8671), so every screen wears it.
 
   // THE SAME SCREEN, held for the beat it takes ⌘R to put her back where she
   // was, so the reload never shows her the inbox on its way to the task. Its
@@ -4367,8 +4168,7 @@ export default function App() {
   // `!modal` used to sit in this condition, so pressing C or Cmd+K at inbox zero
   // swapped the whole page out for the ordinary list, and an ordinary list with
   // an empty inbox drew that sentence behind her card. The idle page stays up
-  // under the overlay now, which is the call `idlePinned` above already makes
-  // about the theme for exactly the same reason.
+  // under the overlay now.
   // THE TEAM VERSION KEEPS ITS TABS ON AN EMPTY INBOX (2026-10-01): the
   // categories must stay on screen even with nothing in them. So the
   // whole-page zero is only the old layout's; the new one draws its zero under
@@ -4434,10 +4234,20 @@ export default function App() {
        */}
       {reviewLab && <div className="review-lab-controls"><span>Review exploration</span><select aria-label="Focus controls" value={focusControlStyle} onChange={e=>setFocusControlStyle(e.target.value as FocusControlStyle)}><option value="text">Focus · Text only</option><option value="corners">Focus · Frame corners + label</option><option value="corners-icon">Focus · Frame corners button</option><option value="corners-bare">Focus · Bare frame corners</option><option value="layout">Focus · Workspace layout</option></select><select aria-label="Review file type" value={artifactPreviewSample} onChange={e=>{setArtifactPreviewSample(e.target.value);setOpenDoc(null);}}><option value="code">Code</option><option value="design">Design</option><option value="notes">Text</option><option value="multiple">All three</option></select><select aria-label="Review actions" value={reviewStyle} onChange={e=>setReviewStyle(e.target.value)}><option value="header-balanced-open">1 · Balanced · open only</option><option value="header-tools-open">2 · Compact · open only</option><option value="header-card-only">3 · Clickable card · no controls</option><option value="header-feedback-only">4 · Clickable card · feedback tools</option><option value="header-balanced">Compare · all controls</option></select>{artifactPreviewSample !== "code" &&<select aria-label="Text surface" value={textReviewStyle} onChange={e=>setTextReviewStyle(e.target.value)}><option value="clear">Text · Fully transparent</option><option value="glass">Text · Matched glass</option></select>}</div>}
       {!reviewLab && api.isFixtures && new URLSearchParams(location.search).has('artifactTweaks') && <div className="artifact-tweaks"><select aria-label="Design toolbar" value={designToolbar} onChange={e => setDesignToolbar(e.target.value)}><option value="floating">Floating bar</option><option value="corner">Corner controls</option><option value="edge">Top edge</option><option value="always">Always visible</option></select>{focused && <select aria-label="Sample artifact" value={artifactPreviewSample} onChange={e => { setArtifactPreviewSample(e.target.value); setOpenDoc(null); }}><option value="multiple">Multiple artifacts</option><option value="design">Design sample</option><option value="code">Code sample</option><option value="notes">Notes sample</option></select>}</div>}
-      {workspaceNavigation && <WorkspaceNavigation page={settingsOpen ? 'settings' : teamShown && membersOpen ? (inviteFocus ? 'invite' : 'members') : null} teamPage={teamOpen && !settingsOpen && !membersOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
-        onInvite={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setInviteFocus(true); setMembersOpen(true); setTeamOpen(true); }}
-        onMembers={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setInviteFocus(false); setMembersOpen(true); setTeamOpen(true); }}
-        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setMembersOpen(false); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setMembersOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
+      {/* INVITE PEOPLE IS A SHORTCUT INTO SETTINGS (w-8415594d19, 2026-10-01).
+          Team management is a pane in Settings and this row routes to it, so
+          the sidebar lights Invite people, not Settings, while that pane is
+          the one up. The rule is that
+          the lit row names the pane you are on, which is why a project page
+          lights Settings (`settingsPage` reports `projects` for it) and the
+          team pane lights its own shortcut. */}
+      {workspaceNavigation && <WorkspaceNavigation
+        update={announcesUpdate(snap?.update, { walking, closed: '' }) ? { installing: !!snap?.update?.installing, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
+        onUpdate={() => { void api.updateInstall(); }}
+        page={settingsOpen ? (settingsPage === 'team' ? 'invite' : 'settings') : null} teamPage={teamOpen && !settingsOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
+        onInvite={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsOpen(true); }}
+        onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsOpen(true); }}
+        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
           only part of our own document lying over the file, so a pointer
           brought up there wakes the marks that a pointer moving across the
@@ -4528,7 +4338,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">{membersOpen ? 'Team members' : openCard ? 'Threads' : 'Team'}</h1> : <h1 className="workspace-title">Threads</h1>)) : (
+        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">{openCard ? 'Threads' : 'Team'}</h1> : <h1 className="workspace-title">Threads</h1>)) : (
         <nav
           className="tabs"
           /* NO HINT ON THIS NAV. It carried one while the keys were ⌘⌥ and an
@@ -4687,6 +4497,9 @@ export default function App() {
               display={inboxDisplay}
               onDisplay={setInboxDisplay}
               products={snap.products}
+              // The projects she uses most come first in the menu, which takes
+              // reading her threads (w-5a08121f99: about forty projects).
+              items={items}
               onSearch={openSearch}
               onCompose={() => setModal('compose')}
               shown={displayedBox.length + theirRows.length}
@@ -4818,8 +4631,8 @@ export default function App() {
           the app counting out loud while she waits. */}
 
       {/* NOTHING ABOUT A NEW VERSION STANDS HERE. A line under the header was
-          one of the four drawn for w-86452550e5; the row in the inbox is the one
-          picked, and it is built in `updateItem` above. */}
+          one of the four drawn for w-86452550e5; it lives in the sidebar
+          (components/SidebarUpdate.tsx). */}
 
       {/* THE TEAM PAGE takes the body's place the way Settings does: drawn
           beside it, with the body hidden while it is up. */}
@@ -4829,9 +4642,9 @@ export default function App() {
             {/* THE TEAM BOARD IS GONE (w-05ff3d1438): its people are on the
                 Inbox, picked by the faces in its tab bar. What is left here is
                 a teammate's thread opened from the Inbox, and, until you are
-                signed in and on a team, or on Team members or Invite people,
-                the setup page. */}
-            {snap?.team?.signedIn && snap.team.team && !membersOpen && openCard ? (
+                signed in and on a team, the sign-in page. Managing the team
+                moved into Settings (w-8415594d19). */}
+            {snap?.team?.signedIn && snap.team.team && openCard ? (
               <div className="tm-team-pane th-pane">
                 {openCard && (
                   /* A TEAMMATE'S THREAD (approved round 9): one card with the
@@ -4856,7 +4669,7 @@ export default function App() {
                 )}
               </div>
             ) : (
-              <TeamPage team={snap?.team} products={snap?.products ?? []} inviteFocus={inviteFocus} />
+              <TeamPage team={snap?.team} />
             )}
           </main>
         </div>
@@ -4939,11 +4752,6 @@ export default function App() {
                   artifactView={openDoc ? artifactView : undefined}
                   onOpenArtifact={(src, mode) => { setArtifactReturnBeside(false); setArtifactMode(mode); setOpenDoc({product: focused.product, src}); }}
                   item={focused}
-                  /*
-                   * The one button the update row carries. Same call the
-                     Settings page makes, so there is one way to install and not
-                     two (w-86452550e5). */
-                  onInstallUpdate={() => { void api.updateInstall(); }}
                   resumeAt={resumeAt}
                   onScrolled={(top) => {
                     const at = Date.now();
@@ -5065,11 +4873,11 @@ export default function App() {
                     view={view}
                     // Yours while you are on the page, and the picked teammates' added in.
                     counts={{
-                      inbox: (mineShown ? inbox.length : 0) + theirCount('inbox'),
-                      progress: (mineShown ? progress.length : 0) + theirCount('progress'),
-                      snoozed: (mineShown ? snoozed.length : 0) + theirCount('snoozed'),
-                      done: (mineShown ? done.length : 0) + theirCount('done'),
-                      all: (mineShown ? allOpen.length : 0) + theirCount('all'),
+                      inbox: (mineShown ? shownCount(inbox) : 0) + theirCount('inbox'),
+                      progress: (mineShown ? shownCount(progress) : 0) + theirCount('progress'),
+                      snoozed: (mineShown ? shownCount(snoozed) : 0) + theirCount('snoozed'),
+                      done: (mineShown ? shownCount(done) : 0) + theirCount('done'),
+                      all: (mineShown ? shownCount(allOpen) : 0) + theirCount('all'),
                     }}
                     needs={team ? needsWord(picked, team.me) : undefined}
                     end={peoplePicker}
@@ -5077,13 +4885,20 @@ export default function App() {
                   />
                 )}
                 {workspaceNavigation && emptyView && !theirRows.length ? (
-                  // "Nothing needs you" is about you alone; with a teammate
-                  // on the page the quiet line says it instead.
-                  view === 'inbox' && !withOthers
-                    ? run === null && <InboxClear running={progress.length} scheduled={snoozed.length}
-                        onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
-                        onCompose={() => setModal('compose')} />
-                    : <EmptyTab view={view} />
+                  // A FILTER IS READ FIRST, so it can never fall through to
+                  // "Nothing needs you" (w-5a08121f99). That sentence is a
+                  // statement about her inbox and the page was saying it about
+                  // her own filter, over a tab that still read 13.
+                  hiddenNow > 0
+                    ? <FilteredEmpty view={view} hidden={hiddenNow}
+                        onClear={() => setInboxDisplay({ ...inboxDisplay, priorities: [], projects: [], updated: 'any' })} />
+                    // "Nothing needs you" is about you alone; with a teammate
+                    // on the page the quiet line says it instead.
+                    : view === 'inbox' && !withOthers
+                      ? run === null && <InboxClear running={progress.length} scheduled={snoozed.length}
+                          onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
+                          onCompose={() => setModal('compose')} />
+                      : <EmptyTab view={view} />
                 ) : <List
                   table={workspaceNavigation && search === null}
                   products={snap.products}
@@ -5190,6 +5005,10 @@ export default function App() {
           defaultProduct={productFilter}
           initial={composeInitial}
           onOpenConversation={openConversation}
+          // "Reorder" beside the project menu's heading: Settings on the
+          // Projects page, which is where the order is set. The draft is
+          // already saved, so closing loses nothing.
+          onReorderProjects={() => { setModal(null); setComposeInitial(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
           onClose={() => { setModal(null); setComposeInitial(null); }}
           onSent={async (made, how) => {
             setComposeInitial(null);
@@ -5385,9 +5204,6 @@ export default function App() {
           products={rankedProducts}
           supervisorPaused={snap.supervisor.paused}
           batch={multiSel.size > 0}
-          look={look}
-          onSetLook={(l) => { setLook(l); setModal(null); }}
-          onThemes={() => setModal('themes')}
           staleFiles={snap.restartNeeded?.files ?? []}
           /*
            * A newer Agentbox that has already downloaded itself. The palette is
@@ -5420,7 +5236,7 @@ export default function App() {
                 ...(view !== 'snoozed'
                   ? [{ id: 'done', label: `Close (${n} selected)`, keyHint: 'E', run: () => { setModal(null); batchDone(multiSel); } }]
                   : []),
-                { id: 'snooze', label: `Remind Me (Snooze ${n} selected)`, keyHint: 'S', run: () => openSnooze(sel) },
+                { id: 'snooze', label: `Remind Me (Snooze ${n} selected)`, keyHint: 'L', run: () => openSnooze(sel) },
                 ...(sel.some((i) => dueAt(i) > Date.now())
                   ? [{ id: 'unsnooze', label: `Back to Inbox (${n} selected)`, run: () => unsnooze(sel) }]
                   : []),
@@ -5497,7 +5313,7 @@ export default function App() {
                     run: () => unsnooze(target),
                   }]
                 : []),
-              { id: 'snooze', label: 'Remind Me (Snooze)', keyHint: 'S', run: () => openSnooze(target) },
+              { id: 'snooze', label: 'Remind Me (Snooze)', keyHint: 'L', run: () => openSnooze(target) },
               // THE FIRST PLACE SHE LOOKED. It asked `supervisor.running`, so on
               // a task she had just composed there was no Stop in ⌘K at all —
               // and, because nothing was running, the one agent command that DID
@@ -5564,30 +5380,7 @@ export default function App() {
           onStanding={() => setModal('standing')}
           onSettings={() => { setModal(null); setSettingsPane(null); setSettingsOpen(true); }}
           onShortcuts={() => { setModal(null); setSettingsPane('shortcuts'); setSettingsOpen(true); }}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {/* THE THEME PICKER, opened from ⌘K (w-a863b48784). It draws AFTER the
-          palette so that ⌘K's own backdrop is gone by the time it appears, and
-          it carries no scrim of its own, because a dimmed window is a window
-          wearing a theme she cannot see. */}
-      {modal === 'themes' && (
-        <ThemePicker
-          look={pickedLook ?? look}
-          onSetLook={setLook}
-          /* * THE SAME DIALS SETTINGS HAS, and the same three functions. One state, two
-             screens: dragging here and dragging in Settings write the same stored numbers
-             for the same picture.
-          */
-          tune={tune}
-          onSetTune={setTune}
-          /*
-           * THE WAY HOME IS NOT PASSED IN. "needs a button
-             to reset to presets/defaults on a theme", and out of six places
-             she took the one INSIDE each dial, under the pointer. So a reset
-             on this bar is a dial putting its own number back, and it reads
-             the same TUNE_DEFAULT table `resetTune` writes. Settings still
-             gets `resetTune`: that pane's reset is one row for both numbers. */
+          onOpenProjects={() => { setModal(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
           onClose={() => setModal(null)}
         />
       )}
@@ -5602,16 +5395,23 @@ export default function App() {
           usageReadings={snap.usageByEngine ?? (snap.usage ? [snap.usage] : [])}
           now={now}
           onSectionChange={setSettingsPage}
-          look={pickedLook ?? look}
-          onSetLook={setLook}
           keyHints={keyHints}
           onSetKeyHints={setHints}
-          tune={tune}
-          onSetTune={setTune}
-          onResetTune={resetTune}
           startPane={settingsPane}
           onNewProject={() => setNewProject(true)}
-          onClose={() => { setSettingsOpen(false); setSettingsPane(null); }}
+          // The Priority page: the same running order every project list
+          // reads, written the one way it is always written.
+          ranked={rankedProducts}
+          onSetOrder={async (slugs) => {
+            await (window.zero as any)?.setProductOrder?.({ order: slugs });
+            await refresh();
+          }}
+          /* TEAM MANAGEMENT, handed to Settings rather than imported by it
+             (w-8415594d19): the Settings screen is shared with the build that
+             has no team in it, and this keeps the team's code in the team's
+             files. No team cloud, no pane and no Team row. */
+          teamPane={snap?.team?.configured ? <TeamPage team={snap?.team} inviteFocus={inviteFocus} /> : undefined}
+          onClose={() => { setSettingsOpen(false); setSettingsPane(null); setSettingsPage(null); }}
         />
       )}
       {/* HER CLAUDE CODE AGENTS, BROUGHT IN FROM ⌘K (w-7fd38422b5).
@@ -5740,9 +5540,11 @@ export default function App() {
              would have the snooze card talking about ⌘K. */
           palette={modal === 'palette'}
           view={view}
-          tabs={tabOrder}
-          look={look}
-          onSetLook={setLook}
+          /* THE TABS THE WALK NAMES ARE THE TABS TAB MOVES ALONG. Its tour
+             tells somebody to press Tab and then says where that press lands,
+             so it has to read the rotation Tab actually takes rather than the
+             sidebar's shorter list (w-5a08121f99). */
+          tabs={stateTabOrder}
           /*
            * THE LAST CARD FILES INTO A PROJECT, so it needs the list to find
              the one this walk made (w-7fd38422b5, 2026-08-27). It takes only

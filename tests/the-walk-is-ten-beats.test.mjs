@@ -28,9 +28,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 describe('the ten beats, in her order', () => {
   it('starts on the plus and not on the palette', () => {
     // Beat four used to open the palette over an empty app. AND THE PLUS IS
-    // REACHED THROUGH THE INTRODUCTION AND THE LOOK NOW. Naming the project
-    // opens the first slab, the look is the last screen before the hand-off,
-    // and the practice project is what opens the plus.
+    // REACHED THROUGH THE INTRODUCTION NOW. Naming the project opens the first
+    // slab, and the practice project is what opens the plus.
     const made = advance({ ...START, step: 'name' }, { t: 'made', product: 'p' });
     expect(made.step).toBe('inbox');
     const practising = advance({ ...made, step: 'hand' }, { t: 'practice', product: 'practice', examples: [] });
@@ -52,13 +51,13 @@ describe('the ten beats, in her order', () => {
     // It was the tenth and last beat until 2026-08-22, when the ending grew a
     // beat behind it. It is still late in the walk, which is the half of this
     // she asked for: "The Command K bar is not the best place to start."
-    // Seventeen since w-ec62ab6b38 (2026-09-28) took the note beat out.
-    expect(BEAT.command).toBe(17);
+    // Sixteen since the theme step went with the themes (w-9e434e8671).
+    expect(BEAT.command).toBe(16);
     // AND THE BEAT IN FRONT OF IT IS THE TOUR OF THE OTHER TWO TABS, added
     // 2026-08-24. ⌘K used to follow the empty inbox straight away; now the walk
     // shows where the work went first, so an empty inbox means something by the
     // time the palette comes up.
-    expect(BEAT.where).toBe(16);
+    expect(BEAT.where).toBe(15);
     // THE SIDEBAR NOTE BEAT IS GONE. It rang the project rail, which is no
     // longer drawn anywhere, so the beat drew nothing (w-ec62ab6b38, 2026-09-28).
     expect(BEAT.note).toBeUndefined();
@@ -78,8 +77,8 @@ describe('the ten beats, in her order', () => {
     // The import spent a day as the eighth beat and a few hours as a screen of
     // its own at the end; it is part of the card now, so there is no beat
     // after this one.
-    // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out.
-    expect(BEAT.done).toBe(18);
+    // Seventeen since the theme step went with the themes (w-9e434e8671).
+    expect(BEAT.done).toBe(17);
     expect(BEAT.command).toBeLessThan(BEAT.done);
     expect(BEAT.agents).toBeUndefined();
   });
@@ -92,7 +91,11 @@ describe('the ten beats, in her order', () => {
     expect(coach('open', 0)).toEqual({
       // THREE "IT"S AND NOT ONE NOUN, until 2026-08-28.
       quiet: 'Your agent worked on its own, and this row is what it sent back.',
-      lead: 'Press ', key: '↵', tail: ' to open it.',
+      // AND IT NAMES THE ROW AS SOMETHING TO CLICK SINCE 2026-10-01. The ring
+      // is round the row, so clicking it was already allowed and already opened
+      // it; the card simply had not said so, and two testers who use no
+      // shortcuts read every beat of this walk as a riddle.
+      lead: 'Press ', key: '↵', tail: ' or click the row to open it.',
     });
   });
 
@@ -100,7 +103,13 @@ describe('the ten beats, in her order', () => {
     // Her sentence names two ways out and the reply box is the one with
     // something to point at. The button is not coming back to suit the walk.
     expect(ANCHOR.answer).toEqual(['.focus-dock .dock-card', '.focus-dock']);
-    expect(coach('answer', 0).lead).toBe('Reply to it, or press ');
+    // AND IT POINTS AT THE BOX IN WORDS SINCE 2026-10-01. "Reply to it" is a
+    // thing to do and not a thing to click, and the ring is already round the
+    // box, so the card now names it. Closing has no button on this screen and
+    // the card does not invent one: Mark done is a row inside a menu behind a
+    // three-dot button, and naming it would make this the longest line in the
+    // walk. The mouse route on this beat is replying.
+    expect(coach('answer', 0).lead).toBe('Click the box below to reply, or press ');
     expect(coach('answer', 0).key).toBe('E');
   });
 
@@ -119,8 +128,8 @@ describe('the ten beats, in her order', () => {
   });
 
   it('counts every beat it renders, and renders every beat it counts', () => {
-    // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out.
-    expect(N_BEATS).toBe(18);
+    // Seventeen since the theme step went with the themes (w-9e434e8671).
+    expect(N_BEATS).toBe(17);
     for (const step of COACHED) expect(coach(step, 0)).not.toBeNull();
     expect(new Set(Object.values(BEAT)).size).toBe(N_BEATS);
     for (const step of COACHED) expect(forcedStep(step)).toBe(step);

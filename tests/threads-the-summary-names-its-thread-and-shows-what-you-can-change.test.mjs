@@ -68,13 +68,25 @@ describe('what you can change looks changeable, and what you cannot does not', (
       expect(cell).toContain('ts-caret');
     }
   });
-  it('draws Status, Owner and Project as plain words: no button, no caret', () => {
-    for (const [from, to] of [['Status', 'Owner'], ['Owner', 'Project'], ['Project', 'Priority']]) {
+  // AND STATUS JOINED THEM ON 2026-10-01: a thread can be marked done from a
+  // dropdown on its Status row. It is a
+  // button only where there is something to set and somebody to set it with,
+  // which is what `onFinish` is; this file draws the panel without that prop,
+  // so Status is a plain word here and stays below with Owner and Project.
+  // The dropdown itself is tests/the-status-row-marks-a-thread-done.test.mjs.
+  it('draws Owner and Project as plain words: no button, no caret', () => {
+    for (const [from, to] of [['Owner', 'Project'], ['Project', 'Priority']]) {
       const cell = between(html, from, to);
       expect(cell.length).toBeGreaterThan(0);
       expect(cell).not.toContain('<button');
       expect(cell).not.toContain('ts-caret');
     }
+  });
+  it('leaves Status a plain word when nothing is handed in to close the thread', () => {
+    const cell = between(html, 'Status', 'Owner');
+    expect(cell.length).toBeGreaterThan(0);
+    expect(cell).not.toContain('<button');
+    expect(cell).not.toContain('ts-caret');
   });
   it('puts a pencil on each of the three lines', () => {
     expect(html.match(/class="ts-line[^"]*"[^>]*>.*?ts-pen/g)).toHaveLength(3);

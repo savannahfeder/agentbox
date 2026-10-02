@@ -35,17 +35,16 @@
    keep the row the 34 it was with the terminal and Done marks in it, so the
    Summary button stays where it was approved (56..86 at 1440). */
 .ts-top { display: inline-flex; align-items: center; gap: 10px; margin: 2px 0; }
-.ts-sumbtn { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+.ts-sumbtn { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
 .ts-sumbtn:hover { color: var(--text); border-color: var(--line-strong); }
 .ts-sumbtn.on { background: var(--wash-strong); color: var(--text); border-color: var(--line-strong); }
-.ts-sumbtn kbd { font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; padding: 0; }
 
 /* THE THREAD'S MENU (threads/ThreadMenu.tsx). The button is the Summary
    button's square: its height, its hairline, its hover. The menu is the app's
    own popover, `.th-menu` in pages.css, dropped from the button's right edge
    because the button is at the right of the window. */
 .ts-more-wrap { position: relative; display: inline-flex; }
-.ts-more { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim); cursor: pointer; }
+.ts-more { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; color: var(--text-dim); cursor: pointer; }
 .ts-more:hover, .ts-more[aria-expanded="true"] { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .ts-more:focus-visible { outline: 2px solid var(--underline); outline-offset: 2px; }
 .th-menu.ts-more-menu { top: calc(100% + 6px); left: auto; right: 0; min-width: 264px; }
@@ -56,7 +55,7 @@
 .workspace-layout > .topbar:has(.ts-more-menu) { z-index: 3; }
 .ts-more-menu .ts-more-row { width: 100%; white-space: nowrap; }
 .ts-more-menu .ts-more-row:focus-visible { outline: none; background: rgba(255,255,255,.07); color: var(--text); }
-:root[data-theme="light"] .ts-more-menu .ts-more-row:focus-visible { background: var(--wash-strong); }
+:root .ts-more-menu .ts-more-row:focus-visible { background: var(--wash-strong); }
 .ts-more-label { flex: 1; }
 .ts-more-menu kbd { margin-left: 18px; font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; padding: 0; }
 /* The figures on the code row are the ones that closed the line under the
@@ -73,6 +72,11 @@
 /* A pane with its own band (no top bar to portal into) narrows that too, and
    the band's inset is reckoned against the narrower column. */
 .focus-pane[data-summary="open"] > .keep-line { margin-right: var(--ts-panel-w); }
+/* So does the thread's terminal, in both placements (w-0ecaecb7ab): at the
+   bottom it narrows like the dock, and at the side, where it is pinned at
+   right 0, the margin moves it in to stand left of the panel. Without this it
+   ran under the panel and the two drew over each other. */
+.focus-pane[data-summary="open"] > .task-terminal { margin-right: var(--ts-panel-w); }
 .focus-pane[data-summary="open"] { --keep-inset: max(32px, calc((100% - var(--ts-panel-w) - var(--read-w)) / 2 + 32px)); }
 /* No fill of its own: it sits beside the words rather than over them, and a
    fill would paint over the frame's corner marks. */
@@ -182,5 +186,5 @@
 .ts-ticket-private .ts-tk-lead { margin-bottom: 4px; }
 
 /* "Message <name>": their face and the words, square, for the top bar */
-.ts-msgbtn { display: inline-flex; align-items: center; gap: 9px; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
+.ts-msgbtn { display: inline-flex; align-items: center; gap: 9px; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
 .ts-msgbtn:hover { background: var(--wash-strong); }

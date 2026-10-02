@@ -13,7 +13,10 @@
 //     files that are private by their paths, recordings of real sessions, home
 //     folders, the words in a private list kept OUTSIDE the repo (a name, an
 //     email, an account id: the list itself would leak if it were committed),
-//     quotes of a person, and settings that switch off a security boundary.
+//     and settings that switch off a security boundary. Quotes are NOT refused
+//     (2026-10-01): a quote of design feedback holds no secret, and the rule
+//     was stopping merges all day. A quote that names her is caught by the
+//     private list like any other line.
 //  2. A REVIEW BY A MODEL. It reads
 //     the added lines and flags what the rules cannot know: a pasted chat, a
 //     customer's name, a comment describing somebody's private data. If it
@@ -89,20 +92,6 @@ export const PRIVATE_PATHS = [
   ['a screen or audio recording', /\.(mov|mp4|m4v|webm|m4a|wav|cast)$/i],
 ];
 
-/** A person's words quoted into the code, rather than the rule they led to. */
-//
-// These match an ATTRIBUTION, not a pronoun. The code calls its user "she"
-// throughout ("what she typed"), and a rule that fired on that would be
-// switched off within a day. What leaks is the habit of opening a comment with
-// whose words follow: "Hers, <date or id>:", "Her words: '...'", // public-check: allow
-// "the founder, <date>", or "she said" straight into a quotation mark. // public-check: allow
-export const QUOTES = [
-  /\b(?:Hers|Theirs)[,:]\s/,
-  /\b[Hh]er (?:own )?words(?:[,:]|\s+on\b|\s+in\b)\s*(?:["“']|w-[0-9a-f]{6})/,
-  /\bthe founder,\s*20\d\d/,
-  /\b(?:she|he) (?:said|wrote|replied|told us)[,:]?\s*["“]/,
-];
-
 /** Settings that switch off a security boundary. */
 export const INSECURE = [
   ['TLS verification switched off', /rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['"]?0/],
@@ -130,8 +119,8 @@ const wordRe = (w) => new RegExp(`(?<![A-Za-z0-9])${escapeRe(w)}(?![A-Za-z0-9])`
 
 /**
  * Every rule against one added line. `soft` is set when the line is not known
- * to be new (a whole-tree audit), which lowers quotes to a warning: they are a
- * habit being broken, and an audit should list them without refusing.
+ * to be new (a whole-tree audit); no rule reads it since quotes stopped being
+ * one, and it is kept so callers need not change.
  */
 export function checkLine(file, text, { words = [], soft = false } = {}) {
   if (ALLOW.test(text)) return [];
@@ -140,7 +129,6 @@ export function checkLine(file, text, { words = [], soft = false } = {}) {
   for (const [name, re] of SECRETS) if (re.test(text)) hit('block', `looks like a real ${name}`);
   if (HOME.test(text)) hit('block', 'names a real home folder');
   for (const w of words) if (wordRe(w).test(text)) hit('block', 'carries a word from the private list');
-  if (!/\.jsonl$/.test(file)) for (const re of QUOTES) if (re.test(text)) { hit(soft ? 'warn' : 'block', 'quotes a person; write the rule, not their words'); break; }
   for (const [name, re] of INSECURE) if (re.test(text)) hit('block', name);
   return out;
 }
@@ -238,10 +226,11 @@ export function scan({ base, head, soft = false, words = readPrivateWords() }) {
 // ---------------------------------------------------------------------------
 // The review by a model.
 
-const PROMPT = `You are reviewing lines about to be pushed to a PUBLIC open-source repository.
+export const PROMPT = `You are reviewing lines about to be pushed to a PUBLIC open-source repository.
 The code is written by AI agents working on one person's machine and accounts, so personal
 material leaks into it easily. Flag ONLY things that should not be public:
-- pasted conversations, chat logs, or quotes of a real person's messages
+- pasted conversations or chat logs that carry private details (quoting a person's
+  feedback or design notes is fine and allowed, unless it names them)
 - names, emails, phone numbers, addresses, or account ids of real people or customers
 - descriptions of someone's private data, finances, health, or private business
 - credentials, keys, tokens, passwords, internal URLs with secrets

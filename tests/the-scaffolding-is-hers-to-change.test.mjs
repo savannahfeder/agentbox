@@ -18,16 +18,20 @@ const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 let root;
 let appDir;
+let userDir;
 
 // A copy of the repo's briefs, so a test that empties the box cannot empty hers.
+// Her own folder is apart from it, as it is in the app (w-3ec9f07978): the box
+// writes there and ours stays in the checkout.
 const makeSupervisor = (config = {}) => {
   appDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-scaffold-app-'));
+  userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-scaffold-user-'));
   fs.mkdirSync(path.join(appDir, 'briefs'), { recursive: true });
   for (const f of fs.readdirSync(path.join(REPO, 'briefs'))) {
     fs.copyFileSync(path.join(REPO, 'briefs', f), path.join(appDir, 'briefs', f));
   }
   const store = { listItems: () => [], listProducts: () => [], isDue: () => true };
-  return new Supervisor({ storeRoot: root, maxConcurrentSessions: 3, ...config }, store, appDir);
+  return new Supervisor({ storeRoot: root, maxConcurrentSessions: 3, ...config }, store, appDir, appDir, userDir);
 };
 
 const item = (over = {}) => ({ id: 'w-1', product: 'p', title: 'do the thing', ...over });
@@ -36,6 +40,7 @@ beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-scaffold-'
 afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true });
   if (appDir) fs.rmSync(appDir, { recursive: true, force: true });
+  if (userDir) fs.rmSync(userDir, { recursive: true, force: true });
 });
 
 // A product dir. It used to be able to hold a state page; that layer is gone
@@ -58,10 +63,12 @@ const A_RULE = 'LINE ONE AND THE OPTIONS ARE ONE QUESTION, NOT TWO';
 const THE_OPENING = 'Line one is the thing they have to say back';
 
 describe('the message rules ship filled in', () => {
-  it('a fresh copy already has them', () => {
+  // A fresh copy has them, and the box does not show them (w-3ec9f07978):
+  // they are the app's, and the box is only what she wrote.
+  it('a fresh copy already has them, outside her box', () => {
     const s = makeSupervisor();
-    expect(s.readMessageRules()).toContain(A_RULE);
-    expect(s.readMessageRules()).toContain(THE_OPENING);
+    expect(s.messageRules()).toContain(A_RULE);
+    expect(s.readMessageRules()).toBe('');
   });
 
   it('every session is briefed with them', () => {
@@ -102,12 +109,15 @@ describe('and they are hers to change or empty', () => {
     expect(s.messageRules()).not.toContain('Say it in one line and stop.');
   });
 
-  // Emptying the box means sessions follow NO message rules. It must not
-  // quietly fall back to the shipped text, or "remove it" was a lie.
-  it('emptying the box takes them out of every run', () => {
+  // Emptying the box takes out what SHE wrote. It used to take out every
+  // message rule, ours too, and ours are what the inbox reads a message by
+  // (w-3ec9f07978).
+  it('emptying the box takes her words out of every run and keeps ours', () => {
     const s = makeSupervisor();
+    s.writeMessageRules('Say it in one line and stop.');
     s.writeMessageRules('   \n\n  ');
-    expect(s.messageRules()).toBe(null);
+    expect(s.messageRules()).not.toContain('Say it in one line and stop.');
+    expect(s.messageRules()).toContain(A_RULE);
     // And the brief is still whole.
     const brief = s.buildBrief(item(), product(), { continuation: false });
     expect(brief).toContain('# How to work');
@@ -123,7 +133,7 @@ describe('and they are hers to change or empty', () => {
   it('never leaves a half-written file for a spawn to read', () => {
     const s = makeSupervisor();
     s.writeMessageRules('a rule');
-    expect(fs.readdirSync(path.join(appDir, 'briefs')).filter((f) => f.includes('.tmp-'))).toEqual([]);
+    expect(fs.readdirSync(path.join(userDir, 'briefs')).filter((f) => f.includes('.tmp-'))).toEqual([]);
   });
 
   // The seam between the brief and the box was a comment in a markdown file.

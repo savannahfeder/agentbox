@@ -82,8 +82,8 @@ const startOfDay = (now) => { const d = new Date(now); d.setHours(0, 0, 0, 0); r
  */
 /**
  * AND A THREAD MAY BE SHARED WITH CHOSEN PEOPLE RATHER THAN THE TEAM
- * (w-41ff964775, her words: "you might only want certain people to see what
- * you're up to"). That is still sharing, so this stays the one rule for
+ * (w-41ff964775: a thread may be seen by a few people, not only by everyone
+ * or nobody). That is still sharing, so this stays the one rule for
  * whether a card is published at all, and `shownToPeople` says who it reaches.
  *
  * Chosen people naming NOBODY reaches nobody, so nothing is published: a card

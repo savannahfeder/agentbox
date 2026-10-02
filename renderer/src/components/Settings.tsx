@@ -17,6 +17,7 @@
 // failure a settings screen can have.
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel } from '../types';
 import { api, RESTART_NOTE } from '../api';
 import { InstructionSettings, sizeLabel } from './InstructionSettings';
@@ -24,9 +25,6 @@ import { EVERY } from '../instruction-scope';
 import type {Usage, WorkspaceSettings} from '../types';
 import { limitRows } from '../../../shared/usage.mjs';
 import { ago } from '../format';
-import { LOOKS, lookMeans, SKINS, TUNE_DEFAULT, TUNE_LIMITS, type Look, type SkinId, type SkinTune } from '../skins';
-import { readySkin } from '../look-switch';
-import { MatchMark } from './MatchMark';
 import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS, RULES_ALWAYS_APPLY } from '../modes';
 import { CODEX_MODES, CODEX_MODE_ORDER } from '../codex-modes';
 import { ProductMark } from './ProductMark';
@@ -34,6 +32,8 @@ import { SHORTCUTS } from '../shortcuts';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mjs';
 import { TaskTerminal } from './TaskTerminal';
+import { ProjectsPage } from './ProjectsPage';
+import type { Product } from '../types';
 
 /* * THERE IS NO ACCOUNTS PANE ANY MORE. It is a group on the Agents page now, next to the
  number of agents whose ceiling that subscription sets. `?settings=accounts` still opens
@@ -41,7 +41,14 @@ import { TaskTerminal } from './TaskTerminal';
 */
 // 'agents' is gone from this union with the pane itself; the name is still
 // accepted at the door above and resolves to 'general'.
-type Pane = 'instructions' | 'general' | 'appearance' | 'shortcuts' | 'projects' | { project: string };
+/* * TEAM IS A PANE HERE NOW (w-8415594d19, 2026-10-01). Team management
+ belongs in Settings. The sidebar used to carry a Team members page of its own
+ beside Invite people, which was the same door twice.
+ The pane's CONTENT is handed in as `teamPane` rather than imported, so this
+ screen, which is shared with the single-person build, keeps no team code and
+ the two codebases stay easy to compare. No pane handed in, no row.
+*/
+type Pane = 'instructions' | 'general' | 'shortcuts' | 'projects' | 'team' | { project: string };
 
 const paneKey = (p: Pane) => (typeof p === 'string' ? p : `project:${p.project}`);
 
@@ -179,49 +186,6 @@ function Picker<T extends string>({ label, value, options, onChange, title }: {
     </div>
   );
 }
-
-// A SLIDER, in this app's own clothes. The one control on this screen that has
-// no true/false answer: blur and darkness are matters of degree. The track and the thumb are drawn off the same tokens as the switch above
-// them rather than left to the platform, which draws a blue capsule that
-// belongs to macOS and to nothing else here.
-function Dial({ label, desc, value, min, max, step, format, onChange }: {
-  label: string; desc: string; value: number;
-  min: number; max: number; step: number;
-  format: (v: number) => string;
-  onChange: (v: number) => void;
-}) {
-  // The filled part of the track is a gradient stop rather than a second
-  // element, so the fill cannot drift out of step with the thumb.
-  const pct = ((value - min) / (max - min)) * 100;
-  return (
-    <div className="set-row set-dial-row">
-      <div className="set-row-text">
-        <div className="set-row-label">{label}</div>
-        <div className="set-row-desc">{desc}</div>
-      </div>
-      <div className="set-dial">
-        <input
-          type="range"
-          className="set-range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          aria-label={label}
-          style={{ '--fill': `${pct}%` } as React.CSSProperties}
-          onChange={(e) => onChange(Number(e.currentTarget.value))}
-        />
-        <span className="set-dial-val">{format(value)}</span>
-      </div>
-    </div>
-  );
-}
-
-// `look` is a theme or a picture and only a picture has dials, so this is the
-// one question the pane asks about it. Off SKINS, so a second picture needs no
-// edit here.
-const isSkin = (l: Look): l is SkinId => SKINS.some((sk) => sk.id === l);
-const skinLabel = (l: SkinId) => SKINS.find((sk) => sk.id === l)?.name ?? 'Picture';
 
 function Row({ label, desc, children }: {
   // `desc` takes a node, not just a string, so a row can put a line of its own
@@ -1009,7 +973,7 @@ function ProjectIcon({ project, onPick, onClear }: {
         title={project.logo ? 'Change this project’s picture' : 'Give this project a picture'}
         aria-label={project.logo ? `Change the picture for ${project.name}` : `Give ${project.name} a picture`}
       >
-        <ProductMark src={project.logo} name={project.name} size={26} />
+        <ProductMark src={project.logo} name={project.name} slug={project.slug} size={26} />
       </button>
       {project.logo && (
         <button
@@ -1106,93 +1070,11 @@ function ProjectTitle({ project, onRename }: {
 /* --------------------------------- screen --------------------------------- */
 
 /* ------------------------------ all her projects --------------------------- */
-// A PAGE FOR THE PROJECTS, BECAUSE THE COLUMN HAD BECOME A LIST OF THEM.
-//
-// With dozens of projects, the nav column drew every one of them under a
-// heading it had scrolled past, so what the user actually saw was five
-// settings pages followed by dozens of unexplained names. The heading was
-// doing all the work of saying what they were, and it was off the screen.
-//
-// THIS IS NOT THE "ALL PROJECTS" TABLE THAT WAS TURNED DOWN. This one is a
-// plain index of names.
-//
-// EACH ROW IS THE WAY INTO THAT PROJECT'S OWN PAGE and nothing else, which is
-// the rule the nav rows already follow. Renaming, pictures and settings all
-// live on the page it opens.
-//
-// THE FILTER IS THERE BECAUSE DOZENS IS PAST READING. It is not a search
-// over anything clever: it matches the name and the folder, which are the two
-// things she would type.
-function ProjectsIndex({ projects, onOpen, onNew }: {
-  projects: ProjectSettings[];
-  onOpen: (slug: string) => void;
-  onNew?: () => void;
-}) {
-  const [filter, setFilter] = useState('');
-  const needle = filter.trim().toLowerCase();
-  const shown = needle
-    ? projects.filter((p) => p.name.toLowerCase().includes(needle)
-      || p.slug.toLowerCase().includes(needle)
-      || (p.dir ?? '').toLowerCase().includes(needle))
-    : projects;
+// THE PROJECTS PAGE is ./ProjectsPage.tsx: every project in the order the
+// agents work them, each row the door to that project's own page. It replaced
+// a plain index here and a separate Priority page (w-a514b58055).
 
-  // THE STATE IN WORDS, and there is one state left to say. This read paused,
-  // else personal, else autonomous; pausing one project and personal projects
-  // are both gone (w-d19d6d387c). Null on an ordinary project, which is nearly
-  // all of them, and then the row is just a name.
-  const flag = (p: ProjectSettings) => (p.autonomous ? 'on its own' : null);
-
-  return (
-    <>
-      <h1 className="set-title">Projects</h1>
-      <p className="set-lede">
-        {projects.length === 1 ? 'One project.' : `${projects.length} projects.`} Open one to change its picture, its rules and how its agents run.
-      </p>
-      <div className="proj-index-top">
-        <input
-          className="proj-index-find"
-          type="search"
-          value={filter}
-          placeholder="Find a project"
-          aria-label="Find a project"
-          onChange={(e) => setFilter(e.target.value)}
-        />
-        {onNew && <button type="button" className="set-ghost" onClick={onNew}>New project</button>}
-      </div>
-      {!projects.length && <div className="set-nav-empty">No projects yet.</div>}
-      {!!projects.length && !shown.length && (
-        <div className="set-nav-empty">Nothing here matches “{filter.trim()}”.</div>
-      )}
-      <div className="proj-index">
-        {shown.map((p) => (
-          <button key={p.slug} type="button" className="proj-card" onClick={() => onOpen(p.slug)}>
-            <ProductMark src={p.logo} name={p.name} size={30} />
-            <span className="proj-card-text">
-              <span className="proj-card-name">{p.name}</span>
-              {/* THE FOLDER, which is the one thing that tells two projects of
-                  the same name apart, and a real store has several pairs of those. */}
-              <span className="proj-card-where">{shortPath(p.dir)}</span>
-            </span>
-            {p.running > 0 && <span className="set-nav-flag">{p.running} running</span>}
-            {flag(p) && <span className="set-nav-flag">{flag(p)}</span>}
-          </button>
-        ))}
-      </div>
-    </>
-  );
-}
-
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, onClose }: {
-  // ONE control for the three of them. Light, dark and each picture are one
-  // list, because a picture IS dark (skins.ts) and asking her to set a theme
-  // and then a background is two decisions for one choice.
-  look: Look;
-  onSetLook: (l: Look) => void;
-  // The dials on whichever picture is on. They only ever show under a picture,
-  // so there is no disabled control on this screen for her to wonder about.
-  tune: SkinTune;
-  onSetTune: (t: SkinTune) => void;
-  onResetTune: () => void;
+export function Settings({ keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, onClose }: {
   // Whether the app draws its keys when you point at something. On General,
   // where people look for it (w-5737fe67cf).
   keyHints: boolean;
@@ -1210,6 +1092,13 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   onSectionChange?: (section: string | null) => void;
   // Door C: the + on the PROJECTS heading, opening the new project card.
   onNewProject?: () => void;
+  // The running order, for the Priority page: every project already in order
+  // (App's `rankedProducts`), and the write. Absent means no Priority row.
+  ranked?: Product[];
+  onSetOrder?: (slugs: string[]) => void | Promise<void>;
+  /** Team management, handed in by whoever has the team's state. Absent on a
+   *  build with no team cloud, and then there is no Team row either. */
+  teamPane?: ReactNode;
   onClose: () => void;
 }) {
   const [model, setModel] = useState<SettingsModel | null>(null);
@@ -1220,7 +1109,14 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // URL the window was opened with.
   const [pane, setPane] = useState<Pane>(() => {
     const want = startPane || new URLSearchParams(location.search).get('settings') || '';
-    if (want === 'instructions' || want === 'appearance' || want === 'general' || want === 'shortcuts' || want === 'projects') return want;
+    if (want === 'instructions' || want === 'general' || want === 'shortcuts' || want === 'projects') return want;
+    // Priority was its own page for a round and is now the Projects page itself
+    // (w-a514b58055), so the old name opens the page its content went to.
+    if (want === 'priority') return 'projects';
+    // ?settings=team, and the Invite people shortcut in the sidebar foot. On a
+    // build with no team cloud there is nothing to draw, so it lands on
+    // General rather than on an empty screen.
+    if (want === 'team') return teamPane ? 'team' : 'general';
     // The page moved into Agents, so the old name lands where its content went.
     // ?settings=accounts still opens the account rows, wherever they live.). An
     // old link is not somebody's mistake. AND AGENTS ITSELF JOINED THEM ON
@@ -1228,9 +1124,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
     // the same way the accounts name has since August rather than opening an
     // empty screen.
     if (want === 'accounts' || want === 'agents') return 'general';
-    // The page was renamed Themes (w-5737fe67cf); its id stays `appearance`
-    // so every old link still opens it, and the new name opens it too.
-    if (want === 'themes') return 'appearance';
+    // THERE IS NO THEMES PAGE: the app has one look (w-9e434e8671). An old
+    // link to it opens General rather than an empty screen.
+    if (want === 'themes' || want === 'appearance') return 'general';
     if (want.startsWith('project:')) return { project: want.slice('project:'.length) };
     return 'general';
   });
@@ -1240,7 +1136,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // "I'm stuck in settings" (w-69e7f56362) happened the first time.
   useEffect(() => {
     onSectionChange?.(
-      pane === 'instructions' || pane === 'shortcuts' || pane === 'projects' ? pane
+      pane === 'instructions' || pane === 'shortcuts' || pane === 'projects' || pane === 'team' ? pane
         : typeof pane === 'object' ? 'projects'
           : null,
     );
@@ -1329,6 +1225,25 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
      every Mac with the gate shut. */
   const engineRows = w?.engineChoices ?? [];
   const twoEngines = engineRows.length > 1;
+  /** THE WORKSPACE GROUP IN THE NAV COLUMN.
+   *
+   *  Team is in it, and not under Projects, because a team owns the whole
+   *  workspace rather than one project. It is before Shortcuts for the reason
+   *  on Shortcuts below: that one is a page you read once, so it stays last.
+   *  With no team cloud in the build there is no pane to open, so there is no
+   *  row either.
+   */
+  const navRows: Array<[string, string]> = [
+    ['general', 'General'],
+    ['instructions', 'Instructions'],
+    ...(teamPane ? [['team', 'Team'] as [string, string]] : []),
+    /* * THE KEYS, WITH A DOOR OF THEIR OWN. It is last in this group because it is
+       a page you read once, not a setting you come back to, and it is in this group
+       rather than under Projects because the keys are the app's, not any one
+       project's.
+    */
+    ['shortcuts', 'Shortcuts'],
+  ];
   // THE CODEX MODEL LIST WAS READ HERE and is not read any more
   // (w-12081d32cc): the card asks which model a run goes out on, so neither
   // card on this screen draws a Model row. `engineModelChoices` still keeps
@@ -1354,22 +1269,12 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               second pane that no longer exists is a door into a wall. The
               `agents` name itself still resolves, one level up, so a link
               anybody saved still opens the page its content went to. */}
-          {([
-            ['general', 'General'],
-            ['appearance', 'Themes'],
-            ['instructions', 'Instructions'],
-            /* * THE KEYS, WITH A DOOR OF THEIR OWN. It is last in this group because it is
-               a page you read once, not a setting you come back to, and it is in this group
-               rather than under Projects because the keys are the app's, not any one
-               project's.
-            */
-            ['shortcuts', 'Shortcuts'],
-          ] as const).map(([id, label]) => (
+          {navRows.map(([id, label]) => (
             <button
               key={id}
               type="button"
               className={`set-nav-item ${pane === id ? 'on' : ''}`}
-              onClick={() => setPane(id)}
+              onClick={() => setPane(id as Pane)}
             >
               <span className="set-nav-label">{label}</span>
               {/* The account count that used to sit beside the Accounts row is
@@ -1396,13 +1301,17 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               The count is on the row because it is the fact that decides whether
               opening it is worth doing, and because a nav row reading "Projects"
               with nothing beside it is the heading again.
+
+              CALLED PROJECTS, AND IT IS ALSO WHERE THE ORDER IS SET. Priority was
+              its own row for a round; the founder merged the two into one page
+              and named it Projects (w-a514b58055).
            */}
           <button
             type="button"
             className={`set-nav-item ${pane === 'projects' ? 'on' : ''}`}
             onClick={() => setPane('projects')}
           >
-            <span className="set-nav-label">All projects</span>
+            <span className="set-nav-label">Projects</span>
             {!!projects.length && <span className="set-nav-flag">{projects.length}</span>}
           </button>
           {/* AND WHERE YOU ARE, when you are inside one. Opening a project used
@@ -1420,7 +1329,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               className="set-nav-item on"
               onClick={() => setPane({ project: current.slug })}
             >
-              <span className="set-nav-ico"><ProductMark src={current.logo} name={current.name} size={15} /></span>
+              <span className="set-nav-ico"><ProductMark src={current.logo} name={current.name} slug={current.slug} size={15} /></span>
               <span className="set-nav-label">{current.name}</span>
             </button>
           )}
@@ -1446,16 +1355,31 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
            using one can reach it; only a window reloaded with ⌘R onto a newer build in
            development can. A real failure to save still shows here.
          */}
-        {error && error !== RESTART_NOTE && pane !== 'shortcuts' && <div className="set-error">{error}</div>}
+        {error && error !== RESTART_NOTE && pane !== 'shortcuts' && pane !== 'team' && <div className="set-error">{error}</div>}
         {/* The Shortcuts page is excluded: it reads nothing off the main
             process, so "Reading settings…" over it would be the app waiting
-            for an answer it does not need. */}
-        {!model && pane !== 'shortcuts' && pane !== 'instructions' && <div className="set-inner"><div className="set-lede">Reading settings…</div></div>}
+            for an answer it does not need. Team is excluded for the same
+            reason: nothing on it comes out of the settings file. */}
+        {!model && pane !== 'shortcuts' && pane !== 'instructions' && pane !== 'team' && <div className="set-inner"><div className="set-lede">Reading settings…</div></div>}
+
+        {/* TEAM MANAGEMENT (w-8415594d19): the page that used to sit in the
+            sidebar, drawn here. It does not wait on `model`, because nothing on
+            it comes from the settings file; the team's state arrives with the
+            pane itself. */}
+        {pane === 'team' && teamPane && (
+          <div className="set-inner">
+            <h1 className="set-title">Team</h1>
+            <p className="set-lede">Who is on your team, who has been invited, and the team's name. Everyone sees a short summary of your threads unless you mark one private.</p>
+            {teamPane}
+          </div>
+        )}
 
         {model && pane === 'projects' && (
           <div className="set-inner">
-            <ProjectsIndex
-              projects={projects}
+            <ProjectsPage
+              ranked={ranked}
+              details={projects}
+              onSetOrder={onSetOrder}
               onOpen={(slug) => setPane({ project: slug })}
               onNew={onNewProject}
             />
@@ -1810,80 +1734,6 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
           </div>
         )}
 
-        {model && pane === 'appearance' && (
-          <div className="set-inner">
-            <h1 className="set-title">Themes</h1>
-            <p className="set-lede">How the app looks. Also on ⌘K.</p>
-            {/* A theme is the one setting on this screen you judge by LOOKING at it, so the
-               picture is the control: it sits on the page, at a size worth looking at, and
-               the only edge on it is its own.
-             */}
-            <div className="look-row">
-              {LOOKS.map((l) => (
-                <button
-                  key={l.id}
-                  className={`look${look === l.id ? ' on' : ''}`}
-                  aria-pressed={look === l.id}
-                  onPointerEnter={() => void readySkin(lookMeans(l.id).skin)}
-                  onFocus={() => void readySkin(lookMeans(l.id).skin)}
-                  onClick={() => onSetLook(l.id)}
-                >
-                  <span className={`look-swatch ${l.id}`} aria-hidden="true">
-                    {l.id === 'match' && <MatchMark />}
-                    <span className="look-tick" aria-hidden="true">
-                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                        <path d="M1.6 5.7 4.2 8.3 9.4 2.7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </span>
-                  </span>
-                  <span className="look-name">{l.name}</span>
-                </button>
-              ))}
-            </div>
-            {/* THE DIALS, and only under a picture. Both move the window she is looking at
-               as she drags, because a theme you have to close a screen to see is a theme
-               you tune by memory.
-             */}
-            {isSkin(look) && (
-              <Group label={skinLabel(look)} note="Changes appear immediately and are saved for this theme.">
-                {TUNE_DEFAULT[look].panelOpacity !== undefined && <Dial label={look === 'orbital-glass' ? 'Panel tint' : 'Panel whiteness'} desc="Reduce the tint to let more of the background show through." value={tune.panelOpacity ?? TUNE_DEFAULT[look].panelOpacity!} {...TUNE_LIMITS.panelOpacity} format={(v) => `${Math.round(v * 100)}%`} onChange={(panelOpacity) => onSetTune({ ...tune, panelOpacity })} />}
-                <Dial
-                  label="Foreground blur"
-                  desc="Softens the glass behind your tasks."
-                  value={tune.blur}
-                  {...TUNE_LIMITS.blur}
-                  format={(v) => (v === 0 ? 'none' : `${v}px`)}
-                  onChange={(blur) => onSetTune({ ...tune, blur })}
-                />
-                <Dial label="Background blur" desc="Softens the whole backdrop, including behind the sidebar." value={tune.backgroundBlur ?? 0} {...TUNE_LIMITS.backgroundBlur} format={(v) => `${v}px`} onChange={(backgroundBlur) => onSetTune({ ...tune, backgroundBlur })} />
-                <Dial
-                  label="Darkness"
-                  desc="How far the picture is turned down under the app."
-                  value={tune.dim}
-                  {...TUNE_LIMITS.dim}
-                  format={(v) => `${Math.round(v * 100)}%`}
-                  onChange={(dim) => onSetTune({ ...tune, dim })}
-                />
-                <Row
-                  label="What it shipped with"
-                  desc={`Foreground blur ${TUNE_DEFAULT[look].blur}px, background blur ${TUNE_DEFAULT[look].backgroundBlur ?? 0}px, darkness ${Math.round(TUNE_DEFAULT[look].dim * 100)}%${TUNE_DEFAULT[look].panelOpacity !== undefined ? `, panel whiteness ${Math.round(TUNE_DEFAULT[look].panelOpacity! * 100)}%` : ''}.`}
-                >
-                  <button
-                    type="button"
-                    className="set-ghost"
-                    disabled={tune.panelOpacity === TUNE_DEFAULT[look].panelOpacity && (tune.backgroundBlur ?? 0) === (TUNE_DEFAULT[look].backgroundBlur ?? 0) && tune.blur === TUNE_DEFAULT[look].blur && tune.dim === TUNE_DEFAULT[look].dim}
-                    onClick={onResetTune}
-                  >
-                    Put it back
-                  </button>
-                </Row>
-              </Group>
-            )}
-            {/* The keyboard hints switch sat here until w-5737fe67cf and is on
-                General now, where people look for it. */}
-          </div>
-        )}
-
         {/* THE SHORTCUTS PAGE (w-fb22ca8895).
 
             NOTHING ON THIS PAGE IS A CONTROL. It is the one screen in Settings
@@ -1940,7 +1790,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
              */}
             <button type="button" className="set-crumb" onClick={() => setPane('projects')}>
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M10 3.5L5.5 8l4.5 4.5" /></svg>
-              <span>All projects</span>
+              <span>Projects</span>
             </button>
             {/* THE SAME TWO THINGS AS THE SIDEBAR ROW, at the size of a title.
                 The name is edited in the sidebar, and the mark is changed here,

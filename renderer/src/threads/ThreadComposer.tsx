@@ -50,7 +50,7 @@ import { repeatPresets } from '../components/When';
 import { fitMenu } from '../keep-in-window';
 import {
   allModels, findPeople, harnessFields, inputValueOf, laterHint, momentFromInput, mondayMorning, moreCount,
-  onlyYouAnd, placeholderFor, projectsOffered, projectSwatch, recentModels, sameModel,
+  joinNames, landsIn, placeholderFor, projectsOffered, projectSwatch, recentModels, sameModel,
   sharingFields, startingProject, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   type Harness, type ModelPick, type Visibility,
 } from './composer-rules';
@@ -74,7 +74,7 @@ export interface ThreadSent {
 type MenuKey = 'to' | 'model' | 'project' | 'priority' | 'visibility' | 'later';
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, onClose, onSent, onOpenConversation,
+  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, onClose, onSent, onOpenConversation, onReorderProjects,
 }: {
   products: Product[];
   items: WorkItem[];
@@ -92,6 +92,8 @@ export function ThreadComposer({
    *  the last few lines reads badly for a conversation that is hundreds of
    *  lines long). */
   onOpenConversation?: (item: WorkItem, draft: string) => void;
+  /** Opens Settings > Priority, from the "Reorder" beside the project menu's heading. */
+  onReorderProjects?: () => void;
   onClose: () => void;
   /** Called once the send stands, BEFORE the draft is cleared, so the caller can still read it for an undo. */
   onSent: (item: WorkItem | null, sent?: ThreadSent) => void;
@@ -145,8 +147,8 @@ export function ThreadComposer({
   // Visibility follows what the task is, not where it lives. It was
   // remembered per project for a while, and a tester then found the next
   // thread silently Private; nothing carries over now.
-  // AND IT MAY BE A FEW PEOPLE RATHER THAN THE TEAM (w-41ff964775): "you might
-  // only want certain people to see what you're up to". Chosen people opens the
+  // AND IT MAY BE A FEW PEOPLE RATHER THAN THE TEAM (w-41ff964775). Chosen
+  // people opens the
   // same picker the To field uses, and the pick stands only while somebody is
   // on the list; with nobody on it the thread is sent Private, because that is
   // who can see it (composer-rules.ts `sharingFields`).
@@ -475,7 +477,18 @@ export function ThreadComposer({
 
   const projectMenu = (
     <div className="tc-menu tc-rise" role="listbox" aria-label="Project" onKeyDown={menuKeys}>
-      <span className="tc-menu-head">Project</span>
+      {/* THE LIST IS ALREADY IN PRIORITY ORDER, AND NOW IT SAYS SO, with the
+          way to change it beside the words. The drag that used to live in this
+          menu was the only way to set the order and almost nobody found it;
+          the order now has its own page in Settings, and this is its door. */}
+      {onReorderProjects ? (
+        <span className="tc-menu-head tc-head-split">
+          <span>By priority</span>
+          {/* The card closes behind it; the draft is saved on every keystroke,
+              so it is all still there next time the card opens. */}
+          <button type="button" className="tc-head-link" onClick={onReorderProjects}>Reorder</button>
+        </span>
+      ) : <span className="tc-menu-head">Project</span>}
       {offered.map((p) => (
         <button key={p.slug} type="button" data-item className={`tc-row ${p.slug === product?.slug ? 'on' : ''}`} onPointerEnter={hover}
           onClick={() => { pickProject(p.slug); close('text'); }}>
@@ -696,7 +709,13 @@ export function ThreadComposer({
 
         {person ? (
           <div className="tc-bar">
-            <span className="tc-only">{extra.length ? `Only you, ${names} see this.` : onlyYouAnd(person)}</span>
+            {/* WHERE IT GOES, NOT WHO SEES IT (w-a8e752a9f2). "Only you and
+                Maya see this." sat directly under a To field reading Maya, so
+                it was the second place on the card saying the same thing. The
+                corner keeps a line rather than going bare, and that line now
+                says the thing the card does not: a message to a teammate
+                becomes a thread in their inbox. */}
+            <span className="tc-only">{landsIn(group.map((p) => firstName(p)))}</span>
             <span className="tc-send solo">
               <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title="Send · ⌘↵">
                 Send <kbd>⌘↵</kbd>
@@ -787,10 +806,3 @@ const RepeatIcon = () => (
     <path d="M17 3l3 3-3 3" /><path d="M4 11V9a3 3 0 0 1 3-3h13M7 21l-3-3 3-3" /><path d="M20 13v2a3 3 0 0 1-3 3H4" />
   </svg>
 );
-
-/** "Bea", "Bea and Carla", "Bea, Carla and Dev". */
-function joinNames(names: string[]): string {
-  if (names.length <= 1) return names[0] ?? '';
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-}
-

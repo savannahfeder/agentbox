@@ -238,10 +238,10 @@ describe('3. the scope is the practice band and nothing else', () => {
     expect(IN_PRACTICE).toEqual(COACHED);
   });
 
-  it('so the setup screens, the look, the slabs and the finish card are untouched', () => {
+  it('so the setup screens, the slabs and the finish card are untouched', () => {
     // She has to get through those, they draw no ring, and there is nothing on
     // them to wander into. `practising` is false for every one of them.
-    for (const step of ['welcome', 'folder', 'name', 'look', 'inbox', 'away', 'goal', 'hand', 'done', 'landed']) {
+    for (const step of ['welcome', 'folder', 'name', 'inbox', 'away', 'goal', 'hand', 'done', 'landed']) {
       expect(practising({ step, practice: 'practice' }), `${step} is held`).toBe(false);
     }
     for (const step of IN_PRACTICE) {
@@ -284,8 +284,12 @@ describe('4. ALSO names only what a card says out loud', () => {
     // Which lives in the docked reply surface, the one selector left here.
     expect(focus).toMatch(/className="focus-dock"/);
     // And the answer beat still names replying, which is now what it rings.
+    // THE WORD IS LOWER CASE SINCE 2026-10-01, because the sentence no longer
+    // opens on it: it reads "Click the box below to reply, or press E to close
+    // it", which names the box for the people who do not use shortcuts. What is
+    // being checked is unchanged, which is that the card names replying at all.
     const answer = coach('answer', 0, {});
-    expect(`${answer.quiet} ${answer.lead}${answer.tail}`).toMatch(/Reply/);
+    expect(`${answer.quiet} ${answer.lead}${answer.tail}`).toMatch(/reply/i);
   });
 
   it('every beat named has an anchor of its own, so ALSO only ever adds', () => {
@@ -347,10 +351,11 @@ describe('5. what the app answers a stray click with', () => {
     expect(ring).not.toMatch(/stroke:/);
     expect(ring).not.toMatch(/fill/);
     // AND THE DEEPER VEIL IS THE SAME COLOUR, TURNED UP. Measured off the
-    // tokens rather than eyeballed: same rgb triple, more alpha, both themes.
+    // tokens rather than eyeballed: same rgb triple, more alpha. One pair, for
+    // the one look the app has.
     const tokens = [...cssCode.matchAll(/--fr-veil(-knock)?: rgba\(([^)]+)\);/g)]
       .map((m) => ({ knock: !!m[1], parts: m[2].split(',').map((n) => Number(n.trim())) }));
-    expect(tokens).toHaveLength(4);
+    expect(tokens).toHaveLength(2);
     for (let i = 0; i < tokens.length; i += 2) {
       const [rest, knock] = [tokens[i], tokens[i + 1]];
       expect(knock.knock).toBe(true);

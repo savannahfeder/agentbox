@@ -11,7 +11,31 @@ function add(session, id, label, detail) {
   return true;
 }
 function finish(session, id) { return session.activeTools?.delete(id) ?? false; }
-function clear(session) { const changed = !!session.activeTools?.size; session.activeTools?.clear(); return changed; }
+// A turn ending clears what it was doing, but not a background job: that is
+// still running, and the session is kept open waiting for it
+// (main/claude-input.mjs), so the row keeps saying what it waits on.
+function clear(session) {
+  let changed = false;
+  for (const [id, entry] of session.activeTools ?? []) {
+    if (entry.background) continue;
+    session.activeTools.delete(id);
+    changed = true;
+  }
+  return changed;
+}
+function backgroundJobs(session, tasks) {
+  const pending = session.activeTools ??= new Map();
+  const live = new Set(tasks.map(t => `bg:${t?.task_id}`));
+  let changed = false;
+  for (const [id, entry] of pending) if (entry.background && !live.has(id)) { pending.delete(id); changed = true; }
+  for (const task of tasks) {
+    const description = clean(task?.description);
+    const plain = commandWork(description);
+    const label = plain ? `${plain.doing} ${plain.subject}`.trim() : `Waiting on: ${description || 'a background job'}`;
+    if (add(session, `bg:${task?.task_id}`, label, description)) { pending.get(`bg:${task?.task_id}`).background = true; changed = true; }
+  }
+  return changed;
+}
 export function currentActivity(session) { return [...(session.activeTools?.values() ?? [])]; }
 function toolLabel(name, input) {
   const command = clean(input.command);
@@ -35,6 +59,7 @@ export function claudeActivity(session, line) {
     const obj = JSON.parse(line);
     if (obj.parent_tool_use_id) return false;
     if (obj.type === 'result') return clear(session);
+    if (obj.type === 'system' && obj.subtype === 'background_tasks_changed' && Array.isArray(obj.tasks)) return backgroundJobs(session, obj.tasks);
     let changed = false;
     for (const part of Array.isArray(obj.message?.content) ? obj.message.content : []) {
       if (obj.type === 'assistant' && part.type === 'tool_use') {

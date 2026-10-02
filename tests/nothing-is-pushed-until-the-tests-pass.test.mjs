@@ -1,5 +1,8 @@
-// The whole suite runs locally before every push, rather than waiting for
-// GitHub Actions, which had stopped starting runs for this organisation.
+// Tests run locally before every push. It began as the whole suite, because
+// GitHub Actions had stopped starting runs for the old organisation; since
+// 2026-10-01 GitHub runs the whole suite on every push to the public repo, and
+// the hook runs the tests for what the push changed (see "a push tests what it
+// changed" below).
 //
 // So the guard against breaking onboarding is now a git hook, and a hook is a
 // strange thing to trust: it lives outside the code it protects, git will not
@@ -92,7 +95,7 @@ function flakyVitest(dir, { redFiles, stillRedOnRetry = false }) {
 /**
  * Runs the real hook the way git runs it: cwd at the tree root, refs on stdin,
  *  and git's own variables in the environment. */
-function runHook(dir, stdin, env = {}) {
+function runHook(dir, stdin, env = {}, args = []) {
   const hook = path.join(dir, 'pre-push');
   fs.copyFileSync(HOOK, hook);
   fs.chmodSync(hook, 0o755);
@@ -100,7 +103,7 @@ function runHook(dir, stdin, env = {}) {
   // the throwaway repo needs it too.
   fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
   fs.copyFileSync(path.join(root, 'scripts/red-test-files.mjs'), path.join(dir, 'scripts/red-test-files.mjs'));
-  const r = spawnSync(hook, { cwd: dir, input: stdin, encoding: 'utf8', env: { ...process.env, ...env } });
+  const r = spawnSync(hook, args, { cwd: dir, input: stdin, encoding: 'utf8', env: { ...process.env, AGENTBOX_PUSH_FULL_SUITE: '', ...env } });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }
 
@@ -241,6 +244,95 @@ describe('the hook decides whether the push happens', () => {
     );
     expect(code).toBe(0);
     expect(ranTests(dir)).toBe(true);
+  });
+});
+
+// A PUSH RUNS THE TESTS FOR WHAT IT CHANGED, NOT ALL OF THEM (2026-10-01).
+//
+// Every push ran all 618 files, and every agent ran them again before it
+// reported. On a Mac with several agents at once the suite took 170 to 1964
+// seconds instead of about 25, at load averages of 14 to 23, and agents sat in
+// the hook for most of their run. GitHub runs the whole suite on every push to
+// the public repo (and is green since d82043d), so the hook runs what the
+// change can break: `vitest related` on the files the push carries. A change to
+// something every test depends on still runs everything.
+function commit(dir, files, message = 'change') {
+  for (const [name, text] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
+    fs.writeFileSync(path.join(dir, name), text);
+  }
+  const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
+  git('add', '-A');
+  git('-c', 'user.email=t@x.test', '-c', 'user.name=t', 'commit', '-q', '-m', message);
+  return git('rev-parse', 'HEAD').trim();
+}
+
+/** A repo with a first commit, as a remote already has it, and the vitest stand-in. */
+function repoWithBase(tag) {
+  const dir = tmpRepo(tag);
+  const calls = flakyVitest(dir, { redFiles: [] });
+  // The stand-in is green from its first call here: this block is about what
+  // the hook ASKS for, not about retries.
+  fs.writeFileSync(path.join(dir, 'node_modules/.bin/vitest'),
+    `#!/bin/sh\necho ran > "${path.join(dir, 'vitest-ran')}"\necho "$@" >> "${path.join(dir, 'vitest-calls')}"\nexit 0\n`);
+  fs.writeFileSync(path.join(dir, '.gitignore'), 'node_modules/\nvitest-*\npre-push\nscripts/red-test-files.mjs\n');
+  const base = commit(dir, { 'main/a.mjs': 'export const a = 1;\n', 'docs/notes.md': 'notes\n' }, 'base');
+  return { dir, calls, base };
+}
+
+describe('a push tests what it changed', () => {
+  it('runs only the tests related to the files the push carries', () => {
+    const { dir, calls, base } = repoWithBase('related');
+    const head = commit(dir, { 'main/a.mjs': 'export const a = 2;\n', 'tests/a.test.mjs': '// a\n' });
+    const { code, out } = runHook(dir, `refs/heads/main ${head} refs/heads/main ${base}\n`);
+    expect(code).toBe(0);
+    expect(calls()).toHaveLength(1);
+    expect(calls()[0]).toMatch(/^related --run /);
+    expect(calls()[0]).toContain('main/a.mjs');
+    expect(calls()[0]).toContain('tests/a.test.mjs');
+    expect(out).toContain('GitHub runs the whole suite');
+  });
+
+  it('runs no tests at all for a push that changes only words', () => {
+    const { dir, calls, base } = repoWithBase('docs');
+    const head = commit(dir, { 'docs/notes.md': 'more notes\n', 'README.md': 'hi\n' });
+    const { code, out } = runHook(dir, `refs/heads/main ${head} refs/heads/main ${base}\n`);
+    expect(code).toBe(0);
+    expect(calls()).toEqual([]);
+    expect(out).toContain('no code');
+  });
+
+  it('runs the whole suite when the push changes what every test depends on', () => {
+    const { dir, calls, base } = repoWithBase('deps');
+    const head = commit(dir, { 'package.json': '{}\n', 'main/a.mjs': 'export const a = 3;\n' });
+    runHook(dir, `refs/heads/main ${head} refs/heads/main ${base}\n`);
+    expect(calls()).toHaveLength(1);
+    expect(calls()[0]).not.toContain('related');
+  });
+
+  it('measures a new branch from where it left main, not from nothing', () => {
+    const { dir, calls, base } = repoWithBase('branch');
+    execFileSync('git', ['update-ref', 'refs/remotes/origin/main', base], { cwd: dir });
+    const head = commit(dir, { 'main/b.mjs': 'export const b = 1;\n' });
+    runHook(dir, `refs/heads/x ${head} refs/heads/x ${ZERO}\n`, {}, ['origin', 'https://example.test/r.git']);
+    expect(calls()[0]).toMatch(/^related --run /);
+    expect(calls()[0]).toContain('main/b.mjs');
+    expect(calls()[0]).not.toContain('main/a.mjs');
+  });
+
+  it('runs the whole suite when it cannot tell what changed', () => {
+    // The remote's commit is not here, so there is nothing to compare with.
+    const { dir, calls } = repoWithBase('unknown');
+    const head = commit(dir, { 'main/a.mjs': 'export const a = 4;\n' });
+    runHook(dir, `refs/heads/main ${head} refs/heads/main ${SHA}\n`);
+    expect(calls()[0]).not.toContain('related');
+  });
+
+  it('runs the whole suite when asked to', () => {
+    const { dir, calls, base } = repoWithBase('forced');
+    const head = commit(dir, { 'main/a.mjs': 'export const a = 5;\n' });
+    runHook(dir, `refs/heads/main ${head} refs/heads/main ${base}\n`, { AGENTBOX_PUSH_FULL_SUITE: '1' });
+    expect(calls()[0]).not.toContain('related');
   });
 });
 

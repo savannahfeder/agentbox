@@ -19,9 +19,11 @@
 //   - no Team tab, in any state (w-05ff3d1438, 2026-10-01): the Inbox and the
 //     Team page were one question on two pages, so the faces on the Inbox's
 //     tab bar pick whose threads are listed, and the sidebar keeps one list;
-//   - at the foot, Invite people and Team members (only when signed in to a
-//     team), Instructions, Settings, then the signed-in person's face, name
-//     and email.
+//   - at the foot, Invite people (only when signed in to a team),
+//     Instructions, Settings, then the signed-in person's face, name and
+//     email. Team members was there too until 2026-10-01 (w-8415594d19), when
+//     team management moved into Settings and Invite people became the
+//     shortcut into it: two rows opening one page is one row.
 // The promise that survives from the old file is the accessible one: in the
 // collapsed rail the words are hidden, so every button has to carry its name
 // in an aria-label or it is a blank square.
@@ -75,11 +77,15 @@ describe('one list tab, and it is lit wherever her threads are listed', () => {
     expect(buttonWith(html, 'aria-label="Settings"')).toContain('aria-current="page"');
   });
 
-  it('lights Team members and not Inbox while the members page is open', () => {
-    const html = draw({ page: 'members', team: onATeam, onMembers: noop, hasTeam: true, onTeam: noop });
+  // THE MEMBERS PAGE IS GONE (w-8415594d19, 2026-10-01): team management is a
+  // pane in Settings and Invite people is the shortcut into it, so the row
+  // that lights while that pane is up is Invite people. The detail is pinned
+  // in team-management-lives-in-settings.test.mjs.
+  it('lights Invite people and not Inbox while the Settings team pane is open', () => {
+    const html = draw({ page: 'invite', team: onATeam, onInvite: noop, hasTeam: true, onTeam: noop });
     expect(inboxTab(html)).not.toContain('aria-current');
     expect(buttonWith(html, 'data-tab="team"')).not.toContain('aria-current');
-    expect(buttonWith(html, 'aria-label="Team members"')).toContain('aria-current="page"');
+    expect(buttonWith(html, 'aria-label="Invite people"')).toContain('aria-current="page"');
   });
 
   it('draws none of the places and buttons that moved to the Inbox page and its header', () => {
@@ -112,20 +118,22 @@ describe('there is no Team tab', () => {
 });
 
 describe('the foot of the sidebar', () => {
-  const both = { onInvite: noop, onMembers: noop };
+  // ONE TEAM ROW, NOT TWO (w-8415594d19, 2026-10-01). Team members was the
+  // same door as Invite people and left the sidebar; `onAccount` is your own
+  // row at the bottom, which opens the same Settings pane.
+  const both = { onInvite: noop, onAccount: noop };
 
-  it('offers Invite people and Team members to someone signed in to a team', () => {
+  it('offers Invite people to someone signed in to a team, and no members row', () => {
     const html = draw({ team: onATeam, ...both });
     expect(html).toContain('aria-label="Invite people"');
-    expect(html).toContain('aria-label="Team members"');
+    expect(html).not.toContain('Team members');
   });
 
-  // Signed in with no team yet, both are offered and open the page that starts
-  // one, because without them there was no way to reach the invite page (2026-10-01).
-  it('offers both to someone signed in who is on no team yet', () => {
+  // Signed in with no team yet, it is offered and opens the page that starts
+  // one, because without it there was no way to reach the invite page (2026-10-01).
+  it('offers it to someone signed in who is on no team yet', () => {
     const html = draw({ team: signedInNoTeam, ...both });
     expect(html).toContain('aria-label="Invite people"');
-    expect(html).toContain('aria-label="Team members"');
   });
 
   it.each([
@@ -146,7 +154,7 @@ describe('the foot of the sidebar', () => {
   it('keeps Instructions and Settings at the foot, under the tabs, in that order', () => {
     const html = draw({ team: onATeam, ...both, onInstructions: noop, onSettings: noop, hasTeam: true, onTeam: noop });
     const foot = html.slice(html.indexOf('workspace-bottom'));
-    const order = ['Invite people', 'Team members', 'Instructions', 'Settings'].map((l) => foot.indexOf(`aria-label="${l}"`));
+    const order = ['Invite people', 'Instructions', 'Settings'].map((l) => foot.indexOf(`aria-label="${l}"`));
     for (const at of order) expect(at).toBeGreaterThan(-1);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(html.indexOf('workspace-tabs')).toBeLessThan(html.indexOf('workspace-bottom'));
@@ -182,24 +190,33 @@ describe('the top of the sidebar', () => {
     expect(top).toContain('>Northwind</span>');
   });
 
-  it('falls back to the app name when there is no team', () => {
+  // With no team the corner names the app, so it wears the app's icon (the
+  // launch film's "On the grid" logo) rather than a letter (w-a514b58055).
+  it('falls back to the app name and the app icon when there is no team', () => {
     const html = draw();
     const top = html.slice(0, html.indexOf('workspace-tabs'));
     expect(top).toContain(`>${Name}</span>`);
-    expect(top).toContain(`>${Name.slice(0, 1).toUpperCase()}</span>`);
+    expect(top).toContain('th-mark-app');
+    expect(top).toMatch(/<img[^>]*class="product-mark app-mark"/);
+    expect(top).not.toContain(`>${Name.slice(0, 1).toUpperCase()}</span>`);
   });
 });
 
 describe('every control keeps its name in either width', () => {
   it.each([false, true])('names every button with an aria-label when collapsed=%s', (collapsed) => {
     const html = draw({
-      collapsed, team: onATeam, hasTeam: true, onTeam: noop, onInvite: noop, onMembers: noop,
+      collapsed, team: onATeam, hasTeam: true, onTeam: noop, onInvite: noop, onAccount: noop,
       onInstructions: noop, onSettings: noop, inboxCount: 2,
     });
     const buttons = html.match(/<button[^>]*>/g);
-    // Inbox, Invite people, Team members, Instructions, Settings, the toggle,
-    // and your own row (it opens your account). Team left with w-05ff3d1438.
-    expect(buttons).toHaveLength(7);
+    // Inbox, Invite people, Instructions, Settings, the toggle and your own
+    // row (it opens your account). Team left with w-05ff3d1438, and Team
+    // members with w-8415594d19.
+    //
+    // The seventh when the sidebar is open is the line under your name, which
+    // opens the box you say what you are up to in (w-0b54ee983f). A collapsed
+    // sidebar is icons only and that line is words, so it is not drawn there.
+    expect(buttons).toHaveLength(collapsed ? 6 : 7);
     for (const b of buttons) expect(b).toMatch(/aria-label="[^"]+"/);
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
   });
