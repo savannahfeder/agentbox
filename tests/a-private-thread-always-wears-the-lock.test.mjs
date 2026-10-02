@@ -6,9 +6,10 @@
 // were lit at the top of the page. A mark that comes and goes with an
 // unrelated control is a mark you cannot read.
 //
-// So both marks are now unconditional, and a row carries exactly one of them:
-// the lock on a thread only you can see, the people mark on one the team can
-// see. Neither depends on who else is on the page. Where the question does not
+// So the marks are now unconditional, and a row carries at most one of them:
+// the lock on a thread only you can see, the people mark on one a few chosen
+// people see, and (since 2026-10-02) nothing on one the whole team sees,
+// because that is the default. None depends on who else is on the page. Where the question does not
 // arise at all (nobody signed in, a message between people, an agent's own
 // row, a teammate's thread) there is still no mark, because `rowSharing`
 // answers null and both marks hang off it.
@@ -67,11 +68,17 @@ describe('the row draws one mark, and the same one either way', () => {
   it('the lock on a private thread', () => {
     expect(draw(item())).toContain('th-lock');
   });
-  it('the people mark on a thread the team can see', () => {
-    expect(draw(item({ createdAt: SINCE + DAY }))).toContain('th-shared');
+  // Since 2026-10-02 a thread the whole team sees, the default, wears nothing
+  // (tests/a-thread-the-whole-team-sees-wears-no-mark.test.mjs); the people
+  // mark is left for a thread a few chosen people see.
+  it('no lock on a thread the team can see', () => {
+    expect(draw(item({ createdAt: SINCE + DAY }))).not.toContain('th-lock');
+  });
+  it('the people mark on a thread a few chosen people see', () => {
+    expect(draw(item({ createdAt: SINCE + DAY, visibility: 'people', visibleTo: ['p-theo'] }))).toContain('th-shared');
   });
   it('never both on one row', () => {
-    for (const html of [draw(item()), draw(item({ createdAt: SINCE + DAY }))]) {
+    for (const html of [draw(item()), draw(item({ createdAt: SINCE + DAY })), draw(item({ visibility: 'people', visibleTo: ['p-theo'] }))]) {
       expect(html.includes('th-lock') && html.includes('th-shared')).toBe(false);
     }
   });
@@ -94,9 +101,7 @@ describe('a board card wears it too, on your own board', () => {
   it('the lock on a private card with nobody else on the board', () => {
     expect(board([item()])).toContain('th-lock');
   });
-  it('the people mark on a card the team can see', () => {
-    const html = board([item({ createdAt: SINCE + DAY })]);
-    expect(html).toContain('th-shared');
-    expect(html).not.toContain('th-lock');
+  it('no lock on a card the team can see', () => {
+    expect(board([item({ createdAt: SINCE + DAY })])).not.toContain('th-lock');
   });
 });

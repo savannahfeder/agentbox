@@ -154,17 +154,18 @@ describe('the inbox row', () => {
     expect(rowSharing(item({ visibility: 'team' }), northwind, T)).toBe('team');
   });
 
-  // QUIETLY: the same two-people mark, with the count of people beside it.
-  it('marks it with the count of people it reaches, and the team with no count', () => {
+  // QUIETLY: the two-people mark with the count of people beside it. The whole
+  // team, the default, wears no mark since 2026-10-02
+  // (tests/a-thread-the-whole-team-sees-wears-no-mark.test.mjs).
+  it('marks it with the count of people it reaches, and the team with nothing', () => {
     const few = row(item({ visibility: 'people', visibleTo: [THEO, ANA] }));
     expect(few).toContain('th-shared');
     expect(few).toMatch(/<span class="th-shared-n"[^>]*>2<\/span>/);
     expect(few).toMatch(/aria-label="Visible to 2 people"/);
 
     const all = row(item({ visibility: 'team' }));
-    expect(all).toContain('th-shared');
-    expect(all).not.toContain('th-shared-n');
-    expect(all).toMatch(/aria-label="Visible to the team"/);
+    expect(all).not.toContain('class="th-shared');
+    expect(all).not.toMatch(/aria-label="Visible to the team"/);
   });
 
   it('draws the count in the mark\'s own faint colour, not as a badge', () => {
