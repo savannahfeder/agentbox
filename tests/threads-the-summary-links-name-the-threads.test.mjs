@@ -44,7 +44,7 @@ describe('linked titles', () => {
 });
 
 describe('the threads offered to link', () => {
-  const me = 'p-sav';
+  const me = 'p-me';
   const directs = new Set(['direct-1']);
   it('offers her other open threads, newest first', () => {
     const out = linkCandidates(items[0], items, [], { me, direct: directs }).map((i) => i.id);
@@ -68,13 +68,13 @@ describe('the threads offered to link', () => {
 describe('the owner', () => {
   const byId = new Map([['p-maya', { id: 'p-maya', name: 'Maya Chen' }]]);
   it('is you on a thread you started, or one with nobody on it', () => {
-    expect(ownerName(row({ createdBy: 'p-sav' }), 'p-sav', byId)).toBe('You');
-    expect(ownerName(row({}), 'p-sav', byId)).toBe('You');
+    expect(ownerName(row({ createdBy: 'p-me' }), 'p-me', byId)).toBe('You');
+    expect(ownerName(row({}), 'p-me', byId)).toBe('You');
   });
   it('is the teammate’s full name on a thread they started', () => {
-    expect(ownerName(row({ createdBy: 'p-maya' }), 'p-sav', byId)).toBe('Maya Chen');
+    expect(ownerName(row({ createdBy: 'p-maya' }), 'p-me', byId)).toBe('Maya Chen');
   });
   it('is never a raw id, even for someone who has left the team', () => {
-    expect(ownerName(row({ createdBy: 'p-gone' }), 'p-sav', byId)).toBe('Someone');
+    expect(ownerName(row({ createdBy: 'p-gone' }), 'p-me', byId)).toBe('Someone');
   });
 });

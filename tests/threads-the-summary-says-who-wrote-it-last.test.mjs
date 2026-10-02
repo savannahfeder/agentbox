@@ -37,25 +37,25 @@ describe('the line under the summary', () => {
   const item = (wrote) => ({ id: 'w-1', title: 'Acme', wrote });
   it('names the agent when the agent wrote last', () => {
     const it1 = item({ problem: { ts: NOW - 40 * M, source: 'founder' }, progress: { ts: NOW - 19 * M, source: 'agent' } });
-    expect(lastEdit(it1, { me: 'p-sav', now: NOW })).toBe('Kept up to date by the agent · 19 min ago');
+    expect(lastEdit(it1, { me: 'p-me', now: NOW })).toBe('Kept up to date by the agent · 19 min ago');
   });
   it('names you when you wrote last, with or without a person on the line', () => {
-    expect(lastEdit(item({ solution: { ts: NOW - 2 * M, source: 'founder' } }), { me: 'p-sav', now: NOW })).toBe('Edited by you · 2 min ago');
-    expect(lastEdit(item({ solution: { ts: NOW - 2 * M, source: 'founder', by: 'p-sav' } }), { me: 'p-sav', now: NOW })).toBe('Edited by you · 2 min ago');
+    expect(lastEdit(item({ solution: { ts: NOW - 2 * M, source: 'founder' } }), { me: 'p-me', now: NOW })).toBe('Edited by you · 2 min ago');
+    expect(lastEdit(item({ solution: { ts: NOW - 2 * M, source: 'founder', by: 'p-me' } }), { me: 'p-me', now: NOW })).toBe('Edited by you · 2 min ago');
   });
   it('names a teammate by their first name, not you', () => {
     const names = new Map([['p-maya', 'Maya Chen']]);
-    expect(lastEdit(item({ progress: { ts: NOW - 4 * M, source: 'founder', by: 'p-maya' } }), { me: 'p-sav', names, now: NOW })).toBe('Edited by Maya · 4 min ago');
+    expect(lastEdit(item({ progress: { ts: NOW - 4 * M, source: 'founder', by: 'p-maya' } }), { me: 'p-me', names, now: NOW })).toBe('Edited by Maya · 4 min ago');
   });
   it('says nothing when only the title and body were ever written', () => {
-    expect(lastEdit(item({ title: { ts: NOW, source: 'founder' }, body: { ts: NOW, source: 'founder' } }), { me: 'p-sav', now: NOW })).toBeNull();
-    expect(lastEdit(item(undefined), { me: 'p-sav', now: NOW })).toBeNull();
+    expect(lastEdit(item({ title: { ts: NOW, source: 'founder' }, body: { ts: NOW, source: 'founder' } }), { me: 'p-me', now: NOW })).toBeNull();
+    expect(lastEdit(item(undefined), { me: 'p-me', now: NOW })).toBeNull();
   });
   it('counts an edit of yours still on its way to the ledger as the latest', () => {
     const it1 = item({ progress: { ts: NOW - 19 * M, source: 'agent' } });
-    expect(lastEdit(it1, { me: 'p-sav', now: NOW, pending: { progress: NOW - 1000 } })).toBe('Edited by you · just now');
+    expect(lastEdit(it1, { me: 'p-me', now: NOW, pending: { progress: NOW - 1000 } })).toBe('Edited by you · just now');
     // and an older pending edit loses to a newer agent write
-    expect(lastEdit(it1, { me: 'p-sav', now: NOW, pending: { progress: NOW - 30 * M } })).toBe('Kept up to date by the agent · 19 min ago');
+    expect(lastEdit(it1, { me: 'p-me', now: NOW, pending: { progress: NOW - 30 * M } })).toBe('Kept up to date by the agent · 19 min ago');
   });
 });
 
