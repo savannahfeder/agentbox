@@ -27,8 +27,6 @@ import {
 import { type AgentFolder, type Project } from '../agent-import-card';
 import { ImportAgents } from './ImportAgents';
 import FolderPicker from './FolderPicker';
-import { LOOKS, type Look as LookId } from '../skins';
-import { MatchMark } from './MatchMark';
 import { PRACTICE_NAME, PRACTICE_ROWS, PRACTICE_TASK } from '../../../shared/first-run-practice.mjs';
 import { AppMark } from './AppMark';
 import { SidebarIcon } from './SidebarIcon';
@@ -86,17 +84,6 @@ function SkipGlyph() {
   );
 }
 
-/**
- * THE TICK on a kept agent. Drawn rather than typed, because a check written
- *  as a character is a different size in every font a Mac decides to use. */
-function Tick() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4 12.5 9.5 18 20 6.5" />
-    </svg>
-  );
-}
 
 /**
  * THE QUIET WAY OUT.
@@ -1553,139 +1540,8 @@ function IntroPiece({ kind }: { kind: 'list' | 'ask' | 'empty' | 'progress' }) {
   );
 }
 
-/* * ---------------------------- PICKING THE LOOK -----------------------------
-
- ROUND TWO, AND SHE SENT US TO SOMEBODY ELSE'S DRAWING FOR IT.
-
- FOUR TILES, NOT EIGHTEEN. The row is the picture being shown, then Dark, Light and Match my
- system, and it never wraps and never grows.
-
- THE TILES ARE THE PRODUCT.
-
- AND THE SCREEN BEHIND IS THE PRODUCT TOO.
-
-   THE BACKGROUND IS NOT AN IMAGE HERE, WHICH IS BETTER THAN THE DRAWING. The
-   page had to photograph it; this is the app's own `.tabs`, `.list-pane` and
-   `.rail` with the practice rows in them, so it is right at any window size and
-   cannot go stale. It is also why the step can stay at beat four: standing on
-   the REAL inbox would have meant moving to beat eight, because this early
-   somebody's own inbox is empty.
-
-   IT PAINTS THE WINDOW AS IT IS PRESSED. `onPick` writes the look through
-   App.tsx the same way Settings does, so the whole screen is the answer rather
-   than a preview of it, and the four screens after this one arrive already
-   wearing it.
-*/
-
-/**
- * THE APP, WITH NOTHING OF ANYBODY'S IN IT. Placeholder data was her word for
- *  it and it settles something real: the four rows below are the same four the
- *  walk hands over at beat twelve, so this is a first sight of them rather than
- *  an invention that appears once and is never seen again. */
-function LookApp() {
-  return (
-    <div className="fr-look-app" aria-hidden="true">
-      <div className="body">
-        <PieceNav count={PRACTICE_ROWS.length + INTRO_MORE.length} />
-        <div className="list-pane">
-          {/* `.list` IS WHERE THE ROW'S MEASUREMENTS LIVE: --gutter, --text-x and
-              --row-r are declared on it and nowhere else, so a row outside one is
-              drawn with no left inset and no right one. */}
-          <div className="list">
-            <div><div className="day-label">Today</div></div>
-            {[...PRACTICE_ROWS.map((r) => ({ ...r, project: PRACTICE_NAME })), ...INTRO_MORE].map((r) => (
-              <div className="row" key={r.title}>
-                <div className="row-main">
-                  <div className="subject">{r.title}</div>
-                  <div className="preview">{r.result}</div>
-                </div>
-                <div className="row-end">
-                  <span className="product">{r.project}</span>
-                  <span className="time">{Math.round(r.agoMs / 60_000)}m</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* The plain Dark, Light and "Match my system" tiles are off this row: "match"
-   is retired app-wide, and Dark and Light gave way to two hazes at her word
-   (w-ec62ab6b38). See `others` in `Look`. */
-
-function Look({ look, onPick, onNext }: {
-  look: LookId; onPick: (l: LookId) => void; onNext: () => void;
-}) {
-  // ENTER CARRIES IT, like every other screen in the walk, and from the next
-  // tick for the reason written on `Slab` below: the press that opened this
-  // screen must not be the press that leaves it.
-  useEffect(() => {
-    const on = (e: KeyboardEvent) => {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      onNext();
-    };
-    const t = setTimeout(() => window.addEventListener('keydown', on), 0);
-    return () => { clearTimeout(t); window.removeEventListener('keydown', on); };
-  }, [onNext]);
-
-  // THE SAME THREE SETTINGS AND ⌘K OFFER (w-9e434e8671): Light, Dark (Ember
-  // Grid) and Match system. No pictures and no randomizer any more.
-  const row = LOOKS;
-
-  // LEFT AND RIGHT MOVE THE TICK ALONG THE ROW, because the arrow keys are the
-  // first thing people reach for to switch themes. Each press
-  // applies the look, the same as a click, so the window changes under the
-  // hand. Armed on the next tick like every key on the walk.
-  useEffect(() => {
-    const on = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-      e.preventDefault();
-      const at = Math.max(0, row.findIndex((l) => l.id === look));
-      const next = e.key === 'ArrowRight' ? Math.min(row.length - 1, at + 1) : Math.max(0, at - 1);
-      if (row[next].id !== look) onPick(row[next].id);
-    };
-    const t = setTimeout(() => window.addEventListener('keydown', on), 0);
-    return () => { clearTimeout(t); window.removeEventListener('keydown', on); };
-  });
-
-  return (
-    <div className="fr-screen fr-screen-look">
-      <LookApp />
-      <div className="fr-look-veil" aria-hidden="true" />
-      {/* NO `.fr-brand` ON THIS SCREEN. The other setup screens are a photograph
-          with a word in the corner and need one; this one is the app, and the app
-          already carries its own top bar. Shot with it on 2026-08-24: "the app"
-          printed across the tab strip of the window underneath it. */}
-      <div className="fr-look-mid">
-        <h1 className="fr-look-q">{COPY.lookQ}</h1>
-        <div className="look-row fr-look-row">
-          {row.map((l) => (
-            <button
-              key={l.id}
-              className={`look${look === l.id ? ' on' : ''}`}
-              aria-pressed={look === l.id}
-              onClick={() => onPick(l.id)}
-            >
-              <span className={`look-swatch shot ${l.id}`} aria-hidden="true">
-                {l.id === 'match' && <MatchMark />}
-                <span className="look-tick" aria-hidden="true">
-                  <Tick />
-                </span>
-              </span>
-              <span className="look-name">{l.name}</span>
-            </button>
-          ))}
-        </div>
-        <p className="fr-look-clause">{COPY.lookClause}</p>
-        <button className="fr-go" onClick={onNext}>{COPY.lookGo} <Cap cap="↵" /></button>
-      </div>
-    </div>
-  );
-}
+/* THE THEME PICKER STOOD HERE. The walk no longer asks: Light, Dark and Match
+   system are chosen in Settings and in Command-K (w-9e434e8671). */
 
 /**
  * THE THREE INTRODUCTION SLABS, THE RULE, AND THE HAND-OFF.
@@ -1783,9 +1639,9 @@ function Statement({ head, line, go, onNext }: {
 }
 
 export function Onboarding({
-  run, claude, home, opened, waiting, later, picking, palette, view, tabs, look, products = [],
+  run, claude, home, opened, waiting, later, picking, palette, view, tabs, products = [],
   beat, pointed,
-  onEvent, onStep, onSkipToApp, onPractice, onDone, onFiled, onProjectMade, onRecheck, onSetLook,
+  onEvent, onStep, onSkipToApp, onPractice, onDone, onFiled, onProjectMade, onRecheck,
 }: {
   run: FirstRun;
   /**
@@ -1793,12 +1649,6 @@ export function Onboarding({
    *  name and the code folder; it takes only the one this walk made (see
    *  `Finished`), and the app's whole list is what it takes it out of. */
   products: Project[];
-  /**
-   * WHAT THE WINDOW IS WEARING RIGHT NOW, so the fourth step can show which
-   *  tile is on. It is the app's own state, not a copy: picking on that screen
-   *  writes through `onSetLook` exactly the way Settings does, and the window
-   *  behind the tiles repaints under the hand. */
-  look: LookId;
   /**
    * WHETHER A TASK IS OPEN IN THE READING PANE RIGHT NOW. Beat fourteen is one
    *  beat with two sentences, in the list and then in the pane, so it is the
@@ -1889,9 +1739,6 @@ export function Onboarding({
    *  standing a main process up behind it; the button is still real, it simply
    *  reports that nothing changed. */
   onRecheck?: () => Promise<boolean>;
-  /**
-   * Set the look, for real and for keeps.*/
-  onSetLook: (l: LookId) => void;
 }) {
   const nameRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -2139,12 +1986,6 @@ export function Onboarding({
       if (why) setNotMade(why);
     } finally { setBusy(false); }
   };
-
-  // It stands between the name and the introduction, which is the last moment
-  // where changing it changes something somebody is about to look at.
-  if (run.step === 'look') {
-    return <Look look={look} onPick={onSetLook} onNext={() => go('look')} />;
-  }
 
   // ---- the introduction, before the app is ever on the screen --------------
   // Four slabs and the hand-off. Nothing here touches the store except the last

@@ -4,14 +4,15 @@
 // out of the built app, and sent three things back:
 //
 // The third is held next door in her-three-onboarding-fixes.test.mjs, which is
-// where the way out already lived. This file holds the first two, and the part
-// of the third that is about the harness rather than the app.
+// where the way out already lived. This file holds the second, and the part
+// of the third that is about the harness rather than the app. The first was
+// about the walk wearing the picked theme, and went with the themes.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { BEAT, IN_PRACTICE, N_BEATS, STEPS, wearsTheWalksLook } from '../renderer/src/onboarding.ts';
+import { BEAT, IN_PRACTICE, N_BEATS, STEPS } from '../renderer/src/onboarding.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (p) => readFileSync(join(here, '..', p), 'utf8');
@@ -21,69 +22,6 @@ const onboarding = read('renderer/src/onboarding.ts');
 const app = read('renderer/src/App.tsx');
 const css = read('renderer/src/styles.css');
 const harness = read('scripts/shot-the-built-walk.mjs');
-
-describe('1. the tutorial wears the theme that was picked', () => {
-  // TWO FAULTS WORE ONE SENTENCE. The page was taken by a harness that pressed
-  // Light to prove the window follows and then failed to press back, and the
-  // app itself was painting the default over five beats of the practice round.
-  // Both are held here, because either one alone puts her back where she was.
-
-  it('takes the inbox-zero pin off for the whole of the walk', () => {
-    // Her decision of 2026-08-19 stands OUTSIDE the walk: inbox zero in her own
-    // app is always the picture. Inside the walk it is the ground under a
-    // lesson, and the lesson wears what was picked.
-    // w-9e434e8671: the idle pin is off everywhere now, not only in the walk,
-    // because a pin to plain dark would show a theme nobody can pick.
-    expect(app).toContain('const idlePinned = false;');
-    // THE TWO PINS SPLIT INTO TWO BRANCHES ON 2026-09-01. They shared one for
-    // as long as they painted the same picture and they no longer do: the walk
-    // opens on Gouache Valley where nothing is picked, the idle page still
-    // opens on nothing. `run === null` above is what takes the idle pin off for
-    // the whole of the walk, which is what this test is about, and it is
-    // untouched.
-    expect(app).toMatch(/if \(firstRunPinned\) \{/);
-    expect(app).toMatch(/if \(idlePinned\) \{/);
-  });
-
-  it('pins nothing from the look step onward, so the pick is never painted over', () => {
-    // EVERY screen before the picker and no others. This test named the three
-    // setup screens until 2026-08-26, because on 08-24 those three WERE every
-    // screen before the picker. The picker moved to beat seven on 08-25, the
-    // introduction's three slabs slid in front of it, and neither the pin nor
-    // this test noticed: she photographed the first slab drawn white. So the
-    // question is asked of the step order now and cannot go stale again.
-    expect(app).toContain('const firstRunPinned = run !== null && wearsTheWalksLook(run.step);');
-    for (const step of STEPS.filter((s) => BEAT[s] < BEAT.look)) {
-      expect(wearsTheWalksLook(step)).toBe(true);
-    }
-    for (const step of STEPS.filter((s) => BEAT[s] >= BEAT.look)) {
-      expect(wearsTheWalksLook(step)).toBe(false);
-    }
-  });
-
-  it('holds every beat of the driven walk to the theme the look step ended on', () => {
-    // The harness reads the window back after the look step and then checks it
-    // on every beat after it, so a walk that drifts throws instead of being
-    // photographed.
-    expect(harness).toContain('const PICKED = { theme: null, skin: null };');
-    expect(harness).toMatch(/if \(PICKED\.theme && m\.theme !== PICKED\.theme\) \{/);
-    expect(harness).toMatch(/is in \$\{m\.theme\} and the look step picked \$\{PICKED\.theme\}/);
-  });
-
-  it('restores the look step by the tile it is, not by the name it had', () => {
-    // THIS IS THE LINE THAT DID IT. It looked for a tile starting "Gouache
-    // Valley", and Randomize is pressed six lines above, so after that press
-    // the picture slot holds one of the other fifteen and no tile has that
-    // name. `find` returned undefined, the click was skipped without a word,
-    // and the Light press from the beat before rode through the rest of the
-    // walk.
-    const restore = harness.slice(harness.indexOf('// AND BACK TO A PICTURE'));
-    expect(restore).not.toMatch(/startsWith\('Gouache Valley'\)/);
-    expect(restore).toMatch(/document\.querySelector\('\.look'\)/);
-    // And it throws rather than carrying on into nineteen wrong photographs.
-    expect(restore).toMatch(/throw new Error\(`the look step did not go back to a picture/);
-  });
-});
 
 describe('2. nothing counts the walk on screen any more', () => {
   it('draws no row of dots anywhere in the walk', () => {
@@ -110,8 +48,8 @@ describe('2. nothing counts the walk on screen any more', () => {
   it('keeps the numbering, because the order of the walk is still a real claim', () => {
     // What went is the drawing, not the beats. Renaming it is the whole of how
     // a later session is stopped from reading `DOT` and drawing one again.
-    // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out.
-    expect(N_BEATS).toBe(18);
+    // Nineteen since 2026-10-01: who a thread is for, and the board, each became a beat of their own.
+    expect(N_BEATS).toBe(19);
     expect(new Set(Object.values(BEAT)).size).toBe(N_BEATS);
     expect(onboarding).not.toMatch(/export const DOT\b/);
     expect(onboarding).toMatch(/export const BEAT: Record<Step, number>/);
@@ -141,8 +79,9 @@ describe('3. the way out is on the tutorial, and the harness looks at it', () =>
     const way = walk.slice(walk.indexOf('export function WayOut'), walk.indexOf('THE DOTS ARE GONE'));
     expect(way).toMatch(/!practising\(run\)/);
     // Ten beats, from making the first task to ⌘K, and nothing before them.
-    // Ten, not eleven, since w-ec62ab6b38 (2026-09-28) took the note beat out.
-    expect(IN_PRACTICE).toHaveLength(10);
+    // Ten, not eleven, since w-ec62ab6b38 (2026-09-28) took the note beat out,
+    // and eleven again since 2026-10-01, when who a thread is for became a beat.
+    expect(IN_PRACTICE).toHaveLength(12);
     expect(IN_PRACTICE[0]).toBe('make');
     expect(IN_PRACTICE.at(-1)).toBe('command');
     for (const step of STEPS.filter((s) => BEAT[s] < BEAT.make)) {

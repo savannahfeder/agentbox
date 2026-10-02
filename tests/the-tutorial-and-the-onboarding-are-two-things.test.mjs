@@ -267,10 +267,12 @@ describe('2. the two of them are two things, and a stranger can tell them apart'
     // ONE WALK, ENTERED AT TWO DOORS. A second copy of these beats is a second
     // copy that drifts, which is the whole reason the split is a field on the
     // run rather than a state machine of its own.
-    // Ten, not eleven, since w-ec62ab6b38 (2026-09-28) took the note beat out.
+    // Ten, not eleven, since w-ec62ab6b38 (2026-09-28) took the note beat out,
+    // and eleven again since 2026-10-01: writing a thread is the card opening on
+    // who it is for and then the send, which the walk never used to say.
     expect(IN_PRACTICE).toEqual([
-      'make', 'task', 'working', 'open', 'answer',
-      'clear', 'snooze', 'unblock', 'where', 'command',
+      'make', 'who', 'task', 'working', 'open', 'answer',
+      'clear', 'snooze', 'unblock', 'where', 'board', 'command',
     ]);
     // And the band that says nothing in here is real is on the screen for all
     // of them, in the tutorial exactly as in the onboarding.

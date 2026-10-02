@@ -495,12 +495,11 @@ describe('the introduction, in front of the app', () => {
   it('is four screens and every one of them counts', () => {
     // FIVE UNTIL 2026-08-24.
     expect(INTRO).toEqual(['inbox', 'away', 'goal', 'hand']);
-    // Eighteen since w-ec62ab6b38 (2026-09-28) took the note beat out.
-    expect(N_BEATS).toBe(18);
+    // Nineteen since 2026-10-01: who a thread is for, and the board, each became a beat of their own.
+    expect(N_BEATS).toBe(19);
     // THE THREE SLABS COME STRAIGHT AFTER THE THREE SETUP SCREENS, and the
-    // theme picker is between the last slab and the hand-off.
-    expect(INTRO.map((s) => BEAT[s])).toEqual([4, 5, 6, 8]);
-    expect(BEAT.look).toBe(7);
+    // hand-off straight after the last slab.
+    expect(INTRO.map((s) => BEAT[s])).toEqual([4, 5, 6, 7]);
   });
 
   it('is three slabs of words, and each one has something to say', () => {
@@ -598,10 +597,10 @@ describe('the introduction, in front of the app', () => {
     // landing. Every screen in the walk that Enter carries takes this, and one
     // that does not is a screen that eats the press that opened it.
     // FIVE since w-ec62ab6b38 (2026-09-28): the rebuilt folder list takes Enter too.
-    // SIX since w-ec62ab6b38 (2026-09-28): the theme row's left and right arrows are armed the same way.
+    // FOUR since w-9e434e8671: the theme picker and its row of arrows are gone.
     const src = fs.readFileSync(new URL('../renderer/src/components/Onboarding.tsx', import.meta.url), 'utf8');
     expect(src.match(/setTimeout\(\(\) => window\.addEventListener\('keydown', on\), 0\)/g) ?? [])
-      .toHaveLength(6);
+      .toHaveLength(4);
   });
 });
 
@@ -700,8 +699,10 @@ describe('the wire between the two halves', () => {
     const app = read('../renderer/src/App.tsx');
     expect(app).toMatch(/api\.firstRunPractice\(\)/);
     expect(app).toMatch(/api\.firstRunPracticeEnd\(\)/);
-    // And the practice project is what the compose card is addressed to, or
-    // the one task they send themselves lands in their own project.
-    expect(app).toMatch(/product: run\.practice \?\? run\.product/);
+    // And the practice project is what the card is addressed to, or the one
+    // task they send themselves lands in their own project. The walk opens the
+    // real new thread card since 2026-10-01, and that card is told which
+    // project to open on rather than being handed a prefill with one inside it.
+    expect(app).toMatch(/defaultProduct=\{walkCard \? \(run!\.practice \?\? run!\.product\) : productFilter\}/);
   });
 });
