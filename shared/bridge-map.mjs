@@ -145,4 +145,8 @@ export const WRAPPED_ARGS = {
 // Electron can tell you the real path of a file somebody dropped onto the
 // window. A browser cannot, by design, and no server can answer it either, so
 // this one is absent there rather than wrong. The screen already reads null.
-export const DESKTOP_ONLY = ['pathForFile'];
+//
+// `onWriteHeld` is the desktop's ⌘R asking the page to write what the undo
+// window holds before it reloads (main/write-before-reload.mjs). A browser
+// reload asks nobody; the page writes on `pagehide` there instead.
+export const DESKTOP_ONLY = ['pathForFile', 'onWriteHeld'];

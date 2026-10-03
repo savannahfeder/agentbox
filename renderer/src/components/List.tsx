@@ -320,7 +320,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
 
   return (
     <div className={`list${table ? ' th-table' : ''}`}>
-      {table && <TableHead person={withPerson} />}
+      {table && <TableHead person={withPerson} tab={view} />}
       {/* Repeating tasks sit above the deferred rows, in the tab that already
           holds work with a moment attached. They are RULES, not items, so they
           arrive on their own list and no inbox rule has an opinion about them. */}
@@ -452,7 +452,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                   // THE TABLE ROW (the team version): the same row, its select
                   // box and its keys, with the approved columns instead of a
                   // title over a summary.
-                  <ThreadCells item={item} product={products.find((p) => p.slug === item.product)} now={Date.now()}
+                  <ThreadCells item={item} product={products.find((p) => p.slug === item.product)} now={Date.now()} tab={view}
                     person={withPerson ? personCell?.(team?.me ?? null) : undefined} />
                 ) : <>
                 <div className="row-main">
