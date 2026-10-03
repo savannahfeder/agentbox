@@ -470,6 +470,29 @@ export function writeColumnOrder(order: ThreadStateWord[], store: Pick<Storage, 
   try { store?.setItem(COLUMN_KEY, JSON.stringify(order)); } catch { /* private mode */ }
 }
 
+/**
+ * THE SLOT A CARRIED COLUMN IS OVER, from numbers alone: the slots' centres,
+ * measured once when the drag starts, and where the carried column's middle
+ * is now. The nearest centre wins, so it changes exactly halfway between two.
+ * It used to be read off the column the browser said was under the pointer,
+ * and a column sliding out of the way is still drawn there for a few frames,
+ * so a swap undid itself every frame: "swapping back and forth at about 40
+ * frames per second" (2026-10-02).
+ */
+export function slotUnder(centres: number[], x: number): number {
+  let best = -1;
+  for (let i = 0; i < centres.length; i++) if (best < 0 || Math.abs(centres[i] - x) < Math.abs(centres[best] - x)) best = i;
+  return best;
+}
+
+/** The order with `state` moved to place `index`, the rest closing up. */
+export function columnTo(order: ThreadStateWord[], state: string, index: number): ThreadStateWord[] {
+  if (index < 0 || index >= order.length || !order.includes(state as ThreadStateWord)) return order.slice();
+  const next = order.filter((s) => s !== state);
+  next.splice(index, 0, state as ThreadStateWord);
+  return next;
+}
+
 /** A column dropped on another takes that column's place: moving right it
  *  lands after it, moving left before it, which is where the eye put it. */
 export function moveColumn(order: ThreadStateWord[], from: string, to: string): ThreadStateWord[] {

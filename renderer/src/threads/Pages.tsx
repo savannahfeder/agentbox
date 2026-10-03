@@ -13,12 +13,12 @@ import { PriorityIcon } from '../components/Priority';
 import { notStarted, rowTitle } from '../list-rules';
 import { DONE } from '../done-word';
 import {
-  boardColumns, DEFAULT_COLUMN_ORDER, filteredEmptyWords, finishedAt, isDirect, isFiltered, moveColumn, projectChoices,
+  boardColumns, columnTo, DEFAULT_COLUMN_ORDER, filteredEmptyWords, finishedAt, isDirect, isFiltered, projectChoices, slotUnder,
   timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
-import { togglePicked, whoseWord } from './people-rules';
+import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
 import { shownToPeople } from '../../../shared/thread-cards.mjs';
 import { api } from '../api';
 import './pages.css';
@@ -26,10 +26,7 @@ import './pages.css';
 // Before the frame is drawn in the app; a plain effect where there is no
 // window (the tests draw the board to a string, and React warns otherwise).
 const useBeforePaint = typeof window === 'undefined' ? useEffect : useLayoutEffect;
-// A transparent pixel to hand the browser as the drag picture, loaded ahead
-// of the first drag because an image still loading draws nothing useful.
-const BLANK_DRAG: HTMLImageElement | null = typeof Image === 'undefined' ? null
-  : Object.assign(new Image(), { src: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' });
+const SETTLE = { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' };
 
 /* ------------------------------------------------------------ icons */
 const GripIcon = () => <svg className="th-col-grip" viewBox="0 0 10 16" width="8" height="13" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4" /><circle cx="7.5" cy="3" r="1.4" /><circle cx="2.5" cy="8" r="1.4" /><circle cx="7.5" cy="8" r="1.4" /><circle cx="2.5" cy="13" r="1.4" /><circle cx="7.5" cy="13" r="1.4" /></svg>;
@@ -82,23 +79,39 @@ function useOutside(open: boolean, close: () => void) {
 }
 
 /* ------------------------------------------------------------ the header */
+/** Whose threads are on the page, and how to change it (App.tsx holds it). */
+export type PeoplePick = { everyone: Person[]; picked: string[]; me: string | null; onPick: (picked: string[]) => void };
+
 /** Search, New thread and the Display icon, at the right of the Inbox and Team headers. */
-export function HeaderActions({ page, display, onDisplay, products, items, onSearch, onCompose, shown, total, tab }: {
+export function HeaderActions({ page, display, onDisplay, products, items, onSearch, onCompose, shown, total, tab, people }: {
   page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[]; items?: WorkItem[];
   onSearch: () => void; onCompose: () => void; shown?: number; total?: number; tab?: string;
+  people?: PeoplePick;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useOutside(open, () => setOpen(false));
+  // WHOSE THREADS, AS FACES ON THIS BUTTON (w-14bb56c833). The Everyone control
+  // had a row of its own over the board, 40px of nothing but one small button.
+  // Its faces sit here now and its choice is the first line of the menu.
+  const worn = people ? facesOnButton(people.everyone, people.picked, people.me) : null;
+  const whose = worn && people ? whoseWord(people.everyone, people.picked, people.me) : null;
+  const dot = isFiltered(display) || (!!people && peopleWorthADot(people.everyone, people.picked, people.me));
   // NO "/" ON ITS FACE (w-facfc092e1): a shortcut shows on hover, through the
   // hint plate, and is never printed on the control.
   return <div className="th-right">
     <button type="button" className="th-search" data-hint="search" data-hint-text="span" onClick={onSearch} title="Search threads (/)" aria-label="Search threads"><SearchGlyph /><span>Search</span></button>
     <button type="button" className="th-new" data-hint="new-task" onClick={onCompose} title="New thread (N)"><PenIcon />New thread</button>
     <span ref={(el) => { ref.current = el; }} style={{ position: 'relative', display: 'inline-flex' }}>
-      <button type="button" className={`th-disp${open ? ' open' : ''}`} aria-label="View and filters" title="View and filters" onClick={() => setOpen((o) => !o)}>
-        <SlidersIcon />{isFiltered(display) && <i />}
+      <button type="button" className={`th-disp${worn ? ' faces' : ''}${open ? ' open' : ''}`}
+        aria-label={whose ? `View and filters, showing ${whose}` : 'View and filters'} title={whose ? `${whose} · View and filters` : 'View and filters'}
+        onClick={() => setOpen((o) => !o)}>
+        {worn && <span className="th-faces">
+          {worn.faces.map((p) => <Face key={p.id} person={p} me={p.id === people!.me} />)}
+          {worn.more > 0 && <span className="th-faces-more">+{worn.more}</span>}
+        </span>}
+        <SlidersIcon />{dot && <i />}
       </button>
-      {open && <DisplayMenu page={page} display={display} onDisplay={onDisplay} products={products} items={items} shown={shown} total={total} tab={tab} />}
+      {open && <DisplayMenu page={page} display={display} onDisplay={onDisplay} products={products} items={items} shown={shown} total={total} tab={tab} people={people} />}
     </span>
   </div>;
 }
@@ -106,13 +119,15 @@ export function HeaderActions({ page, display, onDisplay, products, items, onSea
 const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
 /** View, sort, and the filters: priority, project and when it was updated. */
-export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total, tab }: {
+export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total, tab, people }: {
   page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[];
   /** The tab the page is on, which Done's own order depends on. */
   tab?: string;
   /** Her threads, to rank the projects by the one she used most recently. */
   items?: WorkItem[];
   shown?: number; total?: number;
+  /** Whose threads are on the page; no People line without a teammate. */
+  people?: PeoplePick;
 }) {
   // THE PROJECT FILTER, FOR SOMEBODY WITH FORTY PROJECTS (w-5a08121f99). The
   // eight she used most recently, the rest behind one button, and an All
@@ -124,6 +139,7 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
   const set = (patch: Partial<Display>) => onDisplay({ ...display, ...patch });
   const windows: [UpdatedWindow, string][] = [['today', 'Today'], ['week', 'This week'], ['any', 'Any time']];
   return <div className="th-pop" role="dialog" aria-label={page === 'inbox' ? 'Inbox view and filters' : 'Team view and filters'}>
+    {people && <PeopleLine {...people} />}
     <div className="line"><span className="lab">View</span><span className="opts">
       <button type="button" className={display.view === 'list' ? 'on' : ''} title="List (B)" onClick={() => set({ view: 'list' })}><ListIcon />List</button>
       <button type="button" className={display.view === 'board' ? 'on' : ''} title="Board (B)" onClick={() => set({ view: 'board' })}><BoardIcon />Board</button>
@@ -181,51 +197,42 @@ export const INBOX_TABS: { view: TabView; label: string }[] = [
  */
 const COUNTED: TabView[] = ['inbox', 'progress', 'snoozed'];
 
-/** `needs` renames the first tab (Waiting, once a teammate is on the page);
- *  `end` is what sits at the bar's right end, the people filter. */
-export function StateTabs({ view, counts, onView, needs, end }: {
-  view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string; end?: ReactNode;
+/** `needs` renames the first tab (Waiting, once a teammate is on the page). */
+export function StateTabs({ view, counts, onView, needs }: {
+  view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string;
 }) {
   return <div className="th-bar"><div className="tm-tabs">
     {/* Every tab wears the Tab plate (hint-plate.ts, 'state-tab'). */}
     {INBOX_TABS.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${view === t.view ? ' on' : ''}`} onClick={() => onView(t.view)}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
-  </div>{end}</div>;
+  </div></div>;
 }
 
 /* ------------------------------------------------------------ whose threads */
 /**
- * ONE FILTER AT THE END OF THE TAB BAR (w-57034cf3c0). Up to four face chips
- * and a "+N" stood here and read as clutter on the one row that has to stay
- * quiet. This says whose threads the page is showing in words, and opens the
- * same list: Just you, Everyone, then each person with a tick. Nothing is drawn
- * for a person alone on a team, or for nobody signed in.
+ * WHOSE THREADS, THE FIRST LINE OF THE VIEW AND FILTERS MENU (w-14bb56c833).
+ * It was a dropdown of its own, at the end of the tab bar and in a row of its
+ * own over the board; the button that opens this menu wears the faces now.
+ * Everyone, Just you, then each person as a switch; the last one picked stays
+ * picked, so the page is never nobody's. Nothing for a person alone on a team.
  */
-export function PeopleFilter({ everyone, picked, me, onPick }: {
-  everyone: Person[]; picked: string[]; me: string | null; onPick: (picked: string[]) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useOutside(open, () => setOpen(false));
-  if (everyone.filter((p) => p.id !== me).length === 0) return null;
+function PeopleLine({ everyone, picked, me, onPick }: PeoplePick) {
+  if (!everyone.some((p) => p.id !== me)) return null;
   const name = (p: Person) => (p.id === me ? 'You' : p.name || p.email || 'Someone');
   const sorted = [...everyone.filter((p) => p.id === me), ...everyone.filter((p) => p.id !== me).sort((a, b) => name(a).localeCompare(name(b)))];
-  return <span className="th-pf-wrap" ref={(el) => { ref.current = el; }}>
-    <button type="button" className={`th-pf${open ? ' open' : ''}`} aria-haspopup="listbox" aria-expanded={open}
-      title="Whose threads are shown" onClick={() => setOpen(!open)}>
-      <PeopleIcon /><span className="w">{whoseWord(everyone, picked, me)}</span>
-      <svg width="9" height="6" viewBox="0 0 9 6" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="m1 1.5 3.5 3L8 1.5" /></svg>
-    </button>
-    {open && <div className="th-menu th-people-menu" role="listbox" aria-multiselectable="true">
-      <button type="button" className="row-i" onClick={() => { onPick(me ? [me] : picked); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Just you</button>
-      <button type="button" className="row-i" onClick={() => { onPick(sorted.map((p) => p.id)); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Everyone</button>
-      <span className="sep" />
-      {sorted.map((p) => <button type="button" key={p.id} role="option" aria-selected={picked.includes(p.id)} className={`row-i${picked.includes(p.id) ? ' on' : ''}`}
+  const all = sorted.every((p) => picked.includes(p.id));
+  const justYou = !!me && picked.length === 1 && picked[0] === me;
+  return <>
+    <div className="line"><span className="lab">People</span><span className="opts">
+      <button type="button" className={all ? 'on' : ''} onClick={() => onPick(sorted.map((p) => p.id))}>Everyone</button>
+      {me && <button type="button" className={justYou ? 'on' : ''} onClick={() => onPick([me])}>Just you</button>}
+      {sorted.map((p) => <button type="button" key={p.id} aria-pressed={picked.includes(p.id)} className={picked.includes(p.id) ? 'on' : ''}
         onClick={() => onPick(togglePicked(picked, p.id, me))}>
-        <Face person={p} me={p.id === me} />{name(p)}{picked.includes(p.id) && <CheckMark />}
+        <Face person={p} me={p.id === me} />{name(p)}
       </button>)}
-    </div>}
-  </span>;
+    </span></div>
+    <div className="rule" />
+  </>;
 }
-const CheckMark = () => <svg className="th-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
 
 /* ------------------------------------------------------------ an empty tab */
 /** AN EMPTY INBOX, DRAWN AGAIN FROM THE QUESTION IT ANSWERS (2026-10-01),
@@ -416,12 +423,13 @@ export function ThreadCells({ item, product, now, person, tab }: {
 /** THE PAGE AS A BOARD, when the Display says Board: your threads and, once
  *  you pick them, your teammates' (w-05ff3d1438). Every thread of yours is on
  *  it, the private ones included; with a teammate in view, those wear a lock
- *  and every card names its person. `end` is the faces, over the board. */
-export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, end, selected, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns }: {
+ *  and every card names its person. Whose threads is picked on the header's
+ *  filters button (w-14bb56c833), so the columns start right under it. */
+export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number; onOpenItem: (item: WorkItem) => void;
   /** The column each thread sits in, by the Inbox tabs' rule (App.tsx). */
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
-  cards?: ThreadCard[]; picked?: string[]; onOpenCard?: (card: ThreadCard) => void; end?: ReactNode;
+  cards?: ThreadCard[]; picked?: string[]; onOpenCard?: (card: ThreadCard) => void;
   /** The thread the keyboard is on (App.tsx's `current`), drawn as selected. */
   selected?: WorkItem | null;
   /** The columns left to right, and where a dragged order goes to be kept. */
@@ -433,9 +441,12 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   const who = picked ?? (me ? [me] : []);
   const withOthers = who.some((p) => p !== me);
   const since = team?.state.since ?? null;
-  // A COLUMN BEING DRAGGED MOVES AS YOU DRAG IT (w-23fc91bff5): the others
-  // make room under the pointer, and letting go keeps that order. Let go
-  // anywhere else and the board goes back the way it was.
+  // A COLUMN IS LIFTED AND CARRIED (w-23fc91bff5, fourth round): it rides the
+  // pointer both ways, raised over the board, while the others slide aside;
+  // letting go keeps the order, and Escape puts it back. Pointer events, not
+  // the browser's drag and drop: that one cancelled itself when the column was
+  // redrawn, drew a ghost, and only ever moved the column sideways, which "doesn't
+  // feel like I've even processed it".
   const [dragging, setDragging] = useState<ThreadStateWord | null>(null);
   const [preview, setPreview] = useState<ThreadStateWord[] | null>(null);
   const shown = preview ?? columnOrder;
@@ -453,19 +464,85 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   // columns now, so a window resized since the last move cannot throw it off.
   const colEls = useRef(new Map<ThreadStateWord, HTMLDivElement>());
   const lastOrder = useRef(shown);
+  const shownNow = useRef(shown);
+  shownNow.current = shown;
+  // The drag in hand: where it started, the slots' centres measured once at
+  // its start, and where the pointer is. A ref, so a move costs no render.
+  const drag = useRef<{
+    state: ThreadStateWord; el: HTMLDivElement; startX: number; startY: number; x: number; y: number;
+    started: boolean; startIndex: number; slots: number[]; pitch: number;
+  } | null>(null);
+  // Keep the carried column under the pointer: its box sits in whatever slot
+  // the order gives it, so the offset takes that slot back out.
+  const follow = () => {
+    const d = drag.current;
+    if (!d?.started) return;
+    const el = d.el;
+    const x = d.x - d.startX - (shownNow.current.indexOf(d.state) - d.startIndex) * d.pitch;
+    // Up only a little: the board's top edge clips, and a column carried up
+    // past it lost its heading (photographed 2026-10-02). Down and across freely.
+    const y = Math.max(-6, d.y - d.startY);
+    el.style.transform = `translate(${x}px, ${y}px) scale(1.02)`;
+  };
   useBeforePaint(() => {
     const before = lastOrder.current;
     lastOrder.current = shown;
+    follow();
     if (before === shown) return;
     const lefts = shown.map((s) => colEls.current.get(s)?.offsetLeft ?? 0);
     const pitch = lefts.length > 1 ? lefts[1] - lefts[0] : 0;
     shown.forEach((state, i) => {
+      if (state === dragging) return;
       const was = before.indexOf(state);
       const el = colEls.current.get(state);
       if (was < 0 || was === i || !el?.animate) return;
-      el.animate([{ transform: `translateX(${(was - i) * pitch}px)` }, { transform: 'translateX(0)' }], { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      el.animate([{ transform: `translateX(${(was - i) * pitch}px)` }, { transform: 'translateX(0)' }], SETTLE);
     });
   }, [shown]);
+  const putDown = (keep: boolean) => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d?.started) return;
+    if (keep) onReorderColumns?.(shownNow.current);
+    // From wherever it was let go into its slot, rather than snapping there.
+    const from = d.el.style.transform;
+    d.el.style.transform = '';
+    if (from && d.el.animate) d.el.animate([{ transform: from }, { transform: 'none' }], SETTLE);
+    setDragging(null);
+    setPreview(null);
+  };
+  // The newest putDown, for the window's listeners, which outlive the render
+  // that set them up.
+  const putDownNow = useRef(putDown);
+  putDownNow.current = putDown;
+  const moveDrag = (x: number, y: number) => {
+    const d = drag.current;
+    if (!d) return;
+    d.x = x; d.y = y;
+    if (!d.started) {
+      // A press that barely moves is a click, not a lift.
+      if (Math.hypot(d.x - d.startX, d.y - d.startY) < 4) return;
+      // THE SLOTS ARE MEASURED ONCE, HERE, and the place is worked out from
+      // them and the pointer alone (`slotUnder`). Reading it off the column
+      // drawn under the pointer made a swap undo itself every frame while the
+      // columns slid.
+      const order = shownNow.current;
+      d.slots = order.map((s) => { const r = colEls.current.get(s)?.getBoundingClientRect(); return r ? r.left + r.width / 2 : 0; });
+      d.pitch = d.slots.length > 1 ? d.slots[1] - d.slots[0] : 0;
+      d.startIndex = order.indexOf(d.state);
+      d.started = true;
+      setDragging(d.state);
+    }
+    const want = slotUnder(d.slots, d.slots[d.startIndex] + (d.x - d.startX));
+    if (want >= 0 && want !== shownNow.current.indexOf(d.state)) setPreview(columnTo(shownNow.current, d.state, want));
+    follow();
+  };
+  useEffect(() => {
+    if (!dragging) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); putDown(false); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  });
   const sharing = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since } : null);
   const isSelected = (it: WorkItem | null) => !!it && !!selected && it.id === selected.id && it.product === selected.product;
   // The keyboard's card stays on the screen as J, K and the arrows move it,
@@ -477,43 +554,38 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   useBeforePaint(() => {
     boardRef.current?.querySelector('.th-card.selected')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [selected?.id, selected?.product]);
-  // Whether a drag is still going, for the frame-late start above: a drag let
-  // go before that frame must not leave a column marked as carried.
-  const dragLive = useRef(false);
-  const endDrag = () => { dragLive.current = false; setDragging(null); setPreview(null); };
   return <div className="list hm-me">
-    {end && <div className="th-bar th-bar-end">{end}</div>}
     <div className={`th-board${dragging ? ' dragging' : ''}`} ref={boardRef}>
     {columns.map((col) => {
       const rows = col.rows;
       return <div key={col.state} className={`th-col${dragging === col.state ? ' lifted' : ''}`}
-        ref={(el) => { if (el) colEls.current.set(col.state, el); else colEls.current.delete(col.state); }}
-        onDragOver={(e) => {
-          if (!dragging) return;
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-          if (col.state !== dragging) setPreview(moveColumn(shown, dragging, col.state));
-        }}
-        onDrop={(e) => { if (!dragging) return; e.preventDefault(); onReorderColumns?.(shown); endDrag(); }}>
+        ref={(el) => { if (el) colEls.current.set(col.state, el); else colEls.current.delete(col.state); }}>
         {/* Your own board says what the tab says: what waits on you needs you.
             The heading is the handle: grab it to move the whole column. */}
-        <div className="th-col-h" draggable={!!onReorderColumns}
-          onDragStart={(e) => {
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('application/x-agentbox-column', col.state);
-            // No ghost: the column itself moves through the board as you drag
-            // (the slot that stood in for it was "very strange visually").
-            if (BLANK_DRAG) e.dataTransfer.setDragImage(BLANK_DRAG, 0, 0);
-            // THE DRAG DIED THE MOMENT IT STARTED (reported 2026-10-02, "when
-            // i try to drag nothing happens"; a real mouse drag measured
-            // dragstart then dragend and nothing between). Chrome cancels a
-            // drag whose source is redrawn inside dragstart, and setting this
-            // state redrew the column there. A frame later it is not.
-            const state = col.state;
-            dragLive.current = true;
-            requestAnimationFrame(() => { if (dragLive.current) setDragging(state); });
-          }}
-          onDragEnd={endDrag}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b>
+        <div className={`th-col-h${onReorderColumns ? ' movable' : ''}`}
+          onPointerDown={(e) => {
+            if (!onReorderColumns || e.button !== 0) return;
+            const el = colEls.current.get(col.state);
+            if (!el) return;
+            e.preventDefault();
+            drag.current = { state: col.state, el, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY, started: false, startIndex: 0, slots: [], pitch: 0 };
+            // THE WHOLE WINDOW LISTENS UNTIL THE PRESS ENDS. Holding the
+            // pointer on the heading broke on the first change of order: that
+            // moves the column in the page, which lets go of the pointer, and
+            // the column stopped after one place ("it only moves one row at a
+            // time").
+            const move = (ev: PointerEvent) => moveDrag(ev.clientX, ev.clientY);
+            const stop = () => {
+              window.removeEventListener('pointermove', move);
+              window.removeEventListener('pointerup', up);
+              window.removeEventListener('pointercancel', cancel);
+            };
+            const up = () => { stop(); putDownNow.current(true); };
+            const cancel = () => { stop(); putDownNow.current(false); };
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', up);
+            window.addEventListener('pointercancel', cancel);
+          }}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b>
           {/* THE HANDLE COMES UP WHEN YOU ARE OVER THE COLUMN: "a little drag
               icon comes up subtly". Only where a drag does something. */}
           {onReorderColumns && <GripIcon />}</div>

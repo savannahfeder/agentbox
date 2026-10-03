@@ -174,9 +174,9 @@
    The first round put a grey block behind it on hover, 6px wider than the
    cards, and a tooltip across the first card: "visually it looks pretty
    weird". Now the words brighten and the handle comes up, nothing else. */
-.th-col-h[draggable="true"] { cursor: grab; user-select: none; transition: color .12s ease; }
-.th-col-h[draggable="true"]:hover { color: var(--text); }
-.th-board.dragging .th-col-h { cursor: grabbing; }
+.th-col-h.movable { cursor: grab; user-select: none; touch-action: none; transition: color .12s ease; }
+.th-col-h.movable:hover { color: var(--text); }
+.th-board.dragging, .th-board.dragging * { cursor: grabbing !important; user-select: none; }
 /* The handle: six dots at the heading's right end, out of sight until the
    pointer is over the column, faint there, and full only on the heading you
    would grab. Never drawn mid-drag, when it would only be noise. */
@@ -184,11 +184,18 @@
 .th-col:hover .th-col-grip { opacity: .7; }
 .th-col-h:hover .th-col-grip { opacity: 1; color: var(--text-dim); }
 .th-board.dragging .th-col-grip { opacity: 0; }
-/* THE CARRIED COLUMN IS THE COLUMN, DRAWN ONCE, WHERE IT WILL LAND. A faded
-   copy beside the browser's ghost was the column twice; the empty slot that
-   replaced it was "very strange visually" (2026-10-02). So the ghost is
-   blanked (Pages.tsx) and the column itself moves as you drag, whole, the
-   others sliding aside. All it wears is its heading lit and its handle up. */
+/* THE CARRIED COLUMN IS LIFTED (2026-10-02, fourth round). A faded copy was
+   the column twice, an empty slot was "very strange visually", and a column
+   that only slid sideways "doesn't feel like I've even processed it". So it
+   rises: it rides the pointer both ways (Pages.tsx writes the transform), on
+   a panel drawn by its shadow alone, 8px proud of its cards, so the layout
+   under it never moves. Nothing is left behind; the others slide aside. */
+.th-col.lifted {
+  position: relative; z-index: 5; border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: 0 0 0 8px var(--bg-raised), 0 0 0 9px var(--line-strong), 0 22px 48px 8px rgba(0,0,0,.42);
+  will-change: transform;
+}
 .th-col.lifted .th-col-h { color: var(--text); }
 .th-board.dragging .th-col.lifted .th-col-grip { opacity: 1; color: var(--text-dim); }
 .th-card .t { font-size: 14px; line-height: 20px; color: var(--text); margin: 0 0 14px; }
@@ -295,22 +302,17 @@
 .th-cell-title .th-st.live { margin-right: 8px; top: 1px; }
 .th-card .m .th-st.live { margin-right: 8px; top: 0; }
 
-/* WHOSE THREADS: one filter at the right end of the tab bar (w-57034cf3c0).
-   Four face chips and a "+N" stood here and read as clutter; this says who in
-   words and opens the same list. */
-.th-pf-wrap { position: relative; display: inline-flex; margin-left: auto; }
-.th-pf { height: 26px; padding: 0 9px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
-  border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim);
-  font: inherit; font-size: 12.5px; white-space: nowrap;
-  transition: border-color .08s ease, color .08s ease, background .08s ease; }
-.th-pf svg:first-child { width: 15px; height: 15px; color: var(--text-faint); }
-.th-pf svg:last-child { color: var(--text-faint); }
-.th-pf:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash); }
-.th-pf.open { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
-.th-pf:focus-visible { outline: none; border-color: var(--text-faint); color: var(--text); }
-.th-people-menu { left: auto; right: 0; top: 32px; }
-.th-people-menu .th-check { margin-left: auto; color: var(--text-dim); }
-/* Over the board there are no tabs, so the filter sits alone at the right. */
-.th-bar-end { justify-content: flex-end; padding-bottom: 0; }
+/* WHOSE THREADS: the faces on the View and filters button (w-14bb56c833), in
+   place of a filter that took a row of its own over the board. Three at most,
+   overlapping, each ringed in the ground so they read as separate people. */
+.th-disp.faces { width: auto; display: inline-flex; align-items: center; gap: 9px; padding: 0 9px 0 6px; }
+.th-faces { display: inline-flex; align-items: center; }
+.th-faces .tm-av { width: 20px; height: 20px; line-height: 18px; font-size: 8.5px; box-shadow: 0 0 0 2px var(--bg); }
+/* Initials sit on a see-through film elsewhere; overlapped, the face under them would show through. */
+.th-faces span.tm-av:not(.you) { background: var(--pop); }
+.th-faces .tm-av + .tm-av, .th-faces-more { margin-left: -5px; }
+.th-faces-more { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 3px; box-sizing: border-box;
+  font: 500 9.5px var(--mono); color: var(--text-dim); background: var(--pop); border-radius: var(--radius); box-shadow: 0 0 0 2px var(--bg); }
+.th-pop .opts > button .tm-av { width: 16px; height: 16px; line-height: 14px; font-size: 7.5px; }
 /* A teammate's row has no select box: nothing on this Mac can act on it. */
 .th-their-row .mark { visibility: hidden; }
