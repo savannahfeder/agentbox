@@ -552,7 +552,15 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   // later, which is a jump on every press down a long column.
   const boardRef = useRef<HTMLDivElement>(null);
   useBeforePaint(() => {
-    boardRef.current?.querySelector('.th-card.selected')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    // Never while a column is being carried: the board stays where you put it.
+    if (drag.current?.started) return;
+    const card = boardRef.current?.querySelector('.th-card.selected');
+    if (!card) return;
+    // On a column's first card, bring its heading into view too: the card
+    // alone left the heading above the top of the board.
+    const col = card.parentElement;
+    const first = col?.querySelector('.th-card') === card;
+    (first ? col?.querySelector('.th-col-h') ?? card : card).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [selected?.id, selected?.product]);
   return <div className="list hm-me">
     <div className={`th-board${dragging ? ' dragging' : ''}`} ref={boardRef}>
