@@ -99,9 +99,8 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
           it. `onTeam` is still the sign-in link at the foot. */}
     </nav>
     <div className="workspace-bottom">
-      {update && onUpdate && !collapsed && <SidebarUpdate collapsed={false} installing={update.installing} changes={changeLines(update)} error={update.error ?? null} onRestart={onUpdate} />}
       <div className="workspace-utilities th-side-foot">
-        {update && onUpdate && collapsed && <SidebarUpdate collapsed installing={update.installing} changes={changeLines(update)} onRestart={onUpdate} />}
+        {update && onUpdate && <SidebarUpdate installing={update.installing} changes={changeLines(update)} error={update.error ?? null} onRestart={onUpdate} />}
         {/* Shown to anyone signed in, on a team or not (2026-10-01: the
             invite page and team settings must always be reachable). With no
             team yet, both open the page that starts one. */}
