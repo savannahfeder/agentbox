@@ -285,22 +285,17 @@
 .th-cell-title .th-st.live { margin-right: 8px; top: 1px; }
 .th-card .m .th-st.live { margin-right: 8px; top: 0; }
 
-/* WHOSE THREADS: one filter at the right end of the tab bar (w-57034cf3c0).
-   Four face chips and a "+N" stood here and read as clutter; this says who in
-   words and opens the same list. */
-.th-pf-wrap { position: relative; display: inline-flex; margin-left: auto; }
-.th-pf { height: 26px; padding: 0 9px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
-  border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim);
-  font: inherit; font-size: 12.5px; white-space: nowrap;
-  transition: border-color .08s ease, color .08s ease, background .08s ease; }
-.th-pf svg:first-child { width: 15px; height: 15px; color: var(--text-faint); }
-.th-pf svg:last-child { color: var(--text-faint); }
-.th-pf:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash); }
-.th-pf.open { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
-.th-pf:focus-visible { outline: none; border-color: var(--text-faint); color: var(--text); }
-.th-people-menu { left: auto; right: 0; top: 32px; }
-.th-people-menu .th-check { margin-left: auto; color: var(--text-dim); }
-/* Over the board there are no tabs, so the filter sits alone at the right. */
-.th-bar-end { justify-content: flex-end; padding-bottom: 0; }
+/* WHOSE THREADS: the faces on the View and filters button (w-14bb56c833), in
+   place of a filter that took a row of its own over the board. Three at most,
+   overlapping, each ringed in the ground so they read as separate people. */
+.th-disp.faces { width: auto; display: inline-flex; align-items: center; gap: 9px; padding: 0 9px 0 6px; }
+.th-faces { display: inline-flex; align-items: center; }
+.th-faces .tm-av { width: 20px; height: 20px; line-height: 18px; font-size: 8.5px; box-shadow: 0 0 0 2px var(--bg); }
+/* Initials sit on a see-through film elsewhere; overlapped, the face under them would show through. */
+.th-faces span.tm-av:not(.you) { background: var(--pop); }
+.th-faces .tm-av + .tm-av, .th-faces-more { margin-left: -5px; }
+.th-faces-more { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 3px; box-sizing: border-box;
+  font: 500 9.5px var(--mono); color: var(--text-dim); background: var(--pop); border-radius: var(--radius); box-shadow: 0 0 0 2px var(--bg); }
+.th-pop .opts > button .tm-av { width: 16px; height: 16px; line-height: 14px; font-size: 7.5px; }
 /* A teammate's row has no select box: nothing on this Mac can act on it. */
 .th-their-row .mark { visibility: hidden; }
