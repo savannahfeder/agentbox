@@ -148,6 +148,21 @@ describe('the window', () => {
     expect(settings).toMatch(/api\.archiveProject\(\{\s*product:\s*slug,\s*archived:\s*false\s*\}\)/);
   });
 
+  // FROM THE LIST ITSELF (2026-10-02, the second round). Archive lived only on
+  // a project's own page, which is a click in, a scroll down and a click back
+  // per project: "i personally have 35 projects and it would be a headache".
+  it('each row on the Projects page has its own Archive button', () => {
+    expect(projects).toMatch(/onArchive\?: \(slug: string\) => void/);
+    expect(projects).toMatch(/className="pp-archive"[^>]*aria-label=\{`Archive \$\{p\.name\}`\}/s);
+    expect(projects).toMatch(/onClick=\{\(\) => onArchive\(p\.slug\)\}/);
+    expect(settings).toMatch(/onArchive=\{\(slug\) => write\(api\.archiveProject\(\{\s*product:\s*slug,\s*archived:\s*true\s*\}\)\)\}/);
+  });
+
+  // A press on a row opens the project; a press on its Archive button must not.
+  it('pressing Archive on a row does not open the project', () => {
+    expect(projects).toMatch(/\(e\.target as HTMLElement\)\.closest\('button'\)\) return;/);
+  });
+
   // The order is read off the inbox's list, which refreshes a moment after the
   // archive is saved; without this the row stayed until it did.
   it('the Projects page drops an archived project from the order at once', () => {

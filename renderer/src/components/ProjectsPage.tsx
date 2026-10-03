@@ -40,7 +40,7 @@ interface Row {
   autonomous: boolean;
 }
 
-export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archived = [], onUnarchive }: {
+export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archived = [], onUnarchive, onArchive }: {
   /** Every project, already in the running order (App's `rankedProducts`). */
   ranked: Product[];
   /** What Settings knows about each project: its folder, what is running, its mode. */
@@ -52,6 +52,9 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
   /** Projects archived from their own page: off every list but this one. */
   archived?: { slug: string; name: string; dir: string }[];
   onUnarchive?: (slug: string) => void;
+  /** Archive straight from the row: with thirty-odd projects, opening each
+   *  one to archive it from its own page is a click in and out per project. */
+  onArchive?: (slug: string) => void;
 }) {
   // FOLDED AWAY until asked for. An archived project is one you chose not to
   // see, so the list of them stays one quiet line unless you open it.
@@ -221,6 +224,13 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
                   </span>
                   {p.running > 0 && <span className="pp-flag">{p.running} running</span>}
                   {flag(p) && <span className="pp-flag">{flag(p)}</span>}
+                  {/* ARCHIVE, ON THE ROW. Shown under the pointer like To top;
+                      a button, so the press does not open the project. */}
+                  {onArchive && (
+                    <button type="button" className="pp-archive" aria-label={`Archive ${p.name}`}
+                      title="Archive: off every list, files kept. Bring it back below."
+                      onClick={() => onArchive(p.slug)}>Archive</button>
+                  )}
                   {onSetOrder && (
                     <span className="pp-acts">
                       <button type="button" className="pp-top" disabled={rank === 0}

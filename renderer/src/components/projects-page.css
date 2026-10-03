@@ -97,6 +97,20 @@
 .pp-acts button:disabled { opacity: .25; cursor: default; }
 .pp-row .pp-top:disabled { opacity: 0; }
 
+/* Archive, on the row: the same quiet mono word as To top, there under the
+   pointer and on keyboard focus, so a long list can be cleared row by row. */
+.pp-archive {
+  flex: none; height: 26px; padding: 0 8px;
+  font: 10.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  background: none; color: var(--text-faint); cursor: pointer;
+  border: 1px solid transparent; border-radius: var(--radius);
+  opacity: 0; transition: opacity .12s, color .12s, border-color .12s;
+}
+/* Outlined, unlike To top, because it sits beside the row's state words
+   ("2 running", "on its own") and must not read as one of them. */
+.pp-row:hover .pp-archive, .pp-row:focus-within .pp-archive { opacity: 1; color: var(--text-dim); border-color: var(--line); }
+.pp-archive:hover { color: var(--text) !important; border-color: var(--line-strong); }
+
 /* In hand: lifted onto the menu surface the composer uses, the only time a row
    is filled. */
 .pp-row.dragging {
