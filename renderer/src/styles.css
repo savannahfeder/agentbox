@@ -2206,6 +2206,11 @@ body {
 .focus-dock {
   flex-shrink: 0; padding: 0 32px 44px; position: relative;
   background: var(--surface);
+  /* AND THE SCROLLBAR'S WIDTH ON THE RIGHT. The words centre in the scroll
+     box minus its scrollbar; the dock is outside it, so it pays the same
+     width here or the box starts 5.5px right of the words (w-a9b77c7b57).
+     Measured by ../scroll-gutter.ts; 0 when the scrollbar overlays. */
+  padding-right: calc(32px + var(--scroll-gutter, 0px));
 }
 .focus-dock::before {
   /* the task fades out above the dock instead of hitting a hard edge */

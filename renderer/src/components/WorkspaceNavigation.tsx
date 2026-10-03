@@ -7,7 +7,7 @@ import { SidebarIcon } from './SidebarIcon';
 import { SidebarToggleIcon } from './SidebarToggleIcon';
 import { AppMark } from './AppMark';
 import { SidebarUpdate } from './SidebarUpdate';
-import { changeLines, readUpdateSmall, writeUpdateSmall } from '../update-row';
+import { changeLines, closedHere, readUpdateClosed, writeUpdateClosed } from '../update-row';
 import { SidebarStatus } from '../team/status';
 /** ONE NUMBER IN THE SIDEBAR, ON INBOX, AND IT IS DRAWN IN THE TAB'S OWN TYPE.
  *
@@ -42,7 +42,8 @@ import { SidebarStatus } from '../team/status';
  */
 export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, update = null, onUpdate }: {
   // A NEW VERSION WAITING (SidebarUpdate.tsx). Null when there is none.
-  update?: { installing: boolean; changes?: string[]; behind?: number | null; error?: string | null } | null; onUpdate?: () => void;
+  // `version` is what its × closes, until a newer one arrives.
+  update?: { installing: boolean; version?: string | null; changes?: string[]; behind?: number | null; error?: string | null } | null; onUpdate?: () => void;
   page?: string | null; inboxCount?: number; scheduledCount?: number; usage?: ReactNode; onSettings?: () => void; onInstructions?: () => void;
   // THE TEAM TAB. No people and no counts here: approved 2026-09-30, a list of
   // who is busy is not worth seeing all the time, and the Team page is where
@@ -62,11 +63,13 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
 }) {
   // The Team page is a page like Settings: while it is up no list tab is lit.
   const page = pageIn ?? (teamPage ? 'team' : null);
-  const [updateSmall, setUpdateSmall] = useState(() => readUpdateSmall());
-  const shrinkUpdate = (small: boolean) => { setUpdateSmall(small); writeUpdateSmall(globalThis.localStorage, small); };
-  const updateCard = !!update && !!onUpdate && !updateSmall && !collapsed;
-  const updateView = update && onUpdate && <SidebarUpdate installing={update.installing} changes={changeLines(update)} error={update.error ?? null}
-    small={updateSmall} collapsed={collapsed} onRestart={onUpdate} onSmall={shrinkUpdate} />;
+  // The version whose card was closed with its × (SidebarUpdate.tsx).
+  const [updateClosed, setUpdateClosed] = useState(() => readUpdateClosed());
+  const closeUpdate = () => { const version = update?.version ?? ''; setUpdateClosed(version); writeUpdateClosed(globalThis.localStorage, version); };
+  const showUpdate = !!update && !!onUpdate && !closedHere(update, updateClosed);
+  const updateCard = showUpdate && !collapsed;
+  const updateView = showUpdate && update && onUpdate && <SidebarUpdate installing={update.installing} changes={changeLines(update)} error={update.error ?? null}
+    collapsed={collapsed} onRestart={onUpdate} onClose={closeUpdate} />;
   const waiting = Number.isFinite(inboxCount) ? Math.max(0, Math.floor(inboxCount)) : 0;
   const waitingDescription = `${waiting} ${waiting === 1 ? 'thread' : 'threads'} waiting`;
   // ONE PAGE OF YOUR THREADS (approved 2026-10-01). In progress, Scheduled and
@@ -104,8 +107,8 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
           it. `onTeam` is still the sign-in link at the foot. */}
     </nav>
     <div className="workspace-bottom">
-      {/* The card sits above the foot list; shrunk, or with the sidebar
-          shut, it is a row inside it (SidebarUpdate.tsx). */}
+      {/* The card sits above the foot list; with the sidebar shut it is a
+          row inside it (SidebarUpdate.tsx). */}
       {updateCard && updateView}
       <div className="workspace-utilities th-side-foot">
         {!updateCard && updateView}
