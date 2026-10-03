@@ -184,11 +184,13 @@
 .th-col:hover .th-col-grip { opacity: .7; }
 .th-col-h:hover .th-col-grip { opacity: 1; color: var(--text-dim); }
 .th-board.dragging .th-col-grip { opacity: 0; }
-/* THE CARRIED COLUMN LEAVES A SLOT, NOT A COPY. The browser already draws
-   the column under the pointer; a faded second copy where it will land was
-   the column twice. The slot keeps its size and says "it goes here". */
-.th-col.lifted { border-radius: var(--radius); background: var(--wash); box-shadow: inset 0 0 0 1px var(--line); }
-.th-col.lifted > * { visibility: hidden; }
+/* THE CARRIED COLUMN IS THE COLUMN, DRAWN ONCE, WHERE IT WILL LAND. A faded
+   copy beside the browser's ghost was the column twice; the empty slot that
+   replaced it was "very strange visually" (2026-10-02). So the ghost is
+   blanked (Pages.tsx) and the column itself moves as you drag, whole, the
+   others sliding aside. All it wears is its heading lit and its handle up. */
+.th-col.lifted .th-col-h { color: var(--text); }
+.th-board.dragging .th-col.lifted .th-col-grip { opacity: 1; color: var(--text-dim); }
 .th-card .t { font-size: 14px; line-height: 20px; color: var(--text); margin: 0 0 14px; }
 .th-card .t.hidden { color: var(--text-dim); }
 

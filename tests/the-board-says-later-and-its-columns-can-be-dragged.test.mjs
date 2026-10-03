@@ -154,9 +154,23 @@ describe('a column moves cleanly', () => {
     }));
     expect(out).not.toContain('Drag to move this column');
   });
-  it('the column being carried leaves an empty slot, not a faded copy of itself', () => {
-    expect(rule('.th-col.lifted') ?? '').not.toMatch(/opacity/);
-    expect(rule('.th-col.lifted > *')).toMatch(/visibility:\s*hidden/);
+  // Third round, with a screenshot of that slot: "this empty block looks
+  // very strange visually". So no stand-in at all: the browser's ghost is
+  // blanked and the column itself moves through the board, whole, as you drag.
+  it('the column being carried is drawn once, itself, where it will land', () => {
+    expect(rule('.th-col.lifted') ?? '').not.toMatch(/opacity|background|box-shadow/);
+    expect(rule('.th-col.lifted > *')).toBeNull();
+    const pages = readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
+    expect(pages).toContain('e.dataTransfer.setDragImage(BLANK_DRAG, 0, 0)');
+    // And the drag survives its own start: "when i try to drag nothing
+    // happens". A real mouse drag in Chrome measured dragstart, then dragend,
+    // and nothing between, because the column was redrawn inside dragstart.
+    const start = pages.slice(pages.indexOf('onDragStart={(e) => {'), pages.indexOf('onDragEnd={endDrag}'));
+    expect(start).toContain('requestAnimationFrame(() => { if (dragLive.current) setDragging(state); })');
+    // ...and a drag let go before that frame does not leave a column carried.
+    expect(pages).toContain('const endDrag = () => { dragLive.current = false;');
+    expect(start).not.toMatch(/^\s*setDragging\(col\.state\);/m);
+    expect(pages).not.toContain('setDragImage(column');
   });
   it('the other columns slide to their new places rather than jump', () => {
     const pages = readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');

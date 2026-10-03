@@ -26,6 +26,10 @@ import './pages.css';
 // Before the frame is drawn in the app; a plain effect where there is no
 // window (the tests draw the board to a string, and React warns otherwise).
 const useBeforePaint = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+// A transparent pixel to hand the browser as the drag picture, loaded ahead
+// of the first drag because an image still loading draws nothing useful.
+const BLANK_DRAG: HTMLImageElement | null = typeof Image === 'undefined' ? null
+  : Object.assign(new Image(), { src: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' });
 
 /* ------------------------------------------------------------ icons */
 const GripIcon = () => <svg className="th-col-grip" viewBox="0 0 10 16" width="8" height="13" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4" /><circle cx="7.5" cy="3" r="1.4" /><circle cx="2.5" cy="8" r="1.4" /><circle cx="7.5" cy="8" r="1.4" /><circle cx="2.5" cy="13" r="1.4" /><circle cx="7.5" cy="13" r="1.4" /></svg>;
@@ -473,7 +477,10 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   useBeforePaint(() => {
     boardRef.current?.querySelector('.th-card.selected')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [selected?.id, selected?.product]);
-  const endDrag = () => { setDragging(null); setPreview(null); };
+  // Whether a drag is still going, for the frame-late start above: a drag let
+  // go before that frame must not leave a column marked as carried.
+  const dragLive = useRef(false);
+  const endDrag = () => { dragLive.current = false; setDragging(null); setPreview(null); };
   return <div className="list hm-me">
     {end && <div className="th-bar th-bar-end">{end}</div>}
     <div className={`th-board${dragging ? ' dragging' : ''}`} ref={boardRef}>
@@ -494,9 +501,17 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('application/x-agentbox-column', col.state);
-            const column = e.currentTarget.parentElement;
-            if (column) e.dataTransfer.setDragImage(column, e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-            setDragging(col.state);
+            // No ghost: the column itself moves through the board as you drag
+            // (the slot that stood in for it was "very strange visually").
+            if (BLANK_DRAG) e.dataTransfer.setDragImage(BLANK_DRAG, 0, 0);
+            // THE DRAG DIED THE MOMENT IT STARTED (reported 2026-10-02, "when
+            // i try to drag nothing happens"; a real mouse drag measured
+            // dragstart then dragend and nothing between). Chrome cancels a
+            // drag whose source is redrawn inside dragstart, and setting this
+            // state redrew the column there. A frame later it is not.
+            const state = col.state;
+            dragLive.current = true;
+            requestAnimationFrame(() => { if (dragLive.current) setDragging(state); });
           }}
           onDragEnd={endDrag}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b>
           {/* THE HANDLE COMES UP WHEN YOU ARE OVER THE COLUMN: "a little drag
