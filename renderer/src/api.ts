@@ -828,9 +828,14 @@ export const api = {
       const s = fixtureSettingsState;
       s.archivedProjects ??= [];
       if (p.archived) {
-        const project = s.projects.find((x: any) => x.slug === p.product);
-        if (project) {
-          s.projects = s.projects.filter((x: any) => x !== project);
+        // ?fixtures=crowded lists projects Settings has no row for; they are
+        // found by the same slug the crowded snapshot gives them.
+        const crowded = CROWDED_NAMES
+          .map((name) => ({ slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''), name, dir: `/fixtures/${name}` }))
+          .find((x) => x.slug === p.product);
+        const project = s.projects.find((x: any) => x.slug === p.product) ?? crowded;
+        if (project && !s.archivedProjects.some((x: any) => x.slug === p.product)) {
+          s.projects = s.projects.filter((x: any) => x.slug !== p.product);
           s.archivedProjects.push({ slug: project.slug, name: project.name, dir: project.dir });
         }
       } else {

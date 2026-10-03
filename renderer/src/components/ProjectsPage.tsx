@@ -26,6 +26,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { landingRow, nudge, placeBefore, priorityList } from '../project-priority';
 import { ProductMark } from './ProductMark';
 import { shortPath } from './Settings';
+import { archiveLabel, archivedLine, keepShown, selectionLine, togglePick } from '../project-archive';
 import type { Product, ProjectSettings } from '../types';
 import './projects-page.css';
 
@@ -52,13 +53,51 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
   /** Projects archived from their own page: off every list but this one. */
   archived?: { slug: string; name: string; dir: string }[];
   onUnarchive?: (slug: string) => void;
-  /** Archive straight from the row: with thirty-odd projects, opening each
-   *  one to archive it from its own page is a click in and out per project. */
-  onArchive?: (slug: string) => void;
+  /** Archive several at once from Select mode: with thirty-odd projects,
+   *  opening each one to archive it from its own page is a headache. */
+  onArchive?: (slugs: string[]) => void | Promise<void>;
 }) {
   // FOLDED AWAY until asked for. An archived project is one you chose not to
   // see, so the list of them stays one quiet line unless you open it.
   const [showArchived, setShowArchived] = useState(false);
+
+  // SELECT MODE (w-bb5047e258). Chosen over an Archive mark on every row,
+  // which was "ugly/bad ux": the rows stay as they are until you ask to tidy
+  // them. While selecting, a press ticks a row instead of opening it, the
+  // move controls step aside, and the table's own header line becomes the
+  // action line, so nothing on the page jumps. After the press the same line
+  // says what went, with an Undo, until the next thing you do.
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [undone, setUndone] = useState<string[] | null>(null);
+  const startSelecting = () => { setSelecting(true); setPicked(new Set()); setUndone(null); };
+  const stopSelecting = () => { setSelecting(false); setPicked(new Set()); };
+  const archivePicked = async () => {
+    if (!picked.size || !onArchive) return;
+    const batch = [...picked];
+    stopSelecting();
+    setUndone(batch);
+    await onArchive(batch);
+  };
+  const undo = () => {
+    if (!undone) return;
+    undone.forEach((slug) => onUnarchive?.(slug));
+    setUndone(null);
+  };
+  // The Undo line is for the moment just after; it goes on its own.
+  useEffect(() => {
+    if (!undone) return;
+    const t = setTimeout(() => setUndone(null), 12_000);
+    const off = () => clearTimeout(t);
+    return off;
+  }, [undone]);
+  useEffect(() => {
+    if (!selecting) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') stopSelecting(); };
+    window.addEventListener('keydown', esc);
+    const off = () => window.removeEventListener('keydown', esc);
+    return off;
+  }, [selecting]);
   // THE MOVE SHOWS AT ONCE. The saved order comes back on the next refresh,
   // and a row that sat still until then would read as a press that missed.
   const [pending, setPending] = useState<string[] | null>(null);
@@ -101,6 +140,10 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
       || (p.dir ?? '').toLowerCase().includes(needle))
     : rows;
   const shownSlugs = shown.map((r) => r.slug);
+  // A tick on a row the search has hidden, or that left the list, is dropped,
+  // so the press only ever archives what is on the screen.
+  const shownKey = shownSlugs.join('\n');
+  useEffect(() => { setPicked((prev) => (prev.size ? keepShown(prev, shownSlugs) : prev)); }, [shownKey]);
 
   // THE STATE IN WORDS, at most one. Null on an ordinary project, which is
   // nearly all of them, and then the row is just a name.
@@ -116,6 +159,7 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
 
   const commit = (slug: string, next: string[] | null) => {
     if (!next || !onSetOrder) return;
+    setUndone(null);
     setPending(next);
     setMoved(slug);
     void onSetOrder(next);
@@ -139,7 +183,7 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
     row.setPointerCapture(e.pointerId);
 
     const onMove = (ev: PointerEvent) => {
-      if (!onSetOrder) return;
+      if (!onSetOrder || selecting) return;
       const dy = ev.clientY - startY;
       if (!travelled && Math.abs(dy) < DRAG_THRESHOLD_PX) return;
       travelled = true;
@@ -153,6 +197,7 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
       row.removeEventListener('pointerup', onUp);
       row.removeEventListener('pointercancel', onUp);
       setDrag(null);
+      if (!travelled && selecting) { setPicked((prev) => togglePick(prev, slug)); return; }
       if (!travelled) { onOpen(slug); return; }
       // Worked out on the FULL order, so rows this page never lists
       // (conversations, the practice project) keep their place.
@@ -180,6 +225,10 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
           aria-label="Find a project"
           onChange={(e) => setFilter(e.target.value)}
         />
+        {onArchive && rows.length > 0 && (
+          <button type="button" className="set-ghost pp-select" aria-pressed={selecting}
+            onClick={selecting ? stopSelecting : startSelecting}>{selecting ? 'Cancel' : 'Select'}</button>
+        )}
         {onNew && <button type="button" className="set-ghost" onClick={onNew}>New project</button>}
       </div>
       {!rows.length && <div className="set-nav-empty">No projects yet.</div>}
@@ -188,24 +237,47 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
       )}
       {shown.length > 0 && (
         <div className="pp-table">
-          <div className="pp-head" aria-hidden="true">
-            <span className="pp-rank">#</span>
-            <span className="pp-head-name">Project</span>
-            {onSetOrder && <span className="pp-head-move">Move</span>}
-          </div>
+          {/* THE HEADER LINE IS ALSO THE ACTION LINE: column names normally,
+              the count and the press while selecting, what went and Undo just
+              after. Same height in all three, so the list never moves. */}
+          {selecting ? (
+            <div className="pp-head pp-head-act">
+              <span className="pp-rank" />
+              <span className="pp-head-name" aria-live="polite">{selectionLine(picked.size)}</span>
+              <button type="button" className="pp-head-btn" disabled={!picked.size} onClick={archivePicked}>
+                {archiveLabel(picked.size)}
+              </button>
+            </div>
+          ) : undone ? (
+            <div className="pp-head pp-head-act">
+              <span className="pp-rank" />
+              <span className="pp-head-name" aria-live="polite">{archivedLine(undone.length)}</span>
+              <button type="button" className="pp-head-btn" onClick={undo}>Undo</button>
+            </div>
+          ) : (
+            <div className="pp-head" aria-hidden="true">
+              <span className="pp-rank">#</span>
+              <span className="pp-head-name">Project</span>
+              {onSetOrder && <span className="pp-head-move">Move</span>}
+            </div>
+          )}
           <ol className="pp-list" ref={listRef}>
             {shown.map((p, i) => {
               const rank = allSlugs.indexOf(p.slug);
+              const on = picked.has(p.slug);
               return (
                 <li
                   key={p.slug}
-                  className={['pp-row', drag?.slug === p.slug ? 'dragging' : '', moved === p.slug ? 'moved' : '', rank === 0 ? 'first' : '', onSetOrder ? 'can-move' : ''].filter(Boolean).join(' ')}
+                  className={['pp-row', drag?.slug === p.slug ? 'dragging' : '', moved === p.slug ? 'moved' : '', rank === 0 ? 'first' : '', onSetOrder && !selecting ? 'can-move' : '', selecting ? 'selecting' : '', on ? 'picked' : ''].filter(Boolean).join(' ')}
                   style={drag?.slug === p.slug ? { transform: `translateY(${drag.dy}px)` } : undefined}
                   tabIndex={0}
-                  role="button"
-                  aria-label={`${p.name}, number ${rank + 1} of ${rows.length}. Open`}
+                  role={selecting ? 'checkbox' : 'button'}
+                  aria-checked={selecting ? on : undefined}
+                  aria-label={selecting ? p.name : `${p.name}, number ${rank + 1} of ${rows.length}. Open`}
                   onPointerDown={press(p.slug)}
                   onKeyDown={(e) => {
+                    if (selecting && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setPicked((prev) => togglePick(prev, p.slug)); return; }
+                    if (selecting) return;
                     if (e.key === 'Enter') { e.preventDefault(); onOpen(p.slug); return; }
                     if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
                     e.preventDefault();
@@ -213,8 +285,18 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
                   }}
                 >
                   <span className="pp-rank">
-                    <span className="pp-num">{String(rank + 1).padStart(2, '0')}</span>
-                    {onSetOrder && <span className="pp-grip" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>}
+                    {selecting ? (
+                      // THE TICK TAKES THE NUMBER'S PLACE, in ink and not the
+                      // accent: the accent on this page means "first in line".
+                      <span className={`pp-check${on ? ' on' : ''}`} aria-hidden="true">
+                        {on && <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3.8 8.4 6.6 11.2 12.2 5" /></svg>}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="pp-num">{String(rank + 1).padStart(2, '0')}</span>
+                        {onSetOrder && <span className="pp-grip" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span>}
+                      </>
+                    )}
                   </span>
                   <ProductMark src={p.logo} name={p.name} slug={p.slug} size={18} />
                   <span className="pp-text">
@@ -224,14 +306,7 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
                   </span>
                   {p.running > 0 && <span className="pp-flag">{p.running} running</span>}
                   {flag(p) && <span className="pp-flag">{flag(p)}</span>}
-                  {/* ARCHIVE, ON THE ROW. Shown under the pointer like To top;
-                      a button, so the press does not open the project. */}
-                  {onArchive && (
-                    <button type="button" className="pp-archive" aria-label={`Archive ${p.name}`}
-                      title="Archive: off every list, files kept. Bring it back below."
-                      onClick={() => onArchive(p.slug)}>Archive</button>
-                  )}
-                  {onSetOrder && (
+                  {onSetOrder && !selecting && (
                     <span className="pp-acts">
                       <button type="button" className="pp-top" disabled={rank === 0}
                         onClick={() => commit(p.slug, placeBefore(full, p.slug, allSlugs[0]))}>To top</button>
@@ -245,9 +320,11 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
                       </button>
                     </span>
                   )}
-                  <span className="pp-open" aria-hidden="true">
-                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 4 10.5 8l-4 4" /></svg>
-                  </span>
+                  {!selecting && (
+                    <span className="pp-open" aria-hidden="true">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 4 10.5 8l-4 4" /></svg>
+                    </span>
+                  )}
                 </li>
               );
             })}
