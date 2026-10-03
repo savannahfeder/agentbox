@@ -113,7 +113,7 @@ import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
-import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, PeopleFilter, StateTabs } from './threads/Pages';
+import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
 import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationWith, flipView, isDirect, nextTab, pageFor, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
@@ -1973,8 +1973,8 @@ export default function App() {
   // what the one page stopped doing.
   const [mineDisplay, setMineDisplayRaw] = useState<Display>(() => readDisplay('inbox'));
   const [teamDisplay, setTeamDisplayRaw] = useState<Display>(() => readDisplay('team'));
-  // WHOSE THREADS ARE ON THE PAGE (w-05ff3d1438): the faces at the end of the
-  // tab bar. The Inbox and the Team page were one question on two pages; this
+  // WHOSE THREADS ARE ON THE PAGE (w-05ff3d1438): the faces on the header's
+  // View and filters button (w-14bb56c833). The Inbox and the Team page were one question on two pages; this
   // is the one page, and it opens as yours. Remembered between launches.
   const everyone = useMemo(() => {
     if (!team) return [];
@@ -2033,9 +2033,9 @@ export default function App() {
       <Face person={p} me={id === team?.me} />{id === team?.me ? 'You' : firstName(p)}
     </FaceHover>;
   }, [team, now]);
-  const peoplePicker = team
-    ? <PeopleFilter everyone={everyone} picked={picked} me={team.me} onPick={setPicked} />
-    : undefined;
+  // Whose threads are on the page, as faces on the header's View and filters
+  // button and the first line of its menu (w-14bb56c833).
+  const peoplePick = useMemo(() => (team ? { everyone, picked, me: team.me, onPick: setPicked } : undefined), [team, everyone, picked, setPicked]);
   // EACH TAB'S NUMBER COUNTS WHAT THE FILTERS SHOW (w-5a08121f99). It counted
   // the whole tab, so a filter that had emptied Needs you left the tab saying
   // 13 over a page saying "Nothing needs you". A tab's number is a promise
@@ -4822,6 +4822,7 @@ export default function App() {
               shown={displayedBox.length + theirRows.length}
               total={(mineShown ? shownBox.length : 0) + theirRows.length}
               tab={view}
+              people={peoplePick}
             />
           )}
           {!workspaceNavigation && !focused && !settingsOpen && !inPractice && (
@@ -5184,7 +5185,7 @@ export default function App() {
                     the sidebar places they used to be. */}
                 {workspaceNavigation && search === null && inboxDisplay.view === 'board' ? (
                   <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine}
-                    cards={cards} picked={team ? picked : undefined} end={peoplePicker}
+                    cards={cards} picked={team ? picked : undefined}
                     onOpenCard={openTeammateCard}
                     selected={current} columnOrder={columnOrder} onReorderColumns={reorderColumns}
                     // A click puts the keyboard where the click was, so J
@@ -5203,7 +5204,6 @@ export default function App() {
                       all: (mineShown ? shownCount(allOpen) : 0) + theirCount('all'),
                     }}
                     needs={team ? needsWord(picked, team.me) : undefined}
-                    end={peoplePicker}
                     onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
                   />
                 )}
