@@ -18,7 +18,7 @@ import {
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
-import { togglePicked, whoseWord } from './people-rules';
+import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
 import { shownToPeople } from '../../../shared/thread-cards.mjs';
 import { api } from '../api';
 import './pages.css';
@@ -79,23 +79,39 @@ function useOutside(open: boolean, close: () => void) {
 }
 
 /* ------------------------------------------------------------ the header */
+/** Whose threads are on the page, and how to change it (App.tsx holds it). */
+export type PeoplePick = { everyone: Person[]; picked: string[]; me: string | null; onPick: (picked: string[]) => void };
+
 /** Search, New thread and the Display icon, at the right of the Inbox and Team headers. */
-export function HeaderActions({ page, display, onDisplay, products, items, onSearch, onCompose, shown, total, tab }: {
+export function HeaderActions({ page, display, onDisplay, products, items, onSearch, onCompose, shown, total, tab, people }: {
   page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[]; items?: WorkItem[];
   onSearch: () => void; onCompose: () => void; shown?: number; total?: number; tab?: string;
+  people?: PeoplePick;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useOutside(open, () => setOpen(false));
+  // WHOSE THREADS, AS FACES ON THIS BUTTON (w-14bb56c833). The Everyone control
+  // had a row of its own over the board, 40px of nothing but one small button.
+  // Its faces sit here now and its choice is the first line of the menu.
+  const worn = people ? facesOnButton(people.everyone, people.picked, people.me) : null;
+  const whose = worn && people ? whoseWord(people.everyone, people.picked, people.me) : null;
+  const dot = isFiltered(display) || (!!people && peopleWorthADot(people.everyone, people.picked, people.me));
   // NO "/" ON ITS FACE (w-facfc092e1): a shortcut shows on hover, through the
   // hint plate, and is never printed on the control.
   return <div className="th-right">
     <button type="button" className="th-search" data-hint="search" data-hint-text="span" onClick={onSearch} title="Search threads (/)" aria-label="Search threads"><SearchGlyph /><span>Search</span></button>
     <button type="button" className="th-new" data-hint="new-task" onClick={onCompose} title="New thread (N)"><PenIcon />New thread</button>
     <span ref={(el) => { ref.current = el; }} style={{ position: 'relative', display: 'inline-flex' }}>
-      <button type="button" className={`th-disp${open ? ' open' : ''}`} aria-label="View and filters" title="View and filters" onClick={() => setOpen((o) => !o)}>
-        <SlidersIcon />{isFiltered(display) && <i />}
+      <button type="button" className={`th-disp${worn ? ' faces' : ''}${open ? ' open' : ''}`}
+        aria-label={whose ? `View and filters, showing ${whose}` : 'View and filters'} title={whose ? `${whose} · View and filters` : 'View and filters'}
+        onClick={() => setOpen((o) => !o)}>
+        {worn && <span className="th-faces">
+          {worn.faces.map((p) => <Face key={p.id} person={p} me={p.id === people!.me} />)}
+          {worn.more > 0 && <span className="th-faces-more">+{worn.more}</span>}
+        </span>}
+        <SlidersIcon />{dot && <i />}
       </button>
-      {open && <DisplayMenu page={page} display={display} onDisplay={onDisplay} products={products} items={items} shown={shown} total={total} tab={tab} />}
+      {open && <DisplayMenu page={page} display={display} onDisplay={onDisplay} products={products} items={items} shown={shown} total={total} tab={tab} people={people} />}
     </span>
   </div>;
 }
@@ -103,13 +119,15 @@ export function HeaderActions({ page, display, onDisplay, products, items, onSea
 const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
 /** View, sort, and the filters: priority, project and when it was updated. */
-export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total, tab }: {
+export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total, tab, people }: {
   page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[];
   /** The tab the page is on, which Done's own order depends on. */
   tab?: string;
   /** Her threads, to rank the projects by the one she used most recently. */
   items?: WorkItem[];
   shown?: number; total?: number;
+  /** Whose threads are on the page; no People line without a teammate. */
+  people?: PeoplePick;
 }) {
   // THE PROJECT FILTER, FOR SOMEBODY WITH FORTY PROJECTS (w-5a08121f99). The
   // eight she used most recently, the rest behind one button, and an All
@@ -121,6 +139,7 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
   const set = (patch: Partial<Display>) => onDisplay({ ...display, ...patch });
   const windows: [UpdatedWindow, string][] = [['today', 'Today'], ['week', 'This week'], ['any', 'Any time']];
   return <div className="th-pop" role="dialog" aria-label={page === 'inbox' ? 'Inbox view and filters' : 'Team view and filters'}>
+    {people && <PeopleLine {...people} />}
     <div className="line"><span className="lab">View</span><span className="opts">
       <button type="button" className={display.view === 'list' ? 'on' : ''} title="List (B)" onClick={() => set({ view: 'list' })}><ListIcon />List</button>
       <button type="button" className={display.view === 'board' ? 'on' : ''} title="Board (B)" onClick={() => set({ view: 'board' })}><BoardIcon />Board</button>
@@ -178,51 +197,42 @@ export const INBOX_TABS: { view: TabView; label: string }[] = [
  */
 const COUNTED: TabView[] = ['inbox', 'progress', 'snoozed'];
 
-/** `needs` renames the first tab (Waiting, once a teammate is on the page);
- *  `end` is what sits at the bar's right end, the people filter. */
-export function StateTabs({ view, counts, onView, needs, end }: {
-  view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string; end?: ReactNode;
+/** `needs` renames the first tab (Waiting, once a teammate is on the page). */
+export function StateTabs({ view, counts, onView, needs }: {
+  view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string;
 }) {
   return <div className="th-bar"><div className="tm-tabs">
     {/* Every tab wears the Tab plate (hint-plate.ts, 'state-tab'). */}
     {INBOX_TABS.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${view === t.view ? ' on' : ''}`} onClick={() => onView(t.view)}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
-  </div>{end}</div>;
+  </div></div>;
 }
 
 /* ------------------------------------------------------------ whose threads */
 /**
- * ONE FILTER AT THE END OF THE TAB BAR (w-57034cf3c0). Up to four face chips
- * and a "+N" stood here and read as clutter on the one row that has to stay
- * quiet. This says whose threads the page is showing in words, and opens the
- * same list: Just you, Everyone, then each person with a tick. Nothing is drawn
- * for a person alone on a team, or for nobody signed in.
+ * WHOSE THREADS, THE FIRST LINE OF THE VIEW AND FILTERS MENU (w-14bb56c833).
+ * It was a dropdown of its own, at the end of the tab bar and in a row of its
+ * own over the board; the button that opens this menu wears the faces now.
+ * Everyone, Just you, then each person as a switch; the last one picked stays
+ * picked, so the page is never nobody's. Nothing for a person alone on a team.
  */
-export function PeopleFilter({ everyone, picked, me, onPick }: {
-  everyone: Person[]; picked: string[]; me: string | null; onPick: (picked: string[]) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useOutside(open, () => setOpen(false));
-  if (everyone.filter((p) => p.id !== me).length === 0) return null;
+function PeopleLine({ everyone, picked, me, onPick }: PeoplePick) {
+  if (!everyone.some((p) => p.id !== me)) return null;
   const name = (p: Person) => (p.id === me ? 'You' : p.name || p.email || 'Someone');
   const sorted = [...everyone.filter((p) => p.id === me), ...everyone.filter((p) => p.id !== me).sort((a, b) => name(a).localeCompare(name(b)))];
-  return <span className="th-pf-wrap" ref={(el) => { ref.current = el; }}>
-    <button type="button" className={`th-pf${open ? ' open' : ''}`} aria-haspopup="listbox" aria-expanded={open}
-      title="Whose threads are shown" onClick={() => setOpen(!open)}>
-      <PeopleIcon /><span className="w">{whoseWord(everyone, picked, me)}</span>
-      <svg width="9" height="6" viewBox="0 0 9 6" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="m1 1.5 3.5 3L8 1.5" /></svg>
-    </button>
-    {open && <div className="th-menu th-people-menu" role="listbox" aria-multiselectable="true">
-      <button type="button" className="row-i" onClick={() => { onPick(me ? [me] : picked); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Just you</button>
-      <button type="button" className="row-i" onClick={() => { onPick(sorted.map((p) => p.id)); setOpen(false); }}><span className="ico"><PeopleIcon /></span>Everyone</button>
-      <span className="sep" />
-      {sorted.map((p) => <button type="button" key={p.id} role="option" aria-selected={picked.includes(p.id)} className={`row-i${picked.includes(p.id) ? ' on' : ''}`}
+  const all = sorted.every((p) => picked.includes(p.id));
+  const justYou = !!me && picked.length === 1 && picked[0] === me;
+  return <>
+    <div className="line"><span className="lab">People</span><span className="opts">
+      <button type="button" className={all ? 'on' : ''} onClick={() => onPick(sorted.map((p) => p.id))}>Everyone</button>
+      {me && <button type="button" className={justYou ? 'on' : ''} onClick={() => onPick([me])}>Just you</button>}
+      {sorted.map((p) => <button type="button" key={p.id} aria-pressed={picked.includes(p.id)} className={picked.includes(p.id) ? 'on' : ''}
         onClick={() => onPick(togglePicked(picked, p.id, me))}>
-        <Face person={p} me={p.id === me} />{name(p)}{picked.includes(p.id) && <CheckMark />}
+        <Face person={p} me={p.id === me} />{name(p)}
       </button>)}
-    </div>}
-  </span>;
+    </span></div>
+    <div className="rule" />
+  </>;
 }
-const CheckMark = () => <svg className="th-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
 
 /* ------------------------------------------------------------ an empty tab */
 /** AN EMPTY INBOX, DRAWN AGAIN FROM THE QUESTION IT ANSWERS (2026-10-01),
@@ -413,12 +423,13 @@ export function ThreadCells({ item, product, now, person, tab }: {
 /** THE PAGE AS A BOARD, when the Display says Board: your threads and, once
  *  you pick them, your teammates' (w-05ff3d1438). Every thread of yours is on
  *  it, the private ones included; with a teammate in view, those wear a lock
- *  and every card names its person. `end` is the faces, over the board. */
-export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, end, selected, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns }: {
+ *  and every card names its person. Whose threads is picked on the header's
+ *  filters button (w-14bb56c833), so the columns start right under it. */
+export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number; onOpenItem: (item: WorkItem) => void;
   /** The column each thread sits in, by the Inbox tabs' rule (App.tsx). */
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
-  cards?: ThreadCard[]; picked?: string[]; onOpenCard?: (card: ThreadCard) => void; end?: ReactNode;
+  cards?: ThreadCard[]; picked?: string[]; onOpenCard?: (card: ThreadCard) => void;
   /** The thread the keyboard is on (App.tsx's `current`), drawn as selected. */
   selected?: WorkItem | null;
   /** The columns left to right, and where a dragged order goes to be kept. */
@@ -500,6 +511,32 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     setDragging(null);
     setPreview(null);
   };
+  // The newest putDown, for the window's listeners, which outlive the render
+  // that set them up.
+  const putDownNow = useRef(putDown);
+  putDownNow.current = putDown;
+  const moveDrag = (x: number, y: number) => {
+    const d = drag.current;
+    if (!d) return;
+    d.x = x; d.y = y;
+    if (!d.started) {
+      // A press that barely moves is a click, not a lift.
+      if (Math.hypot(d.x - d.startX, d.y - d.startY) < 4) return;
+      // THE SLOTS ARE MEASURED ONCE, HERE, and the place is worked out from
+      // them and the pointer alone (`slotUnder`). Reading it off the column
+      // drawn under the pointer made a swap undo itself every frame while the
+      // columns slid.
+      const order = shownNow.current;
+      d.slots = order.map((s) => { const r = colEls.current.get(s)?.getBoundingClientRect(); return r ? r.left + r.width / 2 : 0; });
+      d.pitch = d.slots.length > 1 ? d.slots[1] - d.slots[0] : 0;
+      d.startIndex = order.indexOf(d.state);
+      d.started = true;
+      setDragging(d.state);
+    }
+    const want = slotUnder(d.slots, d.slots[d.startIndex] + (d.x - d.startX));
+    if (want >= 0 && want !== shownNow.current.indexOf(d.state)) setPreview(columnTo(shownNow.current, d.state, want));
+    follow();
+  };
   useEffect(() => {
     if (!dragging) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); putDown(false); } };
@@ -518,7 +555,6 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     boardRef.current?.querySelector('.th-card.selected')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [selected?.id, selected?.product]);
   return <div className="list hm-me">
-    {end && <div className="th-bar th-bar-end">{end}</div>}
     <div className={`th-board${dragging ? ' dragging' : ''}`} ref={boardRef}>
     {columns.map((col) => {
       const rows = col.rows;
@@ -532,33 +568,24 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
             const el = colEls.current.get(col.state);
             if (!el) return;
             e.preventDefault();
-            e.currentTarget.setPointerCapture?.(e.pointerId);
             drag.current = { state: col.state, el, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY, started: false, startIndex: 0, slots: [], pitch: 0 };
-          }}
-          onPointerMove={(e) => {
-            const d = drag.current;
-            if (!d || d.state !== col.state) return;
-            d.x = e.clientX; d.y = e.clientY;
-            if (!d.started) {
-              // A press that barely moves is a click, not a lift.
-              if (Math.hypot(d.x - d.startX, d.y - d.startY) < 4) return;
-              // THE SLOTS ARE MEASURED ONCE, HERE, and the place is worked out
-              // from them and the pointer alone (`slotUnder`). Reading it off
-              // the column drawn under the pointer made a swap undo itself
-              // every frame while the columns slid.
-              const order = shownNow.current;
-              d.slots = order.map((s) => { const r = colEls.current.get(s)?.getBoundingClientRect(); return r ? r.left + r.width / 2 : 0; });
-              d.pitch = d.slots.length > 1 ? d.slots[1] - d.slots[0] : 0;
-              d.startIndex = order.indexOf(d.state);
-              d.started = true;
-              setDragging(d.state);
-            }
-            const want = slotUnder(d.slots, d.slots[d.startIndex] + (d.x - d.startX));
-            if (want >= 0 && want !== shownNow.current.indexOf(d.state)) setPreview(columnTo(shownNow.current, d.state, want));
-            follow();
-          }}
-          onPointerUp={() => putDown(true)}
-          onPointerCancel={() => putDown(false)}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b>
+            // THE WHOLE WINDOW LISTENS UNTIL THE PRESS ENDS. Holding the
+            // pointer on the heading broke on the first change of order: that
+            // moves the column in the page, which lets go of the pointer, and
+            // the column stopped after one place ("it only moves one row at a
+            // time").
+            const move = (ev: PointerEvent) => moveDrag(ev.clientX, ev.clientY);
+            const stop = () => {
+              window.removeEventListener('pointermove', move);
+              window.removeEventListener('pointerup', up);
+              window.removeEventListener('pointercancel', cancel);
+            };
+            const up = () => { stop(); putDownNow.current(true); };
+            const cancel = () => { stop(); putDownNow.current(false); };
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', up);
+            window.addEventListener('pointercancel', cancel);
+          }}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b>
           {/* THE HANDLE COMES UP WHEN YOU ARE OVER THE COLUMN: "a little drag
               icon comes up subtly". Only where a drag does something. */}
           {onReorderColumns && <GripIcon />}</div>

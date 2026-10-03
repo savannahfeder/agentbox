@@ -74,7 +74,7 @@ describe('Tab is offered where the number keys were', () => {
   it('hovers "Next tab" on every tab along the top of the inbox, and nothing about going back', () => {
     expect(HINTS['state-tab']).toEqual([{ key: '⇥', what: 'Next tab' }]);
     const pages = code('renderer/src/threads/Pages.tsx');
-    const tabs = pages.slice(pages.indexOf('export function StateTabs'), pages.indexOf('export function PeopleFilter'));
+    const tabs = pages.slice(pages.indexOf('export function StateTabs'), pages.indexOf('function PeopleLine'));
     expect(tabs).toContain('data-hint="state-tab"');
   });
 

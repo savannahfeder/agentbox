@@ -64,6 +64,34 @@ export function whoseWord(everyone: Person[], picked: string[], me: string | nul
   return youToo ? `You and ${others.length} others` : `${others.length} people`;
 }
 
+/**
+ * THE FACES ON THE VIEW AND FILTERS BUTTON (w-14bb56c833). Whose threads are on
+ * the page, said with faces on the button that changes it, so the choice needs
+ * no row of its own over the board. You first, then the others by name, three
+ * at most and a count for the rest. Null on a team of one: nothing to choose.
+ */
+export function facesOnButton(everyone: Person[], picked: string[], me: string | null, max = 3): { faces: Person[]; more: number } | null {
+  if (!everyone.some((p) => p.id !== me)) return null;
+  const name = (p: Person) => p.name || p.email || '';
+  const shown = everyone.filter((p) => picked.includes(p.id));
+  const ordered = [...shown.filter((p) => p.id === me), ...shown.filter((p) => p.id !== me).sort((a, b) => name(a).localeCompare(name(b)))];
+  return { faces: ordered.slice(0, max), more: Math.max(0, ordered.length - max) };
+}
+
+/**
+ * WHETHER THE PEOPLE CHOICE LIGHTS THE FILTERS DOT. The dot says something is
+ * being held back from you. Just you is the everyday state and the expected
+ * one, so it lights nothing (their words: "we don't want to distract people
+ * with that little dot"); everyone lights nothing either. Any other narrowing
+ * hides somebody's threads, and does.
+ */
+export function peopleWorthADot(everyone: Person[], picked: string[], me: string | null): boolean {
+  if (!everyone.some((p) => p.id !== me)) return false;
+  const shown = everyone.filter((p) => picked.includes(p.id));
+  if (shown.length === everyone.length) return false;
+  return !(shown.length === 1 && shown[0].id === me);
+}
+
 type Tab = 'inbox' | 'progress' | 'snoozed' | 'done' | 'all';
 const TAB_STATE: Record<Tab, (s: ThreadCard['state']) => boolean> = {
   inbox: (s) => s === 'waiting',
