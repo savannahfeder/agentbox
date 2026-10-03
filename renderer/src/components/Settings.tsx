@@ -1440,6 +1440,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               onSetOrder={onSetOrder}
               onOpen={(slug) => setPane({ project: slug })}
               onNew={onNewProject}
+              archived={model?.archivedProjects ?? []}
+              onUnarchive={(slug) => write(api.archiveProject({ product: slug, archived: false }))}
             />
           </div>
         )}
@@ -2014,6 +2016,20 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
             <Group label="Where this project is kept on this Mac">
               <Row label="Documents" desc={current.dir} />
               <Row label="Repository" desc={current.repoPath ?? 'No code repo registered for this project.'} />
+            </Group>
+
+            {/* ARCHIVE, NOT DELETE (w-bb5047e258). The ask was a way to delete a
+                project "or at least not have to see them anymore". Archiving is
+                that without the risk: one flag in its project.json, its folder
+                untouched, and the Projects page this lands on lists it to bring
+                back. */}
+            <Group label="Archive">
+              <Row
+                label="Archive this project"
+                desc={`It leaves your inbox, the sidebar and Projects, and no new agents start on it${current.running ? '; the ones running now finish' : ''}. Its files stay where they are, and you can bring it back from Projects.`}
+              >
+                <button type="button" className="set-ghost" onClick={() => write(api.archiveProject({ product: current.slug, archived: true }))}>Archive</button>
+              </Row>
             </Group>
           </div>
         )}

@@ -140,6 +140,8 @@ contextBridge.exposeInMainWorld('zero', {
   projectRename: (payload) => ipcRenderer.invoke('zero:project-rename', payload),
   projectIcon: (payload) => ipcRenderer.invoke('zero:project-icon', payload),
   projectIconClear: (payload) => ipcRenderer.invoke('zero:project-icon-clear', payload),
+  // Archive a project or bring it back; also a flag in its own project.json.
+  projectArchive: (payload) => ipcRenderer.invoke('zero:project-archive', payload),
   // Her rules for one project, briefed after the standing ones.
   projectInstructionsRead: (payload) => ipcRenderer.invoke('zero:project-instructions-read', payload),
   projectInstructionsWrite: (payload) => ipcRenderer.invoke('zero:project-instructions-write', payload),

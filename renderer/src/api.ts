@@ -821,6 +821,14 @@ export const api = {
     return zero.projectIconClear(p);
   },
 
+  // Archive a project (off every list, files kept) or bring one back.
+  async archiveProject(p: { product: string; archived: boolean }): Promise<Settings> {
+    if (useFixtures) return { ...emptySettings, ok: true };
+    const zero = window.zero as any;
+    if (!zero?.projectArchive) return { ...emptySettings, ok: false, error: RESTART_NOTE };
+    return zero.projectArchive(p);
+  },
+
   // TAKING THE AGENTS OFF THE FINISH CARD. One call, because the ticks and the
   // rows are one act: what she ticked is what arrives.
   //
