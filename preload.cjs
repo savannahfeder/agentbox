@@ -1,6 +1,25 @@
 // The bridge. Everything the renderer may do, spelled out.
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
+// EVERY ASK BEFORE A RELOAD IS ANSWERED, held write or not. main waits for
+// this before it reloads (main/write-before-reload.mjs), so a page with
+// nothing held, or one that has not set a handler yet, says so at once rather
+// than making ⌘R sit out the wait.
+let writeHeld = null;
+const holdWriter = (fn) => {
+  writeHeld = fn;
+  return () => { if (writeHeld === fn) writeHeld = null; };
+};
+ipcRenderer.on('zero:write-held', async (_e, nonce) => {
+  try {
+    if (writeHeld) await writeHeld();
+  } catch {
+    // A write that failed is the page's to report; the reload goes ahead.
+  } finally {
+    ipcRenderer.send('zero:wrote-held', nonce);
+  }
+});
+
 contextBridge.exposeInMainWorld('zero', {
   terminal: (payload) => ipcRenderer.invoke('zero:terminal', payload),
   agentUpdate: (payload) => ipcRenderer.invoke('zero:agent-update', payload),
@@ -221,6 +240,10 @@ contextBridge.exposeInMainWorld('zero', {
     ipcRenderer.on('zero:screen-detail', handler);
     return () => ipcRenderer.removeListener('zero:screen-detail', handler);
   },
+  // ⌘R is about to reload the page. Whatever she did in the last three seconds
+  // is still held for Z (`deferCommit`), so the page writes it first. One
+  // handler at a time, and the ask is answered above whether or not one is set.
+  onWriteHeld: (fn) => holdWriter(fn),
   onEscapeBrowser: (fn) => {
     const handler = () => fn();
     ipcRenderer.on('zero:escape-browser', handler);

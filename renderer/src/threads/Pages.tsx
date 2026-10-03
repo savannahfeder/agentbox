@@ -5,7 +5,7 @@
 // Everyone and project pickers over a board or a list. The rules they follow
 // are in ./page-rules.ts; the look is ./pages.css, ported from the drawings
 // she approved.
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName } from '../team/people';
@@ -22,6 +22,14 @@ import { togglePicked, whoseWord } from './people-rules';
 import { shownToPeople } from '../../../shared/thread-cards.mjs';
 import { api } from '../api';
 import './pages.css';
+
+// Before the frame is drawn in the app; a plain effect where there is no
+// window (the tests draw the board to a string, and React warns otherwise).
+const useBeforePaint = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+// A transparent pixel to hand the browser as the drag picture, loaded ahead
+// of the first drag because an image still loading draws nothing useful.
+const BLANK_DRAG: HTMLImageElement | null = typeof Image === 'undefined' ? null
+  : Object.assign(new Image(), { src: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' });
 
 /* ------------------------------------------------------------ icons */
 const GripIcon = () => <svg className="th-col-grip" viewBox="0 0 10 16" width="8" height="13" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4" /><circle cx="7.5" cy="3" r="1.4" /><circle cx="2.5" cy="8" r="1.4" /><circle cx="7.5" cy="8" r="1.4" /><circle cx="2.5" cy="13" r="1.4" /><circle cx="7.5" cy="13" r="1.4" /></svg>;
@@ -433,23 +441,53 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   const shown = preview ?? columnOrder;
   // One copy of what the board holds and in what order, which App.tsx also
   // walks with J and K (`boardColumns`, page-rules.ts).
-  const columns = boardColumns({ items, products, display, now, stateOf, cards, picked, me, since, live: liveIds, order: shown });
+  // Held between renders, because J re-renders the board on every press and
+  // the columns do not change when only the keyboard's card does.
+  const columns = useMemo(
+    () => boardColumns({ items, products, display, now, stateOf, cards, picked, me, since, live: liveIds, order: shown }),
+    [items, products, display, now, stateOf, cards, picked, me, since, liveIds, shown],
+  );
+  // THE OTHER COLUMNS SLIDE TO THEIR NEW PLACES (2026-10-02): they used to
+  // jump, which read as "weird ... when I'm moving things around". Measured
+  // from where each column sat in the old order and the pitch between two
+  // columns now, so a window resized since the last move cannot throw it off.
+  const colEls = useRef(new Map<ThreadStateWord, HTMLDivElement>());
+  const lastOrder = useRef(shown);
+  useBeforePaint(() => {
+    const before = lastOrder.current;
+    lastOrder.current = shown;
+    if (before === shown) return;
+    const lefts = shown.map((s) => colEls.current.get(s)?.offsetLeft ?? 0);
+    const pitch = lefts.length > 1 ? lefts[1] - lefts[0] : 0;
+    shown.forEach((state, i) => {
+      const was = before.indexOf(state);
+      const el = colEls.current.get(state);
+      if (was < 0 || was === i || !el?.animate) return;
+      el.animate([{ transform: `translateX(${(was - i) * pitch}px)` }, { transform: 'translateX(0)' }], { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    });
+  }, [shown]);
   const sharing = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since } : null);
   const isSelected = (it: WorkItem | null) => !!it && !!selected && it.id === selected.id && it.product === selected.product;
   // The keyboard's card stays on the screen as J, K and the arrows move it,
   // and only when it moves, so a refresh never scrolls the board out from
-  // under the pointer.
+  // under the pointer. Before the frame is drawn, not after: after, a card
+  // below the fold was painted where it was and then scrolled to a frame
+  // later, which is a jump on every press down a long column.
   const boardRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  useBeforePaint(() => {
     boardRef.current?.querySelector('.th-card.selected')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [selected?.id, selected?.product]);
-  const endDrag = () => { setDragging(null); setPreview(null); };
+  // Whether a drag is still going, for the frame-late start above: a drag let
+  // go before that frame must not leave a column marked as carried.
+  const dragLive = useRef(false);
+  const endDrag = () => { dragLive.current = false; setDragging(null); setPreview(null); };
   return <div className="list hm-me">
     {end && <div className="th-bar th-bar-end">{end}</div>}
     <div className={`th-board${dragging ? ' dragging' : ''}`} ref={boardRef}>
     {columns.map((col) => {
       const rows = col.rows;
       return <div key={col.state} className={`th-col${dragging === col.state ? ' lifted' : ''}`}
+        ref={(el) => { if (el) colEls.current.set(col.state, el); else colEls.current.delete(col.state); }}
         onDragOver={(e) => {
           if (!dragging) return;
           e.preventDefault();
@@ -459,13 +497,21 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
         onDrop={(e) => { if (!dragging) return; e.preventDefault(); onReorderColumns?.(shown); endDrag(); }}>
         {/* Your own board says what the tab says: what waits on you needs you.
             The heading is the handle: grab it to move the whole column. */}
-        <div className="th-col-h" draggable={!!onReorderColumns} title={onReorderColumns ? 'Drag to move this column' : undefined}
+        <div className="th-col-h" draggable={!!onReorderColumns}
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('application/x-agentbox-column', col.state);
-            const column = e.currentTarget.parentElement;
-            if (column) e.dataTransfer.setDragImage(column, e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-            setDragging(col.state);
+            // No ghost: the column itself moves through the board as you drag
+            // (the slot that stood in for it was "very strange visually").
+            if (BLANK_DRAG) e.dataTransfer.setDragImage(BLANK_DRAG, 0, 0);
+            // THE DRAG DIED THE MOMENT IT STARTED (reported 2026-10-02, "when
+            // i try to drag nothing happens"; a real mouse drag measured
+            // dragstart then dragend and nothing between). Chrome cancels a
+            // drag whose source is redrawn inside dragstart, and setting this
+            // state redrew the column there. A frame later it is not.
+            const state = col.state;
+            dragLive.current = true;
+            requestAnimationFrame(() => { if (dragLive.current) setDragging(state); });
           }}
           onDragEnd={endDrag}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b>
           {/* THE HANDLE COMES UP WHEN YOU ARE OVER THE COLUMN: "a little drag

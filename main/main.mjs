@@ -32,6 +32,7 @@ import { installNotifier } from './notify.mjs';
 import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mjs';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mjs';
 import { hotWindowVerdict, storeHasWork } from './dev-window.mjs';
+import { writeHeldThenReload } from './write-before-reload.mjs';
 import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterInAPage } from '../shared/artifact-keys.mjs';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 
@@ -252,8 +253,18 @@ function reloadRenderer() {
   // identical build unless something records that it arrived at all.
   console.log(`zero: reload requested, renderer built ${new Date(builtAt()).toLocaleTimeString()}`);
   if (!window || window.isDestroyed()) return;
-  reloadRequested = true;
-  window.webContents.reloadIgnoringCache();
+  // The page may be holding something she did in the last three seconds (a
+  // close, an answer, a reply) for Z to take back. It is written first, or the
+  // reload throws it away and the thread comes back to her inbox
+  // (w-47218417a5). See write-before-reload.mjs.
+  void writeHeldThenReload({
+    webContents: window.webContents,
+    ipcMain,
+    reload: () => {
+      reloadRequested = true;
+      window.webContents.reloadIgnoringCache();
+    },
+  });
 }
 
 async function createWindow() {

@@ -1016,6 +1016,8 @@ declare global {
       // interrupted, and how many are waiting on her because their session was
       // gone. Startup's version of it rides on bootInfo instead.
       onRecovered?(fn: (r: { text: string }) => void): () => void;
+      // ⌘R is about to reload: write what the grace window is holding first.
+      onWriteHeld?(fn: () => Promise<void>): () => void;
       // What arrived. The page does not choose the words and does not choose
       // whether to speak at all; only the main process can see whether she is
       // looking at the window (main/notify.mjs).
