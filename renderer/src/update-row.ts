@@ -69,3 +69,25 @@ export function changeLines(state: Pick<UpdateState, 'changes' | 'behind'> | nul
   const more = (state?.behind ?? changes.length) - changes.length;
   return more > 0 ? [...changes, `and ${more} more`] : [...changes];
 }
+
+/**
+ * WHETHER THE SIDEBAR'S UPDATE CARD HAS BEEN SHRUNK TO ONE LINE
+ *  (components/SidebarUpdate.tsx). Kept across versions on purpose: changes
+ *  land several times a day, and a card that came back for each one would be
+ *  the thing that was shrunk. Storage that is missing or refuses reads as the
+ *  card, which is the default. */
+export const UPDATE_SMALL_KEY = 'zero.updateSmall';
+
+type SmallStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null | undefined;
+const windowStore = (): SmallStore => (typeof localStorage === 'undefined' ? undefined : localStorage);
+
+export function readUpdateSmall(store: SmallStore = windowStore()): boolean {
+  try { return store?.getItem(UPDATE_SMALL_KEY) === '1'; } catch { return false; }
+}
+
+export function writeUpdateSmall(store: SmallStore, small: boolean): void {
+  try {
+    if (small) store?.setItem(UPDATE_SMALL_KEY, '1');
+    else store?.removeItem(UPDATE_SMALL_KEY);
+  } catch { /* the choice is not kept this time; the screen still changes */ }
+}

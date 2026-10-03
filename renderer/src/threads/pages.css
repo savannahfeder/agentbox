@@ -17,11 +17,30 @@
 .th-mark-btn:hover .th-mark, .th-mark-btn:focus-visible .th-mark { visibility: hidden; }
 .th-side-foot { display: flex; flex-direction: column; gap: 2px; }
 
-/* A NEW VERSION WAITING (components/SidebarUpdate.tsx). One row in the foot
-   list, sized like Settings, quieter than it: grey words, no border. It was a
-   bordered card until 2026-10-02 and pulled at you to restart all day. The
-   icon is grey: the accent here is a red-orange and read as a bug. */
+/* A NEW VERSION WAITING (components/SidebarUpdate.tsx). A card above the foot
+   by default; its corner button, shown when you point at it, shrinks it to one
+   row in the foot list, sized like Settings and quieter than it: grey words,
+   no border. The row's own corner button brings the card back. Every icon is
+   grey: the accent here is a red-orange and read as a bug. */
 @keyframes sb-update-spin { to { transform: rotate(360deg); } }
+
+.sb-update-card { position: relative; margin: 0 0 14px; padding: 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); display: flex; flex-direction: column; gap: 6px; }
+.sb-update-card-title { display: flex; align-items: center; gap: 8px; padding-right: 22px; font-size: 13.5px; color: var(--text); }
+.sb-update-card-title svg { width: 16px; height: 16px; color: var(--text-dim); flex: none; }
+.sb-update-card[data-installing] .sb-update-card-title svg { animation: sb-update-spin 1.4s linear infinite; }
+.sb-update-card p { margin: 0; font-size: 12px; line-height: 1.45; color: var(--text-faint); }
+.workspace-navigation .sb-update-go { margin-top: 4px; height: 30px; width: 100%; justify-content: center; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--wash); color: var(--text); font-size: 13px; }
+.workspace-navigation .sb-update-go:hover { background: var(--wash-strong); }
+
+/* The two small corner buttons. Hidden until you point at what they sit on,
+   and still reachable by Tab, which shows them too. */
+.workspace-navigation .sb-update-shrink, .workspace-navigation .sb-update-grow { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; padding: 0; justify-content: center; color: var(--text-faint); opacity: 0; transition: opacity 120ms ease; }
+.workspace-navigation .sb-update-grow { top: 7px; }
+.workspace-navigation .sb-update-shrink svg, .workspace-navigation .sb-update-grow svg { width: 14px; height: 14px; }
+.sb-update-card:hover .sb-update-shrink, .sb-update-card:focus-within .sb-update-shrink { opacity: 1; }
+.sb-update-small:hover .sb-update-grow, .sb-update-small:focus-within .sb-update-grow { opacity: 1; }
+.workspace-navigation .sb-update-shrink:hover, .workspace-navigation .sb-update-grow:hover { color: var(--text); }
+.sb-update-small { position: relative; }
 
 .workspace-navigation .sb-update-row { color: var(--text-faint); border: none; }
 .workspace-navigation .sb-update-row:hover { color: var(--text-dim); }
