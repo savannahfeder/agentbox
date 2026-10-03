@@ -4219,6 +4219,14 @@ img.app-mark { opacity: 1; border-radius: 0; }
 }
 .msg-on:hover { color: var(--text-dim); text-decoration: underline; }
 .msg-on:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
+/* Send now, on a message waiting for the agent's current step. */
+.msg-now {
+  appearance: none; background: none; border: 0; padding: 0; margin: 0;
+  font: inherit; font-size: 12.5px; color: var(--text-dim); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.msg-now:hover { color: var(--text); }
+.msg-now:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
 .msg-body { font-size: 15px; line-height: 1.6; color: var(--text); }
 .msg-body > :first-child { margin-top: 0; }
 .msg-body > :last-child { margin-bottom: 0; }

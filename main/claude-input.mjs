@@ -117,6 +117,17 @@ export function attachClaudeInput(child) {
     try { child.stdin.write(JSON.stringify({ type:'control_request', request_id, request }) + '\n'); }
     catch(error) { clearTimeout(timer); controls.delete(request_id); reject(error); }
   });
+  // SEND NOW: cut the step the agent is in so her waiting message is answered
+  // as a turn of its own, instead of after a command that may run for minutes
+  // (tests/send-now-cuts-the-current-step-so-the-agent-answers). Measured on a
+  // 45-second command: 43 s of waiting without it, 1.4 s to the answer with it.
+  // ONLY WHILE A MESSAGE OF HERS IS WAITING. The cut turn ends in a result,
+  // and with nothing pending that result closes the input and ends the run.
+  child.interrupt = () => {
+    if (closed || !pending.size) return Promise.resolve({ interrupted: false });
+    child.lastInterruptAt = Date.now();
+    return child.control({ subtype: 'interrupt' }).then(() => ({ interrupted: true }));
+  };
   // NO CLOCK ON THE ACKNOWLEDGEMENT. Claude replays a queued message at its next
   // break, and a break can be minutes away: a worker inside one long command
   // (a render poll, `sleep 12` fifty times) holds it until the command returns.

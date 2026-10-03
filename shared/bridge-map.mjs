@@ -22,6 +22,7 @@ export const REQUEST_CHANNELS = {
   compact: 'zero:compact',
   compactionStatus: 'zero:compaction-status',
   answer: 'zero:answer',
+  sendNow: 'zero:send-now',
   compose: 'zero:compose',
   schedule: 'zero:schedule',
   // The team version: signing in, the team, sharing, routing a given task.

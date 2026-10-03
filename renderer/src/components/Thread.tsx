@@ -66,7 +66,10 @@ export interface CodeInThread {
   open: (path: string) => void;
 }
 
-export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, name, landOn, md, code, chat = false }: {
+export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, landOn, md, code, chat = false }: {
+  // CUT THE AGENT'S CURRENT STEP so a message of hers that is waiting on it is
+  // answered now (w-f37a34def6). Absent where nothing can be cut.
+  onSendNow?: () => unknown;
   events: AgentEvent[];
   /** A conversation with a person: what is not on screen is the oldest part,
    *  so its line sits at the top, the way a chat's history does. */
@@ -118,6 +121,12 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, name, landO
     setOpen(new Map());
     setRunsOpen(new Set());
   }, [landOn]);
+
+  // Send now was pressed and the agent has not taken her words yet. One flag
+  // for the thread: the cut answers every message waiting, not only one.
+  const [cutting, setCutting] = useState(false);
+  const waiting = events.some((e) => e.kind !== 'work' && e.pending && !e.held);
+  useEffect(() => { if (!waiting) setCutting(false); }, [waiting]);
 
   // AT THE BOTTOM, ON THE NEWEST THING SAID. That is the whole reason for this
   // shape.
@@ -268,9 +277,17 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, name, landO
                         which the row knows one. */}
                     {/* AND WHETHER Z STILL REACHES IT: three seconds, then
                         `steer` has it. See `held` in types.ts (w-5281ef1221). */}
+                    {/* AND, ONCE IT IS IN LINE, THAT IT IS WAITING ON THE STEP THE
+                        AGENT IS IN, which can be a command minutes long, with
+                        the one way to stop waiting (w-f37a34def6). */}
                     {e.pending
-                      ? <span className="msg-when msg-sending">{e.held ? 'Sending… press Z to undo' : 'Sending…'}</span>
+                      ? <span className="msg-when msg-sending">{e.held ? 'Sending… press Z to undo' : cutting ? 'Sending now…' : onSendNow ? 'Waiting for its current step' : 'Sending…'}</span>
                       : <span className="msg-when">{when(e.at)}</span>}
+                    {e.pending && !e.held && !cutting && onSendNow && (
+                      <button type="button" className="msg-now" onClick={() => { setCutting(true); onSendNow(); }}>
+                        Send now
+                      </button>
+                    )}
                     {/* WHICH ROW THESE WORDS ARE ON, when they are not on this
                         one. It rides the message's own head rather than a box
                         above the conversation (w-23db941885), so the way back

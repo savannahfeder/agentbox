@@ -5,7 +5,7 @@
 import { NAME } from '../shared/product-name.mjs';
 import { TURN_CLOSED } from './claude-input.mjs';
 export function submitReply(supervisor, payload, commit) {
-  const { product, id, answer, status, permissionMode } = payload;
+  const { product, id, answer, status, permissionMode, now = false } = payload;
   const key = JSON.stringify([product, id]);
   const sends = supervisor._replySends ??= new Map();
   const previous = sends.get(key) ?? Promise.resolve();
@@ -18,7 +18,12 @@ export function submitReply(supervisor, payload, commit) {
     if (!live) return;
     if (permissionMode != null) throw Error('A running turn keeps its current permissions. Stop it before sending with a different permission mode.');
     if (answer.trimStart().startsWith('/') && !session.remoteIdle) throw Error('Wait for the current turn to finish before running a slash command.');
-    return session.child.steer(answer);
+    const taken = session.child.steer(answer);
+    // SENT NOW: her words go in line first, then the step is cut, in the same
+    // tick, so the cut turn's result can never close the input ahead of them.
+    // A cut that fails leaves the message waiting its turn, which is still sent.
+    if (now) session.child.interrupt?.()?.catch?.(() => {});
+    return taken;
   }).then(() => ({ ok: true }), error => ({ ok: false, error }));
   const operation = previous.catch(() => {}).then(async () => {
     const accepted = await delivery;

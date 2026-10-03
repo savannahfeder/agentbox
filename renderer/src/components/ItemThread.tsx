@@ -246,6 +246,11 @@ export function ItemThread({ item, engine, session, opening, sending, onOpenOrig
         landOn={item.id}
         onWhole={() => setWhole(true)}
         onOpenOrigin={onOpenOrigin}
+        // Only a running Claude Code step can be cut; Codex takes her message
+        // at its next step whatever is pressed.
+        onSendNow={session && (session.engine ?? engine) !== 'codex'
+          ? () => api.sendNow({ product: item.product, id: item.id }).catch(() => {})
+          : undefined}
         md={md}
         code={changed.length && onOpenDoc
           ? { paths: changed, open: (path) => onOpenDoc(changePathFor(item.id), path) }

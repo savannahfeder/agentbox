@@ -624,6 +624,18 @@ export class Supervisor {
     return this._kill(session);
   }
 
+  // SEND NOW, on a message of hers already waiting for the agent's current step
+  // to end: cut that step so the message is answered at once
+  // (`interrupt` in claude-input.mjs). The run goes on; only the step stops.
+  // An engine with no way to cut a step takes the message at its next one.
+  async sendNow(product, itemId) {
+    const session = this.sessions.get(itemId);
+    if (!session || session.product !== product) return { ok: false, interrupted: false };
+    if (typeof session.child?.interrupt !== 'function') return { ok: true, interrupted: false };
+    const { interrupted } = await session.child.interrupt();
+    return { ok: true, interrupted };
+  }
+
   // App quit: take the workers down with the supervisor. Killing the app used
   // to orphan every running claude session; six orphans from before a restart
   // kept working under stale permission rules and flooded the founder with
@@ -6107,7 +6119,9 @@ export class Supervisor {
               this.store.recordSessionResult(item.product,item.id,{result:String(event.result || '(the session ended with an empty reply)')});
               session.remoteResultRecorded = true;
               if (session.lastLiveReply) this._handledAnswers.add(this._answerKey(session.lastLiveReply));
-            } else {
+            } else if (!(Date.now() - (session.child?.lastInterruptAt ?? 0) < 30000)) {
+              // A step she cut with Send now ends in an error result too; that
+              // is her message being taken, not the turn failing.
               this._remoteControls?.set(JSON.stringify([item.product,item.id]),{state:'failed',at:Date.now(),mayBeActive:true,text:String(event.result || 'Claude could not complete the remote turn.')});
             }
             this._saveState(); this.onChange?.();
