@@ -211,7 +211,11 @@
 }
 .th-col.lifted .th-col-h { color: var(--text); }
 .th-board.dragging .th-col.lifted .th-col-grip { opacity: 1; color: var(--text-dim); }
-.th-card .t { font-size: 14px; line-height: 20px; color: var(--text); margin: 0 0 14px; }
+.th-card .t { font-size: 14px; line-height: 20px; color: var(--text); margin: 0 0 14px; overflow-wrap: anywhere; }
+/* THE LAST WORD AND THE MARK AFTER IT MOVE AS ONE (w-49cace6736): "we should
+   never have cases where the icon flows over but the text doesn't".
+   TitleThenMark in Pages.tsx puts them in this span. */
+.th-keep { white-space: nowrap; }
 .th-card .t.hidden { color: var(--text-dim); }
 
 /* A message from a person: their face and name first, then what they said. */
