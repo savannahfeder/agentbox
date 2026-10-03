@@ -343,6 +343,8 @@ export class Supervisor {
       // Persisted: an in-memory-only set re-spawned a continuation for every
       // still-open answered item on every app restart.
       this._handledAnswers = new Set(state.handledAnswers ?? []);
+      // Which conversation already holds each of her words (`_noteHeard`).
+      this._heardAnswers = state.heardAnswers ?? {};
       // `_personalSessions` used to sit here, itemId -> claude session id for a
       // personal project's threads. Personal projects are gone (w-d19d6d387c)
       // and `_rowSessions` below does that job for every row there is.
@@ -422,6 +424,7 @@ export class Supervisor {
       this.hiddenProducts = new Set(state.hiddenProducts ?? []);
     } catch {
       this._handledAnswers = new Set();
+      this._heardAnswers = {};
       this._liveSessions = {};
       this._rowSessions = {};
       this._compactions = {};
@@ -1801,7 +1804,11 @@ export class Supervisor {
     const parts = [
       'The founder has replied on the work item you were just working on. This is',
       'that same session: everything you read and wrote is still here, so do not go',
-      'back over the files or the item to catch up. Read their words and carry on.',
+      'back over the files or the item to catch up.',
+      '',
+      'Their newest message is the last one below, and it outranks anything',
+      'before it. Do what it asks first, before you go back to anything you were',
+      'doing; if it says to keep going afterwards, keep going then.',
       '',
       'Two things did change while you were stopped. Your claim on the row was',
       'released when your last run ended, so claim it again before you write to it.',
@@ -1865,7 +1872,8 @@ export class Supervisor {
       'and re-read the work item if you need to.',
     ];
     if (continuation && item?.answer && item.answer !== '(withdrawn)') {
-      parts.push('', 'The founder has answered since you stopped:', '', String(item.answer));
+      parts.push('', 'The founder has answered since you stopped. Their newest message is the',
+        'last one below: do what it asks before you carry on with anything else.', '', String(item.answer));
       // A resumed session has everything it read still in it, EXCEPT anything
       // she attached to the reply that woke it. That is new, and it is the one
       // thing a six-line wake-up can genuinely be missing.
@@ -1925,6 +1933,24 @@ export class Supervisor {
   _answerDelivered(item, answer = item.answer) {
     return this._handledAnswers.has(this._answerKey(item, answer))
       || this._handledAnswers.has(this._legacyAnswerKey(item, answer));
+  }
+
+  // WHICH CONVERSATION ALREADY HOLDS THESE WORDS, which is not whether a run
+  // finished carrying them. A stop releases the delivery mark on purpose, so
+  // the row gets another run, and the resume used to read that release as
+  // "never heard" and hand the same conversation everything again: on
+  // w-f37a34def6 a 2,000-character round of feedback it had acted on for forty
+  // minutes, ahead of the one short ask it had not seen, which it then missed.
+  // Written when a run starts on the words or takes them mid-run, and never
+  // released, because a stop does not unhear anything.
+  _noteHeard(item, sessionId, answer = item?.answer) {
+    if (!sessionId || !item?.wrote?.answer) return;
+    (this._heardAnswers ??= {})[this._answerKey(item, answer)] = sessionId;
+    this._saveState();
+  }
+
+  _heardIn(item, sessionId, answer = item?.answer) {
+    return !!sessionId && this._heardAnswers?.[this._answerKey(item, answer)] === sessionId;
   }
 
   // SOMEONE ELSE IS STILL HOLDING THIS ROW, so a worker sent to it now would be
@@ -3268,6 +3294,7 @@ export class Supervisor {
     try {
       fs.writeFileSync(this._stateFile, JSON.stringify({
         handledAnswers: [...this._handledAnswers].slice(-500),
+        heardAnswers: Object.fromEntries(Object.entries(this._heardAnswers ?? {}).slice(-500)),
         productOrder: this.productOrder,
         hiddenProducts: [...this.hiddenProducts],
         liveSessions: this._liveSessions,
@@ -4256,8 +4283,12 @@ export class Supervisor {
       : (forkFrom ? forkFrom.profile ?? null : (strandedThread ? null : walkedHome));
     // Preserve multiple replies queued before a worker starts, including on a
     // resumed session whose native history has not seen them yet.
+    // A CONVERSATION GOING BACK TO WORK IS NOT TOLD AGAIN WHAT IT ALREADY HEARD
+    // (`_noteHeard`). Only that conversation: a fork or a fresh session needs
+    // every word.
     if (continuation && item.answer && this.store?.readHistory) {
-      const answer = queuedReplyText(item, this.store.readHistory(item.product, item.id), (row) => this._answerDelivered(row));
+      const conversation = forkFrom ? null : resumeId;
+      const answer = queuedReplyText(item, this.store.readHistory(item.product, item.id), (row) => this._answerDelivered(row) || this._heardIn(row, conversation));
       if (answer !== item.answer) item = { ...item, answer };
     }
     let prompt;
@@ -6060,6 +6091,12 @@ export class Supervisor {
     const absorb = (...frame) => {
       session.lastOutputAt = Date.now();
       capture(session, ...frame);
+      // The conversation is up, so the words it was started with are in it
+      // (`_noteHeard`). Here rather than at exit: an app quit may not wait for one.
+      if (continuation && item.answer && session.sessionId && !session.heardNoted) {
+        session.heardNoted = true;
+        this._noteHeard(item, session.sessionId);
+      }
       if (activity(session, ...frame)) this.onChange?.();
       if (session.remoteHeld && engine === DEFAULT_ENGINE) {
         try {

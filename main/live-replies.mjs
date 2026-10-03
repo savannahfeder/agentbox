@@ -40,6 +40,8 @@ export function submitReply(supervisor, payload, commit) {
     const item = saved ? { ...saved, product, id } : saved;
     if (steered && item) {
       supervisor._handledAnswers.add(supervisor._answerKey(item));
+      // Taken into this conversation, which a later stop does not undo.
+      supervisor._noteHeard?.(item, session.sessionId);
       session.lastLiveReply = item;
       supervisor._saveState();
       if (session.exitFailed) {
