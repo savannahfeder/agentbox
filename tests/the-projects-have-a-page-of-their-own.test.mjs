@@ -80,16 +80,16 @@ describe('the page itself', () => {
     expect(page).toContain('shortPath(p.dir)');
   });
 
-  // AT MOST ONE STATE WORD PER ROW, and now there is one word it can be. This
-  // read paused, else personal, else autonomous; the first two are deleted
-  // (w-d19d6d387c, 2026-09-22). One question and a null after it, so a row
-  // still cannot end up carrying two words side by side.
-  it('says a project’s state in one word at most', () => {
+  // NO STATE WORDS ON A ROW (2026-10-02, w-bb5047e258). The row carried "2
+  // running" and "on its own", which read together as "2 running on its own":
+  // "I'm not sure I understand what [it] means, and it looks a little visually
+  // unappealing". Both facts live where they mean something, the inbox and
+  // the project's own page, so the row is a name and a folder.
+  it('says nothing about a project’s state on its row', () => {
     const page = pageOf();
-    const flag = page.slice(page.indexOf('const flag ='), page.indexOf('return ('));
-    expect(flag).toContain('on its own');
-    expect(flag.match(/\?/g)).toHaveLength(1);
-    expect(flag).toContain(": null)");
+    expect(page).not.toContain('pp-flag');
+    expect(page).not.toContain("'on its own'");
+    expect(page).not.toMatch(/\{p\.running\} running/);
   });
 
   // A PRESS ON A ROW OPENS THE PROJECT. Renaming and pictures stay on the page
@@ -128,8 +128,21 @@ describe('the way back', () => {
       expect(css).toContain(name);
     }
     const page = read('renderer/src/components/projects-page.css');
-    for (const name of ['.pp-row', '.pp-where', '.pp-flag', '.pp-rank', '.pp-acts']) {
+    for (const name of ['.pp-row', '.pp-where', '.pp-rank', '.pp-acts']) {
       expect(page).toContain(name);
     }
+    expect(page).not.toContain('.pp-flag');
+  });
+
+  // THE SEARCH LOOKS LIKE A SEARCH (2026-10-02): a plain box reading "Find a
+  // project" "doesn't look super clear as a search". It carries the magnifier
+  // every search field has, says Search, and clears with one press.
+  it('draws the find box as a search bar', () => {
+    const page = pageOf();
+    expect(page).toMatch(/className="proj-search"/);
+    expect(page).toMatch(/className="proj-search-icon"/);
+    expect(page).toMatch(/placeholder="Search projects"/);
+    expect(page).toMatch(/aria-label="Clear the search"/);
+    expect(read('renderer/src/styles.css')).toMatch(/\.proj-search-icon \{/);
   });
 });

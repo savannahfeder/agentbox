@@ -10,7 +10,9 @@
 //   - it filters, by name and by folder, because dozens is past reading;
 //   - each row shows the folder, the one thing that tells two projects of the
 //     same name apart;
-//   - one state word at most per row;
+//   - no state words on a row: "2 running" and "on its own" read as one
+//     unclear phrase, and both live where they mean something, the inbox and
+//     the project's own page (w-bb5047e258);
 //   - a press on the row opens the project and does nothing else. Renaming and
 //     pictures stay on the page it opens.
 //
@@ -37,8 +39,6 @@ interface Row {
   name: string;
   logo?: string | null;
   dir: string;
-  running: number;
-  autonomous: boolean;
 }
 
 export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archived = [], onUnarchive, onArchive }: {
@@ -120,13 +120,13 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
     for (const p of ordered) {
       const d = info.get(p.slug);
       seen.add(p.slug);
-      out.push({ slug: p.slug, name: d?.name ?? p.name, logo: d?.logo ?? p.logo, dir: d?.dir ?? p.dir, running: d?.running ?? 0, autonomous: !!d?.autonomous });
+      out.push({ slug: p.slug, name: d?.name ?? p.name, logo: d?.logo ?? p.logo, dir: d?.dir ?? p.dir });
     }
     for (const d of details) {
       // In the order but left off on purpose (a conversation, the practice
       // project) stays off; only one the order has never heard of is added.
       if (seen.has(d.slug) || bySlug.has(d.slug)) continue;
-      out.push({ slug: d.slug, name: d.name, logo: d.logo, dir: d.dir ?? '', running: d.running ?? 0, autonomous: !!d.autonomous });
+      out.push({ slug: d.slug, name: d.name, logo: d.logo, dir: d.dir ?? '' });
     }
     return out;
   }, [full.join('\n'), ranked, details, archived]);
@@ -144,10 +144,6 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
   // so the press only ever archives what is on the screen.
   const shownKey = shownSlugs.join('\n');
   useEffect(() => { setPicked((prev) => (prev.size ? keepShown(prev, shownSlugs) : prev)); }, [shownKey]);
-
-  // THE STATE IN WORDS, at most one. Null on an ordinary project, which is
-  // nearly all of them, and then the row is just a name.
-  const flag = (p: Row) => (p.autonomous ? 'on its own' : null);
 
   // The row that just moved keeps a mark for a moment, so the eye can follow it.
   const [moved, setMoved] = useState<string | null>(null);
@@ -217,14 +213,28 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
           : 'Open a project to change its name, its picture and how its agents run.'}
       </p>
       <div className="proj-index-top">
-        <input
-          className="proj-index-find"
-          type="search"
-          value={filter}
-          placeholder="Find a project"
-          aria-label="Find a project"
-          onChange={(e) => setFilter(e.target.value)}
-        />
+        {/* A SEARCH THAT LOOKS LIKE ONE: the magnifier, the word Search, and
+            a clear button once something is typed. A plain box reading "Find a
+            project" did not read as a search. */}
+        <label className="proj-search">
+          <svg className="proj-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.25" /><path d="m10.2 10.2 3.3 3.3" />
+          </svg>
+          <input
+            className="proj-index-find"
+            type="search"
+            value={filter}
+            placeholder="Search projects"
+            aria-label="Search projects"
+            onChange={(e) => setFilter(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Escape' && filter) { e.stopPropagation(); setFilter(''); } }}
+          />
+          {filter && (
+            <button type="button" className="proj-search-clear" aria-label="Clear the search" onClick={() => setFilter('')}>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="m5 5 6 6M11 5l-6 6" /></svg>
+            </button>
+          )}
+        </label>
         {onArchive && rows.length > 0 && (
           <button type="button" className="set-ghost pp-select" aria-pressed={selecting}
             onClick={selecting ? stopSelecting : startSelecting}>{selecting ? 'Cancel' : 'Select'}</button>
@@ -304,8 +314,6 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
                     {/* THE FOLDER, which tells two projects of the same name apart. */}
                     {p.dir && <span className="pp-where">{shortPath(p.dir)}</span>}
                   </span>
-                  {p.running > 0 && <span className="pp-flag">{p.running} running</span>}
-                  {flag(p) && <span className="pp-flag">{flag(p)}</span>}
                   {onSetOrder && !selecting && (
                     <span className="pp-acts">
                       <button type="button" className="pp-top" disabled={rank === 0}

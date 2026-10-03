@@ -5143,13 +5143,29 @@ a.set-ghost { text-decoration: none; display: inline-block; }
    state only when there is one.
 */
 .proj-index-top { display: flex; align-items: center; gap: 8px; margin: 4px 0 14px; }
+/* The search: a magnifier inside the box and room for it, the browser's own
+   cancel mark swapped for ours so it matches the rest of the page. */
+.proj-search { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
+.proj-search-icon {
+  position: absolute; left: 11px; width: 15px; height: 15px;
+  color: var(--text-faint); pointer-events: none; transition: color .12s;
+}
+.proj-search:focus-within .proj-search-icon { color: var(--text-dim); }
 .proj-index-find {
-  flex: 1; min-width: 0; height: 32px; padding: 0 10px;
+  flex: 1; min-width: 0; height: 32px; padding: 0 32px 0 34px;
   font-family: inherit; font-size: 13.5px; color: var(--text);
   background: var(--bg-hover); border: 1px solid var(--line); border-radius: var(--radius);
 }
 .proj-index-find:focus { outline: none; border-color: var(--text-faint); }
 .proj-index-find::placeholder { color: var(--text-faint); }
+.proj-index-find::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
+.proj-search-clear {
+  position: absolute; right: 6px; width: 22px; height: 22px; padding: 0;
+  display: grid; place-items: center;
+  background: none; border: 0; border-radius: 50%; color: var(--text-faint); cursor: pointer;
+}
+.proj-search-clear svg { width: 13px; height: 13px; }
+.proj-search-clear:hover { color: var(--text); background: var(--line); }
 /* The rows themselves are components/projects-page.css: the list is also the
    running order now (w-a514b58055). */
 
