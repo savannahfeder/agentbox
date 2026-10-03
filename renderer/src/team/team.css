@@ -200,14 +200,13 @@ img.tm-av { background: var(--bg-selected); }
 .th-me-text { display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
   min-width: 0; flex: 1 1 auto; }
 
-/* YOUR FACE IS ABOUT THE SIZE IT ALWAYS WAS. It was made as tall as the two
-   lines beside it (36px) and she found that "a little large" and asked for
-   "around the size it was before", which was 22px (2026-10-02). 24 is that,
-   a touch bigger because it now sits beside two lines rather than one, and
-   the row centres it between them.
+/* YOUR FACE IS 32px, THE SIZE SHE PICKED. It was made as tall as the two
+   lines beside it (36px) and she found that "a little large" (2026-10-02).
+   24 shipped first; shown 22, 24, 28, 32 and 36 side by side at full screen,
+   she answered "32px approved". The row centres it between the two lines.
    The collapsed rail keeps the 22px square: there the face is an icon among
    icons. */
-.workspace-navigation .th-me .tm-av { width: 24px; height: 24px; line-height: 22px; font-size: 9.5px; }
+.workspace-navigation .th-me .tm-av { width: 32px; height: 32px; line-height: 30px; font-size: 10.5px; }
 .workspace-collapsed .workspace-navigation .th-me .tm-av { width: 22px; height: 22px; line-height: 20px; font-size: 9px; }
 
 /* 20 and 16 sit inside the row's 38px of content box, so the row keeps the

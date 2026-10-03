@@ -40,6 +40,9 @@
   box-shadow: 0 32px 90px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   text-align: left;
   color: var(--text);
+  /* Not part of the window's drag region, for the same reason as `.tc-menu`
+     below: on a short window the card's top can reach the top bar. */
+  -webkit-app-region: no-drag;
 }
 
 /* ------------------------------ the header ------------------------------- */
@@ -142,6 +145,13 @@
   display: flex; flex-direction: column; gap: 1px; text-align: left;
   font-size: 13.5px; line-height: 20px; color: var(--text-dim);
   animation: tc-in 0.13s cubic-bezier(0.2, 0.8, 0.3, 1);
+  /* NOT DRAGGABLE, AND THAT IS WHY REORDER WAS DEAD (w-b4e97f344e, 2026-10-02).
+     A menu rising from the card can lie over `.topbar`, a window drag region
+     about 94 points tall. Electron's drag region is native and ignores what is
+     painted over it, so a press there moved the window and the hover lagged.
+     This cuts the menu out of it, and it wins because the card is drawn after
+     the top bar. Pinned by tests/a-composer-menu-over-the-top-bar-takes-clicks. */
+  -webkit-app-region: no-drag;
 }
 @keyframes tc-in { from { opacity: 0; transform: translateY(3px); } }
 .tc-row {
