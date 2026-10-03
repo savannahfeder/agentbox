@@ -200,13 +200,19 @@ img.tm-av { background: var(--bg-selected); }
 .th-me-text { display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
   min-width: 0; flex: 1 1 auto; }
 
-/* YOUR FACE IS 32px, THE SIZE SHE PICKED. It was made as tall as the two
-   lines beside it (36px) and she found that "a little large" (2026-10-02).
-   24 shipped first; shown 22, 24, 28, 32 and 36 side by side at full screen,
-   she answered "32px approved". The row centres it between the two lines.
-   The collapsed rail keeps the 22px square: there the face is an icon among
-   icons. */
-.workspace-navigation .th-me .tm-av { width: 32px; height: 32px; line-height: 30px; font-size: 10.5px; }
+/* YOUR ROW KEEPS THE SIDEBAR'S COLUMN. Your name starts where "Settings"
+   and "Invite people" start (10 + 18 + 11 = 39px in, from the menu's
+   padding, icon and gap in workspace-navigation.css), and your face is
+   centred on their icons. At 32px the face stuck out past the icons and the
+   name sat 10px right of the labels, which is what still felt "a little bit
+   weird" after the size was settled (2026-10-02). Shown seven versions at
+   full screen she picked this one: 28px, light border kept, 4 + 28 + 7 = 39.
+   Change the menu's spacing and this has to move with it; the test does
+   the sum. The collapsed rail keeps the 22px square and its own 8px: there
+   the face is an icon among icons. */
+.workspace-navigation .th-me { padding-left: 4px; gap: 7px; }
+.workspace-navigation .th-me .tm-av { width: 28px; height: 28px; line-height: 26px; font-size: 10px; }
+.workspace-collapsed .workspace-navigation .th-me { padding-left: 8px; gap: 9px; }
 .workspace-collapsed .workspace-navigation .th-me .tm-av { width: 22px; height: 22px; line-height: 20px; font-size: 9px; }
 
 /* 20 and 16 sit inside the row's 38px of content box, so the row keeps the

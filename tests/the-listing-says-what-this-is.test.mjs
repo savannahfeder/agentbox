@@ -42,7 +42,9 @@ describe('the npm listing', () => {
     // The npm name is not the app's name. `productName` and `build.appId` are
     // what macOS hangs a window title and a permission grant on, and moving
     // either of those revokes what she has already granted.
-    expect(pkg.productName).toBe('agentbox');
+    // Capitalised 2026-10-02 (w-23fa810982). A Mac disk ignores letter case,
+    // so the data folder "agentbox" is the same folder as "Agentbox".
+    expect(pkg.productName).toBe('Agentbox');
     expect(pkg.build.appId).toBe('ac.astral.app');
   });
 

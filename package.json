@@ -1,6 +1,6 @@
 {
   "name": "agentbox-app",
-  "productName": "agentbox",
+  "productName": "Agentbox",
   "version": "0.1.7",
   "description": "An inbox for managing dozens of Claude Code and Codex agents.",
   "author": "Savannah Feder",
@@ -108,8 +108,8 @@
   },
   "build": {
     "appId": "ac.astral.app",
-    "productName": "agentbox",
-    "copyright": "Copyright \u00a9 2026 Agentbox",
+    "productName": "Agentbox",
+    "copyright": "Copyright © 2026 Agentbox",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -162,7 +162,7 @@
       "notarize": false
     },
     "dmg": {
-      "title": "agentbox",
+      "title": "Agentbox",
       "contents": [
         {
           "x": 140,

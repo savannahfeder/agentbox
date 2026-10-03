@@ -2109,9 +2109,13 @@ export default function App() {
   const onBoard = search === null && inboxDisplay.view === 'board';
   // The columns themselves are kept too, for the left and right arrows
   // (`boardSideways`), and they come in the order you dragged them to.
+  const boardArgs = useMemo(
+    () => ({ items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards, picked: team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds, projectOrder }),
+    [items, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds, projectOrder],
+  );
   const boardCols = useMemo(
-    () => (onBoard ? boardColumns({ items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards, picked: team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds, order: columnOrder, projectOrder }) : null),
-    [onBoard, items, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds, columnOrder, projectOrder],
+    () => (onBoard ? boardColumns({ ...boardArgs, order: columnOrder }) : null),
+    [onBoard, boardArgs, columnOrder],
   );
   const boardOrder = useMemo(() => (boardCols ? boardWalk(boardCols) : null), [boardCols]);
   const list = search !== null ? (hits ?? []).map((h) => h.item) : boardOrder ?? displayedBox;
@@ -2120,18 +2124,18 @@ export default function App() {
   // A DROPPED COLUMN LEAVES THE KEYBOARD ON THE SAME THREAD. `selected` is a
   // place in the walk, and moving a column moves every place after it, so the
   // highlight jumped to another card on the drop (photographed 2026-10-02).
-  const keepOnReorder = useRef<WorkItem | null>(null);
+  // IN THE SAME UPDATE AS THE ORDER, not an effect a render later: for that
+  // one render the place pointed at a card further down, the board scrolled
+  // to it, and came back only as far as the right card, headings hidden
+  // ("the content scrolled down like this without my prompting").
   const reorderColumns = useCallback((order: ThreadStateWord[]) => {
-    keepOnReorder.current = current ?? null;
+    const keep = current;
     setColumnOrder(order);
-  }, [current, setColumnOrder]);
-  useEffect(() => {
-    const k = keepOnReorder.current;
-    if (!k || !boardOrder) return;
-    keepOnReorder.current = null;
-    const i = boardOrder.findIndex((x) => x.id === k.id && x.product === k.product);
+    if (!keep) return;
+    const next = boardWalk(boardColumns({ ...boardArgs, order }));
+    const i = next.findIndex((x) => x.id === keep.id && x.product === keep.product);
     if (i >= 0) setSelected(i);
-  }, [boardOrder]);
+  }, [current, setColumnOrder, boardArgs]);
   // THE ROW THE ROW-KEYS ACT ON. The pointer's row when it is on one, and the
   // keyboard's row otherwise. This is the half of that is not a drawing: the
   // hint is printed on the row under the pointer, so pressing the key it

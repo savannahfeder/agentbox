@@ -111,7 +111,17 @@ describe('moving down the board does not jump', () => {
   const board = pages.slice(pages.indexOf('export function InboxBoard'));
   it('scrolls to the keyboard\'s card before the frame is drawn', () => {
     expect(pages).toContain('const useBeforePaint = typeof window === \'undefined\' ? useEffect : useLayoutEffect;');
-    expect(board).toMatch(/useBeforePaint\(\(\) => \{\s*boardRef\.current\?\.querySelector\('\.th-card\.selected'\)/);
+    expect(board).toMatch(/useBeforePaint\(\(\) => \{[^}]{0,200}boardRef\.current\?\.querySelector\('\.th-card\.selected'\)/);
+  });
+  // A column's first card scrolled into view left its heading above the top
+  // of the board (the founder's screenshots, 2026-10-02). On a first card the
+  // heading is what is brought into view, and the card comes with it.
+  it('shows the column\'s heading when the keyboard is on its first card', () => {
+    expect(board).toContain("const first = col?.querySelector('.th-card') === card;");
+    expect(board).toContain("(first ? col?.querySelector('.th-col-h') ?? card : card).scrollIntoView");
+  });
+  it('does not scroll the board while a column is being carried', () => {
+    expect(board).toContain('if (drag.current?.started) return;');
   });
   it('does not rebuild the columns when only the keyboard\'s card moved', () => {
     expect(board).toMatch(/const columns = useMemo\(/);
