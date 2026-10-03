@@ -10,6 +10,7 @@ import type { Seen } from './summary-rules';
 import type { Product, ThreadCard, ThreadStateWord, WorkItem } from '../types';
 import { priorityIdOf, type PriorityId } from '../priority';
 import { threadState } from '../../../shared/thread-cards.mjs';
+import { productRankScore } from '../../../shared/rank.mjs';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
@@ -88,14 +89,25 @@ export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>
   return true;
 }
 
-// URGENT, HIGH, MEDIUM, LOW, newest first inside a level. One comparator, read
-// by the list and by every column of the board, because the two disagreed: a
-// section promising priority order was not in one (w-5a08121f99).
+// YOUR PROJECT ORDER, THEN URGENT, HIGH, MEDIUM, LOW, newest first inside a
+// level. One comparator, read by the list, by every column of the board and by
+// the merge of a teammate's rows, because the two disagreed: a section
+// promising priority order was not in one (w-5a08121f99).
+//
+// PRIORITY INCLUDES PROJECTS (w-e263a8a0fb, 2026-10-02): the board ran each
+// thread's own level alone, so one project's threads were scattered down a
+// column and the order set in Settings > Project priority counted for nothing
+// on the page. A project's place comes first, by `productRankScore`, the same
+// rule the fleet runs by; inside one project the level is the number the row
+// shows, so the levels never read out of order. A project never placed scores
+// nothing, so with no order this is the level sort it was.
 const RANK: Record<PriorityId, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-const byPriority = (a: Ranked, b: Ranked) =>
-  RANK[priorityIdOf(a.priority)] - RANK[priorityIdOf(b.priority)] || b.updatedAt - a.updatedAt;
+export const byPriority = (projectOrder: string[] = []) => (a: Ranked, b: Ranked) =>
+  productRankScore(projectOrder, b.product ?? '') - productRankScore(projectOrder, a.product ?? '')
+  || RANK[priorityIdOf(a.priority)] - RANK[priorityIdOf(b.priority)] || b.updatedAt - a.updatedAt;
 const byUpdated = (a: Ranked, b: Ranked) => b.updatedAt - a.updatedAt;
-type Ranked = { priority?: number | null; updatedAt: number; status?: string; wrote?: WorkItem['wrote'] };
+/** `product` is the project's slug, which is what the running order holds. */
+export type Ranked = { priority?: number | null; updatedAt: number; status?: string; wrote?: WorkItem['wrote']; product?: string | null };
 
 /**
  * WHEN A THREAD WAS FINISHED: the moment its status was written as done, which
@@ -112,7 +124,8 @@ const byFinished = (a: Ranked, b: Ranked) => finishedAt(b) - finishedAt(a);
 // it was a wall of Urgent rows in no order a reader could follow, and nothing
 // in it is waiting on a priority any more. So Done always runs newest finished
 // first, and every other tab keeps the Display's sort.
-const order = (d: Display, tab?: string) => (tab === 'done' ? byFinished : d.sort === 'updated' ? byUpdated : byPriority);
+const order = (d: Display, tab?: string, projectOrder: string[] = []) =>
+  (tab === 'done' ? byFinished : d.sort === 'updated' ? byUpdated : byPriority(projectOrder));
 
 /** The time column's heading: on Done it is when each thread was finished. */
 export const timeHeading = (tab?: string) => (tab === 'done' ? 'Done' : 'Updated');
@@ -122,10 +135,10 @@ export const timeHeading = (tab?: string) => (tab === 'done' ? 'Done' : 'Updated
  *
  * PRIORITY USED TO MEAN "LEAVE THEM ALONE", on the grounds that the list
  * arrived in the app's own ranking. That ranking is `byRunningOrder(score)` in
- * App.tsx, where a product's place in her running order is worth a hundred item
- * points: it is the order the fleet takes work in, and it is not what the word
- * Priority on a menu promises. A board was reported running Medium, Low, High,
- * Medium under that heading.
+ * App.tsx, which throws away a level an agent wrote, so a board was reported
+ * running Medium, Low, High, Medium under that heading. It sorts here now, by
+ * `projectOrder` (your running order of projects) and then the level each row
+ * shows.
  *
  * The two rows the app makes itself stay at the top of either sort. They belong
  * to no project (`product` is empty, trouble-row.ts and update-row.ts) because
@@ -133,17 +146,18 @@ export const timeHeading = (tab?: string) => (tab === 'done' ? 'Done' : 'Updated
  * work would put them somewhere meaningless. `keeps` exempts them for the same
  * reason.
  */
-export function sorted<T extends Ranked & { product?: string }>(rows: T[], d: Display, tab?: string): T[] {
+export function sorted<T extends Ranked & { product?: string }>(rows: T[], d: Display, tab?: string, projectOrder: string[] = []): T[] {
+  const by = order(d, tab, projectOrder);
   const mine = rows.filter((r) => r.product !== '');
-  if (mine.length === rows.length) return rows.slice().sort(order(d, tab));
-  return [...rows.filter((r) => r.product === ''), ...mine.sort(order(d, tab))];
+  if (mine.length === rows.length) return rows.slice().sort(by);
+  return [...rows.filter((r) => r.product === ''), ...mine.sort(by)];
 }
 
-/** The same order, for the board's cards, which carry a level and no project
- *  row. A card of yours is timed by its thread, so Done reads when it finished. */
-export function sortedEntries(entries: BoardEntry[], d: Display, column?: string): BoardEntry[] {
-  const by = order(d, column);
-  const timed = (e: BoardEntry): Ranked => (e.item ? { ...e, status: e.item.status, wrote: e.item.wrote } : e);
+/** The same order, for the board's cards, which carry a level and a project
+ *  slug. A card of yours is timed by its thread, so Done reads when it finished. */
+export function sortedEntries(entries: BoardEntry[], d: Display, column?: string, projectOrder: string[] = []): BoardEntry[] {
+  const by = order(d, column, projectOrder);
+  const timed = (e: BoardEntry): Ranked => ({ ...e, product: e.projectSlug, ...(e.item ? { status: e.item.status, wrote: e.item.wrote } : {}) });
   return entries.slice().sort((a, b) => by(timed(a), timed(b)));
 }
 
@@ -421,6 +435,10 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
       live: !!live?.has(item.id),
     });
   }
+  // A teammate's card names its project and not its slug. A shared project
+  // carries the same name on every Mac, so the name finds your copy of it, and
+  // with it the project's place in your order.
+  const slugOfName = new Map(products.map((p) => [p.name, p.slug]));
   for (const card of cards) {
     if (card.personId === me) continue;
     // A PRIVATE THREAD IS NOT ON THE BOARD AT ALL (decided 2026-10-01): a lock
@@ -430,7 +448,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     if (card.state === 'done' && !(card.updatedAt >= today)) continue;
     out.push({
       key: `card/${card.personId}/${card.threadId}`, ownerId: card.personId, state: card.state, title: card.visible ? card.title : null,
-      project: card.visible ? card.project : null, projectSlug: null, priority: card.priority, updatedAt: card.updatedAt, item: null, card,
+      project: card.visible ? card.project : null, projectSlug: (card.visible && slugOfName.get(card.project ?? '')) || null, priority: card.priority, updatedAt: card.updatedAt, item: null, card,
     });
   }
   return out.sort((a, b) => b.updatedAt - a.updatedAt);
@@ -521,12 +539,14 @@ export function teamKeeps(e: BoardEntry, { person, projectName }: { person: stri
  * to walk the current tab's list, which a card from another column is not in,
  * so J stopped with the board still full (2026-10-02).
  */
-export function boardColumns({ items, products, display, now, stateOf, cards = [], picked, me, since = null, live, order = DEFAULT_COLUMN_ORDER }: {
+export function boardColumns({ items, products, display, now, stateOf, cards = [], picked, me, since = null, live, order = DEFAULT_COLUMN_ORDER, projectOrder = [] }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number;
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
   cards?: ThreadCard[]; picked?: string[]; me: string | null; since?: number | null; live?: Set<string>;
   /** The columns left to right, as you dragged them (`readColumnOrder`). */
   order?: ThreadStateWord[];
+  /** Your running order of projects, which Sort by Priority reads first. */
+  projectOrder?: string[];
 }): { state: ThreadStateWord; label: string; rows: BoardEntry[] }[] {
   const who = picked ?? (me ? [me] : []);
   const entries = teamEntries({ items: me && !who.includes(me) ? [] : items, products, cards: cards.filter((c) => who.includes(c.personId)), me, now, since, stateOf, live, allMine: true })
@@ -536,7 +556,7 @@ export function boardColumns({ items, products, display, now, stateOf, cards = [
   // (w-5a08121f99). `teamEntries` hands these back newest first. Except Done
   // today, which runs newest finished first like the Done tab (w-c61f5bf497).
   return order.flatMap((state) => BOARD_COLUMNS.filter((c) => c.state === state))
-    .map((col) => ({ ...col, rows: sortedEntries(entries.filter((e) => e.state === col.state), display, col.state) }));
+    .map((col) => ({ ...col, rows: sortedEntries(entries.filter((e) => e.state === col.state), display, col.state, projectOrder) }));
 }
 
 /** Your threads on the board, in reading order. A teammate's card has no

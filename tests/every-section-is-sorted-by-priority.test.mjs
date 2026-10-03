@@ -18,6 +18,11 @@
 //   list and not one column of the board.
 //
 // Priority means Urgent, High, Medium, Low, newest first inside a level.
+//
+// AND YOUR PROJECT ORDER BEFORE THAT, since 2026-10-02 (w-e263a8a0fb): "Tasks
+// in board and list view should be organized by priority, which *includes*
+// projects." Every row here is in one project, so these still hold; the
+// project half is tests/sort-by-priority-puts-your-higher-project-first.test.mjs.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -106,6 +111,6 @@ describe('where the order is applied', () => {
     const board = pages.slice(pages.indexOf('export function InboxBoard'));
     expect(board).toContain('boardColumns({ items, products, display,');
     const rules = src('threads', 'page-rules.ts');
-    expect(rules.slice(rules.indexOf('export function boardColumns'))).toContain('sortedEntries(entries.filter((e) => e.state === col.state), display, col.state)');
+    expect(rules.slice(rules.indexOf('export function boardColumns'))).toContain('sortedEntries(entries.filter((e) => e.state === col.state), display, col.state, projectOrder)');
   });
 });

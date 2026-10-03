@@ -425,7 +425,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
  *  it, the private ones included; with a teammate in view, those wear a lock
  *  and every card names its person. Whose threads is picked on the header's
  *  filters button (w-14bb56c833), so the columns start right under it. */
-export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns }: {
+export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns, projectOrder }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number; onOpenItem: (item: WorkItem) => void;
   /** The column each thread sits in, by the Inbox tabs' rule (App.tsx). */
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
@@ -434,6 +434,8 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   selected?: WorkItem | null;
   /** The columns left to right, and where a dragged order goes to be kept. */
   columnOrder?: ThreadStateWord[]; onReorderColumns?: (order: ThreadStateWord[]) => void;
+  /** Your running order of projects, which Sort by Priority reads first. */
+  projectOrder?: string[];
 }) {
   const liveIds = useContext(LiveContext);
   const team = useContext(TeamContext);
@@ -455,8 +457,8 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   // Held between renders, because J re-renders the board on every press and
   // the columns do not change when only the keyboard's card does.
   const columns = useMemo(
-    () => boardColumns({ items, products, display, now, stateOf, cards, picked, me, since, live: liveIds, order: shown }),
-    [items, products, display, now, stateOf, cards, picked, me, since, liveIds, shown],
+    () => boardColumns({ items, products, display, now, stateOf, cards, picked, me, since, live: liveIds, order: shown, projectOrder }),
+    [items, products, display, now, stateOf, cards, picked, me, since, liveIds, shown, projectOrder],
   );
   // THE OTHER COLUMNS SLIDE TO THEIR NEW PLACES (2026-10-02): they used to
   // jump, which read as "weird ... when I'm moving things around". Measured
