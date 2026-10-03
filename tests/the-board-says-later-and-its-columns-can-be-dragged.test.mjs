@@ -14,7 +14,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
-  BOARD_COLUMNS, DEFAULT_COLUMN_ORDER, boardColumns, boardWalk, moveColumn, readColumnOrder, writeColumnOrder,
+  BOARD_COLUMNS, DEFAULT_COLUMN_ORDER, boardColumns, boardWalk, columnTo, moveColumn, readColumnOrder, slotUnder, writeColumnOrder,
 } from '../renderer/src/threads/page-rules.ts';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -134,14 +134,108 @@ describe('a column says it can be moved', () => {
   });
 });
 
+// AND IT HAS TO LOOK CLEAN DOING IT (2026-10-02, second round, with a
+// screenshot): "visually it looks pretty weird, especially when I hover and
+// when I'm hovering and moving things around." What the picture showed: a
+// grey block behind the heading that ran 6px past the cards on both sides, a
+// "Drag to move this column" tooltip sitting across the first card's title,
+// and, mid-drag, the column drawn twice (the browser's ghost and a 35% copy
+// left in place), with the others jumping rather than moving.
+describe('a column moves cleanly', () => {
+  const css = readFileSync(new URL('../renderer/src/threads/pages.css', import.meta.url), 'utf8');
+  const rule = (sel) => (css.match(new RegExp(`${sel.replace(/[.[\]"()=:*]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ?? [])[1] ?? null;
+  it('hovering the heading puts no block behind it', () => {
+    expect(rule('.th-col-h.movable:hover') ?? '').not.toMatch(/background/);
+    expect(rule('.th-col-h.movable') ?? '').not.toMatch(/margin:\s*0 -/);
+  });
+  it('no tooltip lands on the cards', () => {
+    const out = renderToStaticMarkup(React.createElement(InboxBoard, {
+      items, products, display, now: NOW, stateOf: (i) => i._state, onOpenItem: () => {}, onReorderColumns: () => {},
+    }));
+    expect(out).not.toContain('Drag to move this column');
+  });
+  // Third round, of the empty slot: "this empty block looks very strange
+  // visually". Fourth round, of the column that then only slid sideways: "the
+  // whole columns don't really move ... if I try to lift the column, it
+  // doesn't feel like I've even processed it". So the column is LIFTED: it
+  // follows the pointer both ways, raised over the board, its cards on it.
+  const pages = readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
+  const board = pages.slice(pages.indexOf('export function InboxBoard'));
+  it('the column being carried rides the pointer, raised, with its cards on it', () => {
+    expect(rule('.th-col.lifted')).toMatch(/z-index/);
+    expect(rule('.th-col.lifted')).toMatch(/box-shadow/);
+    expect(rule('.th-col.lifted > *')).toBeNull();
+    // Moved by the pointer in both directions, written straight to the
+    // element so a move costs no render.
+    expect(board).toContain('el.style.transform = `translate(${x}px, ${y}px) scale(1.02)`');
+    // Photographed mid-drag: carried upward, its heading went under the
+    // board's top edge. It rises only a few pixels now.
+    expect(board).toContain('const y = Math.max(-6, d.y - d.startY);');
+  });
+  // AND IT FLICKERED (fourth round): "swapping back and forth at about 40
+  // frames per second ... it's taking me 10 tries" to swap Waiting and In
+  // Progress. The place was read off whichever column the browser said was
+  // under the pointer, and a column sliding out of the way was still drawn
+  // there for a few frames, so the swap undid itself every frame. The place
+  // is now read off the board's fixed slots and the pointer alone.
+  it('works out the place from the pointer and fixed slots, never from what is drawn there', () => {
+    expect(board).not.toMatch(/onDragOver|onDragStart|draggable=/);
+    expect(board).toContain('onPointerDown');
+    expect(board).toContain('setPointerCapture');
+    expect(board).toContain('slotUnder(d.slots, d.slots[d.startIndex] + (d.x - d.startX))');
+  });
+  it('the other columns slide to their new places rather than jump, and the carried one is left to the pointer', () => {
+    expect(pages).toContain('useBeforePaint(() => {\n    const before = lastOrder.current;');
+    expect(pages).toContain('translateX(');
+    expect(pages).toContain('if (state === dragging) return;');
+  });
+});
+
+describe('the slot under the pointer', () => {
+  // Four columns, their centres where a 1440-wide board draws them.
+  const centres = [255, 650, 1045, 1440];
+  it('is the nearest slot to where the carried column\'s middle is', () => {
+    expect(slotUnder(centres, 255)).toBe(0);
+    expect(slotUnder(centres, 600)).toBe(1);
+    expect(slotUnder(centres, 1300)).toBe(3);
+  });
+  it('changes exactly halfway between two slots, not before', () => {
+    expect(slotUnder(centres, 452)).toBe(0);
+    expect(slotUnder(centres, 453)).toBe(1);
+  });
+  it('holds at either end however far past it the pointer goes', () => {
+    expect(slotUnder(centres, -500)).toBe(0);
+    expect(slotUnder(centres, 9000)).toBe(3);
+  });
+  it('is a question of numbers only, so the same pointer always gives the same slot', () => {
+    expect([1, 2, 3, 4, 5].map(() => slotUnder(centres, 652))).toEqual([1, 1, 1, 1, 1]);
+  });
+  it('with no slots there is nowhere to go', () => {
+    expect(slotUnder([], 100)).toBe(-1);
+  });
+});
+
+describe('a column taken to a slot', () => {
+  it('lands at that place, the others closing up around it', () => {
+    expect(columnTo(DEFAULT_COLUMN_ORDER, 'waiting', 1)).toEqual(['running', 'waiting', 'scheduled', 'done']);
+    expect(columnTo(DEFAULT_COLUMN_ORDER, 'done', 0)).toEqual(['done', 'waiting', 'running', 'scheduled']);
+    expect(columnTo(DEFAULT_COLUMN_ORDER, 'running', 3)).toEqual(['waiting', 'scheduled', 'done', 'running']);
+  });
+  it('changes nothing for its own place, or a place that is not on the board', () => {
+    expect(columnTo(DEFAULT_COLUMN_ORDER, 'running', 1)).toEqual(DEFAULT_COLUMN_ORDER);
+    expect(columnTo(DEFAULT_COLUMN_ORDER, 'running', -1)).toEqual(DEFAULT_COLUMN_ORDER);
+    expect(columnTo(DEFAULT_COLUMN_ORDER, 'running', 4)).toEqual(DEFAULT_COLUMN_ORDER);
+    expect(columnTo(DEFAULT_COLUMN_ORDER, 'nowhere', 0)).toEqual(DEFAULT_COLUMN_ORDER);
+  });
+});
+
 describe('the board itself', () => {
   const pages = readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
   const board = pages.slice(pages.indexOf('export function InboxBoard'));
   it('draws in the order App.tsx walks, and lets a column be dragged by its heading', () => {
     expect(board).toContain('order: shown');
-    expect(board).toContain('draggable');
-    expect(board).toContain('onDrop');
-    expect(board).toContain('moveColumn(');
+    expect(board).toContain('onPointerDown');
+    expect(board).toContain('columnTo(');
   });
   it('App.tsx hands the same order to the board and to J and K', () => {
     const app = readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');

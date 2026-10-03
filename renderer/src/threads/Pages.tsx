@@ -5,7 +5,7 @@
 // Everyone and project pickers over a board or a list. The rules they follow
 // are in ./page-rules.ts; the look is ./pages.css, ported from the drawings
 // she approved.
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName } from '../team/people';
@@ -13,7 +13,7 @@ import { PriorityIcon } from '../components/Priority';
 import { notStarted, rowTitle } from '../list-rules';
 import { DONE } from '../done-word';
 import {
-  boardColumns, DEFAULT_COLUMN_ORDER, filteredEmptyWords, finishedAt, isDirect, isFiltered, moveColumn, projectChoices,
+  boardColumns, columnTo, DEFAULT_COLUMN_ORDER, filteredEmptyWords, finishedAt, isDirect, isFiltered, projectChoices, slotUnder,
   timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type UpdatedWindow,
 } from './page-rules';
@@ -22,6 +22,11 @@ import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './peopl
 import { shownToPeople } from '../../../shared/thread-cards.mjs';
 import { api } from '../api';
 import './pages.css';
+
+// Before the frame is drawn in the app; a plain effect where there is no
+// window (the tests draw the board to a string, and React warns otherwise).
+const useBeforePaint = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+const SETTLE = { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' };
 
 /* ------------------------------------------------------------ icons */
 const GripIcon = () => <svg className="th-col-grip" viewBox="0 0 10 16" width="8" height="13" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4" /><circle cx="7.5" cy="3" r="1.4" /><circle cx="2.5" cy="8" r="1.4" /><circle cx="7.5" cy="8" r="1.4" /><circle cx="2.5" cy="13" r="1.4" /><circle cx="7.5" cy="13" r="1.4" /></svg>;
@@ -436,48 +441,134 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   const who = picked ?? (me ? [me] : []);
   const withOthers = who.some((p) => p !== me);
   const since = team?.state.since ?? null;
-  // A COLUMN BEING DRAGGED MOVES AS YOU DRAG IT (w-23fc91bff5): the others
-  // make room under the pointer, and letting go keeps that order. Let go
-  // anywhere else and the board goes back the way it was.
+  // A COLUMN IS LIFTED AND CARRIED (w-23fc91bff5, fourth round): it rides the
+  // pointer both ways, raised over the board, while the others slide aside;
+  // letting go keeps the order, and Escape puts it back. Pointer events, not
+  // the browser's drag and drop: that one cancelled itself when the column was
+  // redrawn, drew a ghost, and only ever moved the column sideways, which "doesn't
+  // feel like I've even processed it".
   const [dragging, setDragging] = useState<ThreadStateWord | null>(null);
   const [preview, setPreview] = useState<ThreadStateWord[] | null>(null);
   const shown = preview ?? columnOrder;
   // One copy of what the board holds and in what order, which App.tsx also
   // walks with J and K (`boardColumns`, page-rules.ts).
-  const columns = boardColumns({ items, products, display, now, stateOf, cards, picked, me, since, live: liveIds, order: shown });
+  // Held between renders, because J re-renders the board on every press and
+  // the columns do not change when only the keyboard's card does.
+  const columns = useMemo(
+    () => boardColumns({ items, products, display, now, stateOf, cards, picked, me, since, live: liveIds, order: shown }),
+    [items, products, display, now, stateOf, cards, picked, me, since, liveIds, shown],
+  );
+  // THE OTHER COLUMNS SLIDE TO THEIR NEW PLACES (2026-10-02): they used to
+  // jump, which read as "weird ... when I'm moving things around". Measured
+  // from where each column sat in the old order and the pitch between two
+  // columns now, so a window resized since the last move cannot throw it off.
+  const colEls = useRef(new Map<ThreadStateWord, HTMLDivElement>());
+  const lastOrder = useRef(shown);
+  const shownNow = useRef(shown);
+  shownNow.current = shown;
+  // The drag in hand: where it started, the slots' centres measured once at
+  // its start, and where the pointer is. A ref, so a move costs no render.
+  const drag = useRef<{
+    state: ThreadStateWord; el: HTMLDivElement; startX: number; startY: number; x: number; y: number;
+    started: boolean; startIndex: number; slots: number[]; pitch: number;
+  } | null>(null);
+  // Keep the carried column under the pointer: its box sits in whatever slot
+  // the order gives it, so the offset takes that slot back out.
+  const follow = () => {
+    const d = drag.current;
+    if (!d?.started) return;
+    const el = d.el;
+    const x = d.x - d.startX - (shownNow.current.indexOf(d.state) - d.startIndex) * d.pitch;
+    // Up only a little: the board's top edge clips, and a column carried up
+    // past it lost its heading (photographed 2026-10-02). Down and across freely.
+    const y = Math.max(-6, d.y - d.startY);
+    el.style.transform = `translate(${x}px, ${y}px) scale(1.02)`;
+  };
+  useBeforePaint(() => {
+    const before = lastOrder.current;
+    lastOrder.current = shown;
+    follow();
+    if (before === shown) return;
+    const lefts = shown.map((s) => colEls.current.get(s)?.offsetLeft ?? 0);
+    const pitch = lefts.length > 1 ? lefts[1] - lefts[0] : 0;
+    shown.forEach((state, i) => {
+      if (state === dragging) return;
+      const was = before.indexOf(state);
+      const el = colEls.current.get(state);
+      if (was < 0 || was === i || !el?.animate) return;
+      el.animate([{ transform: `translateX(${(was - i) * pitch}px)` }, { transform: 'translateX(0)' }], SETTLE);
+    });
+  }, [shown]);
+  const putDown = (keep: boolean) => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d?.started) return;
+    if (keep) onReorderColumns?.(shownNow.current);
+    // From wherever it was let go into its slot, rather than snapping there.
+    const from = d.el.style.transform;
+    d.el.style.transform = '';
+    if (from && d.el.animate) d.el.animate([{ transform: from }, { transform: 'none' }], SETTLE);
+    setDragging(null);
+    setPreview(null);
+  };
+  useEffect(() => {
+    if (!dragging) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); putDown(false); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  });
   const sharing = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since } : null);
   const isSelected = (it: WorkItem | null) => !!it && !!selected && it.id === selected.id && it.product === selected.product;
   // The keyboard's card stays on the screen as J, K and the arrows move it,
   // and only when it moves, so a refresh never scrolls the board out from
-  // under the pointer.
+  // under the pointer. Before the frame is drawn, not after: after, a card
+  // below the fold was painted where it was and then scrolled to a frame
+  // later, which is a jump on every press down a long column.
   const boardRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  useBeforePaint(() => {
     boardRef.current?.querySelector('.th-card.selected')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [selected?.id, selected?.product]);
-  const endDrag = () => { setDragging(null); setPreview(null); };
   return <div className="list hm-me">
     <div className={`th-board${dragging ? ' dragging' : ''}`} ref={boardRef}>
     {columns.map((col) => {
       const rows = col.rows;
       return <div key={col.state} className={`th-col${dragging === col.state ? ' lifted' : ''}`}
-        onDragOver={(e) => {
-          if (!dragging) return;
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-          if (col.state !== dragging) setPreview(moveColumn(shown, dragging, col.state));
-        }}
-        onDrop={(e) => { if (!dragging) return; e.preventDefault(); onReorderColumns?.(shown); endDrag(); }}>
+        ref={(el) => { if (el) colEls.current.set(col.state, el); else colEls.current.delete(col.state); }}>
         {/* Your own board says what the tab says: what waits on you needs you.
             The heading is the handle: grab it to move the whole column. */}
-        <div className="th-col-h" draggable={!!onReorderColumns} title={onReorderColumns ? 'Drag to move this column' : undefined}
-          onDragStart={(e) => {
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('application/x-agentbox-column', col.state);
-            const column = e.currentTarget.parentElement;
-            if (column) e.dataTransfer.setDragImage(column, e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-            setDragging(col.state);
+        <div className={`th-col-h${onReorderColumns ? ' movable' : ''}`}
+          onPointerDown={(e) => {
+            if (!onReorderColumns || e.button !== 0) return;
+            const el = colEls.current.get(col.state);
+            if (!el) return;
+            e.preventDefault();
+            e.currentTarget.setPointerCapture?.(e.pointerId);
+            drag.current = { state: col.state, el, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY, started: false, startIndex: 0, slots: [], pitch: 0 };
           }}
-          onDragEnd={endDrag}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b>
+          onPointerMove={(e) => {
+            const d = drag.current;
+            if (!d || d.state !== col.state) return;
+            d.x = e.clientX; d.y = e.clientY;
+            if (!d.started) {
+              // A press that barely moves is a click, not a lift.
+              if (Math.hypot(d.x - d.startX, d.y - d.startY) < 4) return;
+              // THE SLOTS ARE MEASURED ONCE, HERE, and the place is worked out
+              // from them and the pointer alone (`slotUnder`). Reading it off
+              // the column drawn under the pointer made a swap undo itself
+              // every frame while the columns slid.
+              const order = shownNow.current;
+              d.slots = order.map((s) => { const r = colEls.current.get(s)?.getBoundingClientRect(); return r ? r.left + r.width / 2 : 0; });
+              d.pitch = d.slots.length > 1 ? d.slots[1] - d.slots[0] : 0;
+              d.startIndex = order.indexOf(d.state);
+              d.started = true;
+              setDragging(d.state);
+            }
+            const want = slotUnder(d.slots, d.slots[d.startIndex] + (d.x - d.startX));
+            if (want >= 0 && want !== shownNow.current.indexOf(d.state)) setPreview(columnTo(shownNow.current, d.state, want));
+            follow();
+          }}
+          onPointerUp={() => putDown(true)}
+          onPointerCancel={() => putDown(false)}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b>
           {/* THE HANDLE COMES UP WHEN YOU ARE OVER THE COLUMN: "a little drag
               icon comes up subtly". Only where a drag does something. */}
           {onReorderColumns && <GripIcon />}</div>

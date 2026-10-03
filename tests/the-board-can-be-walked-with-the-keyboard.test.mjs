@@ -100,6 +100,24 @@ describe('the card the keyboard is on is drawn as selected', () => {
   });
 });
 
+// "I keep running into little instances of lag ... it looks like it's
+// jumping" (2026-10-02). Timed over a copy of the real inbox (1,254 threads)
+// in headless Chrome: a press showed in 14 to 19 ms median before and after,
+// the slow ones (up to 100 ms) arriving with the Mac's load at 60 to 78. What
+// the code did own: the keyboard's card was scrolled to AFTER the frame was
+// painted, so a card below the fold was drawn, then moved.
+describe('moving down the board does not jump', () => {
+  const pages = readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
+  const board = pages.slice(pages.indexOf('export function InboxBoard'));
+  it('scrolls to the keyboard\'s card before the frame is drawn', () => {
+    expect(pages).toContain('const useBeforePaint = typeof window === \'undefined\' ? useEffect : useLayoutEffect;');
+    expect(board).toMatch(/useBeforePaint\(\(\) => \{\s*boardRef\.current\?\.querySelector\('\.th-card\.selected'\)/);
+  });
+  it('does not rebuild the columns when only the keyboard\'s card moved', () => {
+    expect(board).toMatch(/const columns = useMemo\(/);
+  });
+});
+
 describe('App.tsx', () => {
   const app = readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
   const list = app.slice(app.indexOf('      switch (e.key) {'));
