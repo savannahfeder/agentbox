@@ -87,6 +87,7 @@ export const REQUEST_CHANNELS = {
   setProjectSetting: 'zero:settings-set-project',
   setWorkspaceSetting: 'zero:settings-set-workspace',
   projectRename: 'zero:project-rename',
+  projectArchive: 'zero:project-archive',
   projectIcon: 'zero:project-icon',
   projectIconClear: 'zero:project-icon-clear',
   projectInstructionsRead: 'zero:project-instructions-read',
