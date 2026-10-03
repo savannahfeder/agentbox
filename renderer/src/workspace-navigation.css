@@ -339,6 +339,8 @@
 .workspace-layout[data-artifact-layout="beside"] > .body > .list-pane { min-width:400px; }
 .workspace-layout[data-artifact-layout="beside"] > .body > .artifact-host > .doc-pane { min-width:560px; }
 .workspace-layout[data-artifact-layout="beside"] .focus { padding:28px 28px 40px; }
+/* The reply box keeps the words' 28, not the dock's 32, so its edges are theirs. */
+.workspace-layout[data-artifact-layout="beside"] .focus-dock { padding-left:28px; padding-right:calc(28px + var(--scroll-gutter, 0px)); }
 .workspace-layout[data-artifact-layout="beside"] > .body > .artifact-host > .doc-pane .doc-card { margin:12px; }
 /* THE CONVERSATION IS NOT HIDDEN IN FULL SCREEN ANY MORE. It was, until the
    reply line along the foot was chosen; what is left of it now is its dock,
@@ -501,7 +503,10 @@
 .workspace-layout[data-reading-width="wide"] .focus { max-width:1200px; }
 .workspace-layout[data-reading-width="wide"] .focus-dock-inner { max-width:1136px; }
 .workspace-layout[data-reading-width="edge"] .focus { max-width:none; padding-left:20px; padding-right:20px; }
-.workspace-layout[data-reading-width="edge"] .focus-dock-inner { max-width:none; margin-left:20px; margin-right:20px; }
+/* The 20 is the dock's padding, not a margin on top of its 32: stacked, the
+   box began 52 in against the words' 20. */
+.workspace-layout[data-reading-width="edge"] .focus-dock { padding-left:20px; padding-right:calc(20px + var(--scroll-gutter, 0px)); }
+.workspace-layout[data-reading-width="edge"] .focus-dock-inner { max-width:none; }
 .artifact-tweaks { max-width:calc(100vw - 48px); flex-wrap:wrap; }
 
 /* The preview supplies its own entrance and return, without a layout picker. */
