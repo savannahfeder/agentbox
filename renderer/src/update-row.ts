@@ -71,23 +71,28 @@ export function changeLines(state: Pick<UpdateState, 'changes' | 'behind'> | nul
 }
 
 /**
- * WHETHER THE SIDEBAR'S UPDATE CARD HAS BEEN SHRUNK TO ONE LINE
- *  (components/SidebarUpdate.tsx). Kept across versions on purpose: changes
- *  land several times a day, and a card that came back for each one would be
- *  the thing that was shrunk. Storage that is missing or refuses reads as the
- *  card, which is the default. */
-export const UPDATE_SMALL_KEY = 'zero.updateSmall';
+ * THE VERSION WHOSE SIDEBAR CARD WAS CLOSED WITH ITS ×
+ *  (components/SidebarUpdate.tsx). Closing is for that version only: the next
+ *  restart installs it anyway, and a newer one brings the card back. Kept
+ *  across restarts, so a card closed this morning stays closed after lunch.
+ *  Storage that is missing or refuses reads as nothing closed. */
+export const UPDATE_CLOSED_KEY = 'zero.updateClosed';
 
-type SmallStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null | undefined;
-const windowStore = (): SmallStore => (typeof localStorage === 'undefined' ? undefined : localStorage);
+type ClosedStore = Pick<Storage, 'getItem' | 'setItem'> | null | undefined;
+const windowStore = (): ClosedStore => (typeof localStorage === 'undefined' ? undefined : localStorage);
 
-export function readUpdateSmall(store: SmallStore = windowStore()): boolean {
-  try { return store?.getItem(UPDATE_SMALL_KEY) === '1'; } catch { return false; }
+export function readUpdateClosed(store: ClosedStore = windowStore()): string | null {
+  try { return store?.getItem(UPDATE_CLOSED_KEY) || null; } catch { return null; }
 }
 
-export function writeUpdateSmall(store: SmallStore, small: boolean): void {
-  try {
-    if (small) store?.setItem(UPDATE_SMALL_KEY, '1');
-    else store?.removeItem(UPDATE_SMALL_KEY);
-  } catch { /* the choice is not kept this time; the screen still changes */ }
+/** A version the app could not name is not kept: closing it lasts this run. */
+export function writeUpdateClosed(store: ClosedStore, version: string): void {
+  if (!version) return;
+  try { store?.setItem(UPDATE_CLOSED_KEY, version); } catch { /* closed for this run only */ }
+}
+
+/** Whether `closed` hides this card. Never while a restart is under way: the
+ *  card saying "Updating" is how a press is seen to have done something. */
+export function closedHere(update: { installing: boolean; version?: string | null }, closed: string | null): boolean {
+  return !update.installing && closed !== null && closed === (update.version ?? '');
 }
