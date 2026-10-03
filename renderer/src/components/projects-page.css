@@ -113,3 +113,19 @@
   position: absolute; left: 0; right: 0; height: 2px; border-radius: 2px;
   background: var(--accent); pointer-events: none; z-index: 6;
 }
+
+/* Archived projects: one quiet line under the table until it is opened, then
+   the same name-and-folder rows, unnumbered, because they are out of the order. */
+.pp-archived { margin-top: 28px; }
+.pp-archived-toggle {
+  font: 10.5px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-faint); background: none; border: 0; padding: 0 4px; cursor: pointer;
+}
+.pp-archived-toggle:hover { color: var(--text-dim); }
+.pp-archived-list { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.pp-archived-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 4px 12px 36px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--line);
+}

@@ -162,7 +162,9 @@ export function createTeamService({
       backend,
       disk,
       state: kept(),
-      listShared: () => listSharedProjects(products()),
+      // ARCHIVED ONES COUNT AS HERE. Asked of the visible list, a shared
+      // project you archived read as missing and was joined again beside it.
+      listShared: () => { try { return listSharedProjects(store.listProducts({ includeArchived: true })); } catch { return []; } },
       joinProject: (project) => joinSharedProject(accountRoot, project),
       listCards: () => cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null }),
       teamIdOf: () => state.team?.id ?? null,

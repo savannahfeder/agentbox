@@ -40,7 +40,7 @@ interface Row {
   autonomous: boolean;
 }
 
-export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew }: {
+export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archived = [], onUnarchive }: {
   /** Every project, already in the running order (App's `rankedProducts`). */
   ranked: Product[];
   /** What Settings knows about each project: its folder, what is running, its mode. */
@@ -49,7 +49,13 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew }: {
   onSetOrder?: (slugs: string[]) => void | Promise<void>;
   onOpen: (slug: string) => void;
   onNew?: () => void;
+  /** Projects archived from their own page: off every list but this one. */
+  archived?: { slug: string; name: string; dir: string }[];
+  onUnarchive?: (slug: string) => void;
 }) {
+  // FOLDED AWAY until asked for. An archived project is one you chose not to
+  // see, so the list of them stays one quiet line unless you open it.
+  const [showArchived, setShowArchived] = useState(false);
   // THE MOVE SHOWS AT ONCE. The saved order comes back on the next refresh,
   // and a row that sat still until then would read as a press that missed.
   const [pending, setPending] = useState<string[] | null>(null);
@@ -63,7 +69,10 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew }: {
   const rows: Row[] = useMemo(() => {
     const bySlug = new Map(ranked.map((p) => [p.slug, p]));
     const info = new Map(details.map((d) => [d.slug, d]));
-    const ordered = priorityList(full.map((s) => bySlug.get(s)).filter((p): p is Product => !!p));
+    // ONE JUST ARCHIVED LEAVES AT ONCE. The order comes off the inbox's list,
+    // which catches up a moment after the archive is saved.
+    const gone = new Set(archived.map((a) => a.slug));
+    const ordered = priorityList(full.map((s) => bySlug.get(s)).filter((p): p is Product => !!p && !gone.has(p.slug)));
     const seen = new Set<string>();
     const out: Row[] = [];
     for (const p of ordered) {
@@ -78,7 +87,7 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew }: {
       out.push({ slug: d.slug, name: d.name, logo: d.logo, dir: d.dir ?? '', running: d.running ?? 0, autonomous: !!d.autonomous });
     }
     return out;
-  }, [full.join('\n'), ranked, details]);
+  }, [full.join('\n'), ranked, details, archived]);
   const allSlugs = rows.map((r) => r.slug);
 
   const [filter, setFilter] = useState('');
@@ -234,6 +243,31 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew }: {
             })}
             {drag && <span className="pp-caret" style={{ top: drag.caret - 1 }} />}
           </ol>
+        </div>
+      )}
+      {/* ARCHIVED PROJECTS. Archiving keeps the folder and only takes the
+          project off every list, so this is where one comes back. */}
+      {archived.length > 0 && (
+        <div className="pp-archived">
+          <button type="button" className="pp-archived-toggle" aria-expanded={showArchived}
+            onClick={() => setShowArchived((v) => !v)}>
+            {showArchived ? 'Hide archived projects' : 'Show archived projects'}
+          </button>
+          {showArchived && (
+            <ul className="pp-archived-list">
+              {archived.map((p) => (
+                <li key={p.slug} className="pp-archived-row">
+                  <span className="pp-text">
+                    <span className="pp-name">{p.name}</span>
+                    {p.dir && <span className="pp-where">{shortPath(p.dir)}</span>}
+                  </span>
+                  {onUnarchive && (
+                    <button type="button" className="set-ghost" onClick={() => onUnarchive(p.slug)}>Bring back</button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </>

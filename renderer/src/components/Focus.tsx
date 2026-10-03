@@ -58,6 +58,7 @@ import { changePathFor } from '../code-artifact';
 import { fileCount, figuresFrom, figuresLabel, signed, type ChangeFigures } from '../change-figures';
 import { embeddedDocuments, isBookkeeping } from '../message-artifacts';
 import { opensInPane } from '../doc-pane';
+import { watchScrollGutter } from '../scroll-gutter';
 import { artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
 import { api } from '../api';
 import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveDraftAttachments, type SentDraft } from '../drafts';
@@ -591,6 +592,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     stick();
     return () => { box.removeEventListener('scroll', onScroll); grew.disconnect(); };
   }, [direct, item.id]);
+
+  // THE REPLY BOX CENTRES IN THE WIDTH THE WORDS DO. The scrollbar narrows this
+  // box and not the dock under it, so without this the box began half a
+  // scrollbar right of the first word (../scroll-gutter.ts).
+  useEffect(() => watchScrollGutter(scrollRef.current), [item.id]);
 
   // WHERE SHE IS, SO ⌘R HAS SOMETHING TO REMEMBER. Only the number, and only
   // while a task is open; App.tsx decides whether it is ever worth reading back.

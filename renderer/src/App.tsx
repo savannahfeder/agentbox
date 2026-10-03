@@ -196,6 +196,10 @@ const deliveredThrough = (() => {
 // back to the inbox instead of vanishing from every view (2026-08-04).
 const liveAnswer = (i: WorkItem) => (i.answer && i.answer !== '(withdrawn)' ? i.answer : undefined);
 
+// No project order yet, as one array, so the sorts that read it do not rerun
+// on every snapshot.
+const NO_ORDER: string[] = [];
+
 export default function App() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   // WHERE SHE WAS BEFORE ⌘R, read once, on the way in.
@@ -2009,9 +2013,12 @@ export default function App() {
   const mineShown = !team || picked.includes(team.me ?? '');
   // The tab goes in too: Done runs newest finished first whatever the sort
   // says (w-c61f5bf497, page-rules.ts).
+  // And your project order, which Sort by Priority reads before each thread's
+  // own level (w-e263a8a0fb).
+  const projectOrder = snap?.supervisor.productOrder ?? NO_ORDER;
   const displayedBox = useMemo(
-    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay, view) : []),
-    [shownBox, inboxDisplay, now, mineShown, view],
+    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay, view, projectOrder) : []),
+    [shownBox, inboxDisplay, now, mineShown, view, projectOrder],
   );
   // THE PICKED TEAMMATES' THREADS FOR THIS TAB, from the cards their Macs
   // publish, merged into your rows in the Display's order.
@@ -2020,7 +2027,10 @@ export default function App() {
     () => (withOthers ? teammateRows(cards, { tab: view, picked, me: team?.me ?? null, display: inboxDisplay, products: snap?.products ?? [], now }) : []),
     [withOthers, cards, view, picked, team?.me, inboxDisplay, snap?.products, now],
   );
-  const mixedRows = useMemo(() => (withOthers ? mergeRows(displayedBox, theirRows, view === 'done' ? 'done' : inboxDisplay.sort) : null), [withOthers, displayedBox, theirRows, inboxDisplay.sort, view]);
+  const mixedRows = useMemo(
+    () => (withOthers ? mergeRows(displayedBox, theirRows, view === 'done' ? 'done' : inboxDisplay.sort, { order: projectOrder, products: snap?.products ?? [] }) : null),
+    [withOthers, displayedBox, theirRows, inboxDisplay.sort, view, projectOrder, snap?.products],
+  );
   // A teammate's thread opens as their card, over the page, and Back returns here.
   const openTeammateCard = useCallback((card: ThreadCard) => { setOpenCard(card); setTeamOpen(true); }, []);
   // HOVERING A FACE SAYS WHAT THEY ARE UP TO (w-0b54ee983f). Her words:
@@ -2060,8 +2070,8 @@ export default function App() {
   // whole inbox, or the next task opened can be one she has hidden
   // (w-27759abd33).
   const shownInbox = useMemo(
-    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay),
-    [inbox, boxFilter, inboxDisplay, now],
+    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay, undefined, projectOrder),
+    [inbox, boxFilter, inboxDisplay, now, projectOrder],
   );
   const boxFilterMenu = useMemo(
     () => (modal === 'filter' ? filterMenu(wholeBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i)), boxFilter, snap?.products ?? []) : null),
@@ -2100,8 +2110,8 @@ export default function App() {
   // The columns themselves are kept too, for the left and right arrows
   // (`boardSideways`), and they come in the order you dragged them to.
   const boardArgs = useMemo(
-    () => ({ items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards, picked: team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds }),
-    [items, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds],
+    () => ({ items, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards, picked: team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: liveIds, projectOrder }),
+    [items, snap?.products, inboxDisplay, now, stateOfMine, cards, team, picked, liveIds, projectOrder],
   );
   const boardCols = useMemo(
     () => (onBoard ? boardColumns({ ...boardArgs, order: columnOrder }) : null),
@@ -4566,7 +4576,7 @@ export default function App() {
           lights Settings (`settingsPage` reports `projects` for it) and the
           team pane lights its own shortcut. */}
       {workspaceNavigation && <WorkspaceNavigation
-        update={announcesUpdate(snap?.update, { walking, closed: '' }) ? { installing: !!snap?.update?.installing, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
+        update={announcesUpdate(snap?.update, { walking, closed: '' }) ? { installing: !!snap?.update?.installing, version: snap?.update?.newVersion, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
         onUpdate={() => { void api.updateInstall(); }}
         page={settingsOpen ? (settingsPage === 'team' ? 'invite' : 'settings') : null} teamPage={teamOpen && !settingsOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
         onInvite={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsOpen(true); }}
@@ -5188,7 +5198,7 @@ export default function App() {
                     Scheduled, Done and All, on the Inbox itself. They replace
                     the sidebar places they used to be. */}
                 {workspaceNavigation && search === null && inboxDisplay.view === 'board' ? (
-                  <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine}
+                  <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine} projectOrder={projectOrder}
                     cards={cards} picked={team ? picked : undefined}
                     onOpenCard={openTeammateCard}
                     selected={current} columnOrder={columnOrder} onReorderColumns={reorderColumns}

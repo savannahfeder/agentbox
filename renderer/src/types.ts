@@ -859,6 +859,9 @@ export interface Settings {
   error?: string;
   workspace: WorkspaceSettings;
   projects: ProjectSettings[];
+  /** Archived projects, off every list but the one that brings them back.
+   *  Absent from a main process older than archiving. */
+  archivedProjects?: { slug: string; name: string; dir: string }[];
 }
 
 // A repeating task: a RULE, not a work item, so it never runs, is never claimed
