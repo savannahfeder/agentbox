@@ -205,8 +205,11 @@ const RELAY_MARK = `Relayed from ${NAME},`;
 // HAD. A transcript is a file on her disk and it outlives a rename, so a
 // marker matched on the current name alone stops matching the day the name
 // changes, and the app's own preamble starts reading as something the user typed.
-const RELAY_MARKERS = [RELAY_MARK, ...WAS.map((was) => `Relayed from ${was},`)];
-const wasRelayed = (line) => RELAY_MARKERS.some((m) => line.startsWith(m));
+// The letter case is ignored as well: the name was written lowercase until
+// 2026-10-02, and those transcripts say "Relayed from agentbox,".
+const RELAY_MARKERS = [RELAY_MARK, ...WAS.map((was) => `Relayed from ${was},`)].map((m) => m.toLowerCase());
+const wasRelayed = (line) => RELAY_MARKERS.some((m) => line.toLowerCase().startsWith(m));
+export { wasRelayed as __wasRelayed };
 
 function herTurnRaw(obj) {
   if (obj.type !== 'user' || obj.isMeta || obj.isCompactSummary || obj.toolUseResult) return '';
