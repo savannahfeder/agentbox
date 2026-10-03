@@ -500,6 +500,32 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     setDragging(null);
     setPreview(null);
   };
+  // The newest putDown, for the window's listeners, which outlive the render
+  // that set them up.
+  const putDownNow = useRef(putDown);
+  putDownNow.current = putDown;
+  const moveDrag = (x: number, y: number) => {
+    const d = drag.current;
+    if (!d) return;
+    d.x = x; d.y = y;
+    if (!d.started) {
+      // A press that barely moves is a click, not a lift.
+      if (Math.hypot(d.x - d.startX, d.y - d.startY) < 4) return;
+      // THE SLOTS ARE MEASURED ONCE, HERE, and the place is worked out from
+      // them and the pointer alone (`slotUnder`). Reading it off the column
+      // drawn under the pointer made a swap undo itself every frame while the
+      // columns slid.
+      const order = shownNow.current;
+      d.slots = order.map((s) => { const r = colEls.current.get(s)?.getBoundingClientRect(); return r ? r.left + r.width / 2 : 0; });
+      d.pitch = d.slots.length > 1 ? d.slots[1] - d.slots[0] : 0;
+      d.startIndex = order.indexOf(d.state);
+      d.started = true;
+      setDragging(d.state);
+    }
+    const want = slotUnder(d.slots, d.slots[d.startIndex] + (d.x - d.startX));
+    if (want >= 0 && want !== shownNow.current.indexOf(d.state)) setPreview(columnTo(shownNow.current, d.state, want));
+    follow();
+  };
   useEffect(() => {
     if (!dragging) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); putDown(false); } };
@@ -532,33 +558,24 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
             const el = colEls.current.get(col.state);
             if (!el) return;
             e.preventDefault();
-            e.currentTarget.setPointerCapture?.(e.pointerId);
             drag.current = { state: col.state, el, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY, started: false, startIndex: 0, slots: [], pitch: 0 };
-          }}
-          onPointerMove={(e) => {
-            const d = drag.current;
-            if (!d || d.state !== col.state) return;
-            d.x = e.clientX; d.y = e.clientY;
-            if (!d.started) {
-              // A press that barely moves is a click, not a lift.
-              if (Math.hypot(d.x - d.startX, d.y - d.startY) < 4) return;
-              // THE SLOTS ARE MEASURED ONCE, HERE, and the place is worked out
-              // from them and the pointer alone (`slotUnder`). Reading it off
-              // the column drawn under the pointer made a swap undo itself
-              // every frame while the columns slid.
-              const order = shownNow.current;
-              d.slots = order.map((s) => { const r = colEls.current.get(s)?.getBoundingClientRect(); return r ? r.left + r.width / 2 : 0; });
-              d.pitch = d.slots.length > 1 ? d.slots[1] - d.slots[0] : 0;
-              d.startIndex = order.indexOf(d.state);
-              d.started = true;
-              setDragging(d.state);
-            }
-            const want = slotUnder(d.slots, d.slots[d.startIndex] + (d.x - d.startX));
-            if (want >= 0 && want !== shownNow.current.indexOf(d.state)) setPreview(columnTo(shownNow.current, d.state, want));
-            follow();
-          }}
-          onPointerUp={() => putDown(true)}
-          onPointerCancel={() => putDown(false)}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b>
+            // THE WHOLE WINDOW LISTENS UNTIL THE PRESS ENDS. Holding the
+            // pointer on the heading broke on the first change of order: that
+            // moves the column in the page, which lets go of the pointer, and
+            // the column stopped after one place ("it only moves one row at a
+            // time").
+            const move = (ev: PointerEvent) => moveDrag(ev.clientX, ev.clientY);
+            const stop = () => {
+              window.removeEventListener('pointermove', move);
+              window.removeEventListener('pointerup', up);
+              window.removeEventListener('pointercancel', cancel);
+            };
+            const up = () => { stop(); putDownNow.current(true); };
+            const cancel = () => { stop(); putDownNow.current(false); };
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', up);
+            window.addEventListener('pointercancel', cancel);
+          }}><StateGlyph state={col.state} />{col.state === 'waiting' && !withOthers ? 'Needs you' : col.label}<b>{rows.length}</b>
           {/* THE HANDLE COMES UP WHEN YOU ARE OVER THE COLUMN: "a little drag
               icon comes up subtly". Only where a drag does something. */}
           {onReorderColumns && <GripIcon />}</div>

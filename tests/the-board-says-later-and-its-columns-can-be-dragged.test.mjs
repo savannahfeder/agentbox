@@ -181,7 +181,15 @@ describe('a column moves cleanly', () => {
   it('works out the place from the pointer and fixed slots, never from what is drawn there', () => {
     expect(board).not.toMatch(/onDragOver|onDragStart|draggable=/);
     expect(board).toContain('onPointerDown');
-    expect(board).toContain('setPointerCapture');
+    // FIFTH ROUND: "it only moves one row at a time". The heading held the
+    // pointer (setPointerCapture), and the first change of order MOVES the
+    // column in the page, which silently lets go of it; after that the moves
+    // only arrived while the pointer happened to be over the heading. Measured
+    // with a real quick drag, first column to last in 8 moves: 1 change of
+    // order, then nothing. The whole window listens for the length of a drag.
+    expect(board).not.toContain('setPointerCapture');
+    expect(board).toContain("window.addEventListener('pointermove', move)");
+    expect(board).toContain("window.addEventListener('pointerup', up)");
     expect(board).toContain('slotUnder(d.slots, d.slots[d.startIndex] + (d.x - d.startX))');
   });
   it('the other columns slide to their new places rather than jump, and the carried one is left to the pointer', () => {
