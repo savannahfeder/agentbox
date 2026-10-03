@@ -134,6 +134,37 @@ describe('a column says it can be moved', () => {
   });
 });
 
+// AND IT HAS TO LOOK CLEAN DOING IT (2026-10-02, second round, with a
+// screenshot): "visually it looks pretty weird, especially when I hover and
+// when I'm hovering and moving things around." What the picture showed: a
+// grey block behind the heading that ran 6px past the cards on both sides, a
+// "Drag to move this column" tooltip sitting across the first card's title,
+// and, mid-drag, the column drawn twice (the browser's ghost and a 35% copy
+// left in place), with the others jumping rather than moving.
+describe('a column moves cleanly', () => {
+  const css = readFileSync(new URL('../renderer/src/threads/pages.css', import.meta.url), 'utf8');
+  const rule = (sel) => (css.match(new RegExp(`${sel.replace(/[.[\]"()=:*]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) ?? [])[1] ?? null;
+  it('hovering the heading puts no block behind it', () => {
+    expect(rule('.th-col-h[draggable="true"]:hover') ?? '').not.toMatch(/background/);
+    expect(rule('.th-col-h[draggable="true"]') ?? '').not.toMatch(/margin:\s*0 -/);
+  });
+  it('no tooltip lands on the cards', () => {
+    const out = renderToStaticMarkup(React.createElement(InboxBoard, {
+      items, products, display, now: NOW, stateOf: (i) => i._state, onOpenItem: () => {}, onReorderColumns: () => {},
+    }));
+    expect(out).not.toContain('Drag to move this column');
+  });
+  it('the column being carried leaves an empty slot, not a faded copy of itself', () => {
+    expect(rule('.th-col.lifted') ?? '').not.toMatch(/opacity/);
+    expect(rule('.th-col.lifted > *')).toMatch(/visibility:\s*hidden/);
+  });
+  it('the other columns slide to their new places rather than jump', () => {
+    const pages = readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
+    expect(pages).toContain('useBeforePaint(() => {\n    const before = lastOrder.current;');
+    expect(pages).toContain('translateX(');
+  });
+});
+
 describe('the board itself', () => {
   const pages = readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
   const board = pages.slice(pages.indexOf('export function InboxBoard'));
