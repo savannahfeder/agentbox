@@ -69,7 +69,10 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
   const rows: Row[] = useMemo(() => {
     const bySlug = new Map(ranked.map((p) => [p.slug, p]));
     const info = new Map(details.map((d) => [d.slug, d]));
-    const ordered = priorityList(full.map((s) => bySlug.get(s)).filter((p): p is Product => !!p));
+    // ONE JUST ARCHIVED LEAVES AT ONCE. The order comes off the inbox's list,
+    // which catches up a moment after the archive is saved.
+    const gone = new Set(archived.map((a) => a.slug));
+    const ordered = priorityList(full.map((s) => bySlug.get(s)).filter((p): p is Product => !!p && !gone.has(p.slug)));
     const seen = new Set<string>();
     const out: Row[] = [];
     for (const p of ordered) {
@@ -84,7 +87,7 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
       out.push({ slug: d.slug, name: d.name, logo: d.logo, dir: d.dir ?? '', running: d.running ?? 0, autonomous: !!d.autonomous });
     }
     return out;
-  }, [full.join('\n'), ranked, details]);
+  }, [full.join('\n'), ranked, details, archived]);
   const allSlugs = rows.map((r) => r.slug);
 
   const [filter, setFilter] = useState('');

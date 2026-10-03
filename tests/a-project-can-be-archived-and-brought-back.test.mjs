@@ -148,6 +148,13 @@ describe('the window', () => {
     expect(settings).toMatch(/api\.archiveProject\(\{\s*product:\s*slug,\s*archived:\s*false\s*\}\)/);
   });
 
+  // The order is read off the inbox's list, which refreshes a moment after the
+  // archive is saved; without this the row stayed until it did.
+  it('the Projects page drops an archived project from the order at once', () => {
+    expect(projects).toMatch(/const gone = new Set\(archived\.map/);
+    expect(projects).toMatch(/!gone\.has\(p\.slug\)/);
+  });
+
   it('main and the bridge carry the channel', () => {
     expect(read('main/ipc.mjs')).toMatch(/'zero:project-archive'/);
     expect(read('preload.cjs')).toMatch(/projectArchive:.*'zero:project-archive'/);

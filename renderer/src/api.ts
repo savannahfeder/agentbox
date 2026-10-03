@@ -823,7 +823,24 @@ export const api = {
 
   // Archive a project (off every list, files kept) or bring one back.
   async archiveProject(p: { product: string; archived: boolean }): Promise<Settings> {
-    if (useFixtures) return { ...emptySettings, ok: true };
+    if (useFixtures) {
+      // Moved between the two lists in memory, so the page can be clicked through.
+      const s = fixtureSettingsState;
+      s.archivedProjects ??= [];
+      if (p.archived) {
+        const project = s.projects.find((x: any) => x.slug === p.product);
+        if (project) {
+          s.projects = s.projects.filter((x: any) => x !== project);
+          s.archivedProjects.push({ slug: project.slug, name: project.name, dir: project.dir });
+        }
+      } else {
+        const back = s.archivedProjects.find((x: any) => x.slug === p.product);
+        const original = fixtureSettings.projects.find((x: any) => x.slug === p.product);
+        s.archivedProjects = s.archivedProjects.filter((x: any) => x !== back);
+        if (back && original) s.projects.push(structuredClone(original));
+      }
+      return structuredClone(s) as Settings;
+    }
     const zero = window.zero as any;
     if (!zero?.projectArchive) return { ...emptySettings, ok: false, error: RESTART_NOTE };
     return zero.projectArchive(p);
