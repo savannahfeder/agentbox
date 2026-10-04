@@ -128,8 +128,12 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
              can be a button of its own: your name opens your account, the line
              opens the box you write it in, and one cannot nest in the other.
              Face then span is the shape the no-account case below already
-             uses, so the collapsed rule that hides the words still finds them. */
-          ? <><Face person={me} me /><span className="th-me-text"><button type="button" className="th-me-btn" aria-label="Your account" title={collapsed ? 'Your account' : undefined} onClick={onAccount}>{me.name || me.email}</button><SidebarStatus me={me} now={Date.now()} collapsed={collapsed} /></span></>
+             uses, so the collapsed rule that hides the words still finds them.
+             THE FACE OPENS YOUR ACCOUNT TOO (w-a09476712f): it is the first
+             thing a hand goes to, and in the collapsed rail it is all there
+             is. Beside your name it is the same door twice, so it stays out of
+             the tab order there; in the rail it is the named way in. */
+          ? <><button type="button" className="th-me-face" onClick={onAccount} {...(collapsed ? { 'aria-label': 'Your account', title: 'Your account' } : { tabIndex: -1, 'aria-hidden': true })}><Face person={me} me /></button><span className="th-me-text"><button type="button" className="th-me-btn" aria-label="Your account" title={collapsed ? 'Your account' : undefined} onClick={onAccount}>{me.name || me.email}</button><SidebarStatus me={me} now={Date.now()} collapsed={collapsed} /></span></>
           : <><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></>)
           : team?.configured && onTeam ? <button type="button" className="th-me-signin" aria-label="Sign in to your team" onClick={onTeam}>Sign in to your team</button>
             : <span />}
