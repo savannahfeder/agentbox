@@ -443,6 +443,28 @@ const DEAD_RUN_OPENERS = {
   unknown: 'stopped before it did anything, so this task has not been started.',
 };
 
+/**
+ * THE LINE IN A THREAD WHERE A RUN STOPPED, in our words.
+ *
+ * The CLI types its own refusal into the run as if the agent had said it
+ * ("Failed to authenticate: OAuth session expired..."), and the thread drew it
+ * as the agent's message. This is about one run, not the task: a run that
+ * stops mid-thread has usually done plenty before it, so it says nothing about
+ * what has or has not been done.
+ */
+const RUN_STOPPED = {
+  'signed-out': 'This run stopped because the account was signed out.',
+  'org-blocked': 'This run stopped because that account is switched off by its organization.',
+  'at-limit': 'This run stopped because the account hit its usage limit.',
+  workspace: "This run stopped because it would not start in this project's folder.",
+  interrupted: 'This run was cut off in the middle.',
+  unknown: 'This run stopped before it finished.',
+};
+
+export function runStoppedLine(raw) {
+  return RUN_STOPPED[troubleCause(raw)] ?? RUN_STOPPED.unknown;
+}
+
 export function deadRunSentence({ engineWord = 'The agent', cause = 'unknown', runs = 1, resetsAt = null } = {}) {
   const opener = `${engineWord} ${DEAD_RUN_OPENERS[cause] ?? DEAD_RUN_OPENERS.unknown}`;
 

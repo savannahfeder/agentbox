@@ -29,7 +29,7 @@ import { withoutTrailingWork } from '../trailing-work';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
 import type { RunningSession, WorkItem } from '../types';
-import { Thread, ThreadWaiting } from './Thread';
+import { ActLine, Thread, ThreadWaiting } from './Thread';
 
 // THE BACKSTOP, NOT THE HEARTBEAT.
 //
@@ -216,7 +216,7 @@ export function ItemThread({ item, engine, session, opening, sending, onOpenOrig
   const events = opening
     ? [{ at: opening.at, who: 'you' as const, text: opening.text, on: opening.on }, ...shown]
     : shown;
-  const { omitted, outcome } = built;
+  const { omitted, outcome, after } = built;
   if (!said.length && !opening && !outcome) return <div className="thread-wait">Nothing has been said here yet.</div>;
 
   // THE ANSWER, WHOLE, AT THE FOOT OF THE CONVERSATION.
@@ -246,12 +246,23 @@ export function ItemThread({ item, engine, session, opening, sending, onOpenOrig
         landOn={item.id}
         onWhole={() => setWhole(true)}
         onOpenOrigin={onOpenOrigin}
+        // Only a running Claude Code step can be cut; Codex takes her message
+        // at its next step whatever is pressed.
+        onSendNow={session && (session.engine ?? engine) !== 'codex'
+          ? () => api.sendNow({ product: item.product, id: item.id }).catch(() => {})
+          : undefined}
         md={md}
         code={changed.length && onOpenDoc
           ? { paths: changed, open: (path) => onOpenDoc(changePathFor(item.id), path) }
           : null}
       />
       {answer}
+      {/* What you did after that answer, under it and in order. */}
+      {after.length > 0 && (
+        <div className="act-after">
+          {after.map((act, i) => <ActLine key={`${act.at}-${i}`} act={act} />)}
+        </div>
+      )}
     </>
   );
 }

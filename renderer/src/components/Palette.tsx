@@ -15,6 +15,7 @@ import type { Product, View } from '../types';
 import { commandKeys } from '../palette-keys';
 import { emptyLine, lookRows, matchesQuery, rankMatches } from '../palette-rows';
 import { type Look } from '../skins';
+import { type ThemeChoice } from '../theme';
 import { NAME } from '../../../shared/product-name.mjs';
 
 interface Command {
@@ -28,7 +29,7 @@ interface Command {
   run: () => void;
 }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onStanding, onSettings, onShortcuts, panelUp, onTogglePanel, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onStanding, onSettings, onShortcuts, panelUp, onTogglePanel, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -38,6 +39,9 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   // theme here, not a setting on top of one (skins.ts), so the palette offers
   // all of them by name and there is no second path for light and dark.
   look: Look;
+  // Which way the Mac points, so on Match system the theme row on top is the
+  // one that changes what the window shows (palette-rows.ts).
+  machine?: ThemeChoice;
   onSetLook: (look: Look) => void;
   // Main-process files that changed since this process read them. The banner
   // that used to announce these is gone; the fact lives here, where it costs
@@ -178,7 +182,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     //
     // THE PICKER ROW USED TO BE ASSEMBLED HERE while its neighbours were
     // assembled next door, and the sixteen picture rows sat under it.
-    ...lookRows(look).map((r) => ({
+    ...lookRows(look, machine).map((r) => ({
       id: r.id,
       label: r.label,
       hint: r.hint,
@@ -461,7 +465,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, onSetLook, staleFiles, updateReady, onInstallUpdate, panelUp, onTogglePanel, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo]);
+  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, staleFiles, updateReady, onInstallUpdate, panelUp, onTogglePanel, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
