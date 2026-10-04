@@ -61,6 +61,16 @@ const FULL = new RegExp(String.raw`(?<![\w./:@~-])(?:~|/)/?[\w./-]*\.(?:${EXT})\
 // opens beside the card (isLocalPreview).
 const LOCAL = /(?<![\w./:@-])(?:localhost|127\.0\.0\.1):\d{2,5}(?:\/[^\s<>()[\]`'"]*)?/gi;
 
+// A FOLDER ON A LINE OF ITS OWN IS A DOOR TOO (2026-10-04). The brief asks a
+// worker to put what it made on its own line, and a worker that drew several
+// pictures puts their folder there. It drew as grey text with nothing to press.
+// Only on its own line, and only inside the product's folder: a folder in the
+// middle of a sentence is usually a remark about where something went, and a
+// folder anywhere else is our machinery. The link's url keeps its slash, which
+// is how Focus knows to draw the folder's pictures rather than open a file.
+const FOLDER_LINE = /(^|\n)([ \t]*)((?:~\/|\/)[\w./-]*[\w-])(\/?)[ \t]*(?=\n|$)/g;
+const FILE_LIKE = /\.[a-z0-9]{1,8}$/i;
+
 // A PICTURE NAMED IN A SENTENCE IS DRAWN, NOT LINKED.
 //
 // Counted over her Agentbox store that day, every way an AGENT has named a
@@ -138,6 +148,13 @@ function pieces(text: string, dir: string): Node[] {
       if (inQuote(m.index!)) continue;
       const rel = productPath(m[0], dir);
       if (rel) hits.push({ at: m.index ?? 0, text: m[0], url: rel });
+    }
+    for (const m of text.matchAll(FOLDER_LINE)) {
+      const [, lead, pad, folder, slash] = m;
+      if (FILE_LIKE.test(folder)) continue;
+      const rel = productPath(folder, dir);
+      if (!rel) continue;
+      hits.push({ at: m.index! + lead.length + pad.length, text: folder + slash, url: `${rel}/` });
     }
   }
   for (const m of text.matchAll(LOCAL)) {

@@ -31,6 +31,7 @@ import { listFolders } from './folders.mjs';
 import * as approvals from './approvals.mjs';
 import { restartNeeded } from './staleness.mjs';
 import { artifactRoots, resolveArtifact } from './artifact-path.mjs';
+import { folderPictures } from './folder-pictures.mjs';
 import { docUrl } from './doc-scheme.mjs';
 import { readDoc, writeDoc } from './doc-file.mjs';
 import { readChange } from './code-change.mjs';
@@ -1560,6 +1561,16 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const err = await shell.openPath(found.path);
     return err ? { ok: false, error: err } : { ok: true, opened: found.path };
   });
+
+  // THE PICTURES IN A FOLDER A MESSAGE NAMES, so the folder line draws them
+  // (FolderPreview in Focus.tsx). Only pictures, only inside this product.
+  ipcMain.handle('zero:folder-pictures', (_e, { product, src } = {}) => folderPictures({
+    src,
+    product,
+    products: store.listProducts(),
+    accountRoot: config.accountRoot,
+    storeRoot: config.storeRoot,
+  }));
 
   // THE DOCUMENT PANE READS AND WRITES THE FILE ITSELF. A path goes through
   // the very same finder the links and the chips use, so the pane opens

@@ -164,6 +164,8 @@ contextBridge.exposeInMainWorld('zero', {
   // Everything that happened on one task, as the ledger lines it happened as.
   itemHistory: (payload) => ipcRenderer.invoke('zero:item-history', payload),
   openArtifact: (payload) => ipcRenderer.invoke('zero:open-artifact', payload),
+  // The pictures in a folder a message names on its own line (main/folder-pictures.mjs).
+  folderPictures: (payload) => ipcRenderer.invoke('zero:folder-pictures', payload),
   // The document pane's own two: the text of a file it has open, and her edit
   // going back onto disk. Markdown only on the way back (main/doc-file.mjs).
   readDoc: (payload) => ipcRenderer.invoke('zero:read-doc', payload),

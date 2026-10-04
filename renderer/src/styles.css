@@ -1971,6 +1971,39 @@ body {
 .inline-media-missing .inline-media-name { display: inline; margin: 0; }
 .inline-media video { display: block; max-width: 100%; max-height: 360px; border: 1px solid var(--line); }
 
+/* A folder a worker named on its own line: its name, then its newest pictures,
+   three across (FolderPreview in Focus.tsx). Spans, because it sits in a <p>. */
+.folder-preview { display: block; margin: 8px 0 4px; }
+.folder-preview-name {
+  display: inline-flex; align-items: baseline; gap: 10px; padding: 0; border: 0;
+  background: none; cursor: pointer; font: inherit; text-align: left;
+}
+.folder-preview-path { color: var(--accent); font-family: var(--mono, ui-monospace, monospace); font-size: 0.9em; }
+.folder-preview-count { color: var(--text-faint); font-size: 0.86em; }
+.folder-preview-name:hover .folder-preview-path { text-decoration: underline; }
+.folder-preview-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 8px;
+}
+.folder-preview-shot {
+  display: block; padding: 0; border: 0; background: none; cursor: zoom-in;
+  font: inherit; color: inherit; text-align: left; min-width: 0;
+}
+.folder-preview-shot img {
+  display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top;
+  border: 1px solid var(--line); background: var(--bg-raised);
+}
+.folder-preview-shot:hover img { border-color: var(--text-faint); }
+.folder-preview-shot:focus-visible img { outline: 1px solid var(--text-faint); outline-offset: 2px; }
+.folder-preview-label {
+  display: block; margin-top: 4px; color: var(--text-faint); font-size: 0.82em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.folder-preview-more {
+  display: inline-block; margin-top: 6px; padding: 0; border: 0; background: none;
+  cursor: pointer; font: inherit; font-size: 0.86em; color: var(--text-dim);
+}
+.folder-preview-more:hover { color: var(--text); }
+
 /* The originating message: quiet quoted context above the agent's ask. */
 .origin {
   margin: 4px 0 22px;
