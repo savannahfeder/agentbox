@@ -95,7 +95,10 @@ export function HeaderActions({ page, display, onDisplay, products, items, onSea
   // Its faces sit here now and its choice is the first line of the menu.
   const worn = people ? facesOnButton(people.everyone, people.picked, people.me) : null;
   const whose = worn && people ? whoseWord(people.everyone, people.picked, people.me) : null;
-  const dot = isFiltered(display) || (!!people && peopleWorthADot(people.everyone, people.picked, people.me));
+  // Just you, on a team, lights no dot at all, whatever its own remembered
+  // filters say: it is the everyday state (asked for 2026-10-04).
+  const justYou = !!worn && !!people?.me && people.picked.length === 1 && people.picked[0] === people.me;
+  const dot = !justYou && (isFiltered(display) || (!!people && peopleWorthADot(people.everyone, people.picked, people.me)));
   // NO "/" ON ITS FACE (w-facfc092e1): a shortcut shows on hover, through the
   // hint plate, and is never printed on the control.
   return <div className="th-right">
