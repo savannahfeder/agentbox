@@ -1442,7 +1442,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               onNew={onNewProject}
               archived={model?.archivedProjects ?? []}
               onUnarchive={(slug) => write(api.archiveProject({ product: slug, archived: false }))}
-              onArchive={(slug) => write(api.archiveProject({ product: slug, archived: true }))}
+              onArchive={async (slugs) => {
+                for (const slug of slugs) await write(api.archiveProject({ product: slug, archived: true }));
+              }}
             />
           </div>
         )}

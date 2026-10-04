@@ -39,7 +39,12 @@ export function attachClaudeInput(child) {
   // end of the run, and closing there killed the suite it was waiting on
   // (tests/an-agent-waiting-on-its-own-tests-does-not-come-back-to-you).
   let waiting = [], wakeTimer = null;
-  const closeInput = () => { closed = true; clearTimeout(wakeTimer); child.stdin.end(); };
+  // Input only ever closes at a result with nothing out, so a closed input is
+  // the one proof the run reached its end. A session that exits with input
+  // still open was stopped part-way, whatever its last turn said
+  // (tests/a-worker-whose-helpers-are-still-working-does-not-come-back-to-you).
+  let ended = false;
+  const closeInput = () => { closed = true; ended = true; clearTimeout(wakeTimer); child.stdin.end(); };
   const mayClose = () => !held && atResult && !pending.size && !waiting.length;
   const fail = reason => {
     closed = true;
@@ -103,6 +108,7 @@ export function attachClaudeInput(child) {
     }
   });
   child.waitingOn = () => [...waiting];
+  child.ranToTheEnd = () => ended;
   child.holdInput = value => {
     if (closed && value) throw Error('This session has ended. Open remote control again to resume it.');
     held = !!value;

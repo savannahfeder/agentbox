@@ -30,6 +30,7 @@ import { loadConfig } from '../main/config.mjs';
 import { Supervisor } from '../main/supervisor.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const { selectionLine, archiveLabel, archivedLine, togglePick, keepShown } = await import('../renderer/src/project-archive.ts');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 function store(projects = { alpha: { name: 'Alpha' }, beta: { name: 'Beta' } }) {
@@ -132,6 +133,41 @@ describe('a shared project you archived is not joined a second time', () => {
   });
 });
 
+describe('what the Select line says', () => {
+  it('asks for a tick before anything is ticked, and counts after', () => {
+    expect(selectionLine(0)).toBe('Select the projects to archive');
+    expect(selectionLine(1)).toBe('1 selected');
+    expect(selectionLine(3)).toBe('3 selected');
+  });
+
+  it('names what the button will do, singular and plural', () => {
+    expect(archiveLabel(0)).toBe('Archive');
+    expect(archiveLabel(1)).toBe('Archive 1 project');
+    expect(archiveLabel(3)).toBe('Archive 3 projects');
+  });
+
+  it('says what happened afterwards', () => {
+    expect(archivedLine(1)).toBe('Archived 1 project');
+    expect(archivedLine(4)).toBe('Archived 4 projects');
+  });
+
+  it('ticks and unticks without touching the set it was given', () => {
+    const none = new Set();
+    const one = togglePick(none, 'a');
+    expect([...one]).toEqual(['a']);
+    expect(none.size).toBe(0);
+    expect([...togglePick(one, 'a')]).toEqual([]);
+    expect([...togglePick(one, 'b')]).toEqual(['a', 'b']);
+  });
+
+  // A ticked project that leaves the list (archived elsewhere, or filtered
+  // away by the search) must not be archived by a press it cannot be seen in.
+  it('only keeps ticks on projects the list still shows', () => {
+    expect([...keepShown(new Set(['a', 'b', 'c']), ['a', 'c', 'd'])]).toEqual(['a', 'c']);
+    expect([...keepShown(new Set(), ['a'])]).toEqual([]);
+  });
+});
+
 describe('the window', () => {
   const settings = read('renderer/src/components/Settings.tsx');
   const page = settings.slice(settings.indexOf('Everything here is this project only'));
@@ -148,19 +184,32 @@ describe('the window', () => {
     expect(settings).toMatch(/api\.archiveProject\(\{\s*product:\s*slug,\s*archived:\s*false\s*\}\)/);
   });
 
-  // FROM THE LIST ITSELF (2026-10-02, the second round). Archive lived only on
-  // a project's own page, which is a click in, a scroll down and a click back
-  // per project: "i personally have 35 projects and it would be a headache".
-  it('each row on the Projects page has its own Archive button', () => {
-    expect(projects).toMatch(/onArchive\?: \(slug: string\) => void/);
-    expect(projects).toMatch(/className="pp-archive"[^>]*aria-label=\{`Archive \$\{p\.name\}`\}/s);
-    expect(projects).toMatch(/onClick=\{\(\) => onArchive\(p\.slug\)\}/);
-    expect(settings).toMatch(/onArchive=\{\(slug\) => write\(api\.archiveProject\(\{\s*product:\s*slug,\s*archived:\s*true\s*\}\)\)\}/);
+  // FROM THE LIST ITSELF. Archive lived only on a project's own page: "i
+  // personally have 35 projects and it would be a headache". A hover Archive
+  // word on every row came next and was rejected as "ugly/bad ux"; of three
+  // drawings, Select mode was chosen (2026-10-02), then redrawn cleaner.
+  it('has no Archive word on every row any more', () => {
+    expect(projects).not.toMatch(/pp-archive"/);
+    expect(read('renderer/src/components/projects-page.css')).not.toMatch(/\.pp-archive \{/);
   });
 
-  // A press on a row opens the project; a press on its Archive button must not.
-  it('pressing Archive on a row does not open the project', () => {
-    expect(projects).toMatch(/\(e\.target as HTMLElement\)\.closest\('button'\)\) return;/);
+  it('archives the ticked projects in one press, through the bridge', () => {
+    expect(projects).toMatch(/onArchive\?: \(slugs: string\[\]\) => void \| Promise<void>/);
+    expect(projects).toMatch(/const batch = \[\.\.\.picked\];/);
+    expect(projects).toMatch(/await onArchive\(batch\);/);
+    expect(settings).toMatch(/onArchive=\{async \(slugs\) => \{\s*for \(const slug of slugs\) await write\(api\.archiveProject\(\{\s*product:\s*slug,\s*archived:\s*true\s*\}\)\);/);
+  });
+
+  // In Select mode a press ticks the row; it must not open it or drag it.
+  it('a press in Select mode ticks the row instead of opening it', () => {
+    expect(projects).toMatch(/if \(!travelled && selecting\) \{ setPicked\(\(prev\) => togglePick\(prev, slug\)\); return; \}/);
+    expect(projects).toMatch(/if \(!onSetOrder \|\| selecting\) return;/);
+  });
+
+  it('Escape leaves Select mode, and Undo brings the batch back', () => {
+    expect(projects).toMatch(/e\.key === 'Escape'/);
+    expect(projects).toMatch(/undone\.forEach\(\(slug\) => onUnarchive\?\.\(slug\)\)/);
+    expect(projects).toMatch(/\{archivedLine\(undone\.length\)\}/);
   });
 
   // The order is read off the inbox's list, which refreshes a moment after the
