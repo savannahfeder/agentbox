@@ -8,7 +8,7 @@ import { SidebarToggleIcon } from './SidebarToggleIcon';
 import { AppMark } from './AppMark';
 import { SidebarUpdate } from './SidebarUpdate';
 import { changeLines, closedHere, readUpdateClosed, writeUpdateClosed } from '../update-row';
-import { SidebarStatus } from '../team/status';
+import { AccountMenu } from '../team/account-menu';
 /** ONE NUMBER IN THE SIDEBAR, ON INBOX, AND IT IS DRAWN IN THE TAB'S OWN TYPE.
  *
  *  w-5f02e7b525. Only Inbox shows a number, like a classic email client, and of
@@ -40,7 +40,7 @@ import { SidebarStatus } from '../team/status';
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, update = null, onUpdate }: {
+export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, onSignOut, update = null, onUpdate }: {
   // A NEW VERSION WAITING (SidebarUpdate.tsx). Null when there is none.
   // `version` is what its × closes, until a newer one arrives.
   update?: { installing: boolean; version?: string | null; changes?: string[]; behind?: number | null; error?: string | null } | null; onUpdate?: () => void;
@@ -59,6 +59,8 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   // were one door twice. `onInvite` is that shortcut and `onAccount` is your
   // own row, which opens the same pane without the cursor in the email box.
   team?: TeamState | null; onInvite?: () => void; onAccount?: () => void;
+  // The last row of your account menu.
+  onSignOut?: () => void;
   view: View; collapsed: boolean; onToggle: () => void; onView: (view: View) => void; onSearch: () => void; onCompose: () => void;
 }) {
   // The Team page is a page like Settings: while it is up no list tab is lit.
@@ -121,19 +123,13 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
       </div>
       {usage && <div className="workspace-usage">{usage}</div>}
       <div className="th-me">
-        {/* Your own row opens the page with your account on it, so clicking
-            your own name always does something. */}
+        {/* YOUR OWN ROW IS ONE BUTTON, face, name and email, and it opens your
+            account menu upward (w-a09476712f): what you are up to, Invite
+            people, Settings and Sign out. Clicking it used to open a page with
+            Sign out somewhere on it, and "I tried clicking my profile area ...
+            expecting a sign out or somthing and nothing." */}
         {me ? (onAccount
-          /* The face sits outside the name's button so that the line under it
-             can be a button of its own: your name opens your account, the line
-             opens the box you write it in, and one cannot nest in the other.
-             Face then span is the shape the no-account case below already
-             uses, so the collapsed rule that hides the words still finds them.
-             THE FACE OPENS YOUR ACCOUNT TOO (w-a09476712f): it is the first
-             thing a hand goes to, and in the collapsed rail it is all there
-             is. Beside your name it is the same door twice, so it stays out of
-             the tab order there; in the rail it is the named way in. */
-          ? <><button type="button" className="th-me-face" onClick={onAccount} {...(collapsed ? { 'aria-label': 'Your account', title: 'Your account' } : { tabIndex: -1, 'aria-hidden': true })}><Face person={me} me /></button><span className="th-me-text"><button type="button" className="th-me-btn" aria-label="Your account" title={collapsed ? 'Your account' : undefined} onClick={onAccount}>{me.name || me.email}</button><SidebarStatus me={me} now={Date.now()} collapsed={collapsed} /></span></>
+          ? <AccountMenu me={me} now={Date.now()} collapsed={collapsed} onAccount={onAccount} onInvite={onInvite} onSettings={onSettings} onSignOut={onSignOut} />
           : <><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></>)
           : team?.configured && onTeam ? <button type="button" className="th-me-signin" aria-label="Sign in to your team" onClick={onTeam}>Sign in to your team</button>
             : <span />}

@@ -35,6 +35,10 @@ import { HOLDS, STATUS_MAX, holdEnds, holdsUntil, liveStatus } from '../../../sh
  *  without waiting for the writer's Mac to be awake and clear it. */
 export const saying = (person: Person | null | undefined, now: number) => liveStatus(person?.status, now);
 
+/** What your own status is called where nothing is said yet: the row in your
+ *  account menu, and the card on your own face. */
+export const STATUS_PROMPT = 'Set a status';
+
 /** What the hover card says: who they are, and what they said. */
 function FaceCardBody({ person, me, now }: { person: Person; me: boolean; now: number }) {
   const said = saying(person, now);
@@ -43,7 +47,7 @@ function FaceCardBody({ person, me, now }: { person: Person; me: boolean; now: n
     <span className="tm-face-card-who">{me ? 'You' : person.name}</span>
     {said
       ? <span className="tm-face-card-said">{said.text}{held && <span className="tm-status-held">{held}</span>}</span>
-      : <span className="tm-face-card-said nothing">{me ? 'Say what you are up to' : 'Nothing said'}</span>}
+      : <span className="tm-face-card-said nothing">{me ? STATUS_PROMPT : 'Nothing said'}</span>}
   </>;
 }
 
@@ -115,9 +119,12 @@ export function StatusComposer({ person, now, onDone }: { person: Person; now: n
   </div>;
 }
 
-/** The line under your name in your own row at the foot of the sidebar.
- *
- *  IT SITS WHERE YOUR EMAIL USED TO. Her words, 2026-10-02: the first attempt
+// THE LINE UNDER YOUR NAME IN THE SIDEBAR IS GONE (w-a09476712f, 2026-10-04):
+// "I wasn't a fan of the 'Say what you're up to' line being visible in the
+// bottom-left corner at all times." Your email is back in that row, and the
+// status is one row of your account menu (account-menu.tsx), which opens the
+// composer above. What it replaced, for whoever weighs bringing it back:
+/*  IT SAT WHERE YOUR EMAIL USED TO. Her words, 2026-10-02: the first attempt
  *  "takes up space", "makes everything move" and looks "pretty wonky". It did
  *  all three, because it was a THIRD line: the row is a fixed height until a
  *  status forces it open, so the corner jumped the moment you wrote one and
@@ -134,19 +141,3 @@ export function StatusComposer({ person, now, onDone }: { person: Person; now: n
  *  and never border-bottom: a border plus padding makes the box taller than
  *  its neighbours and a centred flex row then lifts the text off the
  *  baseline, which is the 1px stagger styles.css warns about. */
-export function SidebarStatus({ me, now, collapsed }: { me: Person; now: number; collapsed: boolean }) {
-  const [open, setOpen] = useState(false);
-  const said = saying(me, now);
-  const held = holdsUntil(said?.until, now);
-  if (collapsed) return null;
-  return <>
-    <button type="button" className={`th-me-status${said ? '' : ' nothing'}`} aria-expanded={open}
-      aria-label="Say what you are up to" title="Say what you are up to" onClick={() => setOpen(!open)}>
-      <span className="th-me-status-ink">{said ? `${said.text}${held ? ` \u00b7 ${held}` : ''}` : 'Say what you are up to'}</span>
-    </button>
-    {open && <div className="th-me-pop">
-      <div className="th-me-pop-head">What are you up to?</div>
-      <StatusComposer person={me} now={now} onDone={() => setOpen(false)} />
-    </div>}
-  </>;
-}

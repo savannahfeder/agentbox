@@ -186,19 +186,15 @@ img.tm-av { background: var(--bg-selected); }
 .tm-status-write .tm-btn { margin-left: auto; }
 .tm-status-error { flex: 1 1 100%; color: var(--accent); font-size: 12.5px; }
 
-/* YOUR OWN ROW IS THE TWO LINES IT ALWAYS WAS: your name, and what you are
-   up to where your email used to be. Nothing is added, so nothing moves.
-   Your email is on Settings -> Team, which is where clicking your name goes.
+/* YOUR OWN ROW IS YOUR NAME AND YOUR EMAIL, one button that opens your
+   account menu (w-a09476712f). The status line that took the email's place
+   on 2026-10-02 is a row in that menu now.
 
    EVERY RULE HERE IS SCOPED TO .workspace-navigation BECAUSE IT HAS TO
-   OUT-RANK TWO OF ITS RULES: `.workspace-navigation button` sizes every
-   button in the sidebar (13px, 36px tall, flex, padding), and
-   `.workspace-navigation .th-me-btn` sized this one as the whole row back
-   when it held the face too. A bare `.th-me-btn` loses to both, and the two
-   lines then stack to 74px inside a 46px row and fall out of the window. */
+   OUT-RANK `.workspace-navigation button`, which sizes every button in the
+   sidebar (13px, 36px tall, flex, padding) and reaches into the menu too. */
 .th-me { position: relative; }
-.th-me-text { display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
-  min-width: 0; flex: 1 1 auto; }
+.th-me-wrap { flex: 1 1 auto; min-width: 0; }
 
 /* YOUR ROW KEEPS THE SIDEBAR'S COLUMN. Your name starts where "Settings"
    and "Invite people" start (10 + 18 + 11 = 39px in, from the menu's
@@ -215,43 +211,51 @@ img.tm-av { background: var(--bg-selected); }
 .workspace-collapsed .workspace-navigation .th-me { padding-left: 8px; gap: 9px; }
 .workspace-collapsed .workspace-navigation .th-me .tm-av { width: 22px; height: 22px; line-height: 20px; font-size: 9px; }
 
-/* THE FACE IS A BUTTON AND LOOKS LIKE THE FACE IT WAS (w-a09476712f). It
-   undoes `.workspace-navigation button` (36px tall, padding, a wash on
-   hover) so the photo sits exactly where it did, and keeps initials showing
-   where that file hides every `button > span` in the collapsed rail. */
-.workspace-navigation .th-me .th-me-face { height: auto; padding: 0; gap: 0; border-radius: 50%; }
-.workspace-navigation .th-me .th-me-face:hover { background: none; }
-.workspace-navigation .th-me .th-me-face > .tm-av { display: inline-block; }
+/* THE BUTTON IS THE WHOLE ROW, and its hover wash reaches the row's left
+   edge, so it starts where the row's padding starts and puts it back inside:
+   the face lands where the row's padding put it and the name keeps the
+   column above. Its gap is the row's gap for the same reason. Open, it keeps
+   the wash, which is how the row says the menu above it is its own. */
+.workspace-navigation .th-me .th-me-btn { width: calc(100% + 4px); height: 38px; margin-left: -4px; padding: 0 8px 0 4px; gap: 7px; }
+.workspace-navigation .th-me .th-me-btn[aria-expanded='true'] { background: var(--wash); }
+.workspace-navigation .th-me .th-me-btn small { font-size: 11.5px; line-height: 16px; }
+.workspace-collapsed .workspace-navigation .th-me .th-me-btn { width: 38px; margin-left: -8px; padding: 0 0 0 8px; }
 
-/* 20 and 16 sit inside the row's 38px of content box, so the row keeps the
-   one height it has always had. */
-.workspace-navigation .th-me-text .th-me-btn { height: 20px; width: 100%; gap: 0; }
-.workspace-navigation .th-me-text .th-me-status { display: block; width: 100%; min-width: 0; height: auto;
-  box-sizing: border-box; padding: 0 8px; margin-left: -8px; border: 0; background: none;
-  font-size: 11.5px; line-height: 16px; color: var(--text-dim); text-align: left; cursor: pointer; }
-.workspace-navigation .th-me-text .th-me-status.nothing { color: var(--text-faint); }
-/* The underline is the affordance; a wash as well would be two of them. */
-.workspace-navigation .th-me-text .th-me-status:hover { background: none; }
-.workspace-navigation .th-me-text .th-me-status:focus-visible { outline: none; }
+/* YOUR ACCOUNT MENU, opening upward from the row, as wide as the row. It is
+   on the grey every other dropdown floats on (--pop), and it is drawn the way
+   the thread bar's menu is: a header, rows with a faint icon, hairlines.
+   In the collapsed rail the row is a 38px square, so the menu takes a width
+   of its own. Every button in here gets the sidebar's button rules first,
+   so these hand them back their own size, and keep their words showing
+   where the collapsed rail hides every `button > span`. */
+.th-acct-menu { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 60; padding: 4px;
+  display: flex; flex-direction: column; gap: 1px;
+  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  animation: prio-in 0.13s cubic-bezier(0.2, 0.8, 0.3, 1); }
+:root[data-theme="light"] .th-acct-menu { background: var(--surface); }
+.workspace-collapsed .th-acct-menu { right: auto; width: 240px; }
+.workspace-navigation .th-acct-menu button { height: auto; width: 100%; gap: 10px; padding: 7px 9px; font-size: 13px;
+  color: var(--text-dim); text-align: left; }
+.workspace-navigation .th-acct-menu button:hover, .workspace-navigation .th-acct-menu button:focus-visible { background: var(--wash-strong); color: var(--text); outline: none; }
+.workspace-collapsed .workspace-navigation .th-acct-menu button > span { display: block; }
+.th-acct-menu svg { width: 16px; height: 16px; flex: none; color: var(--text-faint); }
+.th-acct-menu button:hover svg { color: var(--text-dim); }
+.th-acct-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* What you said is read whole, so it wraps rather than losing its "until". */
+.th-acct-row.said > span { color: var(--text); white-space: normal; line-height: 1.35; }
+.workspace-navigation .th-acct-menu .th-acct-row.said { align-items: flex-start; }
+.th-acct-row.said svg { margin-top: 1px; }
+.workspace-navigation .th-acct-menu .th-acct-who { gap: 9px; padding: 8px 9px 9px; }
+.workspace-navigation .th-acct-menu .th-acct-who .tm-av { width: 28px; height: 28px; line-height: 26px; font-size: 10px; display: inline-block; }
+.th-acct-who > span { min-width: 0; }
+.th-acct-who b { display: block; font-weight: 500; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.th-acct-who small { display: block; font-size: 11.5px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.th-acct-rule { height: 1px; background: var(--line); margin: 3px 5px; flex: none; }
 
-/* THE DOTTED UNDERLINE IS THE APP'S SIGN FOR A VALUE YOU CAN CHANGE, and it
-   is text-decoration, never border-bottom: a border plus padding makes this
-   box taller than its neighbours and the row then lifts the text off the
-   baseline by a pixel. styles.css says never to reintroduce that. The ink
-   carries it rather than the button, so the underline is only ever as wide as
-   the words and stops where they are cut off. */
-.th-me-status-ink { display: inline-block; max-width: 100%; vertical-align: top; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap;
-  text-decoration: underline dotted transparent; text-decoration-thickness: 1px; text-underline-offset: 2px;
-  transition: color .14s, text-decoration-color .14s; }
-.th-me-status:hover .th-me-status-ink, .th-me-status:focus-visible .th-me-status-ink,
-.th-me-status[aria-expanded='true'] .th-me-status-ink { color: var(--text); text-decoration-color: var(--line-strong); }
-.workspace-collapsed .th-me-status { display: none; }
-
-/* The box you write in, above your row and lined up with it, so it reads as
-   belonging to the line it changes rather than floating beside the sidebar. */
-.th-me-pop { position: absolute; left: 0; bottom: calc(100% + 8px); width: 420px; padding: 13px 15px 15px;
-  background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg); z-index: 40; }
+/* The box you write a status in. It takes the account menu's place when you
+   pick that row, from the same corner and on the same grey. */
+.th-me-pop { position: absolute; left: 0; bottom: calc(100% + 6px); width: 420px; padding: 13px 15px 15px;
+  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg); z-index: 40; }
 /* THE BOX IS DRAWN INSIDE THE SIDEBAR, so `.workspace-navigation button`
    reaches into it and makes every control there 36px tall with the sidebar's
    own padding and gap. The segment is 28px, so its selected block hung 8px

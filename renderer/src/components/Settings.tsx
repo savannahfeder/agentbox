@@ -1121,7 +1121,7 @@ function ProjectTitle({ project, onRename }: {
 // agents work them, each row the door to that project's own page. It replaced
 // a plain index here and a separate Priority page (w-a514b58055).
 
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, onClose }: {
+export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, account, onClose }: {
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
@@ -1156,6 +1156,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   /** Team management, handed in by whoever has the team's state. Absent on a
    *  build with no team cloud, and then there is no Team row either. */
   teamPane?: ReactNode;
+  /** Who is signed in, for the Account group at the foot of General. Absent
+   *  when nobody is, and then there is no group. */
+  account?: { email: string; team?: string | null; onSignOut: () => void };
   onClose: () => void;
 }) {
   const [model, setModel] = useState<SettingsModel | null>(null);
@@ -1793,6 +1796,16 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 <Switch label="Counts and crash reports" on={w.diagnostics} onChange={(v) => setWorkspace('diagnostics', v)} />
               </Row>
             </Group>
+            {/* SIGN OUT IS THE LAST THING ON THE PAGE (w-a09476712f), where
+                "How do i log out" looks for it. Your account menu in the
+                sidebar's corner has it too. */}
+            {account && (
+              <Group label="Account">
+                <Row label={`Signed in as ${account.email}`} desc={account.team ? `On the ${account.team} team.` : undefined}>
+                  <button type="button" className="set-ghost" onClick={account.onSignOut}>Sign out</button>
+                </Row>
+              </Group>
+            )}
 
           </div>
         )}
