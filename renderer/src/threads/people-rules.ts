@@ -7,8 +7,8 @@
 // Person column. Pure, so tests read it directly
 // (tests/team-one-page-shows-the-people-you-pick.test.mjs).
 import type { Person, Product, ThreadCard, WorkItem } from '../types';
-import { priorityIdOf, type PriorityId } from '../priority';
-import { finishedAt, rowSharing, type Display } from './page-rules';
+import { priorityIdOf } from '../priority';
+import { byPriority, finishedAt, rowSharing, type Display, type Ranked } from './page-rules';
 
 const KEY = 'threads.people';
 
@@ -127,22 +127,25 @@ export function teammateRows(cards: ThreadCard[], { tab, picked, me, display, pr
 
 export type MixedRow = { item: WorkItem; card?: undefined } | { card: ThreadCard; item?: undefined };
 
-const RANK: Record<PriorityId, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-
 /**
  * ONE TABLE, YOURS AND THEIRS. Yours arrive already in the order the tab keeps
  * them, and that order is never broken. Theirs fall in by the same sort: by
  * Updated, newest first across everyone; by Priority, a card goes ahead of the
- * first of yours that is less urgent. On the Done tab ('done') by when each
+ * first of yours it outranks, by your project order and then its level
+ * (`byPriority`, page-rules.ts; a card names its project, and the name finds
+ * your copy of it in `products`). On the Done tab ('done') by when each
  * finished, newest first; a card says only when it last changed, so that
  * stands in for it.
  */
-export function mergeRows(mine: WorkItem[], theirs: ThreadCard[], sort: Display['sort'] | 'done'): MixedRow[] {
+export function mergeRows(mine: WorkItem[], theirs: ThreadCard[], sort: Display['sort'] | 'done', rank: { order: string[]; products: Product[] } = { order: [], products: [] }): MixedRow[] {
   const updated = sort !== 'priority';
-  const cards = theirs.slice().sort((a, b) => (updated ? 0 : RANK[priorityIdOf(a.priority)] - RANK[priorityIdOf(b.priority)]) || b.updatedAt - a.updatedAt);
+  const slugOf = new Map(rank.products.map((p) => [p.name, p.slug]));
+  const ranked = (c: ThreadCard): Ranked => ({ priority: c.priority, updatedAt: c.updatedAt, product: slugOf.get(c.project ?? '') ?? null });
+  const by = byPriority(rank.order);
+  const cards = theirs.slice().sort((a, b) => (updated ? b.updatedAt - a.updatedAt : by(ranked(a), ranked(b))));
   const ahead = (c: ThreadCard, i: WorkItem) => (updated
     ? c.updatedAt > (sort === 'done' ? finishedAt(i) : i.updatedAt)
-    : RANK[priorityIdOf(c.priority)] < RANK[priorityIdOf(i.priority)]);
+    : by(ranked(c), i) < 0);
   const out: MixedRow[] = [];
   let k = 0;
   for (const i of mine) {

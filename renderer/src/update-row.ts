@@ -69,3 +69,30 @@ export function changeLines(state: Pick<UpdateState, 'changes' | 'behind'> | nul
   const more = (state?.behind ?? changes.length) - changes.length;
   return more > 0 ? [...changes, `and ${more} more`] : [...changes];
 }
+
+/**
+ * THE VERSION WHOSE SIDEBAR CARD WAS CLOSED WITH ITS ×
+ *  (components/SidebarUpdate.tsx). Closing is for that version only: the next
+ *  restart installs it anyway, and a newer one brings the card back. Kept
+ *  across restarts, so a card closed this morning stays closed after lunch.
+ *  Storage that is missing or refuses reads as nothing closed. */
+export const UPDATE_CLOSED_KEY = 'zero.updateClosed';
+
+type ClosedStore = Pick<Storage, 'getItem' | 'setItem'> | null | undefined;
+const windowStore = (): ClosedStore => (typeof localStorage === 'undefined' ? undefined : localStorage);
+
+export function readUpdateClosed(store: ClosedStore = windowStore()): string | null {
+  try { return store?.getItem(UPDATE_CLOSED_KEY) || null; } catch { return null; }
+}
+
+/** A version the app could not name is not kept: closing it lasts this run. */
+export function writeUpdateClosed(store: ClosedStore, version: string): void {
+  if (!version) return;
+  try { store?.setItem(UPDATE_CLOSED_KEY, version); } catch { /* closed for this run only */ }
+}
+
+/** Whether `closed` hides this card. Never while a restart is under way: the
+ *  card saying "Updating" is how a press is seen to have done something. */
+export function closedHere(update: { installing: boolean; version?: string | null }, closed: string | null): boolean {
+  return !update.installing && closed !== null && closed === (update.version ?? '');
+}

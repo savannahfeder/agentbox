@@ -104,6 +104,7 @@ import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexM
 import { nameRow, wantsName } from './row-label.mjs';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mjs';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
+import { signInFiles, signInStamp } from './sign-in-files.mjs';
 
 const POLL_MS = 15_000;
 // HOW LONG SHE WAITS AFTER PRESSING THE BUTTON, and until now it was the line
@@ -143,6 +144,13 @@ const DIGEST_RETRY_MS = 30 * 60_000;
 const FAST_EXIT_MS = 45_000;
 const BACKOFF_BASE_MS = 60_000;
 const BACKOFF_CAP_MS = 30 * 60_000;
+// HOW LONG A SIGNED-OUT LOGIN SITS OUT WHEN NOTHING SAYS IT CAME BACK. It was
+// the same half hour as an ambiguous death, and that half hour is exactly how
+// long her agents stayed "Queued" after she had signed in again (2026-10-04).
+// The app now watches for the login itself (`_noticeSignIns`); this is only the
+// fallback for a login that lands somewhere it cannot see. A try on a login
+// that is still out costs a two-second run and is charged to nobody.
+const SIGNED_OUT_REST_MS = 5 * 60_000;
 // How long past a limit's printed reset hour the fleet waits before trying.
 const LIMIT_RESET_GRACE_MS = 30_000;
 // HOW LONG NOTHING MAY WORK BEFORE THE APP SAYS SO OUT LOUD.
@@ -159,6 +167,9 @@ const TROUBLE_QUIET_MS = 20 * 60_000;
 // noticed it was stuck. Both signals together, never one: a long render is silent but its
 // store server keeps beating, and a session that never claimed has no lease.
 const HUNG_QUIET_MS = 10 * 60_000;
+// A pass this late was not late, the Mac was asleep (forgiveSleep). Eight
+// missed passes: past any slow pass, well under the ten minutes above.
+const SLEPT_GAP_MS = 2 * 60_000;
 // Two hangs on one row inside this window and the app stops restarting it and
 // tells her instead, so a row that hangs every time is not killed forever.
 const HUNG_REPEAT_WINDOW_MS = 2 * 3_600_000;
@@ -575,16 +586,70 @@ export class Supervisor {
   // and app restart charged the item a failed delivery attempt.
   /** HER OWN HAND OUTRANKS A TIMER (2026-09-22).
    * Called for the things only she does that mean "run this now": a reply,
-   * Resume, reopening a row. An account waiting on a PERSON (signed out,
-   * switched off by an admin) stays out, because retrying it cannot help
-   * however often she asks. The streak
-   *  count is kept, so a real outage still escalates. */
+   * Resume, reopening a row. The streak count is kept, so a real outage still
+   * escalates.
+   *
+   * AN ACCOUNT WAITING ON A PERSON (signed out, switched off by an admin) IS
+   * LIFTED TOO WHEN NOTHING ELSE ON ITS ENGINE COULD RUN (2026-10-04). It used
+   * to stay out on the theory that retrying cannot help, but she IS the person:
+   * she signs back in, presses Resume, and that is the only signal the app
+   * gets. Her one login was parked from 11:30:29 to 12:00:29 and every Resume
+   * and "continue" in between left her rows queued. If she is still signed out
+   * the trial dies in two seconds and parks it again on the spot. Where another
+   * login is working, the dead one stays out: the work is moving without it. */
   liftBrakeForHer() {
     this._spawnCooldownUntil = 0;
     for (const account of Object.keys(this._profileCooldown ?? {})) {
-      if (needsHerHands(this._profileTrouble?.[account]?.cause)) continue;
+      if (needsHerHands(this._profileTrouble?.[account]?.cause) && this._anotherAccountCanRun(account)) continue;
       this._profileCooldown[account] = 0;
     }
+  }
+
+  /**
+   * A LOGIN THAT LANDED PUTS ITS ACCOUNT STRAIGHT BACK.
+   *
+   * Trouble on an account is only cleared by a session surviving on it, and a
+   * signed-out account was benched so that no session could start on it. So
+   * nothing she did could bring it back, and the bench ran out on its own half
+   * an hour later (2026-10-04). Here every tick asks whether the files a login
+   * writes have moved since the account was found signed out. If they have,
+   * the account gets one try now. The trouble itself stays until that try
+   * survives, so a write that was not a login (another Claude window touching
+   * the same file) buys one two-second try and no more: the stamp moves with
+   * it, and the next lift needs the next write.
+   */
+  _noticeSignIns() {
+    let lifted = false;
+    for (const [key, trouble] of Object.entries(this._profileTrouble ?? {})) {
+      if (trouble?.cause !== 'signed-out') continue;
+      const stamp = signInStamp(this._signInFilesFor(key));
+      if (!stamp || stamp <= (trouble.stamp ?? trouble.at ?? 0)) continue;
+      trouble.stamp = stamp;
+      if (this._profileCooldown) this._profileCooldown[key] = 0;
+      if (!key.startsWith('codex:')) this._spawnCooldownUntil = 0;
+      lifted = true;
+    }
+    if (lifted) this._saveState();
+    return lifted;
+  }
+
+  /** Which files one account's login writes, by the key its trouble is kept under. */
+  _signInFilesFor(key) {
+    const home = this.config.home || os.homedir();
+    if (key.startsWith('codex:')) {
+      const profile = key.slice('codex:'.length);
+      return signInFiles({ engine: 'codex', folder: this._codexProfileHome(profile), home });
+    }
+    return signInFiles({ folder: key === 'default' ? null : key, home });
+  }
+
+  // Whether some OTHER login on this account's engine could run once her hand
+  // has lifted what time alone would lift, i.e. one not waiting on a person.
+  _anotherAccountCanRun(account) {
+    const engine = String(account).startsWith('codex:') ? 'codex' : DEFAULT_ENGINE;
+    return this._profilesFor(engine)
+      .map((p) => this._accountKey(engine, p))
+      .some((key) => key !== account && !needsHerHands(this._profileTrouble?.[key]?.cause));
   }
 
   _kill(session) {
@@ -2097,7 +2162,10 @@ export class Supervisor {
     // answered read "stopped", which CLAUDE.md says must never mean "and
     // nothing will retry". The account health of the engine is still charged
     // for it, in `noteExitForBackoff`; only the delivery is spared.
-    if (signal || session?.stoppedByUs || session?.transportFault) {
+    // AND A FOURTH: the ACCOUNT refused it (signed out, out of usage, switched
+    // off). Her words never reached a worker, so they wait for the account
+    // rather than being spent on it (`accountFault`, noteExitForBackoff).
+    if (signal || session?.stoppedByUs || session?.transportFault || session?.accountFault) {
       this.redeliverAnswer(item, answerAtSpawn); // saves state
       return 'interrupted';
     }
@@ -2200,6 +2268,8 @@ export class Supervisor {
     const seen = this._fruitless[`${item.product}:${item.id}`];
     const runs = this._emptyRuns(item);
     if (!runs) return 0;
+    // Rested because its ACCOUNT refused it: awake as soon as the account is.
+    if (seen?.account && !this._profileResting(seen.account)) return 0;
     // AN URGENT ROW NEVER CLIMBS THE LADDER. Urgent outranks High, and is
     // even meant to INTERRUPT High and below, so it must never end up waiting
     // behind them.
@@ -2277,6 +2347,26 @@ export class Supervisor {
    * says so on the row and parks it with her, because a third try is unlikely
    * to go differently and a silent loop is the thing being fixed.
    */
+  /**
+   * TIME THE MAC SPENT ASLEEP IS NOT SILENCE.
+   *
+   * Both of the hang check's signals are made by a sleep: no output, because
+   * nothing ran, and a lapsed claim, because the heartbeats were frozen too.
+   * So the first pass after the lid opened stopped every worker that had been
+   * waiting on its helpers (the landing page thread, 2026-10-03: asleep 03:36
+   * to 03:52, stopped two seconds after the wake;
+   * tests/a-worker-whose-helpers-are-still-working-does-not-come-back-to-you).
+   *
+   * A pass normally comes every fifteen seconds, so a gap of minutes means the
+   * process was not running. Every worker's quiet clock starts again from
+   * now, which gives a genuinely hung one ten more minutes, not a pass.
+   */
+  forgiveSleep(now = Date.now()) {
+    if (!this._lastTickAt || now - this._lastTickAt < SLEPT_GAP_MS) return false;
+    for (const session of this.sessions.values()) session.lastOutputAt = Math.max(session.lastOutputAt ?? 0, now);
+    return true;
+  }
+
   reapHungSessions(items, now = Date.now()) {
     if (!this.sessions.size) return [];
     const byId = new Map((items ?? []).map((i) => [i.id, i]));
@@ -2616,7 +2706,7 @@ export class Supervisor {
    *   on arrival: it never got as far as being a session, so what it proves is
    *   that the machine is broken, not that this row has nothing in it.
    */
-  noteFreshRun(item, { everRan = true } = {}) {
+  noteFreshRun(item, { everRan = true, account = null } = {}) {
     const key = `${item.product}:${item.id}`;
     // Re-read: `item` is the snapshot taken at spawn, and the whole question is
     // what the session did to the row since.
@@ -2649,7 +2739,12 @@ export class Supervisor {
     // The first rung still applies, so a broken engine is not hammered: fifteen
     // minutes between attempts, forever, until it works or she is told.
     if (!everRan) runs = Math.min(runs, 1);
-    this._fruitless[key] = { runs, endedAt: Date.now(), founderAt };
+    // NOR A SPAWN ITS ACCOUNT REFUSED. Nobody looked at the row; the account
+    // was out. The rest is remembered against that account and ends the
+    // moment it is back (`restingUntil`), rather than fifteen minutes after
+    // she has signed in again.
+    if (account) runs = Math.min(runs, 1);
+    this._fruitless[key] = { runs, endedAt: Date.now(), founderAt, ...(account ? { account } : {}) };
     this._saveState();
     return 'rested';
   }
@@ -2872,6 +2967,12 @@ export class Supervisor {
     this._profileTrouble = this._profileTrouble ?? {};
     const had = this._profileTrouble[profile];
     this._profileTrouble[profile] = { since: had?.since ?? Date.now(), at: Date.now(), cause, raw: String(raw ?? '').slice(0, 300) };
+    // What the login files looked like when it was found out, so that
+    // `_noticeSignIns` can tell a login landing afterwards from one before.
+    if (cause === 'signed-out') {
+      const stamp = signInStamp(this._signInFilesFor(profile));
+      this._profileTrouble[profile].stamp = Math.max(stamp, had?.stamp ?? 0);
+    }
     return cause;
   }
 
@@ -2920,13 +3021,13 @@ export class Supervisor {
   // next spawn might well work. A login that has run out is not ambiguous, and
   // the two spawns it takes to reach three strikes are two real pieces of her
   // work handed to an account that cannot do them.
-  _strikeProfile(profile, { hard = false } = {}) {
+  _strikeProfile(profile, { hard = false, rest = 30 * 60_000 } = {}) {
     if (!profile) return;
     this._profileStrikes = this._profileStrikes ?? {};
     this._profileCooldown = this._profileCooldown ?? {};
     this._profileStrikes[profile] = (this._profileStrikes[profile] ?? 0) + 1;
     if (hard || this._profileStrikes[profile] >= 3) {
-      this._profileCooldown[profile] = Date.now() + 30 * 60_000;
+      this._profileCooldown[profile] = Date.now() + rest;
       this._profileStrikes[profile] = 0;
     }
   }
@@ -3199,8 +3300,17 @@ export class Supervisor {
         this._profileCooldown = this._profileCooldown ?? {};
         this._profileCooldown[account] = resetAt + LIMIT_RESET_GRACE_MS;
       } else {
-        this._strikeProfile(account, { hard: needsHerHands(cause) });
+        this._strikeProfile(account, {
+          hard: needsHerHands(cause),
+          rest: cause === 'signed-out' ? SIGNED_OUT_REST_MS : undefined,
+        });
       }
+      // A DEATH THE ACCOUNT CAUSED IS NOT THE ROW'S. Read by `settleDelivery`
+      // (her reply is handed back rather than spending one of its three tries)
+      // and by `noteFreshRun` (the row's rest ends when the account is back).
+      // Measured 2026-10-04: her "continue" on a row, sent while signed out,
+      // died in two seconds and counted against the reply.
+      if (needsHerHands(cause) || cause === 'at-limit') session.accountFault = { cause, account };
 
       // ONLY THE ENGINE SHE IS ACTUALLY RUNNING ON MAY BRAKE THE FLEET.
       //
@@ -3229,7 +3339,7 @@ export class Supervisor {
         this._fastExits = (this._fastExits ?? 0) + 1;
         const delay = resetAt
           ? Math.max(0, resetAt + LIMIT_RESET_GRACE_MS - Date.now())
-          : Math.min(BACKOFF_BASE_MS * 2 ** (this._fastExits - 1), BACKOFF_CAP_MS);
+          : Math.min(BACKOFF_BASE_MS * 2 ** (this._fastExits - 1), cause === 'signed-out' ? SIGNED_OUT_REST_MS : BACKOFF_CAP_MS);
         this._spawnCooldownUntil = Date.now() + delay;
         this._fleetTroubleSince = this._fleetTroubleSince || Date.now();
         this._lastFastExit = { at: Date.now(), cause, raw };
@@ -3394,8 +3504,19 @@ export class Supervisor {
         .map((i) => i.id);
     } catch {}
     if (this.paused) queued = [];
+    let signInNeeded = {};
+    try {
+      const productBySlug = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
+      const me = process.env.AGENTBOX_PERSON_ID;
+      signInNeeded = this._waitingOnSignIn(this.store.listItems(Date.now())
+        .filter((i) => mayRunHere(i, productBySlug.get(i.product), me)));
+    } catch {}
     return {
       paused: this.paused,
+      // ROWS NOTHING CAN START BECAUSE THEIR TOOL IS SIGNED OUT, by id, with the
+      // tool's name. The row says so instead of "Queued", which promised an
+      // agent "as soon as one is free" while none could be (2026-10-04).
+      signInNeeded,
       running: [...this.sessions.values()].filter(s => !s.remoteIdle).map((s) => ({
         itemId: s.itemId,
         product: s.product,
@@ -3597,6 +3718,30 @@ export class Supervisor {
   // is only ever set when no healthy account remains; twenty unbroken minutes;
   // and something it is actually stopping, so there is work waiting and nothing
   // running.
+  /**
+   * WHICH OPEN ROWS ARE WAITING ON A SIGN-IN, and in which tool. True of a row
+   * when every account its engine could run it on is sitting out and at least
+   * one of them is signed out. One sitting-out account beside a working one is
+   * not this: the work goes to the working one.
+   */
+  _waitingOnSignIn(rows) {
+    const out = {};
+    const blocked = new Map();
+    const isBlocked = (engine) => {
+      if (!blocked.has(engine)) {
+        blocked.set(engine, !this._liveProfilesFor(engine).length
+          && this._profilesFor(engine).some((p) => this._profileTrouble?.[this._accountKey(engine, p)]?.cause === 'signed-out'));
+      }
+      return blocked.get(engine);
+    };
+    for (const i of rows ?? []) {
+      if (i.status !== 'open' || this.sessions.has(i.id)) continue;
+      const engine = engineOf(this._engineFor(i));
+      if (isBlocked(engine)) out[i.id] = engineLabel(engine);
+    }
+    return out;
+  }
+
   _spawnTrouble(queued) {
     const since = this._fleetTroubleSince ?? 0;
     if (!since) return null;
@@ -3625,6 +3770,7 @@ export class Supervisor {
     // fifteen second wait back again for exactly the row that asked for it.
     if (this._ticking) { this._tickAgain = true; return; }
     this._ticking = true;
+    this.forgiveSleep(Date.now());
     this._lastTickAt = Date.now();
     try {
       return await this._tick();
@@ -3639,6 +3785,9 @@ export class Supervisor {
   async _tick() {
     if (this.paused) return;
     if (this.firstRunHolding()) return;
+    // Has a login landed since an account was found signed out? Ahead of the
+    // brake below, which would otherwise hold the fleet past the sign-in.
+    try { this._noticeSignIns(); } catch (e) { console.warn('zero: could not look for a sign-in:', e.message); }
     // A COOLDOWN STOPS THE SPAWNING AND IT MUST NOT STOP THE TELLING. The brake
     // goes on when there is no healthy account left anywhere, for up to half an
     // hour, which is precisely the half hour her tasks are all stuck and the
@@ -5795,6 +5944,14 @@ export class Supervisor {
       return;
     }
     if (!this._hasSlotFor(engine) && !continuation) return;
+    // HER REPLY WAITS FOR AN ACCOUNT THAT CAN CARRY IT. A continuation skips the
+    // slot check by design, so with every account on this engine sitting out it
+    // would go to one anyway, die in two seconds, and go again next tick. Held
+    // here and handed back, it goes out the tick the account returns.
+    if (continuation && !this._liveProfilesFor(engine).length) {
+      if (item.answer) this.redeliverAnswer(item, item.answer);
+      return;
+    }
     const product = this.store.listProducts().find((p) => p.slug === item.product);
     if (!product) return;
     // AND THIS IS WHERE "nothing ever runs in the practice project" IS ACTUALLY
@@ -6273,21 +6430,11 @@ export class Supervisor {
         } catch (e) { console.warn('zero: writing the closing message as the answer failed:', e.message); }
       }
       this.releaseFinishedClaim(item, session);
-      // A session that finished under its own power has nothing left to resume.
-      // ANYTHING ELSE STAYS REMEMBERED, and that includes a kill of ours: an
-      // app quit is the commonest way her fleet dies, and it is the case where
-      // going back to the same session rather than briefing a stranger is worth
-      // the most. What keeps that honest is the sweep's own guard: it only ever
-      // puts a worker back on a row that is still open or claimed.
-      //
       // NOTHING HERE TOUCHES `_rowSessions`, and that is the whole change of. A
       // finished session has nothing left to RESCUE, which is what this line is
       // about, but it is exactly the session her next reply should go back to.
       // `pruneRowSessions` is what eventually forgets it.
-      if (session.result != null && !session.resultIsError) {
-        delete this._liveSessions[item.id];
-        this._saveState();
-      }
+      this.forgetFinishedSession(item, session);
       this.noteExitForBackoff(session, { onLine });
       const carryingAnswer = continuation && answerAtSpawn;
       if (carryingAnswer) this.settleDeliveryAndSay(item, answerAtSpawn, session, signal, { command: !!plan.command });
@@ -6308,7 +6455,7 @@ export class Supervisor {
         // Claude Code announces itself with `session_id` on its first line of
         // output, so a session with neither died before the CLI was running.
         const everRan = session.sessionId != null || session.result != null;
-        const outcome = this.noteFreshRun(item, { everRan });
+        const outcome = this.noteFreshRun(item, { everRan, account: session.accountFault?.account ?? null });
         if (outcome === 'rested') {
           const until = this.restingUntil(item);
           if (until > Date.now()) onLine(`nothing moved on this row; resting ${Math.round((until - Date.now()) / 60_000)}m`);
@@ -6735,7 +6882,36 @@ export class Supervisor {
   // says why this had to change and what it cost her.
   speaksForTheSession(session, { command = false } = {}) {
     if (this.storeMcpCommand() && !command) return false;
-    return session?.result != null && !session.resultIsError;
+    return this.runFinished(session);
+  }
+
+  // A CLEAN RESULT IS NOT A FINISHED RUN WHEN THE RUN WAS STOPPED PART-WAY.
+  //
+  // A result arrives at the end of every turn, and a turn can end with helpers
+  // still out: "three builders are working, I'll stack them once they're
+  // done". The session stays open for them (main/claude-input.mjs). If it is
+  // then stopped, by a hang check fooled by a sleep or an app restart, its last
+  // result is a promise, and reading it as the end of the run dropped the
+  // record it resumes from and landed the promise on her row as the answer
+  // (tests/a-worker-whose-helpers-are-still-working-does-not-come-back-to-you).
+  // The input pipe knows: it only closes at a result with nothing out. A child
+  // that cannot say (a Codex turn) keeps the old reading.
+  runFinished(session) {
+    if (session?.result == null || session.resultIsError) return false;
+    return session.child?.ranToTheEnd?.() !== false;
+  }
+
+  // A session that finished under its own power has nothing left to resume.
+  // ANYTHING ELSE STAYS REMEMBERED, and that includes a kill of ours: an app
+  // quit is the commonest way her fleet dies, and it is the case where going
+  // back to the same session rather than briefing a stranger is worth the
+  // most. What keeps that honest is the sweep's own guard: it only ever puts a
+  // worker back on a row that is still open or claimed.
+  forgetFinishedSession(item, session) {
+    if (!this.runFinished(session)) return false;
+    delete this._liveSessions[item.id];
+    this._saveState();
+    return true;
   }
 
   // A WORKER'S CLOSING MESSAGE IS ITS ANSWER, ON EVERY INSTALL.
@@ -6764,7 +6940,7 @@ export class Supervisor {
   // line would land on a row another session is holding.
   closingMessageIsTheAnswer(session) {
     if (!this.storeMcpCommand() || session?.command) return false;
-    if (session?.result == null || session.resultIsError || !String(session.result).trim()) return false;
+    if (!this.runFinished(session) || !String(session.result).trim()) return false;
     if (session.claimRefused) return false;
     try {
       const fresh = this.store.readItem?.(session.product, session.itemId);
@@ -6778,7 +6954,7 @@ export class Supervisor {
   // stays alive for other turns. Release the run's claim without choosing a
   // status for the conversation. Failed runs retain the existing retry path.
   releaseFinishedClaim(item, session) {
-    if (session.exitFailed || session.resultIsError || session.claimRefused || session.stoppedByUs
+    if (session.exitFailed || !this.runFinished(session) || session.claimRefused || session.stoppedByUs
       || !String(session.result ?? '').trim()) return;
     try {
       this.store.releaseRunClaim?.(item.product, item.id, {

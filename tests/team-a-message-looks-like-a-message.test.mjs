@@ -95,7 +95,9 @@ describe('drawn', () => {
     expect(pages).toMatch(/<span className="th-msg">/);
   });
   it('draws the same on a board card', () => {
-    expect(pages).toMatch(/e\.message \? <MessageTitle/);
+    // The card breaks the ternary over lines since b04c600; what is pinned is
+    // that a message on a card is drawn by MessageTitle, however it wraps.
+    expect(pages).toMatch(/e\.message\s*\?\s*<MessageTitle/);
   });
   // THE UNDERLINE REACHES A MESSAGE ROW (2026-10-01: hovering a message row
   // showed no underline, and the selected one none either). The

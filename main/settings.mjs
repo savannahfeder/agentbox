@@ -448,7 +448,17 @@ export function readSettings({ config, supervisor, store }) {
     };
   });
 
+  // ARCHIVED PROJECTS, only so the Projects page can bring one back. Name and
+  // folder, the two things that tell three projects called Daydream apart.
+  let archivedProjects = [];
+  try {
+    archivedProjects = store.listProducts({ includeArchived: true })
+      .filter((p) => p.archived === true)
+      .map((p) => ({ slug: p.slug, name: p.name, dir: p.dir }));
+  } catch {}
+
   return {
+    archivedProjects,
     workspace: {
       agentsRunning: !supervisor.paused,
       sessionsAtOnce: config.maxConcurrentSessions,

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { SettingsIcon } from './SettingsIcon';
 import type { TeamState, View } from '../types';
 import { Face } from '../team/people';
@@ -7,7 +7,7 @@ import { SidebarIcon } from './SidebarIcon';
 import { SidebarToggleIcon } from './SidebarToggleIcon';
 import { AppMark } from './AppMark';
 import { SidebarUpdate } from './SidebarUpdate';
-import { changeLines } from '../update-row';
+import { changeLines, closedHere, readUpdateClosed, writeUpdateClosed } from '../update-row';
 import { SidebarStatus } from '../team/status';
 /** ONE NUMBER IN THE SIDEBAR, ON INBOX, AND IT IS DRAWN IN THE TAB'S OWN TYPE.
  *
@@ -42,7 +42,8 @@ import { SidebarStatus } from '../team/status';
  */
 export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, update = null, onUpdate }: {
   // A NEW VERSION WAITING (SidebarUpdate.tsx). Null when there is none.
-  update?: { installing: boolean; changes?: string[]; behind?: number | null; error?: string | null } | null; onUpdate?: () => void;
+  // `version` is what its × closes, until a newer one arrives.
+  update?: { installing: boolean; version?: string | null; changes?: string[]; behind?: number | null; error?: string | null } | null; onUpdate?: () => void;
   page?: string | null; inboxCount?: number; scheduledCount?: number; usage?: ReactNode; onSettings?: () => void; onInstructions?: () => void;
   // THE TEAM TAB. No people and no counts here: approved 2026-09-30, a list of
   // who is busy is not worth seeing all the time, and the Team page is where
@@ -62,6 +63,13 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
 }) {
   // The Team page is a page like Settings: while it is up no list tab is lit.
   const page = pageIn ?? (teamPage ? 'team' : null);
+  // The version whose card was closed with its × (SidebarUpdate.tsx).
+  const [updateClosed, setUpdateClosed] = useState(() => readUpdateClosed());
+  const closeUpdate = () => { const version = update?.version ?? ''; setUpdateClosed(version); writeUpdateClosed(globalThis.localStorage, version); };
+  const showUpdate = !!update && !!onUpdate && !closedHere(update, updateClosed);
+  const updateCard = showUpdate && !collapsed;
+  const updateView = showUpdate && update && onUpdate && <SidebarUpdate installing={update.installing} changes={changeLines(update)} error={update.error ?? null}
+    collapsed={collapsed} onRestart={onUpdate} onClose={closeUpdate} />;
   const waiting = Number.isFinite(inboxCount) ? Math.max(0, Math.floor(inboxCount)) : 0;
   const waitingDescription = `${waiting} ${waiting === 1 ? 'thread' : 'threads'} waiting`;
   // ONE PAGE OF YOUR THREADS (approved 2026-10-01). In progress, Scheduled and
@@ -99,9 +107,11 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
           it. `onTeam` is still the sign-in link at the foot. */}
     </nav>
     <div className="workspace-bottom">
-      {update && onUpdate && !collapsed && <SidebarUpdate collapsed={false} installing={update.installing} changes={changeLines(update)} error={update.error ?? null} onRestart={onUpdate} />}
+      {/* The card sits above the foot list; with the sidebar shut it is a
+          row inside it (SidebarUpdate.tsx). */}
+      {updateCard && updateView}
       <div className="workspace-utilities th-side-foot">
-        {update && onUpdate && collapsed && <SidebarUpdate collapsed installing={update.installing} changes={changeLines(update)} onRestart={onUpdate} />}
+        {!updateCard && updateView}
         {/* Shown to anyone signed in, on a team or not (2026-10-01: the
             invite page and team settings must always be reachable). With no
             team yet, both open the page that starts one. */}

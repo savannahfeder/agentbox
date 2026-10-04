@@ -300,7 +300,7 @@ picks which coding agents the fixture Mac has, where nothing is one agent,
 or `?engines=codex` give two.
 
 To open the app as somebody who has never seen it, with its own throwaway home
-and nothing of yours inside it, press `⌘K` and choose "Open agentbox as a new
+and nothing of yours inside it, press `⌘K` and choose "Open Agentbox as a new
 user". `npm run fresh` does the same from a terminal.
 
 The app is named in exactly one place, `shared/product-name.mjs`. Change it

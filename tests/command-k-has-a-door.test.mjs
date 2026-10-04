@@ -174,8 +174,11 @@ describe('the header on the sidebar layout', () => {
   it('puts Search first, then New thread, then Display', () => {
     const search = right.indexOf('data-hint="search"');
     const compose = right.indexOf('data-hint="new-task"');
-    const display = right.indexOf('aria-label="View and filters"');
+    // The filters button's label carries whose threads are on the page since
+    // 538593f, so it is an expression now, not the plain attribute this read.
+    const display = right.indexOf("'View and filters'");
     expect(search).toBeGreaterThan(-1);
+    expect(display).toBeGreaterThan(-1);
     expect(search).toBeLessThan(compose);
     expect(compose).toBeLessThan(display);
   });

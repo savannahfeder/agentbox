@@ -17,6 +17,7 @@ import {
 } from '../shared/first-run-practice.mjs';
 import { NOTE_NAME } from './rail-note.mjs';
 import { iconPathFor } from './project-identity.mjs';
+import { patchProjectAt } from './store/project.mjs';
 import { imgUrl } from './img-scheme.mjs';
 import { teamOf } from './team/projects.mjs';
 import {
@@ -67,7 +68,12 @@ export class Store {
   /* ------------------------------- products ------------------------------ */
   // A product is a project directory under the account root carrying a
   // project.json. Archived products (or the reserved analytics id) don't ride.
-  listProducts() {
+  // ARCHIVED PROJECTS ARE LEFT OUT unless a caller asks for them, which is
+  // what makes archiving one take it off the inbox, the sidebar, the fleet and
+  // the Projects page in one write. Two callers do ask: the Projects page, so
+  // an archived one can be brought back, and the team sync, which must still
+  // count a shared project you archived as here or it joins it a second time.
+  listProducts({ includeArchived = false } = {}) {
     const root = this.config.accountRoot;
     let entries = [];
     try {
@@ -94,9 +100,10 @@ export class Store {
       } catch {
         continue;
       }
-      if (project.archived) continue;
+      if (project.archived && !includeArchived) continue;
       products.push({
         slug: entry.name,
+        ...(includeArchived ? { archived: project.archived === true } : {}),
         dir,
         name: project.name || entry.name,
         oneLiner: project.oneLiner || '',
@@ -125,6 +132,25 @@ export class Store {
       });
     }
     return products.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** ARCHIVE A PROJECT, OR BRING ONE BACK. One flag in its project.json and
+   *  nothing else: the folder, its documents and its threads stay on disk, and
+   *  `listProducts` is what stops showing it. Agents already running there
+   *  finish; nothing new starts, because the fleet reads the same list.
+   *
+   *  Resolved through the list itself, so the only thing this can ever write
+   *  is a project folder directly inside this account, named exactly. */
+  setProductArchived(slug, archived) {
+    const product = slug ? this.listProducts({ includeArchived: true }).find((p) => p.slug === slug) : null;
+    if (!product) throw new Error('That project could not be found.');
+    if (product.archived !== (archived === true)) {
+      patchProjectAt(product.dir, { archived: archived === true });
+      // The watched folders are the listed ones, so one brought back is not
+      // watched until the list is read again.
+      if (this.watchers.length) this.watch();
+    }
+    return { slug, archived: archived === true };
   }
 
   /* ------------------------------ work items ----------------------------- */

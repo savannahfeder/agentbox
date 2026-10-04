@@ -31,8 +31,10 @@ const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(repo, p), 'utf8');
 
 describe('the two spellings', () => {
+  // Capitalised mid-sentence too since 2026-10-02 (w-23fa810982), so the two
+  // spellings are the same word; the rule still holds for the next name.
   it('is the plain word mid-sentence and the same word raised at a sentence start', () => {
-    expect(NAME).toBe('agentbox');
+    expect(NAME).toBe('Agentbox');
     expect(Name).toBe('Agentbox');
     expect(Name).toBe(NAME.charAt(0).toUpperCase() + NAME.slice(1));
   });

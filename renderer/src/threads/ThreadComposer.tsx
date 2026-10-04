@@ -36,6 +36,7 @@ import type { Engine } from '../../../shared/engines.mjs';
 import { ENGINES } from '../../../shared/engines.mjs';
 import { api } from '../api';
 import { TeamContext, Face, firstName } from '../team/people';
+import { AgentFace } from '../components/AgentFace';
 import { conversationWith } from './page-rules';
 import { collectFiles, fromPaste, persistAttachments, type PendingAttachment } from '../attachments';
 import { AttachRow } from '../components/AttachRow';
@@ -417,7 +418,7 @@ export function ThreadComposer({
     <div className="tc-menu tc-drop tc-to-menu" role="listbox" aria-label="To" onKeyDown={menuKeys}>
       {!adding && (
         <button type="button" data-item className={`tc-row ${person ? '' : 'on'}`} onPointerEnter={hover} onClick={() => chooseTo('agent')}>
-          <span className="tc-agent" aria-hidden="true" /><span className="tc-row-label">Agent</span>
+          <AgentFace /><span className="tc-row-label">Agent</span>
         </button>
       )}
       {team && others.length > 0 && (<>
@@ -667,7 +668,7 @@ export function ThreadComposer({
             <span className="tc-anchor" ref={anchor('to')}>
               <button type="button" data-trigger className={`tc-word ${open === 'to' ? 'open' : ''}`} aria-haspopup="listbox" aria-expanded={open === 'to'}
                 onClick={() => toggle('to')} onKeyDown={triggerKeys('to')}>
-                {person ? <Face person={person} /> : <span className="tc-agent" aria-hidden="true" />}
+                {person ? <Face person={person} /> : <AgentFace />}
                 <span className="tc-word-text">{person ? person.name : 'Agent'}</span>
               </button>
               {extra.map((p) => (

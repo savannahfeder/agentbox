@@ -33,8 +33,10 @@
 // menu item and a button label take `Name`; anywhere else in a sentence takes
 // `name`.
 
-/** The name, spelled as it reads in the middle of a sentence. */
-export const NAME = 'agentbox';
+/** The name, spelled as it reads in the middle of a sentence. Capitalised
+ *  since 2026-10-02 (w-23fa810982): "agentbox is restarting" read wrong, and
+ *  the ask was for a capital A everywhere in the app. */
+export const NAME = 'Agentbox';
 
 /**
  * Every name this app has had, newest first. main/main.mjs walks this to find

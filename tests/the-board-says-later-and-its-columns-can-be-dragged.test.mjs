@@ -181,7 +181,15 @@ describe('a column moves cleanly', () => {
   it('works out the place from the pointer and fixed slots, never from what is drawn there', () => {
     expect(board).not.toMatch(/onDragOver|onDragStart|draggable=/);
     expect(board).toContain('onPointerDown');
-    expect(board).toContain('setPointerCapture');
+    // FIFTH ROUND: "it only moves one row at a time". The heading held the
+    // pointer (setPointerCapture), and the first change of order MOVES the
+    // column in the page, which silently lets go of it; after that the moves
+    // only arrived while the pointer happened to be over the heading. Measured
+    // with a real quick drag, first column to last in 8 moves: 1 change of
+    // order, then nothing. The whole window listens for the length of a drag.
+    expect(board).not.toContain('setPointerCapture');
+    expect(board).toContain("window.addEventListener('pointermove', move)");
+    expect(board).toContain("window.addEventListener('pointerup', up)");
     expect(board).toContain('slotUnder(d.slots, d.slots[d.startIndex] + (d.x - d.startX))');
   });
   it('the other columns slide to their new places rather than jump, and the carried one is left to the pointer', () => {
@@ -249,7 +257,20 @@ describe('the board itself', () => {
   it('keeps the keyboard on the same thread when a column is dropped somewhere else', () => {
     const app = readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(app).toContain('onReorderColumns={reorderColumns}');
-    expect(app).toContain('keepOnReorder.current = current ?? null;');
-    expect(app).toContain('boardOrder.findIndex((x) => x.id === k.id && x.product === k.product)');
+    expect(app).toContain('next.findIndex((x) => x.id === keep.id && x.product === keep.product)');
+  });
+  // SIXTH ROUND, two screenshots: "i dragged a column to the right, and then
+  // back to the left ... and then the content scrolled down like this without
+  // my prompting". The keyboard's place was put back by an effect one render
+  // AFTER the new order landed, so for that one render it pointed at a
+  // different card further down the board, the board scrolled to show it,
+  // and then scrolled back only as far as the right card, with the headings
+  // left above the top. The place is now set in the same update as the order.
+  it('sets the keyboard\'s place in the same update as the new order, never a render later', () => {
+    const app = readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+    const reorder = app.slice(app.indexOf('const reorderColumns = useCallback('), app.indexOf('const reorderColumns = useCallback(') + 900);
+    expect(reorder).toContain('setColumnOrder(order);');
+    expect(reorder).toContain('setSelected(');
+    expect(app).not.toContain('keepOnReorder');
   });
 });

@@ -4,7 +4,12 @@
 // it's the first thing in the sentence or naturally capitalized. Only not
 // capitalized in the middle of a sentence."
 //
-// The brand mark is lowercase, which is why shared/product-name.mjs exports
+// SUPERSEDED 2026-10-02 (w-23fa810982): "update Agentbox to be capitalized
+// ... fix that everywhere else in the app as well." NAME is now 'Agentbox', so
+// NAME and Name are the same word and the check below asks for the capital
+// everywhere in prose. It still catches a lowercase one.
+//
+// The brand mark was lowercase, which is why shared/product-name.mjs exports
 // both NAME and Name, and the app already obeys this everywhere because it
 // picks between the two. The README is the one place the name is TYPED, so it
 // is the one place the rule can rot, and it rots in public: this file is what
@@ -58,8 +63,9 @@ describe('finding the title', () => {
   });
 
   it('reports a lowercase title as lowercase, so the check below fails it', () => {
-    expect(firstHeading(`<h1>${NAME}</h1>`)).toBe(NAME);
-    expect(firstHeading(`<h1>${NAME}</h1>`)).not.toBe(Name);
+    const lower = Name.toLowerCase();
+    expect(firstHeading(`<h1>${lower}</h1>`)).toBe(lower);
+    expect(firstHeading(`<h1>${lower}</h1>`)).not.toBe(Name);
   });
 
   it('takes the first heading, not a later one', () => {
