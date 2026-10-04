@@ -14,8 +14,11 @@
 // The caller applies this only while a session is up. Once the run ends there
 // is no mark to stand in for them and they come back whole.
 
-export function withoutTrailingWork<T extends { kind?: string }>(events: T[]): T[] {
+export function withoutTrailingWork<T extends { kind?: string; yours?: boolean }>(events: T[]): T[] {
+  // What she did herself is not the mark's to speak for, so it stays, and only
+  // the agent's commands after it go.
+  const keep = (e: T | undefined) => e?.kind !== 'work' || !!e?.yours;
   let end = events.length;
-  while (end > 0 && events[end - 1]?.kind === 'work') end -= 1;
+  while (end > 0 && !keep(events[end - 1])) end -= 1;
   return end === events.length ? events : events.slice(0, end);
 }

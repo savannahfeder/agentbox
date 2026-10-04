@@ -1,6 +1,7 @@
 // Schedule: Superhuman's snooze picker without the NLP. Presets you arrow
-// through, or a tiny typed grammar (3h, 2d, 8am, 6:30pm, mon) with a live
-// preview of exactly when the item comes due.
+// through, or a time typed in words ("one week", "fri 3pm", "tomorrow at
+// noon", read by ../when-words.ts) with a live preview of exactly when the
+// item comes due.
 //
 // NOT a reminder, and the copy must never drift back into calling it one.So a
 // scheduled item RUNS at its moment.

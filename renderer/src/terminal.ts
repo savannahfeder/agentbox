@@ -13,6 +13,7 @@
 // read the same trace for two different purposes — that one keeps the
 // SENTENCES the agent wrote, this one keeps every line it typed.
 import { momentOf, type TraceSession } from './notes';
+import { runStoppedLine } from '../../shared/spawn-trouble.mjs';
 
 export interface TraceLine {
   // "9:12:04", in the time zone she is sitting in.
@@ -68,6 +69,17 @@ function oneLine(text: string): string {
 // because the LIVE copy of a sentence has to be compared against the traced
 // one, and a second normaliser is a second answer to "are these the same
 // words".
+// The body of the run's ERROR result, or '' when it ended any other way. The
+// same block shared/dead-run-trace.mjs reads for a cause.
+const ERROR_RESULT = /^\d{2}:\d{2}:\d{2}\s{2}== RESULT \([^)]*\bERROR\b[^)]*\) ==$/m;
+function errorResultText(raw: string): string {
+  const at = ERROR_RESULT.exec(raw);
+  if (!at) return '';
+  const after = raw.slice(at.index + at[0].length);
+  const end = after.search(/^# exited \(/m);
+  return (end === -1 ? after : after.slice(0, end)).trim();
+}
+
 export function said(text: string): string {
   return text.replace(/[^\S\n]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
 }
@@ -88,6 +100,13 @@ export function traceLines(session: TraceSession): TraceLine[] {
   // How many blank lines have gone by since the last line of prose, so a
   // paragraph break survives and a run of them does not become a gap.
   let blanks = 0;
+
+  // THE TOOL'S OWN REFUSAL, WHEN THE RUN ENDED ON ONE. The CLI types it into
+  // the run as a line of prose and then repeats it as an ERROR result; the
+  // prose copy is swapped for our sentence below. Only a line that IS the
+  // error result is touched, so an agent writing about a login page is not.
+  const failure = errorResultText(session?.text ?? '');
+  const failureLine = failure ? said(failure.split('\n')[0]) : '';
 
   for (const raw of (session?.text ?? '').split('\n')) {
     const stamped = STAMPED.exec(raw);
@@ -118,6 +137,10 @@ export function traceLines(session: TraceSession): TraceLine[] {
     if (!body.trim()) continue;
 
     const kind = body.startsWith('[') ? 'tool' : 'say';
+    if (kind === 'say' && failureLine && said(body) === failureLine) {
+      lines.push({ time, at, kind: 'say', text: runStoppedLine(failure) });
+      continue;
+    }
     lines.push({ time, at, kind, text: kind === 'tool' ? oneLine(body) : said(body) });
   }
 

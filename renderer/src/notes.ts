@@ -70,10 +70,16 @@ function clock(h: number, m: number): string {
 // read 5:01am, 6:39am, 12:15am, 4:29am for one continuous run. The session's
 // own startedAt supplies the missing date, and the moment comes back as a real
 // one; the day rolls forward when a run crosses midnight UTC.
+//
+// AGAINST THE START'S WHOLE SECOND, because the stamp has none smaller. A run
+// spawned at 18:30:28.097 whose only line read "18:30:28" was 97ms "before"
+// it began, so that line was put on the next day, and a message from tomorrow
+// sat under everything the next run wrote (2026-10-04). The store's practice
+// traces floored their start for the same reason; this is the reader's copy.
 export function momentOf(startedAt: number, h: number, m: number, s: number): number {
   const began = new Date(startedAt);
   const at = Date.UTC(began.getUTCFullYear(), began.getUTCMonth(), began.getUTCDate(), h, m, s);
-  return at < startedAt ? at + 86_400_000 : at;
+  return at < Math.floor(startedAt / 1000) * 1000 ? at + 86_400_000 : at;
 }
 
 // The same moment, in the time zone she is sitting in.

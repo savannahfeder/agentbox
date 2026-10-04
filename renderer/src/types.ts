@@ -514,6 +514,12 @@ export interface AgentWork {
   lines: number;
   failed: boolean;
   more?: number;
+  // SOMETHING SHE DID, not something the agent ran: a snooze, a picked option,
+  // a rename, a close (w-49b4e45403). It never folds into the agent's work and
+  // is drawn as its own quiet line with its time. `by` is the teammate who did
+  // it, on a shared project.
+  yours?: true;
+  by?: string;
 }
 
 export type AgentEvent = (AgentTurn & { kind?: undefined }) | AgentWork;
