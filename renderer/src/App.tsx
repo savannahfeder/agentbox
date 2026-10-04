@@ -5437,6 +5437,7 @@ export default function App() {
           supervisorPaused={snap.supervisor.paused}
           batch={multiSel.size > 0}
           look={look}
+          machine={machine}
           onSetLook={(l) => { setLook(l); setModal(null); }}
           staleFiles={snap.restartNeeded?.files ?? []}
           /*
