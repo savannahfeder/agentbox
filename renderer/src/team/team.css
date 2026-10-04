@@ -241,8 +241,10 @@ img.tm-av { background: var(--bg-selected); }
 .th-acct-menu svg { width: 16px; height: 16px; flex: none; color: var(--text-faint); }
 .th-acct-menu button:hover svg { color: var(--text-dim); }
 .th-acct-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* What you said is read whole, so it wraps rather than losing its "until". */
-.th-acct-row.said > span { color: var(--text); white-space: normal; line-height: 1.35; }
+/* What you said wraps rather than losing its "until", but to two lines and
+   no more: "it should be a maximum of two rows of space" (2026-10-04). */
+.th-acct-row.said > span { color: var(--text); white-space: normal; line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .workspace-navigation .th-acct-menu .th-acct-row.said { align-items: flex-start; }
 .th-acct-row.said svg { margin-top: 1px; }
 .workspace-navigation .th-acct-menu .th-acct-who { gap: 9px; padding: 8px 9px 9px; }

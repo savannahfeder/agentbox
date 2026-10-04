@@ -132,6 +132,25 @@ describe('your account menu', () => {
     expect(m).not.toContain(STATUS_PROMPT);
   });
 
+  // THE WORDS AND THE ICON SHE PICKED, 2026-10-04: "'Set a status' is the
+  // copy that wins ... the little smiley face. I think that works well."
+  it('asks with "Set a status" and a smiley', () => {
+    expect(STATUS_PROMPT).toBe('Set a status');
+    const status = menu().match(/<button[^>]*th-acct-status[\s\S]*?<\/button>/)[0];
+    expect(status).toContain('th-acct-smile');
+    expect(status).toContain('Set a status');
+  });
+
+  // "if people have really long statuses, we don't want it to flow over too
+  // many times so it should be a maximum of two rows of space."
+  it('gives a long status two lines at most', () => {
+    const css = read('renderer/src/team/team.css');
+    const rule = css.match(/\.th-acct-row\.said > span \{([^}]*)\}/)?.[1] ?? '';
+    expect(rule).toMatch(/-webkit-line-clamp:\s*2/);
+    expect(rule).toMatch(/overflow:\s*hidden/);
+    expect(rule).not.toMatch(/line-clamp:\s*[13-9]/);
+  });
+
   it('asks again once a status has run out', () => {
     const m = menu({ ...me, status: { text: 'Away last week', until: Date.now() - 60_000 } });
     expect(m).not.toContain('Away last week');

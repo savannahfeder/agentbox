@@ -18,8 +18,8 @@ import { SettingsIcon } from '../components/SettingsIcon';
 
 const InviteIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="10" cy="8.5" r="3.5"/><path d="M3.5 20c.7-3.4 3.3-5.3 6.5-5.3 1.4 0 2.6.3 3.7.9"/><path d="M18 14v6M15 17h6"/></svg>;
 const SignOutIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4h4.5v16H14M10 8l-4 4 4 4M6 12h10"/></svg>;
-/** A circle with a dot: you, and what you are doing. */
-const StatusIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>;
+/** A small smiley, picked over a dot, a clock and a pencil (2026-10-04). */
+const StatusIcon = () => <svg className="th-acct-smile" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M8.8 14c.8 1.1 1.9 1.7 3.2 1.7s2.4-.6 3.2-1.7"/><path d="M9.5 10h.01M14.5 10h.01" strokeWidth="2"/></svg>;
 
 export function AccountMenu({ me, now, collapsed, onAccount, onInvite, onSettings, onSignOut }: {
   me: Person; now: number; collapsed: boolean;
