@@ -159,6 +159,9 @@ const TROUBLE_QUIET_MS = 20 * 60_000;
 // noticed it was stuck. Both signals together, never one: a long render is silent but its
 // store server keeps beating, and a session that never claimed has no lease.
 const HUNG_QUIET_MS = 10 * 60_000;
+// A pass this late was not late, the Mac was asleep (forgiveSleep). Eight
+// missed passes: past any slow pass, well under the ten minutes above.
+const SLEPT_GAP_MS = 2 * 60_000;
 // Two hangs on one row inside this window and the app stops restarting it and
 // tells her instead, so a row that hangs every time is not killed forever.
 const HUNG_REPEAT_WINDOW_MS = 2 * 3_600_000;
@@ -2277,6 +2280,26 @@ export class Supervisor {
    * says so on the row and parks it with her, because a third try is unlikely
    * to go differently and a silent loop is the thing being fixed.
    */
+  /**
+   * TIME THE MAC SPENT ASLEEP IS NOT SILENCE.
+   *
+   * Both of the hang check's signals are made by a sleep: no output, because
+   * nothing ran, and a lapsed claim, because the heartbeats were frozen too.
+   * So the first pass after the lid opened stopped every worker that had been
+   * waiting on its helpers (the landing page thread, 2026-10-03: asleep 03:36
+   * to 03:52, stopped two seconds after the wake;
+   * tests/a-worker-whose-helpers-are-still-working-does-not-come-back-to-you).
+   *
+   * A pass normally comes every fifteen seconds, so a gap of minutes means the
+   * process was not running. Every worker's quiet clock starts again from
+   * now, which gives a genuinely hung one ten more minutes, not a pass.
+   */
+  forgiveSleep(now = Date.now()) {
+    if (!this._lastTickAt || now - this._lastTickAt < SLEPT_GAP_MS) return false;
+    for (const session of this.sessions.values()) session.lastOutputAt = Math.max(session.lastOutputAt ?? 0, now);
+    return true;
+  }
+
   reapHungSessions(items, now = Date.now()) {
     if (!this.sessions.size) return [];
     const byId = new Map((items ?? []).map((i) => [i.id, i]));
@@ -3625,6 +3648,7 @@ export class Supervisor {
     // fifteen second wait back again for exactly the row that asked for it.
     if (this._ticking) { this._tickAgain = true; return; }
     this._ticking = true;
+    this.forgiveSleep(Date.now());
     this._lastTickAt = Date.now();
     try {
       return await this._tick();
@@ -6273,21 +6297,11 @@ export class Supervisor {
         } catch (e) { console.warn('zero: writing the closing message as the answer failed:', e.message); }
       }
       this.releaseFinishedClaim(item, session);
-      // A session that finished under its own power has nothing left to resume.
-      // ANYTHING ELSE STAYS REMEMBERED, and that includes a kill of ours: an
-      // app quit is the commonest way her fleet dies, and it is the case where
-      // going back to the same session rather than briefing a stranger is worth
-      // the most. What keeps that honest is the sweep's own guard: it only ever
-      // puts a worker back on a row that is still open or claimed.
-      //
       // NOTHING HERE TOUCHES `_rowSessions`, and that is the whole change of. A
       // finished session has nothing left to RESCUE, which is what this line is
       // about, but it is exactly the session her next reply should go back to.
       // `pruneRowSessions` is what eventually forgets it.
-      if (session.result != null && !session.resultIsError) {
-        delete this._liveSessions[item.id];
-        this._saveState();
-      }
+      this.forgetFinishedSession(item, session);
       this.noteExitForBackoff(session, { onLine });
       const carryingAnswer = continuation && answerAtSpawn;
       if (carryingAnswer) this.settleDeliveryAndSay(item, answerAtSpawn, session, signal, { command: !!plan.command });
@@ -6735,7 +6749,36 @@ export class Supervisor {
   // says why this had to change and what it cost her.
   speaksForTheSession(session, { command = false } = {}) {
     if (this.storeMcpCommand() && !command) return false;
-    return session?.result != null && !session.resultIsError;
+    return this.runFinished(session);
+  }
+
+  // A CLEAN RESULT IS NOT A FINISHED RUN WHEN THE RUN WAS STOPPED PART-WAY.
+  //
+  // A result arrives at the end of every turn, and a turn can end with helpers
+  // still out: "three builders are working, I'll stack them once they're
+  // done". The session stays open for them (main/claude-input.mjs). If it is
+  // then stopped, by a hang check fooled by a sleep or an app restart, its last
+  // result is a promise, and reading it as the end of the run dropped the
+  // record it resumes from and landed the promise on her row as the answer
+  // (tests/a-worker-whose-helpers-are-still-working-does-not-come-back-to-you).
+  // The input pipe knows: it only closes at a result with nothing out. A child
+  // that cannot say (a Codex turn) keeps the old reading.
+  runFinished(session) {
+    if (session?.result == null || session.resultIsError) return false;
+    return session.child?.ranToTheEnd?.() !== false;
+  }
+
+  // A session that finished under its own power has nothing left to resume.
+  // ANYTHING ELSE STAYS REMEMBERED, and that includes a kill of ours: an app
+  // quit is the commonest way her fleet dies, and it is the case where going
+  // back to the same session rather than briefing a stranger is worth the
+  // most. What keeps that honest is the sweep's own guard: it only ever puts a
+  // worker back on a row that is still open or claimed.
+  forgetFinishedSession(item, session) {
+    if (!this.runFinished(session)) return false;
+    delete this._liveSessions[item.id];
+    this._saveState();
+    return true;
   }
 
   // A WORKER'S CLOSING MESSAGE IS ITS ANSWER, ON EVERY INSTALL.
@@ -6764,7 +6807,7 @@ export class Supervisor {
   // line would land on a row another session is holding.
   closingMessageIsTheAnswer(session) {
     if (!this.storeMcpCommand() || session?.command) return false;
-    if (session?.result == null || session.resultIsError || !String(session.result).trim()) return false;
+    if (!this.runFinished(session) || !String(session.result).trim()) return false;
     if (session.claimRefused) return false;
     try {
       const fresh = this.store.readItem?.(session.product, session.itemId);
@@ -6778,7 +6821,7 @@ export class Supervisor {
   // stays alive for other turns. Release the run's claim without choosing a
   // status for the conversation. Failed runs retain the existing retry path.
   releaseFinishedClaim(item, session) {
-    if (session.exitFailed || session.resultIsError || session.claimRefused || session.stoppedByUs
+    if (session.exitFailed || !this.runFinished(session) || session.claimRefused || session.stoppedByUs
       || !String(session.result ?? '').trim()) return;
     try {
       this.store.releaseRunClaim?.(item.product, item.id, {
