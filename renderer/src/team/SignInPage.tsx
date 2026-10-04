@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api } from '../api';
 import { Name } from '../../../shared/product-name.mjs';
+import { AppMark } from '../components/AppMark';
 import './sign-in.css';
 
 const GoogleMark = () => (
@@ -55,7 +56,7 @@ export function SignInPage({ signedOut = false, error: startError = null, waitin
     return (
       <div className="si-page" role="dialog" aria-modal="true" aria-label="Finish signing in in your browser">
         <div className="si-card">
-          <span className="si-mark" aria-hidden="true">{Name.slice(0, 1).toUpperCase()}</span>
+          <span className="si-mark"><AppMark size={40} /></span>
           <h1>Finish in your browser</h1>
           <p className="si-lede">
             {waitingUrl
@@ -99,7 +100,7 @@ export function SignInPage({ signedOut = false, error: startError = null, waitin
   return (
     <div className="si-page" role="dialog" aria-modal="true" aria-label={heading}>
       <div className="si-card">
-        <span className="si-mark" aria-hidden="true">{Name.slice(0, 1).toUpperCase()}</span>
+        <span className="si-mark"><AppMark size={40} /></span>
         <h1>{heading}</h1>
         <p className="si-lede">{lede}</p>
 

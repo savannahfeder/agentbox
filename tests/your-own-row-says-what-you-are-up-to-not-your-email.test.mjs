@@ -67,8 +67,10 @@ describe('your own row at the foot of the sidebar', () => {
   it('is the same two lines whether or not anything is said', () => {
     const said = row(draw(withStatus({ text: 'At the Acme onsite', until: Date.now() + 86_400_000 })));
     const quiet = row(draw(withStatus(null)));
-    // Two controls in the row and no more: your name, and the line under it.
-    const controls = (r) => (r.match(/<button/g) ?? []).length;
+    // Two lines' worth of controls and no more: your name, and the line under
+    // it. The face is a button too since w-a09476712f, but it is the face,
+    // not a line, so it is not counted here.
+    const controls = (r) => (r.match(/<button(?![^>]*th-me-face)/g) ?? []).length;
     expect(controls(said)).toBe(2);
     expect(controls(quiet)).toBe(2);
   });

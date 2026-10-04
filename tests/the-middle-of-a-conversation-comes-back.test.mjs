@@ -328,8 +328,9 @@ describe('the ask she typed opens the conversation', () => {
     // The span stands for "inside the head" and is not a budget worth
     // defending: it grew when the head gained the second sending state, which
     // is the three seconds in which Z still takes a message back
-    // (w-5281ef1221). What this is guarding is the line above it.
-    expect(thread).toMatch(/<div className="msg-head">[\s\S]{0,1600}msg-on/);
+    // (w-5281ef1221), and again when it gained Send now (w-f37a34def6). What
+    // this is guarding is the line above it.
+    expect(thread).toMatch(/<div className="msg-head">[\s\S]{0,2600}msg-on/);
   });
 
   it('is never clipped, because nothing clips a message', () => {

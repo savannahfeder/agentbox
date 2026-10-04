@@ -129,7 +129,9 @@ describe('after the window, when Z cannot reach it', () => {
 describe('the message says which of the two states it is in', () => {
   it('wears the way back while it is held and drops it at the hand-over', () => {
     const thread = read('renderer', 'src', 'components', 'Thread.tsx');
-    expect(thread).toMatch(/e\.held \? 'Sending… press Z to undo' : 'Sending…'/);
+    // The line after the hand-over now also says when it waits on a running
+    // step, with Send now (w-f37a34def6); held still reads the way back.
+    expect(thread).toMatch(/e\.held \? 'Sending… press Z to undo' : [^\n]*'Sending…'/);
   });
 
   it('carries the flag from the queue to the message', () => {
