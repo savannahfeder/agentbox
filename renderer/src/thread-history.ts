@@ -73,6 +73,11 @@ export interface ThreadEvent {
   // What was actually written, in full. The component shows the beginning and
   // opens the rest in place; nothing here decides how much is shown.
   words?: string;
+  // AN ACTION OF HERS THAT ANSWERED THE AGENT, though it is not a message: a
+  // picked option. The conversation treats it as her reply for what comes
+  // after it, so the agent's result stays above it instead of being lifted
+  // under it.
+  answers?: true;
 }
 
 // '(withdrawn)' is the tombstone an undone send leaves behind, not words.
@@ -85,13 +90,28 @@ function has(patch: Record<string, unknown> | null | undefined, key: string): bo
   return !!patch && Object.prototype.hasOwnProperty.call(patch, key);
 }
 
-// "tomorrow 8:00 AM", the same words the open task's unschedule button uses.
-function moment(ts: number): string {
-  const d = new Date(ts);
-  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-  const day = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-  return `${day}, ${time}`;
+/**
+ * "until tomorrow 9:00am", said from the moment of the snooze, not from now.
+ *
+ * The line already carries when it was snoozed, so the day it runs to is said
+ * relative to that: the same day is a bare time, the next is "tomorrow", the
+ * rest of the week is a weekday, and further than that gets its date. The full
+ * "Fri, Oct 2, 9:00 AM" it used to print on every line is what made three
+ * snoozes read as a table rather than as three things you did.
+ */
+export function snoozeWords(runAt: number, from: number): string {
+  const days = Math.round((startOfDay(runAt) - startOfDay(from)) / 86_400_000);
+  const time = clock(runAt);
+  if (days <= 0) return `until ${time}`;
+  if (days === 1) return `until tomorrow ${time}`;
+  if (days < 7) return `until ${new Date(runAt).toLocaleDateString(undefined, { weekday: 'short' })} ${time}`;
+  return `until ${new Date(runAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} ${time}`;
 }
+
+// A PICKED OPTION IS WRITTEN AS "Option 2: <its words>" (pickOption in
+// App.tsx), one line. A typed reply that merely starts the same way and goes on
+// to say more is still a message of hers, so the match is the whole answer.
+const PICK = /^Option (\d+): ([^\n]+)$/;
 
 /**
  * The ledger's lines for ONE item, oldest first, as sentences.
@@ -249,6 +269,19 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
       // can tell: by the time the status arrives, the ledger line carrying
       // `/usage` is three events back. See that branch for what it cost.
       askedACommand = claudeCode && !!said && commandPrompt(said) !== null;
+      // A PICK IS AN ACTION, NOT SOMETHING SHE TYPED (w-49b4e45403). It used to
+      // be drawn as her message reading "Option 1: …". It is a quiet line of
+      // hers now, the option's own words beside it, and `answers` tells the
+      // conversation it still answered the agent (item-thread.ts).
+      const picked = said ? PICK.exec(said) : null;
+      if (picked) {
+        events.push({
+          at, who: 'you', said: `You picked option ${picked[1]}`,
+          words: picked[2].replace(/\s*\(recommended\)\s*$/i, '').trim(),
+          field: 'answer', answers: true,
+        });
+        continue;
+      }
       events.push(said
         ? { at, who: 'you', said: 'You replied', words: said, message: true, field: 'answer' }
         : { at, who: 'you', said: 'You withdrew your reply' });
@@ -287,8 +320,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
       } else {
         events.push({
           at, who,
-          said: mine ? 'You put it off' : 'It paused this',
-          words: `until ${moment(runAt)}`,
+          said: mine ? 'You snoozed it' : 'It paused this',
+          words: snoozeWords(runAt, at),
         });
       }
       continue;
