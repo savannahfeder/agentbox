@@ -223,8 +223,13 @@ describe('every control keeps its name in either width', () => {
     // The seventh when the sidebar is open is the line under your name, which
     // opens the box you say what you are up to in (w-0b54ee983f). A collapsed
     // sidebar is icons only and that line is words, so it is not drawn there.
-    expect(buttons).toHaveLength(collapsed ? 6 : 7);
-    for (const b of buttons) expect(b).toMatch(/aria-label="[^"]+"/);
+    //
+    // Plus your face, which opens your account too (w-a09476712f). Beside your
+    // name it is the same door twice, so it is hidden from screen readers and
+    // needs no name there; in the collapsed rail it is the named way in.
+    expect(buttons).toHaveLength(collapsed ? 7 : 8);
+    for (const b of buttons.filter((b) => !b.includes('aria-hidden="true"'))) expect(b).toMatch(/aria-label="[^"]+"/);
+    expect(buttons.filter((b) => b.includes('aria-hidden="true"'))).toHaveLength(collapsed ? 0 : 1);
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
   });
 
