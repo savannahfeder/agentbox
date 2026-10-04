@@ -102,6 +102,7 @@ export const REQUEST_CHANNELS = {
   sessionTrace: 'zero:session-trace',
   itemHistory: 'zero:item-history',
   openArtifact: 'zero:open-artifact',
+  folderPictures: 'zero:folder-pictures',
   readDoc: 'zero:read-doc',
   codeChange: 'zero:code-change',
   codeFile: 'zero:code-file',
