@@ -142,19 +142,14 @@ describe('her own hand lifts what time alone would lift', () => {
     expect(sup._hasSlotFor('claude')).toBe(true);
   });
 
-  // THIS USED TO SAY A SIGNED-OUT LOGIN STAYS OUT, "retrying it cannot help,
-  // however often she asks". That was the bug of 2026-10-04: she signed in,
-  // pressed Resume, and nothing moved for half an hour. Her hand lifts a
-  // signed-out login now; only an admin's switch, which her signing in cannot
-  // fix, stays out. tests/agents-come-back-the-moment-she-signs-in-again.test.mjs
-  it('a login an admin switched off stays out; a signed-out one comes back', () => {
+  it('a signed-out login stays out: retrying it cannot help, however often she asks', () => {
     const two = new Supervisor(
       { home: ONE_ACCOUNT_HOME, storeRoot: root, maxConcurrentSessions: 3, authProfiles: ['default', '/second'] },
       { listItems: () => [], listProducts: () => [] },
       '/nonexistent-app',
     );
-    two.noteExitForBackoff(deadOnArrival('Your organization has disabled Claude subscription access for Claude Code', '/second'));
-    two.noteExitForBackoff(deadOnArrival(SIGNED_OUT, 'default'));
+    two.noteExitForBackoff(deadOnArrival(SIGNED_OUT, '/second'));
+    two.noteExitForBackoff(deadOnArrival(HER_LIMIT, 'default'));
     two.liftBrakeForHer();
     expect(two._profileResting('default')).toBe(false);
     expect(two._profileResting('/second')).toBe(true);

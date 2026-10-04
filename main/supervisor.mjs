@@ -586,17 +586,18 @@ export class Supervisor {
    * Resume, reopening a row. The streak count is kept, so a real outage still
    * escalates.
    *
-   * A SIGNED-OUT LOGIN IS LIFTED TOO (2026-10-04). This used to skip it on the
-   * grounds that retrying cannot help however often she asks. It is the one
-   * thing that does help, once she has typed /login, and pressing Resume right
-   * after is exactly what she did; the skip turned it into a button that did
-   * nothing. If she has not signed in, the try dies in two seconds, is charged
-   * to no row (`accountFault`), and the account sits out again. An account an
-   * admin switched off still stays out: her signing in cannot fix that one. */
+   * AN ACCOUNT WAITING ON A PERSON (signed out, switched off by an admin) IS
+   * LIFTED TOO WHEN NOTHING ELSE ON ITS ENGINE COULD RUN (2026-10-04). It used
+   * to stay out on the theory that retrying cannot help, but she IS the person:
+   * she signs back in, presses Resume, and that is the only signal the app
+   * gets. Her one login was parked from 11:30:29 to 12:00:29 and every Resume
+   * and "continue" in between left her rows queued. If she is still signed out
+   * the trial dies in two seconds and parks it again on the spot. Where another
+   * login is working, the dead one stays out: the work is moving without it. */
   liftBrakeForHer() {
     this._spawnCooldownUntil = 0;
     for (const account of Object.keys(this._profileCooldown ?? {})) {
-      if (this._profileTrouble?.[account]?.cause === 'org-blocked') continue;
+      if (needsHerHands(this._profileTrouble?.[account]?.cause) && this._anotherAccountCanRun(account)) continue;
       this._profileCooldown[account] = 0;
     }
   }
@@ -637,6 +638,15 @@ export class Supervisor {
       return signInFiles({ engine: 'codex', folder: this._codexProfileHome(profile), home });
     }
     return signInFiles({ folder: key === 'default' ? null : key, home });
+  }
+
+  // Whether some OTHER login on this account's engine could run once her hand
+  // has lifted what time alone would lift, i.e. one not waiting on a person.
+  _anotherAccountCanRun(account) {
+    const engine = String(account).startsWith('codex:') ? 'codex' : DEFAULT_ENGINE;
+    return this._profilesFor(engine)
+      .map((p) => this._accountKey(engine, p))
+      .some((key) => key !== account && !needsHerHands(this._profileTrouble?.[key]?.cause));
   }
 
   _kill(session) {
