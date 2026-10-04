@@ -947,7 +947,7 @@ declare global {
       teamCreate(p: { name: string }): Promise<TeamCallResult>;
       teamAcceptInvite(p: { teamId: string }): Promise<TeamCallResult>;
       teamInvite(p: { email: string }): Promise<TeamCallResult>;
-      teamStatus(p: { text: string; hold: string }): Promise<TeamCallResult>;
+      teamStatus(p: { text: string; hold: string; until?: number }): Promise<TeamCallResult>;
       teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult>;
       teamSync(): Promise<TeamCallResult>;
       teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;

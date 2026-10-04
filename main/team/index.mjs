@@ -17,7 +17,7 @@ import { listSharedProjects, joinSharedProject, markShared, makeDirect } from '.
 import { firstSentence } from '../../shared/thread-cards.mjs';
 import { cardsFor } from '../../shared/thread-cards.mjs';
 import fs from 'node:fs';
-import { hasLapsed, holdEnds } from '../../shared/team-status.mjs';
+import { hasLapsed, statusEnds } from '../../shared/team-status.mjs';
 
 // `signingIn` is { url } while a Google sign-in waits on the browser, so the
 // page can offer that link again rather than a button that does nothing.
@@ -281,9 +281,9 @@ export function createTeamService({
 
     // A line you write about yourself, held until the end of today, tomorrow
     // or this week, or until you clear it. Saying nothing clears it.
-    async setStatus({ text, hold = 'open' } = {}) {
+    async setStatus({ text, hold = 'open', until } = {}) {
       if (!backend) throw new Error('sign in first');
-      const status = await backend.setStatus({ text, until: holdEnds(hold, now()) });
+      const status = await backend.setStatus({ text, until: statusEnds({ hold, until }, now()) });
       set({ me: { ...state.me, status } });
       return state;
     },

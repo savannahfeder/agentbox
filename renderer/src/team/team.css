@@ -176,15 +176,26 @@ img.tm-av { background: var(--bg-selected); }
 .tm-face-card-said .tm-status-held { display: block; margin: 3px 0 0; }
 .tm-face-hover { position: relative; display: inline-flex; align-items: center; gap: inherit; }
 
-/* writing one */
-.tm-status-write { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-.tm-status-field { flex: 1 1 100%; box-sizing: border-box; height: 34px; padding: 0 10px; border: 1px solid var(--text-dim);
-  background: transparent; color: var(--text); font: inherit; font-size: 13.5px; border-radius: var(--radius); }
-.tm-status-field:focus { outline: none; }
-.tm-status-field::placeholder { color: var(--text-faint); }
-.tm-status-holds { flex: 1 1 100%; }
-.tm-status-write .tm-btn { margin-left: auto; }
-.tm-status-error { flex: 1 1 100%; color: var(--accent); font-size: 12.5px; }
+/* WRITING ONE IS ONE SENTENCE (w-a09476712f): "I'm in meetings until the end
+   of today." The composer's two inks: the prose is faint, what you change is
+   dim and underlined with dots, and what you typed is full ink. What you type
+   is an editable run of the sentence itself, so it wraps with the words
+   around it, and the underline is text-decoration, so it follows every line
+   and never makes the line taller. 80 characters is two lines at most. */
+.tm-status-sentence { font-size: 15px; line-height: 1.6; color: var(--text-faint); overflow-wrap: anywhere; }
+.tm-status-what { color: var(--text); outline: none; caret-color: var(--text); white-space: pre-wrap;
+  text-decoration: underline dotted var(--line-strong); text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.tm-status-what:empty::before { content: attr(data-placeholder); color: var(--text-dim); }
+.workspace-navigation .th-me-pop .compose-word.open, .workspace-navigation .th-me-pop .compose-word:hover { color: var(--text); text-decoration-color: var(--text-dim); }
+/* The time menu opens UP from here: the box sits at the foot of the window. */
+.tm-status-until .when-menu { top: auto; bottom: calc(100% + 8px); }
+.tm-status-keys { display: flex; align-items: center; gap: 14px; margin-top: 12px; padding-top: 10px;
+  border-top: 1px solid var(--line); font-size: 12px; color: var(--text-faint); }
+.tm-status-keys kbd { font: 11px var(--mono); border: 1px solid var(--line-strong); border-radius: 3px; padding: 0 4px;
+  margin-right: 5px; color: var(--text-dim); }
+.tm-status-clear { margin-left: auto; font: inherit; font-size: 12px; color: var(--text-faint); background: none; border: 0; cursor: pointer; }
+.tm-status-clear:hover { color: var(--text); }
+.tm-status-error { margin-top: 8px; color: var(--accent); font-size: 12.5px; }
 
 /* YOUR OWN ROW IS YOUR NAME AND YOUR EMAIL, one button that opens your
    account menu (w-a09476712f). The status line that took the email's place
@@ -256,17 +267,16 @@ img.tm-av { background: var(--bg-selected); }
 
 /* The box you write a status in. It takes the account menu's place when you
    pick that row, from the same corner and on the same grey. */
-.th-me-pop { position: absolute; left: 0; bottom: calc(100% + 6px); width: 420px; padding: 13px 15px 15px;
+.th-me-pop { position: absolute; left: 0; bottom: calc(100% + 6px); width: 360px; padding: 14px 16px 12px; box-sizing: border-box;
   background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg); z-index: 40; }
 /* THE BOX IS DRAWN INSIDE THE SIDEBAR, so `.workspace-navigation button`
    reaches into it and makes every control there 36px tall with the sidebar's
-   own padding and gap. The segment is 28px, so its selected block hung 8px
-   below the box it sits in. These hand the two components back their own
-   sizes; without them the sidebar wins on specificity. */
+   own padding and gap, and in the collapsed rail hides every `button > span`.
+   These hand the sentence's word, the time menu's rows and Clear status back
+   their own shapes; without them the sidebar wins on specificity. */
 .workspace-navigation .th-me-pop button { height: auto; gap: 0; padding: 0; border-radius: 0; }
-.workspace-navigation .th-me-pop .tm-seg button { height: 100%; padding: 0 10px;
-  font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
-.workspace-navigation .th-me-pop .tm-btn { height: 34px; padding: 0 14px; border: 1px solid var(--line-strong);
-  border-radius: var(--radius); font-size: 13px; }
-
-.th-me-pop-head { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 10px; }
+.workspace-navigation .th-me-pop .compose-word { display: inline; font: inherit; color: var(--text-dim); background: none; }
+.workspace-navigation .th-me-pop .when-row { display: flex; gap: 9px; width: 100%; padding: 6px 9px; font-size: 13px;
+  color: var(--text-dim); border-radius: var(--radius); }
+.workspace-navigation .th-me-pop .when-row:hover { background: var(--bg-selected); color: var(--text); }
+.workspace-collapsed .workspace-navigation .th-me-pop button > span { display: inline; }

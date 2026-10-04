@@ -63,6 +63,15 @@ export const HOLDS = [
   { id: 'open', label: 'Until I clear it' },
 ];
 
+/** When a status set now runs out. A moment they chose wins while it is still
+ *  ahead ("they should be able to choose their own timelines", 2026-10-04);
+ *  anything else, now, the past or not a number at all, falls back to the
+ *  named hold, so a stale or garbled moment can never end a status at once. */
+export function statusEnds({ hold = 'open', until } = {}, now = Date.now()) {
+  if (typeof until === 'number' && Number.isFinite(until) && until > now) return until;
+  return holdEnds(hold, now);
+}
+
 /** When a hold runs out. Today and tomorrow end at the end of that day, so a
  *  line set at 9am and one set at 4pm both last the day out. */
 export function holdEnds(id, now = Date.now()) {

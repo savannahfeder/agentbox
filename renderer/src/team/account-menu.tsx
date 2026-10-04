@@ -33,14 +33,16 @@ export function AccountMenu({ me, now, collapsed, onAccount, onInvite, onSetting
   const wrap = useRef<HTMLDivElement>(null);
   const close = () => { setOpen(false); setWriting(false); };
 
-  // A press anywhere else, or Escape, puts it away.
+  // A press anywhere else, or Escape, puts it away. Escape is heard on the way
+  // UP, so a menu inside this one (when a status ends) can take its own
+  // Escape first and close only itself.
   useEffect(() => {
     if (!open) return;
     const away = (e: PointerEvent) => { if (!wrap.current?.contains(e.target as Node)) close(); };
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
     document.addEventListener('pointerdown', away, true);
-    document.addEventListener('keydown', key, true);
-    return () => { document.removeEventListener('pointerdown', away, true); document.removeEventListener('keydown', key, true); };
+    document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('pointerdown', away, true); document.removeEventListener('keydown', key); };
   }, [open]);
 
   const go = (fn?: () => void) => fn && (() => { close(); fn(); });
@@ -52,7 +54,6 @@ export function AccountMenu({ me, now, collapsed, onAccount, onInvite, onSetting
     </button>
     {open && (writing
       ? <div className="th-me-pop">
-          <div className="th-me-pop-head">{STATUS_PROMPT}</div>
           <StatusComposer person={me} now={now} onDone={close} />
         </div>
       : <AccountMenuList me={me} now={now} onStatus={() => setWriting(true)}
