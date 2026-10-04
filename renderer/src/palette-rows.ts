@@ -27,6 +27,7 @@
 // thing that replaced it.
 
 import { type Look } from './skins';
+import { type ThemeChoice } from './theme';
 
 /* ------------------------------- matching -------------------------------- */
 
@@ -107,17 +108,20 @@ export type LookRow = {
 // row her return key hits.
 const TOGGLE_KEYWORDS = 'light mode dark mode appearance colours colors';
 
-// THREE ROWS, ONE PER CHOICE (w-9e434e8671): Light, Dark (which is Ember
-// Grid) and Match system, the same three Settings' Themes page offers. The one
-// already on says so in its hint. Every row answers to "theme", so typing it
-// lists all three; "light", "dark" and "system" each find their own.
-export function lookRows(look: Look): LookRow[] {
-  const on = (id: Look) => (look === id ? 'on now' : 'theme');
-  return [
-    { id: 'theme-light', label: 'Theme: Light', hint: on('light'), keywords: `${TOGGLE_KEYWORDS} theme themes light`, to: 'light' },
-    { id: 'theme-dark', label: 'Theme: Dark', hint: on('ember-grid'), keywords: `${TOGGLE_KEYWORDS} theme themes dark ember`, to: 'ember-grid' },
-    { id: 'theme-match', label: 'Theme: Match system', hint: on('match'), keywords: 'theme themes match system mac automatic appearance', to: 'match' },
-  ];
+// THE CHOICES YOU ARE NOT ON, THE OPPOSITE ONE FIRST (w-e5f31083ff). Settings
+// offers three (w-9e434e8671): Light, Dark (which is Ember Grid) and Match
+// system. ⌘K used to list all three for "theme", with the one already on at the
+// top and Enter on it doing nothing. There are two themes, so typing "theme"
+// asks for the other one: the look already on is left out, and the row that
+// changes what the window shows goes first. On Match system that is the
+// opposite of what the Mac is showing, which is why `machine` is asked.
+export function lookRows(look: Look, machine: ThemeChoice = 'dark'): LookRow[] {
+  const light: LookRow = { id: 'theme-light', label: 'Theme: Light', hint: 'theme', keywords: `${TOGGLE_KEYWORDS} theme themes light`, to: 'light' };
+  const dark: LookRow = { id: 'theme-dark', label: 'Theme: Dark', hint: 'theme', keywords: `${TOGGLE_KEYWORDS} theme themes dark ember`, to: 'ember-grid' };
+  const match: LookRow = { id: 'theme-match', label: 'Theme: Match system', hint: 'theme',keywords: 'theme themes match system mac automatic appearance', to: 'match' };
+  if (look === 'light') return [dark, match];
+  if (look === 'match') return machine === 'light' ? [dark, light] : [light, dark];
+  return [light, match];
 }
 
 /* ------------------------- when nothing comes back ------------------------ */
