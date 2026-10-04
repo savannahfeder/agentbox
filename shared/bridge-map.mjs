@@ -22,6 +22,7 @@ export const REQUEST_CHANNELS = {
   compact: 'zero:compact',
   compactionStatus: 'zero:compaction-status',
   answer: 'zero:answer',
+  sendNow: 'zero:send-now',
   compose: 'zero:compose',
   schedule: 'zero:schedule',
   // The team version: signing in, the team, sharing, routing a given task.
@@ -101,6 +102,7 @@ export const REQUEST_CHANNELS = {
   sessionTrace: 'zero:session-trace',
   itemHistory: 'zero:item-history',
   openArtifact: 'zero:open-artifact',
+  folderPictures: 'zero:folder-pictures',
   readDoc: 'zero:read-doc',
   codeChange: 'zero:code-change',
   codeFile: 'zero:code-file',

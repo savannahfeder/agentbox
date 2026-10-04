@@ -104,6 +104,7 @@ import {
   saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, whyNotMade, type FirstRun,
 } from './onboarding';
 import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from './priority';
+import { runNowCommands } from './run-now';
 import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
 import { BoxFilter } from './components/BoxFilter';
 import { itemPriority, moveProduct, productRankScore } from '../../shared/rank.mjs';
@@ -522,6 +523,13 @@ export default function App() {
   // signed in, once the saved sign-in has been looked for (team/SignInPage.tsx).
   // Signing out lands on it, and it says so.
   const signInGate = !api.isFixtures && !!snap?.team?.configured && snap.team.started === true && !snap.team.signedIn;
+  // AND THE FIRST-RUN WALK WAITS FOR SOMEBODY TO BE SIGNED IN (2026-10-04).
+  // It used to run underneath the sign-in page, invisible but live: on its
+  // guided steps it holds every press not on what it points at, so Continue
+  // with Google did nothing at all for the first teammate to install this, and
+  // Return in the sign-in form went to the walk instead. It neither starts nor
+  // draws until someone is signed in, and picks up where it was after.
+  const walkWaitsForSignIn = !api.isFixtures && !!snap?.team?.configured && !snap.team.signedIn;
   const wasSignedIn = useRef(false);
   const [signedOutHere, setSignedOutHere] = useState(false);
   useEffect(() => {
@@ -812,6 +820,7 @@ export default function App() {
   // read never flashes the welcome at someone who has twenty projects.
   useEffect(() => {
     if (run || !snap) return;
+    if (walkWaitsForSignIn) return;
     if (!firstRunNeeded({ products: snap.products.length, done: firstRunDone(localStorage), forced: !!forcedRun.current })) return;
     // A half-finished walk resumes where it stopped: the folder and name are
     // saved as answered, so reopening resumes.
@@ -834,7 +843,7 @@ export default function App() {
     // effect on the next launch.
     const seeded = seedFirstRunLook(localStorage, THEME_KEY);
     if (seeded) { setTheme(seeded.theme); setSkin(seeded.skin); }
-  }, [snap, run]);
+  }, [snap, run, walkWaitsForSignIn]);
 
   useEffect(() => { if (run) saveFirstRun(localStorage, run); }, [run]);
 
@@ -3688,13 +3697,17 @@ export default function App() {
     await refresh();
   }, [refresh, showToast, working]);
 
-  // RUN NOW, from the three-dot menu on a waiting task (supervisor.runNow).
-  // The menu only offers it on a queued task, so the refusals are races: the
-  // task started, or left the store, between the menu drawing and the press.
+  // RUN NOW, from the three-dot menu or ⌘K on a waiting task (supervisor.runNow).
+  // Offered on anything In progress with nothing running (run-now.ts), so a
+  // refusal is either a race or a reason nothing can start it, said plainly.
   const runNow = useCallback(async (item: WorkItem) => {
     const r = await window.zero?.runNow?.({ product: item.product, id: item.id });
     showToast(r?.ok ? 'Up next. It starts as soon as an agent is free.'
-      : r?.reason === 'running' ? 'Already running.' : 'This task is no longer waiting.');
+      : r?.reason === 'running' ? 'Already running.'
+      : r?.reason === 'paused' ? 'Agents are paused. Turn them back on to run this.'
+      : r?.reason === 'scheduled' ? 'This task is scheduled for later.'
+      : r?.reason === 'held' ? 'Another session still holds this task. It starts when that lets go.'
+      : 'This task is no longer waiting.');
     await refresh();
   }, [refresh, showToast]);
 
@@ -5532,6 +5545,14 @@ export default function App() {
                       : target.kind === 'review' ? 'Approve (Proceed as Proposed)' : 'Approve (Run It)',
                     run: () => { setModal(null); resolve(target); } }]
                 : []),
+              // RUN NOW, by the same rule as the three-dot menu (run-now.ts).
+              // It had no entry here, and ⌘K is where she looked for it.
+              ...runNowCommands(target, {
+                session: snap.supervisor.running.find((r) => r.itemId === target.id) ?? null,
+                queued: snap.supervisor.queued,
+                runNow: snap.supervisor.runNow,
+                inProgress: belongsInProgress(target, { deferredUntil: dueAt(target), now }),
+              }, () => { setModal(null); void runNow(target); }),
               { id: 'done', label: target.agent ? DONE.verb : `${DONE.verb} Task`, keyHint: 'E', run: () => { setModal(null); markDone(target); } },
               { id: 'reply', label: 'Reply', keyHint: 'R', run: () => { open(); setModal('reply'); } },
               // Carry on with this row. Offered on ANY status a worker is not
@@ -5765,7 +5786,7 @@ export default function App() {
           its tether draws over whatever the app has open. w-82bb9e2c69.
           A ?modes= drawing stands INSTEAD of it, never over it: two full
           surfaces at once would photograph the welcome screen. */}
-      {run && !modeDraft && (
+      {run && !modeDraft && !walkWaitsForSignIn && (
         <Onboarding
           run={run}
           claude={claude}
@@ -5903,7 +5924,7 @@ export default function App() {
           smaller copy of it. Outside <Onboarding> because it belongs to the
           project rather than to the step: it has to stay through six beats and
           through everything those beats open. */}
-      {inPractice && <PracticeBand />}
+      {inPractice && !walkWaitsForSignIn && <PracticeBand />}
       {modal === 'standing' && <Standing kind={STANDING} onClose={() => setModal(null)} />}
 
       {(() => {

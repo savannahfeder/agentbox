@@ -434,9 +434,16 @@ export const api = {
   // `model` and `effort` are the reply box's drawer: which model picks up the
   // run this reply starts. Undefined means she never opened it and the row
   // keeps what it had; null clears it back to the engine's own choice.
-  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; model?: string | null; effort?: string | null }): Promise<WorkItem | null> {
+  // `now` cuts the running agent's current step so this message is answered at
+  // once instead of after it (main/claude-input.mjs `interrupt`).
+  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; model?: string | null; effort?: string | null; now?: boolean }): Promise<WorkItem | null> {
     if (useFixtures) return null;
     return window.zero!.answer(p);
+  },
+  // The same cut, for a message of hers already waiting on the agent.
+  async sendNow(p: { product: string; id: string }): Promise<{ ok: boolean; interrupted: boolean }> {
+    if (useFixtures) return { ok: true, interrupted: true };
+    return window.zero!.sendNow(p);
   },
 
   /* --------------------------------- the team ------------------------------- */

@@ -58,6 +58,11 @@ review, gets its path or address on its own line, and a design or a change
 opens beside the message by itself. Not the source files you edited, which are
 no use to them.
 
+A PICTURE YOU SHOW IS SAVED IN THE PROJECT'S FOLDER, in designs/ under this
+task's id, and named in the message, one per line. The app draws it where you
+name it. A picture in /tmp or anywhere else outside the project is never drawn,
+so it reaches them as a grey path however clearly you wrote it.
+
 Steps they must take are a numbered list, five at most, the first one doable now.
 
 If anything at all is left for them to decide, end with an Options section, in
