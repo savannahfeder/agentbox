@@ -11,6 +11,7 @@ import { DEFAULT_ENGINE, engineLabel, type Engine } from '../../../shared/engine
 import { useKeepInWindow } from '../keep-in-window';
 import type { Person } from '../types';
 import { Face, firstName } from './people';
+import { AgentFace } from '../components/AgentFace';
 
 type Row = { kind: 'agent'; id: string; label: string } | { kind: 'person'; id: string; label: string; person: Person | null; me: boolean };
 
@@ -70,7 +71,7 @@ export function WhoPicker({ engine, person, engines, people, me, onEngine, onPer
                 onClick={() => pick(r)}
               >
                 {r.kind === 'agent'
-                  ? <span className="tm-av bot">{r.id === 'codex' ? 'Cx' : 'Cc'}</span>
+                  ? <AgentFace />
                   : <Face person={r.person} me={r.me} />}
                 <span className="prio-menu-label">{r.label}</span>
               </button>

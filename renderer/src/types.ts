@@ -315,6 +315,9 @@ export interface SupervisorStatus {
   // Items a tick will spawn as soon as a slot frees: waiting their turn, not
   // forgotten. The row says "queued" so the two are never confused.
   queued?: string[];
+  // Rows nothing can start because their tool is signed out, id -> the tool's
+  // name. Said instead of "queued", which would promise an agent that cannot come.
+  signInNeeded?: Record<string, string>;
   // Of those, the ones pushed with Run now from the three-dot menu: next to
   // start, ahead of every project and tag (supervisor.runNow).
   runNow?: string[];

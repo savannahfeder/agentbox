@@ -61,7 +61,7 @@
   font: inherit; color: var(--text);
   background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
 }
-.tc-word > .tm-av, .tc-word > .tc-agent { margin-left: -27px; margin-right: 9px; position: relative; top: -1px; }
+.tc-word > .tm-av, .tc-word > .agent-face { margin-left: -27px; margin-right: 9px; position: relative; top: -1px; }
 .tc-word-text {
   text-decoration: underline dotted var(--line-strong);
   text-decoration-thickness: 1px;
@@ -71,11 +71,6 @@
 .tc-word:hover .tc-word-text, .tc-word.open .tc-word-text { text-decoration-color: var(--text-faint); }
 .tc-word:focus-visible { outline: none; }
 .tc-word:focus-visible .tc-word-text { text-decoration-color: var(--text-dim); }
-
-.tc-agent {
-  display: inline-block; flex: none; width: 18px; height: 18px; box-sizing: border-box;
-  border: 1px dashed var(--line-strong); border-radius: var(--radius);
-}
 
 /* ------------------------------- the body -------------------------------- */
 .tc-text {

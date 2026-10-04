@@ -1,0 +1,9 @@
+/* AN AGENT'S FACE (./AgentFace.tsx). The same 18px square as a person's
+   (.tm-av), dashed because it is an agent, square because the product is. */
+.agent-face {
+  display: inline-grid; place-items: center; flex: none; vertical-align: middle;
+  width: 18px; height: 18px; box-sizing: border-box;
+  border: 1px dashed var(--line-strong); border-radius: var(--radius);
+  color: var(--text-dim);
+}
+.agent-eyes { display: block; width: 16px; height: 16px; fill: currentColor; }
