@@ -578,16 +578,32 @@ export class Supervisor {
   // and app restart charged the item a failed delivery attempt.
   /** HER OWN HAND OUTRANKS A TIMER (2026-09-22).
    * Called for the things only she does that mean "run this now": a reply,
-   * Resume, reopening a row. An account waiting on a PERSON (signed out,
-   * switched off by an admin) stays out, because retrying it cannot help
-   * however often she asks. The streak
-   *  count is kept, so a real outage still escalates. */
+   * Resume, reopening a row. The streak count is kept, so a real outage still
+   * escalates.
+   *
+   * AN ACCOUNT WAITING ON A PERSON (signed out, switched off by an admin) IS
+   * LIFTED TOO WHEN NOTHING ELSE ON ITS ENGINE COULD RUN (2026-10-04). It used
+   * to stay out on the theory that retrying cannot help, but she IS the person:
+   * she signs back in, presses Resume, and that is the only signal the app
+   * gets. Her one login was parked from 11:30:29 to 12:00:29 and every Resume
+   * and "continue" in between left her rows queued. If she is still signed out
+   * the trial dies in two seconds and parks it again on the spot. Where another
+   * login is working, the dead one stays out: the work is moving without it. */
   liftBrakeForHer() {
     this._spawnCooldownUntil = 0;
     for (const account of Object.keys(this._profileCooldown ?? {})) {
-      if (needsHerHands(this._profileTrouble?.[account]?.cause)) continue;
+      if (needsHerHands(this._profileTrouble?.[account]?.cause) && this._anotherAccountCanRun(account)) continue;
       this._profileCooldown[account] = 0;
     }
+  }
+
+  // Whether some OTHER login on this account's engine could run once her hand
+  // has lifted what time alone would lift, i.e. one not waiting on a person.
+  _anotherAccountCanRun(account) {
+    const engine = String(account).startsWith('codex:') ? 'codex' : DEFAULT_ENGINE;
+    return this._profilesFor(engine)
+      .map((p) => this._accountKey(engine, p))
+      .some((key) => key !== account && !needsHerHands(this._profileTrouble?.[key]?.cause));
   }
 
   _kill(session) {
