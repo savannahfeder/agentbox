@@ -973,7 +973,7 @@ declare global {
       listFolders?(p?: { at?: string | null; showHidden?: boolean }): Promise<FolderListing>;
       folderExists?(p: { path: string }): Promise<{ exists: boolean }>;
       stopSession(p: { product: string; id: string }): Promise<WorkItem>;
-      runNow?(p: { product: string; id: string }): Promise<{ ok: boolean; reason?: 'running' | 'missing' }>;
+      runNow?(p: { product: string; id: string }): Promise<{ ok: boolean; reason?: 'running' | 'missing' | 'paused' | 'scheduled' | 'held' }>;
       reopen(p: { product: string; id: string }): Promise<WorkItem>;
       // The user's standing instructions: one text, briefed to every session.
       instructionRead?(id: string): Promise<{text:string;defaultText:string;error?:string}>;

@@ -1133,6 +1133,13 @@ export class Supervisor {
     const item = this.store.listItems(Date.now()).find((i) => i.id === id && i.product === product);
     if (!item) return { ok: false, reason: 'missing' };
     if (this.sessions.has(id)) return { ok: false, reason: 'running' };
+    // A PUSH NOTHING WILL ACT ON IS REFUSED OUT LOUD. The menu now offers Run
+    // now on anything In progress (renderer/src/run-now.ts), which takes in
+    // rows the tick is not going to start. Accepting those would read as Up
+    // next while nothing moved, so each says why instead.
+    if (this.paused) return { ok: false, reason: 'paused' };
+    if (!this.store.isDue(item, Date.now())) return { ok: false, reason: 'scheduled' };
+    if (this.claimHeldElsewhere(item)) return { ok: false, reason: 'held' };
     this._runNow.set(id, { product, at: Date.now(), started: false });
     // Asking for a row by name outranks a rest the fleet earned on it, the
     // same way `resumeItems` treats it.
