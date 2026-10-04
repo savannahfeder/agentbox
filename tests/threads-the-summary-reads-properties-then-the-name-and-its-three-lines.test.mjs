@@ -15,6 +15,13 @@
 // panel: she asked for them out. The row still carries blockedBy and blocks,
 // and a teammate's card still shows them; only this panel stopped drawing them.
 // Drawn with react-dom/server, so these are the real components.
+//
+// CHANGED 2026-10-04 (w-922f66bb06): the order turned over again. The name and
+// its three lines now open the panel and the properties sit at its foot
+// (pinned in the-summary-reads-its-name-and-lines-first-and-keeps-its-
+// properties-at-the-foot). What this file still holds is what did not change:
+// the name sits directly over Problem with nothing between, once, in its
+// approved type, and the links stay gone.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
@@ -38,13 +45,10 @@ const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 const src = fs.readFileSync(new URL('../renderer/src/threads/Summary.tsx', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../renderer/src/threads/summary.css', import.meta.url), 'utf8');
 
-describe('the panel reads properties first, then the name and its three lines', () => {
+describe('the name and its three lines read as one block', () => {
   const html = draw(item());
-  it('opens with the properties, and the name comes after them', () => {
-    expect(text(html)).toMatch(/^Status In progress Owner You Project Northwind Priority High Visible to Team Acme renewal terms Problem/);
-  });
-  it('puts the name directly above Problem, after the hairline, with nothing between', () => {
-    expect(html).toMatch(/<div class="ts-rule"><\/div><h2 class="ts-title">Acme renewal terms<\/h2><div class="ts-sec"><div class="ts-h">Problem<\/div>/);
+  it('puts the name directly above Problem, with nothing between', () => {
+    expect(html).toMatch(/<h2 class="ts-title">Acme renewal terms<\/h2><div class="ts-sec"><div class="ts-h">Problem<\/div>/);
   });
   it('keeps problem, progress and solution in that order under the name', () => {
     expect(text(html)).toMatch(/Acme renewal terms Problem Acme’s contract ends on the 14th\. Progress Terms are drafted\. Solution Not written yet/);
@@ -61,7 +65,7 @@ describe('the panel reads properties first, then the name and its three lines', 
   // Dark at 300, 400, 500 and 600, she picked 500. Still 16px: only the
   // weight moved.
   it('sets the name in Geist medium at 16px', () => {
-    const rule = css.match(/\.ts-title \{[^}]*\}/)[0];
+    const rule = css.match(/(?:^|\n)\.ts-title \{[^}]*\}/)[0];
     expect(rule).toMatch(/font-size: 16px/);
     expect(rule).toMatch(/font-weight: 500/);
     expect(rule).not.toMatch(/font-weight: (300|400|600)/);

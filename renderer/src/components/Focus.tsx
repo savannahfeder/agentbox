@@ -88,7 +88,7 @@ import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
 } from './Priority';
-import { SummaryPanel, SummaryRail, ThreadStateMark, useSummaryOpen, useSummaryShortcut } from '../threads/Summary';
+import { SummaryPanel, SummaryRail, ThreadCrumb, ThreadStateMark, useSummaryOpen, useSummaryShortcut } from '../threads/Summary';
 import { ThreadMenu } from '../threads/ThreadMenu';
 import { engineModelLabel } from '../models';
 
@@ -416,7 +416,7 @@ function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 // not the user's, and it is the part that was unnecessary. `filesFromRuns` stays,
 // because App.tsx still reads it to choose the design a card opens itself on.
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onHandToAgent, onAddPeople }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onHandToAgent, onAddPeople }: {
   previewSample?: string;
   /**
    * A MESSAGE FROM A PERSON IS NOT WORK UNTIL SHE SAYS SO. The one line under
@@ -438,6 +438,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    *  code, has a terminal or can still be finished, which is why the menu is
    *  drawn here and teleported there. */
   cornerHeaderTarget?: HTMLElement | null;
+  /** WHERE THIS THREAD WAS OPENED FROM, as its tab says it ("Needs you",
+   *  "Done"), for the thin bar the thread wears while its summary is open
+   *  (w-922f66bb06). Absent, the bar is always the full one. */
+  crumbFrom?: string;
   item: WorkItem;
   // WHAT AGENTS ARE ALLOWED TO DO RIGHT NOW, so the reply footer can print it
   // whether or not this message has changed it. Claude Code prints its own
@@ -1115,6 +1119,15 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     </div>
   );
 
+  // WHILE THE SUMMARY IS OPEN THE BAR IS THIN (w-922f66bb06): one line, the
+  // tab this thread was opened from and its name, all of it the way back
+  // (Summary.tsx ThreadCrumb). The full band would say again what the summary
+  // beside it says. Folded, nothing else names the thread, so the band is back.
+  const threadName = direct && talkFull ? talkFull : rowTitle(item);
+  const barContent = summaryShown && crumbFrom
+    ? <ThreadCrumb from={crumbFrom} name={threadName} onBack={onClose} />
+    : <>{backButton}{bandLine}</>;
+
   // ANYTHING ADDED TO THIS ELEMENT RIDES BESIDE THE LITERAL, NEVER INSIDE IT.
   // `the way out of an opened task` finds this element by the literal string
   // `className="focus-pane"` to prove the chevron is a sibling of the scroll
@@ -1163,7 +1176,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         How it is DRAWN is entirely CSS, at the foot of styles.css. It is not a
         setting and there is nothing left to choose: the place, the size and
         the height are all settled. w-7bc66fced1. */}
-    {headerTarget ? createPortal(<>{backButton}{bandLine}</>, headerTarget) : bandLine}
+    {headerTarget ? createPortal(barContent, headerTarget) : bandLine}
     {/* THE CORNER: THE THREAD'S MENU, and nothing else. The Summary button
         that stood beside it (w-e731ca9376) moved onto the summary itself on
         w-a3482b8c2c: the rail opens it, the icon beside its title closes it. */}

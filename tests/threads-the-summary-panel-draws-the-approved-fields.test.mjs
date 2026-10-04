@@ -54,8 +54,9 @@ describe('the top bar', () => {
 describe('the panel', () => {
   const html = draw(React.createElement(SummaryPanel, { item: item(), items, team: null }));
   const words = text(html);
+  // CHANGED 2026-10-04 (w-922f66bb06): Priority second, and Updated last.
   it('lists the properties in the approved order', () => {
-    expect(words).toMatch(/Status Waiting Owner You Project Northwind Priority High Visible to Team/);
+    expect(words).toMatch(/Status Waiting Priority High Owner You Project Northwind Visible to Team Updated/);
   });
   // Blocked by and Blocks left the panel on w-b38e975e2c; that test file
   // (threads-the-summary-reads-properties-then-the-name-and-its-three-lines)
@@ -66,8 +67,11 @@ describe('the panel', () => {
     expect(words).toMatch(/Solution Not written yet/);
     expect(html).toMatch(/class="ts-line dim"[^>]*>Not written yet/);
   });
-  it('says who kept it up to date last, in one faint line', () => {
-    expect(words).toMatch(/Kept up to date by the agent · 19 min ago$/);
+  // CHANGED 2026-10-04 (w-922f66bb06): the faint line under the words became
+  // the Updated row at the foot, and it says only when.
+  it('says when it was last updated, as the last property', () => {
+    expect(words).toMatch(/Updated 19 min ago$/);
+    expect(words).not.toContain('Kept up to date');
   });
   it('draws priority with the app’s own bars, Urgent as a fourth bar and never an exclamation mark', () => {
     expect(html).toMatch(/<span class="prio-bars p3">/);

@@ -5099,6 +5099,12 @@ export default function App() {
                   onAddPeople={addPeopleToConversation}
                   headerTarget={workspaceNavigation ? taskHeader : null}
                   cornerHeaderTarget={cornerHeaderTarget}
+                  // WHERE IT WAS OPENED FROM, in the tab strip's own words (so
+                  // "Waiting" when teammates are on the page), for the thin
+                  // bar the thread wears while its summary is open (w-922f66bb06).
+                  crumbFrom={teamOpen ? 'Team' : search !== null ? 'Search'
+                    : view === 'inbox' && team ? needsWord(picked, team.me)
+                      : INBOX_TABS.find((t) => t.view === view)?.label}
                   inlineArtifacts={workspaceNavigation}
                   previewSample={api.isFixtures && (reviewLab || new URLSearchParams(location.search).has('artifactTweaks')) ? artifactPreviewSample : undefined}
                   artifactView={openDoc ? artifactView : undefined}

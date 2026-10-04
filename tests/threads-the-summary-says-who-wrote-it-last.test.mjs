@@ -9,8 +9,14 @@
 // this reads that and nothing else. The cases that must NOT match are the
 // title and body, which she wrote at the start and are not the summary, and a
 // teammate's edit, which is not "you".
+//
+// CHANGED 2026-10-04 (w-922f66bb06): the line left the words and became the
+// Updated row at the foot of the panel, and it says only when. She found "By
+// the agent · 6 min ago" ugly and the lowercase "just now" weird, so the row
+// reads "Just now", "19 min ago". Who wrote it is no longer said. The cases
+// below are the same ones, read through `updatedWord`.
 import { describe, it, expect } from 'vitest';
-import { agoWords, lastEdit, stateGlyph, STATE_WORD, readSummaryOpen, SUMMARY_OPEN_KEY } from '../renderer/src/threads/summary-rules.ts';
+import { agoWords, updatedWord, stateGlyph, STATE_WORD, readSummaryOpen, SUMMARY_OPEN_KEY } from '../renderer/src/threads/summary-rules.ts';
 
 const NOW = Date.parse('2026-10-01T15:00:00');
 const M = 60_000;
@@ -33,29 +39,28 @@ describe('how long ago, in words', () => {
   });
 });
 
-describe('the line under the summary', () => {
+describe('the Updated row', () => {
   const item = (wrote) => ({ id: 'w-1', title: 'Acme', wrote });
-  it('names the agent when the agent wrote last', () => {
+  it('takes the agent\'s write when the agent wrote last', () => {
     const it1 = item({ problem: { ts: NOW - 40 * M, source: 'founder' }, progress: { ts: NOW - 19 * M, source: 'agent' } });
-    expect(lastEdit(it1, { me: 'p-me', now: NOW })).toBe('Kept up to date by the agent · 19 min ago');
+    expect(updatedWord(it1, { me: 'p-me', now: NOW })).toBe('19 min ago');
   });
-  it('names you when you wrote last, with or without a person on the line', () => {
-    expect(lastEdit(item({ solution: { ts: NOW - 2 * M, source: 'founder' } }), { me: 'p-me', now: NOW })).toBe('Edited by you · 2 min ago');
-    expect(lastEdit(item({ solution: { ts: NOW - 2 * M, source: 'founder', by: 'p-me' } }), { me: 'p-me', now: NOW })).toBe('Edited by you · 2 min ago');
+  it('takes yours when you wrote last, with or without a person on the line', () => {
+    expect(updatedWord(item({ solution: { ts: NOW - 2 * M, source: 'founder' } }), { me: 'p-me', now: NOW })).toBe('2 min ago');
+    expect(updatedWord(item({ solution: { ts: NOW - 2 * M, source: 'founder', by: 'p-me' } }), { me: 'p-me', now: NOW })).toBe('2 min ago');
   });
-  it('names a teammate by their first name, not you', () => {
-    const names = new Map([['p-maya', 'Maya Chen']]);
-    expect(lastEdit(item({ progress: { ts: NOW - 4 * M, source: 'founder', by: 'p-maya' } }), { me: 'p-me', names, now: NOW })).toBe('Edited by Maya · 4 min ago');
+  it('takes a teammate\'s, and does not say whose', () => {
+    expect(updatedWord(item({ progress: { ts: NOW - 4 * M, source: 'founder', by: 'p-maya' } }), { me: 'p-me', now: NOW })).toBe('4 min ago');
   });
   it('says nothing when only the title and body were ever written', () => {
-    expect(lastEdit(item({ title: { ts: NOW, source: 'founder' }, body: { ts: NOW, source: 'founder' } }), { me: 'p-me', now: NOW })).toBeNull();
-    expect(lastEdit(item(undefined), { me: 'p-me', now: NOW })).toBeNull();
+    expect(updatedWord(item({ title: { ts: NOW, source: 'founder' }, body: { ts: NOW, source: 'founder' } }), { me: 'p-me', now: NOW })).toBeNull();
+    expect(updatedWord(item(undefined), { me: 'p-me', now: NOW })).toBeNull();
   });
   it('counts an edit of yours still on its way to the ledger as the latest', () => {
     const it1 = item({ progress: { ts: NOW - 19 * M, source: 'agent' } });
-    expect(lastEdit(it1, { me: 'p-me', now: NOW, pending: { progress: NOW - 1000 } })).toBe('Edited by you · just now');
+    expect(updatedWord(it1, { me: 'p-me', now: NOW, pending: { progress: NOW - 1000 } })).toBe('Just now');
     // and an older pending edit loses to a newer agent write
-    expect(lastEdit(it1, { me: 'p-me', now: NOW, pending: { progress: NOW - 30 * M } })).toBe('Kept up to date by the agent · 19 min ago');
+    expect(updatedWord(it1, { me: 'p-me', now: NOW, pending: { progress: NOW - 30 * M } })).toBe('19 min ago');
   });
 });
 
