@@ -523,6 +523,13 @@ export default function App() {
   // signed in, once the saved sign-in has been looked for (team/SignInPage.tsx).
   // Signing out lands on it, and it says so.
   const signInGate = !api.isFixtures && !!snap?.team?.configured && snap.team.started === true && !snap.team.signedIn;
+  // AND THE FIRST-RUN WALK WAITS FOR SOMEBODY TO BE SIGNED IN (2026-10-04).
+  // It used to run underneath the sign-in page, invisible but live: on its
+  // guided steps it holds every press not on what it points at, so Continue
+  // with Google did nothing at all for the first teammate to install this, and
+  // Return in the sign-in form went to the walk instead. It neither starts nor
+  // draws until someone is signed in, and picks up where it was after.
+  const walkWaitsForSignIn = !api.isFixtures && !!snap?.team?.configured && !snap.team.signedIn;
   const wasSignedIn = useRef(false);
   const [signedOutHere, setSignedOutHere] = useState(false);
   useEffect(() => {
@@ -813,6 +820,7 @@ export default function App() {
   // read never flashes the welcome at someone who has twenty projects.
   useEffect(() => {
     if (run || !snap) return;
+    if (walkWaitsForSignIn) return;
     if (!firstRunNeeded({ products: snap.products.length, done: firstRunDone(localStorage), forced: !!forcedRun.current })) return;
     // A half-finished walk resumes where it stopped: the folder and name are
     // saved as answered, so reopening resumes.
@@ -835,7 +843,7 @@ export default function App() {
     // effect on the next launch.
     const seeded = seedFirstRunLook(localStorage, THEME_KEY);
     if (seeded) { setTheme(seeded.theme); setSkin(seeded.skin); }
-  }, [snap, run]);
+  }, [snap, run, walkWaitsForSignIn]);
 
   useEffect(() => { if (run) saveFirstRun(localStorage, run); }, [run]);
 
@@ -5774,7 +5782,7 @@ export default function App() {
           its tether draws over whatever the app has open. w-82bb9e2c69.
           A ?modes= drawing stands INSTEAD of it, never over it: two full
           surfaces at once would photograph the welcome screen. */}
-      {run && !modeDraft && (
+      {run && !modeDraft && !walkWaitsForSignIn && (
         <Onboarding
           run={run}
           claude={claude}
@@ -5912,7 +5920,7 @@ export default function App() {
           smaller copy of it. Outside <Onboarding> because it belongs to the
           project rather than to the step: it has to stay through six beats and
           through everything those beats open. */}
-      {inPractice && <PracticeBand />}
+      {inPractice && !walkWaitsForSignIn && <PracticeBand />}
       {modal === 'standing' && <Standing kind={STANDING} onClose={() => setModal(null)} />}
 
       {(() => {

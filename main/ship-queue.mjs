@@ -161,9 +161,12 @@ export class ShipQueue {
     if (!Object.keys(settings).length) return null;
     const next = nextToShip(items, products, settings, { isLive: this.isLive, folderFor: this.folderFor, handled: readHandled(this.userDir) });
     if (!next) return null;
-    // Marked handled BEFORE the run, so a slow ship is never started twice.
-    writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(next.item)]: markedAt(next.item) });
-    this.busy = this.ship(next).finally(() => { this.busy = null; });
+    // Marked handled only once the run has ENDED, pass or fail. Marked before
+    // it, a run cut off by an app restart was never tried again
+    // (w-f37a34def6, 2026-10-04). Within one app, `busy` already stops a
+    // second start; across a restart, trying again is the point.
+    const done = () => writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(next.item)]: markedAt(next.item) });
+    this.busy = this.ship(next).then(done, done).finally(() => { this.busy = null; });
     return this.busy;
   }
 

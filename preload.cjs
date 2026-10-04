@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('zero', {
   compact: (payload) => ipcRenderer.invoke('zero:compact', payload),
   compactionStatus: (payload) => ipcRenderer.invoke('zero:compaction-status', payload),
   answer: (payload) => ipcRenderer.invoke('zero:answer', payload),
+  sendNow: (payload) => ipcRenderer.invoke('zero:send-now', payload),
   compose: (payload) => ipcRenderer.invoke('zero:compose', payload),
   schedule: (payload) => ipcRenderer.invoke('zero:schedule', payload),
   // The team version: signing in, the team, and sharing a project.
