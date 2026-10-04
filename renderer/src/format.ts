@@ -1,4 +1,5 @@
 import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mjs';
+import { readMoment } from './when-words';
 // Time and grouping, Superhuman-style: terse, scannable, never a full date
 // where "3m" will do.
 
@@ -136,12 +137,6 @@ export function offerIsLive(item: HasFields & {
   return offered > spoke;
 }
 
-// Snooze grammar: deliberately tiny and deterministic, not NLP. Accepts
-// "30m", "3h", "2d", "8am", "6:30pm", "18:30", "mon".."sun", and the words the
-// picker itself prints. Anything else is invalid and says so, rather than
-// guessing.
-const DAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-
 // What Enter means in the schedule box, in one place so the key handler and the
 // preview beside it cannot disagree about whether the typed words counted.
 //
@@ -157,123 +152,13 @@ export function enterMeans(text: string, parsed: unknown): EnterMeans {
   return parsed ? 'typed' : 'refuse';
 }
 
-// Only the numbers that appear in a schedule out loud, and only at the START of
-// the phrase, where a count belongs. "Six" is a time of day in "six pm" and a
-// count in "six hours"; the clock rule below still owns the first, because it
-// runs on the digits this leaves behind and merely sees "6" either way.
-const WORD_NUMBERS: Record<string, number> = {
-  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
-  nine: 9, ten: 10, eleven: 11, twelve: 12, fifteen: 15, 'twenty five': 25,
-  twenty: 20, thirty: 30, 'forty five': 45, forty: 40, fifty: 50, sixty: 60,
-  ninety: 90,
-};
-// Longest first: "twenty" would otherwise eat the front of "twenty five".
-const WORD_NUMBER = new RegExp(`^(${Object.keys(WORD_NUMBERS)
-  .sort((a, b) => b.length - a.length)
-  .map((w) => w.replace(' ', '[\\s-]+'))
-  .join('|')})\\b`);
-
+// A time typed in words, for every box that takes one: Schedule, Send later
+// and the When menu. The grammar lives in ./when-words.ts; this only puts the
+// label on it. Deterministic and no model: a phrase it cannot read is refused
+// and says so, rather than guessed at.
 export function parseWhen(raw: string, now = Date.now()): { ts: number; label: string } | null {
-  let text = raw.trim().toLowerCase().replace(/\s+/g, ' ');
-  if (!text) return null;
-
-  // The labels in the list directly beneath this box. Typing a word you can see
-  // on screen and being told it is not a time is a trap that can cost a whole
-  // row; the grammar has to accept what the UI is offering.
-  if (text === 'next week') return atEight(nextWeekday(now, 1), now);
-  if (text === 'tonight' || text === 'this evening' || text === 'evening') {
-    const d = new Date(now);
-    d.setHours(18, 0, 0, 0);
-    // Past 6pm this evening has gone. Roll it forward rather than schedule a
-    // moment already behind us, because an overdue runAt is due forever, which
-    // reads exactly like the row coming straight back.
-    if (d.getTime() <= now) d.setDate(d.getDate() + 1);
-    return stamp2(d.getTime(), now);
-  }
-  if (/^(tomorrow|tomorrow morning|tmrw|tmr|tom)$/.test(text)) {
-    const d = new Date(now + 86_400_000);
-    d.setHours(8, 0, 0, 0);
-    return stamp2(d.getTime(), now);
-  }
-
-  // TOMORROW OR TODAY WITH A CLOCK ON IT, the first thing a person types into
-  // Send later (tests/send-later-takes-a-time-in-words.test.mjs). "Today" names
-  // the day, so an hour already gone is refused rather than rolled on to
-  // tomorrow the way a bare "9am" is.
-  const dayAt = text.match(/^(tomorrow|tmrw|tmr|today)\s+(?:at\s+)?(.+)$/);
-  if (dayAt) {
-    const at = timeOf(dayAt[2]);
-    if (!at || !/^\d{1,2}(?::\d{2})?\s*(?:am|pm)?$/.test(dayAt[2])) return null;
-    const [hour, minute] = at.split(':').map(Number);
-    const d = new Date(now);
-    if (dayAt[1] !== 'today') d.setDate(d.getDate() + 1);
-    d.setHours(hour, minute, 0, 0);
-    if (d.getTime() <= now) return null;
-    return stamp2(d.getTime(), now);
-  }
-
-  // Filler words a person types around the grammar that already works:
-  // "in 30 minutes", "in an hour", "next monday".
-  text = text.replace(/^in /, '');
-  if (text === 'an hour' || text === 'a hour') text = '1h';
-  if (text === 'a day') text = '1d';
-  if (text === 'half an hour' || text === 'half hour') text = '30m';
-  text = text.replace(/^next /, '');
-
-  // Numbers spelled the way a person says them. "in three hours" used to be
-  // refused by every grammar in the app, which is worse now than it was quiet
-  // before: the box reads back while she types, so an ordinary phrase would
-  // answer "not a time" in front of her.
-  text = text.replace(WORD_NUMBER, (word) => String(WORD_NUMBERS[word.replace(/[\s-]+/g, ' ')]));
-
-  // Minutes first: "30m" must never fall through to the clock-time rule.
-  let m = text.match(/^(\d+)\s*m(?:ins?|inutes?)?$/);
-  if (m) return stamp2(now + Number(m[1]) * 60_000, now);
-
-  m = text.match(/^(\d+(?:\.\d+)?)\s*h(?:ours?|rs?)?$/);
-  if (m) return stamp2(now + Number(m[1]) * 3_600_000, now);
-
-  m = text.match(/^(\d+)\s*d(?:ays?)?$/);
-  if (m) {
-    const d = new Date(now + Number(m[1]) * 86_400_000);
-    d.setHours(8, 0, 0, 0);
-    return stamp2(d.getTime(), now);
-  }
-
-  m = text.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
-  if (m) {
-    let hour = Number(m[1]);
-    const minute = Number(m[2] ?? 0);
-    const mer = m[3];
-    if (hour > 23 || minute > 59) return null;
-    if (mer === 'pm' && hour < 12) hour += 12;
-    if (mer === 'am' && hour === 12) hour = 0;
-    const d = new Date(now);
-    d.setHours(hour, minute, 0, 0);
-    if (d.getTime() <= now) d.setDate(d.getDate() + 1);
-    return stamp2(d.getTime(), now);
-  }
-
-  // A DAY NAME SETS THE DATE, AND WHAT FOLLOWS IT SETS THE HOUR. Bare
-  // "thursday" keeps the 8am every day-shaped answer here lands on; "thursday
-  // at 8am" is eight o'clock on that day, which is the one-off she could not
-  // reach at all while the repeat grammar was taking the phrase first.
-  //
-  // Anchored, where this used to be `text.startsWith(name)`: that read "satisfy
-  // the customer" as Saturday and scheduled it. A trailing phrase this cannot
-  // read as a clock is now a no rather than a silent 8am.
-  const named = text.match(/^(sun|mon|tue|wed|thu|fri|sat)[a-z]*(?:\s+(?:at\s+)?(.+))?$/);
-  if (named) {
-    const d = nextWeekday(now, DAY_NAMES.indexOf(named[1]));
-    if (!named[2]) return atEight(d, now);
-    const at = timeOf(named[2]);
-    if (!at) return null;
-    const [hour, minute] = at.split(':').map(Number);
-    d.setHours(hour, minute, 0, 0);
-    return stamp2(d.getTime(), now);
-  }
-
-  return null;
+  const ts = readMoment(raw ?? '', now);
+  return ts === null ? null : stamp2(ts, now);
 }
 
 /* ------------------------------- recurrence ------------------------------ */
@@ -368,19 +253,6 @@ function timeOf(text: string): string | null {
 
 function repeatRule(rule: RepeatRuleValue): RepeatParse {
   return { rule, label: ruleLabel(rule) };
-}
-
-// Always the NEXT one: "mon" on a Monday means the Monday coming, not today.
-function nextWeekday(now: number, day: number): Date {
-  const d = new Date(now);
-  d.setDate(d.getDate() + (((day - d.getDay()) + 7) % 7 || 7));
-  return d;
-}
-
-// The morning hour every day-shaped answer lands on.
-function atEight(d: Date, now: number): { ts: number; label: string } {
-  d.setHours(8, 0, 0, 0);
-  return stamp2(d.getTime(), now);
 }
 
 function stamp2(ts: number, now: number): { ts: number; label: string } {
