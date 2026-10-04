@@ -71,6 +71,7 @@ import { askLine, askFull, askIsClipped } from '../ask-line';
 import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
 import { recapFor, type Recap as RecapValue } from '../recap';
 import type { LiveFacts } from '../live-line';
+import { offersRunNow } from '../run-now';
 import { AttachRow } from './AttachRow';
 import { BackToWhatSheWasReading } from './UrgentBar';
 import { AgentThread } from './AgentThread';
@@ -1044,10 +1045,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
      and no code, so it is offered Mark done alone. NOTHING TO FINISH ON A
      FINISHED THREAD. */
   const canFinish = item.status !== 'done';
-  // RUN NOW is offered while the task is waiting its turn and has not been
-  // pushed yet: the supervisor's own queued list, so it never appears on a
-  // task nothing is going to start (resting, scheduled, leased elsewhere).
-  const waiting = !session && !!live.queued?.includes(item.id) && !live.runNow?.includes(item.id);
+  // RUN NOW is offered while the task is waiting for a slot and has not been
+  // pushed yet: on the waiting list or In progress with nothing running. The
+  // one rule ⌘K asks too (run-now.ts); a push the supervisor cannot act on is
+  // refused with a reason rather than hidden.
+  const waiting = offersRunNow(item, { session, queued: live.queued, runNow: live.runNow, inProgress: live.inProgress });
   const [terminalOpen, setTerminalOpen] = useState(false);
   const threadMenu = (
     <ThreadMenu
@@ -1327,6 +1329,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                  the moment the running agent gets round to acknowledging it
                  (w-1ef03d6f27). */
               sending={sending}
+              onSendNow={() => api.sendNow({ product: item.product, id: item.id }).catch(() => {})}
               onOpenOrigin={() => parent && onOpenItem(parent)}
               md={md}
               clean={cleanMessage}

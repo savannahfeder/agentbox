@@ -186,7 +186,10 @@ elif [ -z "$code" ]; then
   echo "GitHub runs the whole suite on it after the push."
   exit 0
 else
-  runargs="related --run --passWithNoTests $(printf '%s\n' "$code" | tr '\n' ' ')"
+  # And the tests that read a changed file as text, which `related` cannot
+  # see: three of them shipped red in a359d81 (scripts/lib/tests-that-read.mjs).
+  readers=$(node scripts/lib/tests-that-read.mjs $code 2>/dev/null || true)
+  runargs="related --run --passWithNoTests $(printf '%s\n' "$code" $readers | tr '\n' ' ')"
   echo "pre-push: running the tests for the $(printf '%s\n' "$code" | wc -l | tr -d ' ') file(s) this push changes."
   echo "GitHub runs the whole suite on it after the push."
 fi

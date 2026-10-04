@@ -27,6 +27,7 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Face, TeamContext, firstName } from '../team/people';
 import { activitySummary, keepActivityKeyLocal } from '../activity-summary';
+import { actWhen, actWords } from '../act-line';
 import { herTurnEnds, herTurnStarts } from '../her-turns';
 import { holdAtBottom } from '../thread-bottom';
 import { clock, dayHeading } from '../thread-history';
@@ -66,7 +67,10 @@ export interface CodeInThread {
   open: (path: string) => void;
 }
 
-export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, name, landOn, md, code, chat = false }: {
+export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, landOn, md, code, chat = false }: {
+  // CUT THE AGENT'S CURRENT STEP so a message of hers that is waiting on it is
+  // answered now (w-f37a34def6). Absent where nothing can be cut.
+  onSendNow?: () => unknown;
   events: AgentEvent[];
   /** A conversation with a person: what is not on screen is the oldest part,
    *  so its line sits at the top, the way a chat's history does. */
@@ -118,6 +122,12 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, name, landO
     setOpen(new Map());
     setRunsOpen(new Set());
   }, [landOn]);
+
+  // Send now was pressed and the agent has not taken her words yet. One flag
+  // for the thread: the cut answers every message waiting, not only one.
+  const [cutting, setCutting] = useState(false);
+  const waiting = events.some((e) => e.kind !== 'work' && e.pending && !e.held);
+  useEffect(() => { if (!waiting) setCutting(false); }, [waiting]);
 
   // AT THE BOTTOM, ON THE NEWEST THING SAID. That is the whole reason for this
   // shape.
@@ -220,11 +230,13 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, name, landO
         // was dead, and the 22px column gap was the only thing setting the
         // rhythm. Naming the wrapper is what lets the rhythm be set at all.
         const holds = e.kind === 'run' ? 'is-run'
-          : e.kind === 'work' ? 'is-work'
+          : e.kind === 'work' ? (e.yours ? 'is-act' : 'is-work')
           : e.same ? 'is-msg-same' : 'is-msg';
         return (
         <div key={`${e.at}-${key}-${n}`} className={`thread-block ${holds} ${ends === gapAfter ? 'has-gap' : ''}`}>
-          {e.kind === 'run'
+          {e.kind === 'work' && e.yours
+            ? <ActLine act={e} />
+            : e.kind === 'run'
             ? <RunLine
                 items={e.items}
                 open={runsOpen.has(key)}
@@ -268,9 +280,17 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, name, landO
                         which the row knows one. */}
                     {/* AND WHETHER Z STILL REACHES IT: three seconds, then
                         `steer` has it. See `held` in types.ts (w-5281ef1221). */}
+                    {/* AND, ONCE IT IS IN LINE, THAT IT IS WAITING ON THE STEP THE
+                        AGENT IS IN, which can be a command minutes long, with
+                        the one way to stop waiting (w-f37a34def6). */}
                     {e.pending
-                      ? <span className="msg-when msg-sending">{e.held ? 'Sending… press Z to undo' : 'Sending…'}</span>
+                      ? <span className="msg-when msg-sending">{e.held ? 'Sending… press Z to undo' : cutting ? 'Sending now…' : onSendNow ? 'Waiting for its current step' : 'Sending…'}</span>
                       : <span className="msg-when">{when(e.at)}</span>}
+                    {e.pending && !e.held && !cutting && onSendNow && (
+                      <button type="button" className="msg-now" onClick={() => { setCutting(true); onSendNow(); }}>
+                        Send now
+                      </button>
+                    )}
                     {/* WHICH ROW THESE WORDS ARE ON, when they are not on this
                         one. It rides the message's own head rather than a box
                         above the conversation (w-23db941885), so the way back
@@ -522,6 +542,32 @@ function WorkLine({ work, state, onStep, code }: {
         <div className="did-cut">{outputCut(all.length, work.lines)}</div>
       )}
       {!!work.more && <div className="did-cut">{runOverflow(work.more)}</div>}
+    </div>
+  );
+}
+
+/**
+ * SOMETHING YOU DID, as one point on a short timeline (w-49b4e45403): a small
+ * ring, a few words ("Snoozed until tomorrow 9:00am"), and the time in the
+ * header's mono caps. A pick fills the ring and shows the option brighter.
+ *
+ * Not a work line: nothing opens, it never folds into the agent's run, and it
+ * carries its own time, because when you put something off is the point of
+ * seeing it. The first build was a grey sentence with a long time after it and
+ * was turned down as ugly; this is the drawing chosen after (round4-single).
+ */
+export function ActLine({ act }: { act: AgentWork }) {
+  // A TEAMMATE'S ACTION is theirs: their first name where "You" would be.
+  const team = useContext(TeamContext);
+  const who = team && act.by && act.by !== team.me ? team.byId.get(act.by) ?? { id: act.by, email: '', name: 'A teammate', avatarUrl: null } : null;
+  const words = actWords(act, who ? firstName(who) : null);
+  return (
+    <div className={`act-line ${words.picked ? 'is-pick' : ''}`}>
+      <span className="act-said">
+        {words.lead}
+        {words.choice && <span className="act-choice"> {words.choice}</span>}
+      </span>
+      <span className="act-when">{actWhen(act.at)}</span>
     </div>
   );
 }

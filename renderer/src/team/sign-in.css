@@ -5,7 +5,11 @@
 :root[data-theme="dark"] .si-page { background: radial-gradient(120% 90% at 50% 0%, #2a2724 0%, #1c1a19 70%); }
 .si-card { width: 380px; max-width: 100%; padding: 34px 32px 26px; background: #2d2b29; border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: 0 24px 70px rgba(0,0,0,.45); -webkit-app-region: no-drag; }
 :root[data-theme="light"] .si-card { background: var(--surface); }
-.si-mark { width: 30px; height: 30px; display: grid; place-items: center; border-radius: var(--radius); background: var(--accent); color: #1a1817; font: 600 14px var(--mono); margin: 0 0 22px; }
+/* The Agentbox icon, not a letter A (2026-10-04). Its tile sits a tenth in from
+   the image's edge, so the image steps left by that much to line the tile up
+   with the heading. */
+.si-mark { display: block; width: 40px; height: 40px; margin: 0 0 18px -4px; }
+.si-mark .app-mark { display: block; }
 .si-card h1 { margin: 0 0 8px; font-size: 20px; font-weight: 500; letter-spacing: -.015em; color: var(--text); }
 .si-lede { margin: 0 0 24px; font-size: 13.5px; line-height: 20px; color: var(--text-dim); }
 .si-google { width: 100%; height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; transition: background-color .08s ease; }

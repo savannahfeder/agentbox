@@ -297,3 +297,34 @@ describe('a branch that is already on main', () => {
     expect(handed).toEqual([]);
   });
 });
+
+describe('a ship cut off before it finished', () => {
+  // Measured 2026-10-04 on w-f37a34def6: the ship started, the app restarted
+  // mid-run, and because the ready mark was recorded as handled BEFORE the
+  // run, no later tick tried again. The task sat labelled `ship` with two
+  // commits unshipped, twice, and nothing was handed back to its agent.
+  const store = () => ({ shipped() {}, shipFailed() {} });
+  const on = () => fs.writeFileSync(path.join(userDir, 'ship.json'), JSON.stringify(settings));
+
+  it('is tried again by the app that comes back up', async () => {
+    on();
+    const marked = row('w-a', { wrote: { labels: { ts: 100 } } });
+    // The first app starts the run and never sees it end.
+    const first = new ShipQueue({ store: store(), userDir, folderFor, isLive: () => false, run: () => new Promise(() => {}) });
+    first.tick([marked], products());
+    let runs = 0;
+    const second = new ShipQueue({ store: store(), userDir, folderFor, isLive: () => false, run: async () => { runs += 1; return { code: 0, out: '' }; } });
+    await second.tick([marked], products());
+    expect(runs).toBe(1);
+  });
+
+  it('is still never started twice by the same app', () => {
+    on();
+    const marked = row('w-a', { wrote: { labels: { ts: 100 } } });
+    let runs = 0;
+    const q = new ShipQueue({ store: store(), userDir, folderFor, isLive: () => false, run: () => { runs += 1; return new Promise(() => {}); } });
+    q.tick([marked], products());
+    expect(q.tick([marked], products())).toBeNull();
+    expect(runs).toBe(1);
+  });
+});

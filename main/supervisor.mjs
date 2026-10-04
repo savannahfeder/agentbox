@@ -354,6 +354,8 @@ export class Supervisor {
       // Persisted: an in-memory-only set re-spawned a continuation for every
       // still-open answered item on every app restart.
       this._handledAnswers = new Set(state.handledAnswers ?? []);
+      // Which conversation already holds each of her words (`_noteHeard`).
+      this._heardAnswers = state.heardAnswers ?? {};
       // `_personalSessions` used to sit here, itemId -> claude session id for a
       // personal project's threads. Personal projects are gone (w-d19d6d387c)
       // and `_rowSessions` below does that job for every row there is.
@@ -433,6 +435,7 @@ export class Supervisor {
       this.hiddenProducts = new Set(state.hiddenProducts ?? []);
     } catch {
       this._handledAnswers = new Set();
+      this._heardAnswers = {};
       this._liveSessions = {};
       this._rowSessions = {};
       this._compactions = {};
@@ -671,7 +674,15 @@ export class Supervisor {
     // a stopped fleet and spawn one more worker on the way out.
     clearTimeout(this._wakeTimer);
     this._wakeTimer = null;
-    // And a spawn still waiting on its folder never starts.
+    // And a spawn still waiting on its folder never starts. ITS REPLY GOES BACK
+    // IN LINE: the tick saved the reply as delivered when it picked it, and a
+    // start that never happened delivered nothing. Left standing, the saved
+    // mark had the restarted app skip the reply for good, with no agent on it:
+    // an Urgent task sat over an hour while a Medium in its project ran
+    // (w-53a72e6e7f, tests/a-reply-waiting-for-its-folder-survives-a-restart).
+    for (const { item, opts } of this._preparing?.values() ?? []) {
+      if (opts?.continuation && item?.answer) this.redeliverAnswer(item, item.answer);
+    }
     this._preparing?.clear();
     for (const s of this.sessions.values()) this._kill(s);
     this.sessions.clear();
@@ -684,6 +695,18 @@ export class Supervisor {
     const session = this.sessions.get(itemId);
     if (!session) return false;
     return this._kill(session);
+  }
+
+  // SEND NOW, on a message of hers already waiting for the agent's current step
+  // to end: cut that step so the message is answered at once
+  // (`interrupt` in claude-input.mjs). The run goes on; only the step stops.
+  // An engine with no way to cut a step takes the message at its next one.
+  async sendNow(product, itemId) {
+    const session = this.sessions.get(itemId);
+    if (!session || session.product !== product) return { ok: false, interrupted: false };
+    if (typeof session.child?.interrupt !== 'function') return { ok: true, interrupted: false };
+    const { interrupted } = await session.child.interrupt();
+    return { ok: true, interrupted };
   }
 
   // App quit: take the workers down with the supervisor. Killing the app used
@@ -1133,6 +1156,13 @@ export class Supervisor {
     const item = this.store.listItems(Date.now()).find((i) => i.id === id && i.product === product);
     if (!item) return { ok: false, reason: 'missing' };
     if (this.sessions.has(id)) return { ok: false, reason: 'running' };
+    // A PUSH NOTHING WILL ACT ON IS REFUSED OUT LOUD. The menu now offers Run
+    // now on anything In progress (renderer/src/run-now.ts), which takes in
+    // rows the tick is not going to start. Accepting those would read as Up
+    // next while nothing moved, so each says why instead.
+    if (this.paused) return { ok: false, reason: 'paused' };
+    if (!this.store.isDue(item, Date.now())) return { ok: false, reason: 'scheduled' };
+    if (this.claimHeldElsewhere(item)) return { ok: false, reason: 'held' };
     this._runNow.set(id, { product, at: Date.now(), started: false });
     // Asking for a row by name outranks a rest the fleet earned on it, the
     // same way `resumeItems` treats it.
@@ -1866,7 +1896,11 @@ export class Supervisor {
     const parts = [
       'The founder has replied on the work item you were just working on. This is',
       'that same session: everything you read and wrote is still here, so do not go',
-      'back over the files or the item to catch up. Read their words and carry on.',
+      'back over the files or the item to catch up.',
+      '',
+      'Their newest message is the last one below, and it outranks anything',
+      'before it. Do what it asks first, before you go back to anything you were',
+      'doing; if it says to keep going afterwards, keep going then.',
       '',
       'Two things did change while you were stopped. Your claim on the row was',
       'released when your last run ended, so claim it again before you write to it.',
@@ -1930,7 +1964,8 @@ export class Supervisor {
       'and re-read the work item if you need to.',
     ];
     if (continuation && item?.answer && item.answer !== '(withdrawn)') {
-      parts.push('', 'The founder has answered since you stopped:', '', String(item.answer));
+      parts.push('', 'The founder has answered since you stopped. Their newest message is the',
+        'last one below: do what it asks before you carry on with anything else.', '', String(item.answer));
       // A resumed session has everything it read still in it, EXCEPT anything
       // she attached to the reply that woke it. That is new, and it is the one
       // thing a six-line wake-up can genuinely be missing.
@@ -1990,6 +2025,24 @@ export class Supervisor {
   _answerDelivered(item, answer = item.answer) {
     return this._handledAnswers.has(this._answerKey(item, answer))
       || this._handledAnswers.has(this._legacyAnswerKey(item, answer));
+  }
+
+  // WHICH CONVERSATION ALREADY HOLDS THESE WORDS, which is not whether a run
+  // finished carrying them. A stop releases the delivery mark on purpose, so
+  // the row gets another run, and the resume used to read that release as
+  // "never heard" and hand the same conversation everything again: on
+  // w-f37a34def6 a 2,000-character round of feedback it had acted on for forty
+  // minutes, ahead of the one short ask it had not seen, which it then missed.
+  // Written when a run starts on the words or takes them mid-run, and never
+  // released, because a stop does not unhear anything.
+  _noteHeard(item, sessionId, answer = item?.answer) {
+    if (!sessionId || !item?.wrote?.answer) return;
+    (this._heardAnswers ??= {})[this._answerKey(item, answer)] = sessionId;
+    this._saveState();
+  }
+
+  _heardIn(item, sessionId, answer = item?.answer) {
+    return !!sessionId && this._heardAnswers?.[this._answerKey(item, answer)] === sessionId;
   }
 
   // SOMEONE ELSE IS STILL HOLDING THIS ROW, so a worker sent to it now would be
@@ -3411,6 +3464,7 @@ export class Supervisor {
     try {
       fs.writeFileSync(this._stateFile, JSON.stringify({
         handledAnswers: [...this._handledAnswers].slice(-500),
+        heardAnswers: Object.fromEntries(Object.entries(this._heardAnswers ?? {}).slice(-500)),
         productOrder: this.productOrder,
         hiddenProducts: [...this.hiddenProducts],
         liveSessions: this._liveSessions,
@@ -4058,6 +4112,14 @@ export class Supervisor {
           && this._engineFor(item) === DEFAULT_ENGINE,
       });
     }
+    // THE SLOT AN INTERRUPTION FREED BELONGS TO THE ROW IT WAS FREED FOR.
+    // Without this the slot went to the top of the queue on the next tick,
+    // and the top is often a higher project's row that could never have
+    // interrupted anything itself: the session was paused for nothing and the
+    // Urgent row went on waiting. Rows ranked above it lose nothing by it,
+    // since the session it paused scored below it and held that slot anyway.
+    const heldFor = new Set([...this._preempted.values()].map((r) => `${r.forProduct}:${r.forItem}`));
+    const holds = (row) => (heldFor.has(`${row.item.product}:${row.item.id}`) ? 1 : 0);
     queue.sort((a, b) =>
       // A COMMAND GOES TO THE FRONT, ahead of the priority she set on anything
       // else, because it is not competing with them for anything. It takes no
@@ -4074,6 +4136,7 @@ export class Supervisor {
       // tick's one interruption on its engine (`spent` below).
       || (this._runNow.has(b.item.id) ? 1 : 0) - (this._runNow.has(a.item.id) ? 1 : 0)
       || (this._runNow.get(a.item.id)?.at ?? 0) - (this._runNow.get(b.item.id)?.at ?? 0)
+      || holds(b) - holds(a)
       || this._score(b.item) - this._score(a.item)
       // The tie-break, and the only thing left of "continuations go first".
       || (b.continuation ? 1 : 0) - (a.continuation ? 1 : 0)
@@ -4095,11 +4158,17 @@ export class Supervisor {
      * written for, and the deleted 2026-08-25 build shipped with it.
      *
      * WHAT THE BREAK WAS ALSO DOING, and what this set keeps: at most one
-     * session is interrupted per engine per tick. Nothing further down the
-     * queue outranks the row we just made room for, so a second preemption on
-     * the same engine could only take a slot for a row that is going to wait
-     * anyway. An engine goes in here whether or not `_preemptFor` actually
-     * took anything, because that is exactly what the break did.
+     * session is interrupted per engine per tick.
+     *
+     * AN ENGINE GOES IN HERE ONLY WHEN SOMETHING WAS ACTUALLY INTERRUPTED. It
+     * used to go in on the first row that did not fit, whatever that row was,
+     * and the first row is usually a higher project's Medium, which may not
+     * interrupt anything. The Urgent row below it, which may, was never
+     * asked: an Astral Video Urgent waited 49 minutes while the Medium in its
+     * own project ran (w-53a72e6e7f,
+     * tests/an-urgent-task-takes-its-own-projects-slot-even-behind-a-higher-project).
+     * The slot that interruption frees is held for the row that made it
+     * (`heldFor` above), so the rows above it do not take it instead.
      */
     const spent = new Set();
 
@@ -4158,10 +4227,7 @@ export class Supervisor {
         // exit before its slot is really free, and an exit nudges a tick, so
         // the ordinary cost of this is seconds rather than the fifteen-second
         // poll.
-        if (!spent.has(engine)) {
-          spent.add(engine);
-          this._preemptFor(item, items, engine);
-        }
+        if (!spent.has(engine) && this._preemptFor(item, items, engine)) spent.add(engine);
         // AND ON DOWN THE QUEUE, because the next row may be on the engine
         // that is still idle. See `spent` above for what this used to be.
         continue;
@@ -4440,8 +4506,12 @@ export class Supervisor {
       : (forkFrom ? forkFrom.profile ?? null : (strandedThread ? null : walkedHome));
     // Preserve multiple replies queued before a worker starts, including on a
     // resumed session whose native history has not seen them yet.
+    // A CONVERSATION GOING BACK TO WORK IS NOT TOLD AGAIN WHAT IT ALREADY HEARD
+    // (`_noteHeard`). Only that conversation: a fork or a fresh session needs
+    // every word.
     if (continuation && item.answer && this.store?.readHistory) {
-      const answer = queuedReplyText(item, this.store.readHistory(item.product, item.id), (row) => this._answerDelivered(row));
+      const conversation = forkFrom ? null : resumeId;
+      const answer = queuedReplyText(item, this.store.readHistory(item.product, item.id), (row) => this._answerDelivered(row) || this._heardIn(row, conversation));
       if (answer !== item.answer) item = { ...item, answer };
     }
     let prompt;
@@ -6252,6 +6322,12 @@ export class Supervisor {
     const absorb = (...frame) => {
       session.lastOutputAt = Date.now();
       capture(session, ...frame);
+      // The conversation is up, so the words it was started with are in it
+      // (`_noteHeard`). Here rather than at exit: an app quit may not wait for one.
+      if (continuation && item.answer && session.sessionId && !session.heardNoted) {
+        session.heardNoted = true;
+        this._noteHeard(item, session.sessionId);
+      }
       if (activity(session, ...frame)) this.onChange?.();
       if (session.remoteHeld && engine === DEFAULT_ENGINE) {
         try {
@@ -6262,7 +6338,9 @@ export class Supervisor {
               this.store.recordSessionResult(item.product,item.id,{result:String(event.result || '(the session ended with an empty reply)')});
               session.remoteResultRecorded = true;
               if (session.lastLiveReply) this._handledAnswers.add(this._answerKey(session.lastLiveReply));
-            } else {
+            } else if (!(Date.now() - (session.child?.lastInterruptAt ?? 0) < 30000)) {
+              // A step she cut with Send now ends in an error result too; that
+              // is her message being taken, not the turn failing.
               this._remoteControls?.set(JSON.stringify([item.product,item.id]),{state:'failed',at:Date.now(),mayBeActive:true,text:String(event.result || 'Claude could not complete the remote turn.')});
             }
             this._saveState(); this.onChange?.();

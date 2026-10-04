@@ -23,6 +23,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { racedWithAnotherPush, notReadyToShip } from './lib/ship-rules.mjs';
+import { testsThatRead } from './lib/tests-that-read.mjs';
 
 // THE FOLDER IT SHIPS IS THE ONE IT RUNS IN. `npm run ship` runs in the
 // package root, so a person or agent in a worktree ships that worktree as
@@ -73,7 +74,11 @@ function runTests() {
   const files = changedFiles();
   if (!files.length) return;
   say(`running the tests for ${files.length} changed file(s). The hook runs the rest on push.`);
-  const out = spawnSync('npx', ['vitest', 'related', '--run', ...files], {
+  // `related` runs the tests that import these; a test that reads one as
+  // text is invisible to it (scripts/lib/tests-that-read.mjs), so those are
+  // named too, and a test file named to related runs itself.
+  const readers = testsThatRead(files, root);
+  const out = spawnSync('npx', ['vitest', 'related', '--run', ...files, ...readers], {
     cwd: root,
     encoding: 'utf8',
     stdio: 'inherit',
