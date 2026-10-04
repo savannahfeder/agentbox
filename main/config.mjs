@@ -63,6 +63,13 @@ const DEFAULTS = {
   // ever chosen on. When nobody has set one, loadConfig below reads the plan
   // Claude Code is signed in on and lowers this for a smaller one.
   maxConcurrentSessions: DEFAULT_SESSIONS_AT_ONCE,
+  // HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). Off until somebody
+  // turns it on from the Agents page. With it on, every shell command a worker
+  // runs asks main/memory-gate-server.mjs first, and heavy ones wait their turn
+  // while the Mac is short of memory. `memoryGateSlots` is how many heavy
+  // commands may run at once; null is Auto, one per 8 GB.
+  memoryGate: false,
+  memoryGateSlots: null,
   // What spawned sessions are allowed to do. Left unset on purpose, because the
   // right default now depends on whether a store MCP server is present: see
   // Supervisor#sessionArgsFor. Setting it here still wins over that, which is
