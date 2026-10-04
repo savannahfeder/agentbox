@@ -90,18 +90,22 @@ describe('it is stored as itself, not frozen into a colour', () => {
 describe('system matching is one of the three choices', () => {
   it('is in the catalog and the command menu', () => {
     expect(LOOKS.map((l) => l.id)).toEqual(['light', 'ember-grid', 'match']);
-    for (const look of ['ember-grid', 'light', 'match']) {
+    // ⌘K leaves out the look already on (w-e5f31083ff), so Match system is a
+    // row from either theme and not from itself.
+    for (const look of ['ember-grid', 'light']) {
       expect(lookRows(look).filter((r) => r.to === 'match').map((r) => r.id)).toEqual(['theme-match']);
     }
+    expect(lookRows('match').filter((r) => r.to === 'match')).toEqual([]);
   });
 
-  it('puts one row under "dark" and one under "light", never the Match row', () => {
+  it('labels at most one row "dark" and one "light", never the Match row', () => {
     // Typing "dark" must land on one row; a second under the same word is the
     // choice she should not have to make correctly at speed.
     for (const look of ['ember-grid', 'light', 'match']) {
       for (const [word, id] of [['dark', 'theme-dark'], ['light', 'theme-light']]) {
         const rows = lookRows(look).filter((r) => r.label.toLowerCase().includes(word));
-        expect(rows.map((r) => r.id), `${look} / ${word}`).toEqual([id]);
+        expect(rows.length, `${look} / ${word}`).toBeLessThanOrEqual(1);
+        for (const r of rows) expect(r.id, `${look} / ${word}`).toBe(id);
       }
     }
   });

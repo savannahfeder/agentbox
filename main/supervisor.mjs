@@ -3279,7 +3279,15 @@ export class Supervisor {
     // the branch below that CLEARS the account's trouble, and the row went
     // straight back to the capped login four times while the other account sat
     // at 0%.
-    const limitHit = !!session.resultIsError && troubleCause(session.result) === 'at-limit';
+    //
+    // AND SO DOES A RUN THE ACCOUNT REFUSED IN ANY OTHER WAY (2026-10-04). A
+    // signed-out Codex retries ten times, five over WebSocket and five over
+    // HTTPS, before its turn fails with the 401, so the run can outlast
+    // FAST_EXIT_MS. Past it, the branch below CLEARED the account's trouble:
+    // no bench, no "Signed out" on the row, and her reply was charged one of
+    // its three tries. The error result names its cause whatever the length.
+    const refusedBy = session.resultIsError ? troubleCause(session.result) : null;
+    const limitHit = refusedBy === 'at-limit' || needsHerHands(refusedBy);
     if ((Date.now() - session.startedAt < FAST_EXIT_MS && !quickButReal) || limitHit) {
       // The last words of a fast-dead session are the diagnosis. They are kept,
       // but as EVIDENCE now, not as copy: shared/spawn-trouble.mjs turns them
