@@ -27,6 +27,7 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Face, TeamContext, firstName } from '../team/people';
 import { activitySummary, keepActivityKeyLocal } from '../activity-summary';
+import { actWhen, actWords } from '../act-line';
 import { herTurnEnds, herTurnStarts } from '../her-turns';
 import { holdAtBottom } from '../thread-bottom';
 import { clock, dayHeading } from '../thread-history';
@@ -546,28 +547,27 @@ function WorkLine({ work, state, onStep, code }: {
 }
 
 /**
- * SOMETHING YOU DID, as one quiet line (w-49b4e45403): "You snoozed it until
- * tomorrow 9:00am", then when. A snooze, a picked option, a rename, a close.
+ * SOMETHING YOU DID, as one point on a short timeline (w-49b4e45403): a small
+ * ring, a few words ("Snoozed until tomorrow 9:00am"), and the time in the
+ * header's mono caps. A pick fills the ring and shows the option brighter.
  *
  * Not a work line: nothing opens, it never folds into the agent's run, and it
  * carries its own time, because when you put something off is the point of
- * seeing it. The words after the verb are the detail (the option you picked,
- * the moment it comes back) and sit at full strength only for a pick, where
- * they are what you chose.
+ * seeing it. The first build was a grey sentence with a long time after it and
+ * was turned down as ugly; this is the drawing chosen after (round4-single).
  */
 export function ActLine({ act }: { act: AgentWork }) {
   // A TEAMMATE'S ACTION is theirs: their first name where "You" would be.
   const team = useContext(TeamContext);
   const who = team && act.by && act.by !== team.me ? team.byId.get(act.by) ?? { id: act.by, email: '', name: 'A teammate', avatarUrl: null } : null;
-  const said = who ? act.verb.replace(/^You\b/, firstName(who)) : act.verb;
-  const picked = /^You picked option/.test(act.verb);
+  const words = actWords(act, who ? firstName(who) : null);
   return (
-    <div className="act-line">
+    <div className={`act-line ${words.picked ? 'is-pick' : ''}`}>
       <span className="act-said">
-        {said}
-        {act.subject && <span className={`act-words ${picked ? 'is-choice' : ''}`}>{picked ? `: ${act.subject}` : ` ${act.subject}`}</span>}
+        {words.lead}
+        {words.choice && <span className="act-choice"> {words.choice}</span>}
       </span>
-      <span className="act-when">{when(act.at)}</span>
+      <span className="act-when">{actWhen(act.at)}</span>
     </div>
   );
 }
