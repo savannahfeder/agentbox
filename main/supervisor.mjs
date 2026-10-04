@@ -675,7 +675,15 @@ export class Supervisor {
     // a stopped fleet and spawn one more worker on the way out.
     clearTimeout(this._wakeTimer);
     this._wakeTimer = null;
-    // And a spawn still waiting on its folder never starts.
+    // And a spawn still waiting on its folder never starts. ITS REPLY GOES BACK
+    // IN LINE: the tick saved the reply as delivered when it picked it, and a
+    // start that never happened delivered nothing. Left standing, the saved
+    // mark had the restarted app skip the reply for good, with no agent on it:
+    // an Urgent task sat over an hour while a Medium in its project ran
+    // (w-53a72e6e7f, tests/a-reply-waiting-for-its-folder-survives-a-restart).
+    for (const { item, opts } of this._preparing?.values() ?? []) {
+      if (opts?.continuation && item?.answer) this.redeliverAnswer(item, item.answer);
+    }
     this._preparing?.clear();
     for (const s of this.sessions.values()) this._kill(s);
     this.sessions.clear();

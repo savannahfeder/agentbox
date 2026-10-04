@@ -4276,22 +4276,33 @@ img.app-mark { opacity: 1; border-radius: 0; }
 */
 .thread-block:is(.is-work, .is-run) + .thread-block:is(.is-work, .is-run) { margin-top: -17px; }
 
-/* SOMETHING YOU DID, one quiet line each (w-49b4e45403). The same 13px grey as
-   a work line, so it never competes with what was said, but its own rhythm:
-   a set of them stands as one small group, 6px apart, with the air of a
-   paragraph above and below rather than pressed under the message. The time
-   sits after the sentence in the faint tone the message heads use. */
-.thread-block.is-act + .thread-block.is-act { margin-top: -16px; }
+/* SOMETHING YOU DID, a point on a short timeline (w-49b4e45403, round4-single).
+   A 7px ring at the column's edge, the words 20px in at the 13px grey of a work
+   line, and the time in the header's mono caps. A pick fills the ring. Most
+   actions come one at a time, so a single line is the whole drawing; only when
+   two come back to back does a hairline join their rings, drawn from the line
+   below up to the ring above. The rings sit 9px apart: line 20px, ring 6.5px
+   from its top, so the hairline runs from -15.5px to the next ring's top. */
+.thread-block.is-act + .thread-block.is-act { margin-top: -13px; }
 .thread-block:is(.is-work, .is-run) + .thread-block.is-act,
 .thread-block.is-act + .thread-block:is(.is-work, .is-run) { margin-top: -8px; }
 .act-line {
-  display: flex; align-items: baseline; gap: 10px; min-width: 0;
-  font-size: 13px; line-height: 20px; color: var(--text-dim);
+  position: relative; display: flex; align-items: baseline; gap: 10px; min-width: 0;
+  padding-left: 20px; font-size: 13px; line-height: 20px; color: var(--text-dim);
+}
+.act-line::before {
+  content: ''; position: absolute; left: 0; top: 6.5px; width: 7px; height: 7px;
+  box-sizing: border-box; border-radius: 50%; border: 1px solid var(--text-faint); background: var(--bg);
+}
+.act-line.is-pick::before { background: var(--text-dim); border-color: var(--text-dim); }
+.thread-block.is-act + .thread-block.is-act .act-line::after,
+.act-after .act-line + .act-line::after {
+  content: ''; position: absolute; left: 3px; top: -15.5px; width: 1px; height: 22px; background: var(--line);
 }
 .act-said { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.act-words.is-choice { color: var(--text); }
-.act-when { flex: none; font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
-.act-after { display: flex; flex-direction: column; gap: 6px; margin-top: 22px; }
+.act-choice { color: var(--text); }
+.act-when { flex: none; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.act-after { display: flex; flex-direction: column; gap: 9px; margin-top: 22px; }
 .thread-block:is(.is-msg, .is-msg-same) + .thread-block:is(.is-work, .is-run) { margin-top: -14px; }
 /* Except under the line that says where the middle of the conversation went,
    which is a note and not a message, and has its own 18px above it. */
