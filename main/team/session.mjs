@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { supabaseBackend } from './supabase-backend.mjs';
-import { signInWithGoogle } from './sign-in.mjs';
+import { signInWithGoogle, cancelGoogleSignIn } from './sign-in.mjs';
 
 // A BUILD SOMEONE INSTALLED IGNORES THE TWO TEST SWITCHES BELOW. Found by
 // review 2026-10-01: AGENTBOX_TEAM_CONFIG and AGENTBOX_TEAM_TEST_LOGIN were
@@ -92,10 +92,10 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       return null;
     },
 
-    async signIn() {
+    async signIn({ onUrl, log } = {}) {
       if (!configured) throw new Error('this build has no team cloud configured');
       const c = await getClient();
-      await signInWithGoogle({ client: c, openExternal, returnUrl: cloudConfig.signInReturn || 'http://127.0.0.1:54783/auth/callback' });
+      await signInWithGoogle({ client: c, openExternal, onUrl, log, returnUrl: cloudConfig.signInReturn || 'http://127.0.0.1:54783/auth/callback' });
       return supabaseBackend(c);
     },
 
@@ -124,6 +124,10 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       if (error) throw new Error(plainAuthError(error.message));
       return data?.session ? { backend: supabaseBackend(c) } : { confirm: true };
     },
+
+    cancelSignIn: () => cancelGoogleSignIn(),
+    // Only ever the link this sign-in made; the window never names one.
+    reopen: (url) => openExternal(url),
 
     async signOut() {
       if (client) await client.auth.signOut().catch(() => {});
