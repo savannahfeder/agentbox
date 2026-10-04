@@ -157,8 +157,9 @@ number of running sessions. Agentbox keeps one order and uses it for both.
 | `E` | Approve the recommendation, or mark a row done |
 | `1` `2` `3` | Pick an option an agent offered |
 | `R` | Reply |
-| `C` | New task |
-| `S` | Snooze |
+| `N` | New thread |
+| `L` | Later: put a task off until a time you pick |
+| `S` | Show or hide the summary, in an open task |
 | `Z` | Undo |
 | `⌘K` | Everything else |
 

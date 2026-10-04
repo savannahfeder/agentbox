@@ -41,6 +41,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, productRankScore } from '../shared/rank.mjs';
+import { keysForAgents } from '../shared/shortcuts.mjs';
 import { isCleanRun, ruleIdOf } from '../shared/repeats.mjs';
 import { mayRunHere } from '../shared/team-rules.mjs';
 
@@ -4943,6 +4944,11 @@ export class Supervisor {
       '',
       theirs,
     ].join('\n'));
+    // THE APP'S KEYS RIDE WITH OUR RULES (w-7ec8553e23). An agent told the user
+    // to "Press S" to schedule three days after S became the summary, going by
+    // a memory its own session saved before the key moved. They ride inside
+    // this block, never alone, so a run the app hands no rules still gets no
+    // flag at all.
     if (ours) blocks.push([
       'How to write to the person reading this, and how to finish, from the app',
       'they read it in. These are its defaults, so any instruction above this one',
@@ -4951,6 +4957,10 @@ export class Supervisor {
       '---',
       '',
       ours,
+      '',
+      '---',
+      '',
+      keysForAgents(),
     ].join('\n'));
     return blocks.length ? blocks.join('\n\n') : null;
   }

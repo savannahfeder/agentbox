@@ -236,7 +236,8 @@ describe('what the page refuses to say', () => {
   });
 
   it('says out loud, in the file itself, why each of those is missing', () => {
-    const src = read('renderer/src/shortcuts.ts');
+    // The list moved to shared/ so agents are told the same keys (w-7ec8553e23).
+    const src = read('shared/shortcuts.mjs');
     expect(src).toContain('WHAT IS DELIBERATELY NOT HERE');
     expect(src).toContain('⌘1..4');
     expect(src).toContain('Y, N and I on a row in the list');
@@ -340,7 +341,7 @@ describe('the page stays a page and not a wall', () => {
     for (const g of SHORTCUTS) {
       expect(Object.keys(g).sort()).toEqual(['keys', 'label']);
     }
-    expect(read('renderer/src/shortcuts.ts')).not.toMatch(/^\s*note\?:/m);
+    expect(read('shared/shortcuts.d.mts')).not.toMatch(/^\s*note\?:/m);
     // Scoped to this pane's own markup: `.set-group-note` is a real class that
     // other panes in Settings still use, so a whole-file search proves nothing.
     const pane = settings.slice(

@@ -121,7 +121,9 @@ export function failureReply(output) {
 /** The line the thread shows: the app's own, short, and the first error in it. */
 export function failureNote(output) {
   const lines = String(output ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
-  const why = lines.find((l) => /CONFLICT|error|red|refused|failed|FAIL/i.test(l)) ?? lines.at(-1) ?? 'no output';
+  // WHOLE WORDS (w-7ec8553e23): without \b, "red" matched inside "configured"
+  // and a harmless warning the tests print was shown as why a ship failed.
+  const why = lines.find((l) => /\b(CONFLICT|error|red|refused|failed|FAIL)\b/i.test(l)) ?? lines.at(-1) ?? 'no output';
   return `It did not ship, and it went back to its agent: ${why.slice(0, 300)}`;
 }
 
