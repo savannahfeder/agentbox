@@ -514,6 +514,12 @@ export interface AgentWork {
   lines: number;
   failed: boolean;
   more?: number;
+  // SOMETHING SHE DID, not something the agent ran: a snooze, a picked option,
+  // a rename, a close (w-49b4e45403). It never folds into the agent's work and
+  // is drawn as its own quiet line with its time. `by` is the teammate who did
+  // it, on a shared project.
+  yours?: true;
+  by?: string;
 }
 
 export type AgentEvent = (AgentTurn & { kind?: undefined }) | AgentWork;
@@ -973,7 +979,7 @@ declare global {
       listFolders?(p?: { at?: string | null; showHidden?: boolean }): Promise<FolderListing>;
       folderExists?(p: { path: string }): Promise<{ exists: boolean }>;
       stopSession(p: { product: string; id: string }): Promise<WorkItem>;
-      runNow?(p: { product: string; id: string }): Promise<{ ok: boolean; reason?: 'running' | 'missing' }>;
+      runNow?(p: { product: string; id: string }): Promise<{ ok: boolean; reason?: 'running' | 'missing' | 'paused' | 'scheduled' | 'held' }>;
       reopen(p: { product: string; id: string }): Promise<WorkItem>;
       // The user's standing instructions: one text, briefed to every session.
       instructionRead?(id: string): Promise<{text:string;defaultText:string;error?:string}>;

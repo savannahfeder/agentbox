@@ -106,6 +106,9 @@ export interface ItemThread {
   events: AgentEvent[];
   // The agent's last word, when the last word is the agent's. Not in `events`.
   outcome: ItemOutcome | null;
+  // Her own actions taken after that last word (a snooze), drawn under it.
+  // Always empty when there is no outcome.
+  after: AgentWork[];
   // Every message on the row, which is what the head line counts. Work lines
   // are not messages: a run of forty tool calls is one thing that happened, and
   // a reply that stopped twice for a tool is one message drawn as three blocks.
@@ -198,6 +201,11 @@ function saidLine(event: ThreadEvent): AgentWork {
     output: '',
     lines: 0,
     failed: false,
+    // HERS, AND SO NEVER PART OF THE AGENT'S WORK (w-49b4e45403). Three
+    // snoozes used to fold into one "You put it off", and beside the agent's
+    // file writes into "You put it off, wrote files".
+    ...(event.who === 'you' ? { yours: true as const } : {}),
+    ...(event.who === 'you' && event.by ? { by: event.by } : {}),
   };
 }
 
@@ -232,6 +240,9 @@ interface Placed {
   node: AgentEvent;
   run: number | null;
   answer: ItemOutcome | null;
+  // An action of hers that answered the agent (a picked option): it ends the
+  // agent's last word the way a typed reply does.
+  answers?: boolean;
 }
 
 // One message flattened, so two copies of it written through different surfaces
@@ -525,7 +536,7 @@ export function itemThread(
       });
       continue;
     }
-    placed.push({ node: saidLine(event), run: null, answer: null });
+    placed.push({ node: saidLine(event), run: null, answer: null, ...(event.answers ? { answers: true } : {}) });
   }
 
   // AND THE SENTENCE BEING TYPED RIGHT NOW, IF THE TRACE HAS NOT CAUGHT IT YET.
@@ -599,7 +610,11 @@ export function itemThread(
 
   let prevRun: number | null | undefined;
   for (const p of once) {
-    if (p.node.kind === 'work') { out.push(p.node); continue; }
+    if (p.node.kind === 'work') {
+      if (p.answers) answer = null;
+      out.push(p.node);
+      continue;
+    }
     const same = p.run !== null && p.run === prevRun;
     prevRun = p.run;
     spokeAt = out.length;
@@ -622,7 +637,17 @@ export function itemThread(
   // Counted before it is lifted: it is still a message on this task, and the
   // head line says how many there are, not how many are in the stream.
   const spoken = saidCount(out);
-  if (outcome) out.splice(answer!.i, 1);
+  // WHAT SHE DID AFTER THE ANSWER GOES UNDER IT. The answer is drawn at the
+  // foot of the page, so a snooze made after it, left in the stream, would sit
+  // above the very answer it put off (w-49b4e45403).
+  const after: AgentWork[] = [];
+  if (outcome) {
+    for (let j = out.length - 1; j > answer!.i; j -= 1) {
+      const e = out[j];
+      if (e.kind === 'work' && e.yours) { after.unshift(e); out.splice(j, 1); }
+    }
+    out.splice(answer!.i, 1);
+  }
 
   // THE SAME WINDOW A LONG CLAUDE CODE SESSION GETS, and for the same reason.
   // Measured on a real row: six sessions, 122 messages, 73 work lines
@@ -648,5 +673,5 @@ export function itemThread(
   // pinned above a gap.
   const windowed = threadWindow(out, opts.chat ? { whole: !!opts.whole, opening: 0, keep: 60 } : { whole: !!opts.whole }) as { events: AgentEvent[]; omitted: number };
   const shown = saidCount(windowed.events) + (outcome ? 1 : 0);
-  return { events: windowed.events, outcome, total: spoken, omitted: spoken - shown };
+  return { events: windowed.events, outcome, after, total: spoken, omitted: spoken - shown };
 }
