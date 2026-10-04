@@ -442,6 +442,8 @@ export const api = {
   /* --------------------------------- the team ------------------------------- */
   // Every call answers { ok, team } or { ok: false, error } in words.
   async teamSignIn(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignIn()); },
+  async teamSignInCancel(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignInCancel()); },
+  async teamSignInReopen(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignInReopen()); },
   async teamSignOut(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignOut()); },
   async teamSignInEmail(email: string, password: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignInEmail({ email, password })); },
   async teamSignUp(name: string, email: string, password: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignUp({ name, email, password })); },

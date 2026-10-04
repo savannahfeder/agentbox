@@ -19,7 +19,9 @@ import { cardsFor } from '../../shared/thread-cards.mjs';
 import fs from 'node:fs';
 import { hasLapsed, holdEnds } from '../../shared/team-status.mjs';
 
-const EMPTY = { configured: false, started: false, signedIn: false, me: null, team: null, invites: [], sent: [], people: [], cards: [], lastSyncAt: null, error: null };
+// `signingIn` is { url } while a Google sign-in waits on the browser, so the
+// page can offer that link again rather than a button that does nothing.
+const EMPTY = { configured: false, started: false, signedIn: false, signingIn: null, me: null, team: null, invites: [], sent: [], people: [], cards: [], lastSyncAt: null, error: null };
 
 export function createTeamService({
   session, store, disk, accountRoot, stateFile, onChange = () => {}, log = () => {}, intervalMs = 5000, startRetryMs = 1500,
@@ -204,9 +206,27 @@ export function createTeamService({
     },
 
     async signIn() {
-      const b = await session.signIn();
+      let b;
+      try {
+        b = await session.signIn({ onUrl: (url) => set({ signingIn: { url } }), log });
+      } finally {
+        if (state.signingIn) set({ signingIn: null });
+      }
       await signedIn(b);
       return state;
+    },
+
+    /** Open the waiting Google sign-in's own link again. False if none waits. */
+    async reopenSignIn() {
+      const url = state.signingIn?.url;
+      if (!url || !session?.reopen) return false;
+      log('team: Google sign-in: opening the browser again');
+      await session.reopen(url);
+      return true;
+    },
+
+    cancelSignIn() {
+      return session?.cancelSignIn?.() ?? false;
     },
 
     async signInWithEmail(email, password) {
