@@ -179,6 +179,8 @@ export interface TeamState {
   /** The invites this team has out that nobody has taken up yet. */
   sent?: { email: string; invitedBy: string | null }[];
   signedIn: boolean;
+  /** A Google sign-in waiting on the browser, with the link it opened. */
+  signingIn?: { url: string } | null;
   me: Person | null;
   team: { id: string; name: string } | null;
   /** Invites waiting for your confirmed email, while you are in no team. Joining one needs your yes. */
@@ -926,6 +928,8 @@ declare global {
       compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
       // The team version (main/team/index.mjs through main/ipc.mjs).
       teamSignIn(): Promise<TeamCallResult>;
+      teamSignInCancel(): Promise<TeamCallResult>;
+      teamSignInReopen(): Promise<TeamCallResult>;
       teamSignOut(): Promise<TeamCallResult>;
       teamSignInEmail(p: { email: string; password: string }): Promise<TeamCallResult>;
       teamRename(p: { name: string }): Promise<TeamCallResult>;
