@@ -97,8 +97,23 @@ describe('the button as drawn', () => {
     expect(html).toContain('+4');
   });
 
-  it('just you with a priority filter on: the dot still lights for the filter', () => {
-    expect(dot(button(pick(team3, [me.id]), { ...display, priorities: ['urgent'] }))).toBe(true);
+  // JUST YOU NEVER LIGHTS IT (2026-10-04). Just you keeps a remembered display
+  // of its own, and a project filter saved there lit the dot on just you and
+  // not on everyone. Asked for: "update it so it doesn't light up when I just
+  // have it set to me". The menu still says "Showing N of M" and the empty tab
+  // still names what a filter is hiding.
+  it('just you with a priority, project or date filter on: still no dot', () => {
+    expect(dot(button(pick(team3, [me.id]), { ...display, priorities: ['urgent'] }))).toBe(false);
+    expect(dot(button(pick(team3, [me.id]), { ...display, projects: ['northwind'] }))).toBe(false);
+    expect(dot(button(pick(team3, [me.id]), { ...display, updated: 'week' }))).toBe(false);
+  });
+
+  it('everyone with a filter on: the dot lights for the filter', () => {
+    expect(dot(button(pick(team3, ids(team3)), { ...display, projects: ['northwind'] }))).toBe(true);
+  });
+
+  it('nobody signed in with a filter on: the dot lights as it always did', () => {
+    expect(dot(button(undefined, { ...display, priorities: ['urgent'] }))).toBe(true);
   });
 
   it('nobody signed in, or a team of one: the plain filters icon, no faces', () => {
