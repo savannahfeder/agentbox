@@ -2264,6 +2264,27 @@ export class Supervisor {
     return seen.runs;
   }
 
+  /**
+   * THE LAST WORDS ON THIS ROW ARE OURS, ABOUT AN ACCOUNT, NOT AN AGENT'S.
+   *
+   * A fresh row whose run died on a signed-out login (or a usage limit) gets
+   * our own sentence written onto it ("Claude Code could not sign in... it
+   * picks straight up"), so she knows. That write is an agent-sourced result,
+   * and `awaitingHer` reads any such result as an agent having answered her,
+   * so the fresh-work pass walked past the row for good: the account came back
+   * and the row never ran, the opposite of what the sentence promised. Proved
+   * with real processes in
+   * tests/a-signed-out-claude-comes-back-on-its-own-end-to-end (no run at all
+   * after signing in, before this). True only when what we said was about the
+   * account and nothing has been written on the row since, so a real answer
+   * still waits for her. When the row may run is still `restingUntil`'s call.
+   */
+  _onlyWeSpokeForAnAccount(item) {
+    const seen = this._fruitless[`${item.product}:${item.id}`];
+    if (!seen?.saidTs || !(needsHerHands(seen.saidWhy) || seen.saidWhy === 'at-limit')) return false;
+    return (item.wrote?.result?.ts ?? 0) <= seen.saidTs;
+  }
+
   restingUntil(item) {
     const seen = this._fruitless[`${item.product}:${item.id}`];
     const runs = this._emptyRuns(item);
@@ -2442,7 +2463,7 @@ export class Supervisor {
         runs,
         resetsAt,
       });
-      this.store.recordSessionResult(item.product, item.id, { result, status: 'open' });
+      const written = this.store.recordSessionResult(item.product, item.id, { result, status: 'open' });
       // REMEMBER THAT WE SAID IT, keyed on the run we said it about. The pass
       // below re-reads every resting row on every tick, and without a
       // watermark it would write the same sentence onto the same row every
@@ -2450,6 +2471,9 @@ export class Supervisor {
       const seen = this._fruitless[`${item.product}:${item.id}`];
       if (seen) {
         seen.saidAt = seen.endedAt ?? Date.now();
+        // The stamp of OUR write, so `_onlyWeSpokeForAnAccount` can tell it
+        // from anything written on the row afterwards.
+        seen.saidTs = written?.wrote?.result?.ts ?? Date.now();
         // AND WHY, WHICH IS THE HALF THE COUNT ABOVE HER LIST READS. Writing
         // the watermark alone told the pass below "this row has been dealt
         // with" and nothing else, so the row went silently uncounted and the
@@ -2639,7 +2663,7 @@ export class Supervisor {
         // (`stderr` in shared/dead-run-trace.mjs is stderr AND the error
         // result), so the hour was there to be read the whole time.
         const resetsAt = cause === 'at-limit' ? limitResetsAt(trace.stderr) : null;
-        this.store.recordSessionResult(product, id, {
+        const written = this.store.recordSessionResult(product, id, {
           result: deadRunSentence({
             engineWord: 'Claude Code',
             cause,
@@ -2649,6 +2673,7 @@ export class Supervisor {
           status: 'open',
         });
         seen.saidAt = seen.endedAt ?? now;
+        seen.saidTs = written?.wrote?.result?.ts ?? now;
         seen.saidWhy = cause;
         // KEPT, because the line above the list wants the same hour and the
         // trace it came off is not read again after this pass.
@@ -3960,7 +3985,9 @@ export class Supervisor {
       // newer than the body on an OPEN row, so the answer is in her inbox
       // being read; the only thing that stops is writing it again. Any word
       // from her moves `lastFounderWrite` past it and the row is fresh again.
-      && !awaitingHer(i)
+      // EXCEPT when the words are OURS, about an account that refused the run
+      // (`_onlyWeSpokeForAnAccount`): those are not an answer to her.
+      && (!awaitingHer(i) || this._onlyWeSpokeForAnAccount(i))
       // A row a worker already took and gave nothing back rests before it is
       // handed to another one. This pass had no memory whatsoever, which is
       // the whole of the every-tick loop (FRUITLESS_RESTS_MS).
