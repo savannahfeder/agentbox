@@ -50,7 +50,7 @@ import type { RunningSession, WorkItem } from './types';
 // would be worse than the silence it replaces.
 // `next` is a queued task she pushed with Run now (w-87ff499077): still
 // waiting, but first in line, and the word changing is how the press shows.
-export type LiveState = 'working' | 'next' | 'queued' | 'paused' | 'silent' | 'idle';
+export type LiveState = 'working' | 'next' | 'queued' | 'signin' | 'paused' | 'silent' | 'idle';
 
 export interface LiveLine {
   state: LiveState;
@@ -63,6 +63,10 @@ export interface LiveFacts {
   session?: RunningSession | null;
   /** `supervisor.queued`: the ids a tick will spawn as soon as a slot frees. */
   queued?: string[];
+  /**
+   * `supervisor.signInNeeded`: rows nothing can start because the tool they run
+   *  on is signed out, each with that tool's name ("Claude Code", "Codex"). */
+  signInNeeded?: Record<string, string>;
   /** `supervisor.runNow`: the queued ids she pushed with Run now. */
   runNow?: string[];
   /** `supervisor.stalled`: a worker died on it. The stalled bar owns this. */
@@ -131,6 +135,7 @@ export function shortWord(state: LiveState, helpers = 0): string {
   if (state === 'working') return 'Working';
   if (state === 'next') return 'Up next';
   if (state === 'queued') return 'Queued';
+  if (state === 'signin') return 'Signed out';
   if (state === 'paused') return 'Paused';
   // "NOTHING CAME BACK", AND THE PLAINNESS IS THE POINT.
   //
@@ -194,7 +199,7 @@ export function cameBackEmpty(
 
 export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null {
   const {
-    session = null, queued = [], runNow = [], stalled = false, paused = false, silent = null,
+    session = null, queued = [], runNow = [], stalled = false, paused = false, silent = null, signInNeeded = {},
     inProgress = false, scheduledUntil = 0, now = Date.now(),
   } = facts;
 
@@ -273,6 +278,21 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   }
 
   if (!inProgress) return null;
+
+  // SIGNED OUT IS NOT QUEUED (2026-10-04). "An agent starts on it as soon as
+  // one is free" was on her screen for half an hour while no agent could start
+  // at all, because her Claude Code login had run out. The row says what is
+  // wrong and the one thing that fixes it, and the sentence is drawn, not only
+  // announced: it is the next step, and there is nothing else to do.
+  const tool = signInNeeded[item.id];
+  if (tool) {
+    return {
+      state: 'signin',
+      line: tool === 'Codex'
+        ? 'Codex is signed out. Open a terminal and run codex login, and this starts on its own.'
+        : `${tool} is signed out. Open a terminal, run claude, and type /login, and this starts on its own.`,
+    };
+  }
 
   if (queued.includes(item.id) && runNow.includes(item.id)) {
     return {

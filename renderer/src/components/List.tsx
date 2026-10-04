@@ -109,7 +109,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard }: {
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -140,6 +140,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   engines?: { workspace: string; byItem: Record<string, string> };
   stalled?: string[];
   queued?: string[];
+  signInNeeded?: Record<string, string>;
   // A RUN ENDED ON THIS ROW AND WROTE NOTHING DOWN, keyed by id. The half of
   // it that matters most is that this is visible in the inbox without opening
   // anything. Not `stalled`, which is a worker that died and
@@ -672,6 +673,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                       ? <span className="time stalled">stopped · {ago(item.updatedAt)}</span>
                       : cameBackEmpty(item, silent?.[item.id])
                         ? <span className="time quiet" title="An agent ran on this and finished without writing anything back. Send it a message to find out what happened.">nothing came back · {ago(silent![item.id].endedAt || item.updatedAt)}</span>
+                        : signInNeeded?.[item.id]
+                          ? <span className="time" title={`${signInNeeded[item.id]} is signed out, so nothing can start. Sign in again and this starts on its own.`}>signed out</span>
                         : queued?.includes(item.id)
                           ? <span className="time">queued</span>
                           : paused && view === 'progress'

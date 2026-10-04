@@ -104,6 +104,7 @@ import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexM
 import { nameRow, wantsName } from './row-label.mjs';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mjs';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
+import { signInFiles, signInStamp } from './sign-in-files.mjs';
 
 const POLL_MS = 15_000;
 // HOW LONG SHE WAITS AFTER PRESSING THE BUTTON, and until now it was the line
@@ -143,6 +144,13 @@ const DIGEST_RETRY_MS = 30 * 60_000;
 const FAST_EXIT_MS = 45_000;
 const BACKOFF_BASE_MS = 60_000;
 const BACKOFF_CAP_MS = 30 * 60_000;
+// HOW LONG A SIGNED-OUT LOGIN SITS OUT WHEN NOTHING SAYS IT CAME BACK. It was
+// the same half hour as an ambiguous death, and that half hour is exactly how
+// long her agents stayed "Queued" after she had signed in again (2026-10-04).
+// The app now watches for the login itself (`_noticeSignIns`); this is only the
+// fallback for a login that lands somewhere it cannot see. A try on a login
+// that is still out costs a two-second run and is charged to nobody.
+const SIGNED_OUT_REST_MS = 5 * 60_000;
 // How long past a limit's printed reset hour the fleet waits before trying.
 const LIMIT_RESET_GRACE_MS = 30_000;
 // HOW LONG NOTHING MAY WORK BEFORE THE APP SAYS SO OUT LOUD.
@@ -575,16 +583,60 @@ export class Supervisor {
   // and app restart charged the item a failed delivery attempt.
   /** HER OWN HAND OUTRANKS A TIMER (2026-09-22).
    * Called for the things only she does that mean "run this now": a reply,
-   * Resume, reopening a row. An account waiting on a PERSON (signed out,
-   * switched off by an admin) stays out, because retrying it cannot help
-   * however often she asks. The streak
-   *  count is kept, so a real outage still escalates. */
+   * Resume, reopening a row. The streak count is kept, so a real outage still
+   * escalates.
+   *
+   * A SIGNED-OUT LOGIN IS LIFTED TOO (2026-10-04). This used to skip it on the
+   * grounds that retrying cannot help however often she asks. It is the one
+   * thing that does help, once she has typed /login, and pressing Resume right
+   * after is exactly what she did; the skip turned it into a button that did
+   * nothing. If she has not signed in, the try dies in two seconds, is charged
+   * to no row (`accountFault`), and the account sits out again. An account an
+   * admin switched off still stays out: her signing in cannot fix that one. */
   liftBrakeForHer() {
     this._spawnCooldownUntil = 0;
     for (const account of Object.keys(this._profileCooldown ?? {})) {
-      if (needsHerHands(this._profileTrouble?.[account]?.cause)) continue;
+      if (this._profileTrouble?.[account]?.cause === 'org-blocked') continue;
       this._profileCooldown[account] = 0;
     }
+  }
+
+  /**
+   * A LOGIN THAT LANDED PUTS ITS ACCOUNT STRAIGHT BACK.
+   *
+   * Trouble on an account is only cleared by a session surviving on it, and a
+   * signed-out account was benched so that no session could start on it. So
+   * nothing she did could bring it back, and the bench ran out on its own half
+   * an hour later (2026-10-04). Here every tick asks whether the files a login
+   * writes have moved since the account was found signed out. If they have,
+   * the account gets one try now. The trouble itself stays until that try
+   * survives, so a write that was not a login (another Claude window touching
+   * the same file) buys one two-second try and no more: the stamp moves with
+   * it, and the next lift needs the next write.
+   */
+  _noticeSignIns() {
+    let lifted = false;
+    for (const [key, trouble] of Object.entries(this._profileTrouble ?? {})) {
+      if (trouble?.cause !== 'signed-out') continue;
+      const stamp = signInStamp(this._signInFilesFor(key));
+      if (!stamp || stamp <= (trouble.stamp ?? trouble.at ?? 0)) continue;
+      trouble.stamp = stamp;
+      if (this._profileCooldown) this._profileCooldown[key] = 0;
+      if (!key.startsWith('codex:')) this._spawnCooldownUntil = 0;
+      lifted = true;
+    }
+    if (lifted) this._saveState();
+    return lifted;
+  }
+
+  /** Which files one account's login writes, by the key its trouble is kept under. */
+  _signInFilesFor(key) {
+    const home = this.config.home || os.homedir();
+    if (key.startsWith('codex:')) {
+      const profile = key.slice('codex:'.length);
+      return signInFiles({ engine: 'codex', folder: this._codexProfileHome(profile), home });
+    }
+    return signInFiles({ folder: key === 'default' ? null : key, home });
   }
 
   _kill(session) {
@@ -2097,7 +2149,10 @@ export class Supervisor {
     // answered read "stopped", which CLAUDE.md says must never mean "and
     // nothing will retry". The account health of the engine is still charged
     // for it, in `noteExitForBackoff`; only the delivery is spared.
-    if (signal || session?.stoppedByUs || session?.transportFault) {
+    // AND A FOURTH: the ACCOUNT refused it (signed out, out of usage, switched
+    // off). Her words never reached a worker, so they wait for the account
+    // rather than being spent on it (`accountFault`, noteExitForBackoff).
+    if (signal || session?.stoppedByUs || session?.transportFault || session?.accountFault) {
       this.redeliverAnswer(item, answerAtSpawn); // saves state
       return 'interrupted';
     }
@@ -2200,6 +2255,8 @@ export class Supervisor {
     const seen = this._fruitless[`${item.product}:${item.id}`];
     const runs = this._emptyRuns(item);
     if (!runs) return 0;
+    // Rested because its ACCOUNT refused it: awake as soon as the account is.
+    if (seen?.account && !this._profileResting(seen.account)) return 0;
     // AN URGENT ROW NEVER CLIMBS THE LADDER. Urgent outranks High, and is
     // even meant to INTERRUPT High and below, so it must never end up waiting
     // behind them.
@@ -2616,7 +2673,7 @@ export class Supervisor {
    *   on arrival: it never got as far as being a session, so what it proves is
    *   that the machine is broken, not that this row has nothing in it.
    */
-  noteFreshRun(item, { everRan = true } = {}) {
+  noteFreshRun(item, { everRan = true, account = null } = {}) {
     const key = `${item.product}:${item.id}`;
     // Re-read: `item` is the snapshot taken at spawn, and the whole question is
     // what the session did to the row since.
@@ -2649,7 +2706,12 @@ export class Supervisor {
     // The first rung still applies, so a broken engine is not hammered: fifteen
     // minutes between attempts, forever, until it works or she is told.
     if (!everRan) runs = Math.min(runs, 1);
-    this._fruitless[key] = { runs, endedAt: Date.now(), founderAt };
+    // NOR A SPAWN ITS ACCOUNT REFUSED. Nobody looked at the row; the account
+    // was out. The rest is remembered against that account and ends the
+    // moment it is back (`restingUntil`), rather than fifteen minutes after
+    // she has signed in again.
+    if (account) runs = Math.min(runs, 1);
+    this._fruitless[key] = { runs, endedAt: Date.now(), founderAt, ...(account ? { account } : {}) };
     this._saveState();
     return 'rested';
   }
@@ -2872,6 +2934,12 @@ export class Supervisor {
     this._profileTrouble = this._profileTrouble ?? {};
     const had = this._profileTrouble[profile];
     this._profileTrouble[profile] = { since: had?.since ?? Date.now(), at: Date.now(), cause, raw: String(raw ?? '').slice(0, 300) };
+    // What the login files looked like when it was found out, so that
+    // `_noticeSignIns` can tell a login landing afterwards from one before.
+    if (cause === 'signed-out') {
+      const stamp = signInStamp(this._signInFilesFor(profile));
+      this._profileTrouble[profile].stamp = Math.max(stamp, had?.stamp ?? 0);
+    }
     return cause;
   }
 
@@ -2920,13 +2988,13 @@ export class Supervisor {
   // next spawn might well work. A login that has run out is not ambiguous, and
   // the two spawns it takes to reach three strikes are two real pieces of her
   // work handed to an account that cannot do them.
-  _strikeProfile(profile, { hard = false } = {}) {
+  _strikeProfile(profile, { hard = false, rest = 30 * 60_000 } = {}) {
     if (!profile) return;
     this._profileStrikes = this._profileStrikes ?? {};
     this._profileCooldown = this._profileCooldown ?? {};
     this._profileStrikes[profile] = (this._profileStrikes[profile] ?? 0) + 1;
     if (hard || this._profileStrikes[profile] >= 3) {
-      this._profileCooldown[profile] = Date.now() + 30 * 60_000;
+      this._profileCooldown[profile] = Date.now() + rest;
       this._profileStrikes[profile] = 0;
     }
   }
@@ -3199,8 +3267,17 @@ export class Supervisor {
         this._profileCooldown = this._profileCooldown ?? {};
         this._profileCooldown[account] = resetAt + LIMIT_RESET_GRACE_MS;
       } else {
-        this._strikeProfile(account, { hard: needsHerHands(cause) });
+        this._strikeProfile(account, {
+          hard: needsHerHands(cause),
+          rest: cause === 'signed-out' ? SIGNED_OUT_REST_MS : undefined,
+        });
       }
+      // A DEATH THE ACCOUNT CAUSED IS NOT THE ROW'S. Read by `settleDelivery`
+      // (her reply is handed back rather than spending one of its three tries)
+      // and by `noteFreshRun` (the row's rest ends when the account is back).
+      // Measured 2026-10-04: her "continue" on a row, sent while signed out,
+      // died in two seconds and counted against the reply.
+      if (needsHerHands(cause) || cause === 'at-limit') session.accountFault = { cause, account };
 
       // ONLY THE ENGINE SHE IS ACTUALLY RUNNING ON MAY BRAKE THE FLEET.
       //
@@ -3229,7 +3306,7 @@ export class Supervisor {
         this._fastExits = (this._fastExits ?? 0) + 1;
         const delay = resetAt
           ? Math.max(0, resetAt + LIMIT_RESET_GRACE_MS - Date.now())
-          : Math.min(BACKOFF_BASE_MS * 2 ** (this._fastExits - 1), BACKOFF_CAP_MS);
+          : Math.min(BACKOFF_BASE_MS * 2 ** (this._fastExits - 1), cause === 'signed-out' ? SIGNED_OUT_REST_MS : BACKOFF_CAP_MS);
         this._spawnCooldownUntil = Date.now() + delay;
         this._fleetTroubleSince = this._fleetTroubleSince || Date.now();
         this._lastFastExit = { at: Date.now(), cause, raw };
@@ -3394,8 +3471,19 @@ export class Supervisor {
         .map((i) => i.id);
     } catch {}
     if (this.paused) queued = [];
+    let signInNeeded = {};
+    try {
+      const productBySlug = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
+      const me = process.env.AGENTBOX_PERSON_ID;
+      signInNeeded = this._waitingOnSignIn(this.store.listItems(Date.now())
+        .filter((i) => mayRunHere(i, productBySlug.get(i.product), me)));
+    } catch {}
     return {
       paused: this.paused,
+      // ROWS NOTHING CAN START BECAUSE THEIR TOOL IS SIGNED OUT, by id, with the
+      // tool's name. The row says so instead of "Queued", which promised an
+      // agent "as soon as one is free" while none could be (2026-10-04).
+      signInNeeded,
       running: [...this.sessions.values()].filter(s => !s.remoteIdle).map((s) => ({
         itemId: s.itemId,
         product: s.product,
@@ -3597,6 +3685,30 @@ export class Supervisor {
   // is only ever set when no healthy account remains; twenty unbroken minutes;
   // and something it is actually stopping, so there is work waiting and nothing
   // running.
+  /**
+   * WHICH OPEN ROWS ARE WAITING ON A SIGN-IN, and in which tool. True of a row
+   * when every account its engine could run it on is sitting out and at least
+   * one of them is signed out. One sitting-out account beside a working one is
+   * not this: the work goes to the working one.
+   */
+  _waitingOnSignIn(rows) {
+    const out = {};
+    const blocked = new Map();
+    const isBlocked = (engine) => {
+      if (!blocked.has(engine)) {
+        blocked.set(engine, !this._liveProfilesFor(engine).length
+          && this._profilesFor(engine).some((p) => this._profileTrouble?.[this._accountKey(engine, p)]?.cause === 'signed-out'));
+      }
+      return blocked.get(engine);
+    };
+    for (const i of rows ?? []) {
+      if (i.status !== 'open' || this.sessions.has(i.id)) continue;
+      const engine = engineOf(this._engineFor(i));
+      if (isBlocked(engine)) out[i.id] = engineLabel(engine);
+    }
+    return out;
+  }
+
   _spawnTrouble(queued) {
     const since = this._fleetTroubleSince ?? 0;
     if (!since) return null;
@@ -3639,6 +3751,9 @@ export class Supervisor {
   async _tick() {
     if (this.paused) return;
     if (this.firstRunHolding()) return;
+    // Has a login landed since an account was found signed out? Ahead of the
+    // brake below, which would otherwise hold the fleet past the sign-in.
+    try { this._noticeSignIns(); } catch (e) { console.warn('zero: could not look for a sign-in:', e.message); }
     // A COOLDOWN STOPS THE SPAWNING AND IT MUST NOT STOP THE TELLING. The brake
     // goes on when there is no healthy account left anywhere, for up to half an
     // hour, which is precisely the half hour her tasks are all stuck and the
@@ -5795,6 +5910,14 @@ export class Supervisor {
       return;
     }
     if (!this._hasSlotFor(engine) && !continuation) return;
+    // HER REPLY WAITS FOR AN ACCOUNT THAT CAN CARRY IT. A continuation skips the
+    // slot check by design, so with every account on this engine sitting out it
+    // would go to one anyway, die in two seconds, and go again next tick. Held
+    // here and handed back, it goes out the tick the account returns.
+    if (continuation && !this._liveProfilesFor(engine).length) {
+      if (item.answer) this.redeliverAnswer(item, item.answer);
+      return;
+    }
     const product = this.store.listProducts().find((p) => p.slug === item.product);
     if (!product) return;
     // AND THIS IS WHERE "nothing ever runs in the practice project" IS ACTUALLY
@@ -6308,7 +6431,7 @@ export class Supervisor {
         // Claude Code announces itself with `session_id` on its first line of
         // output, so a session with neither died before the CLI was running.
         const everRan = session.sessionId != null || session.result != null;
-        const outcome = this.noteFreshRun(item, { everRan });
+        const outcome = this.noteFreshRun(item, { everRan, account: session.accountFault?.account ?? null });
         if (outcome === 'rested') {
           const until = this.restingUntil(item);
           if (until > Date.now()) onLine(`nothing moved on this row; resting ${Math.round((until - Date.now()) / 60_000)}m`);
