@@ -37,6 +37,20 @@ const ListIcon = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="non
 const BoardIcon = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3.5" y="4" width="5" height="16" rx="1" /><rect x="10.5" y="4" width="5" height="11" rx="1" /><rect x="17.5" y="4" width="3" height="7" rx="1" /></svg>;
 export const PeopleIcon = () => <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="9" cy="9" r="3.2" /><path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5" /><path d="M15.5 6.2a3 3 0 0 1 0 5.6M17.5 14.8c1.8.6 3 2.1 3.4 4.7" /></svg>;
 export const LockMark = () => <svg className="th-lock" width="11" height="12" viewBox="0 0 11 12" fill="none" stroke="currentColor" strokeWidth="1.2" aria-label="Private"><rect x="1.5" y="5.5" width="8" height="6" rx="1" /><path d="M3.5 5.5V3.8a2 2 0 0 1 4 0v1.7" /></svg>;
+/** A title with a mark after it, where the mark never wraps onto a line by
+ *  itself: "the icon flows over but the text doesn't" (w-49cace6736). A line
+ *  may break right before an inline picture, so the last word and the mark sit
+ *  in one span that does not break, and move down together. A last word longer
+ *  than KEEP_WHOLE keeps only its last letters with the mark; the card lets the
+ *  rest break anywhere, so a long link never pushes the card wider. */
+const KEEP_WHOLE = 16;
+export function TitleThenMark({ title, mark }: { title: string; mark: ReactNode }) {
+  if (!mark) return <>{title}</>;
+  const text = title.trimEnd();
+  const lastWord = Math.max(0, text.search(/\S+$/));
+  const cut = text.length - lastWord > KEEP_WHOLE ? text.length - 3 : lastWord;
+  return <>{text.slice(0, cut)}<span className="th-keep">{text.slice(cut)}{mark}</span></>;
+}
 /** Two people: others can see this thread. After the title of a row only a
  *  few chosen people see (the whole team, the default, carries no mark),
  *  inside the Share button, and beside "Team" in the summary.
@@ -425,7 +439,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
  *  it, the private ones included; with a teammate in view, those wear a lock
  *  and every card names its person. Whose threads is picked on the header's
  *  filters button (w-14bb56c833), so the columns start right under it. */
-export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns }: {
+export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns, projectOrder }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number; onOpenItem: (item: WorkItem) => void;
   /** The column each thread sits in, by the Inbox tabs' rule (App.tsx). */
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
@@ -434,6 +448,8 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   selected?: WorkItem | null;
   /** The columns left to right, and where a dragged order goes to be kept. */
   columnOrder?: ThreadStateWord[]; onReorderColumns?: (order: ThreadStateWord[]) => void;
+  /** Your running order of projects, which Sort by Priority reads first. */
+  projectOrder?: string[];
 }) {
   const liveIds = useContext(LiveContext);
   const team = useContext(TeamContext);
@@ -455,8 +471,8 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   // Held between renders, because J re-renders the board on every press and
   // the columns do not change when only the keyboard's card does.
   const columns = useMemo(
-    () => boardColumns({ items, products, display, now, stateOf, cards, picked, me, since, live: liveIds, order: shown }),
-    [items, products, display, now, stateOf, cards, picked, me, since, liveIds, shown],
+    () => boardColumns({ items, products, display, now, stateOf, cards, picked, me, since, live: liveIds, order: shown, projectOrder }),
+    [items, products, display, now, stateOf, cards, picked, me, since, liveIds, shown, projectOrder],
   );
   // THE OTHER COLUMNS SLIDE TO THEIR NEW PLACES (2026-10-02): they used to
   // jump, which read as "weird ... when I'm moving things around". Measured
@@ -602,9 +618,11 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
             only you can see, the people mark on what a few chosen people
             can, and nothing on what the whole team can, the default. */}
         {rows.map((e) => <button type="button" key={e.key} className={`th-card${isSelected(e.item) ? ' selected' : ''}`} onClick={() => (e.item ? onOpenItem(e.item) : e.card && onOpenCard?.(e.card))}>
-          <div className="t">{e.message ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} /> : e.title}
-            {e.item && !e.message && sharing(e.item) === 'people' && <SharedMark label="Visible to the people on it" />}
-            {e.item && !e.message && sharing(e.item) === 'private' && <LockMark />}
+          <div className="t">{e.message
+            ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} />
+            : <TitleThenMark title={e.title ?? ''} mark={
+              e.item && sharing(e.item) === 'people' ? <SharedMark label="Visible to the people on it" />
+                : e.item && sharing(e.item) === 'private' ? <LockMark /> : null} />}
           </div>
           <div className="m">{e.live && <StateGlyph state="running" live />}{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project}</span>
             {withOthers && <Face person={e.ownerId ? team?.byId.get(e.ownerId) ?? null : null} me={e.ownerId === me} />}</div>

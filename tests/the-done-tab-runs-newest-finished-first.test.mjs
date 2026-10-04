@@ -114,8 +114,9 @@ describe('what the page says', () => {
   });
   it('the app hands the tab to the sorter, for your rows and for the merge', () => {
     const app = src('App.tsx');
-    expect(app).toMatch(/sortedByDisplay\([^;]*inboxDisplay, view\)/);
-    expect(app).toMatch(/mergeRows\(displayedBox, theirRows, view === 'done' \? 'done' : inboxDisplay\.sort\)/);
+    // Your project order rides after the tab since w-e263a8a0fb.
+    expect(app).toMatch(/sortedByDisplay\([^;]*inboxDisplay, view[,)]/);
+    expect(app).toMatch(/mergeRows\(displayedBox, theirRows, view === 'done' \? 'done' : inboxDisplay\.sort[,)]/);
   });
   it('the Display menu says Done keeps its own order while you are on it', () => {
     expect(src('threads', 'Pages.tsx')).toMatch(/Done runs newest first/);

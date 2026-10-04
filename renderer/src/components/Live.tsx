@@ -100,7 +100,7 @@ export function Live({ item, facts }: { item: WorkItem; facts: LiveFacts }) {
             {span && <span className="live-span">{span}</span>}
             <svg className="live-chevron" viewBox="0 0 12 12" aria-hidden="true"><path d="m4 2 4 4-4 4" /></svg>
           </button>
-        ) : <span className="live-word">{word}</span>}
+        ) : <span className="live-word">{live.state === 'signin' ? live.line : word}</span>}
         {!working && span && <span className="live-span">{span}</span>}
         <span className="live-announcement" role="status">{working ? word : live.line}</span>
       </div>

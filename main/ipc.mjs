@@ -1311,6 +1311,19 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     }
   });
 
+  // ARCHIVE A PROJECT, OR BRING ONE BACK (main/store.mjs setProductArchived).
+  // Its files stay on disk; it leaves every list the app draws. Pushed for the
+  // same reason a rename is: the rail, the inbox and the picker all list it.
+  ipcMain.handle('zero:project-archive', (_e, { product, archived } = {}) => {
+    try {
+      store.setProductArchived(product, archived === true);
+      push();
+      return { ok: true, ...readSettings({ config, supervisor, store }) };
+    } catch (err) {
+      return { ok: false, error: String(err.message) };
+    }
+  });
+
   // Opens the picker AND does the copy, in one round trip. Two handlers would
   // mean the renderer briefly holds a path into her Downloads folder and hands
   // it back to be trusted; this way the only path that crosses the bridge is one

@@ -231,6 +231,10 @@ describe('no raw colour outside the token blocks', () => {
       // looks that drew a tinted or a shadowed band. All three went when the
       // round was settled.
       '--keep-inset', '--keep-lift',
+      // The opened task's scrollbar width, written onto the pane by
+      // ../renderer/src/scroll-gutter.ts so the reply box centres in the same
+      // width as the words. Geometry only the running window knows.
+      '--scroll-gutter',
       '--did-mark', '--did-gap', '--did-hang']);
     expect([...used].filter((t) => !light.has(t) && !local.has(t))).toEqual([]);
   });
