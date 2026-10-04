@@ -418,7 +418,7 @@ export function ThreadComposer({
     <div className="tc-menu tc-drop tc-to-menu" role="listbox" aria-label="To" onKeyDown={menuKeys}>
       {!adding && (
         <button type="button" data-item className={`tc-row ${person ? '' : 'on'}`} onPointerEnter={hover} onClick={() => chooseTo('agent')}>
-          <AgentFace engine={pick.engine} /><span className="tc-row-label">Agent</span>
+          <AgentFace /><span className="tc-row-label">Agent</span>
         </button>
       )}
       {team && others.length > 0 && (<>
@@ -668,7 +668,7 @@ export function ThreadComposer({
             <span className="tc-anchor" ref={anchor('to')}>
               <button type="button" data-trigger className={`tc-word ${open === 'to' ? 'open' : ''}`} aria-haspopup="listbox" aria-expanded={open === 'to'}
                 onClick={() => toggle('to')} onKeyDown={triggerKeys('to')}>
-                {person ? <Face person={person} /> : <AgentFace engine={pick.engine} />}
+                {person ? <Face person={person} /> : <AgentFace />}
                 <span className="tc-word-text">{person ? person.name : 'Agent'}</span>
               </button>
               {extra.map((p) => (

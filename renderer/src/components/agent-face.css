@@ -1,29 +1,9 @@
 /* AN AGENT'S FACE (./AgentFace.tsx). The same 18px square as a person's
-   (.tm-av), dashed because it is an agent, square because the product is.
-
-   The badge sits over the corner with a ring cut out of whatever is behind it,
-   so it reads as a separate chip and not a smudge on the face. Its colours are
-   two variables, so the orange and the neutral looks are one rule apart. */
+   (.tm-av), dashed because it is an agent, square because the product is. */
 .agent-face {
-  position: relative; display: inline-grid; place-items: center; flex: none; vertical-align: middle;
+  display: inline-grid; place-items: center; flex: none; vertical-align: middle;
   width: 18px; height: 18px; box-sizing: border-box;
   border: 1px dashed var(--line-strong); border-radius: var(--radius);
   color: var(--text-dim);
 }
 .agent-eyes { display: block; width: 16px; height: 16px; fill: currentColor; }
-
-.agent-badge {
-  --agent-badge-bg: var(--accent);
-  --agent-badge-ink: var(--bg);
-  /* Small and pushed out past the corner, so it never covers the right eye. */
-  position: absolute; right: -5px; bottom: -5px; width: 9px; height: 9px;
-  display: grid; place-items: center; border-radius: 2px;
-  background: var(--agent-badge-bg);
-  box-shadow: 0 0 0 1.5px var(--agent-ring, var(--bg));
-}
-.agent-badge svg { width: 7px; height: 7px; fill: none; stroke: var(--agent-badge-ink); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.agent-badge[data-engine="claude"] svg { stroke-width: 1.8; }
-
-/* The ring takes the colour of the surface the face sits on. */
-.tc-card { --agent-ring: var(--tc-modal); }
-.tc-menu, .prio-menu { --agent-ring: var(--tc-pop, var(--pop, var(--bg-raised))); }

@@ -71,7 +71,7 @@ export function WhoPicker({ engine, person, engines, people, me, onEngine, onPer
                 onClick={() => pick(r)}
               >
                 {r.kind === 'agent'
-                  ? <AgentFace engine={r.id} />
+                  ? <AgentFace />
                   : <Face person={r.person} me={r.me} />}
                 <span className="prio-menu-label">{r.label}</span>
               </button>
