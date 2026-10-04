@@ -62,7 +62,8 @@ describe('her one login signed out, and she has signed back in', () => {
   it('the case she reported: Resume lifts the login at once', () => {
     const sup = supervisor();
     sup.noteExitForBackoff(deadOnArrival(SIGNED_OUT));
-    vi.setSystemTime(new Date(2026, 9, 4, 11, 40));
+    // Inside the five-minute bench a signed-out login now earns on its own.
+    vi.setSystemTime(new Date(2026, 9, 4, 11, 33));
     expect(sup._hasSlotFor('claude')).toBe(false);
 
     sup.liftBrakeForHer();
@@ -78,7 +79,8 @@ describe('her one login signed out, and she has signed back in', () => {
     const spawned = [];
     sup.spawnWorker = (i) => spawned.push(i.id);
     sup.noteExitForBackoff(deadOnArrival(SIGNED_OUT));
-    vi.setSystemTime(new Date(2026, 9, 4, 11, 40));
+    // Inside the five-minute bench a signed-out login now earns on its own.
+    vi.setSystemTime(new Date(2026, 9, 4, 11, 33));
 
     const out = sup.resumeItems(['w-a', 'w-b']);
     expect(out).toMatchObject({ resumed: 2, queued: 0 });
@@ -139,7 +141,8 @@ describe('where another login is working, the signed-out one stays out', () => {
   it('nothing she did: a signed-out login stays parked', () => {
     const sup = supervisor();
     sup.noteExitForBackoff(deadOnArrival(SIGNED_OUT));
-    vi.setSystemTime(new Date(2026, 9, 4, 11, 40));
+    // Inside the five-minute bench a signed-out login now earns on its own.
+    vi.setSystemTime(new Date(2026, 9, 4, 11, 33));
     sup.wake();
     expect(sup._profileResting('default')).toBe(true);
   });

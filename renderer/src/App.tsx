@@ -5180,6 +5180,7 @@ export default function App() {
                   // rule is the point of that file.
                   live={{
                     queued: snap.supervisor.queued,
+                    signInNeeded: snap.supervisor.signInNeeded,
                     runNow: snap.supervisor.runNow,
                     paused: snap.supervisor.paused,
                     running: snap.supervisor.running.length,
@@ -5256,6 +5257,7 @@ export default function App() {
                   engines={snap.engines}
                   stalled={snap.supervisor.stalled}
                   queued={snap.supervisor.queued}
+                  signInNeeded={snap.supervisor.signInNeeded}
                   silent={snap.supervisor.silent}
                   paused={snap.supervisor.paused}
                   multiSel={multiSel}
