@@ -611,7 +611,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       return { ok: false, error: String(err?.message ?? err), team: team.state() };
     }
   };
-  ipcMain.handle('zero:team-sign-in', teamCall(() => team.signIn()));
+  // Signing in finishes in the browser, so the app comes back to the front
+  // when it lands rather than leaving the person to find it.
+  ipcMain.handle('zero:team-sign-in', teamCall(async () => {
+    await team.signIn();
+    try { if (window?.isMinimized?.()) window.restore(); window?.show?.(); app?.focus?.({ steal: true }); } catch { /* no window to raise */ }
+  }));
+  ipcMain.handle('zero:team-sign-in-cancel', teamCall(() => team.cancelSignIn()));
+  ipcMain.handle('zero:team-sign-in-reopen', teamCall(() => team.reopenSignIn()));
   ipcMain.handle('zero:team-sign-out', teamCall(() => team.signOut()));
   ipcMain.handle('zero:team-sign-in-email', teamCall(({ email, password }) => team.signInWithEmail(email, password)));
   // Its own door, because it has one more thing to say: whether the account

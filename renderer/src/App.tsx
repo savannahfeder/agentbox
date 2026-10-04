@@ -545,6 +545,11 @@ export default function App() {
   // and land where they always did. It is cleared on the way out so reopening
   // Settings does not silently reopen somebody's last errand.
   const [settingsPane, setSettingsPane] = useState<string | null>(null);
+  // EVERY PRESS ON A SIDEBAR DOOR INTO SETTINGS IS A NEW VISIT (w-a09476712f).
+  // The screen is keyed on the tab it was asked for, so asking for the same
+  // tab twice changed nothing: open it from your name, move to General, click
+  // your name again, and you stayed on General with Sign out one tab away.
+  const [settingsVisit, setSettingsVisit] = useState(0);
   const [settingsPage, setSettingsPage] = useState<string | null>(null);
   const [productFilter, setProductFilter] = useState<string | null>(null);
   // THE BOX FILTER'S OTHER TWO PARTS (w-aa3fa4cbf0). The project part is
@@ -4551,7 +4556,7 @@ export default function App() {
     <TeamContext.Provider value={team}>
     <LiveContext.Provider value={liveIds}>
     <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${workspaceCollapsed ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}`}>
-      {signInGate && <SignInPage signedOut={signedOutHere} error={snap?.team?.error ?? null} />}
+      {signInGate && <SignInPage signedOut={signedOutHere} error={snap?.team?.error ?? null} waitingUrl={snap?.team?.signingIn?.url ?? null} />}
       {/* THE TOP BAR IS NOT DRAWN ON AN OPENED TASK.
 
           WHAT REPLACES IT IS NOT NOTHING, and the reason is three buttons this
@@ -4579,9 +4584,9 @@ export default function App() {
         update={announcesUpdate(snap?.update, { walking, closed: '' }) ? { installing: !!snap?.update?.installing, version: snap?.update?.newVersion, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
         onUpdate={() => { void api.updateInstall(); }}
         page={settingsOpen ? (settingsPage === 'team' ? 'invite' : 'settings') : null} teamPage={teamOpen && !settingsOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
-        onInvite={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsOpen(true); }}
-        onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsOpen(true); }}
-        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
+        onInvite={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
+        onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
+        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
           only part of our own document lying over the file, so a pointer
           brought up there wakes the marks that a pointer moving across the
@@ -5437,6 +5442,7 @@ export default function App() {
           supervisorPaused={snap.supervisor.paused}
           batch={multiSel.size > 0}
           look={look}
+          machine={machine}
           onSetLook={(l) => { setLook(l); setModal(null); }}
           staleFiles={snap.restartNeeded?.files ?? []}
           /*
@@ -5628,7 +5634,7 @@ export default function App() {
           from. The standing modal below therefore renders over it. */}
       {settingsOpen && (
         <Settings
-          key={settingsPane ?? 'general'}
+          key={`${settingsPane ?? 'general'}:${settingsVisit}`}
           embedded={workspaceNavigation}
           usageReadings={snap.usageByEngine ?? (snap.usage ? [snap.usage] : [])}
           now={now}

@@ -215,6 +215,14 @@ img.tm-av { background: var(--bg-selected); }
 .workspace-collapsed .workspace-navigation .th-me { padding-left: 8px; gap: 9px; }
 .workspace-collapsed .workspace-navigation .th-me .tm-av { width: 22px; height: 22px; line-height: 20px; font-size: 9px; }
 
+/* THE FACE IS A BUTTON AND LOOKS LIKE THE FACE IT WAS (w-a09476712f). It
+   undoes `.workspace-navigation button` (36px tall, padding, a wash on
+   hover) so the photo sits exactly where it did, and keeps initials showing
+   where that file hides every `button > span` in the collapsed rail. */
+.workspace-navigation .th-me .th-me-face { height: auto; padding: 0; gap: 0; border-radius: 50%; }
+.workspace-navigation .th-me .th-me-face:hover { background: none; }
+.workspace-navigation .th-me .th-me-face > .tm-av { display: inline-block; }
+
 /* 20 and 16 sit inside the row's 38px of content box, so the row keeps the
    one height it has always had. */
 .workspace-navigation .th-me-text .th-me-btn { height: 20px; width: 100%; gap: 0; }

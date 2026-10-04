@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld('zero', {
   schedule: (payload) => ipcRenderer.invoke('zero:schedule', payload),
   // The team version: signing in, the team, and sharing a project.
   teamSignIn: () => ipcRenderer.invoke('zero:team-sign-in'),
+  teamSignInCancel: () => ipcRenderer.invoke('zero:team-sign-in-cancel'),
+  teamSignInReopen: () => ipcRenderer.invoke('zero:team-sign-in-reopen'),
   teamSignOut: () => ipcRenderer.invoke('zero:team-sign-out'),
   teamSignInEmail: (payload) => ipcRenderer.invoke('zero:team-sign-in-email', payload),
   teamSignUp: (payload) => ipcRenderer.invoke('zero:team-sign-up', payload),
