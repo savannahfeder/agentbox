@@ -4275,6 +4275,23 @@ img.app-mark { opacity: 1; border-radius: 0; }
    which keeps the words further apart than the machinery between them.
 */
 .thread-block:is(.is-work, .is-run) + .thread-block:is(.is-work, .is-run) { margin-top: -17px; }
+
+/* SOMETHING YOU DID, one quiet line each (w-49b4e45403). The same 13px grey as
+   a work line, so it never competes with what was said, but its own rhythm:
+   a set of them stands as one small group, 6px apart, with the air of a
+   paragraph above and below rather than pressed under the message. The time
+   sits after the sentence in the faint tone the message heads use. */
+.thread-block.is-act + .thread-block.is-act { margin-top: -16px; }
+.thread-block:is(.is-work, .is-run) + .thread-block.is-act,
+.thread-block.is-act + .thread-block:is(.is-work, .is-run) { margin-top: -8px; }
+.act-line {
+  display: flex; align-items: baseline; gap: 10px; min-width: 0;
+  font-size: 13px; line-height: 20px; color: var(--text-dim);
+}
+.act-said { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-words.is-choice { color: var(--text); }
+.act-when { flex: none; font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.act-after { display: flex; flex-direction: column; gap: 6px; margin-top: 22px; }
 .thread-block:is(.is-msg, .is-msg-same) + .thread-block:is(.is-work, .is-run) { margin-top: -14px; }
 /* Except under the line that says where the middle of the conversation went,
    which is a note and not a message, and has its own 18px above it. */

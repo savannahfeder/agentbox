@@ -229,11 +229,13 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
         // was dead, and the 22px column gap was the only thing setting the
         // rhythm. Naming the wrapper is what lets the rhythm be set at all.
         const holds = e.kind === 'run' ? 'is-run'
-          : e.kind === 'work' ? 'is-work'
+          : e.kind === 'work' ? (e.yours ? 'is-act' : 'is-work')
           : e.same ? 'is-msg-same' : 'is-msg';
         return (
         <div key={`${e.at}-${key}-${n}`} className={`thread-block ${holds} ${ends === gapAfter ? 'has-gap' : ''}`}>
-          {e.kind === 'run'
+          {e.kind === 'work' && e.yours
+            ? <ActLine act={e} />
+            : e.kind === 'run'
             ? <RunLine
                 items={e.items}
                 open={runsOpen.has(key)}
@@ -539,6 +541,33 @@ function WorkLine({ work, state, onStep, code }: {
         <div className="did-cut">{outputCut(all.length, work.lines)}</div>
       )}
       {!!work.more && <div className="did-cut">{runOverflow(work.more)}</div>}
+    </div>
+  );
+}
+
+/**
+ * SOMETHING YOU DID, as one quiet line (w-49b4e45403): "You snoozed it until
+ * tomorrow 9:00am", then when. A snooze, a picked option, a rename, a close.
+ *
+ * Not a work line: nothing opens, it never folds into the agent's run, and it
+ * carries its own time, because when you put something off is the point of
+ * seeing it. The words after the verb are the detail (the option you picked,
+ * the moment it comes back) and sit at full strength only for a pick, where
+ * they are what you chose.
+ */
+export function ActLine({ act }: { act: AgentWork }) {
+  // A TEAMMATE'S ACTION is theirs: their first name where "You" would be.
+  const team = useContext(TeamContext);
+  const who = team && act.by && act.by !== team.me ? team.byId.get(act.by) ?? { id: act.by, email: '', name: 'A teammate', avatarUrl: null } : null;
+  const said = who ? act.verb.replace(/^You\b/, firstName(who)) : act.verb;
+  const picked = /^You picked option/.test(act.verb);
+  return (
+    <div className="act-line">
+      <span className="act-said">
+        {said}
+        {act.subject && <span className={`act-words ${picked ? 'is-choice' : ''}`}>{picked ? `: ${act.subject}` : ` ${act.subject}`}</span>}
+      </span>
+      <span className="act-when">{when(act.at)}</span>
     </div>
   );
 }

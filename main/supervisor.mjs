@@ -1148,6 +1148,13 @@ export class Supervisor {
     const item = this.store.listItems(Date.now()).find((i) => i.id === id && i.product === product);
     if (!item) return { ok: false, reason: 'missing' };
     if (this.sessions.has(id)) return { ok: false, reason: 'running' };
+    // A PUSH NOTHING WILL ACT ON IS REFUSED OUT LOUD. The menu now offers Run
+    // now on anything In progress (renderer/src/run-now.ts), which takes in
+    // rows the tick is not going to start. Accepting those would read as Up
+    // next while nothing moved, so each says why instead.
+    if (this.paused) return { ok: false, reason: 'paused' };
+    if (!this.store.isDue(item, Date.now())) return { ok: false, reason: 'scheduled' };
+    if (this.claimHeldElsewhere(item)) return { ok: false, reason: 'held' };
     this._runNow.set(id, { product, at: Date.now(), started: false });
     // Asking for a row by name outranks a rest the fleet earned on it, the
     // same way `resumeItems` treats it.
@@ -4097,6 +4104,14 @@ export class Supervisor {
           && this._engineFor(item) === DEFAULT_ENGINE,
       });
     }
+    // THE SLOT AN INTERRUPTION FREED BELONGS TO THE ROW IT WAS FREED FOR.
+    // Without this the slot went to the top of the queue on the next tick,
+    // and the top is often a higher project's row that could never have
+    // interrupted anything itself: the session was paused for nothing and the
+    // Urgent row went on waiting. Rows ranked above it lose nothing by it,
+    // since the session it paused scored below it and held that slot anyway.
+    const heldFor = new Set([...this._preempted.values()].map((r) => `${r.forProduct}:${r.forItem}`));
+    const holds = (row) => (heldFor.has(`${row.item.product}:${row.item.id}`) ? 1 : 0);
     queue.sort((a, b) =>
       // A COMMAND GOES TO THE FRONT, ahead of the priority she set on anything
       // else, because it is not competing with them for anything. It takes no
@@ -4113,6 +4128,7 @@ export class Supervisor {
       // tick's one interruption on its engine (`spent` below).
       || (this._runNow.has(b.item.id) ? 1 : 0) - (this._runNow.has(a.item.id) ? 1 : 0)
       || (this._runNow.get(a.item.id)?.at ?? 0) - (this._runNow.get(b.item.id)?.at ?? 0)
+      || holds(b) - holds(a)
       || this._score(b.item) - this._score(a.item)
       // The tie-break, and the only thing left of "continuations go first".
       || (b.continuation ? 1 : 0) - (a.continuation ? 1 : 0)
@@ -4134,11 +4150,17 @@ export class Supervisor {
      * written for, and the deleted 2026-08-25 build shipped with it.
      *
      * WHAT THE BREAK WAS ALSO DOING, and what this set keeps: at most one
-     * session is interrupted per engine per tick. Nothing further down the
-     * queue outranks the row we just made room for, so a second preemption on
-     * the same engine could only take a slot for a row that is going to wait
-     * anyway. An engine goes in here whether or not `_preemptFor` actually
-     * took anything, because that is exactly what the break did.
+     * session is interrupted per engine per tick.
+     *
+     * AN ENGINE GOES IN HERE ONLY WHEN SOMETHING WAS ACTUALLY INTERRUPTED. It
+     * used to go in on the first row that did not fit, whatever that row was,
+     * and the first row is usually a higher project's Medium, which may not
+     * interrupt anything. The Urgent row below it, which may, was never
+     * asked: an Astral Video Urgent waited 49 minutes while the Medium in its
+     * own project ran (w-53a72e6e7f,
+     * tests/an-urgent-task-takes-its-own-projects-slot-even-behind-a-higher-project).
+     * The slot that interruption frees is held for the row that made it
+     * (`heldFor` above), so the rows above it do not take it instead.
      */
     const spent = new Set();
 
@@ -4197,10 +4219,7 @@ export class Supervisor {
         // exit before its slot is really free, and an exit nudges a tick, so
         // the ordinary cost of this is seconds rather than the fifteen-second
         // poll.
-        if (!spent.has(engine)) {
-          spent.add(engine);
-          this._preemptFor(item, items, engine);
-        }
+        if (!spent.has(engine) && this._preemptFor(item, items, engine)) spent.add(engine);
         // AND ON DOWN THE QUEUE, because the next row may be on the engine
         // that is still idle. See `spent` above for what this used to be.
         continue;
