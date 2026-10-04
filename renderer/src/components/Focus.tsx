@@ -1228,6 +1228,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                  the moment the running agent gets round to acknowledging it
                  (w-1ef03d6f27). */
               sending={sending}
+              onSendNow={() => api.sendNow({ product: item.product, id: item.id }).catch(() => {})}
               onOpenOrigin={() => parent && onOpenItem(parent)}
               md={md}
               clean={cleanMessage}
