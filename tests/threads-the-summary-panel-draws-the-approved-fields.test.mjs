@@ -61,11 +61,15 @@ describe('the panel', () => {
   // Blocked by and Blocks left the panel on w-b38e975e2c; that test file
   // (threads-the-summary-reads-properties-then-the-name-and-its-three-lines)
   // pins their absence and the new order.
-  it('then the three lines, with the stand-in dim until something is written', () => {
+  // CHANGED 2026-10-04 (w-54e9c7243f): a line with no words is left out,
+  // heading and all, instead of reading "Not written yet". A stand-in read
+  // off the ask is still drawn, dim.
+  it('then the lines that have words, a stand-in dim until something is written', () => {
     expect(words).toMatch(/Problem Acme’s contract ends on the 14th/);
     expect(words).toMatch(/Progress Terms are drafted at 8% over last year\./);
-    expect(words).toMatch(/Solution Not written yet/);
-    expect(html).toMatch(/class="ts-line dim"[^>]*>Not written yet/);
+    expect(words).not.toMatch(/Solution|Not written yet/);
+    const standIn = draw(React.createElement(SummaryPanel, { item: item({ problem: undefined, body: 'Draft the Acme terms.' }), items, team: null }));
+    expect(standIn).toMatch(/class="ts-line dim"[^>]*>Draft the Acme terms\./);
   });
   // CHANGED 2026-10-04 (w-922f66bb06): the faint line under the words became
   // the Updated row at the foot, and it says only when.

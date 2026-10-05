@@ -102,6 +102,9 @@ describe('the tarball npm would publish', () => {
       'scripts/after-install.mjs',
       'scripts/approval-server.sh',
       'scripts/before-publish.mjs',
+      // The memory check every worker's shell commands ask (w-3958c3753d):
+      // Claude Code runs it as a file, so it ships like the approval server.
+      'scripts/memory-gate-hook.sh',
     ]);
   });
 

@@ -1119,12 +1119,14 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     </div>
   );
 
-  // WHILE THE SUMMARY IS OPEN THE BAR IS THIN (w-922f66bb06): one line, the
+  // A THREAD WITH A SUMMARY WEARS THE THIN BAR (w-922f66bb06): one line, the
   // tab this thread was opened from and its name, all of it the way back
   // (Summary.tsx ThreadCrumb). The full band would say again what the summary
-  // beside it says. Folded, nothing else names the thread, so the band is back.
+  // beside it says. It stays thin when the summary folds (w-20292d329f): the
+  // crumb still names the thread, and a bar that changed shape every time the
+  // summary opened or closed "looks a little weird".
   const threadName = direct && talkFull ? talkFull : rowTitle(item);
-  const barContent = summaryShown && crumbFrom
+  const barContent = summaryOffered && crumbFrom
     ? <ThreadCrumb from={crumbFrom} name={threadName} onBack={onClose} />
     : <>{backButton}{bandLine}</>;
 

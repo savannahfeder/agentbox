@@ -1,4 +1,19 @@
-// THE FEEDBACK FEATURE IS GONE, AND THIS IS THE FILE THAT KEEPS IT GONE.
+// THE OLD ⌘K FEEDBACK ROW STAYS GONE (was the-feedback-feature-is-gone).
+//
+// WHAT CHANGED ON 2026-10-04 (w-1b574413db). This file ended by saying that if
+// feedback is genuinely wanted again, she is the one who says so, and this file
+// goes with it. She said so, in her own words: "I want us to create a way for
+// users of Agentbox to easily send me feedback", with the entry point in the
+// sidebar "just like another sidebar tab". That feature is a Feedback row in
+// the sidebar's foot opening a card (FeedbackCard.tsx), and it reuses the
+// ordinary names `main/feedback.mjs`, `shared/feedback.mjs`, "Send feedback"
+// and `onFeedback`, so those are no longer banned here.
+//
+// What is still banned is the thing she asked three times to be rid of: the
+// row in ⌘K, its card, its bridge, its channel and its modal. Those names
+// belong to nothing else and must not come back.
+//
+// The history, as it was written:
 //
 // SHE IS DESCRIBING SOMETHING REAL AND IT IS MEASURABLE. The removal was
 // written twice and merged never:
@@ -32,21 +47,20 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The files the feature was made of. Each one is the whole of a piece of it. */
+/** The old card's file. `main/feedback.mjs` and `shared/feedback.mjs` were
+ *  the old feature's too and are the new one's now (see the head of the file). */
 const FILES = [
-  'main/feedback.mjs',
-  'shared/feedback.mjs',
   'renderer/src/components/Feedback.tsx',
 ];
 
-/** Its own names, none of which mean anything else in this codebase. */
+/** The old row's own names, none of which the sidebar feature uses. "Send
+ *  feedback" and `onFeedback` left this list on 2026-10-04: the new card is
+ *  titled "Send feedback" and the sidebar takes `onFeedback`. */
 const NAMES = [
-  'Send feedback',        // the palette row's label, which is what she photographed
-  'tell us what broke',   // its hint
+  'tell us what broke',   // the palette row's hint
   'feedbackSend',         // the preload bridge and the window.zero type
   'zero:feedback-send',   // the IPC channel behind it
-  'onFeedback',           // the prop App.tsx handed the palette
-  "setModal('feedback')", // the card being opened
+  "setModal('feedback')", // the card being opened as a palette modal
 ];
 
 /**

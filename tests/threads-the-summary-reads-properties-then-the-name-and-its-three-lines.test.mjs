@@ -51,7 +51,8 @@ describe('the name and its three lines read as one block', () => {
     expect(html).toMatch(/<h2 class="ts-title">Acme renewal terms<\/h2><div class="ts-sec"><div class="ts-h">Problem<\/div>/);
   });
   it('keeps problem, progress and solution in that order under the name', () => {
-    expect(text(html)).toMatch(/Acme renewal terms Problem Acme’s contract ends on the 14th\. Progress Terms are drafted\. Solution Not written yet/);
+    // An empty line is not drawn at all since w-54e9c7243f, so this one has all three.
+    expect(text(draw(item({ solution: 'Terms sent.' })))).toMatch(/Acme renewal terms Problem Acme’s contract ends on the 14th\. Progress Terms are drafted\. Solution Terms sent\./);
   });
   it('draws the name once', () => {
     expect(html.match(/class="ts-title"/g)).toHaveLength(1);
