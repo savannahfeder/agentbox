@@ -126,8 +126,10 @@ describe('the five code colours', () => {
   it('finds a comment, a string, a keyword, a number and a capitalised name', () => {
     const kinds = (line) => tokenize(line).filter((t) => t.c).map((t) => `${t.c}:${t.s}`);
     expect(kinds('// the way back')).toEqual(['com:// the way back']);
-    expect(kinds("const x = 'hi'")).toEqual(['kw:const', "str:'hi'"]);
-    expect(kinds('let n = 42')).toEqual(['kw:let', 'num:42']);
+    // The name being made is coloured too since 2026-10-05
+    // (tests/function-calls-and-new-names-are-coloured.test.mjs).
+    expect(kinds("const x = 'hi'")).toEqual(['kw:const', 'def:x', "str:'hi'"]);
+    expect(kinds('let n = 42')).toEqual(['kw:let', 'def:n', 'num:42']);
     expect(kinds('new Focus()')).toEqual(['kw:new', 'typ:Focus']);
   });
 

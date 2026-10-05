@@ -114,11 +114,11 @@
   */
   --doc-page: #fefefe;
   --doc-wash: rgba(17, 25, 48, 0.05);
-  /* THE FIRST CODE COLOURS THIS APP HAS EVER HAD. Five, not the fifteen an
-     editor theme carries, because every one of them has to be answered by dark
-     and by all fourteen picture themes: a comment, a string, a keyword, a
-     number and a capitalised name. Everything else in a line of code is the
-     window's own ink. The green and the red are the app's own --chip-review and
+  /* THE CODE COLOURS. Eight, not the fifteen an editor theme carries, because
+     every one of them has to be answered by dark and by all fourteen picture
+     themes: a comment, a string, a keyword, a number, a type, a function, a
+     name being made and a constant (code-artifact.ts says what each one is).
+     Everything else in a line of code is the window's own ink. The green and the red are the app's own --chip-review and
      --chip-bug, not a new pair, so a change reads in the same two colours a
      review chip and a bug chip already do. The bed under a changed line is that
      colour at a tenth, which is the lightest wash that still reads as a band.
@@ -130,11 +130,22 @@
   /* The line she has a cursor in. Lighter than either of the two beds above,
      because it has to read under them as well as beside them. */
   --code-live-bed: rgba(20, 24, 34, 0.055);
-  --code-com: #6b7382;
-  --code-str: #2f7d4e;
-  --code-kw: #8250a8;
-  --code-num: #a8570d;
-  --code-typ: #2b6ca8;
+  /* THE CODE COLOURS ARE GITHUB'S, 2026-10-05. The five of our own read as
+     "pretty much all gray" in light, and the string was the plus colour
+     itself, so on every added line it vanished into the band. These are the
+     hues a reviewer already knows from the tool they review in, with the
+     purple of a function taken one step darker (#8250df measured 4.39 on the
+     green band; #6f42c1 is 5.66). MEASURED on #fefefe and on both bands,
+     worst of the three: keyword 4.66, comment 5.32, function 5.66, name made
+     and type 6.42, number and constant 6.60, string 11.14. */
+  --code-com: #59636e;
+  --code-str: #0a3069;
+  --code-kw: #cf222e;
+  --code-num: #0550ae;
+  --code-typ: #953800;
+  --code-fn: #6f42c1;
+  --code-def: #953800;
+  --code-con: #0550ae;
   /* A light window keeps its paper under a change; see the rule at the foot of
      this file for why this is a token at all. */
   --code-ground: var(--doc-page);
@@ -449,31 +460,33 @@
   --doc-page: #2e3136;
   --doc-page-held: #2e3136;
   --doc-wash: rgba(255, 255, 255, 0.07);
-  /* The same five, lifted for a dark ground. MEASURED against --doc-page
-     #2e3136: comment 4.67, minus 5.27, keyword 6.06, plus 6.58, capitalised
-     name 6.63, number 6.73, string 7.63. The comment and the minus were the
-     two that had to move; a comment is the longest thing on the screen and it
-     was the one below 4.5. In light, on #fefefe: comment 4.73, minus 4.67,
-     string and plus 5.00, number 5.16, capitalised name 5.46, keyword 5.69. */
+  /* The plus and minus, lifted for a dark ground. MEASURED against --doc-page
+     #2e3136: minus 5.27, plus 6.58; in light, on #fefefe, minus 4.67 and plus
+     5.00. The syntax colours below carry their own measurements. */
   --code-plus: #7bc98e;
   --code-minus: #e28f82;
   --code-plus-bed: rgba(123, 201, 142, 0.13);
   --code-minus-bed: rgba(226, 143, 130, 0.12);
   --code-live-bed: rgba(255, 255, 255, 0.055);
-  --code-com: #939bab;
-  --code-str: #9ed2ad;
-  --code-kw: #c5a3e6;
-  --code-num: #e0b27c;
-  --code-typ: #8fbdec;
+  /* GitHub's dark set, 2026-10-05, for the reason in the light block. MEASURED
+     on --code-ground #0e0f12, the ember ground #22201f and both bands, worst
+     of them: comment 5.01, keyword 6.11, function 7.91, number and constant
+     7.92, name made and type 7.96, string 10.03. */
+  --code-com: #8b949e;
+  --code-str: #a5d6ff;
+  --code-kw: #ff7b72;
+  --code-num: #79c0ff;
+  --code-typ: #ffa657;
+  --code-fn: #d2a8ff;
+  --code-def: #ffa657;
+  --code-con: #79c0ff;
   /* BLACK UNDER A CHANGE, 2026-08-23. Not #000: the app's own darkest
      ground is --bg #1a191b in the Lake and #131316 in plain dark, and a pure
      black beside either reads as a hole rather than as a surface. This is one
      step under the darker of the two, which is what an editor's own ground is
      doing when it looks black. MEASURED against the ink on it, --text #ecedee:
-     15.9:1, and against the five code colours: comment 4.98, keyword 6.46,
-     minus 5.62, plus 7.02, number 7.18, string 8.14, capitalised name 7.07 —
-     every one of them above 4.5, which is what the dark set was solved for on
-     #2e3136 and is why they did not have to move. INHERITED BY ALL SIXTEEN
+     15.9:1, minus 5.62 and plus 7.02; the syntax colours were measured on
+     this ground (see them above). INHERITED BY ALL SIXTEEN
      SKINS: the skin blocks layer over this one and none of them names it. */
   --code-ground: #0e0f12;
   /* Frosted, exactly the values the twenty drawings were made with. */
@@ -7602,6 +7615,9 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .t-kw { color: var(--code-kw); }
 .t-num { color: var(--code-num); }
 .t-typ { color: var(--code-typ); }
+.t-fn { color: var(--code-fn); }
+.t-def { color: var(--code-def); }
+.t-con { color: var(--code-con); }
 
 /* HOW A CHANGE IS HELD, AND IT IS ANSWERED.So flush is not a setting, it is
    what a change IS: no air, no corner, the file's own header on the window's
