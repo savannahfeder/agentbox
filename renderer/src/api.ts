@@ -454,7 +454,7 @@ export const api = {
   // Answers { ok } or { ok: false, error } in words (main/feedback.mjs).
   async sendFeedback(p: { text: string; files: { name: string; type: string; size: number; data: string }[] }): Promise<{ ok: boolean; error?: string }> {
     if (useFixtures) return { ok: true };
-    if (!window.zero?.sendFeedback) return { ok: false, error: 'Restart Agentbox to send feedback.' };
+    if (!window.zero?.sendFeedback) return { ok: false, error: `Restart ${Name} to send feedback.` };
     return window.zero.sendFeedback(p);
   },
 

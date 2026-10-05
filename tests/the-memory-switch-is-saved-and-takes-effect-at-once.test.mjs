@@ -13,6 +13,8 @@ import { join } from 'node:path';
 import { loadConfig } from '../main/config.mjs';
 import { setWorkspaceSetting, memoryGateSettings } from '../main/settings.mjs';
 import { NAME } from '../shared/product-name.mjs';
+import { totalmem } from 'node:os';
+import { autoSlots } from '../main/memory-gate.mjs';
 
 function withConfig(onDisk) {
   const appDir = mkdtempSync(join(tmpdir(), 'gate-settings-'));
@@ -61,7 +63,9 @@ describe('heavy commands at once', () => {
   it('is Auto until somebody picks a number, and a pick reaches the running coordinator', () => {
     const { config, onDisk } = withConfig({ memoryGate: true });
     const supervisor = fakeSupervisor();
-    expect(memoryGateSettings({ config, supervisor })).toMatchObject({ on: true, slots: null, slotsAuto: 2 });
+    expect(memoryGateSettings({ config, supervisor })).toMatchObject({ on: true, slots: null, slotsAuto: autoSlots(totalmem()) });
+    // Auto is worked out from THIS Mac's memory, so the number is that Mac's:
+    // a fixed 2 passed here and failed on GitHub's runner (c5bcb93).
     setWorkspaceSetting({ config, supervisor }, { key: 'memoryGateSlots', value: 3 });
     expect(onDisk().memoryGateSlots).toBe(3);
     expect(supervisor.calls).toEqual([['on', true]]);

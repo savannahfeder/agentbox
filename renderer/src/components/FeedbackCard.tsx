@@ -1,3 +1,4 @@
+import { Name } from '../../../shared/product-name.mjs';
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
 import { FEEDBACK_LIMITS, checkFeedback } from '../../../shared/feedback.mjs';
 import { CrossIcon } from './CrossIcon';
@@ -127,7 +128,7 @@ export function FeedbackCard({ onClose, onSend }: { onClose: () => void; onSend:
           <h2>Send feedback</h2>
           <button type="button" className="fb-close" aria-label="Close" title="Close · esc" onClick={onClose}><CrossIcon /></button>
         </div>
-        <p className="fb-sub">Goes straight to the Agentbox team.</p>
+        <p className="fb-sub">Goes straight to the {Name} team.</p>
         <div className="fb-box">
           <textarea ref={box} value={text} onChange={(e) => setText(e.target.value)} maxLength={FEEDBACK_LIMITS.text + 1}
             placeholder="What happened, and what did you expect?" aria-label="Your feedback" />
