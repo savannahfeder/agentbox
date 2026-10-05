@@ -216,7 +216,17 @@ export function tookLabel(change: Change): string {
 // ink. Five classes, five tokens in the stylesheet, so all sixteen skins answer
 // them in one place instead of each carrying a theme of its own.
 
-export type Tok = { c: '' | 'com' | 'str' | 'kw' | 'num' | 'typ'; s: string };
+//
+// FIVE WAS TOO FEW, 2026-10-05. With only those, a line like
+// `const [drawn, setDrawn] = useState<ReadonlySet<number>>(() => {` had two of
+// its nine words coloured, and she read the pane as "pretty much all gray":
+// "there are variables being instantiated and functions being run, and yet
+// we're not highlighting those." So three more, the three every editor has: a
+// function being run or defined (`fn`), a name being made (`def`) and a
+// constant in capitals (`con`). A property that is only read keeps its ink, on
+// purpose: colouring every word is a highlighter again.
+
+export type Tok = { c: '' | 'com' | 'str' | 'kw' | 'num' | 'typ' | 'fn' | 'def' | 'con'; s: string };
 
 const KEYWORDS = new Set([
   'const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while', 'of', 'in',
@@ -224,13 +234,41 @@ const KEYWORDS = new Set([
   'try', 'catch', 'finally', 'throw', 'typeof', 'instanceof', 'delete', 'void',
   'type', 'interface', 'enum', 'as', 'null', 'undefined', 'true', 'false', 'this',
   'switch', 'case', 'break', 'continue', 'do', 'yield', 'static', 'public', 'private',
+  'def', 'elif', 'lambda', 'None', 'True', 'False', 'pass', 'raise', 'with',
 ]);
 
+/** The words after which the next name, or every name in the next pattern, is being made. */
+const DECLARES = new Set(['const', 'let', 'var']);
+/** The words after which the next name is a function being defined. */
+const NAMES_A_FUNCTION = new Set(['function', 'def']);
+/** Built-in types, which are lower case and so would otherwise be ink. */
+const BUILTIN_TYPES = new Set(['number', 'string', 'boolean', 'bigint', 'symbol', 'object', 'any', 'unknown', 'never']);
+
 /**
- * One line of source, split into the five. Deliberately a lexer for one line and
- * not a parser: a diff hands you lines out of context, so anything with state
- * across lines (a block comment, a template literal) would be guessing. A line
- * that opens `/*` and never closes it simply keeps its ink.
+ * Whether the text right after a name runs it: `(`, `?.(`, or a type argument
+ * written against the name and closed before a `(`, as in `useState<T>(`. A
+ * comparison is not one: `a < b` has a space, and `&&`, `||` or a bracket
+ * inside the angle brackets is an expression, not a type.
+ */
+function runsAt(after: string): boolean {
+  if (/^\s*(\?\.)?\(/.test(after)) return true;
+  if (after[0] !== '<') return false;
+  let depth = 0;
+  for (let j = 0; j < Math.min(after.length, 120); j += 1) {
+    const ch = after[j];
+    if (ch === '<') depth += 1;
+    else if (ch === '>') { depth -= 1; if (depth === 0) return after[j + 1] === '('; }
+    else if (ch === '(' || ch === ')' || ch === ';') return false;
+    else if ((ch === '&' || ch === '|') && after[j + 1] === ch) return false;
+  }
+  return false;
+}
+
+/**
+ * One line of source, split into the kinds above. Deliberately a lexer for one
+ * line and not a parser: a diff hands you lines out of context, so anything
+ * with state across lines (a block comment, a template literal) would be
+ * guessing. A line that opens `/*` and never closes it simply keeps its ink.
  */
 export function tokenize(line: string): Tok[] {
   const out: Tok[] = [];
@@ -238,6 +276,16 @@ export function tokenize(line: string): Tok[] {
   let i = 0;
   let plain = '';
   const flush = () => { push('', plain); plain = ''; };
+  // What the last keyword promised about the next name: one being made, a
+  // function being defined, or (inside `[ ]` or `{ }` after `const`) a pattern
+  // of them, `depth` deep.
+  let declaring = false;
+  let naming = false;
+  let depth = 0;
+  // The inside of a `/** */` block is the one cross-line state that announces
+  // itself on every line: a leading `*` then a space, a `/` or nothing.
+  const lead = line.match(/^\s*(?=\*(\s|\/|$))/);
+  if (lead) { push('', lead[0]); push('com', line.slice(lead[0].length)); return out; }
   while (i < line.length) {
     const rest = line.slice(i);
     const two = rest.slice(0, 2);
@@ -256,14 +304,31 @@ export function tokenize(line: string): Tok[] {
     const word = rest.match(/^[A-Za-z_$][\w$]*/);
     if (word) {
       const w = word[0];
+      const after = rest.slice(w.length);
       flush();
-      if (KEYWORDS.has(w)) push('kw', w);
+      if (KEYWORDS.has(w)) {
+        push('kw', w);
+        declaring = DECLARES.has(w);
+        naming = NAMES_A_FUNCTION.has(w);
+      } else if (naming) { push('fn', w); naming = false; }
+      else if (declaring) { push('def', w); declaring = false; }
+      // In a pattern, `a: renamed` makes `renamed`; `a` is the key it reads.
+      else if (depth > 0) push(/^\s*:/.test(after) ? '' : 'def', w);
+      else if (BUILTIN_TYPES.has(w)) push('typ', w);
+      else if (w.length > 1 && /^[A-Z][A-Z0-9_]*$/.test(w)) push('con', w);
       else if (/^[A-Z]/.test(w)) push('typ', w);
+      else if (runsAt(after)) push('fn', w);
       else push('', w);
       i += w.length; continue;
     }
     const num = rest.match(/^\d[\d_.a-fA-FxX]*/);
     if (num) { flush(); push('num', num[0]); i += num[0].length; continue; }
+    if (two === '=>') { flush(); push('kw', two); i += 2; declaring = false; naming = false; continue; }
+    const ch = rest[0];
+    if (declaring && (ch === '[' || ch === '{')) { declaring = false; depth = 1; }
+    else if (depth > 0 && (ch === '[' || ch === '{')) depth += 1;
+    else if (depth > 0 && (ch === ']' || ch === '}')) depth -= 1;
+    else if (!/[\s*]/.test(ch)) { declaring = false; naming = false; }
     plain += rest[0];
     i += 1;
   }

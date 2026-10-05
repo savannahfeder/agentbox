@@ -275,7 +275,7 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
   const chosen = shownToPeople({
     visibility: valueOf<'team' | 'people' | 'private' | undefined>('visibility') ?? item.visibility,
     visibleTo: valueOf<string[] | undefined>('visibleTo') ?? item.visibleTo,
-  });
+  }, team?.products.get(item.product));
   const others = useMemo(() => teammates(team?.state.people ?? [], team?.me ?? null), [team]);
   const owner = ownerName(item, me, team?.byId ?? new Map());
   const ownerPerson = owner === 'You' ? null : team?.byId.get(item.createdBy ?? '') ?? null;

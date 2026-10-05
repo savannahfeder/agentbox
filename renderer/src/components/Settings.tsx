@@ -1121,7 +1121,7 @@ function ProjectTitle({ project, onRename }: {
 // agents work them, each row the door to that project's own page. It replaced
 // a plain index here and a separate Priority page (w-a514b58055).
 
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, account, onClose }: {
+export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, onClose }: {
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
@@ -1156,6 +1156,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   /** Team management, handed in by whoever has the team's state. Absent on a
    *  build with no team cloud, and then there is no Team row either. */
   teamPane?: ReactNode;
+  /** WHO SEES A PROJECT'S THREADS (w-b989839656), handed in the same way:
+   *  the button beside a project's name, and the Projects list's column.
+   *  Absent with nobody signed in, and then neither is drawn. */
+  projectShare?: (slug: string) => ReactNode;
+  projectWho?: (product: Product) => ReactNode;
   /** Who is signed in, for the Account group at the foot of General. Absent
    *  when nobody is, and then there is no group. */
   account?: { email: string; team?: string | null; onSignOut: () => void };
@@ -1441,6 +1446,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               ranked={ranked}
               details={projects}
               onSetOrder={onSetOrder}
+              who={projectWho}
               onOpen={(slug) => setPane({ project: slug })}
               onNew={onNewProject}
               archived={model?.archivedProjects ?? []}
@@ -2009,6 +2015,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   subject of the page rather than a label pointing at one, so
                   editing it in place is the obvious reading of a click. */}
               <ProjectTitle project={current} onRename={(name) => write(api.renameProject({ product: current.slug, name }))} />
+              {/* WHO SEES ITS THREADS, drawn as the answer (design 2B,
+                  w-b989839656). Handed in, like the Team pane: on a team
+                  build the window passes the button, and with nobody signed
+                  in there is nothing here. */}
+              {projectShare?.(current.slug)}
             </div>
             <p className="set-lede">Everything here is this project only. Other projects are unaffected.</p>
 

@@ -4,7 +4,9 @@
 //
 // Asks for three things: the Resend API key (hidden as you type), the email
 // feedback should reach, and the domain the mail is sent from (Enter takes the
-// suggestion). Everything else it works out:
+// suggestion). Run again, it asks only for the domain: the key and the email
+// are already saved on the server (`--new-key` replaces them). Everything else
+// it works out:
 //   - which Supabase project, from cloud/team.config.json;
 //   - signing in to Supabase, in the browser, only if you are not already.
 // Then it stores the secrets on the server function, deploys it (no Docker
@@ -27,7 +29,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   projectRefFrom, functionUrl, senderAt, domainOf, looksLikeDomain, refusedForDomain,
-  looksLikeResendKey, looksLikeEmail, secretsFile, withFeedbackUrl,
+  looksLikeResendKey, looksLikeEmail, secretsFile, withFeedbackUrl, savedSecrets,
 } from './lib/feedback-setup.mjs';
 
 const repo = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -52,8 +54,8 @@ async function ask(question, { hidden = false } = {}) {
 }
 async function askDomain(suggested) {
   for (;;) {
-    const typed = await ask(`Which domain should the mail come from? It must be listed under Domains in Resend [${suggested}]: `);
-    const domain = typed || suggested;
+    const typed = await ask(`Which domain should the mail come from? It must be listed under Domains in Resend${suggested ? ` [${suggested}]` : ''}: `);
+    const domain = typed || suggested || '';
     if (looksLikeDomain(domain)) return domain.toLowerCase();
     say('That does not look like a domain. It looks like updates.example.com.');
   }
@@ -94,30 +96,44 @@ const ref = projectRefFrom(JSON.parse(fs.readFileSync(configFile, 'utf8')).url);
 if (!ref) stop('cloud/team.config.json does not name a Supabase project.');
 if (supabase(['--version'], { quiet: true }).status !== 0) stop('The Supabase command is not installed. Run: brew install supabase/tap/supabase');
 
-// 2. The things only you know.
-let key = '';
-while (!looksLikeResendKey(key)) {
-  if (key) say('That does not look like a Resend key. It starts with re_.');
-  key = await ask('Paste your Resend API key (it stays hidden), then press Enter: ', { hidden: true });
-}
-say(`Got the key (${key.slice(0, 5)}…).`);
-let to = '';
-while (!looksLikeEmail(to)) {
-  if (to) say('That does not look like an email address.');
-  to = await ask('Which email should feedback go to? ');
-}
-let domain = await askDomain(domainOf(to));
-say(`Feedback will arrive from ${senderAt(domain)}.\n`);
-
-// 3. Signed in to Supabase? If not, it opens the browser once.
+// 2. Signed in to Supabase? If not, it opens the browser once.
 if (supabase(['projects', 'list'], { quiet: true }).status !== 0) {
   say('Signing you in to Supabase. A browser window will open.');
   if (supabase(['login']).status !== 0) stop('Supabase sign-in did not finish. Run npm run setup:feedback again.');
 }
 
-// 4. The secrets.
-say('Saving the key and addresses on the server…');
-if (!setSecrets(ref, secretsFile({ to, from: senderAt(domain), key }))) stop('Supabase did not take the secrets. The message above says why.');
+// 3. What is already saved. A run after the first must not ask for the key
+//    again ("Why do I have to add another key?"). `--new-key` replaces it.
+const newKey = process.argv.includes('--new-key');
+const listed = supabase(['secrets', 'list', '--project-ref', ref], { quiet: true });
+const saved = listed.status === 0 ? savedSecrets(listed.stdout) : new Set();
+const haveKey = !newKey && saved.has('RESEND_API_KEY') && saved.has('FEEDBACK_TO');
+
+// 4. Only what is missing.
+let to = '';
+let domain;
+if (haveKey) {
+  say('Your Resend key and email are already saved, so I will not ask for them again.');
+  domain = await askDomain(null);
+  say(`Feedback will arrive from ${senderAt(domain)}.\n`);
+  say('Saving the sender on the server…');
+  if (!setSecrets(ref, `FEEDBACK_FROM="${senderAt(domain)}"\n`)) stop('Supabase did not take the sender. The message above says why.');
+} else {
+  let key = '';
+  while (!looksLikeResendKey(key)) {
+    if (key) say('That does not look like a Resend key. It starts with re_.');
+    key = await ask('Paste your Resend API key (it stays hidden), then press Enter: ', { hidden: true });
+  }
+  say(`Got the key (${key.slice(0, 5)}…).`);
+  while (!looksLikeEmail(to)) {
+    if (to) say('That does not look like an email address.');
+    to = await ask('Which email should feedback go to? ');
+  }
+  domain = await askDomain(domainOf(to));
+  say(`Feedback will arrive from ${senderAt(domain)}.\n`);
+  say('Saving the key and addresses on the server…');
+  if (!setSecrets(ref, secretsFile({ to, from: senderAt(domain), key }))) stop('Supabase did not take the secrets. The message above says why.');
+}
 
 // 5. The function itself.
 say('Putting the feedback function online…');
@@ -138,7 +154,8 @@ for (let tries = 1; ; tries += 1) {
   if (sent.ok) break;
   if (refusedForDomain(sent.detail) && tries < 4) {
     say(`Resend refused that domain: ${sent.detail}`);
-    domain = await askDomain(domain === domainOf(to) ? `updates.${domain}` : domain);
+    // A bare domain refused usually means a subdomain of it is the verified one.
+    domain = await askDomain(domain.split('.').length === 2 ? `updates.${domain}` : null);
     if (!setSecrets(ref, `FEEDBACK_FROM="${senderAt(domain)}"\n`)) stop('Supabase did not take the new sender. The message above says why.');
     // A changed secret reaches the next fresh worker; give it a moment.
     await new Promise((r) => setTimeout(r, 4000));
@@ -148,5 +165,5 @@ for (let tries = 1; ; tries += 1) {
 }
 rl.close();
 
-say(`\n✓ Done. Check ${to} for "Agentbox feedback: Test from npm run setup:feedback".`);
+say(`\n✓ Done. Check ${to || 'your inbox'} for "Agentbox feedback: Test from npm run setup:feedback".`);
 say('  Quit and reopen Agentbox so it picks up the new address.');

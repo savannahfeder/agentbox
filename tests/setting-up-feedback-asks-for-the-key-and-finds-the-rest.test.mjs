@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import {
   projectRefFrom, functionUrl, senderFor, senderAt, domainOf, looksLikeDomain, refusedForDomain,
-  looksLikeResendKey, looksLikeEmail, secretsFile, withFeedbackUrl,
+  looksLikeResendKey, looksLikeEmail, secretsFile, withFeedbackUrl, savedSecrets,
 } from '../scripts/lib/feedback-setup.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -89,6 +89,41 @@ describe('it sends from a domain Resend has verified', () => {
     const script = read('scripts/set-up-feedback.mjs');
     expect(script).toContain('refusedForDomain(');
     expect(script).toMatch(/Which domain should the mail come from\?/);
+  });
+});
+
+// A SECOND RUN DOES NOT ASK FOR THE KEY AGAIN (2026-10-05). After the domain
+// fix the instructions said to paste the key again, and the answer was "Why do
+// I have to add another key? Already went through the effort of giving you a
+// prev one". The key from the first run was already saved on the server. So the
+// setup reads which secrets are saved (names only; Supabase never shows the
+// values back) and asks only for what is missing. `--new-key` replaces them.
+describe('it does not ask again for what is already saved', () => {
+  it('reads the saved names out of the list Supabase prints', () => {
+    const table = `
+         NAME           │ DIGEST
+  ──────────────────────┼──────────
+    FEEDBACK_FROM       │ 1a2b3c
+    FEEDBACK_TO         │ 4d5e6f
+    RESEND_API_KEY      │ 7a8b9c
+    SUPABASE_URL        │ 0d1e2f`;
+    expect([...savedSecrets(table)].sort()).toEqual(['FEEDBACK_FROM', 'FEEDBACK_TO', 'RESEND_API_KEY']);
+  });
+  it('reads them out of JSON too', () => {
+    expect([...savedSecrets('[{"name":"RESEND_API_KEY","value":"abc"}]')]).toEqual(['RESEND_API_KEY']);
+  });
+  it('does not mistake a longer name for one of ours', () => {
+    expect(savedSecrets('OLD_RESEND_API_KEY_BACKUP  │ 123').has('RESEND_API_KEY')).toBe(false);
+  });
+  it('finds nothing in nothing', () => {
+    expect(savedSecrets('').size).toBe(0);
+    expect(savedSecrets(undefined).size).toBe(0);
+  });
+  it('the script lists the secrets and asks for the key only when it is missing or --new-key is given', () => {
+    const script = read('scripts/set-up-feedback.mjs');
+    expect(script).toContain("'secrets', 'list'");
+    expect(script).toMatch(/const haveKey = !newKey && saved\.has\('RESEND_API_KEY'\) && saved\.has\('FEEDBACK_TO'\)/);
+    expect(script).toContain("'--new-key'");
   });
 });
 
