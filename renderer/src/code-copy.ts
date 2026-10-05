@@ -29,6 +29,26 @@
 // below, the same way it is refused a caret.
 
 /**
+ * WHICH OF THE ROWS A SELECTION TOUCHES GO ON THE CLIPBOARD, by index, or
+ * null to leave the copy to the browser.
+ *
+ * `removed` is one flag per touched row, in the order drawn. The count is of
+ * EVERY touched row, removed ones included: counting only the surviving ones
+ * called a removed line plus its replacement "one line", stood aside, and the
+ * browser copied nothing, so the paste brought back whatever was on the
+ * clipboard before (2026-10-04,
+ * tests/a-copy-across-a-removed-line-takes-what-was-selected.test.mjs).
+ *
+ * Removed rows are skipped when any surviving row is selected; when only
+ * removed rows are, she chose them, and they are what she gets.
+ */
+export function linesToCopy(removed: boolean[]): number[] | null {
+  if (removed.length < 2) return null;
+  const live = removed.map((r, i) => (r ? -1 : i)).filter((i) => i >= 0);
+  return live.length ? live : removed.map((_, i) => i);
+}
+
+/**
  * The text of a run of lines, clipped at both ends the way a selection is.
  *
  * `lines` is every line the selection touches, in the order drawn.

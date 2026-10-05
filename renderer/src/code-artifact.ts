@@ -435,6 +435,34 @@ export function filesInTreeOrder(files: ChangedFile[]): ChangedFile[] {
 }
 
 /**
+ * WHERE AN ARROW ON THE TREE GOES, as a path, or null for nowhere.
+ *
+ * `shown` is the files the tree draws (folding hides some), `all` every file in
+ * the change in the same order. She may be standing in a file the tree is not
+ * showing, because folding never moves her (since 2026-10-04,
+ * tests/folding-the-tree-never-moves-the-code.test.mjs); then down is the next
+ * file shown after hers and up the one before, rather than the top.
+ */
+export function stepInTree(key: string, path: string | null, shown: string[], all: string[]): string | null {
+  if (!shown.length) return null;
+  if (key === 'Home') return shown[0];
+  if (key === 'End') return shown[shown.length - 1];
+  if (key !== 'ArrowDown' && key !== 'ArrowUp') return null;
+  const down = key === 'ArrowDown';
+  const here = path ? shown.indexOf(path) : -1;
+  if (here >= 0) {
+    const to = here + (down ? 1 : -1);
+    return to >= 0 && to < shown.length ? shown[to] : null;
+  }
+  const rank = new Map(all.map((p, i) => [p, i]));
+  const mine = path ? rank.get(path) ?? -1 : -1;
+  const pick = down
+    ? shown.find((p) => (rank.get(p) ?? -1) > mine)
+    : [...shown].reverse().find((p) => (rank.get(p) ?? -1) < mine);
+  return pick ?? null;
+}
+
+/**
  * The agent's sentence over a change, trimmed to one line's worth.
  *
  * MEASURED ON HER MAC, 2026-08-23: 4,442 file-writing tool calls across the

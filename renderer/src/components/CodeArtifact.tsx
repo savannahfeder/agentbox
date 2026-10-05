@@ -20,12 +20,12 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import {
-  BATCH_ROWS, changeSummary, filesInTreeOrder, fillNext, firstBatch, hunkView, hunkViewAt, linesSkipped, rowSlices, sliceGuessPx, tokenize, tookLabel, treeRows, visibleRows,
+  BATCH_ROWS, changeSummary, filesInTreeOrder, fillNext, firstBatch, hunkView, hunkViewAt, linesSkipped, rowSlices, sliceGuessPx, stepInTree, tokenize, tookLabel, treeRows, visibleRows,
   type Change, type ChangedFile, type Hunk,
 } from '../code-artifact';
-import { copiedText } from '../code-copy';
+import { copiedText, linesToCopy } from '../code-copy';
 import { applySplices, savedLine, unsavedIn, type Row as EditRow } from '../code-edit';
-import { caretStep, codeScroll, editsAcrossLines, extendHead, extendsSelection, fileOnScreen, inputChangesText, walkFiles, type Head } from '../code-keys';
+import { caretStep, codeScroll, editsAcrossLines, extendHead, extendsSelection, fileOnScreen, inputChangesText, type Head } from '../code-keys';
 
 /*
  * ------------------------- the caret, in the DOM ---------------------------
@@ -106,22 +106,6 @@ function allLines(): HTMLElement[] {
 }
 
 /**
- * The lines of the change a selection reaches into, in the order drawn.
- *
- * THE REMOVED LINES ARE NOT AMONG THEM, and that is round four's correction.
- * code-copy.ts has said since it was written that a red line is skipped
- * "by the caller"; nothing skipped it. Measured 2026-08-27: dragging across a
- * deleted line and pasting handed back `const MAX_ROWS = 600;`, a line that is
- * not in the file any more. A copy out of a diff exists to be pasted into
- * code, so a line that no longer exists must never come with it.
- */
-function linesInRange(range: Range): HTMLElement[] {
-  return allLines()
-    .filter((el) => range.intersectsNode(el))
-    .filter((el) => !el.closest('.code-row')?.classList.contains('cr-minus'));
-}
-
-/**
  * How many lines of the change the selection is standing on right now.
  *
  * Two or more is the case an edit cannot serve: the browser's delete and its
@@ -131,7 +115,7 @@ function linesInRange(range: Range): HTMLElement[] {
  *
  * It counts every line the range touches, INCLUDING the removed ones, because
  * the question here is what she has under her hands, not what a copy would
- * hand back. linesInRange drops the red lines for the clipboard's sake; a
+ * hand back. linesToCopy drops the red lines for the clipboard's sake; a
  * selection that reaches across one is still a selection across lines.
  */
 function selectedLineCount(): number {
@@ -401,7 +385,21 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   // between two, which is why a shift-click across lines took only one.
   const clickAnchor = useRef<{ line: HTMLElement; col: number } | null>(null);
 
-  const current = fileRows[Math.min(at, Math.max(0, fileRows.length - 1))];
+  // WHERE SHE STANDS IS A FILE OF THE WHOLE CHANGE, NOT A ROW OF THE TREE.
+  // It was a position in the visible tree, so folding a folder made the same
+  // position name another file and the code jumped there: 2,739 to 20,787,
+  // measured 2026-10-04. `files` never changes when the tree folds.
+  const current = files[Math.min(at, Math.max(0, files.length - 1))];
+  // A press on a file always jumps, the one she is on included, which bare
+  // `at` cannot say when it does not change.
+  const [jump, setJump] = useState(0);
+  const goTo = (path: string) => {
+    const i = files.findIndex((f) => f.path === path);
+    if (i < 0) return;
+    fromScroll.current = false;
+    setAt(i);
+    setJump((n) => n + 1);
+  };
 
   // HOW MANY FILES HAVE THEIR CODE DRAWN. A big change opens on its first
   // screenful and the rest is drawn in the idle moments straight after, so
@@ -414,7 +412,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
     const at0 = Math.max(0, files.findIndex((f) => f.path === startAt));
     return new Set(Array.from({ length: firstBatch(files, 0) }, (_, i) => i).concat(at0));
   });
-  const hereIndex = files.findIndex((f) => f.path === current?.path);
+  const hereIndex = at;
   useEffect(() => {
     if (drawn.size >= files.length) return;
     // NEAREST TO HER FIRST. The file she is on is urgent; anything else waits
@@ -656,11 +654,10 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       // thing from anywhere in the pane and were taken off it.
       const onTree = !!el?.closest?.('.code-tree');
       if (onTree && !e.metaKey) {
-        const to = walkFiles(e.key, at, fileRows.length);
+        const to = stepInTree(e.key, current?.path ?? null, fileRows.map((r) => (r as { path: string }).path), files.map((f) => f.path));
         if (to != null) {
           e.preventDefault();
-          fromScroll.current = false;
-          setAt(to);
+          goTo(to);
           return;
         }
       }
@@ -724,7 +721,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('beforeinput', onInput, true);
     };
-  }, [fileRows.length, current?.key, at, saveAll, settle]);
+  }, [fileRows, files, current?.path, at, saveAll, settle]);
 
   /*
    * ------------- SELECTING SOME OF THE CHANGE, AND COPYING IT ---------------
@@ -830,10 +827,13 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
       const range = sel.getRangeAt(0);
-      const lines = linesInRange(range);
-      // ONE LINE IS THE BROWSER'S. It has no gutter in it and no header, so
+      // ONE ROW IS THE BROWSER'S. It has no gutter in it and no header, so
       // there is nothing here to improve and every reason not to interfere.
-      if (lines.length < 2) return;
+      // The count is of every row touched, removed ones too: see linesToCopy.
+      const touched = allLines().filter((el) => range.intersectsNode(el));
+      const plan = linesToCopy(touched.map((el) => !!el.closest('.code-row')?.classList.contains('cr-minus')));
+      if (!plan) return;
+      const lines = plan.map((i) => touched[i]);
       const first = lines[0];
       const last = lines[lines.length - 1];
       const texts = lines.map((el) => el.textContent ?? '');
@@ -869,10 +869,8 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   // anyway — but nothing should ever send one, because the chip is only drawn
   // when the change holds the file (fileInChange, shared/work-lines.mjs).
   useEffect(() => {
-    if (!startAt) return;
-    const n = fileRows.findIndex((f) => f.path === startAt);
-    if (n >= 0) { fromScroll.current = false; setAt(n); }
-  }, [startAt, startAtFrom, fileRows.length]);
+    if (startAt) goTo(startAt);
+  }, [startAt, startAtFrom, files]);
 
   // The file she walked to comes to the top of the running column — UNLESS the
   // tree only moved because she scrolled there herself, in which case pulling
@@ -947,7 +945,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       if (r.top < t.top) tree.scrollTop += r.top - t.top;
       else if (r.bottom > t.bottom) tree.scrollTop += r.bottom - t.bottom;
     }
-  }, [current?.path]);
+  }, [current?.path, jump]);
 
   // THE TREE FOLLOWS HER EYE, and before this it simply did not. Measured on
   // the real pane: scrolled 12,240px down into renderer/src/fixtures.ts, the
@@ -976,11 +974,11 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
     const body = bodyRef.current;
     if (!body) return;
     const top = body.getBoundingClientRect().top;
-    offsets.current = fileRows.map((f) => {
+    offsets.current = files.map((f) => {
       const block = heads.current.get(f.path)?.parentElement;
       return block ? block.getBoundingClientRect().top - top + body.scrollTop : Number.POSITIVE_INFINITY;
     });
-  }, [fileRows]);
+  }, [files]);
 
   useEffect(() => {
     const body = bodyRef.current;
@@ -1032,7 +1030,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       window.removeEventListener('keydown', release);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [fileRows, measureFiles]);
+  }, [files, measureFiles]);
 
   const took = tookLabel(change);
   // Recomputed off the ref every time the dirty stamp moves, which is on blur
@@ -1056,7 +1054,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
           the picker. It is `aria-hidden` and takes no pointer, because the select
           underneath it is still the whole control. */}
       <div className="code-file-pick">
-        <select className="code-file-picker" aria-label="File to review" value={current?.path ?? fileRows[0]?.path ?? ''} onChange={e => { fromScroll.current = false; setAt(fileRows.findIndex(f => f.path === e.target.value)); }}>{fileRows.map(file => <option key={file.path} value={file.path}>{file.path}{unsaved.has(file.path) ? ' · Unsaved' : ''}</option>)}</select>
+        <select className="code-file-picker" aria-label="File to review" value={current?.path ?? files[0]?.path ?? ''} onChange={e => goTo(e.target.value)}>{files.map(file => <option key={file.path} value={file.path}>{file.path}{unsaved.has(file.path) ? ' · Unsaved' : ''}</option>)}</select>
         <svg className="code-pick-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
       </div>
       <div className="code-tree">
@@ -1074,23 +1072,11 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
               onClick={() => {
                 const next = new Set(shut);
                 if (next.has(row.key)) next.delete(row.key); else next.add(row.key);
-                // WHERE SHE IS STANDING IS A FILE, NOT A NUMBER. `at` indexes
-                // the file rows that are DRAWN, and folding a folder takes rows
-                // out of that list, so the same number afterwards points at a
-                // different file. Measured on the real pane 2026-08-27:
-                // standing on Rail.tsx, folding a folder she was not even in
-                // moved the tree to Shelf.tsx — and the mark that opens a file
-                // in her editor reads exactly this, so it would then have
-                // opened Shelf.tsx.
-                //
-                // Folding the folder she IS in is a different question and is
-                // left alone: her file is genuinely off the screen, and the
-                // clamp below `current` is what catches her.
-                const wasPath = current?.path ?? null;
-                const found = wasPath
-                  ? visibleRows(rows, next).filter((r) => r.kind === 'file').findIndex((f) => f.path === wasPath)
-                  : -1;
-                if (found >= 0 && found !== at) setAt(found);
+                // FOLDING MOVES NOTHING BUT THE TREE. `at` indexes every file of
+                // the change, which folding does not touch, so she stays on the
+                // file she was reading whether the folder is hers or not. It
+                // used to index the drawn rows, and folding her own folder
+                // threw the code from 2,739 to 20,787 (2026-10-04).
                 setShut(next);
               }}
             >
@@ -1108,7 +1094,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
               title={row.path}
               // Pressing a file is her ASKING to be taken there, so the column
               // does move to it — the opposite of the scroll case above.
-              onClick={() => { fromScroll.current = false; setAt(fileRows.findIndex((f) => f.path === row.path)); }}
+              onClick={() => goTo(row.path)}
             >
               <span className="code-node-name">{row.label}</span>
               {unsaved.has(row.path)
