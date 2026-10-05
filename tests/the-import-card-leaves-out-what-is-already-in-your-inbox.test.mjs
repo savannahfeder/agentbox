@@ -70,4 +70,12 @@ describe('the card', () => {
     expect(CARD.allIn(1)).toBe('The one conversation from the last ten days is already in your inbox.');
     expect(card).toMatch(/alreadyIn > 0 \? CARD\.allIn\(alreadyIn\)/);
   });
+  // Seen in the real app: "No agents to bring across yet." over "All 5 ... are
+  // already in your inbox." read as two answers to one question.
+  it('heads that card as nothing new, not as nothing at all', () => {
+    expect(CARD.headAllIn).toBe('Nothing new to bring across.');
+    expect(CARD.laterAllIn).toBe('When there is more, press ⌘K and type import.');
+    expect(card).toMatch(/alreadyIn > 0 \? CARD\.headAllIn : CARD\.headNone/);
+    expect(card).toMatch(/alreadyIn > 0 \? CARD\.laterAllIn : CARD\.noneLater/);
+  });
 });

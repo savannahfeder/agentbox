@@ -664,7 +664,7 @@ export function ImportAgents({ products, filter, walk, onDone, onNewProject, onP
                on 08-24: a headline offering agents over a line saying
                there were none. Now the headline is the answer and the lines
                under it say where {NAME} looked. */
-            <h1 className="ia-head">{read && !some ? CARD.headNone : CARD.head}</h1>
+            <h1 className="ia-head">{read && !some ? (alreadyIn > 0 ? CARD.headAllIn : CARD.headNone) : CARD.head}</h1>
           )}
           {/* ALL AND NONE WERE HERE AND THEY ARE DELETED (2026-08-26).
 
@@ -705,7 +705,7 @@ export function ImportAgents({ products, filter, walk, onDone, onNewProject, onP
         {read && !some && (
           <div className="ia-none">
             <p className="ia-none-where">{alreadyIn > 0 ? CARD.allIn(alreadyIn) : CARD.noneWhere(SECTION.homeFolder)}</p>
-            <p className="ia-none-later">{CARD.noneLater}</p>
+            <p className="ia-none-later">{alreadyIn > 0 ? CARD.laterAllIn : CARD.noneLater}</p>
             <button type="button" className="ia-look-again" onClick={lookAgain} disabled={looking}>
               {looking ? CARD.looking : CARD.lookAgain}
             </button>

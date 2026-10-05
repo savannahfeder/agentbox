@@ -124,6 +124,8 @@ export const CARD = {
   allIn: (n: number) => n === 1
     ? 'The one conversation from the last ten days is already in your inbox.'
     : `All ${n} conversations from the last ten days are already in your inbox.`,
+  headAllIn: 'Nothing new to bring across.',
+  laterAllIn: 'When there is more, press ⌘K and type import.',
   /**
    * AND THE WAY TO ASK AGAIN WITHOUT LEAVING. a tester's case, 2026-08-24, is
    * the one this is for: Claude Code was installed in front of her while the
