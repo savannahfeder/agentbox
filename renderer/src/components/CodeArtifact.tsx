@@ -310,7 +310,12 @@ function HunkRows({ hunk, editable, pending, onEdit, onDone }: {
 // works: `file` comes out of a useMemo, `pending` is a map held in a ref,
 // and both handlers are useCallbacks with no dependencies. A fresh closure in
 // any one of them would defeat this exactly the way it would defeat CodeLine.
-const FileHunks = memo(function FileHunks({ file, pending, onEdit, onDone, readFile, onNotice }: {
+type Gap = { from: number; lines: string[] };
+
+const FileHunks = memo(function FileHunks({ file, pending, onEdit, onDone, readFile, onNotice, gaps }: {
+  // The gaps opened in this file, held by the pane so folding the file and
+  // opening it again does not close them. The same Map for the life of the pane.
+  gaps: Map<number, Gap>;
   file: ChangedFile;
   // What the user typed into this file and has not saved, by hunk. Null is ordinary.
   pending?: Map<number, Map<number, string>> | null;
@@ -322,13 +327,14 @@ const FileHunks = memo(function FileHunks({ file, pending, onEdit, onDone, readF
 }) {
   // THE GAPS SHE HAS OPENED, by the index of the hunk below each one: the
   // lines read off the disk and the number the first of them has.
-  const [opened, setOpened] = useState<Map<number, { from: number; lines: string[] }>>(() => new Map());
+  const [opened, setOpened] = useState<Map<number, Gap>>(() => new Map(gaps));
   const openGap = async (i: number) => {
     const read = await readFile(file.path);
     if (!read.ok || typeof read.text !== 'string') { onNotice(read.error ?? `${file.path} could not be read.`); return; }
     const r = hiddenLines(read.text, file.hunks[i - 1], file.hunks[i]);
     if (!r.ok) { onNotice(r.error); return; }
-    setOpened((was) => new Map(was).set(i, { from: r.from, lines: r.lines }));
+    gaps.set(i, { from: r.from, lines: r.lines });
+    setOpened(new Map(gaps));
   };
   return (
     <>
@@ -423,6 +429,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   // A press on a file always jumps, the one she is on included, which bare
   // `at` cannot say when it does not change.
   const [jump, setJump] = useState(0);
+  const seenJump = useRef(0);
   // THE FILES SHE HAS FOLDED SHUT FROM THEIR HEADER, which is how a reviewer
   // says "done with this one" (2026-10-04,
   // tests/a-file-folds-shut-from-its-header.test.mjs). Folding the file she is
@@ -544,6 +551,13 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   noticeRef.current = onNotice;
   const notice = useCallback((text: string) => noticeRef.current(text), []);
   const readFile = useCallback((path: string) => api.codeFile({ product, src, path }), [product, src]);
+  // One Map of opened gaps per file, the same one every render.
+  const gapStore = useRef(new Map<string, Map<number, Gap>>());
+  const gapsFor = (path: string) => {
+    let m = gapStore.current.get(path);
+    if (!m) { m = new Map(); gapStore.current.set(path, m); }
+    return m;
+  };
 
   const dirtyFiles = () => unsavedIn(edits.current);
 
@@ -719,7 +733,9 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
           e.preventDefault();
           const top = body.getBoundingClientRect().top;
           const headH = (body.querySelector('.code-file-head') as HTMLElement | null)?.offsetHeight ?? 0;
-          const starts = [...body.querySelectorAll<HTMLElement>('.code-hunk-block, .code-unfilled')]
+          // The hunk's own rows, not its block: opened lines sit at the top of
+          // the block, and aiming there landed ] on unchanged code.
+          const starts = [...body.querySelectorAll<HTMLElement>('.code-hunk, .code-unfilled')]
             .map((b) => b.getBoundingClientRect().top - top + body.scrollTop - headH);
           const to = nextChange(starts, body.scrollTop, e.key === ']' ? 1 : -1);
           if (to != null) body.scrollTop = Math.max(0, to);
@@ -957,8 +973,14 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   // her hand. `fromScroll` is which of the two happened.
   useEffect(() => {
     if (!current) return;
-    const cameFromScroll = fromScroll.current;
-    if (cameFromScroll) fromScroll.current = false;
+    // A JUMP SHE ASKED FOR IS KNOWN BY ITS OWN COUNTER. `fromScroll` is set
+    // inside a scroll's state update, and one queued in the same render as a
+    // jump flipped it back on after goTo cleared it, so Home marked the first
+    // file and left the code where it was (2026-10-04, twice in two).
+    const asked = jump !== seenJump.current;
+    seenJump.current = jump;
+    const cameFromScroll = fromScroll.current && !asked;
+    fromScroll.current = false;
     if (!cameFromScroll) {
       // NOTHING OUTSIDE THE RUNNING COLUMN MOVES. This was `scrollIntoView`,
       // which walks EVERY scrollable ancestor it can find and scrolls each one,
@@ -1238,6 +1260,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
                 onDone={settle}
                 readFile={readFile}
                 onNotice={notice}
+                gaps={gapsFor(file.path)}
               />
             ) : (
               <div className="code-unfilled" style={{ height: sliceGuessPx(file.hunks.reduce((n, h) => n + h.rows.length, 0)) }} />
