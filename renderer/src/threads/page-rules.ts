@@ -369,7 +369,7 @@ export function rowSharing(
   if (!team || !product || isDirect(product) || item.agent) return null;
   if (item.createdBy && item.createdBy !== team.me) return null;
   if (!shownToTeam(item, team.since ?? null, product)) return 'private';
-  return shownToPeople(item).length ? 'people' : 'team';
+  return shownToPeople(item, product).length ? 'people' : 'team';
 }
 
 /**

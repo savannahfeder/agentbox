@@ -185,11 +185,11 @@ export function ownerName(item: Pick<WorkItem, 'createdBy'>, me: string | null, 
  * it asks the same rule the Team page does (shared/thread-cards.mjs
  * shownToTeam), and an old thread nobody shared reads "Only you".
  */
-// And in your personal project a thread with no word of its own is "Only you"
-// (shared/thread-cards.mjs visibilityOf, w-b989839656).
-export function whoSees(item: Pick<WorkItem, 'visibility' | 'visibleTo' | 'createdAt'>, since: number | null, product?: { personal?: boolean } | null): Seen {
+// And a thread with no word of its own reads as its project does
+// (shared/thread-cards.mjs projectSeenBy, w-b989839656).
+export function whoSees(item: Pick<WorkItem, 'visibility' | 'visibleTo' | 'createdAt'>, since: number | null, product?: { personal?: boolean; seenBy?: string; seenByPeople?: string[] } | null): Seen {
   if (!shownToTeam(item, since, product)) return 'private';
-  return shownToPeople(item).length ? 'people' : 'team';
+  return shownToPeople(item, product).length ? 'people' : 'team';
 }
 
 export type Seen = 'team' | 'people' | 'private';

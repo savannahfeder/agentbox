@@ -844,6 +844,15 @@ export const api = {
     return zero.projectIconClear(p);
   },
 
+  // Who sees a project's threads on the Team page (w-b989839656). The
+  // snapshot that follows carries it back, so this answers only whether it
+  // landed.
+  async setProjectSeenBy(p: { product: string; who: 'private' | 'team' | 'people'; people?: string[] }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.projectSeenBy) return { ok: false, error: RESTART_NOTE };
+    return zero.projectSeenBy(p);
+  },
+
   // Archive a project (off every list, files kept) or bring one back.
   async archiveProject(p: { product: string; archived: boolean }): Promise<Settings> {
     if (useFixtures) {
