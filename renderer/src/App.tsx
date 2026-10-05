@@ -3726,6 +3726,11 @@ export default function App() {
     // these would be a write into nothing. Both behave like a task in every way
     // she can see and in none that she cannot.
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
+    // A MESSAGE STILL IN ITS THREE SECONDS IS WRITTEN BEFORE THE STOP. Held, it
+    // landed after the kill, read as a reply sent after stopping, reopened the
+    // row and started a fresh run on it two minutes later (2026-10-05).
+    // tests/a-message-still-sending-lands-before-the-stop.test.mjs
+    await flushPending();
     const wasRunning = working(item);
     setFollowing({ product: item.product, id: item.id });
     await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
@@ -3734,7 +3739,7 @@ export default function App() {
       ? 'Agent stopped. Back in your inbox. Reply to redirect it.'
       : 'Stopped before it started. Back in your inbox. Reply to redirect it.');
     await refresh();
-  }, [refresh, showToast, working]);
+  }, [refresh, showToast, working, flushPending]);
 
   // RUN NOW, from the three-dot menu or ⌘K on a waiting task (supervisor.runNow).
   // Offered on anything In progress with nothing running (run-now.ts), so a
