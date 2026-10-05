@@ -1677,6 +1677,42 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                  */}
                 <Stepper label="Agents at once" value={w.sessionsAtOnce} min={1} max={w.slotsMax ?? 12} onChange={(v) => setWorkspace('sessionsAtOnce', v)} />
               </Row>
+              {/* HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). An agent
+                  waiting on the model costs a few hundred MB; one running tests
+                  or a build costs a gigabyte or more, so the number that runs
+                  out is heavy commands, not agents. With this on, every shell
+                  command asks first and heavy ones wait their turn, urgent
+                  first. Off out of the box. The sentence about right now rides
+                  on the description so the row stays one line of controls. */}
+              {w.memoryGate && (
+                <Row
+                  label="Hold heavy work when memory is short"
+                  /* Codex workers do not carry the check yet: Codex runs a hook
+                     only once it is trusted, and its app-server is shared by
+                     every thread. Said only where Codex can be chosen at all. */
+                  desc={`${twoEngines ? 'Claude Code agents' : 'Agents'} run tests, builds and other heavy commands a few at a time while this Mac is short of memory, urgent tasks first. Everything else runs as normal.${twoEngines ? ' Codex agents are not held yet.' : ''}${w.memoryGate.on && w.memoryGate.now ? ` ${w.memoryGate.now}` : ''}`}
+                >
+                  <Switch label="Hold heavy work when memory is short" on={w.memoryGate.on} onChange={(v) => setWorkspace('memoryGate', v)} />
+                </Row>
+              )}
+              {w.memoryGate?.on && (
+                <Row
+                  label="Heavy commands at once"
+                  desc={w.memoryGate.slots === null
+                    ? `Auto: ${w.memoryGate.slotsAuto} on this Mac, one for every 8 GB of memory.`
+                    : `You picked ${w.memoryGate.slots}. Auto is ${w.memoryGate.slotsAuto} on this Mac.`}
+                >
+                  {/* Stepping back onto Auto's own number IS Auto, so there is
+                      always a way back without a second control. */}
+                  <Stepper
+                    label="Heavy commands at once"
+                    value={w.memoryGate.slots ?? w.memoryGate.slotsAuto}
+                    min={1}
+                    max={w.memoryGate.slotsMax}
+                    onChange={(v) => setWorkspace('memoryGateSlots', v === w.memoryGate?.slotsAuto ? null : v)}
+                  />
+                </Row>
+              )}
               {/* THE CODING AGENT IS CHOSEN ON THE CARD (w-12081d32cc). A row
                   offering Claude Code or Codex stood here until 2026-09-23, on
                   a Mac that had both. The new task card asks the same question

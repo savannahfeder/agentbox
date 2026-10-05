@@ -14,7 +14,7 @@ import { productRankScore } from '../../../shared/rank.mjs';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
-/** All, Hide private ('shared'), or Only private. */
+/** Privacy: Private, Shared, or neither picked ('any'). */
 export type Privacy = 'any' | 'shared' | 'private';
 export interface Display {
   view: 'list' | 'board';
@@ -47,6 +47,11 @@ export function keepsPrivacy(seen: Seen | null | undefined, privacy: Privacy | u
   if (privacy === 'private') return seen === 'private';
   return true;
 }
+
+/** A click on Private or Shared picks it, and a click on the lit one lets go,
+ *  the way the Priority line works. */
+export const nextPrivacy = (now: Privacy | undefined, clicked: Exclude<Privacy, 'any'>): Privacy =>
+  (now === clicked ? 'any' : clicked);
 
 // ONE CHOICE FOR THE WHOLE PAGE, not one per half of it. Each half remembers
 // its own view and filters, and a privacy choice kept in only one of them

@@ -759,6 +759,12 @@ export interface WorkspaceSettings {
    *  null once somebody is already at or under it. Main's words, not the
    *  page's. */
   machineNote?: string | null;
+  /**
+   * HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). `slots` is the number
+   * of heavy commands at once somebody picked, null for Auto; `slotsAuto` is
+   * what Auto is on this Mac; `now` is one sentence about right now, null while
+   * it is off. Optional so an older payload still draws the page it drew. */
+  memoryGate?: { on: boolean; slots: number | null; slotsAuto: number; slotsMax: number; now: string | null };
   capacity: number;
   running: number;
   model: string | null;

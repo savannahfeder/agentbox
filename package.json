@@ -42,6 +42,7 @@
     "scripts/before-publish.mjs",
     "scripts/after-install.mjs",
     "scripts/approval-server.sh",
+    "scripts/memory-gate-hook.sh",
     "worker-permissions.json",
     "LICENSE",
     "README.md"
@@ -123,12 +124,14 @@
       "!briefs/writing-rules.md",
       "worker-permissions.json",
       "scripts/approval-server.sh",
+      "scripts/memory-gate-hook.sh",
       "renderer/dist/**/*",
       "package.json"
     ],
     "asarUnpack": [
       "worker-permissions.json",
       "scripts/approval-server.sh",
+      "scripts/memory-gate-hook.sh",
       "node_modules/node-pty/**"
     ],
     "mac": {
