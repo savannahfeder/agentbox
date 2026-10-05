@@ -108,7 +108,7 @@ import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name
 import { signInFiles, signInStamp } from './sign-in-files.mjs';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath } from './memory-gate-server.mjs';
 import { autoSlots, DEFAULTS as MEMORY_GATE } from './memory-gate.mjs';
-import { LeftoverSweeper } from './leftovers.mjs';
+import { LeftoverCleaner } from './leftovers.mjs';
 import { syncCodexMemoryGate } from './codex-memory-gate.mjs';
 
 const POLL_MS = 15_000;
@@ -580,6 +580,7 @@ export class Supervisor {
     // back to the session that was doing it.
     try { this.recoverInterrupted('startup'); } catch (e) { console.warn('zero: startup recovery:', e.message); }
     if (this.config.memoryGate) this.setMemoryGate(true).catch((e) => console.warn('zero: memory gate:', e.message));
+    if (this.config.cleanupLeftovers) this.setLeftoverCleanup(true).catch((e) => console.warn('zero: leftovers:', e.message));
     this._timer = setInterval(() => this.tick().catch((e) => console.warn('supervisor:', e.message)), POLL_MS);
     this.tick().catch(() => {});
   }
@@ -724,6 +725,7 @@ export class Supervisor {
     for (const session of this.sessions.values()) this._kill(session);
     this._closeCodex(`${Name} is quitting`);
     this.stopMemoryGate();
+    clearInterval(this._leftoverTimer);
   }
 
   // PUT A WORKER BACK ON THESE ROWS, WHATEVER STATE THEY ARE IN.
@@ -1565,6 +1567,9 @@ export class Supervisor {
       return Promise.resolve(null);
     }
     this.sessions.delete(item.id);
+    // The run is over, said by the only app that runs this row; what it left
+    // running may now be stopped on the cleaner's clock (main/leftovers.mjs).
+    this._leftoverCleaner?.ended(item.id);
     // The row's folder goes back. It is only deleted when losing it costs
     // nothing, so the usual answer is that it stays, holding work she has not
     // approved. The same call sweeps the folders whose work has since landed in
@@ -4535,6 +4540,11 @@ export class Supervisor {
     // session that wrote it, and that is all it is told: it has everything
     // else already. A fresh session gets its brief first.
     if (shipFailure) prompt = resumeId || rowChat ? shipFailure : `${prompt}\n\n${shipFailure}`;
+    // WHAT HAPPENS TO WHAT IT LEAVES RUNNING, when that switch is on
+    // (main/leftovers.mjs): the rule once, in a fresh brief, and on any run
+    // the programs of this task still shutting down, which it must not reuse.
+    const leftoverNote = this.leftoverBriefNote(item, { fresh: !resumeId && !rowChat && !forkFrom });
+    if (leftoverNote) prompt = `${prompt}\n\n${leftoverNote}`;
     // A project may override what its own sessions may do. Absent (the normal
     // case) means the workspace default, which is why this is a lookup with no
     // entry rather than a copy of the default written onto every project: a
@@ -6157,6 +6167,11 @@ export class Supervisor {
     // symlinks made into a Claude home on behalf of a session that will never
     // open them.
     const tooling = engine === 'codex' ? null : linkAccountTooling(profile);
+    // A RUN IS STARTING ON THIS ROW, said before the worker exists and in the
+    // same turn of the event loop as the spawn, so the cleaner can never stop
+    // this task's programs between its last check and this agent arriving
+    // (main/leftovers.mjs, agreed with Codex).
+    this._leftoverCleaner?.starting(item.id);
     const env = this._workerEnv(engine);
     const child = engine === 'codex'
       ? this._spawnCodexWorker(plan, { cwd, item, profile })
@@ -6202,6 +6217,8 @@ export class Supervisor {
       spawnFiles,
     };
     this.sessions.set(item.id, session);
+    // Its worker, so a run left "running" by a crash can later be told ended.
+    if (Number.isInteger(child?.pid)) this._leftoverCleaner?.worker(item.id, child.pid);
     if (engine !== 'codex') {
       attachClaudeInput(child);
       if (remoteOnly) { child.holdInput(true); session.remoteIdle = true; session.remoteHeld = true; }
@@ -7298,16 +7315,12 @@ export class Supervisor {
     if (this._memoryGate) { this._memoryGate.setSlots(this.memoryGateSlots()); return; }
     const server = new MemoryGateServer({
       socketPath: this.config.memoryGateSocket || memoryGateSocketPath(),
+      // A test runs its own coordinator beside the real one; it names a port.
+      ...(Number.isInteger(this.config.memoryGateLockPort) ? { lockPort: this.config.memoryGateLockPort } : {}),
       historyFile: path.join(this.userDir, 'memory-gate-history.json'),
       gate: { slots: this.memoryGateSlots() },
       scoreFor: (product, itemId) => this.memoryGateScore(product, itemId),
       ownerOf: (sessionId) => this.memoryGateOwner(sessionId),
-      // While memory is short, what finished agents left running is stopped
-      // (main/leftovers.mjs). A task with a session here is never touched.
-      sweeper: new LeftoverSweeper({
-        live: (itemId) => this.sessions.has(itemId),
-        log: (line) => console.log(`zero: ${line}`),
-      }),
       log: (line) => console.log(`zero: ${line}`),
     });
     this._memoryGate = server;
@@ -7321,6 +7334,58 @@ export class Supervisor {
     const server = this._memoryGate;
     this._memoryGate = null;
     if (server) await server.stop();
+  }
+
+  /* ------------- what finished agents leave running (main/leftovers.mjs) ------------- */
+  // Its own switch, off until somebody turns it on. This app tells the cleaner
+  // when each run starts (in spawnWorker, before the worker exists) and ends
+  // (endSession), because only this app runs this store's tasks and so only
+  // it can say for certain that a task's run is over.
+
+  async setLeftoverCleanup(on) {
+    if (!on) {
+      clearInterval(this._leftoverTimer);
+      this._leftoverTimer = null;
+      this._leftoverCleaner = null;
+      return;
+    }
+    if (this._leftoverCleaner) return;
+    this._leftoverCleaner = new LeftoverCleaner({
+      file: path.join(this.userDir, 'leftovers.json'),
+      enabledSince: Number(this.config.cleanupLeftoversSince) || Date.now(),
+      live: (itemId) => this.sessions.has(itemId),
+      owns: (itemId, product) => {
+        if (!product) return false;
+        try { return !!this.store.readItem?.(product, itemId); } catch { return false; }
+      },
+      log: (line) => console.log(`zero: ${line}`),
+    });
+    const tick = () => this._leftoverCleaner?.tick().catch((e) => console.warn('zero: leftovers:', e.message));
+    this._leftoverTimer = setInterval(tick, 60_000);
+    this._leftoverTimer.unref?.();
+    tick();
+  }
+
+  leftoverStatus() {
+    return this._leftoverCleaner ? this._leftoverCleaner.status() : null;
+  }
+
+  /**
+   * What an agent is told about this, or null. A fresh brief carries the rule
+   * and the way to keep something; any brief carries the programs of this task
+   * still shutting down, which the agent must not reuse.
+   */
+  leftoverBriefNote(item, { fresh = false } = {}) {
+    const cleaner = this._leftoverCleaner;
+    if (!cleaner || !item?.id) return null;
+    const parts = [];
+    if (fresh) {
+      parts.push('Anything you leave running after your turn (a dev server, a preview, a background job) is stopped two hours after you finish, sooner if this Mac runs short of memory. '
+        + 'If the person needs something to keep running, start it with AGENTBOX_KEEP=1 in its environment and say so in your answer. Stop anything else you started before you finish.');
+    }
+    const stopping = cleaner.stoppingNote(item.id);
+    if (stopping) parts.push(stopping);
+    return parts.length ? parts.join('\n\n') : null;
   }
 
   memoryGateStatus() {

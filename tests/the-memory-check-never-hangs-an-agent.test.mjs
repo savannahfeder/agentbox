@@ -55,6 +55,8 @@ async function makeServer(dir, opts = {}) {
     sampleProcesses: async () => [],
     pollMs: 50,
     takeoverMs: 50,
+    // Its own lock port, so tests never meet the real app or each other.
+    lockPort: 0,
     gate: { slots: 1, ...(opts.gate ?? {}) },
     ...opts,
   });
@@ -184,16 +186,43 @@ describe('the check fails open, and fast', () => {
 });
 
 describe('one coordinator per Mac', () => {
+  /** A port nothing holds right now, for two coordinators to contend over. */
+  const freePort = async () => {
+    const net = await import('node:net');
+    const s = net.createServer();
+    await new Promise((r) => s.listen({ host: '127.0.0.1', port: 0 }, r));
+    const { port } = s.address();
+    await new Promise((r) => s.close(r));
+    return port;
+  };
+
   it('a second app stands by, and takes over when the first one stops', async () => {
     const dir = tmpDir();
-    const first = await makeServer(dir);
-    const second = await makeServer(dir);
+    const lockPort = await freePort();
+    const first = await makeServer(dir, { lockPort });
+    const second = await makeServer(dir, { lockPort });
     expect(first.role).toBe('owner');
     expect(second.role).toBe('standby');
     await first.stop();
     for (let i = 0; i < 40 && second.role !== 'owner'; i++) await new Promise((r) => setTimeout(r, 25));
     expect(second.role).toBe('owner');
     expect((await runHook(dir, 'pre', { command: 'git status' }).done).out).toBe('');
+  });
+
+  // THE OLD ELECTION REPLACED AN OWNER THAT WAS SLOW TO ANSWER (2026-10-05,
+  // found by Codex): a socket silent for a second was unlinked and taken, so a
+  // stalled owner and a new one could both run. The lock is a port now.
+  it('an owner that has stopped answering is never replaced, and its socket never removed', async () => {
+    const dir = tmpDir();
+    const lockPort = await freePort();
+    const stalled = await makeServer(dir, { lockPort });
+    // Stalled: still alive and holding the lock, but no longer answering.
+    stalled.server.close();
+    const second = await makeServer(dir, { lockPort });
+    // Several takeover attempts' worth of waiting.
+    await new Promise((r) => setTimeout(r, 300));
+    expect(second.role).toBe('standby');
+    expect(stalled.role).toBe('owner');
   });
 
   it('takes over a socket file nobody is listening on', async () => {

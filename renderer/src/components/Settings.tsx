@@ -1690,10 +1690,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   /* Codex workers do not carry the check yet: Codex runs a hook
                      only once it is trusted, and its app-server is shared by
                      every thread. Said only where Codex can be chosen at all. */
-                  /* AND IT CLEARS UP AFTER THEM (2026-10-05). A night of agents
-                     left 7.7 GB running after every agent had finished, and the
-                     Mac ran out of memory; main/leftovers.mjs has the numbers. */
-                  desc={`While this Mac is short of memory, ${twoEngines ? 'Claude Code agents' : 'agents'} run tests, builds and other heavy commands a few at a time, urgent tasks first, and anything finished agents left running is stopped. Everything else runs as normal.${twoEngines ? ' Codex agents are not held yet.' : ''}${w.memoryGate.on && w.memoryGate.now ? ` ${w.memoryGate.now}` : ''}`}
+                  desc={`While this Mac is short of memory, agents run tests, builds and other heavy commands a few at a time, urgent tasks first. Everything else runs as normal.${w.memoryGate.on && w.memoryGate.now ? ` ${w.memoryGate.now}` : ''}`}
                 >
                   <Switch label="Hold heavy work when memory is short" on={w.memoryGate.on} onChange={(v) => setWorkspace('memoryGate', v)} />
                 </Row>
@@ -1714,6 +1711,22 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                     max={w.memoryGate.slotsMax}
                     onChange={(v) => setWorkspace('memoryGateSlots', v === w.memoryGate?.slotsAuto ? null : v)}
                   />
+                </Row>
+              )}
+              {/* STOP WHAT FINISHED AGENTS LEAVE RUNNING (2026-10-05). A night of
+                  agents left 7.7 GB running after every agent had finished and
+                  the Mac ran out of memory; main/leftovers.mjs has the numbers
+                  and the rules agreed with Codex. Its own switch, because the
+                  memory switch only ever delays commands and this one stops
+                  programs, and the person should agree to that by name. The
+                  description is the whole policy, so nothing about it is a
+                  surprise later. */}
+              {w.leftovers && (
+                <Row
+                  label="Stop what finished agents leave running"
+                  desc={`Dev servers, previews and test runs an agent started and left behind are stopped two hours after its run ends, or ten minutes while memory is short. Never stopped: what an agent was asked to keep, apps installed on this Mac such as Docker Desktop, and anything you started yourself.${twoEngines ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.on && w.leftovers.now ? ` ${w.leftovers.now}` : ''}`}
+                >
+                  <Switch label="Stop what finished agents leave running" on={w.leftovers.on} onChange={(v) => setWorkspace('cleanupLeftovers', v)} />
                 </Row>
               )}
               {/* THE CODING AGENT IS CHOSEN ON THE CARD (w-12081d32cc). A row

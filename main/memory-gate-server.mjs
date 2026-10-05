@@ -37,6 +37,7 @@ import { CommandHistory } from './memory-gate-history.mjs';
 import { etimeSeconds } from './leftovers.mjs';
 
 export const PROTOCOL = 1;
+export const DEFAULT_LOCK_PORT = 47263;
 
 /** Where every Agentbox on this Mac meets. Short, because macOS caps a socket
  *  path at 104 bytes, and in the per-user temp folder, so it is this user's. */
@@ -107,10 +108,11 @@ export class MemoryGateServer {
     sampleProcesses = listProcesses,
     pollMs = 2_000,
     takeoverMs = 5_000,
+    // The port whose holder is the one coordinator on this Mac. Fixed so that
+    // every Agentbox finds the same one; a test passes its own.
+    lockPort = DEFAULT_LOCK_PORT,
     idleReleaseMs = 30_000,
     maxGrantMs = 3 * 60 * 60_000,
-    sweeper = null,
-    sweepEveryMs = 30_000,
     clock = Date.now,
     log = () => {},
   } = {}) {
@@ -120,12 +122,6 @@ export class MemoryGateServer {
     this.clock = clock;
     this.idleReleaseMs = idleReleaseMs;
     this.maxGrantMs = maxGrantMs;
-    // What finished agents left running is stopped while memory is short
-    // (main/leftovers.mjs). Only the owning coordinator sweeps, so two apps
-    // on one Mac never both do.
-    this.sweeper = sweeper;
-    this.sweepEveryMs = sweepEveryMs;
-    this.lastSweep = -Infinity;
     this.gate = new MemoryGate({ ...gate, history: this.history, clock });
     this.scoreFor = scoreFor;
     this.ownerOf = ownerOf;
@@ -133,6 +129,7 @@ export class MemoryGateServer {
     this.sampleProcesses = sampleProcesses;
     this.pollMs = pollMs;
     this.takeoverMs = takeoverMs;
+    this.lockPort = lockPort;
     this.log = log;
     this.role = 'stopped';
     this.grants = new Map();
@@ -166,6 +163,12 @@ export class MemoryGateServer {
       server.closeAllConnections?.();
       try { fs.unlinkSync(this.socketPath); } catch {}
     }
+    // The lock goes last, so nobody can take over while the socket is still ours.
+    if (this.lock) {
+      const lock = this.lock;
+      this.lock = null;
+      await new Promise((resolve) => lock.close(() => resolve()));
+    }
     this._saveHistory();
     this.role = 'stopped';
   }
@@ -174,7 +177,7 @@ export class MemoryGateServer {
 
   status() {
     const snap = this.gate.snapshot();
-    return { role: this.role, ...snap, freePct: this.reading.freePct, counts: { ...this.counts }, cleared: this.sweeper?.last ?? null };
+    return { role: this.role, ...snap, freePct: this.reading.freePct, counts: { ...this.counts } };
   }
 
   /* --------------------------- owning the socket --------------------------- */
@@ -194,25 +197,46 @@ export class MemoryGateServer {
     this.takeoverTimer.unref?.();
   }
 
+  // WHO COORDINATES IS DECIDED BY A PORT THE KERNEL HOLDS, NOT BY THE SOCKET
+  // FILE (agreed with Codex, 2026-10-05). The socket used to be its own lock:
+  // a socket that did not answer within a second was taken for dead, unlinked
+  // and replaced, so a stalled owner and a new one could both be running. Now
+  // the owner binds 127.0.0.1:`lockPort` first and keeps it for its whole
+  // life; the kernel refuses a second bind (EADDRINUSE, measured on macOS) and
+  // frees the port only when the owner process dies. Only the holder may
+  // unlink and bind the socket, and an app that cannot get the port stands by
+  // and never touches anything.
   async _listen() {
-    const server = http.createServer((req, res) => this._handle(req, res));
-    const tryListen = () => new Promise((resolve) => {
+    const bind = (server, where) => new Promise((resolve) => {
       const onError = (err) => { server.off('listening', onListen); resolve(err); };
       const onListen = () => { server.off('error', onError); resolve(null); };
       server.once('error', onError);
       server.once('listening', onListen);
-      server.listen(this.socketPath);
+      server.listen(where);
     });
-    let err = await tryListen();
-    if (err?.code === 'EADDRINUSE') {
-      if (await answers(this.socketPath)) return false;
-      // Left behind by a process that is gone: nobody is on the other end.
-      try { fs.unlinkSync(this.socketPath); } catch {}
-      err = await tryListen();
+    const lock = net.createServer((c) => c.destroy());
+    const lockErr = await bind(lock, { host: '127.0.0.1', port: this.lockPort, exclusive: true });
+    if (lockErr) {
+      if (lockErr.code !== 'EADDRINUSE') this.log(`memory gate: could not take the lock: ${lockErr.message}`);
+      return false;
     }
-    if (err) { this.log(`memory gate: could not listen: ${err.message}`); return false; }
+    lock.unref?.();
+    const server = http.createServer((req, res) => this._handle(req, res));
+    let err = await bind(server, this.socketPath);
+    if (err?.code === 'EADDRINUSE') {
+      // We hold the lock, so whatever sits at the path belongs to an owner that
+      // is gone.
+      try { fs.unlinkSync(this.socketPath); } catch {}
+      err = await bind(server, this.socketPath);
+    }
+    if (err) {
+      this.log(`memory gate: could not listen: ${err.message}`);
+      await new Promise((r) => lock.close(() => r()));
+      return false;
+    }
     try { fs.chmodSync(this.socketPath, 0o600); } catch {}
     this.server = server;
+    this.lock = lock;
     return true;
   }
 
@@ -334,10 +358,6 @@ export class MemoryGateServer {
     try {
       this.reading = await this.readPressure();
       this.gate.setPressure(pressureFrom(this.reading));
-      if (this.sweeper && this.role === 'owner' && this.clock() - this.lastSweep >= this.sweepEveryMs) {
-        this.lastSweep = this.clock();
-        await this.sweeper.sweep(this.gate.pressure);
-      }
       // Processes are only looked at while something is granted: nothing
       // else needs them, and each look costs a `ps`.
       if (this.grants.size) this._sample(await this.sampleProcesses());
@@ -438,15 +458,4 @@ export class MemoryGateServer {
 function loadHistory(file) {
   if (!file) return new CommandHistory();
   try { return CommandHistory.fromJSON(JSON.parse(fs.readFileSync(file, 'utf8'))); } catch { return new CommandHistory(); }
-}
-
-/** Whether a live process is listening on `socketPath`. */
-function answers(socketPath) {
-  return new Promise((resolve) => {
-    const c = net.connect(socketPath);
-    const done = (v) => { c.destroy(); resolve(v); };
-    c.once('connect', () => done(true));
-    c.once('error', () => done(false));
-    setTimeout(() => done(false), 1_000).unref?.();
-  });
 }

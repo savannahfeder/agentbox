@@ -765,6 +765,10 @@ export interface WorkspaceSettings {
    * what Auto is on this Mac; `now` is one sentence about right now, null while
    * it is off. Optional so an older payload still draws the page it drew. */
   memoryGate?: { on: boolean; slots: number | null; slotsAuto: number; slotsMax: number; now: string | null };
+  /**
+   * STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mjs). `now` is one
+   * sentence about what is left right now, null while it is off. */
+  leftovers?: { on: boolean; now: string | null };
   capacity: number;
   running: number;
   model: string | null;
