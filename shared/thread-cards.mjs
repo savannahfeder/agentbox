@@ -106,11 +106,27 @@ const startOfDay = (now) => { const d = new Date(now); d.setHours(0, 0, 0, 0); r
  * carrying an empty list would otherwise read as the whole team's, and that is
  * the one mistake nobody can take back.
  */
-export function shownToTeam(item, since = null) {
-  if (item?.visibility === 'team') return true;
-  if (item?.visibility === 'people') return shownToPeople(item).length > 0;
-  if (item?.visibility === 'private') return false;
+export function shownToTeam(item, since = null, product = null) {
+  const visibility = visibilityOf(item, product);
+  if (visibility === 'team') return true;
+  if (visibility === 'people') return shownToPeople(item).length > 0;
+  if (visibility === 'private') return false;
   return !since || (item?.createdAt ?? 0) >= since;
+}
+
+/**
+ * THE WORD A THREAD'S VISIBILITY READS AS, once its project has had its say.
+ *
+ * YOUR PERSONAL PROJECT IS PRIVATE UNLESS YOU SAY OTHERWISE (w-b989839656).
+ * Everywhere else a thread with no word of its own is the team's, and in
+ * Personal it is yours alone, whoever wrote it: the composer, an agent filing a
+ * proposal, a repeat. Failing closed here, rather than writing 'private' on
+ * each new thread, is what covers every one of those paths at once.
+ */
+export function visibilityOf(item, product = null) {
+  const v = item?.visibility;
+  if (v === 'team' || v === 'people' || v === 'private') return v;
+  return product?.personal === true ? 'private' : undefined;
 }
 
 /** Whom a shared thread reaches, by id, or [] for the whole team. */
@@ -136,7 +152,7 @@ export function cardsFor({ products, readItems, now = Date.now(), since = null }
       // (w-41ff964775): every card is read by its own set of people, and a
       // blocker shared with two of them would have told a third its title.
       // Only a thread the whole team may read is safe in anybody's links.
-      const open = shownToTeam(item, since) && !shownToPeople(item).length;
+      const open = shownToTeam(item, since, product) && !shownToPeople(item).length;
       titleOf.set(item.id, open ? item.label || item.title : null);
       all.push({ item, product });
     }
@@ -144,7 +160,7 @@ export function cardsFor({ products, readItems, now = Date.now(), since = null }
   const linked = (ids) => (Array.isArray(ids) ? ids : []).map((id) => ({ id, title: titleOf.get(id) ?? null }));
   const today = startOfDay(now);
   for (const { item, product } of all) {
-    if (!shownToTeam(item, since)) continue;
+    if (!shownToTeam(item, since, product)) continue;
     const state = threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
     const s = summaryOf(item);

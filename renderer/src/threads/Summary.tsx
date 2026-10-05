@@ -146,7 +146,7 @@ export function SummaryRail({ item, team, onOpen }: { item: WorkItem; team: Team
   const byId = team?.byId ?? new Map<string, Person>();
   const owner = ownerName(item, me, byId);
   const ownerPerson = owner === 'You' ? (me ? byId.get(me) ?? null : null) : byId.get(item.createdBy ?? '') ?? null;
-  const visibility = whoSees(item, team?.state.since ?? null);
+  const visibility = whoSees(item, team?.state.since ?? null, team?.products.get(item.product));
   return (
     // The hint is on the icon, not the strip: a plate is placed off the box of
     // what wears it, and a strip the pane's full height left it no room below,
@@ -254,7 +254,7 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
     ...item,
     visibility: valueOf<'team' | 'people' | 'private' | undefined>('visibility'),
     visibleTo: valueOf<string[] | undefined>('visibleTo') ?? item.visibleTo,
-  }, team?.state.since ?? null);
+  }, team?.state.since ?? null, team?.products.get(item.product));
   // WHO IS ON THE LIST, when it is shared with chosen people (w-41ff964775).
   // Read off the row the same way, so her tick shows before the store's next
   // snapshot comes back with it.
@@ -357,7 +357,10 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
       {/* WHICH THREAD THIS IS, by the name its row shows (list-rules.ts
           rowTitle). */}
       <h2 className="ts-title">{rowTitle(item)}</h2>
-      {SUMMARY_FIELDS.map((f) => (
+      {/* A LINE WITH NO WORDS IS NOT DRAWN AT ALL (w-54e9c7243f): no heading
+          over a dim "Not written yet". The one being typed in stays, so
+          clearing it does not pull the box out from under the cursor. */}
+      {SUMMARY_FIELDS.filter((f) => editing === f || stood[f]?.trim()).map((f) => (
         <div className="ts-sec" key={f}>
           <div className="ts-h">{f === 'problem' ? 'Problem' : f === 'progress' ? 'Progress' : 'Solution'}</div>
           {editing === f ? (
@@ -373,13 +376,13 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
             />
           ) : (
             <p
-              className={`ts-line${written(f) && stood[f] ? '' : ' dim'}`}
+              className={`ts-line${written(f) ? '' : ' dim'}`}
               role="button"
               tabIndex={0}
               title="Click to edit"
               onClick={() => begin(f)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); begin(f); } }}
-            >{stood[f] || NOT_WRITTEN}<Pen /></p>
+            >{stood[f]}<Pen /></p>
           )}
         </div>
       ))}

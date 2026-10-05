@@ -18,7 +18,7 @@
 // few seconds and the new lines arrive at the foot of the thread.
 //
 // NOTHING NEW IS STORED AND NOTHING IS WRITTEN. Two files that already exist
-// are read.
+// are read, and the marks a Z left on this Mac (../undo-marks).
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '../api';
@@ -26,6 +26,7 @@ import { changePathFor, type Change } from '../code-artifact';
 import { itemThread, type PendingSaid } from '../item-thread';
 import { resultLeads } from '../recap';
 import { withoutTrailingWork } from '../trailing-work';
+import { marksFor, readUndoMarks, UNDO_MARKS_EVENT, type UndoMark } from '../undo-marks';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
 import type { RunningSession, WorkItem } from '../types';
@@ -121,6 +122,16 @@ export function ItemThread({ item, engine, session, opening, sending, onOpenOrig
   const [whole, setWhole] = useState(false);
   useEffect(() => { setWhole(false); }, [item.product, item.id]);
 
+  // THE Zs PRESSED ON THIS TASK, each drawn as one of her actions
+  // (../undo-marks, w-c78d1e1607). Read again the moment a new one is left, so
+  // the Z that brought her back to this thread is already on it.
+  const [undoMarks, setUndoMarks] = useState<UndoMark[]>(() => readUndoMarks());
+  useEffect(() => {
+    const reread = () => setUndoMarks(readUndoMarks());
+    window.addEventListener(UNDO_MARKS_EVENT, reread);
+    return () => window.removeEventListener(UNDO_MARKS_EVENT, reread);
+  }, []);
+
   // THE CONVERSATION IS EMPTIED WHEN SHE CHANGES ROWS, AND AT NO OTHER TIME.
   //
   // This used to sit at the top of the read below, whose deps include
@@ -189,7 +200,7 @@ export function ItemThread({ item, engine, session, opening, sending, onOpenOrig
   const saying = session?.saying && session.sayingAt
     ? { text: session.saying, at: session.sayingAt, run: session.startedAt }
     : null;
-  const built = itemThread(ledger.lines, sessions, saying, { whole, engine, pending: sending, chat });
+  const built = itemThread(ledger.lines, sessions, saying, { whole, engine, pending: sending, chat, undone: marksFor(undoMarks, item.product, item.id) });
   const said = built.events.map((e) => (e.kind === 'work' ? e : { ...e, text: clean(e.text ?? '') }));
   /* * WHILE AN AGENT IS WORKING, THE LAST THING ON THE PAGE IS THE THINKING
      COMPONENT, AND THE COMMANDS UNDER IT ARE ITS OWN.
