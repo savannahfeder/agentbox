@@ -35,6 +35,7 @@
 //     reason it can act on, and the hook's own time limit sits above that.
 
 import { CommandHistory, HEAVY_MB } from './memory-gate-history.mjs';
+import { NAME } from '../shared/product-name.mjs';
 
 /**
  * The kernel's own pressure reading (`kern.memorystatus_vm_pressure_level`:
@@ -67,7 +68,7 @@ export const DEFAULTS = {
 
 export function refusal(waitedMs) {
   const minutes = Math.max(1, Math.round(waitedMs / 60_000));
-  return `This Mac is short of memory, so Agentbox held this command for ${minutes} minute${minutes === 1 ? '' : 's'} `
+  return `This Mac is short of memory, so ${NAME} held this command for ${minutes} minute${minutes === 1 ? '' : 's'} `
     + 'while heavier work ran, and it still cannot start it. Do not retry it straight away. Carry on with anything '
     + 'that does not need it, or end your turn and say you are waiting for memory.';
 }
