@@ -34,15 +34,18 @@ function rowRule() {
 }
 
 describe('a hunk off the screen costs nothing to have', () => {
-  it('lets the browser skip a hunk that is nowhere near the window', () => {
-    expect(hunkRule()).toMatch(/content-visibility:\s*auto/);
+  // SINCE 2026-10-04 THE SKIPPING IS PER SLICE OF A HUNK, not per hunk: an
+  // 800-row hunk laid out whole the moment one pixel of it scrolled in.
+  // tests/a-big-change-scrolls-without-stalling.test.mjs holds the slice rule
+  // and its height; this keeps the guard that the rows are never hidden.
+  it('lets the browser skip code that is nowhere near the window', () => {
+    expect(css).toMatch(/^\.code-slice \{[^}]*content-visibility:\s*auto/m);
   });
 
-  it('gives a skipped hunk a height, or the scrollbar would lie', () => {
-    // The height is per hunk and comes from the component, because it depends
-    // on how many rows that hunk has. `auto` in the value is what makes the
-    // browser keep the real height once it has drawn the hunk properly.
-    expect(tsx).toMatch(/containIntrinsicSize: `auto \$\{hunkGuessPx\(rows\.length\)\}px`/);
+  it('gives a skipped slice a height, or the scrollbar would lie', () => {
+    // `auto` in the value is what makes the browser keep the real height once
+    // it has drawn the slice properly.
+    expect(tsx).toMatch(/containIntrinsicSize: `auto \$\{sliceGuessPx\(b - a\)\}px`/);
   });
 
   it('keeps every row in the document rather than hiding code again', () => {

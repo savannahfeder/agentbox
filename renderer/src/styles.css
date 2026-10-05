@@ -7468,7 +7468,11 @@ a.set-ghost { text-decoration: none; display: inline-block; }
    that value makes the browser keep the real height once the hunk has been
    drawn properly, which is what corrects a wrapped line.
 */
-.code-hunk { padding: 2px 0; content-visibility: auto; }
+.code-hunk { padding: 2px 0; }
+/* THE SKIPPING IS PER SLICE OF AT MOST 48 ROWS, NOT PER HUNK (2026-10-04). A
+   hunk can be a whole new file of 800 rows, and touching one pixel of it laid
+   out all 800 in one frame. `rowSlices` in code-artifact.ts has the numbers. */
+.code-slice { content-visibility: auto; }
 .code-row { display: flex; font-family: var(--mono); font-size: 12px; line-height: 1.55; white-space: pre; }
 .code-mark { flex: 0 0 22px; text-align: center; color: var(--text-faint); }
 /* THE LINE NUMBER, 2026-09-20. The pane had no numbers at all, which is the

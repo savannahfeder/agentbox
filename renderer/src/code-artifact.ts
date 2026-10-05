@@ -359,6 +359,70 @@ export function hunkGuessPx(rows: number): number {
   return Math.round(rows * ROW_PX + HUNK_PAD_PX);
 }
 
+// THE BROWSER SKIPS OFF-SCREEN CODE IN SLICES, NOT WHOLE HUNKS (2026-10-04).
+//
+// A hunk can be a whole new file: the largest real change had hunks of 808,
+// 608 and 440 rows. With `content-visibility` on the hunk, scrolling one pixel
+// into one made the browser style and lay out every row of it in a single
+// frame, and sixty wheel ticks dropped 21 frames past 50ms. A slice of at most
+// this many rows is about two screenfuls, so the work arrives a little at a
+// time as she scrolls. tests/a-big-change-scrolls-without-stalling.test.mjs.
+export const SLICE_ROWS = 48;
+
+/** [from, to) row ranges cutting `n` rows into slices of at most SLICE_ROWS. */
+export function rowSlices(n: number): [number, number][] {
+  const out: [number, number][] = [];
+  for (let a = 0; a < n; a += SLICE_ROWS) out.push([a, Math.min(n, a + SLICE_ROWS)]);
+  return out;
+}
+
+/** A slice's height before it is drawn: its rows, no padding of its own. */
+export function sliceGuessPx(rows: number): number {
+  return Math.round(rows * ROW_PX);
+}
+
+// HOW MANY FILES ARE DRAWN IN THE FIRST FRAME. The rest follow in idle moments
+// straight after, so a 28,000-row change opens on a screenful instead of
+// freezing the window for every row of it (4.7s at a quarter speed, measured).
+// The median real change is 76 rows and is under the budget, so it is drawn
+// whole at once exactly as before. A batch is small enough to fit the gap
+// between two frames (400 rows cost about 40ms at half speed and dropped
+// frames under a scrolling hand; 150 do not), so filling in is not felt.
+export const FIRST_ROWS = 2400;
+export const BATCH_ROWS = 150;
+
+/**
+ * The next files to fill in: the one she is on, then the ones below her, then
+ * the ones above, skipping what is drawn, up to `budget` rows and at least one.
+ */
+export function fillNext(files: ChangedFile[], drawn: ReadonlySet<number>, here: number, budget = BATCH_ROWS): number[] {
+  const order = [here, ...Array.from({ length: files.length }, (_, i) => i).filter((i) => i > here),
+    ...Array.from({ length: here }, (_, i) => here - 1 - i)];
+  const out: number[] = [];
+  let rows = 0;
+  for (const i of order) {
+    if (i < 0 || i >= files.length || drawn.has(i)) continue;
+    const size = files[i].hunks.reduce((m, h) => m + h.rows.length, 0);
+    if (out.length && rows + size > budget) break;
+    out.push(i);
+    rows += size;
+  }
+  return out;
+}
+
+/** Files to draw at once: up to the row budget, at least one, always through `atLeast`. */
+export function firstBatch(files: ChangedFile[], atLeast: number, budget = FIRST_ROWS): number {
+  let rows = 0;
+  let n = 0;
+  while (n < files.length) {
+    const size = files[n].hunks.reduce((m, h) => m + h.rows.length, 0);
+    if (n > atLeast && n > 0 && rows + size > budget) break;
+    rows += size;
+    n += 1;
+  }
+  return n;
+}
+
 /**
  * The files in the order the tree puts them, so J and K walk the list she is
  * looking at. Reading order in the running column and reading order in the tree

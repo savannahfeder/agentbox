@@ -20,7 +20,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import {
-  changeSummary, filesInTreeOrder, hunkGuessPx, hunkView, hunkViewAt, linesSkipped, tokenize, tookLabel, treeRows, visibleRows,
+  BATCH_ROWS, changeSummary, filesInTreeOrder, fillNext, firstBatch, hunkView, hunkViewAt, linesSkipped, rowSlices, sliceGuessPx, tokenize, tookLabel, treeRows, visibleRows,
   type Change, type ChangedFile, type Hunk,
 } from '../code-artifact';
 import { copiedText } from '../code-copy';
@@ -150,11 +150,13 @@ function offsetIn(el: HTMLElement, node: Node, offset: number): number {
   return r.toString().length;
 }
 
-/** The five colours, drawn as classes so the stylesheet owns every value. */
+/** The five colours, drawn as classes so the stylesheet owns every value. An
+ * uncoloured token is bare text: one element fewer per word, on a pane that
+ * held 386,310 of them on the biggest real change. */
 function Code({ line }: { line: string }) {
   const toks = useMemo(() => tokenize(line), [line]);
   return (
-    <>{toks.map((t, i) => (t.c ? <span key={i} className={`t-${t.c}`}>{t.s}</span> : <span key={i}>{t.s}</span>))}</>
+    <>{toks.map((t, i) => (t.c ? <span key={i} className={`t-${t.c}`}>{t.s}</span> : t.s))}</>
   );
 }
 
@@ -277,13 +279,18 @@ function HunkRows({ hunk, editable, pending, onEdit, onDone }: {
       />
     );
   };
-  // THE HEIGHT A HUNK STANDS AT WHILE THE BROWSER IS SKIPPING IT. The
-  // stylesheet turns on `content-visibility: auto` here; this is the size that
-  // stops the scrollbar lurching before each hunk has been drawn once. The
-  // story is on `hunkGuessPx` in code-artifact.ts.
+  // THE HEIGHT A SLICE STANDS AT WHILE THE BROWSER IS SKIPPING IT. The
+  // stylesheet turns on `content-visibility: auto` per slice, not per hunk, so
+  // an 800-row hunk is laid out a slice at a time as she reaches it
+  // (`rowSlices` in code-artifact.ts has the measurement).
+  const slices = useMemo(() => rowSlices(rows.length), [rows.length]);
   return (
-    <div className="code-hunk" style={{ containIntrinsicSize: `auto ${hunkGuessPx(rows.length)}px` }}>
-      {rows.map(([mark, text], i) => draw(mark, text, i))}
+    <div className="code-hunk">
+      {slices.map(([a, b]) => (
+        <div className="code-slice" key={a} style={{ containIntrinsicSize: `auto ${sliceGuessPx(b - a)}px` }}>
+          {rows.slice(a, b).map(([mark, text], j) => draw(mark, text, a + j))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -395,6 +402,36 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   const clickAnchor = useRef<{ line: HTMLElement; col: number } | null>(null);
 
   const current = fileRows[Math.min(at, Math.max(0, fileRows.length - 1))];
+
+  // HOW MANY FILES HAVE THEIR CODE DRAWN. A big change opens on its first
+  // screenful and the rest is drawn in the idle moments straight after, so
+  // opening the largest real change no longer freezes the window for every
+  // row of it (`firstBatch` in code-artifact.ts has the numbers). Every file's
+  // header is drawn from the start, so the tree, the jumps and the sticky
+  // names work while the rest arrives. An ordinary change is drawn whole in
+  // the first frame and none of this runs.
+  const [drawn, setDrawn] = useState<ReadonlySet<number>>(() => {
+    const at0 = Math.max(0, files.findIndex((f) => f.path === startAt));
+    return new Set(Array.from({ length: firstBatch(files, 0) }, (_, i) => i).concat(at0));
+  });
+  const hereIndex = files.findIndex((f) => f.path === current?.path);
+  useEffect(() => {
+    if (drawn.size >= files.length) return;
+    // NEAREST TO HER FIRST. The file she is on is urgent; anything else waits
+    // for a moment her hand is still, because a batch forced in mid-scroll is a
+    // dropped frame. Drawing everything above a far file in one go is what
+    // stalled a fast scroll for 754ms, measured, so it is never done.
+    const plan = fillNext(files, drawn, Math.max(0, hereIndex), BATCH_ROWS);
+    const urgent = plan.includes(Math.max(0, hereIndex));
+    const next = () => setDrawn((was) => new Set([...was, ...plan]));
+    const w = window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (h: number) => void };
+    if (w.requestIdleCallback) {
+      const h = w.requestIdleCallback(next, urgent ? { timeout: 60 } : undefined);
+      return () => w.cancelIdleCallback?.(h);
+    }
+    const t = setTimeout(next, 0);
+    return () => clearTimeout(t);
+  }, [drawn, files, hereIndex]);
 
   /* * ------------------------- typing into the change -------------------------
 
@@ -1097,7 +1134,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       </div>
 
       <div className="code-body" ref={bodyRef}>
-        {files.map((file: ChangedFile) => (
+        {files.map((file: ChangedFile, fileIndex: number) => (
           <section className="code-file-block" key={file.path}>
             <div
               className={`code-file-head${current?.path === file.path ? ' is-at' : ''}`}
@@ -1120,12 +1157,16 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
             {/* THE AGENT'S OWN SENTENCE IS NOT DRAWN OVER THE CHANGE, on purpose.
                Do not put it back.
              */}
-            <FileHunks
-              file={file}
-              pending={seeded.current.get(file.path) ?? null}
-              onEdit={noteEdit}
-              onDone={settle}
-            />
+            {drawn.has(fileIndex) ? (
+              <FileHunks
+                file={file}
+                pending={seeded.current.get(file.path) ?? null}
+                onEdit={noteEdit}
+                onDone={settle}
+              />
+            ) : (
+              <div className="code-unfilled" style={{ height: sliceGuessPx(file.hunks.reduce((n, h) => n + h.rows.length, 0)) }} />
+            )}
           </section>
         ))}
       </div>
