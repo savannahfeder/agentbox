@@ -91,6 +91,8 @@ import {
 import { SummaryPanel, SummaryRail, ThreadCrumb, ThreadStateMark, useSummaryOpen, useSummaryShortcut } from '../threads/Summary';
 import { ThreadMenu } from '../threads/ThreadMenu';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
+import { useChatMentions } from '../team/ChatAgents';
+import { AGENT_SCHEME } from '../team/agent-mentions';
 import { engineModelLabel } from '../models';
 
 // With the options strip riding on the composer, the field's own "## Options"
@@ -865,6 +867,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const mdComponents = {
       pre: ({ children }: { children?: ReactNode }) => <CodePre>{children}</CodePre>,
       a: ({ href, children }: { href?: string; children?: ReactNode }) => {
+        // AN AGENT MENTIONED IN A CONVERSATION is drawn as the mention it is;
+        // its address is for the app, which draws the answer under the message
+        // (w-7b9cb8636a, ../team/agent-mentions.ts).
+        if (href?.startsWith(AGENT_SCHEME)) return <span className="chat-at">{children}</span>;
         // A FOLDER, written on its own line, shows its pictures (FolderPreview).
         if (href && /\/$/.test(href) && !/^(https?|data|file|mailto):/i.test(href)) {
           return <FolderPreview key={href} product={product} folder={href} onOpen={openHref} quiet={drawsPictures} />;
@@ -1982,6 +1988,10 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
     setEffort(item.effort ?? null);
   }, [item.product, item.id, item.model, item.effort]);
   const ref = useRef<HTMLTextAreaElement>(null);
+  // AGENTS IN A CONVERSATION WITH A PERSON (w-7b9cb8636a, ../team/ChatAgents.tsx):
+  // the @ menu, mentions that carry their own project, model and effort, and
+  // the rule that Send waits until every agent has a project.
+  const chat = useChatMentions({ on: !!talkTo?.length && !item.agent, where: item, text, setText, input: ref, people: talkTo ?? [] });
   // WHAT THIS ONE MESSAGE MAY DO.So it is not a project setting and not a
   // workspace one; it rides on the send.
   //
@@ -2062,6 +2072,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
      always did. (w-5d1ad29efa, 2026-08-29.) */
   const send = async (spoken?: string) => {
     if (!(spoken ?? text).trim() && !attachments.length) return;
+    // AN AGENT WITH NO PROJECT DOES NOT GO OUT. The footer already says why;
+    // ⌘↵ says it again rather than doing nothing.
+    if (chat.block) { onNotice(chat.block); return; }
     const originalDraft = text;
     const consumeCommand = () => {
       if (ref.current?.value !== originalDraft) return;
@@ -2100,7 +2113,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
     // chip has been touched at all.
     // The model rides along ONLY when she opened the drawer, on the priority
     // tag's rule: an untouched box must not write what it is merely displaying.
-    onSend([words, attachedMd].filter(Boolean).join('\n\n'), prio ? priorityValueOf(prio) : undefined, repeat, sent, mode,
+    // In a conversation, every agent mention goes out as its link, carrying the
+    // project, model and effort the card holds (../team/agent-mentions.ts).
+    onSend([chat.encode(words), attachedMd].filter(Boolean).join('\n\n'), prio ? priorityValueOf(prio) : undefined, repeat, sent, mode,
       touched ? { model, effort } : undefined);
   };
   const hasDraft = !!text.trim() || attachments.length > 0;
@@ -2347,11 +2362,20 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
       {slashOpen && (
         <SlashMenu rows={menuRows} at={slashAt} onPick={pickRow} onHover={setSlashAt} />
       )}
+      {/* AGENTS IN A CONVERSATION (w-7b9cb8636a): the @ menu, a mention's
+          card, and the mentions drawn as chips under the text. Nothing here
+          draws outside a conversation with a person. */}
+      {chat.menu}
+      {chat.card}
+      {chat.chips}
       <textarea
-        className="dock-input"
+        className={`dock-input${chat.live ? ' with-mentions' : ''}`}
         ref={ref}
         value={text}
-        onChange={(e) => changeText(e.target.value)}
+        onChange={(e) => { changeText(e.target.value); chat.track(e.target); }}
+        onSelect={(e) => chat.track(e.currentTarget)}
+        onScroll={(e) => chat.track(e.currentTarget)}
+        onClick={(e) => chat.click(e.currentTarget)}
         /* * ONE CLEAR SENTENCE. The old placeholder was unclear about what it even meant,
            and a reply box needs one simple sentence.
 
@@ -2370,6 +2394,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           // the menu because it works whether the menu is open or shut, and
           // because a bare Tab inside the menu is a pick, which is a different
           // key.
+          // The @ menu and a mention's card take their keys first, and only
+          // while one of them is up.
+          if (chat.keyDown(e)) return;
           if (e.key === 'Tab' && e.shiftKey && canSetMode) {
             e.preventDefault();
             const next = claudeCode ? nextMode(running as PermissionMode) : nextCodexMode(running as CodexModeId);
@@ -2460,7 +2487,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
               place on the screen saying the same thing. It is replaced rather
               than deleted: a bare corner here reads as a control that failed
               to draw, so the slot always carries a line. */}
-          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo?.length ? <span className="dim">{landsIn(talkTo)}</span> : <>
+          {/* AN AGENT IN THE MESSAGE WITH NO PROJECT says so here, in the slot
+              that always carries a line, and Send waits (w-7b9cb8636a). */}
+          {item.agent ? <span className="dim">Goes straight into {item.agent.name}.</span> : talkTo?.length ? <span className="dim">{chat.block ?? landsIn(talkTo)}</span> : <>
           <PriorityPicker
             variant="word"
             value={shown}
@@ -2592,8 +2621,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
         <button
           className="dock-send"
           onClick={() => send()}
-          disabled={!hasDraft}
-          title="Send · ⌘↵"
+          disabled={!hasDraft || !!chat.block}
+          title={chat.block ?? 'Send · ⌘↵'}
         >Send <kbd>⌘↵</kbd></button>
         )}
       </div>
