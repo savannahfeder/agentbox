@@ -39,7 +39,9 @@ const supervisorSrc = read('main/supervisor.mjs');
 
 // The project page, sliced off its own lede so a match cannot come from the
 // workspace panes above it.
-const page = settings.slice(settings.indexOf('Everything here is this project only'));
+// From the project's title row: the sentence under it went on 2026-10-05,
+// when the settings pages lost the text that only repeated what was on them.
+const page = settings.slice(settings.indexOf('<div className="set-title-row">'));
 
 describe('the one switch a project still has', () => {
   let dir;

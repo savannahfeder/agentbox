@@ -175,9 +175,11 @@ describe('it is said in English', () => {
   });
 
   // The path is the one fact here for somebody who already knows what it
-  // means, so it is the quiet grey note under the plate and not the sentence.
+  // means, so it is never the sentence. It was a grey note under the plate
+  // until no text was allowed under a card (2026-10-05); it is the card's last
+  // row now.
   it('keeps the filesystem path out of the sentence', () => {
-    expect(block).toContain('note={found && bin ? copy.where(bin) : undefined}');
+    expect(block).toContain('{found && bin && <Row label="Runs from" desc={copy.where(bin)} />}');
     expect(block).toContain('desc={say}');
   });
 });

@@ -73,13 +73,17 @@
   padding: 0 0 12px; font-size: 14px; font-weight: 500; letter-spacing: -0.005em;
   text-transform: none; color: var(--text);
 }
-.settings-screen[data-pane] .set-group-note { padding: 10px 2px 0; font-size: 12px; line-height: 1.55; }
-.settings-screen[data-pane] .set-group-warn { margin: 0 0 12px; }
-
 /* THE CARD. One plate per group, a hairline round it and a wash inside it, and
-   the rows inside it divided by the same hairline. */
+   the rows inside it divided by the same hairline. ITS CORNERS ARE THE APP'S
+   (2026-10-05): `--radius`, 3px, and square on the themes that set it to 0.
+   The first drawing used 10px, and "in agentbox all borders are relatively
+   sharp". Nothing on this screen is rounder than that. */
 .settings-screen[data-pane] .set-plate:not(.set-keys) {
-  padding: 0 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--wash);
+  padding: 0 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--wash);
+}
+/* A warning about the whole group is the card's first line, inside it. */
+.settings-screen[data-pane] .set-plate > .set-row-warn {
+  display: block; padding: 13px 0; font-size: 12.5px; line-height: 1.5; color: var(--text-dim);
 }
 .settings-screen[data-pane] .set-plate:not(.set-keys) > .set-row { align-items: center; gap: 24px; padding: 14px 0; }
 .settings-screen[data-pane] .set-plate:not(.set-keys) > .set-row + .set-row { border-top: 1px solid var(--line); }
@@ -108,10 +112,9 @@
 }
 .settings-screen[data-pane] .set-plate > .set-acct-row.on .set-row-label { color: var(--text); }
 .settings-screen[data-pane] .set-plate > .set-acct-row.on + .set-row { border-top-color: transparent; }
-.settings-screen[data-pane] .set-plate > .set-acct-row.on:first-child { border-radius: 9px 9px 0 0; }
 .set-badge {
   display: inline-block; margin-left: 8px; padding: 1px 7px; vertical-align: 1px;
-  border-radius: 999px; background: var(--film-strong); color: var(--text);
+  border-radius: var(--radius); background: var(--film-strong); color: var(--text);
   font-size: 11px; font-weight: 500; letter-spacing: 0;
 }
 

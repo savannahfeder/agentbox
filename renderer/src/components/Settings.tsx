@@ -432,14 +432,21 @@ function SettingsTerminal({ command }: { command?: string }) {
 }
 
 /**
- * A HEADING OVER ONE CARD OF ROWS. `id` is what the search scrolls to: a hit
- *  on "memory" opens Running and lands on this group, lit for a moment. */
-const Group = ({ id, label, note, warn, children }: { id?: string; label?: string; note?: string; warn?: string | null; children: React.ReactNode }) => (
+ * A HEADING OVER ONE CARD OF ROWS, AND NOTHING UNDER IT. `id` is what the
+ *  search scrolls to: a hit on "memory" opens Running and lands on this group,
+ *  lit for a moment.
+ *
+ *  NO TEXT OUTSIDE THE CARD (2026-10-05): grey notes under the cards were
+ *  "a lot of text under components, gets a bit ugly", so a group no longer
+ *  takes one. Anything a row needs to say is in the row. A warning about the
+ *  whole group is the card's first line, inside it. */
+const Group = ({ id, label, warn, children }: { id?: string; label?: string; warn?: string | null; children: React.ReactNode }) => (
   <div className="set-group" data-find={id}>
     {label && <div className="set-group-label">{label}</div>}
-    {warn && <p className="set-warn set-group-warn">{warn}</p>}
-    <div className="set-plate">{children}</div>
-    {note && <div className="set-group-note">{note}</div>}
+    <div className="set-plate">
+      {warn && <div className="set-row set-row-warn" role="status">{warn}</div>}
+      {children}
+    </div>
   </div>
 );
 
@@ -509,10 +516,12 @@ const AGENT_OPTIONS: Array<{ value: AgentMode; label: string }> = [
   { value: 'off', label: 'None' },
 ];
 
+// One short sentence each (2026-10-05): the row is read at a glance, and the
+// picker beside it already names the choice.
 const AGENT_SENTENCE: Record<AgentMode, string> = {
-  all: 'Every one of them is a row in your inbox you can read and close. Closing one only takes it out of the inbox.',
-  waiting: 'Only the ones that have stopped and are waiting for you to type. The rest run without interrupting you.',
-  off: 'None of them reach your inbox. One running in a project’s folder is still in that project’s sidebar, so you can open it from there.',
+  all: 'Each one is a row in your inbox. Closing it only takes it out of the inbox.',
+  waiting: 'Only the ones waiting for you to type. The rest run without interrupting you.',
+  off: 'None reach your inbox. Each is still in its project’s sidebar.',
 };
 
 /* --------------------- IS CLAUDE CODE CONNECTED OR NOT -------------------- */
@@ -694,15 +703,7 @@ function Connection({ copy, check, found, certain, bin, url, trouble = null, acc
         : certain ? copy.missingSay : copy.unsureSay;
 
   return (
-    <Group
-      id="status"
-      label="Status"
-      /*
-       * The path, and only when there is one. It is under the plate with the
-         other grey notes rather than in the row, because it is the one thing
-         here that is for somebody who already knows what it means. */
-      note={found && bin ? copy.where(bin) : undefined}
-    >
+    <Group id="status" label="Status">
       <Row label={label} desc={say}>
         {/* The dot says the state and the word beside it says the same thing
             in English, so neither has to be learned from the other. There is
@@ -731,6 +732,10 @@ function Connection({ copy, check, found, certain, bin, url, trouble = null, acc
           <a className="set-ghost" href={url} target="_blank" rel="noreferrer">{copy.missingLink}</a>
         </Row>
       )}
+      {/* The path, and only when there is one. Its own row at the foot of the
+          card, never in the status sentence, because it is the one thing here
+          that is for somebody who already knows what it means. */}
+      {found && bin && <Row label="Runs from" desc={copy.where(bin)} />}
     </Group>
   );
 }
@@ -1094,12 +1099,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
     const agent = agentStory(w, usageReadings, engine);
     const status = { found: agent.found, certain: agent.certain, bin: agent.bin, url: agent.url, trouble: agent.trouble, onChecked: load };
     return (
-      <Page
-        title={agent.name}
-        lede={engine === 'codex'
-          ? 'How much is left, which account Codex tasks run on, and what they may do.'
-          : 'How much is left, which account your agents run on, and what they may do.'}
-      >
+      <Page title={agent.name}>
         {/* THE STATE SPEAKS ONLY WHEN IT IS BAD. */}
         {(!agent.found || agent.trouble) && (engine === 'codex' ? <CodexCli {...status} /> : <ClaudeCode {...status} />)}
         {agent.found && (
@@ -1115,9 +1115,6 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               /* TWO FOLDERS, ONE SUBSCRIPTION, SAID ABOVE THE ROWS
                  (w-f2a5c9894e). Main's sentence, about the pair. */
               warn={engine === 'claude' ? w.accountsNote : null}
-              note={!agent.accounts.some((a) => a.chosen) && agent.accounts.length > 1
-                ? 'Work runs on all of these. Pick one to use it on its own.'
-                : undefined}
             >
               <AccountRows
                 agent={agent}
@@ -1165,15 +1162,18 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 </Row>
               </Group>
             ) : (
-              <Group id="permissions" label="Permissions" note={w.permission === 'custom' ? undefined : RULES_ALWAYS_APPLY}>
+              <Group id="permissions" label="Permissions">
                 {w.permission === 'custom' ? (
                   <Row label="Permission mode" desc={PERMISSION_SENTENCE.custom} />
                 ) : (
                   <Row label="Permission mode" desc={PERMISSION_SENTENCE[w.permission]}>
+                    {/* The caveat that your own allow and deny rules sit on top
+                        of the mode rides on the picker rather than as a
+                        paragraph under the card. */}
                     <Picker
                       bare
                       label="Permission mode"
-                      title="Claude Code's own modes. The starting point for every Claude Code agent, and a single reply can be sent in another."
+                      title={`Claude Code's own modes. The starting point for every Claude Code agent, and a single reply can be sent in another. ${RULES_ALWAYS_APPLY}`}
                       value={w.permission}
                       options={PERMISSION_OPTIONS}
                       onChange={(v) => setWorkspace('permission', v)}
@@ -1296,10 +1296,10 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
             kept. Four small things set once. */}
         {model && w && pane === 'general' && (
           <Page title="General">
-            <Group id="keys" label="Keyboard" note="The keys themselves are on the Shortcuts page.">
+            <Group id="keys" label="Keyboard">
               <Row
                 label="Show keyboard shortcut hints"
-                desc="Point at a task and its right end says that task's keys. The tabs say the tab key moves between them, and the magnifier and the plus name theirs. Off, none of it is drawn and every key still works."
+                desc="Point at something and its keys appear beside it. Off, every key still works."
               >
                 <Switch label="Show keyboard shortcut hints" on={keyHints} onChange={onSetKeyHints} />
               </Row>
@@ -1307,13 +1307,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
             {/* ONE SWITCH OVER EVERYTHING THAT LEAVES THE MACHINE, and there is
                 deliberately no second one and no partial mode, because the
                 privacy page (section 10) promises there is not. */}
-            <Group
-              id="privacy"
-              label={`What ${NAME} sends`}
-              note={w.diagnosticsDestination
-                ? 'Turning it off stops both from that moment. It does not delete what was sent before.'
-                : 'This copy has nowhere to send to, so nothing leaves it either way.'}
-            >
+            <Group id="privacy" label={`What ${NAME} sends`}>
               <Row
                 label="Counts and crash reports"
                 desc={`That ${NAME} was opened, that a task was opened, that a reply was sent, and a report when something breaks. Never your code, your prompts, your keys or your paths, and never a title.`}
@@ -1348,14 +1342,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
         {/* RUNNING: how many agents work at once, what holds them back when the
             Mac is short of memory, and which of your own reach the inbox. */}
         {model && w && pane === 'running' && (
-          <Page title="Running" lede="How many agents work at once, and which agents you started yourself reach your inbox.">
-            <Group
-              id="at-once"
-              label="Agents"
-              note={w.running
-                ? `${w.running} running right now, of ${w.capacity} at once.`
-                : `Nothing running right now. Room for ${w.capacity} at once.`}
-            >
+          <Page title="Running">
+            <Group id="at-once" label="Agents">
               {/* PAUSING IS A COMMAND, NOT A SETTING (w-12081d32cc): Pause
                   agents and Unpause agents are on ⌘K. */}
               <Row
@@ -1377,7 +1365,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                        was photographed on a Pro payload. */
                     : w.sessionsAtOnceFromPlan
                       ? 'The rest wait in line.'
-                      : 'One runs at a time. The rest wait in line.'}${w.machineNote ? ` ${w.machineNote}` : ''}`}
+                      : 'One runs at a time. The rest wait in line.'}${w.machineNote ? ` ${w.machineNote}` : ''}${w.running ? ` ${w.running} running now.` : ''}`}
               >
                 {/* THE STEPPER'S RANGE IS THE SAME ON EVERY MAC (w-3d634cbc44).
                     The hardware reading is in the sentence above, where it
@@ -1398,7 +1386,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   /* AND IT CLEARS UP AFTER THEM (2026-10-05). A night of agents
                      left 7.7 GB running after every agent had finished, and the
                      Mac ran out of memory; main/leftovers.mjs has the numbers. */
-                  desc={`While this Mac is short of memory, ${twoEngines ? 'Claude Code agents' : 'agents'} run tests, builds and other heavy commands a few at a time, urgent tasks first, and anything finished agents left running is stopped. Everything else runs as normal.${twoEngines ? ' Codex agents are not held yet.' : ''}${w.memoryGate.on && w.memoryGate.now ? ` ${w.memoryGate.now}` : ''}`}
+                  desc={`Tests and builds run a few at a time, urgent first, and what finished agents left running is stopped.${twoEngines ? ' Claude Code only for now.' : ''}${w.memoryGate.on && w.memoryGate.now ? ` ${w.memoryGate.now}` : ''}`}
                 >
                   <Switch label="Hold heavy work when memory is short" on={w.memoryGate.on} onChange={(v) => setWorkspace('memoryGate', v)} />
                 </Row>
@@ -1426,14 +1414,10 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 They are rows in the Inbox and in no other list since
                 2026-08-17; this is the only place that decides how many of
                 them get there. */}
-            <Group
-              id="outside"
-              label="Agents you started yourself"
-              note={`${Name} reads this Mac every few seconds. An agent you answer in its own terminal leaves your inbox on its own.`}
-            >
+            <Group id="outside" label="Agents you started yourself">
               <Row
                 label="Show in your inbox"
-                desc={`Claude Code you started in a terminal or another app, not from here. ${AGENT_SENTENCE[w.outsideAgents]}`}
+                desc={`Claude Code started in a terminal, not from here. ${AGENT_SENTENCE[w.outsideAgents]}`}
               >
                 <Picker bare label="Agents you started yourself" value={w.outsideAgents} options={AGENT_OPTIONS} onChange={(v) => setWorkspace('outsideAgents', v)} />
               </Row>
@@ -1442,7 +1426,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
         )}
 
         {model && pane === 'appearance' && (
-          <Page title="Appearance" lede="How the app looks. Also on ⌘K.">
+          <Page title="Appearance">
             {/* A theme is the one setting on this screen you judge by LOOKING at
                 it, so the picture is the control. */}
             <Group id="theme" label="Theme">
@@ -1474,7 +1458,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 picture to blur or dim, so they do not show for it
                 (w-9e434e8671). */}
             {isSkin(look) && look !== 'ember-grid' && (
-              <Group id="tune" label={skinLabel(look)} note="Changes appear immediately and are saved for this theme.">
+              <Group id="tune" label={skinLabel(look)}>
                 {TUNE_DEFAULT[look].panelOpacity !== undefined && <Dial label={look === 'orbital-glass' ? 'Panel tint' : 'Panel whiteness'} desc="Reduce the tint to let more of the background show through." value={tune.panelOpacity ?? TUNE_DEFAULT[look].panelOpacity!} {...TUNE_LIMITS.panelOpacity} format={(v) => `${Math.round(v * 100)}%`} onChange={(panelOpacity) => onSetTune({ ...tune, panelOpacity })} />}
                 <Dial
                   label="Foreground blur"
@@ -1546,7 +1530,6 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               <ProjectIcon project={current} onPick={() => write(api.pickProjectIcon({ product: current.slug }))} onClear={() => write(api.clearProjectIcon({ product: current.slug }))} />
               <ProjectTitle project={current} onRename={(name) => write(api.renameProject({ product: current.slug, name }))} />
             </div>
-            <p className="set-lede">Everything here is this project only. Other projects are unaffected.</p>
 
             {/* FIVE CONTROLS BECAME ONE (w-d19d6d387c, 2026-09-22): whether a
                 task an AGENT files here waits for her. Her own tasks always
