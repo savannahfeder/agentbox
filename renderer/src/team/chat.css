@@ -24,6 +24,20 @@
 .chat-gt { display: block; font: 10px/25px var(--mono); color: var(--text-faint); text-align: right; visibility: hidden; }
 .chat-msg:hover .chat-gt { visibility: visible; }
 
+/* WHAT YOU DID STANDS IN THE TEXT COLUMN, NOT THE FACE COLUMN (w-2b0cd0f741).
+   The timeline's ring sat at the column's edge, which in a conversation is the
+   faces' edge, so "Snoozed until 3:36pm" stood 42px left of every word around
+   it. The words start where the names and the messages start now, the face's
+   28px and the 14px gap, and the ring sits centred under the faces, so the
+   column of faces reads as the timeline's spine. The quiet line that hands a
+   message to an agent is only ever drawn under a conversation, so it moves
+   with the words. */
+.thread.is-chat .act-line, .act-after.is-chat .act-line { padding-left: 42px; }
+.thread.is-chat .act-line::before, .act-after.is-chat .act-line::before { left: 10.5px; }
+.thread.is-chat .thread-block.is-act + .thread-block.is-act .act-line::after,
+.act-after.is-chat .act-line + .act-line::after { left: 13.5px; }
+.ts-hand { padding-left: 42px; }
+
 /* THE RULE A MESSAGE WRITES WITH ---. The message body had no rule style, so it
    drew the browser's own grooved 2px line at full strength. */
 .chat-msg .msg-body hr { border: 0; border-top: 1px solid var(--line); opacity: .5; margin: 16px 0; }

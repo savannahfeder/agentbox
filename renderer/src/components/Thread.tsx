@@ -240,7 +240,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   </>;
 
   return (
-    <div className="thread">
+    <div className={`thread${chat ? ' is-chat' : ''}`}>
       {chat && omitted > 0 && (
         <button type="button" className="thread-gap thread-gap-top" onClick={openGap}>
           {`Show ${omitted} earlier message${omitted === 1 ? '' : 's'}`}

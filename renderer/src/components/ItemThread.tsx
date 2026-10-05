@@ -273,7 +273,7 @@ export function ItemThread({ item, engine, session, opening, sending, onOpenOrig
       {answer}
       {/* What you did after that answer, under it and in order. */}
       {after.length > 0 && (
-        <div className="act-after">
+        <div className={`act-after${chat ? ' is-chat' : ''}`}>
           {after.map((act, i) => <ActLine key={`${act.at}-${i}`} act={act} />)}
         </div>
       )}

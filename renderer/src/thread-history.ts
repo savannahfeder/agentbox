@@ -113,6 +113,12 @@ export function snoozeWords(runAt: number, from: number): string {
 // to say more is still a message of hers, so the match is the whole answer.
 const PICK = /^Option (\d+): ([^\n]+)$/;
 
+// HOW LONG AFTER YOUR REPLY A LIFTED SNOOZE STILL BELONGS TO IT. The app
+// writes the two one after the other, milliseconds apart; a minute leaves room
+// for a slow disk and is still far shorter than anyone bringing a thread back
+// by hand after answering it.
+const REPLY_LIFTS_MS = 60_000;
+
 /**
  * The ledger's lines for ONE item, oldest first, as sentences.
  *
@@ -171,6 +177,12 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
   // once more after the last, which leaves the loop below exactly as it was.
   let markAt = 0;
   let markBy: string | undefined;
+  // YOUR LAST REPLY, read by the `runAt` branch. A reply lifts a snooze
+  // (`replyClearsSchedule`, list-rules), and the app writes that a moment
+  // after the answer, so it is part of the reply and not a second thing you
+  // did. It read "Brought it back" under a teammate's "Working on it" and
+  // they could not think why they had (w-2b0cd0f741).
+  let replied: { at: number; by: string | undefined } | null = null;
   const tagWriter = () => {
     if (markBy) for (let k = markAt; k < events.length; k += 1) if (!events[k].by) events[k].by = markBy;
   };
@@ -264,6 +276,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     // on the same line; an agent's finished word outranks its progress.
     if (has(patch, 'answer')) {
       const said = words(patch.answer);
+      replied = mine && said ? { at, by: markBy } : null;
       // WAS THE LAST THING SHE SENT ONE OF CLAUDE CODE'S COMMANDS. The blocked
       // line below reads differently after one, and this is the only place that
       // can tell: by the time the status arrives, the ledger line carrying
@@ -316,6 +329,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     if (has(patch, 'runAt')) {
       const runAt = Number(patch.runAt) || 0;
       if (!runAt) {
+        if (mine && replied && replied.by === markBy && at - replied.at <= REPLY_LIFTS_MS) continue;
         events.push({ at, who, said: mine ? 'You brought it back' : 'It let this run now' });
       } else {
         events.push({
