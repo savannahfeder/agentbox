@@ -29,6 +29,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mjs';
 import { Supervisor } from '../main/supervisor.mjs';
+import { waitFor, waitUntilNo } from './waiting.mjs';
 
 const FAKE = path.resolve('tests/fixtures/fake-codex-app-server.mjs');
 const SIGNED_OUT_401 = 'unauthorized: unexpected status 401 Unauthorized: Missing bearer or basic authentication in header, url: https://api.openai.com/v1/responses';
@@ -39,11 +40,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fakeLog = () => { try { return fs.readFileSync(path.join(codexHome, 'fake.log'), 'utf8').trim().split('\n'); } catch { return []; } };
 const turns = () => fakeLog().filter((l) => l.startsWith('turn '));
 const row = () => store.readItem('shop', itemId, Date.now());
-// One tick, and long enough for the run it starts to end: the fake answers in
-// milliseconds, so this waits on the session, not on a clock.
+// One tick, and long enough for the run it starts to end. This waited on a
+// five-second clock and carried on quietly when it ran out, which is how a
+// busy Mac bounced two ships off this file (w-c121bd85e6, 2026-10-04): the
+// session was still running, the assertions below read a half-finished one,
+// and the report called a sound branch red. It waits on the session now, and
+// says so out loud if the session never ends. The 100 ms after is grace for
+// the exit handler, not a ceiling anything has to fit inside.
 const settle = async () => {
   await sup.tick();
-  for (let k = 0; k < 100 && (sup.sessions.size || sup._preparing?.size); k++) await sleep(50);
+  await waitUntilNo('the run this tick started to end', () => sup.sessions.size || sup._preparing?.size);
   await sleep(100);
 };
 // What `codex login` writes. The fake reads the word; the app may only read the time.
@@ -115,6 +121,9 @@ describe('a signed-out Codex, through a real app-server', () => {
     await settle();
     await codexLogin();
     await settle();
+    // The answer landing on the row is the thing this waits for; the grace in
+    // settle is not a promise that the write has happened yet.
+    await waitFor('the row to get its answer', () => row().result);
     expect(turns()).toEqual(['turn refused', 'turn ok']);
     // A fresh process, because the old one could have kept the old login.
     expect(fakeLog().filter((l) => l.startsWith('start '))).toEqual(['start signed-out', 'start signed-in']);
