@@ -131,6 +131,17 @@
 .tc-send kbd { font: 11px var(--mono); opacity: 0.75; }
 .tc-only { flex: 1; min-width: 0; font-size: 13px; color: var(--text-faint); }
 
+/* WHY SEND IS OFF (w-f8d123be62). It takes the corner the attach clip would
+   otherwise push Send against, and it is not an error: nothing has gone wrong
+   yet, there is simply nowhere to send to. So it reads at the weight of the
+   chips beside it, with the way out as the only lit thing in the sentence. */
+.tc-why { flex: 1; min-width: 0; padding-left: 8px; font-size: 13px; line-height: 18px; color: var(--text-dim); }
+.tc-why-do {
+  font: inherit; color: var(--accent); background: none; border: 0; padding: 0;
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+.tc-why-do:hover, .tc-why-do:focus-visible { color: var(--text); outline: none; }
+
 /* ------------------------------- the menus ------------------------------- */
 /* One step lighter than the card. */
 .tc-menu {
@@ -164,6 +175,12 @@
    way to change it. The link is in the accent and not shouted in capitals, so
    it reads as a thing to press rather than as more of the heading. */
 .tc-menu-head.tc-head-split { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+
+/* The hairline over "New project": it is a way to make one, not another one to
+   pick, and without the rule it reads as the last project in the list. */
+.tc-menu-rule { display: block; height: 1px; margin: 5px 6px; background: var(--tc-hair); }
+.tc-row.tc-new-project { color: var(--text-dim); }
+.tc-row.tc-new-project:hover, .tc-row.tc-new-project:focus { color: var(--text); }
 .tc-head-link {
   font: inherit; font-size: 11.5px; letter-spacing: 0.02em; text-transform: none;
   color: var(--accent); background: none; border: none; padding: 0; cursor: pointer;

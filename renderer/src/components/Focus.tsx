@@ -1398,13 +1398,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             well is what made one screen say "Codex" twice. */}
         {!heldByPerson && <Live item={item} facts={{ ...live, session, stalled, scheduledUntil }} />}
 
-        {/* A MESSAGE FROM A PERSON BECOMES WORK ONLY WHEN SHE SAYS SO: one quiet
-            line under the latest message, and the dotted words are the door. */}
-        {direct && onHandToAgent && (
-          <p className="ts-hand">
-            <button type="button" onClick={() => onHandToAgent(item)}>Hand it to an agent</button> to turn it into a task.
-          </p>
-        )}
+        {/* NO LINE UNDER A CONVERSATION OFFERING TO HAND IT TO AN AGENT
+            (w-2e8aa16f0f): it read as one more message, and it made the whole
+            conversation one task. An agent comes in with @ in the reply box,
+            in the project its mention names (../team/ChatAgents.tsx). */}
 
       </div>
 
