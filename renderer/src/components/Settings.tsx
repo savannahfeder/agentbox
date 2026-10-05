@@ -1724,7 +1724,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               {w.leftovers && (
                 <Row
                   label="Stop what finished agents leave running"
-                  desc={`Dev servers, previews and test runs an agent started and left behind are stopped two hours after its run ends, or ten minutes while memory is short. Never stopped: what an agent was asked to keep, apps installed on this Mac such as Docker Desktop, and anything you started yourself.${twoEngines ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.on && w.leftovers.now ? ` ${w.leftovers.now}` : ''}`}
+                  desc={`Dev servers, previews, test runs and other background jobs an agent started and left behind are stopped two hours after its run ends, or ten minutes while memory is short, including what is already running when you turn this on. Never stopped: what an agent was asked to keep, apps installed on this Mac such as Docker Desktop, and anything you started yourself.${twoEngines ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.now ? ` ${w.leftovers.now}` : ''}`}
                 >
                   <Switch label="Stop what finished agents leave running" on={w.leftovers.on} onChange={(v) => setWorkspace('cleanupLeftovers', v)} />
                 </Row>

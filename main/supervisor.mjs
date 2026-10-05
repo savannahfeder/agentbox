@@ -580,7 +580,7 @@ export class Supervisor {
     // back to the session that was doing it.
     try { this.recoverInterrupted('startup'); } catch (e) { console.warn('zero: startup recovery:', e.message); }
     if (this.config.memoryGate) this.setMemoryGate(true).catch((e) => console.warn('zero: memory gate:', e.message));
-    if (this.config.cleanupLeftovers) this.setLeftoverCleanup(true).catch((e) => console.warn('zero: leftovers:', e.message));
+    this.setLeftoverCleanup(!!this.config.cleanupLeftovers).catch((e) => console.warn('zero: leftovers:', e.message));
     this._timer = setInterval(() => this.tick().catch((e) => console.warn('supervisor:', e.message)), POLL_MS);
     this.tick().catch(() => {});
   }
@@ -4541,9 +4541,9 @@ export class Supervisor {
     // else already. A fresh session gets its brief first.
     if (shipFailure) prompt = resumeId || rowChat ? shipFailure : `${prompt}\n\n${shipFailure}`;
     // WHAT HAPPENS TO WHAT IT LEAVES RUNNING, when that switch is on
-    // (main/leftovers.mjs): the rule once, in a fresh brief, and on any run
-    // the programs of this task still shutting down, which it must not reuse.
-    const leftoverNote = this.leftoverBriefNote(item, { fresh: !resumeId && !rowChat && !forkFrom });
+    // (main/leftovers.mjs): the rule, and the programs of this task still
+    // shutting down, which it must not reuse.
+    const leftoverNote = this.leftoverBriefNote(item);
     if (leftoverNote) prompt = `${prompt}\n\n${leftoverNote}`;
     // A project may override what its own sessions may do. Absent (the normal
     // case) means the workspace default, which is why this is a lookup with no
@@ -6061,6 +6061,26 @@ export class Supervisor {
 
   spawnWorker(item, { continuation = false, resumeSessionId = null, profile: forcedProfile = null, engine: forcedEngine = null, remoteOnly = false, shipFailure = null } = {}) {
     if (this._compactionJobs?.has(JSON.stringify([item.product, item.id]))) return;
+    // THIS TASK'S LEFTOVERS WERE ASKED TO STOP SECONDS AGO (main/leftovers.mjs)
+    // and may still be on their way out, so the agent waits out the rest of
+    // those 30 seconds rather than finding a dying server and reusing it. Only
+    // one retry is ever pending per row, carrying the latest call's options;
+    // if a session has started by then, the retry does nothing.
+    const hold = this._leftoverCleaner?.holdMs?.(item.id) ?? 0;
+    if (hold > 0) {
+      this._leftoverHeld ??= new Map();
+      const pending = this._leftoverHeld.has(item.id);
+      this._leftoverHeld.set(item.id, { item, opts: { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, shipFailure } });
+      if (!pending) {
+        const t = setTimeout(() => {
+          const held = this._leftoverHeld.get(item.id);
+          this._leftoverHeld.delete(item.id);
+          if (held && !this.sessions.has(item.id)) this.spawnWorker(held.item, held.opts);
+        }, hold + 100);
+        t.unref?.();
+      }
+      return;
+    }
     // ASKED ONCE, HERE, AND ANSWERED CLAUDE CODE ON EVERY MACHINE TODAY. See
     // `_engineFor` for the two independent reasons why. It is asked ahead of
     // the door rather than after it because the door is the engine's own cap
@@ -7342,26 +7362,32 @@ export class Supervisor {
   // (endSession), because only this app runs this store's tasks and so only
   // it can say for certain that a task's run is over.
 
+  // THE CLEANER ALWAYS RUNS; THE SWITCH DECIDES WHETHER IT MAY SIGNAL. Off, it
+  // looks every five minutes and reports, so the Agents page can say what
+  // turning it on would stop before anybody turns it on, and every run is
+  // recorded either way, so turning it on later finds real records rather than
+  // guesses (Codex's review, 2026-10-05). On, it looks every minute.
   async setLeftoverCleanup(on) {
-    if (!on) {
-      clearInterval(this._leftoverTimer);
-      this._leftoverTimer = null;
-      this._leftoverCleaner = null;
-      return;
+    if (!this._leftoverCleaner) {
+      this._leftoverCleaner = new LeftoverCleaner({
+        file: path.join(this.userDir, 'leftovers.json'),
+        enabled: !!on,
+        enabledSince: Number(this.config.cleanupLeftoversSince) || Date.now(),
+        live: (itemId) => this.sessions.has(itemId),
+        owns: (itemId, product) => {
+          if (!product) return false;
+          try { return !!this.store.readItem?.(product, itemId); } catch { return false; }
+        },
+        log: (line) => console.log(`zero: ${line}`),
+      });
+    } else if (on) {
+      this._leftoverCleaner.enable(Number(this.config.cleanupLeftoversSince) || Date.now());
+    } else {
+      this._leftoverCleaner.disable();
     }
-    if (this._leftoverCleaner) return;
-    this._leftoverCleaner = new LeftoverCleaner({
-      file: path.join(this.userDir, 'leftovers.json'),
-      enabledSince: Number(this.config.cleanupLeftoversSince) || Date.now(),
-      live: (itemId) => this.sessions.has(itemId),
-      owns: (itemId, product) => {
-        if (!product) return false;
-        try { return !!this.store.readItem?.(product, itemId); } catch { return false; }
-      },
-      log: (line) => console.log(`zero: ${line}`),
-    });
+    clearInterval(this._leftoverTimer);
     const tick = () => this._leftoverCleaner?.tick().catch((e) => console.warn('zero: leftovers:', e.message));
-    this._leftoverTimer = setInterval(tick, 60_000);
+    this._leftoverTimer = setInterval(tick, on ? 60_000 : 5 * 60_000);
     this._leftoverTimer.unref?.();
     tick();
   }
@@ -7375,11 +7401,13 @@ export class Supervisor {
    * and the way to keep something; any brief carries the programs of this task
    * still shutting down, which the agent must not reuse.
    */
-  leftoverBriefNote(item, { fresh = false } = {}) {
+  leftoverBriefNote(item) {
     const cleaner = this._leftoverCleaner;
-    if (!cleaner || !item?.id) return null;
+    if (!cleaner?.enabled || !item?.id) return null;
     const parts = [];
-    if (fresh) {
+    // EVERY RUN, not only a fresh one: a conversation resumed after the switch
+    // went on, and a chat, never heard it otherwise (Codex's review).
+    {
       parts.push('Anything you leave running after your turn (a dev server, a preview, a background job) is stopped two hours after you finish, sooner if this Mac runs short of memory. '
         + 'If the person needs something to keep running, start it with AGENTBOX_KEEP=1 in its environment and say so in your answer. Stop anything else you started before you finish.');
     }

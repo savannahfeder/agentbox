@@ -843,13 +843,22 @@ export function memoryGateSettings({ config, supervisor }) {
 export function leftoverSettings({ config, supervisor }) {
   const on = !!config.cleanupLeftovers;
   let now = null;
-  if (on) {
-    let s = null;
-    try { s = supervisor.leftoverStatus?.() ?? null; } catch {}
-    const list = s?.leftovers ?? [];
-    const stoppable = list.reduce((n, l) => n + (l.programs ?? 0), 0);
-    const kept = list.reduce((n, l) => n + (l.kept ?? 0), 0);
-    const total = stoppable + kept;
+  let s = null;
+  try { s = supervisor.leftoverStatus?.() ?? null; } catch {}
+  const list = s?.leftovers ?? [];
+  const stoppable = list.reduce((n, l) => n + (l.programs ?? 0), 0);
+  const kept = list.reduce((n, l) => n + (l.kept ?? 0), 0);
+  const total = stoppable + kept;
+  // OFF, IT SAYS WHAT TURNING IT ON WOULD STOP, before anybody does: the
+  // consent is to these programs too, not only to future ones (agreed with
+  // Codex, 2026-10-05).
+  if (!on) {
+    if (total && stoppable) {
+      now = `Right now finished agents have left ${total} program${total === 1 ? '' : 's'} running; turning this on stops ${stoppable === total ? (total === 1 ? 'it' : 'them') : `${stoppable} of them`}, two hours from then.`;
+    }
+    return { on, now };
+  }
+  {
     if (!total) now = 'Nothing left running by finished agents.';
     else {
       const next = list.filter((l) => l.programs && l.stopsAt).map((l) => l.stopsAt).sort((a, b) => a - b)[0];

@@ -179,15 +179,31 @@ async function readMacPressureWord() {
   return pressureFrom({ level: Number.isFinite(level) ? level : null, freePct: Number.isFinite(freePct) ? freePct : null });
 }
 
-/** Installed apps and the system: never stopped, nor anything under them. */
-export function isProtectedPath(exe, home = os.homedir()) {
-  if (!exe) return true;
-  if (!exe.startsWith('/')) return true;
-  return /^\/(Applications|System|Library|usr\/(libexec|sbin|bin)|sbin|bin)\//.test(exe)
-    || exe.startsWith(`${home}/Applications/`);
+/**
+ * An installed app or macOS itself: never stopped, and neither is anything an
+ * installed app starts. Only these, and not every system binary: launchd
+ * adopts every orphan and Claude Code runs commands through /bin/zsh, so
+ * treating /sbin or /bin as protective protected every dev server an agent ever
+ * left (found by Codex in review, 2026-10-05).
+ */
+export function isAppPath(exe, home = os.homedir()) {
+  if (!exe || !exe.startsWith('/')) return false;
+  return /^\/Applications\/[^/]+\.app\//.test(exe)
+    || /^\/System\//.test(exe)
+    || (exe.startsWith(`${home}/Applications/`) && /\.app\//.test(exe));
+}
+
+/** An executable we could not read is kept, for itself only. */
+const unreadable = (exe) => !exe || !exe.startsWith('/');
+
+/** An agent itself, which is never stopped and keeps its task alive. */
+export function isAgentProcess(p) {
+  const first = String(p.cmd ?? '').split(/\s/)[0];
+  return [p.exe, first].some((s) => /(^|\/)(claude|codex)$/.test(String(s ?? '')) || /\/claude\/versions\//.test(String(s ?? '')));
 }
 
 const idOf = (p) => `${p.pid}:${p.start}:${p.exe}`;
+const FORMAT = 2;
 
 export class LeftoverCleaner {
   constructor({
@@ -204,9 +220,12 @@ export class LeftoverCleaner {
     confirmMs = 60_000,
     settleMs = 30_000,
     home = os.homedir(),
+    // Off means look and report, never signal (agreed with Codex: the person
+    // sees what turning it on would stop before they do).
+    enabled = true,
     log = () => {},
   } = {}) {
-    Object.assign(this, { list, kill, clock, readPressure, file, enabledSince, live, owns, idleMs, tightIdleMs, confirmMs, settleMs, home, log });
+    Object.assign(this, { list, kill, clock, readPressure, file, enabledSince, live, owns, idleMs, tightIdleMs, confirmMs, settleMs, home, enabled, log });
     this.firstSeen = new Map();
     this.lastStatus = { leftovers: [], survivors: [], stopped: null, pressure: 'normal' };
     const saved = this._load();
@@ -255,6 +274,28 @@ export class LeftoverCleaner {
 
   status() { return this.lastStatus; }
 
+  /** Stop signalling from this moment, even in a look already under way. */
+  disable() { this.enabled = false; }
+
+  enable(since = this.clock()) {
+    this.enabled = true;
+    this.enabledSince = since;
+  }
+
+  /**
+   * How long a run on `item` should wait before starting, because programs of
+   * this task were asked to stop under `settleMs` ago and may still be on their
+   * way out. 0 when there is nothing to wait for.
+   */
+  holdMs(item) {
+    const now = this.clock();
+    let wait = 0;
+    for (const s of Object.values(this.stopping)) {
+      if (s.item === item) wait = Math.max(wait, s.at + this.settleMs - now);
+    }
+    return Math.max(0, wait);
+  }
+
   /* ---------------------------------- a look ---------------------------------- */
 
   async tick() {
@@ -289,18 +330,22 @@ export class LeftoverCleaner {
   _view(procs, now) {
     const byPid = new Map(procs.map((p) => [p.pid, p]));
     const memo = new Map();
+    const none = { item: null, inherits: false };
     const resolve = (p, depth = 0) => {
       if (memo.has(p.pid)) return memo.get(p.pid);
-      memo.set(p.pid, { item: p.item, guard: false });
+      memo.set(p.pid, none);
       const parent = depth < 64 ? byPid.get(p.ppid) : null;
-      const up = parent && parent.pid !== p.pid ? resolve(parent, depth + 1) : { item: null, guard: false };
+      const up = parent && parent.pid !== p.pid ? resolve(parent, depth + 1) : none;
       // A process keeps the task it was first found under: when its parent
       // exits first, launchd adopts it and the parent is no longer there to
       // say whose it is.
-      const r = {
-        item: p.item ?? up.item ?? this.taskOf.get(idOf(p)) ?? null,
-        guard: p.keep || isProtectedPath(p.exe, this.home) || this.protectedIds.has(idOf(p)) || up.guard,
-      };
+      const item = p.item ?? up.item ?? this.taskOf.get(idOf(p)) ?? null;
+      // Protection passes down only from a kept program or an installed app
+      // that belongs to a task, never from launchd, a shell or the app that
+      // spawned the agent (Codex's review, 2026-10-05). An executable that
+      // cannot be read keeps that one process and passes nothing on.
+      const inherits = !!(p.keep || isAppPath(p.exe, this.home) || this.protectedIds.has(idOf(p)) || (up.item && up.inherits));
+      const r = { item, inherits, guard: inherits || unreadable(p.exe), agent: isAgentProcess(p) };
       memo.set(p.pid, r);
       return r;
     };
@@ -311,13 +356,16 @@ export class LeftoverCleaner {
       seen.add(id);
       if (!this.firstSeen.has(id)) this.firstSeen.set(id, now);
       const r = resolve(p);
-      if (r.guard && (r.item || this.protectedIds.has(id))) this.protectedIds.add(id);
       if (!r.item) continue;
+      if (r.inherits) this.protectedIds.add(id);
       this.taskOf.set(id, r.item);
       if (!tasks.has(r.item)) tasks.set(r.item, { item: r.item, product: null, procs: [], guarded: [], agents: [] });
       const t = tasks.get(r.item);
       if (p.product && !t.product) t.product = p.product;
-      if (r.guard) t.guarded.push(p); else t.procs.push(p);
+      // An agent is never a leftover: it is the run itself, alive.
+      if (r.agent) t.agents.push(p);
+      else if (r.guard) t.guarded.push(p);
+      else t.procs.push(p);
     }
     for (const id of [...this.firstSeen.keys()]) if (!seen.has(id)) this.firstSeen.delete(id);
     for (const id of [...this.protectedIds]) if (!seen.has(id)) this.protectedIds.delete(id);
@@ -332,12 +380,22 @@ export class LeftoverCleaner {
       const p = view.byPid.get(run.worker.pid);
       if (p && !run.worker.id) { run.worker.id = idOf(p); continue; }
       const gone = !p || (run.worker.id && idOf(p) !== run.worker.id);
-      if (gone && !this.live(item)) this.runs[item] = { state: 'ended', endedAt: now, why: 'worker gone' };
+      const t = view.tasks.get(item);
+      if (gone && !this.live(item) && !t?.agents.length) this.runs[item] = { state: 'ended', endedAt: now, why: 'worker gone' };
     }
+    // A task of this app's own store with leftovers, no record, no session
+    // here and NO AGENT PROCESS carrying its id: its run is over. With an agent
+    // process still alive (a worker that outlived a crashed app) it is not,
+    // whatever this app remembers (Codex's review, 2026-10-05).
     for (const t of view.tasks.values()) {
-      if (this.runs[t.item] || this.live(t.item)) continue;
+      if (this.runs[t.item] || this._alive(t)) continue;
       if (this.owns(t.item, t.product)) this.runs[t.item] = { state: 'ended', endedAt: now, why: 'no session here' };
     }
+  }
+
+  /** A task with a session in this app, or any agent process carrying its id. */
+  _alive(t) {
+    return this.live(t.item) || t.agents.length > 0;
   }
 
   _trackStopping(view, now) {
@@ -357,8 +415,9 @@ export class LeftoverCleaner {
   /** Programs whose time has come and that have been seen long enough. */
   _due(view, now, pressure) {
     const due = [];
+    if (!this.enabled) return due;
     for (const t of view.tasks.values()) {
-      if (this.live(t.item)) continue;
+      if (this._alive(t)) continue;
       const at = this._stopsAt(t.item, pressure);
       if (at === null || now < at) continue;
       for (const p of t.procs) {
@@ -386,9 +445,11 @@ export class LeftoverCleaner {
       if (!p) continue;
       const t = view.tasks.get(d.item);
       if (!t || !t.procs.includes(p)) continue; // protected now, or no longer this task's
-      if (this.live(d.item)) continue;
+      if (this._alive(t)) continue;
       const at = this._stopsAt(d.item, pressure);
       if (at === null || now < at) continue; // a run started meanwhile
+      // Switched off while this look was under way: nothing more is signalled.
+      if (!this.enabled) break;
       try { this.kill(p.pid, 'SIGTERM'); } catch { continue; }
       this.stopping[d.id] = { item: d.item, pid: p.pid, cmd: p.cmd.slice(0, 80), exe: p.exe, at: now };
       programs++;
@@ -403,7 +464,7 @@ export class LeftoverCleaner {
   _report(view, now, pressure) {
     const out = [];
     for (const t of view.tasks.values()) {
-      if (this.live(t.item)) continue;
+      if (this._alive(t)) continue;
       const run = this.runs[t.item];
       if (run?.state === 'running') continue;
       const all = [...t.procs, ...t.guarded];
@@ -427,10 +488,14 @@ export class LeftoverCleaner {
     if (!this.file) return empty;
     try {
       const raw = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+      // Protection and attribution saved by an earlier format were worked out
+      // by rules since found wrong (protection spread from launchd and shells),
+      // so they are thrown away rather than trusted; run records stay.
+      const current = raw?.v === FORMAT;
       return {
         runs: raw?.runs && typeof raw.runs === 'object' ? raw.runs : {},
-        protectedIds: Array.isArray(raw?.protectedIds) ? raw.protectedIds : [],
-        taskOf: Array.isArray(raw?.taskOf) ? raw.taskOf.filter((e) => Array.isArray(e) && e.length === 2) : [],
+        protectedIds: current && Array.isArray(raw?.protectedIds) ? raw.protectedIds : [],
+        taskOf: current && Array.isArray(raw?.taskOf) ? raw.taskOf.filter((e) => Array.isArray(e) && e.length === 2) : [],
         stopping: raw?.stopping && typeof raw.stopping === 'object' ? raw.stopping : {},
       };
     } catch { return empty; }
@@ -444,7 +509,7 @@ export class LeftoverCleaner {
     try {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
       const tmp = `${this.file}.${process.pid}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify({ runs: this.runs, protectedIds: [...this.protectedIds], taskOf: [...this.taskOf], stopping: this.stopping }));
+      fs.writeFileSync(tmp, JSON.stringify({ v: FORMAT, runs: this.runs, protectedIds: [...this.protectedIds], taskOf: [...this.taskOf], stopping: this.stopping }));
       fs.renameSync(tmp, this.file);
     } catch (err) { this.log(`leftovers: could not save: ${err.message}`); }
   }

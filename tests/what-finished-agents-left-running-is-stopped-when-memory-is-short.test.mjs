@@ -325,8 +325,6 @@ describe('the app', () => {
     const note = sup.leftoverBriefNote({ id: 'w-x' }, { fresh: true });
     expect(note).toMatch(/AGENTBOX_KEEP=1/);
     expect(note).toMatch(/two hours/);
-    // A reply to a session that has already been told is not told again.
-    expect(sup.leftoverBriefNote({ id: 'w-x' }, { fresh: false })).toBe(null);
     await sup.setLeftoverCleanup(false);
   });
 
@@ -430,5 +428,116 @@ describe('a program that renames itself', () => {
     now += 3 * HOUR; await cleaner.tick();
     now += MIN; await cleaner.tick();
     expect(signals).toEqual([[11, 'SIGTERM']]);
+  });
+});
+
+// CODEX'S CODE REVIEW OF c7e490c, 2026-10-05: six defects, each reproduced by
+// Codex with injected listings before it reported them. One test per defect.
+describe('what the code review found', () => {
+  const NODE = '/Users/x/.nvm/versions/node/v22/bin/node';
+  const p = (pid, ppid, item, extra = {}) => ({ pid, ppid, mb: 50, start: sec(T0 - 5 * HOUR), exe: NODE, item, product: 'demo', keep: false, cmd: 'node', ...extra });
+  const LAUNCHD = { pid: 1, ppid: 0, mb: 10, start: sec(T0 - 9 * 24 * HOUR), exe: '/sbin/launchd', item: null, product: null, keep: false, cmd: '/sbin/launchd' };
+  function make(list, extra = {}) {
+    let now = T0;
+    const signals = [];
+    const c = new LeftoverCleaner({
+      list: async () => (typeof list === 'function' ? list() : list), kill: (pid, sig) => signals.push([pid, sig]), clock: () => now,
+      readPressure: async () => 'normal', enabledSince: 0, owns: () => true, ...extra,
+    });
+    return { c, signals, advance: (ms) => { now += ms; } };
+  }
+
+  it('1. switching it off while a look is under way stops nothing', async () => {
+    let calls = 0;
+    const h = make(() => { calls += 1; if (calls === 3) h.c.disable(); return [LAUNCHD, p(10, 1, 'w-done')]; });
+    h.c.ended('w-done');
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(MIN); await h.c.tick();
+    expect(h.signals).toEqual([]);
+  });
+
+  it('1b. while it is off it looks and reports, and never signals', async () => {
+    const h = make([LAUNCHD, p(10, 1, 'w-done')]);
+    h.c.disable();
+    h.c.ended('w-done');
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(MIN); await h.c.tick();
+    expect(h.signals).toEqual([]);
+    expect(h.c.status().leftovers.map((l) => l.item)).toEqual(['w-done']);
+  });
+
+  it('2. a task with a running agent process is never finished, records or not, and an agent is never signalled', async () => {
+    const worker = p(600, 500, 'w-orphan', { exe: '/Users/x/.local/bin/claude', cmd: '/Users/x/.local/bin/claude -p' });
+    const h = make([LAUNCHD, worker, p(601, 600, null)]);
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(3 * HOUR); await h.c.tick();
+    expect(h.signals).toEqual([]);
+    expect(h.c.runs['w-orphan']).toBeUndefined();
+    h.c.ended('w-orphan');
+    h.advance(3 * HOUR); await h.c.tick();
+    expect(h.signals).toEqual([]);
+  });
+
+  it('3. launchd adopting a server does not protect it', async () => {
+    const h = make([LAUNCHD, p(10, 1, 'w-done')]);
+    h.c.ended('w-done');
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(MIN); await h.c.tick();
+    expect(h.signals).toEqual([[10, 'SIGTERM']]);
+  });
+
+  it('3b. a command an agent ran through the system shell is not protected by the shell', async () => {
+    const shell = p(20, 1, 'w-done', { exe: '/bin/zsh', cmd: '/bin/zsh -c npm run dev' });
+    const h = make([LAUNCHD, shell, p(21, 20, null)]);
+    h.c.ended('w-done');
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(MIN); await h.c.tick();
+    expect(h.signals.map(([pid]) => pid).sort()).toEqual([20, 21]);
+  });
+
+  it('3c. but an installed app\'s helpers stay protected, and protection saved by the old version is thrown away', async () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-v1-')), 'leftovers.json');
+    fs.writeFileSync(file, JSON.stringify({ runs: {}, protectedIds: [`10:${sec(T0 - 5 * HOUR)}:${NODE}`], stopping: {} }));
+    const docker = p(30, 1, 'w-done', { exe: '/Applications/Docker.app/Contents/MacOS/com.docker.backend' });
+    const h = make([LAUNCHD, p(10, 1, 'w-done'), docker, p(31, 30, 'w-done')], { file });
+    h.c.ended('w-done');
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(MIN); await h.c.tick();
+    expect(h.signals).toEqual([[10, 'SIGTERM']]);
+  });
+
+  it('4. a run on a task whose programs were asked to stop under 30 seconds ago waits for the rest of that time', async () => {
+    const h = make([LAUNCHD, p(10, 1, 'w-done')]);
+    h.c.ended('w-done');
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(MIN); await h.c.tick();
+    expect(h.c.holdMs('w-done')).toBe(30_000);
+    h.advance(20_000);
+    expect(h.c.holdMs('w-done')).toBe(10_000);
+    h.advance(11_000);
+    expect(h.c.holdMs('w-done')).toBe(0);
+    expect(h.c.holdMs('w-other')).toBe(0);
+  });
+
+  it('5. while it is off, Settings says what turning it on would stop, including what is running now', async () => {
+    const { leftoverSettings } = await import('../main/settings.mjs');
+    const status = { leftovers: [{ item: 'w-a', programs: 38, kept: 2, oldest: Date.now() - 3 * 24 * HOUR, stopsAt: null }], survivors: [] };
+    const off = leftoverSettings({ config: { cleanupLeftovers: false }, supervisor: { leftoverStatus: () => status } }).now;
+    expect(off).toBe('Right now finished agents have left 40 programs running; turning this on stops 38 of them, two hours from then.');
+  });
+});
+
+describe('6. every run is told the rule while it is on', () => {
+  it('a resumed conversation too', async () => {
+    const { Supervisor } = await import('../main/supervisor.mjs');
+    const { fileURLToPath } = await import('node:url');
+    const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-brief-'));
+    const store = { listItems: () => [], listProducts: () => [], isDue: () => true, readItem: () => null };
+    const sup = new Supervisor({ storeRoot: tmp, home: tmp, cleanupLeftovers: true, cleanupLeftoversSince: T0 }, store, root, tmp, tmp);
+    await sup.setLeftoverCleanup(true);
+    expect(sup.leftoverBriefNote({ id: 'w-x' }, { fresh: false })).toMatch(/AGENTBOX_KEEP=1/);
+    await sup.setLeftoverCleanup(false);
+    expect(sup.leftoverBriefNote({ id: 'w-x' }, { fresh: true })).toBe(null);
   });
 });
