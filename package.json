@@ -56,6 +56,7 @@
     "pack": "node scripts/release.mjs --no-sign",
     "pack:side": "node scripts/pack-side.mjs",
     "release": "node scripts/release.mjs",
+    "setup:feedback": "node scripts/set-up-feedback.mjs",
     "fresh": "node scripts/fresh-user.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
     "check:public": "node scripts/check-before-public.mjs --all",
