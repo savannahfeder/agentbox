@@ -45,19 +45,23 @@ describe('the row', () => {
     priority: 5, updatedAt: NOW - HOUR, now: NOW, ...o,
   }));
 
-  it('tags a thread that has not started', () => {
-    expect(row({ held: true })).toContain('>Not started<');
+  // NOT A BOXED TAG ANY MORE (w-4189a5c1a0, 2026-10-05). Out of a dashed
+  // circle before the title, faint words after it, the time column, and
+  // nothing, the pick was faint words: the same treatment as a repeating
+  // task's schedule, so the page has one way of saying a quiet fact.
+  it('says a thread has not started in faint words after its title', () => {
+    expect(row({ held: true })).toMatch(/class="th-aside">not started</);
+    expect(row({ held: true })).not.toMatch(/th-tag/);
   });
 
   it('says nothing on a thread that has a moment, or on an ordinary one', () => {
-    expect(row({ held: false })).not.toContain('Not started');
-    expect(row({})).not.toContain('Not started');
+    expect(row({ held: false })).not.toMatch(/not started/i);
+    expect(row({})).not.toMatch(/not started/i);
   });
 
-  it('keeps the tag out of the underlined title', () => {
-    // The title cell carries the decoration; the tag is its own box after it.
+  it('puts the words straight after the title, before any mark', () => {
     const html = row({ held: true, shared: true });
-    expect(html).toMatch(/class="th-cell-title subject[^"]*"[\s\S]*th-tag/);
+    expect(html).toMatch(/Rewrite the help centre page on refunds<span class="th-aside">not started<\/span>[\s\S]*th-shared/);
   });
 });
 
@@ -96,6 +100,13 @@ describe('the underline under a row title', () => {
     for (const name of ['th-shared', 'th-shared-n', 'th-lock']) {
       expect(rule(name)).toMatch(/display: inline;/);
     }
+  });
+
+  // The faint words after a title are NOT the title, so they stay out of the
+  // line: the first drawing of them showed an urgent row's underline running
+  // on under "not started". A decoration does not paint across an inline-block.
+  it('stops before the faint words after the title', () => {
+    expect(rule('th-aside')).toMatch(/display: inline-block;/);
   });
 
   it('is the row decoration it has to survive, not a border of its own', () => {

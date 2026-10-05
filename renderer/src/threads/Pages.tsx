@@ -361,7 +361,7 @@ export function RowCells({ live = false, lead, title, hidden = false, lock = fal
   title: ReactNode; hidden?: boolean; lock?: boolean; shared?: boolean; where: ReactNode; person?: ReactNode;
   /** How many people a thread shared with chosen people reaches; 0 for the team. */
   chosen?: number;
-  /** Added to Later and not started: the row says so in a tag (w-afb66e6661). */
+  /** Added to Later and not started (w-afb66e6661): faint words after the title (w-4189a5c1a0). */
   held?: boolean;
   /** A mark before the title when nothing is live: a repeating task's RepeatMark. */
   lead?: ReactNode;
@@ -376,7 +376,7 @@ export function RowCells({ live = false, lead, title, hidden = false, lock = fal
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
         people with a small count beside them for a thread only a few people
         see. The whole team, the default, carries nothing (2026-10-02). */}
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live ? <StateGlyph state="running" live /> : lead}{title}{aside && <span className="th-aside">{aside}</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{held && <span className="th-tag">Not started</span>}</div>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live ? <StateGlyph state="running" live /> : lead}{title}{aside && <span className="th-aside">{aside}</span>}{held && <span className="th-aside">not started</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}</div>
     <div className="th-cell-proj">{where}</div>
     {person !== undefined && <div className="th-cell-person">{person}</div>}
     <div className={`th-cell-prio${id === 'urgent' ? ' urgent' : ''}`}>{id && <><PriorityMark id={id} />{priorityLabelOf(id)}</>}</div>
