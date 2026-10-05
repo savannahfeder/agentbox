@@ -117,8 +117,6 @@ export function teammateRows(cards: ThreadCard[], { tab, picked, me, display, pr
   return cards.filter((c) => {
     if (c.personId === me || !picked.includes(c.personId) || !c.visible) return false;
     if (!inTab(c.state)) return false;
-    // Shared with you by definition, so Only private leaves none of them.
-    if (display.privacy === 'private') return false;
     if (display.priorities.length && !display.priorities.includes(priorityIdOf(c.priority))) return false;
     if (display.projects.length && !display.projects.includes(slugOf.get(c.project ?? '') ?? '')) return false;
     if (display.updated === 'today' && !(c.updatedAt >= startOfDay(now))) return false;

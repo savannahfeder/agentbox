@@ -14,8 +14,8 @@ import { productRankScore } from '../../../shared/rank.mjs';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
-/** All, Hide private ('shared'), or Only private. */
-export type Privacy = 'any' | 'shared' | 'private';
+/** Private threads shown ('any') or hidden ('shared'). */
+export type Privacy = 'any' | 'shared';
 export interface Display {
   view: 'list' | 'board';
   sort: 'priority' | 'updated';
@@ -43,9 +43,7 @@ export const DEFAULT_DISPLAY: Record<PageId, Display> = {
  * private and stays under Hide private.
  */
 export function keepsPrivacy(seen: Seen | null | undefined, privacy: Privacy | undefined): boolean {
-  if (privacy === 'shared') return seen !== 'private';
-  if (privacy === 'private') return seen === 'private';
-  return true;
+  return privacy !== 'shared' || seen !== 'private';
 }
 
 // ONE CHOICE FOR THE WHOLE PAGE, not one per half of it. Each half remembers
@@ -56,7 +54,9 @@ const PRIVACY_KEY = 'threads.privacy';
 export function readPrivacy(store: Pick<Storage, 'getItem'> | null = typeof localStorage === 'undefined' ? null : localStorage): Privacy {
   try {
     const p = JSON.parse(store?.getItem(PRIVACY_KEY) ?? 'null');
-    return p === 'shared' || p === 'private' ? p : 'any';
+    // The first version also offered Only private; one saved then reads as
+    // Show, since the menu no longer has a way back out of it.
+    return p === 'shared' ? p : 'any';
   } catch {
     return 'any';
   }
@@ -119,7 +119,7 @@ export function writeDisplay(page: PageId, d: Display, store: Pick<Storage, 'set
 
 /** Whether any filter is on, which is what puts the dot on the Display icon. */
 export const isFiltered = (d: Display) => d.priorities.length > 0 || d.projects.length > 0 || d.updated !== 'any'
-  || d.privacy === 'shared' || d.privacy === 'private';
+  || d.privacy === 'shared';
 
 const startOfDay = (now: number) => { const t = new Date(now); t.setHours(0, 0, 0, 0); return t.getTime(); };
 

@@ -155,7 +155,7 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
   const projects = showAll ? [...topProjects, ...moreProjects] : topProjects;
   const set = (patch: Partial<Display>) => onDisplay({ ...display, ...patch });
   const windows: [UpdatedWindow, string][] = [['today', 'Today'], ['week', 'This week'], ['any', 'Any time']];
-  const privacies: [Privacy, string][] = [['any', 'All'], ['shared', 'Hide private'], ['private', 'Only private']];
+  const privacies: [Privacy, string][] = [['any', 'Show'], ['shared', 'Hide']];
   const privacy = display.privacy ?? 'any';
   return <div className="th-pop" role="dialog" aria-label={page === 'inbox' ? 'Inbox view and filters' : 'Team view and filters'}>
     {people && <PeopleLine {...people} />}
@@ -181,15 +181,17 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
         {showAll ? 'Show fewer' : `Show all ${topProjects.length + moreProjects.length}`}
       </button>}
     </span></div>}
+    {/* PRIVATE THREADS, SHOW OR HIDE (w-f6ea56b89a): Hide for when somebody
+        is looking at your screen. Two plain choices, because the first
+        version's All / Hide private / Only private read as "very confusing".
+        Only on a team, where a thread can be private at all; `people` is
+        there exactly when you are on one. */}
+    {people && <div className="line"><span className="lab">Private</span><span className="opts">
+      {privacies.map(([p, label]) => <button type="button" key={p} className={privacy === p ? 'on' : ''} onClick={() => set({ privacy: p })}>{label}</button>)}
+    </span></div>}
     <div className="line"><span className="lab">Updated</span><span className="opts">
       {windows.map(([w, label]) => <button type="button" key={w} className={display.updated === w ? 'on' : ''} onClick={() => set({ updated: w })}>{label}</button>)}
     </span></div>
-    {/* PRIVACY (w-f6ea56b89a): Hide private for when somebody is looking at
-        your screen. Only on a team, where a thread can be private at all;
-        `people` is there exactly when you are on one. */}
-    {people && <div className="line"><span className="lab">Privacy</span><span className="opts">
-      {privacies.map(([p, label]) => <button type="button" key={p} className={privacy === p ? 'on' : ''} onClick={() => set({ privacy: p })}>{p === 'private' && <LockMark />}{label}</button>)}
-    </span></div>}
     <div className="rule" />
     <div className="foot"><span>{shown !== undefined && total !== undefined ? `Showing ${shown} of ${total}` : ''}</span>
       {isFiltered(display) && <button type="button" onClick={() => set({ priorities: [], projects: [], updated: 'any', privacy: 'any' })}>Clear filters</button>}

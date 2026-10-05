@@ -6,11 +6,18 @@
 // who can see a thread, so every row with a lock on it was on the screen for
 // whoever was looking over your shoulder.
 //
-// It is one more line in that menu, Privacy: All, Hide private, Only private.
-// A private thread is exactly a row that wears the lock (`rowSharing` says
-// 'private'), so what the filter takes away is what the eye already reads as
-// private. Measured before the fix: `keeps` had no privacy argument at all and
-// the menu drew no Privacy line, so both halves below were red.
+// It is one more line in that menu, Private: Show or Hide. A private thread
+// is exactly a row that wears the lock (`rowSharing` says 'private'), so what
+// the filter takes away is what the eye already reads as private. Measured
+// before the fix: `keeps` had no privacy argument at all and the menu drew no
+// line for it, so both halves below were red.
+//
+// The first version shipped as Privacy: All, Hide private, Only private, after
+// Updated. Seen in the app: "UI-wise it's very confusing. That filter should be
+// relatively simple but it's not. Also put it above Updated." Two of three
+// choices said "private" and read like two filters. Measured before this
+// change: the menu tests below found three choices and the line after
+// Updated, and were red.
 //
 // It is ONE choice for the whole page, not one per half of it. Your page and
 // the page with teammates on it remember their own view and filters, and a
@@ -45,22 +52,16 @@ const card = (o = {}) => ({
 const memory = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)) }; };
 
 describe('keepsPrivacy: what each choice keeps', () => {
-  it('Hide private takes away the rows with a lock and nothing else', () => {
+  it('Hide takes away the rows with a lock and nothing else', () => {
     expect(keepsPrivacy('private', 'shared')).toBe(false);
     expect(keepsPrivacy('team', 'shared')).toBe(true);
     expect(keepsPrivacy('people', 'shared')).toBe(true);
   });
-  it('Hide private leaves the rows the question does not arise on: a message, an agent, the app’s own rows', () => {
+  it('Hide leaves the rows the question does not arise on: a message, an agent, the app’s own rows', () => {
     expect(keepsPrivacy(null, 'shared')).toBe(true);
     expect(keepsPrivacy(undefined, 'shared')).toBe(true);
   });
-  it('Only private keeps the rows with a lock and nothing else', () => {
-    expect(keepsPrivacy('private', 'private')).toBe(true);
-    expect(keepsPrivacy('team', 'private')).toBe(false);
-    expect(keepsPrivacy('people', 'private')).toBe(false);
-    expect(keepsPrivacy(null, 'private')).toBe(false);
-  });
-  it('All keeps everything, and so does a display saved before there was a choice', () => {
+  it('Show keeps everything, and so does a display saved before there was a choice', () => {
     for (const seen of ['private', 'team', 'people', null]) {
       expect(keepsPrivacy(seen, 'any')).toBe(true);
       expect(keepsPrivacy(seen, undefined)).toBe(true);
@@ -69,7 +70,7 @@ describe('keepsPrivacy: what each choice keeps', () => {
 });
 
 describe('keeps: the privacy choice joins the other filters', () => {
-  it('drops a private row under Hide private, keeps a shared one', () => {
+  it('drops a private row under Hide, keeps a shared one', () => {
     expect(keeps(item(), display({ privacy: 'shared' }), NOW, 'private')).toBe(false);
     expect(keeps(item(), display({ privacy: 'shared' }), NOW, 'team')).toBe(true);
   });
@@ -80,16 +81,15 @@ describe('keeps: the privacy choice joins the other filters', () => {
     expect(keeps(item(), display(), NOW, 'private')).toBe(true);
     expect(keeps(item(), display(), NOW)).toBe(true);
   });
-  it('counts as a filter, so the dot and Clear filters show', () => {
+  it('counts as a filter when Hide is on, so the dot and Clear filters show', () => {
     expect(isFiltered(display({ privacy: 'shared' }))).toBe(true);
-    expect(isFiltered(display({ privacy: 'private' }))).toBe(true);
     expect(isFiltered(display({ privacy: 'any' }))).toBe(false);
     expect(isFiltered(display())).toBe(false);
   });
 });
 
 describe('one choice for the whole page', () => {
-  it('is remembered between launches, and anything unreadable is All', () => {
+  it('is remembered between launches, and anything unreadable is Show', () => {
     const store = memory();
     expect(readPrivacy(store)).toBe('any');
     writePrivacy('shared', store);
@@ -99,6 +99,11 @@ describe('one choice for the whole page', () => {
     store.setItem('threads.privacy', '{not json');
     expect(readPrivacy(store)).toBe('any');
   });
+  it('reads a saved Only private, which the menu no longer offers, as Show, so nobody is stuck in it', () => {
+    const store = memory();
+    store.setItem('threads.privacy', '"private"');
+    expect(readPrivacy(store)).toBe('any');
+  });
   it('rides on whichever half of the page is showing', () => {
     const mine = readDisplay('inbox', memory());
     const theirs = readDisplay('team', memory());
@@ -106,20 +111,17 @@ describe('one choice for the whole page', () => {
     expect(pageDisplay(theirs, 'shared', true).privacy).toBe('shared');
     expect(pageDisplay(theirs, 'shared', true).view).toBe('board');
   });
-  it('means nothing off a team, where no row is private, so it reads as All there', () => {
-    expect(pageDisplay(display(), 'private', false).privacy).toBe('any');
+  it('means nothing off a team, where no row is private, so it reads as Show there', () => {
+    expect(pageDisplay(display(), 'shared', false).privacy).toBe('any');
   });
 });
 
 describe('teammates’ threads', () => {
   const args = (privacy) => ({ tab: 'inbox', picked: [ME, maya.id], me: ME, display: display({ privacy }), products: [northwind], now: NOW });
-  it('are shared with you by definition, so Hide private keeps them', () => {
+  it('are shared with you by definition, so Hide keeps them', () => {
     expect(teammateRows([card()], args('shared'))).toHaveLength(1);
   });
-  it('and Only private leaves none of them', () => {
-    expect(teammateRows([card()], args('private'))).toHaveLength(0);
-  });
-  it('and All keeps them', () => expect(teammateRows([card()], args('any'))).toHaveLength(1));
+  it('and Show keeps them', () => expect(teammateRows([card()], args('any'))).toHaveLength(1));
 });
 
 describe('the board takes the same choice', () => {
@@ -129,27 +131,40 @@ describe('the board takes the same choice', () => {
     items: [shared, locked], products: [northwind], display: display({ view: 'board', privacy }), now: NOW,
     cards: [card()], picked: [ME, maya.id], me: ME, since: SINCE,
   }).flatMap((c) => c.rows).map((e) => e.item?.title ?? e.title).sort();
-  it('Hide private takes the locked card off and leaves yours and theirs', () => {
+  it('Hide takes the locked card off and leaves yours and theirs', () => {
     expect(titles('shared')).toEqual(['Acme renewal', 'Shared one']);
   });
-  it('Only private leaves the locked card alone', () => expect(titles('private')).toEqual(['Locked one']));
-  it('All leaves all three', () => expect(titles('any')).toEqual(['Acme renewal', 'Locked one', 'Shared one']));
+  it('Show leaves all three', () => expect(titles('any')).toEqual(['Acme renewal', 'Locked one', 'Shared one']));
 });
 
-describe('the Privacy line in View and filters', () => {
+describe('the Private line in View and filters', () => {
   const pick = { everyone: [me, maya], picked: [ME], me: ME, onPick: () => {} };
   const menu = (people, d = display()) => renderToStaticMarkup(React.createElement(DisplayMenu, { page: 'inbox', display: d, onDisplay: () => {}, products: [], people }));
-  it('offers All, Hide private and Only private, after Updated', () => {
-    const html = menu(pick);
-    expect(html).toMatch(/Updated[\s\S]*Privacy[\s\S]*All[\s\S]*Hide private[\s\S]*Only private/);
+  const line = (html) => html.match(/<span class="lab">Private<\/span>[\s\S]*?<\/div>/)?.[0] ?? '';
+  it('offers exactly two choices, Show and Hide', () => {
+    const buttons = [...line(menu(pick)).matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g)].map((m) => m[1]);
+    expect(buttons).toEqual(['Show', 'Hide']);
   });
-  it('lights the choice that is on', () => {
-    expect(menu(pick, display({ privacy: 'shared' }))).toMatch(/class="on"[^>]*>(<svg[\s\S]*?<\/svg>)?Hide private/);
+  it('sits above Updated, just under Project', () => {
+    const products = [northwind, { slug: 'meadow', name: 'Meadow' }];
+    const items = [item(), item({ id: 'w-2', product: 'meadow' })];
+    const html = renderToStaticMarkup(React.createElement(DisplayMenu, { page: 'inbox', display: display(), onDisplay: () => {}, products, items, people: pick }));
+    expect(html).toMatch(/>Project<[\s\S]*>Private<[\s\S]*>Updated</);
+  });
+  it('sits above Updated when there is no Project line too', () => {
+    expect(menu(pick)).toMatch(/>Private<[\s\S]*>Updated</);
+  });
+  it('lights Show by default and Hide when it is on', () => {
+    expect(line(menu(pick))).toMatch(/class="on"[^>]*>Show</);
+    expect(line(menu(pick, display({ privacy: 'shared' })))).toMatch(/class="on"[^>]*>Hide</);
+  });
+  it('no longer offers Only private', () => {
+    expect(menu(pick)).not.toContain('Only private');
   });
   it('is not there off a team, where nothing is private', () => {
-    expect(menu(undefined)).not.toContain('Privacy');
+    expect(menu(undefined)).not.toContain('>Private<');
   });
   it('is there on a team of one too: your threads can still be private', () => {
-    expect(menu({ everyone: [me], picked: [ME], me: ME, onPick: () => {} })).toContain('Privacy');
+    expect(menu({ everyone: [me], picked: [ME], me: ME, onPick: () => {} })).toContain('>Private<');
   });
 });
