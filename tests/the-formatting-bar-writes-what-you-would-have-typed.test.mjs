@@ -12,6 +12,7 @@
 // that is to type the second word. So every case below checks the selection it
 // leaves as well as the text it writes.
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
 import { applyFormat, insertAt } from '../renderer/src/team/compose-format.ts';
 import { quoteOf, withQuote } from '../renderer/src/team/chat-quote.ts';
 
@@ -92,6 +93,31 @@ describe('@ and an emoji', () => {
 
   it('replaces a selection the way typing would', () => {
     expect(shown(insertAt('hi you', 3, 6, '@'))).toBe('hi @[]');
+  });
+});
+
+// AND THAT THE BAR IS ACTUALLY ON THE BOX.
+//
+// Everything above is the pure rule, which passes whether or not anything draws
+// it. This row was merged into four times while it waited to ship, every merge
+// landing in the same few lines of the composer, and a resolution that quietly
+// dropped the bar would have left all twenty tests above green. So the wiring
+// is pinned too: drawn in a chat, handed the box, and nowhere near a thread with
+// an agent, where a reply is an instruction and not a formatted message.
+describe('the bar is wired to the reply box', () => {
+  const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
+
+  it('is drawn on the composer, taking the box and the attach handler', () => {
+    expect(focus).toMatch(/<FormatBar box=\{ref\} onChange=\{changeText\} onAttach=\{pickFiles\} \/>/);
+  });
+
+  it('is drawn only when the reply goes to people, never to an agent', () => {
+    expect(focus).toMatch(/\{talkTo\?\.length \? <FormatBar/);
+  });
+
+  it('has a file picker for its attach button to open', () => {
+    expect(focus).toMatch(/const pickFiles = \(\) => filePicker\.current\?\.click\(\);/);
+    expect(focus).toMatch(/ref=\{filePicker\}/);
   });
 });
 
