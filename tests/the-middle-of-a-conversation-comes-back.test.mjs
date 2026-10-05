@@ -289,15 +289,7 @@ describe('the ask she typed opens the conversation', () => {
     // the run of commands at the very bottom belongs to the thinking mark and
     // is not drawn twice. Her ask goes in front of whichever list is being
     // drawn, which is the part this line is pinning.
-    //
-    // It carries one more field since w-2e13752a85, and nothing else changed:
-    // on a row no worker has written to, the ask SHE typed is the field an
-    // offer comes off, so the opening message is a turn that can be the one
-    // the options were asked on, and it is matched and cleaned on exactly the
-    // terms every other turn is.
-    expect(item).toMatch(/at: opening\.at, who: 'you' as const, on: opening\.on,/);
-    expect(item).toMatch(/\}, \.\.\.shown\]/);
-    expect(item).toMatch(/text: offerOnTurn\(opening\.text, offer \?\? null\) \? clean\(opening\.text\) : opening\.text,/);
+    expect(item).toMatch(/\[\{ at: opening\.at, who: 'you' as const, text: opening\.text, on: opening\.on \}, \.\.\.shown\]/);
   });
 
   // NOTHING COUNTS THE CONVERSATION OVER THE TOP OF IT ANY MORE.

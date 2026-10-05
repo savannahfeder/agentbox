@@ -523,52 +523,6 @@ export const fixtureHistory: Record<string, Array<Record<string, any>>> = {
     { id: 'w-p0', ts: now - 31 * min, source: 'agent', epoch: 4, claim: { holder: 'mcp-38801', leaseUntil: now - 26 * min }, patch: { status: 'claimed' } },
     { id: 'w-p0', ts: now - 27 * min, source: 'agent', epoch: 4, patch: { status: 'done' } },
   ],
-  // THE OFFER AT THE END OF A RUN, WITH THE RUN IT CAME OFF (w-2e13752a85).
-  //
-  // The row above has existed since the picker learned to read a result, and it
-  // had no ledger, so the one fixture in this file built to show a pick opened
-  // on "Nothing has been said here yet." That was invisible while the options
-  // were docked below the conversation and drawn whatever the conversation
-  // said. They are on the turn they were offered on now, so a row with no turns
-  // cannot show the thing it exists to show.
-  //
-  // The lines are the row's own fields in the order they were written, which is
-  // what the store really holds: the directive, a checkpoint, the answer, and
-  // the result that offers the pick.
-  'w-p4': [
-    {
-      id: 'w-p4', ts: now - 3 * hr, source: 'founder',
-      patch: {
-        title: 'The booster opening animation is too slow on the second card.',
-        status: 'open', kind: 'directive', priority: 5,
-        body: 'The booster opening animation is too slow on the second card. It feels fine on the first and then it drags, and by the fifth I am waiting on it rather than watching it.',
-      },
-    },
-    { id: 'w-p4', ts: now - 95 * min, source: 'agent', epoch: 2, claim: { holder: 'mcp-41190', leaseUntil: now - 90 * min }, patch: { status: 'claimed' } },
-    {
-      id: 'w-p4', ts: now - 92 * min, source: 'agent', epoch: 2,
-      patch: { note: 'Timed all five cards on the real build, ten opens each. The second is the only one at 340ms and the rest are already at 200.' },
-    },
-    { id: 'w-p4', ts: now - 70 * min, source: 'founder', patch: { answer: 'Yes, try it at 200ms and show me.' } },
-    {
-      id: 'w-p4', ts: now - 3 * min, source: 'agent', epoch: 2,
-      patch: {
-        status: 'done',
-        result: [
-          '**The second card is at 200ms and it is on the branch, ready to merge.**',
-          '',
-          'All five cards now turn at the same speed, which is what made the second one feel like a stall: it was the only one at 340. A full booster is 1.1 seconds faster end to end, measured on the real build over ten opens, not estimated.',
-          '',
-          'The one judgement left is the flip on the rare card, which still holds a beat longer on purpose. Merge it as it is, take the beat off the rare card too, or leave it on the branch until you have opened one yourself.',
-          '',
-          '## Options',
-          '1. Merge it (recommended)',
-          '2. Take the extra beat off the rare card first',
-          '3. Leave it on the branch until I have opened one',
-        ].join('\n'),
-      },
-    },
-  ],
 };
 
 // Two repeating tasks and the runs behind them, so the Scheduled group and the

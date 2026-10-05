@@ -44,7 +44,7 @@ import { commandDraft } from '../../../shared/claude-commands.mjs';
 import { CompactionResult, runCompaction, runCommand } from './CompactionResult';
 import { codexCommand, COMPACTION_COPY } from '../../../shared/codex-commands.mjs';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
-import { ago, dayLabel, offerIsLive, parseRepeat } from '../format';
+import { ago, dayLabel, itemOptions, offerIsLive, optionsFrom, parseOptions, parseRepeat } from '../format';
 import { ruleIdOf } from '../../../shared/repeats.mjs';
 import { WhenPicker } from './When';
 import { ModelPicker } from './Model';
@@ -66,7 +66,8 @@ import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveD
 import { foldedReply } from '../folded-reply';
 import { applyDockHeight } from '../dock-height';
 import { resumeTo } from '../thread-bottom';
-import { offerFor, offerOnTurn } from '../offer-in-thread';
+import { optionIsClipped, optionPeek } from '../option-peek';
+import { askLine, askFull, askIsClipped } from '../ask-line';
 import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
 import { recapFor, type Recap as RecapValue } from '../recap';
 import type { LiveFacts } from '../live-line';
@@ -78,7 +79,6 @@ import { Live } from './Live';
 import { SidebarIcon } from './SidebarIcon';
 import { Byline } from './Byline';
 import { ItemThread } from './ItemThread';
-import { OptionBlock } from './OptionBlock';
 import type { PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle } from '../list-rules';
@@ -537,6 +537,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // A TASK GIVEN TO A PERSON has no agent on it, so nothing says one is not running.
   const teamCtx = useContext(TeamContext);
   const heldByPerson = teamHeld(item, teamCtx);
+  // Whatever the pane is leading with, not the ask alone: on a row the user wrote,
+  // the ask is the one field a worker cannot answer in (format.ts says why).
+  const options = itemOptions(item);
+
   // A ROW THAT STANDS FOR A RUNNING AGENT, not for work in a ledger. Almost
   // every verb this pane offers means nothing to one: there is no task to
   // close, nothing to defer, no worker to stop and no thread to page back
@@ -719,15 +723,50 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     };
   }, [item.id, onScrolled]);
 
-  // THE FOLD, THE CLAMP AND THE TWO HOVER CARDS WENT WITH THE DOCK
-  // (w-2e13752a85). All four were answers to the options being a permanent
-  // fixture over the reply box: a chevron to get them out of the way, a
-  // two-line clamp so a long option could not push the message up the screen,
-  // and a card over the message for each of the two things the clamp then cut
-  // (the question and the option). On the turn they were asked on there is no
-  // fixture to fold, nothing competing for the pane's height, and the question
-  // is the paragraph directly above the rows, so the clamp, the chevron,
-  // `ask-line.ts` and `option-peek.ts` are all deleted rather than carried.
+  // The options strip on the composer collapses (chevron), and reopens fresh
+  // for every task: a fold is a reading preference, not a standing setting.
+  //
+  // THE HALF FOLD IT HAD FOR ONE DAY IS GONE. Under a full screen document
+  // this started false, so the strip drew its heading and nothing else. She is
+  // right: a heading with no options under it is neither the question answered
+  // nor the page unobstructed, it is a third state nobody asked for. Full
+  // screen hides the WHOLE strip until she opens the box, which is
+  // `stripShown` below.
+  const [optsOpen, setOptsOpen] = useState(true);
+  useEffect(() => { setOptsOpen(true); }, [item.id]);
+
+  // Arrowing onto an option that has scrolled offscreen brings it into view.
+  const selRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (selectedOption !== null) selRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [selectedOption]);
+
+  // THE OPTION UNDER THE POINTER, IN FULL, IN A CARD OVER THE MESSAGE. The
+  // rules live in ../option-peek: hover only, and only on an option the strip
+  // is cutting.
+  //
+  // The measurement happens on the way in rather than on every render, because
+  // whether two lines are enough depends on the width the pane happens to have
+  // right now, and reading it once per hover is both current and free.
+  const [peek, setPeek] = useState<number | null>(null);
+  useEffect(() => { setPeek(null); }, [item.id, optsOpen]);
+  const onOptionEnter = (n: number, el: HTMLElement) => {
+    const text = el.querySelector('.opt-text');
+    setPeek(optionPeek(n, !!text && optionIsClipped(text)));
+  };
+  const peekOption = peek === null ? null : options.find((o) => o.n === peek) ?? null;
+
+  // AND THE QUESTION ITSELF, ON THE SAME TERMS.
+  //
+  // The heading is the one line in the strip she had no way to finish reading,
+  // which is the worst place in the pane for it to happen: the options
+  // underneath are answers to a sentence she can only see half of.
+  const [askPeek, setAskPeek] = useState(false);
+  useEffect(() => { setAskPeek(false); }, [item.id]);
+  const onAskEnter = (el: HTMLElement) => {
+    setAskPeek(askIsClipped(ask, askAll, el.querySelector('span')));
+  };
+
   const product = item.product;
 
   // WHAT THIS RUN CHANGED, READ ONCE PER CARD.
@@ -908,31 +947,40 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // has one of each sitting above the code card she was pointing at.
     : [...new Set([...htmlArtifacts, ...referencedFiles(item.result, item.note, item.body, item.answer, {dir: productDir}).filter(path => /\.(md|markdown)$/i.test(path) && !isBookkeeping(path))])];
   const showOptions = offerIsLive(item);
-  // THE OFFER THIS ROW MADE, AND WHICH TURN IT WAS MADE ON (said 2026-10-05). It is drawn in the conversation at the end of that turn, so
-  // the strip that used to stand above the reply box for as long as the task
-  // was open is gone from here entirely. ../offer-in-thread holds the rule and
-  // says why it is one rule rather than a condition in each place.
-  const offer = useMemo(() => offerFor(item), [item.result, item.note, item.body, item.answer, item.wrote]);
+  // WHETHER THE STRIP IS DRAWN, which is not the same question as whether the
+  // row has a live offer. Everywhere else the two are the same. Opening the box
+  // brings the options with it, and clicking away from the box takes them away
+  // again (App.tsx, `closeReplyOnTheWayOut`).
+  //
+  // `showOptions` itself must NOT be narrowed for this. It also decides whether
+  // the options list is stripped out of the message text below (`cleanMessage`),
+  // so a full screen row would have printed its own options twice.
+  const stripShown = showOptions && (artifactView !== 'focus' || replyOpen);
+  // The strip already draws the list, so the field that carried it prints
+  // without it. Only that field: a result offering a pick must not silently
+  // eat an "## Options" heading left behind in an older body.
+  const optSource = optionsFrom(item);
+  const offered = (item[optSource] ?? '').trim();
+  // The sentence the options answer, drawn as the strip's heading below, and
+  // the whole of it for the card that opens when the heading cannot hold it.
+  const ask = useMemo(() => askLine(item), [item.result, item.note, item.body, item.title]);
+  const askAll = useMemo(() => askFull(item), [item.result, item.note, item.body, item.title]);
 
   // WHAT A MESSAGE LOOKS LIKE ONCE THE PANE HAS TAKEN ITS SHARE. The thread
   // reads its messages out of the row's ledger, so the two things the pane
   // already draws elsewhere have to come off them here or they print twice.
   //
-  // The options list is drawn as a block at the end of that same message, so
-  // the words come off it and the block goes on in their place
-  // (`stripOptionsSection` above). Only the field the offer actually came from
-  // loses its list: a result offering a pick must not silently eat an
-  // "## Options" heading left behind in an older body.
-  //
-  // IT COMES OFF A SPENT OFFER TOO, which it did not before. An answered offer
-  // used to keep its markdown list because nothing else was drawing it; the
-  // block is now drawn on both, as the live question or as the record of what
-  // was offered, so leaving the list in would print it twice.
+  // The options list is drawn on the composer, on the strip she picks from
+  // (`stripOptionsSection` above says why), and only the field the live offer
+  // actually came from loses it. A message that merely HOLDS the same words as
+  // an older offer keeps them, because on a finished row the list is the record
+  // of what was offered.
   //
   // "## Gist" is a heading old workers wrote above their first paragraph and
   // she reads straight past.
   const cleanMessage = (text: string) => {
-    const off = offerOnTurn(text, offer) ? stripOptionsSection(text) : text;
+    const off = showOptions && !!offered && text.trim() === offered
+      ? stripOptionsSection(text) : text;
     return off.replace(/^##\s*Gist\s*\n+/i, '');
   };
 
@@ -1305,24 +1353,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               md={md}
               clean={cleanMessage}
               onOpenDoc={onOpenDoc}
-              /* THE OPTIONS, FOR THE TURN THEY WERE OFFERED ON. The thread
-                 matches the turn and draws them at the end of it; this hands
-                 down what was offered and what a press means. */
-              offer={offer}
-              selectedOption={selectedOption}
-              onPick={onPick}
             />
           )}
-
-        {/* A ROW WITH NO CONVERSATION STILL HAS TO BE ANSWERABLE. The trouble
-            and update rows are one message and no ledger, and an imported
-            Claude Code session draws its own transcript from disk, so none of
-            them has a turn for the thread to hang an offer on. The block goes
-            under the one message there is, which is the same promise: at the
-            end of what was said, not docked below everything for ever. */}
-        {(made || agent) && offer && (
-          <OptionBlock offer={offer} selected={selectedOption} onPick={onPick} />
-        )}
 
         {/* WHAT THIS THREAD FILED, IN LINE, under what it said about them
             (w-2e8aa16f0f). The result names them in prose; this is where each
@@ -1499,21 +1531,91 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           {/* A TASK A TEAMMATE GAVE YOU: to an agent, keep it, or hand it back.
               Unless they wrote options of their own, which are the better
               answers to their question and are drawn instead. */}
-          {/* THE AGENT'S OWN OPTIONS ARE NOT HERE ANY MORE (w-2e13752a85).
-              They are in the conversation, at the end of the turn they were
-              offered on, and they scroll away with it. Said 2026-10-05:
-              "right now all my chats have this stuck at the bottom. it should
-              instead occur at the end of the turn/message where it occured...
-              Once I've seen it as a user, I don't really want to see it
-              continuously. It's been processed."
+          {!stripShown && <TeamRouteStrip item={item} />}
+          {stripShown && (
+            <div className="opt-strip">
+              {/* THE HEADING IS THE QUESTION, NOT THE NAME OF THE CONTROL.
 
-              THIS ONE STAYS, and it is a different thing wearing the same
-              clothes: not an agent's answer to a question but the three ways
-              to route a task a teammate handed you, which is a control the app
-              is offering and belongs with the other controls. It still gives
-              way to an agent's live offer, because those are the better
-              answers to the question actually on the screen. */}
-          {!showOptions && <TeamRouteStrip item={item} />}
+                  The ask is up in the message and the message scrolls; this
+                  strip is docked and does not, so by the time she has read
+                  down to the answers the sentence they answer is off the top
+                  of the screen. It comes off the same field the options came
+                  off, so the two can never be from different rounds
+                  (ask-line.ts).
+
+                  The old words are the fallback and nothing more: a row whose
+                  offering field opens with no sentence still needs a heading
+                  saying what the numbers under it are.
+               */}
+              {/* THE HOVER SITS ON THE WHOLE HEADING ROW, not on the text node
+                  inside it. A pointer travelling down the pane crosses the
+                  padding before it crosses the words, and a card that opens
+                  only on the glyphs themselves blinks shut in the gaps between
+                  the two lines. The chevron is inside this row and keeps its
+                  own click; reading the question while reaching for it is not
+                  a conflict. */}
+              <div
+                className={`opt-head ${ask ? 'opt-head-ask' : ''}`}
+                onMouseEnter={(e) => onAskEnter(e.currentTarget)}
+                onMouseLeave={() => setAskPeek(false)}
+              >
+                <span>{ask || 'Their options · pick or write your own'}</span>
+                <button className="opt-collapse" onClick={() => setOptsOpen((o) => !o)} title={optsOpen ? 'Collapse options' : 'Expand options'}>
+                  <svg viewBox="0 0 16 16" className={optsOpen ? '' : 'flipped'} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6l4 4 4-4" /></svg>
+                </button>
+              </div>
+              {/* The card, drawn FIRST so it is the strip's first child: appended
+                  last it stole the last row's 4px of bottom padding and the
+                  strip measured 4px short. It is out of the flow entirely
+                  (`bottom: 100%`), which is the promise of this design: the
+                  strip is the same height with the card open as without it. */}
+              {optsOpen && peekOption && (
+                <div className="opt-peek">
+                  <div className="opt-peek-head">Option {peekOption.n}, in full</div>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {peekOption.text.replace(/\s*\(recommended\)/i, '')}
+                  </ReactMarkdown>
+                </div>
+              )}
+              {/* ONE SLOT, SO NEVER TWO CARDS. The option card wins when both
+                  could be open, which cannot happen from one pointer but can
+                  from a stale state, and two of these stacked would cover the
+                  message they are supposed to be read against.
+
+                  IT OPENS WITH THE STRIP COLLAPSED TOO. The chevron folds the
+                  answers away and leaves the question, so a folded strip is
+                  exactly the case where this line is all she has. */}
+              {!peekOption && askPeek && (
+                <div className="opt-peek">
+                  <div className="opt-peek-head">The question, in full</div>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{askAll}</ReactMarkdown>
+                </div>
+              )}
+              {optsOpen && options.map((o) => (
+                <button
+                  key={o.n}
+                  ref={o.n === selectedOption ? selRef : undefined}
+                  className={`opt-row ${o.n === selectedOption ? 'selected' : ''}`}
+                  onClick={() => onPick(o.n)}
+                  onMouseEnter={(e) => onOptionEnter(o.n, e.currentTarget)}
+                  onMouseLeave={() => setPeek(null)}
+                >
+                  <span className="opt-key">{o.n}</span>
+                  <span className="opt-text">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{ p: ({ children }) => <>{children}</> }}
+                    >
+                      {o.text.replace(/\s*\(recommended\)/i, '')}
+                    </ReactMarkdown>
+                  </span>
+                  {o.n === selectedOption
+                    ? <span className="opt-rec">↵ send</span>
+                    : o.recommended && <span className="opt-rec">recommended</span>}
+                </button>
+              ))}
+            </div>
+          )}
           {/* NO REPLY BOX ON THE TROUBLE ROW EITHER, and for the same reason as
               the one below: there is nobody on the other end of it. A box that
               looks like it sends is the failure this codebase cares about most.

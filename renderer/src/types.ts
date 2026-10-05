@@ -487,15 +487,6 @@ export interface AgentTurn {
   // the thread and whole, and this carries the one thing the box had that a
   // message does not: which row those words are on, and the way back to it.
   on?: string;
-  // THE TURN THE AGENT'S OPTIONS WERE OFFERED ON, so they are drawn at the end
-  // of it rather than docked at the foot of the thread for ever (said
-  // 2026-10-05). Exactly one turn in a thread carries it, and which one is
-  // `offerOnTurn` in ../offer-in-thread, decided where the message text is
-  // still the field's own words. It is a flag on the turn and not a lookup in
-  // the component, because the pane takes the options list OUT of this
-  // message's text on the same comparison, and the two cannot be allowed to
-  // disagree about which message that was.
-  offers?: boolean;
 }
 
 // ONE THING THE AGENT RAN, on its own quiet line between the messages.`lines`

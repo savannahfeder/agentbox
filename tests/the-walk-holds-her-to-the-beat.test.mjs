@@ -279,18 +279,9 @@ describe('4. ALSO names only what a card says out loud', () => {
 
   it('and the reply box it names is really what that card offers', () => {
     // 'It gave you three answers to pick from. Press 1 to send the one it
-    // recommends.' So the three answers have to be numbered rows you can
-    // press, and they are: the block the ring goes round draws one button per
-    // option with its number on it.
-    //
-    // THE STRIP'S OWN HEADING USED TO SAY THE REST OF THIS OUT LOUD ("pick or
-    // write your own") AND IT IS GONE (w-2e13752a85). The options moved out of
-    // the dock and onto the turn they were offered on, where the question is
-    // the paragraph directly above them and a heading would print it twice.
-    // The card still says the whole sentence, which is what this beat needs.
-    expect(read('renderer/src/components/OptionBlock.tsx')).toMatch(/className=\{`opt-row/);
-    expect(read('renderer/src/components/OptionBlock.tsx')).toMatch(/className="opt-key">\{o\.n\}/);
-    // And the reply box ALSO names is still the docked surface.
+    // recommends.' The strip's own heading says the rest of it out loud.
+    expect(focus).toMatch(/pick or write your own/);
+    // Which lives in the docked reply surface, the one selector left here.
     expect(focus).toMatch(/className="focus-dock"/);
     // And the answer beat still names replying, which is now what it rings.
     // THE WORD IS LOWER CASE SINCE 2026-10-01, because the sentence no longer

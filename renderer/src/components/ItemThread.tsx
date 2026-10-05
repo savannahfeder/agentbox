@@ -24,14 +24,12 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '../api';
 import { changePathFor, type Change } from '../code-artifact';
 import { itemThread, type PendingSaid } from '../item-thread';
-import { offerOnTurn, type Offer } from '../offer-in-thread';
 import { resultLeads } from '../recap';
 import { withoutTrailingWork } from '../trailing-work';
 import { marksFor, readUndoMarks, UNDO_MARKS_EVENT, type UndoMark } from '../undo-marks';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
 import type { RunningSession, WorkItem } from '../types';
-import { OptionBlock } from './OptionBlock';
 import { ActLine, Thread, ThreadWaiting } from './Thread';
 
 // THE BACKSTOP, NOT THE HEARTBEAT.
@@ -56,18 +54,8 @@ const REFRESH_MS = 8_000;
 // screen is the kind of drift this row exists to end.
 const THEM = 'The agent';
 
-export function ItemThread({ item, engine, session, opening, sending, offer, selectedOption, onPick, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false }: {
+export function ItemThread({ item, engine, session, opening, sending, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false }: {
   item: WorkItem;
-  // THE OPTIONS THIS ROW IS OFFERING, DRAWN ON THE TURN THEY WERE OFFERED ON
-  // (said 2026-10-05). They used to be docked above the reply box, where
-  // they stood at the foot of a thread that had scrolled a long way past them.
-  // The pane hands them down because the pane is what takes the same list OUT
-  // of the message's words (`cleanMessage`); one comparison, made in
-  // ../offer-in-thread, decides both.
-  offer?: Offer | null;
-  /** The row the arrow keys are standing on, held by App.tsx. */
-  selectedOption?: number | null;
-  onPick?: (n: number) => void;
   // CUT THE RUNNING STEP so her waiting message is answered now (w-f37a34def6).
   // Handed in: this view draws a conversation and never writes anything.
   onSendNow?: () => unknown;
@@ -213,13 +201,7 @@ export function ItemThread({ item, engine, session, opening, sending, offer, sel
     ? { text: session.saying, at: session.sayingAt, run: session.startedAt }
     : null;
   const built = itemThread(ledger.lines, sessions, saying, { whole, engine, pending: sending, chat, undone: marksFor(undoMarks, item.product, item.id) });
-  // WHICH TURN THE OPTIONS WERE OFFERED ON, decided against the message's own
-  // words BEFORE `clean` takes the list out of them: cleaning is what makes the
-  // match impossible afterwards, because the field and the message stop being
-  // the same string the moment the list is gone.
-  const said = built.events.map((e) => (e.kind === 'work' ? e : {
-    ...e, offers: offerOnTurn(e.text, offer ?? null), text: clean(e.text ?? ''),
-  }));
+  const said = built.events.map((e) => (e.kind === 'work' ? e : { ...e, text: clean(e.text ?? '') }));
   /* * WHILE AN AGENT IS WORKING, THE LAST THING ON THE PAGE IS THE THINKING
      COMPONENT, AND THE COMMANDS UNDER IT ARE ITS OWN.
 
@@ -246,28 +228,10 @@ export function ItemThread({ item, engine, session, opening, sending, offer, sel
   // away, because the window keeps the opening of a conversation and this IS
   // the opening.
   const events = opening
-    ? [{
-        at: opening.at, who: 'you' as const, on: opening.on,
-        // The ask you typed can be the field the offer came off, on a row no
-        // worker has written to yet, so it is matched on the same terms as
-        // every other turn and then cleaned on the same terms too.
-        offers: offerOnTurn(opening.text, offer ?? null),
-        text: offerOnTurn(opening.text, offer ?? null) ? clean(opening.text) : opening.text,
-      }, ...shown]
+    ? [{ at: opening.at, who: 'you' as const, text: opening.text, on: opening.on }, ...shown]
     : shown;
   const { omitted, outcome, after } = built;
-  // AN EMPTY CONVERSATION STILL HAS TO CARRY A LIVE OFFER. The row's ledger can
-  // be unreadable or not written yet while the row itself carries a pick, and
-  // this sentence used to return before anything else was drawn, so the one
-  // thing you could do on that row was invisible. It was invisible for a
-  // different reason before this change (the strip was on the dock, outside
-  // this component), which is exactly why it has to be said here now.
-  if (!said.length && !opening && !outcome) {
-    return <>
-      <div className="thread-wait">Nothing has been said here yet.</div>
-      {offer && <OptionBlock offer={offer} selected={selectedOption ?? null} onPick={onPick} />}
-    </>;
-  }
+  if (!said.length && !opening && !outcome) return <div className="thread-wait">Nothing has been said here yet.</div>;
 
   // THE ANSWER, WHOLE, AT THE FOOT OF THE CONVERSATION.
   //
@@ -275,24 +239,6 @@ export function ItemThread({ item, engine, session, opening, sending, offer, sel
   // two apart. What changed is where they sit. They used to be instead of the
   // conversation; they are now under it, and the thread above no longer draws
   // this message twice.
-  // THE OPTIONS, DRAWN ON WHICHEVER TURN TURNED OUT TO BE THEIRS.
-  //
-  // The agent's last word is held out of the stream and drawn under it as the
-  // answer, so on a live offer that lifted block IS the turn it was asked on.
-  // Everything else matched in the stream above.
-  const block = offer
-    ? <OptionBlock offer={offer} selected={selectedOption ?? null} onPick={onPick} />
-    : null;
-  const onOutcome = offerOnTurn(outcome?.text, offer ?? null);
-  // AND A LIVE OFFER IS NEVER UNREACHABLE. If the turn it was made on is in the
-  // middle a long thread has cut away, or the field never became a message at
-  // all, the block still has to be somewhere it can be pressed: the foot of the
-  // conversation, which is where it stood before this row. A SPENT one gets no
-  // such net — it is a record, and a record with no turn to sit on is just the
-  // bottom-of-the-page fixture this row was filed to be rid of.
-  const stranded = !!offer?.live && !onOutcome && !said.some((e) => e.kind !== 'work' && e.offers)
-    && !(opening && offerOnTurn(opening.text, offer));
-
   const answer = outcome && (
     resultLeads(item) && outcome.field === 'result'
       ? <div className="outcome">{md(clean(outcome.text))}</div>
@@ -307,7 +253,6 @@ export function ItemThread({ item, engine, session, opening, sending, offer, sel
   return (
     <>
       <Thread
-        tail={(e) => (e.offers ? block : null)}
         events={events}
         omitted={omitted}
         chat={chat}
@@ -326,8 +271,6 @@ export function ItemThread({ item, engine, session, opening, sending, offer, sel
           : null}
       />
       {answer}
-      {onOutcome && block}
-      {stranded && block}
       {/* What you did after that answer, under it and in order. */}
       {after.length > 0 && (
         <div className="act-after">
