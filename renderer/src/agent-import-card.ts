@@ -119,6 +119,11 @@ export const CARD = {
   // ever named the files, so it read as if it had not looked in Claude Code.
   noneWhere: (dir: string) => `No agent files in ${dir} or your project folders, and no recent Claude Code or Codex conversations you started yourself.`,
   noneLater: 'When you have some, press ⌘K and type import.',
+  /** In place of `noneWhere` when there is nothing left only because it is all
+   *  in already (w-db6f5e331e): "found nothing" would be untrue. */
+  allIn: (n: number) => n === 1
+    ? 'The one conversation from the last ten days is already in your inbox.'
+    : `All ${n} conversations from the last ten days are already in your inbox.`,
   /**
    * AND THE WAY TO ASK AGAIN WITHOUT LEAVING. a tester's case, 2026-08-24, is
    * the one this is for: Claude Code was installed in front of her while the
@@ -193,6 +198,8 @@ export interface SessionThread {
   title: string;
   when: number;
   path: string;
+  /** Already has a row in the inbox, so the card does not offer it again. */
+  imported?: boolean;
 }
 
 /**

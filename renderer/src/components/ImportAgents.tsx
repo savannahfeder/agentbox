@@ -251,9 +251,14 @@ export function ImportAgents({ products, filter, walk, onDone, onNewProject, onP
     return () => { live = false; };
   }, [folder, project]);
 
+  // WHAT IS ALREADY IN IS NOT OFFERED AGAIN (w-db6f5e331e). The main process
+  // marks each conversation that already has a row; offering those read as
+  // "Add all five" over five rows already in the inbox, and added nothing.
+  const offered = useMemo(() => (threads ?? []).filter((t) => !t.imported), [threads]);
+  const alreadyIn = (threads?.length ?? 0) - offered.length;
   const dests = useMemo(
-    () => destinations({ found, folders: others ?? [], products: all, project, threads: threads ?? [] }),
-    [found, others, all, project, threads],
+    () => destinations({ found, folders: others ?? [], products: all, project, threads: offered }),
+    [found, others, all, project, offered],
   );
 
   const on = useMemo(() => new Set(picked), [picked]);
@@ -699,7 +704,7 @@ export function ImportAgents({ products, filter, walk, onDone, onNewProject, onP
          */}
         {read && !some && (
           <div className="ia-none">
-            <p className="ia-none-where">{CARD.noneWhere(SECTION.homeFolder)}</p>
+            <p className="ia-none-where">{alreadyIn > 0 ? CARD.allIn(alreadyIn) : CARD.noneWhere(SECTION.homeFolder)}</p>
             <p className="ia-none-later">{CARD.noneLater}</p>
             <button type="button" className="ia-look-again" onClick={lookAgain} disabled={looking}>
               {looking ? CARD.looking : CARD.lookAgain}

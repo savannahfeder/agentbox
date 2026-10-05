@@ -48,6 +48,7 @@ import * as agents from './agents.mjs';
 import { findAgentFolders, readAgentFiles, readFolderAgents } from './agent-files.mjs';
 import { readSessionThreads } from './agent-sessions.mjs';
 import { readCodexThreads } from './codex-threads.mjs';
+import { markImported } from '../shared/agent-import.mjs';
 import { codexIdOf, importChoice, isCodexImportRow, isNotImportedRow } from '../shared/codex-import.mjs';
 import { checkProjectFolder } from '../shared/project-folder-check.mjs';
 import { openFreshUser } from './fresh-user.mjs';
@@ -1033,7 +1034,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:agent-threads', () => {
     const threads = readAllThreads();
     lastThreads = threads;
-    return { threads };
+    // Each one already in the inbox says so, and the card leaves it out
+    // (w-db6f5e331e). The walk's folder suggestions still read all of them.
+    let items = [];
+    try { items = store.listItems(); } catch { items = []; }
+    return { threads: markImported(threads, items) };
   });
 
   // So this is `zero:import-agents` with the agent taken out of it. No ticks are

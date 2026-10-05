@@ -211,6 +211,26 @@ export function threadsNeedingRows(chosen, existingItems = []) {
 }
 
 /**
+ * WHICH CONVERSATIONS ARE ALREADY IN, so the card offers only the rest
+ *  (w-db6f5e331e). A Claude Code conversation is in once any row carries
+ *  `thread:<id>`; a Codex one once any row carries `codex:<id>`, except the
+ *  row that records a no, because the card is the way back to that one. Each
+ *  thread comes back as it was, with `imported: true` on the ones that are in. */
+export function markImported(threads = [], items = []) {
+  const inbox = new Set();
+  for (const item of items ?? []) {
+    const labels = item?.labels ?? [];
+    const declined = labels.includes('not-imported') && item?.status === 'done';
+    for (const label of labels) {
+      if (typeof label !== 'string') continue;
+      if (label.startsWith('thread:')) inbox.add(label.slice(7));
+      else if (label.startsWith('codex:') && !declined) inbox.add(label.slice(6));
+    }
+  }
+  return (threads ?? []).map((t) => (inbox.has(String(t?.id ?? '')) ? { ...t, imported: true } : t));
+}
+
+/**
  * WHICH AGENT A ROW IS ABOUT, or null for every other row in the inbox.
  *
  *  The worker's brief reads this. Without it the row's body is the only thing
