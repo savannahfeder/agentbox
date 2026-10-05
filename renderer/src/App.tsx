@@ -110,7 +110,7 @@ import { runNowCommands } from './run-now';
 import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
 import { BoxFilter } from './components/BoxFilter';
 import { itemPriority, moveProduct, placeScore } from '../../shared/rank.mjs';
-import { threadsMade } from './threads-made';
+import { threadsMade, approvableFiled } from './threads-made';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, chatProjects, chatTranscript, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
@@ -3110,7 +3110,16 @@ export default function App() {
     }, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`, undefined, undefined, undefined, undid);
   }, [deferCommit, closeAgentRow, closeTroubleRow, snap?.supervisor.spawnTrouble?.since, run, showToast, pushUndo]);
 
-  const resolve = useCallback(async (item: WorkItem) => {
+  const resolve = useCallback(async (item: WorkItem, { stay }: { stay?: boolean } = {}) => {
+    // `stay` IS FOR APPROVING SOMETHING THAT IS NOT THE ROW YOU ARE ON
+    // (w-9cf2b43110): the Approve beside a thread this one filed. Every other
+    // caller is approving the row in front of them and wants the pane to
+    // advance off it; this one is reading the PARENT, and advancing would throw
+    // them out of the thread they pressed from, which is the trip the button
+    // exists to remove. The row the press was about still leaves the inbox and
+    // still says In progress, because that is `pendingId`'s work and not this
+    // flag's.
+    //
     // The palette's Approve. Question: send the recommended option. Review:
     // "approved, proceed", which a continuation ENACTS. Agent proposal:
     // "run it". Anything else: mark done. This used to be E, and that burned
@@ -3144,7 +3153,7 @@ export default function App() {
           await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
           await api.answer({ product: item.product, id: item.id, answer: '(withdrawn)', status: 'open' });
         } });
-      }, toast, undefined, undefined, { product: item.product, id: item.id }, undid);
+      }, toast, undefined, stay, { product: item.product, id: item.id }, undid);
     };
     if (item.kind === 'question' && recommended && !item.answer) {
       await approveWith(`Option ${recommended.n}: ${recommended.text}`, `Approved: option ${recommended.n} → ${item.productName}`);
@@ -5238,8 +5247,15 @@ export default function App() {
                   })}
                   parent={focused.parent ? items.find((i) => i.id === focused.parent && i.product === focused.product) ?? null : null}
                   blockedBy={items.find((i) => i.parent === focused.id && i.product === focused.product && i.status !== 'done') ?? null}
-                  filed={threadsMade(items, focused).map((i) => ({ id: i.id, title: i.label || i.title, state: stateOfMine(i), item: i }))}
+                  filed={threadsMade(items, focused).map((i) => ({ id: i.id, title: i.label || i.title, state: stateOfMine(i), approve: approvableFiled(i, stateOfMine(i)), item: i }))}
                   onOpenItem={(item) => { setFocused(item); markSeen(item); }}
+                  /*
+                   * SAYING GO TO A THREAD THIS ONE FILED, WITHOUT LEAVING IT
+                     (w-9cf2b43110). The same approval the palette makes on that
+                     row, with `stay` so the pane keeps the thread you pressed
+                     from: the complaint was the trip, so a press that moved you
+                     somewhere else would be the same trip with fewer steps. */
+                  onApproveFiled={(i) => resolve(i, { stay: true })}
                   onNotice={showToast}
                   /*
                    * What THIS row's agents really run as, so the reply footer
