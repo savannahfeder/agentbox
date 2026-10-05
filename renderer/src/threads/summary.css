@@ -130,7 +130,9 @@
    room of its own above the hairline (w-b51b2e1c86): under a long summary the
    hairline sits one section's step under the words, 24px rather than 52px, so
    more of them fit before the panel scrolls. */
-.ts-foot { margin-top: auto; padding-top: 0; }
+/* 6px of its own since w-54e9c7243f brought the parts to 12px apart, so the
+   hairline still sits 24px under the last words. */
+.ts-foot { margin-top: auto; padding-top: 6px; }
 .ts-props { display: grid; grid-template-columns: 92px minmax(0, 1fr); row-gap: 14px; font-size: 13.5px; line-height: 20px; margin: 0; }
 .ts-label { color: var(--text-faint); font-size: 13px; }
 .ts-value { color: var(--text); display: flex; align-items: center; min-width: 0; }
