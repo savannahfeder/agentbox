@@ -111,6 +111,8 @@ describe('where the order is applied', () => {
     const board = pages.slice(pages.indexOf('export function InboxBoard'));
     expect(board).toContain('boardColumns({ items, products, display,');
     const rules = src('threads', 'page-rules.ts');
-    expect(rules.slice(rules.indexOf('export function boardColumns'))).toContain('sortedEntries(entries.filter((e) => e.state === col.state), display, col.state, projectOrder)');
+    // And the conversation projects, which rank with your top project
+    // (w-2e8aa16f0f, tests/a-message-ranks-with-your-top-project.test.mjs).
+    expect(rules.slice(rules.indexOf('export function boardColumns'))).toContain('sortedEntries(entries.filter((e) => e.state === col.state), display, col.state, projectOrder, conversationSlugs(products))');
   });
 });

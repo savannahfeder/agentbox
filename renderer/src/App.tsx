@@ -109,7 +109,7 @@ import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from
 import { runNowCommands } from './run-now';
 import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
 import { BoxFilter } from './components/BoxFilter';
-import { itemPriority, moveProduct, productRankScore } from '../../shared/rank.mjs';
+import { itemPriority, moveProduct, placeScore } from '../../shared/rank.mjs';
 import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
@@ -119,7 +119,7 @@ import { TeamPage } from './team/TeamPage';
 import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, sorted as sortedByDisplay, type Display, type Privacy } from './threads/page-rules';
+import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, sorted as sortedByDisplay, type Display, type Privacy } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
@@ -1617,9 +1617,11 @@ export default function App() {
   // row had been touched most recently and by nothing else, which is the worst
   // possible rule for a list of things WAITING TO BE TOUCHED: a queued row is
   // last touched when it was filed, so the longer it waits the lower it sinks.
+  // A conversation with a person ranks with your top project (w-2e8aa16f0f).
+  const directSlugs = useMemo(() => conversationSlugs(snap?.products ?? []), [snap?.products]);
   const score = useCallback(
-    (i: WorkItem) => productRankScore(snap?.supervisor.productOrder ?? [], i.product) + itemPriority(i),
-    [snap?.supervisor.productOrder],
+    (i: WorkItem) => placeScore(snap?.supervisor.productOrder ?? [], i.product, directSlugs) + itemPriority(i),
+    [snap?.supervisor.productOrder, directSlugs],
   );
 
   const inbox = useMemo(() => {
@@ -2057,8 +2059,8 @@ export default function App() {
   // own level (w-e263a8a0fb).
   const projectOrder = snap?.supervisor.productOrder ?? NO_ORDER;
   const displayedBox = useMemo(
-    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i))), inboxDisplay, view, projectOrder) : []),
-    [shownBox, inboxDisplay, now, mineShown, view, projectOrder, seenOf],
+    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i))), inboxDisplay, view, projectOrder, directSlugs) : []),
+    [shownBox, inboxDisplay, now, mineShown, view, projectOrder, directSlugs, seenOf],
   );
   // THE PICKED TEAMMATES' THREADS FOR THIS TAB, from the cards their Macs
   // publish, merged into your rows in the Display's order.
@@ -2110,8 +2112,8 @@ export default function App() {
   // whole inbox, or the next task opened can be one she has hidden
   // (w-27759abd33).
   const shownInbox = useMemo(
-    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i))), inboxDisplay, undefined, projectOrder),
-    [inbox, boxFilter, inboxDisplay, now, projectOrder, seenOf],
+    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i))), inboxDisplay, undefined, projectOrder, directSlugs),
+    [inbox, boxFilter, inboxDisplay, now, projectOrder, directSlugs, seenOf],
   );
   const boxFilterMenu = useMemo(
     () => (modal === 'filter' ? filterMenu(wholeBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i)), boxFilter, snap?.products ?? []) : null),
