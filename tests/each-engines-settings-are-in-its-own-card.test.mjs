@@ -24,29 +24,36 @@ import { fileURLToPath } from 'node:url';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const settings = fs.readFileSync(path.join(root, 'renderer/src/components/Settings.tsx'), 'utf8');
 
-/**
- * The `settings` slot handed to the cards, which is where every engine-specific
- *  control lives, and its two halves. Slicing it rather than the whole file is
- *  what makes "inside the card" a claim a test can fail.
+/*
+ * AND SINCE THE REDRAW (w-ccadd13c46, 2026-10-05) THE CARD IS A PAGE. Each
+ * coding agent has a page of its own in the settings menu, `enginePage`, and
+ * the permission group at its foot is chosen by the engine the page is for.
+ * The law is unchanged: a control on the Claude Code page cannot be about
+ * Codex, and nothing engine-specific is drawn anywhere else.
  */
-const cards = settings.slice(
-  settings.indexOf("settings={a.engine === 'codex' ? ("),
-  settings.indexOf('{/* THE CODING AGENT IS CHOSEN ON THE CARD'),
+const enginePage = settings.slice(
+  settings.indexOf('const enginePage = (engine'),
+  settings.indexOf('<div className="set-nav">'),
 );
-const SEP = ') : (\n                    <>';
+/** The permission group, which is where every engine-specific control lives,
+ *  and its two halves. */
+const cards = enginePage.slice(enginePage.indexOf("{engine === 'codex' ? ("));
+const SEP = ') : (\n              <Group id="permissions"';
 const codexSide = cards.slice(0, cards.indexOf(SEP));
 const claudeSide = cards.slice(cards.indexOf(SEP));
 
-/** Everything drawn OUTSIDE the cards, for the claims about what is not loose. */
-const loose = settings.slice(settings.indexOf('{/* THE CODING AGENT IS CHOSEN ON THE CARD'));
+/** Everything drawn OUTSIDE the agent pages, for the claims about what is not loose. */
+const loose = settings.slice(settings.indexOf('<div className="set-nav">'));
 
 /* ===================== the controls are inside the cards ================= */
 
 describe('each engine\'s settings are in its own card', () => {
-  it('hands the card a settings slot, chosen by the engine the card is for', () => {
-    expect(settings).toContain("settings={a.engine === 'codex' ? (");
-    // And the card only draws it where the engine is actually installed.
-    expect(settings).toContain('{agent.found && settings && <div className="ac-settings">{settings}</div>}');
+  it('draws the permissions on the agent\'s own page, chosen by the engine the page is for', () => {
+    expect(cards.length).toBeGreaterThan(0);
+    expect(codexSide.length).toBeLessThan(cards.length);
+    // And the page only draws them where the engine is actually installed.
+    expect(enginePage.indexOf('{agent.found && (')).toBeGreaterThan(-1);
+    expect(enginePage.indexOf('{agent.found && (')).toBeLessThan(enginePage.indexOf("{engine === 'codex' ? ("));
   });
 
   it('puts Codex\'s modes on the Codex side only', () => {

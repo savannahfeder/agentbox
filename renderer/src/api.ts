@@ -123,6 +123,11 @@ function fixtureWrite(scope: 'project' | 'workspace', p: any): Settings {
       w.memoryGate = { ...w.memoryGate, on: !!p.value, now: p.value ? 'Memory is fine. Nothing heavy running.' : null };
     } else if (p.key === 'memoryGateSlots' && w.memoryGate) {
       w.memoryGate = { ...w.memoryGate, slots: p.value === null ? null : Math.max(1, Math.min(w.memoryGate.slotsMax, Number(p.value) || 1)) };
+    } else if (p.key === 'activeAccount') {
+      // The account picked is the one marked chosen, as main/settings.mjs
+      // answers it, so the In use row can be seen in a preview.
+      const list = p.value?.engine === 'codex' ? w.codex?.accounts ?? [] : w.accounts;
+      for (const a of list) a.chosen = a.profile === p.value?.profile;
     } else w[p.key] = p.value;
   } else {
     const project = fixtureSettingsState.projects.find((x: any) => x.slug === p.product);

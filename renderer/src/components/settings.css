@@ -1,0 +1,128 @@
+/* THE SETTINGS SCREEN, REDRAWN (w-ccadd13c46, 2026-10-05), with Linear's
+   settings as the reference: a menu with a search box where the sidebar was,
+   and one centred column of pages, each a title over headed cards of rows.
+
+   Every rule is under `.settings-screen[data-pane]`, which every state of the
+   screen carries, so it outranks the older `.set-*` rules in styles.css and in
+   workspace-navigation.css whatever order the bundle puts them in. Every
+   colour is a token, so each theme and picture dresses it the way it dresses
+   the rest of the app. */
+
+/* ---------------------------------- menu ---------------------------------- */
+
+.settings-screen[data-pane] .set-nav-top { padding: 0 0 6px; }
+/* The standalone screen (full screen, the walk) has no sidebar to stand in for,
+   so its menu clears the traffic lights itself. */
+.settings-screen[data-pane]:not(.settings-embedded) .set-nav-top { padding-top: 34px; }
+
+.settings-screen[data-pane] .set-nav-back {
+  display: flex; align-items: center; gap: 9px; width: 100%; height: 32px; margin: 0;
+  padding: 0 10px; justify-content: flex-start; font-size: 13px; color: var(--text-dim);
+}
+.settings-screen[data-pane] .set-nav-back .set-nav-title { flex: 1; text-align: left; font-size: 13px; font-weight: 400; letter-spacing: 0; color: inherit; }
+.settings-screen[data-pane] .set-nav-esc { font: inherit; font-size: 11px; color: var(--text-faint); opacity: .8; }
+
+.set-search {
+  display: flex; align-items: center; gap: 8px; height: 32px; margin-top: 8px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--wash);
+  color: var(--text-faint); cursor: text;
+}
+.set-search:focus-within { border-color: var(--line-strong); }
+.set-search svg { width: 15px; height: 15px; flex: none; }
+.set-search input {
+  flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: none; background: none;
+  font: inherit; font-size: 13px; color: var(--text); user-select: text; -webkit-user-select: text;
+}
+.set-search input::placeholder { color: var(--text-faint); }
+
+.settings-screen[data-pane] .set-nav-scroll { display: block; flex: 1; min-height: 0; overflow-y: auto; padding: 0 0 14px; border: 0; }
+.settings-screen[data-pane] .set-nav-group {
+  display: block; padding: 20px 10px 6px; font-size: 11.5px; font-weight: 500;
+  letter-spacing: 0; text-transform: none; color: var(--text-faint);
+}
+.settings-screen[data-pane] .set-nav-item {
+  display: flex; width: 100%; height: 32px; padding: 0 10px; gap: 10px;
+  font-size: 13px; font-weight: 400; color: var(--text-dim);
+}
+.settings-screen[data-pane] .set-nav-item + .set-nav-item { margin-top: 1px; }
+.settings-screen[data-pane] .set-nav-item:hover { background: var(--wash); color: var(--text); }
+.settings-screen[data-pane] .set-nav-item.on { background: var(--wash); color: var(--text); font-weight: 500; }
+.settings-screen[data-pane] .set-nav-ico { flex: 0 0 16px; width: 16px; height: 16px; color: var(--text-faint); }
+.settings-screen[data-pane] .set-nav-ico svg { width: 16px; height: 16px; }
+.settings-screen[data-pane] .set-nav-item.on .set-nav-ico { color: var(--text); }
+/* The project you are inside, under Projects. Indented a step so it reads as
+   being inside the row above rather than as a page of its own. */
+.settings-screen[data-pane] .set-nav-sub { padding-left: 24px; }
+.settings-screen[data-pane] .set-nav-sub:not(:hover) { background: none; }
+
+/* A search result: the setting's name, and the page it is on under it. */
+.settings-screen[data-pane] .set-hit { flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; height: auto; min-height: 44px; padding: 6px 10px; }
+.set-hit-label { font-size: 13px; color: var(--text); line-height: 1.35; }
+.set-hit-page { font-size: 11.5px; color: var(--text-faint); line-height: 1.35; }
+.settings-screen[data-pane] .set-nav-empty { padding: 12px 10px; font-size: 12.5px; line-height: 1.5; color: var(--text-faint); }
+
+/* ---------------------------------- page ---------------------------------- */
+
+.settings-screen[data-pane] .set-inner:not(.instructions-page) { max-width: 640px; margin: 0 auto; padding: 72px 40px 120px; box-sizing: content-box; }
+.settings-screen[data-pane] .set-title { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+.settings-screen[data-pane] .set-title-edit, .settings-screen[data-pane] .set-title-input { font-size: 24px; }
+.settings-screen[data-pane] .set-lede { margin-top: 6px; font-size: 13.5px; line-height: 1.55; color: var(--text-faint); }
+
+.settings-screen[data-pane] .set-group { margin-top: 40px; scroll-margin: 40px; }
+.settings-screen[data-pane] .set-group-label {
+  padding: 0 0 12px; font-size: 14px; font-weight: 500; letter-spacing: -0.005em;
+  text-transform: none; color: var(--text);
+}
+.settings-screen[data-pane] .set-group-note { padding: 10px 2px 0; font-size: 12px; line-height: 1.55; }
+.settings-screen[data-pane] .set-group-warn { margin: 0 0 12px; }
+
+/* THE CARD. One plate per group, a hairline round it and a wash inside it, and
+   the rows inside it divided by the same hairline. */
+.settings-screen[data-pane] .set-plate:not(.set-keys) {
+  padding: 0 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--wash);
+}
+.settings-screen[data-pane] .set-plate:not(.set-keys) > .set-row { align-items: center; gap: 24px; padding: 14px 0; }
+.settings-screen[data-pane] .set-plate:not(.set-keys) > .set-row + .set-row { border-top: 1px solid var(--line); }
+.settings-screen[data-pane] .set-row-label { font-size: 13.5px; font-weight: 500; letter-spacing: -0.003em; }
+.settings-screen[data-pane] .set-row-desc { margin-top: 3px; font-size: 12.5px; line-height: 1.5; }
+.settings-screen[data-pane] .set-row-ctl { padding-top: 0; }
+
+/* A dropdown at the end of a row opens leftward, into the card, rather than
+   off the column's right edge. */
+.set-picker-bare { gap: 0; }
+.set-row-ctl .set-picker-menu { left: auto; right: 0; }
+
+/* A usage window: the bar, then how much of it is spent. */
+.set-usage { display: inline-flex; align-items: center; gap: 12px; }
+.set-usage .usage-meter.wide { width: 140px; }
+.set-usage-pct { min-width: 64px; text-align: right; font-size: 12.5px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+/* THE ACCOUNT IN USE CANNOT BE MISSED. One cue was missable and she proved it,
+   so the live row says it four ways at once: a brighter film across the whole
+   row, the address in full white, a rule down its left edge, and the words
+   In use beside the address. The row reaches out to the card's edges so the
+   film and the rule are the row's and not a box inside it. */
+.settings-screen[data-pane] .set-plate > .set-acct-row.on {
+  margin: 0 -18px; padding-left: 15px; padding-right: 18px;
+  background: var(--film-strong); border-left: 3px solid var(--text);
+}
+.settings-screen[data-pane] .set-plate > .set-acct-row.on .set-row-label { color: var(--text); }
+.settings-screen[data-pane] .set-plate > .set-acct-row.on + .set-row { border-top-color: transparent; }
+.settings-screen[data-pane] .set-plate > .set-acct-row.on:first-child { border-radius: 9px 9px 0 0; }
+.set-badge {
+  display: inline-block; margin-left: 8px; padding: 1px 7px; vertical-align: 1px;
+  border-radius: 999px; background: var(--film-strong); color: var(--text);
+  font-size: 11px; font-weight: 500; letter-spacing: 0;
+}
+
+/* The theme tiles sit inside their card with the card's own air round them. */
+.settings-screen[data-pane] .set-plate > .look-row { margin: 0; padding: 18px 0; }
+/* The sign in shell under the accounts, at the column's width. */
+.settings-screen[data-pane] .ac-adding { margin-top: 16px; }
+
+/* WHERE A SEARCH LANDED: the group it named, lit for a moment. */
+.settings-screen[data-pane] .set-found > .set-plate { animation: set-found 1.6s ease-out; }
+@keyframes set-found {
+  0%, 30% { border-color: var(--text-faint); box-shadow: 0 0 0 3px var(--wash); }
+  100% { border-color: var(--line); box-shadow: 0 0 0 3px transparent; }
+}

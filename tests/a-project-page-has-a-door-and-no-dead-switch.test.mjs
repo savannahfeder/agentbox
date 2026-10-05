@@ -134,8 +134,9 @@ describe('the door to a project', () => {
 
   // With no Projects row, a project page lights Settings, which is where it lives.
   it('lights Settings while any project page is open', () => {
-    expect(settings).toContain("pane === 'projects' || pane === 'team' ? pane");
-    expect(settings).toContain("typeof pane === 'object' ? 'projects'");
+    // Since the redraw (w-ccadd13c46) every page but General reports itself,
+    // and a project's own page reports Projects.
+    expect(settings).toContain("typeof pane === 'object' ? 'projects' : pane === 'general' ? null : pane");
     // Every Settings pane lights Settings. Team used to light Invite people
     // (w-8415594d19) until that row left the sidebar (w-1b574413db, 2026-10-04).
     expect(app).toContain("page={settingsOpen ? 'settings' : null}");
@@ -146,6 +147,8 @@ describe('the door to a project', () => {
   });
 
   it('still accepts projects as a starting page', () => {
-    expect(settings).toContain("want === 'projects'");
+    // Any page in the menu is a starting page (w-ccadd13c46), and Projects is one.
+    expect(settings).toContain('if (SETTINGS_PAGES.some((p) => p.id === want)) return want as SettingsPageId;');
+    expect(read('renderer/src/settings-search.ts')).toContain("{ id: 'projects', label: 'Projects', group: 'Workspace' }");
   });
 });

@@ -239,7 +239,10 @@ describe('the connection card', () => {
      sentence that main computed and the screen re-derived or dropped. */
   it('passes the payload value in rather than deriving a second one', () => {
     expect(settingsTsx).toMatch(/trouble:\s*w\.codex\?\.trouble \?\? null/);
-    expect(settingsTsx).toContain('{agent.found && agent.trouble && <p className="ac-trouble">{agent.trouble}</p>}');
+    // Since the redraw (w-ccadd13c46) the agent's page draws its status card
+    // whenever there is trouble, and hands it main's sentence untouched.
+    expect(settingsTsx).toContain('trouble: agent.trouble, onChecked: load };');
+    expect(settingsTsx).toContain("(!agent.found || agent.trouble) && (engine === 'codex' ? <CodexCli {...status} /> : <ClaudeCode {...status} />)");
     // And it is still SAID, not turned into a word of ours.
     expect(settingsTsx).not.toContain("<span className=\"ac-warn\">not running</span>");
   });

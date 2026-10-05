@@ -8,6 +8,7 @@ import type { AgentSession, FolderListing, Snapshot, WorkspaceSettings } from '.
 // itself is a fixture that could go on saying it after the app had stopped.
 import { DEFAULT_ENGINE, ENGINES } from '../../shared/engines.mjs';
 import { BUILT_MODELS } from './models';
+import { CODEX_DEFAULT_MODE } from './codex-modes';
 
 const now = Date.now();
 const min = 60_000;
@@ -795,6 +796,10 @@ export const fixtureSettings = {
     running: 2,
     model: 'claude-opus-5',
     permission: 'bypassPermissions',
+    // What main sends when the config names none (main/settings.mjs,
+    // `outsideAgentsMode`). Absent, the Running page drew an empty picker over
+    // a sentence ending in "undefined".
+    outsideAgents: 'off',
     permissionArgs: [
       '--model', 'claude-opus-5',
       '--allowedTools', 'mcp__agentbox', 'Bash(git fetch:*)', 'Bash(git push:*)', 'Bash(git merge:*)',
@@ -1037,7 +1042,14 @@ export function fixtureEngineSettings(world: FixtureEngineWorld | null): Partial
     // She has set no workspace Codex model, so the row draws her config.toml's
     // own and nothing is sent at spawn. That is what her Mac says today.
     codexModel: null,
-    codex: { found: true, certain: true, bin: CODEX_BIN, url: CODEX_INSTALL_URL, trouble: null },
+    // Main's own default when the config names no mode (main/settings.mjs),
+    // and the one login a Codex Mac has. Without them the Codex page drew an
+    // empty picker and no account.
+    codexMode: CODEX_DEFAULT_MODE,
+    codex: {
+      found: true, certain: true, bin: CODEX_BIN, url: CODEX_INSTALL_URL, trouble: null,
+      accounts: [{ profile: 'default', email: 'you@example.com', name: null, plan: 'Plus', accountId: null, signedIn: true, chosen: false }],
+    },
   };
 }
 

@@ -127,7 +127,8 @@ describe('a way to ask again', () => {
   // can have.
   it('redraws the page off the main process rather than off what the press assumed', () => {
     expect(block).toContain('await onChecked();');
-    expect(settings).toContain('onChecked={load}');
+    // Handed in with the rest of the status since the redraw (w-ccadd13c46).
+    expect(settings).toContain('trouble: agent.trouble, onChecked: load };');
   });
 
   // The walk's rule: repeating the first sentence at somebody who has just
@@ -191,17 +192,24 @@ describe('where it lives', () => {
      touched. What still has to hold is that the answer to "is this connected to
      anything" is the FIRST thing on the page Settings opens on, which is what
      a tester went looking for and gave up on (2026-08-28). */
-  it('is the first thing on the pane Settings opens on', () => {
-    const general = settings.slice(settings.indexOf("pane === 'general' && ("), settings.indexOf('What every agent reads before your task'));
-    expect(general).toContain('<AgentCard');
-    expect(general.indexOf('<AgentCard')).toBeLessThan(general.indexOf('label="Agents"'));
+  /* AND SINCE THE REDRAW (w-ccadd13c46, 2026-10-05) IT HAS A PAGE NAMED FOR
+     IT. Settings opens on General, and Claude Code is a row of its own in the
+     menu beside it, so the place to look is the word being looked for. On that
+     page the status comes first, above usage and logins, whenever there is
+     something wrong to say; a healthy Mac is not told "connected" again. */
+  it('is the first thing on Claude Code\'s own page, which the menu names', () => {
+    expect(read('renderer/src/settings-search.ts')).toContain("{ id: 'claude', label: 'Claude Code', group: 'Agents' }");
+    const page = settings.slice(settings.indexOf('const enginePage = (engine'), settings.indexOf('<div className="set-nav">'));
+    expect(page).toContain('(!agent.found || agent.trouble) && (engine === \'codex\' ? <CodexCli {...status} /> : <ClaudeCode {...status} />)');
+    expect(page.indexOf('<ClaudeCode')).toBeLessThan(page.indexOf('label="Usage"'));
     // And the card still reads main's answer rather than deriving a second one.
     expect(settings).toContain('found: !!w.claudeFound');
     expect(settings).toContain('certain: w.claudeCertain !== false');
   });
 
   it('is not left behind in the group about folders', () => {
-    const folders = settings.slice(settings.indexOf('<Group label={`Where ${NAME} keeps things on this Mac`}>'));
+    const folders = settings.slice(settings.indexOf('<Group id="storage" label={`Where ${NAME} keeps things on this Mac`}>'));
+    expect(folders.length).toBeLessThan(settings.length);
     const group = folders.slice(0, folders.indexOf('</Group>'));
     expect(group).not.toContain('claudeFound');
     expect(group).toContain('Your projects, tasks and documents');
