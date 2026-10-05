@@ -14,8 +14,8 @@ import { productRankScore } from '../../../shared/rank.mjs';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
-/** Private threads shown ('any') or hidden ('shared'). */
-export type Privacy = 'any' | 'shared';
+/** Privacy: Private, Shared, or neither picked ('any'). */
+export type Privacy = 'any' | 'shared' | 'private';
 export interface Display {
   view: 'list' | 'board';
   sort: 'priority' | 'updated';
@@ -43,8 +43,15 @@ export const DEFAULT_DISPLAY: Record<PageId, Display> = {
  * private and stays under Hide private.
  */
 export function keepsPrivacy(seen: Seen | null | undefined, privacy: Privacy | undefined): boolean {
-  return privacy !== 'shared' || seen !== 'private';
+  if (privacy === 'shared') return seen !== 'private';
+  if (privacy === 'private') return seen === 'private';
+  return true;
 }
+
+/** A click on Private or Shared picks it, and a click on the lit one lets go,
+ *  the way the Priority line works. */
+export const nextPrivacy = (now: Privacy | undefined, clicked: Exclude<Privacy, 'any'>): Privacy =>
+  (now === clicked ? 'any' : clicked);
 
 // ONE CHOICE FOR THE WHOLE PAGE, not one per half of it. Each half remembers
 // its own view and filters, and a privacy choice kept in only one of them
@@ -54,9 +61,7 @@ const PRIVACY_KEY = 'threads.privacy';
 export function readPrivacy(store: Pick<Storage, 'getItem'> | null = typeof localStorage === 'undefined' ? null : localStorage): Privacy {
   try {
     const p = JSON.parse(store?.getItem(PRIVACY_KEY) ?? 'null');
-    // The first version also offered Only private; one saved then reads as
-    // Show, since the menu no longer has a way back out of it.
-    return p === 'shared' ? p : 'any';
+    return p === 'shared' || p === 'private' ? p : 'any';
   } catch {
     return 'any';
   }
@@ -119,7 +124,7 @@ export function writeDisplay(page: PageId, d: Display, store: Pick<Storage, 'set
 
 /** Whether any filter is on, which is what puts the dot on the Display icon. */
 export const isFiltered = (d: Display) => d.priorities.length > 0 || d.projects.length > 0 || d.updated !== 'any'
-  || d.privacy === 'shared';
+  || d.privacy === 'shared' || d.privacy === 'private';
 
 const startOfDay = (now: number) => { const t = new Date(now); t.setHours(0, 0, 0, 0); return t.getTime(); };
 
