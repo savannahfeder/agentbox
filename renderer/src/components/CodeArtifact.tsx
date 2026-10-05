@@ -20,7 +20,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import {
-  BATCH_ROWS, changeSummary, filesInTreeOrder, fillNext, firstBatch, hunkView, hunkViewAt, linesSkipped, marked, rowSlices, sliceGuessPx, stepInTree, toggled, tokenize, tookLabel, treeRows, visibleRows, wordChanges,
+  BATCH_ROWS, changeSummary, filesInTreeOrder, fillNext, firstBatch, hiddenLines, hunkView, hunkViewAt, linesSkipped, marked, rowSlices, sliceGuessPx, stepInTree, toggled, tokenize, tookLabel, treeRows, visibleRows, wordChanges,
   type Change, type ChangedFile, type Hunk,
 } from '../code-artifact';
 import { copiedText, linesToCopy } from '../code-copy';
@@ -310,25 +310,44 @@ function HunkRows({ hunk, editable, pending, onEdit, onDone }: {
 // works: `file` comes out of a useMemo, `pending` is a map held in a ref,
 // and both handlers are useCallbacks with no dependencies. A fresh closure in
 // any one of them would defeat this exactly the way it would defeat CodeLine.
-const FileHunks = memo(function FileHunks({ file, pending, onEdit, onDone }: {
+const FileHunks = memo(function FileHunks({ file, pending, onEdit, onDone, readFile, onNotice }: {
   file: ChangedFile;
   // What the user typed into this file and has not saved, by hunk. Null is ordinary.
   pending?: Map<number, Map<number, string>> | null;
   onEdit: (file: string, hunk: number, row: number, text: string) => void;
   onDone: () => void;
+  // The file as it is on disk now, for opening a gap. Stable, like the rest.
+  readFile: (path: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
+  onNotice: (text: string) => void;
 }) {
+  // THE GAPS SHE HAS OPENED, by the index of the hunk below each one: the
+  // lines read off the disk and the number the first of them has.
+  const [opened, setOpened] = useState<Map<number, { from: number; lines: string[] }>>(() => new Map());
+  const openGap = async (i: number) => {
+    const read = await readFile(file.path);
+    if (!read.ok || typeof read.text !== 'string') { onNotice(read.error ?? `${file.path} could not be read.`); return; }
+    const r = hiddenLines(read.text, file.hunks[i - 1], file.hunks[i]);
+    if (!r.ok) { onNotice(r.error); return; }
+    setOpened((was) => new Map(was).set(i, { from: r.from, lines: r.lines }));
+  };
   return (
     <>
       {file.hunks.map((hunk, i) => (
         <div className="code-hunk-block" key={i}>
-          {/* WHERE THE FILE JUMPS, SAID PLAINLY. This is the sentence the fold also carried,
-             which is that these two blocks are not neighbours. It draws only between hunks
-             and only when git gave us the numbers to count with.
-           */}
-          {i > 0 && linesSkipped(file.hunks[i - 1], hunk) !== null && (
-            <div className="code-skip" aria-hidden="true">
-              <span>{linesSkipped(file.hunks[i - 1], hunk)} lines not shown</span>
+          {/* WHERE THE FILE JUMPS, AND PRESSING IT OPENS THE LINES IN BETWEEN
+             (2026-10-04). It draws only between hunks and only when git gave us
+             the numbers to count with; opened, the lines take its place, read
+             only, because they are not part of what the agent changed. */}
+          {i > 0 && opened.has(i) ? (
+            <div className="code-gap-lines">
+              {opened.get(i)!.lines.map((text, k) => (
+                <CodeLine key={k} mark="=" line={text} num={opened.get(i)!.from + k} editable={false} onEdit={() => {}} onDone={() => {}} />
+              ))}
             </div>
+          ) : i > 0 && linesSkipped(file.hunks[i - 1], hunk) !== null && (
+            <button type="button" className="code-skip" title="Show these lines" onClick={() => { void openGap(i); }}>
+              <span>{linesSkipped(file.hunks[i - 1], hunk)} lines not shown</span>
+            </button>
           )}
           <HunkRows
             hunk={hunk}
@@ -509,6 +528,13 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   }, []);
 
   const settle = useCallback(() => setDirtyAt((n) => n + 1), []);
+
+  // Stable, so FileHunks' memo holds: the parent's onNotice is a fresh closure
+  // on every render, so it is read through a ref.
+  const noticeRef = useRef(onNotice);
+  noticeRef.current = onNotice;
+  const notice = useCallback((text: string) => noticeRef.current(text), []);
+  const readFile = useCallback((path: string) => api.codeFile({ product, src, path }), [product, src]);
 
   const dirtyFiles = () => unsavedIn(edits.current);
 
@@ -1196,6 +1222,8 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
                 pending={seeded.current.get(file.path) ?? null}
                 onEdit={noteEdit}
                 onDone={settle}
+                readFile={readFile}
+                onNotice={notice}
               />
             ) : (
               <div className="code-unfilled" style={{ height: sliceGuessPx(file.hunks.reduce((n, h) => n + h.rows.length, 0)) }} />

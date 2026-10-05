@@ -7523,6 +7523,14 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 .code-skip::after {
   content: ''; flex: 1; height: 1px; background: var(--line);
 }
+/* PRESSING THE GAP OPENS IT (2026-10-04). It stays the same quiet line until
+   the pointer is on it, so the page reads as before; the words brighten to say
+   it can be pressed. */
+button.code-skip {
+  width: 100%; border: 0; background: none; cursor: pointer; text-align: left;
+}
+button.code-skip:hover { color: var(--text-dim); }
+button.code-skip:hover::after, button.code-skip:hover::before { background: var(--line-strong); }
 /* A LONG LINE WRAPS RATHER THAN BEING CUT OFF OUT OF REACH.
    This was `overflow-x: hidden` on a `white-space: pre` line, which is the one
    combination that hides text and offers nothing that would bring it back: the

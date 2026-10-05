@@ -422,6 +422,35 @@ export function linesSkipped(before: Hunk | undefined, after: Hunk | undefined):
   return gap > 0 ? gap : null;
 }
 
+/**
+ * THE LINES A GAP BETWEEN TWO HUNKS STOOD FOR, read out of the file as it is
+ * on disk now, numbered from `from` (2026-10-04,
+ * tests/the-hidden-lines-open-in-place.test.mjs).
+ *
+ * The disk may have moved on since the change, so the last row before the gap
+ * and the first row after it must still read the same at the numbers the
+ * change gives them, or nothing is returned but the reason.
+ */
+export function hiddenLines(fileText: string, before: Hunk, after: Hunk):
+  { ok: true; from: number; lines: string[] } | { ok: false; error: string } {
+  const lastNew = (h: Hunk) => {
+    for (let i = (h.nums?.length ?? 0) - 1; i >= 0; i--) if (h.nums![i][1] != null) return { n: h.nums![i][1]!, text: h.rows[i][1] };
+    return null;
+  };
+  const firstNew = (h: Hunk) => {
+    const i = (h.nums ?? []).findIndex((p) => p[1] != null);
+    return i >= 0 ? { n: h.nums![i][1]!, text: h.rows[i][1] } : null;
+  };
+  const end = lastNew(before);
+  const start = firstNew(after);
+  if (!end || !start) return { ok: false, error: 'This change does not say which lines it skipped.' };
+  const lines = String(fileText).split('\n');
+  if (lines[end.n - 1] !== end.text || lines[start.n - 1] !== start.text) {
+    return { ok: false, error: 'This file has changed since, so the lines in between could not be placed. Open it in your editor to read them.' };
+  }
+  return { ok: true, from: end.n + 1, lines: lines.slice(end.n, Math.max(end.n, start.n - 1)) };
+}
+
 /** A hunk's height in pixels before it is drawn, for `contain-intrinsic-size`. */
 export function hunkGuessPx(rows: number): number {
   return Math.round(rows * ROW_PX + HUNK_PAD_PX);
