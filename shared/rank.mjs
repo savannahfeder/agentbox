@@ -45,6 +45,28 @@ export function productRankScore(order, slug) {
 }
 
 /**
+ * The same score, except that A CONVERSATION WITH A PERSON RANKS WITH YOUR TOP
+ * PROJECT (w-2e8aa16f0f, 2026-10-05).
+ *
+ * A conversation lives in its own direct project, and nobody places that in
+ * the running order, so it scored zero and a High message from a teammate sat
+ * under every Low task. Her call: "it should def be based on priority. The
+ * issue is the project itself. For now it can just be treated as ranked with
+ * your top project." So it borrows the top place, and its own level decides
+ * where it sits among that project's threads. With no order there is no place
+ * to borrow and it scores nothing, like everything else.
+ *
+ * `direct` is the set of conversation project slugs, which only the caller can
+ * know (it reads them off the products). Without it this is productRankScore.
+ * The fleet does not need it: a conversation is held by a person and never
+ * spawns, so the supervisor's score never meets one.
+ */
+export function placeScore(order, slug, direct) {
+  if (direct?.has(slug)) return order.length * RANK_STEP;
+  return productRankScore(order, slug);
+}
+
+/**
  * The number an item carries into that score.
  *
  * An AGENT'S tag counts for nothing. Agents used to set this themselves, on a

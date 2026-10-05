@@ -111,17 +111,17 @@
    sits halfway between. */
 .th-shared-n { display: inline; margin-left: 3px; font: 10.5px var(--mono); color: var(--text-faint); vertical-align: 0.75px; }
 
-/* NOT STARTED, ON THE ROW (w-afb66e6661). Her ask: "some sort of tag, like
-   'not started', that makes it clearer". It is a box rather than more words in
-   the title, so the underline stops where the title does, and it is the only
-   thing on a row that says what Later holds: everything else there has a
-   moment, and this one is waiting for you. */
-.th-tag {
-  display: inline-block; margin-left: 10px; padding: 1px 6px;
-  border: 1px solid var(--line); border-radius: var(--tag-radius);
-  font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
-  color: var(--text-faint); vertical-align: 1px;
-}
+/* NOT STARTED, ON THE ROW (w-afb66e6661) was a boxed capital tag here. It is
+   faint words after the title now, `.th-aside` below (w-4189a5c1a0): the box
+   was turned down, and the words were picked out of four drawings. */
+
+/* A repeating task (w-4189a5c1a0): its mark leads the title, its schedule
+   trails it in the faint ink, in sentence case rather than the tag's capitals.
+   "not started" trails a title the same way. Inline-block so the row's
+   underline, a decoration on the title cell, stops where the title does: drawn
+   inline it ran on under the faint words on an urgent row. */
+.th-repeat { margin-right: 9px; vertical-align: -2px; color: var(--text-faint); flex: none; }
+.th-aside { display: inline-block; margin-left: 12px; color: var(--text-faint); }
 
 /* ------------------------------------------------------------ the list as a table */
 .th-table .row.th-head { padding-top: 10px; padding-bottom: 8px; font: 10.5px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); cursor: default; }

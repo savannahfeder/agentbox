@@ -76,10 +76,14 @@ describe('the new-task card asks one thing and explains nothing', () => {
 });
 
 describe('Settings offers a + on the heading, never a row', () => {
-  it('puts the plus on the PROJECTS heading the list already had', () => {
+  // THE MENU LOST ITS PROJECTS HEADING IN THE REDRAW (w-ccadd13c46): the
+  // headings are Personal, Agents and Workspace, and a + on Workspace would not
+  // say what it makes. The door in Settings is the Projects page's own New
+  // project button, and the menu still grows no row for it.
+  it('opens the new project card from the Projects page', () => {
     const src = read('renderer/src/components/Settings.tsx');
-    expect(src).toContain('className="set-nav-group np-head"');
-    expect(src).toContain('className="np-plus"');
+    expect(src).toMatch(/<ProjectsPage\b[\s\S]{0,400}onNew=\{onNewProject\}/);
+    expect(read('renderer/src/components/ProjectsPage.tsx')).toContain('New project');
   });
 
   it('adds no new row to the project list, which she called unappealing', () => {

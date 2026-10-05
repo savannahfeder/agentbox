@@ -90,6 +90,7 @@ import {
 } from './Priority';
 import { SummaryPanel, SummaryRail, ThreadCrumb, ThreadStateMark, useSummaryOpen, useSummaryShortcut } from '../threads/Summary';
 import { ThreadMenu } from '../threads/ThreadMenu';
+import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { engineModelLabel } from '../models';
 
 // With the options strip riding on the composer, the field's own "## Options"
@@ -416,7 +417,7 @@ function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 // not the user's, and it is the part that was unnecessary. `filesFromRuns` stays,
 // because App.tsx still reads it to choose the design a card opens itself on.
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onHandToAgent, onAddPeople }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onHandToAgent, onAddPeople }: {
   previewSample?: string;
   /**
    * A MESSAGE FROM A PERSON IS NOT WORK UNTIL SHE SAYS SO. The one line under
@@ -474,6 +475,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onOpenDoc?: (src: string, at?: string) => void;
   parent: WorkItem | null;
   blockedBy: WorkItem | null;
+  // THE THREADS THIS ONE MADE, with where each stands (w-2e8aa16f0f). Drawn in
+  // line under the conversation; absent or empty draws nothing.
+  filed?: Array<MadeRow & { item: WorkItem }>;
   onOpenItem: (item: WorkItem) => void;
   // Said out loud when a file a worker named is not in this product. Nothing
   // else on the card can tell her a chip failed.
@@ -1351,6 +1355,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               onOpenDoc={onOpenDoc}
             />
           )}
+
+        {/* WHAT THIS THREAD FILED, IN LINE, under what it said about them
+            (w-2e8aa16f0f). The result names them in prose; this is where each
+            one stands now, and the door into it. */}
+        <ThreadsMade rows={filed} label="Filed from this thread" onOpen={(id) => { const hit = filed.find((r) => r.id === id); if (hit) onOpenItem(hit.item); }} />
 
         {!agent && <RemoteControl key={`remote:${item.product}:${item.id}`} product={item.product} id={item.id} />}
         {!agent && <CompactionResult engine={runningEngine ?? 'claude-code'} key={`${item.product}:${item.id}`} item={item} />}

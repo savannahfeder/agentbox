@@ -71,6 +71,15 @@ Deno.serve(async (req) => {
       attachments: files.map((f) => ({ filename: f.name, content: f.data })),
     }),
   });
-  if (!res.ok) return json({ ok: false, error: 'mail refused' }, 502);
+  // Resend's own reason rides back, so a refusal says why (an unverified
+  // sending domain was the first one met). Any address in it is cut out first:
+  // anyone can call this, and a reason like "you can only send to <address>"
+  // would hand out exactly what the secret exists to hide.
+  if (!res.ok) {
+    const why = await res.json().catch(() => ({})) as { name?: string; message?: string };
+    const detail = [why.name, why.message].filter(Boolean).join(': ')
+      .replace(/[^\s<>"'`]+@[^\s<>"'`]+/g, '[address]').slice(0, 300);
+    return json({ ok: false, error: 'mail refused', detail }, 502);
+  }
   return json({ ok: true });
 });

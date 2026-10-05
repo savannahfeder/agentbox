@@ -28,23 +28,42 @@ const ruleFor = (sel) => {
   return m ? m[1] : '';
 };
 
+/* THE CARD BECAME A PAGE IN THE REDRAW (w-ccadd13c46, 2026-10-05). Each coding
+   agent has its own page in the settings menu, its usage, its logins and its
+   permissions as headed cards of rows, styled in components/settings.css. What
+   this file protects did not move: the live account is said four ways, nothing
+   is marked until she picks, no control is an opaque plate, and one agent's
+   story is told in one place. */
+const settingsCss = read('renderer/src/components/settings.css');
+/** A rule in settings.css, found by the end of its selector. */
+const pageRule = (tail) => {
+  const at = settingsCss.indexOf(`${tail} {`);
+  return at < 0 ? '' : settingsCss.slice(at, settingsCss.indexOf('}', at));
+};
+const enginePage = settings.slice(settings.indexOf('const enginePage = (engine'), settings.indexOf('<div className="set-nav">'));
+
 describe('the live account cannot be missed', () => {
   // HER NOTE, AND THE WHOLE REASON THIS ROUND EXISTS. One cue was missable and
   // she proved it, so the live row now says it four ways at once.
   it('says it four ways: a brighter film, full white, a rule, and the word', () => {
-    const on = ruleFor('.ac-item.on');
+    const on = pageRule('.set-plate > .set-acct-row.on');
     expect(on).toMatch(/background:\s*var\(--film-strong\)/);
-    expect(on).toMatch(/border-left-color:\s*var\(--text\)/);
-    expect(ruleFor('.ac-item.on .ac-item-mail')).toMatch(/color:\s*var\(--text\)/);
-    expect(card).toContain('{live && <span className="ac-badge">In use</span>}');
+    // The rule is the app's own selection bar since 2026-10-05, the orange a
+    // selected inbox row wears, on a square row inset from the card's corners.
+    expect(on).toMatch(/border-left:\s*2px solid var\(--select-bar\)/);
+    expect(pageRule('.set-plate > .set-acct-row.on .set-row-label')).toMatch(/color:\s*var\(--text\)/);
+    expect(card).toContain('{live && <span className="set-badge">In use</span>}');
+    expect(card).toContain("className={`set-row set-acct-row${live ? ' on' : ''}`}");
   });
 
   // THE WORD SITS BESIDE THE ADDRESS. On the round she rejected it was out on
   // the right margin, where a row's quietest corner is, and she missed it.
   it('puts the words beside the address and not on the right margin', () => {
-    const row = card.slice(card.indexOf('aria-pressed={live}'), card.indexOf('</button>', card.indexOf('aria-pressed={live}')));
-    expect(row.indexOf('ac-item-mail')).toBeLessThan(row.indexOf('ac-badge'));
-    expect(row.indexOf('ac-badge')).toBeLessThan(row.indexOf('ac-item-end'));
+    const row = card.slice(card.indexOf('set-acct-row'), card.indexOf('</div>\n            {/* One account'));
+    expect(row.indexOf('{label}')).toBeGreaterThan(-1);
+    expect(row.indexOf('{label}')).toBeLessThan(row.indexOf('set-badge'));
+    // Inside the label's own line, not in the control column on the right.
+    expect(row.slice(row.indexOf('set-row-label'), row.indexOf('set-badge'))).not.toContain('</div>');
   });
 
   // AND NOTHING IS MARKED WHEN SHE HAS NOT PICKED, because until she does every
@@ -100,13 +119,12 @@ describe('nothing in the card is a black square', () => {
   it('builds every control in the card out of a film of white', () => {
     // Through a TOKEN, never a literal: a raw white rgba is invisible on the
     // light theme, which is the bug tests/theme-tokens.test.mjs exists for.
-    expect(ruleFor('.ac-item:hover')).toMatch(/background:\s*var\(--wash\)/);
-    expect(ruleFor('.ac-item.on')).toMatch(/background:\s*var\(--film-strong\)/);
-    // Nothing in the card reaches for the opaque token, or for the two classes
-    // that do.
-    const block = css.slice(css.indexOf('/* ===== ONE CARD PER CODING AGENT'));
-    expect(block).not.toMatch(/background:\s*var\(--surface\)/);
-    expect(card).not.toContain('set-ghost');
+    // The cards are a wash and the live row a stronger film; the buttons are
+    // `.set-ghost`, which the test above proves is a film too.
+    expect(pageRule('.set-plate:not(.set-keys)')).toMatch(/background:\s*var\(--wash\)/);
+    expect(pageRule('.set-plate > .set-acct-row.on')).toMatch(/background:\s*var\(--film-strong\)/);
+    // Nothing on the page reaches for the opaque token.
+    expect(settingsCss).not.toMatch(/var\(--surface\)/);
     expect(card).not.toContain('Segbar');
   });
 
@@ -119,21 +137,21 @@ describe('nothing in the card is a black square', () => {
 
 describe('the card gathers what the page used to scatter', () => {
   it('holds the agent, its limits and its logins in one place', () => {
-    expect(card).toContain('<CardMeters reading={agent.reading}');
-    expect(card).toContain('className="ac-list"');
-    expect(settings).toContain('<AgentCard');
+    expect(enginePage).toContain('<UsageRows reading={agent.reading}');
+    expect(enginePage).toContain('<AccountRows');
+    expect(settings).toContain("{model && w && pane === 'claude' && enginePage('claude')}");
   });
 
-  // The pieces it replaced are gone, or the page says the same thing twice.
+  // The pieces it replaced are gone, or the pages say the same thing twice.
   it('leaves no second copy of the old groups', () => {
-    const pane = settings.slice(settings.indexOf("pane === 'general'"), settings.indexOf("pane === 'agents'"));
-    expect(pane).not.toContain('<UsageOverview');
-    expect(pane).not.toContain('<ClaudeCode');
-    expect(pane).not.toContain('<CodexCli');
+    const general = settings.slice(settings.indexOf("pane === 'general' && ("), settings.indexOf("pane === 'claude' && enginePage"));
+    expect(general.length).toBeGreaterThan(0);
+    for (const piece of ['<UsageOverview', '<UsageRows', '<AccountRows', '<ClaudeCode', '<CodexCli']) {
+      expect(general).not.toContain(piece);
+    }
   });
 
   it('keeps the usage markup it was already using', () => {
-    expect(card).toContain('className="settings-usage-window"');
     expect(card).toContain('className="usage-meter wide"');
   });
 });
