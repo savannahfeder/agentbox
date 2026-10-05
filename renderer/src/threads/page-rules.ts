@@ -9,6 +9,7 @@ import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread
 import type { Seen } from './summary-rules';
 import type { Product, ThreadCard, ThreadStateWord, WorkItem } from '../types';
 import { priorityIdOf, type PriorityId } from '../priority';
+import { firstRealLine } from '../format';
 import { threadState } from '../../../shared/thread-cards.mjs';
 import { placeScore } from '../../../shared/rank.mjs';
 
@@ -394,7 +395,12 @@ export function messageLine(item: WorkItem, product: Product | undefined | null,
   let people = [...new Set(everyone)].filter((p) => p && p !== me);
   if (!people.length && item.createdBy && item.createdBy !== me) people = [item.createdBy];
   const answered = !!item.answer && item.answer !== '(withdrawn)';
-  const text = String((answered ? item.answer : item.body) || item.title || '').trim().split('\n')[0];
+  // THE LATEST REAL LINE OF THE NEWEST MESSAGE (w-560647d4db). This took the
+  // message's first line, full stop, and the first real conversation between
+  // two teammates had a message opening on "Additional:" with the findings
+  // under it — so the row said a word that is not news and not even a subject.
+  // `firstRealLine` steps over a bare label and takes the line under it.
+  const text = firstRealLine(String((answered ? item.answer : item.body) || item.title || ''));
   const by = (answered ? item.wrote?.answer?.by : item.wrote?.body?.by) ?? item.createdBy ?? null;
   return { people, fromMe: !!me && by === me, text };
 }

@@ -63,6 +63,8 @@ import { watchScrollGutter } from '../scroll-gutter';
 import { artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
 import { api } from '../api';
 import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveDraftAttachments, type SentDraft } from '../drafts';
+import { withQuote } from '../team/chat-quote';
+import { FormatBar } from '../team/FormatBar';
 import { foldedReply } from '../folded-reply';
 import { applyDockHeight } from '../dock-height';
 import { resumeTo } from '../thread-bottom';
@@ -1353,6 +1355,16 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               md={md}
               clean={cleanMessage}
               onOpenDoc={onOpenDoc}
+              // REPLY, AND HAND IT TO AN AGENT, both on the message rather than
+              // under the conversation (w-560647d4db). Reply takes the same
+              // road the review strip already takes into the reply box: write
+              // the draft, say so, open the box.
+              onQuote={(said) => {
+                saveDraft(item, withQuote(readDraft(item), said));
+                window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(item) }));
+                onReply();
+              }}
+              onHandToAgent={onHandToAgent ? () => onHandToAgent(item) : undefined}
             />
           )}
 
@@ -1380,13 +1392,18 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             well is what made one screen say "Codex" twice. */}
         {!heldByPerson && <Live item={item} facts={{ ...live, session, stalled, scheduledUntil }} />}
 
-        {/* A MESSAGE FROM A PERSON BECOMES WORK ONLY WHEN SHE SAYS SO: one quiet
-            line under the latest message, and the dotted words are the door. */}
-        {direct && onHandToAgent && (
-          <p className="ts-hand">
-            <button type="button" onClick={() => onHandToAgent(item)}>Hand it to an agent</button> to turn it into a task.
-          </p>
-        )}
+        {/* A MESSAGE FROM A PERSON BECOMES WORK ONLY WHEN SHE SAYS SO, AND IT
+            SAYS SO ON THE MESSAGE NOW (w-560647d4db).
+
+            This was one quiet line pinned under the whole conversation. Pinned
+            there it had no subject: it said "Hand it to an agent" under the
+            newest message whatever that message was, and the thing you actually
+            want work made of is usually one message several up. It is in the
+            bar that appears when you point at a message instead
+            (team/ChatActions.tsx), which is where drawing A puts it.
+
+            A THREAD WITH AN AGENT NEVER DREW IT and still does not: `direct` is
+            what gated it here, and `chat` is what gates the bar. */}
 
       </div>
 
@@ -1970,6 +1987,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
     setEffort(item.effort ?? null);
   }, [item.product, item.id, item.model, item.effort]);
   const ref = useRef<HTMLTextAreaElement>(null);
+  // The hidden file input the formatting bar's attach button opens.
+  const filePicker = useRef<HTMLInputElement>(null);
+  const pickFiles = () => filePicker.current?.click();
   // WHAT THIS ONE MESSAGE MAY DO.So it is not a project setting and not a
   // workspace one; it rides on the send.
   //
@@ -2407,6 +2427,24 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           if (dropped.length) setAttachments((a) => [...a, ...dropped]);
         }}
       />
+      {/* THE FILE PICKER THE ATTACH BUTTON OPENS. The box already took files by
+          paste and by drop; the bar's + is the third way in, and all three end
+          in the same `collectFiles` and the same row of thumbnails below. The
+          input is hidden rather than styled: an <input type=file> cannot be
+          drawn as one of these buttons, and a second-looking control beside
+          them would be the one rounded thing on the screen. */}
+      <input
+        ref={filePicker}
+        type="file"
+        multiple
+        style={{ display: 'none' }}
+        onChange={async (e) => {
+          const picked = await collectFiles(e.target.files ?? []);
+          if (picked.length) setAttachments((a) => [...a, ...picked]);
+          // Cleared so picking the same file twice in a row still fires.
+          e.target.value = '';
+        }}
+      />
       <AttachRow attachments={attachments} onRemove={(i) => setAttachments((x) => x.filter((_, j) => j !== i))} />
       {/* The notes, which cost a line only when there is something true to say,
           and which are NOT in the sentence: a sentence that grows a clause when
@@ -2441,6 +2479,12 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             Runs once." under a message going into somebody's terminal is a
             sentence about a thing that is not happening. What is left is the
             send button, which is the whole act. */}
+        {/* THE FORMATTING BAR, IN A CHAT AND NOWHERE ELSE (w-560647d4db). It
+            goes first on the footer line, which is where drawing A has it:
+            left of "Goes to Margarette." and left of Send. A reply to an agent
+            is an instruction rather than a formatted message, so that box keeps
+            exactly the footer it had. */}
+        {talkTo?.length ? <FormatBar box={ref} onChange={changeText} onAttach={pickFiles} /> : null}
         <span className="compose-clauses">
           {/* WHERE IT GOES, NOT WHO SEES IT (w-a8e752a9f2). The conversation's
               own header already reads "MESSAGES · MAYA GAVE YOU THIS" with both

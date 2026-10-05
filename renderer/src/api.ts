@@ -481,6 +481,9 @@ export const api = {
   async teamSync(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSync()); },
   // A task somebody gave you: to an agent (on your Mac), keep it, or hand it back.
   async teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRoute(p)); },
+  // A chip put on or taken off one message. `on` is the uid of the ledger line
+  // the message was written as (w-560647d4db).
+  async teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamReact(p)); },
   // A MESSAGE TO A PERSON (people get messages, never tasks).
   async teamMessage(to: string | string[], body: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessage({ to, body })); },
   // An edit to a thread's summary, visibility or priority, made in place.

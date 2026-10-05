@@ -451,6 +451,18 @@ export class Store {
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, allowed, { source: 'founder' });
   }
 
+  // A REACTION ON ONE MESSAGE (w-560647d4db): the chips under it in a chat.
+  // `on` is the uid of the ledger line the message was written as, which is the
+  // one name for a message that is the same on every teammate's Mac. Written as
+  // the person's own word, and appended like anything else: the fold keeps a
+  // press per person rather than one value per row, so two people reacting at
+  // the same moment keep both chips (shared/work-items.mjs).
+  react(slug, id, { on, emoji, off = false }) {
+    return this.modules.workItemsDisk.updateWorkItem(
+      this.productDir(slug), id, { react: off ? { on, emoji, off: true } : { on, emoji } }, { source: 'founder' },
+    );
+  }
+
   // AN EDIT TO A THREAD FROM ITS SUMMARY (approved 2026-10-01): the summary's
   // three lines and its links, who sees it, and its priority. Written as the
   // person's own words; on the summary the later write wins either way

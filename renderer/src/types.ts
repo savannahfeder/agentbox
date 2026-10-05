@@ -7,6 +7,11 @@ export interface WorkItem {
   id: string;
   product: string;
   productName: string;
+  // WHAT PEOPLE PUT ON EACH MESSAGE IN A CONVERSATION (w-560647d4db): by the
+  // message's line uid, then by emoji, then the people on it. Folded out of the
+  // presses the ledger holds (shared/work-items.mjs); absent on every row
+  // nobody has reacted on, which is every row outside a chat.
+  reactions?: Record<string, Record<string, string[]>>;
   status: 'open' | 'claimed' | 'done' | 'blocked';
   title: string;
   // The short written name the LIST draws instead of the title, when a session
@@ -452,6 +457,11 @@ export interface AgentTurn {
   // Which person wrote it, on a shared project (the team version). A message
   // from a teammate is drawn with their face and name instead of "You".
   by?: string;
+  // THE MESSAGE'S OWN NAME, the uid of the ledger line it was written as. A
+  // reaction is stored against it (w-560647d4db), so only a message that has
+  // one can wear chips: a message still on its way has not been written down
+  // yet, and the one the ask was quoted from lives on another row.
+  uid?: string;
   // A CONTINUATION OF THE BLOCK ABOVE, not a new message. Shape B puts the
   // work between the messages, so a reply that stopped for a tool is drawn as
   // two blocks with the thing it ran between them. They are still one reply:
@@ -967,6 +977,7 @@ declare global {
       teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult>;
       teamSync(): Promise<TeamCallResult>;
       teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;
+      teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult>;
       teamMessage(p: { to: string | string[]; body: string }): Promise<TeamCallResult>;
       threadEdit(p: { product: string; id: string; patch: ThreadEditPatch }): Promise<{ ok: boolean; error?: string }>;
       schedule(p: { product: string; id: string; runAt: number }): Promise<WorkItem>;

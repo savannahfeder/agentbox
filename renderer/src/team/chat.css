@@ -36,3 +36,91 @@
 }
 .chat-more:hover { color: var(--text); text-decoration-color: var(--text-faint); }
 .chat-more:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
+
+/* ---------------------- reactions, and the bar on pointing ----------------
+   Drawing A, with round one's note on it: no colour and no rounded corners. So
+   every plate below is a 1px line over the pane's own wash at a square edge,
+   and the ONE distinction a chip makes — whether you are on it — is carried by
+   a brighter line and brighter text rather than by a tint. ./ChatActions.tsx. */
+
+.chat-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+.chat-chip {
+  display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 7px;
+  appearance: none; border: 1px solid var(--line); border-radius: 0; cursor: pointer;
+  background: var(--wash); color: var(--text-dim); font: inherit; font-size: 12px; line-height: 1;
+}
+.chat-chip:hover { border-color: var(--line-strong); color: var(--text); }
+.chat-chip:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 1px; }
+/* YOURS, A SHADE BRIGHTER and nothing more. */
+.chat-chip.mine { border-color: var(--text-faint); color: var(--text); }
+.chat-chip-emoji { font-size: 12.5px; }
+.chat-chip-count { font: 11px var(--mono); letter-spacing: .02em; }
+
+/* THE BAR SITS OVER THE MESSAGE'S TOP EDGE, out of the flow, so pointing at a
+   message never changes its height and never moves the line under it. */
+.chat-msg { position: relative; }
+/* HIDDEN, BUT STILL THERE TO BE TABBED TO. The bar was taken off the screen by
+   not being drawn at all, which also takes its three buttons out of the tab
+   order: the only way to react to a message, quote one or hand one to an agent
+   was with a pointer, and the first of those has no other route anywhere. Faded
+   out and deaf to the mouse is the same thing to look at and a reachable
+   control to use — Tab lands on React and `:focus-within` brings the bar up. */
+.chat-acts {
+  position: absolute; top: -13px; right: 0; z-index: 3;
+  display: flex; align-items: stretch;
+  border: 1px solid var(--line-strong); border-radius: 0;
+  background: var(--skin-solid, var(--surface)); box-shadow: 0 2px 10px #0003;
+  opacity: 0; pointer-events: none; transition: opacity 90ms ease;
+}
+.chat-msg:hover > .chat-acts, .chat-acts:focus-within, .chat-acts.open { opacity: 1; pointer-events: auto; }
+.chat-act {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px;
+  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  color: var(--text-dim); font: inherit; font-size: 12px;
+}
+.chat-act + .chat-act { border-left: 1px solid var(--line); }
+.chat-act:hover { background: var(--wash); color: var(--text); }
+.chat-act:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
+.chat-act svg { width: 14px; height: 14px; flex: none; }
+.chat-act-word { white-space: nowrap; }
+
+/* The emoji plate hangs off the bar and opens UPWARD, for the same reason the
+   reply box's menu does: the newest message is at the foot of the window and
+   there is nothing under it. */
+.chat-emoji {
+  position: absolute; bottom: calc(100% + 5px); right: 0;
+  display: flex; padding: 3px;
+  border: 1px solid var(--line-strong); border-radius: 0;
+  background: var(--skin-solid, var(--surface)); box-shadow: 0 4px 18px #0004;
+}
+.chat-emoji-one {
+  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  width: 26px; height: 26px; padding: 0; font-size: 15px; line-height: 1;
+}
+.chat-emoji-one:hover { background: var(--wash); }
+.chat-emoji-one:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
+
+/* ------------------- the formatting bar under the reply box ----------------
+   ./FormatBar.tsx, drawn only on a chat. It rides the footer line the reply box
+   already has, so it costs no height: it sits where the priority and model
+   clauses sit on a thread with an agent, and the "Goes to …" line and Send keep
+   their own ends of that line. Square and monochrome, like everything else
+   drawing A asked for. */
+
+.fmt-bar { display: flex; align-items: center; gap: 1px; flex: none; margin-right: 14px; }
+.fmt-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; padding: 0;
+  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  color: var(--text-faint); font: inherit;
+}
+.fmt-btn:hover { background: var(--wash); color: var(--text); }
+.fmt-btn:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
+.fmt-btn svg { width: 15px; height: 15px; }
+.fmt-letter { font-size: 13px; line-height: 1; }
+/* B, I and S say what they do by being drawn the way they do it. */
+.fmt-b { font-weight: 700; }
+.fmt-i { font-style: italic; font-family: var(--serif, inherit); }
+.fmt-s { text-decoration: line-through; }
+.fmt-gap { width: 13px; }
+.fmt-emoji-wrap { position: relative; display: inline-flex; }
