@@ -128,6 +128,10 @@ export class Store {
         // YOUR PERSONAL PROJECT, where a thread is Only you unless you say
         // otherwise (main/team/projects.mjs, w-b989839656).
         personal: project[PERSONAL_FLAG] === true,
+        // WHO SEES ITS THREADS on the Team page (w-b989839656), read as
+        // written; shared/thread-cards.mjs projectSeenBy is the one reading.
+        ...(typeof project.seenBy === 'string' ? { seenBy: project.seenBy } : {}),
+        ...(Array.isArray(project.seenByPeople) ? { seenByPeople: project.seenByPeople.filter((p) => typeof p === 'string') } : {}),
         // SHARED OR PRIVATE. Null on a private project, which is every
         // project of a person who never signs in; otherwise the cloud id that
         // is the same on every teammate's Mac (main/team/projects.mjs).
@@ -154,6 +158,21 @@ export class Store {
       if (this.watchers.length) this.watch();
     }
     return { slug, archived: archived === true };
+  }
+
+  /** WHO SEES A PROJECT'S THREADS on the Team page (w-b989839656): 'private'
+   *  (Just you), 'team', or 'people' with the people named. Written into the
+   *  project's own file, because it is the project's, and nothing of the
+   *  project itself leaves this Mac either way. My Workspace is refused: it is
+   *  Just you by what it is. */
+  setProductSeenBy(slug, { who, people } = {}) {
+    const product = slug ? this.listProducts({ includeArchived: true }).find((p) => p.slug === slug) : null;
+    if (!product) throw new Error('That project could not be found.');
+    if (product.personal) throw new Error('My Workspace is always just you.');
+    if (who !== 'private' && who !== 'team' && who !== 'people') throw new Error(`unknown setting for who sees it: ${who}`);
+    const ids = [...new Set((Array.isArray(people) ? people : []).filter((p) => typeof p === 'string' && p))];
+    patchProjectAt(product.dir, { seenBy: who, seenByPeople: who === 'people' ? ids : undefined });
+    return { slug, who, people: who === 'people' ? ids : [] };
   }
 
   /* ------------------------------ work items ----------------------------- */
@@ -629,6 +648,9 @@ export class Store {
       name,
       createdAt: new Date().toISOString(),
       ...(repo ? { repoPath: repo } : {}),
+      // EVERY NEW PROJECT STARTS AS JUST YOU (w-b989839656): its threads
+      // reach the Team page only once you share the project or the thread.
+      seenBy: 'private',
     }, null, 2));
     // AND IT FILES NOTHING INTO HER INBOX.
     //

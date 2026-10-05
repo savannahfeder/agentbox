@@ -13,7 +13,7 @@ import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AnswerMode, Approval, PermissionMode, RepeatRule, RepeatShape, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
+import type { AnswerMode, Approval, PermissionMode, Product, RepeatRule, RepeatShape, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import { api } from './api';
 import { setClaudeModels } from './models';
 import { advanceAfter, nextAfterAdvance, type Advance } from './advance';
@@ -117,6 +117,7 @@ import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
+import { ProjectShare, ProjectWho } from './team/ProjectShare';
 import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
@@ -5743,6 +5744,17 @@ export default function App() {
              has no team in it, and this keeps the team's code in the team's
              files. No team cloud, no pane and no Team row. */
           teamPane={snap?.team?.configured ? <TeamPage team={snap?.team} inviteFocus={inviteFocus} /> : undefined}
+          // WHO SEES A PROJECT'S THREADS (w-b989839656): the button beside a
+          // project's name and the Projects list's column, only while someone
+          // is signed in to a team, handed in for the same reason as the pane.
+          projectShare={team ? (slug: string) => {
+            const product = team.products.get(slug);
+            return product ? <ProjectShare product={product} onChange={async (who, people) => {
+              const out = await api.setProjectSeenBy({ product: slug, who, people });
+              if (!out.ok) showToast(out.error ?? 'Could not change who sees it.');
+            }} /> : null;
+          } : undefined}
+          projectWho={team ? (product: Product) => <ProjectWho product={product} /> : undefined}
           // SIGN OUT AT THE FOOT OF SETTINGS (w-a09476712f): "should be at
           // bottom of settings page". Only while someone is signed in.
           account={snap?.team?.signedIn && snap.team.me ? { email: snap.team.me.email, team: snap.team.team?.name ?? null, onSignOut: () => { void api.teamSignOut().then(() => refresh()); } } : undefined}

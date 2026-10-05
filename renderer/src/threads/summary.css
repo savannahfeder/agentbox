@@ -124,13 +124,15 @@
    under it, not the size. Medium since w-5391bb330f, picked from 300 to 600 in
    Dark; light read too thin. Three lines at most; the conversation beside it
    has the rest. Read-only, so it answers no hover. */
-.ts-title { margin: 0 0 20px; font-size: 16px; font-weight: 500; line-height: 22px; letter-spacing: -.01em; color: var(--text); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ts-title { margin: 0 0 22px; font-size: 16px; font-weight: 500; line-height: 22px; letter-spacing: -.01em; color: var(--text); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* THE FOOT: the hairline and the properties, at the bottom edge. It adds no
    room of its own above the hairline (w-b51b2e1c86): under a long summary the
    hairline sits one section's step under the words, 24px rather than 52px, so
    more of them fit before the panel scrolls. */
-.ts-foot { margin-top: auto; padding-top: 0; }
+/* 6px of its own since w-54e9c7243f brought the parts to 12px apart, so the
+   hairline still sits 24px under the last words. */
+.ts-foot { margin-top: auto; padding-top: 6px; }
 .ts-props { display: grid; grid-template-columns: 92px minmax(0, 1fr); row-gap: 14px; font-size: 13.5px; line-height: 20px; margin: 0; }
 .ts-label { color: var(--text-faint); font-size: 13px; }
 .ts-value { color: var(--text); display: flex; align-items: center; min-width: 0; }
@@ -153,7 +155,10 @@
 .ts-caret { margin-left: auto; padding-left: 8px; box-sizing: content-box; }
 .ts-prop-btn:hover .ts-caret, .ts-prop-btn:focus-visible .ts-caret, .ts-prop-btn[aria-expanded="true"] .ts-caret { opacity: 1; }
 
-.ts-h { display: block; margin: 0 0 10px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+/* A label sits close over its words (w-54e9c7243f): with the line's own 6px
+   of padding that is 8px, against 18px between one part and the next, so a
+   label belongs to what is under it and not to what is above. */
+.ts-h { display: block; margin: 0 0 2px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 
 /* the status, priority and visibility menus rise from the row, since the rows
    sit at the foot of the panel and a menu dropping from them would run off the
@@ -186,7 +191,7 @@
    that was there all along in transparent. Under the pointer a line washes
    like the fields above it and shows a pencil at its top right, in room both
    shapes keep clear on the right, so the words do not move when it opens. */
-.ts-sec { margin: 0 0 18px; }
+.ts-sec { margin: 0 0 12px; }
 .ts-line, .ts-edit { display: block; box-sizing: border-box; width: calc(100% + 16px); margin: 0 -8px; padding: 6px 28px 6px 8px; border: 1px solid transparent; border-radius: var(--radius); font: inherit; font-size: 13.5px; line-height: 21px; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
 .ts-line { position: relative; cursor: pointer; transition: background-color .08s ease; }
 .ts-line:hover { background: var(--wash); }
@@ -195,6 +200,16 @@
 .ts-line:focus-visible { outline: none; border-color: var(--line-strong); }
 .ts-line.dim { color: var(--text-dim); }
 .ts-edit { resize: none; overflow: hidden; border-color: var(--line-strong); background: var(--wash); outline: none; caret-color: var(--accent); }
+/* THE DONE TRAIL (w-54e9c7243f): smaller and dimmer than the Context over it,
+   each step a dot joined to the next by a thin line, the newest dot a shade
+   brighter. Picked from full-window pictures as "the timeline view". */
+.ts-sec-done { margin-top: 6px; }
+.ts-trail { list-style: none; margin: 0; padding: 0; font-size: 12.5px; line-height: 19px; color: var(--text-dim); white-space: normal; }
+.ts-step { position: relative; padding-left: 18px; margin: 0 0 6px; }
+.ts-step:last-child { margin-bottom: 0; }
+.ts-step::before { content: ""; position: absolute; left: 3px; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--text-faint); }
+.ts-step:not(:last-child)::after { content: ""; position: absolute; left: 5px; top: 14px; bottom: -8px; width: 1px; background: var(--line-strong); }
+.ts-step-last::before { background: var(--text-dim); }
 .ts-by { font-size: 12px; line-height: 18px; color: var(--text-faint); margin-top: 4px; }
 .ts-by-error { color: var(--text-dim); }
 
@@ -216,7 +231,11 @@
 .ts-tk-top .ts-st { margin-right: 7px; }
 .ts-tk-top .prio-bars { margin-right: 7px; }
 .ts-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--text-faint); flex: none; }
-.ts-tk-lead { margin: 0 0 24px; font-size: 18px; line-height: 28px; letter-spacing: -.01em; color: var(--text); }
+/* The lead is the thread's Context, a few sentences since w-54e9c7243f, so it
+   is set at reading size rather than the 18px a single line could carry. */
+.ts-tk-lead { margin: 0 0 20px; font-size: 15px; line-height: 23px; letter-spacing: -.005em; color: var(--text); }
+.ts-tk-done { padding: 18px 0 20px; border-top: 1px solid var(--line); }
+.ts-tk-done .ts-h { margin: 0 0 8px; }
 .ts-tk-lead.dim, .ts-ticket p.dim, .ts-ticket span.dim { color: var(--text-dim); }
 .ts-tk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 20px 0 22px; border-top: 1px solid var(--line); }
 .ts-tk-grid .ts-h { margin: 0 0 6px; }

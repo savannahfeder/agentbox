@@ -51,7 +51,7 @@ describe('the panel opens with the thread’s name', () => {
   it('says the name the row shows, the label, first and over the three lines', () => {
     const html = draw(item());
     expect(html).toContain('<h2 class="ts-title">Acme renewal terms</h2><div class="ts-sec">');
-    expect(text(html)).toMatch(/^Acme renewal terms Problem .* Status In progress Priority \w+ Owner You Project Northwind/);
+    expect(text(html)).toMatch(/^Acme renewal terms Context .* Status In progress Priority \w+ Owner You Project Northwind/);
   });
   it('falls back to the title on a thread with no label', () => {
     expect(draw(item({ label: undefined }))).toContain('<h2 class="ts-title">Can you send Acme their renewal terms by Thursday? Their contract ends on the 14th.</h2>');
@@ -90,10 +90,11 @@ describe('what you can change looks changeable, and what you cannot does not', (
     expect(cell).not.toContain('<button');
     expect(cell).not.toContain('ts-caret');
   });
-  // An empty line is not drawn at all since w-54e9c7243f, so all three are written here.
-  it('puts a pencil on each of the three lines', () => {
+  // An empty line is not drawn at all since w-54e9c7243f, so both are written
+  // here; and since later on that thread there are two, Context and Done.
+  it('puts a pencil on Context and on Done', () => {
     const all = draw(item({ problem: 'Terms are late.', progress: 'Drafted.', solution: 'Sent.' }));
-    expect(all.match(/class="ts-line[^"]*"[^>]*>.*?ts-pen/g)).toHaveLength(3);
+    expect(all.match(/class="ts-line[^"]*"[^>]*>.*?ts-pen/g)).toHaveLength(2);
   });
   it('answers the pointer on a changeable field with the wash, a pointer and its mark', () => {
     expect(css).toMatch(/\.ts-prop-btn \{[^}]*cursor: pointer/);

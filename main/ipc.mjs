@@ -1362,6 +1362,19 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     }
   });
 
+  // WHO SEES A PROJECT'S THREADS (main/store.mjs setProductSeenBy,
+  // w-b989839656). Pushed, because the inbox's locks and the New thread
+  // card's starting chip both read it off the snapshot's projects.
+  ipcMain.handle('zero:project-seen-by', (_e, { product, who, people } = {}) => {
+    try {
+      store.setProductSeenBy(product, { who, people });
+      push();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String(err.message) };
+    }
+  });
+
   // Opens the picker AND does the copy, in one round trip. Two handlers would
   // mean the renderer briefly holds a path into her Downloads folder and hands
   // it back to be trusted; this way the only path that crosses the bridge is one
