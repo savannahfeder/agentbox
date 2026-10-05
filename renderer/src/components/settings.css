@@ -74,12 +74,13 @@
   text-transform: none; color: var(--text);
 }
 /* THE CARD. One plate per group, a hairline round it and a wash inside it, and
-   the rows inside it divided by the same hairline. ITS CORNERS ARE THE APP'S
-   (2026-10-05): `--radius`, 3px, and square on the themes that set it to 0.
-   The first drawing used 10px, and "in agentbox all borders are relatively
-   sharp". Nothing on this screen is rounder than that. */
+   the rows inside it divided by the same hairline. Its corners are 10px, which
+   is the round she asked to go back to (2026-10-05) after a round of square
+   ones. THE CARD IS THE ONLY ROUNDED THING HERE: anything that wears a
+   highlighted edge is square and sits clear of the card's corners, because a
+   bright rule bent round a corner "looks whack". */
 .settings-screen[data-pane] .set-plate:not(.set-keys) {
-  padding: 0 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--wash);
+  padding: 0 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--wash);
 }
 /* A warning about the whole group is the card's first line, inside it. */
 .settings-screen[data-pane] .set-plate > .set-row-warn {
@@ -104,19 +105,79 @@
 /* THE ACCOUNT IN USE CANNOT BE MISSED. One cue was missable and she proved it,
    so the live row says it four ways at once: a brighter film across the whole
    row, the address in full white, a rule down its left edge, and the words
-   In use beside the address. The row reaches out to the card's edges so the
-   film and the rule are the row's and not a box inside it. */
+   In use beside the address.
+   THE RULE IS THE APP'S SELECTION BAR, `--select-bar`, the orange a selected
+   inbox row wears, and the row carrying it is SQUARE AND INSET: it stops 8px
+   short of the card's sides and 6px short of its top and bottom, so the bar
+   never meets the card's rounded corner. The first drawing ran it to the edge,
+   where the corner bent it (her picture, 2026-10-05). */
 .settings-screen[data-pane] .set-plate > .set-acct-row.on {
-  margin: 0 -18px; padding-left: 15px; padding-right: 18px;
-  background: var(--film-strong); border-left: 3px solid var(--text);
+  margin: 6px -10px; padding: 12px 10px 12px 8px; border-radius: 0;
+  background: var(--film-strong); border-left: 2px solid var(--select-bar);
 }
 .settings-screen[data-pane] .set-plate > .set-acct-row.on .set-row-label { color: var(--text); }
-.settings-screen[data-pane] .set-plate > .set-acct-row.on + .set-row { border-top-color: transparent; }
+/* An inset row carries its own edges, so the hairlines either side of it go. */
+.settings-screen[data-pane] .set-plate > .set-acct-row.on + .set-row,
+.settings-screen[data-pane] .set-plate > .set-row + .set-acct-row.on { border-top-color: transparent; }
+/* IN USE is said in the app's label voice, the small mono capitals the
+   new-task card's TO and MODEL wear, in the accent. */
 .set-badge {
-  display: inline-block; margin-left: 8px; padding: 1px 7px; vertical-align: 1px;
-  border-radius: var(--radius); background: var(--film-strong); color: var(--text);
-  font-size: 11px; font-weight: 500; letter-spacing: 0;
+  display: inline-block; margin-left: 10px; vertical-align: 1px;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--accent);
 }
+
+/* ------------------------------- controls ---------------------------------
+   THE CONTROLS ARE THE NEW-TASK CARD'S (2026-10-05). The ones this screen had
+   were its own, a white switch, a boxed three-cell stepper and a filled button,
+   and next to the composer's quiet chips and orange Send they read as from
+   another app: "our standard ui with the orange etc is quite beautiful, so idk
+   why our settings keeps feeling like this". So a button here is the
+   composer's chip (`.tc-chip`: 28 tall, a hairline, a faint wash, the tag
+   corner), a switch that is on is the Send orange, and the stepper is two chips
+   with the number between them. Every colour is a token. */
+.settings-screen[data-pane] .set-ghost {
+  display: inline-flex; align-items: center; height: 28px; padding: 0 11px;
+  border: 1px solid var(--line); border-radius: var(--tag-radius); background: var(--wash);
+  color: var(--text-dim); font-size: 13px; line-height: 1; white-space: nowrap;
+  transition: color 0.12s, border-color 0.12s;
+}
+.settings-screen[data-pane] .set-ghost:hover:not(:disabled) { background: var(--wash); color: var(--text); border-color: var(--line-strong); }
+
+/* THE SWITCH. Off is a hairline track with a faint knob; on is the accent,
+   filled, with a light knob. Smaller than before, 30 by 18. */
+.settings-screen[data-pane] .set-sw {
+  width: 30px; height: 18px; border-radius: 9px;
+  background: var(--wash-strong); border: 1px solid var(--line-strong);
+}
+.settings-screen[data-pane] .set-sw::after {
+  top: 2px; left: 2px; width: 12px; height: 12px; background: var(--text-dim); box-shadow: none;
+}
+.settings-screen[data-pane] .set-sw.on { background: var(--accent); border-color: var(--accent); }
+.settings-screen[data-pane] .set-sw.on::after { transform: translateX(12px); background: var(--on-accent, #fff); }
+.settings-screen[data-pane] .set-sw:focus-visible { outline: 1px solid var(--text); outline-offset: 2px; }
+
+/* THE STEPPER: two chips and the number between them, no box round the three. */
+.settings-screen[data-pane] .set-step { gap: 2px; border: 0; border-radius: 0; overflow: visible; }
+.settings-screen[data-pane] .set-step button {
+  display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+  border: 1px solid var(--line); border-radius: var(--tag-radius); background: var(--wash); color: var(--text-dim);
+}
+.settings-screen[data-pane] .set-step button svg { width: 12px; height: 12px; }
+.settings-screen[data-pane] .set-step button:hover:not(:disabled) { background: var(--wash); color: var(--text); border-color: var(--line-strong); }
+.settings-screen[data-pane] .set-step button:disabled { color: var(--line-strong); }
+.settings-screen[data-pane] .set-step .val {
+  width: 32px; height: 28px; line-height: 28px; border: 0;
+  font-size: 13.5px; font-weight: 500; color: var(--text);
+}
+
+/* THE DROPDOWN at the end of a row is the same chip, carrying its value. */
+.settings-screen[data-pane] .set-row-ctl .set-picker-now {
+  height: 28px; padding: 0 10px; gap: 8px; border: 1px solid var(--line);
+  border-radius: var(--tag-radius); background: var(--wash); font-size: 13px;
+}
+.settings-screen[data-pane] .set-row-ctl .set-picker-now:hover,
+.settings-screen[data-pane] .set-row-ctl .set-picker.open .set-picker-now { border-color: var(--line-strong); }
 
 /* The theme tiles sit inside their card with the card's own air round them. */
 .settings-screen[data-pane] .set-plate > .look-row { margin: 0; padding: 18px 0; }

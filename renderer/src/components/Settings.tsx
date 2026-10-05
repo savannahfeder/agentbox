@@ -83,10 +83,17 @@ function Stepper({ value, min, max, onChange, label }: {
   value: number; min: number; max: number; onChange: (v: number) => void; label: string;
 }) {
   return (
+    // TWO CHIPS AND THE NUMBER BETWEEN THEM (2026-10-05), the composer's chip
+    // and not a boxed three-cell bar; the signs are drawn at the text's weight
+    // rather than typed, so − and + are the same size and sit on one line.
     <div className="set-step" aria-label={label}>
-      <button type="button" aria-label={`${label}, fewer`} disabled={value <= min} onClick={() => onChange(value - 1)}>−</button>
+      <button type="button" aria-label={`${label}, fewer`} disabled={value <= min} onClick={() => onChange(value - 1)}>
+        <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6h7" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+      </button>
       <span className="val">{value}</span>
-      <button type="button" aria-label={`${label}, more`} disabled={value >= max} onClick={() => onChange(value + 1)}>+</button>
+      <button type="button" aria-label={`${label}, more`} disabled={value >= max} onClick={() => onChange(value + 1)}>
+        <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6h7M6 2.5v7" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+      </button>
     </div>
   );
 }

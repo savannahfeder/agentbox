@@ -48,7 +48,9 @@ describe('the live account cannot be missed', () => {
   it('says it four ways: a brighter film, full white, a rule, and the word', () => {
     const on = pageRule('.set-plate > .set-acct-row.on');
     expect(on).toMatch(/background:\s*var\(--film-strong\)/);
-    expect(on).toMatch(/border-left:\s*3px solid var\(--text\)/);
+    // The rule is the app's own selection bar since 2026-10-05, the orange a
+    // selected inbox row wears, on a square row inset from the card's corners.
+    expect(on).toMatch(/border-left:\s*2px solid var\(--select-bar\)/);
     expect(pageRule('.set-plate > .set-acct-row.on .set-row-label')).toMatch(/color:\s*var\(--text\)/);
     expect(card).toContain('{live && <span className="set-badge">In use</span>}');
     expect(card).toContain("className={`set-row set-acct-row${live ? ' on' : ''}`}");
