@@ -280,7 +280,9 @@ describe('4. ALSO names only what a card says out loud', () => {
   it('and the reply box it names is really what that card offers', () => {
     // 'It gave you three answers to pick from. Press 1 to send the one it
     // recommends.' The strip's own heading says the rest of it out loud.
-    expect(focus).toMatch(/pick or write your own/);
+    // The strip is its own component since w-560647d4db, when it moved off the
+    // reply card and onto the turn that offered it.
+    expect(read('renderer/src/components/OptionsOffer.tsx')).toMatch(/pick or write your own/);
     // Which lives in the docked reply surface, the one selector left here.
     expect(focus).toMatch(/className="focus-dock"/);
     // And the answer beat still names replying, which is now what it rings.

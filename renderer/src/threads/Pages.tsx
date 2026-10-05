@@ -423,7 +423,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const [flipped, setFlipped] = useState<'team' | 'private' | null>(null);
   useEffect(() => { setFlipped(null); }, [item.visibility, item.visibleTo]);
   const seen = sharing && (flipped ?? sharing);
-  const chosen = seen === 'people' ? shownToPeople(item).length : 0;
+  const chosen = seen === 'people' ? shownToPeople(item, product).length : 0;
   const flip = async () => {
     if (!seen) return;
     const patch = sharePatch(seen);

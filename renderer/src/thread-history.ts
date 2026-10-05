@@ -33,6 +33,12 @@ export interface LedgerLine {
   // Who wrote it, on a signed-in Mac (the team version). Absent on every line
   // of the single-person app.
   by?: string;
+  // THE LINE'S OWN NAME, stamped where it reaches the disk and the same on
+  // every teammate's Mac (main/store/work-items.mjs). A reaction is stored
+  // against it, because it is the only name a message has that survives the
+  // crossing: `ts` does not, since a pulled line takes the cloud's own
+  // created_at (shared/team-rules.mjs, `asPulled`).
+  uid?: string;
 }
 
 export interface ThreadEvent {
@@ -40,6 +46,9 @@ export interface ThreadEvent {
   // WHICH PERSON SAID IT, when a teammate did: their person id, off the
   // ledger line's `by`. The thread draws their face and name instead of "You".
   by?: string;
+  // THE LINE THIS CAME OFF, by its uid. A reaction is put on a message by this
+  // name and no other (w-560647d4db); see LedgerLine.uid above for why.
+  uid?: string;
   // Hers reads at full strength, an agent's is quiet. The same split the pane
   // already makes everywhere else.
   who: 'you' | 'agent';
@@ -169,16 +178,24 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
   // WHO SAID EACH EVENT, for a teammate's line (the team version). Every event
   // a line produced is tagged with its writer when the next line begins, and
   // once more after the last, which leaves the loop below exactly as it was.
+  // AND WHICH LINE IT CAME OFF, tagged in the same sweep and for the same
+  // reason: a reaction names the message by its line's uid, and the loop below
+  // builds events without ever touching the line again (w-560647d4db).
   let markAt = 0;
   let markBy: string | undefined;
+  let markUid: string | undefined;
   const tagWriter = () => {
-    if (markBy) for (let k = markAt; k < events.length; k += 1) if (!events[k].by) events[k].by = markBy;
+    for (let k = markAt; k < events.length; k += 1) {
+      if (markBy && !events[k].by) events[k].by = markBy;
+      if (markUid && !events[k].uid) events[k].uid = markUid;
+    }
   };
 
   for (const [at_, line] of lines.entries()) {
     tagWriter();
     markAt = events.length;
     markBy = typeof line.by === 'string' ? line.by : undefined;
+    markUid = typeof line.uid === 'string' ? line.uid : undefined;
     const patch = line.patch ?? null;
     if (has(patch, 'label')) label = String(patch!.label ?? '');
     const mine = line.source === 'founder';

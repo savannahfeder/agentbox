@@ -47,12 +47,12 @@ const css = fs.readFileSync(new URL('../renderer/src/threads/summary.css', impor
 
 describe('the name and its three lines read as one block', () => {
   const html = draw(item());
-  it('puts the name directly above Problem, with nothing between', () => {
-    expect(html).toMatch(/<h2 class="ts-title">Acme renewal terms<\/h2><div class="ts-sec"><div class="ts-h">Problem<\/div>/);
+  // CHANGED 2026-10-05 (w-54e9c7243f): the lines are Context and Done now.
+  it('puts the name directly above Context, with nothing between', () => {
+    expect(html).toMatch(/<h2 class="ts-title">Acme renewal terms<\/h2><div class="ts-sec"><div class="ts-h">Context<\/div>/);
   });
-  it('keeps problem, progress and solution in that order under the name', () => {
-    // An empty line is not drawn at all since w-54e9c7243f, so this one has all three.
-    expect(text(draw(item({ solution: 'Terms sent.' })))).toMatch(/Acme renewal terms Problem Acme’s contract ends on the 14th\. Progress Terms are drafted\. Solution Terms sent\./);
+  it('keeps context then done in that order under the name', () => {
+    expect(text(draw(item({ solution: 'Terms sent.' })))).toMatch(/Acme renewal terms Context Acme’s contract ends on the 14th\. Done Terms are drafted\. Status/);
   });
   it('draws the name once', () => {
     expect(html.match(/class="ts-title"/g)).toHaveLength(1);

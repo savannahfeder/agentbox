@@ -92,7 +92,14 @@ export function handedOnByReply(item, product, me) {
 const A_TEAMMATE_MAY_SET = ['problem', 'progress', 'solution', 'blockedBy', 'blocks', 'assignee'];
 // The status rides too: a new message reopens a conversation put away, and a
 // message record never starts an agent (mayRunHere).
-const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'people', 'status'];
+//
+// AND A REACTION, which is the chips under a message (w-560647d4db). It is on
+// this list rather than the one above because it is only ever drawn in a
+// conversation, and because an unrecognised delta on an ordinary shared task
+// would be a teammate writing a field nothing there reads. It cannot start an
+// agent: `STARTS_A_RUN` above names the four fields that can, and a reaction
+// touches none of them, so a chip never puts the row in anybody's inbox.
+const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'people', 'status', 'react'];
 export function whatATeammateMaySet(line, { direct = false } = {}) {
   if (!line || typeof line !== 'object' || !line.patch || typeof line.patch !== 'object') return null;
   const allowed = direct ? [...A_TEAMMATE_MAY_SET, ...IN_A_MESSAGE_ALSO] : A_TEAMMATE_MAY_SET;

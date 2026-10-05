@@ -54,8 +54,13 @@ const REFRESH_MS = 8_000;
 // screen is the kind of drift this row exists to end.
 const THEM = 'The agent';
 
-export function ItemThread({ item, engine, session, opening, sending, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false }: {
+export function ItemThread({ item, engine, session, opening, sending, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent }: {
   item: WorkItem;
+  // IN A CHAT ONLY: put a message's words in the reply box as a quote, and turn
+  // this conversation into work. The second was a line under the whole
+  // conversation and is an action on one message now (w-560647d4db).
+  onQuote?: (text: string) => void;
+  onHandToAgent?: () => void;
   // CUT THE RUNNING STEP so her waiting message is answered now (w-f37a34def6).
   // Handed in: this view draws a conversation and never writes anything.
   onSendNow?: () => unknown;
@@ -269,6 +274,19 @@ export function ItemThread({ item, engine, session, opening, sending, onOpenOrig
         code={changed.length && onOpenDoc
           ? { paths: changed, open: (path) => onOpenDoc(changePathFor(item.id), path) }
           : null}
+        {...(chat ? {
+          // ONLY IN A CHAT. The chips, the bar on pointing and the quote are
+          // drawing A's, and a thread with an agent keeps exactly the screen it
+          // had (w-560647d4db). `reactions` is folded off the row itself, so
+          // every press a teammate pushed is on screen the moment the pull
+          // lands, with nothing counted here.
+          reactions: item.reactions,
+          onReact: (on: string, emoji: string, off: boolean) => {
+            api.teamReact({ product: item.product, id: item.id, on, emoji, off });
+          },
+          onQuote,
+          onHandToAgent,
+        } : {})}
       />
       {answer}
       {/* What you did after that answer, under it and in order. */}

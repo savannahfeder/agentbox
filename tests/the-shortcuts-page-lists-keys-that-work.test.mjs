@@ -408,7 +408,8 @@ describe('the page stays a page and not a wall', () => {
 
 describe('she can get to it from both places she looks', () => {
   it('is a page in Settings’ own navigation', () => {
-    expect(settings).toContain("['shortcuts', 'Shortcuts'],");
+    // The menu is a list in settings-search.ts since the redraw (w-ccadd13c46).
+    expect(read('renderer/src/settings-search.ts')).toContain("{ id: 'shortcuts', label: 'Shortcuts', group: 'Personal' }");
     expect(settings).toContain("{pane === 'shortcuts' && (");
     expect(settings).toContain('<h1 className="set-title">Shortcuts</h1>');
   });

@@ -62,7 +62,9 @@ describe('a message sent to a working agent', () => {
     // it stops saying so.
     // Past the window it says what it is waiting on and offers Send now
     // (w-f37a34def6), where a step can be cut.
-    expect(src).toContain("e.pending\n                      ? <span className=\"msg-when msg-sending\">{e.held ? 'Sending… press Z to undo' : cutting ? 'Sending now…' : onSendNow ? 'Waiting for its current step' : 'Sending…'}</span>");
+    // The head's facts are one helper since w-2e8aa16f0f (`headFacts`), which
+    // a chat's head calls as well, so the line is matched without its indent.
+    expect(src).toMatch(/e\.pending\n\s+\? <span className="msg-when msg-sending">\{e\.held \? 'Sending… press Z to undo' : cutting \? 'Sending now…' : onSendNow \? 'Waiting for its current step' : 'Sending…'\}<\/span>/);
   });
 
   it('keeps three of them apart, in the order she sent them', () => {
