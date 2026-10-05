@@ -238,8 +238,9 @@
    the eye lands on where you are. 56 high against the full bar's 88. The name
    is already cut to whole words in crumb-rules.ts; the ellipsis here only
    catches a window too narrow for even that. The corner menu centres on the
-   thinner bar. Folded, the summary takes the crumb away and the bar is its
-   full self again, because these rules only hold while a crumb is in it. */
+   thinner bar. The crumb stays when the summary folds (w-20292d329f); a
+   thread with no summary has no crumb, and these rules only hold while a
+   crumb is in the bar. */
 .workspace-layout.workspace-task:has(.thread-crumb) > .topbar { height: 56px; min-height: 56px; flex-basis: 56px; padding-top: 0; padding-bottom: 0; }
 .workspace-layout.workspace-task:has(.thread-crumb) > .topbar > .topbar-right { top: 50%; transform: translateY(-50%); }
 .workspace-task-header:has(> .thread-crumb) { position: static; flex: 1; min-width: 0; margin: 0 64px 0 0; padding: 0; align-self: center; }

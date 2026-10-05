@@ -8,5 +8,6 @@ export const SUMMARY_WORDS: number;
 export function wordsIn(text: string | undefined | null): number;
 export function summaryOf(item: Partial<WorkItem>): { problem: string; progress: string; solution: string; written: boolean };
 export function cardsFor(p: { products: unknown[]; readItems: (product: any) => any[]; now?: number; since?: number | null }): any[];
-export function shownToTeam(item: Partial<WorkItem>, since?: number | null): boolean;
+export function shownToTeam(item: Partial<WorkItem>, since?: number | null, product?: { personal?: boolean } | null): boolean;
+export function visibilityOf(item: Partial<WorkItem>, product?: { personal?: boolean } | null): 'team' | 'people' | 'private' | undefined;
 export function shownToPeople(item: Partial<WorkItem>): string[];

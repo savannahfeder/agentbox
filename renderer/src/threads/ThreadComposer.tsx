@@ -52,7 +52,7 @@ import { fitMenu } from '../keep-in-window';
 import {
   allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayMorning, moreCount,
   joinNames, landsIn, placeholderFor, projectsOffered, projectSwatch, recentModels, sameModel,
-  sharingFields, startingProject, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
+  sharingFields, startingProject, startingVisibility, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   type Harness, type ModelPick, type Visibility,
 } from './composer-rules';
 import './thread-composer.css';
@@ -174,10 +174,14 @@ export function ThreadComposer({
   // same picker the To field uses, and the pick stands only while somebody is
   // on the list; with nobody on it the thread is sent Private, because that is
   // who can see it (composer-rules.ts `sharingFields`).
-  const [visibility, setVisibility] = useState<Visibility>('team');
+  // EXCEPT IN YOUR PERSONAL PROJECT, WHICH STARTS PRIVATE (w-b989839656). The
+  // chip follows the project until you pick a word yourself, so moving a card
+  // into Personal turns it Private and moving it out turns it back to Team.
+  const [picked, setPicked] = useState<Visibility | null>(null);
+  const visibility: Visibility = picked ?? startingVisibility(product);
   const [chosen, setChosen] = useState<string[]>([]);
   const [visPage, setVisPage] = useState<'rows' | 'people'>('rows');
-  const pickVisibility = (v: Visibility) => { setVisibility(v); };
+  const pickVisibility = (v: Visibility) => { setPicked(v); };
   const toggleChosen = (id: string) => setChosen((c) => (c.includes(id) ? c.filter((p) => p !== id) : [...c, id]));
   // Anyone who leaves the team comes off the list with them.
   const chosenHere = chosen.filter((id) => others.some((p) => p.id === id));

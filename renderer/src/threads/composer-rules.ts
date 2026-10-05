@@ -318,6 +318,15 @@ export function sharingFields(visibility: Visibility, chosen: readonly string[])
   return people.length ? { visibility: 'people', visibleTo: people } : { visibility: 'private' };
 }
 
+/**
+ * WHERE THE CHIP STARTS. Team, except in your personal project, where it is
+ * Private (w-b989839656): that project is for the things you would be anxious
+ * to show the team by accident, so sharing one is the choice you make.
+ */
+export function startingVisibility(product: { personal?: boolean } | null | undefined): Visibility {
+  return product?.personal === true ? 'private' : 'team';
+}
+
 /** The names on the Visibility chip: "Theo", "Theo and Ana", "3 people". */
 export function chosenWords(chosen: readonly string[], people: readonly Person[]): string {
   const named = chosen.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => !!p);

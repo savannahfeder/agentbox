@@ -337,6 +337,11 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
         continue;
       }
       if (status === 'blocked') {
+        // HER OWN BLOCKED IS NOT THE AGENT STOPPING. She has no control that
+        // writes it; the one thing that does is a Z putting a row back where
+        // her reply found it (`withdrawReply`), and it read as "It stopped and
+        // asked you" under the agent's name (w-c78d1e1607).
+        if (mine) continue;
         // BLOCKED AFTER A SLASH COMMAND IS NOT A STOP AND IS NOT A QUESTION.
         // `blocked` is the one status that carries a finished answer back into
         // her inbox (`recordSessionResult`, main/store.mjs), and the supervisor

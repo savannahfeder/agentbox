@@ -5,7 +5,7 @@
 // the rows are ordered, how "Updated" is said, and what goes in each board
 // column for the Team, where your own threads come from this Mac and your
 // teammates' from the cards their Macs publish.
-import { shownToPeople, shownToTeam } from '../../../shared/thread-cards.mjs';
+import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mjs';
 import type { Seen } from './summary-rules';
 import type { Product, ThreadCard, ThreadStateWord, WorkItem } from '../types';
 import { priorityIdOf, type PriorityId } from '../priority';
@@ -14,20 +14,62 @@ import { productRankScore } from '../../../shared/rank.mjs';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
+/** Private threads shown ('any') or hidden ('shared'). */
+export type Privacy = 'any' | 'shared';
 export interface Display {
   view: 'list' | 'board';
   sort: 'priority' | 'updated';
   priorities: PriorityId[];
   projects: string[];
   updated: UpdatedWindow;
+  /** Absent on a display saved before the choice existed, which reads as All. */
+  privacy?: Privacy;
 }
 
 // Your own page opens as a list and the team page as a board, by default, and
 // either is remembered once changed.
 export const DEFAULT_DISPLAY: Record<PageId, Display> = {
-  inbox: { view: 'list', sort: 'priority', priorities: [], projects: [], updated: 'any' },
-  team: { view: 'board', sort: 'priority', priorities: [], projects: [], updated: 'any' },
+  inbox: { view: 'list', sort: 'priority', priorities: [], projects: [], updated: 'any', privacy: 'any' },
+  team: { view: 'board', sort: 'priority', priorities: [], projects: [], updated: 'any', privacy: 'any' },
 };
+
+/**
+ * HIDE PRIVATE, FOR WHEN SOMEBODY IS LOOKING AT YOUR SCREEN (2026-10-04,
+ * w-f6ea56b89a): "I'm showing the app to my friends, it would be nice in that
+ * case to be able to filter out the private tasks." A private thread is
+ * exactly a row that wears the lock (`rowSharing` says 'private'), so the
+ * filter takes away what the eye already reads as private. A row where the
+ * question does not arise (a message, an agent, the app's own rows) is not
+ * private and stays under Hide private.
+ */
+export function keepsPrivacy(seen: Seen | null | undefined, privacy: Privacy | undefined): boolean {
+  return privacy !== 'shared' || seen !== 'private';
+}
+
+// ONE CHOICE FOR THE WHOLE PAGE, not one per half of it. Each half remembers
+// its own view and filters, and a privacy choice kept in only one of them
+// would bring every private row back the moment a teammate's face was lit.
+const PRIVACY_KEY = 'threads.privacy';
+
+export function readPrivacy(store: Pick<Storage, 'getItem'> | null = typeof localStorage === 'undefined' ? null : localStorage): Privacy {
+  try {
+    const p = JSON.parse(store?.getItem(PRIVACY_KEY) ?? 'null');
+    // The first version also offered Only private; one saved then reads as
+    // Show, since the menu no longer has a way back out of it.
+    return p === 'shared' ? p : 'any';
+  } catch {
+    return 'any';
+  }
+}
+
+export function writePrivacy(p: Privacy, store: Pick<Storage, 'setItem'> | null = typeof localStorage === 'undefined' ? null : localStorage) {
+  try { store?.setItem(PRIVACY_KEY, JSON.stringify(p)); } catch { /* private mode */ }
+}
+
+/** The display the page draws: the half it is on, with the one privacy choice
+ *  on it. Off a team no row is private, so there it is always All. */
+export const pageDisplay = (d: Display, privacy: Privacy, onTeam: boolean): Display =>
+  ({ ...d, privacy: onTeam ? privacy : 'any' });
 
 // V FLIPS THE VIEW AND NOTHING ELSE (w-58c8f466e7): the sort and every filter
 // stay, because the list and the board are the same threads in two shapes.
@@ -76,12 +118,15 @@ export function writeDisplay(page: PageId, d: Display, store: Pick<Storage, 'set
 }
 
 /** Whether any filter is on, which is what puts the dot on the Display icon. */
-export const isFiltered = (d: Display) => d.priorities.length > 0 || d.projects.length > 0 || d.updated !== 'any';
+export const isFiltered = (d: Display) => d.priorities.length > 0 || d.projects.length > 0 || d.updated !== 'any'
+  || d.privacy === 'shared';
 
 const startOfDay = (now: number) => { const t = new Date(now); t.setHours(0, 0, 0, 0); return t.getTime(); };
 
-/** What the filters keep. The rows the app makes itself (no project) always stay. */
-export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>, d: Display, now: number): boolean {
+/** What the filters keep. The rows the app makes itself (no project) always
+ *  stay. `seen` is who sees the row (`rowSharing`), for the privacy choice. */
+export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>, d: Display, now: number, seen?: Seen | null): boolean {
+  if (!keepsPrivacy(seen, d.privacy)) return false;
   if (d.priorities.length && !d.priorities.includes(priorityIdOf(item.priority))) return false;
   if (d.projects.length && item.product && !d.projects.includes(item.product)) return false;
   if (d.updated === 'today' && !(item.updatedAt >= startOfDay(now))) return false;
@@ -318,7 +363,7 @@ export function rowSharing(
 ): Seen | null {
   if (!team || !product || isDirect(product) || item.agent) return null;
   if (item.createdBy && item.createdBy !== team.me) return null;
-  if (!shownToTeam(item, team.since ?? null)) return 'private';
+  if (!shownToTeam(item, team.since ?? null, product)) return 'private';
   return shownToPeople(item).length ? 'people' : 'team';
 }
 
@@ -426,7 +471,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     // made private stays, with its lock, so you can see it is hidden.
     // ON YOUR OWN PAGE EVERY ONE OF YOURS STAYS (w-05ff3d1438): leaving them
     // out is how threads once went missing from the board.
-    if (!allMine && item.visibility !== 'private' && !shownToTeam(item, since)) continue;
+    if (!allMine && visibilityOf(item, product) !== 'private' && !shownToTeam(item, since, product)) continue;
     const state = stateOf?.(item) ?? threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
     out.push({
@@ -549,8 +594,13 @@ export function boardColumns({ items, products, display, now, stateOf, cards = [
   projectOrder?: string[];
 }): { state: ThreadStateWord; label: string; rows: BoardEntry[] }[] {
   const who = picked ?? (me ? [me] : []);
+  // A teammate's card is shared with you by definition, so it is never private.
+  const seen = (e: BoardEntry): Seen | null => (e.item
+    ? rowSharing(e.item, products.find((p) => p.slug === e.item!.product), me ? { me, since } : null)
+    : 'team');
   const entries = teamEntries({ items: me && !who.includes(me) ? [] : items, products, cards: cards.filter((c) => who.includes(c.personId)), me, now, since, stateOf, live, allMine: true })
     .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
+    .filter((e) => keepsPrivacy(seen(e), display.privacy))
     .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
   // EVERY COLUMN TAKES THE DISPLAY'S SORT, not just the list view
   // (w-5a08121f99). `teamEntries` hands these back newest first. Except Done

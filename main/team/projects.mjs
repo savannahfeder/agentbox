@@ -52,12 +52,44 @@ export function listSharedProjects(products) {
     .map((p) => ({ projectId: p.team.projectId, dir: p.dir, name: p.name, slug: p.slug, direct: p.team.direct === true }));
 }
 
+// YOUR PERSONAL PROJECT (w-b989839656): one per person, made when they sign
+// in, where a thread with no visibility of its own is Only you
+// (shared/thread-cards.mjs visibilityOf). It says so about itself in
+// project.json rather than by its name, because "personal" is a name somebody
+// may already have given a project of their own, and that one must stay as it
+// is. Never shared, never remade once it exists, archived or not.
+export const PERSONAL_FLAG = 'personal';
+const PERSONAL_NAME = 'Personal';
+
+export function ensurePersonalProject(accountRoot) {
+  let entries = [];
+  try { entries = fs.readdirSync(accountRoot); } catch { entries = []; }
+  for (const slug of entries.sort()) {
+    if (readProject(path.join(accountRoot, slug))?.[PERSONAL_FLAG] === true) return { slug, made: false };
+  }
+  let slug = 'personal';
+  for (let n = 2; fs.existsSync(path.join(accountRoot, slug)); n += 1) slug = `personal-${n}`;
+  const dir = path.join(accountRoot, slug);
+  fs.mkdirSync(dir, { recursive: true });
+  writeProject(dir, {
+    schemaVersion: 1,
+    id: slug,
+    name: PERSONAL_NAME,
+    createdAt: new Date().toISOString(),
+    [PERSONAL_FLAG]: true,
+  });
+  return { slug, made: true };
+}
+
 // Mark a local project shared. Its cloud id is minted the first time and kept
 // for good, so sharing, unsharing to specific people and sharing again is one
 // project in the cloud, not three.
 export function markShared(dir, { teamId, visibility = 'team', people = [], sharedBy = null }) {
   const project = readProject(dir);
   if (!project) throw new Error(`no project.json in ${dir}`);
+  // Sharing it would put every line of it in the cloud, which is the one thing
+  // this project exists to make hard. A thread in it is shared one at a time.
+  if (project[PERSONAL_FLAG] === true) throw new Error('Your personal project stays on this Mac. Share a thread in it instead.');
   const projectId = project.team?.projectId || crypto.randomUUID();
   project.team = {
     projectId, teamId, visibility: visibility === 'people' ? 'people' : 'team', people: [...new Set(people)],

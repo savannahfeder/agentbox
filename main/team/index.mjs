@@ -13,7 +13,7 @@
 //     my teammates' private tasks doing.
 import path from 'node:path';
 import { createTeamSync, fileSyncState } from './sync.mjs';
-import { listSharedProjects, joinSharedProject, markShared, makeDirect } from './projects.mjs';
+import { listSharedProjects, joinSharedProject, markShared, makeDirect, ensurePersonalProject } from './projects.mjs';
 import { firstSentence } from '../../shared/thread-cards.mjs';
 import { cardsFor } from '../../shared/thread-cards.mjs';
 import fs from 'node:fs';
@@ -159,6 +159,12 @@ export function createTeamService({
     disk.setLineAuthor(me.id);
     process.env.AGENTBOX_PERSON_ID = me.id;
     set({ signedIn: true, me, error: null });
+    // EVERYONE ON A TEAM GETS A PERSONAL PROJECT (w-b989839656), where what
+    // they write is theirs unless they share it. Made once; a Mac that cannot
+    // write it still signs in.
+    try {
+      if (ensurePersonalProject(accountRoot).made) store.watch?.();
+    } catch (err) { log(`team: could not make the personal project: ${err.message}`); }
     await refreshTeam();
     sync = createTeamSync({
       backend,

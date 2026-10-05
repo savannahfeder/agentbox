@@ -12,8 +12,9 @@
 // 59 letters. A 32 letter name looked right, a 59 letter one was fine, and a
 // 140 letter one running across the whole bar "looks pretty bad". Past 59 the
 // name keeps whole words only, drops a dangling small word ("for", "so"),
-// and ends in "…". Folded, the summary gives the full bar back, since then
-// nothing else on screen names the thread.
+// and ends in "…". Folding the summary used to give the full bar back; since
+// w-20292d329f the thin bar stays (the-thread-bar-stays-the-same-when-the-
+// summary-folds.test.mjs).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
@@ -90,9 +91,9 @@ describe('the crumb itself', () => {
   });
 });
 
-describe('the thread view swaps its bar while the summary is open', () => {
-  it('portals the crumb into the bar while the summary shows, and the full band otherwise', () => {
-    expect(focus).toMatch(/summaryShown && crumbFrom\s*\?\s*<ThreadCrumb/);
+describe('the thread view wears the crumb when it has a summary', () => {
+  it('portals the crumb into the bar for a thread with a summary, and the full band otherwise', () => {
+    expect(focus).toMatch(/summaryOffered && crumbFrom\s*\?\s*<ThreadCrumb/);
     expect(focus).toMatch(/createPortal\(barContent, headerTarget\)/);
     expect(focus).toMatch(/:\s*<>\{backButton\}\{bandLine\}<\/>/);
   });

@@ -90,8 +90,10 @@ describe('what you can change looks changeable, and what you cannot does not', (
     expect(cell).not.toContain('<button');
     expect(cell).not.toContain('ts-caret');
   });
+  // An empty line is not drawn at all since w-54e9c7243f, so all three are written here.
   it('puts a pencil on each of the three lines', () => {
-    expect(html.match(/class="ts-line[^"]*"[^>]*>.*?ts-pen/g)).toHaveLength(3);
+    const all = draw(item({ problem: 'Terms are late.', progress: 'Drafted.', solution: 'Sent.' }));
+    expect(all.match(/class="ts-line[^"]*"[^>]*>.*?ts-pen/g)).toHaveLength(3);
   });
   it('answers the pointer on a changeable field with the wash, a pointer and its mark', () => {
     expect(css).toMatch(/\.ts-prop-btn \{[^}]*cursor: pointer/);

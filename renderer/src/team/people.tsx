@@ -5,6 +5,7 @@
 import { createContext } from 'react';
 import type { Person, Product, TeamState, WorkItem } from '../types';
 import { isShared } from '../../../shared/team-rules.mjs';
+import { visibilityOf } from '../../../shared/thread-cards.mjs';
 import { dueWords, firstName, sentFrom } from './company';
 import './team.css';
 
@@ -50,7 +51,8 @@ export function TeamRowEnd({ item, team }: { item: WorkItem; team: TeamView | nu
   const due = item.assignee === team?.me ? dueWords(item.due) : null;
   // Privacy is per thread now (approved 2026-10-01), so the lock follows the
   // thread's own choice, not whether its project is shared.
-  const locked = !!team && item.visibility === 'private';
+  // In your personal project that choice is Only you until you make another.
+  const locked = !!team && visibilityOf(item, product) === 'private';
   return <>
     {sent
       ? <span className="tm-who"><Face person={person} agent={sent.agent} />{sent.agent ? `${firstName(person)}’s agent` : firstName(person)}</span>
