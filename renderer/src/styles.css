@@ -2902,37 +2902,45 @@ body {
 .dock-send:hover { background: var(--wash-strong); border-color: var(--text-faint); }
 .dock-send:active { transform: translateY(1px); }
 
-/* `relative` is what the peek card below hangs off. It changes nothing about
-   the strip's own box. */
 .opt-strip { border-bottom: 1px solid var(--line); flex-shrink: 0; position: relative; }
 
-/* THE OPTION UNDER THE POINTER, IN FULL. The chosen version opens above and
-   nothing moves. `bottom: 100%` puts it entirely outside the strip's box, so the strip
-   measures 207px with this open and 207px without it, and the message above it
-   never reflows. Nothing here may take part in the flow. IT CANNOT BE CLICKED,
-   AND THAT IS DELIBERATE. A click anywhere on a row sends that answer, and the
-   card floats over the message she is answering. With pointer-events off it can
-   never eat that click, never take the pointer off the row and blink itself
-   shut, and never sit between her and the words underneath. It is something to
-   read, not a control.
-*/
-.opt-peek {
-  position: absolute; left: 0; right: 0; bottom: 100%; margin-bottom: 8px;
-  z-index: 40; pointer-events: none;
-  background: var(--bg-raised); border: 1px solid var(--line-strong);
-  border-radius: var(--radius); box-shadow: var(--shadow-lg);
-  padding: 12px 16px 13px; font-size: 14px; line-height: 1.5; color: var(--text);
-  animation: prio-in 0.13s cubic-bezier(0.2, 0.8, 0.3, 1);
+/* THE OPTIONS ON THE TURN THEY WERE ASKED ON (w-2e13752a85).
+ *
+ * Said 2026-10-05: "right now all my chats have this stuck at the
+ * bottom. it should instead occur at the end of the turn/message where it
+ * occured... Once I've seen it as a user, I don't really want to see it
+ * continuously. It's been processed."
+ *
+ * So the rows are the same rows and everything the DOCK made necessary is
+ * undone here. The strip's bottom rule went, because the thing under it is no
+ * longer a reply box but the rest of the conversation; it gets a rule ABOVE
+ * instead, which is what separates the choices from the paragraph that asked
+ * for them. The 16px side padding went, because the strip no longer spans a
+ * card of its own and the rows have to line up with the message's own left
+ * edge. AND THE TWO-LINE CLAMP WENT: a docked strip had a fixed slice of the
+ * pane to live in and a long option would have pushed the message up the
+ * screen, which is what the hover card existed to repair. In the stream an
+ * option is just more conversation, so it reads whole and the card is deleted.
+ */
+.opt-strip-inline {
+  border-bottom: none; border-top: 1px solid var(--line);
+  margin-top: 14px; padding-top: 4px;
 }
-.opt-peek-head {
-  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--text-faint); font-weight: 600; margin-bottom: 6px;
+.opt-strip-inline .opt-head { padding: 7px 0 3px; }
+.opt-strip-inline .opt-row { padding-left: 0; padding-right: 8px; }
+.opt-strip-inline .opt-row:hover { background: transparent; }
+.opt-strip-inline .opt-row:not(.is-picked):hover .opt-text { color: var(--text); }
+.opt-strip-inline .opt-text {
+  display: block; -webkit-line-clamp: none; -webkit-box-orient: horizontal; overflow: visible;
 }
-/* The option's own paragraph, which react-markdown wraps in a <p> here (the
-   strip flattens it away, the card does not). */
-.opt-peek p { margin: 0; }
-.opt-peek p + p { margin-top: 8px; }
-.opt-peek strong { color: var(--text); }
+
+/* ANSWERED, AND STILL ON THE PAGE. The offer used to vanish the moment you
+   spoke, which took the record of what was on the table with it. It stands
+   where it stood, quieter, pressing nothing, with the chosen one marked. */
+.opt-strip-inline.is-settled .opt-row { cursor: default; color: var(--text-faint); }
+.opt-strip-inline.is-settled .opt-row .opt-key { color: var(--text-faint); border-color: var(--line); }
+.opt-strip-inline.is-settled .opt-row.is-picked { color: var(--text-dim); }
+.opt-strip-inline.is-settled .opt-row.is-picked .opt-key { color: var(--text-dim); border-color: var(--line-strong); }
 .opt-head { display: flex; align-items: center; padding: 9px 10px 5px 16px; }
 .opt-head span {
   font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em;
@@ -2944,13 +2952,16 @@ body {
    has to READ: uppercase letterforms with 0.08em between them are what the eye
    skims past, and skimming is exactly what must not happen here. So this one
    takes the message's own case and weight, a size between the label's and the
-   options' 14px, and the full text colour. It is the first thing in the strip
-   with any contrast, which is the point. It holds two lines and stops. A
-   worker's ask is one sentence under fifteen words by the brief and `askLine`
-   clips at 130 characters; the clamp is the backstop under both, so a long one
-   can never push the options down the screen. `flex-start` keeps the chevron on
-   the first line when it wraps instead of floating at the middle of a two-line
-   block.
+   options' 14px, and the full text colour. It holds two lines and stops, so a
+   long one can never push the choices down the screen.
+
+   AN AGENT'S OFFER HAS NO SUCH HEADING ANY MORE (w-2e13752a85). It had one
+   because the strip was docked and the question it answered scrolled away
+   above it; on the turn itself the question is the paragraph immediately above
+   the rows, and a heading there would print it twice. What is left wearing
+   this is the team's route strip, where the ask is a teammate's message on
+   another row and really is somewhere else. The chevron went with the dock
+   too: nothing needs folding away once it scrolls away.
 */
 .opt-head-ask { align-items: flex-start; padding: 11px 10px 7px 16px; }
 .opt-head-ask span {
@@ -2958,17 +2969,6 @@ body {
   color: var(--text); font-weight: 600; line-height: 1.4;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-/* The chevron was centred against a 10.5px line. Against a 12.5px one it needs
-   a couple of pixels back to read as level with the first line of the ask. */
-.opt-head-ask .opt-collapse { margin-top: -2px; }
-.opt-collapse {
-  margin-left: auto; display: grid; place-items: center; width: 24px; height: 24px;
-  border: none; background: transparent; color: var(--text-faint); border-radius: var(--radius);
-  cursor: pointer; transition: color 0.15s, background 0.15s;
-}
-.opt-collapse:hover { color: var(--text); background: var(--wash); }
-.opt-collapse svg { width: 14px; height: 14px; transition: transform 0.18s; }
-.opt-collapse svg.flipped { transform: rotate(180deg); }
 .opt-row {
   display: flex; gap: 10px; align-items: baseline; width: 100%; text-align: left;
   background: transparent; border: none; font: inherit; color: var(--text-dim);
@@ -2992,17 +2992,16 @@ body {
    link in the message #7aabff, no underline 8.03:1 the strip and the peek card
    #0000EE, underlined 1.97:1 1.97:1 reads as dark and neon, and
    it is far under the 4.5 this stylesheet solves every other colour against.
-   The message's rule is `.markdown a`, and the strip rides the composer rather
-   than the message, so it is not inside it; the rule is repeated here rather
-   than widened, which is what `.option-text a` above already does for the other
-   options list.
+   The message's rule is `.markdown a`, and the strip is its own block under
+   the message rather than part of it, so it is not inside it; the rule is
+   repeated here rather than widened, which is what `.option-text a` above
+   already does for the other options list.
 */
-.opt-text a, .opt-peek a { color: var(--accent); text-decoration: none; }
+.opt-text a { color: var(--accent); text-decoration: none; }
 
 /* AND A LINK IN A ROW IS WORDS, NOT A DOOR. The whole row is one button and a
    click anywhere on it sends that answer, so a live <a> inside it would send
-   the answer and open mail at once. The peek card already refuses the pointer
-   for exactly this reason; this is the same decision one level down. */
+   the answer and open mail at once. */
 .opt-row a { pointer-events: none; }
 .opt-rec { font-size: 11.5px; color: var(--text-faint); flex-shrink: 0; padding-left: 8px; }
 

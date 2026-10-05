@@ -60,19 +60,30 @@ it('puts the reply line under the page and not over it',()=>{
  expect(css).toContain(`${FOCUS} > .body > .list-pane {\n  order:2;`);
 });
 
-// THE HALF FOLD LASTED ONE DAY. It started the strip collapsed in full screen,
-// which drew a heading with no options under it.So the whole strip is gone
-// until she opens the box.
-it('shows no strip at all under a full screen document until the box is open',()=>{
+// NO OPTIONS OVER A FULL SCREEN PAGE, and since w-2e13752a85 that is true
+// without anybody arranging it.
+//
+// It used to need arranging. The strip was docked, a sibling of the scroll, so
+// it survived every rule that hid the conversation and had to be turned off by
+// hand (`stripShown`, which also had a half fold that lasted one day and drew
+// a heading with no options under it). The options are now part of the
+// conversation, at the end of the turn they were offered on, and the rule
+// above hides the conversation, so they go with it and no condition in the
+// component has to remember to.
+//
+// WHAT IS LEFT IN THE DOCK IS A TEAMMATE'S ROUTE STRIP, which is a control the
+// app offers and not an agent's answer to anything, and the number keys still
+// send a pick from anywhere inside a task (App.tsx), so nothing you could do
+// here before is gone.
+it('shows no options at all under a full screen document',()=>{
  const focus=read('components/Focus.tsx');
- expect(focus).toContain("const stripShown = showOptions && (artifactView !== 'focus' || replyOpen);");
- expect(focus).toContain('{stripShown && (');
- // `showOptions` itself must not be narrowed: it also decides whether the
- // options list is stripped out of the message text, so a full screen row
- // would otherwise print its own options twice.
+ const dock=focus.slice(focus.indexOf('<div className="focus-dock">'));
+ expect(dock).not.toMatch(/className="opt-strip/);
+ expect(focus).not.toContain('stripShown');
+ // And the one strip left on the dock is the team's, which still gives way to
+ // an agent's live offer.
+ expect(dock).toContain('{!showOptions && <TeamRouteStrip item={item} />}');
  expect(focus).toContain('const showOptions = offerIsLive(item);');
- // And the chevron is back to plain: no full screen special case in the state.
- expect(focus).toContain('const [optsOpen, setOptsOpen] = useState(true);');
 });
 
 it('folds the box back when she clicks away, in full screen only',()=>{

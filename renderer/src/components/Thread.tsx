@@ -69,7 +69,7 @@ export interface CodeInThread {
   open: (path: string) => void;
 }
 
-export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, landOn, md, code, chat = false }: {
+export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, landOn, md, code, tail, chat = false }: {
   // CUT THE AGENT'S CURRENT STEP so a message of hers that is waiting on it is
   // answered now (w-f37a34def6). Absent where nothing can be cut.
   onSendNow?: () => unknown;
@@ -106,6 +106,14 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   // The change this conversation made, when there is one. Absent means every
   // work line stays the plain line it has always been.
   code?: CodeInThread | null;
+  // ANYTHING THAT BELONGS AT THE END OF ONE PARTICULAR MESSAGE, inside its
+  // block and under its words. Today that is exactly one thing: the options an
+  // agent offered, which used to be docked at the foot of the pane and now sit
+  // on the turn they were asked on. The thread does not know what an option is
+  // and must not learn — it draws two different conversations and only one of
+  // them has a row behind it — so whoever owns the row decides, and this draws
+  // whatever comes back.
+  tail?: (e: AgentTurn) => ReactNode;
 }) {
   // Which work lines are open, and how far. Kept per conversation, not globally.
   const [open, setOpen] = useState<Map<number, number>>(new Map());
@@ -315,6 +323,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                   </div>
                 )}
                 <ChatFold>{md(e.text ?? '')}</ChatFold>
+                {tail?.(e)}
               </div>
             ) : (
               // A CONTINUATION THAT OPENS THE OTHER SIDE OF THE GAP IS NOT A
@@ -336,6 +345,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                   </div>
                 )}
                 <div className="msg-body">{md(e.text ?? '')}</div>
+                {tail?.(e)}
               </div>
             )}
           {ends === gapAfter && (

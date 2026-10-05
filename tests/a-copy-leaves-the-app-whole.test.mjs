@@ -154,7 +154,11 @@ describe('a link in the options strip', () => {
   const css = read('renderer/src/styles.css');
 
   it('is the app accent, like every other link, not Chromium default #0000EE', () => {
-    expect(css).toMatch(/\.opt-text a, \.opt-peek a \{ color: var\(--accent\); text-decoration: none; \}/);
+    // `.opt-peek` was the other half of this rule until w-2e13752a85 moved the
+    // options onto the turn they were asked on: the hover card existed to show
+    // the half of an option a DOCKED strip had to clip, and nothing in the
+    // stream clips, so the card and its link went with it.
+    expect(css).toMatch(/\.opt-text a \{ color: var\(--accent\); text-decoration: none; \}/);
   });
 
   it('is words rather than a door, because the row it sits in sends an answer', () => {
