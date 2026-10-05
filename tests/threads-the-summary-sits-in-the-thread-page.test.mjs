@@ -70,10 +70,22 @@ describe('the model word', () => {
 });
 
 describe('a message from a person', () => {
-  it('has no summary and no state, and offers to hand it to an agent', () => {
+  // THE "HAND IT TO AN AGENT" LINE UNDER A CONVERSATION IS GONE (w-2e8aa16f0f,
+  // 2026-10-05): "I don't think 'hand it to an agent to turn it into a task'
+  // looks that great or is logically there." It sat under the last message as
+  // if it were one more thing said, and it turned the whole conversation into
+  // one task. An agent now comes into a conversation with @ in the reply box,
+  // working in the project its mention names (team/ChatAgents.tsx). The
+  // handler stays on the pane for a message's own action to call.
+  it('has no summary and no state, and no line offering to hand it to an agent', () => {
     expect(focus).toMatch(/team\?\.direct === true/);
     expect(focus).toMatch(/onHandToAgent\?: \(item: WorkItem\) => void/);
-    expect(focus).toContain('Hand it to an agent');
-    expect(focus).toContain('to turn it into a task.');
+    expect(focus).not.toContain('Hand it to an agent');
+    expect(focus).not.toContain('to turn it into a task.');
+    expect(focus).not.toContain('className="ts-hand"');
+  });
+
+  it('brings an agent in from the reply box instead', () => {
+    expect(focus).toContain('const chat = useChatMentions(');
   });
 });
