@@ -477,10 +477,14 @@ export function ThreadComposer({
         </button>
         <span className="tc-sep" />
         <div className="tc-cols">
-          <div className="tc-col">
-            <span className="tc-menu-head">{engineLabel('claude')}</span>
-            {every.claude.map(modelRow)}
-          </div>
+          {/* Only a column with rows (w-db6f5e331e): a Mac without Claude
+              Code drew an empty CLAUDE CODE heading here. */}
+          {every.claude.length > 0 && (
+            <div className="tc-col">
+              <span className="tc-menu-head">{engineLabel('claude')}</span>
+              {every.claude.map(modelRow)}
+            </div>
+          )}
           {every.codex.length > 0 && (
             <div className="tc-col">
               <span className="tc-menu-head">{engineLabel('codex')}</span>

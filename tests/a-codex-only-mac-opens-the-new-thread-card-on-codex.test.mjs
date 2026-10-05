@@ -42,6 +42,10 @@ describe('the engine a new thread card opens on', () => {
     const card = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
     expect(card).toMatch(/recentModels\(items, \{ codexModels, codexDefault, codexOffered, claudeOffered \}\)/);
     expect(card).toMatch(/allModels\(\{ codexModels, codexOffered, claudeOffered \}\)/);
+    // Seen in the real app: All models drew an empty CLAUDE CODE heading
+    // beside the Codex list. A column is drawn only when it has rows.
+    expect(card).toMatch(/\{every\.claude\.length > 0 && \(/);
+    expect(card).toMatch(/\{every\.codex\.length > 0 && \(/);
   });
 });
 

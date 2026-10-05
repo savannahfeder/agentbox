@@ -155,11 +155,20 @@ export function loadConfig(appDir, { home = os.homedir() } = {}) {
   // The account id, minted once per install. Written back immediately, because
   // a generated id that is not saved is a different id next launch and the
   // store would move out from under everything.
+  //
+  // AND A NEW INSTALL MAY CHOOSE CODEX FROM ITS FIRST LAUNCH (w-db6f5e331e).
+  // `engineChoice` is the moment from which a row may run on Codex; it exists
+  // so August rows in one old store never move engine unasked, and it could
+  // only be written by hand, so a new person with both engines never got
+  // Codex at all. A Mac with no config file has no old rows, so its first
+  // launch is that moment. An install with a config is left as it was.
+  const firstLaunch = fresh && !config.engineChoice ? new Date().toISOString() : null;
+  if (firstLaunch) config.engineChoice = firstLaunch;
   if (typeof config.accountId !== 'string' || !config.accountId) {
     config.accountId = crypto.randomUUID();
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, `${JSON.stringify({ ...overrides, accountId: config.accountId }, null, 2)}\n`);
+      fs.writeFileSync(file, `${JSON.stringify({ ...overrides, accountId: config.accountId, ...(firstLaunch ? { engineChoice: firstLaunch } : {}) }, null, 2)}\n`);
     } catch (err) {
       console.warn(`zero: could not write the new account id to ${file}: ${err.message}`);
     }
