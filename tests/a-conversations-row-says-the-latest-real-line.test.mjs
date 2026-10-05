@@ -6,12 +6,12 @@
 // row gets:
 //
 //   1. IT WAS THE OLDEST MESSAGE, NOT THE NEWEST. The newest message counted as
-//      news only when its writer was not the writer of the ask. Margarette
-//      started the conversation and Margarette sent the latest message, so the
-//      test failed and the row printed her FIRST message — days old, already
-//      read, and the one thing on the row that could not be news.
+//      news only when its writer was not the writer of the ask. One teammate
+//      both started the conversation and sent the latest message, so the test
+//      failed and the row printed their FIRST message — days old, already read,
+//      and the one thing on the row that could not be news.
 //
-//   2. IT OPENED ON A LABEL. Her latest message begins "Additional:" on a line
+//   2. IT OPENED ON A LABEL. That latest message begins "Additional:" on a line
 //      of its own. Every line of a message is joined with spaces to make the
 //      preview, so the row read "Additional: Title: Send gives no sign that it
 //      is working…": two labels and then, maybe, a word of what was said.
@@ -21,10 +21,10 @@
 //
 // THE RULE IS MEASURED WHERE THE ROW ACTUALLY READS IT. The inbox draws a
 // conversation through `messageLine` (threads/page-rules.ts), not through
-// `rowSummary`: photographed in the built app, the row read "Margarette Pineda
-// Additional:" with the summary rule already fixed, because the summary rule is
-// not what that row prints. Both are covered below, and the first describe is
-// the one the screenshot was of.
+// `rowSummary`: photographed in the built app, the row still read the sender's
+// name and then "Additional:" with the summary rule already fixed, because the
+// summary rule is not what that row prints. Both are covered below, and the
+// first describe is the one the screenshot was of.
 import { describe, it, expect } from 'vitest';
 import { rowSummary } from '../renderer/src/list-rules.ts';
 import { messageLine } from '../renderer/src/threads/page-rules.ts';
@@ -37,7 +37,7 @@ const ADDITIONAL = 'Additional:\n\nTitle: Send gives no sign that it is working\
 
 describe('the line a conversation’s row prints in the inbox', () => {
   const convo = (answer) => ({
-    id: 'w-1', product: 'direct-maya', title: 'Hi Savannah', body: 'Hi Savannah, sending my findings here:',
+    id: 'w-1', product: 'direct-maya', title: 'Sending my findings', body: 'Sending my findings here:',
     answer, people: [ME, MAYA], createdBy: MAYA,
     wrote: { body: { ts: 1, by: MAYA }, answer: { ts: 2, by: MAYA } },
   });
@@ -63,7 +63,7 @@ describe('the line a conversation’s row prints in the inbox', () => {
 describe('which message a conversation’s row prints', () => {
   it('takes the newest one even when the same person wrote both', () => {
     const i = row({
-      body: 'Hi Savannah, sending my findings here:',
+      body: 'Sending my findings here:',
       answer: 'One more thing I forgot.',
       wrote: { body: { ts: 1, by: MAYA }, answer: { ts: 2, by: MAYA } },
     });

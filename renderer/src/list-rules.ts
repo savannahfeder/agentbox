@@ -526,9 +526,9 @@ export function rowSummary(
   // THE NEWEST THING SAID IS THE NEWS, WHOEVER SAID IT (w-560647d4db). This
   // used to require a DIFFERENT writer — a teammate's reply over your ask —
   // which is the common case and not the only one. In a conversation between
-  // two people the same person routinely writes both: Margarette starts it and
-  // Margarette sends the latest message, and the test failed, so the row
-  // printed her oldest message, days old and already read. A row cannot print
+  // two people the same person routinely writes both: a teammate starts it and
+  // the same teammate sends the latest message, so the test failed and the row
+  // printed their oldest message, days old and already read. A row cannot print
   // "what was said last" and then make an exception for who said it.
   //
   // `by` is still what gates this, and it still leaves the single-person app

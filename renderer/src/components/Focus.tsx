@@ -2513,7 +2513,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             send button, which is the whole act. */}
         {/* THE FORMATTING BAR, IN A CHAT AND NOWHERE ELSE (w-560647d4db). It
             goes first on the footer line, which is where drawing A has it:
-            left of "Goes to Margarette." and left of Send. A reply to an agent
+            left of "Goes to Maya's inbox." and left of Send. A reply to an agent
             is an instruction rather than a formatted message, so that box keeps
             exactly the footer it had. */}
         {talkTo?.length ? <FormatBar box={ref} onChange={changeText} onAttach={pickFiles} /> : null}
