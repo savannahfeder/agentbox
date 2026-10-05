@@ -450,6 +450,14 @@ export const api = {
     return window.zero!.sendNow(p);
   },
 
+  /* --------------------------------- feedback ------------------------------- */
+  // Answers { ok } or { ok: false, error } in words (main/feedback.mjs).
+  async sendFeedback(p: { text: string; files: { name: string; type: string; size: number; data: string }[] }): Promise<{ ok: boolean; error?: string }> {
+    if (useFixtures) return { ok: true };
+    if (!window.zero?.sendFeedback) return { ok: false, error: `Restart ${Name} to send feedback.` };
+    return window.zero.sendFeedback(p);
+  },
+
   /* --------------------------------- the team ------------------------------- */
   // Every call answers { ok, team } or { ok: false, error } in words.
   async teamSignIn(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignIn()); },

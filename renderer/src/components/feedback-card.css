@@ -1,0 +1,39 @@
+/* THE FEEDBACK CARD (FeedbackCard.tsx, w-1b574413db). Square like the reply
+   card, on the app's own pop surface, over a dimmed window. Send is the
+   composer's .dock-send and takes none of its looks from here. */
+.fb-scrim { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, .55); display: grid; place-items: center; -webkit-app-region: no-drag; }
+.fb-card { position: relative; width: min(600px, calc(100vw - 48px)); background: var(--pop); border: 1px solid var(--line-strong); box-shadow: 0 30px 80px rgba(0, 0, 0, .5); color: var(--text); }
+.fb-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 14px 2px 22px; }
+.fb-head h2 { margin: 0; font-size: 16px; font-weight: 500; }
+.fb-close { all: unset; cursor: pointer; width: 26px; height: 26px; display: grid; place-items: center; color: var(--text-faint); }
+.fb-close:hover { color: var(--text); }
+.fb-close svg { width: 18px; height: 18px; }
+.fb-sub { margin: 0; padding: 0 22px 14px; font-size: 13px; color: var(--text-faint); }
+.fb-box { border-top: 1px solid var(--line); }
+.fb-box textarea { all: unset; display: block; box-sizing: border-box; width: 100%; min-height: 150px; max-height: 50vh; overflow-y: auto; padding: 18px 22px; font-size: 14.5px; line-height: 1.6; color: var(--text); white-space: pre-wrap; }
+.fb-box textarea::placeholder { color: var(--text-faint); }
+.fb-tiles { display: flex; flex-wrap: wrap; gap: 10px; padding: 0 22px 16px; }
+.fb-tile { position: relative; width: 88px; height: 60px; border: 1px solid var(--line); background: var(--surface); }
+.fb-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fb-tile.doc { display: grid; place-items: center; color: var(--text-faint); font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; }
+.fb-tile-x { all: unset; cursor: pointer; position: absolute; top: -7px; right: -7px; width: 16px; height: 16px; border-radius: 50%; background: var(--pop); color: var(--text-dim); font-size: 11px; line-height: 1; display: grid; place-items: center; border: 1px solid var(--line-strong); }
+.fb-tile-x:hover { color: var(--text); }
+.fb-note { margin: 0; padding: 0 22px 12px; font-size: 12.5px; color: var(--text-dim); }
+.fb-foot { display: flex; align-items: center; gap: 12px; padding: 12px 14px 12px 20px; border-top: 1px solid var(--line); }
+.fb-attach { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; color: var(--text-dim); font-size: 13px; }
+.fb-attach:hover { color: var(--text); }
+.fb-hint { color: var(--text-faint); font-size: 12.5px; }
+.fb-foot .dock-send { margin-left: auto; }
+.fb-foot .dock-send:disabled { opacity: .42; cursor: default; background: none; }
+.fb-foot .dock-send:disabled:hover { background: none; border-color: var(--line-strong); }
+/* Dragging files over the card: its corners light in the accent, the same
+   corner marks the app frames its panes with. */
+.fb-drop { position: absolute; inset: 0; z-index: 3; background: color-mix(in srgb, var(--pop) 97%, transparent); display: grid; place-items: center; text-align: center; font-size: 15px; pointer-events: none; }
+.fb-drop small { display: block; color: var(--text-faint); font-size: 12.5px; margin-top: 6px; }
+.fb-drop i { position: absolute; width: 18px; height: 18px; border: 0 solid var(--accent); }
+.fb-drop i:nth-child(1) { top: 10px; left: 10px; border-width: 1.5px 0 0 1.5px; }
+.fb-drop i:nth-child(2) { top: 10px; right: 10px; border-width: 1.5px 1.5px 0 0; }
+.fb-drop i:nth-child(3) { bottom: 10px; left: 10px; border-width: 0 0 1.5px 1.5px; }
+.fb-drop i:nth-child(4) { bottom: 10px; right: 10px; border-width: 0 1.5px 1.5px 0; }
+.fb-sent { display: flex; align-items: center; gap: 10px; padding: 26px 22px; font-size: 15px; }
+.fb-sent svg { color: var(--accent); }

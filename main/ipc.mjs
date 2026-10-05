@@ -28,6 +28,8 @@ import path from 'node:path';
 import os from 'node:os';
 import fsWatch from 'node:fs';
 import { listFolders } from './folders.mjs';
+import { feedbackUrl, sendFeedback } from './feedback.mjs';
+import { feedbackPayload } from '../shared/feedback.mjs';
 import * as approvals from './approvals.mjs';
 import { restartNeeded } from './staleness.mjs';
 import { artifactRoots, resolveArtifact } from './artifact-path.mjs';
@@ -598,6 +600,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       console.warn(`team: could not hand ${id} on: ${err.message}`);
     }
   }
+
+  // FEEDBACK, from the card the sidebar's Feedback row opens (w-1b574413db).
+  // main/feedback.mjs decides where it goes and whether it may; the version
+  // and the macOS release ride along so a report can be matched to a build.
+  ipcMain.handle('zero:send-feedback', async (_e, { text, files } = {}) => sendFeedback({
+    url: feedbackUrl(config),
+    payload: feedbackPayload({ text, files, app: { version: app.getVersion(), os: `${process.platform} ${os.release()}` } }),
+  }));
 
   // THE TEAM'S DOORS. Each answers { ok, team } or { ok: false, error } with
   // the error in words, so the window can say what went wrong where it
