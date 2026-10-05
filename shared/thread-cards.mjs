@@ -36,16 +36,45 @@ export function threadState(item, now = Date.now()) {
 
 const personHolds = (item) => typeof item.assignee === 'string' && item.assignee !== 'agent';
 
+// ONLY EMPHASIS IS STRIPPED, AND ONLY WHERE IT IS A PAIR (w-a33b339772).
+//
+// This used to be `.replace(/[*_`>]/g, '')`: every star, underscore, backtick
+// and angle bracket in the text, gone. A pasted search command
+// (`--include=*.md --include=*.json`) lost all three of its stars on the
+// summary line, and `user_id_v2` came back as `useridv2`.
+//
+// A pair is a mark, then a WORD character, then the closing mark: that is what
+// `*bold*` looks like and what a glob never does, because a glob's star is
+// followed by a dot or a slash. Underscores have to clear the word on either
+// side too, or `user_id_v2` reads as emphasis around `id`. A mark with no
+// partner is left exactly where the person put it.
+const EMPHASIS = [
+  [/\*\*(\w[^*\n]*?)\*\*/g, '$1'],
+  [/(?<!\w)__(\w[^_\n]*?)__(?!\w)/g, '$1'],
+  [/\*(\w[^*\n]*?)\*/g, '$1'],
+  [/(?<!\w)_(\w[^_\n]*?)_(?!\w)/g, '$1'],
+  [/`([^`\n]+)`/g, '$1'],
+];
+
+// WHERE A SENTENCE REALLY ENDS. The old cut was "any of .!? then a space", so
+// the lone ` . ` that means "this directory" ended the sentence and the
+// summary showed `grep -r foo .` and nothing else. A full stop ends a sentence
+// when it closes a word AND what follows is a new sentence: whitespace then a
+// capital (through an opening quote or bracket), or the end of the text.
+const SENTENCE = /^(.+?\w[.!?]["'”’)\]]?)(?=\s+["“'(\[]?[A-Z]|\s*$)/;
+
 // The first sentence of some prose, without markdown, short enough for a line.
 export function firstSentence(text, max = 240) {
   if (typeof text !== 'string') return '';
-  const plain = text
+  let plain = text
     .replace(/^#+\s.*$/gm, '')
     .replace(/^##\s*Options[\s\S]*$/m, '')
-    .replace(/[*_`>]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const m = plain.match(/^(.+?[.!?])(\s|$)/);
+    // A blockquote's mark is the one at the start of its line. Elsewhere `>`
+    // is a redirect or an arrow and belongs to whoever typed it.
+    .replace(/^\s*>\s?/gm, '');
+  for (const [re, to] of EMPHASIS) plain = plain.replace(re, to);
+  plain = plain.replace(/\s+/g, ' ').trim();
+  const m = plain.match(SENTENCE);
   const one = (m ? m[1] : plain).trim();
   return one.length > max ? `${one.slice(0, max - 1).trimEnd()}…` : one;
 }
