@@ -42,6 +42,15 @@ export const refusedForDomain = (detail) => /domain/i.test(String(detail ?? ''))
 export const looksLikeResendKey = (key) => /^re_[A-Za-z0-9_]{8,}$/.test(String(key ?? '').trim());
 export const looksLikeEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(s ?? '').trim());
 
+// Which of our secrets are already saved on the project, read off whatever
+// `supabase secrets list` printed (a table or JSON). Names only: Supabase never
+// shows a value back, so nothing secret passes through here.
+const OURS = ['RESEND_API_KEY', 'FEEDBACK_TO', 'FEEDBACK_FROM'];
+export function savedSecrets(output) {
+  const text = String(output ?? '');
+  return new Set(OURS.filter((name) => new RegExp(`(^|[^A-Z0-9_])${name}([^A-Z0-9_]|$)`, 'm').test(text)));
+}
+
 // What `supabase secrets set --env-file` reads. Quoted, because the sender has
 // spaces and angle brackets in it.
 export function secretsFile({ to, from, key }) {
