@@ -101,34 +101,62 @@ describe('the personal project itself', () => {
   afterEach(() => { fs.rmSync(root, { recursive: true, force: true }); });
   const read = (slug) => JSON.parse(fs.readFileSync(path.join(root, slug, 'project.json'), 'utf8'));
 
-  it('is made once, called Personal, and says so about itself', () => {
+  // CALLED MY WORKSPACE, in title case (the founder's pick, 2026-10-04, over
+  // Personal, Personal Workspace, Personal Space and a name-based one).
+  it('is made once, called My Workspace, and says so about itself', () => {
     const made = ensurePersonalProject(root);
-    expect(made).toEqual({ slug: 'personal', made: true });
-    expect(read('personal')).toMatchObject({ name: 'Personal', [PERSONAL_FLAG]: true });
-    expect(ensurePersonalProject(root)).toEqual({ slug: 'personal', made: false });
-    expect(fs.readdirSync(root)).toEqual(['personal']);
+    expect(made).toEqual({ slug: 'my-workspace', made: true });
+    expect(read('my-workspace')).toMatchObject({ name: 'My Workspace', [PERSONAL_FLAG]: true });
+    expect(ensurePersonalProject(root)).toEqual({ slug: 'my-workspace', made: false });
+    expect(fs.readdirSync(root)).toEqual(['my-workspace']);
   });
 
-  it('never takes over a project of yours that happens to be called personal', () => {
-    fs.mkdirSync(path.join(root, 'personal'));
-    fs.writeFileSync(path.join(root, 'personal', 'project.json'), JSON.stringify({ name: 'personal', id: 'personal' }));
-    expect(ensurePersonalProject(root)).toEqual({ slug: 'personal-2', made: true });
-    expect(read('personal')).not.toHaveProperty(PERSONAL_FLAG);
-    expect(read('personal-2')[PERSONAL_FLAG]).toBe(true);
+  it('never takes over a project of yours that happens to be called my workspace', () => {
+    fs.mkdirSync(path.join(root, 'my-workspace'));
+    fs.writeFileSync(path.join(root, 'my-workspace', 'project.json'), JSON.stringify({ name: 'my workspace', id: 'my-workspace' }));
+    expect(ensurePersonalProject(root)).toEqual({ slug: 'my-workspace-2', made: true });
+    expect(read('my-workspace')).toMatchObject({ name: 'my workspace' });
+    expect(read('my-workspace')).not.toHaveProperty(PERSONAL_FLAG);
+    expect(read('my-workspace-2')[PERSONAL_FLAG]).toBe(true);
   });
 
   it('is not made again once you archived it', () => {
     ensurePersonalProject(root);
-    const file = path.join(root, 'personal', 'project.json');
-    fs.writeFileSync(file, JSON.stringify({ ...read('personal'), archived: true }));
+    const file = path.join(root, 'my-workspace', 'project.json');
+    fs.writeFileSync(file, JSON.stringify({ ...read('my-workspace'), archived: true }));
+    expect(ensurePersonalProject(root)).toEqual({ slug: 'my-workspace', made: false });
+    expect(fs.readdirSync(root)).toEqual(['my-workspace']);
+  });
+
+  // IT SHIPPED AS "Personal" FIRST (9e2a626), so Macs that signed in since
+  // hold one by that name. It takes the new name where it still carries the
+  // old one, in the same folder, and a name the person chose is left alone.
+  const madeAsPersonal = (name) => {
+    fs.mkdirSync(path.join(root, 'personal'));
+    fs.writeFileSync(path.join(root, 'personal', 'project.json'), JSON.stringify({ id: 'personal', name, [PERSONAL_FLAG]: true }));
+  };
+  it('renames one made as Personal to My Workspace, in place', () => {
+    madeAsPersonal('Personal');
     expect(ensurePersonalProject(root)).toEqual({ slug: 'personal', made: false });
+    expect(read('personal')).toMatchObject({ name: 'My Workspace', [PERSONAL_FLAG]: true });
     expect(fs.readdirSync(root)).toEqual(['personal']);
+  });
+  it('leaves a name you gave it yourself', () => {
+    madeAsPersonal('Home Stuff');
+    ensurePersonalProject(root);
+    expect(read('personal').name).toBe('Home Stuff');
+  });
+  it('leaves a project called Personal that is not the flagged one', () => {
+    fs.mkdirSync(path.join(root, 'personal'));
+    fs.writeFileSync(path.join(root, 'personal', 'project.json'), JSON.stringify({ id: 'personal', name: 'Personal' }));
+    ensurePersonalProject(root);
+    expect(read('personal').name).toBe('Personal');
   });
 
   it('cannot be shared with the team as a project', () => {
     ensurePersonalProject(root);
-    expect(() => markShared(path.join(root, 'personal'), { teamId: 't1', sharedBy: 'me' })).toThrow(/personal/i);
-    expect(read('personal')).not.toHaveProperty('team');
+    expect(() => markShared(path.join(root, 'my-workspace'), { teamId: 't1', sharedBy: 'me' })).toThrow(/My Workspace stays on this Mac/);
+    expect(read('my-workspace')).not.toHaveProperty('team');
   });
 
   it('leaves an ordinary project shareable', () => {
@@ -157,7 +185,7 @@ describe('in the app', () => {
     else process.env.AGENTBOX_PERSON_ID = shellPersonId;
   });
 
-  it('signing in makes Personal, and the store says which project it is', async () => {
+  it('signing in makes My Workspace, and the store says which project it is', async () => {
     const cloud = createMemoryCloud();
     const me = signUpMemory(cloud, { email: 'maya@northwind.test', name: 'Maya' });
     const service = createTeamService({
@@ -167,7 +195,7 @@ describe('in the app', () => {
     expect(store.listProducts().map((p) => p.slug)).toEqual(['nw']);
     await service.signIn();
     const listed = store.listProducts().map((p) => ({ slug: p.slug, name: p.name, personal: p.personal }));
-    expect(listed).toEqual([{ slug: 'nw', name: 'Northwind', personal: false }, { slug: 'personal', name: 'Personal', personal: true }]);
+    expect(listed).toEqual([{ slug: 'my-workspace', name: 'My Workspace', personal: true }, { slug: 'nw', name: 'Northwind', personal: false }]);
     await service.signOut();
   });
 
@@ -177,9 +205,9 @@ describe('in the app', () => {
 
   it('a thread you chose to show the team in Personal is written as Team, and one left alone carries no word', () => {
     ensurePersonalProject(accountRoot);
-    const shared = store.composeItem('personal', { title: 'Book the offsite', visibility: 'team' });
-    const quiet = store.composeItem('personal', { title: 'Dentist on Friday' });
-    const read = (id) => disk.readWorkItem(path.join(accountRoot, 'personal'), id);
+    const shared = store.composeItem('my-workspace', { title: 'Book the offsite', visibility: 'team' });
+    const quiet = store.composeItem('my-workspace', { title: 'Dentist on Friday' });
+    const read = (id) => disk.readWorkItem(path.join(accountRoot, 'my-workspace'), id);
     expect(read(shared.id).visibility).toBe('team');
     expect(read(quiet.id).visibility).toBeUndefined();
     const products = store.listProducts();

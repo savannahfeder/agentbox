@@ -116,6 +116,21 @@ function posthogKey() {
 
 const analyticsKey = posthogKey();
 
+// WHERE THE FEEDBACK CARD SENDS (main/feedback.mjs), read the same two ways.
+// It is the address of the server function, not of anybody's inbox: who the
+// mail goes to is a secret on that function and never in a build.
+function feedbackAddress() {
+  const fromEnv = readEnv('FEEDBACK_URL');
+  if (typeof fromEnv === 'string' && fromEnv.trim()) return fromEnv.trim();
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(repo, 'zero.config.json'), 'utf8'));
+    if (typeof cfg?.feedbackUrl === 'string' && cfg.feedbackUrl.trim()) return cfg.feedbackUrl.trim();
+  } catch {}
+  return null;
+}
+
+const feedbackUrl = feedbackAddress();
+
 
 if (!noSign) {
   // A SIGNED RELEASE IS THE ONE STRANGERS DOWNLOAD, so a missing key stops it
@@ -195,6 +210,14 @@ if (analyticsKey) {
   console.log(`→ baking the analytics key into the build (${analyticsKey.slice(0, 8)}…, ${analyticsKey.length} chars)`);
 } else {
   console.log('→ no analytics key, so this build will send nothing');
+}
+// Not a stop like the analytics key: a build without it still works, and its
+// Feedback card says in words that feedback is not set up.
+if (feedbackUrl) {
+  args.push(`-c.extraMetadata.bakedFeedbackUrl=${feedbackUrl}`);
+  console.log('→ baking the feedback address into the build');
+} else {
+  console.log(`→ no feedback address (${envName('FEEDBACK_URL')} or "feedbackUrl" in zero.config.json), so the Feedback card will say it is not set up`);
 }
 if (noSign) {
   console.log('→ packaging, unsigned');

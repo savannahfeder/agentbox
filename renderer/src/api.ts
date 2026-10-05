@@ -119,6 +119,10 @@ function fixtureWrite(scope: 'project' | 'workspace', p: any): Settings {
     if (p.key === 'sessionsAtOnce') {
       w.sessionsAtOnce = Math.max(1, Math.min(w.slotsMax ?? 12, Number(p.value) || 1));
       w.capacity = w.sessionsAtOnce * Math.max(1, w.accounts.length);
+    } else if (p.key === 'memoryGate' && w.memoryGate) {
+      w.memoryGate = { ...w.memoryGate, on: !!p.value, now: p.value ? 'Memory is fine. Nothing heavy running.' : null };
+    } else if (p.key === 'memoryGateSlots' && w.memoryGate) {
+      w.memoryGate = { ...w.memoryGate, slots: p.value === null ? null : Math.max(1, Math.min(w.memoryGate.slotsMax, Number(p.value) || 1)) };
     } else w[p.key] = p.value;
   } else {
     const project = fixtureSettingsState.projects.find((x: any) => x.slug === p.product);
@@ -444,6 +448,14 @@ export const api = {
   async sendNow(p: { product: string; id: string }): Promise<{ ok: boolean; interrupted: boolean }> {
     if (useFixtures) return { ok: true, interrupted: true };
     return window.zero!.sendNow(p);
+  },
+
+  /* --------------------------------- feedback ------------------------------- */
+  // Answers { ok } or { ok: false, error } in words (main/feedback.mjs).
+  async sendFeedback(p: { text: string; files: { name: string; type: string; size: number; data: string }[] }): Promise<{ ok: boolean; error?: string }> {
+    if (useFixtures) return { ok: true };
+    if (!window.zero?.sendFeedback) return { ok: false, error: `Restart ${Name} to send feedback.` };
+    return window.zero.sendFeedback(p);
   },
 
   /* --------------------------------- the team ------------------------------- */

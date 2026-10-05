@@ -136,10 +136,9 @@ describe('the door to a project', () => {
   it('lights Settings while any project page is open', () => {
     expect(settings).toContain("pane === 'projects' || pane === 'team' ? pane");
     expect(settings).toContain("typeof pane === 'object' ? 'projects'");
-    // A project page lights Settings, because `settingsPage` reports
-    // `projects` for it and the only pane that lights another row is Team
-    // (w-8415594d19, 2026-10-01), which Invite people is the shortcut to.
-    expect(app).toContain("page={settingsOpen ? (settingsPage === 'team' ? 'invite' : 'settings') : null}");
+    // Every Settings pane lights Settings. Team used to light Invite people
+    // (w-8415594d19) until that row left the sidebar (w-1b574413db, 2026-10-04).
+    expect(app).toContain("page={settingsOpen ? 'settings' : null}");
   });
 
   it('titles the page it lands on', () => {

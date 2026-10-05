@@ -106,6 +106,8 @@ import { nameRow, wantsName } from './row-label.mjs';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mjs';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
 import { signInFiles, signInStamp } from './sign-in-files.mjs';
+import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath } from './memory-gate-server.mjs';
+import { autoSlots, DEFAULTS as MEMORY_GATE } from './memory-gate.mjs';
 
 const POLL_MS = 15_000;
 // HOW LONG SHE WAITS AFTER PRESSING THE BUTTON, and until now it was the line
@@ -575,6 +577,7 @@ export class Supervisor {
     // the restart she ruled out. The sweep gets there first and hands each row
     // back to the session that was doing it.
     try { this.recoverInterrupted('startup'); } catch (e) { console.warn('zero: startup recovery:', e.message); }
+    if (this.config.memoryGate) this.setMemoryGate(true).catch((e) => console.warn('zero: memory gate:', e.message));
     this._timer = setInterval(() => this.tick().catch((e) => console.warn('supervisor:', e.message)), POLL_MS);
     this.tick().catch(() => {});
   }
@@ -718,6 +721,7 @@ export class Supervisor {
   killAll() {
     for (const session of this.sessions.values()) this._kill(session);
     this._closeCodex(`${Name} is quitting`);
+    this.stopMemoryGate();
   }
 
   // PUT A WORKER BACK ON THESE ROWS, WHATEVER STATE THEY ARE IN.
@@ -6148,6 +6152,8 @@ export class Supervisor {
           // So approval cards can say who is asking and about what.
           ZERO_PRODUCT: item.product,
           ZERO_ITEM: item.id,
+          // Where its shell commands ask about memory, when that is on.
+          ...this.memoryGateEnv(item),
         },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -7113,6 +7119,8 @@ export class Supervisor {
     add(this.config.storeRoot);
     if (product?.dir) add(product.dir);
     rules.permissions = { ...(rules.permissions ?? {}), additionalDirectories: dirs };
+    const gateHooks = this.memoryGateHooks();
+    if (gateHooks) rules.hooks = { ...(rules.hooks ?? {}), ...gateHooks };
     // Beside the MCP config, and written the same way: a real file on disk,
     // because the CLI reading --settings is not this process. Named by the
     // run, because two spawns with different rules must never share a file.
@@ -7130,6 +7138,78 @@ export class Supervisor {
     args.push('--mcp-config', mcpConfig, '--permission-prompt-tool', 'mcp__zero-approvals__approval_prompt');
     const rules = this.writeWorkerSettings(product, runId);
     if (rules) { spawnFiles.push(rules); args.push('--settings', rules); }
+  }
+
+  /* ------------------ heavy work waits when memory is short ----------------- */
+  // w-3958c3753d. With the switch on, every shell command a Claude Code worker
+  // runs asks main/memory-gate-server.mjs first, through a PreToolUse hook on
+  // Bash, and reports back after it. Reading and editing files never ask. With
+  // the switch off a worker carries none of it. The rules and the measurements
+  // behind them are in main/memory-gate.mjs.
+
+  /** The hooks for the per-spawn settings file, or null when it is off. */
+  memoryGateHooks() {
+    if (!this.config.memoryGate) return null;
+    const script = unpacked(path.join(this.appDir, 'scripts', 'memory-gate-hook.sh'));
+    const quoted = `'${script.replace(/'/g, `'\\''`)}'`;
+    // Above the longest wait by ten minutes: a hook that times out lets its
+    // command run (measured), so the app's own refusal must always come first.
+    const timeout = Math.ceil(MEMORY_GATE.maxWaitMs / 1000) + 600;
+    const on = (mode, extra = {}) => [{ matcher: 'Bash', hooks: [{ type: 'command', command: `${quoted} ${mode}`, ...extra }] }];
+    return {
+      PreToolUse: on('pre', { timeout }),
+      PostToolUse: on('post', { timeout: 10 }),
+      PostToolUseFailure: on('post', { timeout: 10 }),
+    };
+  }
+
+  /** Where a worker's hook asks, and who it is asking for. Empty when off. */
+  memoryGateEnv(item) {
+    if (!this.config.memoryGate || !item) return {};
+    return {
+      AGENTBOX_GATE_SOCK: this.config.memoryGateSocket || memoryGateSocketPath(),
+      AGENTBOX_GATE_ITEM: String(item.id ?? ''),
+      AGENTBOX_GATE_PRODUCT: String(item.product ?? ''),
+      AGENTBOX_GATE_SCORE: String(Math.max(0, Math.round(this._score(item)) || 0)),
+    };
+  }
+
+  /** The live rank of one of this app's own tasks, so a raise counts at once. */
+  memoryGateScore(product, itemId) {
+    if (!product || !itemId) return null;
+    try {
+      const item = this.store.readItem?.(product, itemId);
+      return item ? this._score(item) : null;
+    } catch { return null; }
+  }
+
+  memoryGateSlots() {
+    const n = Number(this.config.memoryGateSlots);
+    return Number.isFinite(n) && n >= 1 ? Math.round(n) : autoSlots(os.totalmem());
+  }
+
+  async setMemoryGate(on) {
+    if (!on) { await this.stopMemoryGate(); return; }
+    if (this._memoryGate) { this._memoryGate.setSlots(this.memoryGateSlots()); return; }
+    const server = new MemoryGateServer({
+      socketPath: this.config.memoryGateSocket || memoryGateSocketPath(),
+      historyFile: path.join(this.userDir, 'memory-gate-history.json'),
+      gate: { slots: this.memoryGateSlots() },
+      scoreFor: (product, itemId) => this.memoryGateScore(product, itemId),
+      log: (line) => console.log(`zero: ${line}`),
+    });
+    this._memoryGate = server;
+    await server.start();
+  }
+
+  async stopMemoryGate() {
+    const server = this._memoryGate;
+    this._memoryGate = null;
+    if (server) await server.stop();
+  }
+
+  memoryGateStatus() {
+    return this._memoryGate ? this._memoryGate.status() : null;
   }
 
   // The MCP config handed to a worker, generated fresh so the paths always track
