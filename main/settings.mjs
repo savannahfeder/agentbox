@@ -830,6 +830,11 @@ export function memoryGateSettings({ config, supervisor }) {
       const mem = s.pressure === 'critical' ? 'Memory is very short.' : s.pressure === 'tight' ? 'Memory is tight.' : 'Memory is fine.';
       const run = heavy ? `${heavy} heavy command${heavy === 1 ? '' : 's'} running` : 'Nothing heavy running';
       now = `${mem} ${run}${waiting ? `, ${waiting} waiting` : ''}.`;
+      // What it cleared up, while that is still news: the last hour.
+      const c = s.cleared;
+      if (c?.programs && Date.now() - c.at < 60 * 60_000) {
+        now += ` It stopped ${c.programs} program${c.programs === 1 ? '' : 's'} that finished agents had left running.`;
+      }
     }
   }
   return { on, slots, slotsAuto, slotsMax: MAX_SLOTS, now };

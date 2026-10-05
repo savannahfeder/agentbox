@@ -34,6 +34,7 @@ import http from 'node:http';
 import { execFile } from 'node:child_process';
 import { MemoryGate, pressureFrom } from './memory-gate.mjs';
 import { CommandHistory } from './memory-gate-history.mjs';
+import { etimeSeconds } from './leftovers.mjs';
 
 export const PROTOCOL = 1;
 
@@ -63,12 +64,7 @@ export async function readMacPressure() {
   return { level: Number.isFinite(level) ? level : null, freePct: Number.isFinite(freePct) ? freePct : null };
 }
 
-/** `ps` elapsed time, `[[dd-]hh:]mm:ss`, in seconds. */
-export function etimeSeconds(etime) {
-  const m = String(etime).match(/^(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)$/);
-  if (!m) return null;
-  return (+(m[1] ?? 0)) * 86_400 + (+(m[2] ?? 0)) * 3_600 + (+m[3]) * 60 + (+m[4]);
-}
+export { etimeSeconds };
 
 /**
  * Every process: pid, parent, resident MB, when it started (wall clock, to
@@ -106,6 +102,8 @@ export class MemoryGateServer {
     takeoverMs = 5_000,
     idleReleaseMs = 30_000,
     maxGrantMs = 3 * 60 * 60_000,
+    sweeper = null,
+    sweepEveryMs = 30_000,
     clock = Date.now,
     log = () => {},
   } = {}) {
@@ -115,6 +113,12 @@ export class MemoryGateServer {
     this.clock = clock;
     this.idleReleaseMs = idleReleaseMs;
     this.maxGrantMs = maxGrantMs;
+    // What finished agents left running is stopped while memory is short
+    // (main/leftovers.mjs). Only the owning coordinator sweeps, so two apps
+    // on one Mac never both do.
+    this.sweeper = sweeper;
+    this.sweepEveryMs = sweepEveryMs;
+    this.lastSweep = -Infinity;
     this.gate = new MemoryGate({ ...gate, history: this.history, clock });
     this.scoreFor = scoreFor;
     this.readPressure = readPressure;
@@ -159,7 +163,7 @@ export class MemoryGateServer {
 
   status() {
     const snap = this.gate.snapshot();
-    return { role: this.role, ...snap, freePct: this.reading.freePct, counts: { ...this.counts } };
+    return { role: this.role, ...snap, freePct: this.reading.freePct, counts: { ...this.counts }, cleared: this.sweeper?.last ?? null };
   }
 
   /* --------------------------- owning the socket --------------------------- */
@@ -278,6 +282,10 @@ export class MemoryGateServer {
     try {
       this.reading = await this.readPressure();
       this.gate.setPressure(pressureFrom(this.reading));
+      if (this.sweeper && this.role === 'owner' && this.clock() - this.lastSweep >= this.sweepEveryMs) {
+        this.lastSweep = this.clock();
+        await this.sweeper.sweep(this.gate.pressure);
+      }
       // Processes are only looked at while something is granted: nothing
       // else needs them, and each look costs a `ps`.
       if (this.grants.size) this._sample(await this.sampleProcesses());

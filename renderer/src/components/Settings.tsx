@@ -1690,7 +1690,10 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   /* Codex workers do not carry the check yet: Codex runs a hook
                      only once it is trusted, and its app-server is shared by
                      every thread. Said only where Codex can be chosen at all. */
-                  desc={`${twoEngines ? 'Claude Code agents' : 'Agents'} run tests, builds and other heavy commands a few at a time while this Mac is short of memory, urgent tasks first. Everything else runs as normal.${twoEngines ? ' Codex agents are not held yet.' : ''}${w.memoryGate.on && w.memoryGate.now ? ` ${w.memoryGate.now}` : ''}`}
+                  /* AND IT CLEARS UP AFTER THEM (2026-10-05). A night of agents
+                     left 7.7 GB running after every agent had finished, and the
+                     Mac ran out of memory; main/leftovers.mjs has the numbers. */
+                  desc={`While this Mac is short of memory, ${twoEngines ? 'Claude Code agents' : 'agents'} run tests, builds and other heavy commands a few at a time, urgent tasks first, and anything finished agents left running is stopped. Everything else runs as normal.${twoEngines ? ' Codex agents are not held yet.' : ''}${w.memoryGate.on && w.memoryGate.now ? ` ${w.memoryGate.now}` : ''}`}
                 >
                   <Switch label="Hold heavy work when memory is short" on={w.memoryGate.on} onChange={(v) => setWorkspace('memoryGate', v)} />
                 </Row>

@@ -108,6 +108,7 @@ import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name
 import { signInFiles, signInStamp } from './sign-in-files.mjs';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath } from './memory-gate-server.mjs';
 import { autoSlots, DEFAULTS as MEMORY_GATE } from './memory-gate.mjs';
+import { LeftoverSweeper } from './leftovers.mjs';
 
 const POLL_MS = 15_000;
 // HOW LONG SHE WAITS AFTER PRESSING THE BUTTON, and until now it was the line
@@ -7196,6 +7197,12 @@ export class Supervisor {
       historyFile: path.join(this.userDir, 'memory-gate-history.json'),
       gate: { slots: this.memoryGateSlots() },
       scoreFor: (product, itemId) => this.memoryGateScore(product, itemId),
+      // While memory is short, what finished agents left running is stopped
+      // (main/leftovers.mjs). A task with a session here is never touched.
+      sweeper: new LeftoverSweeper({
+        live: (itemId) => this.sessions.has(itemId),
+        log: (line) => console.log(`zero: ${line}`),
+      }),
       log: (line) => console.log(`zero: ${line}`),
     });
     this._memoryGate = server;
