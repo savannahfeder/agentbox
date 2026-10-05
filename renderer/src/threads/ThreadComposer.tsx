@@ -176,7 +176,7 @@ export function ThreadComposer({
   // who can see it (composer-rules.ts `sharingFields`).
   // EXCEPT IN YOUR PERSONAL PROJECT, WHICH STARTS PRIVATE (w-b989839656). The
   // chip follows the project until you pick a word yourself, so moving a card
-  // into Personal turns it Private and moving it out turns it back to Team.
+  // into My Workspace turns it Private and moving it out turns it back to Team.
   const [picked, setPicked] = useState<Visibility | null>(null);
   const visibility: Visibility = picked ?? startingVisibility(product);
   const [chosen, setChosen] = useState<string[]>([]);
