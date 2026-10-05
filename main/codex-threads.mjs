@@ -27,8 +27,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { RECENT_DAYS, isScratchFolder, shortFolder, threadTitle } from './agent-sessions.mjs';
+import { WAS_SLUGS, nameSlug } from '../shared/product-name.mjs';
 
 export const CODEX_RECENT_DAYS = RECENT_DAYS;
+/** The originator Codex records for a run this app started (CLIENT_INFO.name), now and before. */
+const OUR_ORIGINATORS = new Set([nameSlug, ...WAS_SLUGS]);
 /** How many day folders the walk opens at most, whatever `days` says. */
 const MAX_DAY_FOLDERS = 40;
 /**
@@ -192,7 +195,12 @@ export function readRollout(file) {
       meta = {
         id: String(p.session_id ?? p.id ?? '').trim(),
         cwd: String(p.cwd ?? '').trim(),
-        threadSource: typeof p.thread_source === 'string' ? p.thread_source : (typeof p.source === 'string' ? 'user' : 'other'),
+        // A RUN THIS APP STARTED IS NOT HERS TO IMPORT (w-db6f5e331e). Codex
+        // 0.160.0 writes no thread_source, so the line after this would call
+        // every run a person's; its originator is the clientInfo name we hand
+        // Codex, under this name or one the app had before.
+        threadSource: OUR_ORIGINATORS.has(String(p.originator ?? '').toLowerCase()) ? 'agentbox'
+          : typeof p.thread_source === 'string' ? p.thread_source : (typeof p.source === 'string' ? 'user' : 'other'),
         startedAt: Number.isFinite(startedAt) ? startedAt : 0,
       };
       continue;
