@@ -202,6 +202,46 @@ describe('turning it off', () => {
     await syncCodexMemoryGate({ home: dir, on: false, request: s.request });
     expect(fs.existsSync(path.join(dir, 'config.toml'))).toBe(false);
   });
+
+  it('asks the app-server nothing at all, because taking the hook out is the whole of off', async () => {
+    // Off must not be a reason to start a Codex app-server: that is hundreds of
+    // megabytes spent by the switch whose job is to save them.
+    const dir = home();
+    const s = server([listed(`'${SCRIPT}' pre`)]);
+    await syncCodexMemoryGate({ home: dir, scriptPath: SCRIPT, on: true, request: s.request });
+    const before = s.calls.length;
+    await syncCodexMemoryGate({ home: dir, scriptPath: SCRIPT, on: false, request: s.request });
+    expect(s.calls.length).toBe(before);
+  });
+});
+
+describe('a hooks.json that is there but says nothing', () => {
+  it('is a file we may write, unlike one we cannot parse', async () => {
+    const dir = home();
+    fs.writeFileSync(path.join(dir, 'hooks.json'), '   \n');
+    const out = await syncCodexMemoryGate({ home: dir, scriptPath: SCRIPT, on: true, request: server([listed(`'${SCRIPT}' pre`)]).request });
+    expect(out.wrote).toBe(true);
+    expect(read(dir).hooks.PreToolUse).toHaveLength(1);
+  });
+});
+
+describe('a config write the app-server refuses', () => {
+  it('leaves the hook installed and says why it is not trusted', async () => {
+    // The hook sits there untrusted, which Codex will not run: the honest state
+    // is "installed, not trusted", and the next start tries the trust again.
+    const dir = home();
+    const out = await syncCodexMemoryGate({
+      home: dir, scriptPath: SCRIPT, on: true,
+      request: async (method) => {
+        if (method === 'hooks/list') return { data: [{ cwd: '/app', hooks: [listed(`'${SCRIPT}' pre`)], warnings: [], errors: [] }] };
+        throw new Error('refused');
+      },
+    });
+    expect(out.wrote).toBe(true);
+    expect(out.trusted).toBe(0);
+    expect(out.error).toMatch(/could not trust/);
+    expect(read(dir).hooks.PreToolUse).toHaveLength(1);
+  });
 });
 
 describe('a home that was never named', () => {
