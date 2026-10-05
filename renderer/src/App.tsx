@@ -27,6 +27,7 @@ import { DocPane, type OpenDoc } from './components/DocPane';
 import { docKind, EVEN_SPLIT, escapeClosesDoc, escapeInTheFileClosesIt, focusIsInTheFile, readSplit, writeSplit } from './doc-pane';
 import { changeOwnsKey } from './code-keys';
 import { askStillStands, nextUndo, shownAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO } from './undo-window';
+import { addUndoMark, UNDO_MARKS_EVENT, type UndidSpec } from './undo-marks';
 import { whatTheFileSentUp } from '../../shared/artifact-keys.mjs';
 import { type Place, placeIsSomewhere, readPlace, writePlace, writeScroll } from './where-she-was';
 import { documentCandidates } from './message-artifacts';
@@ -117,7 +118,7 @@ import { TeamPage } from './team/TeamPage';
 import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationWith, flipView, isDirect, nextTab, pageFor, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
+import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, sorted as sortedByDisplay, type Display, type Privacy } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
@@ -725,8 +726,20 @@ export default function App() {
     restore?: () => Restored;
     /** The row this puts back, which a Z opens once it has run (./undo-window, `shownAfterUndo`). */
     brings?: WorkItem;
+    /** What the thread of each task it touches says once it has run (./undo-marks). */
+    undid?: UndidSpec[];
   };
   const [undoStack, setUndoStack] = useState<Array<Undoable & { at: number }>>([]);
+  /**
+   * A Z ON A TASK SHOWS IN ITS THREAD (w-c78d1e1607). One mark per task it
+   * touched, spanning the undo's own writes so the thread can fold them under
+   * it, and a nudge so an open thread draws it at once.
+   */
+  const leaveUndoMarks = useCallback((specs: UndidSpec[] | undefined, from: number, at: number) => {
+    if (!specs?.length) return;
+    for (const spec of specs) addUndoMark({ ...spec, from, at });
+    window.dispatchEvent(new Event(UNDO_MARKS_EVENT));
+  }, []);
   /**
    * THE ONLY WAY ONTO THAT STACK, so the stamp is applied once to the rule rather
    * than at thirteen call sites, one of which would forget it and be undoable for
@@ -1346,6 +1359,8 @@ export default function App() {
     // What to give back if this one is undone. A reply hands the user's words
     // to the composer again; an approval has nothing of theirs to return.
     restore?: () => Restored;
+    // What the thread says if this one is undone (./undo-marks).
+    undid?: UndidSpec[];
   } | null>(null);
 
   const flushPending = useCallback(async () => {
@@ -2004,11 +2019,19 @@ export default function App() {
   const setPicked = useCallback((next: string[]) => { setPickedRaw(next); writePicked(next); setSelected(0); }, []);
   const withOthers = !!team && othersInView(picked, team.me);
   const displayPage = pageFor(withOthers);
-  const inboxDisplay = withOthers ? teamDisplay : mineDisplay;
+  // PRIVACY IS ONE CHOICE FOR BOTH HALVES (w-f6ea56b89a), so Hide private
+  // holds when a teammate's face is lit, which is when somebody is looking.
+  const [privacy, setPrivacyRaw] = useState<Privacy>(() => readPrivacy());
+  const inboxDisplay = useMemo(() => pageDisplay(withOthers ? teamDisplay : mineDisplay, privacy, !!team), [withOthers, teamDisplay, mineDisplay, privacy, team]);
   const setInboxDisplay = useCallback((d: Display) => {
-    if (displayPage === 'team') setTeamDisplayRaw(d); else setMineDisplayRaw(d);
-    writeDisplay(displayPage, d);
+    const { privacy: p = 'any', ...rest } = d;
+    setPrivacyRaw(p); writePrivacy(p);
+    if (displayPage === 'team') setTeamDisplayRaw(rest); else setMineDisplayRaw(rest);
+    writeDisplay(displayPage, rest);
   }, [displayPage]);
+  // Who sees each of your rows, which is what the privacy choice reads: the
+  // same rule that draws the lock.
+  const seenOf = useCallback((i: WorkItem) => rowSharing(i, (snap?.products ?? []).find((p) => p.slug === i.product), team ? { me: team.me, since: team.state.since ?? null } : null), [snap?.products, team]);
   // THE BOARD'S COLUMNS IN THE ORDER YOU DRAGGED THEM TO (w-23fc91bff5). Held
   // here, not in the board, because J, K and the arrows walk the same order.
   const [columnOrder, setColumnOrderRaw] = useState<ThreadStateWord[]>(() => readColumnOrder());
@@ -2031,8 +2054,8 @@ export default function App() {
   // own level (w-e263a8a0fb).
   const projectOrder = snap?.supervisor.productOrder ?? NO_ORDER;
   const displayedBox = useMemo(
-    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay, view, projectOrder) : []),
-    [shownBox, inboxDisplay, now, mineShown, view, projectOrder],
+    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i))), inboxDisplay, view, projectOrder) : []),
+    [shownBox, inboxDisplay, now, mineShown, view, projectOrder, seenOf],
   );
   // THE PICKED TEAMMATES' THREADS FOR THIS TAB, from the cards their Macs
   // publish, merged into your rows in the Display's order.
@@ -2066,8 +2089,8 @@ export default function App() {
   // about what clicking it shows, and the number a filter is holding back is
   // said in full by the empty state and by the Display menu's "Showing 4 of 7".
   const shownCount = useCallback((rows: WorkItem[]) => rows.filter(
-    (i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now),
-  ).length, [inboxDisplay, now]);
+    (i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i)),
+  ).length, [inboxDisplay, now, seenOf]);
   const theirCount = useCallback((tab: string) => (withOthers
     ? teammateRows(cards, { tab, picked, me: team?.me ?? null, display: inboxDisplay, products: snap?.products ?? [], now }).length : 0),
   [withOthers, cards, picked, team?.me, snap?.products, now, inboxDisplay]);
@@ -2084,8 +2107,8 @@ export default function App() {
   // whole inbox, or the next task opened can be one she has hidden
   // (w-27759abd33).
   const shownInbox = useMemo(
-    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay, undefined, projectOrder),
-    [inbox, boxFilter, inboxDisplay, now, projectOrder],
+    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i))), inboxDisplay, undefined, projectOrder),
+    [inbox, boxFilter, inboxDisplay, now, projectOrder, seenOf],
   );
   const boxFilterMenu = useMemo(
     () => (modal === 'filter' ? filterMenu(wholeBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i)), boxFilter, snap?.products ?? []) : null),
@@ -2947,6 +2970,9 @@ export default function App() {
     // the lookup happens at click time rather than in a closure, so it follows
     // the row wherever it has got to by then.
     goes?: { product: string; id: string },
+    // What the thread says if a Z inside the grace window takes this back,
+    // when nothing has reached the ledger to say it (./undo-marks).
+    undid?: UndidSpec[],
   ) => {
     await flushPending(); // a new action commits the previous one immediately
     if (!stay) leaveResolved(item);
@@ -2969,7 +2995,7 @@ export default function App() {
       await refresh();
       setPendingId((p) => (p === item.id ? null : p));
     }, UNDO_GRACE_MS);
-    pendingRef.current = { item, timer, run, restore };
+    pendingRef.current = { item, timer, run, restore, undid };
   }, [flushPending, leaveResolved, refresh, showToast]);
 
   // It closes the ROW and touches nothing else — no message, no signal, and the
@@ -3023,10 +3049,11 @@ export default function App() {
       if (since) await closeTroubleRow(item, since);
       return;
     }
+    const undid = [{ product: item.product, id: item.id, words: 'Undid closing it' }];
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, status: 'done' });
-      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'open' }); } });
-    }, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`);
+      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, undid, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'open' }); } });
+    }, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`, undefined, undefined, undefined, undid);
   }, [deferCommit, closeAgentRow, closeTroubleRow, snap?.supervisor.spawnTrouble?.since, run, showToast, pushUndo]);
 
   const resolve = useCallback(async (item: WorkItem) => {
@@ -3047,6 +3074,7 @@ export default function App() {
     const isProposal = item.status === 'open' && item.kind !== 'question' && item.kind !== 'review'
       && !(item.labels ?? []).includes('founder') && !liveAnswer(item);
     const approveWith = async (answer: string, toast: string) => {
+      const undid = [{ product: item.product, id: item.id, words: 'Undid your approval' }];
       await deferCommit(item, async () => {
         await api.answer({ product: item.product, id: item.id, answer });
         // Post-commit undo is a real cancel: stop whatever spawned, withdraw
@@ -3058,11 +3086,11 @@ export default function App() {
         // user-visible strings held one, and they are the four undo labels, the
         // two stop toasts and the resume toast. Everything else was comment
         // prose, which she never reads.
-        pushUndo({ label: 'Approval withdrawn, back in your inbox', undoes: 'take back that approval and stop the agent', brings: item, run: async () => {
+        pushUndo({ label: 'Approval withdrawn, back in your inbox', undoes: 'take back that approval and stop the agent', brings: item, undid, run: async () => {
           await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
           await api.answer({ product: item.product, id: item.id, answer: '(withdrawn)', status: 'open' });
         } });
-      }, toast, undefined, undefined, { product: item.product, id: item.id });
+      }, toast, undefined, undefined, { product: item.product, id: item.id }, undid);
     };
     if (item.kind === 'question' && recommended && !item.answer) {
       await approveWith(`Option ${recommended.n}: ${recommended.text}`, `Approved: option ${recommended.n} → ${item.productName}`);
@@ -3317,6 +3345,7 @@ export default function App() {
     // sending a message to a person must not jump to another page.
     const stay = staysOnTheTask(item, text, engine) || talking;
     if (stay) setFollowing({ product: item.product, id: item.id });
+    const undid = [{ product: item.product, id: item.id, words: 'Undid your reply' }];
     await deferCommit(item, async () => {
       await api.answer({
         product: item.product,
@@ -3341,7 +3370,7 @@ export default function App() {
         // window still believes in.
         setSnoozes((s) => { const next = { ...s }; delete next[item.id]; return next; });
       }
-      pushUndo({ label: 'Reply withdrawn, back in your inbox', undoes: 'take back that reply and stop the agent', restore, run: async () => {
+      pushUndo({ label: 'Reply withdrawn, back in your inbox', undoes: 'take back that reply and stop the agent', restore, undid, run: async () => {
         if (wasScheduled) await api.schedule({ product: item.product, id: item.id, runAt: priorRunAt });
         await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
         // Put the thread back exactly where the reply found it. The rule and
@@ -3353,7 +3382,7 @@ export default function App() {
         // means what it always meant.
         setFollowing(null);
       } });
-    }, talking ? 'Sent' : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id });
+    }, talking ? 'Sent' : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id }, undid);
   }, [deferCommit, snap?.supervisor.running, snap?.products, showToast, refresh, markSeen, pushUndo]);
 
   /* ------------------------ answering one of her agents -------------------- */
@@ -3443,9 +3472,11 @@ export default function App() {
     // now come off the result too (format.ts), so a finished row can offer one,
     // and this is the half of the reply path it was missing.
     const status = statusForReply(item.status);
+    // The option in the words the thread drew it with when it was picked.
+    const undid = [{ product: item.product, id: item.id, words: 'Undid picking', choice: option.text.replace(/\s*\(recommended\)\s*$/i, '').trim() }];
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, answer: `Option ${option.n}: ${option.text}`, ...(status ? { status } : {}) });
-      pushUndo({ label: `Option ${option.n} withdrawn, back in your inbox`, undoes: `take back option ${option.n}`, brings: item, run: async () => {
+      pushUndo({ label: `Option ${option.n} withdrawn, back in your inbox`, undoes: `take back option ${option.n}`, brings: item, undid, run: async () => {
         await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
         // Back exactly where the pick found it, the same one write a typed
         // reply's undo makes. Hardcoding 'open' was right while a pick could
@@ -3453,7 +3484,7 @@ export default function App() {
         // undone into her inbox instead of back into Done.
         await api.answer({ product: item.product, id: item.id, ...withdrawReply(item.status) });
       } });
-    }, `Option ${option.n} → ${item.productName}`, undefined, undefined, { product: item.product, id: item.id });
+    }, `Option ${option.n} → ${item.productName}`, undefined, undefined, { product: item.product, id: item.id }, undid);
   }, [deferCommit, pushUndo]);
 
   /* ------------------------ the task she just wrote ------------------------ */
@@ -3475,10 +3506,11 @@ export default function App() {
   // is the one question this card must never make her ask. The withdraw stops
   // the worker as well as closing the row: main/ipc.mjs kills the session on any
   // archive, and her archive outranks whatever a straggler writes afterwards.
-  const noteNewTask = useCallback((label: string, undoes: string, sent: ComposeDraft, withdraw: () => Promise<void>) => {
+  const noteNewTask = useCallback((label: string, undoes: string, sent: ComposeDraft, withdraw: () => Promise<void>, undid?: UndidSpec[]) => {
     pushUndo({
       label,
       undoes,
+      undid,
       // The whole card comes back, not just the sentence: see restoreComposeDraft.
       restore: (): Restored => (restoreComposeDraft(sent) ? { compose: true } : null),
       run: withdraw,
@@ -3583,7 +3615,7 @@ export default function App() {
     // found them is in decisions.md under that item. And no em dash, which is
     // the OTHER half of what was wrong with this label. See the note on the
     // approval label above for the sweep.
-    pushUndo({ label: 'Schedule canceled, back in the inbox', undoes: 'cancel that schedule', run: async () => {
+    pushUndo({ label: 'Schedule canceled, back in the inbox', undoes: 'cancel that schedule', undid: list.filter((i) => !i.agent).map((i) => ({ product: i.product, id: i.id, words: 'Undid the snooze' })), run: async () => {
       for (const item of list) await writeMoment(item, prior.get(item.id) ?? 0);
       refresh();
     } });
@@ -3623,7 +3655,7 @@ export default function App() {
     // supervisor see it. The undo puts it back in Later.
     const wasHeld = list.filter((i) => notStarted(i));
     for (const item of wasHeld) await api.threadEdit(item.product, item.id, { start: 'now' });
-    pushUndo({ label: 'Scheduled again', undoes: 'put that schedule back', run: async () => {
+    pushUndo({ label: 'Scheduled again', undoes: 'put that schedule back', undid: list.filter((i) => !i.agent).map((i) => ({ product: i.product, id: i.id, words: notStarted(i) ? 'Undid starting it' : 'Undid bringing it back' })), run: async () => {
       for (const item of list) await writeMoment(item, prior.get(item.id) ?? 0);
       for (const item of wasHeld) await api.threadEdit(item.product, item.id, { start: 'later' });
       refresh();
@@ -3646,7 +3678,7 @@ export default function App() {
       if (item.agent) await api.closeAgent({ key: agentKey(item.agent), through: item.agent.lastActiveAt || item.agent.startedAt || Date.now() });
       else await api.answer({ product: item.product, id: item.id, status: 'done' });
     }
-    pushUndo({ label: `Reopened ${targets.length} items`, undoes: `reopen those ${targets.length} tasks`, run: async () => {
+    pushUndo({ label: `Reopened ${targets.length} items`, undoes: `reopen those ${targets.length} tasks`, undid: targets.filter((i) => !i.agent).map((i) => ({ product: i.product, id: i.id, words: 'Undid closing it' })), run: async () => {
       for (const item of targets) {
         if (item.agent) await api.closeAgent({ key: agentKey(item.agent), through: 0 });
         else await api.answer({ product: item.product, id: item.id, status: 'open' });
@@ -3816,6 +3848,10 @@ export default function App() {
       // Otherwise she lands on a closed composer holding a message she cannot
       // see.
       const restored = pending.restore?.();
+      // Nothing reached the ledger, so this mark is the only trace in the
+      // thread that she did it and took it back.
+      const now = Date.now();
+      leaveUndoMarks(pending.undid, now, now);
       setFocused(pending.item);
       showToast(restored ? 'Undone. Your message is back in the reply box.' : 'Undone. Nothing was sent.');
       return;
@@ -3853,6 +3889,10 @@ export default function App() {
     // press with the entry already off the pile and nothing on screen, so the
     // next Z reached past it: a new task she could not take back, then the
     // reply under it withdrawn instead (w-c78d1e1607).
+    //
+    // `from` is taken before the undo writes anything, so the mark it leaves
+    // spans exactly its own lines and the thread can fold them under it.
+    const from = Date.now();
     try {
       await last.run();
     } catch (err) {
@@ -3860,6 +3900,7 @@ export default function App() {
       showToast(`Could not undo that. ${(err as Error)?.message ?? err}`);
       return;
     }
+    leaveUndoMarks(last.undid, from, Date.now());
     const restored = last.restore?.();
     const item = restoredItem(restored ?? null);
     const shown = shownAfterUndo(restored, last.brings);
@@ -3881,7 +3922,7 @@ export default function App() {
     // on whatever the close had moved her to (w-7eb39d3c97).
     if (shown.open) { setFocused(shown.open); markSeen(shown.open); }
     else if (shown.compose) { setFocused(null); setModal('compose'); }
-  }, [undoStack, refresh, showToast, markSeen]);
+  }, [undoStack, refresh, showToast, markSeen, leaveUndoMarks]);
 
   /* ------------------------------- keyboard ------------------------------- */
   useEffect(() => {
@@ -5264,7 +5305,7 @@ export default function App() {
                   // her own filter, over a tab that still read 13.
                   hiddenNow > 0
                     ? <FilteredEmpty view={view} hidden={hiddenNow}
-                        onClear={() => setInboxDisplay({ ...inboxDisplay, priorities: [], projects: [], updated: 'any' })} />
+                        onClear={() => setInboxDisplay({ ...inboxDisplay, priorities: [], projects: [], updated: 'any', privacy: 'any' })} />
                     // "Nothing needs you" is about you alone; with a teammate
                     // on the page the quiet line says it instead.
                     : view === 'inbox' && !withOthers
@@ -5434,7 +5475,7 @@ export default function App() {
             if (made?.id) {
               noteNewTask(`Withdrawn: ${clipToSentence(made.title, TOAST_TITLE)}`, 'take back the task you just made', sent, async () => {
                 await api.answer({ product: made.product, id: made.id, status: 'done' });
-              });
+              }, [{ product: made.product, id: made.id, words: 'Undid sending it' }]);
             }
             showToast(sentLine({
               to: to ?? slug,
