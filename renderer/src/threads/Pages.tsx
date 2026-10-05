@@ -350,7 +350,7 @@ export function otherPerson(item: WorkItem, me: string | null): string | null {
 /** ONE ROW OF THE TABLE, FOR THE INBOX AND THE TEAM PAGE BOTH (2026-10-01).
  *  The Team page's list view is the same component as the Inbox's, with small
  *  differences only. So there is one set of cells, and the Team page only adds Person. */
-export function RowCells({ live = false, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, where, person, priority, updatedAt, now, action }: {
+export function RowCells({ live = false, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, tag, where, person, priority, updatedAt, when, now, action }: {
   /** An agent is on this thread right now: a turning mark before its name. */
   live?: boolean;
   title: ReactNode; hidden?: boolean; lock?: boolean; shared?: boolean; where: ReactNode; person?: ReactNode;
@@ -358,20 +358,24 @@ export function RowCells({ live = false, title, hidden = false, lock = false, sh
   chosen?: number;
   /** Added to Later and not started: the row says so in a tag (w-afb66e6661). */
   held?: boolean;
+  /** Any other tag after the title, in the same drawing: a repeating task's schedule. */
+  tag?: string;
   priority: number | null; updatedAt: number; now: number; action?: ReactNode;
+  /** Words for the time cell instead of how long ago: a repeating task's next run. */
+  when?: string;
 }) {
   const id = priority === null ? null : priorityIdOf(priority);
   return <div className={`row-main th-grid${person !== undefined ? ' with-person' : ''}`}>
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
         people with a small count beside them for a thread only a few people
         see. The whole team, the default, carries nothing (2026-10-02). */}
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live && <StateGlyph state="running" live />}{title}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{held && <span className="th-tag">Not started</span>}</div>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live && <StateGlyph state="running" live />}{title}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{held && <span className="th-tag">Not started</span>}{tag && <span className="th-tag">{tag}</span>}</div>
     <div className="th-cell-proj">{where}</div>
     {person !== undefined && <div className="th-cell-person">{person}</div>}
     <div className={`th-cell-prio${id === 'urgent' ? ' urgent' : ''}`}>{id && <><PriorityMark id={id} />{priorityLabelOf(id)}</>}</div>
     {/* The row's one hover action, if it has one, covers the time while the
         pointer is on the row (pages.css .th-row-act). */}
-    <div className={`th-cell-when num${action ? ' has-act' : ''}`}><span className="th-when">{updatedWords(updatedAt, now)}</span>{action}</div>
+    <div className={`th-cell-when num${action ? ' has-act' : ''}`}><span className="th-when">{when ?? updatedWords(updatedAt, now)}</span>{action}</div>
   </div>;
 }
 

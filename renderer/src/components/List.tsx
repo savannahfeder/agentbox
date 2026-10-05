@@ -17,7 +17,7 @@ import { isTroubleRow, TROUBLE_ID } from '../trouble-row';
 import { isUpdateRow, UPDATE_ID } from '../update-row';
 import { IMPORT_KEYS, JUST_IMPORTED_WORD, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEYS, isImportRow, isNotImportedRow, justImported, type ImportChoice } from '../import-row';
 import { splitHits } from '../search';
-import { isCleanRun, nextRunAt } from '../../../shared/repeats.mjs';
+import { clockLabel, isCleanRun, nextRunAt } from '../../../shared/repeats.mjs';
 import { TeamRowEnd, type TeamView } from '../team/people';
 import { RowCells, TableHead, ThreadCells } from '../threads/Pages';
 import type { MixedRow } from '../threads/people-rules';
@@ -85,6 +85,32 @@ export function repeatRow(rule: RepeatRule, last: WorkItem | null, now = Date.no
   // Anything that is not explicitly clean is something she should look at, and
   // the row says so in the same words the inbox would.
   return { when, last: `last run ${stamp(last.updatedAt, now)}, ${previewText(last.result) || 'needs a look'}` };
+}
+
+// THE SCHEDULE, AS THE TAG AFTER A REPEATING TASK'S TITLE (w-4189a5c1a0). It is
+// what makes the row a repeating task, so it replaces the "Repeating" heading
+// the table used to draw above it, and it is read off the rule: the chip it
+// replaces said "daily" on every rule, weekly ones included. It carries the
+// hour too, because the time column is 96px and "Tomorrow 10:00 AM" ran past
+// the page's right edge in the first drawing.
+export function repeatTag(rule: RepeatRule): string {
+  const days = rule.every === 'weekday' ? 'Weekdays'
+    : rule.every === 'week' ? `Every ${new Date(2026, 0, 4 + (rule.on ?? 0)).toLocaleDateString(undefined, { weekday: 'long' })}`
+      : 'Every day';
+  return `${days} at ${clockLabel(rule.at).replace(':00', '')}`;
+}
+
+// Which day it next runs, for the table's time column, in that column's own
+// short words: Today, Tomorrow, a weekday inside the week, a date past it.
+export function nextRunWords(rule: RepeatRule, now = Date.now()): string {
+  const next = nextRunAt(rule, now);
+  if (!next) return 'Not scheduled';
+  const midnight = (ts: number) => new Date(ts).setHours(0, 0, 0, 0);
+  const days = Math.round((midnight(next) - midnight(now)) / 86_400_000);
+  const d = new Date(next);
+  return days === 0 ? 'Today' : days === 1 ? 'Tomorrow'
+    : days < 7 ? d.toLocaleDateString(undefined, { weekday: 'long' })
+      : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 // The day groups, and the key each one is drawn under. KEYED BY THE FIRST ROW
@@ -325,7 +351,30 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
       {/* Repeating tasks sit above the deferred rows, in the tab that already
           holds work with a moment attached. They are RULES, not items, so they
           arrive on their own list and no inbox rule has an opinion about them. */}
-      {rules.length > 0 && (
+      {/* IN THE TABLE THEY ARE ROWS LIKE EVERY OTHER (w-4189a5c1a0). Under the
+          Thread column a "Repeating" heading read as a second level of
+          hierarchy, and a title over a grey line with three facts squeezed to
+          the right looked like nothing else on the page. Now: the title with
+          its schedule as a tag, the project, the priority, and when it next
+          runs in the time column. How the last run went is in the hover title
+          and on the task itself; a run that needs a look is its own row in
+          Needs you. */}
+      {table && rules.map((rule) => {
+        const pool = allItems ?? items;
+        const last = rule.lastOccurrence ? pool.find((i) => i.id === rule.lastOccurrence) ?? null : null;
+        const live = !!last && (last.status === 'open' || last.status === 'claimed');
+        return (
+          <div key={rule.id} data-repeat-id={rule.id} className="row" title={repeatRow(rule, last).last}
+            onClick={() => onOpenRepeat?.(rule)}>
+            <span className="mark" aria-hidden="true" />
+            <RowCells live={live} title={rule.title} tag={repeatTag(rule)} where={rule.productName}
+              person={withPerson ? personCell?.(team?.me ?? null) : undefined}
+              priority={rule.priority ?? 5} updatedAt={rule.updatedAt ?? rule.createdAt}
+              when={nextRunWords(rule)} now={Date.now()} />
+          </div>
+        );
+      })}
+      {!table && rules.length > 0 && (
         <div>
           <div className="day-label">Repeating</div>
           {rules.map((rule) => {
@@ -333,17 +382,18 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
             const last = rule.lastOccurrence ? pool.find((i) => i.id === rule.lastOccurrence) ?? null : null;
             const row = repeatRow(rule, last);
             return (
-              <div key={rule.id} className="row" onClick={() => onOpenRepeat?.(rule)}>
+              <div key={rule.id} data-repeat-id={rule.id} className="row" onClick={() => onOpenRepeat?.(rule)}>
                 <span className="mark" />
                 <div className="row-main">
                   <div className="subject">{rule.title}</div>
                   <div className="preview">{row.last}</div>
                 </div>
-                {/* A rule keeps its chip where a message lost one: "daily" is
-                    not a category the summary is about to restate, it is the
-                    one fact that makes this row a rule and not a message. */}
+                {/* A rule keeps its chip where a message lost one: its
+                    schedule is not a category the summary is about to restate,
+                    it is the one fact that makes this row a rule and not a
+                    message. Read off the rule, never written in. */}
                 <div className="row-end">
-                  <span className="chip">daily</span>
+                  <span className="chip">{repeatTag(rule)}</span>
                   <span className="product">{rule.productName}</span>
                   <span className="time">{row.when}</span>
                 </div>
