@@ -476,7 +476,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   parent: WorkItem | null;
   blockedBy: WorkItem | null;
   // THE THREADS THIS ONE MADE, with where each stands (w-2e8aa16f0f). Drawn in
-  // line under the conversation; absent or empty draws nothing.
+  // the conversation, each on the turn that filed it (w-2e13752a85); absent or
+  // empty draws nothing.
   filed?: Array<MadeRow & { item: WorkItem }>;
   onOpenItem: (item: WorkItem) => void;
   // Said out loud when a file a worker named is not in this product. Nothing
@@ -574,6 +575,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // "there is no ledger row behind this one".
   const update = isUpdateRow(item);
   const made = trouble || update;
+  // The door into a thread this one filed, wherever that list ends up drawn.
+  const openFiled = (id: string) => { const hit = filed.find((r) => r.id === id); if (hit) onOpenItem(hit.item); };
   // ONE REASON THERE IS NO REPLY BOX, and it is a box. There was not one. A
   // quiet session is not stuck on anything — it is sitting at its prompt,
   // listening — and a message written to it lands and is worked on, measured
@@ -1353,13 +1356,21 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               md={md}
               clean={cleanMessage}
               onOpenDoc={onOpenDoc}
+              /* WHAT THIS THREAD FILED, EACH ON THE TURN THAT FILED IT
+                 (w-2e13752a85). It used to be one block hung under the whole
+                 conversation, drawn right here, so threads filed in the morning
+                 were still standing over the composer in the evening, under an
+                 answer from a run that had nothing to do with them. The
+                 conversation places them now, by the moment each was created,
+                 and they scroll away with the turn that came back with them. */
+              filed={filed.map((r) => ({ ...r, at: r.item.createdAt ?? 0 }))}
+              onOpenFiled={openFiled}
             />
           )}
 
-        {/* WHAT THIS THREAD FILED, IN LINE, under what it said about them
-            (w-2e8aa16f0f). The result names them in prose; this is where each
-            one stands now, and the door into it. */}
-        <ThreadsMade rows={filed} label="Filed from this thread" onOpen={(id) => { const hit = filed.find((r) => r.id === id); if (hit) onOpenItem(hit.item); }} />
+        {/* NEITHER OF THOSE TWO ROWS HAS A CONVERSATION TO PUT THE LIST IN, so
+            the list keeps its old place under what they said instead. */}
+        {(made || agent) && <ThreadsMade rows={filed} label="Filed from this thread" onOpen={openFiled} />}
 
         {!agent && <RemoteControl key={`remote:${item.product}:${item.id}`} product={item.product} id={item.id} />}
         {!agent && <CompactionResult engine={runningEngine ?? 'claude-code'} key={`${item.product}:${item.id}`} item={item} />}

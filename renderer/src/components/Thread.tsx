@@ -69,7 +69,7 @@ export interface CodeInThread {
   open: (path: string) => void;
 }
 
-export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, landOn, md, code, chat = false }: {
+export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, landOn, md, code, tail, chat = false }: {
   // CUT THE AGENT'S CURRENT STEP so a message of hers that is waiting on it is
   // answered now (w-f37a34def6). Absent where nothing can be cut.
   onSendNow?: () => unknown;
@@ -106,6 +106,13 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   // The change this conversation made, when there is one. Absent means every
   // work line stays the plain line it has always been.
   code?: CodeInThread | null;
+  // SOMETHING THAT BELONGS TO ONE TURN RATHER THAN TO THE WHOLE THREAD, drawn
+  // at the end of it and scrolling away with it (w-2e13752a85). The index is
+  // the one the event had in `events`, so whoever hands this down matches on
+  // the same list it hands in. The thread does not know what goes here and must
+  // not learn: it draws two completely different conversations, and the list of
+  // threads a run filed only exists for one of them.
+  tail?: (index: number) => ReactNode;
 }) {
   // Which work lines are open, and how far. Kept per conversation, not globally.
   const [open, setOpen] = useState<Map<number, number>>(new Map());
@@ -338,6 +345,10 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                 <div className="msg-body">{md(e.text ?? '')}</div>
               </div>
             )}
+          {/* WHAT THIS TURN CARRIES, under the last thing it said and above
+              the seam, because the seam belongs to the conversation and this
+              belongs to the turn (w-2e13752a85). */}
+          {tail?.(ends)}
           {ends === gapAfter && (
             <button type="button" className="thread-gap" onClick={openGap}>
               {conversationGap(omitted)}

@@ -2,6 +2,10 @@
    square, one 1px line between rows; the title in the reading face and the state
    in the app's mono capitals, quieter once it is done. */
 .made { margin: 22px 0 6px; }
+/* INSIDE THE CONVERSATION it is part of the turn above it rather than a section
+   under the whole thread (w-2e13752a85), so it sits close to the words that
+   came back with it and the thread's own 22px column sets the gap below. */
+.thread-block .made { margin: 12px 0 0; }
 .made-label { margin-bottom: 8px; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 .made-list { border: 1px solid var(--line); border-radius: var(--radius); }
 .made-row {
