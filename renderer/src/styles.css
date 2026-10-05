@@ -7449,6 +7449,20 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   border-bottom: 1px solid var(--line);
 }
 .code-file-head.is-at .code-file-name { color: var(--text); }
+/* THE HEADER FOLDS ITS FILE (2026-10-04). The whole bar is the control, the
+   way GitHub's is, so there is nothing new to aim at: a caret where the eye
+   starts reading, turned when the file is shut, and the pointer saying it can
+   be pressed. */
+.code-file-head { cursor: pointer; user-select: none; }
+.code-file-head .code-fold-caret {
+  flex: 0 0 13px; width: 13px; height: 13px; margin-left: -4px;
+  color: var(--text-faint); transition: transform 120ms ease;
+}
+.code-file-head.is-folded .code-fold-caret { transform: rotate(-90deg); }
+.code-file-head.is-folded { border-bottom-color: transparent; }
+/* A folded file in the tree reads as done with: dimmer, counts and all. */
+.code-file.is-folded .code-node-name,
+.code-file.is-folded .code-counts { opacity: 0.45; }
 .code-file-name { font-size: 12.5px; font-weight: 600; color: var(--text-dim); }
 .code-file-where { font-size: 11.5px; color: var(--text-faint); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .code-file-acts { margin-left: auto; display: flex; gap: 6px; flex: 0 0 auto; }
@@ -7487,7 +7501,9 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 */
 .code-num {
   flex: 0 0 44px; padding-right: 10px; text-align: right;
-  color: var(--text-faint); opacity: 0.55; user-select: none;
+  /* No extra opacity on the faint ink (2026-10-04): at 0.55 the numbers
+     measured 2.89:1 on the code ground, so naming a line meant squinting. */
+  color: var(--text-faint); user-select: none;
   font-variant-numeric: tabular-nums;
 }
 /* WHERE THE FILE JUMPS. Not the fold coming back: nothing here can be pressed
@@ -7522,6 +7538,12 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 .cr-minus { background: var(--code-minus-bed); }
 .cr-plus .code-mark { color: var(--code-plus); }
 .cr-minus .code-mark { color: var(--code-minus); }
+/* THE WORDS THAT CHANGED, inside a removed line and its replacement
+   (2026-10-04). The same two inks as the line beds, a few times stronger, so
+   the eye goes straight to the words and the line colour still says which side
+   it is. Every skin answers it through the two tokens it already sets. */
+.cr-plus .w-chg { background: color-mix(in srgb, var(--code-plus) 32%, transparent); border-radius: 2px; }
+.cr-minus .w-chg { background: color-mix(in srgb, var(--code-minus) 32%, transparent); border-radius: 2px; }
 .code-folded { padding: 10px 16px 4px; font-size: 12px; color: var(--text-faint); }
 
 /* A LINE THE USER CAN TYPE INTO. IT LOOKS EXACTLY LIKE A LINE THAT CANNOT BE

@@ -197,7 +197,10 @@ describe('the component reads the rules rather than writing its own', () => {
     expect(codeArtifact).toContain("from '../code-keys'");
     expect(codeArtifact).toContain('caretStep(');
     expect(codeArtifact).toContain('codeScroll(');
-    expect(codeArtifact).toContain('walkFiles(');
+    // The tree walk goes through stepInTree since 2026-10-04, which asks
+    // walkFiles itself (tests/folding-the-tree-never-moves-the-code.test.mjs).
+    expect(codeArtifact).toContain('stepInTree(');
+    expect(codeArtifact).toContain('nextChange(');
     expect(codeArtifact).toContain('fileOnScreen(');
   });
 

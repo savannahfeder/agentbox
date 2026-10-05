@@ -20,12 +20,12 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import {
-  BATCH_ROWS, changeSummary, filesInTreeOrder, fillNext, firstBatch, hunkView, hunkViewAt, linesSkipped, rowSlices, sliceGuessPx, stepInTree, tokenize, tookLabel, treeRows, visibleRows,
+  BATCH_ROWS, changeSummary, filesInTreeOrder, fillNext, firstBatch, hunkView, hunkViewAt, linesSkipped, marked, rowSlices, sliceGuessPx, stepInTree, toggled, tokenize, tookLabel, treeRows, visibleRows, wordChanges,
   type Change, type ChangedFile, type Hunk,
 } from '../code-artifact';
 import { copiedText, linesToCopy } from '../code-copy';
 import { applySplices, savedLine, unsavedIn, type Row as EditRow } from '../code-edit';
-import { caretStep, codeScroll, editsAcrossLines, extendHead, extendsSelection, fileOnScreen, inputChangesText, type Head } from '../code-keys';
+import { caretStep, codeScroll, editsAcrossLines, extendHead, extendsSelection, fileOnScreen, inputChangesText, nextChange, type Head } from '../code-keys';
 
 /*
  * ------------------------- the caret, in the DOM ---------------------------
@@ -137,10 +137,14 @@ function offsetIn(el: HTMLElement, node: Node, offset: number): number {
 /** The five colours, drawn as classes so the stylesheet owns every value. An
  * uncoloured token is bare text: one element fewer per word, on a pane that
  * held 386,310 of them on the biggest real change. */
-function Code({ line }: { line: string }) {
-  const toks = useMemo(() => tokenize(line), [line]);
+function Code({ line, span }: { line: string; span?: [number, number] | null }) {
+  // The words that changed against the paired line are wrapped once more, over
+  // their colour (`wordChanges` in code-artifact.ts).
+  const toks = useMemo(() => marked(tokenize(line), span ?? null), [line, span?.[0], span?.[1]]);
   return (
-    <>{toks.map((t, i) => (t.c ? <span key={i} className={`t-${t.c}`}>{t.s}</span> : t.s))}</>
+    <>{toks.map((t, i) => (t.hl
+      ? <span key={i} className={t.c ? `w-chg t-${t.c}` : 'w-chg'}>{t.s}</span>
+      : t.c ? <span key={i} className={`t-${t.c}`}>{t.s}</span> : t.s))}</>
   );
 }
 
@@ -165,9 +169,11 @@ function Counts({ plus, minus }: { plus: number; minus: number }) {
 // A REMOVED LINE IS NOT EDITABLE, and that is not a restriction so much as an
 // honest one: it is not in the file any more, so there is nowhere on disk her
 // words could go.
-const CodeLine = memo(function CodeLine({ mark, line, num, editable, onEdit, onDone }: {
+const CodeLine = memo(function CodeLine({ mark, line, span, num, editable, onEdit, onDone }: {
   mark: string;
   line: string;
+  // The changed words against its paired line, or null.
+  span?: [number, number] | null;
   // What line this was in the file, or null where the change came out of the
   // conversation and nobody knows. Null draws an empty gutter, not a guess.
   num: number | null;
@@ -216,11 +222,12 @@ const CodeLine = memo(function CodeLine({ mark, line, num, editable, onEdit, onD
           document.execCommand('insertText', false, flat);
         } : undefined}
       >
-        <Code line={line} />
+        <Code line={line} span={span} />
       </span>
     </div>
   );
-}, (a, b) => a.mark === b.mark && a.line === b.line && a.num === b.num && a.editable === b.editable);
+}, (a, b) => a.mark === b.mark && a.line === b.line && a.num === b.num && a.editable === b.editable
+  && a.span?.[0] === b.span?.[0] && a.span?.[1] === b.span?.[1]);
 // The two callbacks are deliberately NOT compared. They are fresh closures on
 // every parent render and comparing them would defeat the memo entirely, which
 // is the bug this component exists to avoid. What they close over — the row's
@@ -241,11 +248,14 @@ function HunkRows({ hunk, editable, pending, onEdit, onDone }: {
   // so the walk is held rather than repeated.
   const { rows } = useMemo(() => hunkView(hunk.rows), [hunk.rows]);
   const at = useMemo(() => hunkViewAt(hunk.rows), [hunk.rows]);
+  const words = useMemo(() => wordChanges(hunk.rows), [hunk.rows]);
   const draw = (mark: string, text: string, i: number) => {
     // THE USER'S WORDS WIN OVER THE FILE'S. A line typed in and not saved is
     // drawn as she left it, so closing the change and opening it again shows
     // her own text rather than quietly putting the original back.
     const line = (mark === '-' ? undefined : pending?.get(at[i])) ?? text;
+    // A line she has typed into is no longer the line the span was found in.
+    const span = line === text ? words[at[i]] : null;
     // A REMOVED LINE IS NUMBERED IN THE OLD FILE, everything else in the new
     // one, which is what every diff tool does and the only reading that is
     // true: a red line has no line in the file as it now stands.
@@ -256,6 +266,7 @@ function HunkRows({ hunk, editable, pending, onEdit, onDone }: {
         key={`${at[i]}:${text}`}
         mark={mark}
         line={line}
+        span={span}
         num={num}
         editable={editable && mark !== '-'}
         onEdit={(next) => onEdit(at[i], next)}
@@ -393,6 +404,21 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   // A press on a file always jumps, the one she is on included, which bare
   // `at` cannot say when it does not change.
   const [jump, setJump] = useState(0);
+  // THE FILES SHE HAS FOLDED SHUT FROM THEIR HEADER, which is how a reviewer
+  // says "done with this one" (2026-10-04,
+  // tests/a-file-folds-shut-from-its-header.test.mjs). Folding the file she is
+  // inside keeps her place: its header stays where it was, at the top.
+  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
+  const foldFile = (path: string, block: HTMLElement | null) => {
+    const body = bodyRef.current;
+    const above = body && block ? block.getBoundingClientRect().top - body.getBoundingClientRect().top : 0;
+    setFolded((was) => toggled(was, path));
+    if (body && block && above < 0) {
+      requestAnimationFrame(() => {
+        body.scrollTop += block.getBoundingClientRect().top - body.getBoundingClientRect().top;
+      });
+    }
+  };
   const goTo = (path: string) => {
     const i = files.findIndex((f) => f.path === path);
     if (i < 0) return;
@@ -647,6 +673,24 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
 
       if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return;
       if (e.ctrlKey || e.altKey) return;
+
+      // ── ] AND [: THE NEXT CHANGE AND THE ONE BEFORE ──────────────────────
+      // Each change lands just under the file's sticky name. A file not drawn
+      // yet counts as one change, so ] never skips past it; a folded file has
+      // none, because folding it is how she said she was done with it.
+      if ((e.key === ']' || e.key === '[') && !e.metaKey) {
+        const body = bodyRef.current;
+        if (body) {
+          e.preventDefault();
+          const top = body.getBoundingClientRect().top;
+          const headH = (body.querySelector('.code-file-head') as HTMLElement | null)?.offsetHeight ?? 0;
+          const starts = [...body.querySelectorAll<HTMLElement>('.code-hunk-block, .code-unfilled')]
+            .map((b) => b.getBoundingClientRect().top - top + body.scrollTop - headH);
+          const to = nextChange(starts, body.scrollTop, e.key === ']' ? 1 : -1);
+          if (to != null) body.scrollTop = Math.max(0, to);
+        }
+        return;
+      }
 
       // ── THE FILE TREE, WHEN HER KEYBOARD IS ON IT ─────────────────────────
       // She clicked a file, so the arrows walk the files the way they walk any
@@ -1089,7 +1133,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
               type="button"
               key={row.key}
               ref={(el) => { treeRowRefs.current.set(row.path, el); }}
-              className={`code-node code-file${current?.path === row.path ? ' is-at' : ''}`}
+              className={`code-node code-file${current?.path === row.path ? ' is-at' : ''}${folded.has(row.path) ? ' is-folded' : ''}`}
               style={{ paddingLeft: 12 + row.depth * 13 }}
               title={row.path}
               // Pressing a file is her ASKING to be taken there, so the column
@@ -1123,9 +1167,12 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
         {files.map((file: ChangedFile, fileIndex: number) => (
           <section className="code-file-block" key={file.path}>
             <div
-              className={`code-file-head${current?.path === file.path ? ' is-at' : ''}`}
+              className={`code-file-head${current?.path === file.path ? ' is-at' : ''}${folded.has(file.path) ? ' is-folded' : ''}`}
               ref={(el) => { heads.current.set(file.path, el); }}
+              title={folded.has(file.path) ? 'Show this file' : 'Fold this file'}
+              onClick={(e) => foldFile(file.path, (e.currentTarget.parentElement as HTMLElement | null))}
             >
+              <svg className="code-fold-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
               <span className="code-file-name">{file.path.split('/').pop()}</span>
               <span className="code-file-where">{file.path.split('/').slice(0, -1).join('/')}</span>
               <Counts plus={file.plus} minus={file.minus} />
@@ -1143,7 +1190,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
             {/* THE AGENT'S OWN SENTENCE IS NOT DRAWN OVER THE CHANGE, on purpose.
                Do not put it back.
              */}
-            {drawn.has(fileIndex) ? (
+            {!folded.has(file.path) && (drawn.has(fileIndex) ? (
               <FileHunks
                 file={file}
                 pending={seeded.current.get(file.path) ?? null}
@@ -1152,7 +1199,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
               />
             ) : (
               <div className="code-unfilled" style={{ height: sliceGuessPx(file.hunks.reduce((n, h) => n + h.rows.length, 0)) }} />
-            )}
+            ))}
           </section>
         ))}
       </div>

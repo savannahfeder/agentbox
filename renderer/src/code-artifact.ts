@@ -1,3 +1,5 @@
+import { walkFiles } from './code-keys';
+
 // PURE. What a change the agent made is, as a thing the pane can open.
 //
 // So a change is a THIRD KIND OF ARTIFACT, beside the markdown file and the
@@ -269,6 +271,72 @@ export function tokenize(line: string): Tok[] {
   return out;
 }
 
+/* ------------------------ the words that changed -------------------------- */
+//
+// A removed line and the line that replaced it used to be two whole coloured
+// lines, so finding `, ensurePersonalProject` meant comparing them by eye
+// (2026-10-04, tests/the-words-that-changed-are-marked.test.mjs). The span the
+// two do not share, between their common start and common end, is marked.
+
+/** The part of each line the other does not share, or null when there is nothing worth marking. */
+export function changedSpan(a: string, b: string): { minus: [number, number]; plus: [number, number] } | null {
+  if (a === b) return null;
+  const max = Math.min(a.length, b.length);
+  let p = 0;
+  while (p < max && a[p] === b[p]) p += 1;
+  let s = 0;
+  while (s < max - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s += 1;
+  const minus: [number, number] = [p, a.length - s];
+  const plus: [number, number] = [p, b.length - s];
+  // A WHOLE LINE THAT IS DIFFERENT IS ALREADY SAID BY ITS COLOUR. Marking most
+  // of it again is noise, so past this share nothing is marked.
+  const share = Math.max((minus[1] - minus[0]) / Math.max(1, a.length), (plus[1] - plus[0]) / Math.max(1, b.length));
+  return share > 0.6 ? null : { minus, plus };
+}
+
+/**
+ * The changed span on each row of a hunk, parallel to `rows`, null where none.
+ * A run of removed rows is paired, in order, with the run of added rows right
+ * after it, which is how every diff reads a replacement; a row without a
+ * partner, and anything across a context row, is left alone.
+ */
+export function wordChanges(rows: Row[]): ([number, number] | null)[] {
+  const out: ([number, number] | null)[] = rows.map(() => null);
+  let i = 0;
+  while (i < rows.length) {
+    if (rows[i][0] !== '-') { i += 1; continue; }
+    const minusAt = i;
+    while (i < rows.length && rows[i][0] === '-') i += 1;
+    const plusAt = i;
+    while (i < rows.length && rows[i][0] === '+') i += 1;
+    const pairs = Math.min(plusAt - minusAt, i - plusAt);
+    for (let k = 0; k < pairs; k++) {
+      const span = changedSpan(rows[minusAt + k][1], rows[plusAt + k][1]);
+      if (!span) continue;
+      out[minusAt + k] = span.minus;
+      out[plusAt + k] = span.plus;
+    }
+  }
+  return out;
+}
+
+/** The tokens of a line, split at the changed span, with the ones inside it flagged. */
+export function marked(toks: Tok[], span: [number, number] | null): (Tok & { hl?: boolean })[] {
+  if (!span || span[0] >= span[1]) return toks;
+  const out: (Tok & { hl?: boolean })[] = [];
+  let at = 0;
+  for (const t of toks) {
+    const end = at + t.s.length;
+    const cuts = [at, Math.min(Math.max(span[0], at), end), Math.min(Math.max(span[1], at), end), end];
+    for (let k = 0; k < 3; k++) {
+      const piece = t.s.slice(cuts[k] - at, cuts[k + 1] - at);
+      if (piece) out.push(k === 1 ? { c: t.c, s: piece, hl: true } : { c: t.c, s: piece });
+    }
+    at = end;
+  }
+  return out;
+}
+
 // NOTHING IS FOLDED. EVERY LINE OF A HUNK IS DRAWN.
 //
 // This used to cut any hunk over 34 rows down to a head of 18 and a tail of 6,
@@ -434,6 +502,13 @@ export function filesInTreeOrder(files: ChangedFile[]): ChangedFile[] {
   return [...files].sort((a, b) => (order.get(a.path) ?? 0) - (order.get(b.path) ?? 0));
 }
 
+/** A copy of `set` with `path` added if it was not there, taken away if it was. */
+export function toggled(set: ReadonlySet<string>, path: string): Set<string> {
+  const next = new Set(set);
+  if (next.has(path)) next.delete(path); else next.add(path);
+  return next;
+}
+
 /**
  * WHERE AN ARROW ON THE TREE GOES, as a path, or null for nowhere.
  *
@@ -445,15 +520,15 @@ export function filesInTreeOrder(files: ChangedFile[]): ChangedFile[] {
  */
 export function stepInTree(key: string, path: string | null, shown: string[], all: string[]): string | null {
   if (!shown.length) return null;
-  if (key === 'Home') return shown[0];
-  if (key === 'End') return shown[shown.length - 1];
-  if (key !== 'ArrowDown' && key !== 'ArrowUp') return null;
-  const down = key === 'ArrowDown';
+  if (key !== 'ArrowDown' && key !== 'ArrowUp' && key !== 'Home' && key !== 'End') return null;
   const here = path ? shown.indexOf(path) : -1;
-  if (here >= 0) {
-    const to = here + (down ? 1 : -1);
-    return to >= 0 && to < shown.length ? shown[to] : null;
+  if (here >= 0 || key === 'Home' || key === 'End') {
+    // The ordinary walk is walkFiles' (code-keys.ts); it stops at the ends,
+    // which here reads as nowhere to go.
+    const to = walkFiles(key, Math.max(0, here), shown.length);
+    return to == null || (to === here) ? null : shown[to];
   }
+  const down = key === 'ArrowDown';
   const rank = new Map(all.map((p, i) => [p, i]));
   const mine = path ? rank.get(path) ?? -1 : -1;
   const pick = down
