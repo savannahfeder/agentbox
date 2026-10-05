@@ -55,6 +55,9 @@ npm start
 `npm start` builds the app and opens it. On first run it walks you through
 connecting Claude Code or Codex and choosing a folder to work in.
 
+macOS may ask to let Terminal find devices on your local network. Agentbox
+does not need that, so Don't Allow is fine.
+
 ## The chat window is the bottleneck
 
 Today you run agents in chat windows and terminals, and you wait for each one
