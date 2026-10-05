@@ -57,6 +57,18 @@ export function engineThisMacOffers(id: string | null, choices: Engine[] | undef
   return (choices ?? []).some((e) => e.id === id) ? id : null;
 }
 
+/**
+ * THE ENGINE A NEW THREAD CARD OPENS ON (w-db6f5e331e). A remembered pick this
+ * Mac offers wins. Otherwise Claude Code, unless this Mac offers Codex and not
+ * Claude Code: a Codex-only Mac opened the card on "Opus 5.5" because nothing
+ * had been picked yet and nothing asked what the Mac could run.
+ */
+export function startingEngine(last: string | null, choices: Engine[] | undefined): 'claude' | 'codex' {
+  const offers = (id: string) => (choices ?? []).some((e) => e.id === id);
+  if (offers('codex') && !offers('claude')) return 'codex';
+  return engineThisMacOffers(last, choices) === 'codex' ? 'codex' : 'claude';
+}
+
 // Remembered the moment she picks, exactly like the project, the level and the
 // model: a card that forgets what you chose the second it closes makes you
 // choose again (hers).
