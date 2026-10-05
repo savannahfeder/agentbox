@@ -479,6 +479,7 @@ export function readSettings({ config, supervisor, store }) {
       slotsMax: MAX_SLOTS,
       machineNote: machineNote(slotsHere, config.maxConcurrentSessions),
       memoryGate: memoryGateSettings({ config, supervisor }),
+      leftovers: leftoverSettings({ config, supervisor }),
       capacity: status.capacity,
       running: sessions.length,
       model: parseSessionArgs(workspaceArgs).model,
@@ -835,6 +836,47 @@ export function memoryGateSettings({ config, supervisor }) {
   return { on, slots, slotsAuto, slotsMax: MAX_SLOTS, now };
 }
 
+/**
+ * The Agents page's leftovers row: the switch, and one sentence about what
+ * finished agents have left running while it is on.
+ */
+export function leftoverSettings({ config, supervisor }) {
+  const on = !!config.cleanupLeftovers;
+  let now = null;
+  let s = null;
+  try { s = supervisor.leftoverStatus?.() ?? null; } catch {}
+  const list = s?.leftovers ?? [];
+  const stoppable = list.reduce((n, l) => n + (l.programs ?? 0), 0);
+  const kept = list.reduce((n, l) => n + (l.kept ?? 0), 0);
+  const total = stoppable + kept;
+  // OFF, IT SAYS WHAT TURNING IT ON WOULD STOP, before anybody does: the
+  // consent is to these programs too, not only to future ones (agreed with
+  // Codex, 2026-10-05).
+  if (!on) {
+    if (total && stoppable) {
+      now = `Right now finished agents have left ${total} program${total === 1 ? '' : 's'} running; turning this on stops ${stoppable === total ? (total === 1 ? 'it' : 'them') : `${stoppable} of them`}, two hours from then.`;
+    }
+    return { on, now };
+  }
+  {
+    if (!total) now = 'Nothing left running by finished agents.';
+    else {
+      const next = list.filter((l) => l.programs && l.stopsAt).map((l) => l.stopsAt).sort((a, b) => a - b)[0];
+      const when = (ms) => {
+        const m = Math.max(1, Math.round((ms - Date.now()) / 60_000));
+        return m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} m` : ''}` : `${m} m`;
+      };
+      now = `Finished agents have left ${total} program${total === 1 ? '' : 's'} running.`;
+      if (stoppable) now += ` ${stoppable} ${next && next > Date.now() ? `stop in ${when(next)}` : 'are stopping'}`;
+      if (kept) now += `${stoppable ? ';' : ''} ${kept} ${kept === 1 ? 'is' : 'are'} kept`;
+      now += '.';
+      const survivors = s?.survivors?.length ?? 0;
+      if (survivors) now += ` ${survivors} did not stop when asked.`;
+    }
+  }
+  return { on, now };
+}
+
 export function setWorkspaceSetting({ config, supervisor }, { key, value }) {
   switch (key) {
     case 'agentsRunning':
@@ -870,6 +912,13 @@ export function setWorkspaceSetting({ config, supervisor }, { key, value }) {
     case 'memoryGate':
       saveConfig(config, { memoryGate: !!value });
       supervisor.setMemoryGate?.(!!value)?.catch?.((e) => console.warn('zero: memory gate:', e.message));
+      supervisor.onChange?.();
+      break;
+    // STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mjs). Turning it
+    // on records the moment, which is the earliest the clock may start from.
+    case 'cleanupLeftovers':
+      saveConfig(config, value ? { cleanupLeftovers: true, cleanupLeftoversSince: Date.now() } : { cleanupLeftovers: false });
+      supervisor.setLeftoverCleanup?.(!!value)?.catch?.((e) => console.warn('zero: leftovers:', e.message));
       supervisor.onChange?.();
       break;
     case 'memoryGateSlots': {

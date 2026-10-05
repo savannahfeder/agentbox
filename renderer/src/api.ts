@@ -121,6 +121,8 @@ function fixtureWrite(scope: 'project' | 'workspace', p: any): Settings {
       w.capacity = w.sessionsAtOnce * Math.max(1, w.accounts.length);
     } else if (p.key === 'memoryGate' && w.memoryGate) {
       w.memoryGate = { ...w.memoryGate, on: !!p.value, now: p.value ? 'Memory is fine. Nothing heavy running.' : null };
+    } else if (p.key === 'cleanupLeftovers' && w.leftovers) {
+      w.leftovers = { on: !!p.value, now: p.value ? 'Finished agents have left 6 programs running. 4 stop in 1 h 40 m; 2 are kept.' : null };
     } else if (p.key === 'memoryGateSlots' && w.memoryGate) {
       w.memoryGate = { ...w.memoryGate, slots: p.value === null ? null : Math.max(1, Math.min(w.memoryGate.slotsMax, Number(p.value) || 1)) };
     } else w[p.key] = p.value;

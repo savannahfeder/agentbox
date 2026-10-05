@@ -12,15 +12,18 @@
 //   3. PULL. Every line the cloud has that this Mac has not seen comes in
 //      through the store's one write path (`appendForeignLines`), at most
 //      once, holding only what a teammate may set here (shared/team-rules.mjs
-//      whatATeammateMaySet). Lines this person wrote are skipped: they are
-//      already here.
+//      whatATeammateMaySet). A line this person wrote comes back too, in a
+//      conversation and nowhere else (whatYourOtherCopyMaySet), because a
+//      second copy of the app signed in as them is a Mac that has not seen it
+//      either; the uid is what makes pulling one back onto the copy that wrote
+//      it cost nothing.
 //   4. PRIVATE WORK. One title-free line per open task in a private project
 //      (who, what state, when it moved), and only when that set changed.
 //
 // Everything outside this file is passed in, so two "Macs" can run in one test
 // over an in-memory cloud. The app wires the real ones in main/team/index.mjs.
 import crypto from 'node:crypto';
-import { whatATeammateMaySet } from '../../shared/team-rules.mjs';
+import { whatATeammateMaySet, whatYourOtherCopyMaySet } from '../../shared/team-rules.mjs';
 
 const PAGE = 500;
 // HOW MANY SHARED PROJECTS A MAC TAKES ON BY ITSELF. Anyone on the team can
@@ -94,9 +97,13 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
       const cursor = state.get(project.projectId);
       const rows = await backend.pullLines(project.projectId, cursor.pulledSeq, PAGE);
       if (!rows.length) break;
-      const theirs = rows.map((r) => r.line).filter((l) => l && l.by !== me)
-        .map((l) => whatATeammateMaySet(l, { direct: project.direct === true })).filter(Boolean);
-      pulled += disk.appendForeignLines(project.dir, theirs);
+      const direct = project.direct === true;
+      const bring = rows.map((r) => r.line).filter(Boolean)
+        // A line of your own comes back only in a conversation, and a line of a
+        // teammate's keeps only what they may set here (shared/team-rules.mjs).
+        .map((l) => (l.by === me ? whatYourOtherCopyMaySet(l, { direct }) : whatATeammateMaySet(l, { direct })))
+        .filter(Boolean);
+      pulled += disk.appendForeignLines(project.dir, bring);
       // Lines pulled in move the file's end, but they were never ours to push,
       // and a push cursor left behind them would only re-read and skip them.
       const after = state.get(project.projectId);

@@ -197,7 +197,10 @@ describe('the component reads the rules rather than writing its own', () => {
     expect(codeArtifact).toContain("from '../code-keys'");
     expect(codeArtifact).toContain('caretStep(');
     expect(codeArtifact).toContain('codeScroll(');
-    expect(codeArtifact).toContain('walkFiles(');
+    // The tree walk goes through stepInTree since 2026-10-04, which asks
+    // walkFiles itself (tests/folding-the-tree-never-moves-the-code.test.mjs).
+    expect(codeArtifact).toContain('stepInTree(');
+    expect(codeArtifact).toContain('nextChange(');
     expect(codeArtifact).toContain('fileOnScreen(');
   });
 
@@ -217,7 +220,9 @@ describe('the component reads the rules rather than writing its own', () => {
     // shape is a test that has to be edited to let a correct change land.
     expect(codeArtifact).toContain('fromScroll');
     const walk = codeArtifact.slice(codeArtifact.indexOf('const cameFromScroll'));
-    expect(walk).toContain('if (cameFromScroll) fromScroll.current = false;');
+    // Cleared every run since 2026-10-04, with a jump she asked for winning
+    // over a scroll queued beside it (tests/a-jump-always-lands-on-the-change.test.mjs).
+    expect(walk).toContain('fromScroll.current = false;');
     // The pull is INSIDE the guard: it runs only when she did not scroll here.
     const guard = walk.indexOf('if (!cameFromScroll)');
     const pull = walk.indexOf('body.scrollTop = Math.max(0, Math.min(max, body.scrollTop + delta))');

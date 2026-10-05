@@ -68,8 +68,11 @@ describe('the pane hands the copy to this rule', () => {
 
   it('leaves a selection inside one line alone', () => {
     // A single line has no gutter and no header in it, so there is nothing to
-    // improve and every reason not to interfere with a double click.
-    expect(pane).toMatch(/lines\.length < 2\) return;/);
+    // improve and every reason not to interfere with a double click. Since
+    // 2026-10-04 "one line" counts removed rows too, or a removed line and its
+    // replacement read as one and the copy went to the browser and was lost
+    // (tests/a-copy-across-a-removed-line-takes-what-was-selected.test.mjs).
+    expect(pane).toMatch(/if \(!plan\) return;/);
   });
 
   it('does not take over a double or triple click', () => {
@@ -83,8 +86,9 @@ describe('folding a folder does not move her', () => {
   it('finds her file again by its path after the tree shortens', () => {
     // Measured 2026-08-27: standing on Rail.tsx, folding a folder she was not
     // in moved the tree to Shelf.tsx, because `at` is an index into the file
-    // rows that are drawn and folding takes rows out of that list.
-    expect(pane).toMatch(/const wasPath = current\?\.path \?\? null;/);
-    expect(pane).toMatch(/findIndex\(\(f\) => f\.path === wasPath\)/);
+    // rows that are drawn and folding takes rows out of that list. Since
+    // 2026-10-04 `at` indexes every file of the change, which folding never
+    // touches (tests/folding-the-tree-never-moves-the-code.test.mjs).
+    expect(pane).toMatch(/const current = files\[/);
   });
 });

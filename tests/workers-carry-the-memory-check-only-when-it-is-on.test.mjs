@@ -32,7 +32,7 @@ function makeSupervisor(memoryGate) {
     listItems: () => [], listProducts: () => [], isDue: () => true,
     readItem: (slug, id) => (id === 'w-urgent' ? { id, product: slug, priority: 9 } : null),
   };
-  const sup = new Supervisor({ storeRoot: tmp, home: tmp, memoryGate, memoryGateSocket: path.join(tmp, 'g.sock') }, store, root, tmp, tmp);
+  const sup = new Supervisor({ storeRoot: tmp, home: tmp, memoryGate, memoryGateSocket: path.join(tmp, 'g.sock'), memoryGateLockPort: 0 }, store, root, tmp, tmp);
   made.push(sup);
   return sup;
 }

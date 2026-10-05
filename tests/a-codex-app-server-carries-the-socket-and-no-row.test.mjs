@@ -30,7 +30,7 @@ function makeSupervisor(memoryGate) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-gate-sup-'));
   const store = { listItems: () => [], listProducts: () => [], isDue: () => true, readItem: () => null };
   const sup = new Supervisor(
-    { storeRoot: tmp, home: tmp, memoryGate, memoryGateSocket: path.join(tmp, 'g.sock') },
+    { storeRoot: tmp, home: tmp, memoryGate, memoryGateSocket: path.join(tmp, 'g.sock'), memoryGateLockPort: 0 },
     store, root, tmp, tmp,
   );
   made.push(sup);
