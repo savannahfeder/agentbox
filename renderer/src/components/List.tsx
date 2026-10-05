@@ -19,7 +19,7 @@ import { IMPORT_KEYS, JUST_IMPORTED_WORD, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEY
 import { splitHits } from '../search';
 import { clockLabel, isCleanRun, nextRunAt } from '../../../shared/repeats.mjs';
 import { TeamRowEnd, type TeamView } from '../team/people';
-import { RowCells, TableHead, ThreadCells } from '../threads/Pages';
+import { RepeatMark, RowCells, TableHead, ThreadCells } from '../threads/Pages';
 import type { MixedRow } from '../threads/people-rules';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
 
@@ -87,16 +87,17 @@ export function repeatRow(rule: RepeatRule, last: WorkItem | null, now = Date.no
   return { when, last: `last run ${stamp(last.updatedAt, now)}, ${previewText(last.result) || 'needs a look'}` };
 }
 
-// THE SCHEDULE, AS THE TAG AFTER A REPEATING TASK'S TITLE (w-4189a5c1a0). It is
-// what makes the row a repeating task, so it replaces the "Repeating" heading
-// the table used to draw above it, and it is read off the rule: the chip it
-// replaces said "daily" on every rule, weekly ones included. It carries the
-// hour too, because the time column is 96px and "Tomorrow 10:00 AM" ran past
-// the page's right edge in the first drawing.
+// THE SCHEDULE, IN FAINT WORDS AFTER A REPEATING TASK'S TITLE (w-4189a5c1a0).
+// With the repeat mark before the title it is what makes the row a repeating
+// task, so it replaces the "Repeating" heading the table used to draw above
+// it, and it is read off the rule: the chip it replaces said "daily" on every
+// rule, weekly ones included. It carries the hour too, because the time column
+// is 96px and "Tomorrow 10:00 AM" ran past the page's right edge in the first
+// drawing. Lower case, because it trails the title as a phrase, not a label.
 export function repeatTag(rule: RepeatRule): string {
-  const days = rule.every === 'weekday' ? 'Weekdays'
-    : rule.every === 'week' ? `Every ${new Date(2026, 0, 4 + (rule.on ?? 0)).toLocaleDateString(undefined, { weekday: 'long' })}`
-      : 'Every day';
+  const days = rule.every === 'weekday' ? 'weekdays'
+    : rule.every === 'week' ? `every ${new Date(2026, 0, 4 + (rule.on ?? 0)).toLocaleDateString(undefined, { weekday: 'long' })}`
+      : 'every day';
   return `${days} at ${clockLabel(rule.at).replace(':00', '')}`;
 }
 
@@ -367,7 +368,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
           <div key={rule.id} data-repeat-id={rule.id} className="row" title={repeatRow(rule, last).last}
             onClick={() => onOpenRepeat?.(rule)}>
             <span className="mark" aria-hidden="true" />
-            <RowCells live={live} title={rule.title} tag={repeatTag(rule)} where={rule.productName}
+            <RowCells live={live} lead={<RepeatMark />} title={rule.title} aside={repeatTag(rule)} where={rule.productName}
               person={withPerson ? personCell?.(team?.me ?? null) : undefined}
               priority={rule.priority ?? 5} updatedAt={rule.updatedAt ?? rule.createdAt}
               when={nextRunWords(rule)} now={Date.now()} />

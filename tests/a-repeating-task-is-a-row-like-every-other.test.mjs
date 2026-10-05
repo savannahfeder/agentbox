@@ -14,8 +14,8 @@
 // was written into the markup rather than read off the rule.
 //
 // Now: no heading in the table; the rule is a table row (title, project,
-// priority, and when it next runs in the time column); its schedule is a tag
-// after the title in the words of the rule itself.
+// priority, and when it next runs in the time column); a repeat mark before
+// the title, and its schedule in faint words after it, read off the rule.
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -55,7 +55,7 @@ describe('in the table, a repeating task is one row in the columns', () => {
   it('fills the same cells as the row beneath it: title, project, priority, when', () => {
     const row = ruleRow(draw());
     expect(row).toMatch(/th-grid/);
-    expect(row).toMatch(/th-cell-title[^>]*>Check for new video skills/);
+    expect(row).toMatch(/th-cell-title[\s\S]*Check for new video skills/);
     expect(row).toMatch(/th-cell-proj[^>]*>Northwind Video</);
     expect(row).toMatch(/th-cell-prio[^>]*>.*Medium/);
     expect(row).toMatch(/th-when[^>]*>Tomorrow</);
@@ -90,25 +90,44 @@ describe('in the table, a repeating task is one row in the columns', () => {
 // sized for "7 hours ago", and the first drawing put "Tomorrow 10:00 AM" in it:
 // it ran past the right edge of the page. So the column says the day and the
 // tag says the rest.
-describe('the tag says the rule’s own schedule', () => {
-  it('every day', () => expect(repeatTag(rule())).toBe('Every day at 9am'));
-  it('weekdays', () => expect(repeatTag(rule({ every: 'weekday' }))).toBe('Weekdays at 9am'));
-  it('one day a week names the day', () => {
-    expect(repeatTag(rule({ every: 'week', on: 1 }))).toBe('Every Monday at 9am');
-    expect(repeatTag(rule({ every: 'week', on: 0 }))).toBe('Every Sunday at 9am');
+// THE PICK WAS B (2026-10-05): out of a boxed tag after the title, a repeat
+// mark before it with the schedule in faint words after it, and a tab of its
+// own, the mark won. So no tag: a repeat mark leads the title the way the live
+// mark does, and the schedule follows in plain, lower-case, faint words.
+describe('the faint words after the title say the rule’s own schedule', () => {
+  it('every day', () => expect(repeatTag(rule())).toBe('every day at 9am'));
+  it('weekdays', () => expect(repeatTag(rule({ every: 'weekday' }))).toBe('weekdays at 9am'));
+  it('one day a week names the day, capitalised as a name', () => {
+    expect(repeatTag(rule({ every: 'week', on: 1 }))).toBe('every Monday at 9am');
+    expect(repeatTag(rule({ every: 'week', on: 0 }))).toBe('every Sunday at 9am');
   });
   it('keeps the minutes only when there are some', () => {
-    expect(repeatTag(rule({ at: '14:30' }))).toBe('Every day at 2:30pm');
-    expect(repeatTag(rule({ at: '00:00' }))).toBe('Every day at 12am');
+    expect(repeatTag(rule({ at: '14:30' }))).toBe('every day at 2:30pm');
+    expect(repeatTag(rule({ at: '00:00' }))).toBe('every day at 12am');
   });
   it('a weekly rule is never called daily, on the row either', () => {
     const row = ruleRow(draw({ repeats: [rule({ every: 'week', on: 1 })] }));
-    expect(row).toMatch(/th-tag[^>]*>Every Monday at 9am</);
-    expect(row).not.toMatch(/daily|Every day/i);
+    expect(row).toMatch(/th-aside[^>]*>every Monday at 9am</);
+    expect(row).not.toMatch(/daily|every day/i);
+  });
+  it('wears the repeat mark before its title and no boxed tag', () => {
+    const row = ruleRow(draw());
+    expect(row).toMatch(/th-repeat[\s\S]*Check for new video skills/);
+    expect(row).not.toMatch(/th-tag/);
+  });
+  it('a running rule shows the live mark in the repeat mark’s place, not both', () => {
+    const run = later({ id: 'r-abc1234567-20261004', status: 'claimed', runAt: undefined });
+    const row = ruleRow(draw({ repeats: [rule({ lastOccurrence: run.id })], allItems: [run] }));
+    expect(row).toMatch(/th-st s-running live/);
+    expect(row).not.toMatch(/th-repeat/);
+  });
+  it('and the deferred thread beneath it wears no repeat mark', () => {
+    const html = draw();
+    expect(html.slice(html.indexOf('data-item-id'))).not.toMatch(/th-repeat/);
   });
   it('and the list outside the table no longer prints a hard-coded daily either', () => {
     const html = draw({ table: false, repeats: [rule({ every: 'week', on: 1 })] });
-    expect(html).toMatch(/Every Monday/);
+    expect(html).toMatch(/every Monday/);
     expect(html).not.toMatch(/>daily</);
   });
 });

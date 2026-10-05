@@ -123,6 +123,11 @@
   color: var(--text-faint); vertical-align: 1px;
 }
 
+/* A repeating task (w-4189a5c1a0): its mark leads the title, its schedule
+   trails it in the faint ink, in sentence case rather than the tag's capitals. */
+.th-repeat { margin-right: 9px; vertical-align: -2px; color: var(--text-faint); flex: none; }
+.th-aside { margin-left: 12px; color: var(--text-faint); }
+
 /* ------------------------------------------------------------ the list as a table */
 .th-table .row.th-head { padding-top: 10px; padding-bottom: 8px; font: 10.5px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); cursor: default; }
 .th-table .row.th-head:hover { background: none; }

@@ -350,7 +350,12 @@ export function otherPerson(item: WorkItem, me: string | null): string | null {
 /** ONE ROW OF THE TABLE, FOR THE INBOX AND THE TEAM PAGE BOTH (2026-10-01).
  *  The Team page's list view is the same component as the Inbox's, with small
  *  differences only. So there is one set of cells, and the Team page only adds Person. */
-export function RowCells({ live = false, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, tag, where, person, priority, updatedAt, when, now, action }: {
+/** A repeating task's mark, before its title where the live mark would sit (w-4189a5c1a0). */
+export const RepeatMark = () => <svg className="th-repeat" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-label="Repeats">
+  <path d="M13 6.5A5.5 5.5 0 0 0 3.2 4.8M3 2.5v2.6h2.6" /><path d="M3 9.5a5.5 5.5 0 0 0 9.8 1.7M13 13.5v-2.6h-2.6" />
+</svg>;
+
+export function RowCells({ live = false, lead, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, aside, where, person, priority, updatedAt, when, now, action }: {
   /** An agent is on this thread right now: a turning mark before its name. */
   live?: boolean;
   title: ReactNode; hidden?: boolean; lock?: boolean; shared?: boolean; where: ReactNode; person?: ReactNode;
@@ -358,8 +363,10 @@ export function RowCells({ live = false, title, hidden = false, lock = false, sh
   chosen?: number;
   /** Added to Later and not started: the row says so in a tag (w-afb66e6661). */
   held?: boolean;
-  /** Any other tag after the title, in the same drawing: a repeating task's schedule. */
-  tag?: string;
+  /** A mark before the title when nothing is live: a repeating task's RepeatMark. */
+  lead?: ReactNode;
+  /** Faint words after the title: a repeating task's schedule. */
+  aside?: string;
   priority: number | null; updatedAt: number; now: number; action?: ReactNode;
   /** Words for the time cell instead of how long ago: a repeating task's next run. */
   when?: string;
@@ -369,7 +376,7 @@ export function RowCells({ live = false, title, hidden = false, lock = false, sh
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
         people with a small count beside them for a thread only a few people
         see. The whole team, the default, carries nothing (2026-10-02). */}
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live && <StateGlyph state="running" live />}{title}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{held && <span className="th-tag">Not started</span>}{tag && <span className="th-tag">{tag}</span>}</div>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live ? <StateGlyph state="running" live /> : lead}{title}{aside && <span className="th-aside">{aside}</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{held && <span className="th-tag">Not started</span>}</div>
     <div className="th-cell-proj">{where}</div>
     {person !== undefined && <div className="th-cell-person">{person}</div>}
     <div className={`th-cell-prio${id === 'urgent' ? ' urgent' : ''}`}>{id && <><PriorityMark id={id} />{priorityLabelOf(id)}</>}</div>
