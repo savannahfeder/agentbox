@@ -517,7 +517,12 @@ export class Store {
       ...(visibility === 'people' && Array.isArray(visibleTo) && visibleTo.length
         ? { visibility, visibleTo: [...new Set(visibleTo.map(String))] } : {}),
     };
-    return workItemsDisk.updateWorkItem(dir, created.id, contentPatch, { source: 'founder' });
+    // WITH ITS PROJECT ON IT, the way `readItem` answers. The fold never carries
+    // one, and the renderer withdraws a just-made task with `made.product`, so
+    // without this Z after a send asked for "no such product: undefined" and
+    // reached past the task to whatever was under it (w-c78d1e1607).
+    const made = workItemsDisk.updateWorkItem(dir, created.id, contentPatch, { source: 'founder' });
+    return made ? { ...made, product: slug } : made;
   }
 
   /* ---------------------------- repeating tasks --------------------------- */

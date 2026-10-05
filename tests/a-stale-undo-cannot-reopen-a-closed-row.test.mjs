@@ -134,6 +134,12 @@ describe('the app asks that rule rather than keeping its own copy', () => {
     expect(app).toContain('const pushUndo = useCallback(');
     expect(app).toMatch(/pushUndo[\s\S]{0,400}at: Date\.now\(\)/);
     const grows = app.split('\n').filter((l) => l.includes('setUndoStack(') && l.includes('[...u,'));
-    expect(grows).toEqual(['    setUndoStack((u) => [...u, stamped]);']);
+    // The one other line is a Z that failed putting its own entry back
+    // (w-c78d1e1607). That entry came off this pile already stamped and keeps
+    // its first `at`, so it is no fresher for having been put back.
+    expect(grows).toEqual([
+      '    setUndoStack((u) => [...u, stamped]);',
+      '      setUndoStack((u) => [...u, last]);',
+    ]);
   });
 });

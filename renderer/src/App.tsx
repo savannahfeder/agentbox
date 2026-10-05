@@ -3849,7 +3849,17 @@ export default function App() {
     // would open the next task straight over the row this Z brings back.
     advanceRef.current = null;
     setUndoStack(rest);
-    await last.run();
+    // A Z THAT FAILS SAYS SO AND KEEPS ITS PLACE. A throw here used to end the
+    // press with the entry already off the pile and nothing on screen, so the
+    // next Z reached past it: a new task she could not take back, then the
+    // reply under it withdrawn instead (w-c78d1e1607).
+    try {
+      await last.run();
+    } catch (err) {
+      setUndoStack((u) => [...u, last]);
+      showToast(`Could not undo that. ${(err as Error)?.message ?? err}`);
+      return;
+    }
     const restored = last.restore?.();
     const item = restoredItem(restored ?? null);
     const shown = shownAfterUndo(restored, last.brings);
