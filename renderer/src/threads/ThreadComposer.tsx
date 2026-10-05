@@ -40,7 +40,7 @@ import { AgentFace } from '../components/AgentFace';
 import { conversationWith } from './page-rules';
 import { collectFiles, fromPaste, persistAttachments, type PendingAttachment } from '../attachments';
 import { AttachRow } from '../components/AttachRow';
-import { PRIORITIES, priorityLabelOf, priorityValueOf, readLastPriority, writeLastPriority, type PriorityId } from '../priority';
+import { PRIORITIES, priorityLabelOf, priorityValueOf, startingPriority, type PriorityId } from '../priority';
 import { readComposeDraft, saveComposeDraft, clearComposeDraft } from '../drafts';
 import { LAST_PRODUCT_KEY } from '../compose-project';
 import { practiceRefusal } from '../compose-says';
@@ -160,9 +160,11 @@ export function ThreadComposer({
   };
 
   /* ---------------------------- priority -------------------------------- */
-  const [prio, setPrio] = useState<PriorityId | null>(() => (opened.current.priority as PriorityId | null) ?? readLastPriority());
+  // Every new thread opens on Medium; only a half-written card keeps its tag
+  // (../priority.ts says why the last pick is no longer carried over).
+  const [prio, setPrio] = useState<PriorityId | null>(() => startingPriority(opened.current.priority));
   const prioShown: PriorityId = prio ?? 'medium';
-  const pickPrio = (id: PriorityId) => { setPrio(id); writeLastPriority(id); };
+  const pickPrio = (id: PriorityId) => { setPrio(id); };
 
   /* --------------------------- visibility ------------------------------- */
   // EVERY NEW THREAD STARTS AS TEAM, AND WHO SEES IT IS CHOSEN FOR THAT THREAD.
