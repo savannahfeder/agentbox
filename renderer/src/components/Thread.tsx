@@ -335,7 +335,20 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                     {headFacts(e, when(e.at))}
                   </div>
                 )}
-                <div className="msg-body">{md(e.text ?? '')}</div>
+                {/* WHAT A PERSON TYPED IS NOT MARKDOWN (w-a33b339772).
+                    Everything in this thread used to go through `md`, whoever
+                    said it, so a tester who pasted
+                    `grep -r foo . --include=*.md --include=*.json`
+                    read it back with both stars gone and the middle of the
+                    command in italics. A message is a person's own words, and
+                    the one thing this app owes them is the words. So a
+                    message from a person — yours and a teammate's, which is
+                    every `who: 'you'` event — is drawn as typed, line breaks
+                    and all (`.msg-body.typed` in the stylesheet). The agent
+                    writes markdown on purpose and keeps it. */}
+                {e.who === 'you'
+                  ? <div className="msg-body typed">{e.text ?? ''}</div>
+                  : <div className="msg-body">{md(e.text ?? '')}</div>}
               </div>
             )}
           {ends === gapAfter && (

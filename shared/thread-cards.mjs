@@ -36,16 +36,45 @@ export function threadState(item, now = Date.now()) {
 
 const personHolds = (item) => typeof item.assignee === 'string' && item.assignee !== 'agent';
 
+// ONLY EMPHASIS IS STRIPPED, AND ONLY WHERE IT IS A PAIR (w-a33b339772).
+//
+// This used to be `.replace(/[*_`>]/g, '')`: every star, underscore, backtick
+// and angle bracket in the text, gone. A pasted search command
+// (`--include=*.md --include=*.json`) lost all three of its stars on the
+// summary line, and `user_id_v2` came back as `useridv2`.
+//
+// A pair is a mark, then a WORD character, then the closing mark: that is what
+// `*bold*` looks like and what a glob never does, because a glob's star is
+// followed by a dot or a slash. Underscores have to clear the word on either
+// side too, or `user_id_v2` reads as emphasis around `id`. A mark with no
+// partner is left exactly where the person put it.
+const EMPHASIS = [
+  [/\*\*(\w[^*\n]*?)\*\*/g, '$1'],
+  [/(?<!\w)__(\w[^_\n]*?)__(?!\w)/g, '$1'],
+  [/\*(\w[^*\n]*?)\*/g, '$1'],
+  [/(?<!\w)_(\w[^_\n]*?)_(?!\w)/g, '$1'],
+  [/`([^`\n]+)`/g, '$1'],
+];
+
+// WHERE A SENTENCE REALLY ENDS. The old cut was "any of .!? then a space", so
+// the lone ` . ` that means "this directory" ended the sentence and the
+// summary showed `grep -r foo .` and nothing else. A full stop ends a sentence
+// when it closes a word AND what follows is a new sentence: whitespace then a
+// capital (through an opening quote or bracket), or the end of the text.
+const SENTENCE = /^(.+?\w[.!?]["'”’)\]]?)(?=\s+["“'(\[]?[A-Z]|\s*$)/;
+
 // The first sentence of some prose, without markdown, short enough for a line.
 export function firstSentence(text, max = 240) {
   if (typeof text !== 'string') return '';
-  const plain = text
+  let plain = text
     .replace(/^#+\s.*$/gm, '')
     .replace(/^##\s*Options[\s\S]*$/m, '')
-    .replace(/[*_`>]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const m = plain.match(/^(.+?[.!?])(\s|$)/);
+    // A blockquote's mark is the one at the start of its line. Elsewhere `>`
+    // is a redirect or an arrow and belongs to whoever typed it.
+    .replace(/^\s*>\s?/gm, '');
+  for (const [re, to] of EMPHASIS) plain = plain.replace(re, to);
+  plain = plain.replace(/\s+/g, ' ').trim();
+  const m = plain.match(SENTENCE);
   const one = (m ? m[1] : plain).trim();
   return one.length > max ? `${one.slice(0, max - 1).trimEnd()}…` : one;
 }
@@ -106,34 +135,63 @@ const startOfDay = (now) => { const d = new Date(now); d.setHours(0, 0, 0, 0); r
  * carrying an empty list would otherwise read as the whole team's, and that is
  * the one mistake nobody can take back.
  */
+// A THREAD WITH NO WORD OF ITS OWN FOLLOWS ITS PROJECT (w-b989839656). A
+// thread from before you joined still stays yours whatever the project says.
 export function shownToTeam(item, since = null, product = null) {
-  const visibility = visibilityOf(item, product);
-  if (visibility === 'team') return true;
-  if (visibility === 'people') return shownToPeople(item).length > 0;
-  if (visibility === 'private') return false;
-  return !since || (item?.createdAt ?? 0) >= since;
+  const own = ownVisibility(item);
+  if (own === 'team') return true;
+  if (own === 'people') return shownToPeople(item, product).length > 0;
+  if (own === 'private') return false;
+  if (since && (item?.createdAt ?? 0) < since) return false;
+  return projectSeenBy(product).who !== 'private';
+}
+
+const ownVisibility = (item) => {
+  const v = item?.visibility;
+  return v === 'team' || v === 'people' || v === 'private' ? v : undefined;
+};
+const cleanIds = (ids) => [...new Set((Array.isArray(ids) ? ids : []).filter((id) => typeof id === 'string' && id))];
+
+/**
+ * WHO SEES A PROJECT'S THREADS (w-b989839656, approved 2026-10-05). Projects
+ * stay on each Mac; what a project decides is only whose Team page its
+ * threads' summaries reach. 'private' (Just you), 'team', or 'people' with
+ * the people named. A project from before this setting existed keeps the team,
+ * which is what it already did; a new one is made Just you (main/store.mjs);
+ * My Workspace is Just you whatever its file says. Chosen people naming nobody
+ * reaches nobody, so it reads as Just you and never as the team.
+ */
+export function projectSeenBy(product) {
+  if (product?.personal === true || product?.seenBy === 'private') return { who: 'private', people: [] };
+  if (product?.seenBy === 'people') {
+    const people = cleanIds(product.seenByPeople);
+    return people.length ? { who: 'people', people } : { who: 'private', people: [] };
+  }
+  return { who: 'team', people: [] };
 }
 
 /**
- * THE WORD A THREAD'S VISIBILITY READS AS, once its project has had its say.
- *
- * YOUR PERSONAL PROJECT IS PRIVATE UNLESS YOU SAY OTHERWISE (w-b989839656).
- * Everywhere else a thread with no word of its own is the team's, and in
- * My Workspace it is yours alone, whoever wrote it: the composer, an agent filing a
- * proposal, a repeat. Failing closed here, rather than writing 'private' on
- * each new thread, is what covers every one of those paths at once.
+ * THE WORD A THREAD'S VISIBILITY READS AS, once its project has had its say:
+ * its own word if it has one, else its project's. Undefined where the project
+ * leaves it to the team, so the "before you joined" rule still applies.
+ * Failing closed on the project, rather than writing a word on each new
+ * thread, is what covers every path a thread arrives by at once: the
+ * composer, an agent filing a proposal, a repeat.
  */
 export function visibilityOf(item, product = null) {
-  const v = item?.visibility;
-  if (v === 'team' || v === 'people' || v === 'private') return v;
-  return product?.personal === true ? 'private' : undefined;
+  const own = ownVisibility(item);
+  if (own) return own;
+  const { who } = projectSeenBy(product);
+  return who === 'team' ? undefined : who;
 }
 
 /** Whom a shared thread reaches, by id, or [] for the whole team. */
-export function shownToPeople(item) {
-  if (item?.visibility !== 'people') return [];
-  const ids = Array.isArray(item.visibleTo) ? item.visibleTo : [];
-  return [...new Set(ids.filter((id) => typeof id === 'string' && id))];
+export function shownToPeople(item, product = null) {
+  const own = ownVisibility(item);
+  if (own === 'people') return cleanIds(item.visibleTo);
+  if (own) return [];
+  const seen = projectSeenBy(product);
+  return seen.who === 'people' ? seen.people : [];
 }
 
 export function cardsFor({ products, readItems, now = Date.now(), since = null }) {
@@ -152,7 +210,7 @@ export function cardsFor({ products, readItems, now = Date.now(), since = null }
       // (w-41ff964775): every card is read by its own set of people, and a
       // blocker shared with two of them would have told a third its title.
       // Only a thread the whole team may read is safe in anybody's links.
-      const open = shownToTeam(item, since, product) && !shownToPeople(item).length;
+      const open = shownToTeam(item, since, product) && !shownToPeople(item, product).length;
       titleOf.set(item.id, open ? item.label || item.title : null);
       all.push({ item, product });
     }
@@ -169,7 +227,7 @@ export function cardsFor({ products, readItems, now = Date.now(), since = null }
       // WHO IT REACHES: the chosen people, or NO LIST AT ALL for the whole
       // team. Never an empty list, which would have to mean both. Both clouds
       // carry it and refuse to show the card to anybody else.
-      people: shownToPeople(item).length ? shownToPeople(item) : null,
+      people: shownToPeople(item, product).length ? shownToPeople(item, product) : null,
       state, priority: Number.isFinite(item.priority) ? item.priority : null,
       problem: s.problem || null, progress: s.progress || null, solution: s.solution || null,
       blockedBy: linked(item.blockedBy), blocks: linked(item.blocks), updatedAt: item.updatedAt ?? now,
