@@ -34,24 +34,39 @@ const css = read('renderer/src/styles.css');
 
 describe('where the offer is drawn', () => {
   it('stands in the pane, above the reply surface', () => {
-    const drawn = focus.indexOf('<OptionsOffer');
+    const drawn = focus.indexOf('{offerInPane && (');
     const dock = focus.indexOf('<div className="focus-dock">');
-    expect(drawn, 'the offer is not drawn at all').toBeGreaterThan(-1);
+    expect(drawn, 'the offer is not drawn in the pane at all').toBeGreaterThan(-1);
     expect(dock).toBeGreaterThan(-1);
     expect(drawn).toBeLessThan(dock);
   });
 
-  it('is no longer inside the reply card', () => {
+  // THE ONE EXCEPTION, AND IT IS NOT THE REPORTED FAULT. With a document full
+  // screen the pane's whole body is hidden and the dock is all that is on the
+  // screen, so an offer drawn in the pane there would not be tastefully out of
+  // the way — it would be unreachable, and answering a question would mean
+  // leaving the document first. There it keeps its old home on the card, on its
+  // old terms: up with the box, gone when the box folds. It follows nobody down
+  // a page in that mode because no page of conversation is on the screen.
+  it('is on the reply card only where the pane’s own body is hidden', () => {
+    expect(focus).toContain("const fullScreenDoc = artifactView === 'focus';");
+    expect(focus).toContain('const offerInPane = stripShown && !fullScreenDoc;');
+    expect(focus).toContain('const offerInDock = stripShown && fullScreenDoc && replyOpen;');
     const dock = focus.indexOf('<div className="focus-dock">');
-    expect(focus.slice(dock)).not.toContain('opt-strip');
-    expect(focus.slice(dock)).not.toContain('<OptionsOffer');
+    // The dock's copy is the full-screen one and nothing else.
+    expect(focus.slice(dock)).toContain('{offerInDock && (');
+    expect(focus.slice(dock)).not.toContain('{offerInPane && (');
+  });
+
+  it('wears the card’s own edge there, not a second card inside the first', () => {
+    expect(css).toMatch(/\.dock-card > \.opt-strip \{[^}]*margin: 0;[^}]*border-bottom: 1px solid var\(--line\)/s);
   });
 
   // THE TURN IT BELONGS TO. "Return to me" is the agent's last word plus the
   // threads that turn filed; the offer is the end of that, so it goes after
   // both rather than between them.
   it('comes after the threads that turn filed', () => {
-    expect(focus.indexOf('<ThreadsMade')).toBeLessThan(focus.indexOf('<OptionsOffer'));
+    expect(focus.indexOf('<ThreadsMade')).toBeLessThan(focus.indexOf('{offerInPane && ('));
   });
 
   it('no longer waits on the reply box being open', () => {
@@ -60,10 +75,12 @@ describe('where the offer is drawn', () => {
   });
 
   it('keeps the one flag that also takes the list out of the message', () => {
-    // Both the drawing and `cleanMessage` read `stripShown`/`showOptions`, so
-    // the options can never be drawn here AND printed again in the message.
-    expect(focus).toContain('{stripShown && (');
+    // `stripShown` stays the whole question of whether there IS an offer, which
+    // is what `cleanMessage` reads; where it is drawn is the two flags below it.
+    // Narrowing `stripShown` to one of them would print the options twice.
     expect(focus).toMatch(/showOptions && !!offered/);
+    expect(focus).toMatch(/const offerInPane = stripShown &&/);
+    expect(focus).toMatch(/const offerInDock = stripShown &&/);
   });
 });
 

@@ -969,15 +969,27 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // `showOptions` itself must NOT be narrowed for this. It also decides whether
   // the options list is stripped out of the message text below (`cleanMessage`),
   // so a full screen row would have printed its own options twice.
-  // WHETHER THE OFFER IS DRAWN. It used to also wait on the reply box being
-  // open, because the strip rode the reply card: opening the box brought the
-  // options with it and clicking away took them off again. The offer is in the
-  // pane now (w-560647d4db), at the foot of the turn that made it, so it stands
-  // or falls with that turn and has nothing to do with the box.
-  //
-  // It is still the same flag that takes the list out of the message text
-  // (`cleanMessage` below), which is what stops the options printing twice.
+  // WHETHER THE OFFER IS DRAWN AT ALL. Unchanged, and it has to stay the whole
+  // question rather than either half below, because this is also the flag that
+  // takes the options list out of the message text (`cleanMessage`). Narrowed,
+  // a row would print its own options twice.
   const stripShown = showOptions;
+  // AND WHERE IT IS DRAWN (w-560647d4db). Almost always in the pane, at the foot
+  // of the turn that made the offer, which is the whole of this round: pinned to
+  // the reply card it followed the reader down the page.
+  //
+  // FULL SCREEN IS THE ONE PLACE IT CANNOT GO THERE. With a document full
+  // screen the pane's whole scrolling body is hidden and only its dock is on
+  // the screen (`.list-pane .focus-scroll { display:none }`,
+  // workspace-navigation.css), so an offer in the pane would not be hidden
+  // tastefully — it would be unreachable, and the only way to answer a question
+  // would be to leave the document. So there, and only there, it keeps its old
+  // home on the card, on the old terms: with the box, gone when the box folds.
+  // It is not pinned under anything in that mode, because there is no
+  // conversation on the screen for it to be pinned under.
+  const fullScreenDoc = artifactView === 'focus';
+  const offerInPane = stripShown && !fullScreenDoc;
+  const offerInDock = stripShown && fullScreenDoc && replyOpen;
   // The strip already draws the list, so the field that carried it prints
   // without it. Only that field: a result offering a pick must not silently
   // eat an "## Options" heading left behind in an older body.
@@ -1417,10 +1429,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             away with its turn, so reading past it is the whole of what makes it
             go, and nothing has to be remembered or marked as seen.
 
-            `stripShown` is what decides it, and it is also what takes the list
-            out of the message text above (`cleanMessage`), so the two can never
-            disagree and print the options twice. */}
-        {stripShown && (
+            Everywhere but full screen, where the pane's body is not on the
+            screen at all and the offer keeps its old home on the reply card
+            (see `offerInPane` for the whole of that). */}
+        {offerInPane && (
           <OptionsOffer
             ask={ask} askAll={askAll} options={options}
             optsOpen={optsOpen} setOptsOpen={setOptsOpen}
@@ -1456,8 +1468,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             in the project its mention names (../team/ChatAgents.tsx).
 
             AND WHERE A HAND-OFF SURVIVES, IT IS ON A MESSAGE (w-560647d4db).
-            Pinned under the conversation the line had no subject: it said
-            "Hand it to an agent" under the newest message whatever that
+            Pinned under the conversation the deleted line had no subject: it
+            offered the same thing under the newest message whatever that
             message was, and the thing you want work made of is usually one
             message further up. The action is in the bar that appears when you
             point at a message (team/ChatActions.tsx), which is where drawing A
@@ -1607,9 +1619,27 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               Unless they wrote options of their own, which are the better
               answers to their question and are drawn instead. */}
           {!stripShown && <TeamRouteStrip item={item} />}
-          {/* THE OPTIONS ARE NOT DOWN HERE ANY MORE (w-560647d4db). They are
-              drawn in the pane, at the foot of the turn that offered them; the
-              note at that call site says why. */}
+          {/* THE OPTIONS ARE NOT DOWN HERE ANY MORE, EXCEPT IN FULL SCREEN
+              (w-560647d4db). They are drawn in the pane, at the foot of the turn
+              that offered them, and the note at that call site says why.
+
+              With a document full screen the pane's body is not on the screen —
+              only this dock is — so an offer in the pane would be unreachable
+              rather than merely out of the way, and answering a question would
+              mean leaving the document first. There it keeps its old home and
+              its old terms: it comes up with the box and goes when the box
+              folds. It follows nobody down a page, because in that mode there
+              is no page of conversation on the screen. */}
+          {offerInDock && (
+            <OptionsOffer
+              ask={ask} askAll={askAll} options={options}
+              optsOpen={optsOpen} setOptsOpen={setOptsOpen}
+              peekOption={peekOption} askPeek={askPeek}
+              selectedOption={selectedOption} selRef={selRef}
+              onPick={onPick} onOptionEnter={onOptionEnter} onAskEnter={onAskEnter}
+              setPeek={setPeek} setAskPeek={setAskPeek}
+            />
+          )}
           {/* NO REPLY BOX ON THE TROUBLE ROW EITHER, and for the same reason as
               the one below: there is nobody on the other end of it. A box that
               looks like it sends is the failure this codebase cares about most.

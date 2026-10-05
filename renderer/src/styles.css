@@ -2928,6 +2928,14 @@ body {
   margin: 22px 0 6px; border: 1px solid var(--line); border-radius: var(--radius);
   flex-shrink: 0; position: relative;
 }
+/* THE ONE PLACE IT IS STILL A LID ON THE REPLY CARD: a document full screen,
+   where the pane's body is off the screen and this dock is all there is
+   (components/Focus.tsx, `offerInDock`). There it wears what it always wore —
+   the card's own top edge — because a bordered box with margins floating inside
+   the card is a second card inside the first. */
+.dock-card > .opt-strip {
+  margin: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+}
 
 /* THE OPTION UNDER THE POINTER, IN FULL. The chosen version opens above and
    nothing moves. `bottom: 100%` puts it entirely outside the strip's box, so the strip
