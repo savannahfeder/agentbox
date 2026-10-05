@@ -60,7 +60,8 @@ describe('the toast can carry a way in', () => {
 // than three separate toasts.
 describe('the toast after an answer carries the same way in', () => {
   it('deferCommit takes a destination', () => {
-    expect(app).toMatch(/goes\?: \{ product: string; id: string \},\s*\) => \{/);
+    // Followed, since w-c78d1e1607, by what the thread says if a Z takes it back.
+    expect(app).toMatch(/goes\?: \{ product: string; id: string \},[\s\S]{0,300}?undid\?: UndidSpec\[\],\s*\) => \{/);
     expect(app).toContain('showToast(`${toast} · press Z to undo`, stay ? undefined : goes);');
   });
 
@@ -69,7 +70,7 @@ describe('the toast after an answer carries the same way in', () => {
   });
 
   it('an approval hands it the row it approved', () => {
-    expect(app).toContain('}, toast, undefined, undefined, { product: item.product, id: item.id });');
+    expect(app).toContain('}, toast, undefined, undefined, { product: item.product, id: item.id }, undid);');
   });
 
   it('a picked option hands it the row it picked on', () => {
@@ -79,6 +80,8 @@ describe('the toast after an answer carries the same way in', () => {
   it('closing a row still says nothing but what happened', () => {
     // Closing, scheduling and priority are not answers: nothing starts on them
     // and there is nothing to go and watch, so those toasts stay plain.
-    expect(app).toContain('}, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`);');
+    // The fifth argument, the way in, stays undefined; the last is only what
+    // the thread says if a Z takes the close back (w-c78d1e1607).
+    expect(app).toContain('}, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`, undefined, undefined, undefined, undid);');
   });
 });
