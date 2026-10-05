@@ -20,7 +20,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import {
-  projectRefFrom, functionUrl, senderFor, looksLikeResendKey, looksLikeEmail, secretsFile, withFeedbackUrl,
+  projectRefFrom, functionUrl, senderFor, senderAt, domainOf, looksLikeDomain, refusedForDomain,
+  looksLikeResendKey, looksLikeEmail, secretsFile, withFeedbackUrl,
 } from '../scripts/lib/feedback-setup.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -50,6 +51,44 @@ describe('it works out who the mail comes from', () => {
   it('has no sender for something that is not an address', () => {
     expect(senderFor('team.example')).toBe(null);
     expect(senderFor('')).toBe(null);
+  });
+});
+
+// THE FIRST REAL RUN WAS REFUSED, 502 "mail refused" (2026-10-05). The sender
+// was worked out as feedback@ the recipient's domain, but the domains verified
+// with Resend were two subdomains of it, not the domain itself (her screenshot
+// of the Add API Key dialog: team.<domain> and updates.<domain>). So the
+// sending domain is asked for, defaulting to the recipient's, and a refusal
+// that names the domain asks again rather than ending the run.
+describe('it sends from a domain Resend has verified', () => {
+  it('puts the sender at whichever domain it is given', () => {
+    expect(senderAt('updates.team.example')).toBe('Agentbox Feedback <feedback@updates.team.example>');
+  });
+  it('offers the recipient’s domain as the starting guess', () => {
+    expect(domainOf('someone@team.example')).toBe('team.example');
+    expect(domainOf('nobody')).toBe(null);
+  });
+  it('takes a domain, a subdomain included, and refuses what is not one', () => {
+    expect(looksLikeDomain('updates.team.example')).toBe(true);
+    expect(looksLikeDomain('team.example')).toBe(true);
+    expect(looksLikeDomain('someone@team.example')).toBe(false);
+    expect(looksLikeDomain('team')).toBe(false);
+    expect(looksLikeDomain('')).toBe(false);
+  });
+  it('knows a refusal about the domain from any other refusal', () => {
+    expect(refusedForDomain('validation_error: The team.example domain is not verified. Please, add and verify your domain.')).toBe(true);
+    expect(refusedForDomain('validation_error: API key is invalid')).toBe(false);
+    expect(refusedForDomain('')).toBe(false);
+    expect(refusedForDomain(undefined)).toBe(false);
+  });
+  it('the server function passes Resend’s own reason back, so a refusal says why', () => {
+    const fn = read('cloud/supabase/functions/feedback/index.ts');
+    expect(fn).toMatch(/error: 'mail refused', detail/);
+  });
+  it('the script asks for the domain, and asks again when Resend refuses it', () => {
+    const script = read('scripts/set-up-feedback.mjs');
+    expect(script).toContain('refusedForDomain(');
+    expect(script).toMatch(/Which domain should the mail come from\?/);
   });
 });
 

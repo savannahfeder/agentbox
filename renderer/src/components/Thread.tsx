@@ -31,10 +31,12 @@ import { actWhen, actWords } from '../act-line';
 import { herTurnEnds, herTurnStarts } from '../her-turns';
 import { holdAtBottom } from '../thread-bottom';
 import { clock, dayHeading } from '../thread-history';
+import { chatLayout } from '../team/chat-layout';
+import { ChatFold } from '../team/ChatFold';
 import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
 } from '../../../shared/agents.mjs';
-import type { AgentEvent, AgentWork } from '../types';
+import type { AgentEvent, AgentTurn, AgentWork } from '../types';
 
 // How much of an output stands open before she asks for the rest. The chosen
 // drawings show five or six lines: enough to see what came back, short
@@ -199,6 +201,43 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   const cutAt = nodes.findIndex((e) => (e.kind === 'run' ? e.items[e.items.length - 1]?.i : e.i) === gapAfter);
   const turnStarts = herTurnStarts(nodes, cutAt);
   const turnEnds = herTurnEnds(nodes, cutAt);
+  // A CONVERSATION WITH A PERSON IS LAID OUT AS A CHAT (w-2e8aa16f0f): a face
+  // in a column, one head per run of messages, a line for each day. Which
+  // message opens what is ../team/chat-layout.ts; a folded run is work to it.
+  const slots = chat ? chatLayout(nodes.map((e) => (e.kind === 'run' ? { kind: 'work', at: e.at } : e))) : null;
+  // What a message's head says beside the name, in either layout: sending, the
+  // way to cut the agent's step, and which row the words were said on.
+  const headFacts = (e: AgentTurn, time: string) => <>
+    {/* SENT, AND THE AGENT HAS NOT TAKEN IT YET (w-1ef03d6f27).
+        It stands where the time stands, because it is the same
+        fact: a message with no time on it has not happened to
+        anybody but her yet. The real time replaces it when the
+        agent picks the message up, which is the only moment at
+        which the row knows one. */}
+    {/* AND WHETHER Z STILL REACHES IT: three seconds, then
+        `steer` has it. See `held` in types.ts (w-5281ef1221). */}
+    {/* AND, ONCE IT IS IN LINE, THAT IT IS WAITING ON THE STEP THE
+        AGENT IS IN, which can be a command minutes long, with
+        the one way to stop waiting (w-f37a34def6). */}
+    {e.pending
+      ? <span className="msg-when msg-sending">{e.held ? 'Sending… press Z to undo' : cutting ? 'Sending now…' : onSendNow ? 'Waiting for its current step' : 'Sending…'}</span>
+      : <span className="msg-when">{time}</span>}
+    {e.pending && !e.held && !cutting && onSendNow && (
+      <button type="button" className="msg-now" onClick={() => { setCutting(true); onSendNow(); }}>
+        Send now
+      </button>
+    )}
+    {/* WHICH ROW THESE WORDS ARE ON, when they are not on this
+        one. It rides the message's own head rather than a box
+        above the conversation (w-23db941885), so the way back
+        to the row it was typed on survives without a second
+        component owning the top of the screen. */}
+    {e.on && (
+      <button type="button" className="msg-on" onClick={onOpenOrigin}>
+        on {e.on}
+      </button>
+    )}
+  </>;
 
   return (
     <div className="thread">
@@ -229,11 +268,14 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
         // wrapper that is. Every spacing rule written against those selectors
         // was dead, and the 22px column gap was the only thing setting the
         // rhythm. Naming the wrapper is what lets the rhythm be set at all.
+        const slot = slots?.[n];
         const holds = e.kind === 'run' ? 'is-run'
           : e.kind === 'work' ? (e.yours ? 'is-act' : 'is-work')
+          : slot && !slot.head ? 'is-msg is-chat-cont'
           : e.same ? 'is-msg-same' : 'is-msg';
         return (
         <div key={`${e.at}-${key}-${n}`} className={`thread-block ${holds} ${ends === gapAfter ? 'has-gap' : ''}`}>
+          {slot?.day && <div className="chat-day">{slot.day}</div>}
           {e.kind === 'work' && e.yours
             ? <ActLine act={e} />
             : e.kind === 'run'
@@ -256,7 +298,25 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                 onStep={(next) => stepLine(key, next)}
                 code={code}
               />
-            : (
+            : slot ? (
+              // A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face holds the
+              // column; a message that carries on a run keeps the column for its
+              // time, shown on pointing. None of the agent thread's chapters:
+              // no rule above or below your words and no larger type, because
+              // a turn means nothing between two people.
+              <div className={`msg chat-msg${slot.head ? '' : ' cont'}${e.pending ? ' sending' : ''}`}>
+                <div className="chat-gutter">{slot.head
+                  ? <Face person={teammateOf(e) ?? (team?.me ? team.byId.get(team.me) : null)} me={!teammateOf(e) && e.who === 'you'} agent={e.who === 'it'} size="lg" />
+                  : <span className="chat-gt">{clock(e.at)}</span>}</div>
+                {slot.head && (
+                  <div className="msg-head">
+                    <span className="msg-who">{teammateOf(e)?.name ?? (e.who === 'you' ? 'You' : name)}</span>
+                    {headFacts(e, clock(e.at))}
+                  </div>
+                )}
+                <ChatFold>{md(e.text ?? '')}</ChatFold>
+              </div>
+            ) : (
               // A CONTINUATION THAT OPENS THE OTHER SIDE OF THE GAP IS NOT A
               // CONTINUATION OF ANYTHING SHE CAN SEE. `same` means one agent
               // still talking, so the block wears no name and no time; across
@@ -272,35 +332,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                     <span className="msg-who">{teammateOf(e)
                       ? <><Face person={teammateOf(e)} />{firstName(teammateOf(e))}</>
                       : e.who === 'you' ? 'You' : name}</span>
-                    {/* SENT, AND THE AGENT HAS NOT TAKEN IT YET (w-1ef03d6f27).
-                        It stands where the time stands, because it is the same
-                        fact: a message with no time on it has not happened to
-                        anybody but her yet. The real time replaces it when the
-                        agent picks the message up, which is the only moment at
-                        which the row knows one. */}
-                    {/* AND WHETHER Z STILL REACHES IT: three seconds, then
-                        `steer` has it. See `held` in types.ts (w-5281ef1221). */}
-                    {/* AND, ONCE IT IS IN LINE, THAT IT IS WAITING ON THE STEP THE
-                        AGENT IS IN, which can be a command minutes long, with
-                        the one way to stop waiting (w-f37a34def6). */}
-                    {e.pending
-                      ? <span className="msg-when msg-sending">{e.held ? 'Sending… press Z to undo' : cutting ? 'Sending now…' : onSendNow ? 'Waiting for its current step' : 'Sending…'}</span>
-                      : <span className="msg-when">{when(e.at)}</span>}
-                    {e.pending && !e.held && !cutting && onSendNow && (
-                      <button type="button" className="msg-now" onClick={() => { setCutting(true); onSendNow(); }}>
-                        Send now
-                      </button>
-                    )}
-                    {/* WHICH ROW THESE WORDS ARE ON, when they are not on this
-                        one. It rides the message's own head rather than a box
-                        above the conversation (w-23db941885), so the way back
-                        to the row it was typed on survives without a second
-                        component owning the top of the screen. */}
-                    {e.on && (
-                      <button type="button" className="msg-on" onClick={onOpenOrigin}>
-                        on {e.on}
-                      </button>
-                    )}
+                    {headFacts(e, when(e.at))}
                   </div>
                 )}
                 {/* WHAT A PERSON TYPED IS NOT MARKDOWN (w-a33b339772).

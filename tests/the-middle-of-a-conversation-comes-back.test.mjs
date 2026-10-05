@@ -330,7 +330,10 @@ describe('the ask she typed opens the conversation', () => {
     // is the three seconds in which Z still takes a message back
     // (w-5281ef1221), and again when it gained Send now (w-f37a34def6). What
     // this is guarding is the line above it.
-    expect(thread).toMatch(/<div className="msg-head">[\s\S]{0,2600}msg-on/);
+    // Since w-2e8aa16f0f both heads (the agent thread's and a chat's) say it
+    // through one helper, `headFacts`, so the head calls it and it holds the line.
+    expect(thread).toMatch(/const headFacts = [\s\S]{0,2600}className="msg-on"/);
+    expect(thread.match(/<div className="msg-head">[\s\S]{0,400}\{headFacts\(e, /g)).toHaveLength(2);
   });
 
   it('is never clipped, because nothing clips a message', () => {
