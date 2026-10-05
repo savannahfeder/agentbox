@@ -14,7 +14,7 @@
 // sends on its own; this is something a person typed and pressed Send on.
 import { createRequire } from 'node:module';
 import { checkFeedback } from '../shared/feedback.mjs';
-import { readEnv } from '../shared/product-name.mjs';
+import { Name, readEnv } from '../shared/product-name.mjs';
 
 function bakedUrl() {
   try {
@@ -34,7 +34,7 @@ export function feedbackUrl(config, baked = BAKED, env = process.env) {
 // Answers { ok: true } or { ok: false, error } with the error as a sentence.
 // It never throws, so the card always has something to say.
 export async function sendFeedback({ url, payload, fetchImpl = globalThis.fetch, timeoutMs = 60_000 }) {
-  if (!url) return { ok: false, error: 'Feedback is not set up in this copy of Agentbox.' };
+  if (!url) return { ok: false, error: `Feedback is not set up in this copy of ${Name}.` };
   // Checked again here, off the bytes that would actually travel, since the
   // renderer is not the last word on what leaves this machine.
   const sized = (payload?.files ?? []).map((f) => ({ size: Math.floor((String(f?.data ?? '').length * 3) / 4) }));
