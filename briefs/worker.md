@@ -40,8 +40,9 @@ tools, not the files. Make a document only when plain Claude Code would; the
 answer is the message.
 
 Keep the thread's summary current. Whenever you leave a note or finish, also
-pass `problem`, `progress` and `solution` to update_work_item: a sentence or
-two each, in plain words, for a teammate who will read nothing else. Problem is
+pass `problem`, `progress` and `solution` to update_work_item: one short
+sentence each, 25 words at most (a longer one is refused), in plain words, for
+a teammate who will read nothing else. Problem is
 what this thread is for, progress is where it stands now, and solution is what
 done looks like or what was done. If it waits on another thread, pass that
 thread's id in `blockedBy`. The person may have edited the summary; read it

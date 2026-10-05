@@ -20,6 +20,7 @@ import { listWorkItems, createItem, updateItem, createClaimRegistry } from './co
 import { listProductChats, readProductChat } from './core/chat.mjs';
 import { lookAtPage } from './core/page.mjs';
 import { WORK_ITEM_STATUSES } from '../shared/work-items.mjs';
+import { SUMMARY_WORDS } from '../shared/thread-cards.mjs';
 import { AGENT_CREATION_KINDS } from '../shared/contracts.mjs';
 // The descriptions below are read by every agent on every run, so the app is
 // named in them from the one place it is named. They said "the app" while this
@@ -200,9 +201,9 @@ export function buildTools({ holder } = {}) {
         labels: z.array(z.string()).optional(),
         runAt: z.number().int().optional().describe('epoch ms to defer this item until; 0 clears a schedule and makes it available now'),
         closeBecause: z.string().optional().describe('only with status done on a row the founder wrote: their own words, quoted exactly from the row, asking you to close it'),
-        problem: z.string().optional().describe('the thread\'s summary: what it is for, a sentence or two'),
-        progress: z.string().optional().describe('the thread\'s summary: where it stands now, a sentence or two'),
-        solution: z.string().optional().describe('the thread\'s summary: what done looks like, or what was done'),
+        problem: z.string().optional().describe(`the thread's summary: what it is for, one short sentence of ${SUMMARY_WORDS} words at most`),
+        progress: z.string().optional().describe(`the thread's summary: where it stands now, one short sentence of ${SUMMARY_WORDS} words at most`),
+        solution: z.string().optional().describe(`the thread's summary: what done looks like, or what was done, one short sentence of ${SUMMARY_WORDS} words at most`),
         blockedBy: z.array(z.string()).optional().describe('ids of threads this one waits on'),
         blocks: z.array(z.string()).optional().describe('ids of threads that wait on this one'),
       },

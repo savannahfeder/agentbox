@@ -25,6 +25,7 @@ import {
 } from '../../main/store/work-items.mjs';
 import { matchesFilter } from '../../shared/work-items.mjs';
 import { unleaked } from '../../shared/agents.mjs';
+import { SUMMARY_WORDS, wordsIn } from '../../shared/thread-cards.mjs';
 import {
   parkPendingWrite, readPendingWrites, collectPendingWrites,
 } from '../../main/store/pending-writes.mjs';
@@ -141,6 +142,21 @@ export function saidToClose(item, words) {
   const quote = plainly(words).replace(/^["'\s]+|["'.,!?\s]+$/g, '');
   if (quote.length < 4) return false;
   return [item?.answer, item?.body, item?.title].some((t) => plainly(t).includes(quote));
+}
+
+/*
+ * A SUMMARY LINE IS SHORT ENOUGH TO READ (w-b51b2e1c86). An agent's problem,
+ * progress or solution over SUMMARY_WORDS words is taken out of the write and
+ * the rest lands; the agent is told which line, how long, and to send it again.
+ * Refused rather than cut, because a cut sentence says less than a short one.
+ */
+function takeOverLong(patch) {
+  const long = ['problem', 'progress', 'solution']
+    .filter((f) => typeof patch[f] === 'string' && wordsIn(patch[f]) > SUMMARY_WORDS);
+  if (!long.length) return {};
+  const said = long.map((f) => `${f} (${wordsIn(patch[f])} words)`).join(', ');
+  for (const f of long) delete patch[f];
+  return { summaryTooLong: `Not saved: ${said}. A summary line is ${SUMMARY_WORDS} words at most, so it fits the panel without scrolling; everything else you sent was written, and the line keeps what it said before. Send ${long.length === 1 ? 'it' : 'them'} again as one short sentence each.` };
 }
 
 const LEFT_OPEN = 'The row was left OPEN. The founder wrote it, and only she closes her own rows unless she asked you to: everything else you sent was written, and your answer reaches her inbox as an answer. If she did ask you to close it, send status done again with closeBecause set to her exact words asking for it.';
@@ -310,6 +326,7 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
           leftOpen = true;
         }
       }
+      const summaryTooLong = takeOverLong(asked);
       patch = asked;
       let item = Object.keys(patch).length
         ? updateWorkItem(holding.dir, id, patch, { epoch: holding.epoch })
@@ -355,9 +372,9 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
           holding.live = false;
           stopTimer();
         }
-        return { ...item, leftOpen: LEFT_OPEN };
+        return { ...item, leftOpen: LEFT_OPEN, ...summaryTooLong };
       }
-      return item;
+      return { ...item, ...summaryTooLong };
     },
 
     release(id) {
