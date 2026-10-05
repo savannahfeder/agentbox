@@ -116,12 +116,22 @@ describe('the look round one asked for', () => {
   it('says which chip is yours with brightness, never with a colour', () => {
     expect(css).toMatch(/\.chat-chip\.mine \{[^}]*border-color: var\(--text-faint\)[^}]*color: var\(--text\)/);
     // AND NOTHING THIS ROW ADDED NAMES A COLOUR AT ALL. Every `color` and
-    // `border-color` below is one of the app's own tokens, so the chips, the bar
-    // and the formatting bar take whatever the window is wearing. (The two
-    // shadows are #000 at low alpha, which is a depth and not a hue, so the
-    // test reads colour declarations rather than every hex in the file.)
-    const added = css.slice(css.indexOf('.chat-chips'));
-    const colours = [...added.matchAll(/(?:^|[^-\w])((?:border-)?color):\s*([^;}]+)/g)].map((m) => m[2].trim());
+    // `border-color` in these rules is one of the app's own tokens, so the
+    // chips, the bar and the formatting bar take whatever the window is
+    // wearing. (The two shadows are #000 at low alpha, which is a depth and not
+    // a hue, so this reads colour declarations rather than every hex.)
+    //
+    // RULE BY RULE, NOT "EVERYTHING BELOW THIS POINT": this stylesheet is
+    // appended to by other rows too, and a sweep from a marker to the end of
+    // the file fails on the next row's work rather than on this one's. The
+    // agent-mention layer that arrived from main is exactly that — it is
+    // `color: transparent` on purpose, being an invisible overlay.
+    const mine = /^\s*\.(chat-chip|chat-act|chat-emoji|fmt-)/;
+    const colours = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+      .filter(([, selector]) => mine.test(selector))
+      .flatMap(([, , body]) => [...body.matchAll(/(?:^|[^-\w])((?:border-)?color):\s*([^;}]+)/g)].map((m) => m[2].trim()));
+    // A floor, so a matcher that silently stops finding anything fails here
+    // rather than passing on an empty list.
     expect(colours.length).toBeGreaterThan(5);
     expect(colours.filter((v) => !v.startsWith('var(') && v !== 'inherit')).toEqual([]);
   });

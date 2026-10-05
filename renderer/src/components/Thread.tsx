@@ -34,6 +34,7 @@ import { clock, dayHeading } from '../thread-history';
 import { chatLayout } from '../team/chat-layout';
 import { ChatFold } from '../team/ChatFold';
 import { MessageActions, Reactions } from '../team/ChatActions';
+import { AgentAnswers } from '../team/ChatAgents';
 import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
 } from '../../../shared/agents.mjs';
@@ -313,12 +314,12 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                 onStep={(next) => stepLine(key, next)}
                 code={code}
               />
-            : slot ? (
-              // A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face holds the
-              // column; a message that carries on a run keeps the column for its
-              // time, shown on pointing. None of the agent thread's chapters:
-              // no rule above or below your words and no larger type, because
-              // a turn means nothing between two people.
+            : slot ? (<>
+              {/* A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face holds the
+                  column; a message that carries on a run keeps the column for
+                  its time, shown on pointing. None of the agent thread's
+                  chapters: no rule above or below your words and no larger
+                  type, because a turn means nothing between two people. */}
               <div className={`msg chat-msg${slot.head ? '' : ' cont'}${e.pending ? ' sending' : ''}`}>
                 <div className="chat-gutter">{slot.head
                   ? <Face person={teammateOf(e) ?? (team?.me ? team.byId.get(team.me) : null)} me={!teammateOf(e) && e.who === 'you'} agent={e.who === 'it'} size="lg" />
@@ -351,7 +352,9 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                   />
                 )}
               </div>
-            ) : (
+              {/* AN AGENT IT MENTIONED ANSWERS UNDER IT (w-7b9cb8636a). */}
+              <AgentAnswers text={e.text ?? ''} md={md} />
+            </>) : (
               // A CONTINUATION THAT OPENS THE OTHER SIDE OF THE GAP IS NOT A
               // CONTINUATION OF ANYTHING SHE CAN SEE. `same` means one agent
               // still talking, so the block wears no name and no time; across

@@ -111,6 +111,8 @@ import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter
 import { BoxFilter } from './components/BoxFilter';
 import { itemPriority, moveProduct, placeScore } from '../../shared/rank.mjs';
 import { threadsMade } from './threads-made';
+import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
+import { agentLinks, chatProjects, chatTranscript, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
@@ -2616,6 +2618,51 @@ export default function App() {
     setSeen((s) => new Set(s).add(item.id));
   }, []);
 
+  // WHAT A CONVERSATION NEEDS TO BRING AN AGENT IN AND TO DRAW ITS ANSWER
+  // (w-7b9cb8636a, team/ChatAgents.tsx): the projects it can be sent to, the
+  // model lists, and the tasks themselves, read off this snapshot.
+  const chatAgents = useMemo<ChatAgentsValue>(() => ({
+    projects: chatProjects(snap?.products ?? [], snap?.supervisor.productOrder ?? [], snap?.supervisor.hiddenProducts ?? []),
+    codexModels,
+    codexDefault: codexModelDefault,
+    find: (product, id) => items.find((i) => i.id === id && i.product === product),
+    stateOf: stateOfMine,
+    filed: (task) => threadsMade(items, task),
+    open: (task) => { setFocused(task); markSeen(task); },
+  }), [snap?.products, snap?.supervisor.productOrder, snap?.supervisor.hiddenProducts, codexModels, codexModelDefault, items, stateOfMine, markSeen]);
+
+  // THE AGENTS A MESSAGE MENTIONS START WHEN THE MESSAGE LANDS, after the undo
+  // window, so a Z inside it leaves nothing behind. Each becomes a task in its
+  // project, briefed with the ask and the conversation so far, and the message
+  // is written pointing at it, which is how every copy of the conversation
+  // (yours and theirs) knows which task answers it.
+  const startChatAgents = useCallback(async (item: WorkItem, text: string): Promise<string> => {
+    const links = agentLinks(text).filter((l) => !l.task && l.project);
+    if (!links.length) return text;
+    const products = snap?.products ?? [];
+    const conversation = products.find((p) => p.slug === item.product);
+    const people = [...new Set([...(conversation?.team?.people ?? []), ...(conversation?.team?.sharedBy ? [conversation.team.sharedBy] : []), ...(item.people ?? [])])].filter(Boolean);
+    const nameOf = (by: string | undefined) => (by && team?.byId.get(by)?.name) || (by && by === team?.me ? 'You' : 'A teammate');
+    const others = people.filter((p) => p !== team?.me).map((p) => nameOf(p));
+    let transcript: Array<{ who: string; text: string }> = [];
+    try { transcript = chatTranscript((await api.itemHistory({ product: item.product, id: item.id }))?.lines ?? [], nameOf); } catch { /* the ask alone still briefs it */ }
+    const brief = taskBrief({ sent: text, asker: nameOf(team?.me ?? undefined), others, transcript });
+    let out = text;
+    for (const link of links) {
+      const project = products.find((p) => p.slug === link.project);
+      if (!project) continue;
+      const made = await api.compose({
+        product: project.slug, title: taskTitle(text), body: brief, engine: link.engine, start: 'now',
+        ...(link.model ? { model: link.model } : {}), ...(link.effort ? { effort: link.effort } : {}),
+        // Seen by the people in the conversation, on a shared project; a
+        // project of your own keeps its own privacy.
+        ...(isShared(project) && people.length ? { visibility: 'people' as const, visibleTo: people } : {}),
+      });
+      if (made?.id) out = withTask(out, link, made.id);
+    }
+    return out;
+  }, [snap?.products, team]);
+
   // AN URGENT ROW THAT ARRIVES WHILE SHE IS READING TAKES THE SCREEN.
   //
   // Every rule about WHEN this is allowed is in interrupt.ts, pure and tested,
@@ -3354,10 +3401,17 @@ export default function App() {
     if (stay) setFollowing({ product: item.product, id: item.id });
     const undid = [{ product: item.product, id: item.id, words: 'Undid your reply' }];
     await deferCommit(item, async () => {
+      // In a conversation, any agent it mentions starts now and the message is
+      // written pointing at its task (w-7b9cb8636a, startChatAgents). The copy
+      // on the screen takes the same words, or the written one would not be
+      // recognised as it and the message would show twice until it lapsed
+      // (seen in the built app: "Sending… press Z to undo" above the real one).
+      const answer = talking ? await startChatAgents(item, text) : text;
+      if (answer !== text) { mine.text = answer; setSending((q) => [...q]); }
       await api.answer({
         product: item.product,
         id: item.id,
-        answer: text,
+        answer,
         ...(status ? { status } : {}),
         ...(priority != null ? { priority } : {}),
         // What this one reply may do. Undefined means she did not touch it and
@@ -3390,7 +3444,7 @@ export default function App() {
         setFollowing(null);
       } });
     }, talking ? 'Sent' : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id }, undid);
-  }, [deferCommit, snap?.supervisor.running, snap?.products, showToast, refresh, markSeen, pushUndo]);
+  }, [deferCommit, snap?.supervisor.running, snap?.products, showToast, refresh, markSeen, pushUndo, startChatAgents]);
 
   /* ------------------------ answering one of her agents -------------------- */
   // THE ONE THING AGENTBOX SAYS OUT LOUD TO THE REST OF HER MACHINE. The reply goes
@@ -4625,6 +4679,7 @@ export default function App() {
   // merely further up.
   return (
     <TeamContext.Provider value={team}>
+    <ChatAgentsContext.Provider value={chatAgents}>
     <LiveContext.Provider value={liveIds}>
     <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${workspaceCollapsed ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}`}>
       {signInGate && <SignInPage signedOut={signedOutHere} error={snap?.team?.error ?? null} waitingUrl={snap?.team?.signingIn?.url ?? null} />}
@@ -5442,6 +5497,11 @@ export default function App() {
           // Projects page, which is where the order is set. The draft is
           // already saved, so closing loses nothing.
           onReorderProjects={() => { setModal(null); setComposeInitial(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
+          /* "New project", last in the project menu. The card draws OVER the
+             composer rather than replacing it (it is last in this file for
+             exactly that), so the draft is still here afterwards and the
+             project just made is the one the thread is addressed to. */
+          onNewProject={() => setNewProject(true)}
           onClose={() => { setModal(null); setComposeInitial(null); }}
           onSent={async (made, how) => {
             setComposeInitial(null);
@@ -6216,6 +6276,7 @@ export default function App() {
       <FindBar />
     </div>
     </LiveContext.Provider>
+    </ChatAgentsContext.Provider>
     </TeamContext.Provider>
   );
 }

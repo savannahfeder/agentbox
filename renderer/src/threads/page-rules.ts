@@ -12,6 +12,7 @@ import { priorityIdOf, type PriorityId } from '../priority';
 import { firstRealLine } from '../format';
 import { threadState } from '../../../shared/thread-cards.mjs';
 import { placeScore } from '../../../shared/rank.mjs';
+import { plainWords } from '../team/agent-mentions';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
@@ -395,12 +396,16 @@ export function messageLine(item: WorkItem, product: Product | undefined | null,
   let people = [...new Set(everyone)].filter((p) => p && p !== me);
   if (!people.length && item.createdBy && item.createdBy !== me) people = [item.createdBy];
   const answered = !!item.answer && item.answer !== '(withdrawn)';
-  // THE LATEST REAL LINE OF THE NEWEST MESSAGE (w-560647d4db). This took the
+  // An agent mentioned in the message reads as its words, not its link (w-7b9cb8636a).
+  //
+  // AND THE LINE TAKEN IS THE LATEST REAL ONE (w-560647d4db). This took the
   // message's first line, full stop, and the first real conversation between
   // two teammates had a message opening on "Additional:" with the findings
   // under it — so the row said a word that is not news and not even a subject.
-  // `firstRealLine` steps over a bare label and takes the line under it.
-  const text = firstRealLine(String((answered ? item.answer : item.body) || item.title || ''));
+  // `firstRealLine` steps over a bare label and takes the line under it; it
+  // runs AFTER the mention links are flattened, so a message opening on a
+  // mention is judged on the words somebody actually reads.
+  const text = firstRealLine(plainWords(String((answered ? item.answer : item.body) || item.title || '')));
   const by = (answered ? item.wrote?.answer?.by : item.wrote?.body?.by) ?? item.createdBy ?? null;
   return { people, fromMe: !!me && by === me, text };
 }
