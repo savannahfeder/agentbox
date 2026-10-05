@@ -54,6 +54,33 @@ export const fixtureSnapshot: Snapshot = {
       labels: [], priority: 1, epoch: 1, claim: null,
       createdAt: now - 9 * min, updatedAt: now - 9 * min,
     },
+    // AND TWO PROPOSALS WAITING ON A PRESS (w-9cf2b43110), which is the case
+    // the list of filed threads had no fixture for and therefore no review:
+    // "when an agent files another agent i don't love that it ends up in my
+    // inbox with no clear next step." An agent filed both, nothing is running
+    // on either, and each carries its own Approve in the parent's list.
+    //
+    // They sit beside the question and the blocked row above on purpose: four
+    // filed threads, two presses. The two that carry none are the two whose
+    // next step is genuinely to read the row (a question's options, and a
+    // worker's own report), so one look at this thread says what the button
+    // means and what it does not.
+    {
+      id: 'w-p3', product: 'kestrel', productName: 'Kestrel', status: 'open', kind: 'task',
+      parent: 'w-p0',
+      title: 'Name the five card rarities, so the economy page and the art brief stop disagreeing',
+      body: 'The economy page calls the top tier "mythic" and the art brief calls it "legendary". Both are written down, both are being built against, and the two names are already in four documents. One pass over all of them, settling on the economy page\'s words.',
+      labels: [], priority: 2, epoch: 1, claim: null,
+      createdAt: now - 8 * min, updatedAt: now - 8 * min,
+    },
+    {
+      id: 'w-p4', product: 'kestrel', productName: 'Kestrel', status: 'open', kind: 'task',
+      parent: 'w-p0',
+      title: 'Measure how long a hand of twelve takes to deal on the oldest phone we support',
+      body: 'The hand animation was designed against a desktop browser. Nothing has run it on a four-year-old phone, and the deal is the first thing anybody sees. One throwaway harness, one number, and a note saying whether the design survives it.',
+      labels: [], priority: 1, epoch: 1, claim: null,
+      createdAt: now - 7 * min, updatedAt: now - 7 * min,
+    },
     // CLOSED BY AN AGENT, WITH A BODY THAT NEVER CAUGHT UP. The shape of
     // (2026-08-10): she rejected the premise, the closing session wrote an
     // honest result, and left a title and an opening that still recommend the

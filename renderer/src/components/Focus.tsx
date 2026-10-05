@@ -417,7 +417,7 @@ function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 // not the user's, and it is the part that was unnecessary. `filesFromRuns` stays,
 // because App.tsx still reads it to choose the design a card opens itself on.
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onHandToAgent, onAddPeople }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onReopen, onSnooze, onReveal, onOpenItem, onApproveFiled, onNotice, onHandToAgent, onAddPeople }: {
   previewSample?: string;
   /**
    * A MESSAGE FROM A PERSON IS NOT WORK UNTIL SHE SAYS SO. The one line under
@@ -479,6 +479,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // line under the conversation; absent or empty draws nothing.
   filed?: Array<MadeRow & { item: WorkItem }>;
   onOpenItem: (item: WorkItem) => void;
+  // SAYING GO TO ONE OF THEM FROM HERE (w-9cf2b43110), on the rows whose
+  // `approve` says they are waiting on it. The same approval ⌘K makes on the
+  // row itself, except that it does not take you off the thread you are
+  // reading: that is the whole point of the press being here.
+  onApproveFiled?: (item: WorkItem) => void;
   // Said out loud when a file a worker named is not in this product. Nothing
   // else on the card can tell her a chip failed.
   onNotice: (text: string) => void;
@@ -1358,8 +1363,15 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
 
         {/* WHAT THIS THREAD FILED, IN LINE, under what it said about them
             (w-2e8aa16f0f). The result names them in prose; this is where each
-            one stands now, and the door into it. */}
-        <ThreadsMade rows={filed} label="Filed from this thread" onOpen={(id) => { const hit = filed.find((r) => r.id === id); if (hit) onOpenItem(hit.item); }} />
+            one stands now, the door into it, and the press that starts it
+            (w-9cf2b43110): each one is a proposal, and the next step on it
+            belongs beside its name rather than on a trip to its own row. */}
+        <ThreadsMade
+          rows={filed}
+          label="Filed from this thread"
+          onOpen={(id) => { const hit = filed.find((r) => r.id === id); if (hit) onOpenItem(hit.item); }}
+          onApprove={onApproveFiled && ((id) => { const hit = filed.find((r) => r.id === id); if (hit) onApproveFiled(hit.item); })}
+        />
 
         {!agent && <RemoteControl key={`remote:${item.product}:${item.id}`} product={item.product} id={item.id} />}
         {!agent && <CompactionResult engine={runningEngine ?? 'claude-code'} key={`${item.product}:${item.id}`} item={item} />}
