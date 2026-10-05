@@ -110,6 +110,7 @@ import { runNowCommands } from './run-now';
 import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
 import { BoxFilter } from './components/BoxFilter';
 import { itemPriority, moveProduct, placeScore } from '../../shared/rank.mjs';
+import { threadsMade } from './threads-made';
 import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
@@ -5181,6 +5182,7 @@ export default function App() {
                   })}
                   parent={focused.parent ? items.find((i) => i.id === focused.parent && i.product === focused.product) ?? null : null}
                   blockedBy={items.find((i) => i.parent === focused.id && i.product === focused.product && i.status !== 'done') ?? null}
+                  filed={threadsMade(items, focused).map((i) => ({ id: i.id, title: i.label || i.title, state: stateOfMine(i), item: i }))}
                   onOpenItem={(item) => { setFocused(item); markSeen(item); }}
                   onNotice={showToast}
                   /*
