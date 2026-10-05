@@ -51,6 +51,7 @@ const ENTRIES: Entry[] = [
   { page: 'codex', label: 'Permission mode', anchor: 'permissions', words: 'codex permissions sandbox read only full access' },
   { page: 'running', label: 'Agents at once', anchor: 'at-once', words: 'concurrent parallel sessions limit queue capacity' },
   { page: 'running', label: 'Hold heavy work when memory is short', anchor: 'memory', words: 'ram tests builds slow' },
+  { page: 'running', label: 'Stop what finished agents leave running', anchor: 'memory', words: 'leftovers left behind dev servers background jobs processes cleanup kill ram' },
   { page: 'running', label: 'Agents you started yourself', anchor: 'outside', words: 'terminal outside sessions inbox your own' },
   { page: 'instructions', label: 'Instructions for every agent', words: 'rules prompt claude.md how agents write to you' },
   { page: 'projects', label: 'Projects', words: 'order priority archive new project' },

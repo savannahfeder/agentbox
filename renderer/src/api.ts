@@ -121,6 +121,8 @@ function fixtureWrite(scope: 'project' | 'workspace', p: any): Settings {
       w.capacity = w.sessionsAtOnce * Math.max(1, w.accounts.length);
     } else if (p.key === 'memoryGate' && w.memoryGate) {
       w.memoryGate = { ...w.memoryGate, on: !!p.value, now: p.value ? 'Memory is fine. Nothing heavy running.' : null };
+    } else if (p.key === 'cleanupLeftovers' && w.leftovers) {
+      w.leftovers = { on: !!p.value, now: p.value ? 'Finished agents have left 6 programs running. 4 stop in 1 h 40 m; 2 are kept.' : null };
     } else if (p.key === 'memoryGateSlots' && w.memoryGate) {
       w.memoryGate = { ...w.memoryGate, slots: p.value === null ? null : Math.max(1, Math.min(w.memoryGate.slotsMax, Number(p.value) || 1)) };
     } else if (p.key === 'activeAccount') {
@@ -845,6 +847,15 @@ export const api = {
     const zero = window.zero as any;
     if (!zero?.projectIconClear) return { ...emptySettings, ok: false, error: RESTART_NOTE };
     return zero.projectIconClear(p);
+  },
+
+  // Who sees a project's threads on the Team page (w-b989839656). The
+  // snapshot that follows carries it back, so this answers only whether it
+  // landed.
+  async setProjectSeenBy(p: { product: string; who: 'private' | 'team' | 'people'; people?: string[] }): Promise<{ ok: boolean; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.projectSeenBy) return { ok: false, error: RESTART_NOTE };
+    return zero.projectSeenBy(p);
   },
 
   // Archive a project (off every list, files kept) or bring one back.

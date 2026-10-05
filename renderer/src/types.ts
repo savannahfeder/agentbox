@@ -114,6 +114,11 @@ export interface Product {
   // YOUR PERSONAL PROJECT (main/team/projects.mjs, w-b989839656): a thread in
   // it with no visibility of its own is Only you, and it is never shared.
   personal?: boolean;
+  // WHO SEES THIS PROJECT'S THREADS on the Team page (w-b989839656):
+  // 'private' is Just you, 'people' names `seenByPeople`, and none at all is
+  // the team. shared/thread-cards.mjs projectSeenBy is the one reading of it.
+  seenBy?: 'private' | 'team' | 'people';
+  seenByPeople?: string[];
   // SHARED OR PRIVATE (main/team/projects.mjs). Null or absent is private.
   // `direct` marks the record a message between two people lives in, which is
   // not a project and holds no work (main/team/projects.mjs makeDirect).
@@ -765,6 +770,10 @@ export interface WorkspaceSettings {
    * what Auto is on this Mac; `now` is one sentence about right now, null while
    * it is off. Optional so an older payload still draws the page it drew. */
   memoryGate?: { on: boolean; slots: number | null; slotsAuto: number; slotsMax: number; now: string | null };
+  /**
+   * STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mjs). `now` is one
+   * sentence about what is left right now, null while it is off. */
+  leftovers?: { on: boolean; now: string | null };
   capacity: number;
   running: number;
   model: string | null;

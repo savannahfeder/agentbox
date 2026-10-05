@@ -915,7 +915,7 @@ function paneFrom(want: string, has: { team: boolean; codex: boolean }): Pane {
 
 /* --------------------------------- screen --------------------------------- */
 
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, account, onClose }: {
+export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, onClose }: {
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
@@ -947,6 +947,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   /** Team management, handed in by whoever has the team's state. Absent on a
    *  build with no team cloud, and then there is no Team row either. */
   teamPane?: ReactNode;
+  /** WHO SEES A PROJECT'S THREADS (w-b989839656), handed in the same way:
+   *  the button beside a project's name, and the Projects list's column.
+   *  Absent with nobody signed in, and then neither is drawn. */
+  projectShare?: (slug: string) => ReactNode;
+  projectWho?: (product: Product) => ReactNode;
   /** Who is signed in, for the Account group on General. Absent when nobody
    *  is, and then there is no group. */
   account?: { email: string; team?: string | null; onSignOut: () => void };
@@ -1288,6 +1293,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               ranked={ranked}
               details={projects}
               onSetOrder={onSetOrder}
+              who={projectWho}
               onOpen={(slug) => setPane({ project: slug })}
               onNew={onNewProject}
               archived={model?.archivedProjects ?? []}
@@ -1384,20 +1390,17 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 waiting on the model costs a few hundred MB; one running tests
                 or a build costs a gigabyte or more, so the number that runs
                 out is heavy commands, not agents. Off out of the box. */}
-            {w.memoryGate && (
+            {(w.memoryGate || w.leftovers) && (
               <Group id="memory" label="Memory">
+                {w.memoryGate && (
                 <Row
                   label="Hold heavy work when memory is short"
-                  /* Codex workers do not carry the check yet. Said only where
-                     Codex can be chosen at all. */
-                  /* AND IT CLEARS UP AFTER THEM (2026-10-05). A night of agents
-                     left 7.7 GB running after every agent had finished, and the
-                     Mac ran out of memory; main/leftovers.mjs has the numbers. */
-                  desc={`Tests and builds run a few at a time, urgent first, and what finished agents left running is stopped.${twoEngines ? ' Claude Code only for now.' : ''}${w.memoryGate.on && w.memoryGate.now ? ` ${w.memoryGate.now}` : ''}`}
+                  desc={`Tests, builds and other heavy commands run a few at a time, urgent first. Everything else runs as normal.${w.memoryGate.on && w.memoryGate.now ? ` ${w.memoryGate.now}` : ''}`}
                 >
                   <Switch label="Hold heavy work when memory is short" on={w.memoryGate.on} onChange={(v) => setWorkspace('memoryGate', v)} />
                 </Row>
-                {w.memoryGate.on && (
+                )}
+                {w.memoryGate?.on && (
                   <Row
                     label="Heavy commands at once"
                     desc={w.memoryGate.slots === null
@@ -1413,6 +1416,22 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                       max={w.memoryGate.slotsMax}
                       onChange={(v) => setWorkspace('memoryGateSlots', v === w.memoryGate?.slotsAuto ? null : v)}
                     />
+                  </Row>
+                )}
+                {/* STOP WHAT FINISHED AGENTS LEAVE RUNNING (2026-10-05). A night
+                    of agents left 7.7 GB running after every agent had finished
+                    and the Mac ran out of memory; main/leftovers.mjs has the
+                    numbers and the rules agreed with Codex. Its own switch,
+                    because the memory switch only ever delays commands and this
+                    one stops programs, and the person should agree to that by
+                    name. The description is the whole policy, so nothing about
+                    it is a surprise later; it is kept word for word. */}
+                {w.leftovers && (
+                  <Row
+                    label="Stop what finished agents leave running"
+                    desc={`Dev servers, previews, test runs and other background jobs an agent started and left behind are stopped two hours after its run ends, or ten minutes while memory is short, including what is already running when you turn this on. Never stopped: what an agent was asked to keep, apps installed on this Mac such as Docker Desktop, and anything you started yourself.${twoEngines ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.now ? ` ${w.leftovers.now}` : ''}`}
+                  >
+                    <Switch label="Stop what finished agents leave running" on={w.leftovers.on} onChange={(v) => setWorkspace('cleanupLeftovers', v)} />
                   </Row>
                 )}
               </Group>
@@ -1536,6 +1555,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
             <div className="set-title-row">
               <ProjectIcon project={current} onPick={() => write(api.pickProjectIcon({ product: current.slug }))} onClear={() => write(api.clearProjectIcon({ product: current.slug }))} />
               <ProjectTitle project={current} onRename={(name) => write(api.renameProject({ product: current.slug, name }))} />
+              {/* WHO SEES ITS THREADS, drawn as the answer (design 2B,
+                  w-b989839656). Handed in, like the Team pane: on a team
+                  build the window passes the button, and with nobody signed
+                  in there is nothing here. */}
+              {projectShare?.(current.slug)}
             </div>
 
             {/* FIVE CONTROLS BECAME ONE (w-d19d6d387c, 2026-09-22): whether a

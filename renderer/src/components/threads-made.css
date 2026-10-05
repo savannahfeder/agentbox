@@ -1,0 +1,17 @@
+/* THE THREADS A THREAD MADE (./ThreadsMade.tsx, w-2e8aa16f0f). A bordered list,
+   square, one 1px line between rows; the title in the reading face and the state
+   in the app's mono capitals, quieter once it is done. */
+.made { margin: 22px 0 6px; }
+.made-label { margin-bottom: 8px; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.made-list { border: 1px solid var(--line); border-radius: var(--radius); }
+.made-row {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 40px; padding: 0 14px;
+  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer; text-align: left;
+  font: inherit; font-size: 14px; color: var(--text);
+}
+.made-row + .made-row { border-top: 1px solid var(--line); }
+.made-row:hover { background: var(--wash); }
+.made-row:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
+.made-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.made-state { flex: none; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.made-state.done, .made-state.scheduled { color: var(--text-faint); }

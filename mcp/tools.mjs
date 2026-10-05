@@ -20,7 +20,7 @@ import { listWorkItems, createItem, updateItem, createClaimRegistry } from './co
 import { listProductChats, readProductChat } from './core/chat.mjs';
 import { lookAtPage } from './core/page.mjs';
 import { WORK_ITEM_STATUSES } from '../shared/work-items.mjs';
-import { SUMMARY_WORDS } from '../shared/thread-cards.mjs';
+import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS } from '../shared/thread-cards.mjs';
 import { AGENT_CREATION_KINDS } from '../shared/contracts.mjs';
 // The descriptions below are read by every agent on every run, so the app is
 // named in them from the one place it is named. They said "the app" while this
@@ -191,7 +191,7 @@ export function buildTools({ holder } = {}) {
     },
     {
       name: 'update_work_item',
-      description: 'Report progress on an item: set status to done when it is finished, blocked when it cannot proceed until something outside it changes, and leave a note saying where things stand. Keep the summary current with problem, progress and solution, which is all a teammate sees of the thread. A worker the app started for a row ends with its answer as its last message, and the app writes that message onto the row as the result, so such a worker does not pass result for its own row: the same answer written twice is what they then read twice. A row the founder wrote (labelled founder) is closed only when they asked for it: answering them is not finishing it, so the row stays open for them. To close one, pass closeBecause with their exact words asking you to; without them the rest of the write lands and the row is left open. Writing to a row this session is not holding takes the row first, so there is no need to claim before you speak; the write is only refused when another session is genuinely on it, and that refusal is kept rather than thrown away, parked where the error says and handed to whoever takes the row next. Finishing a row hands the claim straight back, and you can still answer on it afterwards.',
+      description: 'Report progress on an item: set status to done when it is finished, blocked when it cannot proceed until something outside it changes, and leave a note saying where things stand. Keep the summary current with problem (shown as Context) and progress (shown as the Done list), which is all a teammate sees of the thread. A worker the app started for a row ends with its answer as its last message, and the app writes that message onto the row as the result, so such a worker does not pass result for its own row: the same answer written twice is what they then read twice. A row the founder wrote (labelled founder) is closed only when they asked for it: answering them is not finishing it, so the row stays open for them. To close one, pass closeBecause with their exact words asking you to; without them the rest of the write lands and the row is left open. Writing to a row this session is not holding takes the row first, so there is no need to claim before you speak; the write is only refused when another session is genuinely on it, and that refusal is kept rather than thrown away, parked where the error says and handed to whoever takes the row next. Finishing a row hands the claim straight back, and you can still answer on it afterwards.',
       schema: {
         id: z.string(),
         status: z.enum(WORK_ITEM_STATUSES).optional(),
@@ -201,9 +201,9 @@ export function buildTools({ holder } = {}) {
         labels: z.array(z.string()).optional(),
         runAt: z.number().int().optional().describe('epoch ms to defer this item until; 0 clears a schedule and makes it available now'),
         closeBecause: z.string().optional().describe('only with status done on a row the founder wrote: their own words, quoted exactly from the row, asking you to close it'),
-        problem: z.string().optional().describe(`the thread's summary: what it is for, one short sentence of ${SUMMARY_WORDS} words at most`),
-        progress: z.string().optional().describe(`the thread's summary: where it stands now, one short sentence of ${SUMMARY_WORDS} words at most`),
-        solution: z.string().optional().describe(`the thread's summary: what done looks like, or what was done, one short sentence of ${SUMMARY_WORDS} words at most`),
+        problem: z.string().optional().describe(`the summary's CONTEXT: a few plain sentences, ${CONTEXT_WORDS} words at most, that bring the thread back to someone who has forgotten it: what was asked, what was found, the facts needed to decide`),
+        progress: z.string().optional().describe(`the summary's DONE list: the steps taken so far, one per line, oldest first and newest last, ${DONE_STEPS} lines at most of ${DONE_STEP_WORDS} words each. Send the whole list each time; it replaces the last one`),
+        solution: z.string().optional().describe(`no longer shown; leave it out (older threads may still carry one, ${SUMMARY_WORDS} words at most)`),
         blockedBy: z.array(z.string()).optional().describe('ids of threads this one waits on'),
         blocks: z.array(z.string()).optional().describe('ids of threads that wait on this one'),
       },
