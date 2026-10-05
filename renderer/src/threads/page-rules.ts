@@ -623,8 +623,9 @@ export function boardColumns({ items, products, display, now, stateOf, cards = [
     .map((col) => ({ ...col, rows: sortedEntries(entries.filter((e) => e.state === col.state), display, col.state, projectOrder, conversationSlugs(products)) }));
 }
 
-/** Your threads on the board, in reading order. A teammate's card has no
- *  thread of yours behind it, so J and K pass over it. */
+/** Your threads on the board, in reading order: what `selected` in App.tsx
+ *  counts. J and K walk `boardStops` (walk-rules.ts), which keeps a
+ *  teammate's cards in their places too (w-fb16bcaeba). */
 export function boardWalk(columns: { rows: BoardEntry[] }[]): WorkItem[] {
   return columns.flatMap((c) => c.rows).flatMap((e) => (e.item ? [e.item] : []));
 }
