@@ -146,7 +146,7 @@ export function SummaryRail({ item, team, onOpen }: { item: WorkItem; team: Team
   const byId = team?.byId ?? new Map<string, Person>();
   const owner = ownerName(item, me, byId);
   const ownerPerson = owner === 'You' ? (me ? byId.get(me) ?? null : null) : byId.get(item.createdBy ?? '') ?? null;
-  const visibility = whoSees(item, team?.state.since ?? null);
+  const visibility = whoSees(item, team?.state.since ?? null, team?.products.get(item.product));
   return (
     // The hint is on the icon, not the strip: a plate is placed off the box of
     // what wears it, and a strip the pane's full height left it no room below,
@@ -254,7 +254,7 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
     ...item,
     visibility: valueOf<'team' | 'people' | 'private' | undefined>('visibility'),
     visibleTo: valueOf<string[] | undefined>('visibleTo') ?? item.visibleTo,
-  }, team?.state.since ?? null);
+  }, team?.state.since ?? null, team?.products.get(item.product));
   // WHO IS ON THE LIST, when it is shared with chosen people (w-41ff964775).
   // Read off the row the same way, so her tick shows before the store's next
   // snapshot comes back with it.

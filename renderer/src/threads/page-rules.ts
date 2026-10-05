@@ -5,7 +5,7 @@
 // the rows are ordered, how "Updated" is said, and what goes in each board
 // column for the Team, where your own threads come from this Mac and your
 // teammates' from the cards their Macs publish.
-import { shownToPeople, shownToTeam } from '../../../shared/thread-cards.mjs';
+import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mjs';
 import type { Seen } from './summary-rules';
 import type { Product, ThreadCard, ThreadStateWord, WorkItem } from '../types';
 import { priorityIdOf, type PriorityId } from '../priority';
@@ -318,7 +318,7 @@ export function rowSharing(
 ): Seen | null {
   if (!team || !product || isDirect(product) || item.agent) return null;
   if (item.createdBy && item.createdBy !== team.me) return null;
-  if (!shownToTeam(item, team.since ?? null)) return 'private';
+  if (!shownToTeam(item, team.since ?? null, product)) return 'private';
   return shownToPeople(item).length ? 'people' : 'team';
 }
 
@@ -426,7 +426,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     // made private stays, with its lock, so you can see it is hidden.
     // ON YOUR OWN PAGE EVERY ONE OF YOURS STAYS (w-05ff3d1438): leaving them
     // out is how threads once went missing from the board.
-    if (!allMine && item.visibility !== 'private' && !shownToTeam(item, since)) continue;
+    if (!allMine && visibilityOf(item, product) !== 'private' && !shownToTeam(item, since, product)) continue;
     const state = stateOf?.(item) ?? threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
     out.push({
