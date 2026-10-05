@@ -527,6 +527,63 @@ describe('what the code review found', () => {
   });
 });
 
+// CODEX'S SECOND REVIEW, of a4e2b19, 2026-10-05: three more, each reproduced.
+describe('what the second review found', () => {
+  const NODE = '/Users/x/.nvm/versions/node/v22/bin/node';
+  const p = (pid, ppid, item, extra = {}) => ({ pid, ppid, mb: 50, start: sec(T0 - 5 * HOUR), exe: NODE, item, product: 'demo', keep: false, cmd: 'node', ...extra });
+
+  async function supervisor() {
+    const { Supervisor } = await import('../main/supervisor.mjs');
+    const { fileURLToPath } = await import('node:url');
+    const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-review2-'));
+    const store = { listItems: () => [], listProducts: () => [], isDue: () => true, readItem: () => null };
+    const sup = new Supervisor({ storeRoot: tmp, home: tmp }, store, root, tmp, tmp);
+    await sup.setLeftoverCleanup(true);
+    // Programs of w-held were asked to stop a moment ago.
+    sup._leftoverCleaner.stopping['1:1:/x'] = { item: 'w-held', pid: 4242, cmd: 'next dev', exe: '/x', at: Date.now() };
+    return sup;
+  }
+
+  it('1. a run waiting out the 30 seconds is cancelled by Stop, and never starts', async () => {
+    const { vi } = await import('vitest');
+    const sup = await supervisor();
+    vi.useFakeTimers();
+    try {
+      sup.spawnWorker({ id: 'w-held', product: 'demo' });
+      expect(sup._preparing.has('w-held')).toBe(true);
+      expect(sup.stopSession('w-held')).toBe(true);
+      const spy = vi.spyOn(sup, 'spawnWorker');
+      vi.advanceTimersByTime(40_000);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      await sup.setLeftoverCleanup(false);
+    }
+  });
+
+  it('2. what runs under a task\'s program whose executable cannot be read is kept too', async () => {
+    let now = T0;
+    const signals = [];
+    const c = new LeftoverCleaner({
+      list: async () => [p(40, 1, 'w-done', { exe: 'Some Renamed App' }), p(41, 40, null), p(50, 1, 'w-done')],
+      kill: (pid, sig) => signals.push([pid, sig]), clock: () => now, readPressure: async () => 'normal', enabledSince: 0, owns: () => true,
+    });
+    c.ended('w-done');
+    now += 3 * HOUR; await c.tick();
+    now += MIN; await c.tick();
+    expect(signals).toEqual([[50, 'SIGTERM']]);
+  });
+
+  it('3. with the switch off, an agent is still told about programs already asked to stop, and not the rule', async () => {
+    const sup = await supervisor();
+    await sup.setLeftoverCleanup(false);
+    const note = sup.leftoverBriefNote({ id: 'w-held' });
+    expect(note).toMatch(/4242/);
+    expect(note).not.toMatch(/AGENTBOX_KEEP/);
+  });
+});
+
 describe('6. every run is told the rule while it is on', () => {
   it('a resumed conversation too', async () => {
     const { Supervisor } = await import('../main/supervisor.mjs');

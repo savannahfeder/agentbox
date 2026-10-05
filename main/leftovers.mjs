@@ -340,11 +340,13 @@ export class LeftoverCleaner {
       // exits first, launchd adopts it and the parent is no longer there to
       // say whose it is.
       const item = p.item ?? up.item ?? this.taskOf.get(idOf(p)) ?? null;
-      // Protection passes down only from a kept program or an installed app
-      // that belongs to a task, never from launchd, a shell or the app that
-      // spawned the agent (Codex's review, 2026-10-05). An executable that
-      // cannot be read keeps that one process and passes nothing on.
-      const inherits = !!(p.keep || isAppPath(p.exe, this.home) || this.protectedIds.has(idOf(p)) || (up.item && up.inherits));
+      // Protection passes down only from a process that belongs to a task and
+      // is kept, an installed app, or an executable that cannot be read (it
+      // may be a renamed app lsof could not resolve), never from launchd, a
+      // shell or the app that spawned the agent, none of which carry a task
+      // (Codex's reviews, 2026-10-05).
+      const inherits = !!(p.keep || isAppPath(p.exe, this.home) || this.protectedIds.has(idOf(p))
+        || (item && unreadable(p.exe)) || (up.item && up.inherits));
       const r = { item, inherits, guard: inherits || unreadable(p.exe), agent: isAgentProcess(p) };
       memo.set(p.pid, r);
       return r;

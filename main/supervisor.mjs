@@ -6061,26 +6061,6 @@ export class Supervisor {
 
   spawnWorker(item, { continuation = false, resumeSessionId = null, profile: forcedProfile = null, engine: forcedEngine = null, remoteOnly = false, shipFailure = null } = {}) {
     if (this._compactionJobs?.has(JSON.stringify([item.product, item.id]))) return;
-    // THIS TASK'S LEFTOVERS WERE ASKED TO STOP SECONDS AGO (main/leftovers.mjs)
-    // and may still be on their way out, so the agent waits out the rest of
-    // those 30 seconds rather than finding a dying server and reusing it. Only
-    // one retry is ever pending per row, carrying the latest call's options;
-    // if a session has started by then, the retry does nothing.
-    const hold = this._leftoverCleaner?.holdMs?.(item.id) ?? 0;
-    if (hold > 0) {
-      this._leftoverHeld ??= new Map();
-      const pending = this._leftoverHeld.has(item.id);
-      this._leftoverHeld.set(item.id, { item, opts: { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, shipFailure } });
-      if (!pending) {
-        const t = setTimeout(() => {
-          const held = this._leftoverHeld.get(item.id);
-          this._leftoverHeld.delete(item.id);
-          if (held && !this.sessions.has(item.id)) this.spawnWorker(held.item, held.opts);
-        }, hold + 100);
-        t.unref?.();
-      }
-      return;
-    }
     // ASKED ONCE, HERE, AND ANSWERED CLAUDE CODE ON EVERY MACHINE TODAY. See
     // `_engineFor` for the two independent reasons why. It is asked ahead of
     // the door rather than after it because the door is the engine's own cap
@@ -6102,6 +6082,31 @@ export class Supervisor {
     // and check a Claude Code slot; this is how that one answer reaches the
     // spawn instead of being derived again down here and disagreeing.
     const engine = forcedEngine ? engineOf(forcedEngine) : this._engineFor(item);
+    // THIS TASK'S LEFTOVERS WERE ASKED TO STOP SECONDS AGO (main/leftovers.mjs)
+    // and may still be on their way out, so the agent waits out the rest of
+    // those 30 seconds rather than finding a dying server and reusing it. It
+    // waits as a pending entry, the same one a folder being built uses, so it
+    // counts against its slot, Stop cancels it, and a quit puts its reply back
+    // in line (Codex's review, 2026-10-05). The latest call's options win.
+    const hold = this._leftoverCleaner?.holdMs?.(item.id) ?? 0;
+    if (hold > 0) {
+      this._preparing ??= new Map();
+      const opts = { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, shipFailure };
+      const held = this._preparing.get(item.id);
+      if (held) { held.item = item; held.opts = opts; return; }
+      const entry = { item, opts, engine };
+      this._preparing.set(item.id, entry);
+      const t = setTimeout(() => {
+        if (this._preparing?.get(item.id) !== entry) return; // stopped, or the app quit
+        this._preparing.delete(item.id);
+        if (this.sessions.has(item.id)) return;
+        try { this.spawnWorker(entry.item, entry.opts); }
+        catch (error) { console.warn(`zero: could not start ${item.id}:`, error.message); }
+        this.onChange?.();
+      }, hold + 100);
+      t.unref?.();
+      return;
+    }
     // A ROW WHOSE MODEL BELONGS TO THE OTHER HARNESS DOES NOT RUN, AND SAYS SO.
     // Asked here rather than inside `spawnPlan` because the answer is not a
     // narrower plan, it is no run at all -- and asked before the slot check and
@@ -7403,11 +7408,11 @@ export class Supervisor {
    */
   leftoverBriefNote(item) {
     const cleaner = this._leftoverCleaner;
-    if (!cleaner?.enabled || !item?.id) return null;
+    if (!cleaner || !item?.id) return null;
     const parts = [];
     // EVERY RUN, not only a fresh one: a conversation resumed after the switch
     // went on, and a chat, never heard it otherwise (Codex's review).
-    {
+    if (cleaner.enabled) {
       parts.push('Anything you leave running after your turn (a dev server, a preview, a background job) is stopped two hours after you finish, sooner if this Mac runs short of memory. '
         + 'If the person needs something to keep running, start it with AGENTBOX_KEEP=1 in its environment and say so in your answer. Stop anything else you started before you finish.');
     }
