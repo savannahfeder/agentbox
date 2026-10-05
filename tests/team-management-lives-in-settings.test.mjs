@@ -93,8 +93,10 @@ describe('Settings has the Team pane, and the shared screen holds no team code',
   });
 
   it('has a Team row in the Workspace group, only when the pane exists', () => {
-    expect(settings).toContain("['team', 'Team']");
-    expect(settings).toContain('teamPane ?');
+    // The menu lives in settings-search.ts since the redraw (w-ccadd13c46);
+    // the screen leaves Team out when no pane was handed in.
+    expect(read('renderer/src/settings-search.ts')).toContain("{ id: 'team', label: 'Team', group: 'Workspace' }");
+    expect(settings).toContain("(p.id !== 'team' || !!teamPane)");
   });
 
   it("answers ?settings=team and the sidebar's shortcut with the Team pane", () => {
@@ -103,7 +105,8 @@ describe('Settings has the Team pane, and the shared screen holds no team code',
   });
 
   it('reports team as the open section, so the sidebar can light the shortcut', () => {
-    expect(settings).toMatch(/pane === 'instructions' \|\| pane === 'shortcuts' \|\| pane === 'projects' \|\| pane === 'team'/);
+    // Every page but General reports itself (w-ccadd13c46), Team included.
+    expect(settings).toContain("pane === 'general' ? null : pane");
   });
 });
 

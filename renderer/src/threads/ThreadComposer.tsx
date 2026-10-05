@@ -40,7 +40,7 @@ import { AgentFace } from '../components/AgentFace';
 import { conversationWith } from './page-rules';
 import { collectFiles, fromPaste, persistAttachments, type PendingAttachment } from '../attachments';
 import { AttachRow } from '../components/AttachRow';
-import { PRIORITIES, priorityLabelOf, priorityValueOf, readLastPriority, writeLastPriority, type PriorityId } from '../priority';
+import { PRIORITIES, priorityLabelOf, priorityValueOf, startingPriority, type PriorityId } from '../priority';
 import { readComposeDraft, saveComposeDraft, clearComposeDraft } from '../drafts';
 import { LAST_PRODUCT_KEY } from '../compose-project';
 import { practiceRefusal } from '../compose-says';
@@ -52,7 +52,7 @@ import { fitMenu } from '../keep-in-window';
 import {
   allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayMorning, moreCount,
   joinNames, landsIn, placeholderFor, projectsOffered, projectSwatch, recentModels, sameModel,
-  sharingFields, startingProject, startingVisibility, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
+  sharingFields, startingProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   type Harness, type ModelPick, type Visibility,
 } from './composer-rules';
 import './thread-composer.css';
@@ -160,29 +160,32 @@ export function ThreadComposer({
   };
 
   /* ---------------------------- priority -------------------------------- */
-  const [prio, setPrio] = useState<PriorityId | null>(() => (opened.current.priority as PriorityId | null) ?? readLastPriority());
+  // Every new thread opens on Medium; only a half-written card keeps its tag
+  // (../priority.ts says why the last pick is no longer carried over).
+  const [prio, setPrio] = useState<PriorityId | null>(() => startingPriority(opened.current.priority));
   const prioShown: PriorityId = prio ?? 'medium';
-  const pickPrio = (id: PriorityId) => { setPrio(id); writeLastPriority(id); };
+  const pickPrio = (id: PriorityId) => { setPrio(id); };
 
   /* --------------------------- visibility ------------------------------- */
-  // EVERY NEW THREAD STARTS AS TEAM, AND WHO SEES IT IS CHOSEN FOR THAT THREAD.
-  // Visibility follows what the task is, not where it lives. It was
-  // remembered per project for a while, and a tester then found the next
-  // thread silently Private; nothing carries over now.
+  // A NEW THREAD STARTS WHERE ITS PROJECT IS, AND WHO SEES IT IS STILL CHOSEN
+  // FOR THAT THREAD (w-b989839656, approved 2026-10-05). The project's
+  // setting is the default, never a lock: the chip follows the project until
+  // you pick a word yourself, so moving a card from a Just you project into a
+  // team one turns it to Team, and your pick then stands. (It was remembered
+  // per project from your last pick for a while, and a tester found the next
+  // thread silently Private; a setting you made on the project is not that.)
   // AND IT MAY BE A FEW PEOPLE RATHER THAN THE TEAM (w-41ff964775). Chosen
   // people opens the
   // same picker the To field uses, and the pick stands only while somebody is
   // on the list; with nobody on it the thread is sent Private, because that is
   // who can see it (composer-rules.ts `sharingFields`).
-  // EXCEPT IN YOUR PERSONAL PROJECT, WHICH STARTS PRIVATE (w-b989839656). The
-  // chip follows the project until you pick a word yourself, so moving a card
-  // into My Workspace turns it Private and moving it out turns it back to Team.
   const [picked, setPicked] = useState<Visibility | null>(null);
   const visibility: Visibility = picked ?? startingVisibility(product);
-  const [chosen, setChosen] = useState<string[]>([]);
+  const [chosenPicked, setChosen] = useState<string[] | null>(null);
+  const chosen = chosenPicked ?? (picked ? [] : startingChosen(product));
   const [visPage, setVisPage] = useState<'rows' | 'people'>('rows');
   const pickVisibility = (v: Visibility) => { setPicked(v); };
-  const toggleChosen = (id: string) => setChosen((c) => (c.includes(id) ? c.filter((p) => p !== id) : [...c, id]));
+  const toggleChosen = (id: string) => setChosen(chosen.includes(id) ? chosen.filter((p) => p !== id) : [...chosen, id]);
   // Anyone who leaves the team comes off the list with them.
   const chosenHere = chosen.filter((id) => others.some((p) => p.id === id));
 

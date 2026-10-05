@@ -74,10 +74,12 @@ const settings = fs.readFileSync(path.join(root, 'renderer/src/components/Settin
  *  a comment is ugly and it is honest: every claim below is about WHERE a
  *  sentence sits on a page that is now one page, and the seam is the only thing
  *  in the file that says where. */
-const AGENTS_BLOCK = '{/* THE AGENTS PAGE IS PART OF GENERAL NOW';
+/* AND SINCE THE REDRAW (w-ccadd13c46, 2026-10-05) THEY ARE TWO PAGES AGAIN:
+   each coding agent has a page of its own holding its usage, its logins and
+   its permissions (`enginePage`), and the number of agents is on Running. */
 const accountsPane = settings.slice(
-  settings.indexOf("pane === 'general'"),
-  settings.indexOf(AGENTS_BLOCK),
+  settings.indexOf('const enginePage = (engine'),
+  settings.indexOf('<div className="set-nav">'),
 );
 
 const spoken = (src) => src
@@ -95,7 +97,7 @@ const cardSource = spoken(settings.slice(
 ));
 
 const agentsPane = settings.slice(
-  settings.indexOf(AGENTS_BLOCK),
+  settings.indexOf("pane === 'running' && ("),
   settings.indexOf("pane === 'appearance'"),
 );
 
@@ -122,7 +124,10 @@ describe(`there is no page in ${NAME} for collecting Claude accounts`, () => {
   it('still opens the rows for anybody arriving on the old ?settings=accounts', () => {
     // The `agents` name joined it on 2026-09-22 (w-3d634cbc44), so the line is
     // one condition with two old names on it rather than two lines.
-    expect(settings).toMatch(/want === 'accounts' \|\| want === 'agents'\) return 'general'/);
+    // Since the redraw the rows are on Claude Code's own page, and the old
+    // Agents name opens Running, where the number of agents went.
+    expect(settings).toMatch(/if \(want === 'accounts'\) return 'claude';/);
+    expect(settings).toMatch(/if \(want === 'agents'\) return 'running';/);
   });
 });
 
@@ -143,9 +148,11 @@ describe('the account rows never tell anybody to get a second subscription', () 
   /* * THE HEADING NEVER CHANGES SHAPE WITH THE COUNT.
   */
   it('heads the list with one phrase that works at any number', () => {
-    // The card is headed with the agent's name and nothing else, which cannot
-    // grow a plural whatever the count is.
-    expect(cardSource).toMatch(/className="ac-name">\{agent\.name\}/);
+    // The page is titled with the agent's name, and the rows are headed
+    // "Signed in", neither of which can grow a plural whatever the count is.
+    expect(said).toMatch(/title=\{agent\.name\}/);
+    expect(said).toMatch(/label="Signed in"/);
+    expect(said).not.toMatch(/label="Accounts"/);
     expect(said).not.toMatch(/Claude accounts/);
   });
 
@@ -170,13 +177,13 @@ describe('the account rows never tell anybody to get a second subscription', () 
     // carries no sentence at all. A troubled one is also not a thing to pick:
     // it leaves the clickable row and becomes something to fix.
     expect(cardSource).toMatch(/if \(a\.trouble\) \{/);
-    expect(cardSource).toMatch(/className="ac-bad-note">\{a\.trouble\}/);
+    expect(cardSource).toMatch(/<Row key=\{a\.profile\} label=\{label\} desc=\{a\.trouble\}>/);
   });
 
   it('still raises the two-folders-one-subscription line above the list', () => {
-    // Above the whole set now rather than inside one card, because it is a fact
-    // about the pair.
-    expect(said).toMatch(/\{w\.accountsNote && <p className="ac-note"/);
+    // Above the rows rather than inside one of them, because it is a fact
+    // about the pair, and only on Claude Code's page, whose pair it is.
+    expect(said).toMatch(/warn=\{engine === 'claude' \? w\.accountsNote : null\}/);
   });
 
   /*
@@ -186,7 +193,7 @@ describe('the account rows never tell anybody to get a second subscription', () 
      the opposite, and the difference is the changed rule above. */
   it('offers the same Add account row on either agent', () => {
     expect(cardSource).not.toMatch(/\{agent\.engine === 'codex' && \(/);
-    expect(cardSource).toMatch(/className="ac-item ac-item-add" onClick=\{\(\) => onAdd\(agent\)\}/);
+    expect(cardSource).toMatch(/<Row label="Add account">\s*<button type="button" className="set-ghost" onClick=\{\(\) => onAdd\(agent\)\}>Add<\/button>/);
     // And it still says nothing about what a second one would add, which is the
     // line that did not move.
     expect(cardSource).not.toMatch(/adds capacity/);
@@ -225,9 +232,13 @@ describe('the Agents page explains parallelism without teaching the multiplier',
 });
 
 describe('where the account rows live', () => {
-  it('is General, which is the page she went looking on', () => {
-    expect(spoken(accountsPane)).toMatch(/<AgentCard/);
+  // SINCE THE REDRAW (w-ccadd13c46): each agent's own page, which the menu
+  // names by the agent, so the place to look is the word she is looking for.
+  it('is the coding agent\'s own page', () => {
+    expect(spoken(accountsPane)).toMatch(/<AccountRows/);
     expect(cardSource).toMatch(/w\.accounts \?\? \[\]\)\.map/);
+    const general = settings.slice(settings.indexOf("pane === 'general' && ("), settings.indexOf("pane === 'claude' && enginePage"));
+    expect(general).not.toContain('<AccountRows');
   });
 
   // The reading order of General: is Claude Code here, who is it signed in as,
@@ -245,14 +256,16 @@ describe('where the account rows live', () => {
   // unchanged and only the slice it is measured on had to widen.
   // THE VERSION ROW IS GONE (w-5737fe67cf, the update section was removed).
   // The claim that survives is the first half of it: the agents lead the page.
-  it('puts the agent cards above everything else on General', () => {
-    const said = spoken(settings.slice(
-      settings.indexOf("pane === 'general'"),
-      settings.indexOf("pane === 'appearance'"),
-    ));
-    const cards = said.indexOf('<AgentCard');
-    expect(cards).toBeGreaterThan(-1);
-    expect(said.indexOf('<Group')).toBeGreaterThan(cards);
+  // The agent's page reads in the order a person asks: how much is left, who
+  // it is signed in as, then what it may do.
+  it('reads usage, then who is signed in, then permissions', () => {
+    const said = spoken(accountsPane);
+    const usage = said.indexOf('label="Usage"');
+    const who = said.indexOf('label="Signed in"');
+    const perms = said.indexOf('label="Permissions"');
+    expect(usage).toBeGreaterThan(-1);
+    expect(who).toBeGreaterThan(usage);
+    expect(perms).toBeGreaterThan(who);
     expect(said).not.toContain('<Updates');
   });
 });

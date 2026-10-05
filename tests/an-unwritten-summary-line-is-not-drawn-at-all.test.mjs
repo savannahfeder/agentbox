@@ -24,35 +24,31 @@ const item = (o = {}) => ({
 const words = (o) => renderToStaticMarkup(React.createElement(SummaryPanel, { item: item(o), team: null }))
   .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
+// CHANGED 2026-10-05 (w-54e9c7243f, later on this same thread): the two
+// parts are Context (`problem`) and Done (`progress`); Solution is not drawn.
 describe('an unwritten summary line', () => {
-  it('leaves out Progress, heading and all, when only Progress is empty (the reported case)', () => {
+  it('leaves out Done, heading and all, when nothing is done yet (the reported case)', () => {
     const w = words({ problem: 'Too many subscriptions.', solution: 'Fitness SF is $100 a month.' });
-    expect(w).toMatch(/Problem Too many subscriptions\. Solution Fitness SF is \$100 a month\./);
-    expect(w).not.toContain('Progress');
+    expect(w).toMatch(/Context Too many subscriptions\. Status/);
+    expect(w).not.toContain('Done');
     expect(w).not.toContain('Not written yet');
-  });
-
-  it('leaves out Solution when nothing has been solved yet', () => {
-    const w = words({ problem: 'Too many subscriptions.', progress: 'Listing them.' });
-    expect(w).toMatch(/Problem Too many subscriptions\. Progress Listing them\./);
-    expect(w).not.toContain('Solution');
   });
 
   it('counts a line of only spaces as empty', () => {
-    const w = words({ problem: 'Too many subscriptions.', progress: '   ', solution: 'Cancelled two.' });
-    expect(w).not.toContain('Progress');
+    const w = words({ problem: 'Too many subscriptions.', progress: '   ' });
+    expect(w).not.toContain('Done');
     expect(w).not.toContain('Not written yet');
   });
 
-  it('draws only the name when all three are empty', () => {
+  it('draws only the name when both are empty', () => {
     const w = words({ title: '', label: 'Cutting subscriptions', body: '', problem: '', progress: '', solution: '' });
-    for (const h of ['Problem', 'Progress', 'Solution', 'Not written yet']) expect(w).not.toContain(h);
+    for (const h of ['Context', 'Done', 'Not written yet']) expect(w).not.toContain(h);
     expect(w).toMatch(/^Cutting subscriptions Status/);
   });
 
   // The case that must NOT be hidden.
-  it('still draws every line that has words, including the stand-in read off the ask', () => {
-    const w = words({ body: 'Cut what we do not use.', progress: 'Listing them.', solution: 'Cancelled two.' });
-    expect(w).toMatch(/Problem Cut what we do not use\. Progress Listing them\. Solution Cancelled two\./);
+  it('still draws both parts when they have words, including the stand-in read off the ask', () => {
+    const w = words({ body: 'Cut what we do not use.', progress: 'Listing them.' });
+    expect(w).toMatch(/Context Cut what we do not use\. Done Listing them\./);
   });
 });
