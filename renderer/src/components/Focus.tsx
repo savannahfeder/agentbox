@@ -65,6 +65,7 @@ import { api } from '../api';
 import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveDraftAttachments, type SentDraft } from '../drafts';
 import { withQuote } from '../team/chat-quote';
 import { FormatBar } from '../team/FormatBar';
+import { OptionsOffer } from './OptionsOffer';
 import { foldedReply } from '../folded-reply';
 import { applyDockHeight } from '../dock-height';
 import { resumeTo } from '../thread-bottom';
@@ -957,7 +958,15 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // `showOptions` itself must NOT be narrowed for this. It also decides whether
   // the options list is stripped out of the message text below (`cleanMessage`),
   // so a full screen row would have printed its own options twice.
-  const stripShown = showOptions && (artifactView !== 'focus' || replyOpen);
+  // WHETHER THE OFFER IS DRAWN. It used to also wait on the reply box being
+  // open, because the strip rode the reply card: opening the box brought the
+  // options with it and clicking away took them off again. The offer is in the
+  // pane now (w-560647d4db), at the foot of the turn that made it, so it stands
+  // or falls with that turn and has nothing to do with the box.
+  //
+  // It is still the same flag that takes the list out of the message text
+  // (`cleanMessage` below), which is what stops the options printing twice.
+  const stripShown = showOptions;
   // The strip already draws the list, so the field that carried it prints
   // without it. Only that field: a result offering a pick must not silently
   // eat an "## Options" heading left behind in an older body.
@@ -1373,6 +1382,37 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             one stands now, and the door into it. */}
         <ThreadsMade rows={filed} label="Filed from this thread" onOpen={(id) => { const hit = filed.find((r) => r.id === id); if (hit) onOpenItem(hit.item); }} />
 
+        {/* AND THE OPTIONS IT OFFERED, AT THE FOOT OF THAT SAME TURN
+            (w-560647d4db).
+
+            They were drawn on the reply card, which does not scroll, so one
+            question asked once stood at the bottom of the window for as long as
+            the thread was open: under the message that asked it, under
+            everything that happened after, and still there once it had been
+            read. Reported with a screenshot: "it should instead occur at the
+            end of the turn/message where it occured, not stuck at the bottom …
+            Once I've seen it as a user, I don't really want to see it
+            continuously."
+
+            So it stands here, after the agent's last word and after the threads
+            that turn filed, which is where "return to me" happened. It scrolls
+            away with its turn, so reading past it is the whole of what makes it
+            go, and nothing has to be remembered or marked as seen.
+
+            `stripShown` is what decides it, and it is also what takes the list
+            out of the message text above (`cleanMessage`), so the two can never
+            disagree and print the options twice. */}
+        {stripShown && (
+          <OptionsOffer
+            ask={ask} askAll={askAll} options={options}
+            optsOpen={optsOpen} setOptsOpen={setOptsOpen}
+            peekOption={peekOption} askPeek={askPeek}
+            selectedOption={selectedOption} selRef={selRef}
+            onPick={onPick} onOptionEnter={onOptionEnter} onAskEnter={onAskEnter}
+            setPeek={setPeek} setAskPeek={setAskPeek}
+          />
+        )}
+
         {!agent && <RemoteControl key={`remote:${item.product}:${item.id}`} product={item.product} id={item.id} />}
         {!agent && <CompactionResult engine={runningEngine ?? 'claude-code'} key={`${item.product}:${item.id}`} item={item} />}
 
@@ -1549,90 +1589,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               Unless they wrote options of their own, which are the better
               answers to their question and are drawn instead. */}
           {!stripShown && <TeamRouteStrip item={item} />}
-          {stripShown && (
-            <div className="opt-strip">
-              {/* THE HEADING IS THE QUESTION, NOT THE NAME OF THE CONTROL.
-
-                  The ask is up in the message and the message scrolls; this
-                  strip is docked and does not, so by the time she has read
-                  down to the answers the sentence they answer is off the top
-                  of the screen. It comes off the same field the options came
-                  off, so the two can never be from different rounds
-                  (ask-line.ts).
-
-                  The old words are the fallback and nothing more: a row whose
-                  offering field opens with no sentence still needs a heading
-                  saying what the numbers under it are.
-               */}
-              {/* THE HOVER SITS ON THE WHOLE HEADING ROW, not on the text node
-                  inside it. A pointer travelling down the pane crosses the
-                  padding before it crosses the words, and a card that opens
-                  only on the glyphs themselves blinks shut in the gaps between
-                  the two lines. The chevron is inside this row and keeps its
-                  own click; reading the question while reaching for it is not
-                  a conflict. */}
-              <div
-                className={`opt-head ${ask ? 'opt-head-ask' : ''}`}
-                onMouseEnter={(e) => onAskEnter(e.currentTarget)}
-                onMouseLeave={() => setAskPeek(false)}
-              >
-                <span>{ask || 'Their options · pick or write your own'}</span>
-                <button className="opt-collapse" onClick={() => setOptsOpen((o) => !o)} title={optsOpen ? 'Collapse options' : 'Expand options'}>
-                  <svg viewBox="0 0 16 16" className={optsOpen ? '' : 'flipped'} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6l4 4 4-4" /></svg>
-                </button>
-              </div>
-              {/* The card, drawn FIRST so it is the strip's first child: appended
-                  last it stole the last row's 4px of bottom padding and the
-                  strip measured 4px short. It is out of the flow entirely
-                  (`bottom: 100%`), which is the promise of this design: the
-                  strip is the same height with the card open as without it. */}
-              {optsOpen && peekOption && (
-                <div className="opt-peek">
-                  <div className="opt-peek-head">Option {peekOption.n}, in full</div>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {peekOption.text.replace(/\s*\(recommended\)/i, '')}
-                  </ReactMarkdown>
-                </div>
-              )}
-              {/* ONE SLOT, SO NEVER TWO CARDS. The option card wins when both
-                  could be open, which cannot happen from one pointer but can
-                  from a stale state, and two of these stacked would cover the
-                  message they are supposed to be read against.
-
-                  IT OPENS WITH THE STRIP COLLAPSED TOO. The chevron folds the
-                  answers away and leaves the question, so a folded strip is
-                  exactly the case where this line is all she has. */}
-              {!peekOption && askPeek && (
-                <div className="opt-peek">
-                  <div className="opt-peek-head">The question, in full</div>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{askAll}</ReactMarkdown>
-                </div>
-              )}
-              {optsOpen && options.map((o) => (
-                <button
-                  key={o.n}
-                  ref={o.n === selectedOption ? selRef : undefined}
-                  className={`opt-row ${o.n === selectedOption ? 'selected' : ''}`}
-                  onClick={() => onPick(o.n)}
-                  onMouseEnter={(e) => onOptionEnter(o.n, e.currentTarget)}
-                  onMouseLeave={() => setPeek(null)}
-                >
-                  <span className="opt-key">{o.n}</span>
-                  <span className="opt-text">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{ p: ({ children }) => <>{children}</> }}
-                    >
-                      {o.text.replace(/\s*\(recommended\)/i, '')}
-                    </ReactMarkdown>
-                  </span>
-                  {o.n === selectedOption
-                    ? <span className="opt-rec">↵ send</span>
-                    : o.recommended && <span className="opt-rec">recommended</span>}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* THE OPTIONS ARE NOT DOWN HERE ANY MORE (w-560647d4db). They are
+              drawn in the pane, at the foot of the turn that offered them; the
+              note at that call site says why. */}
           {/* NO REPLY BOX ON THE TROUBLE ROW EITHER, and for the same reason as
               the one below: there is nobody on the other end of it. A box that
               looks like it sends is the failure this codebase cares about most.

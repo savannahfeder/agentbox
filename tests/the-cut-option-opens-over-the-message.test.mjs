@@ -15,7 +15,9 @@ import { optionIsClipped, optionPeek } from '../renderer/src/option-peek';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const css = fs.readFileSync(path.join(root, 'renderer/src/styles.css'), 'utf8');
-const focus = fs.readFileSync(path.join(root, 'renderer/src/components/Focus.tsx'), 'utf8');
+// The strip's markup moved into its own component when it moved off the reply
+// card and onto the turn that offered it (w-560647d4db).
+const focus = fs.readFileSync(path.join(root, 'renderer/src/components/OptionsOffer.tsx'), 'utf8');
 const block = (sel) => {
   const m = css.match(new RegExp(`\\${sel} \\{([^}]*)\\}`, 's'));
   expect(m, `no ${sel} rule`).toBeTruthy();
