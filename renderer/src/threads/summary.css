@@ -126,8 +126,11 @@
    has the rest. Read-only, so it answers no hover. */
 .ts-title { margin: 0 0 20px; font-size: 16px; font-weight: 500; line-height: 22px; letter-spacing: -.01em; color: var(--text); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* THE FOOT: the hairline and the properties, at the bottom edge. */
-.ts-foot { margin-top: auto; padding-top: 28px; }
+/* THE FOOT: the hairline and the properties, at the bottom edge. It adds no
+   room of its own above the hairline (w-b51b2e1c86): under a long summary the
+   hairline sits one section's step under the words, 24px rather than 52px, so
+   more of them fit before the panel scrolls. */
+.ts-foot { margin-top: auto; padding-top: 0; }
 .ts-props { display: grid; grid-template-columns: 92px minmax(0, 1fr); row-gap: 14px; font-size: 13.5px; line-height: 20px; margin: 0; }
 .ts-label { color: var(--text-faint); font-size: 13px; }
 .ts-value { color: var(--text); display: flex; align-items: center; min-width: 0; }
