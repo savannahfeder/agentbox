@@ -532,7 +532,7 @@ const AGENT_SENTENCE: Record<AgentMode, string> = {
 };
 
 /* --------------------- IS CLAUDE CODE CONNECTED OR NOT -------------------- */
-// MARGARETTE WENT LOOKING FOR THIS AND FOUND NOWHERE TO LOOK (2026-08-28).
+// A TESTER WENT LOOKING FOR THIS AND FOUND NOWHERE TO LOOK (2026-08-28).
 //
 // THREE STATES, NEVER TWO. A login shell that timed out, or a Mac carrying
 // every sign of Claude Code somewhere the search cannot reach, comes back
