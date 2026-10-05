@@ -81,6 +81,7 @@ import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, idleSkin, lookMean
 import { resolveTaskShape, TASK_SHAPE_KEY, type TaskShape } from './task-shape';
 import { ComposeIcon } from './components/ComposeIcon';
 import { WorkspaceNavigation } from './components/WorkspaceNavigation';
+import { FeedbackCard } from './components/FeedbackCard';
 import { searchFieldInStrip, workspaceDestinations, workspaceNavigationShown, workspacePageTitle } from './workspace-navigation.mjs';
 import { SettingsIcon } from './components/SettingsIcon';
 import { UsagePill } from './components/UsagePill';
@@ -475,6 +476,8 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(
     () => new URLSearchParams(location.search).has('settings'),
   );
+  // The feedback card (FeedbackCard.tsx), opened by the sidebar's Feedback row.
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   // THE TEAM PAGE, a page like Settings: it takes the main area and leaves the
   // header and the sidebar where they are.
   const [teamOpen, setTeamOpen] = useState(() => new URLSearchParams(location.search).has('team'));
@@ -4637,17 +4640,14 @@ export default function App() {
        */}
       {reviewLab && <div className="review-lab-controls"><span>Review exploration</span><select aria-label="Focus controls" value={focusControlStyle} onChange={e=>setFocusControlStyle(e.target.value as FocusControlStyle)}><option value="text">Focus · Text only</option><option value="corners">Focus · Frame corners + label</option><option value="corners-icon">Focus · Frame corners button</option><option value="corners-bare">Focus · Bare frame corners</option><option value="layout">Focus · Workspace layout</option></select><select aria-label="Review file type" value={artifactPreviewSample} onChange={e=>{setArtifactPreviewSample(e.target.value);setOpenDoc(null);}}><option value="code">Code</option><option value="design">Design</option><option value="notes">Text</option><option value="multiple">All three</option></select><select aria-label="Review actions" value={reviewStyle} onChange={e=>setReviewStyle(e.target.value)}><option value="header-balanced-open">1 · Balanced · open only</option><option value="header-tools-open">2 · Compact · open only</option><option value="header-card-only">3 · Clickable card · no controls</option><option value="header-feedback-only">4 · Clickable card · feedback tools</option><option value="header-balanced">Compare · all controls</option></select>{artifactPreviewSample !== "code" &&<select aria-label="Text surface" value={textReviewStyle} onChange={e=>setTextReviewStyle(e.target.value)}><option value="clear">Text · Fully transparent</option><option value="glass">Text · Matched glass</option></select>}</div>}
       {!reviewLab && api.isFixtures && new URLSearchParams(location.search).has('artifactTweaks') && <div className="artifact-tweaks"><select aria-label="Design toolbar" value={designToolbar} onChange={e => setDesignToolbar(e.target.value)}><option value="floating">Floating bar</option><option value="corner">Corner controls</option><option value="edge">Top edge</option><option value="always">Always visible</option></select>{focused && <select aria-label="Sample artifact" value={artifactPreviewSample} onChange={e => { setArtifactPreviewSample(e.target.value); setOpenDoc(null); }}><option value="multiple">Multiple artifacts</option><option value="design">Design sample</option><option value="code">Code sample</option><option value="notes">Notes sample</option></select>}</div>}
-      {/* INVITE PEOPLE IS A SHORTCUT INTO SETTINGS (w-8415594d19, 2026-10-01).
-          Team management is a pane in Settings and this row routes to it, so
-          the sidebar lights Invite people, not Settings, while that pane is
-          the one up. The rule is that
-          the lit row names the pane you are on, which is why a project page
-          lights Settings (`settingsPage` reports `projects` for it) and the
-          team pane lights its own shortcut. */}
+      {/* EVERY SETTINGS PANE LIGHTS SETTINGS. The team pane used to light
+          Invite people, its shortcut row (w-8415594d19), until that row left
+          the sidebar for the single-player launch (w-1b574413db, 2026-10-04).
+          `onInvite` is still handed in, for the account menu. */}
       {workspaceNavigation && <WorkspaceNavigation
         update={announcesUpdate(snap?.update, { walking, closed: '' }) ? { installing: !!snap?.update?.installing, version: snap?.update?.newVersion, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
         onUpdate={() => { void api.updateInstall(); }}
-        page={settingsOpen ? (settingsPage === 'team' ? 'invite' : 'settings') : null} teamPage={teamOpen && !settingsOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
+        page={settingsOpen ? 'settings' : null} onFeedback={() => setFeedbackOpen(true)} teamPage={teamOpen && !settingsOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
         onInvite={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onSignOut={() => { void api.teamSignOut().then(() => refresh()); }}
@@ -6190,6 +6190,9 @@ export default function App() {
             : null}
         />
       )}
+      {/* The feedback card, from the sidebar's Feedback row (w-1b574413db).
+          Over whatever is on screen, an opened task included. */}
+      {feedbackOpen && <FeedbackCard onClose={() => setFeedbackOpen(false)} onSend={(p) => api.sendFeedback(p)} />}
       {/* Last, and outside everything: the zoom percent is over whatever is on
           screen, including an opened task. */}
       <ZoomPercent />
