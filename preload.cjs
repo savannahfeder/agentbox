@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld('zero', {
   sendNow: (payload) => ipcRenderer.invoke('zero:send-now', payload),
   compose: (payload) => ipcRenderer.invoke('zero:compose', payload),
   schedule: (payload) => ipcRenderer.invoke('zero:schedule', payload),
+  // Feedback to the Agentbox team, from the card the sidebar opens.
+  sendFeedback: (payload) => ipcRenderer.invoke('zero:send-feedback', payload),
   // The team version: signing in, the team, and sharing a project.
   teamSignIn: () => ipcRenderer.invoke('zero:team-sign-in'),
   teamSignInCancel: () => ipcRenderer.invoke('zero:team-sign-in-cancel'),

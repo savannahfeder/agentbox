@@ -1,3 +1,5 @@
+import { walkFiles } from './code-keys';
+
 // PURE. What a change the agent made is, as a thing the pane can open.
 //
 // So a change is a THIRD KIND OF ARTIFACT, beside the markdown file and the
@@ -269,6 +271,72 @@ export function tokenize(line: string): Tok[] {
   return out;
 }
 
+/* ------------------------ the words that changed -------------------------- */
+//
+// A removed line and the line that replaced it used to be two whole coloured
+// lines, so finding `, ensurePersonalProject` meant comparing them by eye
+// (2026-10-04, tests/the-words-that-changed-are-marked.test.mjs). The span the
+// two do not share, between their common start and common end, is marked.
+
+/** The part of each line the other does not share, or null when there is nothing worth marking. */
+export function changedSpan(a: string, b: string): { minus: [number, number]; plus: [number, number] } | null {
+  if (a === b) return null;
+  const max = Math.min(a.length, b.length);
+  let p = 0;
+  while (p < max && a[p] === b[p]) p += 1;
+  let s = 0;
+  while (s < max - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s += 1;
+  const minus: [number, number] = [p, a.length - s];
+  const plus: [number, number] = [p, b.length - s];
+  // A WHOLE LINE THAT IS DIFFERENT IS ALREADY SAID BY ITS COLOUR. Marking most
+  // of it again is noise, so past this share nothing is marked.
+  const share = Math.max((minus[1] - minus[0]) / Math.max(1, a.length), (plus[1] - plus[0]) / Math.max(1, b.length));
+  return share > 0.6 ? null : { minus, plus };
+}
+
+/**
+ * The changed span on each row of a hunk, parallel to `rows`, null where none.
+ * A run of removed rows is paired, in order, with the run of added rows right
+ * after it, which is how every diff reads a replacement; a row without a
+ * partner, and anything across a context row, is left alone.
+ */
+export function wordChanges(rows: Row[]): ([number, number] | null)[] {
+  const out: ([number, number] | null)[] = rows.map(() => null);
+  let i = 0;
+  while (i < rows.length) {
+    if (rows[i][0] !== '-') { i += 1; continue; }
+    const minusAt = i;
+    while (i < rows.length && rows[i][0] === '-') i += 1;
+    const plusAt = i;
+    while (i < rows.length && rows[i][0] === '+') i += 1;
+    const pairs = Math.min(plusAt - minusAt, i - plusAt);
+    for (let k = 0; k < pairs; k++) {
+      const span = changedSpan(rows[minusAt + k][1], rows[plusAt + k][1]);
+      if (!span) continue;
+      out[minusAt + k] = span.minus;
+      out[plusAt + k] = span.plus;
+    }
+  }
+  return out;
+}
+
+/** The tokens of a line, split at the changed span, with the ones inside it flagged. */
+export function marked(toks: Tok[], span: [number, number] | null): (Tok & { hl?: boolean })[] {
+  if (!span || span[0] >= span[1]) return toks;
+  const out: (Tok & { hl?: boolean })[] = [];
+  let at = 0;
+  for (const t of toks) {
+    const end = at + t.s.length;
+    const cuts = [at, Math.min(Math.max(span[0], at), end), Math.min(Math.max(span[1], at), end), end];
+    for (let k = 0; k < 3; k++) {
+      const piece = t.s.slice(cuts[k] - at, cuts[k + 1] - at);
+      if (piece) out.push(k === 1 ? { c: t.c, s: piece, hl: true } : { c: t.c, s: piece });
+    }
+    at = end;
+  }
+  return out;
+}
+
 // NOTHING IS FOLDED. EVERY LINE OF A HUNK IS DRAWN.
 //
 // This used to cut any hunk over 34 rows down to a head of 18 and a tail of 6,
@@ -354,9 +422,102 @@ export function linesSkipped(before: Hunk | undefined, after: Hunk | undefined):
   return gap > 0 ? gap : null;
 }
 
+/**
+ * THE LINES A GAP BETWEEN TWO HUNKS STOOD FOR, read out of the file as it is
+ * on disk now, numbered from `from` (2026-10-04,
+ * tests/the-hidden-lines-open-in-place.test.mjs).
+ *
+ * The disk may have moved on since the change, so the last row before the gap
+ * and the first row after it must still read the same at the numbers the
+ * change gives them, or nothing is returned but the reason.
+ */
+export function hiddenLines(fileText: string, before: Hunk, after: Hunk):
+  { ok: true; from: number; lines: string[] } | { ok: false; error: string } {
+  const lastNew = (h: Hunk) => {
+    for (let i = (h.nums?.length ?? 0) - 1; i >= 0; i--) if (h.nums![i][1] != null) return { n: h.nums![i][1]!, text: h.rows[i][1] };
+    return null;
+  };
+  const firstNew = (h: Hunk) => {
+    const i = (h.nums ?? []).findIndex((p) => p[1] != null);
+    return i >= 0 ? { n: h.nums![i][1]!, text: h.rows[i][1] } : null;
+  };
+  const end = lastNew(before);
+  const start = firstNew(after);
+  if (!end || !start) return { ok: false, error: 'This change does not say which lines it skipped.' };
+  const lines = String(fileText).split('\n');
+  if (lines[end.n - 1] !== end.text || lines[start.n - 1] !== start.text) {
+    return { ok: false, error: 'This file has changed since, so the lines in between could not be placed. Open it in your editor to read them.' };
+  }
+  return { ok: true, from: end.n + 1, lines: lines.slice(end.n, Math.max(end.n, start.n - 1)) };
+}
+
 /** A hunk's height in pixels before it is drawn, for `contain-intrinsic-size`. */
 export function hunkGuessPx(rows: number): number {
   return Math.round(rows * ROW_PX + HUNK_PAD_PX);
+}
+
+// THE BROWSER SKIPS OFF-SCREEN CODE IN SLICES, NOT WHOLE HUNKS (2026-10-04).
+//
+// A hunk can be a whole new file: the largest real change had hunks of 808,
+// 608 and 440 rows. With `content-visibility` on the hunk, scrolling one pixel
+// into one made the browser style and lay out every row of it in a single
+// frame, and sixty wheel ticks dropped 21 frames past 50ms. A slice of at most
+// this many rows is about two screenfuls, so the work arrives a little at a
+// time as she scrolls. tests/a-big-change-scrolls-without-stalling.test.mjs.
+export const SLICE_ROWS = 48;
+
+/** [from, to) row ranges cutting `n` rows into slices of at most SLICE_ROWS. */
+export function rowSlices(n: number): [number, number][] {
+  const out: [number, number][] = [];
+  for (let a = 0; a < n; a += SLICE_ROWS) out.push([a, Math.min(n, a + SLICE_ROWS)]);
+  return out;
+}
+
+/** A slice's height before it is drawn: its rows, no padding of its own. */
+export function sliceGuessPx(rows: number): number {
+  return Math.round(rows * ROW_PX);
+}
+
+// HOW MANY FILES ARE DRAWN IN THE FIRST FRAME. The rest follow in idle moments
+// straight after, so a 28,000-row change opens on a screenful instead of
+// freezing the window for every row of it (4.7s at a quarter speed, measured).
+// The median real change is 76 rows and is under the budget, so it is drawn
+// whole at once exactly as before. A batch is small enough to fit the gap
+// between two frames (400 rows cost about 40ms at half speed and dropped
+// frames under a scrolling hand; 150 do not), so filling in is not felt.
+export const FIRST_ROWS = 2400;
+export const BATCH_ROWS = 150;
+
+/**
+ * The next files to fill in: the one she is on, then the ones below her, then
+ * the ones above, skipping what is drawn, up to `budget` rows and at least one.
+ */
+export function fillNext(files: ChangedFile[], drawn: ReadonlySet<number>, here: number, budget = BATCH_ROWS): number[] {
+  const order = [here, ...Array.from({ length: files.length }, (_, i) => i).filter((i) => i > here),
+    ...Array.from({ length: here }, (_, i) => here - 1 - i)];
+  const out: number[] = [];
+  let rows = 0;
+  for (const i of order) {
+    if (i < 0 || i >= files.length || drawn.has(i)) continue;
+    const size = files[i].hunks.reduce((m, h) => m + h.rows.length, 0);
+    if (out.length && rows + size > budget) break;
+    out.push(i);
+    rows += size;
+  }
+  return out;
+}
+
+/** Files to draw at once: up to the row budget, at least one, always through `atLeast`. */
+export function firstBatch(files: ChangedFile[], atLeast: number, budget = FIRST_ROWS): number {
+  let rows = 0;
+  let n = 0;
+  while (n < files.length) {
+    const size = files[n].hunks.reduce((m, h) => m + h.rows.length, 0);
+    if (n > atLeast && n > 0 && rows + size > budget) break;
+    rows += size;
+    n += 1;
+  }
+  return n;
 }
 
 /**
@@ -368,6 +529,55 @@ export function hunkGuessPx(rows: number): number {
 export function filesInTreeOrder(files: ChangedFile[]): ChangedFile[] {
   const order = new Map(treeRows(files).filter((r) => r.kind === 'file').map((r, i) => [(r as { path: string }).path, i]));
   return [...files].sort((a, b) => (order.get(a.path) ?? 0) - (order.get(b.path) ?? 0));
+}
+
+// THE FILES SHE HAS FOLDED IN EACH CHANGE, for as long as the app runs, so
+// closing the pane does not throw away which ones she was done with (2026-10-04).
+// Not on disk, for the reason the unsaved edits are not: a change she reopens
+// tomorrow is a different reading.
+const FOLDS = new Map<string, Set<string>>();
+
+/** The live set of folded file paths for one change; the same set every time. */
+export function foldsFor(product: string, src: string): Set<string> {
+  const key = `${product}\n${src}`;
+  let set = FOLDS.get(key);
+  if (!set) { set = new Set(); FOLDS.set(key, set); }
+  return set;
+}
+
+/** A copy of `set` with `path` added if it was not there, taken away if it was. */
+export function toggled(set: ReadonlySet<string>, path: string): Set<string> {
+  const next = new Set(set);
+  if (next.has(path)) next.delete(path); else next.add(path);
+  return next;
+}
+
+/**
+ * WHERE AN ARROW ON THE TREE GOES, as a path, or null for nowhere.
+ *
+ * `shown` is the files the tree draws (folding hides some), `all` every file in
+ * the change in the same order. She may be standing in a file the tree is not
+ * showing, because folding never moves her (since 2026-10-04,
+ * tests/folding-the-tree-never-moves-the-code.test.mjs); then down is the next
+ * file shown after hers and up the one before, rather than the top.
+ */
+export function stepInTree(key: string, path: string | null, shown: string[], all: string[]): string | null {
+  if (!shown.length) return null;
+  if (key !== 'ArrowDown' && key !== 'ArrowUp' && key !== 'Home' && key !== 'End') return null;
+  const here = path ? shown.indexOf(path) : -1;
+  if (here >= 0 || key === 'Home' || key === 'End') {
+    // The ordinary walk is walkFiles' (code-keys.ts); it stops at the ends,
+    // which here reads as nowhere to go.
+    const to = walkFiles(key, Math.max(0, here), shown.length);
+    return to == null || (to === here) ? null : shown[to];
+  }
+  const down = key === 'ArrowDown';
+  const rank = new Map(all.map((p, i) => [p, i]));
+  const mine = path ? rank.get(path) ?? -1 : -1;
+  const pick = down
+    ? shown.find((p) => (rank.get(p) ?? -1) > mine)
+    : [...shown].reverse().find((p) => (rank.get(p) ?? -1) < mine);
+  return pick ?? null;
 }
 
 /**

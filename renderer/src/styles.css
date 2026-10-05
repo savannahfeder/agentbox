@@ -7449,6 +7449,20 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   border-bottom: 1px solid var(--line);
 }
 .code-file-head.is-at .code-file-name { color: var(--text); }
+/* THE HEADER FOLDS ITS FILE (2026-10-04). The whole bar is the control, the
+   way GitHub's is, so there is nothing new to aim at: a caret where the eye
+   starts reading, turned when the file is shut, and the pointer saying it can
+   be pressed. */
+.code-file-head { cursor: pointer; user-select: none; }
+.code-file-head .code-fold-caret {
+  flex: 0 0 13px; width: 13px; height: 13px; margin-left: -4px;
+  color: var(--text-faint); transition: transform 120ms ease;
+}
+.code-file-head.is-folded .code-fold-caret { transform: rotate(-90deg); }
+.code-file-head.is-folded { border-bottom-color: transparent; }
+/* A folded file in the tree reads as done with: dimmer, counts and all. */
+.code-file.is-folded .code-node-name,
+.code-file.is-folded .code-counts { opacity: 0.45; }
 .code-file-name { font-size: 12.5px; font-weight: 600; color: var(--text-dim); }
 .code-file-where { font-size: 11.5px; color: var(--text-faint); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .code-file-acts { margin-left: auto; display: flex; gap: 6px; flex: 0 0 auto; }
@@ -7468,7 +7482,11 @@ a.set-ghost { text-decoration: none; display: inline-block; }
    that value makes the browser keep the real height once the hunk has been
    drawn properly, which is what corrects a wrapped line.
 */
-.code-hunk { padding: 2px 0; content-visibility: auto; }
+.code-hunk { padding: 2px 0; }
+/* THE SKIPPING IS PER SLICE OF AT MOST 48 ROWS, NOT PER HUNK (2026-10-04). A
+   hunk can be a whole new file of 800 rows, and touching one pixel of it laid
+   out all 800 in one frame. `rowSlices` in code-artifact.ts has the numbers. */
+.code-slice { content-visibility: auto; }
 .code-row { display: flex; font-family: var(--mono); font-size: 12px; line-height: 1.55; white-space: pre; }
 .code-mark { flex: 0 0 22px; text-align: center; color: var(--text-faint); }
 /* THE LINE NUMBER, 2026-09-20. The pane had no numbers at all, which is the
@@ -7483,7 +7501,9 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 */
 .code-num {
   flex: 0 0 44px; padding-right: 10px; text-align: right;
-  color: var(--text-faint); opacity: 0.55; user-select: none;
+  /* No extra opacity on the faint ink (2026-10-04): at 0.55 the numbers
+     measured 2.89:1 on the code ground, so naming a line meant squinting. */
+  color: var(--text-faint); user-select: none;
   font-variant-numeric: tabular-nums;
 }
 /* WHERE THE FILE JUMPS. Not the fold coming back: nothing here can be pressed
@@ -7503,6 +7523,14 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 .code-skip::after {
   content: ''; flex: 1; height: 1px; background: var(--line);
 }
+/* PRESSING THE GAP OPENS IT (2026-10-04). It stays the same quiet line until
+   the pointer is on it, so the page reads as before; the words brighten to say
+   it can be pressed. */
+button.code-skip {
+  width: 100%; border: 0; background: none; cursor: pointer; text-align: left;
+}
+button.code-skip:hover { color: var(--text-dim); }
+button.code-skip:hover::after, button.code-skip:hover::before { background: var(--line-strong); }
 /* A LONG LINE WRAPS RATHER THAN BEING CUT OFF OUT OF REACH.
    This was `overflow-x: hidden` on a `white-space: pre` line, which is the one
    combination that hides text and offers nothing that would bring it back: the
@@ -7513,11 +7541,21 @@ a.set-ghost { text-decoration: none; display: inline-block; }
    see code; a line whose end is unreachable is that same fault made small.
    `pre-wrap` keeps every leading space, so the indentation still reads, and
    `anywhere` covers a 918-character line with no space in it to break at. */
-.code-line { flex: 1; min-width: 0; padding-right: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.code-line { flex: 1; min-width: 0; padding-right: 14px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+/* `user-select: text` above, because the window's body is `none` and a line
+   that is not editable (a removed one, an opened gap) inherited it: a
+   double-click on a deleted word selected nothing and a copy pasted the old
+   clipboard (2026-10-04). */
 .cr-plus { background: var(--code-plus-bed); }
 .cr-minus { background: var(--code-minus-bed); }
 .cr-plus .code-mark { color: var(--code-plus); }
 .cr-minus .code-mark { color: var(--code-minus); }
+/* THE WORDS THAT CHANGED, inside a removed line and its replacement
+   (2026-10-04). The same two inks as the line beds, a few times stronger, so
+   the eye goes straight to the words and the line colour still says which side
+   it is. Every skin answers it through the two tokens it already sets. */
+.cr-plus .w-chg { background: color-mix(in srgb, var(--code-plus) 32%, transparent); border-radius: 2px; }
+.cr-minus .w-chg { background: color-mix(in srgb, var(--code-minus) 32%, transparent); border-radius: 2px; }
 .code-folded { padding: 10px 16px 4px; font-size: 12px; color: var(--text-faint); }
 
 /* A LINE THE USER CAN TYPE INTO. IT LOOKS EXACTLY LIKE A LINE THAT CANNOT BE

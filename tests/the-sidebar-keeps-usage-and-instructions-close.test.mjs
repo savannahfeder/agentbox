@@ -2,8 +2,8 @@
 // Check expanded/collapsed access, one usage slot, and no placeholder actions.
 //
 // The foot was redrawn on 2026-10-01 and the promise held. approved 2026-10-01
-// (w-e731ca9376, then w-8415594d19): the foot is Invite people when signed in
-// to a team, then Instructions and Settings, then the usage slot, then the
+// (w-e731ca9376, then w-8415594d19): the foot is Feedback (Invite people until
+// w-1b574413db), then Instructions and Settings, then the usage slot, then the
 // signed-in person beside the collapse toggle. The Done place that used to sit
 // down here left the sidebar that day; it is the Done tab on the Inbox page now
 // (StateTabs in renderer/src/threads/Pages.tsx).

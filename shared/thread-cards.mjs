@@ -119,7 +119,7 @@ export function shownToTeam(item, since = null, product = null) {
  *
  * YOUR PERSONAL PROJECT IS PRIVATE UNLESS YOU SAY OTHERWISE (w-b989839656).
  * Everywhere else a thread with no word of its own is the team's, and in
- * Personal it is yours alone, whoever wrote it: the composer, an agent filing a
+ * My Workspace it is yours alone, whoever wrote it: the composer, an agent filing a
  * proposal, a repeat. Failing closed here, rather than writing 'private' on
  * each new thread, is what covers every one of those paths at once.
  */

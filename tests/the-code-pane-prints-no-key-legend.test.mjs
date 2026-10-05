@@ -77,7 +77,9 @@ describe('the keys she did not strike still work', () => {
   });
 
   it('keeps the arrows walking the tree, which is what a person tries untold', () => {
-    expect(codeArtifact).toMatch(/walkFiles\(e\.key, at, fileRows\.length\)/);
+    // stepInTree since 2026-10-04: the same walk, by path, so a folded folder
+    // cannot move her (tests/folding-the-tree-never-moves-the-code.test.mjs).
+    expect(codeArtifact).toMatch(/stepInTree\(e\.key, current\?\.path/);
   });
 
   it('still swallows J and K so a stray press cannot swap her task out', () => {

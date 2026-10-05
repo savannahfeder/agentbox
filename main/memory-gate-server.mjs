@@ -96,6 +96,13 @@ export class MemoryGateServer {
     history = null,
     gate = {},
     scoreFor = null,
+    // WHOSE CODEX THREAD IS THIS (w-e5225b62ba). A Claude worker carries its row
+    // in its environment; one `codex app-server` serves every Codex thread of a
+    // login, so there is one environment for all of them and the thread has to
+    // say who it is. It does, by the `session_id` in its payload, measured to be
+    // the app-server's own `thread.id`. Answering null means "not this app's",
+    // and such a command is let straight through.
+    ownerOf = null,
     readPressure = readMacPressure,
     sampleProcesses = listProcesses,
     pollMs = 2_000,
@@ -121,6 +128,7 @@ export class MemoryGateServer {
     this.lastSweep = -Infinity;
     this.gate = new MemoryGate({ ...gate, history: this.history, clock });
     this.scoreFor = scoreFor;
+    this.ownerOf = ownerOf;
     this.readPressure = readPressure;
     this.sampleProcesses = sampleProcesses;
     this.pollMs = pollMs;
@@ -130,7 +138,10 @@ export class MemoryGateServer {
     this.grants = new Map();
     this.lastPids = new Set();
     this.reading = { level: null, freePct: null };
-    this.counts = { asked: 0, waited: 0, refused: 0 };
+    // `foreign` is counted apart from `asked` so the figures on the Agents page
+    // stay about this app's own work: a Codex session it did not start is let
+    // through and is not one of its agents.
+    this.counts = { asked: 0, waited: 0, refused: 0, foreign: 0 };
     this.dirty = false;
   }
 
@@ -225,17 +236,58 @@ export class MemoryGateServer {
     });
   }
 
+  /**
+   * WHOSE ROW THIS COMMAND BELONGS TO, or null for "not this app's".
+   *
+   * THE ENVIRONMENT WINS. A Claude Code worker is a process per work item and
+   * carries the row on it (`memoryGateEnv`), and that is the authority: reading a
+   * session id first would let a Codex thread id that happened to collide
+   * relabel a Claude worker's command.
+   *
+   * ONLY THEN THE SESSION ID, which is the Codex path and the reason this method
+   * exists. One `codex app-server` serves every Codex thread of a login, so its
+   * environment names no row and the thread names itself: the `session_id` in
+   * the payload was measured to be the app-server's own `thread.id`.
+   *
+   * A LOOKUP THAT THROWS IS A COMMAND WE LET RUN. The lookup reaches into the
+   * supervisor's live sessions, and a store mid-write there must not be able to
+   * stop an agent's shell command.
+   *
+   * AND AN ASK THAT NAMES NEITHER IS STILL GATED, with no row, exactly as it was
+   * before any of this existed. "Let it through" is reserved for a thread we
+   * POSITIVELY know is somebody else's — a session id we were given and do not
+   * recognise. Treating a nameless ask as a stranger's would have been a way for
+   * a payload we failed to read to walk past the gate unmeasured.
+   */
+  _whose(body, hook) {
+    const item = typeof body?.item === 'string' ? body.item.trim() : '';
+    if (item) return { item, product: body.product || null };
+    const session = typeof hook?.session_id === 'string' ? hook.session_id.trim() : '';
+    if (!session) return { item: null, product: body?.product || null };
+    if (typeof this.ownerOf !== 'function') return null;
+    let owner;
+    try { owner = this.ownerOf(session); } catch { return null; }
+    if (!owner?.item) return null;
+    return { item: String(owner.item), product: owner.product ?? null };
+  }
+
   _pre(body, req, res) {
     const hook = body?.hook ?? {};
     const command = hook?.tool_input?.command;
     if (typeof command !== 'string' || !command.trim()) { res.end(''); return; }
+    const whose = this._whose(body, hook);
+    // A COMMAND THIS APP DID NOT START IS NOT ITS TO HOLD. Only a Codex ask can
+    // land here unowned, and letting it run is the only honest answer: holding a
+    // stranger's command behind our queue would stall somebody's terminal with
+    // nothing on any screen to say why.
+    if (!whose) { this.counts.foreign++; res.end(''); return; }
     const id = String(hook.tool_use_id || `${body.ppid}-${Date.now()}-${Math.random()}`);
-    const live = typeof this.scoreFor === 'function' ? this.scoreFor(body.product, body.item) : null;
+    const live = typeof this.scoreFor === 'function' ? this.scoreFor(whose.product, whose.item) : null;
     const score = Number.isFinite(live) ? live : Number(body.score) || 0;
     this.counts.asked++;
     let answered = false;
     this.gate.submit({
-      id, command, score, item: body.item || null, product: body.product || null,
+      id, command, score, item: whose.item, product: whose.product,
       background: !!hook?.tool_input?.run_in_background,
     }, (decision) => {
       answered = true;
