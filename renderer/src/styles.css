@@ -4263,6 +4263,12 @@ img.app-mark { opacity: 1; border-radius: 0; }
 .msg-body { font-size: 15px; line-height: 1.6; color: var(--text); }
 .msg-body > :first-child { margin-top: 0; }
 .msg-body > :last-child { margin-bottom: 0; }
+/* A PERSON'S MESSAGE, AS TYPED. It carries no markup at all, so the breaks
+   they pressed Return for are the only breaks there are and the stylesheet has
+   to honour them. `anywhere` is for the thing that started this: a pasted
+   command is one long unbroken word to a browser, and without it a search
+   command runs off the side of the column instead of wrapping. */
+.msg-body.typed { white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.same { margin-top: -14px; }
 
 /* THE USER'S MESSAGES OPEN CHAPTERS (w-250047ba5f, 2026-09-26). The user's
