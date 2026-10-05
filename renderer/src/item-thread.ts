@@ -35,6 +35,7 @@ import { said, traceLines } from './terminal';
 import type { TraceSession } from './notes';
 import { threadEvents, withRuns, type LedgerLine, type ThreadEvent } from './thread-history';
 import type { AgentEvent, AgentWork } from './types';
+import type { UndoMark } from './undo-marks';
 
 // `[Read] strategy/art-style.md` — how the supervisor writes a tool call into a
 // trace (`traceStreamLine`, main/supervisor.mjs). The name is the tool and the
@@ -470,7 +471,10 @@ export function itemThread(
   //
   // `pending`: WHAT SHE HAS JUST SENT AND THE LEDGER DOES NOT HAVE YET. See
   // `PendingSaid`.
-  opts: { whole?: boolean; engine?: string | null; pending?: PendingSaid[]; chat?: boolean } = {},
+  //
+  // `undone`: THE Zs PRESSED ON THIS TASK (./undo-marks). Each is drawn as one
+  // of her actions, and the ledger lines that Z wrote itself fold under it.
+  opts: { whole?: boolean; engine?: string | null; pending?: PendingSaid[]; chat?: boolean; undone?: UndoMark[] } = {},
 ): ItemThread {
   // The pickup-to-run match is thread-history's, not a second copy of it: it is
   // the part that can be wrong while the screen still looks perfect (a run
@@ -537,6 +541,22 @@ export function itemThread(
       continue;
     }
     placed.push({ node: saidLine(event), run: null, answer: null, ...(event.answers ? { answers: true } : {}) });
+  }
+
+  // A Z IS ONE THING SHE DID, SO IT IS ONE LINE (w-c78d1e1607). The lines its
+  // own undo wrote, stamped between when it started and when it finished, are
+  // bookkeeping ("Withdrew your reply", "Sent it back") and fold under it. An
+  // action of hers from before the undo started is what it undid, and stays.
+  for (const mark of opts.undone ?? []) {
+    for (let k = placed.length - 1; k >= 0; k -= 1) {
+      const n = placed[k].node;
+      if (n.kind === 'work' && n.yours && n.at >= mark.from && n.at <= mark.at) placed.splice(k, 1);
+    }
+    placed.push({
+      node: { kind: 'work', at: mark.at, verb: mark.words, subject: mark.choice ?? '', output: '', lines: 0, failed: false, yours: true },
+      run: null,
+      answer: null,
+    });
   }
 
   // AND THE SENTENCE BEING TYPED RIGHT NOW, IF THE TRACE HAS NOT CAUGHT IT YET.

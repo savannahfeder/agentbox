@@ -125,6 +125,17 @@ export function resolveArtifact({ src, product, products = [], accountRoot, stor
     }
   } else {
     for (const root of roots) candidates.push(path.join(root, raw));
+    // AND THE WORKER'S OWN CHECKOUT, when the path names its task. Every run
+    // works in `<repo>/.claude/worktrees/<task id>` (./task-folders.mjs), so
+    // `designs/w-1b574413db/a1.png` is relative to that folder, and the hunt
+    // below never finds it because it skips every folder starting with a dot.
+    // Only a task the path itself names: a bare `shots/a.png` must not reach
+    // into some other task's checkout (2026-10-04, w-7fe215448b).
+    if (own?.repoPath) {
+      for (const segment of raw.split('/')) {
+        if (/^w-[0-9a-f]{6,}$/i.test(segment)) candidates.push(path.join(own.repoPath, '.claude', 'worktrees', segment, raw));
+      }
+    }
   }
 
   for (const full of candidates) {

@@ -176,7 +176,9 @@ describe('sharing a project', () => {
 
     await theo.service.signIn();
     await theo.service.acceptInvite(maya.service.state().team.id);
-    const joined = storeAt(theo.accountRoot).listProducts();
+    // Theo's own Personal project is here too since w-b989839656; the shared
+    // ones are the question.
+    const joined = storeAt(theo.accountRoot).listProducts().filter((p) => p.team);
     expect(joined.map((p) => p.name)).toEqual(['Website']);
     // A row's words stay on the Mac they were written on (review 2026-10-01,
     // shared/team-rules.mjs whatATeammateMaySet); its summary is what travels.

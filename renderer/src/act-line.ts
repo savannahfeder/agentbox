@@ -17,6 +17,11 @@ export interface ActWords {
 /** The line's words. `name` is a teammate's first name, when it was theirs. */
 export function actWords(act: { verb: string; subject?: string }, name?: string | null): ActWords {
   const subject = (act.subject ?? '').trim();
+  // A Z ALREADY SPEAKS IN A FEW WORDS ("Undid closing it"), and the option it
+  // took back is drawn brighter after it, the way a pick's is (./undo-marks).
+  if (/^Undid\b/.test(act.verb)) {
+    return { lead: name ? `${name} ${act.verb.replace(/^Undid/, 'undid')}` : act.verb, choice: subject || null, picked: false };
+  }
   const picked = /^You picked option \d+$/.test(act.verb);
   // "You snoozed it until …" says "it" about the only thing on the page.
   let rest = picked ? 'picked' : act.verb.replace(/^You\s+/, '').replace(/^snoozed it$/, 'snoozed');

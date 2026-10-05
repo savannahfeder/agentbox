@@ -111,6 +111,9 @@ export interface Product {
   // because the supervisor refuses to start a session in a practice project on
   // purpose and the card used to take the task anyway.
   practice?: boolean;
+  // YOUR PERSONAL PROJECT (main/team/projects.mjs, w-b989839656): a thread in
+  // it with no visibility of its own is Only you, and it is never shared.
+  personal?: boolean;
   // SHARED OR PRIVATE (main/team/projects.mjs). Null or absent is private.
   // `direct` marks the record a message between two people lives in, which is
   // not a project and holds no work (main/team/projects.mjs makeDirect).

@@ -19,7 +19,7 @@ import { NOTE_NAME } from './rail-note.mjs';
 import { iconPathFor } from './project-identity.mjs';
 import { patchProjectAt } from './store/project.mjs';
 import { imgUrl } from './img-scheme.mjs';
-import { teamOf } from './team/projects.mjs';
+import { teamOf, PERSONAL_FLAG } from './team/projects.mjs';
 import {
   agentImportRow, agentsNeedingRows, threadImportRow, threadsNeedingRows,
 } from '../shared/agent-import.mjs';
@@ -125,6 +125,9 @@ export class Store {
         // that turn on this flag — never spawning a worker in it, drawing a
         // band over it — must never happen to real work.
         practice: project[PRACTICE_FLAG] === true,
+        // YOUR PERSONAL PROJECT, where a thread is Only you unless you say
+        // otherwise (main/team/projects.mjs, w-b989839656).
+        personal: project[PERSONAL_FLAG] === true,
         // SHARED OR PRIVATE. Null on a private project, which is every
         // project of a person who never signs in; otherwise the cloud id that
         // is the same on every teammate's Mac (main/team/projects.mjs).
@@ -511,9 +514,11 @@ export class Store {
       ...(due ? { due: String(due) } : {}),
       ...(Array.isArray(people) && people.length ? { people } : {}),
       // WHO SEES IT (approved 2026-10-01): the team by default, nobody but its
-      // owner, or the people she chose (w-41ff964775). Only the two words that
-      // are not the default are written; no field at all reads as the team.
-      ...(visibility === 'private' ? { visibility } : {}),
+      // owner, or the people she chose (w-41ff964775). No field at all reads
+      // as the team, except in your personal project, where it reads as Only
+      // you (w-b989839656). So Team is written when it was chosen, which is
+      // how a thread in Personal is shared on purpose.
+      ...(visibility === 'private' || visibility === 'team' ? { visibility } : {}),
       ...(visibility === 'people' && Array.isArray(visibleTo) && visibleTo.length
         ? { visibility, visibleTo: [...new Set(visibleTo.map(String))] } : {}),
     };

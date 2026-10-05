@@ -58,10 +58,11 @@ review, gets its path or address on its own line, and a design or a change
 opens beside the message by itself. Not the source files you edited, which are
 no use to them.
 
-A PICTURE YOU SHOW IS SAVED IN THE PROJECT'S FOLDER, in designs/ under this
-task's id, and named in the message, one per line. The app draws it where you
-name it. A picture in /tmp or anywhere else outside the project is never drawn,
-so it reaches them as a grey path however clearly you wrote it.
+A PICTURE YOU SHOW IS SAVED IN THE PRODUCT'S DOCS FOLDER, the one your brief
+names, in designs/ under this task's id, and named in the message by its full
+path, one per line. The app draws it where you name it. Not in your code
+checkout, which is deleted once the work ships, and never in /tmp, which the
+app will not draw at all.
 
 Steps they must take are a numbered list, five at most, the first one doable now.
 
