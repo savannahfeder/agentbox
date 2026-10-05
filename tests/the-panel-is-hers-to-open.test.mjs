@@ -29,7 +29,9 @@ describe('the app remembers one answer, not one per screen', () => {
     // What is DRAWN is that flag and one more fact: whether there is a project
     // behind the panel at all (see the block below). The toggle she presses is
     // still one flag, which is what this file is about.
-    expect(app).toContain('const workspaceCollapsed = !panelUp;');
+    // Since w-df42206cea a narrow window can fold it too, which is not her
+    // answer and is never stored: `panelShownNow` is the flag plus that fold.
+    expect(app).toContain('const workspaceCollapsed = !panelShownNow;');
     expect(app).not.toContain('<Rail');
   });
 
@@ -85,10 +87,13 @@ describe('a panel with no project behind it is not drawn at all', () => {
     expect(app).toContain('const panelShown = false;');
   });
 
-  it('still hands ⌘K the flag she set, not the one that got drawn', () => {
-    // "Hide the product panel" has to describe her switch. A label reading off
-    // panelShown would say "Show" while the panel is up on every other task.
-    expect(app).toMatch(/panelUp=\{panelUp\}/);
+  it('hands ⌘K the sidebar as drawn, never the retired rail', () => {
+    // "Hide the product panel" had to describe her switch, not the retired
+    // rail's `panelShown`, which is always false. Since w-df42206cea a narrow
+    // window folds the sidebar without touching her switch, and the command
+    // must say what pressing it does there: "Expand sidebar" on a folded one.
+    expect(app).toMatch(/panelUp=\{panelShownNow\}/);
+    expect(app).not.toMatch(/panelUp=\{panelShown\}/);
   });
 });
 
