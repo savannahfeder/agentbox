@@ -106,6 +106,9 @@ import { nameRow, wantsName } from './row-label.mjs';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mjs';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
 import { signInFiles, signInStamp } from './sign-in-files.mjs';
+import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath } from './memory-gate-server.mjs';
+import { autoSlots, DEFAULTS as MEMORY_GATE } from './memory-gate.mjs';
+import { syncCodexMemoryGate } from './codex-memory-gate.mjs';
 
 const POLL_MS = 15_000;
 // HOW LONG SHE WAITS AFTER PRESSING THE BUTTON, and until now it was the line
@@ -575,6 +578,7 @@ export class Supervisor {
     // the restart she ruled out. The sweep gets there first and hands each row
     // back to the session that was doing it.
     try { this.recoverInterrupted('startup'); } catch (e) { console.warn('zero: startup recovery:', e.message); }
+    if (this.config.memoryGate) this.setMemoryGate(true).catch((e) => console.warn('zero: memory gate:', e.message));
     this._timer = setInterval(() => this.tick().catch((e) => console.warn('supervisor:', e.message)), POLL_MS);
     this.tick().catch(() => {});
   }
@@ -718,6 +722,7 @@ export class Supervisor {
   killAll() {
     for (const session of this.sessions.values()) this._kill(session);
     this._closeCodex(`${Name} is quitting`);
+    this.stopMemoryGate();
   }
 
   // PUT A WORKER BACK ON THESE ROWS, WHATEVER STATE THEY ARE IN.
@@ -5850,7 +5855,10 @@ export class Supervisor {
     const client = createCodexAppServer({
       spawn: () => spawn(this.config.codexBin, ['app-server'], {
         cwd: this.appDir,
-        env: { ...this._workerEnv('codex'), CODEX_HOME: home },
+        // The socket its threads' commands ask on, and no row: see
+        // `codexMemoryGateEnv`. One app-server is every Codex thread of this
+        // login, so a row named here would be the wrong row for all but one.
+        env: { ...this._workerEnv('codex'), CODEX_HOME: home, ...this.codexMemoryGateEnv() },
         stdio: ['pipe', 'pipe', 'pipe'],
       }),
       // WHAT IS LEFT OF THIS LOGIN'S LIMIT, ARRIVING UNBIDDEN. `onNotification`
@@ -5870,6 +5878,24 @@ export class Supervisor {
     handshake.catch(() => { /* every worker chains its own catch off this */ });
     const entry = { client, handshake, home };
     this._codexServers.set(home, entry);
+    // AND THE MEMORY HOOK IS TRUSTED HERE, ON THE WAY UP (w-e5225b62ba).
+    //
+    // It has to happen on a server that is starting anyway. Codex will not run an
+    // untrusted hook, and the trust needs `hooks/list` to report the hash Codex
+    // computed -- which cannot be worked out locally, it is not a hash of the
+    // command text. So the one place that has both an app-server and no reason to
+    // start one is right here.
+    //
+    // The alternative was for the switch to start an app-server itself just to
+    // ask, and on the Mac this was written on that is a few hundred megabytes
+    // spent to protect against spending memory. Chained off the handshake, it
+    // costs two calls on a process that was being started regardless, and it runs
+    // before any thread of this server exists.
+    if (this.config.memoryGate) {
+      handshake
+        .then(() => this.setCodexMemoryGate(true, home, entry))
+        .catch((e) => console.warn(`zero: codex memory gate: ${e.message}`));
+    }
     return entry;
   }
 
@@ -6148,6 +6174,8 @@ export class Supervisor {
           // So approval cards can say who is asking and about what.
           ZERO_PRODUCT: item.product,
           ZERO_ITEM: item.id,
+          // Where its shell commands ask about memory, when that is on.
+          ...this.memoryGateEnv(item),
         },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -7113,6 +7141,8 @@ export class Supervisor {
     add(this.config.storeRoot);
     if (product?.dir) add(product.dir);
     rules.permissions = { ...(rules.permissions ?? {}), additionalDirectories: dirs };
+    const gateHooks = this.memoryGateHooks();
+    if (gateHooks) rules.hooks = { ...(rules.hooks ?? {}), ...gateHooks };
     // Beside the MCP config, and written the same way: a real file on disk,
     // because the CLI reading --settings is not this process. Named by the
     // run, because two spawns with different rules must never share a file.
@@ -7130,6 +7160,164 @@ export class Supervisor {
     args.push('--mcp-config', mcpConfig, '--permission-prompt-tool', 'mcp__zero-approvals__approval_prompt');
     const rules = this.writeWorkerSettings(product, runId);
     if (rules) { spawnFiles.push(rules); args.push('--settings', rules); }
+  }
+
+  /* ------------------ heavy work waits when memory is short ----------------- */
+  // w-3958c3753d. With the switch on, every shell command a Claude Code worker
+  // runs asks main/memory-gate-server.mjs first, through a PreToolUse hook on
+  // Bash, and reports back after it. Reading and editing files never ask. With
+  // the switch off a worker carries none of it. The rules and the measurements
+  // behind them are in main/memory-gate.mjs.
+
+  /** The hooks for the per-spawn settings file, or null when it is off. */
+  memoryGateHooks() {
+    if (!this.config.memoryGate) return null;
+    const script = unpacked(path.join(this.appDir, 'scripts', 'memory-gate-hook.sh'));
+    const quoted = `'${script.replace(/'/g, `'\\''`)}'`;
+    // Above the longest wait by ten minutes: a hook that times out lets its
+    // command run (measured), so the app's own refusal must always come first.
+    const timeout = Math.ceil(MEMORY_GATE.maxWaitMs / 1000) + 600;
+    const on = (mode, extra = {}) => [{ matcher: 'Bash', hooks: [{ type: 'command', command: `${quoted} ${mode}`, ...extra }] }];
+    return {
+      PreToolUse: on('pre', { timeout }),
+      PostToolUse: on('post', { timeout: 10 }),
+      PostToolUseFailure: on('post', { timeout: 10 }),
+    };
+  }
+
+  /** Where a worker's hook asks, and who it is asking for. Empty when off. */
+  memoryGateEnv(item) {
+    if (!this.config.memoryGate || !item) return {};
+    return {
+      AGENTBOX_GATE_SOCK: this.config.memoryGateSocket || memoryGateSocketPath(),
+      AGENTBOX_GATE_ITEM: String(item.id ?? ''),
+      AGENTBOX_GATE_PRODUCT: String(item.product ?? ''),
+      AGENTBOX_GATE_SCORE: String(Math.max(0, Math.round(this._score(item)) || 0)),
+    };
+  }
+
+  /**
+   * THE SAME SOCKET, AND DELIBERATELY NO ROW (w-e5225b62ba). One
+   * `codex app-server` serves every Codex thread of a login, so this environment
+   * is shared by all of them: an AGENTBOX_GATE_ITEM here would label every Codex
+   * thread as whichever row started first. Each thread names itself instead, by
+   * the `session_id` its hook payload carries, which `memoryGateOwner` turns back
+   * into a row.
+   *
+   * It is also what keeps the user's own `codex` out of this. The hook sits in a
+   * hooks.json their terminal reads too, and it exits on its first line when
+   * AGENTBOX_GATE_SOCK is absent — which it is everywhere but here.
+   */
+  codexMemoryGateEnv() {
+    if (!this.config.memoryGate) return {};
+    return { AGENTBOX_GATE_SOCK: this.config.memoryGateSocket || memoryGateSocketPath() };
+  }
+
+  /**
+   * WHICH ROW A CODEX THREAD IS DOING, asked by the gate on every command a
+   * Codex worker runs. `session.sessionId` is set from `thread/started` in
+   * main/codex.mjs, and the hook's `session_id` was measured to be that same
+   * string. A thread this app is not running answers null, and its command is
+   * let through.
+   */
+  memoryGateOwner(sessionId) {
+    if (!sessionId) return null;
+    for (const [itemId, session] of this.sessions) {
+      if (session?.engine === 'codex' && session.sessionId === sessionId) {
+        return { item: itemId, product: session.product ?? null };
+      }
+    }
+    return null;
+  }
+
+  /** The live rank of one of this app's own tasks, so a raise counts at once. */
+  memoryGateScore(product, itemId) {
+    if (!product || !itemId) return null;
+    try {
+      const item = this.store.readItem?.(product, itemId);
+      return item ? this._score(item) : null;
+    } catch { return null; }
+  }
+
+  memoryGateSlots() {
+    const n = Number(this.config.memoryGateSlots);
+    return Number.isFinite(n) && n >= 1 ? Math.round(n) : autoSlots(os.totalmem());
+  }
+
+  /**
+   * PUT OUR HOOK IN A CODEX HOME, OR TAKE IT OUT, AND TRUST ONLY OURS.
+   *
+   * Codex reads its hooks from `hooks.json` in the Codex home, which may be the
+   * user's own `~/.codex` and may already hold hooks of theirs, so the file is
+   * merged and never replaced (main/codex-memory-gate.mjs).
+   *
+   * A HOOK ONLY RUNS ONCE TRUSTED, and the trust is satisfied for one key rather
+   * than switched off for everybody: `hooks/list` names our hook and its hash,
+   * and `config/batchWrite` writes `hooks.state."<key>".trusted_hash` for that
+   * key alone. Codex does the editing of config.toml, so nothing of theirs is
+   * rewritten by us. Measured on this Mac: a second hook in the same file stayed
+   * untrusted, and an unrelated `[projects."..."]` table survived untouched.
+   *
+   * IT RUNS AT EVERY START, not once at install, because the key carries the
+   * absolute path of the script: a new app version is a new hash, which Codex
+   * calls "modified" and will not run until it is trusted again.
+   *
+   * NOTHING HERE IS ALLOWED TO STOP THE APP. A Codex home we cannot write, an
+   * app-server that will not answer, a `config/batchWrite` that is refused: all
+   * of them mean Codex workers go ungated, which is exactly where they were
+   * before this existed.
+   */
+  async setCodexMemoryGate(on, home = this._codexHome(), server = null) {
+    // IT NEVER STARTS AN APP-SERVER, and that is the point. The trust needs one
+    // to ask `hooks/list` with, so it uses the one it was handed (`_codexServer`
+    // chains this onto its own handshake) or one already live for this home, and
+    // otherwise writes the file and stops. A process started here would be a few
+    // hundred megabytes spent by the feature whose whole job is to save memory,
+    // and the next Codex worker starts a server anyway and trusts it then.
+    const live = server ?? (on ? this._codexServers?.get(home) : null);
+    const request = live
+      ? async (method, params) => { await live.handshake; return live.client.request(method, params); }
+      : null;
+    return syncCodexMemoryGate({
+      home,
+      scriptPath: unpacked(path.join(this.appDir, 'scripts', 'memory-gate-hook.sh')),
+      on,
+      request,
+      cwds: [this.appDir],
+      log: (line) => console.log(`zero: ${line}`),
+    });
+  }
+
+  async setMemoryGate(on) {
+    if (!on) {
+      await this.stopMemoryGate();
+      await this.setCodexMemoryGate(false).catch(() => {});
+      return;
+    }
+    if (this._memoryGate) { this._memoryGate.setSlots(this.memoryGateSlots()); return; }
+    const server = new MemoryGateServer({
+      socketPath: this.config.memoryGateSocket || memoryGateSocketPath(),
+      historyFile: path.join(this.userDir, 'memory-gate-history.json'),
+      gate: { slots: this.memoryGateSlots() },
+      scoreFor: (product, itemId) => this.memoryGateScore(product, itemId),
+      ownerOf: (sessionId) => this.memoryGateOwner(sessionId),
+      log: (line) => console.log(`zero: ${line}`),
+    });
+    this._memoryGate = server;
+    await server.start();
+    // The hook goes in after the socket is listening, so the first Codex command
+    // to ask has something to ask. It never blocks the switch taking effect.
+    this.setCodexMemoryGate(true).catch((e) => console.warn(`zero: codex memory gate: ${e.message}`));
+  }
+
+  async stopMemoryGate() {
+    const server = this._memoryGate;
+    this._memoryGate = null;
+    if (server) await server.stop();
+  }
+
+  memoryGateStatus() {
+    return this._memoryGate ? this._memoryGate.status() : null;
   }
 
   // The MCP config handed to a worker, generated fresh so the paths always track

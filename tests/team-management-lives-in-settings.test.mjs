@@ -16,6 +16,12 @@
 //     box, and your own row at the foot opens the same pane without it;
 //   - everything the old page could do is still on the pane: rename the team,
 //     see roles, remove people, cancel invites, invite by email, leave.
+//
+// INVITE PEOPLE LEFT THE SIDEBAR ON 2026-10-04 (w-1b574413db): "we're in
+// single-player mode for what we're going to launch soon." So the foot is
+// Feedback, Instructions, Settings, every Settings pane lights Settings, and
+// `onInvite` survives as the door your account menu uses. The sidebar half of
+// that is pinned in the-sidebar-opens-feedback-and-has-no-invite-row.
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, it, expect } from 'vitest';
@@ -47,8 +53,8 @@ const buttonWith = (html, marker) => {
   return html.slice(start, html.indexOf('</button>', at) + '</button>'.length);
 };
 
-describe('the sidebar keeps Invite people and loses Team members', () => {
-  const full = { team: onATeam, hasTeam: true, onTeam: noop, onInvite: noop, onAccount: noop, onInstructions: noop, onSettings: noop };
+describe('the sidebar has neither Team members nor Invite people', () => {
+  const full = { team: onATeam, hasTeam: true, onTeam: noop, onInvite: noop, onAccount: noop, onInstructions: noop, onSettings: noop, onFeedback: noop };
 
   it('has no Team members button for someone signed in to a team', () => {
     expect(draw(full)).not.toContain('Team members');
@@ -58,27 +64,21 @@ describe('the sidebar keeps Invite people and loses Team members', () => {
     expect(draw({ ...full, collapsed: true })).not.toContain('Team members');
   });
 
-  it('still offers Invite people', () => {
-    expect(draw(full)).toContain('aria-label="Invite people"');
+  it('offers no Invite people row, even with a way to open it', () => {
+    expect(draw(full).split('class="th-me"')[0]).not.toContain('Invite people');
   });
 
-  it('keeps the foot in order: Invite people, Instructions, Settings', () => {
+  it('keeps the foot in order: Feedback, Instructions, Settings', () => {
     const html = draw(full);
-    const order = ['Invite people', 'Instructions', 'Settings'].map((l) => html.indexOf(`aria-label="${l}"`));
+    const order = ['Feedback', 'Instructions', 'Settings'].map((l) => html.indexOf(`aria-label="${l}"`));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
-  it('lights Invite people while the Settings Team pane is up', () => {
-    const html = draw({ ...full, page: 'invite' });
-    expect(buttonWith(html, 'aria-label="Invite people"')).toContain('aria-current="page"');
-    expect(buttonWith(html, 'aria-label="Settings"')).not.toContain('aria-current="page"');
-  });
-
-  it('lights Settings on every other Settings pane', () => {
+  it('lights Settings on every Settings pane, the Team pane included', () => {
     const html = draw({ ...full, page: 'settings' });
     expect(buttonWith(html, 'aria-label="Settings"')).toContain('aria-current="page"');
-    expect(buttonWith(html, 'aria-label="Invite people"')).not.toContain('aria-current="page"');
+    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
   });
 
   it('still opens your own account row, and names it', () => {
@@ -107,7 +107,7 @@ describe('Settings has the Team pane, and the shared screen holds no team code',
   });
 });
 
-describe('Invite people routes into Settings', () => {
+describe('Invite people, from the account menu, routes into Settings', () => {
   it('opens Settings on the Team pane with the cursor in the email box', () => {
     expect(app).toContain("onInvite={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}");
   });
@@ -116,8 +116,8 @@ describe('Invite people routes into Settings', () => {
     expect(app).toContain("onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}");
   });
 
-  it('lights Invite people rather than Settings while that pane is up', () => {
-    expect(app).toContain("page={settingsOpen ? (settingsPage === 'team' ? 'invite' : 'settings') : null}");
+  it('lights Settings while that pane is up, since the shortcut row is gone', () => {
+    expect(app).toContain("page={settingsOpen ? 'settings' : null}");
   });
 
   it('hands Settings the team pane only when the team cloud is configured', () => {

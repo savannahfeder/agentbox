@@ -34,8 +34,13 @@ describe('the line a failed ship shows', () => {
     expect(why([WARNING, 'Tests  1 failed | 9 passed (10)'].join('\n'))).toBe('Tests  1 failed | 9 passed (10)');
   });
 
-  it('falls back to the last line, and says so when there is none', () => {
-    expect(why('one\ntwo')).toBe('two');
-    expect(why('')).toBe('no output');
+  // 2026-10-04 (w-c121bd85e6): this used to offer the last line on its own,
+  // as if it were the failure. It is not: output with nothing failing in it is
+  // a run that DIED, and the last line is only the last thing it managed to
+  // say. It is still shown, now labelled as that.
+  // tests/a-ship-whose-test-run-died-says-it-died.test.mjs is the measurement.
+  it('says the run died when no line in it names a failure, and still quotes the last one', () => {
+    expect(why('one\ntwo')).toBe('the test run died without naming a failing test. It last said: two');
+    expect(why('')).toBe('the test run died without naming a failing test. It last said: nothing at all');
   });
 });

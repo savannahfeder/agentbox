@@ -790,6 +790,7 @@ export const fixtureSettings = {
   workspace: {
     agentsRunning: true,
     sessionsAtOnce: 3,
+    memoryGate: { on: false, slots: null, slotsAuto: 2, slotsMax: 12, now: null },
     capacity: 6,
     running: 2,
     model: 'claude-opus-5',

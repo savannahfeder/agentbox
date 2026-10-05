@@ -40,7 +40,7 @@ import { AccountMenu } from '../team/account-menu';
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, onSignOut, update = null, onUpdate }: {
+export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, onFeedback, onSignOut, update = null, onUpdate }: {
   // A NEW VERSION WAITING (SidebarUpdate.tsx). Null when there is none.
   // `version` is what its × closes, until a newer one arrives.
   update?: { installing: boolean; version?: string | null; changes?: string[]; behind?: number | null; error?: string | null } | null; onUpdate?: () => void;
@@ -51,14 +51,15 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   hasTeam?: boolean; onTeam?: () => void;
   // Whether the Team page is up, which lights its tab and darkens the others.
   teamPage?: boolean;
-  // THE FOOT OF THE SIDEBAR (approved 2026-10-01): invite people, settings,
-  // and you, all in the sidebar rather than on a page.
+  // THE FOOT OF THE SIDEBAR (approved 2026-10-01): settings and you, in the
+  // sidebar rather than on a page. Feedback joined it on 2026-10-04 and opens
+  // the feedback card.
   //
-  // TEAM MEMBERS LEFT IT ON 2026-10-01: team management is a pane in Settings
-  // and this row routes to it as a shortcut, because the two team rows here
-  // were one door twice. `onInvite` is that shortcut and `onAccount` is your
-  // own row, which opens the same pane without the cursor in the email box.
-  team?: TeamState | null; onInvite?: () => void; onAccount?: () => void;
+  // `onInvite` opens Settings on the team pane with the cursor in the email
+  // box. It is no longer a row here (w-1b574413db: single-player for launch);
+  // your account menu still offers it. `onAccount` is your own row, which
+  // opens the same pane without the cursor in the email box.
+  team?: TeamState | null; onInvite?: () => void; onAccount?: () => void; onFeedback?: () => void;
   // The last row of your account menu.
   onSignOut?: () => void;
   view: View; collapsed: boolean; onToggle: () => void; onView: (view: View) => void; onSearch: () => void; onCompose: () => void;
@@ -114,10 +115,14 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
       {updateCard && updateView}
       <div className="workspace-utilities th-side-foot">
         {!updateCard && updateView}
-        {/* Shown to anyone signed in, on a team or not (2026-10-01: the
-            invite page and team settings must always be reachable). With no
-            team yet, both open the page that starts one. */}
-        {me && onInvite && <button aria-label="Invite people" aria-current={page === 'invite' ? 'page' : undefined} title={collapsed ? 'Invite people' : undefined} onClick={onInvite}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="10" cy="8.5" r="3.5"/><path d="M3.5 20c.7-3.4 3.3-5.3 6.5-5.3 1.4 0 2.6.3 3.7.9"/><path d="M18 14v6M15 17h6"/></svg><span>Invite people</span></button>}
+        {/* FEEDBACK, THE TOP ROW OF THE FOOT (w-1b574413db, 2026-10-04),
+            wearing the folded paper plane picked from 24 drawings. It opens
+            the feedback card over whatever is on screen, so it never lights.
+
+            INVITE PEOPLE LEFT THE SIDEBAR THE SAME DAY: "we're in
+            single-player mode for what we're going to launch soon." Inviting
+            is still in your account menu and in Settings. */}
+        {onFeedback && <button aria-label="Feedback" title="Feedback" onClick={onFeedback}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><g transform="translate(12 12) scale(.8) translate(-12 -12)" strokeWidth="1.5625"><path d="M2.5 11.5 21.5 3l-5 18-5-6.5z"/><path d="M11.5 14.5 21.5 3"/><path d="m11.5 14.5-1.2 6 3-3.6"/></g></svg><span>Feedback</span></button>}
         {onInstructions && <button aria-label="Instructions" aria-current={page === 'instructions' ? 'page' : undefined} title="Instructions for every agent" onClick={onInstructions}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 16h6"/></svg><span>Instructions</span></button>}
         {onSettings && <button aria-label="Settings" aria-current={page === 'settings' ? 'page' : undefined} title="Settings" onClick={onSettings}><SettingsIcon/><span>Settings</span></button>}
       </div>
