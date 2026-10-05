@@ -125,9 +125,9 @@ export function asPulled(body, { by, at, me }) {
 
 // YOUR OWN LINE, COMING BACK FROM A SECOND COPY OF THE APP SIGNED IN AS YOU.
 //
-// Reported 2026-10-04 (w-2fce569057): "I sent Riley a message and it didn't
-// come back." It had been sent from a second copy. It reached the cloud and it
-// reached the other person's app; what it never reached was the everyday copy,
+// Reported 2026-10-04 (w-2fce569057): a message sent to a teammate never came
+// back. It had been sent from a second copy. It reached the cloud and it
+// reached the teammate's app; what it never reached was the everyday copy,
 // because the pull skipped every line whose writer was you, on the reasoning
 // that a line you wrote is already here. True of the copy that wrote it, false
 // of every other copy you own, and a conversation missing your own half reads
