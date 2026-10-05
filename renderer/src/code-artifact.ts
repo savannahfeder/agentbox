@@ -531,6 +531,20 @@ export function filesInTreeOrder(files: ChangedFile[]): ChangedFile[] {
   return [...files].sort((a, b) => (order.get(a.path) ?? 0) - (order.get(b.path) ?? 0));
 }
 
+// THE FILES SHE HAS FOLDED IN EACH CHANGE, for as long as the app runs, so
+// closing the pane does not throw away which ones she was done with (2026-10-04).
+// Not on disk, for the reason the unsaved edits are not: a change she reopens
+// tomorrow is a different reading.
+const FOLDS = new Map<string, Set<string>>();
+
+/** The live set of folded file paths for one change; the same set every time. */
+export function foldsFor(product: string, src: string): Set<string> {
+  const key = `${product}\n${src}`;
+  let set = FOLDS.get(key);
+  if (!set) { set = new Set(); FOLDS.set(key, set); }
+  return set;
+}
+
 /** A copy of `set` with `path` added if it was not there, taken away if it was. */
 export function toggled(set: ReadonlySet<string>, path: string): Set<string> {
   const next = new Set(set);

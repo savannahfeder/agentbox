@@ -7541,7 +7541,11 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
    see code; a line whose end is unreachable is that same fault made small.
    `pre-wrap` keeps every leading space, so the indentation still reads, and
    `anywhere` covers a 918-character line with no space in it to break at. */
-.code-line { flex: 1; min-width: 0; padding-right: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.code-line { flex: 1; min-width: 0; padding-right: 14px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+/* `user-select: text` above, because the window's body is `none` and a line
+   that is not editable (a removed one, an opened gap) inherited it: a
+   double-click on a deleted word selected nothing and a copy pasted the old
+   clipboard (2026-10-04). */
 .cr-plus { background: var(--code-plus-bed); }
 .cr-minus { background: var(--code-minus-bed); }
 .cr-plus .code-mark { color: var(--code-plus); }

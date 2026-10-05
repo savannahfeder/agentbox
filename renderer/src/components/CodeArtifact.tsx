@@ -20,7 +20,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import {
-  BATCH_ROWS, changeSummary, filesInTreeOrder, fillNext, firstBatch, hiddenLines, hunkView, hunkViewAt, linesSkipped, marked, rowSlices, sliceGuessPx, stepInTree, toggled, tokenize, tookLabel, treeRows, visibleRows, wordChanges,
+  BATCH_ROWS, changeSummary, filesInTreeOrder, fillNext, foldsFor, firstBatch, hiddenLines, hunkView, hunkViewAt, linesSkipped, marked, rowSlices, sliceGuessPx, stepInTree, toggled, tokenize, tookLabel, treeRows, visibleRows, wordChanges,
   type Change, type ChangedFile, type Hunk,
 } from '../code-artifact';
 import { copiedText, linesToCopy } from '../code-copy';
@@ -427,10 +427,19 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   // says "done with this one" (2026-10-04,
   // tests/a-file-folds-shut-from-its-header.test.mjs). Folding the file she is
   // inside keeps her place: its header stays where it was, at the top.
-  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
+  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set(foldsFor(product, src)));
   const foldFile = (path: string, block: HTMLElement | null) => {
     const body = bodyRef.current;
     const above = body && block ? block.getBoundingClientRect().top - body.getBoundingClientRect().top : 0;
+    // A FILE OPENING AGAIN IS DRAWN FROM WHAT SHE HAS TYPED NOW, not from the
+    // snapshot taken when the pane opened, or the line she edited shows its
+    // old words while ⌘S would save the new ones.
+    if (folded.has(path)) {
+      const now = edits.current.get(path);
+      seeded.current.set(path, new Map([...(now ?? new Map())].map(([h, m]) => [h, new Map(m)])));
+    }
+    const remembered = foldsFor(product, src);
+    if (remembered.has(path)) remembered.delete(path); else remembered.add(path);
     setFolded((was) => toggled(was, path));
     if (body && block && above < 0) {
       requestAnimationFrame(() => {
@@ -1087,17 +1096,22 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
     // taken over, and the file she was being carried to stops mattering
     // mid-flight rather than fighting her for the next few frames.
     const release = () => { holding.current = null; };
+    // NOT THE KEY THAT ASKED FOR THE JUMP. That key reaches this listener too,
+    // and when it ran after the pane's own it cancelled the jump it had just
+    // started: End on the tree marked the last file while the code stayed at
+    // the top (2026-10-04). A key the pane acted on is marked handled.
+    const releaseKey = (e: KeyboardEvent) => { if (!e.defaultPrevented) holding.current = null; };
     body.addEventListener('scroll', onScroll, { passive: true });
     body.addEventListener('wheel', release, { passive: true });
     body.addEventListener('touchstart', release, { passive: true });
     body.addEventListener('mousedown', release);
-    window.addEventListener('keydown', release);
+    window.addEventListener('keydown', releaseKey);
     return () => {
       body.removeEventListener('scroll', onScroll);
       body.removeEventListener('wheel', release);
       body.removeEventListener('touchstart', release);
       body.removeEventListener('mousedown', release);
-      window.removeEventListener('keydown', release);
+      window.removeEventListener('keydown', releaseKey);
       if (frame) cancelAnimationFrame(frame);
     };
   }, [files, measureFiles]);
