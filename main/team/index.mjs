@@ -13,7 +13,7 @@
 //     my teammates' private tasks doing.
 import path from 'node:path';
 import { createTeamSync, fileSyncState } from './sync.mjs';
-import { listSharedProjects, joinSharedProject, markShared, makeDirect, ensurePersonalProject } from './projects.mjs';
+import { listSharedProjects, joinSharedProject, markShared, makeDirect } from './projects.mjs';
 import { firstSentence } from '../../shared/thread-cards.mjs';
 import { cardsFor } from '../../shared/thread-cards.mjs';
 import fs from 'node:fs';
@@ -159,12 +159,11 @@ export function createTeamService({
     disk.setLineAuthor(me.id);
     process.env.AGENTBOX_PERSON_ID = me.id;
     set({ signedIn: true, me, error: null });
-    // EVERYONE ON A TEAM GETS A PERSONAL PROJECT (w-b989839656), where what
-    // they write is theirs unless they share it. Made once; a Mac that cannot
-    // write it still signs in.
-    try {
-      if (ensurePersonalProject(accountRoot).made) store.watch?.();
-    } catch (err) { log(`team: could not make the personal project: ${err.message}`); }
+    // MY WORKSPACE IS NOT MADE HERE ANY MORE (w-f8d123be62, approved
+    // 2026-10-05). It was, and that was the whole bug: the only caller was this
+    // one, inside signing in, and this service is not even built on a Mac with
+    // no team cloud. So the single-person app opened on no projects at all.
+    // Everybody gets one at boot now (main/main.mjs), signed in or not.
     await refreshTeam();
     sync = createTeamSync({
       backend,

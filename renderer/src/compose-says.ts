@@ -76,6 +76,35 @@ export function practiceRefusal(
 }
 
 /**
+ * 3. AND WHY SEND IS OFF WHEN THERE IS NO PROJECT AT ALL (w-f8d123be62).
+ *
+ * The same seam a third time. A tester on a new account saw "No project" on the
+ * chip, typed a message, pressed Send and got nothing: `canSend` wants a
+ * product and there was not one, and the only tooltip the button had was the
+ * practice refusal, which had nothing to say about this.
+ *
+ * My Workspace is made for everybody at boot now (main/main.mjs), so this
+ * should be unreachable. "Should be" is why the sentence exists: making that
+ * folder can fail on a full or locked disk, and the old failure mode was a log
+ * line nobody reads and a dead button. The wording is the one approved on
+ * 2026-10-05, and it is split in two because the second half is a BUTTON that
+ * opens the New project card, not words to read.
+ */
+export const NO_PROJECT_REASON = 'Nowhere to send this yet.';
+export const NO_PROJECT_ACTION = 'Make your first project';
+
+export function noProjectYet(
+  product: ComposeTarget | null | undefined,
+  opts: { person?: boolean } = {},
+): { reason: string; action: string } | null {
+  // A message to a teammate is not filed anywhere, so it is never waiting on a
+  // project and must never be told that it is.
+  if (opts.person) return null;
+  if (product) return null;
+  return { reason: NO_PROJECT_REASON, action: NO_PROJECT_ACTION };
+}
+
+/**
  * THE CONFIRMATION, one line, NAMING THE PROJECT IT WENT TO.
  *
  * It replaced "Queued → Kestrel · Z to undo". Two things were wrong with that
