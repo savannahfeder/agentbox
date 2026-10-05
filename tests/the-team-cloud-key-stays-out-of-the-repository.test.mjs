@@ -43,8 +43,14 @@ describe('the team cloud config', () => {
     expect(example.url).not.toMatch(/\.supabase\.co/);
   });
 
+  // A MAC WITH NO KEY ON IT EITHER, which is what a stranger cloning this has.
+  // Since 2026-10-04 the key may also live on the Mac rather than in the folder
+  // (main/team/session.mjs teamConfigOnThisMac), so the home is a throwaway
+  // here: reading the real one would make this test pass or fail depending on
+  // whether whoever ran it is on a team.
   it('leaves a checkout without the file as the single-person app', () => {
     const appDir = fs.mkdtempSync(path.join(os.tmpdir(), 'no-team-config-'));
-    expect(loadCloudConfig(appDir, { packaged: true })).toBeNull();
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'no-team-mac-'));
+    expect(loadCloudConfig(appDir, { packaged: true, home })).toBeNull();
   });
 });
