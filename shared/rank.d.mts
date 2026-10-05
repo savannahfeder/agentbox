@@ -4,6 +4,7 @@
 export const RANK_STEP: number;
 export function normalizeOrder(slugs: unknown): string[];
 export function productRankScore(order: string[], slug: string): number;
+export function placeScore(order: string[], slug: string, direct?: ReadonlySet<string>): number;
 
 export const DEFAULT_PRIORITY: number;
 

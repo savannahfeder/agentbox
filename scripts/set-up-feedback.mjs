@@ -2,14 +2,19 @@
 //
 //   npm run setup:feedback
 //
-// Asks for two things: the Resend API key (hidden as you type) and the email
-// feedback should reach. Everything else it works out:
+// Asks for three things: the Resend API key (hidden as you type), the email
+// feedback should reach, and the domain the mail is sent from (Enter takes the
+// suggestion). Everything else it works out:
 //   - which Supabase project, from cloud/team.config.json;
-//   - who the mail comes from, an address at your own domain;
 //   - signing in to Supabase, in the browser, only if you are not already.
-// Then it stores the three secrets on the server function, deploys it (no
-// Docker needed), writes the function's address into this folder's
-// zero.config.json, and sends one test message so you can see it arrive.
+// Then it stores the secrets on the server function, deploys it (no Docker
+// needed), writes the function's address into this folder's zero.config.json,
+// and sends one test message so you can see it arrive.
+//
+// THE SENDING DOMAIN IS ASKED FOR BECAUSE GUESSING IT FAILED. The first real
+// run sent from the recipient's own domain and Resend refused it: the domains
+// verified there were two subdomains, not the domain itself. A refusal that
+// names the domain now asks again and retries, without starting over.
 //
 // THE KEY NEVER GOES ON A COMMAND LINE, where it would sit in shell history and
 // in `ps`. It reaches the Supabase CLI through a file only you can read, which
@@ -21,7 +26,8 @@ import readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
-  projectRefFrom, functionUrl, senderFor, looksLikeResendKey, looksLikeEmail, secretsFile, withFeedbackUrl,
+  projectRefFrom, functionUrl, senderAt, domainOf, looksLikeDomain, refusedForDomain,
+  looksLikeResendKey, looksLikeEmail, secretsFile, withFeedbackUrl,
 } from './lib/feedback-setup.mjs';
 
 const repo = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -44,8 +50,40 @@ async function ask(question, { hidden = false } = {}) {
   if (done) stop('Stopped before it was finished.');
   return String(value).trim();
 }
+async function askDomain(suggested) {
+  for (;;) {
+    const typed = await ask(`Which domain should the mail come from? It must be listed under Domains in Resend [${suggested}]: `);
+    const domain = typed || suggested;
+    if (looksLikeDomain(domain)) return domain.toLowerCase();
+    say('That does not look like a domain. It looks like updates.example.com.');
+  }
+}
 
 const supabase = (args, opts = {}) => spawnSync('supabase', args, { stdio: opts.quiet ? 'pipe' : 'inherit', encoding: 'utf8' });
+
+// The secrets, through a file only you can read, deleted straight after.
+function setSecrets(ref, values) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-feedback-'));
+  const file = path.join(dir, 'secrets.env');
+  fs.writeFileSync(file, values, { mode: 0o600 });
+  const out = supabase(['secrets', 'set', '--project-ref', ref, '--env-file', file]);
+  fs.rmSync(dir, { recursive: true, force: true });
+  return out.status === 0;
+}
+
+async function sendTest(url) {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'Test from npm run setup:feedback. If you can read this, the Feedback card works.', files: [], app: { version: 'setup', os: `${process.platform} ${os.release()}` } }),
+    });
+    const body = await res.json().catch(() => ({}));
+    return { ok: res.ok && !!body.ok, status: res.status, error: body.error ?? '', detail: body.detail ?? '' };
+  } catch (err) {
+    return { ok: false, status: 0, error: err.message, detail: '' };
+  }
+}
 
 say('Switching on the Feedback card.\n');
 
@@ -56,7 +94,7 @@ const ref = projectRefFrom(JSON.parse(fs.readFileSync(configFile, 'utf8')).url);
 if (!ref) stop('cloud/team.config.json does not name a Supabase project.');
 if (supabase(['--version'], { quiet: true }).status !== 0) stop('The Supabase command is not installed. Run: brew install supabase/tap/supabase');
 
-// 2. The two things only you know.
+// 2. The things only you know.
 let key = '';
 while (!looksLikeResendKey(key)) {
   if (key) say('That does not look like a Resend key. It starts with re_.');
@@ -68,9 +106,8 @@ while (!looksLikeEmail(to)) {
   if (to) say('That does not look like an email address.');
   to = await ask('Which email should feedback go to? ');
 }
-rl.close();
-const from = senderFor(to);
-say(`Feedback will arrive from ${from}.\n`);
+let domain = await askDomain(domainOf(to));
+say(`Feedback will arrive from ${senderAt(domain)}.\n`);
 
 // 3. Signed in to Supabase? If not, it opens the browser once.
 if (supabase(['projects', 'list'], { quiet: true }).status !== 0) {
@@ -78,13 +115,9 @@ if (supabase(['projects', 'list'], { quiet: true }).status !== 0) {
   if (supabase(['login']).status !== 0) stop('Supabase sign-in did not finish. Run npm run setup:feedback again.');
 }
 
-// 4. The secrets, through a file only you can read.
-const secrets = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-feedback-')), 'secrets.env');
-fs.writeFileSync(secrets, secretsFile({ to, from, key }), { mode: 0o600 });
+// 4. The secrets.
 say('Saving the key and addresses on the server…');
-const saved = supabase(['secrets', 'set', '--project-ref', ref, '--env-file', secrets]);
-fs.rmSync(path.dirname(secrets), { recursive: true, force: true });
-if (saved.status !== 0) stop('Supabase did not take the secrets. The message above says why.');
+if (!setSecrets(ref, secretsFile({ to, from: senderAt(domain), key }))) stop('Supabase did not take the secrets. The message above says why.');
 
 // 5. The function itself.
 say('Putting the feedback function online…');
@@ -97,19 +130,23 @@ const appConfig = path.join(repo, 'zero.config.json');
 fs.writeFileSync(appConfig, withFeedbackUrl(fs.existsSync(appConfig) ? fs.readFileSync(appConfig, 'utf8') : null, url));
 say('Told Agentbox where to send.');
 
-// 7. One real message, so you can see it arrive.
-say('Sending a test message…');
-try {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ text: 'Test from npm run setup:feedback. If you can read this, the Feedback card works.', files: [], app: { version: 'setup', os: `${process.platform} ${os.release()}` } }),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok || !body.ok) stop(`The test did not send (${res.status} ${body.error ?? ''}). If it says "mail refused", check the key is from the Resend workspace that owns ${to.split('@')[1]}.`);
-} catch (err) {
-  stop(`The test did not send: ${err.message}`);
+// 7. One real message. A refusal about the domain asks for another one and
+//    tries again; only the sender changes, so nothing is redeployed.
+for (let tries = 1; ; tries += 1) {
+  say('Sending a test message…');
+  const sent = await sendTest(url);
+  if (sent.ok) break;
+  if (refusedForDomain(sent.detail) && tries < 4) {
+    say(`Resend refused that domain: ${sent.detail}`);
+    domain = await askDomain(domain === domainOf(to) ? `updates.${domain}` : domain);
+    if (!setSecrets(ref, `FEEDBACK_FROM="${senderAt(domain)}"\n`)) stop('Supabase did not take the new sender. The message above says why.');
+    // A changed secret reaches the next fresh worker; give it a moment.
+    await new Promise((r) => setTimeout(r, 4000));
+    continue;
+  }
+  stop(`The test did not send (${sent.status} ${sent.error}${sent.detail ? `: ${sent.detail}` : ''}).`);
 }
+rl.close();
 
 say(`\n✓ Done. Check ${to} for "Agentbox feedback: Test from npm run setup:feedback".`);
 say('  Quit and reopen Agentbox so it picks up the new address.');

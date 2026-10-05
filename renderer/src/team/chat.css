@@ -1,0 +1,38 @@
+/* A CONVERSATION WITH A TEAMMATE (w-2e8aa16f0f, drawing A of round two).
+   Slack's structure in the app's own materials: a square face in a column on
+   the left, the full name and the time once per run, a quiet day line, and a
+   rule that is a hairline. The run itself is ./chat-layout.ts. Nothing here
+   reaches a thread with an agent: every rule hangs off .chat-msg, .chat-day or
+   .is-chat-cont, which only a conversation with a person draws. */
+
+.chat-day {
+  display: flex; align-items: center; gap: 14px; margin: 4px 0 6px;
+  font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint);
+}
+.chat-day::after { content: ''; flex: 1; height: 1px; background: var(--line); opacity: .55; }
+
+.chat-msg { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 14px; }
+.chat-gutter { grid-column: 1; grid-row: 1 / span 3; padding-top: 2px; }
+.chat-msg > .msg-head, .chat-msg > .msg-body, .chat-msg > .chat-more { grid-column: 2; min-width: 0; }
+.chat-msg .msg-head { align-items: baseline; }
+.chat-msg .msg-who { font-size: 14.5px; font-weight: 500; color: var(--text); }
+.chat-msg .msg-when { font: 11px var(--mono); letter-spacing: .03em; color: var(--text-faint); }
+
+/* A message that carries on a run sits close under it, and its time waits in
+   the face column until the pointer is on it. */
+.thread-block.is-chat-cont { margin-top: -12px; }
+.chat-gt { display: block; font: 10px/25px var(--mono); color: var(--text-faint); text-align: right; visibility: hidden; }
+.chat-msg:hover .chat-gt { visibility: visible; }
+
+/* THE RULE A MESSAGE WRITES WITH ---. The message body had no rule style, so it
+   drew the browser's own grooved 2px line at full strength. */
+.chat-msg .msg-body hr { border: 0; border-top: 1px solid var(--line); opacity: .5; margin: 16px 0; }
+
+.chat-folded { max-height: 340px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 62%, transparent); mask-image: linear-gradient(#000 62%, transparent); }
+.chat-more {
+  justify-self: start; appearance: none; background: none; border: 0; padding: 0; margin-top: 6px;
+  font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer;
+  text-decoration: underline dotted var(--line-strong); text-decoration-thickness: 1px; text-underline-offset: 3px;
+}
+.chat-more:hover { color: var(--text); text-decoration-color: var(--text-faint); }
+.chat-more:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }

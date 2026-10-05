@@ -8,7 +8,7 @@
 // (tests/team-one-page-shows-the-people-you-pick.test.mjs).
 import type { Person, Product, ThreadCard, WorkItem } from '../types';
 import { priorityIdOf } from '../priority';
-import { byPriority, finishedAt, rowSharing, type Display, type Ranked } from './page-rules';
+import { byPriority, conversationSlugs, finishedAt, rowSharing, type Display, type Ranked } from './page-rules';
 
 const KEY = 'threads.people';
 
@@ -143,7 +143,7 @@ export function mergeRows(mine: WorkItem[], theirs: ThreadCard[], sort: Display[
   const updated = sort !== 'priority';
   const slugOf = new Map(rank.products.map((p) => [p.name, p.slug]));
   const ranked = (c: ThreadCard): Ranked => ({ priority: c.priority, updatedAt: c.updatedAt, product: slugOf.get(c.project ?? '') ?? null });
-  const by = byPriority(rank.order);
+  const by = byPriority(rank.order, conversationSlugs(rank.products));
   const cards = theirs.slice().sort((a, b) => (updated ? b.updatedAt - a.updatedAt : by(ranked(a), ranked(b))));
   const ahead = (c: ThreadCard, i: WorkItem) => (updated
     ? c.updatedAt > (sort === 'done' ? finishedAt(i) : i.updatedAt)
