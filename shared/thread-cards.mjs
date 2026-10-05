@@ -87,8 +87,25 @@ export function firstSentence(text, max = 240) {
 // (mcp/core/work.mjs); a person's own edits are not limited.
 export const SUMMARY_WORDS = 25;
 
+// THE SUMMARY IS CONTEXT, THEN DONE (w-54e9c7243f, 2026-10-05). `problem` is
+// drawn as Context, a few sentences that bring the thread back to mind, and
+// `progress` as Done, the steps taken so far, one per line, newest last.
+// `solution` is no longer asked for or drawn. Measured on the approved
+// pictures: about 35 words of context filled five lines and was enough to
+// answer from; steps ran 4 to 15 words, and six left the properties on screen.
+// The old field names stay so the team cloud needs no migration.
+export const CONTEXT_WORDS = 45;
+export const DONE_STEPS = 6;
+export const DONE_STEP_WORDS = 15;
+
 export function wordsIn(text) {
   return typeof text === 'string' ? text.split(/\s+/).filter(Boolean).length : 0;
+}
+
+/** The Done steps in `progress`: one per line, the marks a writer puts in front of a step taken off. */
+export function doneSteps(progress) {
+  if (typeof progress !== 'string') return [];
+  return progress.split('\n').map((l) => l.trim().replace(/^(?:[-*•✓✔]\s*)+/, '').trim()).filter(Boolean);
 }
 
 /** The thread's summary: what the agent or the person wrote, else stand-ins. */

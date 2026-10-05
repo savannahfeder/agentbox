@@ -6,6 +6,10 @@ export function threadState(item: Partial<WorkItem> & { claimExpired?: boolean }
 export function firstSentence(text: string | undefined | null, max?: number): string;
 export const SUMMARY_WORDS: number;
 export function wordsIn(text: string | undefined | null): number;
+export const CONTEXT_WORDS: number;
+export const DONE_STEPS: number;
+export const DONE_STEP_WORDS: number;
+export function doneSteps(progress: string | undefined | null): string[];
 export function summaryOf(item: Partial<WorkItem>): { problem: string; progress: string; solution: string; written: boolean };
 export function cardsFor(p: { products: unknown[]; readItems: (product: any) => any[]; now?: number; since?: number | null }): any[];
 export function shownToTeam(item: Partial<WorkItem>, since?: number | null, product?: { personal?: boolean } | null): boolean;

@@ -42,6 +42,15 @@ export const fixtureSnapshot: Snapshot = {
       labels: [], priority: 2, epoch: 5, claim: null,
       wrote: { answer: { ts: now - 4 * min, source: 'founder' } },
       createdAt: now - 17 * min, updatedAt: now - 4 * min,
+      problem: 'The build menu has been scheduled six times and never ran. Every start landed on the one minute its row is locked, so each was turned away. You then asked whether the art style should come first.',
+      progress: [
+        'Read every session this project was given in the last two days',
+        'Each one started within 15 seconds of the menu’s hour',
+        'At that moment the menu is the one row nobody may touch, so every start was refused',
+        'Moved tomorrow’s run ten minutes off the hour as a test',
+        'Wrote up the change the scheduler needs',
+        'Asked you about the art style',
+      ].join('\n'),
     },
     // The same thread before she has spoken: an agent question answering an
     // agent question. Its parent is named in one line, never quoted, because
@@ -179,6 +188,10 @@ export const fixtureSnapshot: Snapshot = {
       claim: { holder: 'zero-worker-9f2', leaseUntil: now + 4 * min },
       createdAt: now - 48 * min, updatedAt: now - 3 * min,
       body: 'Repro: hover any card in the gallery on Safari 19. The zoom transform re-triggers on every mousemove.',
+      // The summary as an agent writes it since w-54e9c7243f: Context, then
+      // the Done steps one per line, newest last.
+      problem: 'Cards flicker in Safari when you hover to zoom. You flagged it after the holo effect landed; Chrome is fine.',
+      progress: 'Found it: the zoom is applied twice, by the hover style and the tilt code\nTilt code no longer moves the card; clean on Safari 19 and Chrome',
     },
     {
       id: 'w-e5', product: 'onboard', productName: 'Onboard', status: 'claimed', kind: 'task',
@@ -210,6 +223,8 @@ export const fixtureSnapshot: Snapshot = {
       body: '**Merge the first row change, or pick different words for it.**\n\nMaking a project used to compose a row the fleet took as work, so an agent started before you had said anything. It asks now, and nothing runs until you reply.\n\nThe page shows the row before and after:\n\n/fixtures/onboard/designs/w-n13/the-first-row.html',
       labels: ['review'], priority: 5, epoch: 2, claim: null,
       createdAt: now - 52 * min, updatedAt: now - 12 * min,
+      problem: 'Making a new project used to start an agent straight away, before you had said anything. Now its first row waits for your reply, and the linked page shows that row before and after.',
+      progress: 'First row waits for your reply\nTests pass\nOn its branch, ready to merge',
     },
     {
       // STOPPED: she answered, a worker took it, and that worker died without
