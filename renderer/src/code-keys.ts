@@ -98,7 +98,23 @@ export const CHANGE_OWNS = new Set([
   'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
   'PageUp', 'PageDown', 'Home', 'End',
   'j', 'k',
+  // Next and previous change (2026-10-04, nextChange below).
+  ']', '[',
 ]);
+
+/**
+ * WHERE ] AND [ GO: the start of the next change below the top of the screen,
+ * or of the one before it, or null at either end. `starts` are where each
+ * change begins in the column, in order; `top` is where the column is scrolled.
+ * A few pixels of slack, so standing on a change and pressing ] goes to the
+ * next one rather than to the same one again. App.tsx in a real change had 27
+ * changes and nothing moved between them (tests/the-next-change-is-one-key-away.test.mjs).
+ */
+export function nextChange(starts: number[], top: number, dir: 1 | -1, slack = 4): number | null {
+  if (dir > 0) return starts.find((s) => s > top + slack) ?? null;
+  for (let i = starts.length - 1; i >= 0; i--) if (starts[i] < top - slack) return starts[i];
+  return null;
+}
 
 /** True when a change open in the reading pane has already answered this key. */
 export function changeOwnsKey(key: string): boolean {

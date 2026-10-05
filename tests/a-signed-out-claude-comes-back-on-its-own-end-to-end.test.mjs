@@ -21,6 +21,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mjs';
 import { Supervisor } from '../main/supervisor.mjs';
+import { waitFor, waitUntilNo } from './waiting.mjs';
 
 const PRODUCT = 'myproduct';
 const SIGNED_OUT = 'Failed to authenticate: OAuth session expired and could not be refreshed';
@@ -81,15 +82,14 @@ const signIn = () => {
   const t = Date.now() / 1000 + 2;
   fs.utimesSync(file, t, t);
 };
-const waitFor = async (cond, ms = 5000) => {
-  const until = Date.now() + ms;
-  while (Date.now() < until) { if (cond()) return true; await new Promise((r) => setTimeout(r, 20)); }
-  return cond();
-};
+// This file's own waitFor gave up after five seconds and returned quietly,
+// which on a Mac running a dozen agents means the assertions after it read a
+// run that had not finished (w-c121bd85e6, 2026-10-04). tests/waiting.mjs
+// waits far longer and throws naming what it waited for.
 // One real tick, then wait for whatever it spawned to finish and be reaped.
 const tickAndSettle = async () => {
   await sup.tick();
-  await waitFor(() => !sup._preparing?.size && !sup.sessions.size);
+  await waitUntilNo('the run this tick started to be reaped', () => sup._preparing?.size || sup.sessions.size);
 };
 const row = (id) => store.readItem(PRODUCT, id, Date.now());
 
@@ -129,7 +129,10 @@ afterEach(() => {
   try { fs.rmSync(root, { recursive: true, force: true }); } catch {}
 });
 
-describe('her morning, start to finish, with a real claude process', { timeout: 20_000 }, () => {
+// No ceiling of its own: vitest.config.mjs carries the one number, and a
+// twenty-second one here would kill the test before the helper could say what
+// it was waiting for.
+describe('her morning, start to finish, with a real claude process', () => {
   it('signed out, replied, signed in: the next tick runs it and the row gets its answer', async () => {
     await build();
     const made = store.fileItem(PRODUCT, { title: 'Add a dark mode toggle', kind: 'task', body: 'Please add a toggle.', labels: ['founder'] });
@@ -153,13 +156,13 @@ describe('her morning, start to finish, with a real claude process', { timeout: 
     signIn();
     const signedInAt = Date.now();
     await sup.tick();
-    const spawned = await waitFor(() => runs().length === 2, 3000);
+    const spawned = await waitFor('the signed-in run to start', () => runs().length === 2);
     const took = Date.now() - signedInAt;
     console.log(`sign-in to spawn: 1 tick, ${took} ms`);
     expect(spawned).toBe(true);
     expect(runs()).toEqual(['out', 'in']);
-    await waitFor(() => !sup.sessions.size && !sup._preparing?.size);
-    await waitFor(() => /toggle is in/.test(row(made.id).result ?? ''));
+    await waitUntilNo('that run to be reaped', () => sup.sessions.size || sup._preparing?.size);
+    await waitFor('the answer to land on the row', () => /toggle is in/.test(row(made.id).result ?? ''));
     expect(row(made.id).result).toMatch(/toggle is in/);
     expect(sup.status().signInNeeded).toEqual({});
     expect(sup._profileTrouble.default).toBeUndefined();
@@ -189,9 +192,9 @@ describe('her morning, start to finish, with a real claude process', { timeout: 
     signIn();
     const out = sup.resumeItems([made.id]);
     expect(out.resumed + out.queued).toBe(1);
-    await waitFor(() => runs().length === 2, 3000);
+    await waitFor('the signed-in run to start', () => runs().length === 2);
     expect(runs()).toEqual(['out', 'in']);
-    await waitFor(() => /toggle is in/.test(row(made.id).result ?? ''));
+    await waitFor('the answer to land on the row', () => /toggle is in/.test(row(made.id).result ?? ''));
     expect(row(made.id).result).toMatch(/toggle is in/);
   });
 
@@ -210,9 +213,9 @@ describe('her morning, start to finish, with a real claude process', { timeout: 
     expect(row(made.id).result).toMatch(/sign in/i);
     signIn();
     await sup.tick();
-    expect(await waitFor(() => runs().length === 2, 3000)).toBe(true);
+    expect(await waitFor('the signed-in run to start', () => runs().length === 2)).toBe(true);
     expect(runs()).toEqual(['out', 'in']);
-    await waitFor(() => /toggle is in/.test(row(made.id).result ?? ''));
+    await waitFor('the answer to land on the row', () => /toggle is in/.test(row(made.id).result ?? ''));
     expect(row(made.id).result).toMatch(/toggle is in/);
   });
 

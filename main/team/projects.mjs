@@ -59,16 +59,27 @@ export function listSharedProjects(products) {
 // may already have given a project of their own, and that one must stay as it
 // is. Never shared, never remade once it exists, archived or not.
 export const PERSONAL_FLAG = 'personal';
-const PERSONAL_NAME = 'Personal';
+// CALLED MY WORKSPACE, in title case: the founder's pick on 2026-10-04. It is
+// a workspace of your own rather than a label for private things, and every
+// word of a project's name is capitalised.
+const PERSONAL_NAME = 'My Workspace';
+const PERSONAL_SLUG = 'my-workspace';
+// What it was called when it first shipped (9e2a626). One still carrying it
+// takes the new name; a name the person gave it is theirs.
+const FIRST_NAME = 'Personal';
 
 export function ensurePersonalProject(accountRoot) {
   let entries = [];
   try { entries = fs.readdirSync(accountRoot); } catch { entries = []; }
   for (const slug of entries.sort()) {
-    if (readProject(path.join(accountRoot, slug))?.[PERSONAL_FLAG] === true) return { slug, made: false };
+    const dir = path.join(accountRoot, slug);
+    const project = readProject(dir);
+    if (project?.[PERSONAL_FLAG] !== true) continue;
+    if (project.name === FIRST_NAME) writeProject(dir, { ...project, name: PERSONAL_NAME });
+    return { slug, made: false };
   }
-  let slug = 'personal';
-  for (let n = 2; fs.existsSync(path.join(accountRoot, slug)); n += 1) slug = `personal-${n}`;
+  let slug = PERSONAL_SLUG;
+  for (let n = 2; fs.existsSync(path.join(accountRoot, slug)); n += 1) slug = `${PERSONAL_SLUG}-${n}`;
   const dir = path.join(accountRoot, slug);
   fs.mkdirSync(dir, { recursive: true });
   writeProject(dir, {
@@ -89,7 +100,7 @@ export function markShared(dir, { teamId, visibility = 'team', people = [], shar
   if (!project) throw new Error(`no project.json in ${dir}`);
   // Sharing it would put every line of it in the cloud, which is the one thing
   // this project exists to make hard. A thread in it is shared one at a time.
-  if (project[PERSONAL_FLAG] === true) throw new Error('Your personal project stays on this Mac. Share a thread in it instead.');
+  if (project[PERSONAL_FLAG] === true) throw new Error(`${PERSONAL_NAME} stays on this Mac. Share a thread in it instead.`);
   const projectId = project.team?.projectId || crypto.randomUUID();
   project.team = {
     projectId, teamId, visibility: visibility === 'people' ? 'people' : 'team', people: [...new Set(people)],

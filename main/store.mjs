@@ -517,7 +517,7 @@ export class Store {
       // owner, or the people she chose (w-41ff964775). No field at all reads
       // as the team, except in your personal project, where it reads as Only
       // you (w-b989839656). So Team is written when it was chosen, which is
-      // how a thread in Personal is shared on purpose.
+      // how a thread in My Workspace is shared on purpose.
       ...(visibility === 'private' || visibility === 'team' ? { visibility } : {}),
       ...(visibility === 'people' && Array.isArray(visibleTo) && visibleTo.length
         ? { visibility, visibleTo: [...new Set(visibleTo.map(String))] } : {}),

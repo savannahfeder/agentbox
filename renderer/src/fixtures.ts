@@ -790,6 +790,8 @@ export const fixtureSettings = {
   workspace: {
     agentsRunning: true,
     sessionsAtOnce: 3,
+    memoryGate: { on: false, slots: null, slotsAuto: 2, slotsMax: 12, now: null },
+    leftovers: { on: false, now: 'Right now finished agents have left 40 programs running; turning this on stops them, two hours from then.' },
     capacity: 6,
     running: 2,
     model: 'claude-opus-5',

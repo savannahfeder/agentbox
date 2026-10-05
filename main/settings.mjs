@@ -24,6 +24,8 @@ import { accountSentence, engineTroubleNote } from '../shared/spawn-trouble.mjs'
 import { readPlan } from './claude-plan.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
 import { machineSlots, machineNote, MAX_SLOTS } from './machine.mjs';
+import { NAME } from '../shared/product-name.mjs';
+import { autoSlots } from './memory-gate.mjs';
 import { accountIdentity, claudeLoginCommand, duplicateAccountNote, linkAccountTooling, makeClaudeHome } from './account-tooling.mjs';
 import { isEngine } from '../shared/engines.mjs';
 import { codexAccount, codexLoginCommand, makeCodexHome } from './codex-account.mjs';
@@ -476,6 +478,8 @@ export function readSettings({ config, supervisor, store }) {
       slotsSuggested: slotsHere.slots,
       slotsMax: MAX_SLOTS,
       machineNote: machineNote(slotsHere, config.maxConcurrentSessions),
+      memoryGate: memoryGateSettings({ config, supervisor }),
+      leftovers: leftoverSettings({ config, supervisor }),
       capacity: status.capacity,
       running: sessions.length,
       model: parseSessionArgs(workspaceArgs).model,
@@ -806,6 +810,73 @@ export function addClaudeAccount({ config, supervisor }) {
   return { home: made.home, profile: made.profile, command: claudeLoginCommand(made.home) };
 }
 
+/**
+ * The Agents page's memory rows: the switch, the number of heavy commands at
+ * once (null is Auto), what Auto works out to here, and one sentence about
+ * right now while it is on.
+ */
+export function memoryGateSettings({ config, supervisor }) {
+  const on = !!config.memoryGate;
+  const slots = Number.isFinite(config.memoryGateSlots) ? config.memoryGateSlots : null;
+  // What Auto works out to on this Mac, whether or not somebody picked.
+  const slotsAuto = autoSlots(os.totalmem());
+  let now = null;
+  if (on) {
+    let s = null;
+    try { s = supervisor.memoryGateStatus?.() ?? null; } catch {}
+    if (s?.role === 'standby') now = `Another ${NAME} on this Mac is coordinating.`;
+    else if (s) {
+      const heavy = (s.running ?? []).filter((r) => r.holdsSlot).length;
+      const waiting = (s.waiting ?? []).length;
+      const mem = s.pressure === 'critical' ? 'Memory is very short.' : s.pressure === 'tight' ? 'Memory is tight.' : 'Memory is fine.';
+      const run = heavy ? `${heavy} heavy command${heavy === 1 ? '' : 's'} running` : 'Nothing heavy running';
+      now = `${mem} ${run}${waiting ? `, ${waiting} waiting` : ''}.`;
+    }
+  }
+  return { on, slots, slotsAuto, slotsMax: MAX_SLOTS, now };
+}
+
+/**
+ * The Agents page's leftovers row: the switch, and one sentence about what
+ * finished agents have left running while it is on.
+ */
+export function leftoverSettings({ config, supervisor }) {
+  const on = !!config.cleanupLeftovers;
+  let now = null;
+  let s = null;
+  try { s = supervisor.leftoverStatus?.() ?? null; } catch {}
+  const list = s?.leftovers ?? [];
+  const stoppable = list.reduce((n, l) => n + (l.programs ?? 0), 0);
+  const kept = list.reduce((n, l) => n + (l.kept ?? 0), 0);
+  const total = stoppable + kept;
+  // OFF, IT SAYS WHAT TURNING IT ON WOULD STOP, before anybody does: the
+  // consent is to these programs too, not only to future ones (agreed with
+  // Codex, 2026-10-05).
+  if (!on) {
+    if (total && stoppable) {
+      now = `Right now finished agents have left ${total} program${total === 1 ? '' : 's'} running; turning this on stops ${stoppable === total ? (total === 1 ? 'it' : 'them') : `${stoppable} of them`}, two hours from then.`;
+    }
+    return { on, now };
+  }
+  {
+    if (!total) now = 'Nothing left running by finished agents.';
+    else {
+      const next = list.filter((l) => l.programs && l.stopsAt).map((l) => l.stopsAt).sort((a, b) => a - b)[0];
+      const when = (ms) => {
+        const m = Math.max(1, Math.round((ms - Date.now()) / 60_000));
+        return m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} m` : ''}` : `${m} m`;
+      };
+      now = `Finished agents have left ${total} program${total === 1 ? '' : 's'} running.`;
+      if (stoppable) now += ` ${stoppable} ${next && next > Date.now() ? `stop in ${when(next)}` : 'are stopping'}`;
+      if (kept) now += `${stoppable ? ';' : ''} ${kept} ${kept === 1 ? 'is' : 'are'} kept`;
+      now += '.';
+      const survivors = s?.survivors?.length ?? 0;
+      if (survivors) now += ` ${survivors} did not stop when asked.`;
+    }
+  }
+  return { on, now };
+}
+
 export function setWorkspaceSetting({ config, supervisor }, { key, value }) {
   switch (key) {
     case 'agentsRunning':
@@ -833,6 +904,32 @@ export function setWorkspaceSetting({ config, supervisor }, { key, value }) {
     // see in her own file. `saveConfig` mutates the live config too, and
     // main/analytics.mjs reads the switch at every send, so off takes effect
     // from the moment she moves it and not at the next launch.
+    // HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). Takes effect now:
+    // the coordinator starts or stops this moment, and workers spawned from
+    // here on carry the check or do not. A worker already running keeps the
+    // hooks it was started with; with the switch off its hook finds no socket
+    // and lets every command straight through.
+    case 'memoryGate':
+      saveConfig(config, { memoryGate: !!value });
+      supervisor.setMemoryGate?.(!!value)?.catch?.((e) => console.warn('zero: memory gate:', e.message));
+      supervisor.onChange?.();
+      break;
+    // STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mjs). Turning it
+    // on records the moment, which is the earliest the clock may start from.
+    case 'cleanupLeftovers':
+      saveConfig(config, value ? { cleanupLeftovers: true, cleanupLeftoversSince: Date.now() } : { cleanupLeftovers: false });
+      supervisor.setLeftoverCleanup?.(!!value)?.catch?.((e) => console.warn('zero: leftovers:', e.message));
+      supervisor.onChange?.();
+      break;
+    case 'memoryGateSlots': {
+      const n = value === null || value === undefined || value === 'auto'
+        ? null
+        : Math.max(1, Math.min(MAX_SLOTS, Math.round(Number(value) || 1)));
+      saveConfig(config, { memoryGateSlots: n });
+      if (config.memoryGate) supervisor.setMemoryGate?.(true)?.catch?.(() => {});
+      supervisor.onChange?.();
+      break;
+    }
     case 'diagnostics':
       saveConfig(config, { diagnostics: !!value });
       break;

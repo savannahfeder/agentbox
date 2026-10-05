@@ -19,8 +19,9 @@
 //   - no Team tab, in any state (w-05ff3d1438, 2026-10-01): the Inbox and the
 //     Team page were one question on two pages, so the faces on the Inbox's
 //     tab bar pick whose threads are listed, and the sidebar keeps one list;
-//   - at the foot, Invite people (only when signed in to a team),
-//     Instructions, Settings, then the signed-in person's face, name and,
+//   - at the foot, Feedback (w-1b574413db, 2026-10-04, which also took
+//     Invite people out for the single-player launch), Instructions,
+//     Settings, then the signed-in person's face, name and,
 //     under it, what they are up to (w-0b54ee983f, 2026-10-02; it was their
 //     email until then, and the email moved to Settings -> Team).
 //     Team members was there too until 2026-10-01 (w-8415594d19), when
@@ -80,14 +81,13 @@ describe('one list tab, and it is lit wherever her threads are listed', () => {
   });
 
   // THE MEMBERS PAGE IS GONE (w-8415594d19, 2026-10-01): team management is a
-  // pane in Settings and Invite people is the shortcut into it, so the row
-  // that lights while that pane is up is Invite people. The detail is pinned
-  // in team-management-lives-in-settings.test.mjs.
-  it('lights Invite people and not Inbox while the Settings team pane is open', () => {
-    const html = draw({ page: 'invite', team: onATeam, onInvite: noop, hasTeam: true, onTeam: noop });
+  // pane in Settings. Its shortcut row, Invite people, left the sidebar on
+  // 2026-10-04 (w-1b574413db), so that pane lights Settings like every other.
+  it('lights Settings and not Inbox while the Settings team pane is open', () => {
+    const html = draw({ page: 'settings', team: onATeam, onInvite: noop, hasTeam: true, onTeam: noop, onSettings: noop });
     expect(inboxTab(html)).not.toContain('aria-current');
     expect(buttonWith(html, 'data-tab="team"')).not.toContain('aria-current');
-    expect(buttonWith(html, 'aria-label="Invite people"')).toContain('aria-current="page"');
+    expect(buttonWith(html, 'aria-label="Settings"')).toContain('aria-current="page"');
   });
 
   it('draws none of the places and buttons that moved to the Inbox page and its header', () => {
@@ -120,22 +120,20 @@ describe('there is no Team tab', () => {
 });
 
 describe('the foot of the sidebar', () => {
-  // ONE TEAM ROW, NOT TWO (w-8415594d19, 2026-10-01). Team members was the
-  // same door as Invite people and left the sidebar; `onAccount` is your own
-  // row at the bottom, which opens the same Settings pane.
+  // NO TEAM ROWS AT ALL NOW. Team members left on 2026-10-01 (w-8415594d19)
+  // and Invite people on 2026-10-04 (w-1b574413db, single-player launch).
+  // `onAccount` is your own row at the bottom, whose menu still invites.
   const both = { onInvite: noop, onAccount: noop };
+  const aboveYou = (html) => html.split('class="th-me"')[0];
 
-  it('offers Invite people to someone signed in to a team, and no members row', () => {
+  it('offers neither Invite people nor a members row to someone on a team', () => {
     const html = draw({ team: onATeam, ...both });
-    expect(html).toContain('aria-label="Invite people"');
+    expect(aboveYou(html)).not.toContain('Invite people');
     expect(html).not.toContain('Team members');
   });
 
-  // Signed in with no team yet, it is offered and opens the page that starts
-  // one, because without it there was no way to reach the invite page (2026-10-01).
-  it('offers it to someone signed in who is on no team yet', () => {
-    const html = draw({ team: signedInNoTeam, ...both });
-    expect(html).toContain('aria-label="Invite people"');
+  it('offers no Invite people row to someone signed in who is on no team yet', () => {
+    expect(aboveYou(draw({ team: signedInNoTeam, ...both }))).not.toContain('Invite people');
   });
 
   it.each([
@@ -153,10 +151,10 @@ describe('the foot of the sidebar', () => {
     expect(html).not.toContain('Team members');
   });
 
-  it('keeps Instructions and Settings at the foot, under the tabs, in that order', () => {
-    const html = draw({ team: onATeam, ...both, onInstructions: noop, onSettings: noop, hasTeam: true, onTeam: noop });
+  it('keeps Feedback, Instructions and Settings at the foot, under the tabs, in that order', () => {
+    const html = draw({ team: onATeam, ...both, onFeedback: noop, onInstructions: noop, onSettings: noop, hasTeam: true, onTeam: noop });
     const foot = html.slice(html.indexOf('workspace-bottom'));
-    const order = ['Invite people', 'Instructions', 'Settings'].map((l) => foot.indexOf(`aria-label="${l}"`));
+    const order = ['Feedback', 'Instructions', 'Settings'].map((l) => foot.indexOf(`aria-label="${l}"`));
     for (const at of order) expect(at).toBeGreaterThan(-1);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(html.indexOf('workspace-tabs')).toBeLessThan(html.indexOf('workspace-bottom'));
@@ -213,12 +211,12 @@ describe('every control keeps its name in either width', () => {
   it.each([false, true])('names every button with an aria-label when collapsed=%s', (collapsed) => {
     const html = draw({
       collapsed, team: onATeam, hasTeam: true, onTeam: noop, onInvite: noop, onAccount: noop,
-      onInstructions: noop, onSettings: noop, inboxCount: 2,
+      onFeedback: noop, onInstructions: noop, onSettings: noop, inboxCount: 2,
     });
     const buttons = html.match(/<button[^>]*>/g);
-    // Inbox, Invite people, Instructions, Settings, the toggle and your own
-    // row (it opens your account). Team left with w-05ff3d1438, and Team
-    // members with w-8415594d19.
+    // Inbox, Feedback, Instructions, Settings, the toggle and your own row
+    // (it opens your account). Team left with w-05ff3d1438, Team members
+    // with w-8415594d19, and Invite people with w-1b574413db.
     //
     // Your own row is one button in either width: face, name and email,
     // opening your account menu (w-a09476712f). The status line that was a

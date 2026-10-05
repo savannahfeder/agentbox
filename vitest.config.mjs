@@ -42,5 +42,20 @@ export default defineConfig({
     // Every test file gets its own throwaway ~/.astral, so nothing in the suite
     // can touch the real one. See tests/agentbox-home.setup.mjs.
     setupFiles: ['tests/agentbox-home.setup.mjs'],
+    // ROOM FOR A MAC THAT IS NEVER IDLE (w-c121bd85e6, 2026-10-04). Vitest's
+    // defaults, 5 s for a test and 10 s for a hook, are written for a laptop
+    // running one suite. A dozen agents share this one, and the end-to-end
+    // tests here drive real child processes: measured that day, the signed-out
+    // Codex file ran its 8 tests in 1,592 ms alone at load 63 and hit the
+    // ten-second ceiling at load 114. Two ships bounced on it in half an hour
+    // with nothing wrong with either branch.
+    //
+    // Nothing fast is slowed by this: a test that finishes in 40 ms still
+    // finishes in 40 ms, and only a test that is genuinely stuck pays the
+    // wait. Tests that wait on real work should wait with tests/waiting.mjs,
+    // whose deadline sits under these so that its message — which names what
+    // the test was waiting for — is the one that gets shown.
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
   },
 });

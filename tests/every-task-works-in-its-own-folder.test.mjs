@@ -38,6 +38,7 @@ import {
   parkTaskFolder, restoreTaskFolder,
 } from '../main/task-folders.mjs';
 import { Supervisor } from '../main/supervisor.mjs';
+import { waitFor } from './waiting.mjs';
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 
@@ -67,14 +68,17 @@ function repo() {
 // roughly the same amount of load, so load decides which one goes first.
 //
 // A timeout is the suite's guard against a hang, not a performance assertion,
-// and a suite whose red means "the Mac was busy" is worth nothing. 30s is what
-// the sibling file a-task-folder-is-never-pulled-out-from-under-an-agent
-// already takes for the same reason, and it is also what `until()` below needs:
-// that helper waits up to 20s and then throws its own clear message, which the
-// old 5s ceiling never let it reach.
-const ROOM_FOR_GIT = { timeout: 30_000 };
-
-describe('the folder a task works in', ROOM_FOR_GIT, () => {
+// and a suite whose red means "the Mac was busy" is worth nothing.
+//
+// AND THE NUMBER LIVES IN vitest.config.mjs NOW (w-c121bd85e6, 2026-10-04).
+// This file answered that by carrying its own 30s, which is TIGHTER than the
+// suite's, so raising the suite's did not reach it: on 2026-10-04 the file
+// went red again at 103,404 ms with one test over the 30, while the Mac was
+// so short of memory that a shell could not start on it. A ceiling written
+// beside one describe can only ever be the smaller of the two, which makes it
+// the one that fires, so there is no reason to keep one here. `until()` below
+// waits 20s, still well inside the suite's, and says what it was waiting for.
+describe('the folder a task works in', () => {
   let dir;
   beforeEach(() => { dir = repo(); });
   afterEach(() => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} });
@@ -272,7 +276,7 @@ function supervisorOver(repoPath, rows = []) {
   return { sup, product, dir };
 }
 
-describe('the folder the supervisor runs a row in', ROOM_FOR_GIT, () => {
+describe('the folder the supervisor runs a row in', () => {
   let dir;
   const made = [];
   beforeEach(() => { dir = repo(); });
@@ -324,15 +328,11 @@ describe('the folder the supervisor runs a row in', ROOM_FOR_GIT, () => {
 // reported "when I complete a task and go into a new one". So a spawn whose row
 // has no folder yet hands the folder to a worker thread and comes back to the
 // spawn when it exists.
-const until = async (check, ms = 20000) => {
-  const end = Date.now() + ms;
-  while (!check()) {
-    if (Date.now() > end) throw Error('timed out');
-    await new Promise((r) => setTimeout(r, 20));
-  }
-};
+// "timed out" named nothing, so a red run here said only that something had
+// not happened. tests/waiting.mjs carries the deadline and the words.
+const until = (what, check) => waitFor(what, check);
 
-describe('a spawn that needs a new folder', ROOM_FOR_GIT, () => {
+describe('a spawn that needs a new folder', () => {
   let dir;
   const made = [];
   beforeEach(() => { dir = repo(); });
@@ -357,7 +357,7 @@ describe('a spawn that needs a new folder', ROOM_FOR_GIT, () => {
     expect(fs.existsSync(taskFolderPath(dir, 'w-offthread'))).toBe(false);
     expect(sup._loadFor('claude')).toBe(1);
 
-    await until(() => spawns.length === 1);
+    await until('the folder to be made and the spawn to follow', () => spawns.length === 1);
     expect(spawns[0].cwd).toBe(taskFolderPath(dir, 'w-offthread'));
     expect(fs.existsSync(path.join(spawns[0].cwd, 'app.txt'))).toBe(true);
     expect(sup._loadFor('claude')).toBe(0);
@@ -368,7 +368,7 @@ describe('a spawn that needs a new folder', ROOM_FOR_GIT, () => {
     const item = { id: 'w-asked-twice', product: 'agentbox' };
     sup._folderFirst(item, product, 'claude', {});
     expect(sup._folderFirst({ ...item, answer: 'go' }, product, 'claude', { continuation: true })).toBe(true);
-    await until(() => spawns.length === 1);
+    await until('the one spawn the two asks share', () => spawns.length === 1);
     await new Promise((r) => setTimeout(r, 100));
     expect(spawns.length).toBe(1);
     expect(spawns[0].opts.continuation).toBe(true);
@@ -378,7 +378,7 @@ describe('a spawn that needs a new folder', ROOM_FOR_GIT, () => {
     const { sup, product, spawns } = watched();
     sup._folderFirst({ id: 'w-stopped', product: 'agentbox' }, product, 'claude', {});
     expect(sup.stopSession('w-stopped')).toBe(true);
-    await until(() => fs.existsSync(taskFolderPath(dir, 'w-stopped')));
+    await until('the folder to be made for the row she stopped', () => fs.existsSync(taskFolderPath(dir, 'w-stopped')));
     await new Promise((r) => setTimeout(r, 100));
     expect(spawns.length).toBe(0);
   });
@@ -406,7 +406,7 @@ describe('a spawn that needs a new folder', ROOM_FOR_GIT, () => {
 // commit, so the session comes back to exactly the files it left. Nothing is
 // deleted that git is not holding, the branch is never deleted, and an
 // accidental close costs the ten seconds it takes to make the folder again.
-describe('parking a closed task', ROOM_FOR_GIT, () => {
+describe('parking a closed task', () => {
   let dir;
   beforeEach(() => { dir = repo(); });
   afterEach(() => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} });

@@ -1677,6 +1677,58 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                  */}
                 <Stepper label="Agents at once" value={w.sessionsAtOnce} min={1} max={w.slotsMax ?? 12} onChange={(v) => setWorkspace('sessionsAtOnce', v)} />
               </Row>
+              {/* HOLD HEAVY WORK WHEN MEMORY IS SHORT (w-3958c3753d). An agent
+                  waiting on the model costs a few hundred MB; one running tests
+                  or a build costs a gigabyte or more, so the number that runs
+                  out is heavy commands, not agents. With this on, every shell
+                  command asks first and heavy ones wait their turn, urgent
+                  first. Off out of the box. The sentence about right now rides
+                  on the description so the row stays one line of controls. */}
+              {w.memoryGate && (
+                <Row
+                  label="Hold heavy work when memory is short"
+                  /* Codex workers do not carry the check yet: Codex runs a hook
+                     only once it is trusted, and its app-server is shared by
+                     every thread. Said only where Codex can be chosen at all. */
+                  desc={`While this Mac is short of memory, agents run tests, builds and other heavy commands a few at a time, urgent tasks first. Everything else runs as normal.${w.memoryGate.on && w.memoryGate.now ? ` ${w.memoryGate.now}` : ''}`}
+                >
+                  <Switch label="Hold heavy work when memory is short" on={w.memoryGate.on} onChange={(v) => setWorkspace('memoryGate', v)} />
+                </Row>
+              )}
+              {w.memoryGate?.on && (
+                <Row
+                  label="Heavy commands at once"
+                  desc={w.memoryGate.slots === null
+                    ? `Auto: ${w.memoryGate.slotsAuto} on this Mac, one for every 8 GB of memory.`
+                    : `You picked ${w.memoryGate.slots}. Auto is ${w.memoryGate.slotsAuto} on this Mac.`}
+                >
+                  {/* Stepping back onto Auto's own number IS Auto, so there is
+                      always a way back without a second control. */}
+                  <Stepper
+                    label="Heavy commands at once"
+                    value={w.memoryGate.slots ?? w.memoryGate.slotsAuto}
+                    min={1}
+                    max={w.memoryGate.slotsMax}
+                    onChange={(v) => setWorkspace('memoryGateSlots', v === w.memoryGate?.slotsAuto ? null : v)}
+                  />
+                </Row>
+              )}
+              {/* STOP WHAT FINISHED AGENTS LEAVE RUNNING (2026-10-05). A night of
+                  agents left 7.7 GB running after every agent had finished and
+                  the Mac ran out of memory; main/leftovers.mjs has the numbers
+                  and the rules agreed with Codex. Its own switch, because the
+                  memory switch only ever delays commands and this one stops
+                  programs, and the person should agree to that by name. The
+                  description is the whole policy, so nothing about it is a
+                  surprise later. */}
+              {w.leftovers && (
+                <Row
+                  label="Stop what finished agents leave running"
+                  desc={`Dev servers, previews, test runs and other background jobs an agent started and left behind are stopped two hours after its run ends, or ten minutes while memory is short, including what is already running when you turn this on. Never stopped: what an agent was asked to keep, apps installed on this Mac such as Docker Desktop, and anything you started yourself.${twoEngines ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.now ? ` ${w.leftovers.now}` : ''}`}
+                >
+                  <Switch label="Stop what finished agents leave running" on={w.leftovers.on} onChange={(v) => setWorkspace('cleanupLeftovers', v)} />
+                </Row>
+              )}
               {/* THE CODING AGENT IS CHOSEN ON THE CARD (w-12081d32cc). A row
                   offering Claude Code or Codex stood here until 2026-09-23, on
                   a Mac that had both. The new task card asks the same question

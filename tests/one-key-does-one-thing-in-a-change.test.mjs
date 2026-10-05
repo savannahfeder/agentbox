@@ -61,7 +61,9 @@ describe('the keys a change answers itself', () => {
   });
 
   it('is one set, not a list copied into the app', () => {
-    expect(CHANGE_OWNS.size).toBe(10);
+    // Twelve since 2026-10-04: ] and [ walk the changes
+    // (tests/the-next-change-is-one-key-away.test.mjs).
+    expect(CHANGE_OWNS.size).toBe(12);
   });
 });
 

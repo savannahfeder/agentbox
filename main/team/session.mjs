@@ -6,7 +6,9 @@
 // Each store root has its own file, which is what lets two copies of the app
 // on one Mac be two different teammates.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { nameSlug } from '../../shared/product-name.mjs';
 import { supabaseBackend } from './supabase-backend.mjs';
 import { signInWithGoogle, cancelGoogleSignIn } from './sign-in.mjs';
 
@@ -17,17 +19,50 @@ import { signInWithGoogle, cancelGoogleSignIn } from './sign-in.mjs';
 // else. Electron sets defaultApp only when run from a checkout.
 export const isPackagedElectron = () => !!process.versions?.electron && !process.defaultApp;
 
-// The hosted project's address and public key, from cloud/team.config.json.
-// Row level security, not secrecy, is what protects the data, but the file is
-// still kept out of the repository (it is ignored), so a public checkout runs
-// as the single-person app; cloud/team.config.example.json shows its shape.
-// AGENTBOX_TEAM_CONFIG points at another file from a checkout only.
-export function loadCloudConfig(appDir, { packaged = isPackagedElectron() } = {}) {
-  const file = (!packaged && process.env.AGENTBOX_TEAM_CONFIG) || path.join(appDir, 'cloud', 'team.config.json');
-  try {
-    const c = JSON.parse(fs.readFileSync(file, 'utf8'));
-    if (typeof c.url === 'string' && typeof c.anonKey === 'string') return c;
-  } catch { /* no team config: the app runs as the single-person app */ }
+// THE TEAM KEY BELONGS TO THE MAC, NOT TO THE FOLDER THE APP RUNS FROM.
+//
+// Asked for 2026-10-04 (w-2fce569057): "we want to run the team version and i
+// need to see my team!" A key per folder is the wrong unit, and the cost of it
+// was a whole hour. Measured that day: the only Agentbox running was a copy out
+// of a task folder with no key, the app in the Dock had none either, and the one
+// folder on the machine that had a key was not running. So no window open could
+// show a teammate, and a message to one looked lost when it had arrived fine.
+//
+// A person has one team. Their Mac holds its key once, at
+// ~/.<app>/team.config.json, and whichever copy they open is the team version:
+// the checkout, a worktree, or the app in the Dock.
+//
+// IT IS READ OFF THE REAL HOME DIRECTORY AND NEVER OFF AGENTBOX_HOME. A review
+// on 2026-10-01 found an installed build honouring AGENTBOX_TEAM_CONFIG, so
+// anything that could set an environment variable could point the app at
+// another server. appHome() reads AGENTBOX_HOME, so using it here would reopen
+// that door; os.homedir() cannot be talked into lying.
+export function teamConfigOnThisMac(home = os.homedir()) {
+  return path.join(home, `.${nameSlug}`, 'team.config.json');
+}
+
+// The hosted project's address and public key. Row level security, not secrecy,
+// is what protects the data, but the file is kept out of the repository (it is
+// ignored), so a checkout with no key on its Mac runs as the single-person app;
+// cloud/team.config.example.json shows its shape.
+//
+// THE FOLDER'S OWN KEY WINS when it has one, so a worktree set up against
+// another team is never quietly moved onto this Mac's. AGENTBOX_TEAM_CONFIG
+// points at another file from a checkout only, and is first because that is
+// what the tests run on.
+export function loadCloudConfig(appDir, { packaged = isPackagedElectron(), home = os.homedir() } = {}) {
+  const tries = [
+    !packaged && process.env.AGENTBOX_TEAM_CONFIG,
+    path.join(appDir, 'cloud', 'team.config.json'),
+    teamConfigOnThisMac(home),
+  ];
+  for (const file of tries) {
+    if (!file) continue;
+    try {
+      const c = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (typeof c.url === 'string' && typeof c.anonKey === 'string') return c;
+    } catch { /* try the next place; none of them is the single-person app */ }
+  }
   return null;
 }
 
