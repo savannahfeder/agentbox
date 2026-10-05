@@ -57,6 +57,11 @@ export function pictureRoots({ dir, repo, id, texts }: {
   const roots = [
     ...(dir ? namedFolders(texts, dir).map((f) => `${dir}/${f}`) : []),
     dir && id && `${dir}/designs/${id}`,
+    // THE WORKER'S OWN CHECKOUT. Every run works in `.claude/worktrees/<task
+    // id>` under the repository (main/task-folders.mjs), so a path it writes is
+    // relative to that folder. Her screenshot that evening was seven of them,
+    // all "missing image" (tests/a-picture-in-the-workers-own-checkout-is-drawn).
+    repo && id && `${repo}/.claude/worktrees/${id}`,
     dir,
     dir && `${dir}/designs`,
     dir && `${dir}/attachments`,

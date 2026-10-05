@@ -89,8 +89,9 @@ describe('where a picture is looked for', () => {
     expect(new Set(twice).size).toBe(twice.length);
   });
 
-  it('has nothing to add without a project folder, and does not invent one', () => {
-    expect(pictureRoots({ dir: null, repo: REPO, id: 'w-1', texts: [HERS] })).toEqual([REPO, `${REPO}/designs`]);
+  it('without a project folder, looks only in the code folder and the worker\'s checkout in it', () => {
+    expect(pictureRoots({ dir: null, repo: REPO, id: 'w-1', texts: [HERS] }))
+      .toEqual([`${REPO}/.claude/worktrees/w-1`, REPO, `${REPO}/designs`]);
   });
 });
 

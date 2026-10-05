@@ -50,6 +50,18 @@ export function firstSentence(text, max = 240) {
   return one.length > max ? `${one.slice(0, max - 1).trimEnd()}…` : one;
 }
 
+// HOW LONG A SUMMARY LINE AN AGENT WRITES MAY BE (w-b51b2e1c86): about four
+// lines of the panel, so the name, the three lines and the properties fit one
+// window without scrolling. Asked for on 2026-10-04 off a summary of 50, 63 and
+// 95 words that ran the properties off the bottom; agents' lines then ran a
+// median of 30 to 36 words. The store tool refuses a longer one
+// (mcp/core/work.mjs); a person's own edits are not limited.
+export const SUMMARY_WORDS = 25;
+
+export function wordsIn(text) {
+  return typeof text === 'string' ? text.split(/\s+/).filter(Boolean).length : 0;
+}
+
 /** The thread's summary: what the agent or the person wrote, else stand-ins. */
 export function summaryOf(item) {
   const has = (f) => typeof item[f] === 'string';

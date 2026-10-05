@@ -118,7 +118,7 @@ import { TeamPage } from './team/TeamPage';
 import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationWith, flipView, isDirect, nextTab, pageFor, readDisplay, writeDisplay, keeps as keepsDisplay, sorted as sortedByDisplay, type Display } from './threads/page-rules';
+import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, sorted as sortedByDisplay, type Display, type Privacy } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
@@ -2019,11 +2019,19 @@ export default function App() {
   const setPicked = useCallback((next: string[]) => { setPickedRaw(next); writePicked(next); setSelected(0); }, []);
   const withOthers = !!team && othersInView(picked, team.me);
   const displayPage = pageFor(withOthers);
-  const inboxDisplay = withOthers ? teamDisplay : mineDisplay;
+  // PRIVACY IS ONE CHOICE FOR BOTH HALVES (w-f6ea56b89a), so Hide private
+  // holds when a teammate's face is lit, which is when somebody is looking.
+  const [privacy, setPrivacyRaw] = useState<Privacy>(() => readPrivacy());
+  const inboxDisplay = useMemo(() => pageDisplay(withOthers ? teamDisplay : mineDisplay, privacy, !!team), [withOthers, teamDisplay, mineDisplay, privacy, team]);
   const setInboxDisplay = useCallback((d: Display) => {
-    if (displayPage === 'team') setTeamDisplayRaw(d); else setMineDisplayRaw(d);
-    writeDisplay(displayPage, d);
+    const { privacy: p = 'any', ...rest } = d;
+    setPrivacyRaw(p); writePrivacy(p);
+    if (displayPage === 'team') setTeamDisplayRaw(rest); else setMineDisplayRaw(rest);
+    writeDisplay(displayPage, rest);
   }, [displayPage]);
+  // Who sees each of your rows, which is what the privacy choice reads: the
+  // same rule that draws the lock.
+  const seenOf = useCallback((i: WorkItem) => rowSharing(i, (snap?.products ?? []).find((p) => p.slug === i.product), team ? { me: team.me, since: team.state.since ?? null } : null), [snap?.products, team]);
   // THE BOARD'S COLUMNS IN THE ORDER YOU DRAGGED THEM TO (w-23fc91bff5). Held
   // here, not in the board, because J, K and the arrows walk the same order.
   const [columnOrder, setColumnOrderRaw] = useState<ThreadStateWord[]>(() => readColumnOrder());
@@ -2046,8 +2054,8 @@ export default function App() {
   // own level (w-e263a8a0fb).
   const projectOrder = snap?.supervisor.productOrder ?? NO_ORDER;
   const displayedBox = useMemo(
-    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay, view, projectOrder) : []),
-    [shownBox, inboxDisplay, now, mineShown, view, projectOrder],
+    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i))), inboxDisplay, view, projectOrder) : []),
+    [shownBox, inboxDisplay, now, mineShown, view, projectOrder, seenOf],
   );
   // THE PICKED TEAMMATES' THREADS FOR THIS TAB, from the cards their Macs
   // publish, merged into your rows in the Display's order.
@@ -2081,8 +2089,8 @@ export default function App() {
   // about what clicking it shows, and the number a filter is holding back is
   // said in full by the empty state and by the Display menu's "Showing 4 of 7".
   const shownCount = useCallback((rows: WorkItem[]) => rows.filter(
-    (i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now),
-  ).length, [inboxDisplay, now]);
+    (i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i)),
+  ).length, [inboxDisplay, now, seenOf]);
   const theirCount = useCallback((tab: string) => (withOthers
     ? teammateRows(cards, { tab, picked, me: team?.me ?? null, display: inboxDisplay, products: snap?.products ?? [], now }).length : 0),
   [withOthers, cards, picked, team?.me, snap?.products, now, inboxDisplay]);
@@ -2099,8 +2107,8 @@ export default function App() {
   // whole inbox, or the next task opened can be one she has hidden
   // (w-27759abd33).
   const shownInbox = useMemo(
-    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now)), inboxDisplay, undefined, projectOrder),
-    [inbox, boxFilter, inboxDisplay, now, projectOrder],
+    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i))), inboxDisplay, undefined, projectOrder),
+    [inbox, boxFilter, inboxDisplay, now, projectOrder, seenOf],
   );
   const boxFilterMenu = useMemo(
     () => (modal === 'filter' ? filterMenu(wholeBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i)), boxFilter, snap?.products ?? []) : null),
@@ -5297,7 +5305,7 @@ export default function App() {
                   // her own filter, over a tab that still read 13.
                   hiddenNow > 0
                     ? <FilteredEmpty view={view} hidden={hiddenNow}
-                        onClear={() => setInboxDisplay({ ...inboxDisplay, priorities: [], projects: [], updated: 'any' })} />
+                        onClear={() => setInboxDisplay({ ...inboxDisplay, priorities: [], projects: [], updated: 'any', privacy: 'any' })} />
                     // "Nothing needs you" is about you alone; with a teammate
                     // on the page the quiet line says it instead.
                     : view === 'inbox' && !withOthers
