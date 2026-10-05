@@ -46,6 +46,33 @@ describe('a test run that died', () => {
   });
 });
 
+// MEASURED ON THIS BRANCH'S OWN SHIP, 2026-10-04. It bounced on three tests
+// that were already red on main, and the thread said
+//
+//   It did not ship, and it went back to its agent: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+//
+// which is vitest's heading for the list, not the list. It carries the count
+// and names nothing, and the FAIL lines that do name something are printed
+// directly under it. Finding those cost a trip to the GitHub run.
+describe('vitest\'s own heading over the failures', () => {
+  const RUN = [
+    '⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯',
+    ' FAIL  tests/the-app-is-named-in-one-place.test.mjs > nothing spells a name this app has had > does not type one in main',
+  ].join('\n');
+
+  it('is passed over for the line under it, which names the file', () => {
+    expect(why(RUN)).toBe('FAIL  tests/the-app-is-named-in-one-place.test.mjs > nothing spells a name this app has had > does not type one in main');
+  });
+
+  it('is not mistaken for the run having died, because it did not', () => {
+    expect(why(RUN)).not.toMatch(/died|ended without/i);
+  });
+
+  it('is still better than nothing when it is genuinely all there is', () => {
+    expect(why('⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯')).toMatch(/Failed Tests 3/);
+  });
+});
+
 describe('a test run that really went red', () => {
   it('names the red file and its failed count', () => {
     const out = [

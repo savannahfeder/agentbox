@@ -115,6 +115,13 @@ const TICKED_GREEN = /^[✓✔]/;
 // WHOLE WORDS (w-7ec8553e23): without \b, "red" matched inside "configured"
 // and a harmless warning the tests print was shown as why a ship failed.
 const NAMES_A_FAILURE = /\b(CONFLICT|error|red|refused|failed|FAIL)\b/i;
+// Vitest's heading over the list of failures, "⎯⎯⎯ Failed Tests 3 ⎯⎯⎯". It
+// carries the count and names nothing, and the FAIL lines that DO name
+// something are printed directly under it, so taking the first match showed
+// the heading and sent whoever read it to the GitHub run to find out which
+// three (w-c121bd85e6, this branch's own first ship). Passed over while there
+// is anything better, and still offered when it is all there is.
+const ONLY_A_COUNT = /^⎯+ .* ⎯+$/;
 
 const DIED = 'the test run died without naming a failing test';
 
@@ -131,7 +138,8 @@ const DIED = 'the test run died without naming a failing test';
 export function whyItDidNotShip(output) {
   const lines = String(output ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
   const said = lines.filter((l) => !TICKED_GREEN.test(l));
-  const why = said.find((l) => NAMES_A_FAILURE.test(l)) ?? null;
+  const named = said.filter((l) => NAMES_A_FAILURE.test(l));
+  const why = named.find((l) => !ONLY_A_COUNT.test(l)) ?? named[0] ?? null;
   return { died: !why, why, last: said.at(-1) ?? null };
 }
 
