@@ -98,37 +98,40 @@ export function agoWords(ts: number, now: number = Date.now()): string {
 const firstOf = (name: string | undefined | null) => (name || 'Someone').split(/\s+/)[0];
 
 /**
- * The faint line under the three lines: who wrote the summary last and when.
+ * THE SUMMARY'S UPDATED ROW: when its three lines were last written, and only
+ * when, with a capital (w-922f66bb06). It used to be a faint line under the
+ * words, "Kept up to date by the agent · 6 min ago"; it moved to the foot of
+ * the panel as a property, and she found "By the agent · 6 min ago" ugly and
+ * the lowercase "just now" weird. So: "Just now", "6 min ago", "Yesterday".
+ *
  * Only the summary's own fields count. The title and body are her ask, written
- * at the start, and counting them would say "Edited by you" over words the
- * agent wrote an hour later.
+ * at the start, and counting them would say "Just now" over words the agent
+ * wrote an hour ago.
  *
  * `pending` is an edit of hers already sent and not yet folded back into the
  * row the window holds (the snapshot is polled), stamped with when she typed
- * it. Without it the line would say the agent wrote last for up to ten seconds
- * after she changed a word.
+ * it. Without it the row would lag her own edit by up to ten seconds.
+ *
+ * Null when the three lines have never been written, and then no row is drawn.
  */
-export function lastEdit(
+export function updatedWord(
   item: Pick<WorkItem, 'wrote'>,
-  { me, names, now = Date.now(), pending = {} }: {
+  { me, now = Date.now(), pending = {} }: {
     me: string | null;
-    names?: Map<string, string>;
     now?: number;
     pending?: Partial<Record<SummaryField, number>>;
   },
 ): string | null {
-  let latest: { ts: number; source: string; by?: string } | null = null;
+  let latest: number | null = null;
   for (const field of SUMMARY_FIELDS) {
     const w = item.wrote?.[field];
-    if (w && (w.source === 'agent' || w.source === 'founder') && (!latest || w.ts > latest.ts)) latest = w;
+    if (w && (w.source === 'agent' || w.source === 'founder') && (latest === null || w.ts > latest)) latest = w.ts;
     const mine = pending[field];
-    if (Number.isFinite(mine) && (!latest || mine! > latest.ts)) latest = { ts: mine!, source: 'founder', by: me ?? undefined };
+    if (Number.isFinite(mine) && (latest === null || mine! > latest)) latest = mine!;
   }
-  if (!latest) return null;
-  const when = agoWords(latest.ts, now);
-  if (latest.source === 'agent') return `Kept up to date by the agent · ${when}`;
-  if (!latest.by || latest.by === me) return `Edited by you · ${when}`;
-  return `Edited by ${firstOf(names?.get(latest.by))} · ${when}`;
+  if (latest === null) return null;
+  const when = agoWords(latest, now);
+  return when.charAt(0).toUpperCase() + when.slice(1);
 }
 
 /** What an id this Mac does not hold reads as: a teammate's private thread, or one since deleted. */

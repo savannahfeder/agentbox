@@ -46,10 +46,12 @@ const src = fs.readFileSync(new URL('../renderer/src/threads/Summary.tsx', impor
 describe('the panel opens with the thread’s name', () => {
   // It opened the panel until w-b38e975e2c moved it under the properties,
   // directly over Problem, so the words read as one block.
-  it('says the name the row shows, the label, after the properties and over the three lines', () => {
+  // CHANGED 2026-10-04 (w-922f66bb06): the name opens the panel and the
+  // properties sit at its foot, Priority second. It was properties first.
+  it('says the name the row shows, the label, first and over the three lines', () => {
     const html = draw(item());
     expect(html).toContain('<h2 class="ts-title">Acme renewal terms</h2><div class="ts-sec">');
-    expect(text(html)).toMatch(/^Status In progress Owner You Project Northwind .* Acme renewal terms Problem/);
+    expect(text(html)).toMatch(/^Acme renewal terms Problem .* Status In progress Priority \w+ Owner You Project Northwind/);
   });
   it('falls back to the title on a thread with no label', () => {
     expect(draw(item({ label: undefined }))).toContain('<h2 class="ts-title">Can you send Acme their renewal terms by Thursday? Their contract ends on the 14th.</h2>');
@@ -62,8 +64,8 @@ describe('the panel opens with the thread’s name', () => {
 describe('what you can change looks changeable, and what you cannot does not', () => {
   const html = draw(item());
   it('draws Priority and Visible to as buttons that carry a caret', () => {
-    for (const [from, to] of [['Priority', 'Visible to'], ['Visible to', 'Acme renewal terms']]) {
-      const cell = between(html, from, to);
+    for (const [from, to] of [['Priority', 'Owner'], ['Visible to', null]]) {
+      const cell = to ? between(html, from, to) : html.slice(html.indexOf(`>${from}<`));
       expect(cell).toMatch(/<button[^>]*class="ts-prop-btn"/);
       expect(cell).toContain('ts-caret');
     }
@@ -75,7 +77,7 @@ describe('what you can change looks changeable, and what you cannot does not', (
   // so Status is a plain word here and stays below with Owner and Project.
   // The dropdown itself is tests/the-status-row-marks-a-thread-done.test.mjs.
   it('draws Owner and Project as plain words: no button, no caret', () => {
-    for (const [from, to] of [['Owner', 'Project'], ['Project', 'Priority']]) {
+    for (const [from, to] of [['Owner', 'Project'], ['Project', 'Visible to']]) {
       const cell = between(html, from, to);
       expect(cell.length).toBeGreaterThan(0);
       expect(cell).not.toContain('<button');
@@ -83,7 +85,7 @@ describe('what you can change looks changeable, and what you cannot does not', (
     }
   });
   it('leaves Status a plain word when nothing is handed in to close the thread', () => {
-    const cell = between(html, 'Status', 'Owner');
+    const cell = between(html, 'Status', 'Priority');
     expect(cell.length).toBeGreaterThan(0);
     expect(cell).not.toContain('<button');
     expect(cell).not.toContain('ts-caret');

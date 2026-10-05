@@ -6,3 +6,5 @@
 // main and by the tests, which are both plain JS and need nothing here.
 
 export function strandedTitle(count: number): string;
+/** The line in a thread where a run stopped, in our words; `raw` is the tool's own refusal. */
+export function runStoppedLine(raw: string): string;

@@ -45,14 +45,17 @@ const panel = (props = {}) => renderToStaticMarkup(React.createElement(SummaryPa
   item: item(), team, onClose: () => {}, onFinish: () => {}, ...props,
 }));
 
-// Where the Status reserve is written: the value cell straight after the label
-// in the props grid that follows the close icon.
-const RESERVE = '.ts-close + .ts-props > .ts-value:nth-child(2)';
+// CHANGED 2026-10-04 (w-922f66bb06): the words moved to the top of the panel
+// and the properties to its foot, so what sits level with the icon now is the
+// thread's name, not the Status row. The guard moved with it: the name stops
+// short of the icon, and the icon still wins the pointer.
+const RESERVE = '.ts-close + .ts-title';
 
-describe('the close icon over the Status row', () => {
-  it('still sits straight before the properties, with Status as their first value', () => {
+describe('the close icon beside the name', () => {
+  it('sits straight before the name, and the Status row is down at the foot', () => {
     const html = panel();
-    expect(html).toMatch(/<button[^>]*class="ts-close"[\s\S]*?<\/button><div class="ts-props"><span class="ts-label">Status<\/span><span class="ts-value[^"]*"/);
+    expect(html).toMatch(/<button[^>]*class="ts-close"[\s\S]*?<\/button><h2 class="ts-title">/);
+    expect(html.indexOf('>Status<')).toBeGreaterThan(html.indexOf('class="ts-foot"'));
   });
 
   it('is painted above the Status row, so the pointer lands on it', () => {
@@ -61,26 +64,24 @@ describe('the close icon over the Status row', () => {
     expect(Number(z)).toBeGreaterThanOrEqual(1);
   });
 
-  it('leaves a gap between the Status wash and the icon', () => {
+  it('leaves a gap between the name and the icon', () => {
     const close = rule('.ts-close');
     const iconLeft = num(px(close, 'right')) + num(px(close, 'width'));       // from the panel's right edge
     const pad = num(px(rule('.ts-panel'), 'padding').split(/\s+/)[1]);         // the panel's right padding
-    const bleed = -num(px(rule('.ts-prop-btn'), 'margin').split(/\s+/)[1]);   // how far the wash runs past its cell
     const reserve = num(px(rule(RESERVE), 'margin-right'));
-    const washEnd = pad + reserve - bleed;                                     // the wash's right end, from the panel's edge
-    expect(washEnd).toBeGreaterThan(iconLeft);
+    const nameEnd = pad + reserve;                                             // the name's right end, from the panel's edge
+    expect(nameEnd).toBeGreaterThan(iconLeft);
   });
 
-  it('does not take the room from the rows below it, which the icon does not reach', () => {
-    // Priority, Owner and Project keep the full width: only the second child of
-    // the grid, the Status value, is narrowed.
+  it('does not take the room from the rows at the foot, which the icon does not reach', () => {
     expect(css).not.toMatch(/\.ts-props\s*>\s*\.ts-value\s*\{[^}]*margin-right/);
     expect(css).not.toMatch(/\.ts-prop-btn\s*\{[^}]*margin-right/);
+    expect(css).not.toContain('.ts-close + .ts-props');
   });
 
   it('reserves nothing when the panel has no close icon', () => {
     // The reserve hangs off `.ts-close +`, so a panel drawn without onClose
-    // has no icon there and its Status row runs the full width.
+    // has no icon there and its name runs the full width.
     expect(RESERVE.startsWith('.ts-close + ')).toBe(true);
     expect(panel({ onClose: undefined })).not.toContain('ts-close');
   });

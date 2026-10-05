@@ -220,10 +220,10 @@ describe('every control keeps its name in either width', () => {
     // row (it opens your account). Team left with w-05ff3d1438, and Team
     // members with w-8415594d19.
     //
-    // The seventh when the sidebar is open is the line under your name, which
-    // opens the box you say what you are up to in (w-0b54ee983f). A collapsed
-    // sidebar is icons only and that line is words, so it is not drawn there.
-    expect(buttons).toHaveLength(collapsed ? 6 : 7);
+    // Your own row is one button in either width: face, name and email,
+    // opening your account menu (w-a09476712f). The status line that was a
+    // seventh button under your name lives in that menu now.
+    expect(buttons).toHaveLength(6);
     for (const b of buttons) expect(b).toMatch(/aria-label="[^"]+"/);
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
   });

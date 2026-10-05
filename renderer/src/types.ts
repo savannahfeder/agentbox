@@ -179,6 +179,8 @@ export interface TeamState {
   /** The invites this team has out that nobody has taken up yet. */
   sent?: { email: string; invitedBy: string | null }[];
   signedIn: boolean;
+  /** A Google sign-in waiting on the browser, with the link it opened. */
+  signingIn?: { url: string } | null;
   me: Person | null;
   team: { id: string; name: string } | null;
   /** Invites waiting for your confirmed email, while you are in no team. Joining one needs your yes. */
@@ -512,6 +514,12 @@ export interface AgentWork {
   lines: number;
   failed: boolean;
   more?: number;
+  // SOMETHING SHE DID, not something the agent ran: a snooze, a picked option,
+  // a rename, a close (w-49b4e45403). It never folds into the agent's work and
+  // is drawn as its own quiet line with its time. `by` is the teammate who did
+  // it, on a shared project.
+  yours?: true;
+  by?: string;
 }
 
 export type AgentEvent = (AgentTurn & { kind?: undefined }) | AgentWork;
@@ -926,12 +934,15 @@ declare global {
       compact(p: { product: string; id: string }): Promise<{state: string; at: number}>;
       remoteControl(p: {product: string; id: string; action?: string}): Promise<{state: string; at: number; text?: string; url?: string; mayBeActive?: boolean} | null>;
       compactionStatus(p: {product: string; id: string}): Promise<{state: string; at: number} | null>;
-      answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null }): Promise<WorkItem>;
+      answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null; now?: boolean }): Promise<WorkItem>;
+      sendNow(p: { product: string; id: string }): Promise<{ ok: boolean; interrupted: boolean }>;
       setProductOrder(p: { order: string[] }): Promise<unknown>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
       compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
       // The team version (main/team/index.mjs through main/ipc.mjs).
       teamSignIn(): Promise<TeamCallResult>;
+      teamSignInCancel(): Promise<TeamCallResult>;
+      teamSignInReopen(): Promise<TeamCallResult>;
       teamSignOut(): Promise<TeamCallResult>;
       teamSignInEmail(p: { email: string; password: string }): Promise<TeamCallResult>;
       teamRename(p: { name: string }): Promise<TeamCallResult>;
@@ -942,7 +953,7 @@ declare global {
       teamCreate(p: { name: string }): Promise<TeamCallResult>;
       teamAcceptInvite(p: { teamId: string }): Promise<TeamCallResult>;
       teamInvite(p: { email: string }): Promise<TeamCallResult>;
-      teamStatus(p: { text: string; hold: string }): Promise<TeamCallResult>;
+      teamStatus(p: { text: string; hold: string; until?: number }): Promise<TeamCallResult>;
       teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult>;
       teamSync(): Promise<TeamCallResult>;
       teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;
@@ -975,7 +986,7 @@ declare global {
       listFolders?(p?: { at?: string | null; showHidden?: boolean }): Promise<FolderListing>;
       folderExists?(p: { path: string }): Promise<{ exists: boolean }>;
       stopSession(p: { product: string; id: string }): Promise<WorkItem>;
-      runNow?(p: { product: string; id: string }): Promise<{ ok: boolean; reason?: 'running' | 'missing' }>;
+      runNow?(p: { product: string; id: string }): Promise<{ ok: boolean; reason?: 'running' | 'missing' | 'paused' | 'scheduled' | 'held' }>;
       reopen(p: { product: string; id: string }): Promise<WorkItem>;
       // The user's standing instructions: one text, briefed to every session.
       instructionRead?(id: string): Promise<{text:string;defaultText:string;error?:string}>;

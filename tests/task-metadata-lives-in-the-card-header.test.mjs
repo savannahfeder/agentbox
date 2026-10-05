@@ -10,7 +10,10 @@ it('moves the existing band instead of copying its metadata',()=>{
   // beside the way out. What this test is for is that the band is MOVED into
   // the heading rather than copied, so it checks the two ends of the portal
   // rather than its exact children.
- expect(read('components/Focus.tsx')).toMatch(/headerTarget \? createPortal\(<>[\s\S]{0,600}\{bandLine\}[\s\S]{0,40}<\/>, headerTarget\) : bandLine/);
+ // Since w-922f66bb06 the portal carries `barContent`: the thin crumb while
+ // the summary is open, and otherwise the band itself, moved, never copied.
+ expect(read('components/Focus.tsx')).toMatch(/headerTarget \? createPortal\(barContent, headerTarget\) : bandLine/);
+ expect(read('components/Focus.tsx')).toMatch(/:\s*<>\{backButton\}\{bandLine\}<\/>;/);
  expect(read('App.tsx')).toContain('headerTarget={workspaceNavigation ? taskHeader : null}');
 });
 it('keeps inline previews out of keyboard focus, leaving document controls available',()=>{

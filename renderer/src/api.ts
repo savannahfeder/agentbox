@@ -438,14 +438,23 @@ export const api = {
   // `model` and `effort` are the reply box's drawer: which model picks up the
   // run this reply starts. Undefined means she never opened it and the row
   // keeps what it had; null clears it back to the engine's own choice.
-  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; model?: string | null; effort?: string | null }): Promise<WorkItem | null> {
+  // `now` cuts the running agent's current step so this message is answered at
+  // once instead of after it (main/claude-input.mjs `interrupt`).
+  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; model?: string | null; effort?: string | null; now?: boolean }): Promise<WorkItem | null> {
     if (useFixtures) return null;
     return window.zero!.answer(p);
+  },
+  // The same cut, for a message of hers already waiting on the agent.
+  async sendNow(p: { product: string; id: string }): Promise<{ ok: boolean; interrupted: boolean }> {
+    if (useFixtures) return { ok: true, interrupted: true };
+    return window.zero!.sendNow(p);
   },
 
   /* --------------------------------- the team ------------------------------- */
   // Every call answers { ok, team } or { ok: false, error } in words.
   async teamSignIn(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignIn()); },
+  async teamSignInCancel(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignInCancel()); },
+  async teamSignInReopen(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignInReopen()); },
   async teamSignOut(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignOut()); },
   async teamSignInEmail(email: string, password: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignInEmail({ email, password })); },
   async teamSignUp(name: string, email: string, password: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignUp({ name, email, password })); },
@@ -457,7 +466,7 @@ export const api = {
   async teamLeave(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamLeave()); },
   async teamCancelInvite(email: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamCancelInvite({ email })); },
   // A line you write about yourself. Saying nothing clears it.
-  async teamStatus(p: { text: string; hold: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamStatus(p)); },
+  async teamStatus(p: { text: string; hold: string; until?: number }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamStatus(p)); },
   async teamShare(p: { product: string; visibility: 'team' | 'people' | 'private'; people?: string[] }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamShare(p)); },
   async teamSync(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSync()); },
   // A task somebody gave you: to an agent (on your Mac), keep it, or hand it back.

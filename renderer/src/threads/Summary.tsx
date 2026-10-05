@@ -1,16 +1,18 @@
 // A THREAD'S SUMMARY: its state, the panel beside the conversation, the rail
 // it folds to when closed, and the card a teammate reads instead.
 //
-// Approved 2026-10-01. Every thread has one: its
-// properties, then three short lines (problem, progress, solution) that the
-// agent keeps current and the person can edit in place. There is no Edit
+// Approved 2026-10-01. Every thread has one: its name and three short lines
+// (problem, progress, solution) that the agent keeps current and the person
+// can edit in place, then its properties at the foot (since w-922f66bb06,
+// 2026-10-04; they came first before that). There is no Edit
 // button. Clicking a line makes it a text box, and it saves as she types,
 // because a summary she has to remember to save is one that goes stale.
 //
 // The data was already there (shared/thread-cards.mjs reads the state and the
 // summary, main/store.mjs threadEdit writes an edit); this file only draws it.
-// The rules that decide words (how long ago, who wrote last, which threads may
-// be linked) are in ./summary-rules.ts, where the tests read them.
+// The rules that decide words (how long ago, when it was updated, which threads
+// may be linked) are in ./summary-rules.ts, and the bar's crumb in
+// ./crumb-rules.ts, where the tests read them.
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Person, ThreadCard, ThreadEditPatch, WorkItem } from '../types';
 import { api } from '../api';
@@ -19,9 +21,10 @@ import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityIdOf, priorityLabelOf, priorityValueOf, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName, type TeamView } from '../team/people';
 import {
-  STATE_WORD, stateWordOf, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, lastEdit, ownerName,
+  STATE_WORD, stateWordOf, SUMMARY_FIELDS, SUMMARY_OPEN_KEY, UNSEEN_THREAD, agoWords, updatedWord, ownerName,
   readSummaryOpen, stateGlyph, statusChoices, type StateGlyph, type SummaryField,
 } from './summary-rules';
+import { crumbName } from './crumb-rules';
 import { VISIBILITY_WORD, chosenNames, whoSees, type Seen } from './summary-rules';
 import { findPeople, teammates } from './composer-rules';
 import { shownToPeople } from '../../../shared/thread-cards.mjs';
@@ -326,13 +329,14 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
     el.setSelectionRange(el.value.length, el.value.length);
   }, [editing]);
 
-  const byLine = editing
-    ? 'You are editing · saves as you type'
-    : error ?? lastEdit(item, {
-      me,
-      names: new Map([...(team?.byId.values() ?? [])].map((p) => [p.id, p.name])),
-      pending: Object.fromEntries(SUMMARY_FIELDS.filter((f) => pending[f]).map((f) => [f, pending[f]!.ts])),
-    });
+  // What is happening to the words right now, said under them only while it
+  // is true: an edit in progress, or one that did not save. When they were
+  // last written is the Updated row at the foot (w-922f66bb06).
+  const note = editing ? 'You are editing · saves as you type' : error;
+  const updated = updatedWord(item, {
+    me,
+    pending: Object.fromEntries(SUMMARY_FIELDS.filter((f) => pending[f]).map((f) => [f, pending[f]!.ts])),
+  });
 
   return (
     <aside className="ts-panel" aria-label="Summary">
@@ -343,12 +347,54 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
           <PanelIcon open />
         </button>
       )}
+      {/* THE WORDS FIRST, THE PROPERTIES AT THE FOOT (w-922f66bb06). She reads
+          the name, the problem, the progress and the solution far more often
+          than the status or the owner, so those four open the panel and the
+          properties sit under a hairline at its bottom edge, level with the
+          reply box, in the same place however long the words run. Before
+          this the name sat under five rows of properties (w-b38e975e2c had
+          already put the name directly over its three lines). */}
+      {/* WHICH THREAD THIS IS, by the name its row shows (list-rules.ts
+          rowTitle). */}
+      <h2 className="ts-title">{rowTitle(item)}</h2>
+      {SUMMARY_FIELDS.map((f) => (
+        <div className="ts-sec" key={f}>
+          <div className="ts-h">{f === 'problem' ? 'Problem' : f === 'progress' ? 'Progress' : 'Solution'}</div>
+          {editing === f ? (
+            <textarea
+              ref={box}
+              className="ts-edit"
+              rows={1}
+              value={draft}
+              aria-label={f}
+              onChange={(e) => type(e.target.value)}
+              onBlur={finish}
+              onKeyDown={onBoxKey}
+            />
+          ) : (
+            <p
+              className={`ts-line${written(f) && stood[f] ? '' : ' dim'}`}
+              role="button"
+              tabIndex={0}
+              title="Click to edit"
+              onClick={() => begin(f)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); begin(f); } }}
+            >{stood[f] || NOT_WRITTEN}<Pen /></p>
+          )}
+        </div>
+      ))}
+      {note && <div className={`ts-by${error && !editing ? ' ts-by-error' : ''}`}>{note}</div>}
+
+      <div className="ts-foot">
+      <div className="ts-rule" />
       {/* CHANGEABLE LOOKS CHANGEABLE (2026-10-01). Status, Priority and Visible
           to are buttons that wash, point and show a caret under the pointer;
           Owner and Project are plain words with no hover at all. Owner stays
           read-only because people here get messages, never tasks. Project
           does because nothing in the store moves a thread from one project's
-          ledger to another, and a menu here would have to invent that. */}
+          ledger to another, and a menu here would have to invent that.
+
+          PRIORITY IS SECOND, after Status, and Updated is last (w-922f66bb06). */}
       <div className="ts-props">
         <span className="ts-label">Status</span>
         {/* AND STATUS JOINED THEM THE SAME DAY: marking a thread done from a
@@ -389,10 +435,6 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
         ) : (
           <span className="ts-value"><Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{stateWordOf(item, state)}</span>
         )}
-        <span className="ts-label">Owner</span>
-        <span className="ts-value">{ownerPerson && <Face person={ownerPerson} />}{owner}</span>
-        <span className="ts-label">Project</span>
-        <span className="ts-value">{item.productName}</span>
         <span className="ts-label">Priority</span>
         <span className="ts-value ts-menu-anchor" ref={holdMenu('priority')}>
           {/* The app's own bars (components/Priority.tsx), Urgent as a fourth
@@ -418,6 +460,10 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
             </span>
           )}
         </span>
+        <span className="ts-label">Owner</span>
+        <span className="ts-value">{ownerPerson && <Face person={ownerPerson} />}{owner}</span>
+        <span className="ts-label">Project</span>
+        <span className="ts-value">{item.productName}</span>
         <span className="ts-label">Visible to</span>
         <span className="ts-value ts-menu-anchor" ref={holdMenu('visibility')}>
           {/* All three choices in a menu, like Priority, so she sees what she
@@ -479,44 +525,40 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
             </span>
           )}
         </span>
+        {/* WHEN THE THREE LINES WERE LAST WRITTEN, and only when: "Just now",
+            "6 min ago" (summary-rules.ts updatedWord). No row before they
+            have ever been written. */}
+        {updated && <>
+          <span className="ts-label">Updated</span>
+          <span className="ts-value">{updated}</span>
+        </>}
       </div>
-
-      <div className="ts-rule" />
-
-      {/* WHICH THREAD THIS IS, by the name its row shows (list-rules.ts
-          rowTitle), DIRECTLY ABOVE THE THREE LINES (w-b38e975e2c). She reads
-          the name, the problem, the progress and the solution in that order
-          and skips the properties, so the words are one block under the
-          hairline and the properties keep to themselves above it. */}
-      <h2 className="ts-title">{rowTitle(item)}</h2>
-      {SUMMARY_FIELDS.map((f) => (
-        <div className="ts-sec" key={f}>
-          <div className="ts-h">{f === 'problem' ? 'Problem' : f === 'progress' ? 'Progress' : 'Solution'}</div>
-          {editing === f ? (
-            <textarea
-              ref={box}
-              className="ts-edit"
-              rows={1}
-              value={draft}
-              aria-label={f}
-              onChange={(e) => type(e.target.value)}
-              onBlur={finish}
-              onKeyDown={onBoxKey}
-            />
-          ) : (
-            <p
-              className={`ts-line${written(f) && stood[f] ? '' : ' dim'}`}
-              role="button"
-              tabIndex={0}
-              title="Click to edit"
-              onClick={() => begin(f)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); begin(f); } }}
-            >{stood[f] || NOT_WRITTEN}<Pen /></p>
-          )}
-        </div>
-      ))}
-      {byLine && <div className={`ts-by${error && !editing ? ' ts-by-error' : ''}`}>{byLine}</div>}
+      </div>
     </aside>
+  );
+}
+
+/* ------------------------------------------------------------- the crumb */
+
+/**
+ * THE THREAD'S BAR WHILE THE SUMMARY IS OPEN (w-922f66bb06): one line in the
+ * app's mono capitals, the tab the thread was opened from, a slash, and the
+ * thread's name, "NEEDS YOU / FIRST FRAME WHITE BACKGROUND FIX". The whole
+ * line is the way back, so it is one button carrying the back hint and Esc.
+ * The full bar (title, project, engine, last moved) said again what the
+ * summary beside it says; folded, the summary gives that bar back (Focus.tsx).
+ *
+ * The name keeps whole words up to 59 letters (crumb-rules.ts) and the whole
+ * of it is one hover away.
+ */
+export function ThreadCrumb({ from, name, onBack }: { from: string; name: string; onBack: () => void }) {
+  return (
+    <button type="button" className="back-esc thread-crumb" data-hint="back" onClick={onBack} aria-label={`Back to ${from} (esc)`} title={name}>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5" /></svg>
+      <span className="thread-crumb-from">{from}</span>
+      <span className="thread-crumb-sep" aria-hidden="true">/</span>
+      <span className="thread-crumb-name">{crumbName(name)}</span>
+    </button>
   );
 }
 

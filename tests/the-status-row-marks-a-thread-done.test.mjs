@@ -94,14 +94,15 @@ describe('the status row draws as something you can change', () => {
 
   it('goes back to a plain word on a finished thread, with nothing to set', () => {
     const done = draw(item({ status: 'done' }), { onFinish: () => {} });
-    const cell = between(done, 'Status', 'Owner');
+    // Priority follows Status since w-922f66bb06 (it was Owner).
+    const cell = between(done, 'Status', 'Priority');
     expect(cell.length).toBeGreaterThan(0);
     expect(cell).not.toContain('<button');
     expect(cell).toContain(STATE_WORD.done);
   });
 
   it('goes back to a plain word where nothing was handed in to close with', () => {
-    const cell = between(draw(item()), 'Status', 'Owner');
+    const cell = between(draw(item()), 'Status', 'Priority');
     expect(cell).not.toContain('<button');
   });
 });

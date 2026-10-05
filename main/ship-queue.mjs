@@ -121,7 +121,9 @@ export function failureReply(output) {
 /** The line the thread shows: the app's own, short, and the first error in it. */
 export function failureNote(output) {
   const lines = String(output ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
-  const why = lines.find((l) => /CONFLICT|error|red|refused|failed|FAIL/i.test(l)) ?? lines.at(-1) ?? 'no output';
+  // WHOLE WORDS (w-7ec8553e23): without \b, "red" matched inside "configured"
+  // and a harmless warning the tests print was shown as why a ship failed.
+  const why = lines.find((l) => /\b(CONFLICT|error|red|refused|failed|FAIL)\b/i.test(l)) ?? lines.at(-1) ?? 'no output';
   return `It did not ship, and it went back to its agent: ${why.slice(0, 300)}`;
 }
 
@@ -161,9 +163,12 @@ export class ShipQueue {
     if (!Object.keys(settings).length) return null;
     const next = nextToShip(items, products, settings, { isLive: this.isLive, folderFor: this.folderFor, handled: readHandled(this.userDir) });
     if (!next) return null;
-    // Marked handled BEFORE the run, so a slow ship is never started twice.
-    writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(next.item)]: markedAt(next.item) });
-    this.busy = this.ship(next).finally(() => { this.busy = null; });
+    // Marked handled only once the run has ENDED, pass or fail. Marked before
+    // it, a run cut off by an app restart was never tried again
+    // (w-f37a34def6, 2026-10-04). Within one app, `busy` already stops a
+    // second start; across a restart, trying again is the point.
+    const done = () => writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(next.item)]: markedAt(next.item) });
+    this.busy = this.ship(next).then(done, done).finally(() => { this.busy = null; });
     return this.busy;
   }
 

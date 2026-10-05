@@ -1971,6 +1971,39 @@ body {
 .inline-media-missing .inline-media-name { display: inline; margin: 0; }
 .inline-media video { display: block; max-width: 100%; max-height: 360px; border: 1px solid var(--line); }
 
+/* A folder a worker named on its own line: its name, then its newest pictures,
+   three across (FolderPreview in Focus.tsx). Spans, because it sits in a <p>. */
+.folder-preview { display: block; margin: 8px 0 4px; }
+.folder-preview-name {
+  display: inline-flex; align-items: baseline; gap: 10px; padding: 0; border: 0;
+  background: none; cursor: pointer; font: inherit; text-align: left;
+}
+.folder-preview-path { color: var(--accent); font-family: var(--mono, ui-monospace, monospace); font-size: 0.9em; }
+.folder-preview-count { color: var(--text-faint); font-size: 0.86em; }
+.folder-preview-name:hover .folder-preview-path { text-decoration: underline; }
+.folder-preview-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 8px;
+}
+.folder-preview-shot {
+  display: block; padding: 0; border: 0; background: none; cursor: zoom-in;
+  font: inherit; color: inherit; text-align: left; min-width: 0;
+}
+.folder-preview-shot img {
+  display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top;
+  border: 1px solid var(--line); background: var(--bg-raised);
+}
+.folder-preview-shot:hover img { border-color: var(--text-faint); }
+.folder-preview-shot:focus-visible img { outline: 1px solid var(--text-faint); outline-offset: 2px; }
+.folder-preview-label {
+  display: block; margin-top: 4px; color: var(--text-faint); font-size: 0.82em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.folder-preview-more {
+  display: inline-block; margin-top: 6px; padding: 0; border: 0; background: none;
+  cursor: pointer; font: inherit; font-size: 0.86em; color: var(--text-dim);
+}
+.folder-preview-more:hover { color: var(--text); }
+
 /* The originating message: quiet quoted context above the agent's ask. */
 .origin {
   margin: 4px 0 22px;
@@ -4219,6 +4252,14 @@ img.app-mark { opacity: 1; border-radius: 0; }
 }
 .msg-on:hover { color: var(--text-dim); text-decoration: underline; }
 .msg-on:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
+/* Send now, on a message waiting for the agent's current step. */
+.msg-now {
+  appearance: none; background: none; border: 0; padding: 0; margin: 0;
+  font: inherit; font-size: 12.5px; color: var(--text-dim); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.msg-now:hover { color: var(--text); }
+.msg-now:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
 .msg-body { font-size: 15px; line-height: 1.6; color: var(--text); }
 .msg-body > :first-child { margin-top: 0; }
 .msg-body > :last-child { margin-bottom: 0; }
@@ -4267,6 +4308,34 @@ img.app-mark { opacity: 1; border-radius: 0; }
    which keeps the words further apart than the machinery between them.
 */
 .thread-block:is(.is-work, .is-run) + .thread-block:is(.is-work, .is-run) { margin-top: -17px; }
+
+/* SOMETHING YOU DID, a point on a short timeline (w-49b4e45403, round4-single).
+   A 7px ring at the column's edge, the words 20px in at the 13px grey of a work
+   line, and the time in the header's mono caps. A pick fills the ring. Most
+   actions come one at a time, so a single line is the whole drawing; only when
+   two come back to back does a hairline join their rings, drawn from the line
+   below up to the ring above. The rings sit 9px apart: line 20px, ring 6.5px
+   from its top, so the hairline runs from -15.5px to the next ring's top. */
+.thread-block.is-act + .thread-block.is-act { margin-top: -13px; }
+.thread-block:is(.is-work, .is-run) + .thread-block.is-act,
+.thread-block.is-act + .thread-block:is(.is-work, .is-run) { margin-top: -8px; }
+.act-line {
+  position: relative; display: flex; align-items: baseline; gap: 10px; min-width: 0;
+  padding-left: 20px; font-size: 13px; line-height: 20px; color: var(--text-dim);
+}
+.act-line::before {
+  content: ''; position: absolute; left: 0; top: 6.5px; width: 7px; height: 7px;
+  box-sizing: border-box; border-radius: 50%; border: 1px solid var(--text-faint); background: var(--bg);
+}
+.act-line.is-pick::before { background: var(--text-dim); border-color: var(--text-dim); }
+.thread-block.is-act + .thread-block.is-act .act-line::after,
+.act-after .act-line + .act-line::after {
+  content: ''; position: absolute; left: 3px; top: -15.5px; width: 1px; height: 22px; background: var(--line);
+}
+.act-said { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-choice { color: var(--text); }
+.act-when { flex: none; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.act-after { display: flex; flex-direction: column; gap: 9px; margin-top: 22px; }
 .thread-block:is(.is-msg, .is-msg-same) + .thread-block:is(.is-work, .is-run) { margin-top: -14px; }
 /* Except under the line that says where the middle of the conversation went,
    which is a note and not a message, and has its own 18px above it. */

@@ -31,10 +31,13 @@ contextBridge.exposeInMainWorld('zero', {
   compact: (payload) => ipcRenderer.invoke('zero:compact', payload),
   compactionStatus: (payload) => ipcRenderer.invoke('zero:compaction-status', payload),
   answer: (payload) => ipcRenderer.invoke('zero:answer', payload),
+  sendNow: (payload) => ipcRenderer.invoke('zero:send-now', payload),
   compose: (payload) => ipcRenderer.invoke('zero:compose', payload),
   schedule: (payload) => ipcRenderer.invoke('zero:schedule', payload),
   // The team version: signing in, the team, and sharing a project.
   teamSignIn: () => ipcRenderer.invoke('zero:team-sign-in'),
+  teamSignInCancel: () => ipcRenderer.invoke('zero:team-sign-in-cancel'),
+  teamSignInReopen: () => ipcRenderer.invoke('zero:team-sign-in-reopen'),
   teamSignOut: () => ipcRenderer.invoke('zero:team-sign-out'),
   teamSignInEmail: (payload) => ipcRenderer.invoke('zero:team-sign-in-email', payload),
   teamSignUp: (payload) => ipcRenderer.invoke('zero:team-sign-up', payload),
@@ -162,6 +165,8 @@ contextBridge.exposeInMainWorld('zero', {
   // Everything that happened on one task, as the ledger lines it happened as.
   itemHistory: (payload) => ipcRenderer.invoke('zero:item-history', payload),
   openArtifact: (payload) => ipcRenderer.invoke('zero:open-artifact', payload),
+  // The pictures in a folder a message names on its own line (main/folder-pictures.mjs).
+  folderPictures: (payload) => ipcRenderer.invoke('zero:folder-pictures', payload),
   // The document pane's own two: the text of a file it has open, and her edit
   // going back onto disk. Markdown only on the way back (main/doc-file.mjs).
   readDoc: (payload) => ipcRenderer.invoke('zero:read-doc', payload),

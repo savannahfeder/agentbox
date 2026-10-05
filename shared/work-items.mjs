@@ -133,7 +133,8 @@ export const WORK_ITEM_FIELDS = [
   //               other two, and a 'people' thread naming nobody reaches
   //               nobody (shared/thread-cards.mjs says why it fails closed)
   //   problem, progress, solution
-  //               the SUMMARY, a sentence or two each. The agent keeps it
+  //               the SUMMARY, one short sentence each (an agent's is held to
+  //               SUMMARY_WORDS, shared/thread-cards.mjs). The agent keeps it
   //               current and the person can edit it in place, so these are
   //               the fields where the later write wins whoever wrote it
   //               (SHARED_FIELDS below)

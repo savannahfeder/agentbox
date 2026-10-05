@@ -102,27 +102,36 @@
    right beside the title. Faint until the pointer is on it. */
 .ts-close { position: absolute; top: 22px; right: 20px; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--tag-radius); background: none; color: var(--text-faint); cursor: pointer; }
 .ts-close:hover, .ts-close:focus-visible { background: var(--wash-strong); color: var(--text); outline: none; }
-/* SINCE THE NAME MOVED UNDER THE HAIRLINE the Status row is what sits level
-   with the icon, and its button ran the panel's full width, so it painted over
-   the icon and took the pointer: hovering the icon lit the Status dropdown and
-   the summary could not be closed (w-febaf7b3d8). The z-index gives the icon
-   the pointer; this stops the Status wash 8px short of it. Only the Status
-   row: the rows below are clear of the icon and keep the full width. */
-.ts-close + .ts-props > .ts-value:nth-child(2) { margin-right: 36px; }
+/* THE NAME IS WHAT SITS LEVEL WITH THE ICON since the words moved to the top
+   (w-922f66bb06), so the name keeps clear of it. Before that the Status row sat
+   there and its wash ran under the icon and took the pointer (w-febaf7b3d8);
+   the z-index above still gives the icon the pointer whatever sits beside it. */
+.ts-close + .ts-title { margin-right: 36px; }
 /* No fill of its own: it sits beside the words rather than over them, and a
-   fill would paint over the frame's corner marks. */
-.ts-panel { position: absolute; top: 0; right: 0; bottom: 0; width: var(--ts-panel-w); box-sizing: border-box; padding: 26px 28px 40px; border-left: 1px solid var(--line); background: none; overflow-y: auto; z-index: 2; }
+   fill would paint over the frame's corner marks.
 
-/* THE THREAD'S NAME, the row's own (list-rules.ts rowTitle), under the
-   hairline and directly over the three lines, so the words read as one block
-   (w-b38e975e2c). 16px, her pick from full-window shots of 16 to 24px: the
-   weight sets it apart from the lines under it, not the size. Medium since
-   w-5391bb330f, picked from 300 to 600 in Dark; light read too thin.
-   Three lines at most; the conversation beside it has the rest. Read-only,
-   so it answers no hover. */
+   A COLUMN, so the foot can be pushed to the bottom edge (w-922f66bb06): the
+   words take what they need from the top, the space under them grows, and
+   the properties sit at the foot, level with the reply box. When the words
+   run longer than the panel, it scrolls as before and the foot follows them. */
+.ts-panel { position: absolute; top: 0; right: 0; bottom: 0; width: var(--ts-panel-w); box-sizing: border-box; padding: 26px 28px 40px; border-left: 1px solid var(--line); background: none; overflow-y: auto; z-index: 2; display: flex; flex-direction: column; }
+.ts-panel > * { flex: none; }
+
+/* THE THREAD'S NAME, the row's own (list-rules.ts rowTitle), at the top of the
+   panel and directly over the three lines, so the words read as one block
+   (w-b38e975e2c, then first of all w-922f66bb06). 16px, her pick from
+   full-window shots of 16 to 24px: the weight sets it apart from the lines
+   under it, not the size. Medium since w-5391bb330f, picked from 300 to 600 in
+   Dark; light read too thin. Three lines at most; the conversation beside it
+   has the rest. Read-only, so it answers no hover. */
 .ts-title { margin: 0 0 20px; font-size: 16px; font-weight: 500; line-height: 22px; letter-spacing: -.01em; color: var(--text); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-.ts-props { display: grid; grid-template-columns: 92px minmax(0, 1fr); row-gap: 14px; font-size: 13.5px; line-height: 20px; margin: 0 0 26px; }
+/* THE FOOT: the hairline and the properties, at the bottom edge. It adds no
+   room of its own above the hairline (w-b51b2e1c86): under a long summary the
+   hairline sits one section's step under the words, 24px rather than 52px, so
+   more of them fit before the panel scrolls. */
+.ts-foot { margin-top: auto; padding-top: 0; }
+.ts-props { display: grid; grid-template-columns: 92px minmax(0, 1fr); row-gap: 14px; font-size: 13.5px; line-height: 20px; margin: 0; }
 .ts-label { color: var(--text-faint); font-size: 13px; }
 .ts-value { color: var(--text); display: flex; align-items: center; min-width: 0; }
 .ts-value .tm-av { margin-right: 8px; }
@@ -146,8 +155,10 @@
 
 .ts-h { display: block; margin: 0 0 10px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 
-/* the priority and visibility menus drop from the row, since the panel sits high */
-.ts-panel .prio-menu.ts-menu { top: calc(100% + 6px); bottom: auto; left: -9px; }
+/* the status, priority and visibility menus rise from the row, since the rows
+   sit at the foot of the panel and a menu dropping from them would run off the
+   bottom of the window (w-922f66bb06) */
+.ts-panel .prio-menu.ts-menu { top: auto; bottom: calc(100% + 6px); left: -9px; }
 .ts-menu .prio-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* and each choice in them answers the pointer the way the field that opened it did */
 /* The same answer the new thread card's rows give (--wash-strong), now that
@@ -220,3 +231,22 @@
 /* "Message <name>": their face and the words, square, for the top bar */
 .ts-msgbtn { display: inline-flex; align-items: center; gap: 9px; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
 .ts-msgbtn:hover { background: var(--wash-strong); }
+
+/* THE THREAD'S BAR WHILE THE SUMMARY IS OPEN (w-922f66bb06, Summary.tsx
+   ThreadCrumb): thin, and one line in the app's mono capitals, "NEEDS YOU /
+   THE NAME". The tab you came from is faint and the name a step brighter, so
+   the eye lands on where you are. 56 high against the full bar's 88. The name
+   is already cut to whole words in crumb-rules.ts; the ellipsis here only
+   catches a window too narrow for even that. The corner menu centres on the
+   thinner bar. Folded, the summary takes the crumb away and the bar is its
+   full self again, because these rules only hold while a crumb is in it. */
+.workspace-layout.workspace-task:has(.thread-crumb) > .topbar { height: 56px; min-height: 56px; flex-basis: 56px; padding-top: 0; padding-bottom: 0; }
+.workspace-layout.workspace-task:has(.thread-crumb) > .topbar > .topbar-right { top: 50%; transform: translateY(-50%); }
+.workspace-task-header:has(> .thread-crumb) { position: static; flex: 1; min-width: 0; margin: 0 64px 0 0; padding: 0; align-self: center; }
+.workspace-task-header > .back-esc.thread-crumb { position: static; display: flex; align-items: center; width: auto; max-width: 100%; height: 28px; margin: 0; padding: 4px 10px 4px 4px; font: 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; overflow: hidden; }
+.workspace-task-header > .back-esc.thread-crumb svg { flex: none; width: 13px; height: 13px; margin-right: 8px; }
+.thread-crumb-from { flex: none; }
+.thread-crumb-sep { flex: none; margin: 0 13px; }
+.thread-crumb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-dim); }
+.thread-crumb:hover .thread-crumb-from, .thread-crumb:focus-visible .thread-crumb-from { color: var(--text-dim); }
+.thread-crumb:hover .thread-crumb-name, .thread-crumb:focus-visible .thread-crumb-name { color: var(--text); }

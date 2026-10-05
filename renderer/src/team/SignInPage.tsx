@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api } from '../api';
 import { Name } from '../../../shared/product-name.mjs';
+import { AppMark } from '../components/AppMark';
 import './sign-in.css';
 
 const GoogleMark = () => (
@@ -22,7 +23,12 @@ const GoogleMark = () => (
 
 type Mode = 'sign-in' | 'sign-up' | 'check-email';
 
-export function SignInPage({ signedOut = false, error: startError = null }: { signedOut?: boolean; error?: string | null }) {
+// WAITING ON THE BROWSER IS A PAGE OF ITS OWN (2026-10-04). The first teammate
+// to install this clicked Continue with Google and saw nothing happen: the
+// sign-in had opened in a browser window she could not see, and this page then
+// offered a disabled button for five minutes. Now it says where the sign-in
+// went, and gives the link back, a copy of it and a way out.
+export function SignInPage({ signedOut = false, error: startError = null, waitingUrl = null }: { signedOut?: boolean; error?: string | null; waitingUrl?: string | null }) {
   const [mode, setMode] = useState<Mode>('sign-in');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -32,12 +38,43 @@ export function SignInPage({ signedOut = false, error: startError = null }: { si
   const first = useRef<HTMLInputElement | null>(null);
   useEffect(() => { first.current?.focus(); }, [mode]);
 
+  const [copied, setCopied] = useState(false);
   const google = async () => {
-    setBusy('google'); setError(null);
+    setBusy('google'); setError(null); setCopied(false);
     const out = await api.teamSignIn();
     setBusy(null);
-    if (!out.ok) setError(out.error ?? 'Google sign-in did not finish.');
+    if (!out.ok && !/cancelled/i.test(out.error ?? '')) setError(out.error ?? 'Google sign-in did not finish.');
   };
+  // A reload while the browser is out still finds the sign-in waiting.
+  const waiting = busy === 'google' || !!waitingUrl;
+  const copy = async () => {
+    if (!waitingUrl) return;
+    try { await navigator.clipboard.writeText(waitingUrl); setCopied(true); setError(null); } catch { setError('Could not copy the link.'); }
+  };
+
+  if (waiting) {
+    return (
+      <div className="si-page" role="dialog" aria-modal="true" aria-label="Finish signing in in your browser">
+        <div className="si-card">
+          <span className="si-mark"><AppMark size={40} /></span>
+          <h1>Finish in your browser</h1>
+          <p className="si-lede">
+            {waitingUrl
+              ? `Google sign-in is open in your default browser. Pick your account there and ${Name} carries on by itself.`
+              : 'Opening Google sign-in in your browser…'}
+          </p>
+          <button type="button" className="si-google" disabled={!waitingUrl} onClick={() => { setError(null); void api.teamSignInReopen(); }}>
+            <GoogleMark />Open the sign-in page again
+          </button>
+          <div className="si-wait-row">
+            <button type="button" disabled={!waitingUrl} onClick={copy}>{copied ? 'Link copied' : 'Copy the link'}</button>
+            <button type="button" onClick={() => { void api.teamSignInCancel(); setBusy(null); setError(null); }}>Cancel</button>
+          </div>
+          {error && <p className="si-error" role="alert">{error}</p>}
+        </div>
+      </div>
+    );
+  }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -63,7 +100,7 @@ export function SignInPage({ signedOut = false, error: startError = null }: { si
   return (
     <div className="si-page" role="dialog" aria-modal="true" aria-label={heading}>
       <div className="si-card">
-        <span className="si-mark" aria-hidden="true">{Name.slice(0, 1).toUpperCase()}</span>
+        <span className="si-mark"><AppMark size={40} /></span>
         <h1>{heading}</h1>
         <p className="si-lede">{lede}</p>
 
@@ -72,7 +109,7 @@ export function SignInPage({ signedOut = false, error: startError = null }: { si
         ) : (
           <>
             <button type="button" className="si-google" disabled={!!busy} onClick={google}>
-              <GoogleMark />{busy === 'google' ? 'Finish in your browser…' : 'Continue with Google'}
+              <GoogleMark />Continue with Google
             </button>
             <div className="si-or"><span>or</span></div>
             <form className="si-form" onSubmit={submit}>

@@ -53,7 +53,8 @@ import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/r
 import { collectFiles, fromPaste, persistAttachments, type PendingAttachment } from '../attachments';
 import { pictureUrl } from '../picture';
 import { handleCopyOut, blockCopyText } from '../copy-out';
-import { referencedFiles } from '../referenced-files';
+import { referencedFiles, isImagePath } from '../referenced-files';
+import { pictureRoots } from '../message-folders';
 import { changePathFor } from '../code-artifact';
 import { fileCount, figuresFrom, figuresLabel, signed, type ChangeFigures } from '../change-figures';
 import { embeddedDocuments, isBookkeeping } from '../message-artifacts';
@@ -70,6 +71,7 @@ import { askLine, askFull, askIsClipped } from '../ask-line';
 import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
 import { recapFor, type Recap as RecapValue } from '../recap';
 import type { LiveFacts } from '../live-line';
+import { offersRunNow } from '../run-now';
 import { AttachRow } from './AttachRow';
 import { BackToWhatSheWasReading } from './UrgentBar';
 import { AgentThread } from './AgentThread';
@@ -86,7 +88,7 @@ import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
 } from './Priority';
-import { SummaryPanel, SummaryRail, ThreadStateMark, useSummaryOpen, useSummaryShortcut } from '../threads/Summary';
+import { SummaryPanel, SummaryRail, ThreadCrumb, ThreadStateMark, useSummaryOpen, useSummaryShortcut } from '../threads/Summary';
 import { ThreadMenu } from '../threads/ThreadMenu';
 import { engineModelLabel } from '../models';
 
@@ -168,8 +170,29 @@ function CodePre({ children }: { children?: ReactNode }) {
 // itself asks for.
 //
 // It opens the way the chip already does, which sends a png to Preview.
-export function ArtifactImg({ src, alt, roots, onOpen }: { src?: string; alt?: string; roots: string[]; onOpen?: (src: string) => void }) {
+//
+// AND WHEN EVERY ROOT MISSES, IT ASKS MAIN BEFORE IT GIVES UP (2026-10-04).
+// `find` is the same finder a click goes through (main/artifact-path.mjs),
+// which also hunts the project for the name. A picture a click could open and
+// the window drew as "missing image" was the screenshot on w-7fe215448b.
+export function ArtifactImg({ src, alt, roots, onOpen, find }: {
+  src?: string; alt?: string; roots: string[]; onOpen?: (src: string) => void;
+  find?: (src: string) => Promise<string | null>;
+}) {
   const [attempt, setAttempt] = useState(0);
+  // undefined: not asked yet; a path: main found it; null: nobody did.
+  const [found, setFound] = useState<string | null | undefined>(undefined);
+  // A full path the scheme refused or that is not on disk. Said in words, not
+  // as the browser's broken-picture mark.
+  const [broken, setBroken] = useState(false);
+  const relative = !!src && !/^(data|https?|file):/.test(src) && !src.startsWith('/');
+  const exhausted = relative && attempt >= roots.length;
+  useEffect(() => {
+    if (!exhausted || found !== undefined || !find) return;
+    let live = true;
+    find(src!.replace(/^\.\//, '')).then((p) => { if (live) setFound(p || null); }).catch(() => { if (live) setFound(null); });
+    return () => { live = false; };
+  }, [exhausted, found, src]);
   if (!src) return null;
   // A picture pasted straight into a message carries its own bytes, so there is
   // no file anywhere for a click to open and it stays a picture and nothing else.
@@ -200,10 +223,17 @@ export function ArtifactImg({ src, alt, roots, onOpen }: { src?: string; alt?: s
     const file = decodeURIComponent(src.slice(7));
     return door(file, <img src={pictureUrl(file)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
   }
-  if (src.startsWith('/')) return door(src, <img src={pictureUrl(src)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
+  if (src.startsWith('/')) {
+    if (broken) return <span className="missing-artifact">missing image: {src}</span>;
+    return door(src, <img src={pictureUrl(src)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setBroken(true)} />);
+  }
   const rel = src.replace(/^\.\//, '');
   const candidates = roots.map((r) => pictureUrl(`${r}/${rel}`));
   if (attempt >= candidates.length) {
+    const asked = find ? found : null;
+    if (asked) return door(asked, <img src={pictureUrl(asked)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setFound(null)} />);
+    // Still asking: nothing yet, rather than a "missing" that turns into a picture.
+    if (asked === undefined) return null;
     return <span className="missing-artifact">missing image: {rel}</span>;
   }
   return door(rel, <img src={candidates[attempt]} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setAttempt(attempt + 1)} />);
@@ -237,6 +267,67 @@ export function ArtifactMedia({ src, label, roots, onOpen }: { src: string; labe
       {film
         ? <video key={candidates[attempt]} src={candidates[attempt]} controls preload="metadata" onError={next} />
         : <audio key={candidates[attempt]} src={candidates[attempt]} controls preload="metadata" onError={next} />}
+    </span>
+  );
+}
+
+// A FOLDER A WORKER NAMES ON ITS OWN LINE SHOWS WHAT IS IN IT (2026-10-04).
+//
+// Her words: the previews she should be able to open from the chat, "and maybe
+// even show a little preview component", had stopped showing up. A worker that
+// drew several versions names their folder under the message, and that line was
+// grey text. Now it is the folder's name, which opens it in Finder, over its
+// newest pictures, each of which opens the way a picture in a message does.
+//
+// `quiet` is a message that already draws its own pictures. Those are the ones
+// it is pointing at, and the folder beside them also holds every older round,
+// so it stays one line rather than drawing the same pictures twice.
+const FOLDER_SHOWS = 6;
+export function FolderPreview({ product, folder, onOpen, quiet }: {
+  product: string; folder: string; onOpen: (src: string) => void; quiet?: boolean;
+}) {
+  const [shown, setShown] = useState<{ pictures: string[]; total: number } | null>(null);
+  useEffect(() => {
+    const api = (window as any).zero;
+    if (quiet || !api?.folderPictures) return;
+    let live = true;
+    api.folderPictures({ product, src: folder })
+      .then((r: { ok: boolean; pictures?: string[]; total?: number }) => {
+        if (live && r?.ok && r.pictures) setShown({ pictures: r.pictures, total: r.total ?? r.pictures.length });
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [product, folder, quiet]);
+  const short = folder.replace(/\/+$/, '');
+  const count = shown?.total ? `${shown.total} picture${shown.total === 1 ? '' : 's'}` : null;
+  const name = (
+    <button type="button" className="folder-preview-name" data-folder={short} title={short} onClick={() => onOpen(folder)}>
+      <span className="folder-preview-path">{short}/</span>
+      {count && <span className="folder-preview-count">{count}</span>}
+    </button>
+  );
+  if (!shown?.pictures.length) return name;
+  const pictures = shown.pictures.slice(0, FOLDER_SHOWS);
+  const more = shown.total - pictures.length;
+  return (
+    <span className="folder-preview">
+      {name}
+      <span className="folder-preview-grid">
+        {pictures.map((file) => {
+          const base = file.split('/').pop() ?? file;
+          return (
+            <button key={file} type="button" className="folder-preview-shot" data-copy-file={file} title={base} onClick={() => onOpen(file)}>
+              <img src={pictureUrl(file)} alt={base} crossOrigin="anonymous" loading="lazy" />
+              <span className="folder-preview-label">{base}</span>
+            </button>
+          );
+        })}
+      </span>
+      {more > 0 && (
+        <button type="button" className="folder-preview-more" onClick={() => onOpen(folder)}>
+          {more} more in the folder
+        </button>
+      )}
     </span>
   );
 }
@@ -325,7 +416,7 @@ function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 // not the user's, and it is the part that was unnecessary. `filesFromRuns` stays,
 // because App.tsx still reads it to choose the design a card opens itself on.
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onHandToAgent, onAddPeople }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onReopen, onSnooze, onReveal, onOpenItem, onNotice, onHandToAgent, onAddPeople }: {
   previewSample?: string;
   /**
    * A MESSAGE FROM A PERSON IS NOT WORK UNTIL SHE SAYS SO. The one line under
@@ -347,6 +438,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    *  code, has a terminal or can still be finished, which is why the menu is
    *  drawn here and teleported there. */
   cornerHeaderTarget?: HTMLElement | null;
+  /** WHERE THIS THREAD WAS OPENED FROM, as its tab says it ("Needs you",
+   *  "Done"), for the thin bar the thread wears while its summary is open
+   *  (w-922f66bb06). Absent, the bar is always the full one. */
+  crumbFrom?: string;
   item: WorkItem;
   // WHAT AGENTS ARE ALLOWED TO DO RIGHT NOW, so the reply footer can print it
   // whether or not this message has changed it. Claude Code prints its own
@@ -720,16 +815,21 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       return `file://${productDir}/${src.replace(/^\.\//, '')}`;
     };
 
-    // Where a worker's relative path might actually live: the docs dir, its
-    // designs/ and attachments/ folders, and the code repo. Workers write
-    // paths relative to whichever one they were thinking about.
-    const roots = [
-      productDir,
-      productDir && `${productDir}/designs`,
-      productDir && `${productDir}/attachments`,
-      repoDir,
-      repoDir && `${repoDir}/designs`,
-    ].filter(Boolean) as string[];
+    // Where a worker's relative path might actually live: the folders this
+    // message names and the thread's own designs folder first, then the docs
+    // dir, its designs/ and attachments/ folders, and the code repo. Workers
+    // write paths relative to whichever one they were thinking about
+    // (../message-folders.ts).
+    const texts = [item.result, item.note, item.body, item.answer];
+    const roots = pictureRoots({ dir: productDir, repo: repoDir, id: item.id, texts });
+    // A message that draws pictures of its own keeps its folder to one line.
+    const drawsPictures = referencedFiles(...texts, { dir: productDir }).some(isImagePath);
+    const find = (src: string) => {
+      const zero = (window as any).zero;
+      if (!zero?.openArtifact) return Promise.resolve(null);
+      return zero.openArtifact({ product, src, mode: 'resolve' })
+        .then((r: { ok: boolean; opened?: string }) => (r?.ok && r.opened && isImagePath(r.opened) ? r.opened : null));
+    };
 
     // Clicks resolve in the main process, across the roots a worker might have
     // meant WITHIN THIS CARD'S OWN PRODUCT (main/artifact-path.mjs): a
@@ -756,6 +856,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const mdComponents = {
       pre: ({ children }: { children?: ReactNode }) => <CodePre>{children}</CodePre>,
       a: ({ href, children }: { href?: string; children?: ReactNode }) => {
+        // A FOLDER, written on its own line, shows its pictures (FolderPreview).
+        if (href && /\/$/.test(href) && !/^(https?|data|file|mailto):/i.test(href)) {
+          return <FolderPreview key={href} product={product} folder={href} onOpen={openHref} quiet={drawsPictures} />;
+        }
         // A LINK TO A PICTURE DRAWS THE PICTURE. The code span below has done
         // this since 08-29 and the bare path now does it too, so the last form
         // a worker reaches for that showed her only blue text is `[the
@@ -763,7 +867,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         // missing file falls back to.
         if (href && !/^(https?|data):/.test(href) && /\.(png|jpe?g|gif|webp|svg)(?:[?#]|$)/i.test(href)) {
           const label = typeof children === 'string' ? children : href;
-          return <ArtifactImg key={href} src={href} alt={label} roots={roots} onOpen={openHref} />;
+          return <ArtifactImg key={href} src={href} alt={label} roots={roots} onOpen={openHref} find={find} />;
         }
         // A SOUND OR A FILM PLAYS IN PLACE (ArtifactMedia, above).
         if (href && isMediaPath(href)) {
@@ -771,7 +875,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         }
         return <ArtifactLink product={product} src={href} fallback={resolveSrc(href)} onOpen={() => openHref(href)}>{children}</ArtifactLink>;
       },
-      img: ({ src, alt }: { src?: string; alt?: string }) => <ArtifactImg key={src} src={src} alt={alt} roots={roots} onOpen={openHref} />,
+      img: ({ src, alt }: { src?: string; alt?: string }) => <ArtifactImg key={src} src={src} alt={alt} roots={roots} onOpen={openHref} find={find} />,
       code: ({ children, className }: { children?: ReactNode; className?: string }) => {
         const value = String(children ?? '');
         const source = !className && sourceReference(value);
@@ -782,7 +886,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         const path = (!className && productDir && productPath(shown, productDir)) || shown;
         if (!className && PATH_RE.test(path)) {
           if (/\.(png|jpe?g|gif|webp)$/i.test(path)) {
-            return <ArtifactImg key={path} src={path} alt={shown} roots={roots} onOpen={openHref} />;
+            return <ArtifactImg key={path} src={path} alt={shown} roots={roots} onOpen={openHref} find={find} />;
           }
           if (isMediaPath(path)) {
             return <ArtifactMedia key={path} src={path} label={<code>{shown}</code>} roots={roots} onOpen={openHref} />;
@@ -793,7 +897,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       },
     };
     return { resolveSrc, mdComponents, openHref, roots };
-  }, [product, productDir, repoDir]);
+  // The message's own words join the list because the folders they name are
+  // where its pictures are looked for. They change only when a worker writes.
+  }, [product, productDir, repoDir, item.id, item.result, item.note, item.body, item.answer]);
 
   const mdPlugins = useMemo(
     () => [remarkGfm, [remarkArtifactPaths, { dir: productDir ?? null }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]['remarkPlugins']>,
@@ -943,10 +1049,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
      and no code, so it is offered Mark done alone. NOTHING TO FINISH ON A
      FINISHED THREAD. */
   const canFinish = item.status !== 'done';
-  // RUN NOW is offered while the task is waiting its turn and has not been
-  // pushed yet: the supervisor's own queued list, so it never appears on a
-  // task nothing is going to start (resting, scheduled, leased elsewhere).
-  const waiting = !session && !!live.queued?.includes(item.id) && !live.runNow?.includes(item.id);
+  // RUN NOW is offered while the task is waiting for a slot and has not been
+  // pushed yet: on the waiting list or In progress with nothing running. The
+  // one rule ⌘K asks too (run-now.ts); a push the supervisor cannot act on is
+  // refused with a reason rather than hidden.
+  const waiting = offersRunNow(item, { session, queued: live.queued, runNow: live.runNow, inProgress: live.inProgress });
   const [terminalOpen, setTerminalOpen] = useState(false);
   const threadMenu = (
     <ThreadMenu
@@ -1012,6 +1119,15 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     </div>
   );
 
+  // WHILE THE SUMMARY IS OPEN THE BAR IS THIN (w-922f66bb06): one line, the
+  // tab this thread was opened from and its name, all of it the way back
+  // (Summary.tsx ThreadCrumb). The full band would say again what the summary
+  // beside it says. Folded, nothing else names the thread, so the band is back.
+  const threadName = direct && talkFull ? talkFull : rowTitle(item);
+  const barContent = summaryShown && crumbFrom
+    ? <ThreadCrumb from={crumbFrom} name={threadName} onBack={onClose} />
+    : <>{backButton}{bandLine}</>;
+
   // ANYTHING ADDED TO THIS ELEMENT RIDES BESIDE THE LITERAL, NEVER INSIDE IT.
   // `the way out of an opened task` finds this element by the literal string
   // `className="focus-pane"` to prove the chevron is a sibling of the scroll
@@ -1060,7 +1176,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         How it is DRAWN is entirely CSS, at the foot of styles.css. It is not a
         setting and there is nothing left to choose: the place, the size and
         the height are all settled. w-7bc66fced1. */}
-    {headerTarget ? createPortal(<>{backButton}{bandLine}</>, headerTarget) : bandLine}
+    {headerTarget ? createPortal(barContent, headerTarget) : bandLine}
     {/* THE CORNER: THE THREAD'S MENU, and nothing else. The Summary button
         that stood beside it (w-e731ca9376) moved onto the summary itself on
         w-a3482b8c2c: the rail opens it, the icon beside its title closes it. */}
@@ -1226,6 +1342,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                  the moment the running agent gets round to acknowledging it
                  (w-1ef03d6f27). */
               sending={sending}
+              onSendNow={() => api.sendNow({ product: item.product, id: item.id }).catch(() => {})}
               onOpenOrigin={() => parent && onOpenItem(parent)}
               md={md}
               clean={cleanMessage}

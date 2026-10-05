@@ -31,6 +31,7 @@ import { listFolders } from './folders.mjs';
 import * as approvals from './approvals.mjs';
 import { restartNeeded } from './staleness.mjs';
 import { artifactRoots, resolveArtifact } from './artifact-path.mjs';
+import { folderPictures } from './folder-pictures.mjs';
 import { docUrl } from './doc-scheme.mjs';
 import { readDoc, writeDoc } from './doc-file.mjs';
 import { readChange } from './code-change.mjs';
@@ -512,7 +513,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:compact', (_e, { product, id }) => supervisor.compactItem(product, id));
   ipcMain.handle('zero:compaction-status', (_e, { product, id }) => supervisor.compactionStatus(product, id));
 
-  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, model, effort }) => {
+  // Send now: cut the running agent's current step so her waiting message is
+  // answered at once (supervisor.sendNow).
+  ipcMain.handle('zero:send-now', (_e, { product, id }) => supervisor.sendNow(product, id));
+
+  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, model, effort, now }) => {
     if (isAgentRow(id)) return { ok: false };
     // A CODEX CONVERSATION'S YES OR NO NEVER REACHES A WORKER. The row asking
     // whether to import one is answered by the app itself: yes makes it a row
@@ -545,7 +550,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // handing them over in one call and writing the model afterwards would be a
     // race the run usually wins, so she would pick a model and watch the old one
     // take the task. `answerItem` writes both, and it writes the model first.
-    const out = await submitReply(supervisor,{product,id,answer,status,permissionMode},()=>store.answerItem(product, id, { answer, status, priority, permissionMode, model, effort }));
+    const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,now:!!now},()=>store.answerItem(product, id, { answer, status, priority, permissionMode, model, effort }));
     // A REPLY ON A ROW A TEAMMATE GAVE YOU HANDS IT BACK TO THEM, so the
     // conversation moves to their inbox instead of sitting in both
     // (shared/team-rules.mjs handedOnByReply). Archiving hands nothing on.
@@ -607,7 +612,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       return { ok: false, error: String(err?.message ?? err), team: team.state() };
     }
   };
-  ipcMain.handle('zero:team-sign-in', teamCall(() => team.signIn()));
+  // Signing in finishes in the browser, so the app comes back to the front
+  // when it lands rather than leaving the person to find it.
+  ipcMain.handle('zero:team-sign-in', teamCall(async () => {
+    await team.signIn();
+    try { if (window?.isMinimized?.()) window.restore(); window?.show?.(); app?.focus?.({ steal: true }); } catch { /* no window to raise */ }
+  }));
+  ipcMain.handle('zero:team-sign-in-cancel', teamCall(() => team.cancelSignIn()));
+  ipcMain.handle('zero:team-sign-in-reopen', teamCall(() => team.reopenSignIn()));
   ipcMain.handle('zero:team-sign-out', teamCall(() => team.signOut()));
   ipcMain.handle('zero:team-sign-in-email', teamCall(({ email, password }) => team.signInWithEmail(email, password)));
   // Its own door, because it has one more thing to say: whether the account
@@ -632,7 +644,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:team-cancel-invite', teamCall(({ email }) => team.cancelInvite(email)));
   // A line you write about yourself, so a day in meetings is not read off
   // the Team page as idleness.
-  ipcMain.handle('zero:team-status', teamCall(({ text, hold }) => team.setStatus({ text, hold })));
+  ipcMain.handle('zero:team-status', teamCall(({ text, hold, until }) => team.setStatus({ text, hold, until })));
   ipcMain.handle('zero:team-share', teamCall(({ product, visibility, people }) => team.share(product, { visibility, people })));
   ipcMain.handle('zero:team-sync', teamCall(() => team.syncNow()));
   // A MESSAGE TO A PERSON (approved 2026-10-01: people get messages, never
@@ -1553,6 +1565,16 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const err = await shell.openPath(found.path);
     return err ? { ok: false, error: err } : { ok: true, opened: found.path };
   });
+
+  // THE PICTURES IN A FOLDER A MESSAGE NAMES, so the folder line draws them
+  // (FolderPreview in Focus.tsx). Only pictures, only inside this product.
+  ipcMain.handle('zero:folder-pictures', (_e, { product, src } = {}) => folderPictures({
+    src,
+    product,
+    products: store.listProducts(),
+    accountRoot: config.accountRoot,
+    storeRoot: config.storeRoot,
+  }));
 
   // THE DOCUMENT PANE READS AND WRITES THE FILE ITSELF. A path goes through
   // the very same finder the links and the chips use, so the pane opens
