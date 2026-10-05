@@ -1,26 +1,25 @@
-// THE WATCH THAT NOTICES A CODEX CONVERSATION AND ASKS.
+// THE WATCH THAT KEEPS AN IMPORTED CODEX CONVERSATION CURRENT.
 //
-// A Codex conversation is asked about before it is imported, never imported
-// silently. So every minute this reads the user's Codex conversations from this
-// week, and for each one that runs in a folder one of the user's projects points
-// at and has no row anywhere yet, it files the asking row in that project. It
-// also keeps the rows the user said yes to current: when Codex
-// writes another answer, the row's result follows it.
+// Every minute this reads the user's recent Codex conversations and, for each
+// one they already brought in, makes the row follow Codex: when Codex writes
+// another answer, the row's result follows it. An asking row filed before this
+// change is kept true the same way.
 //
-// A conversation in a folder no project points at gets no row here. It is
-// still on the ⌘K import card, under a section that makes the project on the
-// press, which is the card's own way of handling a new folder.
+// IT NO LONGER ASKS ABOUT NEW ONES (w-db6f5e331e, 2026-10-05). It used to file
+// an "Import into ...?" row for every new conversation in a project's folder.
+// The founder, before launch: "after onboarding for both anthropic and openai
+// harnesses, it should only import on command, not continuously". Importing is
+// now the walk's last card and ⌘K import, for Claude Code and Codex alike.
 import { readCodexThreads } from './codex-threads.mjs';
 
 export const CODEX_POLL_MS = 60_000;
 
 export function scanCodex({ store, readThreads = readCodexThreads, now = Date.now() } = {}) {
   let threads = [];
-  try { ({ threads } = readThreads({ now })); } catch { return { asked: 0, refreshed: 0, retold: 0, threads: 0 }; }
-  const asked = store.askAboutCodexThreads(threads, { now });
+  try { ({ threads } = readThreads({ now })); } catch { return { refreshed: 0, retold: 0, threads: 0 }; }
   const refreshed = store.refreshCodexMirrors(threads, { now });
   const retold = store.refreshCodexAsks(threads, { now });
-  return { asked, refreshed, retold, threads: threads.length };
+  return { refreshed, retold, threads: threads.length };
 }
 
 export function startCodexWatch({ store, readThreads = readCodexThreads, pollMs = CODEX_POLL_MS, firstDelayMs = 8_000 } = {}) {
