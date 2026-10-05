@@ -282,12 +282,17 @@ export function ImportAgents({ products, filter, walk, onDone, onNewProject, onP
     if (looking) return;
     setLooking(true);
     try {
-      const [r, f] = await Promise.all([
+      // The conversations too (w-db6f5e331e): on a Mac with only Codex they
+      // are the whole of what this card can offer, and a Codex thread started
+      // while the card was open was the one thing it never picked up.
+      const [r, f, t] = await Promise.all([
         api.agentFiles({ folder, product: project }),
         api.agentFolders(),
+        api.agentThreads(),
       ]);
       setFound({ user: r.user, project: r.project });
       setOthers(f);
+      setThreads(t);
     } finally { setLooking(false); }
   }, [looking, folder, project]);
 

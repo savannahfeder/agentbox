@@ -13,7 +13,8 @@
 //      window: every tether is measured off the app's own rectangle, live, and
 //      re-measured when the window changes size.
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { TeamContext } from '../team/people';
 import {
   ALSO, ANCHOR, BOUNDS, BREATHE_AFTER_MS, COACHED, COPY, FLOOR, FLOOR_OF, TEAM_TAB_NAMES, TEXT_MAX, TEXT_MIN, teamTab,
   HELD_EVENTS, LINE_H, SLAB_OF, TEXT_GAP, UNDER,
@@ -1288,6 +1289,7 @@ export function Landed({ agents, onGone }: {
       fall: 62 + ((i * 17) % 26),
     })),
   );
+  const team = useContext(TeamContext);
   useEffect(() => {
     const t = setTimeout(onGone, LANDED_MS);
     // ANY KEY TAKES IT DOWN, and the key still reaches the app underneath: this
@@ -1324,7 +1326,7 @@ export function Landed({ agents, onGone }: {
         <h1 className="fr-landed-head">{COPY.finishHead}</h1>
         <p className="fr-landed-line">{agents ? COPY.finishLineAgents : COPY.finishLine}</p>
         <ul className="fr-landed-next">
-          {COPY.finishNext.map((line) => <li key={line}>{line}</li>)}
+          {[...COPY.finishNext, ...(team ? COPY.finishNextTeam : [])].map((line) => <li key={line}>{line}</li>)}
         </ul>
       </div>
     </div>
@@ -1748,6 +1750,9 @@ export function Onboarding({
   onRecheck?: () => Promise<boolean>;
 }) {
   const nameRef = useRef<HTMLInputElement>(null);
+  // Null unless this Mac is signed into a team, which is the only time the
+  // walk names people (w-db6f5e331e).
+  const team = useContext(TeamContext);
   const [busy, setBusy] = useState(false);
   // WHY THE PROJECT WAS NOT MADE, when it was not. Null the rest of the time.
   const [notMade, setNotMade] = useState<string | null>(null);
@@ -2061,7 +2066,7 @@ export function Onboarding({
       && !!document.querySelector('.th-bar .tm-tabs');
     const say = coach(run.step, run.sentAt ? now - run.sentAt : 0, {
       opened, view, picking, palette, left: beat?.length, tabs,
-      tabNames: teamStrip ? TEAM_TAB_NAMES : undefined,
+      tabNames: teamStrip ? TEAM_TAB_NAMES : undefined, team: !!team,
     });
     if (!say) return null;
     // HER TASK'S OWN ROW FIRST. The walk knows which item it made, so on the

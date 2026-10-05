@@ -467,6 +467,10 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
         <span className="ts-value">{ownerPerson && <Face person={ownerPerson} />}{owner}</span>
         <span className="ts-label">Project</span>
         <span className="ts-value">{item.productName}</span>
+        {/* ONLY ON A TEAM (w-db6f5e331e). With nobody else on the Mac the row
+            read "Visible to: Team" over a menu of people who do not exist,
+            and the public app is not to mention a team at all. */}
+        {team && <>
         <span className="ts-label">Visible to</span>
         <span className="ts-value ts-menu-anchor" ref={holdMenu('visibility')}>
           {/* All three choices in a menu, like Priority, so she sees what she
@@ -528,6 +532,7 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
             </span>
           )}
         </span>
+        </>}
         {/* WHEN THE THREE LINES WERE LAST WRITTEN, and only when: "Just now",
             "6 min ago" (summary-rules.ts updatedWord). No row before they
             have ever been written. */}

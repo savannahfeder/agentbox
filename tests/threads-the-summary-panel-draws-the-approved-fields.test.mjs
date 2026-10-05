@@ -51,8 +51,11 @@ describe('the top bar', () => {
   });
 });
 
+// Signed into a team, because Visible to is drawn only on one (w-db6f5e331e).
+const team = { state: { since: 0, signedIn: true }, me: 'p-me', byId: new Map(), products: new Map() };
+
 describe('the panel', () => {
-  const html = draw(React.createElement(SummaryPanel, { item: item(), items, team: null }));
+  const html = draw(React.createElement(SummaryPanel, { item: item(), items, team }));
   const words = text(html);
   // CHANGED 2026-10-04 (w-922f66bb06): Priority second, and Updated last.
   it('lists the properties in the approved order', () => {
@@ -89,7 +92,7 @@ describe('the panel', () => {
   // "Only you" since 2026-10-01: the same words an old thread nobody shared
   // reads (tests/threads-the-summary-names-its-thread-and-shows-what-you-can-change.test.mjs).
   it('reads Only you for a private thread', () => {
-    expect(text(draw(React.createElement(SummaryPanel, { item: item({ visibility: 'private' }), items, team: null })))).toMatch(/Visible to Only you/);
+    expect(text(draw(React.createElement(SummaryPanel, { item: item({ visibility: 'private' }), items, team })))).toMatch(/Visible to Only you/);
   });
   it('uses no em dash anywhere', () => {
     expect(html).not.toContain('—');

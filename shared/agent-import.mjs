@@ -128,9 +128,11 @@ export const threadLabel = (id) => `thread:${String(id ?? '').trim()}`;
 /**
  * WHEN SHE HAD IT, in the words a person uses about this week.
  *
- *  The window is seven days (`RECENT_DAYS`, main/agent-sessions.mjs), so a day
- *  name covers all of it and a date never has to appear. Anything the arithmetic
- *  cannot place says nothing rather than guessing. */
+ *  Inside a week a day name is the plain word. The window is ten days
+ *  (`RECENT_DAYS`, main/agent-sessions.mjs), and past a week a day name would
+ *  point at the wrong Monday, so those say the date. Anything the arithmetic
+ *  cannot place, or anything far outside the window, says nothing rather than
+ *  guessing. */
 export function whenWords(when, now = Date.now()) {
   const then = new Date(Number(when) || 0);
   if (!Number.isFinite(then.getTime()) || !when) return '';
@@ -139,6 +141,7 @@ export function whenWords(when, now = Date.now()) {
   if (days <= 0) return 'today';
   if (days === 1) return 'yesterday';
   if (days < 7) return `on ${then.toLocaleDateString('en-US', { weekday: 'long' })}`;
+  if (days < 14) return `on ${then.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`;
   return '';
 }
 

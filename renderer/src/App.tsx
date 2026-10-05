@@ -5309,7 +5309,7 @@ export default function App() {
                     // "Nothing needs you" is about you alone; with a teammate
                     // on the page the quiet line says it instead.
                     : view === 'inbox' && !withOthers
-                      ? run === null && <InboxClear running={progress.length} scheduled={snoozed.length}
+                      ? run === null && <InboxClear running={progress.length} scheduled={snoozed.length} team={!!team}
                           onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
                           onCompose={() => setModal('compose')} />
                       : <EmptyTab view={view} />

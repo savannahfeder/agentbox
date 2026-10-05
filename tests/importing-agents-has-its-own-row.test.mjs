@@ -61,7 +61,7 @@ const row = (() => {
 
 describe('the row is in ⌘K and can be found by the words she would type', () => {
   it('is there, and it says what it does', () => {
-    expect(row.label).toBe('Import your Claude Code agents');
+    expect(row.label).toBe('Import agents from Claude Code or Codex');
     expect(row.hint).toBeTruthy();
   });
 
@@ -70,7 +70,7 @@ describe('the row is in ⌘K and can be found by the words she would type', () =
   });
 
   it('is found by "agents", by "import" and by "claude code"', () => {
-    for (const typed of ['agents', 'import', 'import agents', 'claude code', 'my agents']) {
+    for (const typed of ['agents', 'import', 'import agents', 'claude code', 'my agents', 'codex', 'import codex']) {
       expect(matchesQuery(typed, row), `typing "${typed}" found nothing`).toBe(true);
     }
   });

@@ -317,11 +317,15 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     //
     // "bring" and "across" stay in the keywords anyway, because they were the
     // label and somebody who saw it once should still find the row by it.
+    //
+    // IT NAMES CODEX TOO (w-db6f5e331e). The card behind it has read Codex
+    // conversations since w-ec62ab6b38, but a line that said only "Claude Code"
+    // told a person who uses only Codex that it was not for them.
     {
       id: 'import-agents',
-      label: 'Import your Claude Code agents',
-      hint: 'the ones already on this Mac · they land in your inbox',
-      keywords: 'import agents claude code subagents existing mine bring across add my',
+      label: 'Import agents from Claude Code or Codex',
+      hint: 'your last ten days on this Mac · they land in your inbox',
+      keywords: 'import agents claude code codex conversations threads sessions subagents existing mine bring across add my recent',
       run: onImportAgents,
     },
     /* * ------------------- THE TUTORIAL, WHICH IS NOT THE ONBOARDING ---------

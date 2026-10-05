@@ -32,7 +32,9 @@ const item = (o = {}) => ({
   wrote: { problem: { ts: NOW - 6 * M, source: 'agent', by: 'p-sam' } },
   ...o,
 });
-const draw = (it) => renderToStaticMarkup(React.createElement(SummaryPanel, { item: it, team: null }));
+// Signed into a team, because Visible to is drawn only on one (w-db6f5e331e).
+const team = { state: { since: 0, signedIn: true }, me: 'p-me', byId: new Map(), products: new Map() };
+const draw = (it) => renderToStaticMarkup(React.createElement(SummaryPanel, { item: it, team }));
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const css = fs.readFileSync(new URL('../renderer/src/threads/summary.css', import.meta.url), 'utf8');
 const rule = (sel) => {
