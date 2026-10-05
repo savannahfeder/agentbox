@@ -1,0 +1,96 @@
+/* A CONVERSATION WITH A TEAMMATE (w-2e8aa16f0f, drawing A of round two).
+   Slack's structure in the app's own materials: a square face in a column on
+   the left, the full name and the time once per run, a quiet day line, and a
+   rule that is a hairline. The run itself is ./chat-layout.ts. Nothing here
+   reaches a thread with an agent: every rule hangs off .chat-msg, .chat-day or
+   .is-chat-cont, which only a conversation with a person draws. */
+
+.chat-day {
+  display: flex; align-items: center; gap: 14px; margin: 4px 0 6px;
+  font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint);
+}
+.chat-day::after { content: ''; flex: 1; height: 1px; background: var(--line); opacity: .55; }
+
+.chat-msg { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 14px; }
+.chat-gutter { grid-column: 1; grid-row: 1 / span 3; padding-top: 2px; }
+.chat-msg > .msg-head, .chat-msg > .msg-body, .chat-msg > .chat-more { grid-column: 2; min-width: 0; }
+.chat-msg .msg-head { align-items: baseline; }
+.chat-msg .msg-who { font-size: 14.5px; font-weight: 500; color: var(--text); }
+.chat-msg .msg-when { font: 11px var(--mono); letter-spacing: .03em; color: var(--text-faint); }
+
+/* A message that carries on a run sits close under it, and its time waits in
+   the face column until the pointer is on it. */
+.thread-block.is-chat-cont { margin-top: -12px; }
+.chat-gt { display: block; font: 10px/25px var(--mono); color: var(--text-faint); text-align: right; visibility: hidden; }
+.chat-msg:hover .chat-gt { visibility: visible; }
+
+/* THE RULE A MESSAGE WRITES WITH ---. The message body had no rule style, so it
+   drew the browser's own grooved 2px line at full strength. */
+.chat-msg .msg-body hr { border: 0; border-top: 1px solid var(--line); opacity: .5; margin: 16px 0; }
+
+.chat-folded { max-height: 340px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 62%, transparent); mask-image: linear-gradient(#000 62%, transparent); }
+.chat-more {
+  justify-self: start; appearance: none; background: none; border: 0; padding: 0; margin-top: 6px;
+  font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer;
+  text-decoration: underline dotted var(--line-strong); text-decoration-thickness: 1px; text-underline-offset: 3px;
+}
+.chat-more:hover { color: var(--text); text-decoration-color: var(--text-faint); }
+.chat-more:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
+
+/* AGENTS IN A CONVERSATION (w-7b9cb8636a, ./ChatAgents.tsx). */
+
+/* An agent mention inside a sent message: the words, on the app's wash. */
+.chat-at { color: var(--text); background: var(--wash-strong); padding: 0 3px; }
+
+/* The agent's answer, under the message that asked for it. */
+.thread-block .chat-agent { margin-top: 20px; }
+.chat-gutter .agent-face { width: 28px; height: 28px; }
+.chat-gutter .agent-face .agent-eyes { width: 22px; height: 22px; }
+.chat-agent-name { appearance: none; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.chat-agent-name:hover { text-decoration: underline; text-underline-offset: 3px; }
+.chat-msg .chat-agent-state { color: var(--text-dim); }
+.chat-msg > .chat-agent-made { grid-column: 2; min-width: 0; }
+.chat-agent-made .made { margin: 10px 0 0; }
+
+/* The @ menu, rising off the reply box like the / menu does. */
+.mention-menu {
+  position: absolute; bottom: calc(100% + 8px); left: 0; width: 440px; max-width: 100%; z-index: 60; padding: 4px;
+  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+}
+.mention-head { padding: 8px 10px 5px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.mention-row {
+  display: flex; align-items: center; gap: 11px; width: 100%; padding: 7px 10px;
+  appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer; text-align: left;
+  font: inherit; font-size: 13px; color: var(--text-dim);
+}
+.mention-row.cursor { background: var(--bg-selected); color: var(--text); }
+.mention-row .tm-av, .mention-row .agent-face { width: 20px; height: 20px; line-height: 18px; font-size: 8px; }
+.mention-hint { margin-left: auto; font: 11px var(--mono); letter-spacing: .03em; color: var(--text-faint); }
+.mention-row.cursor .mention-hint { color: var(--text-dim); }
+
+/* The chips, under the reply box's own text. The layer holds the same words in
+   the same box, invisible except where a mention is; the text above it is the
+   real one, so typing, selecting and the caret are the textarea's own. */
+.dock-input.with-mentions { position: relative; z-index: 1; }
+.mention-layer {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  padding: 12px 16px 6px; font: inherit; line-height: 1.55; white-space: pre-wrap; overflow-wrap: break-word; color: transparent;
+}
+.mention-chip { background: var(--wash-strong); box-shadow: 0 0 0 1px var(--text-faint); }
+.mention-chip.loose { box-shadow: 0 0 0 1px var(--line-strong); background: none; text-decoration: underline dotted var(--text-faint); }
+
+/* The mention's card: project, model and effort, above the box at the chip. */
+.mention-card {
+  position: absolute; bottom: calc(100% + 8px); width: 300px; z-index: 61; padding: 6px 0;
+  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+}
+.mention-card-head { display: flex; align-items: center; gap: 9px; padding: 6px 14px 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text); }
+.mention-field {
+  display: flex; align-items: center; width: 100%; padding: 7px 14px;
+  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer; text-align: left; font: inherit; font-size: 13px;
+}
+.mention-field:hover, .mention-field.cursor { background: var(--bg-selected); }
+.mention-field .k { width: 72px; flex: none; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.mention-field .v { color: var(--text-dim); }
+.mention-field:hover .v, .mention-field.cursor .v { color: var(--text); }
+.mention-field .car, .mention-field .chk { margin-left: auto; color: var(--text-faint); font-size: 11px; }

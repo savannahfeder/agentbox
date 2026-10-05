@@ -280,3 +280,29 @@ img.tm-av { background: var(--bg-selected); }
   color: var(--text-dim); border-radius: var(--radius); }
 .workspace-navigation .th-me-pop .when-row:hover { background: var(--bg-selected); color: var(--text); }
 .workspace-collapsed .workspace-navigation .th-me-pop button > span { display: inline; }
+
+/* WHO SEES A PROJECT'S THREADS (ProjectShare.tsx, w-b989839656). The button
+   beside a project's name is drawn as the answer: its mark and its words. */
+.ps-anchor { position: relative; margin-left: auto; flex: none; }
+.ps-btn { display: inline-flex; align-items: center; gap: 9px; white-space: nowrap; }
+.ps-btn svg { color: var(--text-dim); flex: none; }
+.ps-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 80; width: 360px; box-sizing: border-box; padding: 5px;
+  background: var(--pop, var(--bg-selected)); border: 1px solid var(--line-strong); border-radius: var(--radius);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+  display: flex; flex-direction: column; gap: 1px; text-align: left;
+  font-size: 13.5px; line-height: 20px; color: var(--text-dim);
+}
+.ps-menu .tc-row.on { background: var(--wash-strong, rgba(255, 255, 255, 0.07)); }
+/* The lock is drawn narrower than the people mark; centred in the same slot,
+   the three labels start on one line. */
+.ps-menu .tc-row > svg[aria-label="Private"], .pp-who > svg[aria-label="Private"] { margin: 2px 2px 0; }
+.ps-menu .tc-row:hover { color: var(--text); }
+.ps-tick { width: 14px; height: 14px; flex: none; display: inline-grid; place-items: center; border: 1px solid var(--line-strong); color: var(--text); }
+.ps-tick svg { width: 11px; height: 11px; }
+.ps-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 6px 5px 3px; }
+
+/* The Projects list's Who sees it column (ProjectsPage.tsx). */
+.pp-who { flex: none; width: 150px; display: inline-flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 13.5px; white-space: nowrap; overflow: hidden; }
+.pp-who svg { color: var(--text-faint); flex: none; }
+.pp-head-who { flex: none; width: 150px; }

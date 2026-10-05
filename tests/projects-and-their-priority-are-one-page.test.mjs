@@ -146,8 +146,10 @@ describe('the ways in', () => {
   // ONE PAGE, CALLED PROJECTS. There was a Priority row beside All projects for
   // a round; she merged them.
   it('Settings has one Projects row, and no separate Priority page', () => {
-    expect(settings).toMatch(/<span className="set-nav-label">Projects<\/span>/);
-    expect(settings).not.toMatch(/set-nav-label">Priority</);
+    // The menu is a list since the redraw (w-ccadd13c46).
+    const menu = read('renderer/src/settings-search.ts');
+    expect(menu).toContain("{ id: 'projects', label: 'Projects', group: 'Workspace' }");
+    expect(menu).not.toMatch(/label: 'Priority'/);
     expect(settings).not.toMatch(/>All projects</);
     expect(settings).not.toMatch(/setPane\('priority'\)/);
     expect(settings).toMatch(/<ProjectsPage\b[\s\S]{0,200}onSetOrder=\{onSetOrder\}/);

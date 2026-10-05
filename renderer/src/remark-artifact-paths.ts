@@ -30,7 +30,9 @@ import { defaultUrlTransform } from 'react-markdown';
 // Local file links are handled by the app's click handler, never navigated to
 // by the browser. Keep all of markdown's other protocol restrictions.
 export function artifactUrlTransform(url: string): string {
-  return /^file:\/\//i.test(url) ? url : defaultUrlTransform(url);
+  // An agent mentioned in a conversation keeps its address, which is what the
+  // link component reads to draw it as a mention (w-7b9cb8636a).
+  return /^(file:\/\/|agentbox-agent:)/i.test(url) ? url : defaultUrlTransform(url);
 }
 
 const MEDIA_EXT = 'mp3|wav|m4a|aac|ogg|mp4|mov|m4v|webm';

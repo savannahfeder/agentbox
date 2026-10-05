@@ -17,16 +17,39 @@ export function projectRefFrom(url) {
 
 export const functionUrl = (ref) => `https://${ref}.supabase.co/functions/v1/feedback`;
 
-// Mail comes from an address at the recipient's own domain, which is the one
-// already verified with Resend.
-export function senderFor(recipient, name = 'Agentbox Feedback') {
-  const at = String(recipient ?? '').lastIndexOf('@');
-  if (at < 1) return null;
-  return `${name} <feedback${String(recipient).slice(at)}>`;
+// Mail has to come from a domain verified with Resend. That is often NOT the
+// recipient's own domain but a subdomain of it (the first real run was refused
+// for exactly that), so the domain is asked for and the recipient's is only the
+// starting guess.
+export const senderAt = (domain, name = 'Agentbox Feedback') => `${name} <feedback@${domain}>`;
+
+export function domainOf(email) {
+  const at = String(email ?? '').lastIndexOf('@');
+  return at < 1 ? null : String(email).slice(at + 1);
 }
+
+export function senderFor(recipient, name = 'Agentbox Feedback') {
+  const domain = domainOf(recipient);
+  return domain ? senderAt(domain, name) : null;
+}
+
+export const looksLikeDomain = (s) => /^(?!-)[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(String(s ?? '').trim());
+
+// Resend's reason, as the server function passes it back, when the reason is
+// that the sending domain is not one it has verified.
+export const refusedForDomain = (detail) => /domain/i.test(String(detail ?? '')) && /verif/i.test(String(detail ?? ''));
 
 export const looksLikeResendKey = (key) => /^re_[A-Za-z0-9_]{8,}$/.test(String(key ?? '').trim());
 export const looksLikeEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(s ?? '').trim());
+
+// Which of our secrets are already saved on the project, read off whatever
+// `supabase secrets list` printed (a table or JSON). Names only: Supabase never
+// shows a value back, so nothing secret passes through here.
+const OURS = ['RESEND_API_KEY', 'FEEDBACK_TO', 'FEEDBACK_FROM'];
+export function savedSecrets(output) {
+  const text = String(output ?? '');
+  return new Set(OURS.filter((name) => new RegExp(`(^|[^A-Z0-9_])${name}([^A-Z0-9_]|$)`, 'm').test(text)));
+}
 
 // What `supabase secrets set --env-file` reads. Quoted, because the sender has
 // spaces and angle brackets in it.

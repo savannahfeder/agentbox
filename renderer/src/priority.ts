@@ -73,59 +73,36 @@ export function priorityCommands(targets: { priority?: number | null }[]): Prior
   }));
 }
 
-/* ------------------------- the level that sticks -------------------------- */
+/* ------------------- every new thread opens on Medium --------------------- */
 
-// The new task card forgot. It opened on the draft's level or on nothing, and
-// a send CLEARS the draft, so the level she had just chosen died with it: tag
-// one task urgent, send it, open the card again and it says Medium. The card
-// already remembers the PROJECT across sends (`zero.lastProduct`), because a
-// founder filing five things for one product should not pick it five times.
-// The level is the same fact about the same card and it was simply missing.
+// The new task card used to remember the last level picked, across sends, in
+// `zero.lastPriority`. So one Urgent thread made the next one Urgent too, and
+// the one after, and because that memory lived on the Mac rather than in the
+// account, a tester on a brand-new account found every thread preset to
+// Urgent. Urgent rows rise above everything in the inbox, so a level that
+// spreads by itself stops meaning anything. The founder's call, 2026-10-05:
+// all new threads default to Medium. Unlike the project, the level is not
+// carried to the next card. Anything still sitting under `zero.lastPriority`
+// is simply never read.
 //
-// Which is why this lives here rather than in ../drafts.ts. A draft is the one
-// unsent card, and it dies when that card is sent; this outlives the send. Same
-// shape and the same reason as the project.
+// A level still holds for the card it was picked on: a half-written card that
+// comes back (../drafts.ts) keeps its own tag until it is sent.
 //
 // NOT THE REPLY BOX. The dock's tag already retains, one better: it shows the
 // THREAD's own level, so a reply to an urgent thread says "Urgent priority."
 // and an untouched reply leaves that level alone (deliberately, because a
 // reply box reading "medium" on an urgent thread read as the reply demoting
-// it). Carrying a global last-pick in there instead would silently escalate
-// every thread she answered after tagging one task urgent.
-
-/** Just enough of the Storage interface to be handed a fake in a test. */
-export interface LevelStore {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-}
-
-export const LAST_PRIORITY_KEY = 'zero.lastPriority';
-
-const levelStore = (store?: LevelStore): LevelStore | null =>
-  store ?? (globalThis as unknown as { localStorage?: LevelStore }).localStorage ?? null;
+// it). Carrying a global last-pick in there would silently escalate every
+// thread answered after tagging one task urgent.
 
 /**
- * The level the next new task card opens on, or null for untagged.
+ * The level a new task card opens on: its own draft's tag, or null for
+ * untagged, which shows and sends as Medium.
  *
  * Anything that is not one of the four words reads as null rather than
  * throwing. A card that refuses to open because of a stale string in storage is
- * worse than a card that opens untagged, and she has no way to clear it.
+ * worse than a card that opens untagged.
  */
-export function readLastPriority(store?: LevelStore): PriorityId | null {
-  let raw: string | null = null;
-  try { raw = levelStore(store)?.getItem(LAST_PRIORITY_KEY) ?? null; } catch { return null; }
-  return PRIORITIES.some((p) => p.id === raw) ? (raw as PriorityId) : null;
-}
-
-/**
- * Remember what she just picked, at the moment she picks it.
- *
- * On the pick and not on the send, exactly as the project is remembered: a
- * level she chose and then thought better of sending is still the level she
- * chose. Never throws, because it runs inside a click handler on a card whose
- * whole job is to not lose what she is doing.
- */
-export function writeLastPriority(id: PriorityId, store?: LevelStore): void {
-  try { levelStore(store)?.setItem(LAST_PRIORITY_KEY, id); } catch { /* the card still sends */ }
+export function startingPriority(draft: string | null | undefined): PriorityId | null {
+  return PRIORITIES.some((p) => p.id === draft) ? (draft as PriorityId) : null;
 }
