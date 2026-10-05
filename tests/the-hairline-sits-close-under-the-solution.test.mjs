@@ -21,14 +21,17 @@ const rule = (sel) => {
 };
 const px = (block, prop) => Number(block.match(new RegExp(`(?:^|[;\\s])${prop}:\\s*(-?[\\d.]+)px`))?.[1] ?? 0);
 
-describe('the room under the solution', () => {
-  it('is the same step as between two sections, and no more', () => {
+// CHANGED 2026-10-05 (w-54e9c7243f): the parts of the summary moved closer
+// together, 12px of margin instead of 18 (picked on full-window pictures), so
+// the foot now adds 6px of its own and the hairline stays 24px under the words.
+describe('the room under the last part of the summary', () => {
+  it('is still 24px from the words to the hairline', () => {
     const line = px(rule('.ts-line, .ts-edit').replace(/padding: (\d+)px \d+px (\d+)px/, 'padding-bottom: $2px'), 'padding-bottom');
     const section = Number(rule('.ts-sec').match(/margin: 0 0 (\d+)px/)?.[1]);
     const foot = px(rule('.ts-foot'), 'padding-top');
     expect(line).toBe(6);
-    expect(section).toBe(18);
-    expect(foot).toBe(0);
+    expect(section).toBe(12);
+    expect(foot).toBe(6);
     expect(line + section + foot).toBe(24);
   });
 

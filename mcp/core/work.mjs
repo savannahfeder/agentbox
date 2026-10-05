@@ -25,7 +25,7 @@ import {
 } from '../../main/store/work-items.mjs';
 import { matchesFilter } from '../../shared/work-items.mjs';
 import { unleaked } from '../../shared/agents.mjs';
-import { SUMMARY_WORDS, wordsIn } from '../../shared/thread-cards.mjs';
+import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS, doneSteps, wordsIn } from '../../shared/thread-cards.mjs';
 import {
   parkPendingWrite, readPendingWrites, collectPendingWrites,
 } from '../../main/store/pending-writes.mjs';
@@ -150,13 +150,29 @@ export function saidToClose(item, words) {
  * the rest lands; the agent is told which line, how long, and to send it again.
  * Refused rather than cut, because a cut sentence says less than a short one.
  */
+//
+// Since w-54e9c7243f the summary is Context (`problem`, CONTEXT_WORDS) and Done
+// (`progress`, at most DONE_STEPS lines of DONE_STEP_WORDS each); `solution`
+// keeps the old one-sentence limit for any writer still sending it.
 function takeOverLong(patch) {
-  const long = ['problem', 'progress', 'solution']
-    .filter((f) => typeof patch[f] === 'string' && wordsIn(patch[f]) > SUMMARY_WORDS);
-  if (!long.length) return {};
-  const said = long.map((f) => `${f} (${wordsIn(patch[f])} words)`).join(', ');
-  for (const f of long) delete patch[f];
-  return { summaryTooLong: `Not saved: ${said}. A summary line is ${SUMMARY_WORDS} words at most, so it fits the panel without scrolling; everything else you sent was written, and the line keeps what it said before. Send ${long.length === 1 ? 'it' : 'them'} again as one short sentence each.` };
+  const said = [];
+  if (typeof patch.problem === 'string' && wordsIn(patch.problem) > CONTEXT_WORDS) {
+    said.push(`context, the problem field (${wordsIn(patch.problem)} words; ${CONTEXT_WORDS} at most)`);
+    delete patch.problem;
+  }
+  if (typeof patch.progress === 'string') {
+    const steps = doneSteps(patch.progress);
+    const longest = Math.max(0, ...steps.map(wordsIn));
+    if (steps.length > DONE_STEPS) said.push(`done, the progress field (${steps.length} steps; ${DONE_STEPS} at most, so keep the ones that matter)`);
+    else if (longest > DONE_STEP_WORDS) said.push(`done, the progress field (a step of ${longest} words; ${DONE_STEP_WORDS} at most each)`);
+    if (steps.length > DONE_STEPS || longest > DONE_STEP_WORDS) delete patch.progress;
+  }
+  if (typeof patch.solution === 'string' && wordsIn(patch.solution) > SUMMARY_WORDS) {
+    said.push(`solution (${wordsIn(patch.solution)} words; ${SUMMARY_WORDS} at most)`);
+    delete patch.solution;
+  }
+  if (!said.length) return {};
+  return { summaryTooLong: `Not saved: ${said.join(', ')}. The summary has to fit the panel without scrolling; everything else you sent was written, and ${said.length === 1 ? 'that part keeps' : 'those parts keep'} what ${said.length === 1 ? 'it' : 'they'} said before. Send ${said.length === 1 ? 'it' : 'them'} again shorter.` };
 }
 
 const LEFT_OPEN = 'The row was left OPEN. The founder wrote it, and only she closes her own rows unless she asked you to: everything else you sent was written, and your answer reaches her inbox as an answer. If she did ask you to close it, send status done again with closeBecause set to her exact words asking for it.';
