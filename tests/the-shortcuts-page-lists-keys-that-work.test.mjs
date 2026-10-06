@@ -178,9 +178,13 @@ describe('every key the shortcuts page draws is one the app answers', () => {
   // inbox", and what keeps that from being a half truth is that the keys are a
   // SUPERSET there, never a different key somewhere else. If this branch ever
   // stops re-focusing the neighbour, the heading starts lying.
+  // Since w-fb16bcaeba the neighbour may be a teammate's thread, so the branch
+  // hands it to `goToStop`, which re-focuses yours and opens theirs as a card.
   it('J and K mean the same thing inside an open task as they do in the list', () => {
     expect(focused).toContain("e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K'");
-    expect(focused).toContain('if (target) { setFocused(target); markSeen(target); setSelected(next); }');
+    expect(focused).toContain('if (target) goToStop(target);');
+    expect(app).toContain('setFocused(stop.item); markSeen(stop.item);');
+    expect(app).toContain('if (at >= 0) setSelected(at);');
   });
 });
 
@@ -404,7 +408,8 @@ describe('the page stays a page and not a wall', () => {
 
 describe('she can get to it from both places she looks', () => {
   it('is a page in Settings’ own navigation', () => {
-    expect(settings).toContain("['shortcuts', 'Shortcuts'],");
+    // The menu is a list in settings-search.ts since the redraw (w-ccadd13c46).
+    expect(read('renderer/src/settings-search.ts')).toContain("{ id: 'shortcuts', label: 'Shortcuts', group: 'Personal' }");
     expect(settings).toContain("{pane === 'shortcuts' && (");
     expect(settings).toContain('<h1 className="set-title">Shortcuts</h1>');
   });

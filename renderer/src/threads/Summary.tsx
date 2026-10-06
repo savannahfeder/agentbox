@@ -16,7 +16,7 @@
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Person, ThreadCard, ThreadEditPatch, WorkItem } from '../types';
 import { api } from '../api';
-import { summaryOf, threadState } from '../../../shared/thread-cards.mjs';
+import { doneSteps, summaryOf, threadState } from '../../../shared/thread-cards.mjs';
 import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityIdOf, priorityLabelOf, priorityValueOf, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName, type TeamView } from '../team/people';
@@ -172,6 +172,20 @@ type Pending = Partial<Record<Field, { value: unknown; ts: number }>>;
 type Menu = null | 'status' | 'priority' | 'visibility';
 
 const NOT_WRITTEN = 'Not written yet';
+// The two parts the panel draws; `solution` is still stored but not shown.
+const SHOWN_FIELDS: SummaryField[] = ['problem', 'progress'];
+
+/**
+ * THE DONE TRAIL: each step a dot, joined to the next by a thin line, oldest
+ * at the top and the newest last (summary.css .ts-trail).
+ */
+function DoneTrail({ steps }: { steps: string[] }) {
+  return (
+    <ol className="ts-trail">
+      {steps.map((s, i) => <li key={i} className={`ts-step${i === steps.length - 1 ? ' ts-step-last' : ''}`}>{s}</li>)}
+    </ol>
+  );
+}
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 /**
@@ -261,7 +275,7 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
   const chosen = shownToPeople({
     visibility: valueOf<'team' | 'people' | 'private' | undefined>('visibility') ?? item.visibility,
     visibleTo: valueOf<string[] | undefined>('visibleTo') ?? item.visibleTo,
-  });
+  }, team?.products.get(item.product));
   const others = useMemo(() => teammates(team?.state.people ?? [], team?.me ?? null), [team]);
   const owner = ownerName(item, me, team?.byId ?? new Map());
   const ownerPerson = owner === 'You' ? null : team?.byId.get(item.createdBy ?? '') ?? null;
@@ -311,8 +325,10 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
     // would close the thread she is in the middle of writing on. It KEEPS what
     // was typed, as the box has been saving all along. Escape used to throw the
     // words away while the line still read "Edited by you".
+    // In the Done list Enter starts the next step, one per line, so only
+    // Escape or clicking away finishes it there.
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(); }
-    else if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); finish(); }
+    else if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && editing !== 'progress') { e.preventDefault(); finish(); }
   };
   // The box grows with what is in it, so a line being edited is the same shape
   // as the line it replaced.
@@ -360,9 +376,14 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
       {/* A LINE WITH NO WORDS IS NOT DRAWN AT ALL (w-54e9c7243f): no heading
           over a dim "Not written yet". The one being typed in stays, so
           clearing it does not pull the box out from under the cursor. */}
-      {SUMMARY_FIELDS.filter((f) => editing === f || stood[f]?.trim()).map((f) => (
-        <div className="ts-sec" key={f}>
-          <div className="ts-h">{f === 'problem' ? 'Problem' : f === 'progress' ? 'Progress' : 'Solution'}</div>
+      {/* CONTEXT, THEN DONE (w-54e9c7243f, 2026-10-05). `problem` is drawn as
+          Context, the few sentences that bring the thread back to mind, and
+          `progress` as Done, the steps so far as a trail of dots, newest last.
+          `solution` is no longer drawn: picked over seven rounds of pictures,
+          the last of them "defo the timeline view". */}
+      {SHOWN_FIELDS.filter((f) => editing === f || stood[f]?.trim()).map((f) => (
+        <div className={`ts-sec${f === 'progress' ? ' ts-sec-done' : ''}`} key={f}>
+          <div className="ts-h">{f === 'problem' ? 'Context' : 'Done'}</div>
           {editing === f ? (
             <textarea
               ref={box}
@@ -375,14 +396,14 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
               onKeyDown={onBoxKey}
             />
           ) : (
-            <p
+            <div
               className={`ts-line${written(f) ? '' : ' dim'}`}
               role="button"
               tabIndex={0}
               title="Click to edit"
               onClick={() => begin(f)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); begin(f); } }}
-            >{stood[f]}<Pen /></p>
+            >{f === 'progress' ? <DoneTrail steps={doneSteps(stood[f])} /> : stood[f]}<Pen /></div>
           )}
         </div>
       ))}
@@ -591,7 +612,6 @@ export function TeammateCard({ card, person, now = Date.now() }: { card: ThreadC
   const titles = (links: ThreadCard['blockedBy']) => (links.length
     ? <p>{links.map((l, i) => <span key={l.id} className={l.title ? '' : 'dim'}>{i > 0 && ', '}{l.title ?? UNSEEN_THREAD}</span>)}</p>
     : <p className="dim">Nothing</p>);
-  const prose = (text: string | null) => (text ? <p>{text}</p> : <p className="dim">{NOT_WRITTEN}</p>);
   return (
     <article className="ts-ticket">
       <div className="ts-tk-top">
@@ -601,11 +621,13 @@ export function TeammateCard({ card, person, now = Date.now() }: { card: ThreadC
         {card.project && <><i className="ts-sep" /><span>{card.project}</span></>}
         <i className="ts-sep" /><span>Visible to the team</span>
       </div>
-      <p className={`ts-tk-lead${card.progress || card.solution ? '' : ' dim'}`}>{card.progress || card.solution || NOT_WRITTEN}</p>
-      <div className="ts-tk-grid">
-        <div><span className="ts-h">Problem</span>{prose(card.problem)}</div>
-        <div><span className="ts-h">Solution</span>{prose(card.solution)}</div>
-      </div>
+      {/* THE SAME TWO PARTS AS THE PANEL (w-54e9c7243f): Context as the lead,
+          then the Done trail when anything is done. Problem and Solution
+          left the card with the panel. */}
+      <p className={`ts-tk-lead${card.problem ? '' : ' dim'}`}>{card.problem || NOT_WRITTEN}</p>
+      {doneSteps(card.progress).length > 0 && (
+        <div className="ts-tk-done"><span className="ts-h">Done</span><DoneTrail steps={doneSteps(card.progress)} /></div>
+      )}
       <div className="ts-tk-grid ts-tk-next">
         <div><span className="ts-h">Blocked by</span>{titles(card.blockedBy)}</div>
         <div><span className="ts-h">Blocks</span>{titles(card.blocks)}</div>

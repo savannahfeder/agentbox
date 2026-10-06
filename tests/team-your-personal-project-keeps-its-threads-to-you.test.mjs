@@ -185,22 +185,32 @@ describe('in the app', () => {
     else process.env.AGENTBOX_PERSON_ID = shellPersonId;
   });
 
-  it('signing in makes My Workspace, and the store says which project it is', async () => {
+  // MY WORKSPACE MOVED OUT OF SIGNING IN (w-f8d123be62, approved 2026-10-05).
+  // These two said the opposite, and they were right about the old app: it was
+  // made in `signedIn()` and nowhere else, which is exactly why a Mac with no
+  // team cloud opened on no projects at all and Send did nothing. Boot makes it
+  // now (main/main.mjs), so what the team service owes this project is only
+  // that it leaves it alone.
+  it('the store says which project is My Workspace, and signing in does not make a second', async () => {
     const cloud = createMemoryCloud();
     const me = signUpMemory(cloud, { email: 'maya@northwind.test', name: 'Maya' });
     const service = createTeamService({
       session: memorySession(() => memoryBackend(cloud, me)), store, disk, accountRoot,
       stateFile: path.join(tmp, '.team-sync.json'), intervalMs: 60_000,
     });
-    expect(store.listProducts().map((p) => p.slug)).toEqual(['nw']);
+    ensurePersonalProject(accountRoot); // what boot does, before anybody signs in
+    store.watch?.();
     await service.signIn();
     const listed = store.listProducts().map((p) => ({ slug: p.slug, name: p.name, personal: p.personal }));
     expect(listed).toEqual([{ slug: 'my-workspace', name: 'My Workspace', personal: true }, { slug: 'nw', name: 'Northwind', personal: false }]);
     await service.signOut();
   });
 
-  it('nobody signed in gets no Personal project', () => {
+  it('is there with nobody signed in, which is the whole point of moving it', () => {
     expect(store.listProducts().some((p) => p.personal)).toBe(false);
+    ensurePersonalProject(accountRoot);
+    store.watch?.();
+    expect(store.listProducts().filter((p) => p.personal).map((p) => p.name)).toEqual(['My Workspace']);
   });
 
   it('a thread you chose to show the team in Personal is written as Team, and one left alone carries no word', () => {

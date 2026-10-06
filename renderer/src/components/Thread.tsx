@@ -33,6 +33,8 @@ import { holdAtBottom } from '../thread-bottom';
 import { clock, dayHeading } from '../thread-history';
 import { chatLayout } from '../team/chat-layout';
 import { ChatFold } from '../team/ChatFold';
+import { MessageActions, Reactions } from '../team/ChatActions';
+import { AgentAnswers } from '../team/ChatAgents';
 import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
 } from '../../../shared/agents.mjs';
@@ -69,7 +71,7 @@ export interface CodeInThread {
   open: (path: string) => void;
 }
 
-export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, landOn, md, code, chat = false }: {
+export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, landOn, md, code, chat = false, reactions, onReact, onQuote, onHandToAgent }: {
   // CUT THE AGENT'S CURRENT STEP so a message of hers that is waiting on it is
   // answered now (w-f37a34def6). Absent where nothing can be cut.
   onSendNow?: () => unknown;
@@ -106,6 +108,20 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   // The change this conversation made, when there is one. Absent means every
   // work line stays the plain line it has always been.
   code?: CodeInThread | null;
+  // WHAT PEOPLE PUT ON EACH MESSAGE (w-560647d4db), by the message's uid, then
+  // by emoji, then the people on it. Straight off the row (`item.reactions`,
+  // shared/work-items.mjs); nothing is counted here.
+  reactions?: Record<string, Record<string, string[]>>;
+  // AND THE WAY TO PUT ONE ON OR TAKE IT OFF. Absent everywhere a chat is not
+  // being drawn, which is also what decides whether a message gets the bar on
+  // pointing at all: a thread with an agent keeps exactly the screen it had.
+  onReact?: (uid: string, emoji: string, off: boolean) => void;
+  // Put a message's words in the reply box as a quote, which is what Reply
+  // means in a conversation that has no sub-threads.
+  onQuote?: (text: string) => void;
+  // Turn this conversation into work. The line that used to say so sat under
+  // the whole conversation; it is an action on a message now.
+  onHandToAgent?: () => void;
 }) {
   // Which work lines are open, and how far. Kept per conversation, not globally.
   const [open, setOpen] = useState<Map<number, number>>(new Map());
@@ -298,12 +314,12 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                 onStep={(next) => stepLine(key, next)}
                 code={code}
               />
-            : slot ? (
-              // A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face holds the
-              // column; a message that carries on a run keeps the column for its
-              // time, shown on pointing. None of the agent thread's chapters:
-              // no rule above or below your words and no larger type, because
-              // a turn means nothing between two people.
+            : slot ? (<>
+              {/* A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face holds the
+                  column; a message that carries on a run keeps the column for
+                  its time, shown on pointing. None of the agent thread's
+                  chapters: no rule above or below your words and no larger
+                  type, because a turn means nothing between two people. */}
               <div className={`msg chat-msg${slot.head ? '' : ' cont'}${e.pending ? ' sending' : ''}`}>
                 <div className="chat-gutter">{slot.head
                   ? <Face person={teammateOf(e) ?? (team?.me ? team.byId.get(team.me) : null)} me={!teammateOf(e) && e.who === 'you'} agent={e.who === 'it'} size="lg" />
@@ -315,8 +331,30 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                   </div>
                 )}
                 <ChatFold>{md(e.text ?? '')}</ChatFold>
+                {/* THE CHIPS, AND THE BAR WHEN YOU POINT AT IT (w-560647d4db).
+                    Both hang off the message's own uid, which is the name the
+                    store keeps a reaction under and the only name a message has
+                    that is the same on every teammate's Mac. A message still on
+                    its way has not been written down and so has neither: it is
+                    not reactable until it exists. */}
+                {e.uid && (
+                  <Reactions
+                    on={reactions?.[e.uid]}
+                    me={team?.me ?? null}
+                    onReact={(emoji, off) => onReact?.(e.uid!, emoji, off)}
+                  />
+                )}
+                {e.uid && onReact && (
+                  <MessageActions
+                    onReact={(emoji) => onReact(e.uid!, emoji, (reactions?.[e.uid!]?.[emoji] ?? []).includes(team?.me ?? ''))}
+                    onQuote={() => onQuote?.(e.text ?? '')}
+                    onHandToAgent={onHandToAgent}
+                  />
+                )}
               </div>
-            ) : (
+              {/* AN AGENT IT MENTIONED ANSWERS UNDER IT (w-7b9cb8636a). */}
+              <AgentAnswers text={e.text ?? ''} md={md} />
+            </>) : (
               // A CONTINUATION THAT OPENS THE OTHER SIDE OF THE GAP IS NOT A
               // CONTINUATION OF ANYTHING SHE CAN SEE. `same` means one agent
               // still talking, so the block wears no name and no time; across
@@ -335,7 +373,20 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                     {headFacts(e, when(e.at))}
                   </div>
                 )}
-                <div className="msg-body">{md(e.text ?? '')}</div>
+                {/* WHAT A PERSON TYPED IS NOT MARKDOWN (w-a33b339772).
+                    Everything in this thread used to go through `md`, whoever
+                    said it, so a tester who pasted
+                    `grep -r foo . --include=*.md --include=*.json`
+                    read it back with both stars gone and the middle of the
+                    command in italics. A message is a person's own words, and
+                    the one thing this app owes them is the words. So a
+                    message from a person — yours and a teammate's, which is
+                    every `who: 'you'` event — is drawn as typed, line breaks
+                    and all (`.msg-body.typed` in the stylesheet). The agent
+                    writes markdown on purpose and keeps it. */}
+                {e.who === 'you'
+                  ? <div className="msg-body typed">{e.text ?? ''}</div>
+                  : <div className="msg-body">{md(e.text ?? '')}</div>}
               </div>
             )}
           {ends === gapAfter && (

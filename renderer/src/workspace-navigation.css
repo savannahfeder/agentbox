@@ -156,27 +156,26 @@
 /* Utilities are destinations on the same foreground, with the workspace
    navigation remaining in place. Hidden tasks cannot take focus underneath. */
 .workspace-settings > .body[hidden] { display: none; }
+/* SETTINGS SWAPS THE SIDEBAR (w-ccadd13c46, 2026-10-05), the way Linear does.
+   While it is up the app's own sidebar and the panel's header step aside, and
+   the settings menu stands exactly where the sidebar stood, at the sidebar's
+   expanded width even if it was collapsed. The panel is the same raised panel
+   the inbox sits on, so nothing else on the window moves.
+
+   The screen stays `position: relative` with a z-index so it paints above the
+   panel's own `::before`; the menu is therefore placed against the screen's
+   box, which starts at --workspace-left and 40px down, and reaches back out to
+   the sidebar's 22px gutter from there. */
+.app.workspace-layout.workspace-settings { --workspace-width: 202px; }
+.workspace-layout.workspace-settings > .workspace-navigation,
+.workspace-layout.workspace-settings > .topbar { display: none; }
 .workspace-layout > .settings-embedded { position: relative; inset: auto; z-index: 1; flex: 1; min-height: 0; display: flex; flex-direction: column; background: transparent; isolation: auto; }
 :root[data-skin] .settings-embedded::before { content: none; }
-.workspace-layout .settings-embedded .set-nav { width: auto; min-width: 0; flex: none; padding: 16px 32px 0; border: 0; background: transparent; backdrop-filter: none; }
-.settings-embedded .set-nav-top, .settings-embedded .set-nav-foot, .settings-embedded .set-nav-group { display: none; }
-.settings-embedded .set-nav-scroll { display: flex; gap: 6px; overflow-x: auto; padding: 0 0 16px; border-bottom: 1px solid var(--line); }
-.settings-embedded .set-nav-item { width: auto; flex: none; padding: 7px 12px; }
-.settings-embedded .set-pane { background: transparent; }
-.settings-embedded .set-inner { max-width: 960px; margin: 0; padding: 30px 32px 60px; }
-/* General is written in two blocks since the Agents pane moved into it. The
-   page's own top and bottom air comes off the seam so the two read as one
-   column; measured on the drawn screen, the gap there was 144px against the
-   54px every other group boundary has. The same pair of rules is in styles.css
-   for the standalone screen, and this one is needed because the rule above
-   resets the padding for the embedded one.
-*/
-.settings-embedded .set-inner + .set-inner { padding-top: 0; }
-.settings-embedded .set-inner:has(+ .set-inner) { padding-bottom: 0; }
-/* Instructions and Shortcuts used to hide the settings tabs here and wear a
-   heading of their own, which made them read as separate pages and made Back
-   leave Settings from what looked like one of its pages. They should keep the
-   settings headers (w-5737fe67cf), so both keep the tabs now. */
+.workspace-layout .settings-embedded .set-nav {
+  position: absolute; top: 10px; bottom: 0; left: calc(22px - var(--workspace-left)); width: var(--workspace-width);
+  min-width: 0; padding: 0; border: 0; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.settings-embedded .set-pane { flex: 1; min-height: 0; background: transparent; border-radius: var(--radius); }
 .workspace-utilities button[aria-current="page"] { background: var(--wash); color: var(--text); }
 .workspace-navigation .usage-pill { display: flex; align-items: center; justify-content: space-between; min-height: 28px; padding: 4px 10px; border: 0; gap: 8px; color: var(--text-faint); }
 .workspace-usage { padding: 8px 0; }
