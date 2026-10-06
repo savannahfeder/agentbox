@@ -5,6 +5,9 @@ import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialo
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mjs';
 import { loadCloudConfig, supabaseSession } from './team/session.mjs';
+// MY WORKSPACE IS NOT A TEAM FEATURE ANY MORE (w-f8d123be62), even though it
+// still lives in the team folder next to the sharing rules it has to obey.
+import { ensurePersonalProject } from './team/projects.mjs';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -330,6 +333,18 @@ async function createWindow() {
     console.log(`zero: diagnostics is ${analytics.reason}, nothing is sent`);
   }
 
+  // EVERYBODY HAS SOMEWHERE TO SEND A THREAD (w-f8d123be62, approved
+  // 2026-10-05). My Workspace used to be made inside `signedIn()`, so the
+  // single-person app — a Mac with no team cloud, which never builds the team
+  // service at all — opened on no projects whatsoever: the chip read "No
+  // project", Send was off, and nothing said why. It is made HERE, before the
+  // store reads the account root, so the first list of projects already has it
+  // and no second pass is needed. Made once and never remade; a Mac that cannot
+  // write it still starts, and the card now says so out loud rather than
+  // leaving a dead button (renderer/src/compose-says.ts noProjectYet).
+  try {
+    ensurePersonalProject(config.accountRoot);
+  } catch (err) { console.warn(`zero: could not make My Workspace: ${err.message}`); }
   const store = await new Store(config).init();
   // Where the window's own pictures may come from (main/img-scheme.mjs). The
   // account root holds every product's docs, attachments, designs and the

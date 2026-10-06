@@ -691,6 +691,22 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     supervisor.wake();
   }));
 
+  // PUT A REACTION ON ONE MESSAGE, OR TAKE YOURS BACK (w-560647d4db). Only in a
+  // conversation between people, because a chip is only ever drawn in one: the
+  // sync carries a reaction across in a message record and nowhere else
+  // (shared/team-rules.mjs), so one written anywhere else would sit on this Mac
+  // alone and look to its author like it had reached somebody.
+  ipcMain.handle('zero:team-react', teamCall(async ({ product, id, on, emoji, off }) => {
+    const me = teamMe();
+    if (!me) throw new Error('sign in first');
+    const row = store.readItem(product, id);
+    if (!row) throw new Error('that conversation is gone');
+    const here = store.listProducts().find((p) => p.slug === product);
+    if (!here?.team?.direct) throw new Error('reactions are for a conversation with a teammate');
+    store.react(product, id, { on, emoji, off });
+    await team.syncNow();
+  }));
+
   ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo }) => {
     const out = store.composeItem(product, {
       // HOW HARD IT THINKS rides through unjudged: the store keeps any word

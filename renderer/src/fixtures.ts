@@ -8,6 +8,7 @@ import type { AgentSession, FolderListing, Snapshot, WorkspaceSettings } from '.
 // itself is a fixture that could go on saying it after the app had stopped.
 import { DEFAULT_ENGINE, ENGINES } from '../../shared/engines.mjs';
 import { BUILT_MODELS } from './models';
+import { CODEX_DEFAULT_MODE } from './codex-modes';
 
 const now = Date.now();
 const min = 60_000;
@@ -62,6 +63,33 @@ export const fixtureSnapshot: Snapshot = {
       body: 'Three of the five sample cards came back in different lighting, so they cannot sit in one hand together. Fixing that after generation costs more than deciding it now. I recommend one page of style rules, written from the two cards you liked, against [round 3](designs/frame-round-3.html).',
       labels: [], priority: 1, epoch: 1, claim: null,
       createdAt: now - 9 * min, updatedAt: now - 9 * min,
+    },
+    // AND TWO PROPOSALS WAITING ON A PRESS (w-9cf2b43110), which is the case
+    // the list of filed threads had no fixture for and therefore no review:
+    // "when an agent files another agent i don't love that it ends up in my
+    // inbox with no clear next step." An agent filed both, nothing is running
+    // on either, and each carries its own Approve in the parent's list.
+    //
+    // They sit beside the question and the blocked row above on purpose: four
+    // filed threads, two presses. The two that carry none are the two whose
+    // next step is genuinely to read the row (a question's options, and a
+    // worker's own report), so one look at this thread says what the button
+    // means and what it does not.
+    {
+      id: 'w-p3', product: 'kestrel', productName: 'Kestrel', status: 'open', kind: 'task',
+      parent: 'w-p0',
+      title: 'Name the five card rarities, so the economy page and the art brief stop disagreeing',
+      body: 'The economy page calls the top tier "mythic" and the art brief calls it "legendary". Both are written down, both are being built against, and the two names are already in four documents. One pass over all of them, settling on the economy page\'s words.',
+      labels: [], priority: 2, epoch: 1, claim: null,
+      createdAt: now - 8 * min, updatedAt: now - 8 * min,
+    },
+    {
+      id: 'w-p4', product: 'kestrel', productName: 'Kestrel', status: 'open', kind: 'task',
+      parent: 'w-p0',
+      title: 'Measure how long a hand of twelve takes to deal on the oldest phone we support',
+      body: 'The hand animation was designed against a desktop browser. Nothing has run it on a four-year-old phone, and the deal is the first thing anybody sees. One throwaway harness, one number, and a note saying whether the design survives it.',
+      labels: [], priority: 1, epoch: 1, claim: null,
+      createdAt: now - 7 * min, updatedAt: now - 7 * min,
     },
     // CLOSED BY AN AGENT, WITH A BODY THAT NEVER CAUGHT UP. The shape of
     // (2026-08-10): she rejected the premise, the closing session wrote an
@@ -811,6 +839,10 @@ export const fixtureSettings = {
     running: 2,
     model: 'claude-opus-5',
     permission: 'bypassPermissions',
+    // What main sends when the config names none (main/settings.mjs,
+    // `outsideAgentsMode`). Absent, the Running page drew an empty picker over
+    // a sentence ending in "undefined".
+    outsideAgents: 'off',
     permissionArgs: [
       '--model', 'claude-opus-5',
       '--allowedTools', 'mcp__agentbox', 'Bash(git fetch:*)', 'Bash(git push:*)', 'Bash(git merge:*)',
@@ -1053,7 +1085,14 @@ export function fixtureEngineSettings(world: FixtureEngineWorld | null): Partial
     // She has set no workspace Codex model, so the row draws her config.toml's
     // own and nothing is sent at spawn. That is what her Mac says today.
     codexModel: null,
-    codex: { found: true, certain: true, bin: CODEX_BIN, url: CODEX_INSTALL_URL, trouble: null },
+    // Main's own default when the config names no mode (main/settings.mjs),
+    // and the one login a Codex Mac has. Without them the Codex page drew an
+    // empty picker and no account.
+    codexMode: CODEX_DEFAULT_MODE,
+    codex: {
+      found: true, certain: true, bin: CODEX_BIN, url: CODEX_INSTALL_URL, trouble: null,
+      accounts: [{ profile: 'default', email: 'you@example.com', name: null, plan: 'Plus', accountId: null, signedIn: true, chosen: false }],
+    },
   };
 }
 

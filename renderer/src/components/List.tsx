@@ -136,7 +136,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null }: {
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -231,6 +231,9 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   /** The Person cell, for your rows (personId = you) and for theirs. */
   personCell?: (personId: string | null) => ReactNode;
   onOpenCard?: (card: ThreadCard) => void;
+  /** The teammate's row the keyboard is on, by `stopKey` (threads/walk-rules.ts).
+   *  While it is set none of your rows is drawn selected. */
+  selectedCard?: string | null;
 }) {
   const rules = view === 'snoozed' ? (repeats ?? []) : [];
   // The keys the rows in THIS list offer, drawn on the row under the pointer.
@@ -411,12 +414,14 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
               first result. */}
           {group.label && !table && <div className="day-label">{group.label}</div>}
           {group.items.map((entry) => {
-            // A TEAMMATE'S THREAD: their card, opened on a click. No select
-            // box and no keys, because nothing on this Mac can act on it.
+            // A TEAMMATE'S THREAD: their card, opened on a click or on Enter.
+            // J and K stop on it like any row (w-fb16bcaeba), but no select
+            // box and no other keys, because nothing on this Mac can act on it.
             if (entry.card) {
               const c = entry.card;
+              const key = `card/${c.personId}/${c.threadId}`;
               return (
-                <div key={`card/${c.personId}/${c.threadId}`} className="row th-their-row" onClick={() => onOpenCard?.(c)}>
+                <div key={key} className={`row th-their-row${selectedCard === key ? ' selected' : ''}`} onClick={() => onOpenCard?.(c)}>
                   <span className="mark" aria-hidden="true" />
                   <RowCells title={c.title ?? 'Private thread'} where={c.project ?? ''} person={personCell?.(c.personId)}
                     priority={c.priority} updatedAt={c.updatedAt} now={Date.now()} />
@@ -450,7 +455,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                 {...(view === 'inbox' && !isImportRow(item)
                   ? { 'data-hint': 'row', 'data-hint-text': '.subject' }
                   : {})}
-                className={`row ${made ? 'trouble-row ' : ''}${index === selected ? 'selected' : ''} ${checked ? 'checked' : ''}`}
+                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}`}
                 /*
                  * ON MOUSE MOVE, NOT ON MOUSE ENTER. A pointer parked over the
                    list while she walks it with J and K would otherwise claim

@@ -350,14 +350,13 @@ describe('the card is drawn only where somebody asked for Codex', () => {
      the page at all is still `w.codex` and nothing else, and the card still
      reads main's fields rather than deriving its own. */
   it('draws the card off that one field and derives nothing itself', () => {
-    const general = settings.slice(
-      settings.indexOf("pane === 'general' && ("),
-      settings.indexOf('What every agent reads before your task'),
-    );
-    expect(general).toContain('...(w.codex ? [agentStory(w, usageReadings, \'codex\')] : [])');
+    // A page of its own since the redraw (w-ccadd13c46): in the menu, and
+    // drawn, only when `w.codex` is there.
+    expect(settings).toContain("(p.id !== 'codex' || !!w?.codex)");
+    expect(settings).toContain("{model && w && pane === 'codex' && w.codex && enginePage('codex')}");
     expect(settings).toContain('found: !!w.codex?.found');
     expect(settings).toContain('certain: !!w.codex?.certain');
-    expect(general).not.toContain('engineChoices.length > 1 && <CodexCli');
+    expect(settings).not.toContain('engineChoices.length > 1 && <CodexCli');
   });
 
   // WHERE IT SITS. Under Claude Code and the account it is signed in as --
@@ -371,12 +370,16 @@ describe('the card is drawn only where somebody asked for Codex', () => {
      longer BETWEEN them: they are inside each card, which is the point. */
   // Updates is gone from General (w-5737fe67cf); the Agents group is what the
   // cards now have to come before.
-  it('puts Claude Code before Codex, and both above the Agents group', () => {
-    const order = settings.slice(settings.indexOf("{([agentStory(w, usageReadings, 'claude'),"), settings.indexOf('label="Agents"'));
-    expect(order.indexOf("agentStory(w, usageReadings, 'claude')"))
-      .toBeLessThan(order.indexOf("agentStory(w, usageReadings, 'codex')"));
-    const general = settings.slice(settings.indexOf("pane === 'general' && ("), settings.indexOf('What every agent reads before your task'));
-    expect(general.indexOf('<AgentCard')).toBeLessThan(general.indexOf('label="Agents"'));
+  // In the menu since the redraw (w-ccadd13c46): Claude Code, then Codex,
+  // then Running, which holds the number of agents.
+  it('puts Claude Code before Codex, and both above Running', () => {
+    const menu = read('renderer/src/settings-search.ts');
+    const claude = menu.indexOf("{ id: 'claude'");
+    const codex = menu.indexOf("{ id: 'codex'");
+    const running = menu.indexOf("{ id: 'running'");
+    expect(claude).toBeGreaterThan(-1);
+    expect(claude).toBeLessThan(codex);
+    expect(codex).toBeLessThan(running);
   });
 
   // AND IT SAYS WHICH ACCOUNT.
