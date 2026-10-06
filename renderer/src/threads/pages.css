@@ -168,7 +168,14 @@
 .th-menu .sep { height: 1px; background: var(--line); margin: 4px 6px; flex: none; }
 
 /* ------------------------------------------------------------ the board */
-.th-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 10px var(--row-r, 24px) 24px var(--text-x, 32px); align-items: start; }
+/* A COLUMN NEVER SQUEEZES PAST READING (w-df42206cea): in a window about 970
+   points wide the four columns were 138 points each and every title broke onto
+   three or four lines. Each column keeps 260, and when four do not fit the
+   board draws wider than the page and the list around it scrolls sideways,
+   "just like Linear, Notion and all other tables". `fit-content` with a floor
+   of the page's width keeps the right padding in the scroll and fills a wide
+   window as before. */
+.th-board { display: grid; grid-template-columns: repeat(4, minmax(260px, 1fr)); gap: 16px; padding: 10px var(--row-r, 24px) 24px var(--text-x, 32px); align-items: start; box-sizing: border-box; width: fit-content; min-width: 100%; }
 .th-col-h { display: flex; align-items: center; height: 38px; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
 .th-col-h b { font-weight: 400; color: var(--text-faint); margin-left: 8px; }
 .th-card { display: block; width: 100%; text-align: left; font: inherit; background: rgba(255,255,255,.035); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 15px 13px; margin: 0 0 10px; cursor: pointer; }

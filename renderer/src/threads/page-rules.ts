@@ -131,11 +131,14 @@ export const isFiltered = (d: Display) => d.priorities.length > 0 || d.projects.
 const startOfDay = (now: number) => { const t = new Date(now); t.setHours(0, 0, 0, 0); return t.getTime(); };
 
 /** What the filters keep. The rows the app makes itself (no project) always
- *  stay. `seen` is who sees the row (`rowSharing`), for the privacy choice. */
-export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>, d: Display, now: number, seen?: Seen | null): boolean {
+ *  stay. `seen` is who sees the row (`rowSharing`), for the privacy choice.
+ *  A MESSAGE TO YOU PASSES THE PROJECT FILTER (w-5a432fb112): `direct` names
+ *  the conversation projects, which no chip offers, so any lit chip hid every
+ *  message. "Messages to me ARE my tasks." */
+export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>, d: Display, now: number, seen?: Seen | null, direct?: ReadonlySet<string>): boolean {
   if (!keepsPrivacy(seen, d.privacy)) return false;
   if (d.priorities.length && !d.priorities.includes(priorityIdOf(item.priority))) return false;
-  if (d.projects.length && item.product && !d.projects.includes(item.product)) return false;
+  if (d.projects.length && item.product && !d.projects.includes(item.product) && !direct?.has(item.product)) return false;
   if (d.updated === 'today' && !(item.updatedAt >= startOfDay(now))) return false;
   if (d.updated === 'week' && !(item.updatedAt >= now - 7 * 86_400_000)) return false;
   return true;
@@ -624,7 +627,7 @@ export function boardColumns({ items, products, display, now, stateOf, cards = [
     ? rowSharing(e.item, products.find((p) => p.slug === e.item!.product), me ? { me, since } : null)
     : 'team');
   const entries = teamEntries({ items: me && !who.includes(me) ? [] : items, products, cards: cards.filter((c) => who.includes(c.personId)), me, now, since, stateOf, live, allMine: true })
-    .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
+    .filter((e) => !e.item || e.message || (display.projects.length === 0 || display.projects.includes(e.item.product)))
     .filter((e) => keepsPrivacy(seen(e), display.privacy))
     .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
   // EVERY COLUMN TAKES THE DISPLAY'S SORT, not just the list view

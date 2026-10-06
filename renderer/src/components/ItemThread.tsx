@@ -23,6 +23,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '../api';
 import { changePathFor, type Change } from '../code-artifact';
+import { filedOnTurn } from '../filed-in-thread';
 import { itemThread, type PendingSaid } from '../item-thread';
 import { resultLeads } from '../recap';
 import { withoutTrailingWork } from '../trailing-work';
@@ -31,6 +32,7 @@ import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
 import type { RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting } from './Thread';
+import { ThreadsMade, type MadeRow } from './ThreadsMade';
 
 // THE BACKSTOP, NOT THE HEARTBEAT.
 //
@@ -54,8 +56,17 @@ const REFRESH_MS = 8_000;
 // screen is the kind of drift this row exists to end.
 const THEM = 'The agent';
 
-export function ItemThread({ item, engine, session, opening, sending, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent }: {
+export function ItemThread({ item, engine, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent }: {
   item: WorkItem;
+  // THE THREADS THIS ONE FILED, EACH ON THE TURN THAT FILED IT (w-2e13752a85).
+  // They used to be one block under the whole conversation, which left the
+  // morning's three threads standing over the composer all evening. The rule
+  // for which turn is ../filed-in-thread.ts, and it reads the moment each one
+  // was created against the moments in this conversation; `at` is that moment.
+  filed?: Array<MadeRow & { at: number }>;
+  onOpenFiled?: (id: string) => void;
+  // The press that starts one, beside its name (w-9cf2b43110).
+  onApproveFiled?: (id: string) => void;
   // IN A CHAT ONLY: put a message's words in the reply box as a quote, and turn
   // this conversation into work. The second was a line under the whole
   // conversation and is an action on one message now (w-560647d4db).
@@ -238,6 +249,15 @@ export function ItemThread({ item, engine, session, opening, sending, onOpenOrig
   const { omitted, outcome, after } = built;
   if (!said.length && !opening && !outcome) return <div className="thread-wait">Nothing has been said here yet.</div>;
 
+  // WHICH TURN EACH FILED THREAD BELONGS TO. Measured against `events`, which
+  // is the list handed to `Thread` below, because the indexes it answers with
+  // are that list's. Everything belonging to the newest turn comes back in
+  // `atFoot` and is drawn under the checkpoint, which is that turn's last word.
+  const made = filedOnTurn(events, filed);
+  const madeList = (rows: typeof filed) => (
+    <ThreadsMade rows={rows} label="Filed from this thread" onOpen={(id) => onOpenFiled?.(id)} onApprove={onApproveFiled} />
+  );
+
   // THE ANSWER, WHOLE, AT THE FOOT OF THE CONVERSATION.
   //
   // A row still in flight keeps the label, which is the only thing telling the
@@ -274,6 +294,7 @@ export function ItemThread({ item, engine, session, opening, sending, onOpenOrig
         code={changed.length && onOpenDoc
           ? { paths: changed, open: (path) => onOpenDoc(changePathFor(item.id), path) }
           : null}
+        tail={(i) => { const rows = made.onTurn.get(i); return rows ? madeList(rows) : null; }}
         {...(chat ? {
           // ONLY IN A CHAT. The chips, the bar on pointing and the quote are
           // drawing A's, and a thread with an agent keeps exactly the screen it
@@ -291,10 +312,12 @@ export function ItemThread({ item, engine, session, opening, sending, onOpenOrig
       {answer}
       {/* What you did after that answer, under it and in order. */}
       {after.length > 0 && (
-        <div className="act-after">
+        <div className={`act-after${chat ? ' is-chat' : ''}`}>
           {after.map((act, i) => <ActLine key={`${act.at}-${i}`} act={act} />)}
         </div>
       )}
+      {/* AND WHAT THE NEWEST TURN FILED, under its own last word. */}
+      {madeList(made.atFoot)}
     </>
   );
 }
