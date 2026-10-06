@@ -224,9 +224,12 @@ describe('where it sits in the walk', () => {
     // when there are no agents on the Mac: a line reading "these are the
     // agents already on this Mac" over nothing is the contradiction this
     // whole file is about.
-    expect(ia.split('walk.line').length - 1).toBe(1);
-    expect(ia).toContain("{walk && screen === 'door' && some && <p className=\"ia-offer\">{walk.line}</p>}");
-    expect(ia.split('COPY.agentsRead').length - 1).toBe(1);
+    //
+    // CHANGED 2026-10-05 (w-db6f5e331e): the one-list card says one line over
+    // its list in the walk and in ⌘K alike, and only when there is a list.
+    expect(ia).toContain('{read && some && <p className="ia-line">{LIST.line}</p>}');
+    expect(ia.split('LIST.line').length - 1).toBe(1);
+    expect(ia).not.toContain('COPY.agentsRead');
   });
 });
 

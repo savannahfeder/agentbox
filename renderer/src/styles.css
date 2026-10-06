@@ -7657,6 +7657,40 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
    not a screen in a walk.
 */
 .modal.ia-card { width: 560px; padding: 26px 30px 22px; }
+/* THE ONE TICKED LIST (w-db6f5e331e), as drawn in Option A: one line per
+   conversation, the tick, the name, and where it came from and when on the
+   right; one button under it. */
+.modal.ia-card.ia-one { width: 720px; }
+.ia-one .ia-line { margin: 0 0 14px; }
+.ia-lines { max-height: min(56vh, 520px); border-top: 1px solid var(--line); }
+.ia-agent.ia-line-row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 11px 2px; border-bottom: 1px solid var(--line); --tick-line: 14px;
+}
+.ia-line-row .ia-box { margin-top: 0; }
+.ia-line-row .ia-agent-name {
+  flex: 1; min-width: 0; font-size: 14.5px; line-height: 1.35;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;
+}
+.ia-line-meta { flex: none; font-size: 12px; color: var(--text-faint); white-space: nowrap; }
+.ia-foot.ia-foot-one { justify-content: flex-start; gap: 10px; padding-top: 18px; }
+/* As drawn: the press is the one filled thing on the card, on the left, and a
+   kept line wears the same fill in its tick. */
+.ia-foot-one .dock-send {
+  margin-left: 0; padding: 8px 16px; font-size: 14px; font-weight: 500;
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+.ia-foot-one .dock-send:hover { background: var(--accent); border-color: var(--accent); filter: brightness(1.08); }
+.ia-foot-one .dock-send kbd { color: rgba(255, 255, 255, 0.8); background: none; border-color: rgba(255, 255, 255, 0.35); }
+.ia-foot-one .dock-send:disabled { background: none; border-color: var(--line-strong); color: var(--text-faint); filter: none; }
+.ia-line-row .ia-box.is-all { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ia-not-now {
+  font: inherit; font-size: 13.5px; display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 14px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: none; color: var(--text-dim); cursor: pointer;
+}
+.ia-not-now:hover { background: var(--wash); color: var(--text); }
+.ia-not-now:disabled { opacity: 0.5; cursor: default; }
 .ia-head {
   margin: 0 0 8px; font-size: 21px; line-height: 1.24; font-weight: 500;
   letter-spacing: -0.01em; color: var(--text);

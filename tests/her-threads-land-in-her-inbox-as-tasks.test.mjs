@@ -342,7 +342,9 @@ describe('the wiring the card needs is really there', () => {
 
   it('reads the threads, draws them, and files them on the same press', () => {
     expect(card).toContain('await api.agentThreads()');
-    expect(card).toContain('{(d.threads ?? []).map(threadRow)}');
+    // One ticked list since w-db6f5e331e: threads are lines among the rest.
+    expect(logic).toContain('for (const t of d.threads ?? [])');
+    expect(card).toContain('{lines.map(lineRow)}');
     expect(card).toContain('api.importThreads({ product: slug, threads: load.ids })');
     expect(api).toContain("zero.agentThreads()");
     expect(api).toContain("zero.importThreads(p)");
@@ -360,7 +362,9 @@ describe('the wiring the card needs is really there', () => {
     expect(paths).toHaveLength(1);
     expect(logic.slice(logic.indexOf('export function picksOf'))).toContain('.items.map((a) => a.path)');
     expect(logic).not.toMatch(/d\.items\.some\(/);
-    expect(card).toContain('SECTION.n(picksOf(d))');
+    // The one count on the card now is the button's, and it counts every
+    // ticked line, threads and agent files alike (w-db6f5e331e).
+    expect(card).toContain('{LIST.add(picked.length)}');
   });
 
   it('takes the thread objects off main rather than off the screen', () => {

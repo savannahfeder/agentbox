@@ -650,3 +650,49 @@ export function pressLine(dests: Destination[], picked: string[]): string {
       : `${word(made.length)} of them become new projects.`;
   return [where, makes].filter(Boolean).join(' ');
 }
+
+/* ---------------------------- THE ONE TICKED LIST -------------------------- */
+// The founder's pick on w-db6f5e331e (2026-10-05), over a card that was two
+// screens and a block per folder: "Every recent conversation is a single line,
+// already ticked, showing where it came from and when. One button: 'Add 6 to
+// your inbox'. No folders, no project tags, no second screen."
+//
+// So the destinations above still decide where each line lands (and a folder
+// no project points at still becomes a project on the press), but none of that
+// is drawn. A line says only what it is, where it came from and when.
+
+export const LIST = {
+  head: 'Bring in your recent agents',
+  line: 'From the last 10 days. Untick any you want to leave out.',
+  add: (n: number) => (n > 0 ? `Add ${n} to your inbox` : 'Nothing ticked'),
+  notNow: 'Not now',
+};
+
+export interface ImportLine { path: string; title: string; meta: string; when: number }
+
+/** "today", "yesterday", "Wednesday", "Sep 27": the card's own short form. */
+function whenShort(when: number, now = Date.now()): string {
+  const then = new Date(Number(when) || 0);
+  if (!when || !Number.isFinite(then.getTime())) return '';
+  const midnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((midnight(new Date(now)) - midnight(then)) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 7) return then.toLocaleDateString('en-US', { weekday: 'long' });
+  return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/** Every line the card draws, newest conversation first and agent files last. */
+export function importLines(dests: Destination[], now = Date.now()): ImportLine[] {
+  const talks: ImportLine[] = [];
+  const files: ImportLine[] = [];
+  for (const d of dests) {
+    for (const t of d.threads ?? []) {
+      const from = t.source === 'codex' ? 'Codex' : 'Claude Code';
+      const when = whenShort(t.when, now);
+      talks.push({ path: t.path, title: t.title, meta: [from, d.name, when].filter(Boolean).join(' · '), when: t.when });
+    }
+    for (const a of d.items) files.push({ path: a.path, title: a.title, meta: `Claude Code agent · ${d.name}`, when: 0 });
+  }
+  return [...talks.sort((a, b) => b.when - a.when), ...files];
+}

@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  SECTION, allPicked, bringAllLine, canBring, destinations, importedLine, projectNameFor,
+  SECTION, allPicked, bringAllLine, canBring, destinations, importedLine, importLines, projectNameFor,
   slugFor, togglePicked,
 } from '../renderer/src/agent-import-card';
 
@@ -102,19 +102,22 @@ describe('nothing on this card asks her to make a project', () => {
   });
 
   it('makes the project inside the press that brings the agents in', () => {
-    const press = card.slice(card.indexOf('const bring ='), card.indexOf('const bringAll ='));
+    const press = card.slice(card.indexOf('const bring ='), card.indexOf('⌘↵ ADDS WHAT IS TICKED'));
     expect(press).toContain('api.createProduct(');
     expect(press).toContain('api.importAgents(');
   });
 
-  it('says so before the press, in the badge and in the line under the door', () => {
-    // Her sentence: "making a project for each". Five new projects in her
-    // sidebar is news, and news goes before the press. `SECTION.newWhy`, which
-    // said it once per section, is deleted and kept in decisions.md.
-    expect(SECTION.newBadge).toBe('New project');
+  // CHANGED 2026-10-05 (w-db6f5e331e). This said so before the press, with a
+  // NEW PROJECT badge and a line under the door. Her pick for the one-list card
+  // was "No folders, no project tags", so the new project is only its name on
+  // the line, and it is made on the press exactly as before (the test above).
+  it('names the project a line lands in, and tags none of them as new', () => {
     expect(SECTION.newWhy).toBeUndefined();
-    expect(card).toContain('pressLine(dests, allPicked(dests))');
-    expect(card).toContain('{SECTION.newBadge}');
+    expect(card).not.toContain('{SECTION.newBadge}');
+    expect(card).not.toContain('pressLine(');
+    const lines = importLines([{ key: 'new:/w/x', kind: 'new', name: 'Orders Api', slug: null, folder: '/w/x', where: '~/w/x', items: [],
+      threads: [{ id: 't', source: 'codex', folder: '/w/x', folderName: 'x', short: '~/w/x', title: 'T', when: Date.now(), path: '/t' }] }]);
+    expect(lines[0].meta).toBe('Codex · Orders Api · today');
   });
 });
 
