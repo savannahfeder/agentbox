@@ -56,7 +56,7 @@ const REFRESH_MS = 8_000;
 // screen is the kind of drift this row exists to end.
 const THEM = 'The agent';
 
-export function ItemThread({ item, engine, session, opening, sending, filed = [], onOpenFiled, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false }: {
+export function ItemThread({ item, engine, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent }: {
   item: WorkItem;
   // THE THREADS THIS ONE FILED, EACH ON THE TURN THAT FILED IT (w-2e13752a85).
   // They used to be one block under the whole conversation, which left the
@@ -65,6 +65,13 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
   // was created against the moments in this conversation; `at` is that moment.
   filed?: Array<MadeRow & { at: number }>;
   onOpenFiled?: (id: string) => void;
+  // The press that starts one, beside its name (w-9cf2b43110).
+  onApproveFiled?: (id: string) => void;
+  // IN A CHAT ONLY: put a message's words in the reply box as a quote, and turn
+  // this conversation into work. The second was a line under the whole
+  // conversation and is an action on one message now (w-560647d4db).
+  onQuote?: (text: string) => void;
+  onHandToAgent?: () => void;
   // CUT THE RUNNING STEP so her waiting message is answered now (w-f37a34def6).
   // Handed in: this view draws a conversation and never writes anything.
   onSendNow?: () => unknown;
@@ -248,7 +255,7 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
   // `atFoot` and is drawn under the checkpoint, which is that turn's last word.
   const made = filedOnTurn(events, filed);
   const madeList = (rows: typeof filed) => (
-    <ThreadsMade rows={rows} label="Filed from this thread" onOpen={(id) => onOpenFiled?.(id)} />
+    <ThreadsMade rows={rows} label="Filed from this thread" onOpen={(id) => onOpenFiled?.(id)} onApprove={onApproveFiled} />
   );
 
   // THE ANSWER, WHOLE, AT THE FOOT OF THE CONVERSATION.
@@ -288,6 +295,19 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
           ? { paths: changed, open: (path) => onOpenDoc(changePathFor(item.id), path) }
           : null}
         tail={(i) => { const rows = made.onTurn.get(i); return rows ? madeList(rows) : null; }}
+        {...(chat ? {
+          // ONLY IN A CHAT. The chips, the bar on pointing and the quote are
+          // drawing A's, and a thread with an agent keeps exactly the screen it
+          // had (w-560647d4db). `reactions` is folded off the row itself, so
+          // every press a teammate pushed is on screen the moment the pull
+          // lands, with nothing counted here.
+          reactions: item.reactions,
+          onReact: (on: string, emoji: string, off: boolean) => {
+            api.teamReact({ product: item.product, id: item.id, on, emoji, off });
+          },
+          onQuote,
+          onHandToAgent,
+        } : {})}
       />
       {answer}
       {/* What you did after that answer, under it and in order. */}

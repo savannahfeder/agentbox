@@ -118,9 +118,10 @@ describe('which turn carries the threads it filed', () => {
 describe('where the list is drawn', () => {
   it('is no longer a block the pane hangs under the whole conversation', () => {
     const focus = read('renderer/src/components/Focus.tsx');
-    // It stays for the two rows that have no conversation to put it in.
-    expect(focus).toMatch(/\{\(made \|\| agent\) && <ThreadsMade rows=\{filed\}/);
-    expect(focus.match(/<ThreadsMade rows=\{filed\}/g)).toHaveLength(1);
+    // It stays for the two rows that have no conversation to put it in, and
+    // nowhere else in the pane.
+    expect(focus).toMatch(/\{\(made \|\| agent\) && \(\s*<ThreadsMade/);
+    expect(focus.match(/<ThreadsMade\b/g)).toHaveLength(1);
     // Handed down with the moment each one was filed, which is what places it.
     expect(focus).toMatch(/filed=\{filed\.map\(\(r\) => \(\{ \.\.\.r, at: r\.item\.createdAt \?\? 0 \}\)\)\}/);
   });

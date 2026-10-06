@@ -9,8 +9,10 @@ import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread
 import type { Seen } from './summary-rules';
 import type { Product, ThreadCard, ThreadStateWord, WorkItem } from '../types';
 import { priorityIdOf, type PriorityId } from '../priority';
+import { firstRealLine } from '../format';
 import { threadState } from '../../../shared/thread-cards.mjs';
 import { placeScore } from '../../../shared/rank.mjs';
+import { plainWords } from '../team/agent-mentions';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
@@ -129,11 +131,14 @@ export const isFiltered = (d: Display) => d.priorities.length > 0 || d.projects.
 const startOfDay = (now: number) => { const t = new Date(now); t.setHours(0, 0, 0, 0); return t.getTime(); };
 
 /** What the filters keep. The rows the app makes itself (no project) always
- *  stay. `seen` is who sees the row (`rowSharing`), for the privacy choice. */
-export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>, d: Display, now: number, seen?: Seen | null): boolean {
+ *  stay. `seen` is who sees the row (`rowSharing`), for the privacy choice.
+ *  A MESSAGE TO YOU PASSES THE PROJECT FILTER (w-5a432fb112): `direct` names
+ *  the conversation projects, which no chip offers, so any lit chip hid every
+ *  message. "Messages to me ARE my tasks." */
+export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>, d: Display, now: number, seen?: Seen | null, direct?: ReadonlySet<string>): boolean {
   if (!keepsPrivacy(seen, d.privacy)) return false;
   if (d.priorities.length && !d.priorities.includes(priorityIdOf(item.priority))) return false;
-  if (d.projects.length && item.product && !d.projects.includes(item.product)) return false;
+  if (d.projects.length && item.product && !d.projects.includes(item.product) && !direct?.has(item.product)) return false;
   if (d.updated === 'today' && !(item.updatedAt >= startOfDay(now))) return false;
   if (d.updated === 'week' && !(item.updatedAt >= now - 7 * 86_400_000)) return false;
   return true;
@@ -378,7 +383,7 @@ export function rowSharing(
   if (!team || !product || isDirect(product) || item.agent) return null;
   if (item.createdBy && item.createdBy !== team.me) return null;
   if (!shownToTeam(item, team.since ?? null, product)) return 'private';
-  return shownToPeople(item).length ? 'people' : 'team';
+  return shownToPeople(item, product).length ? 'people' : 'team';
 }
 
 /**
@@ -394,7 +399,16 @@ export function messageLine(item: WorkItem, product: Product | undefined | null,
   let people = [...new Set(everyone)].filter((p) => p && p !== me);
   if (!people.length && item.createdBy && item.createdBy !== me) people = [item.createdBy];
   const answered = !!item.answer && item.answer !== '(withdrawn)';
-  const text = String((answered ? item.answer : item.body) || item.title || '').trim().split('\n')[0];
+  // An agent mentioned in the message reads as its words, not its link (w-7b9cb8636a).
+  //
+  // AND THE LINE TAKEN IS THE LATEST REAL ONE (w-560647d4db). This took the
+  // message's first line, full stop, and the first real conversation between
+  // two teammates had a message opening on "Additional:" with the findings
+  // under it — so the row said a word that is not news and not even a subject.
+  // `firstRealLine` steps over a bare label and takes the line under it; it
+  // runs AFTER the mention links are flattened, so a message opening on a
+  // mention is judged on the words somebody actually reads.
+  const text = firstRealLine(plainWords(String((answered ? item.answer : item.body) || item.title || '')));
   const by = (answered ? item.wrote?.answer?.by : item.wrote?.body?.by) ?? item.createdBy ?? null;
   return { people, fromMe: !!me && by === me, text };
 }
@@ -613,7 +627,7 @@ export function boardColumns({ items, products, display, now, stateOf, cards = [
     ? rowSharing(e.item, products.find((p) => p.slug === e.item!.product), me ? { me, since } : null)
     : 'team');
   const entries = teamEntries({ items: me && !who.includes(me) ? [] : items, products, cards: cards.filter((c) => who.includes(c.personId)), me, now, since, stateOf, live, allMine: true })
-    .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
+    .filter((e) => !e.item || e.message || (display.projects.length === 0 || display.projects.includes(e.item.product)))
     .filter((e) => keepsPrivacy(seen(e), display.privacy))
     .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
   // EVERY COLUMN TAKES THE DISPLAY'S SORT, not just the list view
@@ -623,8 +637,9 @@ export function boardColumns({ items, products, display, now, stateOf, cards = [
     .map((col) => ({ ...col, rows: sortedEntries(entries.filter((e) => e.state === col.state), display, col.state, projectOrder, conversationSlugs(products)) }));
 }
 
-/** Your threads on the board, in reading order. A teammate's card has no
- *  thread of yours behind it, so J and K pass over it. */
+/** Your threads on the board, in reading order: what `selected` in App.tsx
+ *  counts. J and K walk `boardStops` (walk-rules.ts), which keeps a
+ *  teammate's cards in their places too (w-fb16bcaeba). */
 export function boardWalk(columns: { rows: BoardEntry[] }[]): WorkItem[] {
   return columns.flatMap((c) => c.rows).flatMap((e) => (e.item ? [e.item] : []));
 }

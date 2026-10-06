@@ -36,7 +36,10 @@ it.each([['claude','/reload-skills'],['codex','/review --base main'],['claude','
  const context={text,runningEngine,item:{id:'one',product:'p'},attachments:[],ref:{current:{value:text}},providerCommand,reviewTarget,codexCommand:()=>null,runCommand,onSend,onNotice:vi.fn(),clearDraft:vi.fn(),setText:vi.fn(),persistAttachments:async()=>'',prio:null,repeat:null,mode:null,
  // The reply box's model drawer. `touched` false is the box nobody opened,
  // which must send no model at all and leave the row's own.
- touched:false,model:null,effort:null};
+ touched:false,model:null,effort:null,
+ // The conversation's agent mentions (w-7b9cb8636a). Off here, as on any box
+ // that is not a conversation with a person: nothing waits, words go as typed.
+ chat:{block:null,encode:(w)=>w}};
  const js=ts.transpile(body+'\nreturn send;', {target:ts.ScriptTarget.ES2022});
  const send=new Function(...Object.keys(context),js)(...Object.values(context));
  await send();

@@ -25,34 +25,39 @@ const pageOf = () => pageFile.slice(pageFile.indexOf('export function ProjectsPa
 describe('the column stops being a list of projects', () => {
   // THE DEFECT, STATED AS THE THING IT DID. Every project was a row here.
   it('draws one door and not one row per project', () => {
-    const nav = settings.slice(settings.indexOf('<div className="set-nav-scroll">'), settings.indexOf('<div className="set-pane">'));
+    const nav = settings.slice(settings.indexOf('<div className="set-nav-scroll">'), settings.indexOf('<div className="set-pane"'));
     expect(nav).not.toContain('projects.map(');
-    expect(nav).toContain('<span className="set-nav-label">Projects</span>');
-    expect(nav).toContain("setPane('projects')");
+    // One row per PAGE since the redraw (w-ccadd13c46), Projects among them.
+    expect(nav).toContain('<span className="set-nav-label">{p.label}</span>');
+    expect(nav).toContain('onClick={() => setPane(p.id)}');
   });
 
-  // THE COUNT IS ON THE ROW, because it is the fact that decides whether opening
-  // it is worth doing, and because a row reading "Projects" alone is the heading
-  // again.
-  it('says how many there are without opening anything', () => {
-    const nav = settings.slice(settings.indexOf('<div className="set-nav-scroll">'), settings.indexOf('<div className="set-pane">'));
-    expect(nav).toContain('{projects.length}');
+  // THE COUNT LEFT THE ROW IN THE REDRAW (w-ccadd13c46). The menu is a glance
+  // surface, and the standing rule for those is no counts and no bookkeeping;
+  // the Projects page itself lists every one.
+  it('carries no count on any menu row', () => {
+    const nav = settings.slice(settings.indexOf('<div className="set-nav-scroll">'), settings.indexOf('<div className="set-pane"'));
+    expect(nav).not.toContain('{projects.length}');
+    expect(nav).not.toContain('set-nav-flag');
   });
 
   // AND WHERE YOU ARE, when you are inside one. With the list gone the column
   // would otherwise say nothing about which project's page is on screen, which
   // is worse than the clutter was.
   it('still shows the project whose page is open', () => {
-    const nav = settings.slice(settings.indexOf('<div className="set-nav-scroll">'), settings.indexOf('<div className="set-pane">'));
-    expect(nav).toContain('{current && (');
+    const nav = settings.slice(settings.indexOf('<div className="set-nav-scroll">'), settings.indexOf('<div className="set-pane"'));
+    // Under the Projects row since the redraw (w-ccadd13c46).
+    expect(nav).toContain("{p.id === 'projects' && current && (");
     expect(nav).toContain('setPane({ project: current.slug })');
   });
 
-  // DOOR C STAYS EXACTLY WHERE SHE PUT IT. a new-project ROW here was "visually
-  // unappealing", so the + lives on the heading.
-  it('keeps the plus on the Projects heading', () => {
-    expect(settings).toContain('className="set-nav-group np-head"');
-    expect(settings).toContain('aria-label="New project"');
+  // A NEW-PROJECT ROW HERE WAS "VISUALLY UNAPPEALING", and the menu still has
+  // none. The + on the Projects heading went with that heading in the redraw
+  // (w-ccadd13c46); the Projects page's own New project button is the door.
+  it('adds no new-project row to the menu', () => {
+    const nav = settings.slice(settings.indexOf('<div className="set-nav-scroll">'), settings.indexOf('<div className="set-pane"'));
+    expect(nav).not.toContain('onNewProject');
+    expect(settings).toMatch(/<ProjectsPage\b[\s\S]{0,400}onNew=\{onNewProject\}/);
   });
 });
 
@@ -61,7 +66,7 @@ describe('the page itself', () => {
     expect(pageFile).toContain('export function ProjectsPage(');
     expect(settings).toContain('<ProjectsPage');
     expect(settings).toContain("pane === 'projects'");
-    expect(settings).toContain("want === 'projects'");
+    expect(settings).toContain('if (SETTINGS_PAGES.some((p) => p.id === want)) return want as SettingsPageId;');
   });
 
   // THIRTY-SIX IS PAST READING, so the page filters. It matches the name and the

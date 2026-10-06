@@ -143,7 +143,8 @@ describe('the door on the screen', () => {
 
   it('is one Add account row drawn for whichever agent the card is', () => {
     expect(settings).not.toContain("{agent.engine === 'codex' && (");
-    expect(settings).toContain('className="ac-item ac-item-add" onClick={() => onAdd(agent)}');
+    // A row of the agent's own page since the redraw (w-ccadd13c46).
+    expect(settings).toContain('<button type="button" className="set-ghost" onClick={() => onAdd(agent)}>Add</button>');
   });
 
   it('asks main for the right kind of account', () => {
