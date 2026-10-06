@@ -160,13 +160,16 @@ describe('your account menu', () => {
 
 describe('Sign out is the last thing on Settings -> General', () => {
   it('is an Account group with a Sign out button', () => {
-    expect(settings).toMatch(/<Group label="Account">[\s\S]*?Signed in as \$\{account\.email\}[\s\S]*?onClick=\{account\.onSignOut\}>Sign out</);
+    // The group carries an `id` since the redraw (w-ccadd13c46): it is where
+    // a search for "log out" lands.
+    expect(settings).toMatch(/<Group id="account" label="Account">[\s\S]*?Signed in as \$\{account\.email\}[\s\S]*?onClick=\{account\.onSignOut\}>Sign out</);
   });
 
   it('comes after every other group on the page', () => {
-    const general = settings.slice(settings.indexOf("pane === 'general'"), settings.indexOf("pane === 'appearance'"));
+    const general = settings.slice(settings.indexOf("pane === 'general' && ("), settings.indexOf("pane === 'claude' && enginePage"));
     const groups = [...general.matchAll(/<Group\b/g)].map((m) => m.index);
-    expect(general.lastIndexOf('<Group label="Account">')).toBe(groups.at(-1));
+    expect(groups.length).toBeGreaterThan(1);
+    expect(general.lastIndexOf('<Group id="account" label="Account">')).toBe(groups.at(-1));
   });
 
   it('is only there while someone is signed in', () => {

@@ -68,8 +68,11 @@ describe('the list, drawn', () => {
     onOpen: (id) => opened.push(id),
   }));
 
+  // The press moved off the row and onto a control filling it when the Approve
+  // button arrived (w-9cf2b43110): a button cannot be nested in a button. One
+  // press per thread is still the claim, and the row still looks the same.
   it('is one pressable row per thread with its title and its state', () => {
-    expect(html.match(/<button type="button" class="made-row"/g)).toHaveLength(2);
+    expect(html.match(/<button type="button" class="made-open"/g)).toHaveLength(2);
     expect(html).toContain('>Keep a pasted command exactly as typed<');
     expect(html).toContain('>In progress<');
     expect(html).toContain('>Needs you<');
@@ -83,8 +86,8 @@ describe('the list, drawn', () => {
 describe('where it is drawn', () => {
   it('reaches the opened task with each child’s tab state, and the task draws it under the conversation', () => {
     const app = read('renderer/src/App.tsx');
-    expect(app).toMatch(/filed=\{threadsMade\(items, focused\)\.map\(\(i\) => \(\{ id: i\.id, title: [^,]+, state: stateOfMine\(i\), item: i \}\)\)\}/);
+    expect(app).toMatch(/filed=\{threadsMade\(items, focused\)\.map\(\(i\) => \(\{ id: i\.id, title: [^,]+, state: stateOfMine\(i\), approve: approvableFiled\(i, stateOfMine\(i\)\), item: i \}\)\)\}/);
     const focus = read('renderer/src/components/Focus.tsx');
-    expect(focus).toMatch(/<ThreadsMade rows=\{filed\}/);
+    expect(focus).toMatch(/<ThreadsMade\s+rows=\{filed\}/);
   });
 });

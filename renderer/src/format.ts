@@ -305,3 +305,27 @@ export function searchText(body?: string): string {
 export function previewText(body?: string): string {
   return plainText(body).slice(0, 200);
 }
+
+// A LABEL IS NOT WHAT WAS SAID (w-560647d4db).
+//
+// A conversation's row in the list prints one line of the newest message, and
+// it was printing the message's first line whatever that line was. On the first
+// real conversation between two teammates that line was "Additional:", on its
+// own, with the findings under it — so the row said nothing at all, and the
+// list "looked a bit weird".
+//
+// So a message's line is the first line of it that is a line rather than a
+// heading for one.
+//
+// WHAT COUNTS AS A LABEL IS DELIBERATELY NARROW: short, ending in a colon, with
+// nothing after the colon. "Here is what I found in the three files I read this
+// morning:" ends in a colon and is a sentence, and skipping it would be the
+// same fault the other way round. A message that is nothing BUT a label prints
+// the label, because printing nothing is worse.
+const LABEL_CHARS = 32;
+
+export function firstRealLine(text?: string): string {
+  const lines = (text ?? '').split('\n').map((l) => plainText(l)).filter(Boolean);
+  const real = lines.find((l) => !(l.length <= LABEL_CHARS && l.endsWith(':')));
+  return real ?? lines[0] ?? '';
+}

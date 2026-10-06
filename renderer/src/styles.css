@@ -2915,9 +2915,27 @@ body {
 .dock-send:hover { background: var(--wash-strong); border-color: var(--text-faint); }
 .dock-send:active { transform: translateY(1px); }
 
-/* `relative` is what the peek card below hangs off. It changes nothing about
-   the strip's own box. */
-.opt-strip { border-bottom: 1px solid var(--line); flex-shrink: 0; position: relative; }
+/* THE OFFER IS A BLOCK IN THE THREAD NOW, NOT A LID ON THE REPLY CARD
+   (w-560647d4db). It used to be the top edge of the dock, so one hairline along
+   its bottom was the whole of its box: everything else around it was the card.
+   Standing at the foot of its own turn it needs a box of its own, and it takes
+   the one the threads a thread filed already wear directly above it
+   (components/threads-made.css), because they are two halves of the same
+   moment: here is what I did, here is what I need from you.
+
+   `relative` is what the peek card below hangs off. */
+.opt-strip {
+  margin: 22px 0 6px; border: 1px solid var(--line); border-radius: var(--radius);
+  flex-shrink: 0; position: relative;
+}
+/* THE ONE PLACE IT IS STILL A LID ON THE REPLY CARD: a document full screen,
+   where the pane's body is off the screen and this dock is all there is
+   (components/Focus.tsx, `offerInDock`). There it wears what it always wore —
+   the card's own top edge — because a bordered box with margins floating inside
+   the card is a second card inside the first. */
+.dock-card > .opt-strip {
+  margin: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+}
 
 /* THE OPTION UNDER THE POINTER, IN FULL. The chosen version opens above and
    nothing moves. `bottom: 100%` puts it entirely outside the strip's box, so the strip

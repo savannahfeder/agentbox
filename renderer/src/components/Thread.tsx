@@ -33,6 +33,8 @@ import { holdAtBottom } from '../thread-bottom';
 import { clock, dayHeading } from '../thread-history';
 import { chatLayout } from '../team/chat-layout';
 import { ChatFold } from '../team/ChatFold';
+import { MessageActions, Reactions } from '../team/ChatActions';
+import { AgentAnswers } from '../team/ChatAgents';
 import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
 } from '../../../shared/agents.mjs';
@@ -69,7 +71,7 @@ export interface CodeInThread {
   open: (path: string) => void;
 }
 
-export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, landOn, md, code, chat = false }: {
+export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, landOn, md, code, tail, chat = false, reactions, onReact, onQuote, onHandToAgent }: {
   // CUT THE AGENT'S CURRENT STEP so a message of hers that is waiting on it is
   // answered now (w-f37a34def6). Absent where nothing can be cut.
   onSendNow?: () => unknown;
@@ -106,6 +108,27 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   // The change this conversation made, when there is one. Absent means every
   // work line stays the plain line it has always been.
   code?: CodeInThread | null;
+  // SOMETHING THAT BELONGS TO ONE TURN RATHER THAN TO THE WHOLE THREAD, drawn
+  // at the end of it and scrolling away with it (w-2e13752a85). The index is
+  // the one the event had in `events`, so whoever hands this down matches on
+  // the same list it hands in. The thread does not know what goes here and must
+  // not learn: it draws two completely different conversations, and the list of
+  // threads a run filed only exists for one of them.
+  tail?: (index: number) => ReactNode;
+  // WHAT PEOPLE PUT ON EACH MESSAGE (w-560647d4db), by the message's uid, then
+  // by emoji, then the people on it. Straight off the row (`item.reactions`,
+  // shared/work-items.mjs); nothing is counted here.
+  reactions?: Record<string, Record<string, string[]>>;
+  // AND THE WAY TO PUT ONE ON OR TAKE IT OFF. Absent everywhere a chat is not
+  // being drawn, which is also what decides whether a message gets the bar on
+  // pointing at all: a thread with an agent keeps exactly the screen it had.
+  onReact?: (uid: string, emoji: string, off: boolean) => void;
+  // Put a message's words in the reply box as a quote, which is what Reply
+  // means in a conversation that has no sub-threads.
+  onQuote?: (text: string) => void;
+  // Turn this conversation into work. The line that used to say so sat under
+  // the whole conversation; it is an action on a message now.
+  onHandToAgent?: () => void;
 }) {
   // Which work lines are open, and how far. Kept per conversation, not globally.
   const [open, setOpen] = useState<Map<number, number>>(new Map());
@@ -240,7 +263,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   </>;
 
   return (
-    <div className="thread">
+    <div className={`thread${chat ? ' is-chat' : ''}`}>
       {chat && omitted > 0 && (
         <button type="button" className="thread-gap thread-gap-top" onClick={openGap}>
           {`Show ${omitted} earlier message${omitted === 1 ? '' : 's'}`}
@@ -298,12 +321,12 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                 onStep={(next) => stepLine(key, next)}
                 code={code}
               />
-            : slot ? (
-              // A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face holds the
-              // column; a message that carries on a run keeps the column for its
-              // time, shown on pointing. None of the agent thread's chapters:
-              // no rule above or below your words and no larger type, because
-              // a turn means nothing between two people.
+            : slot ? (<>
+              {/* A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face holds the
+                  column; a message that carries on a run keeps the column for
+                  its time, shown on pointing. None of the agent thread's
+                  chapters: no rule above or below your words and no larger
+                  type, because a turn means nothing between two people. */}
               <div className={`msg chat-msg${slot.head ? '' : ' cont'}${e.pending ? ' sending' : ''}`}>
                 <div className="chat-gutter">{slot.head
                   ? <Face person={teammateOf(e) ?? (team?.me ? team.byId.get(team.me) : null)} me={!teammateOf(e) && e.who === 'you'} agent={e.who === 'it'} size="lg" />
@@ -315,8 +338,30 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                   </div>
                 )}
                 <ChatFold>{md(e.text ?? '')}</ChatFold>
+                {/* THE CHIPS, AND THE BAR WHEN YOU POINT AT IT (w-560647d4db).
+                    Both hang off the message's own uid, which is the name the
+                    store keeps a reaction under and the only name a message has
+                    that is the same on every teammate's Mac. A message still on
+                    its way has not been written down and so has neither: it is
+                    not reactable until it exists. */}
+                {e.uid && (
+                  <Reactions
+                    on={reactions?.[e.uid]}
+                    me={team?.me ?? null}
+                    onReact={(emoji, off) => onReact?.(e.uid!, emoji, off)}
+                  />
+                )}
+                {e.uid && onReact && (
+                  <MessageActions
+                    onReact={(emoji) => onReact(e.uid!, emoji, (reactions?.[e.uid!]?.[emoji] ?? []).includes(team?.me ?? ''))}
+                    onQuote={() => onQuote?.(e.text ?? '')}
+                    onHandToAgent={onHandToAgent}
+                  />
+                )}
               </div>
-            ) : (
+              {/* AN AGENT IT MENTIONED ANSWERS UNDER IT (w-7b9cb8636a). */}
+              <AgentAnswers text={e.text ?? ''} md={md} />
+            </>) : (
               // A CONTINUATION THAT OPENS THE OTHER SIDE OF THE GAP IS NOT A
               // CONTINUATION OF ANYTHING SHE CAN SEE. `same` means one agent
               // still talking, so the block wears no name and no time; across
@@ -351,6 +396,10 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                   : <div className="msg-body">{md(e.text ?? '')}</div>}
               </div>
             )}
+          {/* WHAT THIS TURN CARRIES, under the last thing it said and above
+              the seam, because the seam belongs to the conversation and this
+              belongs to the turn (w-2e13752a85). */}
+          {tail?.(ends)}
           {ends === gapAfter && (
             <button type="button" className="thread-gap" onClick={openGap}>
               {conversationGap(omitted)}

@@ -14,7 +14,7 @@
 //             cmd (or ctrl) picks one out.
 import { isCleanRun } from '../../shared/repeats.mjs';
 import { answerSettled } from '../../shared/answers.mjs';
-import { previewText } from './format';
+import { firstRealLine, previewText } from './format';
 import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
 
@@ -523,10 +523,20 @@ export function rowSummary(
   // title has to be what he said, not her own question read back to her. Only
   // a reply by somebody other than whoever wrote the ask counts, so on one Mac,
   // where no line carries a writer, nothing changes.
+  // THE NEWEST THING SAID IS THE NEWS, WHOEVER SAID IT (w-560647d4db). This
+  // used to require a DIFFERENT writer — a teammate's reply over your ask —
+  // which is the common case and not the only one. In a conversation between
+  // two people the same person routinely writes both: a teammate starts it and
+  // the same teammate sends the latest message, so the test failed and the row
+  // printed their oldest message, days old and already read. A row cannot print
+  // "what was said last" and then make an exception for who said it.
+  //
+  // `by` is still what gates this, and it still leaves the single-person app
+  // exactly as it was: with nobody signed in no line carries a writer at all.
   const said = i.wrote?.answer;
-  if (i.answer && said?.by && said.by !== i.wrote?.body?.by
+  if (i.answer && said?.by
     && said.ts >= Math.max(i.wrote?.body?.ts ?? 0, i.wrote?.result?.ts ?? 0)) {
-    return clipToSentence(previewText(i.answer));
+    return clipToSentence(firstRealLine(i.answer));
   }
   const finished = view === 'done' || i.status === 'done';
   const resultIsNewer = (i.wrote?.result?.ts ?? 0) > (i.wrote?.body?.ts ?? 0);
