@@ -122,6 +122,25 @@ const NAMES_A_FAILURE = /\b(CONFLICT|error|red|refused|failed|FAIL)\b/i;
 // three (w-c121bd85e6, this branch's own first ship). Passed over while there
 // is anything better, and still offered when it is all there is.
 const ONLY_A_COUNT = /^⎯+ .* ⎯+$/;
+// A LINE VITEST QUOTED IS NOT THE SCRIPT SPEAKING (w-560647d4db, five
+// bounces). A failing text assertion prints the file's own text as a diff, so
+// any source line carrying one of those words becomes a candidate — and the
+// diff is printed long before the runner's list of failures. Twice the note
+// read "+               than deleted: a bare corner here reads as a control
+// that failed", which is a pre-existing code comment in a file the branch
+// touched. It names no fault, and the real cause was three failing tests the
+// note never mentioned. Both shapes of quotation are skipped: a diff line
+// (`+`/`-`) and a code frame (`34|   expect(...)`).
+const QUOTED_SOURCE = /^([+-]|\d+\|)/;
+// THE RUNNER'S OWN FAILURES OUTRANK A LOOSE WORD MATCH. These two name a
+// file: `FAIL  tests/x.test.mjs > ...` and `❯ tests/x.test.mjs (3 tests | 3
+// failed)`. Anything else matching the words above — the script's closing
+// line, a merge message, a warning — says less, wherever it sits in the
+// output.
+const NAMES_A_RED_TEST = /^(FAIL\b|❯ .*\|\s*\d+ failed)/;
+// Vitest's totals, "Tests  3 failed | 1920 passed (1923)", and its heading
+// "⎯⎯⎯ Failed Tests 3 ⎯⎯⎯". Not "Test Files  1 failed", which counts files.
+const HOW_MANY = [/^Tests\s+(\d+) failed/, /Failed Tests\s+(\d+)/];
 
 const DIED = 'the test run died without naming a failing test';
 
@@ -133,22 +152,39 @@ const DIED = 'the test run died without naming a failing test';
  * have to be told apart: offering the nearest line instead sends whoever
  * reads it after a fault that is not there.
  *
- * @returns {{ died: boolean, why: string|null, last: string|null }}
+ * @returns {{ died: boolean, why: string|null, last: string|null, failed: number|null }}
  */
 export function whyItDidNotShip(output) {
   const lines = String(output ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
-  const said = lines.filter((l) => !TICKED_GREEN.test(l));
+  const said = lines.filter((l) => !TICKED_GREEN.test(l) && !QUOTED_SOURCE.test(l));
   const named = said.filter((l) => NAMES_A_FAILURE.test(l));
-  const why = named.find((l) => !ONLY_A_COUNT.test(l)) ?? named[0] ?? null;
-  return { died: !why, why, last: said.at(-1) ?? null };
+  const red = named.find((l) => NAMES_A_RED_TEST.test(l));
+  const why = red ?? named.find((l) => !ONLY_A_COUNT.test(l)) ?? named[0] ?? null;
+  // The count goes with a line that names ONE test, so that it reads as the
+  // first of several rather than as the whole story. On a line that is not a
+  // test — a conflict, a refused push — a number beside it would read as that
+  // line's own count, so it is left off.
+  const counted = red ? Number(said.map((l) => HOW_MANY.map((re) => re.exec(l)?.[1]).find(Boolean)).find(Boolean)) : NaN;
+  return { died: !why, why, last: said.at(-1) ?? null, failed: Number.isFinite(counted) ? counted : null };
+}
+
+/** "3 tests failed, the first is FAIL tests/…", or just the line. */
+function diagnosis({ why, failed }) {
+  if (!why || !failed) return why;
+  return `${failed} test${failed === 1 ? '' : 's'} failed, the first is ${why}`;
 }
 
 /** What the agent is told when its branch did not ship. */
 export function failureReply(output) {
   const tail = String(output ?? '').trim().slice(-KEEP);
-  const { died } = whyItDidNotShip(output);
+  const { died, ...rest } = whyItDidNotShip(output);
   return [
     `${Name} tried to ship your branch and it did not go out. Nothing was pushed.`,
+    // THE SAME DIAGNOSIS THE THREAD SHOWS, above the tail (w-560647d4db). The
+    // tail holds everything, which is why two sessions read a quoted code
+    // comment in it as the fault. One line naming how many tests failed and
+    // which file is where to start.
+    ...(died ? [] : ['', `It went red: ${diagnosis(rest)}`]),
     ...(died ? [
       '',
       'Its test run DIED rather than going red: nothing it printed names a failing',
@@ -169,8 +205,8 @@ export function failureReply(output) {
 
 /** The line the thread shows: the app's own, short, and the first error in it. */
 export function failureNote(output) {
-  const { died, why, last } = whyItDidNotShip(output);
-  const said = died ? `${DIED}. It last said: ${last ?? 'nothing at all'}` : why;
+  const { died, last, ...rest } = whyItDidNotShip(output);
+  const said = died ? `${DIED}. It last said: ${last ?? 'nothing at all'}` : diagnosis(rest);
   return `It did not ship, and it went back to its agent: ${said.slice(0, 300)}`;
 }
 
