@@ -3007,7 +3007,13 @@ body {
   border-radius: var(--radius); padding: 0.5px 6px; flex-shrink: 0; position: relative; top: -1px;
 }
 .opt-row.selected .opt-key { border-color: var(--text-faint); color: var(--text); }
-.opt-text { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* THE WORDS TAKE THE ROOM THEY NEED AND NO MORE (w-2e13752a85). This was
+   `flex: 1`, which pushed "recommended" to the far right edge, and with the
+   chevron gone that made the right-hand column a stripe of air with one word
+   floating in it against an empty heading: "there's too much white space on the
+   top right side which looks weird because of the recommended." Nothing is
+   right-aligned in this block now, so there is no column to look empty. */
+.opt-text { flex: 0 1 auto; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .opt-text strong { color: var(--text); }
 
 /* A LINK IN AN OPTION IS THE SAME BLUE AS EVERY OTHER LINK IN THE APP.Nothing
