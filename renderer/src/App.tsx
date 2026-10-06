@@ -16,7 +16,7 @@ import { readySkin, swapLook } from './look-switch';
 import type { AnswerMode, Approval, PermissionMode, Product, RepeatRule, RepeatShape, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import { api } from './api';
 import { setClaudeModels } from './models';
-import { advanceAfter, nextAfterAdvance, type Advance } from './advance';
+import { advanceAfter, advanceLandsHere, nextAfterAdvance, type Advance } from './advance';
 import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
 import { isTroubleRow, troubleRow } from './trouble-row';
@@ -4480,13 +4480,18 @@ export default function App() {
   // The advance: open whatever occupies the resolved item's slot, computed
   // with that item explicitly excluded (its write is deferred behind the
   // grace window, so it may still be in the fold for a few seconds).
+  // On the board the keyboard counts places in the board's reading order, so
+  // the opened card's place there is found by its id.
   useEffect(() => {
     const pending = advanceRef.current;
-    if (!pending || view !== 'inbox' || focused) return;
+    if (!pending || !advanceLandsHere({ view, onBoard }) || focused) return;
     advanceRef.current = null;
     const next = nextAfterAdvance(shownInbox, pending);
-    if (next) { setFocused(next.item); markSeen(next.item); setSelected(next.index); }
-  }, [shownInbox, view, focused, markSeen]);
+    if (!next) return;
+    setFocused(next.item); markSeen(next.item);
+    const at = onBoard ? list.findIndex((i) => i.id === next.item.id && i.product === next.item.product) : next.index;
+    setSelected(at >= 0 ? at : 0);
+  }, [shownInbox, view, onBoard, list, focused, markSeen]);
 
   /* -------------------------------- render -------------------------------- */
   // (Hooks live ABOVE the boot return: below it, React counts them
@@ -5273,7 +5278,10 @@ export default function App() {
                   // WHERE IT WAS OPENED FROM, in the tab strip's own words (so
                   // "Waiting" when teammates are on the page), for the thin
                   // bar the thread wears while its summary is open (w-922f66bb06).
+                  // On the board there is no tab: the page Esc goes back to
+                  // is headed Threads (w-34eb858714).
                   crumbFrom={teamOpen ? 'Team' : search !== null ? 'Search'
+                    : onBoard ? 'Threads'
                     : view === 'inbox' && team ? needsWord(picked, team.me)
                       : INBOX_TABS.find((t) => t.view === view)?.label}
                   inlineArtifacts={workspaceNavigation}
