@@ -125,6 +125,11 @@ function fixtureWrite(scope: 'project' | 'workspace', p: any): Settings {
       w.leftovers = { on: !!p.value, now: p.value ? 'Finished agents have left 6 programs running. 4 stop in 1 h 40 m; 2 are kept.' : null };
     } else if (p.key === 'memoryGateSlots' && w.memoryGate) {
       w.memoryGate = { ...w.memoryGate, slots: p.value === null ? null : Math.max(1, Math.min(w.memoryGate.slotsMax, Number(p.value) || 1)) };
+    } else if (p.key === 'activeAccount') {
+      // The account picked is the one marked chosen, as main/settings.mjs
+      // answers it, so the In use row can be seen in a preview.
+      const list = p.value?.engine === 'codex' ? w.codex?.accounts ?? [] : w.accounts;
+      for (const a of list) a.chosen = a.profile === p.value?.profile;
     } else w[p.key] = p.value;
   } else {
     const project = fixtureSettingsState.projects.find((x: any) => x.slug === p.product);
@@ -481,6 +486,9 @@ export const api = {
   async teamSync(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSync()); },
   // A task somebody gave you: to an agent (on your Mac), keep it, or hand it back.
   async teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRoute(p)); },
+  // A chip put on or taken off one message. `on` is the uid of the ledger line
+  // the message was written as (w-560647d4db).
+  async teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamReact(p)); },
   // A MESSAGE TO A PERSON (people get messages, never tasks).
   async teamMessage(to: string | string[], body: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessage({ to, body })); },
   // An edit to a thread's summary, visibility or priority, made in place.

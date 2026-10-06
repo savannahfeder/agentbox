@@ -219,11 +219,6 @@
 .ts-model { margin-right: 12px; font-size: 13px; color: var(--text-dim); text-decoration: underline dotted var(--line-strong); text-underline-offset: 3px; white-space: nowrap; cursor: pointer; }
 .ts-model:hover { color: var(--text); }
 
-/* A MESSAGE FROM A PERSON: one quiet line under the latest message. */
-.ts-hand { margin: 18px 0 0; font-size: 13px; line-height: 20px; color: var(--text-faint); }
-.ts-hand button { font: inherit; color: var(--text-dim); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline dotted var(--line-strong); text-underline-offset: 3px; }
-.ts-hand button:hover { color: var(--text); }
-
 /* A TEAMMATE'S THREAD: one centred card made of the summary's fields. */
 .ts-ticket { max-width: 680px; margin: 44px auto 40px; box-sizing: border-box; border: 1px solid var(--line); border-radius: var(--radius); background: var(--wash); padding: 26px 30px 24px; }
 .ts-tk-top { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--text-dim); margin: 0 0 18px; }

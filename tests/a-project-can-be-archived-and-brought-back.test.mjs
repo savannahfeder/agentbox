@@ -170,7 +170,7 @@ describe('what the Select line says', () => {
 
 describe('the window', () => {
   const settings = read('renderer/src/components/Settings.tsx');
-  const page = settings.slice(settings.indexOf('Everything here is this project only'));
+  const page = settings.slice(settings.indexOf('<div className="set-title-row">'));
   const projects = read('renderer/src/components/ProjectsPage.tsx');
 
   it('a project page has an Archive button that writes through the bridge', () => {

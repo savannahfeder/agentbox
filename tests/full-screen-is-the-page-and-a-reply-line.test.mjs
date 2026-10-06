@@ -65,8 +65,15 @@ it('puts the reply line under the page and not over it',()=>{
 // until she opens the box.
 it('shows no strip at all under a full screen document until the box is open',()=>{
  const focus=read('components/Focus.tsx');
- expect(focus).toContain("const stripShown = showOptions && (artifactView !== 'focus' || replyOpen);");
- expect(focus).toContain('{stripShown && (');
+ // THE OFFER MOVED INTO THE PANE (w-560647d4db), at the foot of the turn that
+ // made it. Full screen is the one place it cannot go there, because the pane's
+ // whole body is hidden in that mode and only the dock is on the screen, so an
+ // offer in the pane would be unreachable rather than out of the way. It keeps
+ // its old home and its old terms here: with the box, gone when the box folds.
+ expect(focus).toContain("const fullScreenDoc = artifactView === 'focus';");
+ expect(focus).toContain('const offerInPane = stripShown && !fullScreenDoc;');
+ expect(focus).toContain('const offerInDock = stripShown && fullScreenDoc && replyOpen;');
+ expect(focus).toContain('{offerInDock && (');
  // `showOptions` itself must not be narrowed: it also decides whether the
  // options list is stripped out of the message text, so a full screen row
  // would otherwise print its own options twice.

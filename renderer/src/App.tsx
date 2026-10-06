@@ -111,7 +111,9 @@ import { runNowCommands } from './run-now';
 import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
 import { BoxFilter } from './components/BoxFilter';
 import { itemPriority, moveProduct, placeScore } from '../../shared/rank.mjs';
-import { threadsMade } from './threads-made';
+import { threadsMade, approvableFiled } from './threads-made';
+import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
+import { agentLinks, chatProjects, chatTranscript, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf } from '../../shared/team-rules.mjs';
@@ -124,6 +126,7 @@ import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
 import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, sorted as sortedByDisplay, type Display, type Privacy } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
+import { boardStops, listStops, stepStop, stopKey, type Stop } from './threads/walk-rules';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
 
@@ -251,6 +254,10 @@ export default function App() {
     try { localStorage.setItem('zero.troubleClosed', String(since)); } catch { /* private mode: it just comes back */ }
   }, []);
   const [selected, setSelected] = useState(0);
+  // A TEAMMATE'S ROW THE KEYBOARD IS ON (w-fb16bcaeba), by `stopKey`. Their
+  // card has no place in `list`, which is your threads only, so while this is
+  // set the keyboard is on their row and `selected` keeps your last one.
+  const [cardSel, setCardSel] = useState<string | null>(null);
   // THE ROW UNDER THE POINTER, and the row the row-keys act on while it is
   // there. Her hint is drawn on the row she is pointing at, so that row has to
   // be the one R and E reach, or the app draws a promise it does not keep:
@@ -2068,7 +2075,7 @@ export default function App() {
   // own level (w-e263a8a0fb).
   const projectOrder = snap?.supervisor.productOrder ?? NO_ORDER;
   const displayedBox = useMemo(
-    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i))), inboxDisplay, view, projectOrder, directSlugs) : []),
+    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs)), inboxDisplay, view, projectOrder, directSlugs) : []),
     [shownBox, inboxDisplay, now, mineShown, view, projectOrder, directSlugs, seenOf],
   );
   // THE PICKED TEAMMATES' THREADS FOR THIS TAB, from the cards their Macs
@@ -2083,7 +2090,8 @@ export default function App() {
     [withOthers, displayedBox, theirRows, inboxDisplay.sort, view, projectOrder, snap?.products],
   );
   // A teammate's thread opens as their card, over the page, and Back returns here.
-  const openTeammateCard = useCallback((card: ThreadCard) => { setOpenCard(card); setTeamOpen(true); }, []);
+  // The keyboard goes with it, so Escape comes back to their row and J carries on.
+  const openTeammateCard = useCallback((card: ThreadCard) => { setOpenCard(card); setTeamOpen(true); setCardSel(stopKey({ card })); }, []);
   // HOVERING A FACE SAYS WHAT THEY ARE UP TO (w-0b54ee983f). Her words:
   // "I presumed that if I hovered over or clicked on them, it would show
   // something." These rows are the last faces in the app, so the card the
@@ -2103,8 +2111,8 @@ export default function App() {
   // about what clicking it shows, and the number a filter is holding back is
   // said in full by the empty state and by the Display menu's "Showing 4 of 7".
   const shownCount = useCallback((rows: WorkItem[]) => rows.filter(
-    (i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i)),
-  ).length, [inboxDisplay, now, seenOf]);
+    (i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs),
+  ).length, [inboxDisplay, now, seenOf, directSlugs]);
   const theirCount = useCallback((tab: string) => (withOthers
     ? teammateRows(cards, { tab, picked, me: team?.me ?? null, display: inboxDisplay, products: snap?.products ?? [], now }).length : 0),
   [withOthers, cards, picked, team?.me, snap?.products, now, inboxDisplay]);
@@ -2121,7 +2129,7 @@ export default function App() {
   // whole inbox, or the next task opened can be one she has hidden
   // (w-27759abd33).
   const shownInbox = useMemo(
-    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i))), inboxDisplay, undefined, projectOrder, directSlugs),
+    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs)), inboxDisplay, undefined, projectOrder, directSlugs),
     [inbox, boxFilter, inboxDisplay, now, projectOrder, directSlugs, seenOf],
   );
   const boxFilterMenu = useMemo(
@@ -2172,6 +2180,17 @@ export default function App() {
   const list = search !== null ? (hits ?? []).map((h) => h.item) : boardOrder ?? displayedBox;
 
   const current: WorkItem | undefined = list[Math.min(selected, Math.max(0, list.length - 1))];
+  // WHAT J AND K WALK: every thread drawn, a teammate's included
+  // (threads/walk-rules.ts). With nobody else picked it is `list` itself.
+  const stops = useMemo(
+    () => (search !== null ? listStops(list, null) : boardCols ? boardStops(boardCols) : listStops(list, mixedRows)),
+    [search, list, boardCols, mixedRows],
+  );
+  const keyCard = useMemo(() => (cardSel ? stops.find((s) => s.card && stopKey(s) === cardSel)?.card ?? null : null), [cardSel, stops]);
+  // Anything else that moves the keyboard takes it off their row. The people
+  // by name, since the list of them is a new array on every refresh.
+  const pickedKey = picked.join(',');
+  useEffect(() => { setCardSel(null); }, [selected, view, search, inboxDisplay.view, pickedKey]);
   // A DROPPED COLUMN LEAVES THE KEYBOARD ON THE SAME THREAD. `selected` is a
   // place in the walk, and moving a column moves every place after it, so the
   // highlight jumped to another card on the drop (photographed 2026-10-02).
@@ -2193,7 +2212,7 @@ export default function App() {
   // prints has to happen to THAT row. A ticked selection outranks both,
   // because E over ticks is the batch close and no per-row hint is drawn then.
   const pointed: WorkItem | undefined =
-    (hoveredId && !multiSel.size ? list.find((i) => i.id === hoveredId) : undefined) ?? current;
+    (hoveredId && !multiSel.size ? list.find((i) => i.id === hoveredId) : undefined) ?? (keyCard ? undefined : current);
 
   /* ------------------------- a panel with a panel in it -------------------- */
   // NO HAIRLINE WITHOUT A SIDEBAR BEHIND IT.
@@ -2622,6 +2641,63 @@ export default function App() {
   const markSeen = useCallback((item: WorkItem) => {
     setSeen((s) => new Set(s).add(item.id));
   }, []);
+  // J AND K FROM AN OPEN THREAD OR AN OPEN TEAMMATE CARD (w-fb16bcaeba): open
+  // the next stop, whoever's it is. Yours opens as your thread, theirs as
+  // their card, exactly as a click on its row would.
+  const goToStop = useCallback((stop: Stop) => {
+    if (stop.card) { setFocused(null); openTeammateCard(stop.card); return; }
+    const at = list.indexOf(stop.item);
+    setOpenCard(null); setTeamOpen(false); setCardSel(null);
+    setFocused(stop.item); markSeen(stop.item);
+    if (at >= 0) setSelected(at);
+  }, [list, markSeen, openTeammateCard]);
+  // Where the keyboard is in the walk: their row, or your last one.
+  const walkPlace = keyCard ? stops.findIndex((s) => s.card && stopKey(s) === cardSel) : stops.findIndex((s) => s.item === current);
+
+  // WHAT A CONVERSATION NEEDS TO BRING AN AGENT IN AND TO DRAW ITS ANSWER
+  // (w-7b9cb8636a, team/ChatAgents.tsx): the projects it can be sent to, the
+  // model lists, and the tasks themselves, read off this snapshot.
+  const chatAgents = useMemo<ChatAgentsValue>(() => ({
+    projects: chatProjects(snap?.products ?? [], snap?.supervisor.productOrder ?? [], snap?.supervisor.hiddenProducts ?? []),
+    codexModels,
+    codexDefault: codexModelDefault,
+    find: (product, id) => items.find((i) => i.id === id && i.product === product),
+    stateOf: stateOfMine,
+    filed: (task) => threadsMade(items, task),
+    open: (task) => { setFocused(task); markSeen(task); },
+  }), [snap?.products, snap?.supervisor.productOrder, snap?.supervisor.hiddenProducts, codexModels, codexModelDefault, items, stateOfMine, markSeen]);
+
+  // THE AGENTS A MESSAGE MENTIONS START WHEN THE MESSAGE LANDS, after the undo
+  // window, so a Z inside it leaves nothing behind. Each becomes a task in its
+  // project, briefed with the ask and the conversation so far, and the message
+  // is written pointing at it, which is how every copy of the conversation
+  // (yours and theirs) knows which task answers it.
+  const startChatAgents = useCallback(async (item: WorkItem, text: string): Promise<string> => {
+    const links = agentLinks(text).filter((l) => !l.task && l.project);
+    if (!links.length) return text;
+    const products = snap?.products ?? [];
+    const conversation = products.find((p) => p.slug === item.product);
+    const people = [...new Set([...(conversation?.team?.people ?? []), ...(conversation?.team?.sharedBy ? [conversation.team.sharedBy] : []), ...(item.people ?? [])])].filter(Boolean);
+    const nameOf = (by: string | undefined) => (by && team?.byId.get(by)?.name) || (by && by === team?.me ? 'You' : 'A teammate');
+    const others = people.filter((p) => p !== team?.me).map((p) => nameOf(p));
+    let transcript: Array<{ who: string; text: string }> = [];
+    try { transcript = chatTranscript((await api.itemHistory({ product: item.product, id: item.id }))?.lines ?? [], nameOf); } catch { /* the ask alone still briefs it */ }
+    const brief = taskBrief({ sent: text, asker: nameOf(team?.me ?? undefined), others, transcript });
+    let out = text;
+    for (const link of links) {
+      const project = products.find((p) => p.slug === link.project);
+      if (!project) continue;
+      const made = await api.compose({
+        product: project.slug, title: taskTitle(text), body: brief, engine: link.engine, start: 'now',
+        ...(link.model ? { model: link.model } : {}), ...(link.effort ? { effort: link.effort } : {}),
+        // Seen by the people in the conversation, on a shared project; a
+        // project of your own keeps its own privacy.
+        ...(isShared(project) && people.length ? { visibility: 'people' as const, visibleTo: people } : {}),
+      });
+      if (made?.id) out = withTask(out, link, made.id);
+    }
+    return out;
+  }, [snap?.products, team]);
 
   // AN URGENT ROW THAT ARRIVES WHILE SHE IS READING TAKES THE SCREEN.
   //
@@ -3070,7 +3146,16 @@ export default function App() {
     }, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`, undefined, undefined, undefined, undid);
   }, [deferCommit, closeAgentRow, closeTroubleRow, snap?.supervisor.spawnTrouble?.since, run, showToast, pushUndo]);
 
-  const resolve = useCallback(async (item: WorkItem) => {
+  const resolve = useCallback(async (item: WorkItem, { stay }: { stay?: boolean } = {}) => {
+    // `stay` IS FOR APPROVING SOMETHING THAT IS NOT THE ROW YOU ARE ON
+    // (w-9cf2b43110): the Approve beside a thread this one filed. Every other
+    // caller is approving the row in front of them and wants the pane to
+    // advance off it; this one is reading the PARENT, and advancing would throw
+    // them out of the thread they pressed from, which is the trip the button
+    // exists to remove. The row the press was about still leaves the inbox and
+    // still says In progress, because that is `pendingId`'s work and not this
+    // flag's.
+    //
     // The palette's Approve. Question: send the recommended option. Review:
     // "approved, proceed", which a continuation ENACTS. Agent proposal:
     // "run it". Anything else: mark done. This used to be E, and that burned
@@ -3104,7 +3189,7 @@ export default function App() {
           await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
           await api.answer({ product: item.product, id: item.id, answer: '(withdrawn)', status: 'open' });
         } });
-      }, toast, undefined, undefined, { product: item.product, id: item.id }, undid);
+      }, toast, undefined, stay, { product: item.product, id: item.id }, undid);
     };
     if (item.kind === 'question' && recommended && !item.answer) {
       await approveWith(`Option ${recommended.n}: ${recommended.text}`, `Approved: option ${recommended.n} → ${item.productName}`);
@@ -3361,10 +3446,17 @@ export default function App() {
     if (stay) setFollowing({ product: item.product, id: item.id });
     const undid = [{ product: item.product, id: item.id, words: 'Undid your reply' }];
     await deferCommit(item, async () => {
+      // In a conversation, any agent it mentions starts now and the message is
+      // written pointing at its task (w-7b9cb8636a, startChatAgents). The copy
+      // on the screen takes the same words, or the written one would not be
+      // recognised as it and the message would show twice until it lapsed
+      // (seen in the built app: "Sending… press Z to undo" above the real one).
+      const answer = talking ? await startChatAgents(item, text) : text;
+      if (answer !== text) { mine.text = answer; setSending((q) => [...q]); }
       await api.answer({
         product: item.product,
         id: item.id,
-        answer: text,
+        answer,
         ...(status ? { status } : {}),
         ...(priority != null ? { priority } : {}),
         // What this one reply may do. Undefined means she did not touch it and
@@ -3397,7 +3489,7 @@ export default function App() {
         setFollowing(null);
       } });
     }, talking ? 'Sent' : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id }, undid);
-  }, [deferCommit, snap?.supervisor.running, snap?.products, showToast, refresh, markSeen, pushUndo]);
+  }, [deferCommit, snap?.supervisor.running, snap?.products, showToast, refresh, markSeen, pushUndo, startChatAgents]);
 
   /* ------------------------ answering one of her agents -------------------- */
   // THE ONE THING AGENTBOX SAYS OUT LOUD TO THE REST OF HER MACHINE. The reply goes
@@ -4132,13 +4224,11 @@ export default function App() {
         else if (e.key === 'Enter') { e.preventDefault(); if (optionSel !== null) pickOption(focused, optionSel); }
         // J/K walk the inbox from inside a task (Superhuman): read one, jump
         // to the next, leave the arrows to scroll the document and options.
+        // The next one may be a teammate's, which opens as their card.
         else if (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') {
           e.preventDefault();
-          const idx = list.findIndex((i) => i.id === focused.id);
-          const base = idx >= 0 ? idx : selected;
-          const next = (e.key === 'j' || e.key === 'J') ? base + 1 : base - 1;
-          const target = list[next];
-          if (target) { setFocused(target); markSeen(target); setSelected(next); }
+          const target = stepStop(stops, { item: focused }, (e.key === 'j' || e.key === 'J') ? 1 : -1, walkPlace);
+          if (target) goToStop(target);
         }
         // E archives, unconditionally. It must never approve on her behalf.
         else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); markDone(focused); }
@@ -4157,6 +4247,31 @@ export default function App() {
         else if (/^[1-9]$/.test(e.key)) pickOption(focused, Number(e.key));
         return;
       }
+      // A TEAMMATE'S CARD IS A SCREEN, LIKE AN OPEN THREAD (w-fb16bcaeba). It
+      // had no keys of its own, so J, K and E all ran against the list hidden
+      // behind it. J and K walk on, Escape goes back to the page, N and Z mean
+      // what they mean everywhere, and nothing else reaches the list.
+      if (openCard && teamShown) {
+        if (e.key === 'Escape') { e.preventDefault(); setOpenCard(null); setTeamOpen(false); }
+        else if (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') {
+          e.preventDefault();
+          const target = stepStop(stops, { card: openCard }, (e.key === 'j' || e.key === 'J') ? 1 : -1, walkPlace);
+          if (target) goToStop(target);
+        }
+        else if (e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }
+        else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }
+        return;
+      }
+      // On the page J and K move the keyboard and open nothing: onto a
+      // teammate's row as readily as one of yours (w-fb16bcaeba).
+      const walkPage = (dir: 1 | -1) => {
+        const target = stepStop(stops, keyCard ? { card: keyCard } : current ? { item: current } : null, dir, walkPlace);
+        if (!target) return;
+        if (target.card) { setCardSel(stopKey(target)); return; }
+        const at = list.indexOf(target.item);
+        setCardSel(null);
+        if (at >= 0) setSelected(at);
+      };
       switch (e.key) {
         case 'j': case 'J':
         case 'ArrowDown': {
@@ -4165,22 +4280,20 @@ export default function App() {
           // sitting on a row keeps hold of R and E for as long as it sits
           // there, and walking the list would close the wrong thing.
           setHoveredId(null);
+          if (!e.shiftKey) { if (multiSel.size) setMultiSel(new Set()); walkPage(1); break; }
           const next = Math.min(selected + 1, Math.max(0, list.length - 1));
-          if (e.shiftKey) {
-            setMultiSel((m) => new Set([...m, ...(current ? [current.id] : []), ...(list[next] ? [list[next].id] : [])]));
-          } else if (multiSel.size) setMultiSel(new Set());
-          setSelected(next);
+          setMultiSel((m) => new Set([...m, ...(current ? [current.id] : []), ...(list[next] ? [list[next].id] : [])]));
+          setCardSel(null); setSelected(next);
           break;
         }
         case 'k': case 'K':
         case 'ArrowUp': {
           e.preventDefault();
           setHoveredId(null);
+          if (!e.shiftKey) { if (multiSel.size) setMultiSel(new Set()); walkPage(-1); break; }
           const next = Math.max(0, selected - 1);
-          if (e.shiftKey) {
-            setMultiSel((m) => new Set([...m, ...(current ? [current.id] : []), ...(list[next] ? [list[next].id] : [])]));
-          } else if (multiSel.size) setMultiSel(new Set());
-          setSelected(next);
+          setMultiSel((m) => new Set([...m, ...(current ? [current.id] : []), ...(list[next] ? [list[next].id] : [])]));
+          setCardSel(null); setSelected(next);
           break;
         }
         // ACROSS THE BOARD (w-23fc91bff5): "I can't really do that in board
@@ -4192,10 +4305,12 @@ export default function App() {
             e.preventDefault();
             setHoveredId(null);
             if (multiSel.size) setMultiSel(new Set());
+            setCardSel(null);
             setSelected(boardSideways(boardCols, selected, e.key === 'ArrowLeft' ? -1 : 1));
           }
           break;
-        case 'Enter': if (!multiSel.size && pointed) { setFocused(pointed); markSeen(pointed); } break;
+        // On a teammate's row, Enter opens their card.
+        case 'Enter': if (!multiSel.size && pointed) { setFocused(pointed); markSeen(pointed); } else if (!multiSel.size && keyCard) openTeammateCard(keyCard); break;
         case 'e': case 'E':
           e.preventDefault();
           // In the snoozed view E wakes things: getting an item back is that
@@ -4241,7 +4356,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, boardCols]);
+  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, boardCols, stops, keyCard, walkPlace, goToStop, openTeammateCard]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
@@ -4632,6 +4747,7 @@ export default function App() {
   // merely further up.
   return (
     <TeamContext.Provider value={team}>
+    <ChatAgentsContext.Provider value={chatAgents}>
     <LiveContext.Provider value={liveIds}>
     <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${workspaceCollapsed ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}`}>
       {signInGate && <SignInPage signedOut={signedOutHere} error={snap?.team?.error ?? null} waitingUrl={snap?.team?.signingIn?.url ?? null} />}
@@ -5190,8 +5306,15 @@ export default function App() {
                   })}
                   parent={focused.parent ? items.find((i) => i.id === focused.parent && i.product === focused.product) ?? null : null}
                   blockedBy={items.find((i) => i.parent === focused.id && i.product === focused.product && i.status !== 'done') ?? null}
-                  filed={threadsMade(items, focused).map((i) => ({ id: i.id, title: i.label || i.title, state: stateOfMine(i), item: i }))}
+                  filed={threadsMade(items, focused).map((i) => ({ id: i.id, title: i.label || i.title, state: stateOfMine(i), approve: approvableFiled(i, stateOfMine(i)), item: i }))}
                   onOpenItem={(item) => { setFocused(item); markSeen(item); }}
+                  /*
+                   * SAYING GO TO A THREAD THIS ONE FILED, WITHOUT LEAVING IT
+                     (w-9cf2b43110). The same approval the palette makes on that
+                     row, with `stay` so the pane keeps the thread you pressed
+                     from: the complaint was the trip, so a press that moved you
+                     somewhere else would be the same trip with fewer steps. */
+                  onApproveFiled={(i) => resolve(i, { stay: true })}
                   onNotice={showToast}
                   /*
                    * What THIS row's agents really run as, so the reply footer
@@ -5290,10 +5413,10 @@ export default function App() {
                   <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine} projectOrder={projectOrder}
                     cards={cards} picked={team ? picked : undefined}
                     onOpenCard={openTeammateCard}
-                    selected={current} columnOrder={columnOrder} onReorderColumns={reorderColumns}
+                    selected={current} selectedCard={keyCard ? cardSel : null} columnOrder={columnOrder} onReorderColumns={reorderColumns}
                     // A click puts the keyboard where the click was, so J
                     // and the arrows carry on from that card on the way back.
-                    onOpenItem={(item) => { const i = list.indexOf(item); if (i >= 0) setSelected(i); setFocused(item); markSeen(item); }} />
+                    onOpenItem={(item) => { const i = list.indexOf(item); setCardSel(null); if (i >= 0) setSelected(i); setFocused(item); markSeen(item); }} />
                 ) : <>
                 {workspaceNavigation && search === null && (
                   <StateTabs
@@ -5332,6 +5455,7 @@ export default function App() {
                   mixed={search === null ? mixedRows : null}
                   personCell={personCell}
                   onOpenCard={openTeammateCard}
+                  selectedCard={keyCard ? cardSel : null}
                   items={list}
                   // Results are grouped and stamped like the inbox, whatever
                   // tab she opened search from. Scheduled would otherwise label
@@ -5368,9 +5492,9 @@ export default function App() {
                   keyView={view}
                   hoveredId={hoveredId}
                   onHover={keyHints ? setHoveredId : undefined}
-                  onSelect={(i) => setSelected(i)}
+                  onSelect={(i) => { setCardSel(null); setSelected(i); }}
                   onOpenRepeat={(rule) => { setFocused(null); setFocusedRepeat(rule); }}
-                  onOpen={(item) => { setFocused(item); markSeen(item); }}
+                  onOpen={(item) => { setCardSel(null); setFocused(item); markSeen(item); }}
                   onAnswerImport={answerImport}
                   onToggle={(i) => {
                     const id = list[i]?.id;
@@ -5449,6 +5573,11 @@ export default function App() {
           // Projects page, which is where the order is set. The draft is
           // already saved, so closing loses nothing.
           onReorderProjects={() => { setModal(null); setComposeInitial(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
+          /* "New project", last in the project menu. The card draws OVER the
+             composer rather than replacing it (it is last in this file for
+             exactly that), so the draft is still here afterwards and the
+             project just made is the one the thread is addressed to. */
+          onNewProject={() => setNewProject(true)}
           onClose={() => { setModal(null); setComposeInitial(null); }}
           onSent={async (made, how) => {
             setComposeInitial(null);
@@ -6223,6 +6352,7 @@ export default function App() {
       <FindBar />
     </div>
     </LiveContext.Provider>
+    </ChatAgentsContext.Provider>
     </TeamContext.Provider>
   );
 }

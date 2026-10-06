@@ -40,10 +40,10 @@ import { AgentFace } from '../components/AgentFace';
 import { conversationWith } from './page-rules';
 import { collectFiles, fromPaste, persistAttachments, type PendingAttachment } from '../attachments';
 import { AttachRow } from '../components/AttachRow';
-import { PRIORITIES, priorityLabelOf, priorityValueOf, readLastPriority, writeLastPriority, type PriorityId } from '../priority';
+import { PRIORITIES, priorityLabelOf, priorityValueOf, startingPriority, type PriorityId } from '../priority';
 import { readComposeDraft, saveComposeDraft, clearComposeDraft } from '../drafts';
 import { LAST_PRODUCT_KEY } from '../compose-project';
-import { practiceRefusal } from '../compose-says';
+import { practiceRefusal, noProjectYet } from '../compose-says';
 import { defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type ModelChoice } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../effort';
 import { engineThisMacOffers, readLastEngine, writeLastEngine } from '../engines';
@@ -77,7 +77,7 @@ export interface ThreadSent {
 type MenuKey = 'to' | 'model' | 'project' | 'priority' | 'visibility' | 'later';
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onOpenConversation, onReorderProjects,
+  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onOpenConversation, onReorderProjects, onNewProject,
 }: {
   products: Product[];
   items: WorkItem[];
@@ -116,6 +116,10 @@ export function ThreadComposer({
   onOpenConversation?: (item: WorkItem, draft: string) => void;
   /** Opens Settings > Priority, from the "Reorder" beside the project menu's heading. */
   onReorderProjects?: () => void;
+  /** Opens the New project card, from the last row of the project menu. Asked
+   *  for on 2026-10-05: making a project is a thing you should be able to do
+   *  from the menu you are already in, whether you have none or ten. */
+  onNewProject?: () => void;
   onClose: () => void;
   /** Called once the send stands, BEFORE the draft is cleared, so the caller can still read it for an undo. */
   onSent: (item: WorkItem | null, sent?: ThreadSent) => void;
@@ -160,9 +164,11 @@ export function ThreadComposer({
   };
 
   /* ---------------------------- priority -------------------------------- */
-  const [prio, setPrio] = useState<PriorityId | null>(() => (opened.current.priority as PriorityId | null) ?? readLastPriority());
+  // Every new thread opens on Medium; only a half-written card keeps its tag
+  // (../priority.ts says why the last pick is no longer carried over).
+  const [prio, setPrio] = useState<PriorityId | null>(() => startingPriority(opened.current.priority));
   const prioShown: PriorityId = prio ?? 'medium';
-  const pickPrio = (id: PriorityId) => { setPrio(id); writeLastPriority(id); };
+  const pickPrio = (id: PriorityId) => { setPrio(id); };
 
   /* --------------------------- visibility ------------------------------- */
   // A NEW THREAD STARTS WHERE ITS PROJECT IS, AND WHO SEES IT IS STILL CHOSEN
@@ -333,6 +339,10 @@ export function ThreadComposer({
   const [error, setError] = useState<string | null>(null);
   const message = threadMessage(text, person ? [] : attachments);
   const refusal = person ? null : practiceRefusal(product, { scripted: !!scripted });
+  // The other reason Send can be off: there is no project to send to at all
+  // (w-f8d123be62). It gets a line in the bar rather than a tooltip, because
+  // the whole fault was that nothing on screen said anything.
+  const stopper = noProjectYet(product, { person: !!person });
   const canSend = !sending && (person ? !!text.trim() : !!message && !!product && !refusal);
 
   const sendTask = async (when: { runAt?: number; start?: 'later'; repeat?: { every: 'day' | 'weekday' | 'week'; on?: number; at: string } } = {}) => {
@@ -530,6 +540,18 @@ export function ThreadComposer({
           <Swatch slug={p.slug} /><span className="tc-row-label">{p.name}</span>
         </button>
       ))}
+      {/* MAKING A PROJECT IS A THING YOU CAN DO FROM HERE, ALWAYS (approved
+          2026-10-05). Not only when the list is empty: somebody with ten
+          projects who wants an eleventh is in this menu too, and the old
+          answer was to close the card and go to Settings. The hairline is what
+          keeps it from reading as a twelfth project. */}
+      {onNewProject && (<>
+        {offered.length > 0 && <span className="tc-menu-rule" />}
+        <button type="button" data-item className="tc-row tc-new-project" onPointerEnter={hover}
+          onClick={() => { close('text'); onNewProject(); }}>
+          <PlusIcon /><span className="tc-row-label">New project</span>
+        </button>
+      </>)}
     </div>
   );
 
@@ -792,8 +814,20 @@ export function ThreadComposer({
               <ClipIcon />
             </button>
             <input ref={fileRef} type="file" multiple hidden onChange={async (e) => { await addFiles(e.target.files); e.target.value = ''; }} />
+            {/* WHY SEND IS OFF, WHEN IT IS OFF FOR WANT OF A PROJECT. My
+                Workspace is made for everybody at boot, so this should never
+                draw; it draws when making it failed, which used to be a log
+                line and a dead button. */}
+            {stopper && (
+              <span className="tc-why">
+                {stopper.reason}{' '}
+                {onNewProject
+                  ? <button type="button" className="tc-why-do" onClick={onNewProject}>{stopper.action}</button>
+                  : stopper.action}
+              </span>
+            )}
             <span className="tc-send" ref={anchor('later')}>
-              <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={refusal ?? 'Send · ⌘↵'}>
+              <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={refusal ?? stopper?.reason ?? 'Send · ⌘↵'}>
                 Send <kbd>⌘↵</kbd>
               </button>
               <button type="button" data-trigger className="tc-send-caret" disabled={!canSend} aria-label="Send later"
@@ -836,6 +870,11 @@ const ClipIcon = () => (
 );
 const CaretIcon = () => (
   <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+);
+// Sized and weighted to sit where a project's swatch sits, so "New project"
+// lines up with the names above it rather than stepping sideways.
+const PlusIcon = () => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
 );
 const ClockIcon = () => (
   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 8v4.5l3 2" /></svg>
