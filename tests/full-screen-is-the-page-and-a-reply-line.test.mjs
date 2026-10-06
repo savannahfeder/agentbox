@@ -78,8 +78,9 @@ it('shows no strip at all under a full screen document until the box is open',()
  // options list is stripped out of the message text, so a full screen row
  // would otherwise print its own options twice.
  expect(focus).toContain('const showOptions = offerIsLive(item);');
- // And the chevron is back to plain: no full screen special case in the state.
- expect(focus).toContain('const [optsOpen, setOptsOpen] = useState(true);');
+ // There is no half-fold special case for full screen, because there is no fold
+ // at all any more (w-2e13752a85): full screen hides the whole block instead.
+ expect(focus).not.toContain('optsOpen');
 });
 
 it('folds the box back when she clicks away, in full screen only',()=>{

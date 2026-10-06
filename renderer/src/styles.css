@@ -2983,23 +2983,16 @@ body {
    the first line when it wraps instead of floating at the middle of a two-line
    block.
 */
-.opt-head-ask { align-items: flex-start; padding: 11px 10px 7px 16px; }
+/* THE RIGHT-HAND PADDING IS THE ROWS' OWN NOW. It was 10px to leave the chevron
+   its 24px box; with the fold gone (w-2e13752a85) the ask would have ended 6px
+   short of every option underneath it, and the straight right edge is most of
+   what makes the block read as one thing. */
+.opt-head-ask { align-items: flex-start; padding: 11px 16px 7px 16px; }
 .opt-head-ask span {
   font-size: 12.5px; text-transform: none; letter-spacing: 0;
   color: var(--text); font-weight: 600; line-height: 1.4;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-/* The chevron was centred against a 10.5px line. Against a 12.5px one it needs
-   a couple of pixels back to read as level with the first line of the ask. */
-.opt-head-ask .opt-collapse { margin-top: -2px; }
-.opt-collapse {
-  margin-left: auto; display: grid; place-items: center; width: 24px; height: 24px;
-  border: none; background: transparent; color: var(--text-faint); border-radius: var(--radius);
-  cursor: pointer; transition: color 0.15s, background 0.15s;
-}
-.opt-collapse:hover { color: var(--text); background: var(--wash); }
-.opt-collapse svg { width: 14px; height: 14px; transition: transform 0.18s; }
-.opt-collapse svg.flipped { transform: rotate(180deg); }
 .opt-row {
   display: flex; gap: 10px; align-items: baseline; width: 100%; text-align: left;
   background: transparent; border: none; font: inherit; color: var(--text-dim);

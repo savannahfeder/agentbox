@@ -122,8 +122,10 @@ describe('an offer stops being a control once it has been answered', () => {
 });
 
 describe('the markup moved whole', () => {
-  it('still offers the question, the chevron, the rows and the peek card', () => {
-    for (const piece of ['opt-head', 'opt-collapse', 'opt-row', 'opt-peek', 'opt-key', 'opt-rec']) {
+  // The chevron is no longer among them: the fold went when the block stopped
+  // standing over the composer (w-2e13752a85, the-options-are-never-folded-away).
+  it('still offers the question, the rows and the peek card', () => {
+    for (const piece of ['opt-head', 'opt-row', 'opt-peek', 'opt-key', 'opt-rec']) {
       expect(offer, `lost ${piece}`).toContain(piece);
     }
     expect(offer).toContain('recommended');

@@ -21,6 +21,13 @@
 // scrolls with its turn, so reading past it is what makes it go away, and
 // nothing had to be remembered or marked as seen to get that.
 //
+// AND IT CARRIES NO FOLD (w-2e13752a85). "just remove the dropdown as it's not
+// needed and it'd be perfect." The chevron was right for a docked strip, which
+// stood over the composer for as long as the thread was open: folding it was
+// the only way to get the screen back. Drawn at its own turn it scrolls away by
+// itself, so the fold answers a question nobody is asking any more, and a
+// control that does nothing worth doing is one more thing to read past.
+//
 // IT IS STILL LIVE UNTIL IT IS ANSWERED, and that was already true: `offerIsLive`
 // (format.ts) goes false the moment a reply lands after the offer, so a settled
 // question stops being a control on its own. What this row changes is where the
@@ -30,15 +37,13 @@ import remarkGfm from 'remark-gfm';
 import type { ParsedOption } from '../format';
 
 export function OptionsOffer({
-  ask, askAll, options, optsOpen, setOptsOpen, peekOption, askPeek,
+  ask, askAll, options, peekOption, askPeek,
   selectedOption, selRef, onPick, onOptionEnter, onAskEnter, setPeek, setAskPeek,
 }: {
   /** The sentence the options answer, off the same field the options came off. */
   ask: string;
   askAll: string;
   options: ParsedOption[];
-  optsOpen: boolean;
-  setOptsOpen: (f: (was: boolean) => boolean) => void;
   peekOption: ParsedOption | null;
   askPeek: boolean;
   selectedOption: number | null;
@@ -62,25 +67,20 @@ export function OptionsOffer({
           inside it. A pointer travelling down the pane crosses the
           padding before it crosses the words, and a card that opens
           only on the glyphs themselves blinks shut in the gaps between
-          the two lines. The chevron is inside this row and keeps its
-          own click; reading the question while reaching for it is not
-          a conflict. */}
+          the two lines. */}
       <div
         className={`opt-head ${ask ? 'opt-head-ask' : ''}`}
         onMouseEnter={(e) => onAskEnter(e.currentTarget)}
         onMouseLeave={() => setAskPeek(false)}
       >
         <span>{ask || 'Their options · pick or write your own'}</span>
-        <button className="opt-collapse" onClick={() => setOptsOpen((o) => !o)} title={optsOpen ? 'Collapse options' : 'Expand options'}>
-          <svg viewBox="0 0 16 16" className={optsOpen ? '' : 'flipped'} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6l4 4 4-4" /></svg>
-        </button>
       </div>
       {/* The card, drawn FIRST so it is the strip's first child: appended
           last it stole the last row's 4px of bottom padding and the
           strip measured 4px short. It is out of the flow entirely
           (`bottom: 100%`), which is the promise of this design: the
           strip is the same height with the card open as without it. */}
-      {optsOpen && peekOption && (
+      {peekOption && (
         <div className="opt-peek">
           <div className="opt-peek-head">Option {peekOption.n}, in full</div>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -91,18 +91,14 @@ export function OptionsOffer({
       {/* ONE SLOT, SO NEVER TWO CARDS. The option card wins when both
           could be open, which cannot happen from one pointer but can
           from a stale state, and two of these stacked would cover the
-          message they are supposed to be read against.
-
-          IT OPENS WITH THE STRIP COLLAPSED TOO. The chevron folds the
-          answers away and leaves the question, so a folded strip is
-          exactly the case where this line is all she has. */}
+          message they are supposed to be read against. */}
       {!peekOption && askPeek && (
         <div className="opt-peek">
           <div className="opt-peek-head">The question, in full</div>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{askAll}</ReactMarkdown>
         </div>
       )}
-      {optsOpen && options.map((o) => (
+      {options.map((o) => (
         <button
           key={o.n}
           ref={o.n === selectedOption ? selRef : undefined}

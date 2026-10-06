@@ -74,7 +74,7 @@ describe('the question sits above the options', () => {
 
   it('is drawn as a sentence rather than in the label\'s small caps', () => {
     const css = readFileSync(new URL('../renderer/src/styles.css', import.meta.url), 'utf8');
-    const rule = css.slice(css.indexOf('.opt-head-ask span'), css.indexOf('.opt-collapse {'));
+    const rule = css.slice(css.indexOf('.opt-head-ask span'), css.indexOf('.opt-row {'));
     expect(rule).toMatch(/text-transform: none/);
     expect(rule).toMatch(/-webkit-line-clamp: 2/);
   });

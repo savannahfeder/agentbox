@@ -737,17 +737,13 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     };
   }, [item.id, onScrolled]);
 
-  // The options strip on the composer collapses (chevron), and reopens fresh
-  // for every task: a fold is a reading preference, not a standing setting.
-  //
-  // THE HALF FOLD IT HAD FOR ONE DAY IS GONE. Under a full screen document
-  // this started false, so the strip drew its heading and nothing else. She is
-  // right: a heading with no options under it is neither the question answered
-  // nor the page unobstructed, it is a third state nobody asked for. Full
-  // screen hides the WHOLE strip until she opens the box, which is
-  // `stripShown` below.
-  const [optsOpen, setOptsOpen] = useState(true);
-  useEffect(() => { setOptsOpen(true); }, [item.id]);
+  // THE OPTIONS NO LONGER FOLD, AND THERE IS NOTHING HELD HERE FOR IT
+  // (w-2e13752a85). The chevron and the flag behind it were right while the
+  // block was docked over the composer, where folding was the only way to get
+  // the screen back. It is drawn at its own turn now and scrolls away with it,
+  // so the fold answered a question that had stopped being asked: "just remove
+  // the dropdown as it's not needed and it'd be perfect." Full screen still
+  // hides the WHOLE block until the box is open, which is `stripShown` below.
 
   // Arrowing onto an option that has scrolled offscreen brings it into view.
   const selRef = useRef<HTMLButtonElement>(null);
@@ -763,7 +759,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // whether two lines are enough depends on the width the pane happens to have
   // right now, and reading it once per hover is both current and free.
   const [peek, setPeek] = useState<number | null>(null);
-  useEffect(() => { setPeek(null); }, [item.id, optsOpen]);
+  useEffect(() => { setPeek(null); }, [item.id]);
   const onOptionEnter = (n: number, el: HTMLElement) => {
     const text = el.querySelector('.opt-text');
     setPeek(optionPeek(n, !!text && optionIsClipped(text)));
@@ -1434,7 +1430,6 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         {offerInPane && (
           <OptionsOffer
             ask={ask} askAll={askAll} options={options}
-            optsOpen={optsOpen} setOptsOpen={setOptsOpen}
             peekOption={peekOption} askPeek={askPeek}
             selectedOption={selectedOption} selRef={selRef}
             onPick={onPick} onOptionEnter={onOptionEnter} onAskEnter={onAskEnter}
@@ -1632,7 +1627,6 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           {offerInDock && (
             <OptionsOffer
               ask={ask} askAll={askAll} options={options}
-              optsOpen={optsOpen} setOptsOpen={setOptsOpen}
               peekOption={peekOption} askPeek={askPeek}
               selectedOption={selectedOption} selRef={selRef}
               onPick={onPick} onOptionEnter={onOptionEnter} onAskEnter={onAskEnter}
