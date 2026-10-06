@@ -289,16 +289,18 @@ describe('the store, end to end', () => {
     expect(s.importCodexThreads(slug, [a, b, c], { now: NOW + 4000 })).toEqual({ ids: [], added: 0, already: 3 });
   });
 
-  it('one scan of the watch asks and refreshes together', async () => {
+  // The watch stopped asking on 2026-10-05 (w-db6f5e331e): importing is on
+  // command only, pinned in after-setup-nothing-is-imported-unless-you-ask.
+  it('one scan of the watch refreshes what was imported and asks about nothing', async () => {
     const { s, slug, zero } = await store();
     const t = thread('t1', zero);
     const first = scanCodex({ store: s, readThreads: () => ({ threads: [t] }), now: NOW });
-    expect(first).toEqual({ asked: 1, refreshed: 0, retold: 0, threads: 1 });
-    const [asking] = rows(s, slug);
-    s.answerCodexImport(slug, asking.id, 'yes', { thread: t, now: NOW + 1000 });
+    expect(first).toEqual({ refreshed: 0, retold: 0, threads: 1 });
+    expect(rows(s, slug)).toEqual([]);
+    s.importCodexThreads(slug, [t], { now: NOW + 1000 });
     const second = scanCodex({ store: s, readThreads: () => ({ threads: [{ ...t, last: 'Done.' }] }), now: NOW + 2000 });
-    expect(second).toEqual({ asked: 0, refreshed: 1, retold: 0, threads: 1 });
+    expect(second).toEqual({ refreshed: 1, retold: 0, threads: 1 });
     // A reader that throws costs nothing.
-    expect(scanCodex({ store: s, readThreads: () => { throw new Error('no codex'); } })).toEqual({ asked: 0, refreshed: 0, retold: 0, threads: 0 });
+    expect(scanCodex({ store: s, readThreads: () => { throw new Error('no codex'); } })).toEqual({ refreshed: 0, retold: 0, threads: 0 });
   });
 });

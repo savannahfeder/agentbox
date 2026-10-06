@@ -58,8 +58,12 @@ import path from 'node:path';
  *  the last three days and 9 in the last seven, in two folders she works in.
  *  Three days is a card with tonight's test on it and almost nothing else; the
  *  filters have already done the work that "a few" was standing in for, so the
- *  window can afford to be the generous reading. */
-export const RECENT_DAYS = 7;
+ *  window can afford to be the generous reading.
+ *
+ *  Ten since the launch list (w-db6f5e331e, 2026-10-05): "showing your recently
+ *  active agents over the last 10 days". Codex reads the same number
+ *  (main/codex-threads.mjs), so the two halves of the card agree. */
+export const RECENT_DAYS = 10;
 
 /**
  * How much of a transcript is read to find its first human turn. The first

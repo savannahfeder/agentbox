@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 import { matchesQuery } from '../renderer/src/palette-rows';
 import { NAME, Name } from '../shared/product-name.mjs';
 import {
-  CARD, SECTION, canBring, destinations, folderOfProject, importedLine,
+  CARD, SECTION, canBring, destinations, folderOfProject, importedLine, importLines,
   nameOfProject, projectAtOpen,
 } from '../renderer/src/agent-import-card';
 
@@ -61,7 +61,7 @@ const row = (() => {
 
 describe('the row is in ⌘K and can be found by the words she would type', () => {
   it('is there, and it says what it does', () => {
-    expect(row.label).toBe('Import your Claude Code agents');
+    expect(row.label).toBe('Import agents from Claude Code or Codex');
     expect(row.hint).toBeTruthy();
   });
 
@@ -70,7 +70,7 @@ describe('the row is in ⌘K and can be found by the words she would type', () =
   });
 
   it('is found by "agents", by "import" and by "claude code"', () => {
-    for (const typed of ['agents', 'import', 'import agents', 'claude code', 'my agents']) {
+    for (const typed of ['agents', 'import', 'import agents', 'claude code', 'my agents', 'codex', 'import codex']) {
       expect(matchesQuery(typed, row), `typing "${typed}" found nothing`).toBe(true);
     }
   });
@@ -93,10 +93,11 @@ describe('it is the walk\'s import, not a second one', () => {
   // same channel, the same promise in the same words. Those three are checked
   // below and they are what "not a second one" meant.
   it('draws its own rows, and the walk\'s promise word for word', () => {
-    for (const cls of ['ia-agent', 'ia-agent-name', 'ia-box', 'ia-read']) {
+    // The foot line ("never moves the file") left with the one-list card on
+    // w-db6f5e331e: her pick was one list and one button and nothing else.
+    for (const cls of ['ia-agent', 'ia-agent-name', 'ia-box']) {
       expect(card, `the card lost its ${cls}`).toContain(cls);
     }
-    expect(card).toContain('COPY.agentsRead');
     expect(card).toContain("from '../onboarding'");
   });
 
@@ -135,13 +136,16 @@ describe('where the rows land is on the card, in words', () => {
     expect(projectAtOpen(products, { filter: 'deleted', last: 'also-gone' })).toBe('agentbox');
   });
 
-  it('says so out loud, under the one section whose inbox is a choice', () => {
-    // Her home folder agents work in every project, so something has to pick an
-    // inbox for them and the project name is the control that picks it. Every
-    // other section's inbox is decided by the folder and says so instead.
-    expect(SECTION.landBefore).toBe('They work everywhere, so their rows go to');
-    expect(card).toContain('SECTION.landBefore');
-    expect(card).toContain('aria-expanded={picking}');
+  // CHANGED 2026-10-05 (w-db6f5e331e): the one-list card has no project
+  // control. Her home folder agents land in the project the card opened on
+  // (`projectAtOpen` above), and the line names it.
+  it('names, on the line, the project a home folder agent lands in', () => {
+    const dests = destinations({
+      found: { user: [{ name: 'a', title: 'A', line: '', scope: 'all', path: '/h/a.md' }], project: [] },
+      folders: [], products, project: 'agentbox',
+    });
+    expect(importLines(dests)[0].meta).toBe(`Claude Code agent · ${nameOfProject(products, 'agentbox')}`);
+    expect(card).not.toContain('aria-expanded={picking}');
   });
 
   it('reads the folder off the project it is filing into', () => {
@@ -203,13 +207,12 @@ describe('what it says afterwards is what really happened', () => {
 
 describe('the card offers no key and no button it cannot honour', () => {
   it('draws the button only when there is something to bring', () => {
-    // And only on the choose screen: the doors carry their own press.
-    expect(card).toContain("{read && some && screen === 'pick' && (\n          <>");
-    expect(card).toContain('<div className="ia-foot">');
+    // One screen since w-db6f5e331e, so one condition: read, and something on it.
+    expect(card).toContain('{read && some && (\n          <div className="ia-foot ia-foot-one">');
   });
 
   it('takes ⌘↵ and Escape, and leaves plain Enter to the ticks', () => {
-    const keys = card.slice(card.indexOf('⌘↵ PRESSES WHICHEVER SCREEN IS UP'), card.indexOf('WHAT THE LIST STILL OWES'));
+    const keys = card.slice(card.indexOf('⌘↵ ADDS WHAT IS TICKED'), card.indexOf('THE TICK, AND IT IS NOT A FORM CONTROL'));
     expect(keys).toContain("e.key === 'Escape'");
     expect(keys).toContain("e.key === 'Enter' && (e.metaKey || e.ctrlKey)");
   });

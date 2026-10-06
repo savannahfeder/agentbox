@@ -194,7 +194,9 @@ describe('the click each card names is a real one', () => {
   // says both halves, because on a Mac with no teammates the list draws Agent
   // alone and the People half appears the day somebody joins.
   it('points at the To row, and names an agent and a person', () => {
-    const say = coach('who', 0);
+    // On a team. With no team the person half is not said at all
+    // (a-mac-with-no-team-never-hears-about-a-team.test.mjs).
+    const say = coach('who', 0, { team: true });
     expect(say.key).toBeNull();
     expect(loud(say)).toBe('Click To at the top of the card to see who it can go to.');
     expect(say.quiet).toBe('Every thread goes to an agent, or to a person on your team.');

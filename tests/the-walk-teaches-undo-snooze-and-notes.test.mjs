@@ -224,12 +224,14 @@ describe('7. the agents on the last card are hers, and the card says so', () => 
   // side of a switch you happen to be looking at. The walk draws the import card
   // now, and that card's rows carry `where`, which is the real folder each set
   // of agents was read out of.
-  it('prints the folder every set of agents was really read out of', () => {
+  // CHANGED 2026-10-05 (w-db6f5e331e): the one-list card draws no folders ("No
+  // folders, no project tags", her pick). Each line names where it came from
+  // and the project it lands in instead.
+  it('says on every line where it came from and where it lands', () => {
     const card = fs.readFileSync(
       path.join(import.meta.dirname, '..', 'renderer/src/components/ImportAgents.tsx'), 'utf8');
-    // The home folder set names the folder Claude Code loads it from; every
-    // other section names its own, off the path the scan really walked.
-    expect(card).toContain('{d.kind === \'everywhere\' ? <>{SECTION.homeFolder}. {homeLine(d)}</> : d.where}');
+    expect(card).toContain('<span className="ia-line-meta">{l.meta}</span>');
+    expect(card).not.toContain('d.where');
     expect(SECTION.homeFolder).toBe('~/.claude/agents');
     // And the walk still says out loud that these came off this Mac.
     expect(view).toMatch(/line: COPY\.agentsOffer,/);

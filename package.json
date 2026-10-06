@@ -50,8 +50,9 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/prepare-terminal.mjs && node scripts/read-claude-commands.mjs && node scripts/read-claude-models.mjs && vite build renderer",
-    "start": "npm run build && electron .",
+    "start": "npm run build && node scripts/brand-electron.mjs && electron .",
     "test": "vitest run",
+    "test:changed": "node scripts/test-what-changed.mjs",
     "icon": "electron scripts/make-icon.mjs",
     "pack": "node scripts/release.mjs --no-sign",
     "pack:side": "node scripts/pack-side.mjs",
@@ -66,7 +67,7 @@
     "prepack": "npm run build",
     "postinstall": "node scripts/after-install.mjs",
     "prepublishOnly": "node scripts/before-publish.mjs",
-    "app": "vite build renderer --logLevel warn && node scripts/prepare-terminal.mjs && electron ."
+    "app": "vite build renderer --logLevel warn && node scripts/prepare-terminal.mjs && node scripts/brand-electron.mjs && electron ."
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

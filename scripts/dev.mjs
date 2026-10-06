@@ -29,6 +29,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../main/config.mjs';
 import { chooseDevPort } from '../main/dev-window.mjs';
+import { brandElectron } from './brand-electron.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const bin = (name) => path.join(root, 'node_modules', '.bin', name);
@@ -59,6 +60,9 @@ const devUrl = `http://localhost:${port}`;
 console.log(`  dev server on ${devUrl}`);
 
 const vite = spawn(bin('vite'), ['renderer', '--port', String(port), '--strictPort'], { cwd: root, stdio: 'inherit' });
+
+// The menu bar and the Dock say Agentbox rather than Electron (scripts/brand-electron.mjs).
+brandElectron();
 
 setTimeout(() => {
   const electron = spawn(bin('electron'), ['.'], {

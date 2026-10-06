@@ -91,7 +91,7 @@ describe('2. the words work for an engineer and for an assistant', () => {
     COPY.head, COPY.headSub, COPY.folderHead, COPY.folderLede, COPY.folderRecent,
     COPY.folderNone, COPY.nameInNone, COPY.handHead, COPY.handLine, COPY.leaveLine,
     COPY.offerLine, COPY.finishHead, COPY.finishLine,
-    ...(COPY.finishNext ?? [undefined]), ...COPY.intro.flatMap((s) => [s.head, s.line]),
+    ...(COPY.finishNext ?? [undefined]), ...(COPY.finishNextTeam ?? []), ...COPY.intro.flatMap((s) => [s.head, s.line]),
   ];
 
   it('has no jargon and no em dashes on any setup screen', () => {
@@ -133,7 +133,8 @@ describe('3. the walk names the Team page and messaging a person', () => {
   it('ends by saying it is over and what to try next', () => {
     expect(COPY.finishHead).toMatch(/tutorial/i);
     expect(COPY.finishHead).toMatch(/finished|done/i);
-    const next = (COPY.finishNext ?? []).join(' ');
+    // The Team line is drawn only on a team since w-db6f5e331e.
+    const next = [...(COPY.finishNext ?? []), ...(COPY.finishNextTeam ?? [])].join(' ');
     expect(next).toMatch(/thread/);
     expect(next).toMatch(/\bTeam\b/);
     expect(next).toMatch(/message/i);

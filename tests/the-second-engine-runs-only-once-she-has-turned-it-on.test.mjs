@@ -141,12 +141,17 @@ afterAll(() => {
 describe('the second engine is off until she writes the moment she turned it on', () => {
   // THE EXISTING TRIPWIRE, AT THE LEVEL THIS SLICE ADDS: a fresh install has no
   // config file at all, and an August row still runs Claude Code.
-  it('is off on a machine with no zero.config.json', async () => {
+  // CHANGED 2026-10-05 (w-db6f5e331e): a machine with no zero.config.json now
+  // writes its own first launch as the moment, because a new person with both
+  // engines could otherwise never use Codex
+  // (tests/a-new-install-with-both-engines-can-use-codex.test.mjs). What this
+  // test is for still holds: the moment is NOW, so an August row is still
+  // older than it and still runs Claude Code.
+  it('opens at first launch on a machine with no zero.config.json, and an August row still runs Claude Code', async () => {
     const appDir = tempDir('engine-choice-app-');
     const config = loadConfig(appDir, { home: '/nonexistent-home' });
 
-    expect(config.engineChoice).toBe(null);
-    expect(engineChoiceSince(config)).toBe(null);
+    expect(engineChoiceSince(config)).toBeGreaterThan(AUGUST);
 
     // claudeFound is pinned because loadConfig looks for the real Claude Code on
     // this machine, and GitHub's runners have none, so the row fell back to

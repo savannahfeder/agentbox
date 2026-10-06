@@ -16,7 +16,7 @@ import { readySkin, swapLook } from './look-switch';
 import type { AnswerMode, Approval, PermissionMode, Product, RepeatRule, RepeatShape, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import { api } from './api';
 import { setClaudeModels } from './models';
-import { advanceAfter, nextAfterAdvance, type Advance } from './advance';
+import { advanceAfter, advanceLandsHere, nextAfterAdvance, type Advance } from './advance';
 import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
 import { isTroubleRow, troubleRow } from './trouble-row';
@@ -65,6 +65,7 @@ import { sentLine } from './compose-says';
 import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, maskedAncestors, notStarted, parkedByAgent, replyClearsSchedule, statusForReply, stoppable, threadMasked, withdrawReply } from './list-rules';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { opensATextField } from './keys';
+import { sidebarFits, useRoomyToggle, useWindowWidth } from './room';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
 import { DONE } from './done-word';
 import { modalAfterLeavingATask } from './modal-scope';
@@ -634,9 +635,15 @@ export default function App() {
     if (panelBeforeFullScreen.current !== null) return;
     localStorage.setItem(PANEL_KEY, panelUp ? '1' : '0'); localStorage.setItem('powerup.sidebar.collapsed', String(!panelUp));
   }, [panelUp]);
+  // A NARROW WINDOW FOLDS IT (w-df42206cea, ../room.ts), before anything else
+  // gives up room, and that fold is not her choice so `panelUp` never hears of
+  // it. `panelShownNow` is what is drawn: her choice, or the window's fold, or
+  // a click she made after the fold.
+  //
   // The one way to change it. The key, the button in the corner and the ⌘K
   // command all call THIS, so there is no second place for it to be confused in.
-  const togglePanel = useCallback(() => setPanelUp((v) => !v), []);
+  const windowWidth = useWindowWidth();
+  const [panelShownNow, togglePanel] = useRoomyToggle(sidebarFits(windowWidth), panelUp, setPanelUp);
   // Resolved once at mount and applied before the first paint below, so the
   // window never flashes the other theme on the way in.
   // IT HOLDS THE PICK, NOT THE COLOUR. `match` is one of the three things this
@@ -3818,6 +3825,11 @@ export default function App() {
     // these would be a write into nothing. Both behave like a task in every way
     // she can see and in none that she cannot.
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
+    // A MESSAGE STILL IN ITS THREE SECONDS IS WRITTEN BEFORE THE STOP. Held, it
+    // landed after the kill, read as a reply sent after stopping, reopened the
+    // row and started a fresh run on it two minutes later (2026-10-05).
+    // tests/a-message-still-sending-lands-before-the-stop.test.mjs
+    await flushPending();
     const wasRunning = working(item);
     setFollowing({ product: item.product, id: item.id });
     await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
@@ -3826,7 +3838,7 @@ export default function App() {
       ? 'Agent stopped. Back in your inbox. Reply to redirect it.'
       : 'Stopped before it started. Back in your inbox. Reply to redirect it.');
     await refresh();
-  }, [refresh, showToast, working]);
+  }, [refresh, showToast, working, flushPending]);
 
   // RUN NOW, from the three-dot menu or ⌘K on a waiting task (supervisor.runNow).
   // Offered on anything In progress with nothing running (run-now.ts), so a
@@ -4480,13 +4492,18 @@ export default function App() {
   // The advance: open whatever occupies the resolved item's slot, computed
   // with that item explicitly excluded (its write is deferred behind the
   // grace window, so it may still be in the fold for a few seconds).
+  // On the board the keyboard counts places in the board's reading order, so
+  // the opened card's place there is found by its id.
   useEffect(() => {
     const pending = advanceRef.current;
-    if (!pending || view !== 'inbox' || focused) return;
+    if (!pending || !advanceLandsHere({ view, onBoard }) || focused) return;
     advanceRef.current = null;
     const next = nextAfterAdvance(shownInbox, pending);
-    if (next) { setFocused(next.item); markSeen(next.item); setSelected(next.index); }
-  }, [shownInbox, view, focused, markSeen]);
+    if (!next) return;
+    setFocused(next.item); markSeen(next.item);
+    const at = onBoard ? list.findIndex((i) => i.id === next.item.id && i.product === next.item.product) : next.index;
+    setSelected(at >= 0 ? at : 0);
+  }, [shownInbox, view, onBoard, list, focused, markSeen]);
 
   /* -------------------------------- render -------------------------------- */
   // (Hooks live ABOVE the boot return: below it, React counts them
@@ -4505,7 +4522,7 @@ export default function App() {
   const [taskHeader, setTaskHeader] = useState<HTMLDivElement | null>(null);
   // The socket look B of w-581dbc6cc4's round teleports the code mark into.
   const [cornerHeaderTarget, setCornerHeaderTarget] = useState<HTMLSpanElement | null>(null);
-  const workspaceCollapsed = !panelUp;
+  const workspaceCollapsed = !panelShownNow;
   const toggleWorkspace = togglePanel;
 
   // A schedule set on a thread. On one RUN of a repeating task it moves that
@@ -5273,7 +5290,10 @@ export default function App() {
                   // WHERE IT WAS OPENED FROM, in the tab strip's own words (so
                   // "Waiting" when teammates are on the page), for the thin
                   // bar the thread wears while its summary is open (w-922f66bb06).
+                  // On the board there is no tab: the page Esc goes back to
+                  // is headed Threads (w-34eb858714).
                   crumbFrom={teamOpen ? 'Team' : search !== null ? 'Search'
+                    : onBoard ? 'Threads'
                     : view === 'inbox' && team ? needsWord(picked, team.me)
                       : INBOX_TABS.find((t) => t.view === view)?.label}
                   inlineArtifacts={workspaceNavigation}
@@ -5437,7 +5457,7 @@ export default function App() {
                     // "Nothing needs you" is about you alone; with a teammate
                     // on the page the quiet line says it instead.
                     : view === 'inbox' && !withOthers
-                      ? run === null && <InboxClear running={progress.length} scheduled={snoozed.length}
+                      ? run === null && <InboxClear running={progress.length} scheduled={snoozed.length} team={!!team}
                           onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
                           onCompose={() => setModal('compose')} />
                       : <EmptyTab view={view} />
@@ -5664,7 +5684,7 @@ export default function App() {
             ? (snap.update?.newVersion ?? null)
             : null}
           onInstallUpdate={() => { setModal(null); void api.updateInstall(); }}
-          panelUp={panelUp}
+          panelUp={panelShownNow}
           onTogglePanel={() => { setModal(null); togglePanel(); }}
           boardUp={inboxDisplay.view === 'board'}
           onFlipView={!inFullScreen && search === null && !teamShown && !openCard

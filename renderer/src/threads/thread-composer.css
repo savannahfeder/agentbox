@@ -208,7 +208,9 @@
 
 /* All models, two columns side by side. */
 .tc-cols { display: flex; gap: 6px; }
-.tc-col { display: flex; flex-direction: column; gap: 1px; min-width: 176px; }
+/* flex: 1 so one column, on a Mac with one engine, fills the menu rather than
+   lighting a row half its width (w-db6f5e331e). */
+.tc-col { display: flex; flex-direction: column; gap: 1px; min-width: 176px; flex: 1; }
 
 /* The effort strip at the foot of the model menu, as the old drawer drew it,
    with its first word on the menu's own left line. */

@@ -46,7 +46,7 @@ import { LAST_PRODUCT_KEY } from '../compose-project';
 import { practiceRefusal, noProjectYet } from '../compose-says';
 import { defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type ModelChoice } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../effort';
-import { engineThisMacOffers, readLastEngine, writeLastEngine } from '../engines';
+import { readLastEngine, startingEngine, writeLastEngine } from '../engines';
 import { repeatPresets } from '../components/When';
 import { fitMenu } from '../keep-in-window';
 import {
@@ -196,10 +196,11 @@ export function ThreadComposer({
   /* ------------------------------ model --------------------------------- */
   const engineRows = engines?.length ? engines : [ENGINES[0]];
   const codexOffered = engineRows.some((e) => e.id === 'codex');
+  const claudeOffered = engineRows.some((e) => e.id === 'claude');
   const codexDefault = codexModelDefault ?? null;
   const modelOpts = { codexModels, codexDefault };
   const remembered = (): ModelPick => {
-    const engine: Harness = engineThisMacOffers(readLastEngine(), engineRows) === 'codex' ? 'codex' : 'claude';
+    const engine: Harness = startingEngine(readLastEngine(), engines);
     return { engine, model: readLastModel(undefined, engine, codexDefault) ?? defaultModelFor(engine, codexDefault) };
   };
   const [pick, setPick] = useState<ModelPick>(remembered);
@@ -207,7 +208,9 @@ export function ThreadComposer({
   // the rule the old card followed: a word this Mac cannot run is not held.
   useEffect(() => {
     if (pick.engine === 'codex' && !codexOffered) setPick({ engine: 'claude', model: readLastModel(undefined, 'claude') ?? defaultModelFor('claude') });
-  }, [codexOffered]);
+    // And the other way (w-db6f5e331e): a Mac with Codex and no Claude Code.
+    if (pick.engine === 'claude' && !claudeOffered && codexOffered) setPick({ engine: 'codex', model: readLastModel(undefined, 'codex', codexDefault) ?? defaultModelFor('codex', codexDefault) });
+  }, [codexOffered, claudeOffered]);
   const [effort, setEffort] = useState<string | null>(() => readLastEffort(undefined, pick.engine));
   const pickModel = (p: ModelPick) => {
     setPick(p);
@@ -226,10 +229,10 @@ export function ThreadComposer({
   };
   const labelOf = (p: ModelPick) => engineModelLabel(p.engine, p.model, modelOpts);
   const recent = useMemo(
-    () => recentModels(items, { codexModels, codexDefault, codexOffered }),
-    [items, codexModels, codexDefault, codexOffered],
+    () => recentModels(items, { codexModels, codexDefault, codexOffered, claudeOffered }),
+    [items, codexModels, codexDefault, codexOffered, claudeOffered],
   );
-  const every = useMemo(() => allModels({ codexModels, codexOffered }), [codexModels, codexOffered]);
+  const every = useMemo(() => allModels({ codexModels, codexOffered, claudeOffered }), [codexModels, codexOffered, claudeOffered]);
   const more = moreCount(recent, every);
 
   /* ------------------------------ menus --------------------------------- */
@@ -485,10 +488,14 @@ export function ThreadComposer({
         </button>
         <span className="tc-sep" />
         <div className="tc-cols">
-          <div className="tc-col">
-            <span className="tc-menu-head">{engineLabel('claude')}</span>
-            {every.claude.map(modelRow)}
-          </div>
+          {/* Only a column with rows (w-db6f5e331e): a Mac without Claude
+              Code drew an empty CLAUDE CODE heading here. */}
+          {every.claude.length > 0 && (
+            <div className="tc-col">
+              <span className="tc-menu-head">{engineLabel('claude')}</span>
+              {every.claude.map(modelRow)}
+            </div>
+          )}
           {every.codex.length > 0 && (
             <div className="tc-col">
               <span className="tc-menu-head">{engineLabel('codex')}</span>

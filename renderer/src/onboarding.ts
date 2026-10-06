@@ -1143,8 +1143,12 @@ export const COPY = {
   // WHAT TO TRY NEXT, which is the other half of an ending. Two lines, and the
   // second is the only place the walk names the Team page and messaging a
   // person, which are half the product and were never mentioned.
+  // THE SECOND LINE IS DRAWN ONLY ON A TEAM (w-db6f5e331e), because the public
+  // app does not mention a team at all.
   finishNext: [
     'Next, start a real thread. Press N or click New thread.',
+  ] as readonly string[],
+  finishNextTeam: [
     'Open Team to see what your teammates are working on. To message one, start a thread and pick them in To.',
   ] as readonly string[],
   finishGo: 'Open my inbox',
@@ -1396,6 +1400,8 @@ export function coach(
     tabs?: readonly string[];
     /** The team strip's tab names, when that strip is what is drawn. */
     tabNames?: Readonly<Record<string, string>>;
+    /** Whether this Mac is signed into a team, so the walk names people only then. */
+    team?: boolean;
   } = {},
 ): Coach | null {
   switch (step) {
@@ -1429,8 +1435,10 @@ export function coach(
        key for To: the row is a button and that is the whole of how it opens.
        The loud line is therefore the click alone, with no cap, rather than a
        cap invented to keep the shape of the other cards. */
+    // THE PERSON HALF ONLY ON A TEAM (w-db6f5e331e): on a Mac with no team the
+    // list draws agents alone, and the public app does not mention a team.
     case 'who':
-      return say('Every thread goes to an agent, or to a person on your team.',
+      return say(ctx.team ? 'Every thread goes to an agent, or to a person on your team.' : 'Every thread goes to an agent, and To is where you pick which one.',
         'Click To at the top of the card to see who it can go to.');
     // AND IT NAMES THE BUTTON TOO (2026-10-01). Same round and same reason as
     // `make` above: the card's own button is the thing the ring is round, and

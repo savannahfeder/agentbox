@@ -36,6 +36,16 @@ export function advanceAfter(p: { fromTask: boolean; index: number; id: string }
 }
 
 /**
+ * WHERE THE NEXT TASK IS OPENED: in the list on Needs you, and on the board
+ *  always. The board hides the tabs but `view` still holds the one the list was
+ *  last on, and testing that alone dropped her back on the board after every
+ *  task whenever it was All or Done (w-34eb858714). The Waiting column is the
+ *  inbox, so the hidden tab says nothing about where she is working. */
+export function advanceLandsHere(p: { view: string; onBoard: boolean }): boolean {
+  return p.onBoard || p.view === 'inbox';
+}
+
+/**
  * The task to open once the resolved one is gone: whatever now occupies its
  *  slot, or the one above when it was last. `rows` must be the inbox she is
  *  LOOKING AT, filter applied, and the same list `index` was counted in. Handed

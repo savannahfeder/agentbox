@@ -178,6 +178,9 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
   // her.
   const claudeCode = (engine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;
   let askedACommand = false;
+  // The newest ask written from your side, for an imported Codex
+  // conversation's opening (see the relabel branch in the loop).
+  let yourBody: string | null = null;
   // The short written name, folded forward like `title`. Read once at the end:
   // see `withTitleSaid`.
   let label: string | null = null;
@@ -256,6 +259,22 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
 
     if (!patch || !Object.keys(patch).length) continue;
 
+    // THE YES THAT BRINGS A CODEX CONVERSATION IN (w-db6f5e331e). It writes
+    // the prompt as yours and then relabels the row a Codex mirror
+    // (store.answerCodexImport). The opening was the agent's "Import into …?"
+    // with its options, and a body from your side never replaces an agent's,
+    // so every imported conversation opened on the question that brought it
+    // in. The relabel is the moment the question stops being true: from it
+    // on, the conversation opens on what you asked Codex, as yours.
+    if (Array.isArray(patch.labels) && patch.labels.includes('codex')
+      && patch.labels.some((l) => typeof l === 'string' && l.startsWith('codex:')) && yourBody) {
+      const i = events.findIndex((e) => e.field === 'body');
+      if (i >= 0 && events[i].who === 'agent') events[i] = { ...events[i], who: 'you', said: 'You opened this', words: yourBody };
+      // And the wordless birth line above it says where the row came from.
+      const birth = events.findIndex((e) => e.said === 'An agent opened this' && !e.field);
+      if (birth >= 0) events[birth] = { ...events[birth], said: 'Brought in from Codex' };
+    }
+
     // The ask, on whichever line it arrived. See `opened` above: on her own
     // rows that is the line after the one this list used to call the birth.
     if (!opened && words(patch.body) && !has(patch, 'answer') && !words(patch.result) && !words(patch.note)) {
@@ -285,6 +304,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
         const next = words(patch.body)!;
         if (events[i].words !== next) events[i] = { ...events[i], words: next };
       }
+      if (mine) yourBody = words(patch.body)!;
       // A title on the same line is still a rename, and the branch below says so.
       if (!has(patch, 'title')) continue;
     }

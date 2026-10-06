@@ -999,6 +999,9 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
   app.whenReady().then(() => {
+    // THE ABOUT BOX SAYS AGENTBOX AND ITS OWN VERSION (w-db6f5e331e). Run from
+    // source it read the bundle's, which is Electron's: "Electron 43.0.0".
+    app.setAboutPanelOptions({ applicationName: NAME, applicationVersion: app.getVersion(), version: '' });
     // Serve a granted file, and nothing else. A page under this scheme is one
     // of ours, but it is written by an agent and read by her, so the check is
     // on every request rather than only on the one the pane asked for.

@@ -290,7 +290,9 @@ describe('the pieces on their own', () => {
     expect(groups.map((g) => g.short)).toContain('~/Desktop/dev/harbour');
   });
 
-  it('reads a few days as seven, which is the window her card opens on', () => {
-    expect(RECENT_DAYS).toBe(7);
+  // Seven until the launch list asked for ten (w-db6f5e331e); the cases for
+  // ten live in the-import-offers-the-last-ten-days-from-claude-code-or-codex.
+  it('reads a few days as ten, which is the window her card opens on', () => {
+    expect(RECENT_DAYS).toBe(10);
   });
 });

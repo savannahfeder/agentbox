@@ -60,8 +60,12 @@ describe('vitest\'s own heading over the failures', () => {
     ' FAIL  tests/the-app-is-named-in-one-place.test.mjs > nothing spells a name this app has had > does not type one in main',
   ].join('\n');
 
+  // The count it carries is now kept and the line under it is named with it,
+  // so the note reads as a diagnosis rather than as one line out of three
+  // (w-89f1e810b4). tests/a-ship-note-never-quotes-the-source-it-shipped.mjs
+  // is the measurement.
   it('is passed over for the line under it, which names the file', () => {
-    expect(why(RUN)).toBe('FAIL  tests/the-app-is-named-in-one-place.test.mjs > nothing spells a name this app has had > does not type one in main');
+    expect(why(RUN)).toBe('3 tests failed, the first is FAIL  tests/the-app-is-named-in-one-place.test.mjs > nothing spells a name this app has had > does not type one in main');
   });
 
   it('is not mistaken for the run having died, because it did not', () => {

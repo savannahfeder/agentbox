@@ -25,6 +25,7 @@ import {
   readSummaryOpen, stateGlyph, statusChoices, type StateGlyph, type SummaryField,
 } from './summary-rules';
 import { crumbName } from './crumb-rules';
+import { summaryFits, useRoomyToggle } from '../room';
 import { VISIBILITY_WORD, chosenNames, whoSees, type Seen } from './summary-rules';
 import { findPeople, teammates } from './composer-rules';
 import { shownToPeople } from '../../../shared/thread-cards.mjs';
@@ -65,14 +66,16 @@ const waitsOnYou = (item: Pick<WorkItem, 'assignee'>, me: string | null) =>
 
 /* ------------------------------------------------------------- open, closed */
 
-/** Open or closed, remembered across threads and restarts. Open the first time. */
-export function useSummaryOpen(): [boolean, () => void] {
+/** Open or closed, remembered across threads and restarts. Open the first time.
+ *  FOLDED WHILE THE THREAD'S PANE HAS NO ROOM FOR IT (w-df42206cea, ../room.ts):
+ *  "the summary sidebar view should be default closed (but you can reopen it)".
+ *  The fold is not remembered; a click in a narrow window opens it for now. */
+export function useSummaryOpen(paneWidth = Infinity): [boolean, () => void] {
   const [open, setOpen] = useState(() => (typeof localStorage === 'undefined' ? true : readSummaryOpen(localStorage)));
   useEffect(() => {
     try { localStorage.setItem(SUMMARY_OPEN_KEY, open ? '1' : '0'); } catch { /* a window with no storage keeps it for the session */ }
   }, [open]);
-  const toggle = useCallback(() => setOpen((o) => !o), []);
-  return [open, toggle];
+  return useRoomyToggle(summaryFits(paneWidth), open, setOpen);
 }
 
 /**
@@ -488,6 +491,10 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
         <span className="ts-value">{ownerPerson && <Face person={ownerPerson} />}{owner}</span>
         <span className="ts-label">Project</span>
         <span className="ts-value">{item.productName}</span>
+        {/* ONLY ON A TEAM (w-db6f5e331e). With nobody else on the Mac the row
+            read "Visible to: Team" over a menu of people who do not exist,
+            and the public app is not to mention a team at all. */}
+        {team && <>
         <span className="ts-label">Visible to</span>
         <span className="ts-value ts-menu-anchor" ref={holdMenu('visibility')}>
           {/* All three choices in a menu, like Priority, so she sees what she
@@ -549,6 +556,7 @@ export function SummaryPanel({ item, team, onFinish, onClose }: {
             </span>
           )}
         </span>
+        </>}
         {/* WHEN THE THREE LINES WERE LAST WRITTEN, and only when: "Just now",
             "6 min ago" (summary-rules.ts updatedWord). No row before they
             have ever been written. */}

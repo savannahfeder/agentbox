@@ -12,12 +12,14 @@ current state; this file only holds the rules that are not obvious from them.
 - Name the test file after the behaviour, as a sentence
   (`a-reply-moves-the-agent-row.test.mjs`), and open it with a comment saying
   what broke and how you measured it.
-- Before you report, run the tests for what you changed:
-  `npx vitest related --run <the files you changed>`. That is your own tests
-  plus every test that imports those files. Do not run the whole suite by
-  hand: several agents share one Mac, and the push hook and GitHub already do
-  it (GitHub runs the whole suite on every push; the hook runs it when a change
-  touches what every test depends on).
+- Before you report, run the tests for what you changed: `npm run test:changed`
+  (or `npm run test:changed <files>`). That is your own tests, every test that
+  imports those files, and every test that reads one of them as text —
+  `vitest related` alone misses that last kind, which is how three red tests
+  once shipped and how a branch bounced five times. Do not run the whole suite
+  by hand: several agents share one Mac, and the push hook and GitHub already
+  do it (GitHub runs the whole suite on every push; the hook runs it when a
+  change touches what every test depends on).
 
 ## SHIPPING IS ONE COMMAND: `npm run ship`
 

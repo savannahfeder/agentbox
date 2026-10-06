@@ -66,8 +66,8 @@ const keyOf = (p: ModelPick) => `${p.engine}:${p.model}`;
  */
 export function recentModels(
   items: ReadonlyArray<{ createdAt?: number; model?: string; engine?: string }>,
-  { codexModels = [], codexDefault = null, codexOffered, limit = 3 }:
-    { codexModels?: readonly CodexRow[]; codexDefault?: string | null; codexOffered: boolean; limit?: number },
+  { codexModels = [], codexDefault = null, codexOffered, claudeOffered = true, limit = 3 }:
+    { codexModels?: readonly CodexRow[]; codexDefault?: string | null; codexOffered: boolean; claudeOffered?: boolean; limit?: number },
 ): ModelPick[] {
   const out: ModelPick[] = [];
   const seen = new Set<string>();
@@ -84,7 +84,15 @@ export function recentModels(
     const model = i.model as string;
     const engine: Harness = i.engine === 'codex' || i.engine === 'claude' ? i.engine : harnessOf(model, codexModels);
     if (engine === 'codex' && !codexOffered) continue;
+    if (engine === 'claude' && !claudeOffered) continue;
     add({ engine, model: engine === 'claude' ? claudeAliasOf(model) : model });
+  }
+  // A MAC WITHOUT CLAUDE CODE IS OFFERED NO CLAUDE MODEL (w-db6f5e331e): it
+  // has nothing to run one in, and the menu is a list of what it can run.
+  if (!claudeOffered) {
+    if (codexOffered) add({ engine: 'codex', model: codexDefault ?? codexModels[0]?.id ?? CODEX_OWN });
+    for (const m of codexOffered ? codexModels : []) add({ engine: 'codex', model: m.id });
+    return out;
   }
   add({ engine: 'claude', model: DEFAULT_MODEL });
   add({ engine: 'claude', model: 'sonnet' });
@@ -94,11 +102,11 @@ export function recentModels(
 }
 
 /** Everything behind "All models": Claude Code's list and, when offered, Codex's. */
-export function allModels({ codexModels = [], codexOffered }: { codexModels?: readonly CodexRow[]; codexOffered: boolean }): {
+export function allModels({ codexModels = [], codexOffered, claudeOffered = true }: { codexModels?: readonly CodexRow[]; codexOffered: boolean; claudeOffered?: boolean }): {
   claude: ModelPick[]; codex: ModelPick[];
 } {
   return {
-    claude: claudeModelRows().map((m) => ({ engine: 'claude' as const, model: m.id })),
+    claude: claudeOffered ? claudeModelRows().map((m) => ({ engine: 'claude' as const, model: m.id })) : [],
     codex: codexOffered ? codexModels.map((m) => ({ engine: 'codex' as const, model: m.id })) : [],
   };
 }

@@ -628,7 +628,20 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const talkName = talkNames?.length ? joinNames(talkNames) : null;
   const talkFull = talkOthers.length > 1 ? talkOthers.map((p) => p.name).join(', ') : talkPerson?.name || talkName;
   const summarised = !agent && !made && !direct;
-  const [summaryOpen, toggleSummary] = useSummaryOpen();
+  // The pane's own width decides whether the summary has room (../room.ts),
+  // read before the first paint so a narrow window never flashes it open.
+  const paneRef = useRef<HTMLDivElement>(null);
+  const [paneWidth, setPaneWidth] = useState(Infinity);
+  useLayoutEffect(() => {
+    const pane = paneRef.current;
+    if (!pane) return undefined;
+    setPaneWidth(pane.clientWidth);
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => setPaneWidth(pane.clientWidth));
+    ro.observe(pane);
+    return () => ro.disconnect();
+  }, []);
+  const [summaryOpen, toggleSummary] = useSummaryOpen(paneWidth);
   const summaryOffered = summarised && !openDoc;
   const summaryShown = summaryOffered && summaryOpen;
   useSummaryShortcut(toggleSummary, summaryOffered);
@@ -1175,7 +1188,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // away with the words. An earlier cut of folded state into the className and
   // turned that guard off silently.
   return (
-    <div className="focus-pane" data-summary={summaryShown ? 'open' : summaryOffered ? 'rail' : undefined}>
+    <div className="focus-pane" ref={paneRef} data-summary={summaryShown ? 'open' : summaryOffered ? 'rail' : undefined}>
     {/* THERE IS NO WAY-OUT CONTROL ON AN OPENED TASK ANY MORE.
 
         Both faults were real and both are measured on this row. With a
