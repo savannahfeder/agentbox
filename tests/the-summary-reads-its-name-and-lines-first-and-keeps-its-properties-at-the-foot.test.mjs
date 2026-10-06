@@ -47,8 +47,9 @@ describe('the order', () => {
   const words = text(draw(item()));
   // An empty line is not drawn at all since w-54e9c7243f, so the order is
   // read off a thread with all three written.
-  it('opens with the name, then Problem, Progress and Solution', () => {
-    expect(text(draw(item({ solution: 'Terms sent.' })))).toMatch(/^Acme renewal terms Problem Acme’s contract ends on the 14th\. Progress Terms are drafted\. Solution Terms sent\./);
+  // CHANGED 2026-10-05 (w-54e9c7243f): the words are Context then Done.
+  it('opens with the name, then Context and Done', () => {
+    expect(text(draw(item({ solution: 'Terms sent.' })))).toMatch(/^Acme renewal terms Context Acme’s contract ends on the 14th\. Done Terms are drafted\. Status/);
   });
   it('ends with the properties, Priority second and Updated last', () => {
     expect(words).toMatch(/Status In progress Priority High Owner You Project Northwind Visible to Team Updated 6 min ago$/);

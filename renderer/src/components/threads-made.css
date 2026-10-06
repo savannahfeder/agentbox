@@ -1,0 +1,41 @@
+/* THE THREADS A THREAD MADE (./ThreadsMade.tsx, w-2e8aa16f0f). A bordered list,
+   square, one 1px line between rows; the title in the reading face and the state
+   in the app's mono capitals, quieter once it is done. */
+.made { margin: 22px 0 6px; }
+/* INSIDE THE CONVERSATION it is part of the turn above it rather than a section
+   under the whole thread (w-2e13752a85), so it sits close to the words that
+   came back with it and the thread's own 22px column sets the gap below. */
+.thread-block .made { margin: 12px 0 0; }
+.made-label { margin-bottom: 8px; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.made-list { border: 1px solid var(--line); border-radius: var(--radius); }
+/* The row holds the two presses and keeps the geometry the approved drawing had:
+   the right-hand padding is the approve button's own, so a row without one is
+   padded exactly as before and the state words still line up down the list. */
+.made-row { display: flex; align-items: center; min-height: 40px; padding-right: 14px; }
+.made-row + .made-row { border-top: 1px solid var(--line); }
+.made-row:hover { background: var(--wash); }
+.made-open {
+  display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; min-height: 40px; padding: 0 0 0 14px;
+  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer; text-align: left;
+  font: inherit; font-size: 14px; color: var(--text);
+}
+.made-open:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
+.made-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.made-state { flex: none; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.made-state.done, .made-state.scheduled { color: var(--text-faint); }
+
+/* THE PRESS THAT STARTS A FILED THREAD (w-9cf2b43110). Bordered rather than
+   solid: a list of three proposals would be three filled buttons shouting over
+   the titles they belong to, and the loudest thing in this list should stay the
+   thread's name. It reads as a control at rest and fills in under the cursor. */
+.made-approve {
+  flex: none; margin-left: 14px; padding: 4px 11px;
+  appearance: none; cursor: pointer; border-radius: 5px;
+  border: 1px solid var(--line-strong); background: var(--wash); color: var(--text-dim);
+  font: inherit; font-size: 12px;
+}
+.made-approve:hover { border-color: var(--text-faint); color: var(--text); }
+.made-approve:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
+/* The room a press would take, on a row that has none, so the state words stay
+   in one column down the list (./ThreadsMade.tsx). */
+.made-approve-room { visibility: hidden; pointer-events: none; }

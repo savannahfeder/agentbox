@@ -67,9 +67,10 @@ describe('the panel', () => {
   // CHANGED 2026-10-04 (w-54e9c7243f): a line with no words is left out,
   // heading and all, instead of reading "Not written yet". A stand-in read
   // off the ask is still drawn, dim.
+  // CHANGED 2026-10-05 (w-54e9c7243f): Context and Done, never Solution.
   it('then the lines that have words, a stand-in dim until something is written', () => {
-    expect(words).toMatch(/Problem Acme’s contract ends on the 14th/);
-    expect(words).toMatch(/Progress Terms are drafted at 8% over last year\./);
+    expect(words).toMatch(/Context Acme’s contract ends on the 14th/);
+    expect(words).toMatch(/Done Terms are drafted at 8% over last year\./);
     expect(words).not.toMatch(/Solution|Not written yet/);
     const standIn = draw(React.createElement(SummaryPanel, { item: item({ problem: undefined, body: 'Draft the Acme terms.' }), items, team: null }));
     expect(standIn).toMatch(/class="ts-line dim"[^>]*>Draft the Acme terms\./);
@@ -106,10 +107,12 @@ describe('a teammate’s card', () => {
     problem: 'Acme’s contract ends on the 14th.', progress: 'Terms are drafted at 8% over last year.', solution: 'One page of terms.',
     blockedBy: [{ id: 'w-google', title: 'Sign in with Google' }], blocks: [{ id: 'w-x', title: null }], updatedAt: NOW - 19 * M,
   };
-  it('is exactly the summary’s fields: state, priority, project, visible to, progress first, then the pairs, then the owner', () => {
+  // CHANGED 2026-10-05 (w-54e9c7243f): the card follows the panel, Context as
+  // the lead and then the Done trail; Problem and Solution are gone.
+  it('is exactly the summary’s fields: state, priority, project, visible to, context first, then done, the links, then the owner', () => {
     const words = text(draw(React.createElement(TeammateCard, { card, person: maya })));
     // "Waiting on Maya": a persona (2026-10-01) could not tell who a waiting card waits on.
-    expect(words).toBe('Waiting on Maya High Northwind Visible to the team Terms are drafted at 8% over last year. Problem Acme’s contract ends on the 14th. Solution One page of terms. Blocked by Sign in with Google Blocks A thread you cannot see Ma Maya Chen · kept up to date by the agent · 19 min ago');
+    expect(words).toBe('Waiting on Maya High Northwind Visible to the team Acme’s contract ends on the 14th. Done Terms are drafted at 8% over last year. Blocked by Sign in with Google Blocks A thread you cannot see Ma Maya Chen · kept up to date by the agent · 19 min ago');
   });
   it('shows nothing of a private thread but that it is private, whose it is and its state', () => {
     const words = text(draw(React.createElement(TeammateCard, { card: { ...card, visible: false, title: null, project: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [] }, person: maya })));

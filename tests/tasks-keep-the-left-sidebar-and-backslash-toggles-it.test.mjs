@@ -12,7 +12,9 @@ it('keeps navigation on opened tasks and during onboarding', () => {
 });
 it('uses the same state for the key and the collapse button', () => {
   expect(app).toContain('const toggleWorkspace = togglePanel;');
-  expect(app).toContain('const workspaceCollapsed = !panelUp;');
+  // What is drawn is her choice, or a narrow window's fold (w-df42206cea,
+  // renderer/src/room.ts); the key and the button still share one toggle.
+  expect(app).toContain('const workspaceCollapsed = !panelShownNow;');
 });
 it('never renders the retired project rail', () => {
   expect(app).not.toContain('<Rail');

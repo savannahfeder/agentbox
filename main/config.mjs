@@ -70,6 +70,11 @@ const DEFAULTS = {
   // commands may run at once; null is Auto, one per 8 GB.
   memoryGate: false,
   memoryGateSlots: null,
+  // STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mjs). Its own
+  // switch, off until somebody turns it on; `cleanupLeftoversSince` is the
+  // moment they did, so nothing is stopped sooner than the idle time after it.
+  cleanupLeftovers: false,
+  cleanupLeftoversSince: null,
   // What spawned sessions are allowed to do. Left unset on purpose, because the
   // right default now depends on whether a store MCP server is present: see
   // Supervisor#sessionArgsFor. Setting it here still wins over that, which is

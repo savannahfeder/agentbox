@@ -111,17 +111,17 @@
    sits halfway between. */
 .th-shared-n { display: inline; margin-left: 3px; font: 10.5px var(--mono); color: var(--text-faint); vertical-align: 0.75px; }
 
-/* NOT STARTED, ON THE ROW (w-afb66e6661). Her ask: "some sort of tag, like
-   'not started', that makes it clearer". It is a box rather than more words in
-   the title, so the underline stops where the title does, and it is the only
-   thing on a row that says what Later holds: everything else there has a
-   moment, and this one is waiting for you. */
-.th-tag {
-  display: inline-block; margin-left: 10px; padding: 1px 6px;
-  border: 1px solid var(--line); border-radius: var(--tag-radius);
-  font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
-  color: var(--text-faint); vertical-align: 1px;
-}
+/* NOT STARTED, ON THE ROW (w-afb66e6661) was a boxed capital tag here. It is
+   faint words after the title now, `.th-aside` below (w-4189a5c1a0): the box
+   was turned down, and the words were picked out of four drawings. */
+
+/* A repeating task (w-4189a5c1a0): its mark leads the title, its schedule
+   trails it in the faint ink, in sentence case rather than the tag's capitals.
+   "not started" trails a title the same way. Inline-block so the row's
+   underline, a decoration on the title cell, stops where the title does: drawn
+   inline it ran on under the faint words on an urgent row. */
+.th-repeat { margin-right: 9px; vertical-align: -2px; color: var(--text-faint); flex: none; }
+.th-aside { display: inline-block; margin-left: 12px; color: var(--text-faint); }
 
 /* ------------------------------------------------------------ the list as a table */
 .th-table .row.th-head { padding-top: 10px; padding-bottom: 8px; font: 10.5px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); cursor: default; }
@@ -168,7 +168,14 @@
 .th-menu .sep { height: 1px; background: var(--line); margin: 4px 6px; flex: none; }
 
 /* ------------------------------------------------------------ the board */
-.th-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 10px var(--row-r, 24px) 24px var(--text-x, 32px); align-items: start; }
+/* A COLUMN NEVER SQUEEZES PAST READING (w-df42206cea): in a window about 970
+   points wide the four columns were 138 points each and every title broke onto
+   three or four lines. Each column keeps 260, and when four do not fit the
+   board draws wider than the page and the list around it scrolls sideways,
+   "just like Linear, Notion and all other tables". `fit-content` with a floor
+   of the page's width keeps the right padding in the scroll and fills a wide
+   window as before. */
+.th-board { display: grid; grid-template-columns: repeat(4, minmax(260px, 1fr)); gap: 16px; padding: 10px var(--row-r, 24px) 24px var(--text-x, 32px); align-items: start; box-sizing: border-box; width: fit-content; min-width: 100%; }
 .th-col-h { display: flex; align-items: center; height: 38px; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
 .th-col-h b { font-weight: 400; color: var(--text-faint); margin-left: 8px; }
 .th-card { display: block; width: 100%; text-align: left; font: inherit; background: rgba(255,255,255,.035); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 15px 13px; margin: 0 0 10px; cursor: pointer; }

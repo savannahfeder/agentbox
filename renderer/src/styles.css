@@ -114,11 +114,11 @@
   */
   --doc-page: #fefefe;
   --doc-wash: rgba(17, 25, 48, 0.05);
-  /* THE FIRST CODE COLOURS THIS APP HAS EVER HAD. Five, not the fifteen an
-     editor theme carries, because every one of them has to be answered by dark
-     and by all fourteen picture themes: a comment, a string, a keyword, a
-     number and a capitalised name. Everything else in a line of code is the
-     window's own ink. The green and the red are the app's own --chip-review and
+  /* THE CODE COLOURS. Eight, not the fifteen an editor theme carries, because
+     every one of them has to be answered by dark and by all fourteen picture
+     themes: a comment, a string, a keyword, a number, a type, a function, a
+     name being made and a constant (code-artifact.ts says what each one is).
+     Everything else in a line of code is the window's own ink. The green and the red are the app's own --chip-review and
      --chip-bug, not a new pair, so a change reads in the same two colours a
      review chip and a bug chip already do. The bed under a changed line is that
      colour at a tenth, which is the lightest wash that still reads as a band.
@@ -130,11 +130,22 @@
   /* The line she has a cursor in. Lighter than either of the two beds above,
      because it has to read under them as well as beside them. */
   --code-live-bed: rgba(20, 24, 34, 0.055);
-  --code-com: #6b7382;
-  --code-str: #2f7d4e;
-  --code-kw: #8250a8;
-  --code-num: #a8570d;
-  --code-typ: #2b6ca8;
+  /* THE CODE COLOURS ARE GITHUB'S, 2026-10-05. The five of our own read as
+     "pretty much all gray" in light, and the string was the plus colour
+     itself, so on every added line it vanished into the band. These are the
+     hues a reviewer already knows from the tool they review in, with the
+     purple of a function taken one step darker (#8250df measured 4.39 on the
+     green band; #6f42c1 is 5.66). MEASURED on #fefefe and on both bands,
+     worst of the three: keyword 4.66, comment 5.32, function 5.66, name made
+     and type 6.42, number and constant 6.60, string 11.14. */
+  --code-com: #59636e;
+  --code-str: #0a3069;
+  --code-kw: #cf222e;
+  --code-num: #0550ae;
+  --code-typ: #953800;
+  --code-fn: #6f42c1;
+  --code-def: #953800;
+  --code-con: #0550ae;
   /* A light window keeps its paper under a change; see the rule at the foot of
      this file for why this is a token at all. */
   --code-ground: var(--doc-page);
@@ -449,31 +460,33 @@
   --doc-page: #2e3136;
   --doc-page-held: #2e3136;
   --doc-wash: rgba(255, 255, 255, 0.07);
-  /* The same five, lifted for a dark ground. MEASURED against --doc-page
-     #2e3136: comment 4.67, minus 5.27, keyword 6.06, plus 6.58, capitalised
-     name 6.63, number 6.73, string 7.63. The comment and the minus were the
-     two that had to move; a comment is the longest thing on the screen and it
-     was the one below 4.5. In light, on #fefefe: comment 4.73, minus 4.67,
-     string and plus 5.00, number 5.16, capitalised name 5.46, keyword 5.69. */
+  /* The plus and minus, lifted for a dark ground. MEASURED against --doc-page
+     #2e3136: minus 5.27, plus 6.58; in light, on #fefefe, minus 4.67 and plus
+     5.00. The syntax colours below carry their own measurements. */
   --code-plus: #7bc98e;
   --code-minus: #e28f82;
   --code-plus-bed: rgba(123, 201, 142, 0.13);
   --code-minus-bed: rgba(226, 143, 130, 0.12);
   --code-live-bed: rgba(255, 255, 255, 0.055);
-  --code-com: #939bab;
-  --code-str: #9ed2ad;
-  --code-kw: #c5a3e6;
-  --code-num: #e0b27c;
-  --code-typ: #8fbdec;
+  /* GitHub's dark set, 2026-10-05, for the reason in the light block. MEASURED
+     on --code-ground #0e0f12, the ember ground #22201f and both bands, worst
+     of them: comment 5.01, keyword 6.11, function 7.91, number and constant
+     7.92, name made and type 7.96, string 10.03. */
+  --code-com: #8b949e;
+  --code-str: #a5d6ff;
+  --code-kw: #ff7b72;
+  --code-num: #79c0ff;
+  --code-typ: #ffa657;
+  --code-fn: #d2a8ff;
+  --code-def: #ffa657;
+  --code-con: #79c0ff;
   /* BLACK UNDER A CHANGE, 2026-08-23. Not #000: the app's own darkest
      ground is --bg #1a191b in the Lake and #131316 in plain dark, and a pure
      black beside either reads as a hole rather than as a surface. This is one
      step under the darker of the two, which is what an editor's own ground is
      doing when it looks black. MEASURED against the ink on it, --text #ecedee:
-     15.9:1, and against the five code colours: comment 4.98, keyword 6.46,
-     minus 5.62, plus 7.02, number 7.18, string 8.14, capitalised name 7.07 —
-     every one of them above 4.5, which is what the dark set was solved for on
-     #2e3136 and is why they did not have to move. INHERITED BY ALL SIXTEEN
+     15.9:1, minus 5.62 and plus 7.02; the syntax colours were measured on
+     this ground (see them above). INHERITED BY ALL SIXTEEN
      SKINS: the skin blocks layer over this one and none of them names it. */
   --code-ground: #0e0f12;
   /* Frosted, exactly the values the twenty drawings were made with. */
@@ -2902,9 +2915,27 @@ body {
 .dock-send:hover { background: var(--wash-strong); border-color: var(--text-faint); }
 .dock-send:active { transform: translateY(1px); }
 
-/* `relative` is what the peek card below hangs off. It changes nothing about
-   the strip's own box. */
-.opt-strip { border-bottom: 1px solid var(--line); flex-shrink: 0; position: relative; }
+/* THE OFFER IS A BLOCK IN THE THREAD NOW, NOT A LID ON THE REPLY CARD
+   (w-560647d4db). It used to be the top edge of the dock, so one hairline along
+   its bottom was the whole of its box: everything else around it was the card.
+   Standing at the foot of its own turn it needs a box of its own, and it takes
+   the one the threads a thread filed already wear directly above it
+   (components/threads-made.css), because they are two halves of the same
+   moment: here is what I did, here is what I need from you.
+
+   `relative` is what the peek card below hangs off. */
+.opt-strip {
+  margin: 22px 0 6px; border: 1px solid var(--line); border-radius: var(--radius);
+  flex-shrink: 0; position: relative;
+}
+/* THE ONE PLACE IT IS STILL A LID ON THE REPLY CARD: a document full screen,
+   where the pane's body is off the screen and this dock is all there is
+   (components/Focus.tsx, `offerInDock`). There it wears what it always wore —
+   the card's own top edge — because a bordered box with margins floating inside
+   the card is a second card inside the first. */
+.dock-card > .opt-strip {
+  margin: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+}
 
 /* THE OPTION UNDER THE POINTER, IN FULL. The chosen version opens above and
    nothing moves. `bottom: 100%` puts it entirely outside the strip's box, so the strip
@@ -4263,6 +4294,12 @@ img.app-mark { opacity: 1; border-radius: 0; }
 .msg-body { font-size: 15px; line-height: 1.6; color: var(--text); }
 .msg-body > :first-child { margin-top: 0; }
 .msg-body > :last-child { margin-bottom: 0; }
+/* A PERSON'S MESSAGE, AS TYPED. It carries no markup at all, so the breaks
+   they pressed Return for are the only breaks there are and the stylesheet has
+   to honour them. `anywhere` is for the thing that started this: a pasted
+   command is one long unbroken word to a browser, and without it a search
+   command runs off the side of the column instead of wrapping. */
+.msg-body.typed { white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.same { margin-top: -14px; }
 
 /* THE USER'S MESSAGES OPEN CHAPTERS (w-250047ba5f, 2026-09-26). The user's
@@ -7602,6 +7639,9 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .t-kw { color: var(--code-kw); }
 .t-num { color: var(--code-num); }
 .t-typ { color: var(--code-typ); }
+.t-fn { color: var(--code-fn); }
+.t-def { color: var(--code-def); }
+.t-con { color: var(--code-con); }
 
 /* HOW A CHANGE IS HELD, AND IT IS ANSWERED.So flush is not a setting, it is
    what a change IS: no air, no corner, the file's own header on the window's

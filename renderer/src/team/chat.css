@@ -1,0 +1,194 @@
+/* A CONVERSATION WITH A TEAMMATE (w-2e8aa16f0f, drawing A of round two).
+   Slack's structure in the app's own materials: a square face in a column on
+   the left, the full name and the time once per run, a quiet day line, and a
+   rule that is a hairline. The run itself is ./chat-layout.ts. Nothing here
+   reaches a thread with an agent: every rule hangs off .chat-msg, .chat-day or
+   .is-chat-cont, which only a conversation with a person draws. */
+
+.chat-day {
+  display: flex; align-items: center; gap: 14px; margin: 4px 0 6px;
+  font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint);
+}
+.chat-day::after { content: ''; flex: 1; height: 1px; background: var(--line); opacity: .55; }
+
+.chat-msg { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 14px; }
+.chat-gutter { grid-column: 1; grid-row: 1 / span 3; padding-top: 2px; }
+.chat-msg > .msg-head, .chat-msg > .msg-body, .chat-msg > .chat-more { grid-column: 2; min-width: 0; }
+.chat-msg .msg-head { align-items: baseline; }
+.chat-msg .msg-who { font-size: 14.5px; font-weight: 500; color: var(--text); }
+.chat-msg .msg-when { font: 11px var(--mono); letter-spacing: .03em; color: var(--text-faint); }
+
+/* A message that carries on a run sits close under it, and its time waits in
+   the face column until the pointer is on it. */
+.thread-block.is-chat-cont { margin-top: -12px; }
+.chat-gt { display: block; font: 10px/25px var(--mono); color: var(--text-faint); text-align: right; visibility: hidden; }
+.chat-msg:hover .chat-gt { visibility: visible; }
+
+/* WHAT YOU DID STANDS IN THE TEXT COLUMN, NOT THE FACE COLUMN (w-2b0cd0f741).
+   The timeline's ring sat at the column's edge, which in a conversation is the
+   faces' edge, so "Snoozed until 3:36pm" stood 42px left of every word around
+   it. The whole line, ring and words, starts where the names and the messages
+   start now: the face's 28px and the 14px gap. Picked over a ring centred
+   under the faces (2026-10-05). The quiet line that hands a message to an
+   agent is only ever drawn under a conversation, so it moves with them. */
+.thread.is-chat .act-line, .act-after.is-chat .act-line { margin-left: 42px; }
+.ts-hand { padding-left: 42px; }
+
+/* THE RULE A MESSAGE WRITES WITH ---. The message body had no rule style, so it
+   drew the browser's own grooved 2px line at full strength. */
+.chat-msg .msg-body hr { border: 0; border-top: 1px solid var(--line); opacity: .5; margin: 16px 0; }
+
+.chat-folded { max-height: 340px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 62%, transparent); mask-image: linear-gradient(#000 62%, transparent); }
+.chat-more {
+  justify-self: start; appearance: none; background: none; border: 0; padding: 0; margin-top: 6px;
+  font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer;
+  text-decoration: underline dotted var(--line-strong); text-decoration-thickness: 1px; text-underline-offset: 3px;
+}
+.chat-more:hover { color: var(--text); text-decoration-color: var(--text-faint); }
+.chat-more:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
+
+/* ---------------------- reactions, and the bar on pointing ----------------
+   Drawing A, with round one's note on it: no colour and no rounded corners. So
+   every plate below is a 1px line over the pane's own wash at a square edge,
+   and the ONE distinction a chip makes — whether you are on it — is carried by
+   a brighter line and brighter text rather than by a tint. ./ChatActions.tsx. */
+
+.chat-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+.chat-chip {
+  display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 7px;
+  appearance: none; border: 1px solid var(--line); border-radius: 0; cursor: pointer;
+  background: var(--wash); color: var(--text-dim); font: inherit; font-size: 12px; line-height: 1;
+}
+.chat-chip:hover { border-color: var(--line-strong); color: var(--text); }
+.chat-chip:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 1px; }
+/* YOURS, A SHADE BRIGHTER and nothing more. */
+.chat-chip.mine { border-color: var(--text-faint); color: var(--text); }
+.chat-chip-emoji { font-size: 12.5px; }
+.chat-chip-count { font: 11px var(--mono); letter-spacing: .02em; }
+
+/* THE BAR SITS OVER THE MESSAGE'S TOP EDGE, out of the flow, so pointing at a
+   message never changes its height and never moves the line under it. */
+.chat-msg { position: relative; }
+/* HIDDEN, BUT STILL THERE TO BE TABBED TO. The bar was taken off the screen by
+   not being drawn at all, which also takes its three buttons out of the tab
+   order: the only way to react to a message, quote one or hand one to an agent
+   was with a pointer, and the first of those has no other route anywhere. Faded
+   out and deaf to the mouse is the same thing to look at and a reachable
+   control to use — Tab lands on React and `:focus-within` brings the bar up. */
+.chat-acts {
+  position: absolute; top: -13px; right: 0; z-index: 3;
+  display: flex; align-items: stretch;
+  border: 1px solid var(--line-strong); border-radius: 0;
+  background: var(--skin-solid, var(--surface)); box-shadow: 0 2px 10px #0003;
+  opacity: 0; pointer-events: none; transition: opacity 90ms ease;
+}
+.chat-msg:hover > .chat-acts, .chat-acts:focus-within, .chat-acts.open { opacity: 1; pointer-events: auto; }
+.chat-act {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px;
+  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  color: var(--text-dim); font: inherit; font-size: 12px;
+}
+.chat-act + .chat-act { border-left: 1px solid var(--line); }
+.chat-act:hover { background: var(--wash); color: var(--text); }
+.chat-act:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
+.chat-act svg { width: 14px; height: 14px; flex: none; }
+.chat-act-word { white-space: nowrap; }
+
+/* The emoji plate hangs off the bar and opens UPWARD, for the same reason the
+   reply box's menu does: the newest message is at the foot of the window and
+   there is nothing under it. */
+.chat-emoji {
+  position: absolute; bottom: calc(100% + 5px); right: 0;
+  display: flex; padding: 3px;
+  border: 1px solid var(--line-strong); border-radius: 0;
+  background: var(--skin-solid, var(--surface)); box-shadow: 0 4px 18px #0004;
+}
+.chat-emoji-one {
+  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  width: 26px; height: 26px; padding: 0; font-size: 15px; line-height: 1;
+}
+.chat-emoji-one:hover { background: var(--wash); }
+.chat-emoji-one:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
+
+/* ------------------- the formatting bar under the reply box ----------------
+   ./FormatBar.tsx, drawn only on a chat. It rides the footer line the reply box
+   already has, so it costs no height: it sits where the priority and model
+   clauses sit on a thread with an agent, and the "Goes to …" line and Send keep
+   their own ends of that line. Square and monochrome, like everything else
+   drawing A asked for. */
+
+.fmt-bar { display: flex; align-items: center; gap: 1px; flex: none; margin-right: 14px; }
+.fmt-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; padding: 0;
+  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  color: var(--text-faint); font: inherit;
+}
+.fmt-btn:hover { background: var(--wash); color: var(--text); }
+.fmt-btn:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
+.fmt-btn svg { width: 15px; height: 15px; }
+.fmt-letter { font-size: 13px; line-height: 1; }
+/* B, I and S say what they do by being drawn the way they do it. */
+.fmt-b { font-weight: 700; }
+.fmt-i { font-style: italic; font-family: var(--serif, inherit); }
+.fmt-s { text-decoration: line-through; }
+.fmt-gap { width: 13px; }
+.fmt-emoji-wrap { position: relative; display: inline-flex; }
+
+/* AGENTS IN A CONVERSATION (w-7b9cb8636a, ./ChatAgents.tsx). */
+
+/* An agent mention inside a sent message: the words, on the app's wash. */
+.chat-at { color: var(--text); background: var(--wash-strong); padding: 0 3px; }
+
+/* The agent's answer, under the message that asked for it. */
+.thread-block .chat-agent { margin-top: 20px; }
+.chat-gutter .agent-face { width: 28px; height: 28px; }
+.chat-gutter .agent-face .agent-eyes { width: 22px; height: 22px; }
+.chat-agent-name { appearance: none; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.chat-agent-name:hover { text-decoration: underline; text-underline-offset: 3px; }
+.chat-msg .chat-agent-state { color: var(--text-dim); }
+.chat-msg > .chat-agent-made { grid-column: 2; min-width: 0; }
+.chat-agent-made .made { margin: 10px 0 0; }
+
+/* The @ menu, rising off the reply box like the / menu does. */
+.mention-menu {
+  position: absolute; bottom: calc(100% + 8px); left: 0; width: 440px; max-width: 100%; z-index: 60; padding: 4px;
+  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+}
+.mention-head { padding: 8px 10px 5px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.mention-row {
+  display: flex; align-items: center; gap: 11px; width: 100%; padding: 7px 10px;
+  appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer; text-align: left;
+  font: inherit; font-size: 13px; color: var(--text-dim);
+}
+.mention-row.cursor { background: var(--bg-selected); color: var(--text); }
+.mention-row .tm-av, .mention-row .agent-face { width: 20px; height: 20px; line-height: 18px; font-size: 8px; }
+.mention-hint { margin-left: auto; font: 11px var(--mono); letter-spacing: .03em; color: var(--text-faint); }
+.mention-row.cursor .mention-hint { color: var(--text-dim); }
+
+/* The chips, under the reply box's own text. The layer holds the same words in
+   the same box, invisible except where a mention is; the text above it is the
+   real one, so typing, selecting and the caret are the textarea's own. */
+.dock-input.with-mentions { position: relative; z-index: 1; }
+.mention-layer {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  padding: 12px 16px 6px; font: inherit; line-height: 1.55; white-space: pre-wrap; overflow-wrap: break-word; color: transparent;
+}
+.mention-chip { background: var(--wash-strong); box-shadow: 0 0 0 1px var(--text-faint); }
+.mention-chip.loose { box-shadow: 0 0 0 1px var(--line-strong); background: none; text-decoration: underline dotted var(--text-faint); }
+
+/* The mention's card: project, model and effort, above the box at the chip. */
+.mention-card {
+  position: absolute; bottom: calc(100% + 8px); width: 300px; z-index: 61; padding: 6px 0;
+  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+}
+.mention-card-head { display: flex; align-items: center; gap: 9px; padding: 6px 14px 8px; margin-bottom: 4px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text); }
+.mention-field {
+  display: flex; align-items: center; width: 100%; padding: 7px 14px;
+  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer; text-align: left; font: inherit; font-size: 13px;
+}
+.mention-field:hover, .mention-field.cursor { background: var(--bg-selected); }
+.mention-field .k { width: 72px; flex: none; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.mention-field .v { color: var(--text-dim); }
+.mention-field:hover .v, .mention-field.cursor .v { color: var(--text); }
+.mention-field .car, .mention-field .chk { margin-left: auto; color: var(--text-faint); font-size: 11px; }

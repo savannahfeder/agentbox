@@ -21,7 +21,11 @@ import { fileURLToPath } from 'node:url';
 import { askLine, askFull, askIsClipped, ASK_BUDGET } from '../renderer/src/ask-line.ts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const focus = fs.readFileSync(path.join(root, 'renderer/src/components/Focus.tsx'), 'utf8');
+// THE STRIP MOVED HOUSE (w-560647d4db): it is drawn at the foot of the turn
+// that offered it rather than on the reply card, and its markup moved out of
+// Focus.tsx into its own component with it. Everything this file pins is about
+// that markup, so it reads it where it now lives.
+const focus = fs.readFileSync(path.join(root, 'renderer/src/components/OptionsOffer.tsx'), 'utf8');
 
 const OFFER = ['## Options', '1. Merge it (recommended)', '2. Leave it on the branch'].join('\n');
 // The row in her screenshot, as an agent wrote it: two sentences, no bold, so

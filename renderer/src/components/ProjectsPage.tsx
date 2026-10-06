@@ -25,6 +25,7 @@
 // ../project-priority.ts and its worth is shared/rank.mjs.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { landingRow, nudge, placeBefore, priorityList } from '../project-priority';
 import { ProductMark } from './ProductMark';
 import { shortPath } from './Settings';
@@ -41,7 +42,7 @@ interface Row {
   dir: string;
 }
 
-export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archived = [], onUnarchive, onArchive }: {
+export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archived = [], onUnarchive, onArchive, who }: {
   /** Every project, already in the running order (App's `rankedProducts`). */
   ranked: Product[];
   /** What Settings knows about each project: its folder, what is running, its mode. */
@@ -56,6 +57,9 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
   /** Archive several at once from Select mode: with thirty-odd projects,
    *  opening each one to archive it from its own page is a headache. */
   onArchive?: (slugs: string[]) => void | Promise<void>;
+  /** The Who sees it cell for a project (w-b989839656), handed in by the
+   *  team build. Absent with nobody signed in, and then there is no column. */
+  who?: (product: Product) => ReactNode;
 }) {
   // FOLDED AWAY until asked for. An archived project is one you chose not to
   // see, so the list of them stays one quiet line unless you open it.
@@ -131,6 +135,8 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
     return out;
   }, [full.join('\n'), ranked, details, archived]);
   const allSlugs = rows.map((r) => r.slug);
+  // The project as the snapshot has it, for the Who sees it column.
+  const project = useMemo(() => new Map(ranked.map((p) => [p.slug, p])), [ranked]);
 
   const [filter, setFilter] = useState('');
   const needle = filter.trim().toLowerCase();
@@ -268,6 +274,7 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
             <div className="pp-head" aria-hidden="true">
               <span className="pp-rank">#</span>
               <span className="pp-head-name">Project</span>
+              {who && <span className="pp-head-who">Who sees it</span>}
               {onSetOrder && <span className="pp-head-move">Move</span>}
             </div>
           )}
@@ -314,6 +321,9 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
                     {/* THE FOLDER, which tells two projects of the same name apart. */}
                     {p.dir && <span className="pp-where">{shortPath(p.dir)}</span>}
                   </span>
+                  {/* WHO SEES ITS THREADS (design 1B, w-b989839656), only on a
+                      team, where the question exists. */}
+                  {who && <span className="pp-who">{who(project.get(p.slug) ?? (p as unknown as Product))}</span>}
                   {onSetOrder && !selecting && (
                     <span className="pp-acts">
                       <button type="button" className="pp-top" disabled={rank === 0}

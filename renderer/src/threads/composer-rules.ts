@@ -15,6 +15,7 @@ import { splitMessage } from '../message-split';
 import { parseWhen } from '../format';
 import { firstName } from '../team/company';
 import type { Person } from '../types';
+import { projectSeenBy } from '../../../shared/thread-cards.mjs';
 
 export type Harness = 'claude' | 'codex';
 
@@ -327,12 +328,20 @@ export function sharingFields(visibility: Visibility, chosen: readonly string[])
 }
 
 /**
- * WHERE THE CHIP STARTS. Team, except in your personal project, where it is
- * Private (w-b989839656): that project is for the things you would be anxious
- * to show the team by accident, so sharing one is the choice you make.
+ * WHERE THE CHIP STARTS: wherever the project is (w-b989839656). A Just you
+ * project, My Workspace among them, starts Private; a project shared with
+ * chosen people starts on those people; anything else starts on Team. The
+ * chip stays the card's own control, so one thread can still say otherwise.
  */
-export function startingVisibility(product: { personal?: boolean } | null | undefined): Visibility {
-  return product?.personal === true ? 'private' : 'team';
+type ProjectSeen = { personal?: boolean; seenBy?: string; seenByPeople?: string[] } | null | undefined;
+export function startingVisibility(product: ProjectSeen): Visibility {
+  const { who } = projectSeenBy(product);
+  return who === 'private' ? 'private' : who === 'people' ? 'people' : 'team';
+}
+
+/** The people ticked when the card starts on a chosen-people project. */
+export function startingChosen(product: ProjectSeen): string[] {
+  return projectSeenBy(product).people;
 }
 
 /** The names on the Visibility chip: "Theo", "Theo and Ana", "3 people". */

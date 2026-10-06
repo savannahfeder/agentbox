@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('zero', {
   teamShare: (payload) => ipcRenderer.invoke('zero:team-share', payload),
   teamSync: () => ipcRenderer.invoke('zero:team-sync'),
   teamRoute: (payload) => ipcRenderer.invoke('zero:team-route', payload),
+  teamReact: (payload) => ipcRenderer.invoke('zero:team-react', payload),
   teamMessage: (payload) => ipcRenderer.invoke('zero:team-message', payload),
   threadEdit: (payload) => ipcRenderer.invoke('zero:thread-edit', payload),
   // Repeating tasks. A rule, not a work item, so it has its own channels
@@ -147,6 +148,7 @@ contextBridge.exposeInMainWorld('zero', {
   projectIconClear: (payload) => ipcRenderer.invoke('zero:project-icon-clear', payload),
   // Archive a project or bring it back; also a flag in its own project.json.
   projectArchive: (payload) => ipcRenderer.invoke('zero:project-archive', payload),
+  projectSeenBy: (payload) => ipcRenderer.invoke('zero:project-seen-by', payload),
   // Her rules for one project, briefed after the standing ones.
   projectInstructionsRead: (payload) => ipcRenderer.invoke('zero:project-instructions-read', payload),
   projectInstructionsWrite: (payload) => ipcRenderer.invoke('zero:project-instructions-write', payload),

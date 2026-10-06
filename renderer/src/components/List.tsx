@@ -17,9 +17,9 @@ import { isTroubleRow, TROUBLE_ID } from '../trouble-row';
 import { isUpdateRow, UPDATE_ID } from '../update-row';
 import { IMPORT_KEYS, JUST_IMPORTED_WORD, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEYS, isImportRow, isNotImportedRow, justImported, type ImportChoice } from '../import-row';
 import { splitHits } from '../search';
-import { isCleanRun, nextRunAt } from '../../../shared/repeats.mjs';
+import { clockLabel, isCleanRun, nextRunAt } from '../../../shared/repeats.mjs';
 import { TeamRowEnd, type TeamView } from '../team/people';
-import { RowCells, TableHead, ThreadCells } from '../threads/Pages';
+import { RepeatMark, RowCells, TableHead, ThreadCells } from '../threads/Pages';
 import type { MixedRow } from '../threads/people-rules';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
 
@@ -87,6 +87,33 @@ export function repeatRow(rule: RepeatRule, last: WorkItem | null, now = Date.no
   return { when, last: `last run ${stamp(last.updatedAt, now)}, ${previewText(last.result) || 'needs a look'}` };
 }
 
+// THE SCHEDULE, IN FAINT WORDS AFTER A REPEATING TASK'S TITLE (w-4189a5c1a0).
+// With the repeat mark before the title it is what makes the row a repeating
+// task, so it replaces the "Repeating" heading the table used to draw above
+// it, and it is read off the rule: the chip it replaces said "daily" on every
+// rule, weekly ones included. It carries the hour too, because the time column
+// is 96px and "Tomorrow 10:00 AM" ran past the page's right edge in the first
+// drawing. Lower case, because it trails the title as a phrase, not a label.
+export function repeatTag(rule: RepeatRule): string {
+  const days = rule.every === 'weekday' ? 'weekdays'
+    : rule.every === 'week' ? `every ${new Date(2026, 0, 4 + (rule.on ?? 0)).toLocaleDateString(undefined, { weekday: 'long' })}`
+      : 'every day';
+  return `${days} at ${clockLabel(rule.at).replace(':00', '')}`;
+}
+
+// Which day it next runs, for the table's time column, in that column's own
+// short words: Today, Tomorrow, a weekday inside the week, a date past it.
+export function nextRunWords(rule: RepeatRule, now = Date.now()): string {
+  const next = nextRunAt(rule, now);
+  if (!next) return 'Not scheduled';
+  const midnight = (ts: number) => new Date(ts).setHours(0, 0, 0, 0);
+  const days = Math.round((midnight(next) - midnight(now)) / 86_400_000);
+  const d = new Date(next);
+  return days === 0 ? 'Today' : days === 1 ? 'Tomorrow'
+    : days < 7 ? d.toLocaleDateString(undefined, { weekday: 'long' })
+      : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 // The day groups, and the key each one is drawn under. KEYED BY THE FIRST ROW
 // IN THE GROUP, NOT BY THE LABEL: this list is ordered by what matters most,
 // not by when, so "Today" can be the answer twice with a "Yesterday" between
@@ -109,7 +136,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null }: {
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -204,6 +231,9 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   /** The Person cell, for your rows (personId = you) and for theirs. */
   personCell?: (personId: string | null) => ReactNode;
   onOpenCard?: (card: ThreadCard) => void;
+  /** The teammate's row the keyboard is on, by `stopKey` (threads/walk-rules.ts).
+   *  While it is set none of your rows is drawn selected. */
+  selectedCard?: string | null;
 }) {
   const rules = view === 'snoozed' ? (repeats ?? []) : [];
   // The keys the rows in THIS list offer, drawn on the row under the pointer.
@@ -325,7 +355,30 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
       {/* Repeating tasks sit above the deferred rows, in the tab that already
           holds work with a moment attached. They are RULES, not items, so they
           arrive on their own list and no inbox rule has an opinion about them. */}
-      {rules.length > 0 && (
+      {/* IN THE TABLE THEY ARE ROWS LIKE EVERY OTHER (w-4189a5c1a0). Under the
+          Thread column a "Repeating" heading read as a second level of
+          hierarchy, and a title over a grey line with three facts squeezed to
+          the right looked like nothing else on the page. Now: the title with
+          its schedule as a tag, the project, the priority, and when it next
+          runs in the time column. How the last run went is in the hover title
+          and on the task itself; a run that needs a look is its own row in
+          Needs you. */}
+      {table && rules.map((rule) => {
+        const pool = allItems ?? items;
+        const last = rule.lastOccurrence ? pool.find((i) => i.id === rule.lastOccurrence) ?? null : null;
+        const live = !!last && (last.status === 'open' || last.status === 'claimed');
+        return (
+          <div key={rule.id} data-repeat-id={rule.id} className="row" title={repeatRow(rule, last).last}
+            onClick={() => onOpenRepeat?.(rule)}>
+            <span className="mark" aria-hidden="true" />
+            <RowCells live={live} lead={<RepeatMark />} title={rule.title} aside={repeatTag(rule)} where={rule.productName}
+              person={withPerson ? personCell?.(team?.me ?? null) : undefined}
+              priority={rule.priority ?? 5} updatedAt={rule.updatedAt ?? rule.createdAt}
+              when={nextRunWords(rule)} now={Date.now()} />
+          </div>
+        );
+      })}
+      {!table && rules.length > 0 && (
         <div>
           <div className="day-label">Repeating</div>
           {rules.map((rule) => {
@@ -333,17 +386,18 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
             const last = rule.lastOccurrence ? pool.find((i) => i.id === rule.lastOccurrence) ?? null : null;
             const row = repeatRow(rule, last);
             return (
-              <div key={rule.id} className="row" onClick={() => onOpenRepeat?.(rule)}>
+              <div key={rule.id} data-repeat-id={rule.id} className="row" onClick={() => onOpenRepeat?.(rule)}>
                 <span className="mark" />
                 <div className="row-main">
                   <div className="subject">{rule.title}</div>
                   <div className="preview">{row.last}</div>
                 </div>
-                {/* A rule keeps its chip where a message lost one: "daily" is
-                    not a category the summary is about to restate, it is the
-                    one fact that makes this row a rule and not a message. */}
+                {/* A rule keeps its chip where a message lost one: its
+                    schedule is not a category the summary is about to restate,
+                    it is the one fact that makes this row a rule and not a
+                    message. Read off the rule, never written in. */}
                 <div className="row-end">
-                  <span className="chip">daily</span>
+                  <span className="chip">{repeatTag(rule)}</span>
                   <span className="product">{rule.productName}</span>
                   <span className="time">{row.when}</span>
                 </div>
@@ -360,12 +414,14 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
               first result. */}
           {group.label && !table && <div className="day-label">{group.label}</div>}
           {group.items.map((entry) => {
-            // A TEAMMATE'S THREAD: their card, opened on a click. No select
-            // box and no keys, because nothing on this Mac can act on it.
+            // A TEAMMATE'S THREAD: their card, opened on a click or on Enter.
+            // J and K stop on it like any row (w-fb16bcaeba), but no select
+            // box and no other keys, because nothing on this Mac can act on it.
             if (entry.card) {
               const c = entry.card;
+              const key = `card/${c.personId}/${c.threadId}`;
               return (
-                <div key={`card/${c.personId}/${c.threadId}`} className="row th-their-row" onClick={() => onOpenCard?.(c)}>
+                <div key={key} className={`row th-their-row${selectedCard === key ? ' selected' : ''}`} onClick={() => onOpenCard?.(c)}>
                   <span className="mark" aria-hidden="true" />
                   <RowCells title={c.title ?? 'Private thread'} where={c.project ?? ''} person={personCell?.(c.personId)}
                     priority={c.priority} updatedAt={c.updatedAt} now={Date.now()} />
@@ -399,7 +455,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                 {...(view === 'inbox' && !isImportRow(item)
                   ? { 'data-hint': 'row', 'data-hint-text': '.subject' }
                   : {})}
-                className={`row ${made ? 'trouble-row ' : ''}${index === selected ? 'selected' : ''} ${checked ? 'checked' : ''}`}
+                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}`}
                 /*
                  * ON MOUSE MOVE, NOT ON MOUSE ENTER. A pointer parked over the
                    list while she walks it with J and K would otherwise claim

@@ -1,229 +1,600 @@
-// WHAT FINISHED AGENTS LEFT RUNNING IS STOPPED WHEN MEMORY IS SHORT — w-3958c3753d.
+// WHAT FINISHED AGENTS LEAVE RUNNING IS STOPPED, ON A RULE THE PERSON TURNED ON — w-3958c3753d.
 //
 // WHAT BROKE. On 2026-10-05, after a night of agents, the founder's 16 GB Mac
 // showed "Your system has run out of application memory" with every agent
-// already finished. Measured that morning: programs that finished agents had
-// started and never stopped held 3.3 GB (two Next.js dev servers, one 14 hours
-// and one almost 3 days old; three video preview servers with headless
-// browsers; three copies of a test script), and Docker Desktop, started by one
-// of those agents, held 4.5 GB more in its virtual machine. About 7.7 GB of 16
-// held by work that had already ended. The memory check only orders commands
-// that are about to start, so it said "Nothing heavy running" the whole time.
+// already finished. Measured that morning: programs finished agents had
+// started and never stopped held 3.3 GB (two Next.js dev servers, one almost
+// 3 days old; three preview servers with headless browsers; three copies of a
+// test script) and Docker Desktop, started by one of them, 4.5 GB more. 40
+// programs from 7 tasks; stopping them by hand took swap from 7.4 to 4.2 GB.
 //
-// HOW THEY ARE FOUND. Every worker is spawned with ZERO_ITEM=<its task id> in
-// its environment and everything it starts inherits it, measured on all eight
-// leftovers that morning, Docker's backend included. A program that renames
-// itself (next-server) hides its environment from `ps`, so a process under a
-// tagged one belongs to the same task.
-//
-// WHEN THEY ARE STOPPED. Only while memory is tight or critical, and only for a
-// task with no agent running, seen that way on two looks a minute apart, so a
-// reply that is just restarting the agent is not raced. Never while memory is
-// fine: agents leave a preview server running on purpose for somebody to open,
-// and stopping those on a timer would break the link in their answer.
+// THE RULES, agreed with Codex over four rounds (the first version, which
+// stopped anything tagged whenever memory was tight, was taken apart):
+//   - it is its own switch, off by default; with it off leftovers are only
+//     reported;
+//   - a task's programs may be stopped only after its run has explicitly ended
+//     in this app (or its worker is verified gone), 2 hours after that, or 10
+//     minutes while memory is tight, never earlier than when the switch went on;
+//   - starting a run on the task cancels it at once, inside the app, before the
+//     worker is spawned;
+//   - nothing protected is ever stopped: AGENTBOX_KEEP=1, anything run from an
+//     installed app or the system, an unreadable executable, anything under
+//     those; protection is remembered per process, so it survives a parent
+//     exiting;
+//   - a process must be seen with the same identity a minute apart and again
+//     just before the signal; SIGTERM only, never SIGKILL; whatever survives is
+//     reported, and the next agent on that task is told not to reuse it.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { parseEnvListing, leftovers, LeftoverSweeper } from '../main/leftovers.mjs';
-import { MemoryGateServer } from '../main/memory-gate-server.mjs';
-import { memoryGateSettings } from '../main/settings.mjs';
-import { Supervisor } from '../main/supervisor.mjs';
+import { parseListings, LeftoverCleaner } from '../main/leftovers.mjs';
 
-const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-
-const HOUR = 3_600_000;
+const MIN = 60_000;
+const HOUR = 60 * MIN;
 const T0 = 1_791_200_000_000;
-
-/** One `ps -E -ww -axo pid=,ppid=,etime=,rss=,command=` line. */
-const line = (pid, ppid, etime, rssKb, command) => `${String(pid).padStart(6)} ${String(ppid).padStart(6)} ${etime.padStart(11)} ${String(rssKb).padStart(8)} ${command}`;
-
-const APP = { pid: 500, ppid: 1, startedAt: T0 - 9 * HOUR, mb: 300, cmd: 'Electron .', item: null };
-const agent = (pid, item) => ({ pid, ppid: APP.pid, startedAt: T0 - HOUR, mb: 300, cmd: '/Users/x/.local/bin/claude -p --output-format stream-json', item });
-const proc = (pid, ppid, item, cmd = 'node server.mjs', mb = 100, startedAt = T0 - 5 * HOUR) => ({ pid, ppid, startedAt, mb, cmd, item });
+const sec = (ms) => Math.floor(ms / 1000);
 
 describe('reading the process list', () => {
-  it('takes the task id from each program\'s environment, and its start time from how long it has run', () => {
-    const text = [
-      line(30788, 1, '14:38:21', 90_000, 'node pnpm exec next dev -p 3011 PATH=/usr/bin ZERO_PRODUCT=astral-video ZERO_ITEM=w-bddbdfe747 HOME=/Users/x'),
-      line(31907, 30788, '14:38:14', 700_000, 'next-server (v16.3.6)'),
-      line(64505, 1, '3-02:00:00', 900_000, '/Applications/Arc.app/Contents/MacOS/Arc'),
-    ].join('\n');
-    const procs = parseEnvListing(text, T0);
-    expect(procs.map((p) => [p.pid, p.item])).toEqual([[30788, 'w-bddbdfe747'], [31907, null], [64505, null]]);
-    expect(procs[0].startedAt).toBe(T0 - (14 * 3600 + 38 * 60 + 21) * 1000);
-    expect(Math.round(procs[1].mb)).toBe(684);
-    expect(procs[0].cmd).toBe('node pnpm exec next dev -p 3011');
+  const date = (ms) => new Date(ms).toString().slice(0, 24).replace(/GMT.*/, '').trim();
+  const lstart = (ms) => {
+    const d = new Date(ms);
+    const day = d.toLocaleString('en-US', { weekday: 'short' });
+    const mon = d.toLocaleString('en-US', { month: 'short' });
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${day} ${mon} ${String(d.getDate()).padStart(2, ' ')} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${d.getFullYear()}`;
+  };
+  void date;
+  const started = T0 - 3 * HOUR;
+  const base = [
+    `30788     1  90000 ${lstart(started)} /usr/local/bin/node`,
+    `31907 30788 700000 ${lstart(started)} /usr/local/bin/node`,
+    `40000     1  10000 ${lstart(started)} /usr/local/bin/node`,
+    `50000     1  10000 ${lstart(started)} /usr/local/bin/node`,
+  ].join('\n');
+  const argv = [
+    `30788 ${lstart(started)} node next dev -p 3011`,
+    `31907 ${lstart(started)} next-server (v16.3.6)`,
+    `40000 ${lstart(started)} node tool.mjs ZERO_ITEM=w-fromargv`,
+    `50000 ${lstart(started)} node other.mjs`,
+  ].join('\n');
+  const full = [
+    `30788 ${lstart(started)} node next dev -p 3011 PATH=/usr/bin ZERO_PRODUCT=demo ZERO_ITEM=w-aaaa1111 HOME=/Users/x`,
+    `31907 ${lstart(started)} next-server (v16.3.6)`,
+    `40000 ${lstart(started)} node tool.mjs ZERO_ITEM=w-fromargv`,
+    `50000 ${lstart(started + 5000)} node other.mjs ZERO_ITEM=w-bbbb2222`,
+  ].join('\n');
+  const procs = parseListings({ base, argv, full });
+  const by = Object.fromEntries(procs.map((p) => [p.pid, p]));
+
+  it('takes the task id from the environment, never from the command\'s own words', () => {
+    expect(by[30788].item).toBe('w-aaaa1111');
+    expect(by[30788].product).toBe('demo');
+    expect(by[40000].item).toBe(null);
+  });
+
+  it('reads nothing when the two looks disagree about which program it is', () => {
+    expect(by[50000].item).toBe(null);
+  });
+
+  it('a program that hides its environment carries no tag of its own', () => {
+    expect(by[31907].item).toBe(null);
+  });
+
+  it('keeps start time to the second, the executable path, and memory', () => {
+    expect(by[30788].start).toBe(sec(started));
+    expect(by[30788].exe).toBe('/usr/local/bin/node');
+    expect(Math.round(by[31907].mb)).toBe(684);
   });
 });
 
-describe('what counts as left behind', () => {
-  it('a finished agent\'s server and everything under it, including a program that hides its environment', () => {
-    const procs = [APP, proc(30788, 1, 'w-gone'), proc(31907, 30788, null, 'next-server (v16.3.6)', 700)];
-    const found = leftovers(procs);
-    expect(found).toHaveLength(1);
-    expect(found[0].item).toBe('w-gone');
-    expect(found[0].procs.map((p) => p.pid).sort()).toEqual([30788, 31907]);
-    expect(Math.round(found[0].mb)).toBe(800);
-  });
+describe('the cleaner', () => {
+  const NODE = '/Users/x/.nvm/versions/node/v22/bin/node';
+  const p = (pid, ppid, item, extra = {}) => ({ pid, ppid, mb: 100, start: sec(T0 - 5 * HOUR), exe: NODE, item, product: 'demo', keep: false, cmd: 'node server.mjs', ...extra });
 
-  it('never a task whose agent is still running', () => {
-    const procs = [APP, agent(600, 'w-live'), proc(601, 600, 'w-live'), proc(700, 1, 'w-live')];
-    expect(leftovers(procs)).toEqual([]);
-  });
-
-  it('never a task the app says has a session, even before its agent process shows up', () => {
-    const procs = [APP, proc(700, 1, 'w-starting')];
-    expect(leftovers(procs, { live: (item) => item === 'w-starting' })).toEqual([]);
-  });
-
-  it('never a program no agent started: the app itself, your browser, your own terminal sessions', () => {
-    const procs = [APP, proc(64505, 1, null, 'Arc'), proc(800, 1, null, '/Users/x/.local/bin/claude'), proc(801, 800, null, 'node dev')];
-    expect(leftovers(procs)).toEqual([]);
-  });
-});
-
-describe('the sweep', () => {
-  function harness(procs, { pressure = 'tight' } = {}) {
+  function harness(procs, { pressure = 'normal', onSince = T0 - 10 * HOUR, owns = () => true } = {}) {
     let now = T0;
     let list = procs;
+    let level = pressure;
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-'));
     const signals = [];
-    const sweeper = new LeftoverSweeper({
+    const live = new Set();
+    const make = () => new LeftoverCleaner({
       list: async () => list,
       kill: (pid, sig) => { signals.push([pid, sig]); },
       clock: () => now,
+      readPressure: async () => level,
+      file: path.join(dir, 'leftovers.json'),
+      enabledSince: onSince,
+      live: (item) => live.has(item),
+      owns,
     });
-    return {
-      sweeper, signals,
+    const h = {
+      cleaner: make(), signals, live,
       setList: (l) => { list = l; },
+      setPressure: (l) => { level = l; },
       advance: (ms) => { now += ms; },
-      sweep: () => sweeper.sweep(pressure),
+      restart: () => { h.cleaner = make(); },
+      tick: () => h.cleaner.tick(),
+      // Two looks a minute apart, the way the app's timer does it.
+      settle: async () => { await h.tick(); now += MIN; await h.tick(); },
     };
+    return h;
   }
-  const night = () => [APP, proc(30788, 1, 'w-gone'), proc(31907, 30788, null, 'next-server', 700)];
+  const night = () => [p(30788, 1, 'w-done'), p(31907, 30788, null, { cmd: 'next-server' })];
 
-  it('does nothing while memory is fine', async () => {
-    const h = harness(night(), { pressure: 'normal' });
-    await h.sweep(); h.advance(120_000); await h.sweep();
+  it('stops a finished task\'s programs, and what hides its tag under them, two hours after the run ended', async () => {
+    const h = harness(night());
+    h.cleaner.ended('w-done');
+    // `settle` looks twice a minute apart, so this last look is at 1 h 59 m.
+    h.advance(118 * MIN); await h.settle();
     expect(h.signals).toEqual([]);
+    h.advance(1 * MIN); await h.settle();
+    expect(h.signals.map(([pid, s]) => `${pid}:${s}`).sort()).toEqual(['30788:SIGTERM', '31907:SIGTERM']);
   });
 
-  it('waits for a second look a minute later, then asks every leftover to stop', async () => {
-    const h = harness(night());
-    await h.sweep();
-    expect(h.signals).toEqual([]);
-    h.advance(30_000); await h.sweep();
-    expect(h.signals).toEqual([]);
-    h.advance(31_000); await h.sweep();
-    expect(h.signals.map(([p, s]) => `${p}:${s}`).sort()).toEqual(['30788:SIGTERM', '31907:SIGTERM']);
+  it('after ten minutes instead while memory is tight', async () => {
+    const h = harness(night(), { pressure: 'tight' });
+    h.cleaner.ended('w-done');
+    h.advance(9 * MIN); await h.settle();
+    expect(h.signals.length).toBe(2);
   });
 
-  it('leaves a task alone if its agent came back between the two looks', async () => {
+  it('never earlier than two hours after the switch went on, whenever the run ended', async () => {
+    const h = harness(night(), { onSince: T0 });
+    h.cleaner.ended('w-done');
+    h.advance(60 * MIN); await h.settle();
+    expect(h.signals).toEqual([]);
+    h.advance(61 * MIN); await h.settle();
+    expect(h.signals.length).toBe(2);
+  });
+
+  it('never SIGKILL, and what ignores the request is reported, not forced', async () => {
     const h = harness(night());
-    await h.sweep();
-    h.setList([...night(), agent(900, 'w-gone')]);
-    h.advance(61_000); await h.sweep();
+    h.cleaner.ended('w-done');
+    h.advance(3 * HOUR); await h.settle();
+    h.advance(5 * MIN); await h.settle();
+    expect(h.signals.some(([, s]) => s === 'SIGKILL')).toBe(false);
+    expect(h.cleaner.status().survivors.map((s) => s.pid).sort()).toEqual([30788, 31907]);
+  });
+
+  it('a run starting on the task cancels it, and the agent is told what is still shutting down', async () => {
+    const h = harness(night());
+    h.cleaner.ended('w-done');
+    h.advance(3 * HOUR); await h.settle();
+    const note = h.cleaner.starting('w-done');
+    expect(note).toMatch(/30788/);
+    expect(note).toMatch(/do not reuse/i);
     h.setList(night());
-    h.advance(61_000); await h.sweep();
+    h.advance(3 * HOUR); await h.settle();
+    expect(h.signals.length).toBe(2);
+  });
+
+  it('a run starting before the time is up means nothing is stopped', async () => {
+    const h = harness(night());
+    h.cleaner.ended('w-done');
+    h.advance(100 * MIN);
+    h.cleaner.starting('w-done');
+    h.advance(3 * HOUR); await h.settle();
     expect(h.signals).toEqual([]);
   });
 
-  it('forces what is still running ten seconds later, and only if it is the same program', async () => {
+  it('a task the app has a session for is never touched, whatever the records say', async () => {
     const h = harness(night());
-    await h.sweep(); h.advance(61_000); await h.sweep();
-    // 30788 stopped; 31907 ignored the request; and 31907's number now belongs
-    // to nothing else, so it is forced. A third pid was reused by a new program.
-    h.setList([APP, proc(31907, 30788, null, 'next-server', 700)]);
-    h.advance(10_000);
-    await h.sweeper.finishStops();
-    expect(h.signals.filter(([, s]) => s === 'SIGKILL')).toEqual([[31907, 'SIGKILL']]);
+    h.cleaner.ended('w-done');
+    h.live.add('w-done');
+    h.advance(3 * HOUR); await h.settle();
+    expect(h.signals).toEqual([]);
   });
 
-  it('never forces a pid that now belongs to a different program', async () => {
-    const h = harness(night());
-    await h.sweep(); h.advance(61_000); await h.sweep();
-    h.setList([APP, proc(31907, 1, null, 'something new', 50, T0 + 65_000)]);
-    h.advance(10_000);
-    await h.sweeper.finishStops();
-    expect(h.signals.filter(([, s]) => s === 'SIGKILL')).toEqual([]);
+  it('a task with no ended run is never stopped: a run with no end is not finished', async () => {
+    const h = harness(night(), { owns: () => false });
+    h.advance(3 * HOUR); await h.settle();
+    expect(h.signals).toEqual([]);
+    expect(h.cleaner.status().leftovers.map((l) => l.item)).toEqual(['w-done']);
   });
 
-  it('says what it stopped, in a sentence the Settings page shows', async () => {
+  it('a task of this app with leftovers and no session is recorded as ended, and gets a full two hours from then', async () => {
     const h = harness(night());
-    await h.sweep(); h.advance(61_000); await h.sweep();
-    expect(h.sweeper.last).toMatchObject({ programs: 2, tasks: 1 });
-    expect(Math.round(h.sweeper.last.mb)).toBe(800);
+    await h.settle();
+    h.advance(100 * MIN); await h.settle();
+    expect(h.signals).toEqual([]);
+    h.advance(25 * MIN); await h.settle();
+    expect(h.signals.length).toBe(2);
+  });
+
+  it('a run left "running" by a crash counts as ended only once its worker is seen gone', async () => {
+    const worker = p(600, 1, 'w-crashed', { exe: '/Users/x/.local/bin/claude', cmd: 'claude -p' });
+    const h = harness([worker, p(601, 1, 'w-crashed')]);
+    h.cleaner.starting('w-crashed');
+    h.cleaner.worker('w-crashed', 600);
+    h.restart();
+    h.advance(3 * HOUR); await h.settle();
+    expect(h.signals).toEqual([]);
+    h.setList([p(601, 1, 'w-crashed')]);
+    await h.settle();
+    h.advance(2 * HOUR + 2 * MIN); await h.settle();
+    expect(h.signals).toEqual([[601, 'SIGTERM']]);
+  });
+
+  it('records survive the app restarting', async () => {
+    const h = harness(night());
+    h.cleaner.ended('w-done');
+    h.restart();
+    h.advance(3 * HOUR); await h.settle();
+    expect(h.signals.length).toBe(2);
+  });
+
+  it('nothing the person asked to keep, nothing from an installed app, nothing under those', async () => {
+    const h = harness([
+      p(700, 1, 'w-done', { keep: true }), p(701, 700, null),
+      p(800, 1, 'w-done', { exe: '/Applications/Docker.app/Contents/MacOS/com.docker.backend' }), p(801, 800, null, { exe: '/Users/x/.docker/helper' }),
+      p(900, 1, 'w-done', { exe: '' }),
+      p(950, 1, 'w-done'),
+    ]);
+    h.cleaner.ended('w-done');
+    h.advance(3 * HOUR); await h.settle();
+    expect(h.signals).toEqual([[950, 'SIGTERM']]);
+  });
+
+  it('protection is remembered when its parent exits, even across a restart', async () => {
+    // Docker's helpers carry the agent's task id themselves, so once the app
+    // that protected them exits, only the remembered protection keeps them.
+    const h = harness([p(800, 1, 'w-done', { exe: '/Applications/Docker.app/Contents/MacOS/Docker' }), p(801, 800, 'w-done')]);
+    h.cleaner.ended('w-done');
+    await h.tick();
+    h.setList([p(801, 1, 'w-done')]);
+    h.restart();
+    h.advance(3 * HOUR); await h.settle();
+    expect(h.signals).toEqual([]);
+  });
+
+  it('a program first seen less than a minute ago waits for the next look', async () => {
+    const h = harness(night());
+    h.cleaner.ended('w-done');
+    h.advance(3 * HOUR); await h.settle();
+    const late = p(32000, 30788, null, { start: sec(T0 + 3 * HOUR) });
+    h.setList([...night(), late]);
+    h.signals.length = 0;
+    await h.tick();
+    expect(h.signals.find(([pid]) => pid === 32000)).toBeUndefined();
+  });
+
+  it('checks again just before the signal: a run that started meanwhile wins', async () => {
+    const h = harness(night());
+    h.cleaner.ended('w-done');
+    h.advance(3 * HOUR); await h.tick();
+    h.advance(MIN);
+    let calls = 0;
+    h.cleaner.list = async () => { calls += 1; if (calls === 2) h.cleaner.starting('w-done'); return night(); };
+    await h.tick();
+    expect(h.signals).toEqual([]);
+  });
+
+  it('a pid now held by a different program is never signalled', async () => {
+    const h = harness(night());
+    h.cleaner.ended('w-done');
+    h.advance(3 * HOUR); await h.tick();
+    h.advance(MIN);
+    h.setList([p(30788, 1, 'w-done', { start: sec(T0 + 3 * HOUR) }), p(31907, 30788, null, { cmd: 'next-server' })]);
+    await h.tick();
+    expect(h.signals).toEqual([[31907, 'SIGTERM']]);
   });
 
   it('a list that cannot be read stops nothing and does not throw', async () => {
-    const sweeper = new LeftoverSweeper({ list: async () => { throw new Error('ps failed'); }, kill: () => { throw new Error('no'); }, clock: () => T0 });
-    await expect(sweeper.sweep('critical')).resolves.toBe(null);
+    const h = harness(night());
+    h.cleaner.ended('w-done');
+    h.cleaner.list = async () => { throw new Error('ps failed'); };
+    h.advance(3 * HOUR);
+    await expect(h.tick()).resolves.toBeTruthy();
+    expect(h.signals).toEqual([]);
+  });
+
+  it('reports what is left, how old, and when it stops, for the Settings page', async () => {
+    const h = harness(night());
+    h.cleaner.ended('w-done');
+    h.advance(30 * MIN); await h.settle();
+    const s = h.cleaner.status();
+    expect(s.leftovers).toEqual([expect.objectContaining({ item: 'w-done', programs: 2, stopsAt: T0 + 2 * HOUR })]);
   });
 });
 
-describe('the coordinator runs the sweep', () => {
-  async function coordinator(level, { owner = true } = {}) {
-    const dir = fs.mkdtempSync(path.join('/tmp', 'sweep-'));
-    const calls = [];
-    let now = T0;
-    const server = new MemoryGateServer({
-      socketPath: path.join(dir, 'g.sock'),
-      readPressure: async () => ({ level, freePct: 40 }),
-      sampleProcesses: async () => [],
-      pollMs: 60_000,
-      sweepEveryMs: 30_000,
-      clock: () => now,
-      sweeper: { sweep: async (p) => { calls.push(p); return null; }, last: null },
-    });
-    if (owner) await server.start(); else server.role = 'standby';
-    return { server, calls, dir, advance: (ms) => { now += ms; }, done: async () => { await server.stop(); fs.rmSync(dir, { recursive: true, force: true }); } };
+describe('the app', () => {
+  // These need the real Supervisor and settings, imported late so the file's
+  // pure tests above do not pay for them.
+  async function app(config = {}) {
+    const { Supervisor } = await import('../main/supervisor.mjs');
+    const { fileURLToPath } = await import('node:url');
+    const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-app-'));
+    const store = { listItems: () => [], listProducts: () => [], isDue: () => true, readItem: (slug, id) => (id === 'w-mine' ? { id, product: slug } : null) };
+    const sup = new Supervisor({ storeRoot: tmp, home: tmp, ...config }, store, root, tmp, tmp);
+    return { sup, tmp };
   }
 
-  it('hands the sweep the pressure it read, at most every 30 seconds', async () => {
-    const c = await coordinator(2);
-    await c.server._poll();
-    c.advance(10_000); await c.server._poll();
-    c.advance(25_000); await c.server._poll();
-    expect(c.calls).toEqual(['tight', 'tight']);
-    await c.done();
+  it('with the switch off there is no cleaner and agents are told nothing about it', async () => {
+    const { sup } = await app();
+    expect(sup.leftoverStatus()).toBe(null);
+    expect(sup.leftoverBriefNote({ id: 'w-x' }, { fresh: true })).toBe(null);
   });
 
-  it('only the app that owns the coordinator sweeps, so two apps never both do', async () => {
-    const c = await coordinator(4, { owner: false });
-    await c.server._poll();
-    expect(c.calls).toEqual([]);
-    await c.done();
+  it('with it on, a fresh agent is told what happens to what it leaves running, and how to keep something', async () => {
+    const { sup } = await app({ cleanupLeftovers: true, cleanupLeftoversSince: T0 });
+    await sup.setLeftoverCleanup(true);
+    const note = sup.leftoverBriefNote({ id: 'w-x' }, { fresh: true });
+    expect(note).toMatch(/AGENTBOX_KEEP=1/);
+    expect(note).toMatch(/two hours/);
+    await sup.setLeftoverCleanup(false);
+  });
+
+  it('a session ending is recorded as the run ending, and a later session on the row is left alone', async () => {
+    const { sup } = await app({ cleanupLeftovers: true, cleanupLeftoversSince: T0 });
+    await sup.setLeftoverCleanup(true);
+    const cleaner = sup._leftoverCleaner;
+    const first = {};
+    sup.sessions.set('w-mine', first);
+    cleaner.starting('w-mine');
+    await sup.endSession({ id: 'w-mine', product: 'demo' }, first, null);
+    expect(cleaner.runs['w-mine'].state).toBe('ended');
+    const later = {};
+    sup.sessions.set('w-mine', later);
+    cleaner.starting('w-mine');
+    await sup.endSession({ id: 'w-mine', product: 'demo' }, first, null);
+    expect(cleaner.runs['w-mine'].state).toBe('running');
+    await sup.setLeftoverCleanup(false);
+  });
+
+  it('the cleaner knows which tasks are this app\'s and which have a session', async () => {
+    const { sup } = await app({ cleanupLeftovers: true, cleanupLeftoversSince: T0 });
+    await sup.setLeftoverCleanup(true);
+    const cleaner = sup._leftoverCleaner;
+    expect(cleaner.owns('w-mine', 'demo')).toBe(true);
+    expect(cleaner.owns('w-someone-elses', 'demo')).toBe(false);
+    expect(cleaner.owns('w-mine', null)).toBe(false);
+    sup.sessions.set('w-mine', {});
+    expect(cleaner.live('w-mine')).toBe(true);
+    await sup.setLeftoverCleanup(false);
   });
 });
 
-describe('what the Settings page says', () => {
-  const config = { memoryGate: true, memoryGateSlots: null };
-  const status = (cleared) => ({ role: 'owner', pressure: 'tight', running: [], waiting: [], cleared });
-
-  it('what it stopped, for an hour', () => {
-    const now = memoryGateSettings({ config, supervisor: { memoryGateStatus: () => status({ at: Date.now() - 5 * 60_000, programs: 40, tasks: 7 }) } }).now;
-    expect(now).toBe('Memory is tight. Nothing heavy running. It stopped 40 programs that finished agents had left running.');
+describe('the Settings page', () => {
+  it('turning it on is remembered with the moment it went on, and starts the cleaner now', async () => {
+    const { setWorkspaceSetting, leftoverSettings } = await import('../main/settings.mjs');
+    const { loadConfig } = await import('../main/config.mjs');
+    const appDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-settings-'));
+    fs.writeFileSync(path.join(appDir, 'zero.config.json'), '{}');
+    const config = loadConfig(appDir);
+    config.appDir = appDir;
+    expect(config.cleanupLeftovers).toBe(false);
+    const calls = [];
+    const supervisor = { setLeftoverCleanup: async (on) => { calls.push(on); }, leftoverStatus: () => null };
+    const before = Date.now();
+    setWorkspaceSetting({ config, supervisor }, { key: 'cleanupLeftovers', value: true });
+    const disk = JSON.parse(fs.readFileSync(path.join(appDir, 'zero.config.json'), 'utf8'));
+    expect(disk.cleanupLeftovers).toBe(true);
+    expect(disk.cleanupLeftoversSince).toBeGreaterThanOrEqual(before);
+    expect(calls).toEqual([true]);
+    expect(leftoverSettings({ config, supervisor }).on).toBe(true);
   });
 
-  it('and nothing about it after that', () => {
-    const now = memoryGateSettings({ config, supervisor: { memoryGateStatus: () => status({ at: Date.now() - 2 * HOUR, programs: 40, tasks: 7 }) } }).now;
-    expect(now).toBe('Memory is tight. Nothing heavy running.');
+  it('says what finished agents have left running, and when it goes', async () => {
+    const { leftoverSettings } = await import('../main/settings.mjs');
+    const now = Date.now();
+    const status = {
+      leftovers: [
+        { item: 'w-a', programs: 4, kept: 0, oldest: now - 3 * 24 * HOUR, stopsAt: now + 100 * MIN },
+        { item: 'w-b', programs: 0, kept: 2, oldest: now - HOUR, stopsAt: null },
+      ],
+      survivors: [],
+    };
+    const on = leftoverSettings({ config: { cleanupLeftovers: true }, supervisor: { leftoverStatus: () => status } }).now;
+    expect(on).toBe('Finished agents have left 6 programs running. 4 stop in 1 h 40 m; 2 are kept.');
+    const off = leftoverSettings({ config: { cleanupLeftovers: false }, supervisor: { leftoverStatus: () => null } }).now;
+    expect(off).toBe(null);
   });
 });
 
-describe('the app wires it up', () => {
-  it('the sweeper treats every task with a session in this app as live', async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sweep-sup-'));
+// FOUND ON THE REAL MAC, 2026-10-05, running the cleaner on real processes: a
+// Next.js dev server renames itself (process.title), and macOS then reports
+// that new name as its executable ("next-server (e2e"), so it read as an
+// executable we could not see and was kept forever. And when its parent was
+// stopped first it was moved under launchd and lost its task. Measured: lsof
+// resolves the real executable for the 46 renamed processes on that Mac in
+// 24 ms.
+describe('a program that renames itself', () => {
+  it('has its real executable read from lsof', async () => {
+    const { applyExecutables } = await import('../main/leftovers.mjs');
+    const procs = [{ pid: 97969, exe: 'next-server (e2e' }, { pid: 500, exe: '/usr/bin/caffeinate' }, { pid: 600, exe: 'login' }];
+    const lsof = 'p97969\nftxt\nn/Users/x/.nvm/versions/node/v22/bin/node\nftxt\nn/usr/lib/dyld\np600\n';
+    applyExecutables(procs, lsof);
+    expect(procs.map((p) => p.exe)).toEqual(['/Users/x/.nvm/versions/node/v22/bin/node', '/usr/bin/caffeinate', 'login']);
+  });
+
+  it('stays its task\'s after its parent is stopped, and is stopped too', async () => {
+    const NODE = '/Users/x/.nvm/versions/node/v22/bin/node';
+    const p = (pid, ppid, item) => ({ pid, ppid, mb: 50, start: sec(T0 - 5 * HOUR), exe: NODE, item, product: 'demo', keep: false, cmd: 'node' });
+    let now = T0;
+    let list = [p(10, 1, 'w-done'), p(11, 10, null)];
+    const signals = [];
+    const cleaner = new LeftoverCleaner({
+      list: async () => list, kill: (pid, sig) => signals.push([pid, sig]), clock: () => now,
+      readPressure: async () => 'normal', enabledSince: 0, owns: () => true,
+    });
+    cleaner.ended('w-done');
+    await cleaner.tick();
+    // The parent exits on its own; launchd adopts the child.
+    list = [p(11, 1, null)];
+    now += 3 * HOUR; await cleaner.tick();
+    now += MIN; await cleaner.tick();
+    expect(signals).toEqual([[11, 'SIGTERM']]);
+  });
+});
+
+// CODEX'S CODE REVIEW OF c7e490c, 2026-10-05: six defects, each reproduced by
+// Codex with injected listings before it reported them. One test per defect.
+describe('what the code review found', () => {
+  const NODE = '/Users/x/.nvm/versions/node/v22/bin/node';
+  const p = (pid, ppid, item, extra = {}) => ({ pid, ppid, mb: 50, start: sec(T0 - 5 * HOUR), exe: NODE, item, product: 'demo', keep: false, cmd: 'node', ...extra });
+  const LAUNCHD = { pid: 1, ppid: 0, mb: 10, start: sec(T0 - 9 * 24 * HOUR), exe: '/sbin/launchd', item: null, product: null, keep: false, cmd: '/sbin/launchd' };
+  function make(list, extra = {}) {
+    let now = T0;
+    const signals = [];
+    const c = new LeftoverCleaner({
+      list: async () => (typeof list === 'function' ? list() : list), kill: (pid, sig) => signals.push([pid, sig]), clock: () => now,
+      readPressure: async () => 'normal', enabledSince: 0, owns: () => true, ...extra,
+    });
+    return { c, signals, advance: (ms) => { now += ms; } };
+  }
+
+  it('1. switching it off while a look is under way stops nothing', async () => {
+    let calls = 0;
+    const h = make(() => { calls += 1; if (calls === 3) h.c.disable(); return [LAUNCHD, p(10, 1, 'w-done')]; });
+    h.c.ended('w-done');
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(MIN); await h.c.tick();
+    expect(h.signals).toEqual([]);
+  });
+
+  it('1b. while it is off it looks and reports, and never signals', async () => {
+    const h = make([LAUNCHD, p(10, 1, 'w-done')]);
+    h.c.disable();
+    h.c.ended('w-done');
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(MIN); await h.c.tick();
+    expect(h.signals).toEqual([]);
+    expect(h.c.status().leftovers.map((l) => l.item)).toEqual(['w-done']);
+  });
+
+  it('2. a task with a running agent process is never finished, records or not, and an agent is never signalled', async () => {
+    const worker = p(600, 500, 'w-orphan', { exe: '/Users/x/.local/bin/claude', cmd: '/Users/x/.local/bin/claude -p' });
+    const h = make([LAUNCHD, worker, p(601, 600, null)]);
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(3 * HOUR); await h.c.tick();
+    expect(h.signals).toEqual([]);
+    expect(h.c.runs['w-orphan']).toBeUndefined();
+    h.c.ended('w-orphan');
+    h.advance(3 * HOUR); await h.c.tick();
+    expect(h.signals).toEqual([]);
+  });
+
+  it('3. launchd adopting a server does not protect it', async () => {
+    const h = make([LAUNCHD, p(10, 1, 'w-done')]);
+    h.c.ended('w-done');
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(MIN); await h.c.tick();
+    expect(h.signals).toEqual([[10, 'SIGTERM']]);
+  });
+
+  it('3b. a command an agent ran through the system shell is not protected by the shell', async () => {
+    const shell = p(20, 1, 'w-done', { exe: '/bin/zsh', cmd: '/bin/zsh -c npm run dev' });
+    const h = make([LAUNCHD, shell, p(21, 20, null)]);
+    h.c.ended('w-done');
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(MIN); await h.c.tick();
+    expect(h.signals.map(([pid]) => pid).sort()).toEqual([20, 21]);
+  });
+
+  it('3c. but an installed app\'s helpers stay protected, and protection saved by the old version is thrown away', async () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-v1-')), 'leftovers.json');
+    fs.writeFileSync(file, JSON.stringify({ runs: {}, protectedIds: [`10:${sec(T0 - 5 * HOUR)}:${NODE}`], stopping: {} }));
+    const docker = p(30, 1, 'w-done', { exe: '/Applications/Docker.app/Contents/MacOS/com.docker.backend' });
+    const h = make([LAUNCHD, p(10, 1, 'w-done'), docker, p(31, 30, 'w-done')], { file });
+    h.c.ended('w-done');
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(MIN); await h.c.tick();
+    expect(h.signals).toEqual([[10, 'SIGTERM']]);
+  });
+
+  it('4. a run on a task whose programs were asked to stop under 30 seconds ago waits for the rest of that time', async () => {
+    const h = make([LAUNCHD, p(10, 1, 'w-done')]);
+    h.c.ended('w-done');
+    h.advance(3 * HOUR); await h.c.tick();
+    h.advance(MIN); await h.c.tick();
+    expect(h.c.holdMs('w-done')).toBe(30_000);
+    h.advance(20_000);
+    expect(h.c.holdMs('w-done')).toBe(10_000);
+    h.advance(11_000);
+    expect(h.c.holdMs('w-done')).toBe(0);
+    expect(h.c.holdMs('w-other')).toBe(0);
+  });
+
+  it('5. while it is off, Settings says what turning it on would stop, including what is running now', async () => {
+    const { leftoverSettings } = await import('../main/settings.mjs');
+    const status = { leftovers: [{ item: 'w-a', programs: 38, kept: 2, oldest: Date.now() - 3 * 24 * HOUR, stopsAt: null }], survivors: [] };
+    const off = leftoverSettings({ config: { cleanupLeftovers: false }, supervisor: { leftoverStatus: () => status } }).now;
+    expect(off).toBe('Right now finished agents have left 40 programs running; turning this on stops 38 of them, two hours from then.');
+  });
+});
+
+// CODEX'S SECOND REVIEW, of a4e2b19, 2026-10-05: three more, each reproduced.
+describe('what the second review found', () => {
+  const NODE = '/Users/x/.nvm/versions/node/v22/bin/node';
+  const p = (pid, ppid, item, extra = {}) => ({ pid, ppid, mb: 50, start: sec(T0 - 5 * HOUR), exe: NODE, item, product: 'demo', keep: false, cmd: 'node', ...extra });
+
+  async function supervisor() {
+    const { Supervisor } = await import('../main/supervisor.mjs');
+    const { fileURLToPath } = await import('node:url');
+    const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-review2-'));
     const store = { listItems: () => [], listProducts: () => [], isDue: () => true, readItem: () => null };
-    const sup = new Supervisor({ storeRoot: tmp, home: tmp, memoryGate: true, memoryGateSocket: path.join(tmp, 'g.sock') }, store, root, tmp, tmp);
-    await sup.setMemoryGate(true);
-    sup.sessions.set('w-running', {});
-    const sweeper = sup._memoryGate.sweeper;
-    expect(sweeper.live('w-running')).toBe(true);
-    expect(sweeper.live('w-finished')).toBe(false);
-    await sup.stopMemoryGate();
-    fs.rmSync(tmp, { recursive: true, force: true });
+    const sup = new Supervisor({ storeRoot: tmp, home: tmp }, store, root, tmp, tmp);
+    await sup.setLeftoverCleanup(true);
+    // Programs of w-held were asked to stop a moment ago.
+    sup._leftoverCleaner.stopping['1:1:/x'] = { item: 'w-held', pid: 4242, cmd: 'next dev', exe: '/x', at: Date.now() };
+    return sup;
+  }
+
+  it('1. a run waiting out the 30 seconds is cancelled by Stop, and never starts', async () => {
+    const { vi } = await import('vitest');
+    const sup = await supervisor();
+    vi.useFakeTimers();
+    try {
+      sup.spawnWorker({ id: 'w-held', product: 'demo' });
+      expect(sup._preparing.has('w-held')).toBe(true);
+      expect(sup.stopSession('w-held')).toBe(true);
+      const spy = vi.spyOn(sup, 'spawnWorker');
+      vi.advanceTimersByTime(40_000);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      await sup.setLeftoverCleanup(false);
+    }
+  });
+
+  it('2. what runs under a task\'s program whose executable cannot be read is kept too', async () => {
+    let now = T0;
+    const signals = [];
+    const c = new LeftoverCleaner({
+      list: async () => [p(40, 1, 'w-done', { exe: 'Some Renamed App' }), p(41, 40, null), p(50, 1, 'w-done')],
+      kill: (pid, sig) => signals.push([pid, sig]), clock: () => now, readPressure: async () => 'normal', enabledSince: 0, owns: () => true,
+    });
+    c.ended('w-done');
+    now += 3 * HOUR; await c.tick();
+    now += MIN; await c.tick();
+    expect(signals).toEqual([[50, 'SIGTERM']]);
+  });
+
+  it('3. with the switch off, an agent is still told about programs already asked to stop, and not the rule', async () => {
+    const sup = await supervisor();
+    await sup.setLeftoverCleanup(false);
+    const note = sup.leftoverBriefNote({ id: 'w-held' });
+    expect(note).toMatch(/4242/);
+    expect(note).not.toMatch(/AGENTBOX_KEEP/);
+  });
+});
+
+describe('6. every run is told the rule while it is on', () => {
+  it('a resumed conversation too', async () => {
+    const { Supervisor } = await import('../main/supervisor.mjs');
+    const { fileURLToPath } = await import('node:url');
+    const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cleaner-brief-'));
+    const store = { listItems: () => [], listProducts: () => [], isDue: () => true, readItem: () => null };
+    const sup = new Supervisor({ storeRoot: tmp, home: tmp, cleanupLeftovers: true, cleanupLeftoversSince: T0 }, store, root, tmp, tmp);
+    await sup.setLeftoverCleanup(true);
+    expect(sup.leftoverBriefNote({ id: 'w-x' }, { fresh: false })).toMatch(/AGENTBOX_KEEP=1/);
+    await sup.setLeftoverCleanup(false);
+    expect(sup.leftoverBriefNote({ id: 'w-x' }, { fresh: true })).toBe(null);
   });
 });

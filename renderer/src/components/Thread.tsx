@@ -31,10 +31,14 @@ import { actWhen, actWords } from '../act-line';
 import { herTurnEnds, herTurnStarts } from '../her-turns';
 import { holdAtBottom } from '../thread-bottom';
 import { clock, dayHeading } from '../thread-history';
+import { chatLayout } from '../team/chat-layout';
+import { ChatFold } from '../team/ChatFold';
+import { MessageActions, Reactions } from '../team/ChatActions';
+import { AgentAnswers } from '../team/ChatAgents';
 import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
 } from '../../../shared/agents.mjs';
-import type { AgentEvent, AgentWork } from '../types';
+import type { AgentEvent, AgentTurn, AgentWork } from '../types';
 
 // How much of an output stands open before she asks for the rest. The chosen
 // drawings show five or six lines: enough to see what came back, short
@@ -67,7 +71,7 @@ export interface CodeInThread {
   open: (path: string) => void;
 }
 
-export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, landOn, md, code, chat = false }: {
+export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, name, landOn, md, code, tail, chat = false, reactions, onReact, onQuote, onHandToAgent }: {
   // CUT THE AGENT'S CURRENT STEP so a message of hers that is waiting on it is
   // answered now (w-f37a34def6). Absent where nothing can be cut.
   onSendNow?: () => unknown;
@@ -104,6 +108,27 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   // The change this conversation made, when there is one. Absent means every
   // work line stays the plain line it has always been.
   code?: CodeInThread | null;
+  // SOMETHING THAT BELONGS TO ONE TURN RATHER THAN TO THE WHOLE THREAD, drawn
+  // at the end of it and scrolling away with it (w-2e13752a85). The index is
+  // the one the event had in `events`, so whoever hands this down matches on
+  // the same list it hands in. The thread does not know what goes here and must
+  // not learn: it draws two completely different conversations, and the list of
+  // threads a run filed only exists for one of them.
+  tail?: (index: number) => ReactNode;
+  // WHAT PEOPLE PUT ON EACH MESSAGE (w-560647d4db), by the message's uid, then
+  // by emoji, then the people on it. Straight off the row (`item.reactions`,
+  // shared/work-items.mjs); nothing is counted here.
+  reactions?: Record<string, Record<string, string[]>>;
+  // AND THE WAY TO PUT ONE ON OR TAKE IT OFF. Absent everywhere a chat is not
+  // being drawn, which is also what decides whether a message gets the bar on
+  // pointing at all: a thread with an agent keeps exactly the screen it had.
+  onReact?: (uid: string, emoji: string, off: boolean) => void;
+  // Put a message's words in the reply box as a quote, which is what Reply
+  // means in a conversation that has no sub-threads.
+  onQuote?: (text: string) => void;
+  // Turn this conversation into work. The line that used to say so sat under
+  // the whole conversation; it is an action on a message now.
+  onHandToAgent?: () => void;
 }) {
   // Which work lines are open, and how far. Kept per conversation, not globally.
   const [open, setOpen] = useState<Map<number, number>>(new Map());
@@ -199,9 +224,46 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   const cutAt = nodes.findIndex((e) => (e.kind === 'run' ? e.items[e.items.length - 1]?.i : e.i) === gapAfter);
   const turnStarts = herTurnStarts(nodes, cutAt);
   const turnEnds = herTurnEnds(nodes, cutAt);
+  // A CONVERSATION WITH A PERSON IS LAID OUT AS A CHAT (w-2e8aa16f0f): a face
+  // in a column, one head per run of messages, a line for each day. Which
+  // message opens what is ../team/chat-layout.ts; a folded run is work to it.
+  const slots = chat ? chatLayout(nodes.map((e) => (e.kind === 'run' ? { kind: 'work', at: e.at } : e))) : null;
+  // What a message's head says beside the name, in either layout: sending, the
+  // way to cut the agent's step, and which row the words were said on.
+  const headFacts = (e: AgentTurn, time: string) => <>
+    {/* SENT, AND THE AGENT HAS NOT TAKEN IT YET (w-1ef03d6f27).
+        It stands where the time stands, because it is the same
+        fact: a message with no time on it has not happened to
+        anybody but her yet. The real time replaces it when the
+        agent picks the message up, which is the only moment at
+        which the row knows one. */}
+    {/* AND WHETHER Z STILL REACHES IT: three seconds, then
+        `steer` has it. See `held` in types.ts (w-5281ef1221). */}
+    {/* AND, ONCE IT IS IN LINE, THAT IT IS WAITING ON THE STEP THE
+        AGENT IS IN, which can be a command minutes long, with
+        the one way to stop waiting (w-f37a34def6). */}
+    {e.pending
+      ? <span className="msg-when msg-sending">{e.held ? 'Sending… press Z to undo' : cutting ? 'Sending now…' : onSendNow ? 'Waiting for its current step' : 'Sending…'}</span>
+      : <span className="msg-when">{time}</span>}
+    {e.pending && !e.held && !cutting && onSendNow && (
+      <button type="button" className="msg-now" onClick={() => { setCutting(true); onSendNow(); }}>
+        Send now
+      </button>
+    )}
+    {/* WHICH ROW THESE WORDS ARE ON, when they are not on this
+        one. It rides the message's own head rather than a box
+        above the conversation (w-23db941885), so the way back
+        to the row it was typed on survives without a second
+        component owning the top of the screen. */}
+    {e.on && (
+      <button type="button" className="msg-on" onClick={onOpenOrigin}>
+        on {e.on}
+      </button>
+    )}
+  </>;
 
   return (
-    <div className="thread">
+    <div className={`thread${chat ? ' is-chat' : ''}`}>
       {chat && omitted > 0 && (
         <button type="button" className="thread-gap thread-gap-top" onClick={openGap}>
           {`Show ${omitted} earlier message${omitted === 1 ? '' : 's'}`}
@@ -229,11 +291,14 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
         // wrapper that is. Every spacing rule written against those selectors
         // was dead, and the 22px column gap was the only thing setting the
         // rhythm. Naming the wrapper is what lets the rhythm be set at all.
+        const slot = slots?.[n];
         const holds = e.kind === 'run' ? 'is-run'
           : e.kind === 'work' ? (e.yours ? 'is-act' : 'is-work')
+          : slot && !slot.head ? 'is-msg is-chat-cont'
           : e.same ? 'is-msg-same' : 'is-msg';
         return (
         <div key={`${e.at}-${key}-${n}`} className={`thread-block ${holds} ${ends === gapAfter ? 'has-gap' : ''}`}>
+          {slot?.day && <div className="chat-day">{slot.day}</div>}
           {e.kind === 'work' && e.yours
             ? <ActLine act={e} />
             : e.kind === 'run'
@@ -256,7 +321,47 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                 onStep={(next) => stepLine(key, next)}
                 code={code}
               />
-            : (
+            : slot ? (<>
+              {/* A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face holds the
+                  column; a message that carries on a run keeps the column for
+                  its time, shown on pointing. None of the agent thread's
+                  chapters: no rule above or below your words and no larger
+                  type, because a turn means nothing between two people. */}
+              <div className={`msg chat-msg${slot.head ? '' : ' cont'}${e.pending ? ' sending' : ''}`}>
+                <div className="chat-gutter">{slot.head
+                  ? <Face person={teammateOf(e) ?? (team?.me ? team.byId.get(team.me) : null)} me={!teammateOf(e) && e.who === 'you'} agent={e.who === 'it'} size="lg" />
+                  : <span className="chat-gt">{clock(e.at)}</span>}</div>
+                {slot.head && (
+                  <div className="msg-head">
+                    <span className="msg-who">{teammateOf(e)?.name ?? (e.who === 'you' ? 'You' : name)}</span>
+                    {headFacts(e, clock(e.at))}
+                  </div>
+                )}
+                <ChatFold>{md(e.text ?? '')}</ChatFold>
+                {/* THE CHIPS, AND THE BAR WHEN YOU POINT AT IT (w-560647d4db).
+                    Both hang off the message's own uid, which is the name the
+                    store keeps a reaction under and the only name a message has
+                    that is the same on every teammate's Mac. A message still on
+                    its way has not been written down and so has neither: it is
+                    not reactable until it exists. */}
+                {e.uid && (
+                  <Reactions
+                    on={reactions?.[e.uid]}
+                    me={team?.me ?? null}
+                    onReact={(emoji, off) => onReact?.(e.uid!, emoji, off)}
+                  />
+                )}
+                {e.uid && onReact && (
+                  <MessageActions
+                    onReact={(emoji) => onReact(e.uid!, emoji, (reactions?.[e.uid!]?.[emoji] ?? []).includes(team?.me ?? ''))}
+                    onQuote={() => onQuote?.(e.text ?? '')}
+                    onHandToAgent={onHandToAgent}
+                  />
+                )}
+              </div>
+              {/* AN AGENT IT MENTIONED ANSWERS UNDER IT (w-7b9cb8636a). */}
+              <AgentAnswers text={e.text ?? ''} md={md} />
+            </>) : (
               // A CONTINUATION THAT OPENS THE OTHER SIDE OF THE GAP IS NOT A
               // CONTINUATION OF ANYTHING SHE CAN SEE. `same` means one agent
               // still talking, so the block wears no name and no time; across
@@ -272,40 +377,29 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                     <span className="msg-who">{teammateOf(e)
                       ? <><Face person={teammateOf(e)} />{firstName(teammateOf(e))}</>
                       : e.who === 'you' ? 'You' : name}</span>
-                    {/* SENT, AND THE AGENT HAS NOT TAKEN IT YET (w-1ef03d6f27).
-                        It stands where the time stands, because it is the same
-                        fact: a message with no time on it has not happened to
-                        anybody but her yet. The real time replaces it when the
-                        agent picks the message up, which is the only moment at
-                        which the row knows one. */}
-                    {/* AND WHETHER Z STILL REACHES IT: three seconds, then
-                        `steer` has it. See `held` in types.ts (w-5281ef1221). */}
-                    {/* AND, ONCE IT IS IN LINE, THAT IT IS WAITING ON THE STEP THE
-                        AGENT IS IN, which can be a command minutes long, with
-                        the one way to stop waiting (w-f37a34def6). */}
-                    {e.pending
-                      ? <span className="msg-when msg-sending">{e.held ? 'Sending… press Z to undo' : cutting ? 'Sending now…' : onSendNow ? 'Waiting for its current step' : 'Sending…'}</span>
-                      : <span className="msg-when">{when(e.at)}</span>}
-                    {e.pending && !e.held && !cutting && onSendNow && (
-                      <button type="button" className="msg-now" onClick={() => { setCutting(true); onSendNow(); }}>
-                        Send now
-                      </button>
-                    )}
-                    {/* WHICH ROW THESE WORDS ARE ON, when they are not on this
-                        one. It rides the message's own head rather than a box
-                        above the conversation (w-23db941885), so the way back
-                        to the row it was typed on survives without a second
-                        component owning the top of the screen. */}
-                    {e.on && (
-                      <button type="button" className="msg-on" onClick={onOpenOrigin}>
-                        on {e.on}
-                      </button>
-                    )}
+                    {headFacts(e, when(e.at))}
                   </div>
                 )}
-                <div className="msg-body">{md(e.text ?? '')}</div>
+                {/* WHAT A PERSON TYPED IS NOT MARKDOWN (w-a33b339772).
+                    Everything in this thread used to go through `md`, whoever
+                    said it, so a tester who pasted
+                    `grep -r foo . --include=*.md --include=*.json`
+                    read it back with both stars gone and the middle of the
+                    command in italics. A message is a person's own words, and
+                    the one thing this app owes them is the words. So a
+                    message from a person — yours and a teammate's, which is
+                    every `who: 'you'` event — is drawn as typed, line breaks
+                    and all (`.msg-body.typed` in the stylesheet). The agent
+                    writes markdown on purpose and keeps it. */}
+                {e.who === 'you'
+                  ? <div className="msg-body typed">{e.text ?? ''}</div>
+                  : <div className="msg-body">{md(e.text ?? '')}</div>}
               </div>
             )}
+          {/* WHAT THIS TURN CARRIES, under the last thing it said and above
+              the seam, because the seam belongs to the conversation and this
+              belongs to the turn (w-2e13752a85). */}
+          {tail?.(ends)}
           {ends === gapAfter && (
             <button type="button" className="thread-gap" onClick={openGap}>
               {conversationGap(omitted)}

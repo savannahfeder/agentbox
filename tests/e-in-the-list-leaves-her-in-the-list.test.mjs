@@ -54,7 +54,7 @@ describe('the app', () => {
   // an agent row), and they all go through deferCommit → noteAdvance. The rule
   // is asked once, there, for the same reason keys.ts exists.
   it('asks the rule whether a task was open, in the one place that advances', () => {
-    expect(app).toContain("import { advanceAfter, nextAfterAdvance, type Advance } from './advance'");
+    expect(app).toMatch(/import \{ advanceAfter, [^}]*nextAfterAdvance, type Advance \} from '\.\/advance'/);
     expect(app).toMatch(/advanceRef\.current = advanceAfter\(\{ fromTask: !!focused, index, id: item\.id \}\)/);
     // And the answer has to be able to change when she opens or leaves a task,
     // or narrows the inbox (the filtered inbox, w-27759abd33).

@@ -33,6 +33,12 @@ export interface LedgerLine {
   // Who wrote it, on a signed-in Mac (the team version). Absent on every line
   // of the single-person app.
   by?: string;
+  // THE LINE'S OWN NAME, stamped where it reaches the disk and the same on
+  // every teammate's Mac (main/store/work-items.mjs). A reaction is stored
+  // against it, because it is the only name a message has that survives the
+  // crossing: `ts` does not, since a pulled line takes the cloud's own
+  // created_at (shared/team-rules.mjs, `asPulled`).
+  uid?: string;
 }
 
 export interface ThreadEvent {
@@ -40,6 +46,9 @@ export interface ThreadEvent {
   // WHICH PERSON SAID IT, when a teammate did: their person id, off the
   // ledger line's `by`. The thread draws their face and name instead of "You".
   by?: string;
+  // THE LINE THIS CAME OFF, by its uid. A reaction is put on a message by this
+  // name and no other (w-560647d4db); see LedgerLine.uid above for why.
+  uid?: string;
   // Hers reads at full strength, an agent's is quiet. The same split the pane
   // already makes everywhere else.
   who: 'you' | 'agent';
@@ -113,6 +122,12 @@ export function snoozeWords(runAt: number, from: number): string {
 // to say more is still a message of hers, so the match is the whole answer.
 const PICK = /^Option (\d+): ([^\n]+)$/;
 
+// HOW LONG AFTER YOUR REPLY A LIFTED SNOOZE STILL BELONGS TO IT. The app
+// writes the two one after the other, milliseconds apart; a minute leaves room
+// for a slow disk and is still far shorter than anyone bringing a thread back
+// by hand after answering it.
+const REPLY_LIFTS_MS = 60_000;
+
 /**
  * The ledger's lines for ONE item, oldest first, as sentences.
  *
@@ -172,16 +187,30 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
   // WHO SAID EACH EVENT, for a teammate's line (the team version). Every event
   // a line produced is tagged with its writer when the next line begins, and
   // once more after the last, which leaves the loop below exactly as it was.
+  // AND WHICH LINE IT CAME OFF, tagged in the same sweep and for the same
+  // reason: a reaction names the message by its line's uid, and the loop below
+  // builds events without ever touching the line again (w-560647d4db).
   let markAt = 0;
   let markBy: string | undefined;
+  let markUid: string | undefined;
+  // YOUR LAST REPLY, read by the `runAt` branch. A reply lifts a snooze
+  // (`replyClearsSchedule`, list-rules), and the app writes that a moment
+  // after the answer, so it is part of the reply and not a second thing you
+  // did. It read "Brought it back" under a teammate's "Working on it" and
+  // they could not think why they had (w-2b0cd0f741).
+  let replied: { at: number; by: string | undefined } | null = null;
   const tagWriter = () => {
-    if (markBy) for (let k = markAt; k < events.length; k += 1) if (!events[k].by) events[k].by = markBy;
+    for (let k = markAt; k < events.length; k += 1) {
+      if (markBy && !events[k].by) events[k].by = markBy;
+      if (markUid && !events[k].uid) events[k].uid = markUid;
+    }
   };
 
   for (const [at_, line] of lines.entries()) {
     tagWriter();
     markAt = events.length;
     markBy = typeof line.by === 'string' ? line.by : undefined;
+    markUid = typeof line.uid === 'string' ? line.uid : undefined;
     const patch = line.patch ?? null;
     if (has(patch, 'label')) label = String(patch!.label ?? '');
     const mine = line.source === 'founder';
@@ -284,6 +313,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     // on the same line; an agent's finished word outranks its progress.
     if (has(patch, 'answer')) {
       const said = words(patch.answer);
+      replied = mine && said ? { at, by: markBy } : null;
       // WAS THE LAST THING SHE SENT ONE OF CLAUDE CODE'S COMMANDS. The blocked
       // line below reads differently after one, and this is the only place that
       // can tell: by the time the status arrives, the ledger line carrying
@@ -336,6 +366,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     if (has(patch, 'runAt')) {
       const runAt = Number(patch.runAt) || 0;
       if (!runAt) {
+        if (mine && replied && replied.by === markBy && at - replied.at <= REPLY_LIFTS_MS) continue;
         events.push({ at, who, said: mine ? 'You brought it back' : 'It let this run now' });
       } else {
         events.push({

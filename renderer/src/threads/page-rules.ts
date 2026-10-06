@@ -9,8 +9,10 @@ import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread
 import type { Seen } from './summary-rules';
 import type { Product, ThreadCard, ThreadStateWord, WorkItem } from '../types';
 import { priorityIdOf, type PriorityId } from '../priority';
+import { firstRealLine } from '../format';
 import { threadState } from '../../../shared/thread-cards.mjs';
-import { productRankScore } from '../../../shared/rank.mjs';
+import { placeScore } from '../../../shared/rank.mjs';
+import { plainWords } from '../team/agent-mentions';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
@@ -129,11 +131,14 @@ export const isFiltered = (d: Display) => d.priorities.length > 0 || d.projects.
 const startOfDay = (now: number) => { const t = new Date(now); t.setHours(0, 0, 0, 0); return t.getTime(); };
 
 /** What the filters keep. The rows the app makes itself (no project) always
- *  stay. `seen` is who sees the row (`rowSharing`), for the privacy choice. */
-export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>, d: Display, now: number, seen?: Seen | null): boolean {
+ *  stay. `seen` is who sees the row (`rowSharing`), for the privacy choice.
+ *  A MESSAGE TO YOU PASSES THE PROJECT FILTER (w-5a432fb112): `direct` names
+ *  the conversation projects, which no chip offers, so any lit chip hid every
+ *  message. "Messages to me ARE my tasks." */
+export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>, d: Display, now: number, seen?: Seen | null, direct?: ReadonlySet<string>): boolean {
   if (!keepsPrivacy(seen, d.privacy)) return false;
   if (d.priorities.length && !d.priorities.includes(priorityIdOf(item.priority))) return false;
-  if (d.projects.length && item.product && !d.projects.includes(item.product)) return false;
+  if (d.projects.length && item.product && !d.projects.includes(item.product) && !direct?.has(item.product)) return false;
   if (d.updated === 'today' && !(item.updatedAt >= startOfDay(now))) return false;
   if (d.updated === 'week' && !(item.updatedAt >= now - 7 * 86_400_000)) return false;
   return true;
@@ -151,9 +156,13 @@ export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>
 // rule the fleet runs by; inside one project the level is the number the row
 // shows, so the levels never read out of order. A project never placed scores
 // nothing, so with no order this is the level sort it was.
+//
+// A CONVERSATION RANKS WITH YOUR TOP PROJECT (w-2e8aa16f0f): `direct` names
+// the conversation projects, and `placeScore` gives them the top place, so a
+// High message sits under that project's Urgent and above its Medium.
 const RANK: Record<PriorityId, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-export const byPriority = (projectOrder: string[] = []) => (a: Ranked, b: Ranked) =>
-  productRankScore(projectOrder, b.product ?? '') - productRankScore(projectOrder, a.product ?? '')
+export const byPriority = (projectOrder: string[] = [], direct?: ReadonlySet<string>) => (a: Ranked, b: Ranked) =>
+  placeScore(projectOrder, b.product ?? '', direct) - placeScore(projectOrder, a.product ?? '', direct)
   || RANK[priorityIdOf(a.priority)] - RANK[priorityIdOf(b.priority)] || b.updatedAt - a.updatedAt;
 const byUpdated = (a: Ranked, b: Ranked) => b.updatedAt - a.updatedAt;
 /** `product` is the project's slug, which is what the running order holds. */
@@ -174,8 +183,8 @@ const byFinished = (a: Ranked, b: Ranked) => finishedAt(b) - finishedAt(a);
 // it was a wall of Urgent rows in no order a reader could follow, and nothing
 // in it is waiting on a priority any more. So Done always runs newest finished
 // first, and every other tab keeps the Display's sort.
-const order = (d: Display, tab?: string, projectOrder: string[] = []) =>
-  (tab === 'done' ? byFinished : d.sort === 'updated' ? byUpdated : byPriority(projectOrder));
+const order = (d: Display, tab?: string, projectOrder: string[] = [], direct?: ReadonlySet<string>) =>
+  (tab === 'done' ? byFinished : d.sort === 'updated' ? byUpdated : byPriority(projectOrder, direct));
 
 /** The time column's heading: on Done it is when each thread was finished. */
 export const timeHeading = (tab?: string) => (tab === 'done' ? 'Done' : 'Updated');
@@ -196,8 +205,8 @@ export const timeHeading = (tab?: string) => (tab === 'done' ? 'Done' : 'Updated
  * work would put them somewhere meaningless. `keeps` exempts them for the same
  * reason.
  */
-export function sorted<T extends Ranked & { product?: string }>(rows: T[], d: Display, tab?: string, projectOrder: string[] = []): T[] {
-  const by = order(d, tab, projectOrder);
+export function sorted<T extends Ranked & { product?: string }>(rows: T[], d: Display, tab?: string, projectOrder: string[] = [], direct?: ReadonlySet<string>): T[] {
+  const by = order(d, tab, projectOrder, direct);
   const mine = rows.filter((r) => r.product !== '');
   if (mine.length === rows.length) return rows.slice().sort(by);
   return [...rows.filter((r) => r.product === ''), ...mine.sort(by)];
@@ -205,8 +214,8 @@ export function sorted<T extends Ranked & { product?: string }>(rows: T[], d: Di
 
 /** The same order, for the board's cards, which carry a level and a project
  *  slug. A card of yours is timed by its thread, so Done reads when it finished. */
-export function sortedEntries(entries: BoardEntry[], d: Display, column?: string, projectOrder: string[] = []): BoardEntry[] {
-  const by = order(d, column, projectOrder);
+export function sortedEntries(entries: BoardEntry[], d: Display, column?: string, projectOrder: string[] = [], direct?: ReadonlySet<string>): BoardEntry[] {
+  const by = order(d, column, projectOrder, direct);
   const timed = (e: BoardEntry): Ranked => ({ ...e, product: e.projectSlug, ...(e.item ? { status: e.item.status, wrote: e.item.wrote } : {}) });
   return entries.slice().sort((a, b) => by(timed(a), timed(b)));
 }
@@ -313,6 +322,11 @@ export function updatedWords(ts: number, now = Date.now()): string {
 /** A product that is a message record between two people, which no project list shows. */
 export const isDirect = (p: Product | undefined | null) => !!(p as { team?: { direct?: boolean } } | undefined)?.team?.direct;
 
+/** The conversation projects among these, which Sort by Priority ranks with
+ *  your top project (`byPriority`, w-2e8aa16f0f). */
+export const conversationSlugs = (products: readonly Product[] = []): ReadonlySet<string> =>
+  new Set(products.filter(isDirect).map((p) => p.slug));
+
 /**
  * WHO AN OPEN CONVERSATION WOULD HAND TO NEW THREAD, in the shape the card's
  * `initial` takes: the first person in To, everyone else beside them.
@@ -369,7 +383,7 @@ export function rowSharing(
   if (!team || !product || isDirect(product) || item.agent) return null;
   if (item.createdBy && item.createdBy !== team.me) return null;
   if (!shownToTeam(item, team.since ?? null, product)) return 'private';
-  return shownToPeople(item).length ? 'people' : 'team';
+  return shownToPeople(item, product).length ? 'people' : 'team';
 }
 
 /**
@@ -385,7 +399,16 @@ export function messageLine(item: WorkItem, product: Product | undefined | null,
   let people = [...new Set(everyone)].filter((p) => p && p !== me);
   if (!people.length && item.createdBy && item.createdBy !== me) people = [item.createdBy];
   const answered = !!item.answer && item.answer !== '(withdrawn)';
-  const text = String((answered ? item.answer : item.body) || item.title || '').trim().split('\n')[0];
+  // An agent mentioned in the message reads as its words, not its link (w-7b9cb8636a).
+  //
+  // AND THE LINE TAKEN IS THE LATEST REAL ONE (w-560647d4db). This took the
+  // message's first line, full stop, and the first real conversation between
+  // two teammates had a message opening on "Additional:" with the findings
+  // under it — so the row said a word that is not news and not even a subject.
+  // `firstRealLine` steps over a bare label and takes the line under it; it
+  // runs AFTER the mention links are flattened, so a message opening on a
+  // mention is judged on the words somebody actually reads.
+  const text = firstRealLine(plainWords(String((answered ? item.answer : item.body) || item.title || '')));
   const by = (answered ? item.wrote?.answer?.by : item.wrote?.body?.by) ?? item.createdBy ?? null;
   return { people, fromMe: !!me && by === me, text };
 }
@@ -604,18 +627,19 @@ export function boardColumns({ items, products, display, now, stateOf, cards = [
     ? rowSharing(e.item, products.find((p) => p.slug === e.item!.product), me ? { me, since } : null)
     : 'team');
   const entries = teamEntries({ items: me && !who.includes(me) ? [] : items, products, cards: cards.filter((c) => who.includes(c.personId)), me, now, since, stateOf, live, allMine: true })
-    .filter((e) => !e.item || (display.projects.length === 0 || display.projects.includes(e.item.product)))
+    .filter((e) => !e.item || e.message || (display.projects.length === 0 || display.projects.includes(e.item.product)))
     .filter((e) => keepsPrivacy(seen(e), display.privacy))
     .filter((e) => teamKeeps(e, { person: null, projectName: null }, display, now));
   // EVERY COLUMN TAKES THE DISPLAY'S SORT, not just the list view
   // (w-5a08121f99). `teamEntries` hands these back newest first. Except Done
   // today, which runs newest finished first like the Done tab (w-c61f5bf497).
   return order.flatMap((state) => BOARD_COLUMNS.filter((c) => c.state === state))
-    .map((col) => ({ ...col, rows: sortedEntries(entries.filter((e) => e.state === col.state), display, col.state, projectOrder) }));
+    .map((col) => ({ ...col, rows: sortedEntries(entries.filter((e) => e.state === col.state), display, col.state, projectOrder, conversationSlugs(products)) }));
 }
 
-/** Your threads on the board, in reading order. A teammate's card has no
- *  thread of yours behind it, so J and K pass over it. */
+/** Your threads on the board, in reading order: what `selected` in App.tsx
+ *  counts. J and K walk `boardStops` (walk-rules.ts), which keeps a
+ *  teammate's cards in their places too (w-fb16bcaeba). */
 export function boardWalk(columns: { rows: BoardEntry[] }[]): WorkItem[] {
   return columns.flatMap((c) => c.rows).flatMap((e) => (e.item ? [e.item] : []));
 }

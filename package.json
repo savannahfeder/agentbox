@@ -52,6 +52,7 @@
     "build": "node scripts/prepare-terminal.mjs && node scripts/read-claude-commands.mjs && node scripts/read-claude-models.mjs && vite build renderer",
     "start": "npm run build && node scripts/brand-electron.mjs && electron .",
     "test": "vitest run",
+    "test:changed": "node scripts/test-what-changed.mjs",
     "icon": "electron scripts/make-icon.mjs",
     "pack": "node scripts/release.mjs --no-sign",
     "pack:side": "node scripts/pack-side.mjs",

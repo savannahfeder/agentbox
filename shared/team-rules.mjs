@@ -92,7 +92,14 @@ export function handedOnByReply(item, product, me) {
 const A_TEAMMATE_MAY_SET = ['problem', 'progress', 'solution', 'blockedBy', 'blocks', 'assignee'];
 // The status rides too: a new message reopens a conversation put away, and a
 // message record never starts an agent (mayRunHere).
-const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'people', 'status'];
+//
+// AND A REACTION, which is the chips under a message (w-560647d4db). It is on
+// this list rather than the one above because it is only ever drawn in a
+// conversation, and because an unrecognised delta on an ordinary shared task
+// would be a teammate writing a field nothing there reads. It cannot start an
+// agent: `STARTS_A_RUN` above names the four fields that can, and a reaction
+// touches none of them, so a chip never puts the row in anybody's inbox.
+const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'people', 'status', 'react'];
 export function whatATeammateMaySet(line, { direct = false } = {}) {
   if (!line || typeof line !== 'object' || !line.patch || typeof line.patch !== 'object') return null;
   const allowed = direct ? [...A_TEAMMATE_MAY_SET, ...IN_A_MESSAGE_ALSO] : A_TEAMMATE_MAY_SET;
@@ -103,14 +110,43 @@ export function whatATeammateMaySet(line, { direct = false } = {}) {
   return { id: line.id, ts: line.ts, source: line.source, by: line.by, uid: line.uid, patch };
 }
 
+// A LEASE BELONGS TO THE MAC THAT TOOK IT. A claim, an epoch, a release or a
+// heartbeat is a worker's hold on one Mac, so it never rides a line across to
+// another one — not even to a second copy of the app that is also yours.
+export function withoutALease(line) {
+  const out = { ...line };
+  delete out.claim; delete out.epoch; delete out.release; delete out.heartbeat;
+  return out;
+}
+
 // A LINE AS IT COMES BACK FROM THE CLOUD, the same on both backends. Who wrote
 // it and when are the database's (by_person, created_at), never the copy in
-// the body, and a teammate's line carries no claim, epoch, release or
-// heartbeat: those are a worker's lease on this Mac, never another Mac's to set.
+// the body, and a teammate's line carries no lease (above).
 export function asPulled(body, { by, at, me }) {
   const line = { ...body, by };
   if (by === me) return line;
-  delete line.claim; delete line.epoch; delete line.release; delete line.heartbeat;
-  if (Number.isFinite(at)) line.ts = at;
-  return line;
+  const kept = withoutALease(line);
+  if (Number.isFinite(at)) kept.ts = at;
+  return kept;
+}
+
+// YOUR OWN LINE, COMING BACK FROM A SECOND COPY OF THE APP SIGNED IN AS YOU.
+//
+// Reported 2026-10-04 (w-2fce569057): a message sent to a teammate never came
+// back. It had been sent from a second copy. It reached the cloud and it
+// reached the teammate's app; what it never reached was the everyday copy,
+// because the pull skipped every line whose writer was you, on the reasoning
+// that a line you wrote is already here. True of the copy that wrote it, false
+// of every other copy you own, and a conversation missing your own half reads
+// as a message that never sent.
+//
+// ONLY IN A MESSAGE RECORD, where no agent ever runs (mayRunHere). On an
+// ordinary shared row your own answer, body or status is exactly what starts
+// one, and `mayRunHere` believes a line whose writer is you, because it is you:
+// carrying those across would start a second agent on the same row on your
+// other Mac. So nothing crosses there, and your own words stay where you typed
+// them. Returns null when the line is not yours to bring back.
+export function whatYourOtherCopyMaySet(line, { direct = false } = {}) {
+  if (!direct || !line || typeof line !== 'object') return null;
+  return withoutALease(line);
 }

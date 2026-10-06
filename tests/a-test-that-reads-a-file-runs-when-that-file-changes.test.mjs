@@ -57,3 +57,27 @@ describe('both ship checks use it', () => {
     expect(fs.readFileSync(path.join(here, 'scripts', 'hooks', 'pre-push'), 'utf8')).toMatch(/tests-that-read\.mjs/);
   });
 });
+
+// AND SO DOES THE CHECK AN AGENT MAKES BY HAND (w-89f1e810b4, 2026-10-05).
+//
+// The two above run at the end, when it is already a bounced ship. The one
+// before that is the command CLAUDE.md tells every agent to run before it
+// reports, and it was the bare `vitest related --run <changed files>`, which
+// is the selection this whole file exists because of. So the readers go in
+// there too, as one command, and CLAUDE.md names that one.
+describe('the check an agent makes before it reports', () => {
+  const here = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+  const read = (...f) => fs.readFileSync(path.join(here, ...f), 'utf8');
+
+  it('is one command, which selects the readers as well', () => {
+    expect(JSON.parse(read('package.json')).scripts['test:changed']).toBe('node scripts/test-what-changed.mjs');
+    expect(read('scripts', 'test-what-changed.mjs')).toMatch(/testsThatRead\(/);
+  });
+
+  it('is the command CLAUDE.md tells an agent to run', () => {
+    const rules = read('CLAUDE.md');
+    expect(rules).toMatch(/npm run test:changed/);
+    // And no longer the bare one, which skips a test that reads a file.
+    expect(rules).not.toMatch(/vitest related --run/);
+  });
+});

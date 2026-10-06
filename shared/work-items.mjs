@@ -141,6 +141,15 @@ export const WORK_ITEM_FIELDS = [
   //   blockedBy, blocks
   //               other threads' ids, the summary's Linked part
   'visibility', 'visibleTo', 'problem', 'progress', 'solution', 'blockedBy', 'blocks',
+  // A REACTION, AND IT IS THE ONE FIELD ON THIS LIST THAT IS A DELTA RATHER
+  // THAN A VALUE: `{ on, emoji }` to put one on, `{ on, emoji, off: true }` to
+  // take yours back, where `on` is the uid of the line the message was written
+  // as. Every other field here keeps the latest write and drops the rest, which
+  // for a reaction would mean your 👀 erasing the one a teammate put on the same
+  // message a second earlier. The fold accumulates these per person instead and
+  // reads them back as `reactions` (see foldWorkItems); nothing ever reads a
+  // bare `react` off an item.
+  'react',
 ];
 
 // THE SUMMARY IS SHARED BETWEEN THE PERSON AND THE AGENT. Everywhere else the
@@ -186,6 +195,9 @@ const MAX_SHORT = 200;
 // see. Four fields at this size still leave a line at half the append ceiling.
 export const MAX_TEXT_BYTES = 32 * 1024;
 const MAX_LABELS = 20;
+// How long one emoji may be, in code points. 👩🏽‍🚀 is five; eight leaves room
+// for the longest sequence anyone picks and refuses a sentence pasted in.
+const MAX_EMOJI = 8;
 const MAX_ID_CHARS = 64;
 // A single line longer than this is treated as torn or hostile and skipped
 // rather than parsed. Matches the ceiling records.mjs already uses.
@@ -409,6 +421,17 @@ function coerceField(field, value) {
       const people = [...new Set(value.map(shortId).filter(Boolean))].slice(0, MAX_LABELS);
       return people.length ? people : undefined;
     }
+    // WHICH MESSAGE AND WHICH EMOJI. `on` is a line uid, bounded like any other
+    // id; the emoji is counted in CHARACTERS rather than bytes, because a flag
+    // or a person with a skin tone is several code points joined and cutting one
+    // mid-sequence stores a glyph nobody chose.
+    case 'react': {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+      const on = shortId(value.on);
+      const emoji = typeof value.emoji === 'string' ? [...value.emoji.trim()].slice(0, MAX_EMOJI).join('') : '';
+      if (!on || !emoji) return undefined;
+      return value.off === true ? { on, emoji, off: true } : { on, emoji };
+    }
     case 'visibility': return value === 'private' || value === 'team' || value === 'people' ? value : undefined;
     // An empty list is a real value: it is how the last chosen person comes
     // off a thread, and the thread then reaches nobody until she names one.
@@ -450,6 +473,22 @@ function coerceField(field, value) {
 //   2. skip an agent line fenced out by a newer epoch (the zombie writer)
 //   3. apply the claim, if this line carries one
 //   4. apply the patch field by field, founder outranking agent
+// THE CHIPS UNDER A MESSAGE, out of the presses the ledger holds. Message by
+// message, emoji by emoji, the people still on it — oldest press first, so the
+// chips do not reorder themselves under somebody's pointer as a teammate's
+// lines arrive. Returns null when every press has been taken back, which is
+// what leaves a row with no `reactions` at all.
+function rollUpReactions(presses) {
+  const live = [...presses.values()].filter((p) => !p.off).sort((a, b) => a.ts - b.ts);
+  if (!live.length) return null;
+  const out = {};
+  for (const press of live) {
+    const message = out[press.on] ?? (out[press.on] = {});
+    (message[press.emoji] ?? (message[press.emoji] = [])).push(press.who);
+  }
+  return out;
+}
+
 export function foldWorkItems(lines, now = Date.now()) {
   const items = new Map();
 
@@ -503,6 +542,22 @@ export function foldWorkItems(lines, now = Date.now()) {
     const patch = line.heartbeat ? {} : line.patch;
 
     for (const [field, value] of Object.entries(patch)) {
+      // A REACTION IS ACCUMULATED, NOT HELD. Every other field below keeps one
+      // value and the newest writer owns it; a reaction belongs to the person
+      // who pressed it, so two people on one message have to survive each other.
+      // The key is the message, the emoji and the person, and within that one
+      // key the newest press wins — by its own timestamp, because a page pulled
+      // from the cloud is not promised in the order anybody pressed anything.
+      if (field === 'react') {
+        if (!item.reacts) item.reacts = new Map();
+        const who = line.by || 'you';
+        const key = `${value.on}\u0000${value.emoji}\u0000${who}`;
+        const was = item.reacts.get(key);
+        if (!was || line.ts >= was.ts) {
+          item.reacts.set(key, { ts: line.ts, off: value.off === true, who, on: value.on, emoji: value.emoji });
+        }
+        continue;
+      }
       const held = item.wrote[field];
       // There used to be an exception here, for machinery spending a one-off
       // permission mode over the founder's own grant. That field is not on the
@@ -531,6 +586,11 @@ export function foldWorkItems(lines, now = Date.now()) {
   for (const item of items.values()) {
     item.claimExpired = !!(item.claim && item.claim.leaseUntil < now);
     if (item.status === 'claimed' && (!item.claim || item.claimExpired)) item.status = 'open';
+    if (item.reacts) {
+      const chips = rollUpReactions(item.reacts);
+      delete item.reacts;
+      if (chips) item.reactions = chips;
+    }
   }
 
   return items;

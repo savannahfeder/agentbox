@@ -70,7 +70,7 @@ import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/r
 import { landingIndex } from '../../../shared/rank.mjs';
 import { resolveProject, stepProject } from '../compose-project';
 import { readComposeDraft, saveComposeDraft, clearComposeDraft } from '../drafts';
-import { readLastPriority, writeLastPriority } from '../priority';
+import { startingPriority } from '../priority';
 import { ModelPicker } from './Model';
 import { DEFAULT_MODEL, engineModelPicked, readLastModel, writeLastModel, type ModelChoice } from '../models';
 import { effortChoicesFor, effortPicked, readLastEffort, writeLastEffort } from '../effort';
@@ -179,20 +179,13 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
   // with it. See ../drafts.ts for what is kept and why the project is not.
   const opened = useRef(readComposeDraft());
   const [text, setText] = useState(() => opened.current.text);
-  // THE LEVEL SHE LAST PICKED, unless this card is one she left half-written,
-  // in which case its own tag wins.../priority.ts holds the remembering and
-  // says why it is not part of the draft.
-  //
-  // A remembered level arrives SET, not as the dim default, so the card says
-  // "Urgent priority." in the tagged colour the moment it opens. A sticky level
-  // she cannot see is a task filed urgent by a card that looked untouched.
+  // EVERY NEW CARD OPENS ON MEDIUM, unless it is one left half-written, in
+  // which case its own tag wins. ../priority.ts says why the last pick is no
+  // longer carried to the next card.
   const [prio, setPrio] = useState<PriorityId | null>(
-    () => (opened.current.priority as PriorityId | null) ?? readLastPriority(),
+    () => startingPriority(opened.current.priority),
   );
-  // Every way in writes it down, at the moment of the pick and not at the send:
-  // a level she chose and then thought better of sending is still the level she
-  // chose. Same rule as `pick` above, for the same card.
-  const pickPrio = (id: PriorityId) => { setPrio(id); writeLastPriority(id); };
+  const pickPrio = (id: PriorityId) => { setPrio(id); };
   // WHICH ENGINE PICKS THIS UP. Remembered exactly like the level and the model,
   // and for the same reason as both: a card that forgets the pick
   // makes her pick again. With no remembered pick, inherit the workspace agent.

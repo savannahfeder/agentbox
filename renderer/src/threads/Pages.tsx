@@ -19,6 +19,7 @@ import {
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
 import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
+import { stopKey } from './walk-rules';
 import { shownToPeople } from '../../../shared/thread-cards.mjs';
 import { api } from '../api';
 import './pages.css';
@@ -352,28 +353,39 @@ export function otherPerson(item: WorkItem, me: string | null): string | null {
 /** ONE ROW OF THE TABLE, FOR THE INBOX AND THE TEAM PAGE BOTH (2026-10-01).
  *  The Team page's list view is the same component as the Inbox's, with small
  *  differences only. So there is one set of cells, and the Team page only adds Person. */
-export function RowCells({ live = false, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, where, person, priority, updatedAt, now, action }: {
+/** A repeating task's mark, before its title where the live mark would sit (w-4189a5c1a0). */
+export const RepeatMark = () => <svg className="th-repeat" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-label="Repeats">
+  <path d="M13 6.5A5.5 5.5 0 0 0 3.2 4.8M3 2.5v2.6h2.6" /><path d="M3 9.5a5.5 5.5 0 0 0 9.8 1.7M13 13.5v-2.6h-2.6" />
+</svg>;
+
+export function RowCells({ live = false, lead, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, aside, where, person, priority, updatedAt, when, now, action }: {
   /** An agent is on this thread right now: a turning mark before its name. */
   live?: boolean;
   title: ReactNode; hidden?: boolean; lock?: boolean; shared?: boolean; where: ReactNode; person?: ReactNode;
   /** How many people a thread shared with chosen people reaches; 0 for the team. */
   chosen?: number;
-  /** Added to Later and not started: the row says so in a tag (w-afb66e6661). */
+  /** Added to Later and not started (w-afb66e6661): faint words after the title (w-4189a5c1a0). */
   held?: boolean;
+  /** A mark before the title when nothing is live: a repeating task's RepeatMark. */
+  lead?: ReactNode;
+  /** Faint words after the title: a repeating task's schedule. */
+  aside?: string;
   priority: number | null; updatedAt: number; now: number; action?: ReactNode;
+  /** Words for the time cell instead of how long ago: a repeating task's next run. */
+  when?: string;
 }) {
   const id = priority === null ? null : priorityIdOf(priority);
   return <div className={`row-main th-grid${person !== undefined ? ' with-person' : ''}`}>
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
         people with a small count beside them for a thread only a few people
         see. The whole team, the default, carries nothing (2026-10-02). */}
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live && <StateGlyph state="running" live />}{title}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{held && <span className="th-tag">Not started</span>}</div>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live ? <StateGlyph state="running" live /> : lead}{title}{aside && <span className="th-aside">{aside}</span>}{held && <span className="th-aside">not started</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}</div>
     <div className="th-cell-proj">{where}</div>
     {person !== undefined && <div className="th-cell-person">{person}</div>}
     <div className={`th-cell-prio${id === 'urgent' ? ' urgent' : ''}`}>{id && <><PriorityMark id={id} />{priorityLabelOf(id)}</>}</div>
     {/* The row's one hover action, if it has one, covers the time while the
         pointer is on the row (pages.css .th-row-act). */}
-    <div className={`th-cell-when num${action ? ' has-act' : ''}`}><span className="th-when">{updatedWords(updatedAt, now)}</span>{action}</div>
+    <div className={`th-cell-when num${action ? ' has-act' : ''}`}><span className="th-when">{when ?? updatedWords(updatedAt, now)}</span>{action}</div>
   </div>;
 }
 
@@ -413,7 +425,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const [flipped, setFlipped] = useState<'team' | 'private' | null>(null);
   useEffect(() => { setFlipped(null); }, [item.visibility, item.visibleTo]);
   const seen = sharing && (flipped ?? sharing);
-  const chosen = seen === 'people' ? shownToPeople(item).length : 0;
+  const chosen = seen === 'people' ? shownToPeople(item, product).length : 0;
   const flip = async () => {
     if (!seen) return;
     const patch = sharePatch(seen);
@@ -454,13 +466,15 @@ export function ThreadCells({ item, product, now, person, tab }: {
  *  it, the private ones included; with a teammate in view, those wear a lock
  *  and every card names its person. Whose threads is picked on the header's
  *  filters button (w-14bb56c833), so the columns start right under it. */
-export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns, projectOrder }: {
+export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, selectedCard = null, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns, projectOrder }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number; onOpenItem: (item: WorkItem) => void;
   /** The column each thread sits in, by the Inbox tabs' rule (App.tsx). */
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
   cards?: ThreadCard[]; picked?: string[]; onOpenCard?: (card: ThreadCard) => void;
   /** The thread the keyboard is on (App.tsx's `current`), drawn as selected. */
   selected?: WorkItem | null;
+  /** Or the teammate's card it is on, by `stopKey` (walk-rules.ts, w-fb16bcaeba). */
+  selectedCard?: string | null;
   /** The columns left to right, and where a dragged order goes to be kept. */
   columnOrder?: ThreadStateWord[]; onReorderColumns?: (order: ThreadStateWord[]) => void;
   /** Your running order of projects, which Sort by Priority reads first. */
@@ -575,7 +589,9 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     return () => window.removeEventListener('keydown', onKey, true);
   });
   const sharing = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since } : null);
-  const isSelected = (it: WorkItem | null) => !!it && !!selected && it.id === selected.id && it.product === selected.product;
+  const isSelected = (e: BoardEntry) => (e.card
+    ? selectedCard === stopKey({ card: e.card })
+    : !selectedCard && !!e.item && !!selected && e.item.id === selected.id && e.item.product === selected.product);
   // The keyboard's card stays on the screen as J, K and the arrows move it,
   // and only when it moves, so a refresh never scrolls the board out from
   // under the pointer. Before the frame is drawn, not after: after, a card
@@ -592,7 +608,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     const col = card.parentElement;
     const first = col?.querySelector('.th-card') === card;
     (first ? col?.querySelector('.th-col-h') ?? card : card).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
-  }, [selected?.id, selected?.product]);
+  }, [selected?.id, selected?.product, selectedCard]);
   return <div className="list hm-me">
     <div className={`th-board${dragging ? ' dragging' : ''}`} ref={boardRef}>
     {columns.map((col) => {
@@ -632,7 +648,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
         {/* A card says who can see it the way a row does: the lock on what
             only you can see, the people mark on what a few chosen people
             can, and nothing on what the whole team can, the default. */}
-        {rows.map((e) => <button type="button" key={e.key} className={`th-card${isSelected(e.item) ? ' selected' : ''}`} onClick={() => (e.item ? onOpenItem(e.item) : e.card && onOpenCard?.(e.card))}>
+        {rows.map((e) => <button type="button" key={e.key} className={`th-card${isSelected(e) ? ' selected' : ''}`} onClick={() => (e.item ? onOpenItem(e.item) : e.card && onOpenCard?.(e.card))}>
           <div className="t">{e.message
             ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} />
             : <TitleThenMark title={e.title ?? ''} mark={
