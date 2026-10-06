@@ -7718,12 +7718,15 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
    kept line wears the same fill in its tick. */
 .ia-foot-one .dock-send {
   margin-left: 0; padding: 8px 16px; font-size: 14px; font-weight: 500;
-  background: var(--accent); border-color: var(--accent); color: #fff;
+  background: var(--accent); border-color: var(--accent); color: var(--on-solid);
 }
 .ia-foot-one .dock-send:hover { background: var(--accent); border-color: var(--accent); filter: brightness(1.08); }
-.ia-foot-one .dock-send kbd { color: rgba(255, 255, 255, 0.8); background: none; border-color: rgba(255, 255, 255, 0.35); }
+.ia-foot-one .dock-send kbd {
+  color: color-mix(in srgb, var(--on-solid) 80%, transparent); background: none;
+  border-color: color-mix(in srgb, var(--on-solid) 35%, transparent);
+}
 .ia-foot-one .dock-send:disabled { background: none; border-color: var(--line-strong); color: var(--text-faint); filter: none; }
-.ia-line-row .ia-box.is-all { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ia-line-row .ia-box.is-all { background: var(--accent); border-color: var(--accent); color: var(--on-solid); }
 .ia-not-now {
   font: inherit; font-size: 13.5px; display: inline-flex; align-items: center; gap: 8px;
   padding: 7px 14px; border: 1px solid var(--line); border-radius: var(--radius);
