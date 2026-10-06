@@ -65,6 +65,7 @@ import { sentLine } from './compose-says';
 import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, maskedAncestors, notStarted, parkedByAgent, replyClearsSchedule, statusForReply, stoppable, threadMasked, withdrawReply } from './list-rules';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { opensATextField } from './keys';
+import { sidebarFits, useRoomyToggle, useWindowWidth } from './room';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
 import { DONE } from './done-word';
 import { modalAfterLeavingATask } from './modal-scope';
@@ -634,9 +635,15 @@ export default function App() {
     if (panelBeforeFullScreen.current !== null) return;
     localStorage.setItem(PANEL_KEY, panelUp ? '1' : '0'); localStorage.setItem('powerup.sidebar.collapsed', String(!panelUp));
   }, [panelUp]);
+  // A NARROW WINDOW FOLDS IT (w-df42206cea, ../room.ts), before anything else
+  // gives up room, and that fold is not her choice so `panelUp` never hears of
+  // it. `panelShownNow` is what is drawn: her choice, or the window's fold, or
+  // a click she made after the fold.
+  //
   // The one way to change it. The key, the button in the corner and the ⌘K
   // command all call THIS, so there is no second place for it to be confused in.
-  const togglePanel = useCallback(() => setPanelUp((v) => !v), []);
+  const windowWidth = useWindowWidth();
+  const [panelShownNow, togglePanel] = useRoomyToggle(sidebarFits(windowWidth), panelUp, setPanelUp);
   // Resolved once at mount and applied before the first paint below, so the
   // window never flashes the other theme on the way in.
   // IT HOLDS THE PICK, NOT THE COLOUR. `match` is one of the three things this
@@ -2068,7 +2075,7 @@ export default function App() {
   // own level (w-e263a8a0fb).
   const projectOrder = snap?.supervisor.productOrder ?? NO_ORDER;
   const displayedBox = useMemo(
-    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i))), inboxDisplay, view, projectOrder, directSlugs) : []),
+    () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs)), inboxDisplay, view, projectOrder, directSlugs) : []),
     [shownBox, inboxDisplay, now, mineShown, view, projectOrder, directSlugs, seenOf],
   );
   // THE PICKED TEAMMATES' THREADS FOR THIS TAB, from the cards their Macs
@@ -2104,8 +2111,8 @@ export default function App() {
   // about what clicking it shows, and the number a filter is holding back is
   // said in full by the empty state and by the Display menu's "Showing 4 of 7".
   const shownCount = useCallback((rows: WorkItem[]) => rows.filter(
-    (i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i)),
-  ).length, [inboxDisplay, now, seenOf]);
+    (i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs),
+  ).length, [inboxDisplay, now, seenOf, directSlugs]);
   const theirCount = useCallback((tab: string) => (withOthers
     ? teammateRows(cards, { tab, picked, me: team?.me ?? null, display: inboxDisplay, products: snap?.products ?? [], now }).length : 0),
   [withOthers, cards, picked, team?.me, snap?.products, now, inboxDisplay]);
@@ -2122,7 +2129,7 @@ export default function App() {
   // whole inbox, or the next task opened can be one she has hidden
   // (w-27759abd33).
   const shownInbox = useMemo(
-    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i))), inboxDisplay, undefined, projectOrder, directSlugs),
+    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs)), inboxDisplay, undefined, projectOrder, directSlugs),
     [inbox, boxFilter, inboxDisplay, now, projectOrder, directSlugs, seenOf],
   );
   const boxFilterMenu = useMemo(
@@ -3818,6 +3825,11 @@ export default function App() {
     // these would be a write into nothing. Both behave like a task in every way
     // she can see and in none that she cannot.
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
+    // A MESSAGE STILL IN ITS THREE SECONDS IS WRITTEN BEFORE THE STOP. Held, it
+    // landed after the kill, read as a reply sent after stopping, reopened the
+    // row and started a fresh run on it two minutes later (2026-10-05).
+    // tests/a-message-still-sending-lands-before-the-stop.test.mjs
+    await flushPending();
     const wasRunning = working(item);
     setFollowing({ product: item.product, id: item.id });
     await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
@@ -3826,7 +3838,7 @@ export default function App() {
       ? 'Agent stopped. Back in your inbox. Reply to redirect it.'
       : 'Stopped before it started. Back in your inbox. Reply to redirect it.');
     await refresh();
-  }, [refresh, showToast, working]);
+  }, [refresh, showToast, working, flushPending]);
 
   // RUN NOW, from the three-dot menu or ⌘K on a waiting task (supervisor.runNow).
   // Offered on anything In progress with nothing running (run-now.ts), so a
@@ -4510,7 +4522,7 @@ export default function App() {
   const [taskHeader, setTaskHeader] = useState<HTMLDivElement | null>(null);
   // The socket look B of w-581dbc6cc4's round teleports the code mark into.
   const [cornerHeaderTarget, setCornerHeaderTarget] = useState<HTMLSpanElement | null>(null);
-  const workspaceCollapsed = !panelUp;
+  const workspaceCollapsed = !panelShownNow;
   const toggleWorkspace = togglePanel;
 
   // A schedule set on a thread. On one RUN of a repeating task it moves that
@@ -5672,7 +5684,7 @@ export default function App() {
             ? (snap.update?.newVersion ?? null)
             : null}
           onInstallUpdate={() => { setModal(null); void api.updateInstall(); }}
-          panelUp={panelUp}
+          panelUp={panelShownNow}
           onTogglePanel={() => { setModal(null); togglePanel(); }}
           boardUp={inboxDisplay.view === 'board'}
           onFlipView={!inFullScreen && search === null && !teamShown && !openCard

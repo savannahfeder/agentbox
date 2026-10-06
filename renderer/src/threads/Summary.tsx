@@ -25,6 +25,7 @@ import {
   readSummaryOpen, stateGlyph, statusChoices, type StateGlyph, type SummaryField,
 } from './summary-rules';
 import { crumbName } from './crumb-rules';
+import { summaryFits, useRoomyToggle } from '../room';
 import { VISIBILITY_WORD, chosenNames, whoSees, type Seen } from './summary-rules';
 import { findPeople, teammates } from './composer-rules';
 import { shownToPeople } from '../../../shared/thread-cards.mjs';
@@ -65,14 +66,16 @@ const waitsOnYou = (item: Pick<WorkItem, 'assignee'>, me: string | null) =>
 
 /* ------------------------------------------------------------- open, closed */
 
-/** Open or closed, remembered across threads and restarts. Open the first time. */
-export function useSummaryOpen(): [boolean, () => void] {
+/** Open or closed, remembered across threads and restarts. Open the first time.
+ *  FOLDED WHILE THE THREAD'S PANE HAS NO ROOM FOR IT (w-df42206cea, ../room.ts):
+ *  "the summary sidebar view should be default closed (but you can reopen it)".
+ *  The fold is not remembered; a click in a narrow window opens it for now. */
+export function useSummaryOpen(paneWidth = Infinity): [boolean, () => void] {
   const [open, setOpen] = useState(() => (typeof localStorage === 'undefined' ? true : readSummaryOpen(localStorage)));
   useEffect(() => {
     try { localStorage.setItem(SUMMARY_OPEN_KEY, open ? '1' : '0'); } catch { /* a window with no storage keeps it for the session */ }
   }, [open]);
-  const toggle = useCallback(() => setOpen((o) => !o), []);
-  return [open, toggle];
+  return useRoomyToggle(summaryFits(paneWidth), open, setOpen);
 }
 
 /**
