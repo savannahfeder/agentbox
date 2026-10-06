@@ -481,7 +481,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   parent: WorkItem | null;
   blockedBy: WorkItem | null;
   // THE THREADS THIS ONE MADE, with where each stands (w-2e8aa16f0f). Drawn in
-  // line under the conversation; absent or empty draws nothing.
+  // the conversation, each on the turn that filed it (w-2e13752a85); absent or
+  // empty draws nothing.
   filed?: Array<MadeRow & { item: WorkItem }>;
   onOpenItem: (item: WorkItem) => void;
   // SAYING GO TO ONE OF THEM FROM HERE (w-9cf2b43110), on the rows whose
@@ -584,6 +585,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // "there is no ledger row behind this one".
   const update = isUpdateRow(item);
   const made = trouble || update;
+  // The door into a thread this one filed, wherever that list ends up drawn.
+  const openFiled = (id: string) => { const hit = filed.find((r) => r.id === id); if (hit) onOpenItem(hit.item); };
+  const approveFiled = (id: string) => { const hit = filed.find((r) => r.id === id); if (hit) onApproveFiled?.(hit.item); };
   // ONE REASON THERE IS NO REPLY BOX, and it is a box. There was not one. A
   // quiet session is not stuck on anything — it is sitting at its prompt,
   // listening — and a message written to it lands and is worked on, measured
@@ -1387,6 +1391,16 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               md={md}
               clean={cleanMessage}
               onOpenDoc={onOpenDoc}
+              /* WHAT THIS THREAD FILED, EACH ON THE TURN THAT FILED IT
+                 (w-2e13752a85). It used to be one block hung under the whole
+                 conversation, drawn right here, so threads filed in the morning
+                 were still standing over the composer in the evening, under an
+                 answer from a run that had nothing to do with them. The
+                 conversation places them now, by the moment each was created,
+                 and they scroll away with the turn that came back with them. */
+              filed={filed.map((r) => ({ ...r, at: r.item.createdAt ?? 0 }))}
+              onOpenFiled={openFiled}
+              onApproveFiled={onApproveFiled && approveFiled}
               // REPLY, AND HAND IT TO AN AGENT, both on the message rather than
               // under the conversation (w-560647d4db). Reply takes the same
               // road the review strip already takes into the reply box: write
@@ -1400,34 +1414,19 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             />
           )}
 
-        {/* WHAT THIS THREAD FILED, IN LINE, under what it said about them
-            (w-2e8aa16f0f). The result names them in prose; this is where each
-            one stands now, the door into it, and the press that starts it
-            (w-9cf2b43110): each one is a proposal, and the next step on it
-            belongs beside its name rather than on a trip to its own row. */}
-        <ThreadsMade
-          rows={filed}
-          label="Filed from this thread"
-          onOpen={(id) => { const hit = filed.find((r) => r.id === id); if (hit) onOpenItem(hit.item); }}
-          onApprove={onApproveFiled && ((id) => { const hit = filed.find((r) => r.id === id); if (hit) onApproveFiled(hit.item); })}
-        />
+        {/* NEITHER OF THOSE TWO ROWS HAS A CONVERSATION TO PUT THE LIST IN, so
+            the list keeps its old place under what they said instead. */}
+        {(made || agent) && (
+          <ThreadsMade
+            rows={filed}
+            label="Filed from this thread"
+            onOpen={openFiled}
+            onApprove={onApproveFiled && approveFiled}
+          />
+        )}
 
         {/* AND THE OPTIONS IT OFFERED, AT THE FOOT OF THAT SAME TURN
             (w-560647d4db).
-
-            They were drawn on the reply card, which does not scroll, so one
-            question asked once stood at the bottom of the window for as long as
-            the thread was open: under the message that asked it, under
-            everything that happened after, and still there once it had been
-            read. Reported with a screenshot: "it should instead occur at the
-            end of the turn/message where it occured, not stuck at the bottom …
-            Once I've seen it as a user, I don't really want to see it
-            continuously."
-
-            So it stands here, after the agent's last word and after the threads
-            that turn filed, which is where "return to me" happened. It scrolls
-            away with its turn, so reading past it is the whole of what makes it
-            go, and nothing has to be remembered or marked as seen.
 
             Everywhere but full screen, where the pane's body is not on the
             screen at all and the offer keeps its old home on the reply card
