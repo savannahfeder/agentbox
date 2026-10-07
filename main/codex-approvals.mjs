@@ -507,6 +507,14 @@ export function createCodexApprovals({
     }
 
     const id = String(uuid());
+    // THE ID BECOMES A FILE NAME. `uuid` is injectable (tests name a card by
+    // it), and `crypto.randomUUID()` is only the default, not a guarantee, so
+    // it is checked here the same way `answer` checks one coming off the
+    // wire -- before it is ever joined onto `dir`.
+    if (!/^[\w-]+$/.test(id)) {
+      resolve(REFUSAL_DECISION);
+      return;
+    }
     const request = {
       id,
       at: now(),
