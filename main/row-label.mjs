@@ -209,7 +209,7 @@ export function nameRow(item, opts = {}) {
  * for every failure, never a throw. Shared with the message sorter
  * (main/message-priority.mjs).
  */
-export function askSmallModel(prompt, clean, { claudeBin, codexBin = null, engine = 'claude', model = NAME_MODEL, timeoutMs = NAME_TIMEOUT_MS } = {}) {
+export function askSmallModel(prompt, clean, { claudeBin, codexBin = null, engine = 'claude', model = NAME_MODEL, timeoutMs = NAME_TIMEOUT_MS, configDir = null } = {}) {
   return new Promise((resolve) => {
     const bin = engine === 'codex' ? codexBin : claudeBin;
     if (!bin) return resolve('');
@@ -219,6 +219,7 @@ export function askSmallModel(prompt, clean, { claudeBin, codexBin = null, engin
         // Somewhere that is nobody's project. A naming call must not pick up a
         // CLAUDE.md, a settings file or a hook from whatever folder it lands in.
         cwd: '/tmp',
+        ...(engine !== 'codex' && configDir ? { env: { ...process.env, CLAUDE_CONFIG_DIR: configDir } } : {}),
         stdio: ['ignore', 'pipe', 'pipe'],
       });
     } catch {

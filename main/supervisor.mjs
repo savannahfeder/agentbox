@@ -1893,6 +1893,9 @@ export class Supervisor {
     // The account this chat lives on cannot run anything until somebody acts.
     // Null here is the fresh brief, which is exactly what this row needs: it
     // goes to a working account carrying its own thread.
+    if (this._projectProfile(item.product, rec.engine)) {
+      return this._profileFitsProject(rec.profile, item.product, rec.engine) ? rec : null;
+    }
     if (this._profileCannotHoldAChat(rec.profile, rec.engine)) return null;
     return rec;
   }
@@ -2621,7 +2624,7 @@ export class Supervisor {
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0];
     if (!next) return;
     this._naming = true;
-    nameRow(next, { claudeBin: this.config?.claudeBin, codexBin: this.config?.codexBin, engine: this._homeEngine() })
+    nameRow(next, { claudeBin: this.config?.claudeBin, codexBin: this.config?.codexBin, engine: this._homeEngine(), configDir: this._projectConfigDir(next.product) })
       .then((label) => {
         if (label) this.store.nameItem(next.product, next.id, label);
       })
@@ -2648,7 +2651,7 @@ export class Supervisor {
     if (!next) return undefined;
     this._sortingMessages = true;
     this._sortedMessages.add(`${next.item.product}:${next.item.id}:${next.latest.ts}`);
-    return this._askPriority(next.latest)
+    return this._askPriority(next.latest, next.item.product)
       .then((level) => {
         if (level) this.store.prioritizeItem(next.item.product, next.item.id, LEVELS[level]);
       })
@@ -2656,8 +2659,8 @@ export class Supervisor {
       .finally(() => { this._sortingMessages = false; });
   }
 
-  _askPriority(latest) {
-    return sortMessage(latest, { claudeBin: this.config?.claudeBin, codexBin: this.config?.codexBin, engine: this._homeEngine() });
+  _askPriority(latest, product = null) {
+    return sortMessage(latest, { claudeBin: this.config?.claudeBin, codexBin: this.config?.codexBin, engine: this._homeEngine(), configDir: this._projectConfigDir(product) });
   }
 
   sayItOnEveryStrandedRow(items, now = Date.now()) {
@@ -2969,6 +2972,23 @@ export class Supervisor {
     return all.includes(chosen) ? [chosen] : all;
   }
 
+  _projectProfile(product, engine = DEFAULT_ENGINE) {
+    if (engineOf(engine) !== DEFAULT_ENGINE) return null;
+    const slug = typeof product === 'string' ? product : product?.slug;
+    const pinned = slug ? this.config.projectAccounts?.[slug] : null;
+    return typeof pinned === 'string' && pinned ? pinned : null;
+  }
+
+  _profileFitsProject(profile, product, engine = DEFAULT_ENGINE) {
+    const pinned = this._projectProfile(product, engine);
+    return !pinned || (profile || 'default') === pinned;
+  }
+
+  _projectConfigDir(product) {
+    const pinned = this._projectProfile(product, DEFAULT_ENGINE);
+    return pinned && pinned !== 'default' ? pinned : null;
+  }
+
   // THE ACCOUNTS ON ONE ENGINE THAT ARE NOT RESTING. Keyed through
   // `_accountKey`, which is the whole point: both engines call their primary
   // login 'default', and reading one raw name for both would let a quarantined
@@ -3276,6 +3296,16 @@ export class Supervisor {
       n += 1;
     }
     for (const p of this._preparing?.values() ?? []) if (engineOf(p.engine) === which) n += 1;
+    return n;
+  }
+
+  _loadOnProfile(profile, engine = DEFAULT_ENGINE) {
+    const key = this._accountKey(engine, profile);
+    let n = 0;
+    for (const s of this.sessions.values()) {
+      if (s.command || s.remoteIdle) continue;
+      if (this._accountKey(s.engine, s.profile || 'default') === key) n += 1;
+    }
     return n;
   }
 
@@ -4568,7 +4598,9 @@ export class Supervisor {
     // round robin lands on is an id that home has never heard of, the CLI
     // prints "No conversation found" and dies in a second. So this drops both,
     // and the thread is briefed fresh instead.
-    const strandedThread = !!walkedHome && this._profileCannotHoldAChat(walkedHome, engine);
+    const strandedThread = !!walkedHome && (this._projectProfile(product?.slug ?? item.product, engine)
+      ? !this._profileFitsProject(walkedHome, product?.slug ?? item.product, engine)
+      : this._profileCannotHoldAChat(walkedHome, engine));
     const resumeId = strandedThread ? null : resumeIdOnDisk;
     // The fork's account is the source conversation's account, for the reason
     // every line above gives: a resume is only a resume on the login whose home
@@ -6194,11 +6226,20 @@ export class Supervisor {
       return;
     }
     if (!this._hasSlotFor(engine) && !continuation) return;
+    const pinned = this._projectProfile(item.product, engine);
+    if (pinned) {
+      if (forcedProfile && forcedProfile !== pinned) { forcedProfile = null; resumeSessionId = null; }
+      const full = !continuation && this._loadOnProfile(pinned, engine) >= this._slotsPerAccount(engine);
+      if (full || this._profileResting(this._accountKey(engine, pinned))) {
+        if (continuation && item.answer) this.redeliverAnswer(item, item.answer);
+        return;
+      }
+    }
     // HER REPLY WAITS FOR AN ACCOUNT THAT CAN CARRY IT. A continuation skips the
     // slot check by design, so with every account on this engine sitting out it
     // would go to one anyway, die in two seconds, and go again next tick. Held
     // here and handed back, it goes out the tick the account returns.
-    if (continuation && !this._liveProfilesFor(engine).length) {
+    if (continuation && !pinned && !this._liveProfilesFor(engine).length) {
       if (item.answer) this.redeliverAnswer(item, item.answer);
       return;
     }
@@ -6249,7 +6290,7 @@ export class Supervisor {
     // the one path that resumes on every reply the user writes, a personal
     // continuation, fell through to the pick and lost the account half of the
     // time. plan.resumeProfile is that same answer for that path.
-    const profile = forcedProfile ?? plan.resumeProfile ?? this._pickProfile(engine);
+    const profile = pinned ?? forcedProfile ?? plan.resumeProfile ?? this._pickProfile(engine);
     // A SECOND ACCOUNT ARRIVES EMPTY, AND THIS IS WHERE IT STOPS BEING EMPTY.
     // Our own Accounts page tells a person to log in with a brand new folder,
     // and Claude Code reads a session's skills, commands and subagents out of

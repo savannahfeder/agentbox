@@ -1695,6 +1695,24 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               >
                 <Switch label="Let agents start the tasks they file here" on={current.autonomous} onChange={(v) => setProject(current.slug, 'autonomous', v)} />
               </Row>
+              {(w?.accounts ?? []).length > 1 && (
+                <Row
+                  label="Claude account"
+                  desc="Every Claude Code agent on this project runs on this account and on no other. If the account cannot run, the work waits."
+                >
+                  <Picker
+                    bare
+                    label="Claude account"
+                    title="The Claude account this project's agents run on."
+                    value={current.account ?? 'any'}
+                    options={[
+                      { value: 'any', label: 'Any account' },
+                      ...(w?.accounts ?? []).map((a) => ({ value: a.profile, label: a.email ? `${a.email} (${a.label})` : a.label })),
+                    ]}
+                    onChange={(v) => setProject(current.slug, 'account', v)}
+                  />
+                </Row>
+              )}
               {current.permission !== 'workspace' && (
                 <Row
                   label={twoEngines ? 'This project has its own Claude Code permissions' : 'This project has its own permissions'}

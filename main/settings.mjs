@@ -449,6 +449,7 @@ export function readSettings({ config, supervisor, store }) {
       permission: override ? permissionMode(override) : 'workspace',
       permissionArgs: override ?? null,
       codexMode: config.projectCodexMode?.[product.slug] ?? 'workspace',
+      account: supervisor._projectProfile?.(product.slug) ?? 'any',
       instructions,
       running: sessions.filter((s) => s.product === product.slug).length,
     };
@@ -725,6 +726,15 @@ export function setProjectSetting({ config, supervisor }, { product, key, value 
       if (value === 'workspace') delete map[product];
       else map[product] = value;
       saveConfig(config, { projectCodexMode: Object.keys(map).length ? map : undefined });
+      break;
+    }
+    case 'account': {
+      const known = effectiveProfiles(config.authProfiles, { home: config.home });
+      if (value !== 'any' && !known.includes(value)) throw new Error(`unknown Claude account: ${value}`);
+      const map = { ...(config.projectAccounts ?? {}) };
+      if (value === 'any') delete map[product];
+      else map[product] = value;
+      saveConfig(config, { projectAccounts: Object.keys(map).length ? map : undefined });
       break;
     }
     default:

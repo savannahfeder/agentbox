@@ -760,6 +760,7 @@ export interface ProjectSettings {
   permissionArgs: string[] | null;
   /** This project's own Codex mode, or 'workspace' when it has no opinion. */
   codexMode: CodexModeId | 'workspace';
+  account?: string;
   // The user's rules for this project, as they sit on disk. Empty means the file does
   // not exist, and a project without one is briefed exactly as it always was.
   instructions: string;
