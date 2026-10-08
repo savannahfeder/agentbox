@@ -31,6 +31,7 @@ import { installCrashReports, reportFromRenderer, pending as pendingCrashes, set
 import { createAnalytics, createDailyCount } from './analytics.mjs';
 import { createUpdater } from './updater.mjs';
 import { createSourceUpdater } from './source-updater.mjs';
+import { recoverShellPath } from './shell-path.mjs';
 import { installNotifier } from './notify.mjs';
 import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mjs';
 import { quietTheFramesScrollbars } from './frame-scrollbars.mjs';
@@ -272,6 +273,9 @@ function reloadRenderer() {
 }
 
 async function createWindow() {
+  const shellPath = await recoverShellPath();
+  process.env.PATH = shellPath.path;
+  if (shellPath.error) console.warn('agentbox: could not load your shell PATH; using the inherited PATH:', shellPath.error);
   const config = loadConfig(dataDir);
   // The store modules read the app's own home variable at call time; setting it
   // here points auth session files, sync, and every store path at its root.

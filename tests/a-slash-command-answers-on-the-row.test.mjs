@@ -110,9 +110,9 @@ describe('what the thread calls it', () => {
     expect(lineFor('/context')).toBe('It answered you');
   });
 
-  it('leaves every other blocked row saying exactly what it said', () => {
-    expect(lineFor('Yes, merge it.')).toBe('It stopped and asked you');
+  it('leaves ordinary delivered replies at their answer rather than claiming they asked a question', () => {
+    expect(lineFor('Yes, merge it.')).toBe('It came back to you');
     // a slash that is not one of the eight is an ordinary message
-    expect(lineFor('/deploy the thing')).toBe('It stopped and asked you');
+    expect(lineFor('/deploy the thing')).toBe('It came back to you');
   });
 });

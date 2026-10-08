@@ -524,6 +524,8 @@ export interface AgentTurn {
 // others there were.
 export interface AgentWork {
   kind: 'work';
+  // Thread status is a separate event, never part of a group of tool calls.
+  standalone?: true;
   at: number;
   verb: string;
   subject: string;
