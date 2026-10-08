@@ -51,7 +51,7 @@ export const isCarrying = () => carrying > 0;
 
 type Held = {
   id: string; el: HTMLElement; scope: HTMLElement | null; scroller: HTMLElement | null;
-  startY: number; scroll0: number; y: number; started: boolean;
+  startX: number; startY: number; scroll0: number; x: number; y: number; started: boolean;
   rows: { id: string; el: HTMLElement; top: number; bottom: number }[];
   from: number; to: number; frame: number;
 };
@@ -85,18 +85,16 @@ export function useRowDrag(onDrop: ((id: string, beforeId: string | null, drawn:
   // the list's coordinates as they were at the lift, so a scroll moves the
   // pointer through the rows rather than the rows out from under it.
   const scrolled = (h: Held) => (h.scroller ? h.scroller.scrollTop - h.scroll0 : 0);
-  // THE CARRIED ROW STAYS INSIDE ITS LIST, so it cannot be dragged off over the
-  // header or below the last row and look lost.
-  const carried = (h: Held) => {
-    const me = h.rows[h.from];
-    const first = h.rows[0];
-    const last = h.rows[h.rows.length - 1];
-    return Math.max(first.top - me.top, Math.min(last.bottom - me.bottom, h.y + scrolled(h) - h.startY));
-  };
+  // THE CARRIED ROW GOES WHERE THE HAND GOES, both ways (round three,
+  // 2026-10-07: "I expect it to drag left to right ... I feel like I'm stuck
+  // vertically ... completely locked in"). It used to be held to the column
+  // and to the list's top and foot. Only up and down picks its place; across
+  // is the hand moving, and the row follows it.
+  const carried = (h: Held) => `translate(${h.x - h.startX}px, ${h.y + scrolled(h) - h.startY}px)`;
   const paint = (h: Held) => {
     const ds = scrolled(h);
     h.to = landingRow(h.rows, h.y + ds);
-    h.el.style.transform = `translateY(${carried(h)}px)`;
+    h.el.style.transform = carried(h);
     h.rows.forEach((r, i) => { if (i !== h.from) r.el.style.transform = `translateY(${shiftFor(i, h.from, h.to, pitchOf(h))}px)`; });
   };
   // How far the others move to open the slot: the carried row AND the gap
@@ -136,7 +134,7 @@ export function useRowDrag(onDrop: ((id: string, beforeId: string | null, drawn:
     carrying -= 1;
     cancelAnimationFrame(h.frame);
     swallow.current = true;
-    const was = new Map(h.rows.map((r) => [r.id, r.el.getBoundingClientRect().top]));
+    const was = new Map(h.rows.map((r) => { const b = r.el.getBoundingClientRect(); return [r.id, { top: b.top, left: b.left }]; }));
     if (keep && !stays(h.from, h.to)) {
       const beforeId = h.rows[h.to]?.id ?? null;
       const drawn = h.rows.map((r) => r.id);
@@ -155,22 +153,25 @@ export function useRowDrag(onDrop: ((id: string, beforeId: string | null, drawn:
     for (const el of els) {
       const from = was.get(el.dataset.dragId!);
       if (from === undefined || !el.animate) continue;
-      const by = from - el.getBoundingClientRect().top;
+      const now = el.getBoundingClientRect();
+      const by = from.top - now.top;
+      const bx = from.left - now.left;
       const mine = el.dataset.dragId === h.id;
-      if (Math.abs(by) < 0.5 && !mine) continue;
+      if (Math.abs(by) < 0.5 && Math.abs(bx) < 0.5 && !mine) continue;
       if (mine) el.dataset.settling = '';
-      const a = el.animate([{ transform: `translateY(${by}px)` }, { transform: 'none' }], SETTLE);
+      const a = el.animate([{ transform: `translate(${bx}px, ${by}px)` }, { transform: 'none' }], SETTLE);
       if (mine) a.onfinish = a.oncancel = () => { delete el.dataset.settling; };
     }
   };
 
-  const move = (y: number) => {
+  const move = (x: number, y: number) => {
     const h = held.current;
     if (!h) return;
+    h.x = x;
     h.y = y;
     if (!h.started) {
       // A press that barely moves is a click, not a lift.
-      if (Math.abs(y - h.startY) < 4) return;
+      if (Math.hypot(x - h.startX, y - h.startY) < 4) return;
       const els = [...(h.scope?.querySelectorAll<HTMLElement>('[data-drag-id]') ?? [])];
       // A second lift straight after a drop would measure rows mid-glide.
       for (const el of els) { el.getAnimations?.().forEach((a) => a.finish()); delete el.dataset.settling; }
@@ -222,8 +223,8 @@ export function useRowDrag(onDrop: ((id: string, beforeId: string | null, drawn:
     if (hit && hit !== e.currentTarget) return;
     const el = e.currentTarget;
     const scope = el.closest<HTMLElement>('[data-drag-scope]') ?? listRef.current;
-    held.current = { id, el, scope, scroller: null, startY: e.clientY, scroll0: 0, y: e.clientY, started: false, rows: [], from: -1, to: -1, frame: 0 };
-    const onMove = (ev: PointerEvent) => move(ev.clientY);
+    held.current = { id, el, scope, scroller: null, startX: e.clientX, startY: e.clientY, scroll0: 0, x: e.clientX, y: e.clientY, started: false, rows: [], from: -1, to: -1, frame: 0 };
+    const onMove = (ev: PointerEvent) => move(ev.clientX, ev.clientY);
     // The list scrolling under a still pointer moves the slot too.
     const onScroll = () => { const h = held.current; if (h?.started) paint(h); };
     const stop = () => {

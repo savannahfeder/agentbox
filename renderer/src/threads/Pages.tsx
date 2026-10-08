@@ -32,6 +32,12 @@ const SETTLE = { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' };
 
 /* ------------------------------------------------------------ icons */
 const GripIcon = () => <svg className="th-col-grip" viewBox="0 0 10 16" width="8" height="13" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4" /><circle cx="7.5" cy="3" r="1.4" /><circle cx="2.5" cy="8" r="1.4" /><circle cx="7.5" cy="8" r="1.4" /><circle cx="2.5" cy="13" r="1.4" /><circle cx="7.5" cy="13" r="1.4" /></svg>;
+/** THE SIX DOTS ON A ROW OR CARD THAT CAN BE DRAGGED (w-6e5b532a95). They
+ *  sit in the select box's slot, which is empty until the pointer is on it:
+ *  the dots come up faintly as the pointer crosses the row, give way to the
+ *  box when the pointer reaches the slot itself, and stand alone while the row
+ *  is carried, when there is nothing to select (pages.css `.row-grip`). */
+export const RowGrip = () => <span className="row-grip" aria-hidden="true"><svg viewBox="0 0 10 16" width="8" height="13" fill="currentColor"><circle cx="2.5" cy="3" r="1.4" /><circle cx="7.5" cy="3" r="1.4" /><circle cx="2.5" cy="8" r="1.4" /><circle cx="7.5" cy="8" r="1.4" /><circle cx="2.5" cy="13" r="1.4" /><circle cx="7.5" cy="13" r="1.4" /></svg></span>;
 export const PenIcon = () => <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M12 20h8" /><path d="m4 20 1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5 4 20Z" /></svg>;
 const SearchGlyph = () => <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="m20 20-4.5-4.5" /></svg>;
 const SlidersIcon = () => <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>;
@@ -671,6 +677,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
         {rows.map((e) => <button type="button" key={e.key} className={`th-card${isSelected(e) ? ' selected' : ''}`}
           {...(movable && e.item ? { 'data-drag-id': e.item.id, onPointerDown: (ev: ReactPointerEvent<HTMLButtonElement>) => cardDrag.onPointerDown(e.item!.id, ev) } : {})}
           onClick={() => { if (cardDrag.swallowsClick()) return; if (e.item) onOpenItem(e.item); else if (e.card) onOpenCard?.(e.card); }}>
+          {movable && e.item && <RowGrip />}
           <div className="t">{e.message
             ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} />
             : <TitleThenMark title={e.title ?? ''} mark={

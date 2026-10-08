@@ -19,7 +19,7 @@ import { IMPORT_KEYS, JUST_IMPORTED_WORD, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEY
 import { splitHits } from '../search';
 import { clockLabel, isCleanRun, nextRunAt } from '../../../shared/repeats.mjs';
 import { TeamRowEnd, type TeamView } from '../team/people';
-import { RepeatMark, RowCells, TableHead, ThreadCells } from '../threads/Pages';
+import { RepeatMark, RowCells, RowGrip, TableHead, ThreadCells } from '../threads/Pages';
 import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
@@ -515,6 +515,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                   <span className="box" aria-hidden="true" />
                 </button>
                 )}
+                {movable && <RowGrip />}
                 {/* THE ROW IS A TITLE AND A SUMMARY, AND NOTHING ELSE ON THE LEFT.
                    Every chip this row used to wear (ask, review, bug,
                    proposed, answered, blocked, and the returning-from-snooze zzz) named a

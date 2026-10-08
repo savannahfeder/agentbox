@@ -165,13 +165,20 @@
    through both, so nothing pops back in while the row is still gliding. */
 .th-table[data-sorting="carry"], .th-table[data-sorting="carry"] * { cursor: grabbing !important; user-select: none; }
 .th-table[data-sorting="carry"] .row[data-drag-id] { transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+/* ROUND THREE (2026-10-07): "components get a little more transparent ...
+   when you drag them. Our background for the inbox actually develops a
+   background, and it looks a little bit weird and has a strange border." So
+   the card behind the row is the panel's own colour, with no border and no
+   lighter grey, and the whole row goes a little see-through while it is in
+   hand. A soft shadow is the one sign it is lifted. */
 .th-table .row[data-lifted], .th-table .row[data-settling] { z-index: 5; transition: none; will-change: transform; }
+.th-table .row[data-lifted] { opacity: .88; }
 /* Inset 16px from both walls of the list, so it sits evenly in the panel. */
 .th-table .row[data-lifted]::before, .th-table .row[data-settling]::before {
   content: ''; position: absolute; z-index: -1; pointer-events: none;
   left: calc(var(--text-x) - 16px); right: calc(var(--row-r) - 8px); top: 4px; bottom: 0;
-  background: var(--bg-raised); border: 1px solid var(--line-strong); border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.04);
+  background: var(--skin-solid, var(--surface)); border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0,0,0,.45);
 }
 /* Landing: the shadow goes first, as it touches down, then the card fades. */
 .th-table .row[data-settling]::before { animation: th-card-down .2s cubic-bezier(.2,.8,.2,1) forwards; }
@@ -179,19 +186,39 @@
   60% { box-shadow: none; opacity: 1; }
   to { box-shadow: none; opacity: 0; }
 }
+/* THE SIX DOTS (RowGrip, Pages.tsx), in the select box's own slot and on
+   the box's own centre. "Nothing ... makes it clear that I can drag this":
+   they come up faintly while the pointer is on a row that can move, give the
+   slot back to the box the moment the pointer is on the box itself (or a box
+   is ticked), and stand alone, fuller, while the row is in hand: "at that
+   point we don't need the select component". */
+.row-grip { position: absolute; left: calc(var(--gutter) + 3px); top: 21.5px; height: 18px; display: grid; place-items: center; color: var(--text-faint); opacity: 0; pointer-events: none; transition: opacity .12s ease; }
+.th-table .row[data-drag-id]:hover .row-grip { opacity: .75; }
+.th-table .row:has(.mark:hover) .row-grip, .th-table .row:has(.mark.on) .row-grip,
+.th-table[data-sorting] .row:not([data-lifted]) .row-grip { opacity: 0; }
+.th-table .row[data-lifted] .row-grip { opacity: 1; color: var(--text-dim); }
+.th-table .row[data-lifted] .mark { visibility: hidden; }
 /* No underline anywhere mid-drag: on the carried row it is a second mark on
    something already lifted, and on the others it is a hover nobody meant. */
 .th-table[data-sorting] .row .subject { text-decoration-color: transparent !important; transition: none; }
-/* And a card carried up or down its board column, the same way. The card is
-   its own panel, so it turns solid (a resting card is a faint wash, which let
-   the card under it show through) and gains the shadow. */
+/* And a card carried up or down its board column, the same way. It keeps
+   its own look: the same faint wash and line, laid on the panel's colour so
+   the card it passes over does not show through, a little see-through as a
+   whole, and the soft shadow. */
 .th-col[data-sorting="carry"], .th-col[data-sorting="carry"] * { cursor: grabbing !important; user-select: none; }
 .th-col[data-sorting="carry"] .th-card[data-drag-id] { transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+.th-card[data-drag-id] { position: relative; }
 .th-card[data-lifted], .th-card[data-settling] {
-  position: relative; z-index: 6; transition: none; will-change: transform;
-  background: var(--bg-raised); border-color: var(--line-strong);
-  box-shadow: 0 8px 24px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.04);
+  z-index: 6; transition: none; will-change: transform;
+  background: linear-gradient(rgba(255,255,255,.035), rgba(255,255,255,.035)), var(--skin-solid, var(--surface));
+  box-shadow: 0 12px 32px rgba(0,0,0,.45);
 }
+.th-card[data-lifted] { opacity: .88; }
+/* A card's six dots sit in its left padding, centred on its height. */
+.th-card .row-grip { left: 4px; top: 50%; transform: translateY(-50%); }
+.th-card[data-drag-id]:hover .row-grip { opacity: .75; }
+.th-col[data-sorting] .th-card:not([data-lifted]) .row-grip { opacity: 0; }
+.th-card[data-lifted] .row-grip { opacity: 1; color: var(--text-dim); }
 .th-card[data-settling] { animation: th-card-shadow-down .2s cubic-bezier(.2,.8,.2,1) forwards; }
 @keyframes th-card-shadow-down { to { box-shadow: none; } }
 /* Nothing that answers a hover comes up while a row is carried or settling:
