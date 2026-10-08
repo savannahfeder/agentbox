@@ -147,88 +147,82 @@
 .th-table .row:hover .has-act .th-when, .has-act:focus-within .th-when { visibility: hidden; }
 .th-row-act:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .th-row-act:focus-visible { outline: none; border-color: var(--line-strong); }
-/* A THREAD CARRIED UP OR DOWN THE LIST (w-6e5b532a95). It rides the pointer
-   (threads/row-drag.ts writes the transform) and the rows it passes slide
-   aside.
-   ROUND TWO (2026-10-07): "kind of weird that the UI completely changes ...
-   the text of the title isn't centered vertically". The first lift painted
-   the whole row box, edge to edge, and a row's padding is 19px over the text
-   and 15px under it, so the title sat low in a grey bar wider than the list.
-   Now the row itself is untouched, same cells, same ink, and a card is drawn
-   BEHIND it on ::before: inset to the text's own margins and 4px shorter at the
-   top, which centres it on the line. It stays on while the row settles into
-   its slot (`data-settling`), so the card does not vanish mid-glide. The
-   marks are data attributes because React owns these rows' class names.
-   The list wears `data-sorting="carry"` while a row is in hand and "settle"
-   for the 220ms after it is let go: the rows only animate their shift while
-   carrying, and the quiet below (no underline, no Share, no key plate) holds
-   through both, so nothing pops back in while the row is still gliding. */
-.th-table[data-sorting="carry"], .th-table[data-sorting="carry"] * { cursor: grabbing !important; user-select: none; }
+/* A THREAD CARRIED UP OR DOWN THE LIST OR A BOARD COLUMN (w-6e5b532a95).
+   Four rounds with her. What it is now (round four, "make it a linear quality
+   level"): the row STAYS in the list as its own empty slot, which slides to
+   where it will land while the rows it passes make way, and a separate
+   preview rides the pointer over everything (threads/row-drag.ts). Carrying
+   the row itself was the fault every earlier round was patching: a 1,300px bar
+   that was clipped by the panel, covered the column headings, and whose
+   padding put the title low in any box drawn round it.
+   The marks are data attributes because React owns these rows' class names.
+   `data-sorting` is "carry" while a row is in hand and "settle" for a moment
+   after: the rows only animate their shift while carrying, and the quiet below
+   (no underline, no Share, no key plate) holds through both. */
+body[data-dragging], body[data-dragging] * { cursor: grabbing !important; user-select: none; }
 .th-table[data-sorting="carry"] .row[data-drag-id] { transition: transform .18s cubic-bezier(.2,.8,.2,1); }
-/* ROUND THREE (2026-10-07): "components get a little more transparent ...
-   when you drag them. Our background for the inbox actually develops a
-   background, and it looks a little bit weird and has a strange border." So
-   the card behind the row is the panel's own colour, with no border and no
-   lighter grey, and the whole row goes a little see-through while it is in
-   hand. A soft shadow is the one sign it is lifted. */
-.th-table .row[data-lifted], .th-table .row[data-settling] { z-index: 5; transition: none; will-change: transform; }
-.th-table .row[data-lifted] { opacity: .88; }
-/* Inset 16px from both walls of the list, so it sits evenly in the panel. */
-.th-table .row[data-lifted]::before, .th-table .row[data-settling]::before {
-  content: ''; position: absolute; z-index: -1; pointer-events: none;
-  left: calc(var(--text-x) - 16px); right: calc(var(--row-r) - 8px); top: 4px; bottom: 0;
+/* THE SLOT: the row with its words taken out and the faintest fill between
+   its hairlines. Nothing on it but "this is where it goes". */
+.th-table .row[data-lifted] > * { visibility: hidden; }
+.th-table .row[data-lifted]::before {
+  content: ''; position: absolute; pointer-events: none;
+  left: var(--gutter); right: var(--row-r); top: 1px; bottom: 0;
+  background: rgba(255,255,255,.03);
+}
+:root[data-theme="light"] .th-table .row[data-lifted]::before { background: rgba(0,0,0,.035); }
+/* Its words come back as the preview lands on them. */
+.th-table .row[data-settling] > *, .th-card[data-settling] > * { animation: th-words-back .24s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes th-words-back { 0%, 45% { opacity: 0; } to { opacity: 1; } }
+/* THE PREVIEW. On the list a chip: the six dots, the title, the project, on
+   the panel's own colour, no wider than it needs to be. On the board a copy of
+   the card. Both a touch see-through ("components get a little more
+   transparent ... when you drag them"), with a soft shadow and a hairline of
+   light for an edge rather than a drawn border. */
+.drag-preview {
+  position: fixed; left: 0; top: 0; z-index: 1000; margin: 0; pointer-events: none; will-change: transform;
+  opacity: .94; box-shadow: 0 12px 32px rgba(0,0,0,.42), 0 0 0 1px rgba(255,255,255,.07);
+}
+:root[data-theme="light"] .drag-preview { box-shadow: 0 12px 32px rgba(17,25,48,.16), 0 0 0 1px rgba(17,25,48,.08); }
+.drag-chip {
+  display: flex; align-items: center; gap: 12px; max-width: 560px; padding: 10px 18px 10px 12px;
   background: var(--skin-solid, var(--surface)); border-radius: var(--radius);
-  box-shadow: 0 12px 32px rgba(0,0,0,.45);
+  font-size: 14px; line-height: 20px; color: var(--text); white-space: nowrap;
 }
-/* Landing: the shadow goes first, as it touches down, then the card fades. */
-.th-table .row[data-settling]::before { animation: th-card-down .2s cubic-bezier(.2,.8,.2,1) forwards; }
-@keyframes th-card-down {
-  60% { box-shadow: none; opacity: 1; }
-  to { box-shadow: none; opacity: 0; }
-}
+.drag-chip .g { flex: none; display: grid; color: var(--text-dim); }
+.drag-chip .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.drag-chip .p { flex: none; margin-left: 6px; font: 11.5px/20px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); }
 /* THE SIX DOTS (RowGrip, Pages.tsx), in the select box's own slot and on
    the box's own centre. "Nothing ... makes it clear that I can drag this":
    they come up faintly while the pointer is on a row that can move, give the
    slot back to the box the moment the pointer is on the box itself (or a box
-   is ticked), and stand alone, fuller, while the row is in hand: "at that
-   point we don't need the select component". */
+   is ticked), and lead the preview while the row is in hand: "at that point
+   we don't need the select component". */
 .row-grip { position: absolute; left: calc(var(--gutter) + 3px); top: 21.5px; height: 18px; display: grid; place-items: center; color: var(--text-faint); opacity: 0; pointer-events: none; transition: opacity .12s ease; }
 .th-table .row[data-drag-id]:hover .row-grip { opacity: .75; }
 .th-table .row:has(.mark:hover) .row-grip, .th-table .row:has(.mark.on) .row-grip,
 .th-table[data-sorting] .row:not([data-lifted]) .row-grip { opacity: 0; }
-.th-table .row[data-lifted] .row-grip { opacity: 1; color: var(--text-dim); }
-.th-table .row[data-lifted] .mark { visibility: hidden; }
-/* No underline anywhere mid-drag: on the carried row it is a second mark on
-   something already lifted, and on the others it is a hover nobody meant. */
+/* No underline anywhere mid-drag: it is a hover nobody meant. */
 .th-table[data-sorting] .row .subject { text-decoration-color: transparent !important; transition: none; }
-/* And a card carried up or down its board column, the same way. It keeps
-   its own look: the same faint wash and line, laid on the panel's colour so
-   the card it passes over does not show through, a little see-through as a
-   whole, and the soft shadow. */
-.th-col[data-sorting="carry"], .th-col[data-sorting="carry"] * { cursor: grabbing !important; user-select: none; }
+/* THE BOARD, the same way. The slot is the card's own outline with nothing
+   in it, never the orange of a selected card. */
 .th-col[data-sorting="carry"] .th-card[data-drag-id] { transition: transform .18s cubic-bezier(.2,.8,.2,1); }
 .th-card[data-drag-id] { position: relative; }
-.th-card[data-lifted], .th-card[data-settling] {
-  z-index: 6; transition: none; will-change: transform;
-  background: linear-gradient(rgba(255,255,255,.035), rgba(255,255,255,.035)), var(--skin-solid, var(--surface));
-  box-shadow: 0 12px 32px rgba(0,0,0,.45);
-}
-.th-card[data-lifted] { opacity: .88; }
-/* A card's six dots sit in its left padding, centred on its height. */
-.th-card .row-grip { left: 4px; top: 50%; transform: translateY(-50%); }
+.th-card[data-lifted], .th-card.selected[data-lifted] { background: rgba(255,255,255,.015); border-color: var(--line); }
+.th-card[data-lifted] > * { visibility: hidden; }
+.th-card.drag-preview { background: linear-gradient(rgba(255,255,255,.035), rgba(255,255,255,.035)), var(--skin-solid, var(--surface)); border-color: var(--line-strong); }
+/* A card's dots sit at its top right, on the title's line: its left padding
+   is too narrow for them without crowding the title. */
+.th-card .row-grip { left: auto; right: 10px; top: 15px; }
 .th-card[data-drag-id]:hover .row-grip { opacity: .75; }
-.th-col[data-sorting] .th-card:not([data-lifted]) .row-grip { opacity: 0; }
-.th-card[data-lifted] .row-grip { opacity: 1; color: var(--text-dim); }
-.th-card[data-settling] { animation: th-card-shadow-down .2s cubic-bezier(.2,.8,.2,1) forwards; }
-@keyframes th-card-shadow-down { to { box-shadow: none; } }
+.th-col[data-sorting] .th-card .row-grip { opacity: 0; }
+.th-card.drag-preview .row-grip { opacity: 1; color: var(--text-dim); }
 /* Nothing that answers a hover comes up while a row is carried or settling:
    not the key plate, not Share. */
 /* Share is faded rather than removed, so when the settle ends it comes back
    on its own short fade instead of snapping in. */
 body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-table[data-sorting] .th-row-act { opacity: 0 !important; pointer-events: none !important; }
-.th-table[data-sorting] .has-act .th-when { visibility: visible !important; }
-.th-table .row[data-lifted]::after, .th-table .row[data-settling]::after { display: none; }
+.th-table[data-sorting] .row:not([data-lifted]) .has-act .th-when { visibility: visible !important; }
 .th-cell-person { font-size: 13px; line-height: 20px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
 .th-cell-person .tm-av { margin-right: 9px; flex: none; }
 .th-empty { padding: 32px var(--row-r, 24px) 32px var(--text-x, 32px); color: var(--text-faint); font-size: 14px; }

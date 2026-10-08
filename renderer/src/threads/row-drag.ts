@@ -54,7 +54,52 @@ type Held = {
   startX: number; startY: number; scroll0: number; x: number; y: number; started: boolean;
   rows: { id: string; el: HTMLElement; top: number; bottom: number }[];
   from: number; to: number; frame: number;
+  /** What rides the pointer, and where on it the pointer holds it. */
+  preview: HTMLElement | null; gx: number; gy: number;
 };
+
+/** Where a row's empty slot sits, relative to where the row was: in front of
+ *  row `to`, with the rows between closed up behind it. */
+export function slotOffset(rows: { top: number; bottom: number }[], from: number, to: number): number {
+  if (stays(from, to)) return 0;
+  return to > from ? rows[to - 1].bottom - rows[from].bottom : rows[to].top - rows[from].top;
+}
+
+// ROUND FOUR (2026-10-07): "that looks a bit weird ... pretty unpolished ...
+// make it a linear quality level", over two pictures: the whole row, 1,300px
+// wide, sliding off the panel's edge and over the column headings, and a
+// board card dropped half over the selected one. Carrying the row ITSELF was
+// the mistake. So the row stays in the list as its own empty slot, which
+// moves to where it will land, and what rides the pointer is a separate
+// PREVIEW drawn over everything: on the list a compact chip (the six dots, the
+// title, the project), on the board a copy of the card. It cannot be clipped,
+// cannot cover the headings with a wall of row, and letting go flies it into
+// the slot.
+const GRIP = '<svg viewBox="0 0 10 16" width="8" height="13" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>';
+function chipOf(row: HTMLElement): HTMLElement {
+  const chip = document.createElement('div');
+  chip.className = 'drag-preview drag-chip';
+  const grip = document.createElement('span');
+  grip.className = 'g';
+  grip.innerHTML = GRIP;
+  const title = document.createElement('span');
+  title.className = 't';
+  title.textContent = (row.querySelector('.th-cell-title .th-msg-text, .th-cell-title') as HTMLElement | null)?.textContent?.trim() ?? '';
+  const project = document.createElement('span');
+  project.className = 'p';
+  project.textContent = row.querySelector('.th-cell-proj')?.textContent?.trim() ?? '';
+  chip.append(grip, title, project);
+  return chip;
+}
+
+function copyOf(card: HTMLElement): HTMLElement {
+  const copy = card.cloneNode(true) as HTMLElement;
+  for (const a of ['data-drag-id', 'data-lifted', 'data-settling']) copy.removeAttribute(a);
+  copy.classList.remove('selected');
+  copy.classList.add('drag-preview');
+  copy.style.width = `${card.getBoundingClientRect().width}px`;
+  return copy;
+}
 
 const scrollerOf = (el: HTMLElement | null): HTMLElement | null => {
   for (let at = el?.parentElement ?? null; at; at = at.parentElement) {
@@ -72,7 +117,11 @@ const scrollerOf = (el: HTMLElement | null): HTMLElement | null => {
  * `data-drag-scope` (a board column) moves among that scope's rows only;
  * anywhere else, among the whole list's.
  */
-export function useRowDrag(onDrop: ((id: string, beforeId: string | null, drawn: string[]) => void) | undefined) {
+export function useRowDrag(
+  onDrop: ((id: string, beforeId: string | null, drawn: string[]) => void) | undefined,
+  /** 'chip' for the list's wide rows, 'copy' for the board's cards. */
+  look: 'chip' | 'copy' = 'chip',
+) {
   const listRef = useRef<HTMLDivElement>(null);
   const held = useRef<Held | null>(null);
   // The click that ends a drag must not also open the row. Cleared only once
@@ -85,16 +134,14 @@ export function useRowDrag(onDrop: ((id: string, beforeId: string | null, drawn:
   // the list's coordinates as they were at the lift, so a scroll moves the
   // pointer through the rows rather than the rows out from under it.
   const scrolled = (h: Held) => (h.scroller ? h.scroller.scrollTop - h.scroll0 : 0);
-  // THE CARRIED ROW GOES WHERE THE HAND GOES, both ways (round three,
-  // 2026-10-07: "I expect it to drag left to right ... I feel like I'm stuck
-  // vertically ... completely locked in"). It used to be held to the column
-  // and to the list's top and foot. Only up and down picks its place; across
-  // is the hand moving, and the row follows it.
-  const carried = (h: Held) => `translate(${h.x - h.startX}px, ${h.y + scrolled(h) - h.startY}px)`;
+  // THE PREVIEW GOES WHERE THE HAND GOES, both ways (round three: "I expect it
+  // to drag left to right ... completely locked in"). Only up and down picks
+  // the place; the slot shows it.
   const paint = (h: Held) => {
     const ds = scrolled(h);
     h.to = landingRow(h.rows, h.y + ds);
-    h.el.style.transform = carried(h);
+    if (h.preview) h.preview.style.transform = `translate(${h.x - h.gx}px, ${h.y - h.gy}px)`;
+    h.el.style.transform = `translateY(${slotOffset(h.rows, h.from, h.to)}px)`;
     h.rows.forEach((r, i) => { if (i !== h.from) r.el.style.transform = `translateY(${shiftFor(i, h.from, h.to, pitchOf(h))}px)`; });
   };
   // How far the others move to open the slot: the carried row AND the gap
@@ -147,21 +194,45 @@ export function useRowDrag(onDrop: ((id: string, beforeId: string | null, drawn:
       scope.dataset.sorting = 'settle';
       setTimeout(() => { if (scope.dataset.sorting === 'settle') delete scope.dataset.sorting; }, SETTLE.duration + 20);
     }
-    delete h.el.dataset.lifted;
+    delete document.body.dataset.dragging;
     const els = [...(h.scope?.querySelectorAll<HTMLElement>('[data-drag-id]') ?? [])];
     for (const el of els) el.style.transform = '';
+    // The others close up from wherever they were drawn. The row's own slot
+    // is already where it lands, so it barely moves.
     for (const el of els) {
       const from = was.get(el.dataset.dragId!);
       if (from === undefined || !el.animate) continue;
       const now = el.getBoundingClientRect();
       const by = from.top - now.top;
-      const bx = from.left - now.left;
-      const mine = el.dataset.dragId === h.id;
-      if (Math.abs(by) < 0.5 && Math.abs(bx) < 0.5 && !mine) continue;
-      if (mine) el.dataset.settling = '';
-      const a = el.animate([{ transform: `translate(${bx}px, ${by}px)` }, { transform: 'none' }], SETTLE);
-      if (mine) a.onfinish = a.oncancel = () => { delete el.dataset.settling; };
+      if (Math.abs(by) < 0.5) continue;
+      el.animate([{ transform: `translateY(${by}px)` }, { transform: 'none' }], SETTLE);
     }
+    // THE PREVIEW FLIES INTO THE SLOT and fades as it arrives, while the
+    // row's own words come back underneath it: one object landing, not a
+    // chip vanishing and a row appearing.
+    const mine = h.el.isConnected ? h.el : els.find((el) => el.dataset.dragId === h.id) ?? null;
+    const preview = h.preview;
+    if (mine) {
+      delete mine.dataset.lifted;
+      mine.dataset.settling = '';
+    }
+    if (!preview) { if (mine) delete mine.dataset.settling; return; }
+    const at = preview.getBoundingClientRect();
+    const end = mine?.getBoundingClientRect();
+    // Both land on their own left edge: the chip's title starts 32px in, which
+    // is the list's own text inset, so the two titles meet.
+    const tx = end ? end.left : at.left;
+    // A chip's title lands on the row's title line (19px of row padding over
+    // a 20px line); a card copy lands on the card.
+    const ty = end ? (look === 'chip' ? end.top + 29 - at.height / 2 : end.top) : at.top;
+    const done = () => { preview.remove(); if (mine) delete mine.dataset.settling; };
+    if (!preview.animate) { done(); return; }
+    const a = preview.animate([
+      { transform: `translate(${at.left}px, ${at.top}px)`, opacity: 1 },
+      { transform: `translate(${tx}px, ${ty}px)`, opacity: 1, offset: 0.7 },
+      { transform: `translate(${tx}px, ${ty}px)`, opacity: 0 },
+    ], { duration: 240, easing: SETTLE.easing, fill: 'forwards' });
+    a.onfinish = a.oncancel = done;
   };
 
   const move = (x: number, y: number) => {
@@ -186,6 +257,16 @@ export function useRowDrag(onDrop: ((id: string, beforeId: string | null, drawn:
       // lift, so a plain click keeps every default it had.
       window.getSelection()?.removeAllRanges();
       if (h.scope) h.scope.dataset.sorting = 'carry';
+      document.body.dataset.dragging = '';
+      // The preview, held where the pointer took it: a card copy at the very
+      // spot it was grabbed, a chip with the pointer just past its dots.
+      const box = h.el.getBoundingClientRect();
+      const preview = look === 'copy' ? copyOf(h.el) : chipOf(h.el);
+      document.body.appendChild(preview);
+      h.preview = preview;
+      if (look === 'copy') { h.gx = h.startX - box.left; h.gy = h.startY - box.top; }
+      else { h.gx = 22; h.gy = preview.getBoundingClientRect().height / 2; }
+      preview.animate?.([{ opacity: 0, scale: '0.97' }, { opacity: 1, scale: '1' }], { duration: 140, easing: SETTLE.easing });
       h.el.dataset.lifted = '';
       h.frame = requestAnimationFrame(tick);
     }
@@ -223,7 +304,7 @@ export function useRowDrag(onDrop: ((id: string, beforeId: string | null, drawn:
     if (hit && hit !== e.currentTarget) return;
     const el = e.currentTarget;
     const scope = el.closest<HTMLElement>('[data-drag-scope]') ?? listRef.current;
-    held.current = { id, el, scope, scroller: null, startX: e.clientX, startY: e.clientY, scroll0: 0, x: e.clientX, y: e.clientY, started: false, rows: [], from: -1, to: -1, frame: 0 };
+    held.current = { id, el, scope, scroller: null, startX: e.clientX, startY: e.clientY, scroll0: 0, x: e.clientX, y: e.clientY, started: false, rows: [], from: -1, to: -1, frame: 0, preview: null, gx: 0, gy: 0 };
     const onMove = (ev: PointerEvent) => move(ev.clientX, ev.clientY);
     // The list scrolling under a still pointer moves the slot too.
     const onScroll = () => { const h = held.current; if (h?.started) paint(h); };

@@ -21,7 +21,7 @@ import path from 'node:path';
 import { dropPlaces } from '../shared/rank.mjs';
 import { sorted, rankScore, sortedEntries, entryScore, placesForDrop, overlayPlaces, PLACE_WAIT } from '../renderer/src/threads/page-rules.ts';
 import { Supervisor } from '../main/supervisor.mjs';
-import { edgeScroll, shiftFor, stays } from '../renderer/src/threads/row-drag.ts';
+import { edgeScroll, shiftFor, slotOffset, stays } from '../renderer/src/threads/row-drag.ts';
 
 const NOW = Date.UTC(2026, 9, 7, 12);
 const MIN = 60_000;
@@ -169,6 +169,25 @@ describe('a drag near the edge of a long list', () => {
   it('does not scroll with the pointer in the middle', () => {
     expect(edgeScroll(400, 100, 700)).toBe(0);
     expect(edgeScroll(100 + 56, 100, 700)).toBe(0);
+  });
+});
+
+// ROUND FOUR: the row stays in the list as its own empty slot while a preview
+// rides the pointer, so the slot has to sit exactly where the row will land.
+describe('the empty slot a carried row leaves', () => {
+  // Board cards of different heights with a 13px gap between them.
+  const rows = [{ top: 0, bottom: 100 }, { top: 113, bottom: 160 }, { top: 173, bottom: 293 }, { top: 306, bottom: 353 }];
+  it('moves up to the top of the row it goes in front of', () => {
+    expect(slotOffset(rows, 2, 0)).toBe(-173);
+  });
+  it('moves down to just after the last row it passes, which closes up behind it', () => {
+    // Card 0 (100 tall) dropped at the end: the others move up 113, so the
+    // last ends at 240 and the slot starts 13 later, at 253.
+    expect(slotOffset(rows, 0, 4)).toBe(253);
+  });
+  it('stays put when it is let go where it was', () => {
+    expect(slotOffset(rows, 1, 1)).toBe(0);
+    expect(slotOffset(rows, 1, 2)).toBe(0);
   });
 });
 

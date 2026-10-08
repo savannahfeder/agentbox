@@ -612,7 +612,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     const rows = drawn.flatMap((d) => { const e = byId.get(d); return e ? [{ id: d, score: entryScore(e, projectOrder, direct) }] : []; });
     const places = placesForDrop(rows, id, beforeId);
     if (places) onPlaces(places, id);
-  } : undefined);
+  } : undefined, 'copy');
   const sharing = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since } : null);
   const isSelected = (e: BoardEntry) => (e.card
     ? selectedCard === stopKey({ card: e.card })
