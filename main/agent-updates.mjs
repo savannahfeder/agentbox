@@ -105,7 +105,7 @@ export class AgentUpdates{
   if(!this.plans.has(engine))throw Error('Click Update now first.');
   switch(p.action){
    case 'open':return this.terminals.read(engine,0);
-   case 'read':return this.terminals.read(engine,p.offset);
+   case 'read':return this.terminals.read(engine,p.offset,p.wait);
    case 'write':return this.terminals.write(engine,p.data);
    case 'resize':return this.terminals.resize(engine,p.cols,p.rows);
    case 'close':return this.terminals.close(engine);
