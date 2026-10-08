@@ -4092,6 +4092,120 @@ img.app-mark { opacity: 1; border-radius: 0; }
    second box inside it reads as a button inside a button. */
 .toast-go { color: var(--text-dim); text-decoration: underline; white-space: nowrap; }
 
+/* THE TOAST'S PARTS (w-f0bfe32859): the sentence, the task it is about, and
+   its keys as caps. Which of them a look shows is the look's business; the
+   three below are the proposals, picked between and then cut to one. The
+   keycap is the app's own (.row-keys kbd): square, faint, one drawing of a key
+   everywhere. */
+.toast[data-look] {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.3;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.toast[data-look] .toast-mark,
+.toast[data-look] .toast-title,
+.toast[data-look] .toast-clock { display: none; }
+.toast-words { display: flex; flex-direction: column; min-width: 0; }
+.toast-line, .toast-title { overflow: hidden; text-overflow: ellipsis; }
+.toast-keys { display: inline-flex; align-items: center; gap: 14px; flex: 0 0 auto; }
+.toast-key { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.toast-key kbd {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  padding: 0 5px;
+  line-height: 16px;
+}
+.toast-key-word { font-size: 12.5px; color: var(--text-faint); }
+.toast-key:hover .toast-key-word { color: var(--text); }
+.toast-key:hover kbd { border-color: var(--text-faint); color: var(--text); }
+@keyframes toast-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* A · KEYS. Today's place and today's size, cleaned: one line, the sentence on
+   its own, then a hairline and the two caps. Nothing underlined, no prose key. */
+.toast[data-look="keys"] {
+  padding: 8px 14px 8px 16px;
+  border-color: var(--line-strong);
+}
+.toast[data-look="keys"] .toast-keys { padding-left: 14px; border-left: 1px solid var(--line-strong); align-self: stretch; }
+
+/* B · CARD. Bottom right, out of the middle of what she is reading, and it
+   says WHICH task: the sentence becomes a small kicker over the task's own
+   title. The caps sit under it, and a line along the foot drains over the six
+   seconds so how long is left is visible rather than guessed. */
+.toast[data-look="card"] {
+  left: auto;
+  right: 56px;
+  bottom: 56px;
+  transform: none;
+  width: 360px;
+  display: grid;
+  grid-template-columns: 8px 1fr;
+  grid-template-areas: "mark words" ". keys";
+  column-gap: 12px;
+  row-gap: 12px;
+  align-items: start;
+  padding: 14px 16px 16px 14px;
+  border-color: var(--line-strong);
+}
+.toast[data-look="card"] .toast-mark {
+  display: block;
+  grid-area: mark;
+  width: 8px; height: 8px; margin-top: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.toast[data-look="card"] .toast-words { grid-area: words; gap: 3px; }
+.toast[data-look="card"] .toast-line { font-size: 12px; color: var(--text-faint); }
+.toast[data-look="card"] .toast-title { display: block; font-size: 14px; color: var(--text); font-weight: 500; }
+.toast[data-look="card"] .toast-keys { grid-area: keys; gap: 16px; }
+.toast[data-look="card"] .toast-clock {
+  display: block;
+  position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+  background: var(--accent);
+  opacity: .7;
+  transform-origin: left;
+  animation: toast-drain linear forwards;
+}
+
+/* C · SOLID. The colours turned over, the way the toasts on a phone read:
+   unmistakably a passing message and not part of the page. The app's one
+   corner, not a phone's capsule (tests/one-corner-for-the-whole-app). A tick in front, the caps in chips of their own on the end. */
+.toast[data-look="solid"] {
+  background: var(--text);
+  color: var(--bg);
+  border: 0;
+  padding: 6px 6px 6px 10px;
+  gap: 12px;
+  box-shadow: var(--shadow-lg);
+}
+.toast[data-look="solid"] .toast-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--accent);
+}
+.toast[data-look="solid"] .toast-mark::before { content: "✓"; font-size: 12px; font-weight: 700; color: #fff; }
+.toast[data-look="solid"] .toast-line { font-weight: 500; }
+.toast[data-look="solid"] .toast-keys { gap: 4px; }
+.toast[data-look="solid"] .toast-key {
+  padding: 5px 10px 5px 6px;
+  background: color-mix(in srgb, var(--bg) 10%, transparent);
+}
+.toast[data-look="solid"] .toast-key kbd { color: var(--bg); border-color: color-mix(in srgb, var(--bg) 35%, transparent); }
+.toast[data-look="solid"] .toast-key-word { color: color-mix(in srgb, var(--bg) 75%, transparent); }
+.toast[data-look="solid"] .toast-key:hover { background: color-mix(in srgb, var(--bg) 18%, transparent); }
+.toast[data-look="solid"] .toast-key:hover .toast-key-word { color: var(--bg); }
+.toast[data-look="solid"] .toast-key:hover kbd { color: var(--bg); border-color: var(--bg); }
+
 /* It keeps the top bar's own 22px right margin so it lines up with the settings
    gear below it. It is the toast's shape because the toast is this app's
    existing word for "something brief, then gone". `-webkit-app-region: drag`

@@ -26,6 +26,7 @@ describe('the toast can carry a way in', () => {
   });
 
   it('opens that row, marks it seen and clears itself', () => {
+    // One path for the click and for O since w-f0bfe32859: openToastRow.
     expect(app).toMatch(/setToast\(null\);\s*if \(!row\) return;/);
     expect(app).toMatch(/setFocused\(row\);\s*markSeen\(row\);/);
   });
@@ -38,11 +39,13 @@ describe('the toast can carry a way in', () => {
 
   it('stays a plain announcement when there is nowhere to go', () => {
     // Nothing that is only telling her something grows a pointer or a ring.
-    expect(app).toContain('<div className="toast">{toast.text}</div>');
+    // Since w-f0bfe32859 it is drawn in parts, and still a div.
+    expect(app).toContain(': <div key={toastShown.current} className="toast" data-look={toastLook}>{face}</div>;');
   });
 
   it('says out loud that it is pressable', () => {
-    expect(app).toContain('<span className="toast-go">Open it</span>');
+    // Since w-f0bfe32859 the words are a keycap, O, which also works.
+    expect(app).toContain('{toast.goes && <span className="toast-key"><kbd>O</kbd><span className="toast-key-word">Open</span></span>}');
     expect(css).toContain('.toast-goes {');
     expect(css).toMatch(/\.toast-goes \{[^}]*cursor: pointer;/s);
     expect(css).toMatch(/\.toast-goes:focus-visible \{[^}]*outline:/s);
