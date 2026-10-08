@@ -147,24 +147,61 @@
 .th-table .row:hover .has-act .th-when, .has-act:focus-within .th-when { visibility: hidden; }
 .th-row-act:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .th-row-act:focus-visible { outline: none; border-color: var(--line-strong); }
-/* A THREAD CARRIED UP OR DOWN THE LIST (w-6e5b532a95). It is lifted the way a
-   board column is, on a panel drawn by its shadow, and rides the pointer
-   (threads/row-drag.ts writes the transform); the rows it passes slide aside.
-   Its hairline goes with it, so the list under it never shows two. */
-.th-table.th-sorting, .th-table.th-sorting * { cursor: grabbing !important; user-select: none; }
-.th-table.th-sorting .row[data-drag-id] { transition: transform .16s cubic-bezier(.2,.8,.2,1); }
-.th-table.th-sorting .row.th-row-lifted {
-  position: relative; z-index: 5; transition: none; border-radius: var(--radius);
-  background: var(--bg-raised);
-  box-shadow: 0 0 0 1px var(--line-strong), 0 14px 32px 4px rgba(0,0,0,.38);
-  will-change: transform;
+/* A THREAD CARRIED UP OR DOWN THE LIST (w-6e5b532a95). It rides the pointer
+   (threads/row-drag.ts writes the transform) and the rows it passes slide
+   aside.
+   ROUND TWO (2026-10-07): "kind of weird that the UI completely changes ...
+   the text of the title isn't centered vertically". The first lift painted
+   the whole row box, edge to edge, and a row's padding is 19px over the text
+   and 15px under it, so the title sat low in a grey bar wider than the list.
+   Now the row itself is untouched, same cells, same ink, and a card is drawn
+   BEHIND it on ::before: inset to the text's own margins and 4px shorter at the
+   top, which centres it on the line. It stays on while the row settles into
+   its slot (`data-settling`), so the card does not vanish mid-glide. The
+   marks are data attributes because React owns these rows' class names.
+   The list wears `data-sorting="carry"` while a row is in hand and "settle"
+   for the 220ms after it is let go: the rows only animate their shift while
+   carrying, and the quiet below (no underline, no Share, no key plate) holds
+   through both, so nothing pops back in while the row is still gliding. */
+.th-table[data-sorting="carry"], .th-table[data-sorting="carry"] * { cursor: grabbing !important; user-select: none; }
+.th-table[data-sorting="carry"] .row[data-drag-id] { transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+.th-table .row[data-lifted], .th-table .row[data-settling] { z-index: 5; transition: none; will-change: transform; }
+/* Inset 16px from both walls of the list, so it sits evenly in the panel. */
+.th-table .row[data-lifted]::before, .th-table .row[data-settling]::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  left: calc(var(--text-x) - 16px); right: calc(var(--row-r) - 8px); top: 4px; bottom: 0;
+  background: var(--bg-raised); border: 1px solid var(--line-strong); border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.04);
 }
-/* Nothing that answers a hover comes up while a row is carried: not the
-   key plate, not Share. */
-body:has(.th-sorting) .hint-plate, .th-table.th-sorting .th-row-act { display: none !important; }
-.th-table.th-sorting .has-act .th-when { visibility: visible !important; }
-.th-table.th-sorting .row.th-row-lifted::after,
-.th-table.th-sorting .row.th-row-lifted + .row::after { display: none; }
+/* Landing: the shadow goes first, as it touches down, then the card fades. */
+.th-table .row[data-settling]::before { animation: th-card-down .2s cubic-bezier(.2,.8,.2,1) forwards; }
+@keyframes th-card-down {
+  60% { box-shadow: none; opacity: 1; }
+  to { box-shadow: none; opacity: 0; }
+}
+/* No underline anywhere mid-drag: on the carried row it is a second mark on
+   something already lifted, and on the others it is a hover nobody meant. */
+.th-table[data-sorting] .row .subject { text-decoration-color: transparent !important; transition: none; }
+/* And a card carried up or down its board column, the same way. The card is
+   its own panel, so it turns solid (a resting card is a faint wash, which let
+   the card under it show through) and gains the shadow. */
+.th-col[data-sorting="carry"], .th-col[data-sorting="carry"] * { cursor: grabbing !important; user-select: none; }
+.th-col[data-sorting="carry"] .th-card[data-drag-id] { transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+.th-card[data-lifted], .th-card[data-settling] {
+  position: relative; z-index: 6; transition: none; will-change: transform;
+  background: var(--bg-raised); border-color: var(--line-strong);
+  box-shadow: 0 8px 24px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.04);
+}
+.th-card[data-settling] { animation: th-card-shadow-down .2s cubic-bezier(.2,.8,.2,1) forwards; }
+@keyframes th-card-shadow-down { to { box-shadow: none; } }
+/* Nothing that answers a hover comes up while a row is carried or settling:
+   not the key plate, not Share. */
+/* Share is faded rather than removed, so when the settle ends it comes back
+   on its own short fade instead of snapping in. */
+body:has([data-sorting]) .hint-plate { display: none !important; }
+.th-table[data-sorting] .th-row-act { opacity: 0 !important; pointer-events: none !important; }
+.th-table[data-sorting] .has-act .th-when { visibility: visible !important; }
+.th-table .row[data-lifted]::after, .th-table .row[data-settling]::after { display: none; }
 .th-cell-person { font-size: 13px; line-height: 20px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
 .th-cell-person .tm-av { margin-right: 9px; flex: none; }
 .th-empty { padding: 32px var(--row-r, 24px) 32px var(--text-x, 32px); color: var(--text-faint); font-size: 14px; }

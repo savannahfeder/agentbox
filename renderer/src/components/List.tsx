@@ -137,7 +137,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder }: {
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -239,11 +239,15 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
    *  of old finished threads (w-fda2165ec6). Absent, there is no foot. */
   onEnd?: () => void;
   /** A thread dragged up or down the table and let go in front of another
-   *  (null: at the foot), which App.tsx turns into its place (w-6e5b532a95).
-   *  Absent wherever the order is not yours to set: Updated, Done, a search. */
-  onReorder?: (id: string, beforeId: string | null) => void;
+   *  (null: at the foot), with every row's id as drawn, which App.tsx turns
+   *  into its place (w-6e5b532a95). Absent wherever the order is not yours to
+   *  set: Updated, Done, a search. */
+  onReorder?: (id: string, beforeId: string | null, drawn: string[]) => void;
 }) {
   const drag = useRowDrag(table ? onReorder : undefined);
+  // The hover does not move while a row is carried: each row crossed would
+  // redraw the whole app under the drag (w-6e5b532a95).
+  const onHover = (id: string | null) => { if (!drag.carrying()) hoverTo?.(id); };
   const rules = view === 'snoozed' ? (repeats ?? []) : [];
   // The keys the rows in THIS list offer, drawn on the row under the pointer.
   // One list, one set: they are a property of the view, not of the message.

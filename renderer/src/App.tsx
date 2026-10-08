@@ -116,7 +116,7 @@ import { runNowCommands } from './run-now';
 import { withOlder } from './older-threads';
 import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
 import { BoxFilter } from './components/BoxFilter';
-import { dropPlaces, itemPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
+import { itemPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
 import { threadsMade, approvableFiled } from './threads-made';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, chatProjects, chatTaskSharing, chatTranscript, taskBrief, taskTitle, withTask } from './team/agent-mentions';
@@ -128,9 +128,10 @@ import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
 import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, StateTabs } from './threads/Pages';
+import { isCarrying } from './threads/row-drag';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, rankScore, sorted as sortedByDisplay, type Display, type Privacy } from './threads/page-rules';
+import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPlaces, placesForDrop, rankScore, sorted as sortedByDisplay, type Display, type Privacy, type Unsaved } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, listStops, stepStop, stopKey, type Stop } from './threads/walk-rules';
 
@@ -1488,7 +1489,21 @@ export default function App() {
     return () => { off?.(); window.removeEventListener('pagehide', onHide); };
   }, [flushPending]);
 
-  const refresh = useCallback(async () => setSnap(await api.snapshot()), []);
+  // PLACES JUST DROPPED AND NOT YET BACK FROM THE MAIN PROCESS (w-6e5b532a95).
+  // A snapshot asked for a moment before the drop lands after it, and without
+  // this it put the row back where it was for a poll's length. So each
+  // snapshot wears them until it carries them itself. And none lands while a
+  // row is in hand: it would reorder the rows under the carried one.
+  const unsavedPlaces = useRef<Unsaved>({});
+  // A snapshot held back by a drag is asked for again shortly, so a reply or a
+  // state change that arrived mid-drag is not left waiting for the next poll.
+  const refreshAgain = useRef<() => void>(() => {});
+  const refresh = useCallback(async () => {
+    const next = await api.snapshot();
+    if (isCarrying()) { setTimeout(() => refreshAgain.current(), 300); return; }
+    setSnap(next && { ...next, items: overlayPlaces(next.items, unsavedPlaces.current) });
+  }, []);
+  refreshAgain.current = () => { void refresh(); };
   const refreshRef = useRef<() => Promise<void>>();
   refreshRef.current = refresh;
 
@@ -2247,15 +2262,26 @@ export default function App() {
   // A THREAD DRAGGED UP OR DOWN THE LIST (w-6e5b532a95): it is given a place
   // between its new neighbours, which the list and the fleet both sort by.
   // The row moves at once; the supervisor keeps the place.
-  const reorderThread = useCallback((id: string, beforeId: string | null) => {
-    const rows = displayedBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i) && !isImportRow(i));
-    const from = rows.findIndex((i) => i.id === id);
-    const at = beforeId ? rows.findIndex((i) => i.id === beforeId) : -1;
-    const places = dropPlaces(rows.map((i) => ({ id: i.id, score: rankScore(i, projectOrder, directSlugs) })), from, at < 0 ? rows.length : at);
-    if (!places) return;
+  // The board's columns come through `keepPlaces` too (InboxBoard).
+  // THE DROPPED THREAD IS THE SELECTED ONE afterwards, the way a list in Finder
+  // or Linear leaves it: the selection staying on whatever was there before
+  // read as two rows chosen at once (round three review).
+  const selectAfterDrop = useRef<string | null>(null);
+  const keepPlaces = useCallback((places: Record<string, number>, dropped?: string) => {
+    if (dropped) { selectAfterDrop.current = dropped; setCardSel(null); }
+    const at = Date.now();
+    for (const [id, place] of Object.entries(places)) unsavedPlaces.current[id] = { place, at };
     setSnap((s) => s && { ...s, items: s.items.map((i) => (i.id in places ? { ...i, place: places[i.id] } : i)) });
     void api.setThreadPlaces(places);
-  }, [displayedBox, projectOrder, directSlugs]);
+  }, []);
+  // Worked out against the rows in the order they were DRAWN (`drawn`), so the
+  // neighbours are the two the person saw the gap between.
+  const reorderThread = useCallback((id: string, beforeId: string | null, drawn: string[]) => {
+    const byId = new Map(displayedBox.map((i) => [i.id, i]));
+    const rows = drawn.map((d) => byId.get(d)).filter((i): i is WorkItem => !!i);
+    const places = placesForDrop(rows.map((i) => ({ id: i.id, score: rankScore(i, projectOrder, directSlugs) })), id, beforeId);
+    if (places) keepPlaces(places, id);
+  }, [displayedBox, projectOrder, directSlugs, keepPlaces]);
   // THE PICKED TEAMMATES' THREADS FOR THIS TAB, from the cards their Macs
   // publish, merged into your rows in the Display's order.
   const cards = snap?.team?.cards ?? [];
@@ -2354,8 +2380,13 @@ export default function App() {
   const cursor = cursorIndex({ list, selected, last: cardSel ? null : drawnAt.current });
   const current: WorkItem | undefined = list[cursor];
   useLayoutEffect(() => {
-    drawnAt.current = cursorMark(list, cursor);
-    if (cursor !== selected) setSelected(cursor);
+    // A drop just moved this thread; the cursor goes with it (`keepPlaces`).
+    const dropped = selectAfterDrop.current;
+    const at = dropped ? list.findIndex((i) => i.id === dropped) : -1;
+    selectAfterDrop.current = null;
+    const next = at >= 0 ? at : cursor;
+    drawnAt.current = cursorMark(list, next);
+    if (next !== selected) setSelected(next);
   });
   // THE TUTORIAL'S OWN THREAD IS THE SELECTED ROW ON THE BEAT THAT OPENS IT
   // (2026-10-06). The beat set row 0 and assumed it was hers, which held while
@@ -3846,6 +3877,8 @@ export default function App() {
   const retag = useCallback(async (targets: WorkItem[], value: number) => {
     if (!targets.length) return;
     const word = priorityLabelOf(priorityIdOf(value)).toLowerCase();
+    // A level picked clears a dragged place (main/ipc.mjs), so stop waiting for one.
+    for (const i of targets) delete unsavedPlaces.current[i.id];
     await Promise.all(targets.map((i) => api.answer({ product: i.product, id: i.id, priority: value })));
     showToast(targets.length > 1 ? `${targets.length} set to ${word}` : `Priority: ${word}`);
     await refresh();
@@ -5652,6 +5685,9 @@ export default function App() {
                     cards={cards} picked={team ? picked : undefined}
                     onOpenCard={openTeammateCard}
                     selected={current} selectedCard={keyCard ? cardSel : null} columnOrder={columnOrder} onReorderColumns={reorderColumns}
+                    // A card dragged up or down its column keeps that place,
+                    // the way a row in the list does (w-6e5b532a95).
+                    onPlaces={!run && !withOthers && inboxDisplay.sort === 'priority' ? keepPlaces : undefined}
                     // A click puts the keyboard where the click was, so J
                     // and the arrows carry on from that card on the way back.
                     onOpenItem={(item) => { const i = list.indexOf(item); setCardSel(null); if (i >= 0) setSelected(i); setFocused(item); markSeen(item); }} />

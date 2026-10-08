@@ -19,9 +19,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { dropPlaces } from '../shared/rank.mjs';
-import { sorted, rankScore } from '../renderer/src/threads/page-rules.ts';
+import { sorted, rankScore, sortedEntries, entryScore, placesForDrop, overlayPlaces, PLACE_WAIT } from '../renderer/src/threads/page-rules.ts';
 import { Supervisor } from '../main/supervisor.mjs';
-import { shiftFor, stays } from '../renderer/src/threads/row-drag.ts';
+import { edgeScroll, shiftFor, stays } from '../renderer/src/threads/row-drag.ts';
 
 const NOW = Date.UTC(2026, 9, 7, 12);
 const MIN = 60_000;
@@ -92,6 +92,83 @@ describe('dragging a thread in the list', () => {
     // A new Urgent thread in the team product still lands by its level.
     const fresh = [...after, row('t-new-urgent', 'team-app', 9, 0)];
     expect(ids(sorted(fresh, byPriority, undefined, ORDER))).toEqual(['p-high', 't-low', 'p-low', 't-new-urgent', 't-urgent', 't-medium']);
+  });
+});
+
+// THE BOARD, SAME IDEA (asked 2026-10-07 on the same thread): a card dragged
+// up or down its column keeps that place, by the same rule as the list.
+describe('dragging a card in a board column', () => {
+  const entry = (id, projectSlug, priority, agoMin, place) => ({
+    key: id, ownerId: 'u', state: 'waiting', title: id, project: projectSlug, projectSlug, priority, updatedAt: NOW - agoMin * MIN,
+    item: { id, product: projectSlug, priority, updatedAt: NOW - agoMin * MIN, status: 'open', ...(place !== undefined ? { place } : {}) },
+  });
+  const column = [entry('p-high', 'personal', 7, 10), entry('p-low', 'personal', 2, 20), entry('t-medium', 'team-app', 5, 40)];
+  const shown = (entries) => sortedEntries(entries, byPriority, 'waiting', ORDER).map((e) => e.key);
+
+  it('sorts a column by a card\'s place', () => {
+    expect(shown(column)).toEqual(['p-high', 'p-low', 't-medium']);
+    const rows = sortedEntries(column, byPriority, 'waiting', ORDER).map((e) => ({ id: e.item.id, score: entryScore(e, ORDER) }));
+    const places = placesForDrop(rows, 't-medium', 'p-high');
+    const moved = column.map((e) => (e.item.id in places ? { ...e, item: { ...e.item, place: places[e.item.id] } } : e));
+    expect(shown(moved)).toEqual(['t-medium', 'p-high', 'p-low']);
+  });
+
+  it('writes nothing when a card is let go where it was', () => {
+    const rows = sortedEntries(column, byPriority, 'waiting', ORDER).map((e) => ({ id: e.item.id, score: entryScore(e, ORDER) }));
+    expect(placesForDrop(rows, 'p-low', 't-medium')).toBeNull();
+  });
+
+  it('sends a card dropped below the last one to the foot', () => {
+    const rows = sortedEntries(column, byPriority, 'waiting', ORDER).map((e) => ({ id: e.item.id, score: entryScore(e, ORDER) }));
+    const places = placesForDrop(rows, 'p-high', null);
+    const moved = column.map((e) => (e.item.id in places ? { ...e, item: { ...e.item, place: places[e.item.id] } } : e));
+    expect(shown(moved)).toEqual(['p-low', 't-medium', 'p-high']);
+  });
+});
+
+// ROUND TWO: a review found that a snapshot asked for just before a drop
+// lands after it and put the row back for a poll's length. Each snapshot now
+// wears the places still on their way, until it carries them itself.
+describe('a place on its way to the main process', () => {
+  it('is laid over a snapshot that does not carry it yet', () => {
+    const unsaved = { a: { place: 300, at: NOW } };
+    const out = overlayPlaces([{ id: 'a' }, { id: 'b' }], unsaved, NOW + 1000);
+    expect(out[0].place).toBe(300);
+    expect(out[1].place).toBeUndefined();
+    expect(unsaved.a).toBeDefined();
+  });
+  it('is forgotten once a snapshot carries it', () => {
+    const unsaved = { a: { place: 300, at: NOW } };
+    overlayPlaces([{ id: 'a', place: 300 }], unsaved, NOW + 1000);
+    expect(unsaved).toEqual({});
+  });
+  it('is forgotten when the thread has left the snapshot', () => {
+    const unsaved = { a: { place: 300, at: NOW } };
+    overlayPlaces([{ id: 'b' }], unsaved, NOW + 1000);
+    expect(unsaved).toEqual({});
+  });
+  it('gives up after PLACE_WAIT, so a place the app has since cleared is not forced back', () => {
+    const unsaved = { a: { place: 300, at: NOW } };
+    const out = overlayPlaces([{ id: 'a' }], unsaved, NOW + PLACE_WAIT + 1);
+    expect(out[0].place).toBeUndefined();
+    expect(unsaved).toEqual({});
+  });
+  it('hands back the very same list when nothing is waiting', () => {
+    const items = [{ id: 'a' }];
+    expect(overlayPlaces(items, {})).toBe(items);
+  });
+});
+
+describe('a drag near the edge of a long list', () => {
+  // A list on screen from y=100 to y=700.
+  it('scrolls up near the top and down near the bottom, faster nearer the edge', () => {
+    expect(edgeScroll(110, 100, 700)).toBeLessThan(0);
+    expect(edgeScroll(690, 100, 700)).toBeGreaterThan(0);
+    expect(Math.abs(edgeScroll(101, 100, 700))).toBeGreaterThan(Math.abs(edgeScroll(150, 100, 700)));
+  });
+  it('does not scroll with the pointer in the middle', () => {
+    expect(edgeScroll(400, 100, 700)).toBe(0);
+    expect(edgeScroll(100 + 56, 100, 700)).toBe(0);
   });
 });
 
