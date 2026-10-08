@@ -2,6 +2,7 @@
 // Optional reads report absence; unsupported actions fail before side effects.
 import { claudeHarness } from './harnesses/claude.mjs';
 import { codexHarness } from './harnesses/codex.mjs';
+import { openCodeHarness } from './harnesses/opencode.mjs';
 
 export const HARNESS_OPERATIONS = Object.freeze([
   'discover', 'binary', 'install', 'signIn', 'signInStatus', 'signInFiles',
@@ -40,6 +41,10 @@ export function createHarnessRegistry(adapters) {
     supports(id, capability) { return typeof entries.get(id)?.adapter[capability] === 'function'; },
   });
 }
-const registry = createHarnessRegistry([claudeHarness, codexHarness]);
+// REGISTERED IS NOT OFFERED. OpenCode is here so anything that asks for it by
+// name gets the real adapter, and it is deliberately absent from `ENGINES`
+// (shared/engines.mjs) so no row can choose it and no picker draws it until
+// that is turned on deliberately. The two decisions are separate on purpose.
+const registry = createHarnessRegistry([claudeHarness, codexHarness, openCodeHarness]);
 export const harnessFor = id => registry.get(id);
 export const supportsHarnessOperation = (id, name) => registry.supports(id, name);
