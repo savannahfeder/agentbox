@@ -137,6 +137,7 @@ function readVersion() {
  */
 function answerWhatOnlyTheWindowAnswered(ipcMain) {
   ipcMain.handle('zero:badge', () => null);
+  ipcMain.handle('zero:corner-tag', () => null);
   ipcMain.handle('zero:notify', () => null);
   ipcMain.handle('zero:boot-info', () => ({ reloaded: false, builtAt: null, recovered: null }));
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); return null; });

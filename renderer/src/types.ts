@@ -891,6 +891,8 @@ export interface WorkspaceSettings {
   // Whether the ADHD mode rules ride under "How agents write to you". Off
   // unless she turned it on (w-5737fe67cf).
   adhdMode?: boolean;
+  // The corner tag over other apps (w-dafae58a23). On unless she turned it off.
+  cornerTag?: boolean;
   outsideAgents: AgentMode;
   accounts: AccountSetting[];
   /**
@@ -1084,6 +1086,13 @@ declare global {
       // itself, which is the only way the page hears about the chord at all.
       onApprovalAnswered?(fn: (a: { id: string; allow: boolean }) => void): () => void;
       badge?(count: number): Promise<void>;
+      // The corner tag over other apps (main/corner-tag.mjs).
+      cornerTag?(state: {
+        ready: { id: string; title: string; says: string; since?: number; open?: string | null }[];
+        working: number;
+      }): Promise<void>;
+      // The corner tag's "Turn off…": open Settings on this page.
+      onOpenSettings?(fn: (p: { pane?: string }) => void): () => void;
       // screenDetail is which set of theme pictures this screen wants, 'soft' or
       // 'sharp' (main/screen-detail.mjs). It rides here rather than being
       // pushed because the answer is needed on the first paint.

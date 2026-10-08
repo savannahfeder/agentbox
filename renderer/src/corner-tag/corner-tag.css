@@ -1,0 +1,52 @@
+/* THE CORNER TAG (w-dafae58a23). One look on every page behind it: the window
+   cannot see what it floats over, so it never tries to adapt to it, and the
+   silver glass and its grey marks stay the same on a black editor and a white
+   document alike. Approved over eight rounds of drawings in the product's
+   designs folder; change it there first. */
+
+:root { --pad: 16px; }
+html, body, #root { margin: 0; padding: 0; background: transparent; overflow: hidden; height: 100%; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; -webkit-font-smoothing: antialiased; user-select: none; cursor: default; }
+
+.ct-glass {
+  position: absolute;
+  color: #1d1d1f;
+  background: rgba(246, 246, 250, 0.82);
+  backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.10);
+}
+.ct-glass::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.35));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+}
+
+.ct-tag {
+  height: 26px; padding: 0 11px 0 9px; border-radius: 13px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 7px; font-size: 12.5px; white-space: nowrap;
+}
+.ct-tag .ct-words { font-weight: 600; }
+.ct-tag.working .ct-words { font-weight: 500; color: rgba(29, 29, 31, 0.72); }
+
+/* Ready is a full dot, working the same grey half full. Still: nothing here
+   moves, because moving is what pulls an eye off its work. */
+.ct-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: rgba(29, 29, 31, 0.52); }
+.ct-half { flex: none; display: block; }
+
+.ct-card { border-radius: 14px; padding: 12px 14px 10px; box-sizing: border-box; max-width: 440px; }
+.ct-line { display: flex; align-items: center; gap: 9px; font-size: 13px; white-space: nowrap; padding: 3px 0; border-radius: 6px; cursor: pointer; }
+.ct-line .ct-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.ct-line .ct-says { color: rgba(29, 29, 31, 0.72); }
+.ct-line .ct-when { margin-left: auto; padding-left: 14px; font-size: 12px; color: rgba(29, 29, 31, 0.52); }
+.ct-line:hover .ct-name { text-decoration: underline; text-underline-offset: 2px; }
+.ct-quiet { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: rgba(29, 29, 31, 0.52); padding: 3px 0; }
+.ct-gap { height: 7px; }
+
+/* Hide it for a while, or go and turn it off. Small and last, so the list
+   reads first. */
+.ct-foot { display: flex; align-items: center; gap: 6px; margin-top: 9px; padding-top: 8px; border-top: 1px solid rgba(29, 29, 31, 0.10); font-size: 11.5px; color: rgba(29, 29, 31, 0.52); white-space: nowrap; }
+.ct-foot button { all: unset; cursor: pointer; padding: 2px 6px; border-radius: 5px; color: rgba(29, 29, 31, 0.72); }
+.ct-foot button:hover { background: rgba(29, 29, 31, 0.07); color: #1d1d1f; }
+.ct-foot .ct-off { margin-left: auto; }
+
+.ct-measure { position: fixed; left: -10000px; top: 0; visibility: hidden; }
