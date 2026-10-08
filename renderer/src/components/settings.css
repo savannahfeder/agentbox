@@ -79,6 +79,7 @@
    ones. THE CARD IS THE ONLY ROUNDED THING HERE: anything that wears a
    highlighted edge is square and sits clear of the card's corners, because a
    bright rule bent round a corner "looks whack". */
+.settings-screen[data-pane] .set-group-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .settings-screen[data-pane] .set-plate:not(.set-keys) {
   padding: 0 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--wash);
 }

@@ -324,6 +324,7 @@ export interface Usage {
   engine: string;
   limits: UsageLimit[];
   at: number;
+  profile?: string;
 }
 
 export interface SupervisorStatus {
@@ -973,6 +974,7 @@ declare global {
   interface Window {
     zero?: {
       snapshot(): Promise<Snapshot>;
+      refreshUsage?(): Promise<{ ok: boolean; reading?: Usage; error?: string }>;
       olderItems?(p: { offset: number; limit: number }): Promise<{ items: WorkItem[]; more: boolean }>;
       crash?(p: { name: string; message: string; stack: string }): Promise<unknown>;
       // A count. The name is checked against the approved list in the main

@@ -259,7 +259,15 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // while the app is running and the settings screen already promises that
     // works without a restart.
     bin: () => config.claudeBin,
+    // Same narrowed account pool the fleet uses, without advancing its cursor.
+    profile: () => supervisor._profilesFor(DEFAULT_ENGINE)[0] ?? 'default',
     onChange: push,
+  });
+
+  ipcMain.handle('zero:refresh-usage', async event => {
+    if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) throw Error('Usage refresh is only available in the main app window.');
+    const result = await usage.refreshNow();
+    return result.reading ? { ...result, reading: { engine: DEFAULT_ENGINE, ...result.reading } } : result;
   });
 
   // Agents this run has already counted. In memory on purpose: a fresh launch
