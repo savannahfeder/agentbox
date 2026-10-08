@@ -71,24 +71,31 @@ export function slotOffset(rows: { top: number; bottom: number }[], from: number
 // board card dropped half over the selected one. Carrying the row ITSELF was
 // the mistake. So the row stays in the list as its own empty slot, which
 // moves to where it will land, and what rides the pointer is a separate
-// PREVIEW drawn over everything: on the list a compact chip (the six dots, the
-// title, the project), on the board a copy of the card. It cannot be clipped,
-// cannot cover the headings with a wall of row, and letting go flies it into
-// the slot.
-const GRIP = '<svg viewBox="0 0 10 16" width="8" height="13" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg>';
+// PREVIEW drawn over everything: on the list a compact chip (the title and the
+// project), on the board a copy of the card. It cannot be clipped, cannot
+// cover the headings with a wall of row, and letting go flies it into the
+// slot.
+//
+// NO DRAG DOTS ANYWHERE (round five, 2026-10-07): "the drag icon is too much
+// and causes too many problems. Let's just get rid of it entirely: no drag
+// icon on hover or in general, even when you're dragging." Not on a row, not
+// on a card, not on the chip.
+//
+// The chip's title starts this far in from its own left edge (its padding,
+// pages.css `.drag-chip`). The list's titles start at 32px, so a chip lands
+// this much to the right of its row and the two titles meet.
+const CHIP_INSET = 16;
+const LIST_TEXT_X = 32;
 function chipOf(row: HTMLElement): HTMLElement {
   const chip = document.createElement('div');
   chip.className = 'drag-preview drag-chip';
-  const grip = document.createElement('span');
-  grip.className = 'g';
-  grip.innerHTML = GRIP;
   const title = document.createElement('span');
   title.className = 't';
   title.textContent = (row.querySelector('.th-cell-title .th-msg-text, .th-cell-title') as HTMLElement | null)?.textContent?.trim() ?? '';
   const project = document.createElement('span');
   project.className = 'p';
   project.textContent = row.querySelector('.th-cell-proj')?.textContent?.trim() ?? '';
-  chip.append(grip, title, project);
+  chip.append(title, project);
   return chip;
 }
 
@@ -219,9 +226,8 @@ export function useRowDrag(
     if (!preview) { if (mine) delete mine.dataset.settling; return; }
     const at = preview.getBoundingClientRect();
     const end = mine?.getBoundingClientRect();
-    // Both land on their own left edge: the chip's title starts 32px in, which
-    // is the list's own text inset, so the two titles meet.
-    const tx = end ? end.left : at.left;
+    // A card copy lands on its card; a chip lands with its title on the row's.
+    const tx = end ? end.left + (look === 'chip' ? LIST_TEXT_X - CHIP_INSET : 0) : at.left;
     // A chip's title lands on the row's title line (19px of row padding over
     // a 20px line); a card copy lands on the card.
     const ty = end ? (look === 'chip' ? end.top + 29 - at.height / 2 : end.top) : at.top;
@@ -259,13 +265,13 @@ export function useRowDrag(
       if (h.scope) h.scope.dataset.sorting = 'carry';
       document.body.dataset.dragging = '';
       // The preview, held where the pointer took it: a card copy at the very
-      // spot it was grabbed, a chip with the pointer just past its dots.
+      // spot it was grabbed, a chip with the pointer where its title starts.
       const box = h.el.getBoundingClientRect();
       const preview = look === 'copy' ? copyOf(h.el) : chipOf(h.el);
       document.body.appendChild(preview);
       h.preview = preview;
       if (look === 'copy') { h.gx = h.startX - box.left; h.gy = h.startY - box.top; }
-      else { h.gx = 22; h.gy = preview.getBoundingClientRect().height / 2; }
+      else { h.gx = CHIP_INSET; h.gy = preview.getBoundingClientRect().height / 2; }
       preview.animate?.([{ opacity: 0, scale: '0.97' }, { opacity: 1, scale: '1' }], { duration: 140, easing: SETTLE.easing });
       h.el.dataset.lifted = '';
       h.frame = requestAnimationFrame(tick);

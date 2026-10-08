@@ -191,6 +191,21 @@ describe('the empty slot a carried row leaves', () => {
   });
 });
 
+// ROUND FIVE: "the drag icon is too much and causes too many problems. Let's
+// just get rid of it entirely: no drag icon on hover or in general, even when
+// you're dragging." Read as text, because the dots were markup in three files
+// and a style in a fourth, and any one of them coming back is the regression.
+describe('no drag dots anywhere', () => {
+  const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
+  it('draws none on a row, a card or the carried chip', () => {
+    for (const f of ['renderer/src/components/List.tsx', 'renderer/src/threads/Pages.tsx', 'renderer/src/threads/row-drag.ts', 'renderer/src/threads/pages.css']) {
+      expect(read(f)).not.toMatch(/RowGrip|row-grip|drag-chip \.g\b/);
+    }
+    // The chip is the title and the project, and nothing drawn.
+    expect(read('renderer/src/threads/row-drag.ts')).toMatch(/chip\.append\(title, project\)/);
+  });
+});
+
 describe('the rows a drag passes', () => {
   // Five rows, 56px tall; the third (index 2) is carried.
   it('slide up to fill the gap when it goes down, and only those', () => {

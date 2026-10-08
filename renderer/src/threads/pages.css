@@ -173,34 +173,26 @@ body[data-dragging], body[data-dragging] * { cursor: grabbing !important; user-s
 /* Its words come back as the preview lands on them. */
 .th-table .row[data-settling] > *, .th-card[data-settling] > * { animation: th-words-back .24s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes th-words-back { 0%, 45% { opacity: 0; } to { opacity: 1; } }
-/* THE PREVIEW. On the list a chip: the six dots, the title, the project, on
-   the panel's own colour, no wider than it needs to be. On the board a copy of
-   the card. Both a touch see-through ("components get a little more
-   transparent ... when you drag them"), with a soft shadow and a hairline of
-   light for an edge rather than a drawn border. */
+/* THE PREVIEW. On the list a chip: the title and the project, on the panel's
+   own colour, no wider than it needs to be. On the board a copy of the card.
+   Both a touch see-through ("components get a little more transparent ...
+   when you drag them"), with a soft shadow and a hairline of light for an edge
+   rather than a drawn border. No drag dots on it, or anywhere: "the drag icon
+   is too much ... get rid of it entirely" (round five). The 16px left padding
+   is CHIP_INSET in threads/row-drag.ts, which lands the chip's title on the
+   row's. */
 .drag-preview {
   position: fixed; left: 0; top: 0; z-index: 1000; margin: 0; pointer-events: none; will-change: transform;
   opacity: .94; box-shadow: 0 12px 32px rgba(0,0,0,.42), 0 0 0 1px rgba(255,255,255,.07);
 }
 :root[data-theme="light"] .drag-preview { box-shadow: 0 12px 32px rgba(17,25,48,.16), 0 0 0 1px rgba(17,25,48,.08); }
 .drag-chip {
-  display: flex; align-items: center; gap: 12px; max-width: 560px; padding: 10px 18px 10px 12px;
+  display: flex; align-items: center; gap: 12px; max-width: 560px; padding: 10px 18px 10px 16px;
   background: var(--skin-solid, var(--surface)); border-radius: var(--radius);
   font-size: 14px; line-height: 20px; color: var(--text); white-space: nowrap;
 }
-.drag-chip .g { flex: none; display: grid; color: var(--text-dim); }
 .drag-chip .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .drag-chip .p { flex: none; margin-left: 6px; font: 11.5px/20px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); }
-/* THE SIX DOTS (RowGrip, Pages.tsx), in the select box's own slot and on
-   the box's own centre. "Nothing ... makes it clear that I can drag this":
-   they come up faintly while the pointer is on a row that can move, give the
-   slot back to the box the moment the pointer is on the box itself (or a box
-   is ticked), and lead the preview while the row is in hand: "at that point
-   we don't need the select component". */
-.row-grip { position: absolute; left: calc(var(--gutter) + 3px); top: 21.5px; height: 18px; display: grid; place-items: center; color: var(--text-faint); opacity: 0; pointer-events: none; transition: opacity .12s ease; }
-.th-table .row[data-drag-id]:hover .row-grip { opacity: .75; }
-.th-table .row:has(.mark:hover) .row-grip, .th-table .row:has(.mark.on) .row-grip,
-.th-table[data-sorting] .row:not([data-lifted]) .row-grip { opacity: 0; }
 /* No underline anywhere mid-drag: it is a hover nobody meant. */
 .th-table[data-sorting] .row .subject { text-decoration-color: transparent !important; transition: none; }
 /* THE BOARD, the same way. The slot is the card's own outline with nothing
@@ -210,12 +202,6 @@ body[data-dragging], body[data-dragging] * { cursor: grabbing !important; user-s
 .th-card[data-lifted], .th-card.selected[data-lifted] { background: rgba(255,255,255,.015); border-color: var(--line); }
 .th-card[data-lifted] > * { visibility: hidden; }
 .th-card.drag-preview { background: linear-gradient(rgba(255,255,255,.035), rgba(255,255,255,.035)), var(--skin-solid, var(--surface)); border-color: var(--line-strong); }
-/* A card's dots sit at its top right, on the title's line: its left padding
-   is too narrow for them without crowding the title. */
-.th-card .row-grip { left: auto; right: 10px; top: 15px; }
-.th-card[data-drag-id]:hover .row-grip { opacity: .75; }
-.th-col[data-sorting] .th-card .row-grip { opacity: 0; }
-.th-card.drag-preview .row-grip { opacity: 1; color: var(--text-dim); }
 /* Nothing that answers a hover comes up while a row is carried or settling:
    not the key plate, not Share. */
 /* Share is faded rather than removed, so when the settle ends it comes back
