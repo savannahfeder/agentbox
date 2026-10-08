@@ -2,10 +2,7 @@ import fs from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { providerCommand, providerCommands, reviewTarget } from '../shared/provider-commands.mjs';
-import { claudeModelRows } from './claude-models.mjs';
-import { EFFORT_LEVELS } from '../shared/effort-levels.mjs';
-import { codexModels, codexDefaultModel, codexModelLevels } from './codex-models.mjs';
-import { runCodexCommand } from './provider-commands.mjs';
+import { harnessFor } from './harnesses.mjs';
 import { NAME } from '../shared/product-name.mjs';
 const exec = promisify(execFile);
 
@@ -40,7 +37,7 @@ export function forkTitle(words, cap = 60) {
 }
 
 function forkTask(sup, productSlug, id, item, engine, op, publish) {
-  if (engine === 'codex') {
+  if (!harnessFor(engine).capabilities.fork) {
     return publish('failed', 'Forking a Codex conversation is not connected yet. Its protocol has thread/fork and that call has never been made here, so this refuses rather than pretending. Your draft has been kept.', op.name);
   }
   // NAMING THE KEY, because the menu closes at the space and plain return then
@@ -77,10 +74,10 @@ export async function taskCommand(sup, productSlug, id, text) {
  };
  const item=sup.store.readItem(productSlug,id);
  if(!item||item.agent)return publish('failed','This task is not available.');
- const engine=sup._engineFor(item), op=providerCommand(text,engine);
+ const engine=sup._engineFor(item), harness=harnessFor(engine), op=providerCommand(text,engine);
  if(!op)return publish('failed','Enter a slash command.');
- if(engine !== 'codex' && op.route === 'unavailable' && (sup._nativeCommands?.[id]?.includes(op.name) || (op.name === 'review' && sup._nativeCommands?.[id]?.includes('code-review')))) return publish('forward');
- if(op.route==='unavailable')return publish('failed',`/${op.name} is not supported in ${NAME} yet. Your draft has been kept. Use the native ${engine==='codex'?'Codex':'Claude Code'} client for this command.`,op.name);
+ if(harness.capabilities.nativeCommands && op.route === 'unavailable' && (sup._nativeCommands?.[id]?.includes(op.name) || (op.name === 'review' && sup._nativeCommands?.[id]?.includes('code-review')))) return publish('forward');
+ if(op.route==='unavailable')return publish('failed',`/${op.name} is not supported in ${NAME} yet. Your draft has been kept. Use the native ${harness.label} client for this command.`,op.name);
  if(op.route==='remote'){if(op.args)return publish('failed','Run /remote-control on its own.',op.name);sup.remoteControl(productSlug,id,'toggle').catch(()=>{});return publish('done','',op.name);}
  if(op.route==='fork')return forkTask(sup,productSlug,id,item,engine,op,publish);
  if(op.route==='claude')return publish('forward');
@@ -102,20 +99,20 @@ export async function taskCommand(sup, productSlug, id, text) {
  try {
   let result;
   const write=patch=>sup.store.modules.workItemsDisk.updateWorkItem(sup.store.productDir(productSlug),id,patch,{source:'founder'});
-  const home=engine==='codex'?sup._codexProfileHome(rec?.profile??'default'):null;
-  const model=item.model||(engine==='codex'?(sup._codexWorkspaceModel()||codexDefaultModel({home})):null);
+  const home=harness.profileHome(sup,rec?.profile??'default');
+  const model=item.model||harness.workspaceModel(sup)||harness.defaultModel({home});
   if(op.name==='model') {
    // Both halves read off this Mac, so /model lists what its CLIs can actually
    // be asked for today rather than what was true when Agentbox was built.
-   const models=engine==='codex'?codexModels({home}):claudeModelRows({bin:sup.config?.claudeBin??null}).map(m=>({id:m.alias,label:m.label}));
+   const models=harness.models({home,bin:harness.binary(sup.config)});
    if(!op.args)result=`Task model: ${model||'provider default'}\n${models.map(m=>`/model ${m.id} · ${m.label}`).join('\n')}`;
    else {if(!models.some(m=>m.id===op.args))throw new Error('Choose one of the models listed by /model. Your draft has been kept.');
     // Model changes cannot carry an incompatible effort into the next run.
-    const levels=engine==='codex'?codexModelLevels(op.args,{home}):EFFORT_LEVELS.map(e=>e.id);
+    const levels=harness.effortLevels(op.args,{home});
     write({model:op.args,...(item.effort&&levels&&!levels.includes(item.effort)?{effort:null}:{})});
     result=`This task will use ${op.args} on its next response.`;}
   } else if(op.name==='effort') {
-   const levels=engine==='codex'?codexModelLevels(model,{home}):EFFORT_LEVELS.map(e=>e.id);
+   const levels=harness.effortLevels(model,{home});
    if(!op.args)result=`Task effort: ${item.effort||'provider default'}\n${levels?.map(l=>`/effort ${l}`).join('\n')||'The provider has not reported available levels.'}`;
    else {if(!levels?.includes(op.args))throw new Error('Choose one of the levels listed by /effort. Your draft has been kept.');write({effort:op.args});result=`This task will use ${op.args} effort on its next response.`;}
   } else if(op.name==='rename') {
@@ -128,10 +125,10 @@ export async function taskCommand(sup, productSlug, id, text) {
    // (MP-08), so the old sentence naming it was out of date the day it shipped.
    // A list of gaps nobody maintains is worse than no list: it teaches her that
    // what this app says about itself is stale.
-   const missing = engine==='codex'
+   const missing = !harness.capabilities.fork
     ? 'Native terminal settings, forking a conversation, rewind and integration setup are not connected here yet.'
     : 'Native terminal settings, rewind and integration setup are not connected here yet.';
-   result=[...providerCommands(engine).map(c=>`/${c.name}${c.argumentHint?' '+c.argumentHint:''} · ${c.description}`), ...(engine==='codex'?[]:names.map(n=>`/${n} · Native Claude Code command`))].join('\n')+`\n\n${missing} Unavailable commands keep your draft and never run as a prompt.`;
+   result=[...providerCommands(engine).map(c=>`/${c.name}${c.argumentHint?' '+c.argumentHint:''} · ${c.description}`), ...(harness.capabilities.nativeCommands?names.map(n=>`/${n} · Native ${harness.label} command`):[])].join('\n')+`\n\n${missing} Unavailable commands keep your draft and never run as a prompt.`;
   } else if(op.name==='diff') {
    if(op.args)throw new Error('Run /diff on its own.');
    const opts={cwd,timeout:15000,maxBuffer:2*1024*1024};
@@ -146,8 +143,7 @@ export async function taskCommand(sup, productSlug, id, text) {
   } else {
    if(op.name==='goal' && op.args && !['pause','clear'].includes(op.args)) throw new Error(`Setting or resuming a Codex goal is not connected to ${NAME}’s worker lifecycle yet. Your draft has been kept.`);
    if(!rec?.sessionId&&op.name!=='skills')throw new Error('This task has no saved conversation yet. Send a message first.');
-   const {client,handshake}=sup._codexServer(home);await handshake;
-   result=await runCodexCommand({server:client,threadId:rec?.sessionId,cwd,...op});
+   result=await harness.runCommand(sup,{home,threadId:rec?.sessionId,cwd,...op});
    if(op.name==='status')result=`Task model: ${model||'provider default'}\nTask effort: ${item.effort||'provider default'}\n${result}`;
   }
   if(op.name==='copy')return {state:'copy',text:result,at:Date.now()};

@@ -818,7 +818,7 @@ describe('the two guards this file had to copy', () => {
 
 /* ========================== and it stays inert =========================== */
 
-describe('this file is wired to nothing yet', () => {
+describe('Codex readers stay behind the engine and approval boundary', () => {
   // shared/engines.mjs is CLOSED behind a capability token and
   // tests/a-codex-row-from-august-still-runs-on-claude.test.mjs holds that
   // nothing in main/ or renderer/src references it. This module is the
@@ -861,7 +861,10 @@ describe('this file is wired to nothing yet', () => {
   // claim is kept exactly as strong by naming what each importer may take: a
   // reader arriving in the approvals file goes red here and has to be argued
   // for in its turn.
-  it('is imported by the supervisor and the approvals path, and by nothing else under main/, renderer/src or shared/', () => {
+  // 2026-10-07: the engine extraction moves readers into the Codex adapter
+  // and the shared cap into Claude's stream reader. Resolve each import so
+  // the adapter named codex.mjs is not mistaken for the raw reader module.
+  it('is imported only by the engine readers and the approvals path', () => {
     const sources = (dir) => {
       const out = [];
       for (const entry of readdirSync(dir)) {
@@ -876,10 +879,13 @@ describe('this file is wired to nothing yet', () => {
       ...sources(join(repo, 'renderer', 'src')),
       ...sources(join(repo, 'shared')),
     ].filter((f) => !f.endsWith(join('main', 'codex.mjs')));
-    const importers = app.filter((f) => /from\s+['"][^'"]*\bcodex\.mjs['"]/.test(readFileSync(f, 'utf8')));
+    const target = join(repo, 'main', 'codex.mjs');
+    const importers = app.filter((f) => [...readFileSync(f, 'utf8').matchAll(/from\s+['"]([^'"]+)['"]/g)]
+      .some((m) => join(dirname(f), m[1]) === target));
     expect(importers.sort()).toEqual([
       join(repo, 'main', 'codex-approvals.mjs'),
-      join(repo, 'main', 'supervisor.mjs'),
+      join(repo, 'main', 'harnesses', 'claude-stream.mjs'),
+      join(repo, 'main', 'harnesses', 'codex.mjs'),
     ]);
   });
 
@@ -904,17 +910,24 @@ describe('this file is wired to nothing yet', () => {
   //   and into this module, which is what the note at main/codex.mjs:111 asked
   //   for. It was a module-private const in both files for exactly as long as
   //   the reader slice was not allowed to edit the supervisor.
-  it('takes the four readers, both halves of the change, and the one cap', () => {
-    const source = readFileSync(join(repo, 'main', 'supervisor.mjs'), 'utf8');
+  it('lends the Codex adapter the four readers and both halves of the change', () => {
+    const source = readFileSync(join(repo, 'main', 'harnesses', 'codex.mjs'), 'utf8');
     // Matched as a BLOCK and not a line: the import is written across several
     // lines now, and a line-at-a-time reader would find no names at all and
     // pass this assertion against an empty list.
-    const block = source.match(/import\s*\{([^}]*)\}\s*from\s+'\.\/codex\.mjs'/);
+    const block = source.match(/import\s*\{([^}]*)\}\s*from\s+'\.\.\/codex\.mjs'/);
     expect(block).toBeTruthy();
     const named = block[1].split(',').map((n) => n.trim()).filter(Boolean);
     expect(named.sort()).toEqual([
-      'SAYING_CAP', 'captureCodexEvent', 'changeFromCodexTurn', 'codexStreamingText',
+      'captureCodexEvent', 'changeFromCodexTurn', 'codexStreamingText',
       'rememberCodexChange', 'summarizeCodexEvent', 'traceCodexEvent',
     ]);
+  });
+  it('lends Claude only the cap and keeps raw readers out of the supervisor', () => {
+    const source = readFileSync(join(repo, 'main', 'harnesses', 'claude-stream.mjs'), 'utf8');
+    const block = source.match(/import\s*\{([^}]*)\}\s*from\s+'\.\.\/codex\.mjs'/);
+    expect(block).toBeTruthy();
+    expect(block[1].split(',').map((n) => n.trim()).filter(Boolean)).toEqual(['SAYING_CAP']);
+    expect(readFileSync(join(repo, 'main', 'supervisor.mjs'), 'utf8')).not.toMatch(/from\s+['"]\.\/codex\.mjs['"]/);
   });
 });

@@ -13,10 +13,11 @@
 // the project they belong to instead of in a text editor.
 
 import fs from 'node:fs';
+import { harnessFor } from './harnesses.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { codexChoiceToOpen, saveConfig } from './config.mjs';
-import { resolveClaudeBin, forgetClaudeBin, INSTALL_URL } from './claude-bin.mjs';
+import { forgetClaudeBin, INSTALL_URL } from './claude-bin.mjs';
 import { AGENT_MODES } from '../shared/agents.mjs';
 import { analyticsKey, diagnosticsOn } from './analytics.mjs';
 import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
@@ -32,7 +33,7 @@ import { codexAccount, codexLoginCommand, makeCodexHome } from './codex-account.
 import { codexDefaultModel, codexModels } from './codex-models.mjs';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mjs';
 import { claudeModels } from './claude-models.mjs';
-import { resolveCodexBin, forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mjs';
+import { forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mjs';
 
 // Her Claude Code sessions in her inbox: all of them, only the ones stopped on
 // a question, or none. One reader, here, so the settings screen and the
@@ -248,7 +249,7 @@ const lineCount = (text) => (text.trim() ? text.trim().split('\n').length : 0);
 // Claude Code: the path, whether it is really there, and where to get it when
 // it is not. One reader, here, so the screen and the config cannot disagree.
 export function claudeState(config) {
-  const found = resolveClaudeBin(config.claudeBinConfigured ?? null);
+  const found = harnessFor('claude').discover(config.claudeBinConfigured ?? null);
   return {
     claudeBin: found.path ?? config.claudeBin,
     claudeFound: found.found,
@@ -310,7 +311,7 @@ export function recheckClaude(config) {
  * whose unsure state is not checked. Nothing in the app passes it.
  */
 export function codexState(config, where = {}) {
-  const found = resolveCodexBin(config.codexBinConfigured ?? null, where);
+  const found = harnessFor('codex').discover(config.codexBinConfigured ?? null, where);
   return {
     // Empty rather than a path when there is nothing there, which is the same
     // asymmetry `config.codexBin` already keeps (main/config.mjs): a configured
