@@ -208,14 +208,28 @@ export class CommandHistory {
     return verdict;
   }
 
+  /**
+   * A RUN NOBODY MEASURED COUNTS FOR NOTHING, NOT AGAINST (w-8386b3fd47).
+   *
+   * `?` means the run finished between two samples and was not quick enough to
+   * vouch for itself, so nothing was learned either way. It used to veto both
+   * thresholds below, which read missing evidence as evidence AGAINST: on the
+   * founder's Mac `cat` stood at `llllll??ll` and `rg` at `lllllllll?`, so
+   * neither was light, every ordinary read needed one of two heavy slots, and
+   * reads queued behind builds until they were refused twenty minutes later.
+   *
+   * So `?` is skipped. The thresholds are unchanged and are still counted in
+   * runs that were actually measured: two for this exact command, five for its
+   * program. One measured run that was heavy or middling still rules light out.
+   */
   _classifyKey(key) {
-    const own = this.keys.get(key);
-    const recent = own?.slice(-5) ?? [];
+    const recent = this.keys.get(key)?.slice(-5) ?? [];
     if (recent.includes('h')) return 'heavy';
-    if (own && own.length >= 2 && recent.every((o) => o === 'l')) return 'light';
-    if (recent.some((o) => o !== 'l')) return 'unknown';
-    const prog = this.programs.get(programOf(key));
-    if (prog && prog.length >= 5 && prog.slice(-10).every((o) => o === 'l')) return 'light';
+    const measured = recent.filter((o) => o !== '?');
+    if (measured.length >= 2 && measured.every((o) => o === 'l')) return 'light';
+    if (measured.some((o) => o !== 'l')) return 'unknown';
+    const prog = (this.programs.get(programOf(key)) ?? []).slice(-10).filter((o) => o !== '?');
+    if (prog.length >= 5 && prog.every((o) => o === 'l')) return 'light';
     return 'unknown';
   }
 
