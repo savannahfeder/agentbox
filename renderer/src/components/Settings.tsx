@@ -360,7 +360,7 @@ function UsageRows({ reading, now }: { reading: Usage | null; now: number }) {
  *  A TROUBLED ACCOUNT IS NOT SOMETHING TO PICK, IT IS SOMETHING TO FIX. It says
  *  what is wrong in main's own words and carries the command that puts it
  *  right (w-3da36a45e5). */
-function AccountRows({ agent, onChoose, onAdd }: {
+export function AccountRows({ agent, onChoose, onAdd }: {
   agent: Agent;
   onChoose: (engine: string, profile: string) => void;
   onAdd: (agent: Agent) => void;
@@ -386,7 +386,7 @@ function AccountRows({ agent, onChoose, onAdd }: {
                 {label}
                 {live && <span className="set-badge">In use</span>}
               </div>
-              <div className="set-row-desc">{a.plan ?? (a.signedIn ? 'Signed in' : 'Finish signing in to use it')}</div>
+              <div className="set-row-desc">{a.signedIn ? (a.plan ?? 'Signed in') : 'Finish signing in to use it'}</div>
             </div>
             {/* One account has nothing to choose between. */}
             {!live && accounts.length > 1 && (
