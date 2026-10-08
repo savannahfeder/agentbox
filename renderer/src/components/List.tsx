@@ -3,7 +3,7 @@
 // end, on the title's line, the things that are not the message: priority, the
 // product, and when (or that an agent is on it, or that one stopped).
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { Product, RepeatRule, RunningSession, ThreadCard, View, WorkItem } from '../types';
 import { ago, dayLabel, previewText, stamp } from '../format';
 import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitle, walkRowKeys } from '../list-rules';
@@ -21,6 +21,7 @@ import { clockLabel, isCleanRun, nextRunAt } from '../../../shared/repeats.mjs';
 import { TeamRowEnd, type TeamView } from '../team/people';
 import { RepeatMark, RowCells, TableHead, ThreadCells } from '../threads/Pages';
 import type { MixedRow } from '../threads/people-rules';
+import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
 
 /**
@@ -136,7 +137,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder }: {
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -237,7 +238,12 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   /** Called as the foot of the list comes near the screen, for the next page
    *  of old finished threads (w-fda2165ec6). Absent, there is no foot. */
   onEnd?: () => void;
+  /** A thread dragged up or down the table and let go in front of another
+   *  (null: at the foot), which App.tsx turns into its place (w-6e5b532a95).
+   *  Absent wherever the order is not yours to set: Updated, Done, a search. */
+  onReorder?: (id: string, beforeId: string | null) => void;
 }) {
+  const drag = useRowDrag(table ? onReorder : undefined);
   const rules = view === 'snoozed' ? (repeats ?? []) : [];
   // The keys the rows in THIS list offer, drawn on the row under the pointer.
   // One list, one set: they are a property of the view, not of the message.
@@ -353,7 +359,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   const withPerson = table && !!mixed;
 
   return (
-    <div className={`list${table ? ' th-table' : ''}`}>
+    <div className={`list${table ? ' th-table' : ''}`} ref={drag.listRef}>
       {table && <TableHead person={withPerson} tab={view} />}
       {/* Repeating tasks sit above the deferred rows, in the tab that already
           holds work with a moment attached. They are RULES, not items, so they
@@ -438,9 +444,12 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
             // neither can honestly offer a select box, and both wear the rule
             // at the left edge instead.
             const made = isTroubleRow(item) || isUpdateRow(item);
+            // Only a thread in a ledger has a place to keep.
+            const movable = table && !!onReorder && !made && !isImportRow(item);
             return (
               <div
                 key={item.id}
+                {...(movable ? { 'data-drag-id': item.id, onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => drag.onPointerDown(item.id, e) } : {})}
                 /*
                  * The first run points its coaching ring at the row it made
                    itself, by id, rather than at whatever is drawn first
@@ -468,6 +477,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                 onMouseMove={() => { if (hoveredId !== item.id) onHover?.(item.id); }}
                 onMouseLeave={() => { if (hoveredId === item.id) onHover?.(null); }}
                 onClick={(e) => {
+                  if (drag.swallowsClick()) return;
                   const intent = clickIntent('row', { shift: e.shiftKey, meta: e.metaKey, ctrl: e.ctrlKey });
                   if (intent === 'range') { onRange(index); return; }
                   if (intent === 'toggle') { onToggle(index); return; }

@@ -8,10 +8,10 @@
 import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mjs';
 import type { Seen } from './summary-rules';
 import type { Product, ThreadCard, ThreadStateWord, WorkItem } from '../types';
-import { priorityIdOf, type PriorityId } from '../priority';
+import { priorityIdOf, priorityValueOf, type PriorityId } from '../priority';
 import { firstRealLine } from '../format';
 import { threadState } from '../../../shared/thread-cards.mjs';
-import { placeScore } from '../../../shared/rank.mjs';
+import { placeScore, placedScore } from '../../../shared/rank.mjs';
 import { plainWords } from '../team/agent-mentions';
 import { whatWaits } from '../../../shared/team-rules.mjs';
 
@@ -161,13 +161,19 @@ export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>
 // A CONVERSATION RANKS WITH YOUR TOP PROJECT (w-2e8aa16f0f): `direct` names
 // the conversation projects, and `placeScore` gives them the top place, so a
 // High message sits under that project's Urgent and above its Medium.
-const RANK: Record<PriorityId, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+//
+// AND A THREAD YOU DRAGGED SITS WHERE YOU PUT IT (w-6e5b532a95). So the order
+// is one number: the project's place plus the value of the level the row
+// shows (9, 7, 5, 2, all under a project's 100), or the thread's own place,
+// which replaces it (`placedScore`, shared/rank.mjs). A drop works out that
+// place from this same number (`dropPlaces`).
+export const rankScore = (r: Ranked, projectOrder: string[] = [], direct?: ReadonlySet<string>): number =>
+  placedScore(r.place, placeScore(projectOrder, r.product ?? '', direct) + priorityValueOf(priorityIdOf(r.priority)));
 export const byPriority = (projectOrder: string[] = [], direct?: ReadonlySet<string>) => (a: Ranked, b: Ranked) =>
-  placeScore(projectOrder, b.product ?? '', direct) - placeScore(projectOrder, a.product ?? '', direct)
-  || RANK[priorityIdOf(a.priority)] - RANK[priorityIdOf(b.priority)] || b.updatedAt - a.updatedAt;
+  rankScore(b, projectOrder, direct) - rankScore(a, projectOrder, direct) || b.updatedAt - a.updatedAt;
 const byUpdated = (a: Ranked, b: Ranked) => b.updatedAt - a.updatedAt;
 /** `product` is the project's slug, which is what the running order holds. */
-export type Ranked = { priority?: number | null; updatedAt: number; status?: string; wrote?: WorkItem['wrote']; product?: string | null };
+export type Ranked = { priority?: number | null; updatedAt: number; status?: string; wrote?: WorkItem['wrote']; product?: string | null; place?: number };
 
 /**
  * WHEN A THREAD WAS FINISHED: the moment its status was written as done, which
@@ -229,7 +235,7 @@ export function sorted<T extends Ranked & { product?: string }>(rows: T[], d: Di
  *  slug. A card of yours is timed by its thread, so Done reads when it finished. */
 export function sortedEntries(entries: BoardEntry[], d: Display, column?: string, projectOrder: string[] = [], direct?: ReadonlySet<string>): BoardEntry[] {
   const by = order(d, column, projectOrder, direct);
-  const timed = (e: BoardEntry): Ranked => ({ ...e, product: e.projectSlug, ...(e.item ? { status: e.item.status, wrote: e.item.wrote } : {}) });
+  const timed = (e: BoardEntry): Ranked => ({ ...e, product: e.projectSlug, ...(e.item ? { status: e.item.status, wrote: e.item.wrote, place: e.item.place } : {}) });
   return entries.slice().sort((a, b) => by(timed(a), timed(b)));
 }
 

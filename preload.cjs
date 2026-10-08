@@ -201,6 +201,7 @@ contextBridge.exposeInMainWorld('zero', {
   resumeItems: (payload) => ipcRenderer.invoke('zero:resume-items', payload),
   redeliver: (payload) => ipcRenderer.invoke('zero:redeliver', payload),
   setProductOrder: (payload) => ipcRenderer.invoke('zero:set-product-order', payload),
+  setThreadPlaces: (payload) => ipcRenderer.invoke('zero:set-thread-places', payload),
   setProductHidden: (payload) => ipcRenderer.invoke('zero:set-product-hidden', payload),
   approve: (payload) => ipcRenderer.invoke('zero:approve', payload),
   // What was just decided, and on which card. The Cmd+Y chord is caught in the

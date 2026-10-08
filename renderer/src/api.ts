@@ -509,6 +509,11 @@ export const api = {
     if (useFixtures || !window.zero?.threadEdit) return { ok: true };
     try { return await window.zero.threadEdit({ product, id, patch }); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   },
+  // Threads dragged to a place of their own in the list (w-6e5b532a95).
+  async setThreadPlaces(places: Record<string, number | null>): Promise<void> {
+    if (useFixtures || !window.zero?.setThreadPlaces) return;
+    await window.zero.setThreadPlaces({ places });
+  },
 
   async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem | null> {
     // FIXTURES ANSWER WITH THE TASK, the way the real store does. Returning

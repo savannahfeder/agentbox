@@ -116,7 +116,7 @@ import { runNowCommands } from './run-now';
 import { withOlder } from './older-threads';
 import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
 import { BoxFilter } from './components/BoxFilter';
-import { itemPriority, moveProduct, placeScore } from '../../shared/rank.mjs';
+import { dropPlaces, itemPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
 import { threadsMade, approvableFiled } from './threads-made';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, chatProjects, chatTaskSharing, chatTranscript, taskBrief, taskTitle, withTask } from './team/agent-mentions';
@@ -130,7 +130,7 @@ import { ProjectShare, ProjectWho } from './team/ProjectShare';
 import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, StateTabs } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, sorted as sortedByDisplay, type Display, type Privacy } from './threads/page-rules';
+import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, rankScore, sorted as sortedByDisplay, type Display, type Privacy } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, listStops, stepStop, stopKey, type Stop } from './threads/walk-rules';
 
@@ -1770,7 +1770,8 @@ export default function App() {
   // A conversation with a person ranks with your top project (w-2e8aa16f0f).
   const directSlugs = useMemo(() => conversationSlugs(snap?.products ?? []), [snap?.products]);
   const score = useCallback(
-    (i: WorkItem) => placeScore(snap?.supervisor.productOrder ?? [], i.product, directSlugs) + itemPriority(i),
+    // A thread she dragged runs where she put it (w-6e5b532a95).
+    (i: WorkItem) => placedScore(i.place, placeScore(snap?.supervisor.productOrder ?? [], i.product, directSlugs) + itemPriority(i)),
     [snap?.supervisor.productOrder, directSlugs],
   );
 
@@ -2243,6 +2244,18 @@ export default function App() {
     () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs)), inboxDisplay, view, projectOrder, directSlugs) : []),
     [shownBox, inboxDisplay, now, mineShown, view, projectOrder, directSlugs, seenOf],
   );
+  // A THREAD DRAGGED UP OR DOWN THE LIST (w-6e5b532a95): it is given a place
+  // between its new neighbours, which the list and the fleet both sort by.
+  // The row moves at once; the supervisor keeps the place.
+  const reorderThread = useCallback((id: string, beforeId: string | null) => {
+    const rows = displayedBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i) && !isImportRow(i));
+    const from = rows.findIndex((i) => i.id === id);
+    const at = beforeId ? rows.findIndex((i) => i.id === beforeId) : -1;
+    const places = dropPlaces(rows.map((i) => ({ id: i.id, score: rankScore(i, projectOrder, directSlugs) })), from, at < 0 ? rows.length : at);
+    if (!places) return;
+    setSnap((s) => s && { ...s, items: s.items.map((i) => (i.id in places ? { ...i, place: places[i.id] } : i)) });
+    void api.setThreadPlaces(places);
+  }, [displayedBox, projectOrder, directSlugs]);
   // THE PICKED TEAMMATES' THREADS FOR THIS TAB, from the cards their Macs
   // publish, merged into your rows in the Display's order.
   const cards = snap?.team?.cards ?? [];
@@ -5687,6 +5700,11 @@ export default function App() {
                   // The next page of old finished threads, at the foot of the
                   // two tabs that hold them (w-fda2165ec6).
                   onEnd={search === null && olderMore !== false && (view === 'done' || view === 'all') ? loadOlder : undefined}
+                  // DRAG A THREAD TO WHERE IT BELONGS (w-6e5b532a95), wherever
+                  // the list is in your running order: Sort by Priority, on the
+                  // three tabs still ahead of you, your own threads alone.
+                  onReorder={search === null && !run && !withOthers && inboxDisplay.sort === 'priority'
+                    && (view === 'inbox' || view === 'progress' || view === 'snoozed') ? reorderThread : undefined}
                   items={list}
                   // Results are grouped and stamped like the inbox, whatever
                   // tab she opened search from. Scheduled would otherwise label

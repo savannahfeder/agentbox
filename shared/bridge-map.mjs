@@ -127,6 +127,7 @@ export const REQUEST_CHANNELS = {
   resumeItems: 'zero:resume-items',
   redeliver: 'zero:redeliver',
   setProductOrder: 'zero:set-product-order',
+  setThreadPlaces: 'zero:set-thread-places',
   setProductHidden: 'zero:set-product-hidden',
   approve: 'zero:approve',
 };

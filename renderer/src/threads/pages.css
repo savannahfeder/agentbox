@@ -147,6 +147,24 @@
 .th-table .row:hover .has-act .th-when, .has-act:focus-within .th-when { visibility: hidden; }
 .th-row-act:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .th-row-act:focus-visible { outline: none; border-color: var(--line-strong); }
+/* A THREAD CARRIED UP OR DOWN THE LIST (w-6e5b532a95). It is lifted the way a
+   board column is, on a panel drawn by its shadow, and rides the pointer
+   (threads/row-drag.ts writes the transform); the rows it passes slide aside.
+   Its hairline goes with it, so the list under it never shows two. */
+.th-table.th-sorting, .th-table.th-sorting * { cursor: grabbing !important; user-select: none; }
+.th-table.th-sorting .row[data-drag-id] { transition: transform .16s cubic-bezier(.2,.8,.2,1); }
+.th-table.th-sorting .row.th-row-lifted {
+  position: relative; z-index: 5; transition: none; border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: 0 0 0 1px var(--line-strong), 0 14px 32px 4px rgba(0,0,0,.38);
+  will-change: transform;
+}
+/* Nothing that answers a hover comes up while a row is carried: not the
+   key plate, not Share. */
+body:has(.th-sorting) .hint-plate, .th-table.th-sorting .th-row-act { display: none !important; }
+.th-table.th-sorting .has-act .th-when { visibility: visible !important; }
+.th-table.th-sorting .row.th-row-lifted::after,
+.th-table.th-sorting .row.th-row-lifted + .row::after { display: none; }
 .th-cell-person { font-size: 13px; line-height: 20px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
 .th-cell-person .tm-av { margin-right: 9px; flex: none; }
 .th-empty { padding: 32px var(--row-r, 24px) 32px var(--text-x, 32px); color: var(--text-faint); font-size: 14px; }
