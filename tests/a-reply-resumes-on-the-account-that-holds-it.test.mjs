@@ -17,7 +17,7 @@
 // resume goes to the account that holds the transcript, found on disk when it
 // was never written down, and asks for no account when no home holds it.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -35,13 +35,15 @@ function putTranscript(profileHome, cwd, sessionId) {
 
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-two-accounts-'));
-  // The default profile is the CLI's own home, which the supervisor reads off
-  // os.homedir; the test drives it there so nothing has to be stubbed.
+  // 2026-10-07: the default-login fixture wrote into the real Claude home.
+  // Keep default-profile resolution while isolating its files in this test.
+  vi.spyOn(os, 'homedir').mockReturnValue(path.join(tmp, 'home'));
   home = path.join(os.homedir(), '.claude');
   second = path.join(tmp, 'claude-second');
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -55,7 +57,7 @@ function makeSupervisor() {
   return sup;
 }
 
-const row = (extra = {}) => ({ id: 'w-1', product: 'acme', title: 'Reply Alisha Jain for tax stuff', ...extra });
+const row = (extra = {}) => ({ id: 'w-1', product: 'acme', title: 'Reply about the project', ...extra });
 
 describe('which account a resumed reply goes back to', () => {
   it('picks the account whose home actually holds the transcript', () => {

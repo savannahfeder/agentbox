@@ -394,9 +394,10 @@ describe('the cap on the sentence an agent is typing', () => {
   // same number, which is exactly how a duplicated constant survives. This is
   // the one that goes red the moment a second one is declared.
   it('is declared in one file and read from there by the other', () => {
-    const supervisor = fs.readFileSync(path.join(repoRoot, 'main', 'supervisor.mjs'), 'utf8');
-    expect(supervisor).not.toMatch(/(const|let|var)\s+SAYING_CAP\s*=/);
-    expect(supervisor).toMatch(/SAYING_CAP/);
+    // 2026-10-07: the Claude reader moved into its own adapter file.
+    const claudeReader = fs.readFileSync(path.join(repoRoot, 'main', 'harnesses', 'claude-stream.mjs'), 'utf8');
+    expect(claudeReader).not.toMatch(/(const|let|var)\s+SAYING_CAP\s*=/);
+    expect(claudeReader).toMatch(/import\s*\{\s*SAYING_CAP\s*\}\s*from\s*['"]\.\.\/codex\.mjs['"]/);
     expect(fs.readFileSync(path.join(repoRoot, 'main', 'codex.mjs'), 'utf8')).toMatch(/export const SAYING_CAP\s*=/);
   });
 });

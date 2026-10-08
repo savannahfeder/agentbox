@@ -300,7 +300,8 @@ describe('what actually reaches the CLI', () => {
     // words, and on a Codex row the prompt is not argv at all — it is a turn's
     // `input` — so one of the eight would arrive as her message with the brief
     // thrown away. The cases are in the file named at the top of this one.
-    expect(sup).toContain('const command = continuation && engine === DEFAULT_ENGINE ? commandPrompt(item.answer, this._nativeCommands?.[item.id]) : review ? item.answer.trim() : null;');
+    // 2026-10-07: the adapter capability owns this engine distinction.
+    expect(sup).toContain('const command = continuation && harnessFor(engine).capabilities.nativeCommands ? commandPrompt(item.answer, this._nativeCommands?.[item.id]) : review ? item.answer.trim() : null;');
     expect(sup).toContain('if (command) prompt = command;');
   });
 

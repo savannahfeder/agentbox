@@ -18,7 +18,7 @@
 // Every guard below fails safe: the worst case of each one is a fresh brief,
 // which is exactly the behaviour every row had before this existed.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -42,6 +42,9 @@ const personalProduct = () => ({ slug: 'personal', name: 'Personal', dir: person
 
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-row-chat-'));
+  // 2026-10-07: seven fixtures tried writing into the real Claude home.
+  // Preserve the default-profile lookup against an isolated home instead.
+  vi.spyOn(os, 'homedir').mockReturnValue(path.join(tmp, 'home'));
   home = path.join(os.homedir(), '.claude');
   second = path.join(tmp, 'claude-second');
   fs.mkdirSync(appFolder(), { recursive: true });
@@ -49,6 +52,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
