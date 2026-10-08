@@ -111,9 +111,14 @@ export function keepCorner(bounds, size, area) {
  * screen, so it never runs off an edge, lined up with the tag's outer edge.
  */
 export function cardPlacement(tag, card, area, gap = 8) {
-  const above = inLowerHalf(tag, area);
+  let above = inLowerHalf(tag, area);
   const alignRight = inRightHalf(tag, area);
   const x = clamp(alignRight ? tag.x + tag.width - card.width : tag.x, area.x, area.x + area.width - card.width);
-  const y = above ? tag.y - gap - card.height : tag.y + tag.height + gap;
+  const up = tag.y - gap - card.height;
+  const down = tag.y + tag.height + gap;
+  // A tall list near a short screen's middle may not fit the side it prefers.
+  if (above && up < area.y) above = false;
+  else if (!above && down + card.height > area.y + area.height) above = true;
+  const y = clamp(above ? up : down, area.y, area.y + area.height - card.height);
   return { above, alignRight, card: { x, y, width: card.width, height: card.height } };
 }

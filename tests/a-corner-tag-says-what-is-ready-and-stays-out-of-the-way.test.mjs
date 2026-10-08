@@ -161,6 +161,14 @@ describe('which way the list opens', () => {
     expect(p.card.y).toBeGreaterThan(tag.y + tag.height);
   });
 
+  it('opens the other way when the side it prefers has no room', () => {
+    const short = { x: 0, y: 0, width: 1728, height: 300 };
+    const low = { x: 1570, y: 160, width: 140, height: 26 };
+    const p = cardPlacement(low, { width: 360, height: 200 }, short);
+    expect(p.card.y).toBeGreaterThanOrEqual(0);
+    expect(p.card.y + p.card.height).toBeLessThanOrEqual(300);
+  });
+
   it('stays on screen when the tag sits right against an edge', () => {
     const tag = { x: 1700, y: 600, width: 28, height: 26 };
     const p = cardPlacement(tag, card, area);

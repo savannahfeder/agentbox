@@ -861,13 +861,14 @@ async function createWindow() {
   // whatever app she is in. Its page is built beside the app's own, and comes
   // from the dev server only when the app's own page does.
   createCornerTag({
-    BrowserWindow, screen: electronScreen, ipcMain, Menu, config, saveConfig, mainWindow: window,
+    BrowserWindow, screen: electronScreen, ipcMain, Menu, powerMonitor, config, saveConfig, mainWindow: window,
     preload: path.join(appDir, 'main', 'corner-tag-preload.cjs'),
-    load: (tagWindow) => {
+    // `part` is the tag itself or the list beside it, one page drawn twice.
+    load: (tagWindow, part) => {
       const devTag = process.env.ZERO_DEV_URL;
       const builtTag = path.join(appDir, 'renderer', 'dist', 'corner-tag.html');
-      if (devTag && !fs.existsSync(builtTag)) tagWindow.loadURL(`${devTag.replace(/\/$/, '')}/corner-tag.html`);
-      else tagWindow.loadFile(builtTag);
+      if (devTag && !fs.existsSync(builtTag)) tagWindow.loadURL(`${devTag.replace(/\/$/, '')}/corner-tag.html?part=${part}`);
+      else tagWindow.loadFile(builtTag, { search: `part=${part}` });
     },
   });
   // Asked for once by the renderer as it mounts, rather than pushed on
