@@ -1747,6 +1747,11 @@ export class Supervisor {
     if (!product?.repoPath || base !== product.repoPath) return 0;
     const busy = (id) => this.sessions.has(id) || !!this._preparing?.has(id);
     let put = 0;
+    // AND WHILE WE ARE HERE, WHAT ELSE IS HOLDING THE DISK (w-330eea6c66). This
+    // is the only place that already walks a project's folders on a clock, and
+    // the strays are deliberately not in the list below: they are nobody's row,
+    // so they are shown and never swept.
+    await this.lookOverTheProjectsFolders(product, base);
     for (const folder of await folderJob('listTaskFolders', base)) {
       // OUR OWN PID IS NOT SOMEBODY ELSE. Every folder is locked by the process
       // that made it, which is this one, so treating any lock as a live holder
@@ -1774,9 +1779,50 @@ export class Supervisor {
       // reading it is an agent's folder deleted while it works (w-4d722ecf92).
       if (item?.claim && !item.claimExpired) continue;
       if (busy(folder.id)) continue;
-      if ((await folderJob('parkTaskFolder', base, folder.id)).parked) put += 1;
+      // THE PATH WE WERE HANDED, not the row id alone. Parking used to rebuild
+      // `.claude/worktrees/<id>` from the id, so the folder it committed in and
+      // removed was not necessarily the one this loop looked at (w-330eea6c66).
+      if ((await folderJob('parkTaskFolder', base, folder.id, { path: folder.path })).parked) put += 1;
     }
     return put;
+  }
+
+  /**
+   * EVERY COPY OF A PROJECT ON THE DISK, INCLUDING THE ONES THE APP DID NOT MAKE
+   * (w-330eea6c66).
+   *
+   * MEASURED 2026-10-07: thirteen worktrees of one repository sat outside the
+   * app's own home holding about 740 MB, made by hand by sessions rather than by
+   * the app, and nothing in the app could list, show or sweep one. This is the
+   * showing half: the strays are remembered here so a page can name them without
+   * reading the disk on the window's thread.
+   *
+   * IT ONLY EVER LOOKS. Removing a folder somebody made on purpose is not the
+   * app's to do, and the folder is the only copy of whatever is uncommitted in
+   * it. The one thing it does change is bookkeeping with nothing behind it: a
+   * registration whose folder has gone, which is what refuses the next
+   * `worktree add` at that path (one of the thirteen was under `/private/tmp`,
+   * which macOS purges).
+   */
+  async lookOverTheProjectsFolders(product, base) {
+    try {
+      const dropped = await folderJob('pruneMissingWorktrees', base);
+      if (dropped.length) console.warn(`zero: dropped ${dropped.length} worktree registration(s) in ${base} pointing at nothing`);
+      const strays = await folderJob('strayWorktrees', base);
+      this._strayFolders ??= new Map();
+      // By checkout rather than by product, so two products registering the same
+      // one do not count its folders twice.
+      this._strayFolders.set(product.repoPath, strays.map((w) => ({ ...w, project: product.name || product.slug })));
+    } catch (error) {
+      console.warn('zero: could not look over the project´s folders:', error.message);
+    }
+  }
+
+  /** Copies of a project on this disk the app did not make, as the last sweep found them. */
+  strayFolders() {
+    const out = [];
+    for (const list of this._strayFolders?.values() ?? []) out.push(...list);
+    return out;
   }
 
   profileHoldingSession(sessionId, itemId, product) {

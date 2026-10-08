@@ -832,6 +832,11 @@ export interface WorkspaceSettings {
    * STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mjs). `now` is one
    * sentence about what is left right now, null while it is off. */
   leftovers?: { on: boolean; now: string | null };
+  /**
+   * COPIES OF A PROJECT THE APP DID NOT MAKE (main/task-folders.mjs). Null, and
+   * so no row at all, whenever there are none: the app shows these and never
+   * removes one, so there is nothing on the row to decide. */
+  strayFolders?: { count: number; now: string } | null;
   capacity: number;
   running: number;
   model: string | null;
