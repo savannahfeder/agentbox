@@ -32,6 +32,17 @@ export function terminalPlace({store,supervisor,product,id,agent}){
   return {cwd,notice};
 }
 export function terminalFolder(args){return terminalPlace(args).cwd;}
+// The shell a person actually has. `$SHELL` when that file exists, then
+// zsh, bash, and sh. A machine with no zsh used to spawn `/bin/zsh` and
+// the terminal never came up.
+export function loginShell(env=process.env,exists=fs.existsSync){
+  const preferred=env.SHELL;
+  if(preferred&&exists(preferred))return preferred;
+  for(const candidate of ['/bin/zsh','/bin/bash','/bin/sh']){
+    if(exists(candidate))return candidate;
+  }
+  return preferred||'/bin/sh';
+}
 // Enumerate only descendants of our own shell, including background process
 // groups. Kill children before shell; closing a pane never calls this.
 export function disposeTerminalProcess(pty){
@@ -57,8 +68,9 @@ export function disposeTerminalProcess(pty){
  * it is the same call the toolbar makes to decide whether to draw Stop command,
  * deliberately, so a shell she can see is busy can never be one this reaps.
  *
- * WHICH SHELLS NOBODY IS WATCHING: the panel asks for output every 150ms while
- * it is on screen and stops the instant it is hidden or she leaves the task
+ * WHICH SHELLS NOBODY IS WATCHING: the panel asks for output at least once a
+ * second while it is on screen (each ask waits up to READ_WAIT_MS for some)
+ * and stops the instant it is hidden or she leaves the task
  * (TaskTerminal.tsx). So `lastReadAt` is not a guess about attention, it is the
  * last time the app was actually asked what this shell had to say.
  *
@@ -66,10 +78,14 @@ export function disposeTerminalProcess(pty){
  * worth nothing, and it goes. Everything else stays until she or the app quits.
  */
 const IDLE_MS=600000;
+// The longest a read waits for output before answering with none, so the panel
+// still hears about a command that finished quietly and the sweep still sees
+// it watching.
+const READ_WAIT_MS=1000;
 const SWEEP_MS=60000;
 const MAX_TERMINALS=20;
 export class TaskTerminals {
-  constructor({spawn,resolve,disposeProcess=disposeTerminalProcess,env=terminalEnv(),shell=process.env.SHELL||'/bin/zsh',idleMs=IDLE_MS,sweepMs=SWEEP_MS,now=()=>Date.now()}={}){
+  constructor({spawn,resolve,disposeProcess=disposeTerminalProcess,env=terminalEnv(),shell=loginShell(),idleMs=IDLE_MS,sweepMs=SWEEP_MS,now=()=>Date.now()}={}){
     this.spawn=spawn??((...args)=>require('node-pty').spawn(...args));this.resolve=resolve;this.disposeProcess=disposeProcess;this.env=env;this.shell=shell;this.sessions=new Map();
     this.idleMs=idleMs;this.now=now;
     // Keys whose shell this class ended on its own, and WHY. The next open on
@@ -136,7 +152,7 @@ export class TaskTerminals {
     const command=place?.command;
     const pty=this.spawn(command?.file??this.shell,command?.args??['-l'],{cwd,env:{...this.env,...command?.env},cols:80,rows:24,name:'xterm-256color'});
     let resolveExit;const exitPromise=new Promise(resolve=>{resolveExit=resolve;});
-    const session={token:randomUUID(),pty,cwd,buffer:'',offset:0,exitCode:null,exited:false,exitPromise,lastReadAt:this.now()};this.sessions.set(key,session);
+    const session={token:randomUUID(),pty,cwd,buffer:'',offset:0,exitCode:null,exited:false,exitPromise,lastReadAt:this.now(),waiters:new Set()};this.sessions.set(key,session);
     /*
      * AND IT SAYS WHAT HAPPENED TO THE LAST ONE. Without this line, reopening a
        terminal the app tidied away looks exactly like the app losing her
@@ -145,17 +161,37 @@ export class TaskTerminals {
     const why=this.reaped.get(key);
     if(why!==undefined){this.reaped.delete(key);session.buffer=`\x1b[2m[${why} This is a new one.]\x1b[0m\r\n`;}
     if(place?.notice)session.buffer+=`\x1b[2m[${place.notice}]\x1b[0m\r\n`;
-    pty.onData(data=>{session.buffer+=data;const trim=Math.max(0,session.buffer.length-LIMIT);session.buffer=session.buffer.slice(trim);session.offset+=trim;});
-    pty.onExit(({exitCode})=>{session.exited=true;session.exitCode=exitCode;resolveExit();});
+    pty.onData(data=>{session.buffer+=data;const trim=Math.max(0,session.buffer.length-LIMIT);session.buffer=session.buffer.slice(trim);session.offset+=trim;this.wake(session);});
+    pty.onExit(({exitCode})=>{session.exited=true;session.exitCode=exitCode;resolveExit();this.wake(session);});
     return this.read(key,0);
   }
   get(key){const s=this.sessions.get(key);if(!s)throw Error('Terminal session ended. Open a new terminal to continue.');return s;}
   // EVERY READ IS THE PANEL SAYING IT IS STILL THERE. This one line is the whole
   // attention signal the sweep runs on; see the note on the class.
-  read(key,offset=0){const s=this.get(key);if(!Number.isSafeInteger(offset)||offset<0)throw Error('Invalid terminal cursor.');s.lastReadAt=this.now();const end=s.offset+s.buffer.length;return {token:s.token,cwd:s.cwd,data:s.buffer.slice(Math.max(0,offset-s.offset)),offset:end,truncated:offset<s.offset,exited:s.exited,exitCode:s.exitCode,process:s.exited?'Exited':s.pty.process||'Shell'};}
+  read(key,offset=0,wait=0){
+    const s=this.get(key);if(!Number.isSafeInteger(offset)||offset<0)throw Error('Invalid terminal cursor.');s.lastReadAt=this.now();
+    const end=s.offset+s.buffer.length;
+    /*
+     * A READ MAY WAIT FOR THE SHELL'S NEXT OUTPUT, and comes back the moment
+       there is some. The panel used to ask every 150ms, so the echo of a key
+       sat in this buffer until the next ask: deleted characters stayed on her
+       screen after she deleted them (w-16e47d0836). `live` tells the panel this
+       main can wait, so it asks again at once instead of in 150ms; a main
+       older than its renderer (⌘R ahead of a restart) answers without it. */
+    if(wait>0&&!s.exited&&offset>=end)return new Promise((resolve,reject)=>{
+      const done=()=>{clearTimeout(timer);s.waiters.delete(done);try{if(this.sessions.get(key)!==s)throw Error('Terminal session ended. Open a new terminal to continue.');resolve({...this.read(key,offset),live:true});}catch(e){reject(e);}};
+      const timer=setTimeout(done,Math.min(wait,READ_WAIT_MS));
+      s.waiters.add(done);
+    });
+    const state={token:s.token,cwd:s.cwd,data:s.buffer.slice(Math.max(0,offset-s.offset)),offset:end,truncated:offset<s.offset,exited:s.exited,exitCode:s.exitCode,process:s.exited?'Exited':s.pty.process||'Shell'};
+    return wait>0?{...state,live:true}:state;
+  }
+  // Answers every waiting read. Deferred a turn so the pieces of one echo the
+  // pty hands over back to back go out as one answer.
+  wake(s){if(!s.waiters.size||s.waking)return;s.waking=true;setImmediate(()=>{s.waking=false;for(const done of [...s.waiters])done();});}
   write(key,data){const s=this.get(key);if(s.exited)throw Error('This shell has exited. Start a new session.');if(typeof data!=='string'||data.length>65536)throw Error('Terminal input is too large. Paste at most 64 KB at a time.');s.pty.write(data);}
   resize(key,cols,rows){if(!Number.isInteger(cols)||!Number.isInteger(rows)||cols<2||cols>500||rows<2||rows>300)throw Error('Invalid terminal size.');const s=this.get(key);if(!s.exited)s.pty.resize(cols,rows);}
-  close(key){const s=this.sessions.get(key);if(s){if(!s.exited)this.disposeProcess(s.pty);this.sessions.delete(key);}}
+  close(key){const s=this.sessions.get(key);if(s){if(!s.exited)this.disposeProcess(s.pty);this.sessions.delete(key);for(const done of [...s.waiters])done();}}
   async shutdown(){
     const exits=[...this.sessions.values()].map(s=>s.exitPromise);
     this.dispose();

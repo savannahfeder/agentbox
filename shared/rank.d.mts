@@ -18,3 +18,5 @@ export function landingIndex(
   x: number, y: number,
 ): number;
 export function moveProduct(order: string[], slug: string, toIndex: number): string[];
+export function placedScore(place: number | null | undefined, natural: number): number;
+export function dropPlaces(rows: Array<{ id: string; score: number }>, from: number, to: number): Record<string, number> | null;

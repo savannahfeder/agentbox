@@ -50,11 +50,16 @@ afterEach(() => { fs.rmSync(tmp, { recursive: true, force: true }); });
 describe('the home is the one Claude Code taught us', () => {
   // The setup file gives every test file its own throwaway home, which is also
   // the proof that the override exists at all.
-  it('is a dot-folder named after the app unless something says otherwise', () => {
+  it('is the app home for a directory that has none yet', () => {
     const held = {};
     for (const key of envNames('HOME')) { held[key] = process.env[key]; delete process.env[key]; }
     try {
-      expect(appHome(tmp)).toBe(path.join(tmp, `.${nameSlug}`));
+      // Linux keeps a fresh store in the XDG data directory. macOS keeps the
+      // dot-folder. Neither answer is a visible folder of the app's name.
+      const expected = process.platform === 'linux'
+        ? path.join(tmp, '.local', 'share', nameSlug)
+        : path.join(tmp, `.${nameSlug}`);
+      expect(appHome(tmp)).toBe(expected);
     } finally {
       for (const [key, value] of Object.entries(held)) {
         if (value === undefined) delete process.env[key]; else process.env[key] = value;

@@ -22,8 +22,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
+
+// A checkout has scripts/linux-launcher.mjs next to this file. The published
+// package does not, so an npm install of that package, including npx, leaves
+// the launcher alone. A missing file is the ordinary case, not an error.
+const launcherPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'linux-launcher.mjs');
+if (fs.existsSync(launcherPath)) {
+  try {
+    const { installLinuxLauncher } = await import(pathToFileURL(launcherPath).href);
+    installLinuxLauncher({ env: process.env });
+  } catch {
+    // Nothing here is worth stopping an install for.
+  }
+}
 
 function prebuildsDir() {
   // Resolve the package rather than guessing at ../node-pty: npm may have

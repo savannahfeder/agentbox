@@ -31,6 +31,25 @@ export function atTheApp({ focused = false, idleMs = 0 } = {}) {
   return !!focused && idleMs < AWAY_AFTER_MS;
 }
 
+// WHAT COUNTS AS NEWS, which is the question before "is she away".
+//
+// renderer/src/App.tsx owns the definition of the inbox and asks this of every
+// row in it, against the ids it remembered from the snapshot before. `known` is
+// those ids, and `null` means there has not been a snapshot yet: on the app's
+// first look, everything waiting has been waiting, so none of it is a banner.
+//
+// EMPTY AND NEVER-LOOKED ARE DIFFERENT FACTS, and reading one as the other is
+// what sent this feature's best moment into the bin. App.tsx used to decide it
+// had never looked by asking whether the ids it remembered were empty, which is
+// also true of inbox zero — the state the whole product aims at. So the
+// arrival that most deserved to reach her, the first one after she got clear,
+// was the one the app silently dropped before any rule here could see it.
+// tests/the-first-arrival-after-inbox-zero-still-speaks.test.mjs.
+export function isNew(known, id) {
+  if (!known) return false;
+  return !known.has(id);
+}
+
 // A title long enough to be a paragraph is normal here; hers run past a
 // hundred characters. macOS will hard-truncate mid-word, so cut on a space and
 // say that it was cut.

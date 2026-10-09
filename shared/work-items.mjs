@@ -366,6 +366,14 @@ function str(value, max) {
   return trimmed.slice(0, lo) + mark(trimmed.length - lo);
 }
 
+// A text field whose empty string MEANS something: nothing chosen. Only a
+// string may clear it, so a `null` that reached here without going through
+// `answerItem` is still dropped rather than guessed at.
+function clearable(value, max) {
+  if (typeof value !== 'string') return undefined;
+  return value.trim() ? str(value, max) : '';
+}
+
 function coerceField(field, value) {
   switch (field) {
     case 'title': return str(value, MAX_TITLE);
@@ -388,7 +396,23 @@ function coerceField(field, value) {
     // shared/effort-levels.mjs, and the spawn gates on them, so a value this
     // module does not recognise is a run at Claude Code's own choice rather
     // than a row that never runs.
-    case 'kind': case 'product': case 'parent': case 'engine': case 'model': case 'effort': return str(value, MAX_SHORT);
+    case 'kind': case 'product': case 'parent': case 'engine': return str(value, MAX_SHORT);
+    // THESE TWO ARE CLEARED BY WRITING '' AND SO '' IS A REAL VALUE, exactly
+    // as runAt's 0 and start's 'now' are, and for the same reason: a field that
+    // coerces to undefined is dropped by the fold, so without a falsy value
+    // that survives, a model could be chosen and never unchosen.
+    //
+    // They used to sit on the line above, which cost us the most common crash
+    // of launch week. The reply box's drawer hands a pick back as null for
+    // "nothing chosen" and sends `{ model, effort }` whenever it was touched at
+    // all; `answerItem` turns null into '' because `modelForEngine` reads the
+    // empty string as nothing chosen. `str()` then dropped it, `pickFields`
+    // answered null, and `buildLine` threw — before the answer was written,
+    // because the model is written first on purpose. So opening the drawer,
+    // picking a model and pressing send lost the message, with nothing on
+    // screen to say so. Five of the 14 crashes since the Oct 6 launch, on two
+    // installs (PostHog, 2026-10-08).
+    case 'model': case 'effort': return clearable(value, MAX_SHORT);
     case 'status': return WORK_ITEM_STATUSES.includes(value) ? value : undefined;
     case 'priority': return Number.isFinite(value) ? Math.trunc(value) : undefined;
     // When this item may next be acted on, in epoch ms. 0 means unscheduled,

@@ -39,11 +39,17 @@ There are two ways to run it: in the browser, or as a Mac app. Both need Node 22
 npx agentbox-app
 ```
 
-It starts on your machine and opens a tab. Nothing is hosted: it listens only
-on your own computer, and the address carries a key that is new every run. Add
-`--help` to see the options.
+It starts on your machine and opens a tab. On Linux that open goes through `xdg-open`. Nothing is hosted: it listens only on `127.0.0.1`, and the address carries a key that is new every run. Add `--help` to see the options. `--no-open` prints the address and leaves the browser to you.
 
-**As a Mac app.** Build it from this repo:
+From a checkout, build the screen once, then start it the same way:
+
+```
+npm install
+npm run build
+npx agentbox-app
+```
+
+**As a desktop app.** Build it from this repo. `npm start` is the desktop command on Omarchy and on a Mac:
 
 ```
 git clone https://github.com/savannahfeder/agentbox.git
@@ -52,11 +58,11 @@ npm install
 npm start
 ```
 
-`npm start` builds the app and opens it. On first run it walks you through
-connecting Claude Code or Codex and choosing a folder to work in.
+On Linux, `npm install` puts `agentbox` on `~/.local/bin` and adds the app to the launcher. The entry is `$XDG_DATA_HOME/applications/agentbox.desktop` (`~/.local/share/applications` when that variable is unset), and it runs `agentbox`. That command starts this checkout. Open the app from the launcher.
 
-macOS may ask to let Terminal find devices on your local network. Agentbox
-does not need that, so Don't Allow is fine.
+`npm start` builds the app and opens it. On first run it walks you through connecting Claude Code or Codex and choosing a folder to work in.
+
+On macOS, the system may ask to let Terminal find devices on your local network. Agentbox does not need that, so Don't Allow is fine.
 
 ## The chat window is the bottleneck
 
@@ -130,7 +136,7 @@ asked. Code changes open right beside the row.
 Twenty agents means twenty things competing for your attention and for a limited
 number of running sessions. Agentbox keeps one order and uses it for both.
 
-- **Tag a task** Urgent, High, Medium or Low, when you file it or later from `⌘K`.
+- **Tag a task** Urgent, High, Medium or Low, when you file it or later from `⌘K` or `Ctrl+K`.
 - **Rank your projects** once by dragging them into order. A project's place
   counts for more than any single task's tag, so your most important project
   never waits behind a side one.
@@ -146,7 +152,7 @@ number of running sessions. Agentbox keeps one order and uses it for both.
 
 <p align="center">
   <img src="docs/readme/priority-palette.png" alt="The command palette showing Priority Urgent, High, Medium and Low for the selected row" width="60%"><br>
-  <sub>Any row's priority is a <code>⌘K</code> away.</sub>
+  <sub>Any row's priority is a <code>⌘K</code> or <code>Ctrl+K</code> away.</sub>
 </p>
 
 ## Built for the keyboard
@@ -164,10 +170,10 @@ number of running sessions. Agentbox keeps one order and uses it for both.
 | `L` | Later: put a task off until a time you pick |
 | `S` | Show or hide the summary, in an open task |
 | `Z` | Undo |
-| `⌘K` | Everything else |
+| `⌘K` or `Ctrl+K` | Everything else |
 
 Fifteen skins, each in light and dark, from plain slate to woodblock and riso
-prints. Press `⌘K` and type "theme".
+prints. Press `⌘K` or `Ctrl+K` and type "theme". `Ctrl+K` is the same palette on Linux, where there is no Command key.
 
 ## Runs on the plan you already have
 
@@ -191,8 +197,10 @@ nothing new to pay for.
 default works unset and they all live in `main/config.mjs`. The ones that
 matter:
 
-- `storeRoot`: where the store lives. Defaults to a folder named after the app
-  in your home directory.
+- `storeRoot`: where the store lives. On macOS this defaults to a folder
+  named after the app in your home directory. On Linux it defaults to
+  `$XDG_DATA_HOME/agentbox`, which is `~/.local/share/agentbox` when that
+  variable is unset.
 - `claudeBin`: the binary to run. The app finds `claude` itself if you leave
   this alone.
 - `maxConcurrentSessions`: how many agents run at once. The queue absorbs the
@@ -311,8 +319,8 @@ picks which coding agents the fixture Mac has, where nothing is one agent,
 or `?engines=codex` give two.
 
 To open the app as somebody who has never seen it, with its own throwaway home
-and nothing of yours inside it, press `⌘K` and choose "Open Agentbox as a new
-user". `npm run fresh` does the same from a terminal.
+and nothing of yours inside it, press `⌘K` or `Ctrl+K` and choose "Open Agentbox as a new
+user". `npm run fresh` does the same from a terminal. `ZERO_NO_SUPERVISOR=1` applies to `npm start` and to `npx agentbox-app`.
 
 The app is named in exactly one place, `shared/product-name.mjs`. Change it
 there and run `node scripts/product-name.mjs --write`, and everything else

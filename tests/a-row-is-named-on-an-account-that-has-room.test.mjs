@@ -278,3 +278,97 @@ describe('the message sorter', () => {
     expect(fake.spawns.map((s) => s.account)).toEqual(['default', SECOND]);
   });
 });
+
+// A PROJECT TIED TO ONE CLAUDE ACCOUNT IS NOT WALKED (PR 13, w-ee4fd31565).
+//
+// The walk above is what every project gets, and it is exactly wrong for a
+// project somebody has tied to one login: the prompt here carries the ROW'S OWN
+// TEXT, so walking it puts an employer's row in front of a personal
+// subscription, which is the one thing the setting promises will not happen. The
+// pin is Claude-only, and the fallback onto Codex is the same leak through a
+// second door, so it is shut off as well.
+describe('a row in a project tied to one account', () => {
+  const TIED = { projectAccounts: { shop: SECOND } };
+
+  it('is named on that account alone, and never on the other one', async () => {
+    fake.replies = { default: [0, 'Wrong account\n'], [SECOND]: [0, 'Talking head script quality\n'] };
+    const { sup, named } = build({ extra: TIED });
+    await sup.nameTheRows([row()]);
+    expect(named).toEqual([{ id: 'w-dictated', label: 'Talking head script quality' }]);
+    expect(fake.spawns.map((s) => s.account)).toEqual([SECOND]);
+  });
+
+  it('keeps its own title rather than borrowing a login, when that account is at its limit', async () => {
+    fake.replies = { default: [0, 'Wrong account\n'], [SECOND]: LIMIT };
+    const { sup, named } = build({ extra: TIED });
+    await sup.nameTheRows([row()]);
+    expect(named).toEqual([]);
+    expect(fake.spawns.map((s) => s.account)).toEqual([SECOND]);
+  });
+
+  it('is still asked once while that account rests, because there is nowhere else to ask', async () => {
+    fake.replies = { [SECOND]: [0, 'Talking head script quality\n'] };
+    const { sup, named } = build({ extra: TIED });
+    sup._profileCooldown = { [SECOND]: Date.now() + 60 * 60_000 };
+    await sup.nameTheRows([row()]);
+    expect(named).toHaveLength(1);
+    expect(fake.spawns.map((s) => s.account)).toEqual([SECOND]);
+  });
+
+  it('does not fall back to Codex on a Mac that offers both', async () => {
+    fake.replies = { [SECOND]: LIMIT, [`codex:${CODEX_ONE}`]: [0, 'Wrong engine\n'] };
+    const { sup, named } = build({ extra: { ...BOTH, ...TIED } });
+    await sup.nameTheRows([row()]);
+    expect(named).toEqual([]);
+    expect(fake.spawns.map((s) => s.account)).toEqual([SECOND]);
+  });
+
+  // WHAT THE PR DID, AND WHY IT COULD NOT BE TAKEN AS IT STOOD: it built the
+  // tied call's environment as `{ ...process.env, CLAUDE_CONFIG_DIR }`, which
+  // hands an ANTHROPIC_API_KEY from whatever shell launched the app straight into
+  // the call -- and a key silently overrides the subscription the tie just named,
+  // so the one call that was meant to be billed carefully was the one call that
+  // could be billed to an API account instead.
+  it('is handed no API key from the app, tie or no tie', async () => {
+    fake.replies = { [SECOND]: [0, 'Talking head script quality\n'] };
+    const was = process.env.ANTHROPIC_API_KEY;
+    process.env.ANTHROPIC_API_KEY = 'sk-test-not-real';
+    try {
+      const { sup } = build({ extra: TIED });
+      await sup.nameTheRows([row()]);
+    } finally {
+      if (was === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = was;
+    }
+    expect(fake.spawns).toHaveLength(1);
+    expect(fake.spawns[0].options.env.CLAUDE_CONFIG_DIR).toBe(SECOND);
+    expect(fake.spawns[0].options.env.ANTHROPIC_API_KEY).toBeUndefined();
+  });
+
+  it('sorts its messages on that account too, because the message is the prompt', async () => {
+    fake.replies = { default: [0, 'low\n'], [SECOND]: [0, 'high\n'] };
+    const { sup } = build({ extra: TIED });
+    const level = await sup._askPriority({ text: 'The site is down for every customer', ts: 1 }, 'shop');
+    expect(level).toBe('high');
+    expect(fake.spawns.map((s) => s.account)).toEqual([SECOND]);
+  });
+
+  // THE CASE THAT MUST NOT MATCH: a tie naming a login this Mac has not got is
+  // ignored, and the walk is exactly the walk at the top of this file. Without
+  // this, signing out of the tied account would stop every row in that project
+  // being named, with nothing on any screen saying so.
+  it('walks every account again once the tied login is gone', async () => {
+    fake.replies = { default: LIMIT, [SECOND]: [0, 'Talking head script quality\n'] };
+    const { sup, named } = build({ extra: { projectAccounts: { shop: '/nonexistent-accounts/removed' } } });
+    await sup.nameTheRows([row()]);
+    expect(named).toHaveLength(1);
+    expect(fake.spawns.map((s) => s.account)).toEqual(['default', SECOND]);
+  });
+
+  it('leaves a project nobody has tied exactly as it was', async () => {
+    fake.replies = { default: LIMIT, [SECOND]: [0, 'Talking head script quality\n'] };
+    const { sup, named } = build({ extra: { projectAccounts: { somewhere_else: SECOND } } });
+    await sup.nameTheRows([row()]);
+    expect(named).toHaveLength(1);
+    expect(fake.spawns.map((s) => s.account)).toEqual(['default', SECOND]);
+  });
+});

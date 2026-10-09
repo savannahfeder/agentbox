@@ -114,6 +114,7 @@ export function candidatePaths(home = os.homedir()) {
     path.join(home, '.npm-packages/bin/codex'), // actually write in a guide
     path.join(home, '.yarn/bin/codex'),
     path.join(home, 'Library/pnpm/codex'),    // pnpm's own bin on macOS
+    path.join(home, '.local/share/pnpm/codex'), // pnpm's own bin on Linux
     path.join(home, '.deno/bin/codex'),
     path.join(home, 'bin/codex'),             // a hand-rolled ~/bin on PATH
     '/opt/local/bin/codex',                   // MacPorts

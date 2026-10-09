@@ -171,14 +171,17 @@ describe('what a run is told', () => {
 
 describe('the page', () => {
   const page = fs.readFileSync(path.join(REPO, 'renderer/src/components/InstructionSettings.tsx'), 'utf8');
-  const section = page.slice(page.indexOf('const messages:Section'), page.indexOf('\n', page.indexOf('const messages:Section')));
+  // Since 2026-10-07 both kinds of user instructions share the general box.
+  const section = page.slice(page.indexOf('const rules:Section'), page.indexOf('\n', page.indexOf('const rules:Section')));
 
   it('does not fill the box with the shipped text', () => {
     expect(section).not.toContain('defaults.messages');
     expect(section).toContain("defaultText:''");
   });
 
-  it('says the app keeps its own rules apart', () => {
-    expect(section).toMatch(/description:/);
+  it('keeps the app rules out of the combined user editor', () => {
+    expect(page).not.toContain("id:'messages'");
+    expect(section).not.toContain('defaults.system');
+    expect(page).toContain('instruction-advanced');
   });
 });

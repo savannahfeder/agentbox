@@ -93,7 +93,7 @@ describe('how many agents this Mac is offered', () => {
 
   it('suggests in her words, and never says it is a wall', () => {
     expect(machineNote(machineSlots(MACS['M1, 8 GB'])))
-      .toBe('This Mac has 8 GB and 8 cores, so we suggest 2 at once. Go higher if you want to.');
+      .toBe('This computer has 8 GB and 8 cores, so we suggest 2 at once. Go higher if you want to.');
     // THE WORDING IS THE CLAIM HERE, not decoration. This line first read "so 2
     // at once is as high as it goes here", which was true while the number was
     // a ceiling and is a lie now that it is advice.

@@ -2,14 +2,14 @@
 //
 // The page's heading reads "Instructions for every project" or "Instructions
 // for North Sound", and the words after "for" are the switch. The scope is
-// EXCLUSIVE: every project shows the three shared sections and a project shows
+// EXCLUSIVE: every project shows the shared instructions and ADHD mode; a project shows
 // only its own file. A page for one project that also listed sections tagged
 // as applying everywhere contradicted its own heading.
 
 export const EVERY = 'every';
 
 export type Scope = string;
-export type SectionId = 'rules' | 'messages' | 'adhd' | 'project';
+export type SectionId = 'rules' | 'adhd' | 'project';
 
 interface ProjectLike { slug: string; name: string }
 
@@ -31,7 +31,7 @@ export function scopeWords(scope: Scope, projects: readonly ProjectLike[]): stri
 }
 
 export function sectionsFor(scope: Scope): SectionId[] {
-  return scope === EVERY ? ['rules', 'messages', 'adhd'] : ['project'];
+  return scope === EVERY ? ['rules', 'adhd'] : ['project'];
 }
 
 /** An empty section has nothing to read, so it opens as the writing surface. */

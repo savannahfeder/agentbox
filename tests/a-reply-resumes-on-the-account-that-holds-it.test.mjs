@@ -35,9 +35,9 @@ function putTranscript(profileHome, cwd, sessionId) {
 
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-two-accounts-'));
-  // 2026-10-07: the default-login fixture wrote into the real Claude home.
-  // Keep default-profile resolution while isolating its files in this test.
-  vi.spyOn(os, 'homedir').mockReturnValue(path.join(tmp, 'home'));
+  // The desktop-launch verification hit EPERM on 2026-10-07 because this
+  // fixture wrote into the real CLI home. Keep the default account temporary.
+  vi.spyOn(os, 'homedir').mockReturnValue(tmp);
   home = path.join(os.homedir(), '.claude');
   second = path.join(tmp, 'claude-second');
 });

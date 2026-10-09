@@ -155,7 +155,7 @@ describe('the personal project itself', () => {
 
   it('cannot be shared with the team as a project', () => {
     ensurePersonalProject(root);
-    expect(() => markShared(path.join(root, 'my-workspace'), { teamId: 't1', sharedBy: 'me' })).toThrow(/My Workspace stays on this Mac/);
+    expect(() => markShared(path.join(root, 'my-workspace'), { teamId: 't1', sharedBy: 'me' })).toThrow(/My Workspace stays on this computer/);
     expect(read('my-workspace')).not.toHaveProperty('team');
   });
 

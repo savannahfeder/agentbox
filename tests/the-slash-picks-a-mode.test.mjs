@@ -434,8 +434,10 @@ describe('the toast gets out of the composer\'s way', () => {
 
   it('leaves the toast where it was for everything else', () => {
     // The unqualified rule still owns the bottom, so nothing outside the
-    // composer moved.
-    expect(css).toMatch(/\.toast \{[\s\S]{0,200}bottom: 58px;/);
+    // composer moved. On the right since w-f0bfe32859, the card she picked,
+    // and 30px in, on the pane's corner mark; the composer rule above still
+    // lifts it out of the reply box.
+    expect(css).toMatch(/\.toast \{[\s\S]{0,200}bottom: 30px;/);
   });
 });
 

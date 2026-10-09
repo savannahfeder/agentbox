@@ -23,7 +23,7 @@ export async function installedAgent(engine,config){
  if(!bin)throw Error('This agent is not installed.');
  const home=config.home||os.homedir();
  const settings=harness.updateSettings({home});
- const env=terminalEnv();
+ const env=harness.launchEnv(bin,terminalEnv());
  // Version inspection must not itself auto-update anything.
  const {stdout}=await exec(bin,['--version'],{timeout:8000,maxBuffer:16384,env:{...env,DISABLE_AUTOUPDATER:'1'}});
  const version=stdout.match(/\b\d+\.\d+\.\d+(?:-[\w.-]+)?\b/)?.[0];
@@ -92,7 +92,7 @@ export class AgentUpdates{
   if(!this.plans.has(engine))throw Error('Click Update now first.');
   switch(p.action){
    case 'open':return this.terminals.read(engine,0);
-   case 'read':return this.terminals.read(engine,p.offset);
+   case 'read':return this.terminals.read(engine,p.offset,p.wait);
    case 'write':return this.terminals.write(engine,p.data);
    case 'resize':return this.terminals.resize(engine,p.cols,p.rows);
    case 'close':return this.terminals.close(engine);

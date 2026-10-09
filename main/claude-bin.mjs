@@ -71,6 +71,7 @@ export function candidatePaths(home = os.homedir()) {
     path.join(home, '.npm-packages/bin/claude'), // actually write in a guide
     path.join(home, '.yarn/bin/claude'),     // yarn global
     path.join(home, 'Library/pnpm/claude'),  // pnpm's own bin on macOS
+    path.join(home, '.local/share/pnpm/claude'), // pnpm's own bin on Linux
     path.join(home, '.deno/bin/claude'),     // deno
     path.join(home, 'bin/claude'),           // a hand-rolled ~/bin on PATH
     '/opt/local/bin/claude',                 // MacPorts
