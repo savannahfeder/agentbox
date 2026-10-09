@@ -187,6 +187,27 @@ export function createAnalytics({ config, version, dir, client, env = process.en
         // how a release that fixed something reads as a release that broke it.
         // The report has carried the right answer all along.
         app_version: String(payload.app?.version ?? base.app_version),
+        // WHY THE WINDOW DIED, which is the only thing a `renderer-gone`
+        // report is for and the one thing it was not carrying.
+        // `installCrashReports` collects Electron's `details.reason` and
+        // `details.exitCode` and says in its own comment why they are safe:
+        // the reason is Electron's closed vocabulary (`crashed`, `oom`,
+        // `killed`, `launch-failed` and the rest) and carries nothing of
+        // anyone's. They were written to disk and then dropped here, because
+        // this list names its properties by hand. So the launch report's one
+        // dead window says `render process gone` and nothing else, and `oom`
+        // after three and a half hours (a leak) could not be told apart from a
+        // hard fault (not a leak). Measured 2026-10-08.
+        //
+        // Absent rather than empty when there is nothing to say: a null reason
+        // on the thirteen crashes that never had one reads as an answer in a
+        // chart. A reason longer than Electron's longest word is a bug
+        // upstream rather than a reason, and is left out too.
+        ...(typeof payload.reason === 'string' && payload.reason && payload.reason.length <= 40
+          ? { crash_reason: payload.reason } : {}),
+        ...(Number.isFinite(payload.exitCode) ? { exit_code: Number(payload.exitCode) } : {}),
+        ...(typeof payload.processType === 'string' && payload.processType && payload.processType.length <= 40
+          ? { process_type: payload.processType } : {}),
       });
     },
 
