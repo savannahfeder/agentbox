@@ -1012,7 +1012,9 @@ export const api = {
     return zero.projectInstructionsWrite({ product, text });
   },
 
-  async createProduct(p: { name: string; repoPath?: string | null }) {
+  // `ofMany` says this one is part of a press that connects several folders and
+  // will count itself once (main/ipc.mjs); it changes nothing about the project.
+  async createProduct(p: { name: string; repoPath?: string | null; ofMany?: boolean }) {
     if (useFixtures) return null;
     return window.zero!.createProduct(p);
   },
