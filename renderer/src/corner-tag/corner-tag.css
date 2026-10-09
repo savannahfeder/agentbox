@@ -59,7 +59,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif
 
 /* ---- the tag ---- */
 .ct-tag {
-  height: 26px; padding: 0 11px 0 9px; border-radius: 13px; box-sizing: border-box;
+  height: 26px; padding: 0 11px 0 9px; border-radius: 6px; box-sizing: border-box;
   display: flex; align-items: center; gap: 7px; font-size: 12.5px; white-space: nowrap;
   transition: background-color 120ms ease;
 }
@@ -79,38 +79,40 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif
 }
 :root[data-theme='dark'] .ct-dot { background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.55); }
 
-/* Pictures only: ways to make the light-mode dot a glowing pearl. White glow
-   alone vanishes on light glass, so each one gives the light something to
-   read against. */
-/* A: a pearl with its own shading, lit from the top left, and a cool halo. */
-:root[data-dot='lit'] .ct-dot {
-  width: 8px; height: 8px;
-  background: radial-gradient(circle at 35% 30%, #fff 0 28%, #e6e9f0 60%, #b4bccb 100%);
-  box-shadow: 0 0 0 0.5px rgba(60, 70, 90, 0.18), 0 0 8px 2px rgba(125, 140, 175, 0.6);
-}
-/* B: a plain white dot with a strong silver halo around it. */
-:root[data-dot='halo'] .ct-dot {
-  width: 8px; height: 8px; background: #fff;
-  box-shadow: 0 0 0 0.5px rgba(60, 70, 90, 0.14), 0 0 6px 2px rgba(125, 140, 175, 0.75), 0 0 12px 3px rgba(125, 140, 175, 0.3);
-}
-/* C: mother of pearl, a faint pink and blue sheen with a lilac glow. */
+/* Pictures only: the light-mode pearl. She picked the mother-of-pearl sheen
+   (C) and found its glow a little dark at the edges; C1 to C4 lighten it. */
+:root[data-dot^='sheen'] .ct-dot { width: 8px; height: 8px; }
 :root[data-dot='sheen'] .ct-dot {
-  width: 8px; height: 8px;
   background: radial-gradient(circle at 32% 28%, #fff 0 22%, #f6eaf4 45%, #dde4f3 72%, #b9c2d8 100%);
   box-shadow: 0 0 0 0.5px rgba(60, 70, 90, 0.14), 0 0 8px 2px rgba(165, 145, 215, 0.6);
 }
-/* D: the dark-mode dot as it is, on a silver glass a shade deeper than now,
-   so its white glow has something to shine against. */
-:root[data-dot='silver'] { --ct-tint: rgba(205, 208, 216, 0.4); --ct-tint-hover: rgba(205, 208, 216, 0.55); }
-:root.ct-demo[data-dot='silver'] .ct-glass { background: rgba(214, 217, 225, 0.78); }
-:root[data-dot='silver'] .ct-dot { background: #fff; box-shadow: 0 0 6px 1px rgba(255, 255, 255, 0.95), 0 0 0 0.5px rgba(60, 70, 90, 0.12); }
+/* C1: the same, every edge a step lighter. */
+:root[data-dot='sheen1'] .ct-dot {
+  background: radial-gradient(circle at 32% 28%, #fff 0 24%, #f7eef6 48%, #e6ebf6 74%, #ccd3e3 100%);
+  box-shadow: 0 0 0 0.5px rgba(60, 70, 90, 0.09), 0 0 8px 2px rgba(180, 165, 228, 0.42);
+}
+/* C2: no outline at all, the glow wider and paler. */
+:root[data-dot='sheen2'] .ct-dot {
+  background: radial-gradient(circle at 32% 28%, #fff 0 26%, #f8f0f7 50%, #e9eef7 76%, #d6dcea 100%);
+  box-shadow: 0 0 10px 3px rgba(195, 180, 240, 0.38);
+}
+/* C3: a blush glow, nearly white, so the lilac is a hint. */
+:root[data-dot='sheen3'] .ct-dot {
+  background: radial-gradient(circle at 32% 28%, #fff 0 24%, #f8eef6 48%, #e7ecf6 74%, #d3d9e7 100%);
+  box-shadow: 0 0 0 0.5px rgba(60, 70, 90, 0.08), 0 0 8px 2px rgba(232, 208, 240, 0.85);
+}
+/* C4: a thin white rim, then a faint lilac haze outside it. */
+:root[data-dot='sheen4'] .ct-dot {
+  background: radial-gradient(circle at 32% 28%, #fff 0 24%, #f6edf6 48%, #e3e9f5 74%, #cfd6e5 100%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.95), 0 0 0 1.5px rgba(60, 70, 90, 0.06), 0 0 9px 3px rgba(190, 172, 235, 0.32);
+}
 .ct-half { flex: none; display: block; color: var(--ct-mark); }
 
 /* ---- the list ---- */
-.ct-card { border-radius: 14px; padding: 9px 8px 8px; box-sizing: border-box; width: max-content; max-width: 440px; min-width: 240px; }
+.ct-card { border-radius: 8px; padding: 9px 8px 8px; box-sizing: border-box; width: max-content; max-width: 440px; min-width: 240px; }
 .ct-line {
   all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 9px; width: 100%;
-  font-size: 13px; white-space: nowrap; padding: 5px 6px; border-radius: 7px; cursor: pointer; color: var(--ct-ink);
+  font-size: 13px; white-space: nowrap; padding: 5px 6px; border-radius: 4px; cursor: pointer; color: var(--ct-ink);
 }
 .ct-line:hover { background: var(--ct-press); }
 .ct-line .ct-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
