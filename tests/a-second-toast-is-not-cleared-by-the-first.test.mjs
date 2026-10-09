@@ -31,7 +31,10 @@ describe('how long a toast stays', () => {
   });
 
   it('keeps the two lifetimes it already had', () => {
-    expect(app).toContain('setToast(null), goes ? 6000 : 2500');
+    // Six seconds is a named number since w-f0bfe32859, because the card's
+    // orange timer runs for exactly as long and must not drift from it.
+    expect(app).toContain('setToast(null), goes ? TOAST_GOES_MS : 2500');
+    expect(app).toContain('const TOAST_GOES_MS = 6000;');
   });
 
   // The whole point is that there is ONE timer, so a second bare setTimeout that
@@ -40,6 +43,6 @@ describe('how long a toast stays', () => {
   // this fault.
   it('has no other timer that clears the bar', () => {
     const timers = app.split('\n').filter((l) => l.includes('setToast(null)') && l.includes('setTimeout'));
-    expect(timers).toEqual(['    toastTimer.current = setTimeout(() => setToast(null), goes ? 6000 : 2500);']);
+    expect(timers).toEqual(['    toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);']);
   });
 });

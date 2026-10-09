@@ -3,7 +3,7 @@
 // end, on the title's line, the things that are not the message: priority, the
 // product, and when (or that an agent is on it, or that one stopped).
 
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useContext, useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { Product, RepeatRule, RunningSession, ThreadCard, View, WorkItem } from '../types';
 import { ago, dayLabel, previewText, stamp } from '../format';
 import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitle, walkRowKeys } from '../list-rules';
@@ -20,7 +20,8 @@ import { splitHits } from '../search';
 import type { ThreadSearchDetails } from '../threads/search';
 import { clockLabel, isCleanRun, nextRunAt } from '../../../shared/repeats.mjs';
 import { Face, TeamRowEnd, type TeamView } from '../team/people';
-import { RepeatMark, RowCells, TableHead, ThreadCells } from '../threads/Pages';
+import { RepeatMark, RowCells, TableHead, ThreadCells, WaitingContext } from '../threads/Pages';
+import { toApproveWords } from '../threads-made';
 import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
@@ -138,7 +139,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder }: {
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -170,6 +171,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   stalled?: string[];
   queued?: string[];
   signInNeeded?: Record<string, string>;
+  /** `supervisor.shipping`: rows the app's ship queue still owes a ship. */
+  shipping?: string[];
   // A RUN ENDED ON THIS ROW AND WROTE NOTHING DOWN, keyed by id. The half of
   // it that matters most is that this is visible in the inbox without opening
   // anything. Not `stalled`, which is a worker that died and
@@ -246,6 +249,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
    *  set: Updated, Done, a search. */
   onReorder?: (id: string, beforeId: string | null, drawn: string[]) => void;
 }) {
+  const waiting = useContext(WaitingContext);
   const drag = useRowDrag(table ? onReorder : undefined);
   // The hover does not move while a row is carried: each row crossed would
   // redraw the whole app under the drag (w-6e5b532a95).
@@ -545,6 +549,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                       {details.people.length > 3 && <span className="th-faces-more">+{details.people.length - 3}</span>}
                     </span>}
                     <Hits text={details?.title ?? rowTitle(item)} terms={terms} phrase={phrase} />
+                    {/* The same faint words the table row carries (w-d2744c6daa). */}
+                    {waiting.get(`${item.product}/${item.id}`) ? <span className="th-aside">{toApproveWords(waiting.get(`${item.product}/${item.id}`))}</span> : null}
                   </div>
                   {/* On anything finished the RESULT is the news; the body is the
                       ask she already knows she made. Her own directives are often
@@ -760,6 +766,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                         ? <span className="time quiet" title="An agent ran on this and finished without writing anything back. Send it a message to find out what happened.">nothing came back · {ago(silent![item.id].endedAt || item.updatedAt)}</span>
                         : signInNeeded?.[item.id]
                           ? <span className="time" title={`${signInNeeded[item.id]} is signed out, so nothing can start. Sign in again and this starts on its own.`}>signed out</span>
+                        : shipping?.includes(item.id)
+                          ? <span className="time" title="The app is shipping this. It comes back to you once it is live, or goes back to its agent if it fails.">shipping</span>
                         : queued?.includes(item.id)
                           ? <span className="time">queued</span>
                           : paused && view === 'progress'
