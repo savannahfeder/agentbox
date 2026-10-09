@@ -11,7 +11,7 @@ import { ensurePersonalProject } from './team/projects.mjs';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { configDir, loadConfig } from './config.mjs';
+import { configDir, loadConfig, saveConfig } from './config.mjs';
 import { installMenu, applyZoom, requestFind } from './menu.mjs';
 import { zoomDeltaFor } from './zoom-keys.mjs';
 import { copySelection } from './copy-selection.mjs';
@@ -32,6 +32,7 @@ import { createAnalytics, createDailyCount } from './analytics.mjs';
 import { createUpdater } from './updater.mjs';
 import { createSourceUpdater } from './source-updater.mjs';
 import { installNotifier } from './notify.mjs';
+import { createCornerTag } from './corner-tag.mjs';
 import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mjs';
 import { quietTheFramesScrollbars } from './frame-scrollbars.mjs';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mjs';
@@ -864,6 +865,20 @@ async function createWindow() {
   // arrived; main/notify.mjs decides. tell me when I am in another app, never
   // while I am in Agentbox.
   installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage });
+  // THE CORNER TAG (w-dafae58a23): what is ready for her, floating over
+  // whatever app she is in. Its page is built beside the app's own, and comes
+  // from the dev server only when the app's own page does.
+  createCornerTag({
+    BrowserWindow, screen: electronScreen, ipcMain, Menu, powerMonitor, config, saveConfig, mainWindow: window,
+    preload: path.join(appDir, 'main', 'corner-tag-preload.cjs'),
+    // `part` is the tag itself or the list beside it, one page drawn twice.
+    load: (tagWindow, part) => {
+      const devTag = process.env.ZERO_DEV_URL;
+      const builtTag = path.join(appDir, 'renderer', 'dist', 'corner-tag.html');
+      if (devTag && !fs.existsSync(builtTag)) tagWindow.loadURL(`${devTag.replace(/\/$/, '')}/corner-tag.html?part=${part}`);
+      else tagWindow.loadFile(builtTag, { search: `part=${part}` });
+    },
+  });
   // Asked for once by the renderer as it mounts, rather than pushed on
   // did-finish-load, which races the first effects and would drop the very
   // message it exists to deliver.

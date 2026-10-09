@@ -12,9 +12,22 @@
 // package or the build's files, and it only ever touches node_modules.
 //
 // What it changes, once: CFBundleName and CFBundleDisplayName become the app's
-// name, the icon becomes build/icon.icns, and the bundle is re-signed ad hoc,
-// which is how npm's Electron.app was signed to begin with. The bundle id is
-// left alone. A second run finds nothing to do and signs nothing.
+// name, the icon becomes build/icon.icns, the bundle id becomes the app's own,
+// and the bundle is re-signed ad hoc, which is how npm's Electron.app was
+// signed to begin with. A second run finds nothing to do and signs nothing.
+//
+// THE BUNDLE ID USED TO BE LEFT ALONE, and the reason given for leaving it is
+// the reason it now changes. macOS keys every permission off the bundle id and
+// asks a person once per id. Left alone, that id is com.github.Electron, which
+// every Electron app ever run from source on that Mac shares, so Agentbox
+// inherited an answer somebody gave years ago about something else: macOS took
+// every banner it sent, reported success, and drew nothing.
+//
+// Measured 2026-10-08, and this is the whole of the evidence: a copy of this
+// same Electron.app carrying an id macOS had never seen made it ask out loud on
+// the very first banner. Nothing else about the copy differed. So the run from
+// source takes the id the downloadable build already uses, and one answer in
+// System Settings covers both.
 //
 // THIS MUST NEVER STOP A LAUNCH. A missing Electron, another platform or a
 // failed tool are all reasons to say nothing and let Electron start as it is.
@@ -29,6 +42,13 @@ import { NAME } from '../shared/product-name.mjs';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ICON = path.join(ROOT, 'build', 'icon.icns');
 const ICON_FILE = 'agentbox.icns';
+// package.json is where the downloadable build's id already lives, and two
+// copies of it would be two answers to one question.
+const APP_ID = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).build.appId;
+  } catch { return null; }
+})();
 const LSREGISTER = '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister';
 
 function electronApp() {
@@ -59,7 +79,7 @@ function setPlistString(plist, key, value) {
  * Rename and re-icon the Electron.app a from-source run launches.
  *  `run` is how the signing and LaunchServices tools are called, so a test can
  *  watch them without signing anything. Returns { changed }. */
-export function brandElectron({ app = electronApp(), name = NAME, icon = ICON, run = quiet, platform = process.platform } = {}) {
+export function brandElectron({ app = electronApp(), name = NAME, icon = ICON, appId = APP_ID, run = quiet, platform = process.platform } = {}) {
   try {
     if (platform !== 'darwin' || !app) return { changed: false };
     const plist = path.join(app, 'Contents', 'Info.plist');
@@ -69,6 +89,10 @@ export function brandElectron({ app = electronApp(), name = NAME, icon = ICON, r
     const done = plistValue(plist, 'CFBundleName') === name
       && plistValue(plist, 'CFBundleDisplayName') === name
       && plistValue(plist, 'CFBundleIconFile') === ICON_FILE
+      // A bundle branded before this change has everything else right and the
+      // wrong id, so the id alone has to count as work or the fix never
+      // reaches the machines that need it most.
+      && (!appId || plistValue(plist, 'CFBundleIdentifier') === appId)
       && iconSame;
     if (done) return { changed: false };
 
@@ -77,7 +101,9 @@ export function brandElectron({ app = electronApp(), name = NAME, icon = ICON, r
     const before = fs.readFileSync(plist);
     try {
       fs.copyFileSync(icon, dest);
-      for (const [key, value] of [['CFBundleName', name], ['CFBundleDisplayName', name], ['CFBundleIconFile', ICON_FILE]]) {
+      const fields = [['CFBundleName', name], ['CFBundleDisplayName', name], ['CFBundleIconFile', ICON_FILE]];
+      if (appId) fields.push(['CFBundleIdentifier', appId]);
+      for (const [key, value] of fields) {
         setPlistString(plist, key, value);
       }
       run('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', app]);

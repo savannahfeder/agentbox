@@ -64,9 +64,42 @@ describe('the bundle a from-source run launches', () => {
     expect(fs.readFileSync(icon).equals(fs.readFileSync(ICON))).toBe(true);
   });
 
-  it('keeps the bundle id, so nothing keyed to it moves', () => {
+  // THIS TEST USED TO SAY THE OPPOSITE: "keeps the bundle id, so nothing keyed
+  // to it moves". The reason it gave is the reason it had to change.
+  //
+  // macOS keys every permission off the bundle id, and notifications are one of
+  // them. It asks a person once per id, and it only ever asked about
+  // com.github.Electron — an id shared with every Electron app anybody has ever
+  // run from source on that Mac, long since answered or dismissed. So from-
+  // source Agentbox inherited somebody else's answer: macOS took every banner
+  // it sent, reported success, and drew nothing, for weeks, with "I still don't
+  // see notifications coming up" the only symptom.
+  //
+  // Measured 2026-10-08, which is the whole of the evidence for this change: a
+  // copy of that same Electron.app carrying a bundle id macOS had never seen
+  // made it ask, out loud, on the first banner. Nothing else about the copy
+  // differed.
+  //
+  // So the from-source run takes the app's own id, the one the downloadable
+  // build already uses, and one answer in System Settings now covers both.
+  it('carries the app\'s own bundle id, so macOS asks about Agentbox and not about Electron', () => {
     brandElectron({ app, run, platform: 'darwin' });
-    expect(read(plist, 'CFBundleIdentifier')).toBe('com.github.Electron');
+    const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    expect(read(plist, 'CFBundleIdentifier')).toBe(pkg.build.appId);
+    // Named rather than only compared, so that moving the id in package.json
+    // cannot quietly make this test agree with itself about the wrong string.
+    expect(read(plist, 'CFBundleIdentifier')).toBe('ac.astral.app');
+  });
+
+  it('counts a stale bundle id as work to do, so an already-branded copy is fixed', () => {
+    // The boundary that matters on a Mac somebody has been running this on:
+    // name and icon are already right from an earlier launch, and the id alone
+    // is wrong. That must still be a change, or the fix never reaches them.
+    brandElectron({ app, run, platform: 'darwin' });
+    const text = fs.readFileSync(plist, 'utf8').replace('ac.astral.app', 'com.github.Electron');
+    fs.writeFileSync(plist, text);
+    expect(brandElectron({ app, run, platform: 'darwin' }).changed).toBe(true);
+    expect(read(plist, 'CFBundleIdentifier')).toBe('ac.astral.app');
   });
 
   it('re-signs it ad hoc once, after the edit', () => {

@@ -1454,6 +1454,17 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 <Switch label="Show keyboard shortcut hints" on={keyHints} onChange={onSetKeyHints} />
               </Row>
             </Group>
+            {/* THE CORNER TAG (w-dafae58a23). The tag itself only hides for a
+                while; this is the one place it turns off for good, so it can
+                never become a thing she closed once and forgot. */}
+            <Group id="corner-tag" label="While you're in other apps">
+              <Row
+                label="Show what's ready in the corner"
+                desc="A small tag over your other apps says when an agent has something for you. Drag it anywhere. Hide it for a while from the tag itself."
+              >
+                <Switch label="Show what's ready in the corner" on={w.cornerTag !== false} onChange={(v) => setWorkspace('cornerTag', v)} />
+              </Row>
+            </Group>
             {/* ONE SWITCH OVER EVERYTHING THAT LEAVES THE MACHINE, and there is
                 deliberately no second one and no partial mode, because the
                 privacy page (section 10) promises there is not. */}
@@ -1611,6 +1622,20 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                   <Switch label="Stop programs agents leave behind" on={w.leftovers.on} onChange={(v) => setWorkspace('cleanupLeftovers', v)} />
                 </Row>
               )}
+              {/* COPIES OF A PROJECT THIS APP DID NOT MAKE (2026-10-07,
+                  w-330eea6c66). Thirteen worktrees of one repository were found
+                  outside the folder the app keeps its own in, about 740 MB, and
+                  nothing in the app could list, show or sweep one: the same
+                  invisibility that stranded 26 GB a fortnight earlier, in a new
+                  place. main/task-folders.mjs has the measurement and the rules.
+
+                  A SENTENCE AND NO CONTROL, and the row is absent whenever there
+                  is nothing to say. A folder the app did not make is not the
+                  app's to remove — it is the only copy of whatever is
+                  uncommitted inside it — so there is nothing here to decide,
+                  only something to know. A permanent row saying "none" would be
+                  bookkeeping on a page that is already long. */}
+              {w.strayFolders && <Row label="Copies of a project made by hand" desc={w.strayFolders.now} />}
               {/* THE ONE LEVER NO READING REPLACES. She is sitting in front of
                   the Mac and the app is not: "If there are issues with that, the
                   user determines whether they can take some sort of more manual

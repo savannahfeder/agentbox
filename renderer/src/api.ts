@@ -94,7 +94,7 @@ const emptySettings: Settings = {
     // A screen that could not reach the main process says the switch is on and
     // that there is nowhere to send to, which is the truth about a copy that
     // cannot even read its own settings.
-    diagnostics: true, diagnosticsDestination: false, adhdMode: false,
+    diagnostics: true, diagnosticsDestination: false, adhdMode: false, cornerTag: true,
     storePath: '', homePath: '', claudeBin: '', claudeFound: false, claudeCertain: false, claudeInstallUrl: '',
     standingLines: 0,
     messageRulesLines: 0, projectsWithInstructions: 0, projectCount: 0,
@@ -528,6 +528,11 @@ export const api = {
   async threadEdit(product: string, id: string, patch: ThreadEditPatch): Promise<{ ok: boolean; error?: string }> {
     if (useFixtures || !window.zero?.threadEdit) return { ok: true };
     try { return await window.zero.threadEdit({ product, id, patch }); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  },
+  // Threads dragged to a place of their own in the list (w-6e5b532a95).
+  async setThreadPlaces(places: Record<string, number | null>): Promise<void> {
+    if (useFixtures || !window.zero?.setThreadPlaces) return;
+    await window.zero.setThreadPlaces({ places });
   },
 
   async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem | null> {

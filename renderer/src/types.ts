@@ -7,6 +7,10 @@ export interface WorkItem {
   id: string;
   product: string;
   productName: string;
+  // WHERE SHE DRAGGED IT IN THE LIST (w-6e5b532a95), on the scale of the score
+  // it would otherwise sort by, which it replaces. Kept by the supervisor, on
+  // this Mac; absent on every row nobody has dragged.
+  place?: number;
   // WHAT PEOPLE PUT ON EACH MESSAGE IN A CONVERSATION (w-560647d4db): by the
   // message's line uid, then by emoji, then the people on it. Folded out of the
   // presses the ledger holds (shared/work-items.mjs); absent on every row
@@ -836,6 +840,11 @@ export interface WorkspaceSettings {
    * STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mjs). `now` is one
    * sentence about what is left right now, null while it is off. */
   leftovers?: { on: boolean; now: string | null };
+  /**
+   * COPIES OF A PROJECT THE APP DID NOT MAKE (main/task-folders.mjs). Null, and
+   * so no row at all, whenever there are none: the app shows these and never
+   * removes one, so there is nothing on the row to decide. */
+  strayFolders?: { count: number; now: string } | null;
   capacity: number;
   running: number;
   model: string | null;
@@ -911,6 +920,8 @@ export interface WorkspaceSettings {
   // Whether the ADHD mode rules ride under "How agents write to you". Off
   // unless she turned it on (w-5737fe67cf).
   adhdMode?: boolean;
+  // The corner tag over other apps (w-dafae58a23). On unless she turned it off.
+  cornerTag?: boolean;
   outsideAgents: AgentMode;
   accounts: AccountSetting[];
   /**
@@ -1012,6 +1023,7 @@ declare global {
       answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string }): Promise<WorkItem>;
       sendNow(p: { product: string; id: string }): Promise<{ ok: boolean; interrupted: boolean }>;
       setProductOrder(p: { order: string[] }): Promise<unknown>;
+      setThreadPlaces(p: { places: Record<string, number | null> }): Promise<unknown>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
       compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
       // Feedback to the Agentbox team (main/feedback.mjs). Optional: an older
@@ -1105,6 +1117,13 @@ declare global {
       // itself, which is the only way the page hears about the chord at all.
       onApprovalAnswered?(fn: (a: { id: string; allow: boolean }) => void): () => void;
       badge?(count: number): Promise<void>;
+      // The corner tag over other apps (main/corner-tag.mjs).
+      cornerTag?(state: {
+        ready: { id: string; title: string; says: string; since?: number; open?: string | null }[];
+        working: number;
+      }): Promise<void>;
+      // The corner tag's "Turn off…": open Settings on this page.
+      onOpenSettings?(fn: (p: { pane?: string }) => void): () => void;
       // screenDetail is which set of theme pictures this screen wants, 'soft' or
       // 'sharp' (main/screen-detail.mjs). It rides here rather than being
       // pushed because the answer is needed on the first paint.

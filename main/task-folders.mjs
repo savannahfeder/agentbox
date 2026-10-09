@@ -96,9 +96,12 @@ function tryGit(cwd, args) {
   catch (error) { return { ok: false, out: String(error?.stderr ?? error?.message ?? '').trim() }; }
 }
 
+/** `safeTaskName`'s question, asked of a folder already on the disk without throwing. */
+const couldBeATaskName = (name) => SAFE_NAME.test(name) && String(name).length <= 64;
+
 export function safeTaskName(id) {
   const name = String(id ?? '');
-  if (!SAFE_NAME.test(name) || name.length > 64) {
+  if (!couldBeATaskName(name)) {
     throw Error(`Not a name a task folder may be given: ${JSON.stringify(id)}`);
   }
   return name;
@@ -574,16 +577,38 @@ export function folderState(root, folder) {
 }
 
 /**
+ * THE FOLDER A CALL IS ABOUT IS THE ONE IT WAS HANDED, NEVER ONE REBUILT FROM A
+ * BASENAME (w-330eea6c66).
+ *
+ * `releaseTaskFolder` and `parkTaskFolder` used to take a task id and work out
+ * `.claude/worktrees/<id>` from it. That is correct while the only caller is a
+ * row's own session, and it is the bug the moment anything passes on a folder it
+ * found: the sweep walks a list of folders, and a stray whose basename happened
+ * to read like a task id would have had the app committing in, and deleting,
+ * whatever sat at the reconstructed path instead.
+ *
+ * So a caller holding a path says so, and a path that is not this task's own
+ * folder is refused rather than quietly swapped for one. Called with no path at
+ * all it answers exactly as it always did, which is every ordinary call.
+ */
+function ownFolder(root, name, given) {
+  const mine = taskFolderPath(root, name);
+  if (given === null || given === undefined) return mine;
+  return real(given) === mine ? mine : null;
+}
+
+/**
  * Give the folder back when the session is done with it. Removal is the rare
  * case on purpose: it happens when the work is already in main and nothing is
  * uncommitted. Every other answer names what is in the way, so the app can say
  * it rather than leave another invisible folder on her disk.
  */
-export function releaseTaskFolder(dir, id, { pid = process.pid } = {}) {
+export function releaseTaskFolder(dir, id, { pid = process.pid, path: given = null } = {}) {
   const name = safeTaskName(id);
   const root = repoRoot(dir);
   if (!root) return { removed: false, reason: 'no-repo' };
-  const folder = taskFolderPath(root, name);
+  const folder = ownFolder(root, name, given);
+  if (!folder) return { removed: false, reason: 'not-ours', path: given };
   if (!fs.existsSync(folder)) return { removed: false, reason: 'gone' };
 
   // Whose folder this is, asked in the one place that knows (`holder`). A lock
@@ -641,11 +666,14 @@ export const PARKED_INDEX = 'Parked when the task was closed (what was staged)';
  * wrote itself goes. That is the same boundary as removing any worktree, and the
  * alternative is committing secrets onto a branch.
  */
-export function parkTaskFolder(dir, id, { pid = process.pid } = {}) {
+export function parkTaskFolder(dir, id, { pid = process.pid, path: given = null } = {}) {
   const name = safeTaskName(id);
   const root = repoRoot(dir);
   if (!root) return { parked: false, reason: 'no-repo' };
-  const folder = taskFolderPath(root, name);
+  // `ownFolder`, and never the basename of whatever we were pointed at: parking
+  // commits and then removes, so being wrong here costs somebody their folder.
+  const folder = ownFolder(root, name, given);
+  if (!folder) return { parked: false, reason: 'not-ours', path: given };
   if (!fs.existsSync(folder)) return { parked: false, reason: 'gone' };
 
   const owner = holder(root, folder, pid);
@@ -713,32 +741,139 @@ export function restoreTaskFolder(dir, id, { pid = process.pid } = {}) {
 }
 
 /**
+ * EVERY COPY OF THIS PROJECT ON THE DISK, WHOEVER MADE IT. INVENTORY, NOT
+ * OWNERSHIP, AND THE TWO BEING ONE QUESTION IS WHAT STRANDED 740 MB.
+ *
+ * MEASURED 2026-10-07 (w-5952e6de3e). Thirteen worktrees of this repository
+ * existed outside `.claude/worktrees/`: nine beside the checkout as
+ * `agentbox-team-<name>`, one under `/private/tmp`, one as `wt-<task id>`. About
+ * 740 MB of tracked files, every one made by hand by some session rather than by
+ * the app. `listTaskFolders` filtered on the folder's parent being the app's own
+ * home, so not one of them could be listed, shown or swept: the same
+ * invisibility that stranded 26 GB on 2026-09-22, in a new place. One of them had
+ * `node_modules` symlinked back to the shared checkout, so an `npm install`
+ * inside it rewrote every other folder's dependencies.
+ *
+ * AND WIDENING THAT FILTER WOULD HAVE BEEN WORSE THAN THE BUG, which is why this
+ * is a second question rather than a looser version of the first one. The
+ * supervisor feeds the list into automatic parking, and parking rebuilt
+ * `.claude/worktrees/<id>` out of the folder's BASENAME rather than using the
+ * path it was handed. A folder nobody's row owns passes every eligibility check
+ * parking has, so a wider list would have had the app committing to a branch it
+ * invented and deleting a folder somebody made on purpose.
+ *
+ * So: this answers what is there, and `ours` answers what the app may act on.
+ * Only the second is ever parked or removed, and the first is what lets a person
+ * see what is holding their disk.
+ *
+ * `ours` IS PROOF BY LOCATION, and the location is the app's own. Nothing but
+ * `ensureTaskFolder` puts a folder at `<primary>/.claude/worktrees/<task name>`,
+ * so a folder there was made here. It is deliberately not inferred from the lock
+ * (dropped on the way to every removal) or from a marker file (which an agent
+ * working in the folder could delete, turning a folder the app made into one it
+ * will never reclaim).
+ */
+export function inventoryWorktrees(dir) {
+  const root = repoRoot(dir);
+  if (!root) return [];
+  const list = registered(root);
+  // GIT LISTS THE MAIN WORKTREE FIRST, and the home hangs off that one rather
+  // than off whichever folder we were asked from: `rev-parse --show-toplevel`
+  // inside a linked worktree answers with that worktree, so deriving the home
+  // from it would call every real task folder a stray.
+  const primary = real(list[0]?.path ?? root);
+  const home = path.join(primary, ...WORKTREES);
+  return list.map((w) => {
+    const at = real(w.path);
+    const name = path.basename(at);
+    const unfinished = name.startsWith(BUILDING);
+    const missing = !fs.existsSync(at);
+    const holder = pidInReason(w.lock);
+    return {
+      path: at,
+      // What the registration spells it, which on a Mac can be the other side of
+      // a symlink: `/tmp/x` against `/private/tmp/x`.
+      registeredAs: w.path,
+      primary: at === primary,
+      branch: w.branch ?? '',
+      lock: w.lock ?? null,
+      heldBy: holder && alive(holder) ? holder : null,
+      // A folder still being built is the app's and is wanted by nobody: it has
+      // no row standing in it, so it may never be listed, shown or swept.
+      unfinished,
+      missing,
+      prunable: !!w.prunable,
+      // WHERE THE APP PUTS ITS OWN, whether or not anything is there now. Kept
+      // apart from `ours` because a registration whose folder has gone is still
+      // the app's bookkeeping to tidy, and is nothing anybody may act on.
+      atOurPath: path.dirname(at) === home && couldBeATaskName(name),
+      ours: !unfinished && !missing && !w.prunable
+        && path.dirname(at) === home && couldBeATaskName(name),
+    };
+  });
+}
+
+/**
+ * Copies of this project the app did not make, so a person can see what is
+ * holding their disk. The checkout itself is not one of them, and neither is a
+ * registration pointing at nothing: that is a different fact with its own field
+ * and its own answer, `pruneMissingWorktrees`.
+ */
+export function strayWorktrees(dir) {
+  return inventoryWorktrees(dir)
+    .filter((w) => !w.primary && !w.ours && !w.unfinished && !w.missing && !w.prunable);
+}
+
+/**
+ * REGISTRATIONS POINTING AT NOTHING, DROPPED. One of the thirteen lived under
+ * `/private/tmp`, which macOS may purge from under it, and git goes on holding
+ * the registration: that is what refuses the next `worktree add` at that path
+ * with "already registered".
+ *
+ * Nothing can be lost here, by git's own definition of `prune`: it only ever
+ * drops the bookkeeping for a worktree whose directory is already gone, and the
+ * branch it stood on survives, as every branch survives everything in this file.
+ * A folder of OURS is unlocked first, because `prune` skips a locked worktree and
+ * the app locks every folder it makes, which would otherwise leave the
+ * registration of a deleted folder wedged there forever.
+ */
+export function pruneMissingWorktrees(dir) {
+  const root = repoRoot(dir);
+  if (!root) return [];
+  const gone = inventoryWorktrees(dir).filter((w) => !w.primary && (w.missing || w.prunable));
+  if (!gone.length) return [];
+  for (const w of gone) if (w.atOurPath) tryGit(root, ['worktree', 'unlock', w.path]);
+  tryGit(root, ['worktree', 'prune']);
+  const left = new Set(inventoryWorktrees(dir).map((w) => w.path));
+  return gone.map((w) => w.path).filter((at) => !left.has(at));
+}
+
+/**
  * Every task folder in this repository and what would be lost by deleting it.
  * This is what the app reads to show her a folder that is holding work, which
  * is the half that did not exist: hers held 26 GB and she had never seen one.
+ *
+ * THE OWNERSHIP VIEW, and the only list anything automatic is allowed to act on.
+ * `inventoryWorktrees` above is the wider one, and the comment there is why they
+ * are not the same list.
  */
 export function listTaskFolders(dir) {
   const root = repoRoot(dir);
   if (!root) return [];
-  const home = path.join(root, ...WORKTREES);
-  return registered(root)
-    // A folder still being built is not one of hers: it has no row standing in
-    // it and nothing in it is wanted, so it may never be listed, shown or swept.
-    .filter((w) => path.dirname(w.path) === home && !w.prunable
-      && !path.basename(w.path).startsWith(BUILDING))
+  return inventoryWorktrees(dir)
+    .filter((w) => w.ours)
     .map((w) => {
       const { dirty, merged } = folderState(root, w.path);
       let touchedAt = null;
       try { touchedAt = fs.statSync(w.path).mtimeMs; } catch { /* it can vanish under us */ }
-      const holder = pidInReason(w.lock);
       return {
         id: path.basename(w.path),
         path: w.path,
-        branch: w.branch ?? '',
+        branch: w.branch,
         dirty,
         merged,
         touchedAt,
-        heldBy: holder && alive(holder) ? holder : null,
+        heldBy: w.heldBy,
       };
     });
 }
