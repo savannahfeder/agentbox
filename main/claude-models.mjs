@@ -39,7 +39,34 @@
 // at all.
 
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CLAUDE_MODELS, READ_FROM } from '../shared/claude-models.generated.mjs';
+
+// WHAT THE LAST BUILD ON THIS MACHINE READ, which is a better floor than the
+// committed table and is not a file anybody edits.
+//
+// The committed table is tracked, so a build that wrote over it made every
+// folder that had run the app look like it held work (w-6bbb709b1f, 2026-10-07).
+// The build writes this instead. It is gitignored, it is absent on a machine
+// that has never built, and it is read with `fs` rather than imported, for the
+// one reason that decides the whole shape: this module is node, but
+// shared/claude-commands.mjs next door is shared with the renderer, where an
+// import of a file that may not exist cannot be made to resolve. A read is a
+// read in node and nothing at all in a bundle.
+const LOCAL = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'shared', 'claude-models.local.json');
+
+/** The table this machine read at build time, or null if there is none to trust. */
+function readLocal(at) {
+  try {
+    const table = JSON.parse(fs.readFileSync(at, 'utf8'));
+    if (!Array.isArray(table.models) || !table.models.length) return null;
+    // Every row has to carry what the picker draws. A half-written file is a
+    // worse answer than the committed table, not a better one.
+    if (!table.models.every((m) => m && typeof m.alias === 'string' && typeof m.label === 'string')) return null;
+    return table;
+  } catch { return null; }
+}
 
 /**
  * HER ORDER, AND ONLY HER ORDER. Not a filter: an alias missing from this list
@@ -203,8 +230,10 @@ function stampOf(binPath) {
  * WHAT MAY SHE BE OFFERED FOR CLAUDE CODE, and what version said so.
  *
  * `{ models: [{ alias, id, label }], readFrom, source }` where `source` is
- * `'cli'` when it came off this Mac's Claude Code and `'built'` when it is the
- * table committed at build time. Never empty: the committed table is the floor.
+ * `'cli'` when it came off this Mac's Claude Code at the moment it was asked,
+ * `'read'` when it is what the last build on this machine read out of it, and
+ * `'built'` when it is the table committed to the repository. Never empty: the
+ * committed table is the floor under both of them.
  *
  * THE PATH IS HANDED IN, NEVER SEARCHED FOR HERE. `config.claudeBin` is already
  * resolved once at startup (main/config.mjs), and `findClaudeBin` falls back to
@@ -216,15 +245,18 @@ function stampOf(binPath) {
  * `--version` so the Settings screen could say which one it read. That is one
  * `execFileSync` on the path a settings read takes, and no label on a screen is
  * worth a process started while she waits. `readFrom` is the committed table's
- * version, and it is meaningful only when `source` is `'built'`.
+ * version, and it is meaningful whenever `source` is not `'cli'`.
  */
-export function claudeModels({ bin = null } = {}) {
+export function claudeModels({ bin = null, local = LOCAL } = {}) {
+  // THE FLOOR IS THE FRESHER OF THE TWO TABLES NOBODY HAS TO ASK FOR: what the
+  // last build on this machine read, and the one committed to the repository.
+  const read = readLocal(local);
   const built = {
-    models: CLAUDE_MODELS.map((m) => ({
+    models: (read?.models ?? CLAUDE_MODELS).map((m) => ({
       alias: m.alias, id: m.id, label: m.label, defaultLevel: m.defaultLevel ?? null,
     })),
-    readFrom: READ_FROM,
-    source: 'built',
+    readFrom: read ? read.readFrom ?? null : READ_FROM,
+    source: read ? 'read' : 'built',
   };
   if (!bin) return built;
   const stamp = stampOf(bin);

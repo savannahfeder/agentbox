@@ -77,6 +77,9 @@ beforeEach(() => {
   git(tmp, 'clone', '-q', origin, seed);
   git(seed, 'checkout', '-q', '-b', 'main');
   commit(seed, 'package-lock.json', '{"v":1}\n', 'First');
+  // A file of hers to edit. Not the lockfile, which npm rewrites and which no
+  // longer counts as an edit (a-package-install-does-not-stop-the-next-update).
+  commit(seed, 'notes.txt', 'x\n', 'Notes');
   git(seed, 'push', '-q', 'origin', 'main');
   mine = path.join(tmp, 'mine');
   theirs = path.join(tmp, 'theirs');
@@ -134,7 +137,7 @@ describe('never offering what it cannot do safely', () => {
   it('does not offer to update a folder with edits in it, because a pull could tangle them', async () => {
     commit(theirs, 'a.txt', 'a\n', 'New');
     git(theirs, 'push', '-q', 'origin', 'main');
-    fs.writeFileSync(path.join(mine, 'package-lock.json'), '{"edited":true}\n');
+    fs.writeFileSync(path.join(mine, 'notes.txt'), 'edited\n');
     const { u } = make();
     const s = await u.check();
     expect(s.phase).toBe('unsupported');
@@ -250,12 +253,12 @@ describe('the restart', () => {
     const { npm, calls } = fakeNpm();
     const { u, relaunched } = make({ npm });
     await u.check();
-    fs.writeFileSync(path.join(mine, 'package-lock.json'), '{"edited":true}\n');
+    fs.writeFileSync(path.join(mine, 'notes.txt'), 'edited\n');
     u.install();
     await u.settled();
     expect(calls).toEqual([]);
     expect(relaunched).toHaveLength(0);
-    expect(fs.readFileSync(path.join(mine, 'package-lock.json'), 'utf8')).toBe('{"edited":true}\n');
+    expect(fs.readFileSync(path.join(mine, 'notes.txt'), 'utf8')).toBe('edited\n');
     expect(u.state().ready).toBe(false);
   });
 });

@@ -1,21 +1,23 @@
-// WHICH ACCOUNT THE AGENTS ARE ACTUALLY RUNNING ON, read off this Mac.
+// WHETHER THIS MAC IS ALREADY SIGNED INTO A CODING AGENT, AND WHICH ONE.
 //
-// w-e217e577e5, 2026-10-07, from a session with a new user: "He didn't realize
-// it auto-connected to Claude/Codex; he wasn't sure how it was even running."
+// w-e217e577e5, 2026-10-07. A new user ran an agent and, in her words, was
+// "like, 'Oh my God, where are the tokens coming from? I didn't even connect my
+// account.'" The app finds whichever coding agent is already signed in on the
+// Mac and spends that subscription without ever saying so.
 //
-// Every fact here was already on the disk and already being read, each by the
-// screen that needed it: main/claude-plan.mjs for the Claude plan (the Accounts
-// page), main/codex-account.mjs for the ChatGPT one (the Codex card). What did
-// not exist was ONE answer to "what is powering this", in a shape small enough
-// to ride the snapshot and be drawn in a corner. That is all this is: the two
-// readers, asked about the one account the fleet is spending, and null whenever
-// the answer would be a guess.
+// WHICH ENGINE, AND NOTHING ELSE. This read the plan tier too for a few hours,
+// so a row in the sidebar's foot could say "Claude · Max 20x"; that row came
+// out the same day and the tier came out with it ("very critically, I want to
+// get rid of that Claude Max 20x plan"). The question the walk answers is "did
+// it connect to something of mine", and the engine is the whole of that answer.
+// What somebody is paying for is on each agent's own page in Settings, which is
+// where you go when you actually want it (main/settings.mjs reads
+// main/claude-plan.mjs and main/codex-account.mjs for exactly that).
 //
-// NULL IS AN ORDINARY ANSWER AND IT MEANS DRAW NOTHING. A Mac mid-setup, a
-// config file being rewritten under us, a login that exists with no plan string
-// in it: the first two are null, the third is the name with no plan. Nothing
-// here ever reports an account that is not there, because the corner it feeds
-// is read by somebody deciding whose money this is spending.
+// NULL IS AN ORDINARY ANSWER AND IT MEANS SAY NOTHING. A Mac mid-setup, a config
+// file being rewritten under us, a login that is not there: all null, and the
+// walk then says nothing at all rather than guessing. That Mac is also the one
+// that gets the plan question instead, which says all of this out loud already.
 //
 // IT IS CACHED ON THE LOGIN FILES' OWN TIMES, NOT ON A CLOCK. The snapshot is
 // built every ten seconds and `~/.claude.json` is 148 KB on the machine this was
@@ -30,11 +32,11 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { planFile, planOfAccount } from './claude-plan.mjs';
+import { planFile } from './claude-plan.mjs';
 import { codexAccount, codexAuthFile } from './codex-account.mjs';
 import { signInFiles, signInStamp } from './sign-in-files.mjs';
 
-/** keyed by engine and folder, valued by the stamp it was read at. */
+/** keyed by engine, home and folder, valued by the stamp it was read at. */
 const remembered = new Map();
 
 /**
@@ -43,12 +45,11 @@ const remembered = new Map();
  * @param {object} facts
  * @param {string} facts.engine Which coding agent the workspace runs on, which
  *   the supervisor has already decided (`Supervisor#engineFacts`). Never worked
- *   out here: the capability gate lives there, and a corner that guessed could
+ *   out here: the capability gate lives there, and a line that guessed could
  *   name the subscription the fleet is not spending.
  * @param {string} [facts.claudeProfile] The Claude login, `default` or a folder.
  * @param {string} [facts.codexHome] The CODEX_HOME this workspace runs on.
- * @returns {{ engine: string, plan: string|null }|null} `plan` is the words the
- *   tool itself reports, never a label of ours.
+ * @returns {{ engine: string }|null}
  */
 export function runsOn({ engine = null, home = os.homedir(), claudeProfile = 'default', codexHome = null } = {}) {
   if (engine !== 'claude' && engine !== 'codex') return null;
@@ -63,28 +64,24 @@ export function runsOn({ engine = null, home = os.homedir(), claudeProfile = 'de
   const stamp = signInStamp(signInFiles({ engine, folder, home }));
   const seen = remembered.get(key);
   if (seen && seen.stamp === stamp) return seen.value;
-  const value = stamp ? read(engine, { home, claudeProfile, folder }) : null;
+  const value = stamp && signedIn(engine, { home, claudeProfile, folder }) ? { engine } : null;
   remembered.set(key, { stamp, value });
   return value;
 }
 
-function read(engine, { home, claudeProfile, folder }) {
-  if (engine === 'codex') {
-    const id = codexAccount(null, { file: codexAuthFile(folder) });
-    return id ? { engine: 'codex', plan: id.plan ?? null } : null;
-  }
-  // THE LOGIN AND THE PLAN COME OUT OF ONE READ. `readPlan` answers only the
-  // second, and "not signed in" and "signed in with no plan string" are two
-  // different screens: the first draws nothing, the second draws the name.
-  let account = null;
+/** Whether there is a login in there at all. Never throws, never guesses. */
+function signedIn(engine, { home, claudeProfile, folder }) {
+  if (engine === 'codex') return !!codexAccount(null, { file: codexAuthFile(folder) });
+  // `oauthAccount` is the object Claude Code writes when somebody signs in, and
+  // its absence is the honest "nobody is". A file with no account in it is an
+  // ordinary thing: `~/.claude.json` also holds project history, so it exists on
+  // plenty of Macs nobody has logged in on.
   try {
-    account = JSON.parse(fs.readFileSync(planFile(claudeProfile, home), 'utf8'))?.oauthAccount ?? null;
+    const account = JSON.parse(fs.readFileSync(planFile(claudeProfile, home), 'utf8'))?.oauthAccount;
+    return !!account && typeof account === 'object';
   } catch {
-    return null;
+    return false;
   }
-  if (!account || typeof account !== 'object') return null;
-  const plan = planOfAccount(account);
-  return { engine: 'claude', plan: plan.known ? plan.label : null };
 }
 
 /** Forgets every cached reading. For tests, and for a sign-out that lands. */
