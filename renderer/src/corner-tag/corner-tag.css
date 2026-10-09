@@ -75,18 +75,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif
 .ct-tag:hover, .ct-tag.is-open { background: var(--ct-tint-hover); }
 .ct-tag.is-dragging { cursor: grabbing; }
 /* Pictures only: the height it was. */
-:root[data-height='26'] .ct-tag { height: 26px; padding: 0 11px 0 9px; }
+:root[data-height='26'] .ct-tag { height: 26px; }
 
-/* Pointing at the tag shows the way into the app: a hairline and a small
-   arrow at its far end. A click anywhere on the tag opens the app; the arrow
-   says so. */
-.ct-go { display: none; align-items: center; gap: 8px; margin-left: 1px; color: var(--ct-dim); }
+/* The way into the app, always at the tag's end: a hairline and a small
+   arrow (she kept both, 2026-10-08). A click anywhere on the tag opens the
+   app; the arrow says so. Centred on the box, the arrow sat a pixel above the
+   words, whose baseline is lower than the box's middle, so it is set down to
+   sit level with them. */
+.ct-go { display: flex; align-items: center; gap: 8px; margin-left: 1px; color: var(--ct-dim); }
 .ct-go::before { content: ''; width: 1px; height: 14px; background: var(--ct-rule); }
-.ct-tag.is-open .ct-go, .ct-tag.is-pointed .ct-go { display: flex; }
-.ct-tag.is-open, .ct-tag.is-pointed { padding-right: 9px; }
+.ct-tag { padding-right: 9px; }
 .ct-go svg { display: block; }
-/* Pictures only: other ways to draw it. */
-:root[data-go='plain'] .ct-go::before { display: none; }
+.ct-go .ct-arrow { transform: translateY(1px); }
+/* Pictures only: the chevron instead of the arrow. */
 :root[data-go='chevron'] .ct-go .ct-arrow { display: none; }
 :root:not([data-go='chevron']) .ct-go .ct-chevron { display: none; }
 

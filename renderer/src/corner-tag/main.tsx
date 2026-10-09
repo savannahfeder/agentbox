@@ -7,7 +7,7 @@
 // THE POINTER, settled with Codex and then with real mouse events:
 // - The tag is movable as it is, with nothing drawn to say so: press and move.
 // - Resting the pointer on the tag opens the list; a click (press and let go
-//   without moving) opens the app, and an arrow at the tag's end says so.
+//   without moving) opens the app, and the arrow at the tag's end says so.
 // - The page only reports the button going down and coming up. The drag in
 //   between is read off the real cursor by the main process, because a real
 //   drag must not depend on this page being sent every move.
@@ -77,7 +77,7 @@ function Half({ size = 11 }: { size?: number }) {
   );
 }
 
-// The way into the app, drawn at the tag's end while it is pointed at.
+// The way into the app, drawn at the tag's end.
 function Go() {
   return (
     <span className="ct-go" aria-hidden>
@@ -108,7 +108,6 @@ function useReportSize(ref: React.RefObject<HTMLElement>, which: Part, key: unkn
 function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }) {
   const [open, setOpen] = useState(forceOpen);
   const [dragging, setDragging] = useState(false);
-  const [pointed, setPointed] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pressed = useRef(false);
   const counts = { ready: state.ready.length, working: state.working };
@@ -117,14 +116,14 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
 
   useEffect(() => bridge?.onOpen((o) => setOpen(!!o)), []);
   useEffect(() => bridge?.onDragging((d) => setDragging(!!d)), []);
-  useEffect(() => bridge?.onReset(() => { pressed.current = false; setDragging(false); setOpen(false); setPointed(false); }), []);
+  useEffect(() => bridge?.onReset(() => { pressed.current = false; setDragging(false); setOpen(false); }), []);
   // Escape shuts the list, once a click has made the tag the active window.
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape' && open) bridge?.toggle(); };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [open]);
-  useReportSize(ref, 'tag', `${text}|${open || pointed}`);
+  useReportSize(ref, 'tag', text);
 
   if (!says) return null;
 
@@ -140,10 +139,10 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
       role="button"
       aria-label={`${text}. Click to open ${NAME}, drag to move.`}
       aria-expanded={open}
-      className={`ct-glass ct-tag ${says.kind}${open ? ' is-open' : ''}${pointed && !dragging ? ' is-pointed' : ''}${dragging ? ' is-dragging' : ''}`}
+      className={`ct-glass ct-tag ${says.kind}${open ? ' is-open' : ''}${dragging ? ' is-dragging' : ''}`}
       style={demo ? { position: 'relative' } : undefined}
-      onPointerEnter={() => { setPointed(true); bridge?.hover('tag', true); }}
-      onPointerLeave={() => { setPointed(false); if (!pressed.current) bridge?.hover('tag', false); }}
+      onPointerEnter={() => bridge?.hover('tag', true)}
+      onPointerLeave={() => { if (!pressed.current) bridge?.hover('tag', false); }}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -162,7 +161,7 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
     >
       {says.kind === 'ready' ? <span className="ct-dot" /> : <Half />}
       <span className="ct-words">{text}</span>
-      {!dragging && <Go />}
+      <Go />
     </div>
   );
 }
