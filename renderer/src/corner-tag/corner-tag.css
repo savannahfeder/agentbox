@@ -59,10 +59,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif
   box-shadow: var(--ct-edge);
 }
 
-/* Pictures only: the dark edge as macOS drew it, and a fainter one. */
-:root[data-edge='system'][data-theme='dark'] { --ct-edge: inset 0 0 0 0.5px rgba(0, 0, 0, 0.85), inset 0 0 0 1.5px rgba(255, 255, 255, 0.22), inset 0 0 0 2px rgba(255, 255, 255, 0.05); }
-:root[data-edge='faint'][data-theme='dark'] { --ct-edge: inset 0 0 0 0.5px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.09); }
-:root[data-edge='system'][data-theme='light'] { --ct-edge: inset 0 0 0 0.5px rgba(0, 0, 0, 0.15); }
 
 /* ---- the tag ---- */
 .ct-tag {
@@ -74,22 +70,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif
 .ct-tag.working .ct-words { font-weight: 500; color: var(--ct-dim); }
 .ct-tag:hover, .ct-tag.is-open { background: var(--ct-tint-hover); }
 .ct-tag.is-dragging { cursor: grabbing; }
-/* Pictures only: the height it was. */
-:root[data-height='26'] .ct-tag { height: 26px; }
 
-/* The way into the app, always at the tag's end: a hairline and a small
-   arrow (she kept both, 2026-10-08). A click anywhere on the tag opens the
-   app; the arrow says so. Centred on the box, the arrow sat a pixel above the
-   words, whose baseline is lower than the box's middle, so it is set down to
-   sit level with them. */
+/* The way into the app, always at the tag's end: a hairline and a chevron
+   (she kept both, 2026-10-08, picking the chevron over an arrow on full-screen
+   pictures for how it sits). A click anywhere on the tag opens the app; the
+   chevron says so. */
 .ct-go { display: flex; align-items: center; gap: 8px; margin-left: 1px; color: var(--ct-dim); }
 .ct-go::before { content: ''; width: 1px; height: 14px; background: var(--ct-rule); }
 .ct-tag { padding-right: 9px; }
 .ct-go svg { display: block; }
-.ct-go .ct-arrow { transform: translateY(1px); }
-/* Pictures only: the chevron instead of the arrow. */
-:root[data-go='chevron'] .ct-go .ct-arrow { display: none; }
-:root:not([data-go='chevron']) .ct-go .ct-chevron { display: none; }
 
 /* Ready is a full dot, working the same grey half full. Still: nothing here
    moves on its own, because moving is what pulls an eye off its work. */

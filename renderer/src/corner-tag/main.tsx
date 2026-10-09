@@ -7,7 +7,7 @@
 // THE POINTER, settled with Codex and then with real mouse events:
 // - The tag is movable as it is, with nothing drawn to say so: press and move.
 // - Resting the pointer on the tag opens the list; a click (press and let go
-//   without moving) opens the app, and the arrow at the tag's end says so.
+//   without moving) opens the app, and the chevron at the tag's end says so.
 // - The page only reports the button going down and coming up. The drag in
 //   between is read off the real cursor by the main process, because a real
 //   drag must not depend on this page being sent every move.
@@ -59,7 +59,6 @@ function demoState(): { state: State; open: boolean } | null {
 const demo = demoState();
 const theme = params.get('theme');
 document.documentElement.classList.toggle('ct-demo', !!demo);
-for (const k of ['edge', 'height', 'go']) if (demo && params.get(k)) document.documentElement.dataset[k] = params.get(k)!;
 if (theme === 'dark' || theme === 'light') document.documentElement.dataset.theme = theme;
 
 function useTagState() {
@@ -81,10 +80,7 @@ function Half({ size = 11 }: { size?: number }) {
 function Go() {
   return (
     <span className="ct-go" aria-hidden>
-      <svg className="ct-arrow" width="10" height="10" viewBox="0 0 10 10">
-        <path d="M3 1.5h5.5V7M8.5 1.5 1.5 8.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <svg className="ct-chevron" width="7" height="10" viewBox="0 0 7 10">
+      <svg width="7" height="10" viewBox="0 0 7 10">
         <path d="M1.5 1.5 5 5 1.5 8.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </span>
