@@ -17,25 +17,6 @@
 .th-mark-btn:hover .th-mark, .th-mark-btn:focus-visible .th-mark { visibility: hidden; }
 .th-side-foot { display: flex; flex-direction: column; gap: 2px; }
 
-/* WHAT THE AGENTS ARE RUNNING ON (w-e217e577e5, 2026-10-07): the first row of
-   the foot, reading "Claude · Max 20x", opening that agent's page in Settings.
-
-   It wears the plan question's own letter tile (`.ps-mark`, styles.css) at the
-   exact 18px the nav icons are, so it sits on the sidebar's one centre line
-   without a rule of its own, and the walk's letter and this one are the same
-   letter. It takes no ink, weight or size of its own either: it is
-   `.workspace-navigation button`, --text-faint, answering the pointer the way
-   Feedback and Settings do. One rule rather than two is why the three rows
-   above it have stayed in step through four rounds on this foot.
-
-   It can never light. `aria-current` is for a page you are standing on and this
-   row is not a page; it opens one. Nothing here is coloured either: a tinted
-   row on a glance surface is the sidebar shouting, which is out by design rule.
-
-   A plan name is short and a second login's folder name can be long, so the
-   words clip with an ellipsis rather than wrap the row to two lines. */
-.workspace-navigation .th-runs-on { width: 100%; text-align: left; min-width: 0; }
-.th-runs-on > span:last-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* A NEW VERSION WAITING (components/SidebarUpdate.tsx). A card above the foot,
    with a × in its corner, shown when you point at it, that hides it until the

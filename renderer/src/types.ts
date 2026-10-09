@@ -653,13 +653,17 @@ export interface Snapshot {
     byItem: Record<string, string>;
   };
   /**
-   * WHICH SUBSCRIPTION THE AGENTS ARE RUNNING ON (w-e217e577e5, 2026-10-07), for
-   *  the line in the sidebar that says so. Answered whole by
-   *  `Supervisor#runsOnAccount`, for the reason `engines` is: which account the
-   *  fleet spends is `_narrowToChosen`'s rule, pinned to that file. Null, or
-   *  absent on an older payload, on a Mac where nothing readable is signed in,
-   *  and then nothing new is drawn. The words are shared/runs-on.mjs. */
-  runsOn?: { engine: string; plan: string | null } | null;
+   * WHETHER THIS MAC WAS ALREADY SIGNED INTO A CODING AGENT, AND WHICH
+   *  (w-e217e577e5, 2026-10-07), for the one line the walk says about it.
+   *  Answered whole by `Supervisor#runsOnAccount`, for the reason `engines` is:
+   *  which account the fleet spends is `_narrowToChosen`'s rule, pinned to that
+   *  file. Null, or absent on an older payload, on a Mac where nothing readable
+   *  is signed in, and then nothing is said. The words are shared/runs-on.mjs.
+   *
+   *  NO PLAN RIDES HERE. It did for a few hours, so the sidebar could print a
+   *  tier; that row and the tier both came out the same day. What somebody pays
+   *  for is on each agent's own page in Settings. */
+  runsOn?: { engine: string } | null;
   // `outsideAgents` is how many of her own Claude Code sessions the inbox
   // takes: all of them, only the ones stopped on a question, or none. It rides
   // the snapshot because the inbox reads it on every draw. How much of the
@@ -912,6 +916,8 @@ export interface WorkspaceSettings {
   // Whether the ADHD mode rules ride under "How agents write to you". Off
   // unless she turned it on (w-5737fe67cf).
   adhdMode?: boolean;
+  // The corner tag over other apps (w-dafae58a23). On unless she turned it off.
+  cornerTag?: boolean;
   outsideAgents: AgentMode;
   accounts: AccountSetting[];
   /**
@@ -1106,6 +1112,13 @@ declare global {
       // itself, which is the only way the page hears about the chord at all.
       onApprovalAnswered?(fn: (a: { id: string; allow: boolean }) => void): () => void;
       badge?(count: number): Promise<void>;
+      // The corner tag over other apps (main/corner-tag.mjs).
+      cornerTag?(state: {
+        ready: { id: string; title: string; says: string; since?: number; open?: string | null }[];
+        working: number;
+      }): Promise<void>;
+      // The corner tag's "Turn off…": open Settings on this page.
+      onOpenSettings?(fn: (p: { pane?: string }) => void): () => void;
       // screenDetail is which set of theme pictures this screen wants, 'soft' or
       // 'sharp' (main/screen-detail.mjs). It rides here rather than being
       // pushed because the answer is needed on the first paint.

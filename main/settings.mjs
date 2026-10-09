@@ -528,6 +528,9 @@ export function readSettings({ config, supervisor, store }) {
       // ADHD mode: whether the ADHD rules ride under hers (w-5737fe67cf). Off
       // unless she turned it on, so only `true` means on.
       adhdMode: config.adhdMode === true,
+      // The corner tag over other apps (w-dafae58a23). On unless she turned it
+      // off here, which is the only place it turns off for good.
+      cornerTag: config.cornerTag !== false,
       // How much of her own Claude Code goes in her inbox: all / waiting / off.
       // All by default, because the machine nobody has opened this page on is
       // the one with thirteen forgotten sessions on it.
@@ -1058,6 +1061,11 @@ export function setWorkspaceSetting({ config, supervisor }, { key, value }) {
     // spawn, so it applies from the next task on.
     case 'adhdMode':
       saveConfig(config, { adhdMode: !!value });
+      break;
+    // THE CORNER TAG (w-dafae58a23). Turning it back on also ends any hide, so
+    // the switch does what it says the moment she flips it.
+    case 'cornerTag':
+      saveConfig(config, value ? { cornerTag: true, cornerTagHiddenUntil: 0 } : { cornerTag: false });
       break;
     // WHICH ACCOUNT HER WORK RUNS ON.
     //

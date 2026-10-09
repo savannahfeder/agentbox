@@ -13,8 +13,38 @@
 // AND ONCE, NOT TWENTY TIMES. One at a time is not once. `spoke` below is the
 // fix, and shared/notify-rules.mjs carries the rule.
 
+import path from 'node:path';
 import { atTheApp, banner, shouldSpeak } from '../shared/notify-rules.mjs';
 import { NAME } from '../shared/product-name.mjs';
+
+// THE MARK THE BANNER WEARS, and why it is a png and not the .icns every other
+// part of this repo uses.
+//
+// macOS draws the app's OWN bundle icon down the left of a banner, and no app
+// can override that. From a source checkout the bundle being asked is the
+// Electron.app in node_modules, which scripts/brand-electron.mjs renames and
+// re-icons, and macOS still drew a generic grey square: "it shows a plain
+// placeholder", looking at a real one, 2026-10-07.
+//
+// An image handed to the notification is the half we DO control; macOS attaches
+// it to the banner. Measured the same day in the Electron the app runs from:
+// nativeImage.createFromPath on build/icon.icns comes back empty, 0x0, so the
+// icns is not a candidate however convenient it would be. The png beside it,
+// drawn from the same art, reads 256x256.
+//
+// AN EMPTY IMAGE IS NOT A MARK. createFromPath answers a missing or unreadable
+// file with an empty image rather than an error, so "it returned something" is
+// the wrong question, and handing that something to macOS is how this goes
+// quietly back to a grey square. Returns null when there is nothing to show,
+// and the banner then looks exactly as it did before any of this.
+export const MARK_FILE = path.join('build', 'notification-icon.png');
+
+export function markFor({ root, createFromPath }) {
+  try {
+    const img = createFromPath(path.join(root, MARK_FILE));
+    return img && !img.isEmpty() ? img : null;
+  } catch { return null; }
+}
 
 // A BURST IS ONE PIECE OF NEWS. Four workers finishing inside the same
 // supervisor tick is the ordinary case, and it arrives as four pushes over a
@@ -22,7 +52,7 @@ import { NAME } from '../shared/product-name.mjs';
 // with one sound instead of four rewrites and four chimes.
 const COALESCE_MS = 1500;
 
-export function createNotifier({ window, Notification, powerMonitor, coalesceMs = COALESCE_MS }) {
+export function createNotifier({ window, Notification, powerMonitor, icon = null, coalesceMs = COALESCE_MS }) {
   // Everything she has not seen since she last had the window, keyed by id so
   // a repeated push is idempotent. Insertion order is arrival order.
   const unseen = new Map();
@@ -81,6 +111,9 @@ export function createNotifier({ window, Notification, powerMonitor, coalesceMs 
         title: say.title,
         body: say.body,
         silent: false,
+        // Omitted rather than passed empty when there is nothing to show, so a
+        // banner with no mark is byte for byte the banner that shipped before.
+        ...(icon ? { icon } : {}),
       });
     } catch { return; }
     // A banner she can act on. Clicking it brings Agentbox forward and opens the
@@ -138,11 +171,16 @@ export function createNotifier({ window, Notification, powerMonitor, coalesceMs 
   };
 }
 
-export function installNotifier({ app, window, Notification, powerMonitor, ipcMain }) {
+export function installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage }) {
   if (Notification.isSupported && !Notification.isSupported()) {
     return { add() {}, seen() {} };
   }
-  const notifier = createNotifier({ window, Notification, powerMonitor });
+  // app.getAppPath() is the repo from source and the asar inside the bundle
+  // when it is packaged, and the mark sits at the same place in both.
+  const icon = nativeImage
+    ? markFor({ root: app.getAppPath(), createFromPath: (p) => nativeImage.createFromPath(p) })
+    : null;
+  const notifier = createNotifier({ window, Notification, powerMonitor, icon });
   window.on('focus', () => notifier.seen());
   // Unlocking with Agentbox already the front app never fires 'focus' (it never
   // lost it), so without this the banner that fired while the screen was
