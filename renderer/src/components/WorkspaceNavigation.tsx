@@ -9,7 +9,6 @@ import { AppMark } from './AppMark';
 import { SidebarUpdate } from './SidebarUpdate';
 import { changeLines, closedHere, readUpdateClosed, writeUpdateClosed } from '../update-row';
 import { AccountMenu } from '../team/account-menu';
-import { runsOnLine, runsOnName, runsOnTitle, type RunsOn } from '../../../shared/runs-on.mjs';
 /** ONE NUMBER IN THE SIDEBAR, ON INBOX, AND IT IS DRAWN IN THE TAB'S OWN TYPE.
  *
  *  w-5f02e7b525. Only Inbox shows a number, like a classic email client, and of
@@ -41,12 +40,7 @@ import { runsOnLine, runsOnName, runsOnTitle, type RunsOn } from '../../../share
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, onFeedback, onSignOut, update = null, onUpdate, runsOn = null, onAccounts }: {
-  // WHAT THE AGENTS ARE RUNNING ON (w-e217e577e5, 2026-10-07), and null is the
-  // ordinary answer on a Mac mid-setup. The words are shared/runs-on.mjs; the
-  // reading is main/runs-on.mjs and rides the snapshot. `onAccounts` opens that
-  // agent's own page in Settings, where the accounts have always lived.
-  runsOn?: RunsOn | null; onAccounts?: (pane: 'claude' | 'codex') => void;
+export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, onFeedback, onSignOut, update = null, onUpdate }: {
   // A NEW VERSION WAITING (SidebarUpdate.tsx). Null when there is none.
   // `version` is what its × closes, until a newer one arrives.
   update?: { installing: boolean; version?: string | null; changes?: string[]; behind?: number | null; error?: string | null } | null; onUpdate?: () => void;
@@ -79,12 +73,6 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   const updateCard = showUpdate && !collapsed;
   const updateView = showUpdate && update && onUpdate && <SidebarUpdate installing={update.installing} changes={changeLines(update)} error={update.error ?? null}
     collapsed={collapsed} onRestart={onUpdate} onClose={closeUpdate} />;
-  // The two words and the whole sentence, both null together on a Mac where
-  // nothing readable is signed in. `runsOnName` is asked rather than the engine
-  // id read, so a payload carrying an engine this build cannot name draws
-  // nothing instead of a bare mark with no words beside it.
-  const runsOnWords = runsOnName(runsOn?.engine ?? null) ? runsOnLine(runsOn ?? {}) : null;
-  const runsOnSentence = runsOnWords ? runsOnTitle(runsOn ?? {}) : null;
   const waiting = Number.isFinite(inboxCount) ? Math.max(0, Math.floor(inboxCount)) : 0;
   const waitingDescription = `${waiting} ${waiting === 1 ? 'thread' : 'threads'} waiting`;
   // ONE PAGE OF YOUR THREADS (approved 2026-10-01). In progress, Scheduled and
@@ -151,31 +139,21 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
       {updateCard && updateView}
       <div className="workspace-utilities th-side-foot">
         {!updateCard && updateView}
-        {/* WHAT IS POWERING ALL OF THIS (w-e217e577e5, 2026-10-07). From a
-            session with a new user: "He didn't realize it auto-connected to
-            Claude/Codex; he wasn't sure how it was even running."
+        {/* THE SIDEBAR NEVER SAYS WHICH PLAN YOU ARE ON (w-e217e577e5,
+            2026-10-07, and this is a standing rule rather than one round's
+            taste). A row reading "Claude · Max 20x" shipped here for a few
+            hours and came straight back out, in her words: "we have to get rid
+            of this. It should never say that on the sidebar."
 
-            FIRST IN THE FOOT, BECAUSE IT IS A READING AND THE THREE UNDER IT
-            ARE CONTROLS. That is the order the usage bar was given in the old
-            corner for the same reason (App.tsx).
+            What the row was answering is real and is NOT this: a new user ran
+            an agent and thought "where are the tokens coming from? I didn't
+            even connect my account." That is a question somebody asks ONCE, on
+            their first day, and the answer belongs in the walk, where it is now
+            (Onboarding.tsx, the folder screen). A permanent row is the wrong
+            shape for a one-time surprise, and a plan tier printed on a glance
+            surface for ever is billing detail in the corner of the eye.
 
-            AND IT IS INSIDE THIS LIST RATHER THAN UNDER IT. The air under
-            Settings is `.workspace-utilities:last-child`, 4 points, picked over
-            0, 8 and 12 (w-b59cbe3154); a sibling after the list would end that
-            rule and quietly put the 12 back.
-
-            THE PLAN'S NAME, NOT THE TOOL'S: "Claude", never "Claude Code". The
-            walk's own rule (plan-setup.ts), because what this names is the
-            subscription being spent and nobody pays for a CLI.
-
-            Nothing is drawn at all until something is known, so a Mac mid-setup
-            and one whose config file cannot be read both look exactly as they
-            did before this existed. */}
-        {runsOnWords && <button className="th-runs-on" aria-label={runsOnSentence ?? runsOnWords} title={runsOnSentence ?? runsOnWords}
-          onClick={() => onAccounts?.(runsOn?.engine === 'codex' ? 'codex' : 'claude')}>
-          <span className="ps-mark" aria-hidden="true">{runsOn?.engine === 'codex' ? 'G' : 'C'}</span>
-          <span>{runsOnWords}</span>
-        </button>}
+            Nothing goes in this foot that is not a thing you press. */}
         {/* FEEDBACK, THE TOP ROW OF THE FOOT (w-1b574413db, 2026-10-04),
             wearing the folded paper plane picked from 24 drawings. It opens
             the feedback card over whatever is on screen, so it never lights.

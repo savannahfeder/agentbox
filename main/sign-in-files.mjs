@@ -1,3 +1,4 @@
+import { harnessFor } from './harnesses.mjs';
 // THE FILES A LOGIN WRITES, SO THE APP CAN SEE ONE LAND.
 //
 // A signed-out account used to sit out a fixed half hour, and nothing but a
@@ -11,7 +12,7 @@
 // A moved time is a reason to TRY again, not proof; the try is the proof.
 
 import fs from 'node:fs';
-import path from 'node:path';
+
 
 /**
  * Where one account's login is written.
@@ -21,12 +22,7 @@ import path from 'node:path';
  *  - Codex: `auth.json` inside its CODEX_HOME.
  */
 export function signInFiles({ engine = 'claude', folder = null, home }) {
-  if (engine === 'codex') return folder ? [path.join(folder, 'auth.json')] : [];
-  if (!folder) {
-    const dir = path.join(home, '.claude');
-    return [path.join(home, '.claude.json'), path.join(dir, '.claude.json'), path.join(dir, '.credentials.json')];
-  }
-  return [path.join(folder, '.claude.json'), path.join(folder, '.credentials.json')];
+  return harnessFor(engine).signInFiles({ folder, home });
 }
 
 /** The newest modification time among them, or 0 when none can be read. */

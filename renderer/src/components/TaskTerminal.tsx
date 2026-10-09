@@ -81,10 +81,23 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
     setError('');setExited(false);
     void (async()=>{
       try{
-        const [{Terminal},{FitAddon},{SerializeAddon}]=await Promise.all([import('@xterm/xterm'),import('@xterm/addon-fit'),import('@xterm/addon-serialize')]);
+        // SCREEN READER MODE IS ASKED FOR, NOT ASSUMED. It builds xterm's
+        // accessibility tree, which is there "to support NVDA on Windows and
+        // VoiceOver on macOS" (xterm's own words) and whose default in xterm is
+        // false. This asked for it unconditionally, so every install built that
+        // tree and nobody but a screen reader user had any use for it: Electron
+        // says of the same thing that it "can significantly affect the
+        // performance of your app" and "should not be enabled by default", and
+        // on one install it threw xterm's own 'invalid range' from inside
+        // AccessibilityManager (one crash report, 2026-10-08).
+        //
+        // Rides the import batch so asking costs no extra wait. Read when the
+        // terminal is BUILT: turning VoiceOver on mid-session is rare, and the
+        // next pane opened asks again.
+        const [{Terminal},{FitAddon},{SerializeAddon},assistive]=await Promise.all([import('@xterm/xterm'),import('@xterm/addon-fit'),import('@xterm/addon-serialize'),api.assistiveTech()]);
         if(cancelled||!host.current)return;
         const style=getComputedStyle(host.current);
-        const terminal=new Terminal({cursorBlink:true,screenReaderMode:true,allowTransparency:true,fontFamily:'Menlo, Monaco, monospace',fontSize:12,scrollback:5000,allowProposedApi:false,theme:{background:'#00000000',foreground:style.color},convertEol:false});
+        const terminal=new Terminal({cursorBlink:true,screenReaderMode:assistive,allowTransparency:true,fontFamily:'Menlo, Monaco, monospace',fontSize:12,scrollback:5000,allowProposedApi:false,theme:{background:'#00000000',foreground:style.color},convertEol:false});
         const fit=new FitAddon();const serializer=new SerializeAddon();terminal.loadAddon(serializer);terminal.loadAddon(fit);terminal.open(host.current);
         // A WEB ADDRESS OPENS IN THE BROWSER on click, wrapped over rows or not
         // (shared/terminal-links.mjs). window.open is the app's one door out:

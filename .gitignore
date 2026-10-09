@@ -97,3 +97,19 @@ briefs/founder.md
 # lives only on the machines that run that version; a checkout without it is
 # the single-person app. `cloud/team.config.example.json` shows the shape.
 cloud/team.config.json
+
+# WHAT THE BUILD READ OFF THE CLAUDE CODE ON THIS MACHINE.
+#
+# `npm run build` reads the installed Claude Code for the commands the reply box
+# offers and the models the picker draws, and it used to write what it found over
+# two TRACKED files, shared/claude-commands.generated.mjs and
+# shared/claude-models.generated.mjs. Measured 2026-10-07 (w-5952e6de3e): every
+# folder that had ever run the app then reported itself dirty, for a version
+# number and a date. `releaseTaskFolder` answered "uncommitted" and never
+# reclaimed a folder, `parkTaskFolder` committed nobody's work, and the diff in a
+# change card carried two files nobody had touched.
+#
+# So the build writes these instead. The committed tables are still the floor,
+# and `npm run read:claude` is how a new reading is adopted into them, which
+# makes it a decision rather than a side effect of a build.
+shared/*.local.json

@@ -180,7 +180,9 @@ describe('waiting ends', () => {
     expect(state('b')).toBe('waiting');
     advance(61_000);
     expect(state('b')).toBe('refused');
-    expect(replies.get('b')[0].reason).toMatch(/memory/i);
+    // Memory here is normal and the wait was for a slot, so that is what it says
+    // rather than blaming memory (w-8386b3fd47).
+    expect(replies.get('b')[0].reason).toMatch(/heavier work/);
     advance(60_000);
     expect(replies.get('b')).toHaveLength(1);
   });

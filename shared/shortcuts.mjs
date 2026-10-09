@@ -166,8 +166,8 @@ export const SHORTCUTS = [
     ],
   },
   {
-    // The one group that cannot be named by WHERE she is, because all four of
-    // its keys work both in the list and inside an open task. So it is named by
+    // The one group that cannot be named by WHERE she is, because all of its
+    // keys work both in the list and inside an open task. So it is named by
     // what the keys do, literally and in the order they are drawn.
     label: 'Closing, scheduling and undoing',
     keys: [
@@ -183,6 +183,10 @@ export const SHORTCUTS = [
       { keys: ['L'], what: 'Put the task off until a time you pick.' },
       // focused branch and list switch: 'z' → undo
       { keys: ['Z'], what: 'Undo the last thing you did.' },
+      // opensTheToast(e.key, toast) above the focused branch → openToastRow.
+      // Z's other half: Z takes back what the toast announced, O goes into it.
+      // Only while a toast with somewhere to go is up (w-f0bfe32859).
+      { keys: ['O'], what: 'Open the task you just sent or answered, while its note is on screen.' },
       // (meta||ctrl) && 'a' && !inInput && !modal → tick the whole list
       { keys: ['⌘A'], what: 'Tick every task in the list. Press it again to untick.' },
     ],

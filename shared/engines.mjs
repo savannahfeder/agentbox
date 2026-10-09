@@ -1,3 +1,4 @@
+import { HARNESS_DEFINITIONS } from './harness-definitions.mjs';
 // WHICH CODING AGENT A TASK IS HANDED TO.
 //
 // AND THE PREMISE SHE GAVE FOR IT DID NOT HOLD. Measured head to head on her
@@ -45,10 +46,7 @@
 // spawn code.
 
 /** The engines, in the order the picker draws them. */
-export const ENGINES = [
-  { id: 'claude', label: 'Claude Code', word: 'Claude Code' },
-  { id: 'codex', label: 'Codex', word: 'Codex' },
-];
+export const ENGINES = HARNESS_DEFINITIONS.map(({ id, label, word }) => ({ id, label, word }));
 
 export const ENGINE_IDS = ENGINES.map((e) => e.id);
 

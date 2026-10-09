@@ -69,6 +69,24 @@ on, never ours.
 Workers run on the user's own Claude or Codex subscription. Never pass an API
 key into a worker's environment.
 
+## A BUILD NEVER WRITES A TRACKED FILE (2026-10-07)
+
+`npm run build` reads the installed Claude Code for the commands the reply box
+offers and the models the picker draws. It used to write what it found over two
+TRACKED files, and so every folder that had ever run the app reported itself
+dirty for a version number and a date: `releaseTaskFolder` answered
+"uncommitted" and never reclaimed a folder, `parkTaskFolder` committed nobody's
+work, and a change card's diff carried two files nobody had touched.
+
+The build now writes `shared/*.local.json`, which is gitignored. The committed
+`shared/claude-*.generated.mjs` tables are still the floor, and `npm run
+read:claude` is the one thing that updates them, so adopting a new reading is a
+decision somebody makes rather than a side effect of a build. Every refusal is
+unchanged: a build still stops, with the name in the error, when a command the
+menu offers or an alias the picker offers has gone. If a build says the committed
+table is behind, run `npm run read:claude` and commit the diff; do not reach for
+the build.
+
 ## One-off harnesses go in `scripts/scratch/`
 
 It is gitignored. A script that proves one change runs once; move it up into
