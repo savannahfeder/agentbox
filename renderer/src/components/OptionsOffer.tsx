@@ -38,8 +38,11 @@ import type { ParsedOption } from '../format';
 
 export function OptionsOffer({
   ask, askAll, options, peekOption, askPeek,
-  selectedOption, selRef, onPick, onOptionEnter, onAskEnter, setPeek, setAskPeek,
+  selectedOption, selRef, onPick, onOptionEnter, onAskEnter, setPeek, setAskPeek, keep,
 }: {
+  /** A last row keyed esc that answers by doing nothing: the question a close
+   *  asks when tasks are still waiting (../close-asks-first.ts). */
+  keep?: { label: string; onKeep: () => void };
   /** The sentence the options answer, off the same field the options came off. */
   ask: string;
   askAll: string;
@@ -121,6 +124,12 @@ export function OptionsOffer({
             : o.recommended && <span className="opt-rec">recommended</span>}
         </button>
       ))}
+      {keep && (
+        <button className="opt-row" onClick={keep.onKeep}>
+          <span className="opt-key">esc</span>
+          <span className="opt-text">{keep.label}</span>
+        </button>
+      )}
     </div>
   );
 }
