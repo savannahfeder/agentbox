@@ -20,6 +20,31 @@ const WORDS: Record<ThreadStateWord, string> = { waiting: 'Needs you', running: 
 export const stateWord = (state: ThreadStateWord | null | undefined): string => (state ? WORDS[state] : '');
 
 /**
+ * HOW MANY TASKS EACH THREAD HAS WAITING FOR A YES, by `product/id` of the
+ * thread (w-d2744c6daa). The inbox row says it in faint words after the title,
+ * so a thread with tasks under it no longer looks like every other row; one had
+ * waited 22 hours under a closed thread when this was written.
+ *
+ * Worked out once for the whole list, off the same rule the Approve button
+ * reads, so the row and the button inside it cannot disagree.
+ */
+export function waitingCounts<T extends Pick<WorkItem, 'id' | 'product' | 'status' | 'kind' | 'labels' | 'answer'> & { parent?: string; start?: 'later' | 'now' }>(
+  items: readonly T[],
+  stateOf: (item: T) => ThreadStateWord | null,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const i of items) {
+    if (!i.parent || !approvableFiled(i, stateOf(i))) continue;
+    const key = `${i.product}/${i.parent}`;
+    out.set(key, (out.get(key) ?? 0) + 1);
+  }
+  return out;
+}
+
+/** "2 tasks to approve", or nothing. */
+export const toApproveWords = (n: number | undefined): string => (n ? `${n} task${n === 1 ? '' : 's'} to approve` : '');
+
+/**
  * WHICH OF THEM IS WAITING ON A PRESS FROM YOU (w-9cf2b43110): "when an agent
  * files another agent i don't love that it ends up in my inbox with no clear
  * next step... better for it to file those and have an approval button in that

@@ -345,6 +345,9 @@ export interface SupervisorStatus {
   // Rows nothing can start because their tool is signed out, id -> the tool's
   // name. Said instead of "queued", which would promise an agent that cannot come.
   signInNeeded?: Record<string, string>;
+  // Rows the app's ship queue still owes a ship (main/ship-queue.mjs). Waiting
+  // on the app, not on a person: In progress, reading "Shipping".
+  shipping?: string[];
   // Of those, the ones pushed with Run now from the three-dot menu: next to
   // start, ahead of every project and tag (supervisor.runNow).
   runNow?: string[];

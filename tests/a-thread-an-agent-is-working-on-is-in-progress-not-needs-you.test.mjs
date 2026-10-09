@@ -100,7 +100,9 @@ describe('the window hands the running sessions to both lists', () => {
   it('Needs you, In progress and the rail all read the same live set', () => {
     // Needs you takes it out ahead of its team branches, which never reach
     // belongsInInbox and so could not honour `live` there.
-    expect(app).toMatch(/const inboxCandidates = [\s\S]{0,600}if \(liveIds\.has\(i\.id\)\) return false;\s*(\/\/[^\n]*\n\s*)*if \(owedAnAnswer/);
+    // The app's ship queue may sit between them: a row it still owes a ship
+    // is out of Needs you for the same reason (w-0c1ba766eb).
+    expect(app).toMatch(/const inboxCandidates = [\s\S]{0,600}if \(liveIds\.has\(i\.id\)\) return false;\s*(\/\/[^\n]*\n\s*)*(if \(shippingIds\.has\(i\.id\)\) return false;\s*)?if \(owedAnAnswer/);
     expect(app).toMatch(/belongsInProgress\(i, \{[^}]*live: liveIds\.has\(i\.id\)/);
     expect(app).toMatch(/belongsOnTheRail\(i, \{[^}]*live: liveIds\.has\(i\.id\)/);
   });

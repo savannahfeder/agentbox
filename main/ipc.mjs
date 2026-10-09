@@ -259,6 +259,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // while the app is running and the settings screen already promises that
     // works without a restart.
     bin: () => config.claudeBin,
+    // The account marked In use, asked each time so a switch is read at once.
+    account: () => supervisor.usageAccount(),
     onChange: push,
   });
 
@@ -279,11 +281,17 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // send one event per agent per tick, all day. The keys are only ever
       // compared in this process; nothing about an agent is sent with the
       // count, which carries no name, no path and no title.
+      //
+      // AND WHICH ENGINE IT WAS (w-1116fbb68a, 2026-10-08). This list is Claude
+      // Code processes and only ever has been; a Codex conversation has no
+      // process to find and is counted from main/codex-watch.mjs instead. The
+      // engine is what lets the two be read apart, and without it on this side
+      // the Codex count would look like a drop in the Claude one.
       for (const agent of live) {
         const key = agentKey(agent);
         if (!key || seenAgents.has(key)) continue;
         seenAgents.add(key);
-        analytics.track('agent_seen');
+        analytics.track('agent_seen', { engine: 'claude' });
       }
       return live;
     } catch {
@@ -496,7 +504,19 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // it and the user's own sentence never reached the card: the row went on
       // saying only what the session was started with days before. This is the
       // only process that knows the user said it, so this is where it is written.
-      if (out?.ok && out.key) agentSchedule.replied(out.key, out.at ?? Date.now(), Date.now(), String(text ?? ''));
+      //
+      // AND IT IS A REPLY, SO IT IS COUNTED (w-1116fbb68a, 2026-10-08). A reply
+      // on a task has always sent `reply_sent`; one typed into a live session
+      // sent nothing at all, and activation is read as three real replies to
+      // agents in the first day, so the people who talk to their own sessions
+      // rather than through a row were missing from it. `kind` says which of
+      // the two this was. It waits on the same delivery the mark does, and for
+      // the same reason: a count for words that never arrived would read as
+      // activation nobody had.
+      if (out?.ok) {
+        if (out.key) agentSchedule.replied(out.key, out.at ?? Date.now(), Date.now(), String(text ?? ''));
+        analytics.track('reply_sent', { kind: 'agent' });
+      }
       push();
       return out;
     } catch {
@@ -969,11 +989,18 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // an archive, so it does not collide with what done means on a work item.
   ipcMain.handle('zero:end-repeat', (_e, { product, id }) => store.endRepeat(product, id));
 
-  ipcMain.handle('zero:create-product', (_e, { name, repoPath }) => {
+  ipcMain.handle('zero:create-product', (_e, { name, repoPath, ofMany }) => {
     const out = store.createProduct({ name, repoPath });
     // (privacy page 5.1). The count is the whole payload; the path it was
     // connected to never leaves.
-    if (typeof repoPath === 'string' && repoPath.trim()) analytics.track('repo_connected');
+    //
+    // AND A PRESS THAT CONNECTS NINE FOLDERS IS ONE THING SOMEBODY DID, NOT
+    // NINE (w-1116fbb68a, 2026-10-08). The import makes a project per folder,
+    // so this handler fired nine times for one press and nine events read as
+    // nine separate connections to anybody looking at them as activity rather
+    // than as a funnel step. `ofMany` is the caller saying it will count the
+    // press itself, once, with how many folders it connected.
+    if (!ofMany && typeof repoPath === 'string' && repoPath.trim()) analytics.track('repo_connected');
     return out;
   });
 
