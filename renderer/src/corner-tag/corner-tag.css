@@ -79,6 +79,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif
 }
 :root[data-theme='dark'] .ct-dot { background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.55); }
 
+/* Pictures only: the light-mode dot candidates. */
+:root[data-dot='charcoal'] .ct-dot { background: #2b2b2e; box-shadow: none; }
+:root[data-dot='pearl'] .ct-dot { background: #fff; box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.22), 0 1px 2px rgba(0, 0, 0, 0.22); }
+:root[data-dot='none'] .ct-tag .ct-dot { display: none; }
+:root[data-dot='none'] .ct-tag { padding-left: 11px; }
+
+/* Pictures only: square corners, which is what the system material gives
+   when the window is not rounded. */
+:root[data-corners='square'] .ct-tag, :root[data-corners='square'] .ct-card { border-radius: 0; }
+:root[data-corners='square'] .ct-line { border-radius: 2px; }
+
 /* Side quest, pictures only: sharper corners, nearer the app's own. */
 :root[data-corners='sharp'] .ct-tag { border-radius: 6px; }
 :root[data-corners='sharp'] .ct-card { border-radius: 8px; }

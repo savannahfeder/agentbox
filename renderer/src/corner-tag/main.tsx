@@ -60,7 +60,8 @@ const demo = demoState();
 const theme = params.get('theme');
 document.documentElement.classList.toggle('ct-demo', !!demo);
 if (theme === 'dark' || theme === 'light') document.documentElement.dataset.theme = theme;
-if (demo && params.get('corners') === 'sharp') document.documentElement.dataset.corners = 'sharp';
+if (demo && params.get('corners')) document.documentElement.dataset.corners = params.get('corners')!;
+if (demo && params.get('dot')) document.documentElement.dataset.dot = params.get('dot')!;
 
 // Other words for the tag, for the pictures that compare them.
 const COPY: Record<string, (n: number) => string> = {
