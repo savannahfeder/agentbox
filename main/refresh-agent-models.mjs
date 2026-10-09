@@ -3,11 +3,12 @@ import {createCodexAppServer} from './codex-app-server.mjs';
 import {rememberCodexModels} from './codex-models.mjs';
 import {forget,claudeModels} from './claude-models.mjs';
 import {terminalEnv} from './task-terminals.mjs';
+import {codexLaunchEnv} from './codex-launch-env.mjs';
 export async function refreshAgentModels(engine,config,home){
  if(engine==='claude'){forget();claudeModels({bin:config.claudeBin});return;}
  // Codex is optional and codexBin is null without it: nothing to ask, and spawn(null) only threw into the terminal.
  if(!config.codexBin)return;
- const client=createCodexAppServer({spawn:()=>spawn(config.codexBin,['app-server'],{cwd:config.home,env:{...terminalEnv(),CODEX_HOME:home},stdio:['pipe','pipe','pipe']}),requestTimeoutMs:10000});
+ const client=createCodexAppServer({spawn:()=>spawn(config.codexBin,['app-server'],{cwd:config.home,env:codexLaunchEnv(config.codexBin,{...terminalEnv(),CODEX_HOME:home}),stdio:['pipe','pipe','pipe']}),requestTimeoutMs:10000});
  const deadline=setTimeout(()=>client.close('Model refresh timed out'),15000);
  try{
   await client.initialize();let cursor=null;const models=[];const seen=new Set();

@@ -87,7 +87,7 @@ export async function lookAtPage({ product, url, width = 1280, height = 900, cap
  * stored in the browser, and it is thrown away with the profile directory.
  */
 export async function captureWithChrome({ url, width, height, chrome = findChrome(), timeoutMs = 20_000 }) {
-  if (!chrome) return { error: 'No Chrome, Chromium or Edge on this Mac, so there is nothing to open the page with.' };
+  if (!chrome) return { error: 'No Chrome, Chromium or Edge on this computer, so there is nothing to open the page with.' };
   const profile = fs.mkdtempSync(path.join(process.env.TMPDIR ?? '/tmp', 'look-at-page-'));
   const child = spawn(chrome, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,

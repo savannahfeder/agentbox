@@ -85,7 +85,7 @@ describe('what one imported agent says in the inbox', () => {
   it('names the file where its author left it, and which scope it is', () => {
     const all = agentImportRow(HUNTER, { home: HOME }).body;
     expect(all).toContain('~/.claude/agents/flaky-test-hunter.md');
-    expect(all).toContain('It works in every project on this Mac.');
+    expect(all).toContain('It works in every project on this computer.');
     expect(all).toContain('never moves or copies one');
 
     const here = agentImportRow(REVIEWER, { home: HOME }).body;

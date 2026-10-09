@@ -68,7 +68,7 @@ export const DEFAULTS = {
 
 export function refusal(waitedMs) {
   const minutes = Math.max(1, Math.round(waitedMs / 60_000));
-  return `This Mac is short of memory, so ${NAME} held this command for ${minutes} minute${minutes === 1 ? '' : 's'} `
+  return `This computer is short of memory, so ${NAME} held this command for ${minutes} minute${minutes === 1 ? '' : 's'} `
     + 'while heavier work ran, and it still cannot start it. Do not retry it straight away. Carry on with anything '
     + 'that does not need it, or end your turn and say you are waiting for memory.';
 }

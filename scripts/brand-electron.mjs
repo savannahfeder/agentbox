@@ -42,8 +42,17 @@ const quiet = (cmd, args) => execFileSync(cmd, args, { stdio: 'ignore' });
 
 function plistValue(plist, key) {
   try {
-    return execFileSync('/usr/bin/plutil', ['-extract', key, 'raw', '-o', '-', plist], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const text = fs.readFileSync(plist, 'utf8');
+    const m = text.match(new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`));
+    return m ? m[1] : null;
   } catch { return null; }
+}
+
+function setPlistString(plist, key, value) {
+  const text = fs.readFileSync(plist, 'utf8');
+  const re = new RegExp(`(<key>${key}</key>\\s*<string>)[^<]*(</string>)`);
+  if (!re.test(text)) throw new Error(`plist has no ${key}`);
+  fs.writeFileSync(plist, text.replace(re, `$1${value}$2`));
 }
 
 /**
@@ -69,7 +78,7 @@ export function brandElectron({ app = electronApp(), name = NAME, icon = ICON, r
     try {
       fs.copyFileSync(icon, dest);
       for (const [key, value] of [['CFBundleName', name], ['CFBundleDisplayName', name], ['CFBundleIconFile', ICON_FILE]]) {
-        execFileSync('/usr/bin/plutil', ['-replace', key, '-string', value, plist], { stdio: 'ignore' });
+        setPlistString(plist, key, value);
       }
       run('/usr/bin/codesign', ['--force', '--deep', '--sign', '-', app]);
     } catch (err) {

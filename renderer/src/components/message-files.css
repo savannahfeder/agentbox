@@ -1,0 +1,27 @@
+/* The files a message names, as small framed tiles side by side
+   (w-9ed13d72b3). No box: the window's L-shaped corner marks, shorter and
+   tucked onto the picture's own corners, in the plain line colour. */
+.message-files {display:grid;gap:10px;width:100%;max-width:680px;margin:12px 0 20px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));}
+.message-files:empty {display:none;}
+.message-file {position:relative;display:flex;flex-direction:column;min-width:0;font:inherit;color:var(--text);text-align:left;cursor:pointer;padding:0;background:none;border:0;}
+.message-file-face {position:relative;display:block;height:104px;background:var(--doc-page,var(--surface));}
+.message-file-face > :not(.tick) {overflow:hidden;}
+.message-file-face .retained-preview {display:block;height:100%;}
+.message-file-face .artifact-thumbnail {width:100%;height:100%;aspect-ratio:auto;max-height:none;border:0;border-radius:0;}
+.message-file-face .artifact-thumbnail iframe {opacity:1!important;filter:none;}
+.message-file .tick {position:absolute;z-index:1;width:8px;height:8px;border:0 solid var(--line-strong);}
+.message-file .tick.tl {top:0;left:0;border-top-width:1px;border-left-width:1px;}
+.message-file .tick.tr {top:0;right:0;border-top-width:1px;border-right-width:1px;}
+.message-file .tick.bl {bottom:0;left:0;border-bottom-width:1px;border-left-width:1px;}
+.message-file .tick.br {bottom:0;right:0;border-bottom-width:1px;border-right-width:1px;}
+.message-file:hover .tick,.message-file[aria-pressed="true"] .tick {border-color:var(--text-faint);}
+.message-file:focus-visible .tick {border-color:var(--text-dim);}
+.message-file-foot {display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0 0;}
+.message-file-name {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:17px;color:var(--text-dim);}
+.message-file-kind {font:10px/14px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint);white-space:nowrap;}
+
+/* A document as a small page: its title and opening lines, set as text. */
+.message-file-page {display:flex;flex-direction:column;gap:3px;height:100%;padding:10px 12px;overflow:hidden;-webkit-mask-image:linear-gradient(180deg,#000 70%,transparent);mask-image:linear-gradient(180deg,#000 70%,transparent);}
+.message-file-page b {font-size:12px;font-weight:500;line-height:16px;color:var(--text);margin-bottom:2px;}
+.message-file-page em {font-style:normal;font-size:10px;font-weight:500;line-height:14px;color:var(--text-dim);margin-top:3px;}
+.message-file-page span {font-size:10px;line-height:14px;color:var(--text-faint);}

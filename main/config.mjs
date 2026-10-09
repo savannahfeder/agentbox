@@ -11,7 +11,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { resolveClaudeBin, candidatePaths } from './claude-bin.mjs';
 import { resolveCodexBin } from './codex-bin.mjs';
-import { Name } from '../shared/product-name.mjs';
+import { defaultStoreRoot } from './store/home.mjs';
 import { readPlans, slotsForPlans } from './claude-plan.mjs';
 import { machineSlots } from './machine.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
@@ -34,14 +34,6 @@ const CONFIG_NAME = 'zero.config.json';
 export const DEFAULT_SESSIONS_AT_ONCE = 3;
 
 const DEFAULTS = {
-  // Where the inbox's own files live. WHICH FOLDER THIS SHOULD BE ON A
-  // STRANGER'S MAC IS NOT DECIDED HERE: it is the open question on.
-  //
-  // IT IS THE APP'S OWN NAME SINCE 2026-09-22, where it used to be an older
-  // product's. A real store is always named in the config, so this default is
-  // only ever the answer for an install carrying none, and renaming it moved
-  // no files: the folder it used to point at is untouched and still on disk.
-  storeRoot: path.join(os.homedir(), Name),
   // ONE ACCOUNT FOLDER PER INSTALL, AND NOBODY ELSE'S.
   //
   // This was a literal id for most of the app's life, which meant every copy
@@ -160,6 +152,19 @@ export function loadConfig(appDir, { home = os.homedir() } = {}) {
     else console.warn(`zero: could not read ${file}: ${err.message}`);
   }
   const config = { ...DEFAULTS, ...overrides, freshInstall: fresh };
+  // Where the inbox's own files live, when the file names no store. A path in
+  // the file always wins, including on Linux. The default is computed here, not
+  // at import: on Linux it is the XDG data directory, and on macOS a folder of
+  // the app's name. An import-time path cannot see the `home` a test passes,
+  // and it cannot see a blanked XDG_DATA_HOME.
+  //
+  // A stand-in home does not inherit this machine's XDG_DATA_HOME. That
+  // variable is an absolute path in the real home, and a throwaway asked with
+  // `{ home }` would otherwise open the real store.
+  if (typeof overrides.storeRoot !== 'string' || !overrides.storeRoot.trim()) {
+    const real = path.resolve(home) === path.resolve(os.homedir());
+    config.storeRoot = defaultStoreRoot({ home, env: real ? process.env : {} });
+  }
   // An older alias for `storeRoot` was read here until 2026-09-22. A config
   // still carrying only the old key falls through to the default now, which is
   // why the key was renamed in zero.config.json in the same step and not after

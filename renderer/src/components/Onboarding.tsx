@@ -34,6 +34,7 @@ import { SidebarIcon } from './SidebarIcon';
 import { PlanQuestion, PlanSetupCard } from './PlanSetup';
 import { needsPlan, type Plan } from '../plan-setup';
 import { NAME, Name } from '../../../shared/product-name.mjs';
+import { foundOnThisMac, type RunsOn } from '../../../shared/runs-on.mjs';
 
 /**
  * THE ONE PROJECT THE LAST CARD MAY FILE INTO.
@@ -1758,7 +1759,7 @@ function Statement({ head, line, go, onNext, skip, onSkip }: {
 
 export function Onboarding({
   run, claude, home, opened, waiting, later, picking, palette, board, replying, view, tabs, products = [],
-  beat, pointed,
+  beat, pointed, runsOn = null,
   onEvent, onStep, onSkipToApp, onPractice, onDone, onFiled, onProjectMade, onRecheck, onLeave, onShut, onSkipStep,
 }: {
   /** Skip the tutorial from its hand-off page, into her own project. */
@@ -1829,6 +1830,17 @@ export function Onboarding({
   view?: string;
   claude: { missing: boolean; url: string };
   home: string;
+  /**
+   * WHAT THIS MAC WAS ALREADY SIGNED INTO (w-e217e577e5, 2026-10-07), or null
+   *  because nothing is, which is the Mac that gets the plan question instead.
+   *
+   *  The walk is SILENT on a Mac that is already set up, by design: `needsPlan`
+   *  skips the question and the setup card both, which is right -- there is
+   *  nothing to ask -- and leaves nobody told. From a session with a new user:
+   *  "He didn't realize it auto-connected to Claude/Codex; he wasn't sure how it
+   *  was even running." So the folder screen says it once, in its own quiet
+   *  line, on the screen that is already about where the agents will run. */
+  runsOn?: RunsOn | null;
   /** Something really happened: a folder chosen, a project made. */
   onEvent: (e: { t: 'start' } | { t: 'folder'; path: string } | { t: 'noFolder' } | { t: 'name'; name: string }) => void;
   /** Move to a step. Separate from onEvent because a move records nothing. */
@@ -2535,7 +2547,21 @@ export function Onboarding({
               <span className="fr-folder-key">{lit === (recent?.length ?? 0) + 1 && <Cap cap="↵" />}</span>
             </button>
           </div>
-          {refused && <p className="fr-note fr-refused">{refused}</p>}
+          {/* WHAT IT FOUND ALREADY SIGNED IN ON THIS MAC (w-e217e577e5,
+              2026-10-07). One line, in the note slot this screen already has,
+              on the screen that is already about where the agents will run.
+
+              HERE AND NOT ON THE WELCOME. The welcome lost its third stack of
+              text on purpose (w-ec62ab6b38: "three stacks of text made the
+              welcome cluttered"), and putting a new one back is that decision
+              undone. This screen is also the first one a Mac with a plan
+              already on it reaches, so the line is said as early as it can be.
+
+              It is never drawn beside a refusal: one quiet line under the card,
+              and a folder that was turned down is the more urgent of the two. */}
+          {refused
+            ? <p className="fr-note fr-refused">{refused}</p>
+            : foundOnThisMac(runsOn ?? {}) && <p className="fr-note">{foundOnThisMac(runsOn ?? {})}</p>}
         </div>
       )}
 

@@ -133,7 +133,7 @@ export function createTeamService({
           : [[], [], state.me];
         set({ lastSyncAt: Date.now(), error: null, cards, people, me: me ?? state.me });
         if (report.joined.length || report.pulled) log(`team: joined ${report.joined.length}, pulled ${report.pulled}, pushed ${report.pushed}`);
-        if (report.notJoined) log(`team: left ${report.notJoined} shared project(s) unjoined, this Mac already holds the most it takes on by itself`);
+        if (report.notJoined) log(`team: left ${report.notJoined} shared project(s) unjoined, this computer already holds the most it takes on by itself`);
         return report;
       } catch (err) {
         set({ error: String(err?.message ?? err) });
@@ -320,7 +320,7 @@ export function createTeamService({
     // already in a team does not move: that is a choice nobody offers here.
     async acceptInvite(teamId) {
       if (!backend || !state.me) throw new Error('sign in first');
-      if (state.team) throw new Error(`this Mac is already in ${state.team.name}`);
+      if (state.team) throw new Error(`this computer is already in ${state.team.name}`);
       if (!state.invites.some((i) => i.teamId === teamId)) throw new Error('that invite is no longer waiting');
       await backend.acceptInvite(teamId);
       kept().setTeam(state.me.id, teamId);

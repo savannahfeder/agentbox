@@ -400,6 +400,17 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // coding agent this is one entry and an empty map, and nothing anywhere
       // draws anything new.
       engines,
+      // WHETHER THIS MAC WAS ALREADY SIGNED INTO SOMETHING (w-e217e577e5,
+      // 2026-10-07), so the walk can say so once. A new user ran an agent and
+      // could not tell where the tokens were coming from, because the app finds
+      // whichever sign-in is already on the Mac and spends it in silence.
+      //
+      // It rides the snapshot rather than the settings model because the WALK
+      // reads it, and the settings model is only fetched while the settings
+      // screen is open. It costs no file read per tick: `main/runs-on.mjs`
+      // caches on the login files' own modification times, so this re-parses
+      // only after a sign-in or a profile refetch.
+      runsOn: supervisor.runsOnAccount(engines.workspace),
       // Whether this process is still the app on disk. It rides the snapshot
       // rather than boot-info because the staleness DEVELOPS while the app
       // runs: the case that cost her three times was a process left up for days
@@ -849,6 +860,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     if (isAgentRow(id)) return { ok: false };
     if (runAt > Date.now()) supervisor.stopSession(id);
     return store.scheduleItem(product, id, runAt);
+  });
+
+  // Snooze changes when a person sees the thread, never what an agent does.
+  ipcMain.handle('zero:snooze', (_e, { product, id, snoozedUntil }) => {
+    if (isAgentRow(id)) return { ok: false };
+    const item = store.snoozeItem(product, id, snoozedUntil);
+    push();
+    return item;
   });
 
   // said about an agent instead of about a task. The row it moves stands for

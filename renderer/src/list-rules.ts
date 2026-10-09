@@ -54,6 +54,7 @@ export interface InboxItem {
   result?: string;
   answeredThrough?: number;
   runAt?: number;
+  snoozedUntil?: number;
   /** 'later' while a thread sits in Later, written down and not begun. */
   start?: 'later' | 'now';
   /** The thread this one was filed under: what makes it a proposal. */
@@ -163,7 +164,8 @@ export function parkedByAgent(i: InboxItem, now = Date.now()): boolean {
 // release and never written. It is hers by definition, so it counts.
 export function hiddenUntil(i: InboxItem, legacySnooze = 0): number {
   const mine = i.wrote?.runAt?.source === 'founder' ? i.runAt ?? 0 : 0;
-  return Math.max(mine, legacySnooze);
+  const reminder = i.wrote?.snoozedUntil?.source === 'founder' ? i.snoozedUntil ?? 0 : 0;
+  return Math.max(mine, reminder, legacySnooze);
 }
 
 // `hiddenUntil` is HER deferral only: the caller passes the founder-set runAt
@@ -303,6 +305,11 @@ export const PROPOSAL_PATIENCE = 24 * 3_600_000;
  * It names a thread it can see in `items`: a proposal whose parent is not
  * there has nothing to come back, which is why `isProposal` refuses to hide
  * one in the first place.
+ *
+ * A thread YOU closed stays closed. The reminder used to bypass the inbox's
+ * archive rule, returning one Done thread after eight closes (2026-10-07).
+ * An agent finishing is still news; your closure settles the reminder without
+ * answering or deleting its proposals. Reopening deliberately enables it again.
  */
 export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?: string }>(
   items: readonly T[],
@@ -313,7 +320,10 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
   for (const i of items) {
     if (!isProposal(i)) continue;
     if (now - (i.createdAt ?? 0) <= PROPOSAL_PATIENCE) continue;
-    if (i.parent && byId.has(i.parent)) owed.add(i.parent);
+    const parent = i.parent ? byId.get(i.parent) : undefined;
+    if (!parent) continue;
+    if (parent.status === 'done' && parent.wrote?.status?.source === 'founder') continue;
+    owed.add(parent.id);
   }
   return owed;
 }
@@ -451,7 +461,7 @@ export function withdrawReply(statusWhenReplied: string): { answer: string; stat
 // So replying clears the schedule, whoever set it. It costs the approve-Friday-run-Monday case, which is now made by answering and
 // then pressing S, and the undo on the reply puts the old moment back.
 export function replyClearsSchedule(i: InboxItem, now = Date.now()): boolean {
-  return (i.runAt ?? 0) > now;
+  return Math.max(i.runAt ?? 0, i.snoozedUntil ?? 0) > now;
 }
 
 /* --------------------- one thread, one row, ONE ACTION -------------------- */

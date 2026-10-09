@@ -13,6 +13,7 @@ import { fixtureAgents, fixtureSnapshot, fixtureDashboards, fixtureRepeats, fixt
 import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from './fixtures';
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
+import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
 // THE SECOND FRONT DOOR, AND IT HAS TO BE BUILT BEFORE THE LINE BELOW RUNS.
 // `useFixtures` reads `window.zero` once, at module load, and on the desktop
 // preload.cjs has already put it there. In a browser tab nothing has, so this
@@ -141,6 +142,59 @@ function fixtureWrite(scope: 'project' | 'workspace', p: any): Settings {
   return structuredClone(fixtureSettingsState) as Settings;
 }
 
+/**
+ * THE UPDATER'S STATES, SUMMONED BY NAME (?update=ready, &update=source, …).
+ *
+ *  An update that has downloaded itself is by definition something you cannot
+ *  make happen on demand, so every screen that mentions one, the sidebar card,
+ *  the ⌘K restart and the Updates row in Settings, would otherwise be
+ *  unreviewable until it happened to a real install.
+ *
+ *  ONE SHAPE SERVES THE SNAPSHOT AND THE CHECK. `api.updateCheck()` answers
+ *  the world the page was opened in, because a Check button that always found
+ *  version 0.2.0 whatever world it was pressed in is a button that cannot
+ *  photograph the ordinary answer: nothing new.
+ */
+export function updateShape(wanted: string): UpdateState {
+  const shapes: Record<string, Partial<UpdateState>> = {
+    // `readyAt` is set back on purpose: the sidebar card wears it, and a
+    // fixture stamped "now" would photograph a time no real update has by the
+    // moment it is read.
+    ready: { phase: 'ready', newVersion: '0.2.0', percent: 100, ready: true, readyAt: Date.now() - 62 * 60_000 },
+    downloading: { phase: 'downloading', newVersion: '0.2.0', percent: 47 },
+    // A copy run from source (main/source-updater.mjs): versions are commit
+    // ids, and the row lists what changed.
+    source: {
+      phase: 'ready', ready: true, source: true, currentVersion: '5c6afa7', newVersion: '9e1b204',
+      changes: ['Teammates get a restart prompt when main moves', 'The Team page loads faster', 'Sign-in retries once on a slow network'],
+      behind: 4, percent: null, readyAt: Date.now() - 12 * 60_000,
+    },
+    installing: {
+      phase: 'installing', ready: false, installing: true, source: true, currentVersion: '5c6afa7', newVersion: '9e1b204',
+      changes: ['Teammates get a restart prompt when main moves'], behind: 1, readyAt: Date.now() - 12 * 60_000,
+    },
+    current: { phase: 'current' },
+    error: { phase: 'error', error: 'Could not reach the internet.' },
+    // WHY A COPY DOES NOT UPDATE ITSELF AT ALL, which is the state most
+    // teammates' checkouts are actually in (main/source-updater.mjs SAY).
+    unsupported: {
+      phase: 'unsupported', source: true, currentVersion: '5c6afa7',
+      error: 'This folder has changes of your own in it, so it does not update itself.',
+    },
+  };
+  return {
+    phase: 'idle',
+    currentVersion: '0.1.0',
+    newVersion: null,
+    percent: null,
+    error: null,
+    checkedAt: Date.now() - 4 * 60_000,
+    readyAt: null,
+    ready: false,
+    ...(shapes[wanted] ?? {}),
+  };
+}
+
 export const api = {
   isFixtures: useFixtures,
 
@@ -200,44 +254,12 @@ export const api = {
           since: Date.now() - 2.9 * 24 * 3_600_000,
         };
       }
-      // &update=ready|downloading|current|error summons the updater's states.
-      // Same reason as &stale above: an update that has downloaded itself is by
-      // definition something you cannot make happen on demand, so without this
-      // the row she is meant to press could never be looked at before shipping.
+      // &update=... summons the updater's states (`updateShape`). Same reason
+      // as &stale above: an update that has downloaded itself is by definition
+      // something you cannot make happen on demand, so without this the row
+      // she is meant to press could never be looked at before shipping.
       const wanted = params.get('update');
-      if (wanted) {
-        const shapes: Record<string, Partial<NonNullable<typeof base.update>>> = {
-          // `readyAt` is set back on purpose: the inbox row wears it, and a
-          // fixture stamped "now" would photograph a time no real update has by
-          // the moment she reads it.
-          ready: { phase: 'ready', newVersion: '0.2.0', percent: 100, ready: true, readyAt: Date.now() - 62 * 60_000 },
-          downloading: { phase: 'downloading', newVersion: '0.2.0', percent: 47 },
-          // A copy run from source (main/source-updater.mjs): versions are
-          // commit ids, and the row lists what changed.
-          source: {
-            phase: 'ready', ready: true, source: true, currentVersion: '5c6afa7', newVersion: '9e1b204',
-            changes: ['Teammates get a restart prompt when main moves', 'The Team page loads faster', 'Sign-in retries once on a slow network'],
-            behind: 4, percent: null, readyAt: Date.now() - 12 * 60_000,
-          },
-          installing: {
-            phase: 'installing', ready: false, installing: true, source: true, currentVersion: '5c6afa7', newVersion: '9e1b204',
-            changes: ['Teammates get a restart prompt when main moves'], behind: 1, readyAt: Date.now() - 12 * 60_000,
-          },
-          current: { phase: 'current' },
-          error: { phase: 'error', error: 'Could not reach the internet.' },
-        };
-        base.update = {
-          phase: 'idle',
-          currentVersion: '0.1.0',
-          newVersion: null,
-          percent: null,
-          error: null,
-          checkedAt: Date.now() - 4 * 60_000,
-          readyAt: null,
-          ready: false,
-          ...(shapes[wanted] ?? {}),
-        };
-      }
+      if (wanted) base.update = updateShape(wanted);
       // The approval queue is opt-in (&approvals): a worker frozen mid-command
       // is a real state worth being able to look at, and it is not the state
       // every other fixtures screenshot wants a card floating over.
@@ -260,12 +282,10 @@ export const api = {
   // Fixtures answer the way a real installed copy would: the check finds
   // something, and the restart reports that it started.
   async updateCheck(): Promise<UpdateState> {
-    if (useFixtures) {
-      return {
-        phase: 'ready', currentVersion: '0.1.0', newVersion: '0.2.0',
-        percent: 100, error: null, checkedAt: Date.now(), readyAt: Date.now(), ready: true,
-      };
-    }
+    // The world the page was opened in, answered as a real check would answer
+    // it; with no world named, a check that finds a new version, because that
+    // is the state worth looking at.
+    if (useFixtures) return updateShape(params.get('update') || 'ready');
     return window.zero!.updateCheck();
   },
 
@@ -429,7 +449,7 @@ export const api = {
     return window.zero.terminal(p);
   },
   async commandCatalog(p: {product: string; id: string}): Promise<string[]> {
-    if (useFixtures) return ['code-review','simplify','verify'];
+    if (useFixtures) return ['code-review','loop','simplify','verify'];
     return window.zero!.commandCatalog(p);
   },
   async command(p: {product: string; id: string; text: string}): Promise<{state: string; at: number; text?: string; name?: string}> {
@@ -651,6 +671,12 @@ export const api = {
   async schedule(p: { product: string; id: string; runAt: number }): Promise<WorkItem | null> {
     if (useFixtures) return null;
     return window.zero!.schedule(p);
+  },
+
+  async snooze(p: { product: string; id: string; snoozedUntil: number }): Promise<WorkItem | null> {
+    if (useFixtures) return null;
+    if (!window.zero?.snooze) throw new Error('Restart the app to use inbox snooze');
+    return window.zero.snooze(p);
   },
 
   // Defer an AGENT to a moment: the same gesture, on a row that lives in no
@@ -1000,7 +1026,8 @@ export const api = {
     // exists" state be SHOT IN THE REAL APP rather than hand drawn.
     if (useFixtures) {
       if (params.has('refusedFolder')) {
-        return { path: null, refused: 'That is your whole home folder. Agents would work across everything on this Mac, and macOS will ask you about Downloads, Music and every app you have. Pick the folder your project\u2019s code is in.' };
+        const turnedDown = checkProjectFolder('~');
+        return { path: null, refused: turnedDown.ok ? undefined : turnedDown.say };
       }
       return { path: '/Users/you/Desktop/dev/house' };
     }

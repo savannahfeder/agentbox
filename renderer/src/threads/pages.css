@@ -17,6 +17,7 @@
 .th-mark-btn:hover .th-mark, .th-mark-btn:focus-visible .th-mark { visibility: hidden; }
 .th-side-foot { display: flex; flex-direction: column; gap: 2px; }
 
+
 /* A NEW VERSION WAITING (components/SidebarUpdate.tsx). A card above the foot,
    with a × in its corner, shown when you point at it, that hides it until the
    next version. With the sidebar shut it is a grey icon row in the foot list.
@@ -186,6 +187,15 @@
    not two: the doubled edge read as heavy beside the hover (2026-10-02). No
    transition, so a held J never trails behind the key. */
 .th-card.selected, .th-card.selected:hover { border-color: var(--underline); background: rgba(255,255,255,.05); }
+/* A CARD PICKED FOR A BULK COMMAND (w-2e3819913c) wears the accent, a step
+   louder than the keyboard's edge, so several picked cards and the one the
+   keyboard is on never read as the same thing. */
+.th-card.picked, .th-card.picked:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* The ground the box is drawn on fills the page, so a drag can start under the
+   shortest column as well as beside it. */
+.th-board-wrap { position: relative; min-height: 100%; }
+.th-board-wrap.banding, .th-board-wrap.banding * { user-select: none; }
+.th-band { position: absolute; z-index: 5; pointer-events: none; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 2px; }
 /* A COLUMN MOVES BY ITS HEADING, AND THE HEADING STAYS TEXT (2026-10-02).
    The first round put a grey block behind it on hover, 6px wider than the
    cards, and a tooltip across the first card: "visually it looks pretty
