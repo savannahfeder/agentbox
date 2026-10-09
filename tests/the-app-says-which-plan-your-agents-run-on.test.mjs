@@ -21,6 +21,10 @@
 //     draws nothing at all rather than "Claude · unknown" or a dash. The app
 //     saying something it cannot stand behind about what somebody is paying for
 //     is worse than the app saying nothing, which is where this started.
+//
+// 2026-10-07, w-d193de0dbb: the user rejected the one subscription row in
+// the sidebar. Keep the reading and onboarding words, but draw no plan row
+// in either sidebar state, even when a subscription is known.
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -147,37 +151,37 @@ describe('the reading off this Mac', () => {
   });
 });
 
-describe('the row in the sidebar', () => {
+describe('the sidebar keeps subscription details in Settings', () => {
   const noop = () => {};
   const draw = (extra = {}) => renderToStaticMarkup(createElement(WorkspaceNavigation, {
     view: 'inbox', collapsed: false, onToggle: noop, onView: noop, onSearch: noop, onCompose: noop,
     onFeedback: noop, onInstructions: noop, onSettings: noop, ...extra,
   }));
 
-  it('says what the agents run on, and opens the account that answers for it', () => {
-    const html = draw({ runsOn: { engine: 'claude', plan: 'Max 20x' }, onAccounts: noop });
-    expect(html).toContain('Claude · Max 20x');
-    expect(html).toContain('Your agents run on the Claude account already signed in on this Mac.');
-  });
-
-  it('draws nothing at all when nothing is known, so the foot ends at Settings', () => {
-    for (const runsOn of [null, undefined, { engine: null, plan: null }]) {
-      const html = draw({ runsOn, onAccounts: noop });
-      expect(html).not.toContain('runs-on');
+  it.each([false, true])('has no subscription shortcut when collapsed is %s', (collapsed) => {
+    for (const runsOn of [
+      { engine: 'claude', plan: 'Max 20x' },
+      { engine: 'codex', plan: 'Pro' },
+      { engine: 'claude', plan: null },
+      null, undefined, { engine: null, plan: null },
+    ]) {
+      const html = draw({ runsOn, onAccounts: noop, collapsed });
+      expect(html).not.toContain('th-runs-on');
+      expect(html).not.toContain('Claude ·');
+      expect(html).not.toContain('ChatGPT ·');
+      expect(html).toContain('aria-label="Threads"');
+      expect(html).toContain('aria-label="Feedback"');
       expect(html).toContain('aria-label="Settings"');
     }
   });
 
   // THE AIR UNDER SETTINGS IS 4 POINTS AND IT STAYS 4 POINTS. It is
   // `.workspace-utilities:last-child` (w-b59cbe3154), three rounds of her
-  // picking a number, so this row goes INSIDE that list rather than after it: a
-  // sibling under the list would make it not-last-child and quietly put the 12
-  // back.
-  it('sits inside the foot list, so the air she picked under Settings is untouched', () => {
-    const html = draw({ runsOn: { engine: 'claude', plan: 'Max 20x' }, onAccounts: noop });
+  // picking a number. Removing the plan row must preserve that list.
+  it('keeps Settings at the end of the foot list with the same spacing', () => {
+    const html = draw();
     const foot = html.split('workspace-utilities')[1] ?? '';
     const after = foot.split('</div>')[0] ?? '';
-    expect(after).toContain('Claude · Max 20x');
     expect(after).toContain('aria-label="Settings"');
     const css = fs.readFileSync(path.join(root, 'renderer/src/workspace-navigation.css'), 'utf8');
     expect(css).toContain('.workspace-utilities:last-child');
