@@ -79,21 +79,31 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif
 }
 :root[data-theme='dark'] .ct-dot { background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.55); }
 
-/* Pictures only: the light-mode dot candidates. */
-:root[data-dot='charcoal'] .ct-dot { background: #2b2b2e; box-shadow: none; }
-:root[data-dot='pearl'] .ct-dot { background: #fff; box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.22), 0 1px 2px rgba(0, 0, 0, 0.22); }
-:root[data-dot='none'] .ct-tag .ct-dot { display: none; }
-:root[data-dot='none'] .ct-tag { padding-left: 11px; }
-
-/* Pictures only: square corners, which is what the system material gives
-   when the window is not rounded. */
-:root[data-corners='square'] .ct-tag, :root[data-corners='square'] .ct-card { border-radius: 0; }
-:root[data-corners='square'] .ct-line { border-radius: 2px; }
-
-/* Side quest, pictures only: sharper corners, nearer the app's own. */
-:root[data-corners='sharp'] .ct-tag { border-radius: 6px; }
-:root[data-corners='sharp'] .ct-card { border-radius: 8px; }
-:root[data-corners='sharp'] .ct-line { border-radius: 4px; }
+/* Pictures only: ways to make the light-mode dot a glowing pearl. White glow
+   alone vanishes on light glass, so each one gives the light something to
+   read against. */
+/* A: a pearl with its own shading, lit from the top left, and a cool halo. */
+:root[data-dot='lit'] .ct-dot {
+  width: 8px; height: 8px;
+  background: radial-gradient(circle at 35% 30%, #fff 0 28%, #e6e9f0 60%, #b4bccb 100%);
+  box-shadow: 0 0 0 0.5px rgba(60, 70, 90, 0.18), 0 0 8px 2px rgba(125, 140, 175, 0.6);
+}
+/* B: a plain white dot with a strong silver halo around it. */
+:root[data-dot='halo'] .ct-dot {
+  width: 8px; height: 8px; background: #fff;
+  box-shadow: 0 0 0 0.5px rgba(60, 70, 90, 0.14), 0 0 6px 2px rgba(125, 140, 175, 0.75), 0 0 12px 3px rgba(125, 140, 175, 0.3);
+}
+/* C: mother of pearl, a faint pink and blue sheen with a lilac glow. */
+:root[data-dot='sheen'] .ct-dot {
+  width: 8px; height: 8px;
+  background: radial-gradient(circle at 32% 28%, #fff 0 22%, #f6eaf4 45%, #dde4f3 72%, #b9c2d8 100%);
+  box-shadow: 0 0 0 0.5px rgba(60, 70, 90, 0.14), 0 0 8px 2px rgba(165, 145, 215, 0.6);
+}
+/* D: the dark-mode dot as it is, on a silver glass a shade deeper than now,
+   so its white glow has something to shine against. */
+:root[data-dot='silver'] { --ct-tint: rgba(205, 208, 216, 0.4); --ct-tint-hover: rgba(205, 208, 216, 0.55); }
+:root.ct-demo[data-dot='silver'] .ct-glass { background: rgba(214, 217, 225, 0.78); }
+:root[data-dot='silver'] .ct-dot { background: #fff; box-shadow: 0 0 6px 1px rgba(255, 255, 255, 0.95), 0 0 0 0.5px rgba(60, 70, 90, 0.12); }
 .ct-half { flex: none; display: block; color: var(--ct-mark); }
 
 /* ---- the list ---- */
