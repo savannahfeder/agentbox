@@ -167,27 +167,41 @@ export class CommandHistory {
     this.programs = new Map();
   }
 
-  /** What one finished run tells us. `peakMb` null means it was never sampled. */
-  record(command, { peakMb = null, durationMs = null, background = false } = {}) {
+  /**
+   * What one finished run tells us. `peakMb` null means it was never sampled.
+   * Answers whether anything was filed.
+   *
+   * `onlyIfLight` is for a run whose memory reading belonged to several
+   * commands at once: one `codex app-server` serves every Codex thread of a
+   * login, so two Codex commands running together are measured together
+   * (w-5601e99977). How long each took is still its own, so a quick one is
+   * light on that alone — and anything else from such a run is dropped rather
+   * than filed as "not measured", because that would un-learn a command this
+   * app has seen light before, and missing evidence must never move a command
+   * either way.
+   */
+  record(command, { peakMb = null, durationMs = null, background = false, onlyIfLight = false } = {}) {
     const { keys, opaque } = commandSegments(command);
-    if (!keys.length) return;
+    if (!keys.length) return false;
     let obs;
     if (typeof peakMb === 'number' && Number.isFinite(peakMb)) {
       obs = peakMb >= this.heavyMb ? 'h' : peakMb < this.lightMb ? 'l' : 'm';
     } else {
       obs = !background && typeof durationMs === 'number' && durationMs < QUICK_MS ? 'l' : '?';
     }
+    if (onlyIfLight && obs !== 'l') return false;
     // A chain's memory belongs to the chain: `git status && npm test` measured
     // heavy says nothing bad about `git status`. Only a light chain vouches for
     // each of its parts.
     if (keys.length > 1 || opaque) {
       this._push(this.keys, chainKey(keys, opaque), obs);
-      if (obs !== 'l') return;
+      if (obs !== 'l') return true;
     }
     for (const key of keys) {
       this._push(this.keys, key, obs);
       this._push(this.programs, programOf(key), obs);
     }
+    return true;
   }
 
   /** 'light' | 'unknown' | 'heavy' for a command about to run. */
