@@ -63,7 +63,7 @@ import { approvalReads } from './approval-card';
 // one it took went. Only the second is raised from here, because by the time
 // there is anything to confirm the card has closed.
 import { sentLine } from './compose-says';
-import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, isProposal, maskedAncestors, notStarted, parkedByAgent, replyClearsSchedule, rowTitle, statusForReply, stoppable, threadMasked, threadsOwedAnAnswer, withdrawReply } from './list-rules';
+import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, isProposal, notStarted, parkedByAgent, replyClearsSchedule, rowTitle, statusForReply, stoppable, threadsOwedAnAnswer, withdrawReply } from './list-rules';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { opensATextField } from './keys';
 import { sidebarFits, useRoomyToggle, useWindowWidth } from './room';
@@ -1679,9 +1679,7 @@ export default function App() {
     return runnerOf(i, product) === team.me;
   }, [team]);
 
-  // Everything the inbox would show before the thread mask, kept separate
-  // because an ACTION needs it too: the rows this list hides are the rows her
-  // bulk snooze was leaving behind (maskedAncestors, list-rules). EVERY ROW A
+  // EVERY ROW A
   // SELECTION CAN NAME. `items` is the ledger and agent rows are not in it, so
   // resolving her ticks against the ledger alone dropped them from every bulk
   // action without saying so. THE ROW THAT SAYS HER TASKS ARE NOT RUNNING.
@@ -1754,25 +1752,6 @@ export default function App() {
     return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now });
   }), [items, hiddenAt, scope, now, pendingId, teamInbox, liveIds]);
 
-  // EVERY PLACE SHE CAN SEE A ROW, which is what the thread mask reads. A row
-  // that left the inbox because she answered it has not left her: it is in In
-  // progress with a worker on it. The mask used to read the inbox alone, so
-  // answering the front row of a thread pushed the row behind it back at her,
-  // wearing the words it was written with (47 times in 72 hours, measured
-  // 2026-08-14). Scheduled counts for the same reason and is the older half of
-  // this: a row she deferred is somewhere she can reach it.
-  //
-  // The union itself is `belongsOnTheRail` in list-rules now, because the
-  // sidebar's Active agents panel asks the same question of a row and one of
-  // the two copies would have drifted.
-  const liveRows = useMemo(() => items.filter((i) => {
-    if (i.id === pendingId) return false;  // an action in flight holds nothing hidden
-    if (i.product && scope && i.product !== scope) return false;
-    return belongsOnTheRail(i, {
-      deliveredThrough, hiddenUntil: hiddenAt(i), deferredUntil: dueAt(i), now, live: liveIds.has(i.id),
-    });
-  }), [items, pendingId, scope, dueAt, hiddenAt, deliveredThrough, now, liveIds]);
-
   // WHAT MATTERS MOST, ONE COPY, read by every list that claims to be in an
   // order. A product's place in her running order is worth a hundred item
   // points; the item's own priority breaks ties. Same module the supervisor
@@ -1792,13 +1771,6 @@ export default function App() {
   );
 
   const inbox = useMemo(() => {
-    const candidates = inboxCandidates;
-    // One thread, one row. A blocked/waiting parent whose child ask is alive is
-    // represented BY that child (which carries the parent as origin); showing
-    // both is how one query becomes two confusing inbox items. The rule itself
-    // is threadMasked in list-rules, pinned there against her real store.
-    const masked = threadMasked(candidates, liveRows);
-    const hasChildHere = (id: string) => masked.has(id);
     // Priority order, the same score the supervisor spawns by, from the same
     // module (`score` above): a product's place in the user's running order
     // is worth a hundred item points, the item's own priority breaks ties,
@@ -1810,7 +1782,7 @@ export default function App() {
     // carries priority 1, so the whole sweep sits underneath everything that is
     // actually asking her something rather than on top of it.
     const asking = agentList.filter((r) => r.id !== pendingId && r.agent && reachesInbox(r.agent, now, agentMode));
-    const rows = [...candidates.filter((i) => !hasChildHere(i.id)), ...asking]
+    const rows = [...inboxCandidates, ...asking]
       .sort(byRunningOrder(score));
     // AND ABOVE ALL OF THEM, WHEN NOTHING IS RUNNING, THE ROW THAT SAYS SO.
     //
@@ -1859,7 +1831,7 @@ export default function App() {
     const ordinary = urgent.length ? rest.filter((i) => !isUrgentRow(i)) : rest;
     const top = [...(troubleItem ? [troubleItem] : []), ...fresh];
     return [...top, ...urgent, ...ordinary];
-  }, [inboxCandidates, liveRows, agentList, agentMode, score, now, pendingId, troubleItem, seen]);
+  }, [inboxCandidates, agentList, agentMode, score, now, pendingId, troubleItem, seen]);
 
   // BEAT EIGHT ENDS WHEN THE INBOX IS EMPTY, and both ways of ending a task get
   // there: closing one takes it out of the list, and replying to one puts her
@@ -3966,13 +3938,7 @@ export default function App() {
   // The reminder survives restarts without stopping or restarting an agent.
   const snoozeUntil = useCallback(async (target: WorkItem | WorkItem[], ts: number, label: string) => {
     const picked = Array.isArray(target) ? target : [target];
-    // A ROW SHE PICKED IS A THREAD, NOT AN ITEM. The rule and the measurement
-    // are in list-rules. Nothing is added when she snoozes from Scheduled:
-    // those rows are not candidates, so there is nothing behind them. An agent
-    // row is one row and no thread: it has no parent, nothing is masked behind
-    // it, and asking the ledger about its ancestors would search for an id no
-    // ledger holds.
-    const list = [...picked, ...maskedAncestors(picked.filter((i) => !i.agent), inboxCandidates)];
+    const list = picked;
     setModal(null);
     setSnoozeItem(null);
     setMultiSel(new Set());
