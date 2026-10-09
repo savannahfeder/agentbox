@@ -14,7 +14,9 @@
   --ct-mark: rgba(29, 29, 31, 0.42);
   --ct-tint: rgba(243, 244, 247, 0.95);
   --ct-tint-hover: rgba(249, 249, 251, 0.97);
-  --ct-edge: rgba(0, 0, 0, 0.17);
+  /* The edge, drawn here since the window has no system outline. Light: a
+     hairline as dark as the one macOS drew. */
+  --ct-edge: inset 0 0 0 0.5px rgba(0, 0, 0, 0.15);
   --ct-rule: rgba(29, 29, 31, 0.10);
   --ct-press: rgba(29, 29, 31, 0.06);
 }
@@ -26,7 +28,7 @@
     --ct-mark: rgba(255, 255, 255, 0.42);
     --ct-tint: rgba(39, 39, 43, 0.95);
     --ct-tint-hover: rgba(50, 50, 55, 0.96);
-    --ct-edge: rgba(255, 255, 255, 0.08);
+    --ct-edge: inset 0 0 0 0.5px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px rgba(255, 255, 255, 0.13);
     --ct-rule: rgba(255, 255, 255, 0.10);
     --ct-press: rgba(255, 255, 255, 0.07);
   }
@@ -38,7 +40,7 @@
   --ct-mark: rgba(255, 255, 255, 0.42);
   --ct-tint: rgba(39, 39, 43, 0.95);
   --ct-tint-hover: rgba(50, 50, 55, 0.96);
-  --ct-edge: rgba(255, 255, 255, 0.08);
+  --ct-edge: inset 0 0 0 0.5px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px rgba(255, 255, 255, 0.13);
   --ct-rule: rgba(255, 255, 255, 0.10);
   --ct-press: rgba(255, 255, 255, 0.07);
 }
@@ -47,21 +49,20 @@ html, body, #root { margin: 0; padding: 0; background: transparent; overflow: hi
 body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; -webkit-font-smoothing: antialiased; user-select: none; cursor: default; color: var(--ct-ink); }
 
 /* The glass: nearly solid, so what is behind never shows through as words,
-   with a hairline edge drawn inside, because the window ends at the glass. */
+   with its edge drawn inside, because the window ends at the glass. Dark mode
+   has a black hairline and a soft light band, the shape of the outline macOS
+   drew when the window had a system shadow, at about half its strength.
+   Pictures draw exactly this and nothing more: the real window adds nothing. */
 .ct-glass {
   position: absolute; left: 0; top: 0; color: var(--ct-ink); background: var(--ct-tint);
   backdrop-filter: blur(28px) saturate(180%);
-  box-shadow: inset 0 0 0 0.5px var(--ct-edge);
+  box-shadow: var(--ct-edge);
 }
 
-/* A demo is a page, not a window, so it draws the drop shadow the system
-   gives the real one. Pictures only. */
-.ct-demo .ct-glass { box-shadow: inset 0 0 0 0.5px var(--ct-edge), 0 8px 24px rgba(0, 0, 0, 0.18); }
-:root.ct-demo[data-theme='dark'] .ct-glass { box-shadow: inset 0 0 0 0.5px var(--ct-edge), 0 8px 24px rgba(0, 0, 0, 0.35); }
 
 /* ---- the tag ---- */
 .ct-tag {
-  height: 26px; padding: 0 11px 0 9px; border-radius: 6px; box-sizing: border-box;
+  height: 28px; padding: 0 12px 0 10px; border-radius: 6px; box-sizing: border-box;
   display: flex; align-items: center; gap: 7px; font-size: 12.5px; white-space: nowrap;
   transition: background-color 120ms ease;
 }
@@ -69,6 +70,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif
 .ct-tag.working .ct-words { font-weight: 500; color: var(--ct-dim); }
 .ct-tag:hover, .ct-tag.is-open { background: var(--ct-tint-hover); }
 .ct-tag.is-dragging { cursor: grabbing; }
+
+/* The way into the app, always at the tag's end: a hairline and a chevron
+   (she kept both, 2026-10-08, picking the chevron over an arrow on full-screen
+   pictures for how it sits). A click anywhere on the tag opens the app; the
+   chevron says so. */
+.ct-go { display: flex; align-items: center; gap: 8px; margin-left: 1px; color: var(--ct-dim); }
+.ct-go::before { content: ''; width: 1px; height: 14px; background: var(--ct-rule); }
+.ct-tag { padding-right: 9px; }
+.ct-go svg { display: block; }
 
 /* Ready is a full dot, working the same grey half full. Still: nothing here
    moves on its own, because moving is what pulls an eye off its work. */

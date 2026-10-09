@@ -103,13 +103,23 @@ describe('the list under the tag', () => {
     expect(waitedFor(undefined, now)).toBe('');
   });
 
-  it('puts the newest first and keeps the list short', () => {
+  // Three at most: the list opens on a hover now, and five rows made it bigger
+  // than a glance needs (her words: "I probably only need to see three").
+  it('puts the newest first and keeps the list to three', () => {
     const ready = Array.from({ length: 7 }, (_, i) => ({ id: `w-${i}`, title: `T${i}`, says: 'is ready for you', since: now - i * 60_000 }));
     const { lines, more } = cardLines(ready, now);
-    expect(lines.map((l) => l.id)).toEqual(['w-0', 'w-1', 'w-2', 'w-3', 'w-4']);
+    expect(lines.map((l) => l.id)).toEqual(['w-0', 'w-1', 'w-2']);
     expect(lines[0].waited).toBe('now');
-    expect(lines[4].waited).toBe('4 min');
-    expect(more).toBe(2);
+    expect(lines[2].waited).toBe('2 min');
+    expect(more).toBe(4);
+  });
+
+  it('shows exactly three with nothing more, and four as three and one more', () => {
+    const mk = (n) => Array.from({ length: n }, (_, i) => ({ id: `w-${i}`, title: `T${i}`, says: 'is ready for you', since: now - i * 60_000 }));
+    expect(cardLines(mk(3), now)).toMatchObject({ more: 0 });
+    expect(cardLines(mk(3), now).lines).toHaveLength(3);
+    expect(cardLines(mk(4), now)).toMatchObject({ more: 1 });
+    expect(cardLines(mk(4), now).lines).toHaveLength(3);
   });
 
   it('has no "more" line when everything fits', () => {

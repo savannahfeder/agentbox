@@ -17,14 +17,18 @@
 //   windows for a drawn shadow and let clicks fall through the padding, and
 //   switching that on and off under the pointer told the page the pointer had
 //   left, so a real first click fell straight through to the app beneath.
-//   With no margin there is nothing to fall through, macOS draws the shadow,
-//   and the glass is the system's own material: real blur of what is behind,
-//   dark in dark mode and light in light mode, the way its own panels are.
+//   With no margin there is nothing to fall through. The page draws the
+//   glass, its small corners and its edge. The window has no system shadow:
+//   with one, macOS also drew its own window outline (a black hairline and a
+//   light band) around the glass, a strong border no picture had shown.
 // - A DRAG FOLLOWS THE REAL CURSOR. The page only says when the button went
 //   down and up; between the two, this process reads the cursor itself, so a
 //   drag never depends on the page being sent every move.
-// - THE LIST OPENS ON A CLICK, NOT A PASS, in its own window so the tag never
-//   moves. Off both for a moment and it shuts.
+// - POINTING OPENS THE LIST, A CLICK OPENS THE APP (her ask, 2026-10-08: with
+//   16 waiting she wants to go straight in, not click through the list). The
+//   pointer has to rest on the tag a moment, so passing over the corner opens
+//   nothing, and after a drag it has to leave and come back. The list is in
+//   its own window so the tag never moves. Off both for a moment and it shuts.
 // - IT SHOWS OVER FULL-SCREEN APPS, IT HIDES FOR A WHILE AND COMES BACK, it is
 //   off for good only in Settings, it steps aside while she is in the app, and
 //   it goes when the app's window goes.
@@ -39,6 +43,9 @@ import { cardPlacement, hiddenUntil, keepCorner, readyNow, restingSpot, tagShows
 // shuts: long enough to cross the gap between them, short enough to feel like
 // it follows the pointer.
 export const CLOSE_AFTER_MS = 450;
+// How long the pointer rests on the tag before the list opens: long enough
+// that crossing the corner on the way to something else opens nothing.
+export const OPEN_AFTER_MS = 220;
 // Far enough that a click with a shaky hand is still a click.
 export const DRAG_FROM_PX = 6;
 // How often a drag reads the cursor: once a frame.
@@ -73,6 +80,10 @@ export function createCornerTag({
   let wake = null;
   let closing = null;
   let watching = null;
+  let opening = null;
+  // After a drag the pointer is still on the tag; the list waits for it to
+  // leave and come back rather than opening under it.
+  let settling = false;
   let gone = false;
 
   const fresh = () => readyNow(ready, now());
@@ -118,7 +129,7 @@ export function createCornerTag({
       // only with the system's own rounder corners or square ones, and the
       // approved tag has neither.
       roundedCorners: false,
-      hasShadow: true,
+      hasShadow: false,
       resizable: false,
       movable: false,
       minimizable: false,
@@ -219,6 +230,19 @@ export function createCornerTag({
     }, CLOSE_AFTER_MS);
   }
 
+  const cancelOpen = () => { if (opening) { clearTimer(opening); opening = null; } };
+
+  // The pointer came onto the tag: open the list if it is still there in a
+  // moment. The real cursor has the last word, as it does for shutting.
+  function meanToOpen() {
+    if (open || opening || settling || press) return;
+    opening = setTimer(() => {
+      opening = null;
+      readCursor();
+      if (hovered.tag && !settling && !press) openCard();
+    }, OPEN_AFTER_MS);
+  }
+
   /* ------------------------------- the press ------------------------------ */
   // Where the cursor is now, against where it was when the button went down.
   const follow = () => {
@@ -228,6 +252,8 @@ export function createCornerTag({
     const dy = pt.y - press.start.y;
     if (!press.moved && Math.hypot(dx, dy) >= DRAG_FROM_PX) {
       press.moved = true;
+      cancelOpen();
+      settling = true;
       closeCard();
       send('tag', 'corner-tag:dragging', true);
     }
@@ -260,7 +286,8 @@ export function createCornerTag({
       saveConfig(config, { cornerTagSpot: { x: Math.round(tag.x), y: Math.round(tag.y) } });
       send('tag', 'corner-tag:dragging', false);
     } else if (!cancelled) {
-      if (open) closeCard(); else openCard();
+      cancelOpen();
+      goTo(null);
     }
   }
 
@@ -268,6 +295,8 @@ export function createCornerTag({
   // no press half-done, so the tag comes back exactly as it was first drawn.
   const reset = () => {
     endPress(true);
+    cancelOpen();
+    settling = false;
     closeCard();
     hovered.tag = false;
     send('tag', 'corner-tag:reset', null);
@@ -297,6 +326,14 @@ export function createCornerTag({
     mainWindow.focus();
     return true;
   };
+
+  // Into the app: on a thread when a line of the list was picked, or just the
+  // app as it is when it was the tag.
+  function goTo(id) {
+    closeCard();
+    if (!bringAppForward()) return;
+    if (typeof id === 'string' && id) mainWindow.webContents.send('zero:open-item', { id });
+  }
 
   const hide = (choice) => {
     const until = hiddenUntil(choice, now());
@@ -351,7 +388,12 @@ export function createCornerTag({
   });
 
   ipcMain.handle('corner-tag:hover', (_e, p) => {
-    hovered[partOf(p)] = !!p?.inside;
+    const part = partOf(p);
+    hovered[part] = !!p?.inside;
+    if (part === 'tag') {
+      if (p?.inside) meanToOpen();
+      else { settling = false; cancelOpen(); }
+    }
     reconsider();
     if (p?.inside) watch();
     return null;
@@ -375,12 +417,7 @@ export function createCornerTag({
   });
   ipcMain.handle('corner-tag:release', (_e, p) => { endPress(!!p?.cancelled); return null; });
 
-  ipcMain.handle('corner-tag:go', (_e, id) => {
-    closeCard();
-    if (!bringAppForward()) return null;
-    if (typeof id === 'string' && id) mainWindow.webContents.send('zero:open-item', { id });
-    return null;
-  });
+  ipcMain.handle('corner-tag:go', (_e, id) => { goTo(id); return null; });
   ipcMain.handle('corner-tag:hide', (_e, choice) => { hide(choice); return null; });
   ipcMain.handle('corner-tag:settings', () => { openSettings(); return null; });
 
@@ -419,6 +456,7 @@ export function createCornerTag({
     cancelClose();
     if (wake) { clearTimer(wake); wake = null; }
     if (watching) { clearTimer(watching); watching = null; }
+    cancelOpen();
     for (const part of ['tag', 'card']) if (alive(part)) wins[part].destroy();
     for (const ch of CHANNELS) { try { ipcMain.removeHandler?.(ch); } catch {} }
     try {

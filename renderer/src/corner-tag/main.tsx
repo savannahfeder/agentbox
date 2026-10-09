@@ -6,7 +6,8 @@
 //
 // THE POINTER, settled with Codex and then with real mouse events:
 // - The tag is movable as it is, with nothing drawn to say so: press and move.
-// - A click (press and let go without moving) opens the list; a second shuts it.
+// - Resting the pointer on the tag opens the list; a click (press and let go
+//   without moving) opens the app, and the chevron at the tag's end says so.
 // - The page only reports the button going down and coming up. The drag in
 //   between is read off the real cursor by the main process, because a real
 //   drag must not depend on this page being sent every move.
@@ -14,6 +15,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HIDE_CHOICES, cardLines, tagSays } from '../../../shared/corner-tag.mjs';
+import { NAME } from '../../../shared/product-name.mjs';
 import './corner-tag.css';
 
 type Ready = { id: string; title: string; says: string; since?: number; open?: string | null };
@@ -74,6 +76,17 @@ function Half({ size = 11 }: { size?: number }) {
   );
 }
 
+// The way into the app, drawn at the tag's end.
+function Go() {
+  return (
+    <span className="ct-go" aria-hidden>
+      <svg width="7" height="10" viewBox="0 0 7 10">
+        <path d="M1.5 1.5 5 5 1.5 8.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
+  );
+}
+
 // The window is sized to what it shows; tell it whenever that changes.
 function useReportSize(ref: React.RefObject<HTMLElement>, which: Part, key: unknown) {
   useLayoutEffect(() => {
@@ -120,7 +133,7 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
     <div
       ref={ref}
       role="button"
-      aria-label={`${text}. Click to open, drag to move.`}
+      aria-label={`${text}. Click to open ${NAME}, drag to move.`}
       aria-expanded={open}
       className={`ct-glass ct-tag ${says.kind}${open ? ' is-open' : ''}${dragging ? ' is-dragging' : ''}`}
       style={demo ? { position: 'relative' } : undefined}
@@ -144,6 +157,7 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
     >
       {says.kind === 'ready' ? <span className="ct-dot" /> : <Half />}
       <span className="ct-words">{text}</span>
+      <Go />
     </div>
   );
 }
