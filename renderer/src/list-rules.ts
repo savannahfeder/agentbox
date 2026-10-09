@@ -178,9 +178,12 @@ export function hiddenUntil(i: InboxItem, legacySnooze = 0): number {
 // running list). Nothing else here can see that, and the status cannot stand
 // in for it: a worker writes blocked or done, or leaves its answer, and then
 // keeps running while it writes its last message.
+//
+// `shipping` is whether the app's ship queue still owes this row a ship (the
+// supervisor's `shipping` list), which nothing here can see either.
 export function belongsInInbox(
   i: InboxItem,
-  { deliveredThrough = 0, hiddenUntil = 0, now = Date.now(), live = false } = {},
+  { deliveredThrough = 0, hiddenUntil = 0, now = Date.now(), live = false, shipping = false } = {},
 ): boolean {
   // ADDED TO LATER AND NOT STARTED (w-afb66e6661). It is written down on
   // purpose and waits for a person rather than a clock, so it is in Later and
@@ -191,6 +194,12 @@ export function belongsInInbox(
   // exited. It is In progress until then (`belongsInProgress`), and the
   // branches below decide the moment it is not.
   if (live) return false;
+  // THE APP IS STILL TO SHIP IT (w-0c1ba766eb). "It's waiting on us so it
+  // only needs our review when it's finished": a row marked to ship reached
+  // Needs you as finished work while the next move was the app's, and its only
+  // option was "Close this task". It comes back the moment the queue has dealt
+  // with it, shipped or handed back to its agent.
+  if (shipping) return false;
   if (hiddenUntil > now) return false;    // she put it away herself
   // One run of a repeating task that a worker EXPLICITLY marked clean. This is
   // the only place in the app where finishing hides something, so it is keyed on a
@@ -345,7 +354,7 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
 // silence it bought was indistinguishable from being ignored.
 export function belongsInProgress(
   i: InboxItem,
-  { deferredUntil = 0, now = Date.now(), live = false } = {},
+  { deferredUntil = 0, now = Date.now(), live = false, shipping = false } = {},
 ): boolean {
   // Nothing is coming on a thread nobody has started: In progress promises a
   // worker, and this one is waiting for you to say go (w-afb66e6661).
@@ -354,6 +363,8 @@ export function belongsInProgress(
   // agent that has written blocked, done or a moment to wake at is still
   // working until it exits (w-bc976fd247, and `live` above belongsInInbox).
   if (live) return true;
+  // And so is the app's ship queue, which owes this row a ship (w-0c1ba766eb).
+  if (shipping) return true;
   if (deferredUntil > now) return false;
   if (i.status === 'claimed') return true;
   // The promise this list makes has been kept: a session acted on her answer
@@ -422,9 +433,9 @@ export function stoppable(
 // were spawned for, which is what they already are in her inbox.
 export function belongsOnTheRail(
   i: InboxItem,
-  { deliveredThrough = 0, hiddenUntil = 0, deferredUntil = 0, now = Date.now(), live = false } = {},
+  { deliveredThrough = 0, hiddenUntil = 0, deferredUntil = 0, now = Date.now(), live = false, shipping = false } = {},
 ): boolean {
-  if (belongsInProgress(i, { deferredUntil, now, live })) return true;
+  if (belongsInProgress(i, { deferredUntil, now, live, shipping })) return true;
   if (hiddenUntil > now && i.status !== 'done') return true;  // the user's own, put off: Scheduled
   return belongsInInbox(i, { deliveredThrough, hiddenUntil, now });
 }

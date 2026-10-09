@@ -4008,8 +4008,14 @@ export class Supervisor {
       signInNeeded = this._waitingOnSignIn(this.store.listItems(Date.now())
         .filter((i) => mayRunHere(i, productBySlug.get(i.product), me)));
     } catch {}
+    // ROWS THE SHIP QUEUE STILL OWES A SHIP (w-0c1ba766eb). Waiting on the
+    // app and not on a person, so the window keeps them in In progress until
+    // they have shipped or gone back to their agent.
+    let shipping = [];
+    try { shipping = this.shipQueue.waitingIds(this.store.listItems(Date.now()), this.store.listProducts?.() ?? []); } catch {}
     return {
       paused: this.paused,
+      shipping,
       // ROWS NOTHING CAN START BECAUSE THEIR TOOL IS SIGNED OUT, by id, with the
       // tool's name. The row says so instead of "Queued", which promised an
       // agent "as soon as one is free" while none could be (2026-10-04).
