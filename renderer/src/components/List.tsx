@@ -3,7 +3,7 @@
 // end, on the title's line, the things that are not the message: priority, the
 // product, and when (or that an agent is on it, or that one stopped).
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { Product, RepeatRule, RunningSession, ThreadCard, View, WorkItem } from '../types';
 import { ago, dayLabel, previewText, stamp } from '../format';
 import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitle, walkRowKeys } from '../list-rules';
@@ -17,10 +17,12 @@ import { isTroubleRow, TROUBLE_ID } from '../trouble-row';
 import { isUpdateRow, UPDATE_ID } from '../update-row';
 import { IMPORT_KEYS, JUST_IMPORTED_WORD, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEYS, isImportRow, isNotImportedRow, justImported, type ImportChoice } from '../import-row';
 import { splitHits } from '../search';
+import type { ThreadSearchDetails } from '../threads/search';
 import { clockLabel, isCleanRun, nextRunAt } from '../../../shared/repeats.mjs';
-import { TeamRowEnd, type TeamView } from '../team/people';
+import { Face, TeamRowEnd, type TeamView } from '../team/people';
 import { RepeatMark, RowCells, TableHead, ThreadCells } from '../threads/Pages';
 import type { MixedRow } from '../threads/people-rules';
+import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
 
 /**
@@ -136,7 +138,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder }: {
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -195,6 +197,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   // of three lit words with two dim gaps between them.
   phrase?: string;
   summaries?: Map<string, string>;
+  searchDetails?: Map<string, ThreadSearchDetails>;
   // These rows are in match order, not in time order, so the day labels come
   // off and nothing goes up in their place. Set only while she has typed
   // something; an open-but-empty search field is still every task newest first,
@@ -237,7 +240,16 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   /** Called as the foot of the list comes near the screen, for the next page
    *  of old finished threads (w-fda2165ec6). Absent, there is no foot. */
   onEnd?: () => void;
+  /** A thread dragged up or down the table and let go in front of another
+   *  (null: at the foot), with every row's id as drawn, which App.tsx turns
+   *  into its place (w-6e5b532a95). Absent wherever the order is not yours to
+   *  set: Updated, Done, a search. */
+  onReorder?: (id: string, beforeId: string | null, drawn: string[]) => void;
 }) {
+  const drag = useRowDrag(table ? onReorder : undefined);
+  // The hover does not move while a row is carried: each row crossed would
+  // redraw the whole app under the drag (w-6e5b532a95).
+  const onHover = (id: string | null) => { if (!drag.carrying()) hoverTo?.(id); };
   const rules = view === 'snoozed' ? (repeats ?? []) : [];
   // The keys the rows in THIS list offer, drawn on the row under the pointer.
   // One list, one set: they are a property of the view, not of the message.
@@ -353,7 +365,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   const withPerson = table && !!mixed;
 
   return (
-    <div className={`list${table ? ' th-table' : ''}`}>
+    <div className={`list${table ? ' th-table' : ''}`} ref={drag.listRef}>
       {table && <TableHead person={withPerson} tab={view} />}
       {/* Repeating tasks sit above the deferred rows, in the tab that already
           holds work with a moment attached. They are RULES, not items, so they
@@ -438,9 +450,13 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
             // neither can honestly offer a select box, and both wear the rule
             // at the left edge instead.
             const made = isTroubleRow(item) || isUpdateRow(item);
+            // Only a thread in a ledger has a place to keep.
+            const movable = table && !!onReorder && !made && !isImportRow(item);
+            const details = searchDetails?.get(item.id);
             return (
               <div
                 key={item.id}
+                {...(movable ? { 'data-drag-id': item.id, onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => drag.onPointerDown(item.id, e) } : {})}
                 /*
                  * The first run points its coaching ring at the row it made
                    itself, by id, rather than at whatever is drawn first
@@ -468,6 +484,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                 onMouseMove={() => { if (hoveredId !== item.id) onHover?.(item.id); }}
                 onMouseLeave={() => { if (hoveredId === item.id) onHover?.(null); }}
                 onClick={(e) => {
+                  if (drag.swallowsClick()) return;
                   const intent = clickIntent('row', { shift: e.shiftKey, meta: e.metaKey, ctrl: e.ctrlKey });
                   if (intent === 'range') { onRange(index); return; }
                   if (intent === 'toggle') { onToggle(index); return; }
@@ -491,7 +508,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                   className={`mark${checked ? ' on' : ''}`}
                   role="checkbox"
                   aria-checked={checked}
-                  aria-label={`${checked ? 'Deselect' : 'Select'} ${rowTitle(item)}`}
+                  aria-label={`${checked ? 'Deselect' : 'Select'} ${details?.title ?? rowTitle(item)}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (clickIntent('box', { shift: e.shiftKey }) === 'range') onRange(index);
@@ -522,7 +539,13 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                       no label, which is every older row until a session
                       writes one (w-dae464cf30). The opened task's header uses
                       the same name since 2026-09-28 (w-b8c8958a12). */}
-                  <div className="subject"><Hits text={rowTitle(item)} terms={terms} phrase={phrase} /></div>
+                  <div className="subject">
+                    {details?.kind === 'chat' && <span className="th-faces search-faces">
+                      {details.people.slice(0, 3).map(id => <Face key={id} person={team?.byId.get(id)} />)}
+                      {details.people.length > 3 && <span className="th-faces-more">+{details.people.length - 3}</span>}
+                    </span>}
+                    <Hits text={details?.title ?? rowTitle(item)} terms={terms} phrase={phrase} />
+                  </div>
                   {/* On anything finished the RESULT is the news; the body is the
                       ask she already knows she made. Her own directives are often
                       a single line with no body at all, so keying this on the
@@ -540,6 +563,9 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                    title's line: priority, then the product, then when.
                  */}
                 <div className="row-end">
+                  {details?.kind === 'chat' ? <>
+                    <span className="time">{stamp(item.updatedAt)}</span>
+                  </> : <>
                   {/* THE WALK'S OWN KEY, AND ONLY THE WALK'S.
 
                       This slot used to swap the product and the time for two
@@ -741,6 +767,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                             : <span className="time">{view === 'snoozed' ? wake(wakeTs(item)) : view === 'inbox' ? stamp(item.updatedAt) : ago(item.updatedAt)}</span>}
                   </>
                   )}
+                  </>}
                 </div>
                 </>}
               </div>

@@ -145,6 +145,9 @@ const HANDLED = {
 
   // --- wherever she is ---
   '⌘K': [[chords, "e.key.toLowerCase() === 'k'"], [chords, "setModal((m) => (m === 'palette' ? null : 'palette'))"]],
+  // Control-K is the same chord where there is no Command key. The handler
+  // is `(e.metaKey || e.ctrlKey)`, so the excerpt is the ctrl half of it.
+  'Ctrl+K': [[chords, 'e.ctrlKey'], [chords, "e.key.toLowerCase() === 'k'"], [chords, "setModal((m) => (m === 'palette' ? null : 'palette'))"]],
   'C': [[focused, "e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }"], [list, "case 'c': case 'C': case 'n': case 'N': e.preventDefault(); setModal('compose'); break;"]],
   'N': [[focused, "e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }"], [list, "case 'c': case 'C': case 'n': case 'N': e.preventDefault(); setModal('compose'); break;"]],
   '/': [[chords, "if (e.key === '/')"], [chords, 'openSearch();']],

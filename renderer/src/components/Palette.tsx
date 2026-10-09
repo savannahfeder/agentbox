@@ -17,6 +17,7 @@ import { emptyLine, lookRows, matchesQuery, rankMatches } from '../palette-rows'
 import { type Look } from '../skins';
 import { type ThemeChoice } from '../theme';
 import { NAME } from '../../../shared/product-name.mjs';
+import { CHECK_SAY } from '../update-row';
 
 interface Command {
   id: string;
@@ -29,7 +30,7 @@ interface Command {
   run: () => void;
 }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onStanding, onSettings, onShortcuts, panelUp, onTogglePanel, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onStanding, onSettings, onShortcuts, panelUp, onTogglePanel, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -56,6 +57,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
    * and that is a standing rule, not an oversight. */
   updateReady?: string | null;
   onInstallUpdate?: () => void;
+  /** Look for a new version now. Answers in a toast. */
+  onCheckUpdate?: () => void;
   /** Whether the box filter has anything on, which is when "Clear filter" is offered. */
   filtering?: boolean;
   onOpenFilter: () => void;
@@ -201,6 +204,20 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       keywords: 'update upgrade new version restart',
       run: () => onInstallUpdate?.(),
     }] : []),
+    // AND LOOKING NOW, WHEN NOTHING IS WAITING (w-39d6c237f7). The same button
+    // Settings grew, here because wanting the newest version usually occurs to
+    // you somewhere other than Settings. It stands down while an update IS
+    // waiting: the row above is the answer, and two update rows side by side,
+    // one offering to look for what is already on the disk, is a choice nobody
+    // should have to make correctly at speed. The answer arrives as a toast, in
+    // the same words the Settings row uses (../update-row).
+    ...(updateReady ? [] : [{
+      id: 'update-check',
+      label: CHECK_SAY.check,
+      hint: `look now instead of waiting for ${NAME} to look on its own`,
+      keywords: 'update upgrade new version release newest restart',
+      run: () => onCheckUpdate?.(),
+    }]),
     ...(staleFiles.length ? [{
       id: 'stale',
       label: `Restart ${NAME} to pick up main-process changes`,
@@ -324,7 +341,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     {
       id: 'import-agents',
       label: 'Import agents from Claude Code or Codex',
-      hint: 'your last ten days on this Mac · they land in your inbox',
+      hint: 'your last ten days on this computer · they land in your inbox',
       keywords: 'import agents claude code codex conversations threads sessions subagents existing mine bring across add my recent',
       run: onImportAgents,
     },

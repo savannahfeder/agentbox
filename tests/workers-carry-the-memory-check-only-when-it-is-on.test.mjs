@@ -32,7 +32,9 @@ function makeSupervisor(memoryGate) {
     listItems: () => [], listProducts: () => [], isDue: () => true,
     readItem: (slug, id) => (id === 'w-urgent' ? { id, product: slug, priority: 9 } : null),
   };
-  const sup = new Supervisor({ storeRoot: tmp, home: tmp, memoryGate, memoryGateSocket: path.join(tmp, 'g.sock'), memoryGateLockPort: 0 }, store, root, tmp, tmp);
+  // Turning the gate on also installs a Codex hook. Its home must belong to
+  // this fixture; desktop-launch verification caught a real-home write (EPERM).
+  const sup = new Supervisor({ storeRoot: tmp, home: tmp, codexHome: path.join(tmp, '.codex'), memoryGate, memoryGateSocket: path.join(tmp, 'g.sock'), memoryGateLockPort: 0 }, store, root, tmp, tmp);
   made.push(sup);
   return sup;
 }

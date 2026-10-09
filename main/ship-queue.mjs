@@ -188,7 +188,7 @@ export function failureReply(output) {
     ...(died ? [
       '',
       'Its test run DIED rather than going red: nothing it printed names a failing',
-      'test. Look for what killed the run. This Mac runs a dozen agents at once, so',
+      'test. Look for what killed the run. This computer runs a dozen agents at once, so',
       'a worker that was starved or timed out is likelier than a bug in your change.',
       'Run the tests for your change again before you go looking for one.',
     ] : []),

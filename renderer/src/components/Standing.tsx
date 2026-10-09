@@ -23,11 +23,8 @@ type Save = 'idle' | 'saving' | 'saved' | 'failed';
 export const RESTART = `quit and reopen ${NAME} to edit these`;
 export const isMissingHandler = (message: string) => /No handler registered/i.test(message);
 
-// The box is one mechanism over two files. Her standing instructions are the
-// rules she writes; the writing rules are the ones the app ships and she may
-// rewrite or empty. Same box, same saving, same failure sentence: two
-// components would drift, and the second one would be the one that quietly
-// stopped saving. The channels are looked up when the box opens, never at
+// The box edits the user's combined general and writing instructions.
+// The channels are looked up when the box opens, never at
 // module load: a window reloaded onto an older main process has to be able
 // to see that the handler is missing and say so, which a captured undefined
 // cannot.
@@ -48,18 +45,6 @@ export const STANDING: Instructions = {
   placeholder: 'Don\'t hand me summary .md files. Put the answer on the work item.',
   reader: () => window.zero?.standingRead,
   writer: () => window.zero?.standingWrite,
-};
-
-// THE SECOND FILE, AND IT USED TO BE TWO (w-3dc46f3a67, 2026-09-22). One box
-// said how agents write during a task and another said how they end one, which
-// is a seam in our code and not a distinction anybody makes while typing. The
-// sentence says the one thing a stranger cannot get from the text on screen:
-// that this reaches every run, not only the ones that got the worker brief.
-export const MESSAGE_RULES: Instructions = {
-  sentence: 'How agents write to you. Every task, every kind. Empty the box and they follow none of it.',
-  placeholder: 'Open with what happened and what you need from me.',
-  reader: () => window.zero?.messageRulesRead,
-  writer: () => window.zero?.messageRulesWrite,
 };
 
 export function Standing({ kind = STANDING, onClose }: { kind?: Instructions; onClose: () => void }) {

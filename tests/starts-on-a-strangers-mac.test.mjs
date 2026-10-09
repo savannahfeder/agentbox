@@ -20,7 +20,8 @@ import path from 'node:path';
 import { Store } from '../main/store.mjs';
 import { Supervisor } from '../main/supervisor.mjs';
 import { loadConfig } from '../main/config.mjs';
-import { nameSlug, Name } from '../shared/product-name.mjs';
+import { defaultStoreRoot } from '../main/store/home.mjs';
+import { nameSlug } from '../shared/product-name.mjs';
 
 let root, dir;
 
@@ -170,8 +171,9 @@ describe('starting with no outside checkout on the machine', () => {
     const appDir = fs.mkdtempSync(path.join(os.tmpdir(), 'appdir-'));
     fs.writeFileSync(path.join(appDir, 'zero.config.json'), JSON.stringify({ accountId: 'acct' }));
     const config = loadConfig(appDir);
-    expect(config.storeRoot).toBe(path.join(os.homedir(), Name));
-    expect(config.accountRoot).toBe(path.join(os.homedir(), Name, 'accounts', 'acct'));
+    const store = defaultStoreRoot({ home: os.homedir() });
+    expect(config.storeRoot).toBe(store);
+    expect(config.accountRoot).toBe(path.join(store, 'accounts', 'acct'));
     fs.rmSync(appDir, { recursive: true, force: true });
   });
 });

@@ -305,6 +305,11 @@ export const PROPOSAL_PATIENCE = 24 * 3_600_000;
  * It names a thread it can see in `items`: a proposal whose parent is not
  * there has nothing to come back, which is why `isProposal` refuses to hide
  * one in the first place.
+ *
+ * A thread YOU closed stays closed. The reminder used to bypass the inbox's
+ * archive rule, returning one Done thread after eight closes (2026-10-07).
+ * An agent finishing is still news; your closure settles the reminder without
+ * answering or deleting its proposals. Reopening deliberately enables it again.
  */
 export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?: string }>(
   items: readonly T[],
@@ -315,7 +320,10 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
   for (const i of items) {
     if (!isProposal(i)) continue;
     if (now - (i.createdAt ?? 0) <= PROPOSAL_PATIENCE) continue;
-    if (i.parent && byId.has(i.parent)) owed.add(i.parent);
+    const parent = i.parent ? byId.get(i.parent) : undefined;
+    if (!parent) continue;
+    if (parent.status === 'done' && parent.wrote?.status?.source === 'founder') continue;
+    owed.add(parent.id);
   }
   return owed;
 }

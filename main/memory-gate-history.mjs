@@ -8,10 +8,15 @@
 // measured using, here, the last few times it ran.
 //
 // THE ONE RULE THAT IS NOT NEGOTIABLE: missing evidence never makes a command
-// light. Light means "seen light, more than once, and never heavy since". One
-// heavy run is enough to make that exact command heavy. A program that has been
-// light every time across many different arguments lends that to an argument
-// it has not seen, and stops the moment one of its runs is not light.
+// light. Light means "measured light, more than once, and never heavy since".
+// One heavy run is enough to make that exact command heavy. A program that has
+// been light every time it was measured, across many different arguments, lends
+// that to an argument it has not seen, and stops the moment one of its runs is
+// measured as anything else.
+//
+// AND MISSING EVIDENCE DOES NOT MAKE A COMMAND HEAVY EITHER (w-b689e9fc0c). A
+// run nothing measured is filed as `?` and read as nothing at all, rather than
+// as a run that might have been big: see `measured` below for what that cost.
 //
 // A RUN THAT ENDED INSIDE 2 SECONDS AND WAS NEVER SEEN BIG COUNTS AS LIGHT.
 // Measured on 2026-10-04 across 30 recent agent sessions (2006 commands): the
@@ -153,6 +158,26 @@ function basename(p) {
 const programOf = (key) => key.split(' ')[0];
 
 /**
+ * The observations that are evidence, which is all of them but `?`.
+ *
+ * `?` IS THE ABSENCE OF EVIDENCE AND IS READ AS NOTHING AT ALL (w-b689e9fc0c).
+ * It used to count against a command: `git branch` stood at "lllll?llll", nine
+ * light runs and one that nothing measured, and the single `?` inside the last
+ * five made every `git branch` command `unknown` — and because the command's own
+ * record had answered, the `git` program record, ten light runs with nothing else
+ * in it, was never reached. On a 16 GB M4 on 2026-10-07 that put
+ * `git fetch -q origin | tail -2; git branch -r --contains <sha> | head -3`
+ * behind one of two slots for 89 seconds to use 0 MB. One unmeasured run held
+ * that command back for its next nine, and a loaded Mac is precisely where runs
+ * go unmeasured, so the gate made itself hold more and more.
+ *
+ * The rule it must not break is the one above: missing evidence never makes a
+ * command light. It cannot, because a `?` is dropped rather than counted, and
+ * what is left still has to be light and still has to be more than one run.
+ */
+const measured = (list) => (list ?? []).filter((o) => o !== '?');
+
+/**
  * The learned record. Each key and each program keeps its last ten
  * observations as letters: l light, m in between, h heavy, ? not measured.
  * Both maps are kept in least-recently-seen-first order so the oldest falls off
@@ -167,27 +192,41 @@ export class CommandHistory {
     this.programs = new Map();
   }
 
-  /** What one finished run tells us. `peakMb` null means it was never sampled. */
-  record(command, { peakMb = null, durationMs = null, background = false } = {}) {
+  /**
+   * What one finished run tells us. `peakMb` null means it was never sampled.
+   * Answers whether anything was filed.
+   *
+   * `onlyIfLight` is for a run whose memory reading belonged to several
+   * commands at once: one `codex app-server` serves every Codex thread of a
+   * login, so two Codex commands running together are measured together
+   * (w-5601e99977). How long each took is still its own, so a quick one is
+   * light on that alone — and anything else from such a run is dropped rather
+   * than filed as "not measured", because that would un-learn a command this
+   * app has seen light before, and missing evidence must never move a command
+   * either way.
+   */
+  record(command, { peakMb = null, durationMs = null, background = false, onlyIfLight = false } = {}) {
     const { keys, opaque } = commandSegments(command);
-    if (!keys.length) return;
+    if (!keys.length) return false;
     let obs;
     if (typeof peakMb === 'number' && Number.isFinite(peakMb)) {
       obs = peakMb >= this.heavyMb ? 'h' : peakMb < this.lightMb ? 'l' : 'm';
     } else {
       obs = !background && typeof durationMs === 'number' && durationMs < QUICK_MS ? 'l' : '?';
     }
+    if (onlyIfLight && obs !== 'l') return false;
     // A chain's memory belongs to the chain: `git status && npm test` measured
     // heavy says nothing bad about `git status`. Only a light chain vouches for
     // each of its parts.
     if (keys.length > 1 || opaque) {
       this._push(this.keys, chainKey(keys, opaque), obs);
-      if (obs !== 'l') return;
+      if (obs !== 'l') return true;
     }
     for (const key of keys) {
       this._push(this.keys, key, obs);
       this._push(this.programs, programOf(key), obs);
     }
+    return true;
   }
 
   /** 'light' | 'unknown' | 'heavy' for a command about to run. */
@@ -208,27 +247,13 @@ export class CommandHistory {
     return verdict;
   }
 
-  /**
-   * A RUN NOBODY MEASURED COUNTS FOR NOTHING, NOT AGAINST (w-8386b3fd47).
-   *
-   * `?` means the run finished between two samples and was not quick enough to
-   * vouch for itself, so nothing was learned either way. It used to veto both
-   * thresholds below, which read missing evidence as evidence AGAINST: on the
-   * founder's Mac `cat` stood at `llllll??ll` and `rg` at `lllllllll?`, so
-   * neither was light, every ordinary read needed one of two heavy slots, and
-   * reads queued behind builds until they were refused twenty minutes later.
-   *
-   * So `?` is skipped. The thresholds are unchanged and are still counted in
-   * runs that were actually measured: two for this exact command, five for its
-   * program. One measured run that was heavy or middling still rules light out.
-   */
   _classifyKey(key) {
-    const recent = this.keys.get(key)?.slice(-5) ?? [];
+    const own = this.keys.get(key);
+    const recent = measured(own?.slice(-5));
     if (recent.includes('h')) return 'heavy';
-    const measured = recent.filter((o) => o !== '?');
-    if (measured.length >= 2 && measured.every((o) => o === 'l')) return 'light';
-    if (measured.some((o) => o !== 'l')) return 'unknown';
-    const prog = (this.programs.get(programOf(key)) ?? []).slice(-10).filter((o) => o !== '?');
+    if (recent.length >= 2 && recent.every((o) => o === 'l')) return 'light';
+    if (recent.some((o) => o !== 'l')) return 'unknown';
+    const prog = measured(this.programs.get(programOf(key))?.slice(-10));
     if (prog.length >= 5 && prog.every((o) => o === 'l')) return 'light';
     return 'unknown';
   }

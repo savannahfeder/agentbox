@@ -11,7 +11,7 @@ import { ensurePersonalProject } from './team/projects.mjs';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { configDir, loadConfig } from './config.mjs';
+import { configDir, loadConfig, saveConfig } from './config.mjs';
 import { installMenu, applyZoom, requestFind } from './menu.mjs';
 import { zoomDeltaFor } from './zoom-keys.mjs';
 import { copySelection } from './copy-selection.mjs';
@@ -21,7 +21,7 @@ import { storeRootEnv } from './store/home.mjs';
 import { Supervisor } from './supervisor.mjs';
 import { startCodexWatch } from './codex-watch.mjs';
 import { registerIpc } from './ipc.mjs';
-import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules } from './instruction-settings.mjs';
+import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mjs';
 import * as approvals from './approvals.mjs';
 import { recoveryToast } from '../shared/recovery.mjs';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mjs';
@@ -32,6 +32,7 @@ import { createAnalytics, createDailyCount } from './analytics.mjs';
 import { createUpdater } from './updater.mjs';
 import { createSourceUpdater } from './source-updater.mjs';
 import { installNotifier } from './notify.mjs';
+import { createCornerTag } from './corner-tag.mjs';
 import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mjs';
 import { quietTheFramesScrollbars } from './frame-scrollbars.mjs';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mjs';
@@ -206,6 +207,9 @@ try {
   // AND A BOX THAT AN OLDER JOIN FILLED WITH ONLY OUR TEXT IS EMPTIED, ONCE
   // (w-3ec9f07978). Kept as a restore point; our rules ride from the checkout.
   if (setAsideShippedMessageRules(appDir, userDir)) console.log('zero: the message rules box held only the shipped rules; set aside as a restore point');
+  // Both kinds of user rules now live in founder.md. Only user content is
+  // appended; the app's message defaults continue to come from the bundle.
+  if (unifyAgentInstructions(appDir, userDir)) console.log('zero: combined the general and writing instructions');
 } catch (err) {
   console.warn(`zero: could not carry her instructions into ${userDir}: ${err.message}`);
 }
@@ -603,6 +607,11 @@ async function createWindow() {
     },
   });
 
+  // THE MENU IS A BAR INSIDE THE WINDOW on Linux and Windows. On macOS it is
+  // the system menu, so it stays. The menu itself stays everywhere: the Ctrl
+  // chords are bound to it, and taking the menu out would take them with it.
+  if (process.platform !== 'darwin') window.setMenuBarVisibility(false);
+
   // WHICH PICTURE SET THIS WINDOW IS ON, and a shout when it changes.
   // main/screen-detail.mjs has the rule and the reasoning; this is the wiring.
   // The initial answer rides bootInfo rather than being pushed, for the same
@@ -855,7 +864,21 @@ async function createWindow() {
   // a locked screen all read the same from in there). The renderer says what
   // arrived; main/notify.mjs decides. tell me when I am in another app, never
   // while I am in Agentbox.
-  installNotifier({ app, window, Notification, powerMonitor, ipcMain });
+  installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage });
+  // THE CORNER TAG (w-dafae58a23): what is ready for her, floating over
+  // whatever app she is in. Its page is built beside the app's own, and comes
+  // from the dev server only when the app's own page does.
+  createCornerTag({
+    BrowserWindow, screen: electronScreen, ipcMain, Menu, powerMonitor, config, saveConfig, mainWindow: window,
+    preload: path.join(appDir, 'main', 'corner-tag-preload.cjs'),
+    // `part` is the tag itself or the list beside it, one page drawn twice.
+    load: (tagWindow, part) => {
+      const devTag = process.env.ZERO_DEV_URL;
+      const builtTag = path.join(appDir, 'renderer', 'dist', 'corner-tag.html');
+      if (devTag && !fs.existsSync(builtTag)) tagWindow.loadURL(`${devTag.replace(/\/$/, '')}/corner-tag.html?part=${part}`);
+      else tagWindow.loadFile(builtTag, { search: `part=${part}` });
+    },
+  });
   // Asked for once by the renderer as it mounts, rather than pushed on
   // did-finish-load, which races the first effects and would drop the very
   // message it exists to deliver.
@@ -1014,6 +1037,17 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
   app.whenReady().then(() => {
+    // A from-source Linux launch keeps the launcher command installed. The
+    // entry runs that command; this only refreshes where it points. A packaged
+    // build ships its own entry and must not write one from here.
+    // LOADED HERE AND NOT AT THE TOP: scripts/ is not in the packaged app or the
+    // npx package, and a static import of it stopped main.mjs loading at all,
+    // on every Mac (tests/the-mac-app-ships-every-file-it-starts-with).
+    if (process.platform === 'linux' && !app.isPackaged) {
+      import('../scripts/linux-launcher.mjs')
+        .then(({ installLinuxLauncher }) => installLinuxLauncher({ appDir, env: process.env }))
+        .catch(() => { /* a launcher is never a reason to stop a launch */ });
+    }
     // THE ABOUT BOX SAYS AGENTBOX AND ITS OWN VERSION (w-db6f5e331e). Run from
     // source it read the bundle's, which is Electron's: "Electron 43.0.0".
     app.setAboutPanelOptions({ applicationName: NAME, applicationVersion: app.getVersion(), version: '' });

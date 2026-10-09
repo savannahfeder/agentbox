@@ -1,6 +1,22 @@
 // The bridge. Everything the renderer may do, spelled out.
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
+// The layout keeps 40px clear of the macOS traffic lights. Everywhere else
+// that band is empty headroom above the pane. The stylesheet reads this and
+// uses the same inset as the sides. A browser tab sets its own shell and is
+// not this.
+//
+// The sandboxed preload runs while the document is still loading, and
+// documentElement is null then. Reading it here throws, and a throw on this
+// line skips the bridge below, so the window draws the canned inbox.
+if (process.platform !== 'darwin') {
+  const markFlat = () => {
+    if (document.documentElement) document.documentElement.dataset.window = 'flat';
+  };
+  if (document.documentElement) markFlat();
+  else document.addEventListener('DOMContentLoaded', markFlat);
+}
+
 // EVERY ASK BEFORE A RELOAD IS ANSWERED, held write or not. main waits for
 // this before it reloads (main/write-before-reload.mjs), so a page with
 // nothing held, or one that has not set a handler yet, says so at once rather
@@ -98,6 +114,9 @@ contextBridge.exposeInMainWorld('zero', {
   agentThreads: () => ipcRenderer.invoke('zero:agent-threads'),
   importThreads: (payload) => ipcRenderer.invoke('zero:import-threads', payload ?? {}),
   badge: (count) => ipcRenderer.invoke('zero:badge', count),
+  // What the corner tag says when she is in another app: what is ready for
+  // her, and how many are working (main/corner-tag.mjs).
+  cornerTag: (state) => ipcRenderer.invoke('zero:corner-tag', state),
   // Whether this page came up from ⌘R, and which build it is running.
   bootInfo: () => ipcRenderer.invoke('zero:boot-info'),
   // KEEPING AGENTBOX CURRENT (main/updater.mjs). The state of it rides the
@@ -202,6 +221,7 @@ contextBridge.exposeInMainWorld('zero', {
   resumeItems: (payload) => ipcRenderer.invoke('zero:resume-items', payload),
   redeliver: (payload) => ipcRenderer.invoke('zero:redeliver', payload),
   setProductOrder: (payload) => ipcRenderer.invoke('zero:set-product-order', payload),
+  setThreadPlaces: (payload) => ipcRenderer.invoke('zero:set-thread-places', payload),
   setProductHidden: (payload) => ipcRenderer.invoke('zero:set-product-hidden', payload),
   approve: (payload) => ipcRenderer.invoke('zero:approve', payload),
   // What was just decided, and on which card. The Cmd+Y chord is caught in the
@@ -247,6 +267,12 @@ contextBridge.exposeInMainWorld('zero', {
     const handler = (_e, payload) => fn(payload);
     ipcRenderer.on('zero:open-item', handler);
     return () => ipcRenderer.removeListener('zero:open-item', handler);
+  },
+  // The corner tag's "Turn off…": opens Settings at the switch that does it.
+  onOpenSettings: (fn) => {
+    const handler = (_e, payload) => fn(payload);
+    ipcRenderer.on('zero:open-settings', handler);
+    return () => ipcRenderer.removeListener('zero:open-settings', handler);
   },
   // The window moved to a screen that wants the other set of theme pictures.
   // Only main can see which physical display a window is on, and only main can

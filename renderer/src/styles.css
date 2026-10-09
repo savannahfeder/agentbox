@@ -958,6 +958,8 @@ body {
 }
 .search-q::placeholder { color: var(--text-faint); font-weight: 500; }
 
+.search-faces { margin-right: 9px; vertical-align: middle; position: relative; top: -1px; }
+
 /* A bare glyph. The chrome was doing the work the shape already does. */
 .icon-btn {
   width: 34px; height: 34px; flex: 0 0 auto;

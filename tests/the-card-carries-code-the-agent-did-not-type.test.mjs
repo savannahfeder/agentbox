@@ -16,6 +16,9 @@ import { Name } from '../shared/product-name.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const run = (cwd, cmd, args) => execFileSync(cmd, args, { cwd, encoding: 'utf8' });
+// BSD sed takes a backup suffix after -i. GNU sed treats that empty argument
+// as the script and then tries to open it as a file.
+const sedInPlace = (cwd, expr, file) => run(cwd, 'sed', process.platform === 'darwin' ? ['-i', '', expr, file] : ['-i', expr, file]);
 
 /** One assistant turn of a real transcript, in the shape the CLI writes. */
 const turn = (ts, blocks) => JSON.stringify({ type: 'assistant', timestamp: ts, message: { content: blocks } });
@@ -43,7 +46,7 @@ describe('the card carries code the agent did not type into a tool', () => {
     const before = snapshotRepo(dir);
     // The way a worker actually writes a file today, and the reason the card
     // was empty: nothing about this reaches the agent's own transcript.
-    run(dir, 'sed', ['-i', '', 's/line 4/line four/', 'main/ipc.mjs']);
+    sedInPlace(dir, 's/line 4/line four/', 'main/ipc.mjs');
     const change = changeFromRepo(before);
     expect(change.files.map((f) => f.path)).toEqual(['main/ipc.mjs']);
     expect(change.plus).toBe(1);
@@ -59,7 +62,7 @@ describe('the card carries code the agent did not type into a tool', () => {
     fs.appendFileSync(path.join(dir, 'main', 'ipc.mjs'), 'somebody else was here\n');
     fs.writeFileSync(path.join(dir, 'main', 'theirs.mjs'), 'not mine\n');
     const before = snapshotRepo(dir);
-    run(dir, 'sed', ['-i', '', 's/line 2/line two/', 'main/ipc.mjs']);
+    sedInPlace(dir, 's/line 2/line two/', 'main/ipc.mjs');
     const change = changeFromRepo(before);
     expect(change.files.map((f) => f.path)).toEqual(['main/ipc.mjs']);
     // The other agent's line is context here, not a green line of ours.
@@ -134,7 +137,7 @@ describe('the card carries code the agent did not type into a tool', () => {
       const transcript = path.join(docs, 'session.jsonl');
       fs.writeFileSync(transcript, turn('2026-08-24T20:00:00Z', [{ type: 'text', text: 'Running a script.' }]));
       const before = snapshotRepo(dir);
-      run(dir, 'sed', ['-i', '', 's/line 6/line six/', 'main/ipc.mjs']);
+      sedInPlace(dir, 's/line 6/line six/', 'main/ipc.mjs');
       const repos = [changeFromRepo(before)];
       // Without the disk this is the empty card a tester was clicking.
       expect(writeChangeForRun({ transcript, docsDir: docs, itemId: 'w-none', roots: [dir] })).toBeNull();

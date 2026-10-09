@@ -55,7 +55,8 @@
 //    `delete` have nothing but `type`. So a rename is an update that moved.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -761,8 +762,23 @@ describe('what the run changed, in the shape the artifact already draws', () => 
   // tool reports /private/tmp/x. Codex reports the resolved spelling for
   // everything, so this is the COMMON case here rather than the rare one.
   it('matches a root given in the unresolved spelling of a symlinked /tmp', () => {
-    const out = changeFromCodexTurn([fileChangeCompleted()], { roots: [WORK.replace('/private/tmp/', '/tmp/')] });
-    expect(out.files.map((f) => f.path)).toEqual(['math.js', 'notes.txt']);
+    // The measured frame names /private/tmp, which is what macOS calls /tmp.
+    // The rule is the symlink, not that spelling: the app is handed the link
+    // and Codex reports the path the link resolves to. Build that pair here
+    // so the same assertion runs where /tmp is not a link to /private/tmp.
+    const real = realpathSync(mkdtempSync(join(tmpdir(), 'codex-real-')));
+    const linkDir = mkdtempSync(join(tmpdir(), 'codex-link-'));
+    const link = join(linkDir, 'repo');
+    symlinkSync(real, link);
+    const event = fileChangeCompleted();
+    for (const change of event.params.item.changes) change.path = change.path.replace(WORK, real);
+    try {
+      const out = changeFromCodexTurn([event], { roots: [link] });
+      expect(out.files.map((f) => f.path)).toEqual(['math.js', 'notes.txt']);
+    } finally {
+      rmSync(real, { recursive: true, force: true });
+      rmSync(linkDir, { recursive: true, force: true });
+    }
   });
 
   it('drops everything written before the moment it was told to start from', () => {

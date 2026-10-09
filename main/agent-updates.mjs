@@ -6,6 +6,7 @@ import path from 'node:path';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {TaskTerminals,terminalEnv} from './task-terminals.mjs';
+import {codexLaunchEnv} from './codex-launch-env.mjs';
 const exec=promisify(execFile);
 const valid=v=>typeof v==='string'&&/^\d+\.\d+\.\d+$/.test(v);
 export function newerVersion(installed,latest){
@@ -34,7 +35,8 @@ export async function installedAgent(engine,config){
  if(!bin)throw Error('This agent is not installed.');
  const home=config.home||os.homedir();
  const settings=engine==='claude'?json(path.join(process.env.CLAUDE_CONFIG_DIR||path.join(home,'.claude'),'settings.json')):{};
- const env=terminalEnv();
+ const cleanEnv=terminalEnv();
+ const env=engine==='codex'?codexLaunchEnv(bin,cleanEnv):cleanEnv;
  // Version inspection must not itself auto-update anything.
  const {stdout}=await exec(bin,['--version'],{timeout:8000,maxBuffer:16384,env:{...env,DISABLE_AUTOUPDATER:'1'}});
  const version=stdout.match(/\b\d+\.\d+\.\d+(?:-[\w.-]+)?\b/)?.[0];

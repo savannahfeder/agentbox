@@ -32,6 +32,17 @@ export function terminalPlace({store,supervisor,product,id,agent}){
   return {cwd,notice};
 }
 export function terminalFolder(args){return terminalPlace(args).cwd;}
+// The shell a person actually has. `$SHELL` when that file exists, then
+// zsh, bash, and sh. A machine with no zsh used to spawn `/bin/zsh` and
+// the terminal never came up.
+export function loginShell(env=process.env,exists=fs.existsSync){
+  const preferred=env.SHELL;
+  if(preferred&&exists(preferred))return preferred;
+  for(const candidate of ['/bin/zsh','/bin/bash','/bin/sh']){
+    if(exists(candidate))return candidate;
+  }
+  return preferred||'/bin/sh';
+}
 // Enumerate only descendants of our own shell, including background process
 // groups. Kill children before shell; closing a pane never calls this.
 export function disposeTerminalProcess(pty){
@@ -69,7 +80,7 @@ const IDLE_MS=600000;
 const SWEEP_MS=60000;
 const MAX_TERMINALS=20;
 export class TaskTerminals {
-  constructor({spawn,resolve,disposeProcess=disposeTerminalProcess,env=terminalEnv(),shell=process.env.SHELL||'/bin/zsh',idleMs=IDLE_MS,sweepMs=SWEEP_MS,now=()=>Date.now()}={}){
+  constructor({spawn,resolve,disposeProcess=disposeTerminalProcess,env=terminalEnv(),shell=loginShell(),idleMs=IDLE_MS,sweepMs=SWEEP_MS,now=()=>Date.now()}={}){
     this.spawn=spawn??((...args)=>require('node-pty').spawn(...args));this.resolve=resolve;this.disposeProcess=disposeProcess;this.env=env;this.shell=shell;this.sessions=new Map();
     this.idleMs=idleMs;this.now=now;
     // Keys whose shell this class ended on its own, and WHY. The next open on
