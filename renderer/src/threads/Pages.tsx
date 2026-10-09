@@ -6,6 +6,7 @@
 // are in ./page-rules.ts; the look is ./pages.css, ported from the drawings
 // she approved.
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useRowDrag } from './row-drag';
 import type { Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName } from '../team/people';
@@ -14,7 +15,7 @@ import { notStarted, rowTitle } from '../list-rules';
 import { toApproveWords } from '../threads-made';
 import { DONE } from '../done-word';
 import {
-  boardColumns, columnTo, DEFAULT_COLUMN_ORDER, filteredEmptyWords, finishedAt, isDirect, isFiltered, nextPrivacy, projectChoices, slotUnder,
+  boardColumns, columnTo, conversationSlugs, DEFAULT_COLUMN_ORDER, entryScore, filteredEmptyWords, finishedAt, isDirect, isFiltered, nextPrivacy, placesForDrop, projectChoices, slotUnder,
   timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type Privacy, type UpdatedWindow,
 } from './page-rules';
@@ -478,7 +479,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
  *  it, the private ones included; with a teammate in view, those wear a lock
  *  and every card names its person. Whose threads is picked on the header's
  *  filters button (w-14bb56c833), so the columns start right under it. */
-export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, selectedCard = null, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns, projectOrder, marked, onMark }: {
+export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, selectedCard = null, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns, projectOrder, onPlaces, marked, onMark }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number; onOpenItem: (item: WorkItem) => void;
   /** The column each thread sits in, by the Inbox tabs' rule (App.tsx). */
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
@@ -491,6 +492,9 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   columnOrder?: ThreadStateWord[]; onReorderColumns?: (order: ThreadStateWord[]) => void;
   /** Your running order of projects, which Sort by Priority reads first. */
   projectOrder?: string[];
+  /** Where a card dragged up or down its column goes to be kept
+   *  (w-6e5b532a95). Absent where the order is not yours to set. */
+  onPlaces?: (places: Record<string, number>, dropped: string) => void;
   /** The threads picked for a bulk command (App.tsx's `multiSel`), and where a
    *  new pick goes: ⌘- or Shift-click on a card, or a box dragged across the
    *  board's empty space (board-select.ts, w-2e3819913c). */
@@ -604,6 +608,19 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   });
+  // A CARD CARRIED UP OR DOWN ITS OWN COLUMN (w-6e5b532a95) keeps that place,
+  // worked out by the same rule as a row in the list. Not across columns: a
+  // column is a thread's state, and dragging does not change what state is.
+  const direct = useMemo(() => conversationSlugs(products), [products]);
+  const cardDrag = useRowDrag(onPlaces ? (id, beforeId, drawn) => {
+    const col = columns.find((c) => c.rows.some((e) => e.item?.id === id));
+    if (!col) return;
+    // In the order the cards were drawn, so the neighbours are the two the gap was between.
+    const byId = new Map(col.rows.filter((e) => e.item).map((e) => [e.item!.id, e]));
+    const rows = drawn.flatMap((d) => { const e = byId.get(d); return e ? [{ id: d, score: entryScore(e, projectOrder, direct) }] : []; });
+    const places = placesForDrop(rows, id, beforeId);
+    if (places) onPlaces(places, id);
+  } : undefined, 'copy');
   const sharing = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since } : null);
   const isSelected = (e: BoardEntry) => (e.card
     ? selectedCard === stopKey({ card: e.card })
@@ -681,7 +698,8 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     <div className={`th-board${dragging ? ' dragging' : ''}`} ref={boardRef}>
     {columns.map((col) => {
       const rows = col.rows;
-      return <div key={col.state} className={`th-col${dragging === col.state ? ' lifted' : ''}`}
+      const movable = !!onPlaces && col.state !== 'done' && display.sort === 'priority';
+      return <div key={col.state} className={`th-col${dragging === col.state ? ' lifted' : ''}`} data-drag-scope=""
         ref={(el) => { if (el) colEls.current.set(col.state, el); else colEls.current.delete(col.state); }}>
         {/* Your own board says what the tab says: what waits on you needs you.
             The heading is the handle: grab it to move the whole column. */}
@@ -728,7 +746,11 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           const edge = isSelected(e) && !marked?.size;
           return <button type="button" key={e.key} className={`th-card${edge ? ' selected' : ''}${on ? ' picked' : ''}`}
           {...(pick ? { 'data-board-id': e.item!.id, 'aria-pressed': on } : {})}
+          // A plain press and a pull up or down carries the card to a new
+          // place in its column (w-6e5b532a95); ⌘ or Shift never starts one.
+          {...(movable && e.item ? { 'data-drag-id': e.item.id, onPointerDown: (ev: ReactPointerEvent<HTMLButtonElement>) => cardDrag.onPointerDown(e.item!.id, ev) } : {})}
           onClick={(ev) => {
+            if (cardDrag.swallowsClick()) return;
             if (pick && cardClickIntent({ shift: ev.shiftKey, meta: ev.metaKey, ctrl: ev.ctrlKey }) === 'toggle') {
               onMark!(clickMarks(marked ?? new Set(), e.item!.id, cursorId));
               return;

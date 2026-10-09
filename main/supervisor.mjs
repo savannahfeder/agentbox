@@ -40,7 +40,7 @@ import { buildSessionArgs, CLAUDE_MODES, permissionMode } from './settings.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, productRankScore } from '../shared/rank.mjs';
+import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, placedScore, productRankScore } from '../shared/rank.mjs';
 import { keysForAgents } from '../shared/shortcuts.mjs';
 import { isCleanRun, ruleIdOf } from '../shared/repeats.mjs';
 import { mayRunHere } from '../shared/team-rules.mjs';
@@ -458,6 +458,8 @@ export class Supervisor {
       // the inbox: this is a filing decision about a list that had grown to
       // twenty two chips, not an off switch. Pausing is the off switch.
       this.hiddenProducts = new Set(state.hiddenProducts ?? []);
+      // Threads she dragged to a place of their own in the list (`_score`).
+      this.threadPlaces = Object.fromEntries(Object.entries(state.threadPlaces ?? {}).filter(([, v]) => Number.isFinite(v)));
     } catch {
       this._handledAnswers = new Set();
       this._heardAnswers = {};
@@ -471,6 +473,7 @@ export class Supervisor {
       this._profileCooldown = {};
       this.productOrder = [];
       this.hiddenProducts = new Set();
+      this.threadPlaces = {};
     }
     // WHICH ROWS NOTHING HAS BEEN ABLE TO RUN ON, as of the last tick, for the
     // line above her list. Deliberately NOT persisted: it is derived from
@@ -3116,8 +3119,28 @@ export class Supervisor {
   // One product's medium outranks another's urgent when it sits above it.
   // Ties break oldest-first so nothing starves. The item's own number is hers
   // alone now (itemPriority); an agent's tag no longer moves anything.
+  // A THREAD DRAGGED IN THE LIST RUNS WHERE IT WAS PUT (w-6e5b532a95): its
+  // place replaces the score outright (`placedScore`, shared/rank.mjs).
   _score(item) {
-    return productRankScore(this.productOrder, item.product) + itemPriority(item);
+    return placedScore(this.threadPlaces[item.id], productRankScore(this.productOrder, item.product) + itemPriority(item));
+  }
+
+  // Places as a patch: a number sets one, null forgets it. Kept here beside
+  // the project order, on this Mac, because both are one person's running
+  // order and a teammate's list must not move when you drag yours.
+  setThreadPlaces(patch) {
+    for (const [id, place] of Object.entries(patch ?? {})) {
+      if (place === null) delete this.threadPlaces[id];
+      else if (Number.isFinite(place)) this.threadPlaces[id] = place;
+    }
+    this._saveState();
+    this.onChange?.();
+  }
+
+  // The snapshot's items with each one's place on it, which is all the screen
+  // needs to sort by it. A row with no place is handed back untouched.
+  withPlaces(items) {
+    return items.map((i) => (Number.isFinite(this.threadPlaces[i.id]) ? { ...i, place: this.threadPlaces[i.id] } : i));
   }
 
   /* ----------------------- auth profiles (subscriptions) ------------------ */
@@ -3834,6 +3857,7 @@ export class Supervisor {
         heardAnswers: Object.fromEntries(Object.entries(this._heardAnswers ?? {}).slice(-500)),
         productOrder: this.productOrder,
         hiddenProducts: [...this.hiddenProducts],
+        threadPlaces: this.threadPlaces,
         liveSessions: this._liveSessions,
         rowSessions: this._rowSessions,
         compactions: this._compactions,

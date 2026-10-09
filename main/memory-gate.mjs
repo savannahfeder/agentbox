@@ -66,11 +66,23 @@ export const DEFAULTS = {
   agingMs: 5 * 60_000,
 };
 
-export function refusal(waitedMs) {
+/**
+ * IT SAYS WHICH OF THE TWO REASONS IT WAS (w-8386b3fd47). This sentence is the
+ * only account an agent ever gets of why its command did not run, and it used to
+ * blame memory either way. Two sessions were refused ordinary file reads while
+ * the coordinator itself reported normal pressure and 42% free, read the
+ * sentence, believed the machine was out of memory and spent their turns looking
+ * for a fault that was not there. A queue behind heavier work and a computer that
+ * is genuinely short are different things to be told.
+ */
+export function refusal(waitedMs, pressure = 'normal') {
   const minutes = Math.max(1, Math.round(waitedMs / 60_000));
-  return `This computer is short of memory, so ${NAME} held this command for ${minutes} minute${minutes === 1 ? '' : 's'} `
-    + 'while heavier work ran, and it still cannot start it. Do not retry it straight away. Carry on with anything '
-    + 'that does not need it, or end your turn and say you are waiting for memory.';
+  const held = `${NAME} held this command for ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const why = pressure === 'normal'
+    ? `${held} behind heavier work that has not finished, and it still cannot start it.`
+    : `This computer is short of memory, so ${held} while heavier work ran, and it still cannot start it.`;
+  return `${why} Do not retry it straight away. Carry on with anything that does not need it, `
+    + 'or end your turn and say what you are waiting for.';
 }
 
 export class MemoryGate {
@@ -172,7 +184,7 @@ export class MemoryGate {
     for (const w of [...this.waiting.values()]) {
       if (now - w.arrived >= this.maxWaitMs) {
         this.waiting.delete(w.id);
-        for (const r of w.replies) r({ allow: false, reason: refusal(now - w.arrived) });
+        for (const r of w.replies) r({ allow: false, reason: refusal(now - w.arrived, this.pressure) });
       }
     }
     if (this.pressure === 'critical') return;

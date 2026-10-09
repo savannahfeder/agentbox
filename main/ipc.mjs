@@ -379,7 +379,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const reading = usageFor === DEFAULT_ENGINE ? usage.read() : supervisor.codexUsage();
     return {
       products: store.listProducts(),
-      items,
+      // Each with the place she dragged it to, if she did (w-6e5b532a95).
+      items: supervisor.withPlaces(items),
       // THE TEAM: who is signed in, their team and its people, and the
       // title-free activity of their private work. Null on a build with no
       // team cloud, which is the single-person app.
@@ -546,6 +547,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, model, effort, now, inReplyTo }) => {
     if (isAgentRow(id)) return { ok: false };
+    // A level picked from ⌘K arrives here with no words, and gives way the
+    // same as one picked on the summary (zero:thread-edit). A reply that
+    // happens to carry its row's level does not.
+    if (priority != null && !answer && id) supervisor.setThreadPlaces({ [id]: null });
     // A REPLY IN A THREAD (w-920461cbe6) only means something in a conversation
     // between people, which is the only place a thread is drawn and the only
     // record the mark crosses to a teammate in (shared/team-rules.mjs). Anywhere
@@ -608,6 +613,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:set-product-order', (_e, { order }) => {
     supervisor.setProductOrder(order);
     return supervisor.status();
+  });
+
+  // A THREAD DRAGGED TO A PLACE OF ITS OWN in the list (w-6e5b532a95): the
+  // places the drop worked out (`dropPlaces`, shared/rank.mjs), id to number.
+  ipcMain.handle('zero:set-thread-places', (_e, { places }) => {
+    supervisor.setThreadPlaces(places);
+    push();
+    return { ok: true };
   });
 
   // Hidden from the composer's picker and nothing else: a hidden product still
@@ -696,6 +709,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:thread-edit', (_e, { product, id, patch }) => {
     try {
       store.threadEdit(product, id, patch);
+      // PICKING A LEVEL IS THE NEWER WORD on where a thread goes, so a place
+      // it was dragged to gives way and it sorts by its level again.
+      if (patch?.priority != null) supervisor.setThreadPlaces({ [id]: null });
       push();
       return { ok: true };
     } catch (err) {

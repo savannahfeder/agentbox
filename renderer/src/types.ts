@@ -7,6 +7,10 @@ export interface WorkItem {
   id: string;
   product: string;
   productName: string;
+  // WHERE SHE DRAGGED IT IN THE LIST (w-6e5b532a95), on the scale of the score
+  // it would otherwise sort by, which it replaces. Kept by the supervisor, on
+  // this Mac; absent on every row nobody has dragged.
+  place?: number;
   // WHAT PEOPLE PUT ON EACH MESSAGE IN A CONVERSATION (w-560647d4db): by the
   // message's line uid, then by emoji, then the people on it. Folded out of the
   // presses the ledger holds (shared/work-items.mjs); absent on every row
@@ -1019,6 +1023,7 @@ declare global {
       answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string }): Promise<WorkItem>;
       sendNow(p: { product: string; id: string }): Promise<{ ok: boolean; interrupted: boolean }>;
       setProductOrder(p: { order: string[] }): Promise<unknown>;
+      setThreadPlaces(p: { places: Record<string, number | null> }): Promise<unknown>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
       compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
       // Feedback to the Agentbox team (main/feedback.mjs). Optional: an older
