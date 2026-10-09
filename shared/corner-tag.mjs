@@ -80,8 +80,8 @@ export function waitedFor(since, now) {
   return `${Math.floor(min / 60)} h`;
 }
 
-/** The lines under the tag: the newest first, five at most. */
-export function cardLines(ready, now, max = 5) {
+/** The lines under the tag: the newest first, three at most. */
+export function cardLines(ready, now, max = 3) {
   const sorted = readyNow(ready, now, Infinity);
   const lines = sorted.slice(0, max).map((r) => ({ ...r, waited: waitedFor(r.since, now) }));
   return { lines, more: Math.max(0, sorted.length - lines.length) };

@@ -6,7 +6,8 @@
 //
 // THE POINTER, settled with Codex and then with real mouse events:
 // - The tag is movable as it is, with nothing drawn to say so: press and move.
-// - A click (press and let go without moving) opens the list; a second shuts it.
+// - Resting the pointer on the tag opens the list; a click (press and let go
+//   without moving) opens the app, and an arrow at the tag's end says so.
 // - The page only reports the button going down and coming up. The drag in
 //   between is read off the real cursor by the main process, because a real
 //   drag must not depend on this page being sent every move.
@@ -14,6 +15,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HIDE_CHOICES, cardLines, tagSays } from '../../../shared/corner-tag.mjs';
+import { NAME } from '../../../shared/product-name.mjs';
 import './corner-tag.css';
 
 type Ready = { id: string; title: string; says: string; since?: number; open?: string | null };
@@ -57,6 +59,7 @@ function demoState(): { state: State; open: boolean } | null {
 const demo = demoState();
 const theme = params.get('theme');
 document.documentElement.classList.toggle('ct-demo', !!demo);
+for (const k of ['edge', 'height', 'go']) if (demo && params.get(k)) document.documentElement.dataset[k] = params.get(k)!;
 if (theme === 'dark' || theme === 'light') document.documentElement.dataset.theme = theme;
 
 function useTagState() {
@@ -71,6 +74,20 @@ function Half({ size = 11 }: { size?: number }) {
       <circle cx="6" cy="6" r="5.2" fill="none" stroke="currentColor" strokeWidth="1.3" />
       <path d="M6 2.4a3.6 3.6 0 0 1 0 7.2z" fill="currentColor" />
     </svg>
+  );
+}
+
+// The way into the app, drawn at the tag's end while it is pointed at.
+function Go() {
+  return (
+    <span className="ct-go" aria-hidden>
+      <svg className="ct-arrow" width="10" height="10" viewBox="0 0 10 10">
+        <path d="M3 1.5h5.5V7M8.5 1.5 1.5 8.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <svg className="ct-chevron" width="7" height="10" viewBox="0 0 7 10">
+        <path d="M1.5 1.5 5 5 1.5 8.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
   );
 }
 
@@ -91,6 +108,7 @@ function useReportSize(ref: React.RefObject<HTMLElement>, which: Part, key: unkn
 function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }) {
   const [open, setOpen] = useState(forceOpen);
   const [dragging, setDragging] = useState(false);
+  const [pointed, setPointed] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const pressed = useRef(false);
   const counts = { ready: state.ready.length, working: state.working };
@@ -99,14 +117,14 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
 
   useEffect(() => bridge?.onOpen((o) => setOpen(!!o)), []);
   useEffect(() => bridge?.onDragging((d) => setDragging(!!d)), []);
-  useEffect(() => bridge?.onReset(() => { pressed.current = false; setDragging(false); setOpen(false); }), []);
+  useEffect(() => bridge?.onReset(() => { pressed.current = false; setDragging(false); setOpen(false); setPointed(false); }), []);
   // Escape shuts the list, once a click has made the tag the active window.
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape' && open) bridge?.toggle(); };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [open]);
-  useReportSize(ref, 'tag', text);
+  useReportSize(ref, 'tag', `${text}|${open || pointed}`);
 
   if (!says) return null;
 
@@ -120,12 +138,12 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
     <div
       ref={ref}
       role="button"
-      aria-label={`${text}. Click to open, drag to move.`}
+      aria-label={`${text}. Click to open ${NAME}, drag to move.`}
       aria-expanded={open}
-      className={`ct-glass ct-tag ${says.kind}${open ? ' is-open' : ''}${dragging ? ' is-dragging' : ''}`}
+      className={`ct-glass ct-tag ${says.kind}${open ? ' is-open' : ''}${pointed && !dragging ? ' is-pointed' : ''}${dragging ? ' is-dragging' : ''}`}
       style={demo ? { position: 'relative' } : undefined}
-      onPointerEnter={() => bridge?.hover('tag', true)}
-      onPointerLeave={() => { if (!pressed.current) bridge?.hover('tag', false); }}
+      onPointerEnter={() => { setPointed(true); bridge?.hover('tag', true); }}
+      onPointerLeave={() => { setPointed(false); if (!pressed.current) bridge?.hover('tag', false); }}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -144,6 +162,7 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
     >
       {says.kind === 'ready' ? <span className="ct-dot" /> : <Half />}
       <span className="ct-words">{text}</span>
+      {!dragging && <Go />}
     </div>
   );
 }
