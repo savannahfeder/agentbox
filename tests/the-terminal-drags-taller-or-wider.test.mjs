@@ -66,6 +66,13 @@ describe('the panel', () => {
     expect(decl('.task-terminal-bottom > .task-terminal-grip', 'cursor')).toBe('row-resize');
     expect(decl('.task-terminal-side > .task-terminal-grip', 'cursor')).toBe('col-resize');
   });
+  it('draws no handle on the edge, only a hairline (her call: "we want it clean")', () => {
+    let handles = 0;
+    css.walkRules((r) => { if (r.selectors.some((s) => s.includes('task-terminal-grip') && s.includes('::after'))) handles++; });
+    expect(handles).toBe(0);
+    expect(decl('.task-terminal-bottom > .task-terminal-grip::before', 'height')).toBe('1px');
+    expect(decl('.task-terminal-side > .task-terminal-grip::before', 'width')).toBe('1px');
+  });
   it('a dragged size replaces the fixed one, at the bottom and at the side', () => {
     expect(decl('.task-terminal-bottom', 'height')).toContain('var(--task-terminal-h');
     expect(decl('.task-terminal-side', 'width')).toContain('var(--task-terminal-w');
