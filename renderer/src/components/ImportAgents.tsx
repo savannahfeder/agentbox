@@ -343,7 +343,7 @@ export function ImportAgents({ products, filter, walk, onDone, onNewProject, onP
       for (const f of fresh) {
         let slug: string | null = null;
         try {
-          const got = await api.createProduct({ name: f.name, repoPath: f.folder }) as { slug?: string } | null;
+          const got = await api.createProduct({ name: f.name, repoPath: f.folder, ofMany: true }) as { slug?: string } | null;
           slug = got?.slug ?? null;
         } catch { slug = null; }
         // A project the store refused is not silently dropped from the count:
@@ -356,6 +356,14 @@ export function ImportAgents({ products, filter, walk, onDone, onNewProject, onP
         await file(slug, f.load);
         landed = f.name;
       }
+      // ONE PRESS, ONE "A REPO WAS CONNECTED", WITH HOW MANY (w-1116fbb68a,
+      // 2026-10-08). `zero:create-product` counts a single connect itself and
+      // is told to stay quiet above, because nine folders in one press sent
+      // nine events and read as nine separate connections. `newly` is only
+      // pushed for a project the store really made, so a folder it refused is
+      // not in the number either. A name and a number is all the window may
+      // send, which is exactly what this is.
+      if (newly.length) { try { window.zero?.track?.('repo_connected', newly.length); } catch {} }
       // WHICH WORD THE TOAST USES FOR "THAT ONE ALREADY HAS A ROW". Only the
       // singular needs it, and only one kind can be in a press of one.
       const kinds = countKinds(dests, paths);

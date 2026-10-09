@@ -958,6 +958,8 @@ body {
 }
 .search-q::placeholder { color: var(--text-faint); font-weight: 500; }
 
+.search-faces { margin-right: 9px; vertical-align: middle; position: relative; top: -1px; }
+
 /* A bare glyph. The chrome was doing the work the shape already does. */
 .icon-btn {
   width: 34px; height: 34px; flex: 0 0 auto;
@@ -4032,16 +4034,33 @@ img.app-mark { opacity: 1; border-radius: 0; }
 /* --------------------------------- toast ---------------------------------- */
 .toast {
   position: fixed;
-  bottom: 58px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-raised);
+  bottom: 56px;
+  right: 56px;
+  /* THE CARD (w-f0bfe32859), picked out of fourteen drawn over four rounds.
+     Bottom right, out of the middle of what she is reading. The task's title
+     is read first and is the heaviest thing on it; under it one quiet line,
+     where it went on the left and the keys on the right; a thin orange line
+     along the foot is the time left to open it. Warm (the grey every menu
+     floats on), soft border, no capitals. Her words on the round before:
+     "not overwhelmingly distracting ... that's what makes it appealing". */
+  width: 360px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "title title" "line keys";
+  row-gap: 8px;
+  column-gap: 16px;
+  align-items: center;
+  padding: 14px 16px 15px;
+  background: var(--pop);
   border: 1px solid var(--line);
   color: var(--text);
-  padding: 9px 18px;
   border-radius: var(--radius);
+  font: inherit;
   font-size: 13.5px;
-  box-shadow: var(--shadow-md);
+  line-height: 1.3;
+  text-align: left;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
   /* ABOVE THE SETUP SCREENS, WHICH IS THE WHOLE POINT OF A TOAST. This was 60
      while `.fr-screen` was 300 with an opaque background, so every message the
      app tried to give somebody during the first run was painted underneath the
@@ -4054,7 +4073,7 @@ img.app-mark { opacity: 1; border-radius: 0; }
 }
 
 /* AND IT GETS OUT OF THE COMPOSER'S WAY WHILE THE REPLY BOX IS OPEN. The toast
-   sits at the bottom centre, which is exactly where the reply card is, so a
+   sits at the bottom, which is exactly where the reply card is, so a
    message raised BY the reply box lands ON it. Photographed at 900x900: the
    mode toast sat across the Send button for its whole 2.5 seconds, at the
    moment somebody has just picked a mode and is reaching for the send key. That
@@ -4067,28 +4086,67 @@ img.app-mark { opacity: 1; border-radius: 0; }
 */
 .app.composing .toast { bottom: auto; top: 74px; }
 
-/* THE ONE THAT OPENS THE TASK IT IS ABOUT. A `<button>` inherits none of the
-   div's type, so the face is restated rather than assumed, and the only things
-   added to it are the pointer, the focus ring and the words on the end.
-   Everything positional is above and shared, including the lift out of the
-   composer's way, because that rule is written against `.toast`.
-*/
-.toast-goes {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font: inherit;
-  font-size: 13.5px;
-  line-height: 1.3;
-  cursor: pointer;
-  text-align: left;
-}
-.toast-goes:hover .toast-go { color: var(--text); }
+/* THE ONE THAT OPENS THE TASK IT IS ABOUT: the whole card is the target, so
+   it is a `<button>`, and only the pointer and the focus ring are added. */
+.toast-goes { cursor: pointer; }
 .toast-goes:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-/* IT SAYS WHAT THE CLICK DOES, because a pill that is quietly pressable is one
-   nobody presses. Underlined rather than boxed: the pill is already a box, and a
-   second box inside it reads as a button inside a button. */
-.toast-go { color: var(--text-dim); text-decoration: underline; white-space: nowrap; }
+
+/* The title wraps to two lines and stops, never cut at a character count,
+   and never leaves one word alone on its second line. */
+.toast-title {
+  grid-area: title;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 500;
+  color: var(--text);
+  text-wrap: pretty;
+}
+.toast-line {
+  grid-area: line;
+  font-size: 12.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* ITS KEYS ARE DRAWN, NOT SPELT OUT, in the app's own keycap (.row-keys kbd):
+   square, faint, one drawing of a key everywhere. */
+.toast-keys { grid-area: keys; justify-self: end; display: inline-flex; align-items: center; gap: 12px; }
+.toast-key { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.toast-key kbd {
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-faint);
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  padding: 0 4px;
+  line-height: 15px;
+}
+.toast-key-word { font-size: 12px; color: var(--text-faint); }
+.toast-key:hover .toast-key-word { color: var(--text); }
+.toast-key:hover kbd { border-color: var(--text-faint); color: var(--text); }
+/* THE TIMER her words asked for: "that little orange timer that tells you how
+   much time is left". It is the six seconds the card, and O, can open the
+   task. Z is not on it: Z undoes long after the card has gone. */
+.toast-clock {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  opacity: .7;
+  transform-origin: left;
+  animation: toast-drain linear forwards;
+}
+@keyframes toast-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+/* A message with no task: its sentence is the whole card. */
+.toast-plain { width: auto; max-width: 360px; display: flex; gap: 12px; padding: 11px 16px; }
+.toast-plain .toast-line { font-size: 13.5px; color: var(--text); white-space: normal; }
+
 
 /* It keeps the top bar's own 22px right margin so it lines up with the settings
    gear below it. It is the toast's shape because the toast is this app's

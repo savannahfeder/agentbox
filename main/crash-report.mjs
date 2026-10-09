@@ -63,15 +63,38 @@ export function report(kind, err, extra = {}) {
   return write(payload);
 }
 
+// THE ONE KIND WHOSE PROCESS DOES NOT SURVIVE BEING REPORTED. `onUncaught`
+// re-throws, by the decision three lines below where it does it, so the main
+// process stops. posthog-node's `capture` only buffers (flushAt 20,
+// flushInterval 10s), and the `will-quit` flush never runs for a process that
+// died, so for this kind the file on disk is the only copy that can reach
+// anybody. It is therefore kept even when the live send said it took the
+// report: one report counted twice is a worse number, and no report at all is
+// a worse app.
+const DIES_REPORTING = new Set(['main-uncaught']);
+
 function write(payload) {
   try {
     fs.mkdirSync(ctx.dir, { recursive: true });
     const file = path.join(ctx.dir, `crash-${payload.ts.replace(/[:.]/g, '-')}-${Math.floor(Math.random() * 1e6)}.json`);
     fs.writeFileSync(file, JSON.stringify(payload, null, 2));
     prune();
-    // No await, no retry, no queue drain here: this runs while the process is
-    // dying. Delivery is the transport's problem, on the next boot if it has to be.
-    if (transport) { try { transport(payload); } catch {} }
+    // ON DISK FIRST, ALWAYS, because this can run while the process is dying
+    // and there is no time to wait on a socket. No await, no retry.
+    //
+    // AND THEN TAKEN BACK OFF IT IF IT WENT. The queue is for a report nobody
+    // has sent yet; a report that HAS been sent and stays in it is sent a
+    // second time by the next launch's `drainCrashes`, which is 6 of the 21
+    // crash events since the Oct 6 launch being 6 crashes counted twice, and
+    // three of them filed against the version that drained them rather than
+    // the one they happened on (PostHog, 2026-10-08).
+    if (transport) {
+      let took = false;
+      try { took = transport(payload) !== false; } catch { took = false; }
+      if (took && !DIES_REPORTING.has(payload.kind)) {
+        try { fs.unlinkSync(file); } catch {}
+      }
+    }
     return file;
   } catch { return null; }
 }

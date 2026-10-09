@@ -13,10 +13,11 @@
 // the project they belong to instead of in a text editor.
 
 import fs from 'node:fs';
+import { harnessFor } from './harnesses.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { codexChoiceToOpen, saveConfig } from './config.mjs';
-import { resolveClaudeBin, forgetClaudeBin, INSTALL_URL } from './claude-bin.mjs';
+import { forgetClaudeBin, INSTALL_URL } from './claude-bin.mjs';
 import { AGENT_MODES } from '../shared/agents.mjs';
 import { analyticsKey, diagnosticsOn } from './analytics.mjs';
 import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
@@ -24,6 +25,7 @@ import { accountSentence, engineTroubleNote } from '../shared/spawn-trouble.mjs'
 import { readPlan } from './claude-plan.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
 import { machineSlots, machineNote, autoAgents, MAX_SLOTS } from './machine.mjs';
+import { shortPath } from './agent-files.mjs';
 import { NAME } from '../shared/product-name.mjs';
 import { autoSlots } from './memory-gate.mjs';
 import { accountIdentity, claudeLoginCommand, duplicateAccountNote, linkAccountTooling, makeClaudeHome } from './account-tooling.mjs';
@@ -32,7 +34,7 @@ import { codexAccount, codexLoginCommand, makeCodexHome } from './codex-account.
 import { codexDefaultModel, codexModels } from './codex-models.mjs';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mjs';
 import { claudeModels } from './claude-models.mjs';
-import { resolveCodexBin, forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mjs';
+import { forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mjs';
 
 // Her Claude Code sessions in her inbox: all of them, only the ones stopped on
 // a question, or none. One reader, here, so the settings screen and the
@@ -248,7 +250,7 @@ const lineCount = (text) => (text.trim() ? text.trim().split('\n').length : 0);
 // Claude Code: the path, whether it is really there, and where to get it when
 // it is not. One reader, here, so the screen and the config cannot disagree.
 export function claudeState(config) {
-  const found = resolveClaudeBin(config.claudeBinConfigured ?? null);
+  const found = harnessFor('claude').discover(config.claudeBinConfigured ?? null);
   return {
     claudeBin: found.path ?? config.claudeBin,
     claudeFound: found.found,
@@ -310,7 +312,7 @@ export function recheckClaude(config) {
  * whose unsure state is not checked. Nothing in the app passes it.
  */
 export function codexState(config, where = {}) {
-  const found = resolveCodexBin(config.codexBinConfigured ?? null, where);
+  const found = harnessFor('codex').discover(config.codexBinConfigured ?? null, where);
   return {
     // Empty rather than a path when there is nothing there, which is the same
     // asymmetry `config.codexBin` already keeps (main/config.mjs): a configured
@@ -499,6 +501,7 @@ export function readSettings({ config, supervisor, store }) {
       machineNote: machineNote(slotsHere, config.maxConcurrentSessions),
       memoryGate: memoryGateSettings({ config, supervisor }),
       leftovers: leftoverSettings({ config, supervisor }),
+      strayFolders: strayFolderSettings({ supervisor }),
       capacity: status.capacity,
       running: sessions.length,
       model: parseSessionArgs(workspaceArgs).model,
@@ -526,6 +529,9 @@ export function readSettings({ config, supervisor, store }) {
       // ADHD mode: whether the ADHD rules ride under hers (w-5737fe67cf). Off
       // unless she turned it on, so only `true` means on.
       adhdMode: config.adhdMode === true,
+      // The corner tag over other apps (w-dafae58a23). On unless she turned it
+      // off here, which is the only place it turns off for good.
+      cornerTag: config.cornerTag !== false,
       // How much of her own Claude Code goes in her inbox: all / waiting / off.
       // All by default, because the machine nobody has opened this page on is
       // the one with thirteen forgotten sessions on it.
@@ -946,6 +952,34 @@ export function leftoverSettings({ config, supervisor }) {
   return { on, now };
 }
 
+/**
+ * COPIES OF A PROJECT THE APP DID NOT MAKE, SAID OUT LOUD (w-330eea6c66).
+ *
+ * MEASURED 2026-10-07: thirteen worktrees of one repository sat outside the
+ * folder the app keeps its own in, about 740 MB, and nothing in the app could
+ * list, show or sweep one. That is the same invisibility that stranded 26 GB on
+ * 2026-09-22, and the half that fixes it for a person is being told.
+ *
+ * NO BUTTON, DELIBERATELY. A folder the app did not make is not the app's to
+ * remove: it is the only copy of whatever is uncommitted inside it, and somebody
+ * made it on purpose. So this is a sentence and nothing else, and it is absent
+ * entirely when there is nothing to say, because a row that is usually quiet
+ * trains the reaction it exists to prevent.
+ */
+export function strayFolderSettings({ supervisor }, home = os.homedir()) {
+  let list = [];
+  try { list = supervisor?.strayFolders?.() ?? []; } catch { list = []; }
+  if (!list.length) return null;
+  const count = list.length;
+  const one = count === 1;
+  const projects = [...new Set(list.map((w) => w.project).filter(Boolean))];
+  const named = list.slice(0, 3).map((w) => shortPath(w.path, home));
+  const rest = count - named.length;
+  const of = projects.length ? ` of ${projects.slice(0, 2).join(' and ')}${projects.length > 2 ? ' and other projects' : ''}` : '';
+  const now = `${count} ${one ? 'copy' : 'copies'}${of} ${one ? 'was' : 'were'} made by hand outside the folder ${NAME} keeps its own in, and ${one ? 'is' : 'are'} holding disk until you remove ${one ? 'it' : 'them'}: ${named.join(', ')}${rest > 0 ? ` and ${rest} more` : ''}. ${NAME} never removes a folder it did not make.`;
+  return { count, now };
+}
+
 export function setWorkspaceSetting({ config, supervisor }, { key, value }) {
   switch (key) {
     case 'agentsRunning':
@@ -1028,6 +1062,11 @@ export function setWorkspaceSetting({ config, supervisor }, { key, value }) {
     // spawn, so it applies from the next task on.
     case 'adhdMode':
       saveConfig(config, { adhdMode: !!value });
+      break;
+    // THE CORNER TAG (w-dafae58a23). Turning it back on also ends any hide, so
+    // the switch does what it says the moment she flips it.
+    case 'cornerTag':
+      saveConfig(config, value ? { cornerTag: true, cornerTagHiddenUntil: 0 } : { cornerTag: false });
       break;
     // WHICH ACCOUNT HER WORK RUNS ON.
     //

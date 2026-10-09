@@ -133,7 +133,11 @@ const INTERRUPTED = [
   /connection (closed|lost|dropped)/i,
   /response stopped arriving/i,
   /may be incomplete/i,
-  /econnreset|enotfound|etimedout|econnrefused/i,
+  /econnreset|enotfound|etimedout|econnrefused|enetunreach|ehostunreach|eai_again/i,
+  // Codex also prefixes non-network failures with "stream disconnected".
+  // Match the request failure itself so incomplete responses keep their limit.
+  /error sending request for url/i,
+  /failed to send websocket request/i,
   /unable to connect/i,
   /can.{0,3}t reach the api/i,
   /timed out/i,
