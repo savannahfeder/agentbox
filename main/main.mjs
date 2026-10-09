@@ -35,6 +35,7 @@ import { installNotifier } from './notify.mjs';
 import { createCornerTag } from './corner-tag.mjs';
 import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mjs';
 import { quietTheFramesScrollbars } from './frame-scrollbars.mjs';
+import { letLocalAppsShowInThePane } from './local-app-frames.mjs';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mjs';
 import { hotWindowVerdict, storeHasWork } from './dev-window.mjs';
 import { writeHeldThenReload } from './write-before-reload.mjs';
@@ -924,6 +925,11 @@ async function createWindow() {
   // A page in the pane hides its scrollbar until you scroll, like the app's own
   // (frame-scrollbars.mjs). Without it, a mouse on macOS gets a white track.
   quietTheFramesScrollbars(window.webContents);
+
+  // A local app a worker names (http://localhost:3006) draws in the pane even
+  // when it refuses to be framed, and its sign-in cookie sticks there
+  // (main/local-app-frames.mjs).
+  letLocalAppsShowInThePane(window.webContents);
 
   // Escape must ALWAYS leave the junk browser, even when the guest page has
   // focus and would otherwise swallow the key. Intercept it below the page.
