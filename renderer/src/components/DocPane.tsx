@@ -4,7 +4,7 @@ import type {FocusControlStyle} from '../focus-control';
 import {usePreviewReveal} from '../preview-reveal';
 import {PreviewLoading} from './PreviewLoading';
 import { isLocalPreview, type ArtifactMode } from '../artifact-layout';
-import { previewShows, previewStatus, useLocalPreview } from '../local-preview';
+import { LOCAL_APP_SANDBOX, previewShows, previewStatus, useLocalPreview } from '../local-preview';
 import { LocalPreviewStatus } from './LocalPreviewStatus';
 // THE DOCUMENT PANE. The right half of the window is the file itself.
 //
@@ -280,7 +280,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
                 key={frameKey} onLoad={revealFrame} onError={() => setFailed("This preview could not be loaded.")}
                 style={{opacity:frameReady ? 1 : 0}}
                 className="doc-view" src={url}
-                sandbox="allow-scripts allow-same-origin" title={crumb.join('/')}
+                sandbox={app.local ? LOCAL_APP_SANDBOX : 'allow-scripts allow-same-origin'} title={crumb.join('/')}
               />}</div>
             : <div className="doc-missing">Quit and reopen {NAME} to see this page's pictures.</div>) : <PreviewLoading />
         ) : text === null ? (
