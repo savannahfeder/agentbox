@@ -49,7 +49,7 @@ import { Snooze } from './components/Snooze';
  are gone; their copy is in decisions.md and their photographs on
  `astral/w-86452550e5-looks`.
 */
-import { announcesUpdate, isUpdateRow } from './update-row';
+import { announcesUpdate, isUpdateRow, CHECK_SAY, updateLook } from './update-row';
 // Inbox zero is `IdlePage`.
 import { IdlePage } from './components/IdlePage';
 import { ago, closesTheTask, itemOptions, offerIsLive, parseRepeat } from './format';
@@ -63,7 +63,7 @@ import { approvalReads } from './approval-card';
 // one it took went. Only the second is raised from here, because by the time
 // there is anything to confirm the card has closed.
 import { sentLine } from './compose-says';
-import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, isProposal, maskedAncestors, notStarted, parkedByAgent, replyClearsSchedule, statusForReply, stoppable, threadMasked, threadsOwedAnAnswer, withdrawReply } from './list-rules';
+import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, isProposal, maskedAncestors, notStarted, parkedByAgent, replyClearsSchedule, rowTitle, statusForReply, stoppable, threadMasked, threadsOwedAnAnswer, withdrawReply } from './list-rules';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { opensATextField } from './keys';
 import { sidebarFits, useRoomyToggle, useWindowWidth } from './room';
@@ -117,21 +117,23 @@ import { runNowCommands } from './run-now';
 import { withOlder } from './older-threads';
 import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
 import { BoxFilter } from './components/BoxFilter';
-import { itemPriority, moveProduct, placeScore } from '../../shared/rank.mjs';
+import { itemPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
 import { threadsMade, approvableFiled } from './threads-made';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, chatProjects, chatTaskSharing, chatTranscript, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
+import { isNew } from '../../shared/notify-rules.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf, iSpokeLast } from '../../shared/team-rules.mjs';
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
 import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, StateTabs } from './threads/Pages';
+import { isCarrying } from './threads/row-drag';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, sorted as sortedByDisplay, type Display, type Privacy } from './threads/page-rules';
+import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPlaces, placesForDrop, rankScore, sorted as sortedByDisplay, type Display, type Privacy, type Unsaved } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, listStops, stepStop, stopKey, type Stop } from './threads/walk-rules';
 
@@ -1444,8 +1446,11 @@ export default function App() {
     setRun((r) => (r ? stepTo(r, 'done') : r));
   }, [run, modal, finishRun]);
 
-  const prevInboxIds = useRef<Set<string>>(new Set());
-  const prevAskIds = useRef<Set<string>>(new Set());
+  // The ids on the snapshot before this one, which is what makes a row news.
+  // null until there has been one: an inbox she has cleared is empty, and that
+  // is not the same fact as never having looked (isNew, shared/notify-rules).
+  const prevInboxIds = useRef<Set<string> | null>(null);
+  const prevAskIds = useRef<Set<string> | null>(null);
   // After resolving an item FROM INSIDE IT, advance to the next one instead of
   // dropping back to the list: processing the inbox is a flow, not a round trip
   // per item. Resolving from the LIST leaves her in the list, which is
@@ -1489,7 +1494,21 @@ export default function App() {
     return () => { off?.(); window.removeEventListener('pagehide', onHide); };
   }, [flushPending]);
 
-  const refresh = useCallback(async () => setSnap(await api.snapshot()), []);
+  // PLACES JUST DROPPED AND NOT YET BACK FROM THE MAIN PROCESS (w-6e5b532a95).
+  // A snapshot asked for a moment before the drop lands after it, and without
+  // this it put the row back where it was for a poll's length. So each
+  // snapshot wears them until it carries them itself. And none lands while a
+  // row is in hand: it would reorder the rows under the carried one.
+  const unsavedPlaces = useRef<Unsaved>({});
+  // A snapshot held back by a drag is asked for again shortly, so a reply or a
+  // state change that arrived mid-drag is not left waiting for the next poll.
+  const refreshAgain = useRef<() => void>(() => {});
+  const refresh = useCallback(async () => {
+    const next = await api.snapshot();
+    if (isCarrying()) { setTimeout(() => refreshAgain.current(), 300); return; }
+    setSnap(next && { ...next, items: overlayPlaces(next.items, unsavedPlaces.current) });
+  }, []);
+  refreshAgain.current = () => { void refresh(); };
   const refreshRef = useRef<() => Promise<void>>();
   refreshRef.current = refresh;
 
@@ -1694,9 +1713,8 @@ export default function App() {
   // A THREAD WHOSE PROPOSALS HAVE BEEN WAITING A DAY (w-9cf2b43110). Later is
   // where things are lost — "sometimes the tab later is not meant to be looked
   // at" — so silence has a deadline, and what comes back is the THREAD rather
-  // than the agent-to-agent rows it filed. It comes back even if it was closed:
-  // filing a thread away with E answers nothing, and forgetting must cost
-  // nothing. Rejecting them all is what makes it stop.
+  // than the agent-to-agent rows it filed. The rule respects a thread you
+  // closed yourself; finishing by an agent still allows a reminder.
   const owedAnAnswer = useMemo(() => threadsOwedAnAnswer(items, now), [items, now]);
 
   // AND THAT ROW READS AS WORKING, because it is: the app itself is reading the
@@ -1768,7 +1786,8 @@ export default function App() {
   // A conversation with a person ranks with your top project (w-2e8aa16f0f).
   const directSlugs = useMemo(() => conversationSlugs(snap?.products ?? []), [snap?.products]);
   const score = useCallback(
-    (i: WorkItem) => placeScore(snap?.supervisor.productOrder ?? [], i.product, directSlugs) + itemPriority(i),
+    // A thread she dragged runs where she put it (w-6e5b532a95).
+    (i: WorkItem) => placedScore(i.place, placeScore(snap?.supervisor.productOrder ?? [], i.product, directSlugs) + itemPriority(i)),
     [snap?.supervisor.productOrder, directSlugs],
   );
 
@@ -2254,6 +2273,29 @@ export default function App() {
     () => (mineShown ? sortedByDisplay(shownBox.filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs)), inboxDisplay, view, projectOrder, directSlugs) : []),
     [shownBox, inboxDisplay, now, mineShown, view, projectOrder, directSlugs, seenOf],
   );
+  // A THREAD DRAGGED UP OR DOWN THE LIST (w-6e5b532a95): it is given a place
+  // between its new neighbours, which the list and the fleet both sort by.
+  // The row moves at once; the supervisor keeps the place.
+  // The board's columns come through `keepPlaces` too (InboxBoard).
+  // THE DROPPED THREAD IS THE SELECTED ONE afterwards, the way a list in Finder
+  // or Linear leaves it: the selection staying on whatever was there before
+  // read as two rows chosen at once (round three review).
+  const selectAfterDrop = useRef<string | null>(null);
+  const keepPlaces = useCallback((places: Record<string, number>, dropped?: string) => {
+    if (dropped) { selectAfterDrop.current = dropped; setCardSel(null); }
+    const at = Date.now();
+    for (const [id, place] of Object.entries(places)) unsavedPlaces.current[id] = { place, at };
+    setSnap((s) => s && { ...s, items: s.items.map((i) => (i.id in places ? { ...i, place: places[i.id] } : i)) });
+    void api.setThreadPlaces(places);
+  }, []);
+  // Worked out against the rows in the order they were DRAWN (`drawn`), so the
+  // neighbours are the two the person saw the gap between.
+  const reorderThread = useCallback((id: string, beforeId: string | null, drawn: string[]) => {
+    const byId = new Map(displayedBox.map((i) => [i.id, i]));
+    const rows = drawn.map((d) => byId.get(d)).filter((i): i is WorkItem => !!i);
+    const places = placesForDrop(rows.map((i) => ({ id: i.id, score: rankScore(i, projectOrder, directSlugs) })), id, beforeId);
+    if (places) keepPlaces(places, id);
+  }, [displayedBox, projectOrder, directSlugs, keepPlaces]);
   // THE PICKED TEAMMATES' THREADS FOR THIS TAB, from the cards their Macs
   // publish, merged into your rows in the Display's order.
   const cards = snap?.team?.cards ?? [];
@@ -2352,8 +2394,13 @@ export default function App() {
   const cursor = cursorIndex({ list, selected, last: cardSel ? null : drawnAt.current });
   const current: WorkItem | undefined = list[cursor];
   useLayoutEffect(() => {
-    drawnAt.current = cursorMark(list, cursor);
-    if (cursor !== selected) setSelected(cursor);
+    // A drop just moved this thread; the cursor goes with it (`keepPlaces`).
+    const dropped = selectAfterDrop.current;
+    const at = dropped ? list.findIndex((i) => i.id === dropped) : -1;
+    selectAfterDrop.current = null;
+    const next = at >= 0 ? at : cursor;
+    drawnAt.current = cursorMark(list, next);
+    if (next !== selected) setSelected(next);
   });
   // THE TUTORIAL'S OWN THREAD IS THE SELECTED ROW ON THE BEAT THAT OPENS IT
   // (2026-10-06). The beat set row 0 and assumed it was hers, which held while
@@ -2732,15 +2779,32 @@ export default function App() {
   useEffect(() => {
     if (!snap) return;
     const ids = new Set(inbox.map((i) => i.id));
-    const first = prevInboxIds.current.size === 0;
-    const fresh = first ? [] : inbox.filter((i) => !prevInboxIds.current.has(i.id));
+    const known = prevInboxIds.current;
+    const fresh = inbox.filter((i) => isNew(known, i.id));
     prevInboxIds.current = ids;
     window.zero?.badge?.(inbox.length);
 
+    // THE CORNER TAG (w-dafae58a23) says the same thing as the inbox, from
+    // over whatever app she is in: what is ready for her, longest wait first,
+    // and how many are working. Working agents are only a count, because
+    // twenty running is ordinary and only what is ready is worth a line.
+    const productName = (slug: string) => snap.products.find((p) => p.slug === slug)?.name ?? slug;
+    window.zero?.cornerTag?.({
+      ready: [
+        ...inbox.map((i) => ({
+          id: i.id,
+          title: rowTitle(i),
+          says: i.status === 'blocked' ? 'needs you' : 'is ready for you',
+          since: i.wrote?.status?.ts ?? i.updatedAt,
+        })),
+        ...(snap.approvals ?? []).map((a) => ({ id: a.id, title: productName(a.product ?? ''), says: 'needs a yes', open: null })),
+      ],
+      working: runningRows.length,
+    });
+
     const askIds = new Set((snap.approvals ?? []).map((a) => a.id));
-    const freshAsks = prevAskIds.current.size === 0 && first
-      ? []
-      : (snap.approvals ?? []).filter((a) => !prevAskIds.current.has(a.id));
+    const knownAsks = prevAskIds.current;
+    const freshAsks = (snap.approvals ?? []).filter((a) => isNew(knownAsks, a.id));
     prevAskIds.current = askIds;
 
     const arrivals = [
@@ -2754,7 +2818,18 @@ export default function App() {
       })),
     ];
     if (arrivals.length) window.zero?.notify?.(arrivals);
-  }, [snap, inbox]);
+  }, [snap, inbox, runningRows]);
+
+  // The corner tag's "Turn off…" lands on the switch that turns it off.
+  useEffect(() => {
+    const off = window.zero?.onOpenSettings?.(({ pane }) => {
+      setTeamOpen(false);
+      setSettingsPane(pane ?? null);
+      setSettingsVisit((n) => n + 1);
+      setSettingsOpen(true);
+    }) ?? (() => {});
+    return off;
+  }, []);
 
   useEffect(() => { setOptionSel(null); }, [focused?.id]);
 
@@ -3847,6 +3922,8 @@ export default function App() {
   const retag = useCallback(async (targets: WorkItem[], value: number) => {
     if (!targets.length) return;
     const word = priorityLabelOf(priorityIdOf(value)).toLowerCase();
+    // A level picked clears a dragged place (main/ipc.mjs), so stop waiting for one.
+    for (const i of targets) delete unsavedPlaces.current[i.id];
     await Promise.all(targets.map((i) => api.answer({ product: i.product, id: i.id, priority: value })));
     showToast(targets.length > 1 ? `${targets.length} set to ${word}` : `Priority: ${word}`);
     await refresh();
@@ -4987,11 +5064,6 @@ export default function App() {
        */}
       {reviewLab && <div className="review-lab-controls"><span>Review exploration</span><select aria-label="Focus controls" value={focusControlStyle} onChange={e=>setFocusControlStyle(e.target.value as FocusControlStyle)}><option value="text">Focus · Text only</option><option value="corners">Focus · Frame corners + label</option><option value="corners-icon">Focus · Frame corners button</option><option value="corners-bare">Focus · Bare frame corners</option><option value="layout">Focus · Workspace layout</option></select><select aria-label="Review file type" value={artifactPreviewSample} onChange={e=>{setArtifactPreviewSample(e.target.value);setOpenDoc(null);}}><option value="code">Code</option><option value="design">Design</option><option value="notes">Text</option><option value="multiple">All three</option></select><select aria-label="Review actions" value={reviewStyle} onChange={e=>setReviewStyle(e.target.value)}><option value="header-balanced-open">1 · Balanced · open only</option><option value="header-tools-open">2 · Compact · open only</option><option value="header-card-only">3 · Clickable card · no controls</option><option value="header-feedback-only">4 · Clickable card · feedback tools</option><option value="header-balanced">Compare · all controls</option></select>{artifactPreviewSample !== "code" &&<select aria-label="Text surface" value={textReviewStyle} onChange={e=>setTextReviewStyle(e.target.value)}><option value="clear">Text · Fully transparent</option><option value="glass">Text · Matched glass</option></select>}</div>}
       {!reviewLab && api.isFixtures && new URLSearchParams(location.search).has('artifactTweaks') && <div className="artifact-tweaks"><select aria-label="Design toolbar" value={designToolbar} onChange={e => setDesignToolbar(e.target.value)}><option value="floating">Floating bar</option><option value="corner">Corner controls</option><option value="edge">Top edge</option><option value="always">Always visible</option></select>{focused && <select aria-label="Sample artifact" value={artifactPreviewSample} onChange={e => { setArtifactPreviewSample(e.target.value); setOpenDoc(null); }}><option value="multiple">Multiple artifacts</option><option value="design">Design sample</option><option value="code">Code sample</option><option value="notes">Notes sample</option></select>}</div>}
-      {/* AND THE FOOT SAYS WHAT ALL OF THIS IS RUNNING ON (w-e217e577e5,
-          2026-10-07): "He didn't realize it auto-connected to Claude/Codex; he
-          wasn't sure how it was even running." `onAccounts` opens that agent's
-          own page in Settings, which is where the accounts live and where a
-          second login is added. */}
       {/* EVERY SETTINGS PANE LIGHTS SETTINGS. The team pane used to light
           Invite people, its shortcut row (w-8415594d19), until that row left
           the sidebar for the single-player launch (w-1b574413db, 2026-10-04).
@@ -5002,8 +5074,6 @@ export default function App() {
         page={settingsOpen ? 'settings' : null} onFeedback={() => setFeedbackOpen(true)} teamPage={teamOpen && !settingsOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
         onInvite={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
-        runsOn={snap?.runsOn ?? null}
-        onAccounts={(pane) => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setSettingsPane(pane); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onSignOut={() => { void api.teamSignOut().then(() => refresh()); }}
         onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
@@ -5652,6 +5722,9 @@ export default function App() {
                     cards={cards} picked={team ? picked : undefined}
                     onOpenCard={openTeammateCard}
                     selected={current} selectedCard={keyCard ? cardSel : null} columnOrder={columnOrder} onReorderColumns={reorderColumns}
+                    // A card dragged up or down its column keeps that place,
+                    // the way a row in the list does (w-6e5b532a95).
+                    onPlaces={!run && !withOthers && inboxDisplay.sort === 'priority' ? keepPlaces : undefined}
                     // THE SAME PICK THE LIST'S BOXES FILL (w-2e3819913c), so
                     // ⌘K, E, L and Escape act on board cards with no copy.
                     marked={multiSel} onMark={setMultiSel}
@@ -5703,6 +5776,11 @@ export default function App() {
                   // The next page of old finished threads, at the foot of the
                   // two tabs that hold them (w-fda2165ec6).
                   onEnd={search === null && olderMore !== false && (view === 'done' || view === 'all') ? loadOlder : undefined}
+                  // DRAG A THREAD TO WHERE IT BELONGS (w-6e5b532a95), wherever
+                  // the list is in your running order: Sort by Priority, on the
+                  // three tabs still ahead of you, your own threads alone.
+                  onReorder={search === null && !run && !withOthers && inboxDisplay.sort === 'priority'
+                    && (view === 'inbox' || view === 'progress' || view === 'snoozed') ? reorderThread : undefined}
                   items={list}
                   // Results are grouped and stamped like the inbox, whatever
                   // tab she opened search from. Scheduled would otherwise label
@@ -5914,6 +5992,16 @@ export default function App() {
             ? (snap.update?.newVersion ?? null)
             : null}
           onInstallUpdate={() => { setModal(null); void api.updateInstall(); }}
+          /* LOOKING NOW, FROM ⌘K (w-39d6c237f7). The palette closes and the
+             answer arrives as a toast in the Settings row's own words, so the
+             two surfaces can never disagree about what was found. A check takes
+             a second or two against GitHub, so the toast says it is looking
+             first rather than leaving the press unanswered. */
+          onCheckUpdate={() => {
+            setModal(null);
+            showToast(CHECK_SAY.looking);
+            void api.updateCheck().then((got) => showToast(updateLook(got).sentence));
+          }}
           panelUp={panelShownNow}
           onTogglePanel={() => { setModal(null); togglePanel(); }}
           boardUp={inboxDisplay.view === 'board'}
@@ -6137,6 +6225,9 @@ export default function App() {
           // SIGN OUT AT THE FOOT OF SETTINGS (w-a09476712f): "should be at
           // bottom of settings page". Only while someone is signed in.
           account={snap?.team?.signedIn && snap.team.me ? { email: snap.team.me.email, team: snap.team.team?.name ?? null, onSignOut: () => { void api.teamSignOut().then(() => refresh()); } } : undefined}
+          // THE VERSION AND THE CHECK FOR A NEWER ONE (w-39d6c237f7), off the
+          // same snapshot field the sidebar card and ⌘K read.
+          update={snap?.update ?? null}
           onClose={() => { setSettingsOpen(false); setSettingsPane(null); setSettingsPage(null); }}
         />
       )}

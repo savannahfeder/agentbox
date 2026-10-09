@@ -73,6 +73,7 @@ export const REQUEST_CHANNELS = {
   agentThreads: 'zero:agent-threads',
   importThreads: 'zero:import-threads',
   badge: 'zero:badge',
+  cornerTag: 'zero:corner-tag',
   bootInfo: 'zero:boot-info',
   updateCheck: 'zero:update-check',
   updateInstall: 'zero:update-install',
@@ -128,6 +129,7 @@ export const REQUEST_CHANNELS = {
   resumeItems: 'zero:resume-items',
   redeliver: 'zero:redeliver',
   setProductOrder: 'zero:set-product-order',
+  setThreadPlaces: 'zero:set-thread-places',
   setProductHidden: 'zero:set-product-hidden',
   approve: 'zero:approve',
 };
@@ -140,6 +142,7 @@ export const PUSH_CHANNELS = {
   onZoomPercent: 'zero:zoom-percent',
   onRecovered: 'zero:recovered',
   onOpenItem: 'zero:open-item',
+  onOpenSettings: 'zero:open-settings',
   onScreenDetail: 'zero:screen-detail',
   onEscapeBrowser: 'zero:escape-browser',
   onKeyInTheFile: 'zero:key-in-the-file',

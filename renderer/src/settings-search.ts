@@ -40,6 +40,10 @@ const ENTRIES: Entry[] = [
   { page: 'general', label: 'Show keyboard shortcut hints', anchor: 'keys', words: 'keys hints' },
   { page: 'general', label: 'Counts and crash reports', anchor: 'privacy', words: 'privacy diagnostics analytics telemetry sends data' },
   { page: 'general', label: 'Where things are kept', anchor: 'storage', words: 'folder store path storage files disk' },
+  // The words here are the ones a person types when they want the NEWEST
+  // version, which is rarely the word "update": "new version", "upgrade",
+  // "restart" and the version number itself all land on the same row.
+  { page: 'general', label: 'Check for updates', anchor: 'updates', words: 'update updates upgrade new version release restart newest current' },
   { page: 'appearance', label: 'Theme', anchor: 'theme', words: 'dark light colour color look background picture wallpaper' },
   { page: 'appearance', label: 'Blur and darkness', anchor: 'tune', words: 'tint dim glass transparency' },
   { page: 'shortcuts', label: 'Keyboard shortcuts', words: 'keys hotkeys keybindings' },
