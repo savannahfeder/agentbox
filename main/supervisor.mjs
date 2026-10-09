@@ -5689,6 +5689,20 @@ export class Supervisor {
   }
 
   /**
+   * THE CLAUDE LOGIN WHOSE LIMIT THE USAGE PANEL READS, and the environment to
+   * read it in (main/claude-usage.mjs). The same pick as `runsOnAccount`: the
+   * account she chose, or the first one when she has not chosen. The
+   * environment is a worker's, scrubbed the same way, so the app's own
+   * CLAUDE_CONFIG_DIR or an API key never decides which login answers.
+   */
+  usageAccount() {
+    const pool = this._narrowToChosen('claude', this._profiles());
+    const profile = pool[0] ?? 'default';
+    const env = this._workerEnv('claude');
+    return { profile, env: profile === 'default' ? env : { ...env, CLAUDE_CONFIG_DIR: profile } };
+  }
+
+  /**
    * THE ENGINE ON A TASK SHE IS COMPOSING, OR NULL, and the door writes nothing
    * else (`zero:compose` in main/ipc.mjs).
    *

@@ -259,6 +259,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // while the app is running and the settings screen already promises that
     // works without a restart.
     bin: () => config.claudeBin,
+    // The account marked In use, asked each time so a switch is read at once.
+    account: () => supervisor.usageAccount(),
     onChange: push,
   });
 
