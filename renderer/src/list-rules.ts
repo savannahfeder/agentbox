@@ -286,6 +286,19 @@ export function isProposal(i: InboxItem): boolean {
 }
 
 /**
+ * THE THREADS WITH A PROPOSAL STILL WAITING UNDER THEM, by `product/id`
+ * (w-d2744c6daa). The inbox's mask leaves these alone: a thread is otherwise
+ * hidden while a task under it runs (`threadMasked`), and measured in the built
+ * app that hid a thread with one task running and two still waiting, which put
+ * the two waiting ones under a thread in no list she reads.
+ */
+export function proposingThreads(items: readonly (InboxItem & { product: string })[]): Set<string> {
+  const out = new Set<string>();
+  for (const i of items) if (isProposal(i)) out.add(`${i.product}/${i.parent}`);
+  return out;
+}
+
+/**
  * HOW LONG LATER MAY KEEP ONE QUIETLY. "Sometimes the tab later is not meant
  * to be looked at, so I think things that go there are really easy to lose."
  * So the quiet has a deadline, and their range for it was "24 - 72 hours,
