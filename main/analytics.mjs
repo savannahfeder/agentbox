@@ -178,6 +178,15 @@ export function createAnalytics({ config, version, dir, client, env = process.en
         report_version: Number(payload.v ?? 1),
         error: payload.error ?? null,
         happened_at: String(payload.ts ?? ''),
+        // THE VERSION IT CRASHED ON, WHICH IS NOT ALWAYS THE ONE SENDING IT.
+        // A report written by a dying process is drained on the NEXT launch,
+        // and that launch may be a newer app: `base.app_version` then files
+        // 0.1.11's crash against 0.1.12. It did, for three of the six window
+        // errors the launch report attributes to 0.1.12 (PostHog, 2026-10-08),
+        // and a version asked to answer for the bugs of the one before it is
+        // how a release that fixed something reads as a release that broke it.
+        // The report has carried the right answer all along.
+        app_version: String(payload.app?.version ?? base.app_version),
       });
     },
 
