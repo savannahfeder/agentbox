@@ -113,6 +113,12 @@ export class MemoryGateServer {
     lockPort = DEFAULT_LOCK_PORT,
     idleReleaseMs = 30_000,
     maxGrantMs = 3 * 60 * 60_000,
+    // How long a grant may hold a slot when its end can never be observed,
+    // because its memory reading is shared with another command on the same
+    // agent process. Null means the longest the gate will make anything wait:
+    // a grant nobody can see the end of must not outlive the wait it causes,
+    // or a queue is refused one by one while a phantom holds the slot.
+    sharedGrantMs = null,
     clock = Date.now,
     log = () => {},
   } = {}) {
@@ -123,6 +129,7 @@ export class MemoryGateServer {
     this.idleReleaseMs = idleReleaseMs;
     this.maxGrantMs = maxGrantMs;
     this.gate = new MemoryGate({ ...gate, history: this.history, clock });
+    this.sharedGrantMs = Number.isFinite(sharedGrantMs) ? sharedGrantMs : this.gate.maxWaitMs;
     this.scoreFor = scoreFor;
     this.ownerOf = ownerOf;
     this.readPressure = readPressure;
@@ -341,13 +348,20 @@ export class MemoryGateServer {
     this.grants.delete(id);
     const was = this.gate.finish(id);
     if (!was) return;
-    if (grant?.ambiguous) return;
-    this.history.record(was.command, {
-      peakMb: was.peakMb,
+    // A SHARED READING IS NOT NO READING (w-5601e99977). Every Codex thread of
+    // a login runs under one `codex app-server`, so two Codex commands at once
+    // are measured together and neither may claim the figure. How long each
+    // took is its own, though, and a run that was over inside QUICK_MS counts
+    // as light on that alone, so `onlyIfLight` files that verdict and nothing
+    // else. Before this, Codex taught the history almost nothing and rode on
+    // what Claude workers taught it.
+    const filed = this.history.record(was.command, {
+      peakMb: grant?.ambiguous ? null : was.peakMb,
       durationMs: Number(hook.duration_ms) || null,
       background: was.background,
+      onlyIfLight: !!grant?.ambiguous,
     });
-    this.dirty = true;
+    if (filed) this.dirty = true;
   }
 
   /* ------------------------------ measuring ------------------------------ */
@@ -374,7 +388,8 @@ export class MemoryGateServer {
    * One look at every process. Each grant finds the agent process it belongs to
    * (the nearest `claude` or `codex` above the hook), and is measured as the
    * new processes under that agent since it was granted. Two grants on one
-   * agent at once share what they find and teach the history nothing.
+   * agent at once share what they find, so neither claims that figure; each
+   * still teaches the history how long it took (`_post`).
    */
   _sample(procs) {
     const byPid = new Map(procs.map((p) => [p.pid, p]));
@@ -387,9 +402,23 @@ export class MemoryGateServer {
     const now = this.clock();
     for (const grant of this.grants.values()) {
       if (!this.gate.running.has(grant.id)) { this.grants.delete(grant.id); continue; }
-      // The last resort, for a grant whose agent could never be found: no
-      // report back and nothing to measure for three hours is over.
-      if (!grant.anchor && now - grant.startedAt >= this.maxGrantMs) {
+      // THE BACKSTOPS THAT DO NOT DEPEND ON WHAT IS RUNNING (w-5601e99977).
+      // Both of the other releases need a reading of the grant's own
+      // processes, and a Codex grant never gets one: its anchor is the shared
+      // app-server, where a sibling thread's work keeps the reading above zero
+      // for good. So a grant that was ever measured together with another
+      // (`ambiguous`, which nothing clears) is let go after `sharedGrantMs`,
+      // and no grant at all outlives `maxGrantMs`. This used to be checked
+      // only while no anchor had been found, so a Codex command whose "after"
+      // report was lost held one of two heavy slots until the app-server was
+      // replaced.
+      //
+      // LETTING A SLOT GO IS NOT LETTING GO OF THE MACHINE. Nothing is
+      // stopped, and if the command really is still running and really is big,
+      // the kernel's own pressure reading holds the next heavy command back
+      // anyway.
+      const held = now - grant.startedAt;
+      if (held >= this.maxGrantMs || (grant.ambiguous && held >= this.sharedGrantMs)) {
         this.grants.delete(grant.id);
         this.gate.finish(grant.id);
         continue;

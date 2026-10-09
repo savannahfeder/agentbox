@@ -126,7 +126,9 @@ describe('the check, when the slot is taken', () => {
     const said = JSON.parse(r.out);
     expect(said.hookSpecificOutput.hookEventName).toBe('PreToolUse');
     expect(said.hookSpecificOutput.permissionDecision).toBe('deny');
-    expect(said.hookSpecificOutput.permissionDecisionReason).toMatch(/memory/i);
+    // It has to say which of the two reasons it was: this wait was for a slot,
+    // not a Mac that is short of memory (w-8386b3fd47).
+    expect(said.hookSpecificOutput.permissionDecisionReason).toMatch(/heavier work/);
   });
 
   it('forgets a waiting command whose agent went away, so it holds nobody up', async () => {

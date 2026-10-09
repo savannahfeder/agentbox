@@ -24,6 +24,7 @@ import { accountSentence, engineTroubleNote } from '../shared/spawn-trouble.mjs'
 import { readPlan } from './claude-plan.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
 import { machineSlots, machineNote, autoAgents, MAX_SLOTS } from './machine.mjs';
+import { shortPath } from './agent-files.mjs';
 import { NAME } from '../shared/product-name.mjs';
 import { autoSlots } from './memory-gate.mjs';
 import { accountIdentity, claudeLoginCommand, duplicateAccountNote, linkAccountTooling, makeClaudeHome } from './account-tooling.mjs';
@@ -499,6 +500,7 @@ export function readSettings({ config, supervisor, store }) {
       machineNote: machineNote(slotsHere, config.maxConcurrentSessions),
       memoryGate: memoryGateSettings({ config, supervisor }),
       leftovers: leftoverSettings({ config, supervisor }),
+      strayFolders: strayFolderSettings({ supervisor }),
       capacity: status.capacity,
       running: sessions.length,
       model: parseSessionArgs(workspaceArgs).model,
@@ -947,6 +949,34 @@ export function leftoverSettings({ config, supervisor }) {
     }
   }
   return { on, now };
+}
+
+/**
+ * COPIES OF A PROJECT THE APP DID NOT MAKE, SAID OUT LOUD (w-330eea6c66).
+ *
+ * MEASURED 2026-10-07: thirteen worktrees of one repository sat outside the
+ * folder the app keeps its own in, about 740 MB, and nothing in the app could
+ * list, show or sweep one. That is the same invisibility that stranded 26 GB on
+ * 2026-09-22, and the half that fixes it for a person is being told.
+ *
+ * NO BUTTON, DELIBERATELY. A folder the app did not make is not the app's to
+ * remove: it is the only copy of whatever is uncommitted inside it, and somebody
+ * made it on purpose. So this is a sentence and nothing else, and it is absent
+ * entirely when there is nothing to say, because a row that is usually quiet
+ * trains the reaction it exists to prevent.
+ */
+export function strayFolderSettings({ supervisor }, home = os.homedir()) {
+  let list = [];
+  try { list = supervisor?.strayFolders?.() ?? []; } catch { list = []; }
+  if (!list.length) return null;
+  const count = list.length;
+  const one = count === 1;
+  const projects = [...new Set(list.map((w) => w.project).filter(Boolean))];
+  const named = list.slice(0, 3).map((w) => shortPath(w.path, home));
+  const rest = count - named.length;
+  const of = projects.length ? ` of ${projects.slice(0, 2).join(' and ')}${projects.length > 2 ? ' and other projects' : ''}` : '';
+  const now = `${count} ${one ? 'copy' : 'copies'}${of} ${one ? 'was' : 'were'} made by hand outside the folder ${NAME} keeps its own in, and ${one ? 'is' : 'are'} holding disk until you remove ${one ? 'it' : 'them'}: ${named.join(', ')}${rest > 0 ? ` and ${rest} more` : ''}. ${NAME} never removes a folder it did not make.`;
+  return { count, now };
 }
 
 export function setWorkspaceSetting({ config, supervisor }, { key, value }) {

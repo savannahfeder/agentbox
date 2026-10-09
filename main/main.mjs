@@ -400,7 +400,10 @@ async function createWindow() {
   // HER CODEX CONVERSATIONS ASK TO COME IN. Once a minute: a new one in a
   // folder a project points at gets a row asking yes or no, and the ones she
   // said yes to follow Codex's latest answer.
-  const codexWatch = startCodexWatch({ store });
+  // AND IT IS WHERE A CODEX AGENT IS COUNTED, because it is the one thing that
+  // already reads them (main/codex-watch.mjs). The switch is checked by
+  // `analytics.track` itself, so this hands it over unconditionally.
+  const codexWatch = startCodexWatch({ store, count: (name, props) => analytics.track(name, props) });
   app.on('before-quit', () => codexWatch.stop());
   // Whatever is still queued goes with the app rather than dying in memory.
   app.on('will-quit', () => { analytics.flush(); });

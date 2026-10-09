@@ -156,6 +156,56 @@ export function landingIndex(rects, x, y) {
 }
 
 /**
+ * A THREAD'S OWN PLACE, SET BY DRAGGING IT IN THE LIST (w-6e5b532a95,
+ * 2026-10-07). Her words: "sometimes there are tasks that are higher priority
+ * than other projects and it's hard to articulate. I'd rather be able to drag
+ * things around here ... and have that priority remembered and that's how the
+ * app processes it." A project's place and a thread's level could never say
+ * that one Low thread matters more today than a whole project above it.
+ *
+ * So a dragged thread carries a PLACE: a number on the same scale as the score
+ * it would otherwise have, which replaces that score outright. It is a number
+ * and not a list of ids so that everything it was not dragged past keeps
+ * sorting the way it always did: a new Urgent thread still lands by its level,
+ * next to the placed ones rather than under all of them.
+ */
+export function placedScore(place, natural) {
+  return Number.isFinite(place) ? place : natural;
+}
+
+/**
+ * The places a drop writes. `rows` is the list as drawn, top first, each with
+ * the score it sorts by (its place, or its project and level); `from` is the
+ * dragged row and `to` the row it was let go in front of, or the length for
+ * the end, both counted in `rows`. Null when it lands where it was.
+ *
+ * The dragged row goes between its new neighbours. When those two TIE (two
+ * Medium threads in one project, whose order is only which changed last) no
+ * number fits between them, so the tied rows above the drop are given places
+ * of their own first, spread in the order they were drawn. The rows below are
+ * never written.
+ */
+export function dropPlaces(rows, from, to) {
+  if (!Array.isArray(rows) || from < 0 || from >= rows.length) return null;
+  const rest = rows.filter((_, i) => i !== from);
+  const at = Math.max(0, Math.min(rest.length, to > from ? to - 1 : to));
+  if (at === from || !rest.length) return null;
+  const close = (a, b) => Math.abs(a - b) < 1e-6;
+  const below = rest[at]?.score;
+  const floor = below ?? rest[at - 1].score - 2;
+  // The run of rows just above the drop that tie with the floor.
+  let top = at;
+  while (top > 0 && close(rest[top - 1].score, floor)) top -= 1;
+  const ceiling = top > 0 ? rest[top - 1].score : floor + 2;
+  const run = rest.slice(top, at);
+  const step = (ceiling - floor) / (run.length + 2);
+  const out = {};
+  run.forEach((r, j) => { out[r.id] = floor + (run.length + 1 - j) * step; });
+  out[rows[from].id] = floor + step;
+  return out;
+}
+
+/**
  * Move one product to a new index, returning a fresh order. Products that were
  * never in the order join it on their first move, so dragging an unranked chip
  * is how it gets ranked at all.

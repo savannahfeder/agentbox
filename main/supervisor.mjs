@@ -40,7 +40,7 @@ import { buildSessionArgs, CLAUDE_MODES, permissionMode } from './settings.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, productRankScore } from '../shared/rank.mjs';
+import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, placedScore, productRankScore } from '../shared/rank.mjs';
 import { keysForAgents } from '../shared/shortcuts.mjs';
 import { isCleanRun, ruleIdOf } from '../shared/repeats.mjs';
 import { mayRunHere } from '../shared/team-rules.mjs';
@@ -379,6 +379,10 @@ export class Supervisor {
       // Persisted: an in-memory-only set re-spawned a continuation for every
       // still-open answered item on every app restart.
       this._handledAnswers = new Set(state.handledAnswers ?? []);
+      // A crash cannot run stop() to return replies whose workers were still
+      // being prepared. Only these exact reply keys are owed again; a later
+      // delivered reply on the same task keeps its own mark.
+      for (const key of state.preparingAnswers ?? []) this._handledAnswers.delete(key);
       // Which conversation already holds each of her words (`_noteHeard`).
       this._heardAnswers = state.heardAnswers ?? {};
       // `_personalSessions` used to sit here, itemId -> claude session id for a
@@ -458,6 +462,8 @@ export class Supervisor {
       // the inbox: this is a filing decision about a list that had grown to
       // twenty two chips, not an off switch. Pausing is the off switch.
       this.hiddenProducts = new Set(state.hiddenProducts ?? []);
+      // Threads she dragged to a place of their own in the list (`_score`).
+      this.threadPlaces = Object.fromEntries(Object.entries(state.threadPlaces ?? {}).filter(([, v]) => Number.isFinite(v)));
     } catch {
       this._handledAnswers = new Set();
       this._heardAnswers = {};
@@ -471,6 +477,7 @@ export class Supervisor {
       this._profileCooldown = {};
       this.productOrder = [];
       this.hiddenProducts = new Set();
+      this.threadPlaces = {};
     }
     // WHICH ROWS NOTHING HAS BEEN ABLE TO RUN ON, as of the last tick, for the
     // line above her list. Deliberately NOT persisted: it is derived from
@@ -1702,10 +1709,11 @@ export class Supervisor {
     // now, so the disk no longer lies here, and this answers first anyway
     // because a row somebody is already preparing is never a row to spawn on.
     const held = this._preparing.get(item.id);
-    if (held) { held.item = item; held.opts = opts; return true; }
+    if (held) { held.item = item; held.opts = opts; this._saveState(); return true; }
     if (fs.existsSync(folder)) return false;
     const entry = { item, opts, engine };
     this._preparing.set(item.id, entry);
+    this._saveState();
     folderJob('restoreTaskFolder', base, item.id)
       // A FAILURE HERE ENDS THE SPAWN. It used to hand back the shared checkout
       // and go on to start the worker in it, which is `workFolderFor`'s back
@@ -1773,7 +1781,7 @@ export class Supervisor {
     this._photos ??= new Map();
     if (this._photos.has(item.id)) return false;
     const held = this._preparing?.get(item.id);
-    if (held) { held.item = item; held.opts = opts; return true; }
+    if (held) { held.item = item; held.opts = opts; this._saveState(); return true; }
     let cwd = null;
     try { cwd = this.workFolderFor(item, product); } catch { return false; }
     // Only a folder that is itself a checkout (a task folder carries a `.git`
@@ -1783,6 +1791,7 @@ export class Supervisor {
     this._preparing ??= new Map();
     const entry = { item, opts, engine, madeFolder: this._madeFolders?.get(item.id) };
     this._preparing.set(item.id, entry);
+    this._saveState();
     gitJob('snapshotRepo', cwd)
       .then((photo) => photo ?? null, () => null)
       .then((photo) => {
@@ -1846,6 +1855,11 @@ export class Supervisor {
     if (!product?.repoPath || base !== product.repoPath) return 0;
     const busy = (id) => this.sessions.has(id) || !!this._preparing?.has(id);
     let put = 0;
+    // AND WHILE WE ARE HERE, WHAT ELSE IS HOLDING THE DISK (w-330eea6c66). This
+    // is the only place that already walks a project's folders on a clock, and
+    // the strays are deliberately not in the list below: they are nobody's row,
+    // so they are shown and never swept.
+    await this.lookOverTheProjectsFolders(product, base);
     for (const folder of await folderJob('listTaskFolders', base)) {
       // OUR OWN PID IS NOT SOMEBODY ELSE. Every folder is locked by the process
       // that made it, which is this one, so treating any lock as a live holder
@@ -1873,9 +1887,50 @@ export class Supervisor {
       // reading it is an agent's folder deleted while it works (w-4d722ecf92).
       if (item?.claim && !item.claimExpired) continue;
       if (busy(folder.id)) continue;
-      if ((await folderJob('parkTaskFolder', base, folder.id)).parked) put += 1;
+      // THE PATH WE WERE HANDED, not the row id alone. Parking used to rebuild
+      // `.claude/worktrees/<id>` from the id, so the folder it committed in and
+      // removed was not necessarily the one this loop looked at (w-330eea6c66).
+      if ((await folderJob('parkTaskFolder', base, folder.id, { path: folder.path })).parked) put += 1;
     }
     return put;
+  }
+
+  /**
+   * EVERY COPY OF A PROJECT ON THE DISK, INCLUDING THE ONES THE APP DID NOT MAKE
+   * (w-330eea6c66).
+   *
+   * MEASURED 2026-10-07: thirteen worktrees of one repository sat outside the
+   * app's own home holding about 740 MB, made by hand by sessions rather than by
+   * the app, and nothing in the app could list, show or sweep one. This is the
+   * showing half: the strays are remembered here so a page can name them without
+   * reading the disk on the window's thread.
+   *
+   * IT ONLY EVER LOOKS. Removing a folder somebody made on purpose is not the
+   * app's to do, and the folder is the only copy of whatever is uncommitted in
+   * it. The one thing it does change is bookkeeping with nothing behind it: a
+   * registration whose folder has gone, which is what refuses the next
+   * `worktree add` at that path (one of the thirteen was under `/private/tmp`,
+   * which macOS purges).
+   */
+  async lookOverTheProjectsFolders(product, base) {
+    try {
+      const dropped = await folderJob('pruneMissingWorktrees', base);
+      if (dropped.length) console.warn(`zero: dropped ${dropped.length} worktree registration(s) in ${base} pointing at nothing`);
+      const strays = await folderJob('strayWorktrees', base);
+      this._strayFolders ??= new Map();
+      // By checkout rather than by product, so two products registering the same
+      // one do not count its folders twice.
+      this._strayFolders.set(product.repoPath, strays.map((w) => ({ ...w, project: product.name || product.slug })));
+    } catch (error) {
+      console.warn('zero: could not look over the project´s folders:', error.message);
+    }
+  }
+
+  /** Copies of a project on this disk the app did not make, as the last sweep found them. */
+  strayFolders() {
+    const out = [];
+    for (const list of this._strayFolders?.values() ?? []) out.push(...list);
+    return out;
   }
 
   profileHoldingSession(sessionId, itemId, product) {
@@ -3070,8 +3125,28 @@ export class Supervisor {
   // One product's medium outranks another's urgent when it sits above it.
   // Ties break oldest-first so nothing starves. The item's own number is hers
   // alone now (itemPriority); an agent's tag no longer moves anything.
+  // A THREAD DRAGGED IN THE LIST RUNS WHERE IT WAS PUT (w-6e5b532a95): its
+  // place replaces the score outright (`placedScore`, shared/rank.mjs).
   _score(item) {
-    return productRankScore(this.productOrder, item.product) + itemPriority(item);
+    return placedScore(this.threadPlaces[item.id], productRankScore(this.productOrder, item.product) + itemPriority(item));
+  }
+
+  // Places as a patch: a number sets one, null forgets it. Kept here beside
+  // the project order, on this Mac, because both are one person's running
+  // order and a teammate's list must not move when you drag yours.
+  setThreadPlaces(patch) {
+    for (const [id, place] of Object.entries(patch ?? {})) {
+      if (place === null) delete this.threadPlaces[id];
+      else if (Number.isFinite(place)) this.threadPlaces[id] = place;
+    }
+    this._saveState();
+    this.onChange?.();
+  }
+
+  // The snapshot's items with each one's place on it, which is all the screen
+  // needs to sort by it. A row with no place is handed back untouched.
+  withPlaces(items) {
+    return items.map((i) => (Number.isFinite(this.threadPlaces[i.id]) ? { ...i, place: this.threadPlaces[i.id] } : i));
   }
 
   /* ----------------------- auth profiles (subscriptions) ------------------ */
@@ -3686,16 +3761,23 @@ export class Supervisor {
     // FAST_EXIT_MS. Past it, the branch below CLEARED the account's trouble:
     // no bench, no "Signed out" on the row, and her reply was charged one of
     // its three tries. The error result names its cause whatever the length.
+    const lastFailure = (session.tail ?? []).filter((l) => l && !l.startsWith('session exited') && !l.startsWith('fast exit')).slice(-1)[0];
     const refusedBy = session.resultIsError ? troubleCause(session.result) : null;
     const limitHit = refusedBy === 'at-limit' || needsHerHands(refusedBy);
-    if ((Date.now() - session.startedAt < FAST_EXIT_MS && !quickButReal) || limitHit) {
+    // A dropped provider connection is a transport failure too, even when
+    // the local process and its pipe stayed up. It must not spend a reply's
+    // attempts or clear the account's backoff just because it lasted 45s.
+    const connectionLost = refusedBy === 'interrupted'
+      || (session.result == null && troubleCause(lastFailure) === 'interrupted');
+    if (connectionLost) session.transportFault = true;
+    if ((Date.now() - session.startedAt < FAST_EXIT_MS && !quickButReal) || limitHit || connectionLost) {
       // The last words of a fast-dead session are the diagnosis. They are kept,
       // but as EVIDENCE now, not as copy: shared/spawn-trouble.mjs turns them
       // into a cause, and only our own sentence for that cause ever reaches a
       // screen.
-      const lastWords = limitHit
+      const lastWords = (limitHit || connectionLost) && session.resultIsError && session.result != null
         ? String(session.result)
-        : (session.tail ?? []).filter((l) => l && !l.startsWith('session exited') && !l.startsWith('fast exit')).slice(-1)[0];
+        : lastFailure;
       const raw = lastWords ? lastWords.replace(/^stderr: /, '').slice(0, 300) : '';
       const account = this._accountKey(engine, session.profile);
       const cause = this._noteProfileTrouble(account, raw);
@@ -3785,9 +3867,15 @@ export class Supervisor {
     try {
       fs.writeFileSync(this._stateFile, JSON.stringify({
         handledAnswers: [...this._handledAnswers].slice(-500),
+        // The mark was made before setup, not before an agent actually ran.
+        // Persist the distinction for a quit that never reaches stop().
+        preparingAnswers: [...(this._preparing?.values() ?? [])]
+          .filter(({ item, opts }) => opts?.continuation && item?.answer)
+          .map(({ item }) => this._answerKey(item)),
         heardAnswers: Object.fromEntries(Object.entries(this._heardAnswers ?? {}).slice(-500)),
         productOrder: this.productOrder,
         hiddenProducts: [...this.hiddenProducts],
+        threadPlaces: this.threadPlaces,
         liveSessions: this._liveSessions,
         rowSessions: this._rowSessions,
         compactions: this._compactions,
@@ -3938,8 +4026,14 @@ export class Supervisor {
       signInNeeded = this._waitingOnSignIn(this.store.listItems(Date.now())
         .filter((i) => mayRunHere(i, productBySlug.get(i.product), me)));
     } catch {}
+    // ROWS THE SHIP QUEUE STILL OWES A SHIP (w-0c1ba766eb). Waiting on the
+    // app and not on a person, so the window keeps them in In progress until
+    // they have shipped or gone back to their agent.
+    let shipping = [];
+    try { shipping = this.shipQueue.waitingIds(this.store.listItems(Date.now()), this.store.listProducts?.() ?? []); } catch {}
     return {
       paused: this.paused,
+      shipping,
       // ROWS NOTHING CAN START BECAUSE THEIR TOOL IS SIGNED OUT, by id, with the
       // tool's name. The row says so instead of "Queued", which promised an
       // agent "as soon as one is free" while none could be (2026-10-04).
@@ -5619,6 +5713,20 @@ export class Supervisor {
   }
 
   /**
+   * THE CLAUDE LOGIN WHOSE LIMIT THE USAGE PANEL READS, and the environment to
+   * read it in (main/claude-usage.mjs). The same pick as `runsOnAccount`: the
+   * account she chose, or the first one when she has not chosen. The
+   * environment is a worker's, scrubbed the same way, so the app's own
+   * CLAUDE_CONFIG_DIR or an API key never decides which login answers.
+   */
+  usageAccount() {
+    const pool = this._narrowToChosen('claude', this._profiles());
+    const profile = pool[0] ?? 'default';
+    const env = this._workerEnv('claude');
+    return { profile, env: profile === 'default' ? env : { ...env, CLAUDE_CONFIG_DIR: profile } };
+  }
+
+  /**
    * THE ENGINE ON A TASK SHE IS COMPOSING, OR NULL, and the door writes nothing
    * else (`zero:compose` in main/ipc.mjs).
    *
@@ -6467,9 +6575,10 @@ export class Supervisor {
       this._preparing ??= new Map();
       const opts = { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, shipFailure };
       const held = this._preparing.get(item.id);
-      if (held) { held.item = item; held.opts = opts; return; }
+      if (held) { held.item = item; held.opts = opts; this._saveState(); return; }
       const entry = { item, opts, engine };
       this._preparing.set(item.id, entry);
+      this._saveState();
       const t = setTimeout(() => {
         if (this._preparing?.get(item.id) !== entry) return; // stopped, or the app quit
         this._preparing.delete(item.id);

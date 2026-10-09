@@ -259,6 +259,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // while the app is running and the settings screen already promises that
     // works without a restart.
     bin: () => config.claudeBin,
+    // The account marked In use, asked each time so a switch is read at once.
+    account: () => supervisor.usageAccount(),
     onChange: push,
   });
 
@@ -279,11 +281,17 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // send one event per agent per tick, all day. The keys are only ever
       // compared in this process; nothing about an agent is sent with the
       // count, which carries no name, no path and no title.
+      //
+      // AND WHICH ENGINE IT WAS (w-1116fbb68a, 2026-10-08). This list is Claude
+      // Code processes and only ever has been; a Codex conversation has no
+      // process to find and is counted from main/codex-watch.mjs instead. The
+      // engine is what lets the two be read apart, and without it on this side
+      // the Codex count would look like a drop in the Claude one.
       for (const agent of live) {
         const key = agentKey(agent);
         if (!key || seenAgents.has(key)) continue;
         seenAgents.add(key);
-        analytics.track('agent_seen');
+        analytics.track('agent_seen', { engine: 'claude' });
       }
       return live;
     } catch {
@@ -379,7 +387,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const reading = usageFor === DEFAULT_ENGINE ? usage.read() : supervisor.codexUsage();
     return {
       products: store.listProducts(),
-      items,
+      // Each with the place she dragged it to, if she did (w-6e5b532a95).
+      items: supervisor.withPlaces(items),
       // THE TEAM: who is signed in, their team and its people, and the
       // title-free activity of their private work. Null on a build with no
       // team cloud, which is the single-person app.
@@ -480,7 +489,19 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // it and the user's own sentence never reached the card: the row went on
       // saying only what the session was started with days before. This is the
       // only process that knows the user said it, so this is where it is written.
-      if (out?.ok && out.key) agentSchedule.replied(out.key, out.at ?? Date.now(), Date.now(), String(text ?? ''));
+      //
+      // AND IT IS A REPLY, SO IT IS COUNTED (w-1116fbb68a, 2026-10-08). A reply
+      // on a task has always sent `reply_sent`; one typed into a live session
+      // sent nothing at all, and activation is read as three real replies to
+      // agents in the first day, so the people who talk to their own sessions
+      // rather than through a row were missing from it. `kind` says which of
+      // the two this was. It waits on the same delivery the mark does, and for
+      // the same reason: a count for words that never arrived would read as
+      // activation nobody had.
+      if (out?.ok) {
+        if (out.key) agentSchedule.replied(out.key, out.at ?? Date.now(), Date.now(), String(text ?? ''));
+        analytics.track('reply_sent', { kind: 'agent' });
+      }
       push();
       return out;
     } catch {
@@ -546,6 +567,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, model, effort, now, inReplyTo }) => {
     if (isAgentRow(id)) return { ok: false };
+    // A level picked from ⌘K arrives here with no words, and gives way the
+    // same as one picked on the summary (zero:thread-edit). A reply that
+    // happens to carry its row's level does not.
+    if (priority != null && !answer && id) supervisor.setThreadPlaces({ [id]: null });
     // A REPLY IN A THREAD (w-920461cbe6) only means something in a conversation
     // between people, which is the only place a thread is drawn and the only
     // record the mark crosses to a teammate in (shared/team-rules.mjs). Anywhere
@@ -608,6 +633,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:set-product-order', (_e, { order }) => {
     supervisor.setProductOrder(order);
     return supervisor.status();
+  });
+
+  // A THREAD DRAGGED TO A PLACE OF ITS OWN in the list (w-6e5b532a95): the
+  // places the drop worked out (`dropPlaces`, shared/rank.mjs), id to number.
+  ipcMain.handle('zero:set-thread-places', (_e, { places }) => {
+    supervisor.setThreadPlaces(places);
+    push();
+    return { ok: true };
   });
 
   // Hidden from the composer's picker and nothing else: a hidden product still
@@ -696,6 +729,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:thread-edit', (_e, { product, id, patch }) => {
     try {
       store.threadEdit(product, id, patch);
+      // PICKING A LEVEL IS THE NEWER WORD on where a thread goes, so a place
+      // it was dragged to gives way and it sorts by its level again.
+      if (patch?.priority != null) supervisor.setThreadPlaces({ [id]: null });
       push();
       return { ok: true };
     } catch (err) {
@@ -938,11 +974,18 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // an archive, so it does not collide with what done means on a work item.
   ipcMain.handle('zero:end-repeat', (_e, { product, id }) => store.endRepeat(product, id));
 
-  ipcMain.handle('zero:create-product', (_e, { name, repoPath }) => {
+  ipcMain.handle('zero:create-product', (_e, { name, repoPath, ofMany }) => {
     const out = store.createProduct({ name, repoPath });
     // (privacy page 5.1). The count is the whole payload; the path it was
     // connected to never leaves.
-    if (typeof repoPath === 'string' && repoPath.trim()) analytics.track('repo_connected');
+    //
+    // AND A PRESS THAT CONNECTS NINE FOLDERS IS ONE THING SOMEBODY DID, NOT
+    // NINE (w-1116fbb68a, 2026-10-08). The import makes a project per folder,
+    // so this handler fired nine times for one press and nine events read as
+    // nine separate connections to anybody looking at them as activity rather
+    // than as a funnel step. `ofMany` is the caller saying it will count the
+    // press itself, once, with how many folders it connected.
+    if (!ofMany && typeof repoPath === 'string' && repoPath.trim()) analytics.track('repo_connected');
     return out;
   });
 
