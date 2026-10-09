@@ -23,6 +23,7 @@
 
 import { spawn as nodeSpawn } from 'node:child_process';
 import { terminalEnv } from './task-terminals.mjs';
+import { codexLaunchEnv } from './codex-launch-env.mjs';
 
 const INSTALLERS = {
   claude: { shell: '/bin/bash', url: 'https://claude.ai/install.sh', pipe: 'bash' },
@@ -57,7 +58,8 @@ function realSpawn(file, args, { env, onData, keepStdin = false } = {}) {
   let child;
   try {
     child = nodeSpawn(file, args, { env, stdio: [keepStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] });
-  } catch {
+  } catch (error) {
+    onData?.(`${error.message}\n`);
     return { exit: Promise.resolve(127), kill() {} };
   }
   const feed = (d) => onData?.(String(d));
@@ -65,7 +67,7 @@ function realSpawn(file, args, { env, onData, keepStdin = false } = {}) {
   child.stderr?.on('data', feed);
   const exit = new Promise((resolve) => {
     child.on('exit', (code) => resolve(code ?? 1));
-    child.on('error', () => resolve(127));
+    child.on('error', (error) => { onData?.(`${error.message}\n`); resolve(127); });
   });
   return { exit, kill: () => { try { child.kill('SIGTERM'); } catch { /* already gone */ } } };
 }
@@ -82,6 +84,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  */
 export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {} } = {}) {
   const runEnv = terminalEnv(env);
+  const toolEnv = (engine, bin) => engine === 'codex' ? codexLaunchEnv(bin, runEnv) : runEnv;
   const jobs = new Map();
 
   const fresh = (engine) => ({ engine, phase: 'idle', error: null, log: '', running: null, login: null, run: 0 });
@@ -91,20 +94,26 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
 
   async function signedIn(j, bin) {
     const { file, args } = statusCommand(j.engine, bin);
-    const p = spawn(file, args, { env: runEnv });
+    let output = '';
+    const p = spawn(file, args, { env: toolEnv(j.engine, bin), onData: (d) => { output = (output + String(d).replace(ANSI, '')).slice(-LOG_LIMIT); } });
     const TIMED_OUT = Symbol('no answer');
     const code = await Promise.race([p.exit, wait(STATUS_TIMEOUT).then(() => { p.kill(); return TIMED_OUT; })]);
     // TOLD TO THE APP, which routes on it (w-d5d632e503): a Claude Code that
     // is signed out beside a Codex that is signed in is a Mac that runs on
     // Codex. Only a real yes or no; a check that never answered says nothing.
     if (code === 0 || code === 1) onSignIn(j.engine, code === 0);
-    return code === 0;
+    if (code === 0 || code === 1) return code === 0;
+    if (output) say(j, output);
+    const name = j.engine === 'codex' ? 'Codex' : 'Claude Code';
+    throw new Error(code === TIMED_OUT
+      ? `${name} did not answer the sign-in check. Try again.`
+      : `${name} could not check sign-in: ${lastLine(output) || `exit ${code}`}`);
   }
 
   function startLogin(j, bin) {
     j.login?.kill();
     const { file, args } = signInCommand(j.engine, bin);
-    const login = spawn(file, args, { env: runEnv, keepStdin: true, onData: (d) => say(j, d) });
+    const login = spawn(file, args, { env: toolEnv(j.engine, bin), keepStdin: true, onData: (d) => say(j, d) });
     j.login = login;
     return login;
   }
@@ -130,18 +139,19 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
     if (!live()) return;
     j.phase = 'signing-in';
     let login = startLogin(j, hit.path);
-    let gaveUp = false;
-    login.exit.then((code) => { if (login === j.login && code !== 0) gaveUp = true; });
+    let ended = false;
+    const watchLogin = (loginProcess) => loginProcess.exit.then(() => { if (loginProcess === j.login) ended = true; });
+    watchLogin(login);
     for (;;) {
       await wait(poll);
       if (!live()) return;
       if (await signedIn(j, hit.path)) { if (live()) ready(j); return; }
       if (j.login !== login) {
         login = j.login;
-        gaveUp = false;
-        login.exit.then((code) => { if (login === j.login && code !== 0) gaveUp = true; });
+        ended = false;
+        watchLogin(login);
       }
-      if (gaveUp) return fail(j, 'The sign-in was closed before it finished.');
+      if (ended) return fail(j, `The sign-in was closed before it finished.${lastLine(j.log) ? ` ${lastLine(j.log)}` : ''}`);
     }
   }
 
@@ -182,12 +192,13 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
     async readiness(engine) {
       const hit = find(engine);
       if (!hit?.found) return { engine, found: false, signedIn: false };
-      return { engine, found: true, signedIn: await signedIn({ engine }, hit.path) };
+      try { return { engine, found: true, signedIn: await signedIn({ engine, log: '' }, hit.path) }; }
+      catch (error) { return { engine, found: true, signedIn: false, error: error.message }; }
     },
     /** The same question against a path already found, so asking it at
      *  launch does not search the Mac again. */
     signedInNow(engine, bin) {
-      return signedIn({ engine }, bin);
+      return signedIn({ engine, log: '' }, bin).catch(() => false);
     },
   };
 }

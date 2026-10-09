@@ -1,6 +1,22 @@
 // The bridge. Everything the renderer may do, spelled out.
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
+// The layout keeps 40px clear of the macOS traffic lights. Everywhere else
+// that band is empty headroom above the pane. The stylesheet reads this and
+// uses the same inset as the sides. A browser tab sets its own shell and is
+// not this.
+//
+// The sandboxed preload runs while the document is still loading, and
+// documentElement is null then. Reading it here throws, and a throw on this
+// line skips the bridge below, so the window draws the canned inbox.
+if (process.platform !== 'darwin') {
+  const markFlat = () => {
+    if (document.documentElement) document.documentElement.dataset.window = 'flat';
+  };
+  if (document.documentElement) markFlat();
+  else document.addEventListener('DOMContentLoaded', markFlat);
+}
+
 // EVERY ASK BEFORE A RELOAD IS ANSWERED, held write or not. main waits for
 // this before it reloads (main/write-before-reload.mjs), so a page with
 // nothing held, or one that has not set a handler yet, says so at once rather
@@ -35,6 +51,7 @@ contextBridge.exposeInMainWorld('zero', {
   sendNow: (payload) => ipcRenderer.invoke('zero:send-now', payload),
   compose: (payload) => ipcRenderer.invoke('zero:compose', payload),
   schedule: (payload) => ipcRenderer.invoke('zero:schedule', payload),
+  snooze: (payload) => ipcRenderer.invoke('zero:snooze', payload),
   // Feedback to the Agentbox team, from the card the sidebar opens.
   sendFeedback: (payload) => ipcRenderer.invoke('zero:send-feedback', payload),
   // The team version: signing in, the team, and sharing a project.

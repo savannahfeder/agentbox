@@ -371,8 +371,10 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
       continue;
     }
 
-    if (has(patch, 'runAt')) {
-      const runAt = Number(patch.runAt) || 0;
+    // runAt lines remain readable as legacy snoozes; new reminders have
+    // their own field so the worker never mistakes one for an instruction.
+    if (has(patch, 'snoozedUntil') || has(patch, 'runAt')) {
+      const runAt = Number(has(patch, 'snoozedUntil') ? patch.snoozedUntil : patch.runAt) || 0;
       if (!runAt) {
         if (mine && replied && replied.by === markBy && at - replied.at <= REPLY_LIFTS_MS) continue;
         events.push({ at, who, said: mine ? 'You brought it back' : 'It let this run now' });

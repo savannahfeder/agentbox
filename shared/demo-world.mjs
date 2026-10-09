@@ -214,7 +214,7 @@ function lines(now) {
     result: [
       'The clause summariser is merged and running. It read all ten contracts in the test folder and named every termination, auto renewal and liability clause in all ten, with two false positives on the longest one.',
       '',
-      'Ninety three seconds for the longest contract, four seconds for the shortest. Measured on this Mac, not estimated.',
+      'Ninety three seconds for the longest contract, four seconds for the shortest. Measured on this computer, not estimated.',
     ].join('\n'),
   });
 

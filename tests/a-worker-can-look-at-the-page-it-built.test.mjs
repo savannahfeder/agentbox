@@ -94,7 +94,7 @@ describe('looking at the page', () => {
     await expect(lookAtPage({
       product: 'astral',
       url: 'http://localhost:3000',
-      capture: async () => ({ error: 'No Chrome, Chromium or Edge on this Mac, so there is nothing to open the page with.' }),
+      capture: async () => ({ error: 'No Chrome, Chromium or Edge on this computer, so there is nothing to open the page with.' }),
     })).rejects.toThrow(/no chrome/i);
   });
 

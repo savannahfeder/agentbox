@@ -17,7 +17,7 @@
 // resume goes to the account that holds the transcript, found on disk when it
 // was never written down, and asks for no account when no home holds it.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -35,13 +35,15 @@ function putTranscript(profileHome, cwd, sessionId) {
 
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-two-accounts-'));
-  // The default profile is the CLI's own home, which the supervisor reads off
-  // os.homedir; the test drives it there so nothing has to be stubbed.
+  // The desktop-launch verification hit EPERM on 2026-10-07 because this
+  // fixture wrote into the real CLI home. Keep the default account temporary.
+  vi.spyOn(os, 'homedir').mockReturnValue(tmp);
   home = path.join(os.homedir(), '.claude');
   second = path.join(tmp, 'claude-second');
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 

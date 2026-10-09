@@ -192,7 +192,7 @@ export const SHORTCUTS = [
     keys: [
       // (meta||ctrl) && 'k' → the palette, above every other branch, and
       // forwarded from inside an open file by main.mjs as well.
-      { keys: ['⌘K'], what: `The command bar: everything ${NAME} can do, by name.` },
+      { keys: ['⌘K', 'Ctrl+K'], join: 'or', what: `The command bar: everything ${NAME} can do, by name.` },
       // 'n' in both branches → setModal('compose'). C does the same and is
       // left off: N is the default (w-fb9051e597).
       // "Threads", not tasks, since w-ec62ab6b38.

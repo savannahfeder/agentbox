@@ -96,7 +96,7 @@ export function openFreshUser({
   const notes = [];
   if (withTools && !prepared.claudeBin) notes.push('Claude Code is not at ~/.local/bin/claude, so agents will not run in it.');
   if (!prepared.keychain) notes.push('There is no ~/Library/Keychains here, so Claude Code will say it is not logged in.');
-  if (withAgents && !prepared.agents) notes.push('There is no ~/.claude on this Mac, so it will have no agents to offer.');
+  if (withAgents && !prepared.agents) notes.push('There is no ~/.claude on this computer, so it will have no agents to offer.');
 
   return { ok: true, home: prepared.home, agents: prepared.agents, notes, pid: child?.pid ?? null };
 }

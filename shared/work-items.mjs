@@ -108,7 +108,7 @@ export const CLAUDE_PERMISSION_MODES = [
 // search matches either name.
 export const WORK_ITEM_FIELDS = [
   'title', 'label', 'body', 'kind', 'labels', 'priority', 'parent',
-  'status', 'result', 'note', 'answer', 'product', 'runAt', 'answeredThrough',
+  'status', 'result', 'note', 'answer', 'product', 'runAt', 'snoozedUntil', 'answeredThrough',
   'engine', 'model', 'effort',
   // WHETHER THIS HAS BEEN STARTED AT ALL. 'later' is a thread written down and
   // deliberately not begun: it waits for a person, not for a clock, and
@@ -396,6 +396,8 @@ function coerceField(field, value) {
     // that coerces to undefined is dropped by the fold, so without a falsy
     // sentinel a schedule could be set and never cleared.
     case 'runAt': return Number.isFinite(value) ? Math.trunc(value) : undefined;
+    // An inbox reminder, independent of when work may start. 0 brings it back.
+    case 'snoozedUntil': return Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : undefined;
     // 'later' or 'now', and 'now' is the falsy sentinel for the same reason
     // runAt keeps 0: a field that coerces to undefined is dropped by the fold,
     // so without a real value for "started" nothing could ever clear it.

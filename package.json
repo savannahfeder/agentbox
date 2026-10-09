@@ -1,7 +1,7 @@
 {
   "name": "agentbox-app",
   "productName": "Agentbox",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "An inbox for managing dozens of Claude Code and Codex agents.",
   "author": "Savannah Feder",
   "repository": {
@@ -34,6 +34,7 @@
     "shared/**/*.mjs",
     "shared/**/*.mts",
     "shared/**/*.json",
+    "!shared/*.local.json",
     "mcp/**/*.mjs",
     "mcp/**/*.sh",
     "briefs/**/*.md",
@@ -52,6 +53,7 @@
     "build": "node scripts/prepare-terminal.mjs && node scripts/read-claude-commands.mjs && node scripts/read-claude-models.mjs && vite build renderer",
     "start": "npm run build && node scripts/brand-electron.mjs && electron .",
     "test": "vitest run",
+    "read:claude": "node scripts/read-claude-commands.mjs --snapshot && node scripts/read-claude-models.mjs --snapshot",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit -p renderer/tsconfig.json",
     "test:changed": "node scripts/test-what-changed.mjs",
     "icon": "electron scripts/make-icon.mjs",
@@ -122,6 +124,7 @@
       "main/**/*",
       "shared/**/*",
       "preload.cjs",
+      "build/notification-icon.png",
       "briefs/**/*",
       "!briefs/founder.md",
       "!briefs/writing-rules.md",

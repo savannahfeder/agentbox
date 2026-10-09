@@ -449,6 +449,10 @@ export function readSettings({ config, supervisor, store }) {
       permission: override ? permissionMode(override) : 'workspace',
       permissionArgs: override ?? null,
       codexMode: config.projectCodexMode?.[product.slug] ?? 'workspace',
+      // THE SUPERVISOR IS ASKED RATHER THAN THE CONFIG FILE, so the page shows
+      // what will actually happen: a tie naming a login that has been signed out
+      // is ignored when work is handed out, and reads 'any' here too.
+      account: supervisor._projectProfile?.(product.slug) ?? 'any',
       instructions,
       running: sessions.filter((s) => s.product === product.slug).length,
     };
@@ -727,6 +731,24 @@ export function setProjectSetting({ config, supervisor }, { product, key, value 
       saveConfig(config, { projectCodexMode: Object.keys(map).length ? map : undefined });
       break;
     }
+    // WHICH CLAUDE LOGIN THIS PROJECT'S AGENTS RUN ON. 'any' is the absence of
+    // an opinion, like 'workspace' above, and it deletes the entry rather than
+    // writing a word: a config file with no `projectAccounts` is the file every
+    // Mac had before this existed.
+    //
+    // AND A NAME THIS MAC CANNOT HONOUR IS REFUSED AT THE DOOR rather than
+    // written and ignored later. The supervisor does ignore one (`_projectProfile`),
+    // because an account can be signed out after the fact, but a pick made
+    // against a list we just read has no excuse to be wrong.
+    case 'account': {
+      const known = effectiveProfiles(config.authProfiles, { home: config.home });
+      if (value !== 'any' && !known.includes(value)) throw new Error(`unknown Claude account: ${value}`);
+      const map = { ...(config.projectAccounts ?? {}) };
+      if (value === 'any') delete map[product];
+      else map[product] = value;
+      saveConfig(config, { projectAccounts: Object.keys(map).length ? map : undefined });
+      break;
+    }
     default:
       throw new Error(`unknown project setting: ${key}`);
   }
@@ -842,7 +864,7 @@ export function memoryGateSettings({ config, supervisor }) {
   if (on) {
     let s = null;
     try { s = supervisor.memoryGateStatus?.() ?? null; } catch {}
-    if (s?.role === 'standby') now = `Another ${NAME} on this Mac is coordinating.`;
+    if (s?.role === 'standby') now = `Another ${NAME} on this computer is coordinating.`;
     else if (s) {
       const heavy = (s.running ?? []).filter((r) => r.holdsSlot).length;
       const waiting = (s.waiting ?? []).length;

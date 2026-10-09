@@ -958,6 +958,8 @@ body {
 }
 .search-q::placeholder { color: var(--text-faint); font-weight: 500; }
 
+.search-faces { margin-right: 9px; vertical-align: middle; position: relative; top: -1px; }
+
 /* A bare glyph. The chrome was doing the work the shape already does. */
 .icon-btn {
   width: 34px; height: 34px; flex: 0 0 auto;
@@ -2449,6 +2451,16 @@ body {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .slash-row.cursor .slash-hint { color: var(--text-dim); }
+/* THE COMMAND THE BOX IS HOLDING (w-2c8ef9ed9e). After Enter puts /loop in the
+   box the menu closes on the space; what it still wants is drawn faintly after
+   the caret, so the box does not look like it only grew a space. Same padding
+   and line height as .dock-input, so the words land exactly where hers will. */
+.dock-ghost {
+  position: absolute; left: 0; right: 0; pointer-events: none;
+  padding: 12px 16px 6px; line-height: 1.55; color: var(--text-faint);
+  white-space: pre-wrap;
+}
+.dock-ghost-typed { visibility: hidden; }
 
 /* Approval cards: a worker is frozen mid-action until the user answers,
    so these sit above everything, bottom-right, and say exactly what runs. */

@@ -217,8 +217,8 @@ describe('7. the agents on the last card are hers, and the card says so', () => 
     // second line is free to say what the press does instead of repeating where
     // they came from. The claim tested is that the card says it, not that a
     // particular string does.
-    expect(`${COPY.bringHead} ${COPY.agentsOffer}`).toMatch(/this Mac/);
-    expect(COPY.bringHead).toMatch(/this Mac/);
+    expect(`${COPY.bringHead} ${COPY.agentsOffer}`).toMatch(/this computer/);
+    expect(COPY.bringHead).toMatch(/this computer/);
     expect(COPY.agentsOffer).toMatch(/inbox/);
   });
 

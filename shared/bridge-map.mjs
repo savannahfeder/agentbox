@@ -27,6 +27,7 @@ export const REQUEST_CHANNELS = {
   sendNow: 'zero:send-now',
   compose: 'zero:compose',
   schedule: 'zero:schedule',
+  snooze: 'zero:snooze',
   // Feedback to the Agentbox team, from the sidebar's Feedback card.
   sendFeedback: 'zero:send-feedback',
   // The team version: signing in, the team, sharing, routing a given task.

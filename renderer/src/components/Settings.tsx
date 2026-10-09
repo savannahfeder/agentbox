@@ -27,8 +27,9 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel } from '../types';
+import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel, UpdateState } from '../types';
 import { api, RESTART_NOTE } from '../api';
+import { updateLook } from '../update-row';
 import { InstructionSettings, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
 import type {Usage, WorkspaceSettings} from '../types';
@@ -641,13 +642,13 @@ const CLAUDE = {
   // the rest of its words, so binding a card to a table binds its heading too.
   name: 'Claude Code',
   connected: 'Claude Code is connected',
-  connectedSay: `${Name} can see it on this Mac, so your agents have something to run on. There is nothing for you to set up.`,
-  missing: 'Claude Code is not on this Mac',
+  connectedSay: `${Name} can see it on this computer, so your agents have something to run on. There is nothing for you to set up.`,
+  missing: 'Claude Code is not on this computer',
   // Not "your agents run on it": with Codex here they run on Codex instead.
-  missingSay: `${Name} could not find Claude Code on this Mac. Install it, then check again.`,
+  missingSay: `${Name} could not find Claude Code on this computer. Install it, then check again.`,
   missingLink: 'Get Claude Code',
   unsure: `${Name} could not check`,
-  unsureSay: `${Name} has not been able to look for Claude Code on this Mac. That is not the same as it being missing, only that the answer never came back. Try again in a moment.`,
+  unsureSay: `${Name} has not been able to look for Claude Code on this computer. That is not the same as it being missing, only that the answer never came back. Try again in a moment.`,
   check: 'Check again',
   checking: 'Looking',
   // The row under the missing one, which is the only place on this screen that
@@ -679,12 +680,12 @@ const CLAUDE = {
 const CODEX = {
   name: 'Codex',
   connected: 'Codex is connected',
-  connectedSay: `${Name} can see it on this Mac, so you can put a task on Codex instead of Claude Code. There is nothing for you to set up.`,
-  missing: 'Codex is not on this Mac',
-  missingSay: `${Name} could not find Codex on this Mac, so every task runs on Claude Code. Install it, then check again.`,
+  connectedSay: `${Name} can see it on this computer, so you can put a task on Codex instead of Claude Code. There is nothing for you to set up.`,
+  missing: 'Codex is not on this computer',
+  missingSay: `${Name} could not find Codex on this computer, so every task runs on Claude Code. Install it, then check again.`,
   missingLink: 'Get Codex',
   unsure: `${Name} could not check`,
-  unsureSay: `${Name} has not been able to look for Codex on this Mac. That is not the same as it being missing, only that the answer never came back. Try again in a moment.`,
+  unsureSay: `${Name} has not been able to look for Codex on this computer. That is not the same as it being missing, only that the answer never came back. Try again in a moment.`,
   check: 'Check again',
   checking: 'Looking',
   getSay: 'It takes a few minutes. Come back here and press Check again, and Codex is a choice on every task.',
@@ -842,9 +843,64 @@ const CodexCli = (props: EngineConnection) => (
   <Connection copy={CODEX} check={api.recheckCodex} {...props} />
 );
 
-/* THE UPDATES GROUP IS GONE (w-5737fe67cf, 2026-09-23). The app still keeps
-   itself current on its own (main/updater.mjs), and a version that is waiting
-   still reaches the user as a row in the inbox (../update-row.ts). */
+/* THE UPDATES GROUP CAME BACK, AS ONE ROW WITH ONE BUTTON (w-39d6c237f7,
+   2026-10-07). It was taken out on 2026-09-23 (w-5737fe67cf) because the app
+   keeps itself current on its own and a waiting version already reaches you in
+   the sidebar, so the group was four rows of bookkeeping about something that
+   needed no decision. What was missing is the one verb: "a way to pull a new
+   version on demand, as many apps do, instead of waiting for the automatic
+   check."
+
+   SO IT IS A BUTTON AND THE ANSWER TO IT, and no more. The version this copy is
+   running is the row's label, what the last check found is the sentence under
+   it, and the button either looks now or restarts onto what is already on the
+   disk. The words are all ../update-row.ts, shared with ⌘K.
+
+   IT WORKS THE SAME ON BOTH KINDS OF COPY. Installed, the check is a release
+   feed (main/updater.mjs); run from a checkout, it is `git fetch` against the
+   branch (main/source-updater.mjs). Both answer the same door and the same
+   shape, so there is nothing here that knows which one it is talking to.
+
+   NOTHING IS ASSUMED ABOUT THE PRESS. The check's own answer is drawn, and the
+   moment the window's snapshot moves, the snapshot wins: that is the rule the
+   whole screen is built on, and here it matters more than anywhere, because the
+   download that follows a check reports its progress through the snapshot and
+   nothing else. */
+function Updates({ state }: { state?: UpdateState | null }) {
+  // WHAT THE CHECK JUST ANSWERED, HELD ONLY UNTIL THE SNAPSHOT CATCHES UP.
+  // Stamped with the snapshot it was asked against, so a push that arrives
+  // afterwards replaces it rather than being drawn over by an older answer.
+  const [found, setFound] = useState<{ was: string; got: UpdateState } | null>(null);
+  const [checking, setChecking] = useState(false);
+  const key = JSON.stringify(state ?? null);
+  const shown = found && found.was === key ? found.got : (state ?? found?.got ?? null);
+  const look = updateLook(shown, { checking });
+
+  const press = async () => {
+    if (look.busy) return;
+    if (look.restart) { void api.updateInstall(); return; }
+    setChecking(true);
+    try {
+      const got = await api.updateCheck();
+      setFound({ was: key, got });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <Group id="updates" label="Updates">
+      <Row
+        label={shown?.currentVersion ? `${Name} ${shown.currentVersion}` : Name}
+        desc={look.sentence}
+      >
+        <button type="button" className="set-ghost" disabled={look.busy} onClick={() => void press()}>
+          {look.button}
+        </button>
+      </Row>
+    </Group>
+  );
+}
 
 /* ---------------------------- the mark, changed --------------------------- */
 
@@ -995,7 +1051,7 @@ function paneFrom(want: string, has: { team: boolean }): Pane {
 
 /* --------------------------------- screen --------------------------------- */
 
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, onClose }: {
+export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, update = null, onClose }: {
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
@@ -1035,6 +1091,13 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   /** Who is signed in, for the Account group on General. Absent when nobody
    *  is, and then there is no group. */
   account?: { email: string; team?: string | null; onSignOut: () => void };
+  /**
+   * WHETHER A NEWER AGENTBOX IS WAITING, as the whole app already reads it
+   *  (the sidebar card and ⌘K read the same field). Handed in rather than
+   *  fetched, so the Updates row redraws off the snapshot like every other row
+   *  on this screen; the button's own answer is only ever held until the next
+   *  snapshot arrives. Null on a build with no updater behind it. */
+  update?: UpdateState | null;
   onClose: () => void;
 }) {
   const [model, setModel] = useState<SettingsModel | null>(null);
@@ -1406,9 +1469,14 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 heading about folders. Where Claude Code lives on disk is not
                 here: it is the grey note under that agent's status, which only
                 speaks when something is wrong. */}
-            <Group id="storage" label={`Where ${NAME} keeps things on this Mac`}>
+            <Group id="storage" label={`Where ${NAME} keeps things on this computer`}>
               <Row label="Your projects, tasks and documents" desc={w.storePath} />
             </Group>
+            {/* THE VERSION AND THE WAY TO ASK FOR A NEWER ONE (w-39d6c237f7).
+                Under the folders and above Account, because it is the same kind
+                of fact as the folders: something about this install rather than
+                something to decide. */}
+            <Updates state={update} />
             {/* SIGN OUT IS THE LAST THING ON THE PAGE (w-a09476712f), where
                 "How do i log out" looks for it: "should be at bottom of
                 settings page". Your account menu in the sidebar's corner has
@@ -1458,8 +1526,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 desc={w.sessionsAtOnceFromPlan
                   ? `Your plan is ${w.sessionsAtOnceFromPlan}, so ${NAME} starts one ${twoEngines ? 'Claude Code agent ' : ''}at a time.`
                   : w.agentsAuto
-                    ? 'From this Mac’s memory, kept there as you add accounts or turn the memory check on.'
-                    : `You set this. Automatic would run ${w.agentsAutoTotal ?? w.sessionsAtOnce} on this Mac.`}
+                    ? 'From this computer’s memory, kept there as you add accounts or turn the memory check on.'
+                    : `You set this. Automatic would run ${w.agentsAutoTotal ?? w.sessionsAtOnce} on this computer.`}
               >
                 {/* ONE DROPDOWN, NOT A CHOICE AND THEN A NUMBER (2026-10-05, her
                     note). Automatic and every number it could be are the same
@@ -1501,8 +1569,8 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 <Row
                   label="Heavy commands at once"
                   desc={w.memoryGate.slots === null
-                    ? `Auto: ${w.memoryGate.slotsAuto} on this Mac, one for every 8 GB of memory.`
-                    : `You picked ${w.memoryGate.slots}. Auto is ${w.memoryGate.slotsAuto} on this Mac.`}
+                    ? `Auto: ${w.memoryGate.slotsAuto} on this computer, one for every 8 GB of memory.`
+                    : `You picked ${w.memoryGate.slots}. Auto is ${w.memoryGate.slotsAuto} on this computer.`}
                 >
                   <Stepper
                     label="Heavy commands at once"
@@ -1538,7 +1606,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               {w.leftovers && (
                 <Row
                   label="Stop programs agents leave behind"
-                  desc={`Dev servers, previews and test runs an agent started and left running are stopped two hours after its run ends, or ten minutes while memory is short. Never stopped: anything you started yourself, apps installed on this Mac, and what an agent was asked to keep.${twoEngines ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.now ? ` ${w.leftovers.now}` : ''}`}
+                  desc={`Dev servers, previews and test runs an agent started and left running are stopped two hours after its run ends, or ten minutes while memory is short. Never stopped: anything you started yourself, apps installed on this computer, and what an agent was asked to keep.${twoEngines ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.now ? ` ${w.leftovers.now}` : ''}`}
                 >
                   <Switch label="Stop programs agents leave behind" on={w.leftovers.on} onChange={(v) => setWorkspace('cleanupLeftovers', v)} />
                 </Row>
@@ -1552,7 +1620,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
                 <Row
                   label="Something felt slow"
                   desc={w.agentsNudge
-                    ? `${NAME} is running ${w.agentsNudge} fewer than this Mac suggests.`
+                    ? `${NAME} is running ${w.agentsNudge} fewer than this computer suggests.`
                     : `${NAME} runs one fewer from now on, and remembers that it did.`}
                 >
                   {!!w.agentsNudge && <button type="button" className="set-ghost" onClick={() => setWorkspace('agentsFeltSlow', 'reset')}>Undo</button>}
@@ -1700,6 +1768,34 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               >
                 <Switch label="Let agents start the tasks they file here" on={current.autonomous} onChange={(v) => setProject(current.slug, 'autonomous', v)} />
               </Row>
+              {/* ONE LOGIN, NO ROW. The choice is only a choice with a second
+                  account signed in, and on the one-account Mac -- which is
+                  nearly every Mac -- this page reads exactly as it did.
+
+                  UNLESS SOMETHING IS ALREADY TIED, and then it shows however few
+                  accounts are left. Signing out of the second login would
+                  otherwise hide the row with the tie still written in the config,
+                  leaving a setting nothing on any screen could undo. The
+                  supervisor ignores a tie whose account has gone (`_projectProfile`),
+                  so what this row can show is always a login that is really here. */}
+              {((w?.accounts ?? []).length > 1 || (current.account ?? 'any') !== 'any') && (
+                <Row
+                  label="Claude account"
+                  desc="Every Claude Code agent on this project runs on this account and on no other. If the account cannot run, the work waits."
+                >
+                  <Picker
+                    bare
+                    label="Claude account"
+                    title="The Claude account this project's agents run on."
+                    value={current.account ?? 'any'}
+                    options={[
+                      { value: 'any', label: 'Any account' },
+                      ...(w?.accounts ?? []).map((a) => ({ value: a.profile, label: a.email ? `${a.email} (${a.label})` : a.label })),
+                    ]}
+                    onChange={(v) => setProject(current.slug, 'account', v)}
+                  />
+                </Row>
+              )}
               {current.permission !== 'workspace' && (
                 <Row
                   label={twoEngines ? 'This project has its own Claude Code permissions' : 'This project has its own permissions'}
@@ -1730,7 +1826,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
               </Row>
             </Group>
 
-            <Group label="Where this project is kept on this Mac">
+            <Group label="Where this project is kept on this computer">
               <Row label="Documents" desc={current.dir} />
               <Row label="Repository" desc={current.repoPath ?? 'No code repo registered for this project.'} />
             </Group>

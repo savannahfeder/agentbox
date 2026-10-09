@@ -20,11 +20,15 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { brandElectron } from '../scripts/brand-electron.mjs';
 
 const ICON = new URL('../build/icon.icns', import.meta.url).pathname;
-const read = (plist, key) => execFileSync('/usr/bin/plutil', ['-extract', key, 'raw', '-o', '-', plist], { encoding: 'utf8' }).trim();
+const read = (plist, key) => {
+  const text = fs.readFileSync(plist, 'utf8');
+  const m = text.match(new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`));
+  if (!m) throw new Error(`plist has no ${key}`);
+  return m[1];
+};
 
 let dir;
 let app;

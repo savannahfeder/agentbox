@@ -12,11 +12,11 @@
 
 import path from 'node:path';
 import fs from 'node:fs';
-import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { bootHeadless, createServer, newToken } from '../main/serve.mjs';
+import { appHome } from '../main/store/home.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.dirname(here);
@@ -43,9 +43,13 @@ if (args.includes('--help') || args.includes('-h')) {
 
 // WHERE THE STORE LIVES. A copy run out of npm has no folder of its own to
 // write into, and writing inside node_modules would be thrown away by the next
-// install. `~/.agentbox` is the plain answer and `--dir` is the escape hatch.
+// install. The default is appHome(): a dot-folder already on disk, else the
+// XDG data directory on Linux and `~/.agentbox` on macOS, where this command
+// has always kept it. Not the desktop config's default, which on macOS is
+// `~/Agentbox` and would open every existing Mac user on an empty inbox.
+// `--dir` and AGENTBOX_HOME are the escape hatches.
 const dataDir = path.resolve(
-  flag('dir', process.env.AGENTBOX_HOME ?? path.join(os.homedir(), '.agentbox')),
+  flag('dir', process.env.AGENTBOX_HOME ?? appHome()),
 );
 fs.mkdirSync(dataDir, { recursive: true });
 
@@ -56,12 +60,17 @@ if (!fs.existsSync(path.join(dist, 'index.html'))) {
 }
 
 const booted = await bootHeadless({ dataDir, appDir, userDir: dataDir });
-// Whoever was signed in to the team last time is signed in again.
-booted.team?.start().then(() => booted.supervisor.wake?.()).catch((err) => console.warn(`team: ${err.message}`));
-// AND THE AGENTS' CLOCK, as the desktop starts it (main/main.mjs). Without it a
-// tab only moved work when something woke the supervisor: a queued thread sat
-// queued and a scheduled one never fired (found 2026-10-01 on a test copy).
-booted.supervisor.start();
+// ZERO_NO_SUPERVISOR: the desktop already honors this (main/main.mjs). This
+// entry is the same inbox, so a launch that asks for no agents must not start
+// them here either.
+if (!process.env.ZERO_NO_SUPERVISOR) {
+  // Whoever was signed in to the team last time is signed in again.
+  booted.team?.start().then(() => booted.supervisor.wake?.()).catch((err) => console.warn(`team: ${err.message}`));
+  // AND THE AGENTS' CLOCK, as the desktop starts it (main/main.mjs). Without it a
+  // tab only moved work when something woke the supervisor: a queued thread sat
+  // queued and a scheduled one never fired (found 2026-10-01 on a test copy).
+  booted.supervisor.start();
+}
 const token = newToken();
 const server = createServer({
   channels: booted.channels,

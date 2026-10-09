@@ -42,7 +42,10 @@ const MAX_ROWS_PER_FILE = 20_000;
 const NOT_CODE = /(^|\/)(node_modules|\.git)\//;
 
 function git(cwd, args, { maxBuffer = 64 * 1024 * 1024 } = {}) {
-  return execFileSync('git', ['--no-pager', ...args], {
+  // A user's `diff.mnemonicPrefix` rewrites a/ and b/ into c/ i/ o/ w/.
+  // The reader below only knows one prefix. Turn the setting off for this
+  // process so a checkout reads the same on every machine.
+  return execFileSync('git', ['--no-pager', '-c', 'diff.mnemonicPrefix=false', ...args], {
     cwd,
     encoding: 'utf8',
     maxBuffer,
@@ -189,7 +192,10 @@ export function filesFromPatch(patch) {
   const nameOn = (line, side) => {
     const name = line.slice(4).trim();
     if (name === '/dev/null') return null;
-    return name.replace(side === 'old' ? /^a\// : /^b\//, '');
+    // a/ and b/ are the ordinary prefixes. c/ i/ o/ w/ are mnemonicPrefix,
+    // and 1/ 2/ are `git diff --no-index` under that same setting. One
+    // prefix comes off; a file that is itself named `b/foo` stays `b/foo`.
+    return name.replace(/^[abiowc12]\//, '');
   };
   for (const line of String(patch ?? '').split('\n')) {
     if (line.startsWith('diff --git ')) { closeHunk(); file = null; oldName = null; continue; }

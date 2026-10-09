@@ -136,7 +136,7 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
     <div className="tm-section">Leave</div>
     {confirmLeave ? (
       <div className="tm-field-row">
-        <span className="tm-leave-ask">Leave {name}? Your threads stay on this Mac; the team stops seeing them.</span>
+        <span className="tm-leave-ask">Leave {name}? Your threads stay on this computer; the team stops seeing them.</span>
         <button type="button" className="tm-btn" disabled={busy} onClick={() => void run(() => api.teamLeave())}>Leave</button>
         <button type="button" className="tm-btn" onClick={() => setConfirmLeave(false)}>Stay</button>
       </div>

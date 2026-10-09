@@ -21,7 +21,7 @@ import { storeRootEnv } from './store/home.mjs';
 import { Supervisor } from './supervisor.mjs';
 import { startCodexWatch } from './codex-watch.mjs';
 import { registerIpc } from './ipc.mjs';
-import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules } from './instruction-settings.mjs';
+import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mjs';
 import * as approvals from './approvals.mjs';
 import { recoveryToast } from '../shared/recovery.mjs';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mjs';
@@ -206,6 +206,9 @@ try {
   // AND A BOX THAT AN OLDER JOIN FILLED WITH ONLY OUR TEXT IS EMPTIED, ONCE
   // (w-3ec9f07978). Kept as a restore point; our rules ride from the checkout.
   if (setAsideShippedMessageRules(appDir, userDir)) console.log('zero: the message rules box held only the shipped rules; set aside as a restore point');
+  // Both kinds of user rules now live in founder.md. Only user content is
+  // appended; the app's message defaults continue to come from the bundle.
+  if (unifyAgentInstructions(appDir, userDir)) console.log('zero: combined the general and writing instructions');
 } catch (err) {
   console.warn(`zero: could not carry her instructions into ${userDir}: ${err.message}`);
 }
@@ -603,6 +606,11 @@ async function createWindow() {
     },
   });
 
+  // THE MENU IS A BAR INSIDE THE WINDOW on Linux and Windows. On macOS it is
+  // the system menu, so it stays. The menu itself stays everywhere: the Ctrl
+  // chords are bound to it, and taking the menu out would take them with it.
+  if (process.platform !== 'darwin') window.setMenuBarVisibility(false);
+
   // WHICH PICTURE SET THIS WINDOW IS ON, and a shout when it changes.
   // main/screen-detail.mjs has the rule and the reasoning; this is the wiring.
   // The initial answer rides bootInfo rather than being pushed, for the same
@@ -855,7 +863,7 @@ async function createWindow() {
   // a locked screen all read the same from in there). The renderer says what
   // arrived; main/notify.mjs decides. tell me when I am in another app, never
   // while I am in Agentbox.
-  installNotifier({ app, window, Notification, powerMonitor, ipcMain });
+  installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage });
   // Asked for once by the renderer as it mounts, rather than pushed on
   // did-finish-load, which races the first effects and would drop the very
   // message it exists to deliver.
@@ -1014,6 +1022,17 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
   app.whenReady().then(() => {
+    // A from-source Linux launch keeps the launcher command installed. The
+    // entry runs that command; this only refreshes where it points. A packaged
+    // build ships its own entry and must not write one from here.
+    // LOADED HERE AND NOT AT THE TOP: scripts/ is not in the packaged app or the
+    // npx package, and a static import of it stopped main.mjs loading at all,
+    // on every Mac (tests/the-mac-app-ships-every-file-it-starts-with).
+    if (process.platform === 'linux' && !app.isPackaged) {
+      import('../scripts/linux-launcher.mjs')
+        .then(({ installLinuxLauncher }) => installLinuxLauncher({ appDir, env: process.env }))
+        .catch(() => { /* a launcher is never a reason to stop a launch */ });
+    }
     // THE ABOUT BOX SAYS AGENTBOX AND ITS OWN VERSION (w-db6f5e331e). Run from
     // source it read the bundle's, which is Electron's: "Electron 43.0.0".
     app.setAboutPanelOptions({ applicationName: NAME, applicationVersion: app.getVersion(), version: '' });

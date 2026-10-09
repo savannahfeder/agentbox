@@ -35,6 +35,7 @@
 // words the moment they open the row (shared/work-items.mjs).
 
 import { spawn } from 'node:child_process';
+import { codexLaunchEnv } from './codex-launch-env.mjs';
 
 /**
  * The model this runs on. Small and fast on purpose: this is a naming call, it
@@ -225,7 +226,7 @@ export function askSmallModel(prompt, clean, { claudeBin, codexBin = null, engin
         // Somewhere that is nobody's project. A naming call must not pick up a
         // CLAUDE.md, a settings file or a hook from whatever folder it lands in.
         cwd: '/tmp',
-        ...(env ? { env } : {}),
+        ...(engine === 'codex' ? { env: codexLaunchEnv(bin, env) } : env ? { env } : {}),
         stdio: ['ignore', 'pipe', 'pipe'],
       });
     } catch {

@@ -83,7 +83,7 @@ describe('a reminder in particular', () => {
   // reason.
   it('advances only once the moment is really kept', () => {
     const body = bodyOf('snoozeUntil');
-    const failed = body.indexOf('Could not schedule');
+    const failed = body.indexOf('Could not snooze');
     const advanced = body.indexOf('leaveResolved(');
     expect(failed).toBeGreaterThan(-1);
     expect(advanced).toBeGreaterThan(failed);

@@ -471,14 +471,20 @@ export class Store {
   // app restart, a reboot, and a store restored onto another machine, and so no
   // agent line can quietly move a time she set. 0 clears it.
   //
-  // This is the one write behind both gestures: deferring an agent's proposal
-  // out of the inbox and scheduling her own work to start at six. They were
-  // separate mechanisms before, and only the first existed: the old snooze was
-  // a renderer localStorage map that hid a row and deferred no work at all.
+  // Execution scheduling only. Inbox reminders use snoozeItem instead.
   scheduleItem(slug, id, runAt) {
     const { workItemsDisk } = this.modules;
     return workItemsDisk.updateWorkItem(
       this.productDir(slug), id, { runAt: Math.max(0, Math.trunc(runAt) || 0) }, { source: 'founder' },
+    );
+  }
+
+  // Put the existing thread back in the person's inbox later. This never
+  // changes its execution schedule, answer, status, claim or delivery marks.
+  snoozeItem(slug, id, snoozedUntil) {
+    if (!Number.isFinite(snoozedUntil)) throw new Error('Snooze needs a valid time');
+    return this.modules.workItemsDisk.updateWorkItem(
+      this.productDir(slug), id, { snoozedUntil: Math.max(0, Math.trunc(snoozedUntil)) }, { source: 'founder' },
     );
   }
 

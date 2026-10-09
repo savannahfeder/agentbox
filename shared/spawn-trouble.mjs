@@ -249,7 +249,7 @@ export function troubleSentence(cause) {
   if (cause === 'at-limit') return 'No agents can start. Your Claude plan is at its limit.';
   if (cause === 'workspace') return 'No agents can start. Claude will not run in this folder.';
   if (cause === 'interrupted') return 'No agents can start. The connection to Claude keeps dropping.';
-  return 'No agents can start on this Mac right now.';
+  return 'No agents can start on this computer right now.';
 }
 
 // THE SECOND LINE: what happens next, so the first line is never a dead end.

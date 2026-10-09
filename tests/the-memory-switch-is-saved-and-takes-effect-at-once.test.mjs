@@ -100,7 +100,7 @@ describe('what the page shows', () => {
     const idle = { ...fakeSupervisor(), memoryGateStatus: () => ({ role: 'owner', pressure: 'normal', running: [], waiting: [] }) };
     expect(memoryGateSettings({ config, supervisor: idle }).now).toBe('Memory is fine. Nothing heavy running.');
     const standby = { ...fakeSupervisor(), memoryGateStatus: () => ({ role: 'standby', running: [], waiting: [] }) };
-    expect(memoryGateSettings({ config, supervisor: standby }).now).toBe(`Another ${NAME} on this Mac is coordinating.`);
+    expect(memoryGateSettings({ config, supervisor: standby }).now).toBe(`Another ${NAME} on this computer is coordinating.`);
     const { config: off } = withConfig({});
     expect(memoryGateSettings({ config: off, supervisor: fakeSupervisor() }).now).toBe(null);
   });

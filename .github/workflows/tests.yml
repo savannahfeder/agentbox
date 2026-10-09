@@ -10,29 +10,39 @@
 # payment method on it. A red cross on every push that means nothing at all is
 # the symptom to recognise.
 #
-# macOS AND NOT LINUX, ON PURPOSE. The app ships an arm64 dmg and nothing else,
-# and the suite is written against that: the Claude Code search asks a login
-# zsh, the fresh-user home links a macOS keychain, and a good number of the
-# test files reason about `/Users`, `darwin`, zsh or the keychain. Running the
-# suite somewhere the app never runs would tell you about that machine rather
-# than about the app. Nobody has measured whether it would pass on Linux and
-# this comment is not a claim that it would not.
+# LINUX AND MACOS. The suite runs on both. Omarchy and other Linux machines
+# use bash when zsh is absent, `~/.agentbox`, and Control-K for the palette.
+# The macOS job stays because the app still ships an arm64 dmg, and that job
+# still covers login zsh, the keychain, and `/Users`. A green run on one
+# machine does not stand in for the other.
 #
-# A macOS minute costs about ten Linux ones, so this is the expensive runner to
-# be on. It is worth knowing what the job actually takes before turning it on
-# for a busy fork: a whole job, checkout and `npm ci` included, has measured at
-# about a minute and a half.
+# A macOS minute costs about ten Linux ones, so the macOS runner is the
+# expensive one. A whole macOS job, checkout and `npm ci` included, has
+# measured at about a minute and a half.
 #
-# ONE TRIGGER AND NOT TWO. `push` on every branch already covers a branch that
-# later becomes a pull request, so there is no `pull_request` here; having both
-# is what makes a PR branch pay for two runs of the same commit.
+# `push` ON EVERY BRANCH, AND `pull_request` FOR FORKS ONLY. A push covers any
+# branch of this repository that later becomes a pull request, so running both
+# for one of those would pay twice for the same commit; the job's `if` skips
+# that case. But a fork's commits are pushed to the fork, so until 2026-10-07
+# (w-bde446f1aa) no outside pull request had a single test run here.
+#
+# A FORK'S RUN GETS A READ-ONLY TOKEN AND NO SECRETS, which is what makes it
+# safe to run a stranger's code on it. Never `pull_request_target`: it runs
+# with this repository's own token, and checking out the pull request's code
+# under it is the classic way a stranger takes a repository over. GitHub also
+# holds a first-time contributor's run until a maintainer approves it, which the
+# pull request review in the app offers only once the code has been read.
 
 name: tests
 
 on:
   push:
     branches: ['**']
+  pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 # A second push to the same branch cancels the first, so a branch pushed five
 # times in a minute pays for one run rather than five.
@@ -42,6 +52,7 @@ concurrency:
 
 jobs:
   vitest:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: macos-latest
     timeout-minutes: 20
     steps:
@@ -55,6 +66,21 @@ jobs:
       # `npm ci` and not `npm install`: the lockfile is the point of running
       # this at all, and an install that quietly resolves something newer is a
       # green run against a tree nobody has.
+      - run: npm ci
+
+      - run: npx vitest run --reporter=basic
+
+  vitest-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
       - run: npm ci
 
       - run: npx vitest run --reporter=basic

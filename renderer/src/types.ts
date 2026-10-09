@@ -48,6 +48,8 @@ export interface WorkItem {
   // The moment before which nothing happens to this item: it cannot be claimed,
   // it will not start, and it is not in the inbox. 0 or absent is unscheduled.
   runAt?: number;
+  // When the existing answer returns to the human inbox. Never starts work.
+  snoozedUntil?: number;
   // Whether this has been started at all (w-afb66e6661). 'later' is a thread
   // written down and deliberately not begun: it waits for a person rather than
   // a clock, lives in Later, and nothing runs on it. 'now' is how it is
@@ -654,6 +656,18 @@ export interface Snapshot {
     workspace: string;
     byItem: Record<string, string>;
   };
+  /**
+   * WHETHER THIS MAC WAS ALREADY SIGNED INTO A CODING AGENT, AND WHICH
+   *  (w-e217e577e5, 2026-10-07), for the one line the walk says about it.
+   *  Answered whole by `Supervisor#runsOnAccount`, for the reason `engines` is:
+   *  which account the fleet spends is `_narrowToChosen`'s rule, pinned to that
+   *  file. Null, or absent on an older payload, on a Mac where nothing readable
+   *  is signed in, and then nothing is said. The words are shared/runs-on.mjs.
+   *
+   *  NO PLAN RIDES HERE. It did for a few hours, so the sidebar could print a
+   *  tier; that row and the tier both came out the same day. What somebody pays
+   *  for is on each agent's own page in Settings. */
+  runsOn?: { engine: string } | null;
   // `outsideAgents` is how many of her own Claude Code sessions the inbox
   // takes: all of them, only the ones stopped on a question, or none. It rides
   // the snapshot because the inbox reads it on every draw. How much of the
@@ -764,6 +778,12 @@ export interface ProjectSettings {
   permissionArgs: string[] | null;
   /** This project's own Codex mode, or 'workspace' when it has no opinion. */
   codexMode: CodexModeId | 'workspace';
+  /**
+   * The one Claude account this project's agents run on, or 'any' when it runs
+   * on whichever has room. Never a login that has since been signed out: the
+   * supervisor answers 'any' for a tie it can no longer honour.
+   */
+  account?: string;
   // The user's rules for this project, as they sit on disk. Empty means the file does
   // not exist, and a project without one is briefed exactly as it always was.
   instructions: string;
@@ -1024,6 +1044,7 @@ declare global {
       teamMessage(p: { to: string | string[]; body: string; priority?: number }): Promise<TeamCallResult>;
       threadEdit(p: { product: string; id: string; patch: ThreadEditPatch }): Promise<{ ok: boolean; error?: string }>;
       schedule(p: { product: string; id: string; runAt: number }): Promise<WorkItem>;
+      snooze(p: { product: string; id: string; snoozedUntil: number }): Promise<WorkItem>;
       repeats(): Promise<RepeatRule[]>;
       composeRepeat(p: { product: string; title: string; body?: string; priority?: number; rule: RepeatShape; engine?: string; model?: string }): Promise<RepeatRule>;
       setRepeat(p: { product: string; id: string; rule: Partial<RepeatShape & { title: string; body: string; priority: number }> }): Promise<RepeatRule>;

@@ -49,6 +49,7 @@ import { defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type 
 import { defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../effort';
 import { readLastEngine, startingEngine, writeLastEngine } from '../engines';
 import { repeatPresets } from '../components/When';
+import { readRule } from '../format';
 import { fitMenu } from '../keep-in-window';
 import {
   allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayMorning, moreCount,
@@ -241,6 +242,7 @@ export function ThreadComposer({
   const [modelPage, setModelPage] = useState<'recent' | 'all'>('recent');
   const [laterPage, setLaterPage] = useState<'list' | 'repeat'>('list');
   const [laterText, setLaterText] = useState('');
+  const [repeatText, setRepeatText] = useState('');
   const anchors = useRef<Partial<Record<MenuKey, HTMLElement | null>>>({});
   const anchor = (key: MenuKey) => (el: HTMLElement | null) => { anchors.current[key] = el; };
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -257,6 +259,7 @@ export function ThreadComposer({
     // Who sees it opens on its three rows, even if the picker was last open.
     setVisPage('rows');
     setLaterText('');
+    setRepeatText('');
     setQuery('');
   };
   // A pick puts the caret back in the message, where she was going anyway. An
@@ -293,7 +296,7 @@ export function ThreadComposer({
     if (!open) return;
     const menu = anchors.current[open]?.querySelector<HTMLElement>(':scope > .tc-menu');
     if (menu) fitMenu(menu);
-  }, [query, laterText]);
+  }, [query, laterText, repeatText]);
 
   const menuKeys = (e: React.KeyboardEvent<HTMLElement>) => {
     const t = e.target as HTMLElement;
@@ -679,6 +682,7 @@ export function ThreadComposer({
   const tomorrow = tomorrowMorning(now);
   const monday = mondayMorning(now);
   const typedAt = momentFromWords(laterText, now);
+  const typedRule = readRule(repeatText);
   const laterMenu = (
     <div className="tc-menu tc-rise tc-right tc-wide" role="menu" aria-label="Send later" onKeyDown={menuKeys}>
       {laterPage === 'list' ? (<>
@@ -725,6 +729,26 @@ export function ThreadComposer({
             <RepeatIcon /><span className="tc-row-label">{r.label}</span>
           </button>
         ))}
+        {/* A RULE IN WORDS, the way the page before takes a time: three
+            presets were the only rules this page could set. Typing on a row
+            above lands here (menuKeys). */}
+        <span className="tc-pick">
+          <RepeatIcon />
+          <input
+            data-item
+            className="tc-when"
+            placeholder="Or type: every day 5pm, fridays 4pm"
+            aria-label="Repeat on a rule you type"
+            value={repeatText}
+            onChange={(e) => setRepeatText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && typedRule && 'rule' in typedRule) { e.preventDefault(); sendTask({ repeat: typedRule.rule }); }
+            }}
+          />
+          {repeatText.trim() && (typedRule && 'rule' in typedRule
+            ? <button type="button" data-item className="tc-schedule" onClick={() => sendTask({ repeat: typedRule.rule })}>{typedRule.label[0].toUpperCase() + typedRule.label.slice(1)}</button>
+            : <small className="tc-when-no">{typedRule ? 'Can’t repeat that' : 'Not a repeat yet'}</small>)}
+        </span>
       </>)}
     </div>
   );

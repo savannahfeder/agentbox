@@ -84,6 +84,10 @@ function runHook(dir, mode, { id = 't1', command = 'npm test', env = {}, sock } 
   child.stdout.on('data', (d) => { out += d; });
   const started = Date.now();
   const done = new Promise((resolve) => child.on('close', (code) => resolve({ code, out, ms: Date.now() - started })));
+  // The hook exits before reading stdin when no socket is there (`exit 0` on
+  // the first line that checks it). A write into that closed pipe is EPIPE,
+  // and on a fast machine it arrives after the test has already passed.
+  child.stdin.on('error', (err) => { if (err.code !== 'EPIPE') throw err; });
   child.stdin.end(input);
   return { child, done };
 }
