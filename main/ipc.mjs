@@ -44,7 +44,7 @@ import { addClaudeAccount, addCodexAccount, outsideAgentsMode, permissionMode, r
 import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './project-identity.mjs';
 import { ClaudeUsage } from './claude-usage.mjs';
 import { usageEngine } from '../shared/usage.mjs';
-import { DEFAULT_ENGINE } from '../shared/engines.mjs';
+import { DEFAULT_ENGINE, isEngine } from '../shared/engines.mjs';
 import * as agents from './agents.mjs';
 import { findAgentFolders, readAgentFiles, readFolderAgents } from './agent-files.mjs';
 import { readSessionThreads } from './agent-sessions.mjs';
@@ -1379,9 +1379,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // rest of the app runs on it without a restart.
   const engineSetup = createEngineSetup({
     find: (engine) => {
-      if (engine === 'claude') { const s = recheckClaude(config); return { found: s.claudeFound, path: s.claudeBin }; }
-      const s = recheckCodex(config);
-      return { found: s.found, path: s.bin };
+      const finders = {
+        claude: () => { const s = recheckClaude(config); return { found: s.claudeFound, path: s.claudeBin }; },
+        codex: () => { const s = recheckCodex(config); return { found: s.found, path: s.bin }; },
+      };
+      return finders[engine]?.() ?? { found: false, path: null };
     },
     // WHICH ONE IS SIGNED IN, kept on the config for the run that reads it
     // (`Supervisor#_enginesFound`) and never saved: it changes outside the app.
@@ -1400,7 +1402,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // A sign-in left waiting on the browser is not left running after the app.
   app.on('will-quit', () => { engineSetup.cancel('claude'); engineSetup.cancel('codex'); });
   ipcMain.handle('zero:engine-setup', async (_e, { action, engine } = {}) => {
-    if (engine !== 'claude' && engine !== 'codex') return { ok: false, error: 'Unknown coding agent.' };
+    if (!isEngine(engine)) return { ok: false, error: 'Unknown coding agent.' };
     try {
       if (action === 'ready') return { ok: true, ...(await engineSetup.readiness(engine)) };
       if (action === 'start') return { ok: true, ...engineSetup.start(engine) };
