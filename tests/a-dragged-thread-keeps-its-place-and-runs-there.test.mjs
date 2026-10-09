@@ -21,7 +21,7 @@ import path from 'node:path';
 import { dropPlaces } from '../shared/rank.mjs';
 import { sorted, rankScore, sortedEntries, entryScore, placesForDrop, overlayPlaces, PLACE_WAIT } from '../renderer/src/threads/page-rules.ts';
 import { Supervisor } from '../main/supervisor.mjs';
-import { edgeScroll, shiftFor, slotOffset, stays } from '../renderer/src/threads/row-drag.ts';
+import { chipHome, edgeScroll, grabWithin, shiftFor, slotOffset, stays } from '../renderer/src/threads/row-drag.ts';
 
 const NOW = Date.UTC(2026, 9, 7, 12);
 const MIN = 60_000;
@@ -174,6 +174,31 @@ describe('a drag near the edge of a long list', () => {
 
 // ROUND FOUR: the row stays in the list as its own empty slot while a preview
 // rides the pointer, so the slot has to sit exactly where the row will land.
+// ROUND SIX (2026-10-08): "in inbox view, the component I'm dragging jumps
+// really far horizontally. In board view, it moves just as much as I would
+// expect." The list's chip was placed with its left edge 16px left of the
+// pointer the moment it lifted, so a row grabbed by its middle (900px in) had
+// its title leap 550px across the screen. The board's card copy keeps the
+// spot it was grabbed by, so it never moved more than the hand. Now the chip
+// lifts exactly where the row's title is, and only then drifts under the hand.
+describe('the chip a list row lifts into', () => {
+  it('starts on the row\'s own title, so nothing jumps at the lift', () => {
+    // A row at x=300, y=200; its title is 32px in, on a 20px line 19px down.
+    const home = chipHome({ left: 300, top: 200 }, 40);
+    expect(home.left).toBe(300 + 32 - 16);
+    expect(home.top).toBe(200 + 29 - 20);
+  });
+  it('keeps the spot it was grabbed by when that spot is on the chip', () => {
+    expect(grabWithin(120, 400)).toBe(120);
+  });
+  it('drifts under the hand when the row was grabbed past the chip\'s end', () => {
+    // Grabbed 900px in, on a chip 400px wide: it settles with the hand near
+    // its right end, never further than the hand has moved.
+    expect(grabWithin(900, 400)).toBe(400 - 16);
+    expect(grabWithin(-30, 400)).toBe(16);
+  });
+});
+
 describe('the empty slot a carried row leaves', () => {
   // Board cards of different heights with a 13px gap between them.
   const rows = [{ top: 0, bottom: 100 }, { top: 113, bottom: 160 }, { top: 173, bottom: 293 }, { top: 306, bottom: 353 }];

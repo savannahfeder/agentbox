@@ -56,6 +56,8 @@ type Held = {
   from: number; to: number; frame: number;
   /** What rides the pointer, and where on it the pointer holds it. */
   preview: HTMLElement | null; gx: number; gy: number;
+  /** Where the grab drifts to on the chip; equal to gx/gy for a card copy. */
+  gxEnd: number; gyEnd: number;
 };
 
 /** Where a row's empty slot sits, relative to where the row was: in front of
@@ -86,6 +88,23 @@ export function slotOffset(rows: { top: number; bottom: number }[], from: number
 // this much to the right of its row and the two titles meet.
 const CHIP_INSET = 16;
 const LIST_TEXT_X = 32;
+// A row's title line: 19px of padding over a 20px line, so its middle is 29px down.
+const LIST_TITLE_MID = 29;
+
+/** WHERE A LIST ROW'S CHIP FIRST APPEARS: on the row's own title, so the lift
+ *  moves nothing (round six: "the component I'm dragging jumps really far
+ *  horizontally"). It used to appear at the pointer, which on a row grabbed by
+ *  its middle was 550px from the title it stood for. */
+export function chipHome(row: { left: number; top: number }, chipHeight: number) {
+  return { left: row.left + LIST_TEXT_X - CHIP_INSET, top: row.top + LIST_TITLE_MID - chipHeight / 2 };
+}
+
+/** Where on the chip the hand ends up holding it: the spot it was grabbed by
+ *  while that spot is on the chip, else just inside the nearer end. The chip
+ *  drifts there over a few frames (`tick`), never in one jump. */
+export function grabWithin(offset: number, size: number, margin = 16): number {
+  return Math.max(margin, Math.min(size - margin, offset));
+}
 function chipOf(row: HTMLElement): HTMLElement {
   const chip = document.createElement('div');
   chip.className = 'drag-preview drag-chip';
@@ -165,14 +184,25 @@ export function useRowDrag(
   };
   // Near the edge of a scrolling list it scrolls, a frame at a time, for as
   // long as the pointer stays there.
+  // And a chip lifted far from the hand drifts under it, a fifth of the way
+  // each frame, so it arrives in about a tenth of a second without a jump.
   const tick = () => {
     const h = held.current;
     if (!h?.started) return;
+    let moved = false;
     if (h.scroller) {
       const box = h.scroller.getBoundingClientRect();
       const by = edgeScroll(h.y, box.top, box.bottom);
-      if (by) { h.scroller.scrollTop += by; paint(h); }
+      if (by) { h.scroller.scrollTop += by; moved = true; }
     }
+    const dx = h.gxEnd - h.gx;
+    const dy = h.gyEnd - h.gy;
+    if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+      h.gx += Math.abs(dx) > 0.5 ? dx * 0.2 : dx;
+      h.gy += Math.abs(dy) > 0.5 ? dy * 0.2 : dy;
+      moved = true;
+    }
+    if (moved) paint(h);
     h.frame = requestAnimationFrame(tick);
   };
 
@@ -226,11 +256,11 @@ export function useRowDrag(
     if (!preview) { if (mine) delete mine.dataset.settling; return; }
     const at = preview.getBoundingClientRect();
     const end = mine?.getBoundingClientRect();
-    // A card copy lands on its card; a chip lands with its title on the row's.
-    const tx = end ? end.left + (look === 'chip' ? LIST_TEXT_X - CHIP_INSET : 0) : at.left;
-    // A chip's title lands on the row's title line (19px of row padding over
-    // a 20px line); a card copy lands on the card.
-    const ty = end ? (look === 'chip' ? end.top + 29 - at.height / 2 : end.top) : at.top;
+    // A card copy lands on its card; a chip lands on its row's title, the
+    // same spot it lifted from (`chipHome`).
+    const land = end ? (look === 'chip' ? chipHome(end, at.height) : { left: end.left, top: end.top }) : { left: at.left, top: at.top };
+    const tx = land.left;
+    const ty = land.top;
     const done = () => { preview.remove(); if (mine) delete mine.dataset.settling; };
     if (!preview.animate) { done(); return; }
     const a = preview.animate([
@@ -270,8 +300,19 @@ export function useRowDrag(
       const preview = look === 'copy' ? copyOf(h.el) : chipOf(h.el);
       document.body.appendChild(preview);
       h.preview = preview;
-      if (look === 'copy') { h.gx = h.startX - box.left; h.gy = h.startY - box.top; }
-      else { h.gx = CHIP_INSET; h.gy = preview.getBoundingClientRect().height / 2; }
+      if (look === 'copy') {
+        h.gx = h.gxEnd = h.startX - box.left;
+        h.gy = h.gyEnd = h.startY - box.top;
+      } else {
+        // On the row's title, held by the spot it was grabbed at, then
+        // drifting so the hand ends up on the chip.
+        const size = preview.getBoundingClientRect();
+        const home = chipHome(box, size.height);
+        h.gx = h.startX - home.left;
+        h.gy = h.startY - home.top;
+        h.gxEnd = grabWithin(h.gx, size.width);
+        h.gyEnd = grabWithin(h.gy, size.height, size.height / 2);
+      }
       preview.animate?.([{ opacity: 0, scale: '0.97' }, { opacity: 1, scale: '1' }], { duration: 140, easing: SETTLE.easing });
       h.el.dataset.lifted = '';
       h.frame = requestAnimationFrame(tick);
@@ -310,7 +351,7 @@ export function useRowDrag(
     if (hit && hit !== e.currentTarget) return;
     const el = e.currentTarget;
     const scope = el.closest<HTMLElement>('[data-drag-scope]') ?? listRef.current;
-    held.current = { id, el, scope, scroller: null, startX: e.clientX, startY: e.clientY, scroll0: 0, x: e.clientX, y: e.clientY, started: false, rows: [], from: -1, to: -1, frame: 0, preview: null, gx: 0, gy: 0 };
+    held.current = { id, el, scope, scroller: null, startX: e.clientX, startY: e.clientY, scroll0: 0, x: e.clientX, y: e.clientY, started: false, rows: [], from: -1, to: -1, frame: 0, preview: null, gx: 0, gy: 0, gxEnd: 0, gyEnd: 0 };
     const onMove = (ev: PointerEvent) => move(ev.clientX, ev.clientY);
     // The list scrolling under a still pointer moves the slot too.
     const onScroll = () => { const h = held.current; if (h?.started) paint(h); };

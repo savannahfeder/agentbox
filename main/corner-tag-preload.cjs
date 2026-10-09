@@ -14,14 +14,16 @@ contextBridge.exposeInMainWorld('cornerTag', {
   onState: listen('corner-tag:state'),
   onOpen: listen('corner-tag:open'),
   onReset: listen('corner-tag:reset'),
+  onDragging: listen('corner-tag:dragging'),
   ready: (part) => ipcRenderer.invoke('corner-tag:ready', { part }),
   size: (part, width, height) => ipcRenderer.invoke('corner-tag:size', { part, width, height }),
-  solid: (part, solid) => ipcRenderer.invoke('corner-tag:solid', { part, solid }),
   hover: (part, inside) => ipcRenderer.invoke('corner-tag:hover', { part, inside }),
   toggle: () => ipcRenderer.invoke('corner-tag:toggle'),
-  dragStart: () => ipcRenderer.invoke('corner-tag:drag-start'),
-  drag: (dx, dy) => ipcRenderer.invoke('corner-tag:drag', { dx, dy }),
-  dragEnd: () => ipcRenderer.invoke('corner-tag:drag-end'),
+  // The button went down on the tag, and came up (or was taken away). What
+  // happens in between, a drag or nothing, the main process reads off the
+  // real cursor.
+  press: (x, y) => ipcRenderer.invoke('corner-tag:press', { x, y }),
+  release: (cancelled) => ipcRenderer.invoke('corner-tag:release', { cancelled: !!cancelled }),
   go: (id) => ipcRenderer.invoke('corner-tag:go', id),
   hide: (choice) => ipcRenderer.invoke('corner-tag:hide', choice),
   settings: () => ipcRenderer.invoke('corner-tag:settings'),

@@ -379,6 +379,10 @@ export class Supervisor {
       // Persisted: an in-memory-only set re-spawned a continuation for every
       // still-open answered item on every app restart.
       this._handledAnswers = new Set(state.handledAnswers ?? []);
+      // A crash cannot run stop() to return replies whose workers were still
+      // being prepared. Only these exact reply keys are owed again; a later
+      // delivered reply on the same task keeps its own mark.
+      for (const key of state.preparingAnswers ?? []) this._handledAnswers.delete(key);
       // Which conversation already holds each of her words (`_noteHeard`).
       this._heardAnswers = state.heardAnswers ?? {};
       // `_personalSessions` used to sit here, itemId -> claude session id for a
@@ -1705,10 +1709,11 @@ export class Supervisor {
     // now, so the disk no longer lies here, and this answers first anyway
     // because a row somebody is already preparing is never a row to spawn on.
     const held = this._preparing.get(item.id);
-    if (held) { held.item = item; held.opts = opts; return true; }
+    if (held) { held.item = item; held.opts = opts; this._saveState(); return true; }
     if (fs.existsSync(folder)) return false;
     const entry = { item, opts, engine };
     this._preparing.set(item.id, entry);
+    this._saveState();
     folderJob('restoreTaskFolder', base, item.id)
       // A FAILURE HERE ENDS THE SPAWN. It used to hand back the shared checkout
       // and go on to start the worker in it, which is `workFolderFor`'s back
@@ -1776,7 +1781,7 @@ export class Supervisor {
     this._photos ??= new Map();
     if (this._photos.has(item.id)) return false;
     const held = this._preparing?.get(item.id);
-    if (held) { held.item = item; held.opts = opts; return true; }
+    if (held) { held.item = item; held.opts = opts; this._saveState(); return true; }
     let cwd = null;
     try { cwd = this.workFolderFor(item, product); } catch { return false; }
     // Only a folder that is itself a checkout (a task folder carries a `.git`
@@ -1786,6 +1791,7 @@ export class Supervisor {
     this._preparing ??= new Map();
     const entry = { item, opts, engine, madeFolder: this._madeFolders?.get(item.id) };
     this._preparing.set(item.id, entry);
+    this._saveState();
     gitJob('snapshotRepo', cwd)
       .then((photo) => photo ?? null, () => null)
       .then((photo) => {
@@ -3755,16 +3761,23 @@ export class Supervisor {
     // FAST_EXIT_MS. Past it, the branch below CLEARED the account's trouble:
     // no bench, no "Signed out" on the row, and her reply was charged one of
     // its three tries. The error result names its cause whatever the length.
+    const lastFailure = (session.tail ?? []).filter((l) => l && !l.startsWith('session exited') && !l.startsWith('fast exit')).slice(-1)[0];
     const refusedBy = session.resultIsError ? troubleCause(session.result) : null;
     const limitHit = refusedBy === 'at-limit' || needsHerHands(refusedBy);
-    if ((Date.now() - session.startedAt < FAST_EXIT_MS && !quickButReal) || limitHit) {
+    // A dropped provider connection is a transport failure too, even when
+    // the local process and its pipe stayed up. It must not spend a reply's
+    // attempts or clear the account's backoff just because it lasted 45s.
+    const connectionLost = refusedBy === 'interrupted'
+      || (session.result == null && troubleCause(lastFailure) === 'interrupted');
+    if (connectionLost) session.transportFault = true;
+    if ((Date.now() - session.startedAt < FAST_EXIT_MS && !quickButReal) || limitHit || connectionLost) {
       // The last words of a fast-dead session are the diagnosis. They are kept,
       // but as EVIDENCE now, not as copy: shared/spawn-trouble.mjs turns them
       // into a cause, and only our own sentence for that cause ever reaches a
       // screen.
-      const lastWords = limitHit
+      const lastWords = (limitHit || connectionLost) && session.resultIsError && session.result != null
         ? String(session.result)
-        : (session.tail ?? []).filter((l) => l && !l.startsWith('session exited') && !l.startsWith('fast exit')).slice(-1)[0];
+        : lastFailure;
       const raw = lastWords ? lastWords.replace(/^stderr: /, '').slice(0, 300) : '';
       const account = this._accountKey(engine, session.profile);
       const cause = this._noteProfileTrouble(account, raw);
@@ -3854,6 +3867,11 @@ export class Supervisor {
     try {
       fs.writeFileSync(this._stateFile, JSON.stringify({
         handledAnswers: [...this._handledAnswers].slice(-500),
+        // The mark was made before setup, not before an agent actually ran.
+        // Persist the distinction for a quit that never reaches stop().
+        preparingAnswers: [...(this._preparing?.values() ?? [])]
+          .filter(({ item, opts }) => opts?.continuation && item?.answer)
+          .map(({ item }) => this._answerKey(item)),
         heardAnswers: Object.fromEntries(Object.entries(this._heardAnswers ?? {}).slice(-500)),
         productOrder: this.productOrder,
         hiddenProducts: [...this.hiddenProducts],
@@ -4008,8 +4026,14 @@ export class Supervisor {
       signInNeeded = this._waitingOnSignIn(this.store.listItems(Date.now())
         .filter((i) => mayRunHere(i, productBySlug.get(i.product), me)));
     } catch {}
+    // ROWS THE SHIP QUEUE STILL OWES A SHIP (w-0c1ba766eb). Waiting on the
+    // app and not on a person, so the window keeps them in In progress until
+    // they have shipped or gone back to their agent.
+    let shipping = [];
+    try { shipping = this.shipQueue.waitingIds(this.store.listItems(Date.now()), this.store.listProducts?.() ?? []); } catch {}
     return {
       paused: this.paused,
+      shipping,
       // ROWS NOTHING CAN START BECAUSE THEIR TOOL IS SIGNED OUT, by id, with the
       // tool's name. The row says so instead of "Queued", which promised an
       // agent "as soon as one is free" while none could be (2026-10-04).
@@ -5689,6 +5713,20 @@ export class Supervisor {
   }
 
   /**
+   * THE CLAUDE LOGIN WHOSE LIMIT THE USAGE PANEL READS, and the environment to
+   * read it in (main/claude-usage.mjs). The same pick as `runsOnAccount`: the
+   * account she chose, or the first one when she has not chosen. The
+   * environment is a worker's, scrubbed the same way, so the app's own
+   * CLAUDE_CONFIG_DIR or an API key never decides which login answers.
+   */
+  usageAccount() {
+    const pool = this._narrowToChosen('claude', this._profiles());
+    const profile = pool[0] ?? 'default';
+    const env = this._workerEnv('claude');
+    return { profile, env: profile === 'default' ? env : { ...env, CLAUDE_CONFIG_DIR: profile } };
+  }
+
+  /**
    * THE ENGINE ON A TASK SHE IS COMPOSING, OR NULL, and the door writes nothing
    * else (`zero:compose` in main/ipc.mjs).
    *
@@ -6537,9 +6575,10 @@ export class Supervisor {
       this._preparing ??= new Map();
       const opts = { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, shipFailure };
       const held = this._preparing.get(item.id);
-      if (held) { held.item = item; held.opts = opts; return; }
+      if (held) { held.item = item; held.opts = opts; this._saveState(); return; }
       const entry = { item, opts, engine };
       this._preparing.set(item.id, entry);
+      this._saveState();
       const t = setTimeout(() => {
         if (this._preparing?.get(item.id) !== entry) return; // stopped, or the app quit
         this._preparing.delete(item.id);
