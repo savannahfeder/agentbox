@@ -3,47 +3,53 @@
 // tag's own small window, the list that opens beside it, the screens they sit
 // on, and her choices about them.
 //
-// What the windows have to get right, each learned from the drawings, from a
-// real-Electron run and from a review by Codex (2026-10-07):
+// What the windows have to get right, each learned from the drawings, from
+// real-Electron runs, from four reviews by Codex, and from real mouse events
+// posted at the real windows (2026-10-08), which is where the last three of
+// these were found:
 //
-// - THEY NEVER TAKE THE KEYBOARD. Both are panels that do not activate, so
-//   pointing at them, or even clicking, leaves the cursor in whatever she was
-//   typing in. Only opening a thread brings the app forward.
-// - THEY SHOW OVER FULL-SCREEN APPS, because that is where she works, with no
-//   dock and no menu bar in sight.
-// - THE EMPTY MARGIN IS NOT THERE. A window is a rectangle and the tag is a
-//   pill with a shadow, so each window lets clicks fall through to the app
-//   beneath it until the pointer is over something drawn.
-// - THE LIST OPENS ON A CLICK, NOT A PASS. Opening on hover meant a pointer
-//   crossing the corner on its way somewhere opened it. Hovering only shows
-//   that the tag can be dragged; clicking it opens the list; leaving both for
-//   a moment closes it. The list is its own window so the tag never moves.
-// - IT GOES WHERE SHE DRAGS IT, and stays there across restarts.
-// - IT HIDES FOR A WHILE AND COMES BACK: 5 minutes, 30 minutes or the rest of
-//   the day; off for good only in Settings, so a single click can never make
-//   it a thing she closed once and forgot.
-// - IT STEPS ASIDE WHILE SHE IS IN THE APP, where the inbox says it bigger,
-//   and it goes when the app's window goes; otherwise it would keep the app
-//   alive with nothing behind it.
+// - A PRESS ON THE TAG MUST NOT BRING THE APP FORWARD. It did, on every
+//   floating-window setting tried: macOS makes the app active on a press, and
+//   a window that may not take focus hands it to the app's main window, which
+//   comes to the front. So the tag and its list MAY take focus. A press makes
+//   the tag the active window and the app's window stays exactly where it was.
+// - EACH WINDOW IS EXACTLY ITS PILL OR ITS LIST. The first version padded the
+//   windows for a drawn shadow and let clicks fall through the padding, and
+//   switching that on and off under the pointer told the page the pointer had
+//   left, so a real first click fell straight through to the app beneath.
+//   With no margin there is nothing to fall through, macOS draws the shadow,
+//   and the glass is the system's own material: real blur of what is behind,
+//   dark in dark mode and light in light mode, the way its own panels are.
+// - A DRAG FOLLOWS THE REAL CURSOR. The page only says when the button went
+//   down and up; between the two, this process reads the cursor itself, so a
+//   drag never depends on the page being sent every move.
+// - THE LIST OPENS ON A CLICK, NOT A PASS, in its own window so the tag never
+//   moves. Off both for a moment and it shuts.
+// - IT SHOWS OVER FULL-SCREEN APPS, IT HIDES FOR A WHILE AND COMES BACK, it is
+//   off for good only in Settings, it steps aside while she is in the app, and
+//   it goes when the app's window goes.
 //
 // What the tag counts is not decided here. Only the page knows what the inbox
-// is, so it hands over the list of what is ready and the count of what is
-// working on `zero:corner-tag`, the way it already hands over the dock badge.
+// is, so it hands over what is ready and how many are working on
+// `zero:corner-tag`; shared/corner-tag.mjs keeps what is fresh, newest first.
 
-import { cardPlacement, hiddenUntil, keepCorner, restingSpot, tagShows, HIDE_CHOICES } from '../shared/corner-tag.mjs';
+import { cardPlacement, hiddenUntil, keepCorner, readyNow, restingSpot, tagShows, HIDE_CHOICES } from '../shared/corner-tag.mjs';
 
-// Room around the tag and its list for their shadows, which a window clips.
-export const PAD = 16;
 // How long the pointer may be off both the tag and its list before the list
-// closes: long enough to cross the gap between them, short enough to feel
-// like it follows the pointer.
+// shuts: long enough to cross the gap between them, short enough to feel like
+// it follows the pointer.
 export const CLOSE_AFTER_MS = 450;
+// Far enough that a click with a shaky hand is still a click.
+export const DRAG_FROM_PX = 6;
+// How often a drag reads the cursor: once a frame.
+const FRAME_MS = 16;
+// A press whose release never came is let go after this long.
+const PRESS_GIVES_UP_MS = 60_000;
 
 const HIDE_LABELS = { '5m': 'Hide for 5 minutes', '30m': 'Hide for 30 minutes', today: 'Hide for the rest of today' };
 const CHANNELS = [
-  'zero:corner-tag', 'corner-tag:ready', 'corner-tag:size', 'corner-tag:solid', 'corner-tag:hover', 'corner-tag:toggle',
-  'corner-tag:drag-start', 'corner-tag:drag', 'corner-tag:drag-end', 'corner-tag:go', 'corner-tag:hide',
-  'corner-tag:settings', 'corner-tag:menu',
+  'zero:corner-tag', 'corner-tag:ready', 'corner-tag:size', 'corner-tag:hover', 'corner-tag:toggle',
+  'corner-tag:press', 'corner-tag:release', 'corner-tag:go', 'corner-tag:hide', 'corner-tag:settings', 'corner-tag:menu',
 ];
 
 export function createCornerTag({
@@ -53,63 +59,52 @@ export function createCornerTag({
   const wins = { tag: null, card: null };
   const loaded = { tag: false, card: false };
   const hovered = { tag: false, card: false };
-  // Whether each window is taking clicks right now, rather than letting them
-  // fall through to the app beneath it.
-  const solid = { tag: false, card: false };
-  let watching = null;
   let ready = [];
   let working = 0;
-  // The tag's own rectangle on screen, without the padding around it.
+  // The tag's rectangle on screen; its window is exactly this.
   let tag = null;
-  let tagSize = { width: 120, height: 26 };
+  let tagSize = { width: 96, height: 26 };
   let measured = false;
   let cardSize = null;
   let open = false;
-  let drag = null;
+  // A press on the tag: where the cursor and the tag were when it went down,
+  // and whether it has moved far enough to be a drag.
+  let press = null;
   let wake = null;
   let closing = null;
+  let watching = null;
   let gone = false;
 
+  const fresh = () => readyNow(ready, now());
   const areas = () => screen.getAllDisplays().map((d) => d.workArea);
   const areaOf = (r) => screen.getDisplayMatching({ x: Math.round(r.x), y: Math.round(r.y), width: Math.max(1, Math.round(r.width)), height: Math.max(1, Math.round(r.height)) }).workArea;
   const inApp = () => {
     try { return !!mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused(); } catch { return false; }
   };
   const alive = (part) => !!wins[part] && !wins[part].isDestroyed();
-  const padded = (r) => ({ x: Math.round(r.x - PAD), y: Math.round(r.y - PAD), width: Math.round(r.width + PAD * 2), height: Math.round(r.height + PAD * 2) });
+  const rounded = (r) => ({ x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) });
   const send = (part, channel, payload) => { if (alive(part) && loaded[part]) wins[part].webContents.send(channel, payload); };
   const sendState = () => {
-    const s = { ready, working, now: now(), open };
+    const s = { ready: fresh(), working, now: now(), open };
     send('tag', 'corner-tag:state', s);
     send('card', 'corner-tag:state', s);
   };
-
-  const placeTag = () => {
-    const spot = restingSpot(tag ? { x: tag.x, y: tag.y } : config.cornerTagSpot ?? null, tagSize, areas());
-    tag = { ...spot, ...tagSize };
-    if (alive('tag')) wins.tag.setBounds(padded(tag));
-  };
-
   const shouldShow = () => tagShows({
-    on: config.cornerTag, hiddenUntil: config.cornerTagHiddenUntil ?? 0, now: now(), inApp: inApp(), ready: ready.length, working,
+    on: config.cornerTag, hiddenUntil: config.cornerTagHiddenUntil ?? 0, now: now(), inApp: inApp(), ready: fresh().length, working,
   });
   // The list may only appear beside a tag that is on screen and should be.
   // A click that was on its way while the tag hid must not open it alone.
   const tagUp = () => !gone && alive('tag') && wins.tag.isVisible() && shouldShow();
 
-  const setSolid = (part, on) => {
-    if (!alive(part)) return;
-    // Mid-drag the tag keeps the pointer whatever the page says.
-    if (part === 'tag' && drag) on = true;
-    solid[part] = on;
-    if (on) wins[part].setIgnoreMouseEvents(false);
-    else wins[part].setIgnoreMouseEvents(true, { forward: true });
+  const placeTag = () => {
+    const spot = restingSpot(tag ? { x: tag.x, y: tag.y } : config.cornerTagSpot ?? null, tagSize, areas());
+    tag = { ...spot, ...tagSize };
+    if (alive('tag')) wins.tag.setBounds(rounded(tag));
   };
 
   const placeCard = () => {
     if (!tag || !cardSize || !alive('card')) return;
-    const p = cardPlacement(tag, cardSize, areaOf(tag));
-    wins.card.setBounds(padded(p.card));
+    wins.card.setBounds(rounded(cardPlacement(tag, cardSize, areaOf(tag)).card));
   };
 
   const make = (part) => {
@@ -118,14 +113,20 @@ export function createCornerTag({
       frame: false,
       transparent: true,
       backgroundColor: '#00000000',
-      hasShadow: false,
+      // Clear and unrounded: the page draws the glass and its small corners.
+      // The system's frosted material would blur what is behind, but it comes
+      // only with the system's own rounder corners or square ones, and the
+      // approved tag has neither.
+      roundedCorners: false,
+      hasShadow: true,
       resizable: false,
       movable: false,
       minimizable: false,
       maximizable: false,
       fullscreenable: false,
       skipTaskbar: true,
-      focusable: false,
+      // May take focus, so a press never hands it to the app's main window.
+      focusable: true,
       // The first click on a window that is not active still counts.
       acceptFirstMouse: true,
       alwaysOnTop: true,
@@ -136,20 +137,16 @@ export function createCornerTag({
     });
     win.setAlwaysOnTop(true, 'floating');
     try { win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true }); } catch {}
-    // Clicks fall through until the page says the pointer is over the tag.
-    win.setIgnoreMouseEvents(true, { forward: true });
     win.on('closed', () => { wins[part] = null; loaded[part] = false; });
     // A reload starts the handshake again: the window goes, anything half
     // done with it is let go, and until the page says it is ready nothing is
-    // sent to it and it is not shown.
+    // sent to it and it is not shown. The first load is not a reload.
     win.webContents.on('did-start-loading', () => {
-      // The first load is not a reload, and must not shut the list it is for.
       if (!loaded[part]) return;
       loaded[part] = false;
       hovered[part] = false;
-      if (part === 'tag') { drag = null; if (win.isVisible()) win.hide(); }
+      if (part === 'tag') { endPress(true); if (win.isVisible()) win.hide(); }
       closeCard();
-      setSolid(part, false);
     });
     wins[part] = win;
     if (part === 'tag') placeTag();
@@ -164,8 +161,6 @@ export function createCornerTag({
     open = false;
     hovered.card = false;
     if (alive('card') && wins.card.isVisible()) wins.card.hide();
-    // A shut list stops catching clicks at once, not at the next pointer move.
-    setSolid('card', false);
     send('tag', 'corner-tag:open', false);
   }
 
@@ -174,7 +169,7 @@ export function createCornerTag({
   };
 
   function openCard() {
-    if (!tag || drag || !tagUp()) return;
+    if (!tag || press?.moved || !tagUp()) return;
     open = true;
     send('tag', 'corner-tag:open', true);
     watch();
@@ -186,31 +181,15 @@ export function createCornerTag({
   }
 
   /* --------------------- where the pointer really is ---------------------- */
-  // The page says when the pointer comes and goes, and the windows trust it,
-  // but a boundary event can go missing: a pointer flicked off the corner, a
-  // window shown under a pointer that never moved. So while anything depends
-  // on the pointer, the real cursor is checked a few times a second and wins.
+  // The page says when the pointer comes and goes, and that is trusted, but a
+  // boundary event can go missing, so while the list is open the real cursor
+  // is read a few times a second and wins. Nothing is read otherwise.
   const within = (pt, r) => !!r && pt.x >= r.x && pt.x < r.x + r.width && pt.y >= r.y && pt.y < r.y + r.height;
-  const drawn = (part) => {
-    if (!alive(part) || !wins[part].isVisible()) return null;
-    if (part === 'tag') return tag;
-    const b = wins.card.getBounds();
-    return { x: b.x + PAD, y: b.y + PAD, width: b.width - PAD * 2, height: b.height - PAD * 2 };
-  };
-  const needsWatching = () => open || solid.tag || solid.card || hovered.tag || hovered.card;
-
-  // Where the real cursor is, for both windows, when the system will say.
-  // It sets both what each window counts as pointed at and whether it takes
-  // clicks, in both directions: a missed leave lets clicks through again, a
-  // missed enter makes the list clickable. Returns false when it cannot say.
+  const drawn = (part) => (alive(part) && wins[part].isVisible() ? wins[part].getBounds() : null);
   const readCursor = () => {
     const pt = screen.getCursorScreenPoint?.();
-    if (!pt || drag) return false;
-    for (const part of ['tag', 'card']) {
-      const inside = within(pt, drawn(part));
-      hovered[part] = inside;
-      if (inside !== solid[part]) setSolid(part, inside);
-    }
+    if (!pt || press) return false;
+    for (const part of ['tag', 'card']) hovered[part] = within(pt, drawn(part));
     return true;
   };
 
@@ -221,14 +200,12 @@ export function createCornerTag({
       if (gone) return;
       readCursor();
       reconsider();
-      if (needsWatching()) watching = setTimer(tick, 200);
+      if (open || hovered.tag || hovered.card) watching = setTimer(tick, 200);
     };
     watching = setTimer(tick, 200);
   }
 
   // Whether the open list should start, keep or drop its countdown to shutting.
-  // Asked after every change of hover and every check of the cursor, so a list
-  // whose pointer left before it opened still shuts.
   function reconsider() {
     if (!open || hovered.tag || hovered.card) { cancelClose(); return; }
     if (closing) return;
@@ -242,32 +219,68 @@ export function createCornerTag({
     }, CLOSE_AFTER_MS);
   }
 
-  function noteHover(part, inside) {
-    hovered[part] = inside;
-    reconsider();
+  /* ------------------------------- the press ------------------------------ */
+  // Where the cursor is now, against where it was when the button went down.
+  const follow = () => {
+    const pt = screen.getCursorScreenPoint?.();
+    if (!pt || !press) return;
+    const dx = pt.x - press.start.x;
+    const dy = pt.y - press.start.y;
+    if (!press.moved && Math.hypot(dx, dy) >= DRAG_FROM_PX) {
+      press.moved = true;
+      closeCard();
+      send('tag', 'corner-tag:dragging', true);
+    }
+    if (press.moved && alive('tag')) {
+      tag = { ...tag, x: press.from.x + dx, y: press.from.y + dy };
+      wins.tag.setPosition(Math.round(tag.x), Math.round(tag.y));
+    }
+  };
+
+  function step() {
+    if (!press || gone) return;
+    press.timer = null;
+    follow();
+    if (now() - press.at > PRESS_GIVES_UP_MS) { endPress(true); return; }
+    press.timer = setTimer(step, FRAME_MS);
+  }
+
+  // The button came up (or the press was taken away). A drag lands where the
+  // cursor left it and is remembered; a press that never moved is a click.
+  function endPress(cancelled) {
+    if (!press) return;
+    if (press.timer) clearTimer(press.timer);
+    press.timer = null;
+    const p = press;
+    if (!cancelled) follow();
+    press = null;
+    if (p.moved) {
+      tag = { ...restingSpot({ x: tag.x, y: tag.y }, tagSize, areas()), ...tagSize };
+      if (alive('tag')) wins.tag.setBounds(rounded(tag));
+      saveConfig(config, { cornerTagSpot: { x: Math.round(tag.x), y: Math.round(tag.y) } });
+      send('tag', 'corner-tag:dragging', false);
+    } else if (!cancelled) {
+      if (open) closeCard(); else openCard();
+    }
   }
 
   // Everything that is not on screen is back where it starts: the list shut,
-  // no drag half-done, so the tag comes back exactly as it was first drawn.
+  // no press half-done, so the tag comes back exactly as it was first drawn.
   const reset = () => {
+    endPress(true);
     closeCard();
-    drag = null;
     hovered.tag = false;
     send('tag', 'corner-tag:reset', null);
-    setSolid('tag', false);
-    if (alive('tag') && tag) wins.tag.setBounds(padded(tag));
+    if (alive('tag') && tag) wins.tag.setBounds(rounded(tag));
   };
 
   function refresh() {
     if (gone) return;
     if (wake) { clearTimer(wake); wake = null; }
     const until = config.cornerTagHiddenUntil ?? 0;
-    const shows = tagShows({
-      on: config.cornerTag, hiddenUntil: until, now: now(), inApp: inApp(), ready: ready.length, working,
-    });
     // A hide comes back by itself the moment it runs out.
     if (until > now()) wake = setTimer(refresh, until - now() + 50);
-    if (!shows) {
+    if (!shouldShow()) {
       if (alive('tag') && wins.tag.isVisible()) { wins.tag.hide(); reset(); }
       else if (open) closeCard();
       return;
@@ -327,7 +340,7 @@ export function createCornerTag({
     }
     tagSize = size;
     // Nothing moves under the pointer while it is dragging.
-    if (drag) return null;
+    if (press?.moved) return null;
     // The first measure places it where she left it. Every one after keeps
     // the edge nearest its corner still as the words change length.
     tag = tag && measured ? keepCorner(tag, tagSize, areaOf(tag)) : null;
@@ -337,16 +350,9 @@ export function createCornerTag({
     return null;
   });
 
-  // The page says when the pointer is over something drawn, and only then
-  // does the window take the click; the rest falls through to the app below.
-  ipcMain.handle('corner-tag:solid', (_e, p) => {
-    setSolid(partOf(p), !!p?.solid);
-    if (p?.solid) watch();
-    return null;
-  });
-
   ipcMain.handle('corner-tag:hover', (_e, p) => {
-    noteHover(partOf(p), !!p?.inside);
+    hovered[partOf(p)] = !!p?.inside;
+    reconsider();
     if (p?.inside) watch();
     return null;
   });
@@ -356,30 +362,18 @@ export function createCornerTag({
     return null;
   });
 
-  // Dragging moves the tag's window; the page reports how far the pointer has
-  // gone since it was pressed, so a fast drag that outruns the tag still lands.
-  ipcMain.handle('corner-tag:drag-start', () => {
-    if (!tag || !alive('tag')) return null;
-    closeCard();
-    drag = { x: tag.x, y: tag.y };
-    setSolid('tag', true);
+  // `at` is where the button went down, from the page. The message can arrive
+  // after the cursor has already moved, and starting from the cursor then put
+  // the tag about 30 px off under it. A press on a tag that has since hidden
+  // starts nothing.
+  ipcMain.handle('corner-tag:press', (_e, at) => {
+    const pt = Number.isFinite(at?.x) && Number.isFinite(at?.y) ? { x: at.x, y: at.y } : screen.getCursorScreenPoint?.();
+    if (!pt || !tag || !tagUp() || press) return null;
+    press = { start: pt, from: { x: tag.x, y: tag.y }, moved: false, at: now(), timer: null };
+    press.timer = setTimer(step, FRAME_MS);
     return null;
   });
-  ipcMain.handle('corner-tag:drag', (_e, d) => {
-    if (!drag || !alive('tag')) return null;
-    tag = { ...tag, x: drag.x + (d?.dx ?? 0), y: drag.y + (d?.dy ?? 0) };
-    wins.tag.setPosition(Math.round(tag.x - PAD), Math.round(tag.y - PAD));
-    return null;
-  });
-  // Also how an interrupted drag ends: it stays where the pointer left it.
-  ipcMain.handle('corner-tag:drag-end', () => {
-    if (!drag) return null;
-    drag = null;
-    tag = { ...restingSpot({ x: tag.x, y: tag.y }, tagSize, areas()), ...tagSize };
-    if (alive('tag')) wins.tag.setBounds(padded(tag));
-    saveConfig(config, { cornerTagSpot: { x: Math.round(tag.x), y: Math.round(tag.y) } });
-    return null;
-  });
+  ipcMain.handle('corner-tag:release', (_e, p) => { endPress(!!p?.cancelled); return null; });
 
   ipcMain.handle('corner-tag:go', (_e, id) => {
     closeCard();
@@ -408,9 +402,9 @@ export function createCornerTag({
   const reseat = () => {
     if (gone) return;
     closeCard();
-    if (!tag || drag) return;
+    if (!tag || press) return;
     tag = { ...restingSpot({ x: tag.x, y: tag.y }, tagSize, areas()), ...tagSize };
-    if (alive('tag')) wins.tag.setBounds(padded(tag));
+    if (alive('tag')) wins.tag.setBounds(rounded(tag));
   };
   // After sleep the screens may have changed and a hide may have run out.
   const woke = () => { reseat(); refresh(); };
@@ -421,6 +415,7 @@ export function createCornerTag({
   const dispose = () => {
     if (gone) return;
     gone = true;
+    endPress(true);
     cancelClose();
     if (wake) { clearTimer(wake); wake = null; }
     if (watching) { clearTimer(watching); watching = null; }
@@ -451,6 +446,6 @@ export function createCornerTag({
     refresh,
     dispose,
     // Tests, and nothing else.
-    _state: () => ({ ready, working, tag, open, visible: alive('tag') && wins.tag.isVisible() }),
+    _state: () => ({ ready: fresh(), working, tag, open, visible: alive('tag') && wins.tag.isVisible() }),
   };
 }

@@ -139,6 +139,7 @@ import { SignInPage } from './team/SignInPage';
 import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPlaces, placesForDrop, rankScore, sorted as sortedByDisplay, type Display, type Privacy, type Unsaved } from './threads/page-rules';
 import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, listStops, stepStop, stopKey, type Stop } from './threads/walk-rules';
+import { opensTheToast, toastParts, type ToastGoes } from './toast-parts';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
 
@@ -162,6 +163,9 @@ interface Snooze { [id: string]: number }
  *  for stopping on a sentence, or failing that on a word. 48 holds every
  *  practice row's first sentence and most real ones. */
 const TOAST_TITLE = 48;
+// How long a toast that goes somewhere stays up, and so how long its orange
+// timer runs. One number for both, or the line and the card disagree.
+const TOAST_GOES_MS = 6000;
 
 /**
  * How long a message she sent to a running agent is held after the row has
@@ -3248,10 +3252,13 @@ export default function App() {
    * not an edge one, so the timer is held and cleared here.
    */
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Counts toasts, so each new one is a new element and its clock starts over.
+  const toastShown = useRef(0);
   const showToast = useCallback((text: string, goes?: { product: string; id: string }) => {
+    toastShown.current += 1;
     setToast({ text, goes });
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), goes ? 6000 : 2500);
+    toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);
   }, []);
   showToastRef.current = showToast;
 
@@ -4469,6 +4476,20 @@ export default function App() {
     else if (shown.compose) { setFocused(null); setModal('compose'); }
   }, [undoStack, refresh, showToast, markSeen, leaveUndoMarks]);
 
+  // INTO THE ROW THE TOAST IS ABOUT, from a click on it or from O
+  // (w-f0bfe32859). One path, so the key can never open something the click
+  // would not. The lookup is by id at the moment of the press, against whatever
+  // the window holds by then; a row withdrawn with Z simply does not answer.
+  const openToastRow = useCallback((to: ToastGoes) => {
+    const row = [...inbox, ...progress, ...snoozed, ...done]
+      .find((i) => i.id === to.id && i.product === to.product);
+    setToast(null);
+    if (!row) return;
+    setSearch(null);
+    setFocused(row);
+    markSeen(row);
+  }, [inbox, progress, snoozed, done, markSeen]);
+
   /* ------------------------------- keyboard ------------------------------- */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -4598,6 +4619,14 @@ export default function App() {
         openSearch();
         return;
       }
+      // O OPENS THE TASK THE TOAST IS ABOUT (w-f0bfe32859): "I very often,
+      // after submitting a task, click 'Open it' in the toast." Z takes back
+      // what the toast announced; O goes into it. Here, above the split, because
+      // it means the same thing on the list and inside a task (answering one
+      // moves you on, and O brings you back to it). Only while a toast with
+      // somewhere to go is up: the cap drawn on it is the only promise of it.
+      const goesTo = opensTheToast(e.key, toast);
+      if (goesTo) { e.preventDefault(); openToastRow(goesTo); return; }
       // AN OPEN REPEATING TASK IS A SCREEN, AND EVERY KEY STOPS HERE.
       //
       // There was no branch for it at all, so with a rule on screen the whole
@@ -4811,7 +4840,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, boardCols, stops, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, waitingFiled, answerCloseAsk, keepThreadOpen]);
+  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, boardCols, stops, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
@@ -6869,17 +6898,45 @@ export default function App() {
           and the pill is the thing she is already looking at. Without a
           destination it stays the plain div it always was, so nothing that is
           only an announcement grows a pointer or a focus ring. */}
-      {toast && (toast.goes
-        ? <button type="button" className="toast toast-goes" onClick={() => {
-            const row = [...inbox, ...progress, ...snoozed, ...done]
-              .find((i) => i.id === toast.goes!.id && i.product === toast.goes!.product);
-            setToast(null);
-            if (!row) return;
-            setSearch(null);
-            setFocused(row);
-            markSeen(row);
-          }}>{toast.text}<span className="toast-go">Open it</span></button>
-        : <div className="toast">{toast.text}</div>)}
+      {/* ITS KEYS ARE DRAWN, NOT SPELT OUT (w-f0bfe32859). It read "Started in
+          Agentbox Team · Z to undo  Open it": a sentence, a key in prose after
+          a middle dot and an underlined link, three registers in one pill. The
+          sentence now stands alone and O and Z are keycaps on the end. Undo is
+          its own target, so a click on it takes the thing back rather than
+          opening it; anywhere else on a toast with somewhere to go opens it.
+          AND IT NAMES THE TASK: the row's own title is the card's first line,
+          and the sentence ("Started in Agentbox Team") the quiet one under it,
+          picked out of fourteen drawings over four rounds. */}
+      {toast && (() => {
+        const { line, undo: undoes } = toastParts(toast.text);
+        const about = toast.goes
+          ? [...inbox, ...progress, ...snoozed, ...done].find((i) => i.id === toast.goes!.id && i.product === toast.goes!.product)
+          : undefined;
+        const face = (
+          <>
+            {about && <span className="toast-title">{about.label || about.title}</span>}
+            <span className="toast-line">{line}</span>
+            {(toast.goes || undoes) && (
+              <span className="toast-keys">
+                {toast.goes && <span className="toast-key"><kbd>O</kbd><span className="toast-key-word">Open</span></span>}
+                {undoes && (
+                  <span className="toast-key toast-undo" role="button" tabIndex={-1}
+                    onClick={(e) => { e.stopPropagation(); setToast(null); void undo(); }}>
+                    <kbd>Z</kbd><span className="toast-key-word">Undo</span>
+                  </span>
+                )}
+              </span>
+            )}
+            {/* THE TIMER: how long the card, and O, can still open the task.
+                Only on a toast that goes somewhere; an announcement has
+                nothing to run out. Same six seconds as the timer below. */}
+            {toast.goes && <span className="toast-clock" aria-hidden="true" style={{ animationDuration: `${TOAST_GOES_MS}ms` }} />}
+          </>
+        );
+        return toast.goes
+          ? <button key={toastShown.current} type="button" className={`toast toast-goes${about ? '' : ' toast-plain'}`} onClick={() => openToastRow(toast.goes!)}>{face}</button>
+          : <div key={toastShown.current} className="toast toast-plain">{face}</div>;
+      })()}
       {/* AND NO TOAST FOR A NEW VERSION. It was the third of the four drawn for
           w-86452550e5 and the argument against it is the one she agreed with: a
           toast that fires while she is away from the Mac was seen by nobody. */}

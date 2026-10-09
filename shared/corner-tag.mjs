@@ -37,11 +37,29 @@ export function hiddenUntil(choice, now) {
   return 0;
 }
 
-/** The words on the tag, or null when there is nothing to say. */
+/** The words on the tag, or null when there is nothing to say. Short, because
+ *  "22 ready for you" in the corner of a full screen was more than it needed;
+ *  "waiting" was picked over "ready" and "need you". */
 export function tagSays({ ready = 0, working = 0 } = {}) {
-  if (ready > 0) return { kind: 'ready', text: `${ready} ready for you` };
+  if (ready > 0) return { kind: 'ready', text: `${ready} waiting` };
   if (working > 0) return { kind: 'working', text: `${working} working` };
   return null;
+}
+
+/** How far back "ready" reaches. Older than this is the inbox's business. */
+export const RECENT_MS = 24 * 60 * 60_000;
+
+/**
+ * What the tag counts and lists: what became ready in the last day, newest
+ * first. The whole inbox was the first version's answer, and it put threads
+ * from weeks ago, ones nobody was thinking about, at the top of a tag meant
+ * to say what just finished. Something with no moment it became ready (an
+ * agent stopped on a yes, right now) always counts.
+ */
+export function readyNow(ready, now, within = RECENT_MS) {
+  return (ready ?? [])
+    .filter((r) => !Number.isFinite(r.since) || now - r.since <= within)
+    .sort((a, b) => (Number.isFinite(b.since) ? b.since : now) - (Number.isFinite(a.since) ? a.since : now));
 }
 
 /** Whether the tag is on screen right now. */
@@ -62,9 +80,9 @@ export function waitedFor(since, now) {
   return `${Math.floor(min / 60)} h`;
 }
 
-/** The lines under the tag: the longest wait first, five at most. */
+/** The lines under the tag: the newest first, five at most. */
 export function cardLines(ready, now, max = 5) {
-  const sorted = [...(ready ?? [])].sort((a, b) => (a.since ?? now) - (b.since ?? now));
+  const sorted = readyNow(ready, now, Infinity);
   const lines = sorted.slice(0, max).map((r) => ({ ...r, waited: waitedFor(r.since, now) }));
   return { lines, more: Math.max(0, sorted.length - lines.length) };
 }

@@ -152,6 +152,9 @@ const HANDLED = {
   'N': [[focused, "e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }"], [list, "case 'c': case 'C': case 'n': case 'N': e.preventDefault(); setModal('compose'); break;"]],
   '/': [[chords, "if (e.key === '/')"], [chords, 'openSearch();']],
   '\\': [[chords, "if (e.key === '\\\\')"], [chords, 'togglePanel();']],
+  // Into the task the toast is about, on the list and inside a task alike
+  // (w-f0bfe32859). Gated on the toast in toast-parts.ts, which has its own test.
+  'O': [[chords, 'const goesTo = opensTheToast(e.key, toast);'], [chords, 'openToastRow(goesTo);']],
 };
 
 describe('every key the shortcuts page draws is one the app answers', () => {
@@ -293,11 +296,18 @@ describe('the page stays a page and not a wall', () => {
   // across the board's columns, so without the row nobody learns the board
   // can be walked at all. It fills the inbox group to exactly seven, so the
   // next inbox key has to make room rather than add.
+  //
+  // AND 24 SINCE 2026-10-07, FOR O (w-f0bfe32859). The argument: asked for in
+  // so many words ("I very often, after submitting a task, click 'Open it' in
+  // the toast ... having a keyboard shortcut for that would be very nice"),
+  // and the toast draws the cap, so a cap on a toast that this page never
+  // mentions is the same nuisance. It sits beside Z, its other half, in a
+  // group of four that becomes five.
   it('is four groups, none of them longer than seven keys', () => {
     expect(SHORTCUTS).toHaveLength(4);
     for (const g of SHORTCUTS) expect(g.keys.length).toBeLessThanOrEqual(7);
     // Rows, not caps: everyKey() flattens the caps and a row can draw two.
-    expect(SHORTCUTS.reduce((n, g) => n + g.keys.length, 0)).toBeLessThanOrEqual(23);
+    expect(SHORTCUTS.reduce((n, g) => n + g.keys.length, 0)).toBeLessThanOrEqual(24);
   });
 
   it('groups by when the keys work, not by which handler runs them', () => {
