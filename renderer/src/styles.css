@@ -4130,81 +4130,155 @@ img.app-mark { opacity: 1; border-radius: 0; }
 .toast-key:hover kbd { border-color: var(--text-faint); color: var(--text); }
 @keyframes toast-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
-/* A · KEYS. Today's place and today's size, cleaned: one line, the sentence on
-   its own, then a hairline and the two caps. Nothing underlined, no prose key. */
-.toast[data-look="keys"] {
-  padding: 8px 14px 8px 16px;
-  border-color: var(--line-strong);
-}
-.toast[data-look="keys"] .toast-keys { padding-left: 14px; border-left: 1px solid var(--line-strong); align-self: stretch; }
+@keyframes toast-drain-down { from { transform: scaleY(1); } to { transform: scaleY(0); } }
 
-/* B · CARD. Bottom right, out of the middle of what she is reading, and it
-   says WHICH task: the sentence becomes a small kicker over the task's own
-   title. The caps sit under it, and a line along the foot drains over the six
-   seconds so how long is left is visible rather than guessed. */
-.toast[data-look="card"] {
+/* THE CARD (picked over Keys and Solid). Bottom right, out of the middle of
+   what she is reading, and it says WHICH task: the sentence becomes a kicker
+   in the app's own caps (the tabs, the column heads) over the task's title,
+   which wraps to two lines rather than being cut at a character count. A
+   toast with no task in it has no kicker to be, so its sentence takes the
+   title's place. The four below share all of that and differ in how the keys
+   and the clock are carried. */
+.toast[data-look^="card"] {
   left: auto;
   right: 56px;
   bottom: 56px;
   transform: none;
-  width: 360px;
-  display: grid;
-  grid-template-columns: 8px 1fr;
-  grid-template-areas: "mark words" ". keys";
-  column-gap: 12px;
-  row-gap: 12px;
-  align-items: start;
-  padding: 14px 16px 16px 14px;
-  border-color: var(--line-strong);
+  width: 380px;
+  padding: 0;
+  white-space: normal;
+  background: var(--skin-solid);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-lg);
 }
-.toast[data-look="card"] .toast-mark {
-  display: block;
-  grid-area: mark;
-  width: 8px; height: 8px; margin-top: 5px;
-  border-radius: 50%;
-  background: var(--accent);
+.toast[data-look^="card"] .toast-words { gap: 6px; }
+.toast[data-look^="card"] .toast-line {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
 }
-.toast[data-look="card"] .toast-words { grid-area: words; gap: 3px; }
-.toast[data-look="card"] .toast-line { font-size: 12px; color: var(--text-faint); }
-.toast[data-look="card"] .toast-title { display: block; font-size: 14px; color: var(--text); font-weight: 500; }
-.toast[data-look="card"] .toast-keys { grid-area: keys; gap: 16px; }
-.toast[data-look="card"] .toast-clock {
+.toast[data-look^="card"] .toast-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14.5px;
+  line-height: 1.4;
+  font-weight: 500;
+  color: var(--text);
+  /* No one-word second line ("…the last email / used"). */
+  text-wrap: pretty;
+}
+/* A plain message has no keys row, so no gap is held open for one. */
+.toast[data-look^="card"].toast-plain { width: auto; max-width: 380px; row-gap: 0; align-items: center; }
+.toast[data-look^="card"].toast-plain .toast-line {
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+  white-space: normal;
+}
+.toast[data-look^="card"] .toast-clock {
   display: block;
-  position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+  position: absolute;
+  height: 2px;
   background: var(--accent);
-  opacity: .7;
   transform-origin: left;
   animation: toast-drain linear forwards;
 }
 
-/* C · SOLID. The colours turned over, the way the toasts on a phone read:
-   unmistakably a passing message and not part of the page. The app's one
-   corner, not a phone's capsule (tests/one-corner-for-the-whole-app). A tick in front, the caps in chips of their own on the end. */
-.toast[data-look="solid"] {
-  background: var(--text);
-  color: var(--bg);
-  border: 0;
-  padding: 6px 6px 6px 10px;
-  gap: 12px;
-  box-shadow: var(--shadow-lg);
+/* 1 · QUIET. The card as drawn first, tightened: a small orange dot on the
+   kicker's line, the caps under the title, the clock along the foot. */
+.toast[data-look="card-a"] {
+  display: grid;
+  grid-template-columns: 6px 1fr;
+  grid-template-areas: "mark words" ". keys";
+  column-gap: 12px;
+  row-gap: 14px;
+  align-items: start;
+  padding: 16px 20px 18px 16px;
 }
-.toast[data-look="solid"] .toast-mark {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; border-radius: 50%;
-  background: var(--accent);
+.toast[data-look="card-a"] .toast-mark {
+  display: block; grid-area: mark;
+  width: 6px; height: 6px; margin-top: 4px;
+  border-radius: 50%; background: var(--accent);
 }
-.toast[data-look="solid"] .toast-mark::before { content: "✓"; font-size: 12px; font-weight: 700; color: #fff; }
-.toast[data-look="solid"] .toast-line { font-weight: 500; }
-.toast[data-look="solid"] .toast-keys { gap: 4px; }
-.toast[data-look="solid"] .toast-key {
-  padding: 5px 10px 5px 6px;
-  background: color-mix(in srgb, var(--bg) 10%, transparent);
+.toast[data-look="card-a"].toast-plain { padding: 14px 20px 15px 16px; }
+.toast[data-look="card-a"].toast-plain .toast-mark { margin-top: 0; }
+.toast[data-look="card-a"] .toast-words { grid-area: words; }
+.toast[data-look="card-a"] .toast-keys { grid-area: keys; gap: 18px; }
+.toast[data-look="card-a"] .toast-clock { left: 0; right: 0; bottom: 0; }
+
+/* 2 · BUTTONS. The keys become the card's own footer, split in two, the way a
+   Mac notification carries its buttons: each half is a target the size of a
+   finger, and Undo is plainly not the same press as Open. The clock runs
+   along the top edge, where the eye enters the card. */
+.toast[data-look="card-b"] { display: flex; flex-direction: column; align-items: stretch; }
+.toast[data-look="card-b"] .toast-words { padding: 18px 20px 16px; }
+.toast[data-look="card-b"] .toast-line { color: var(--accent); }
+.toast[data-look="card-b"].toast-plain .toast-line { color: var(--text); }
+.toast[data-look="card-b"] .toast-keys { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; border-top: 1px solid var(--line-strong); }
+.toast[data-look="card-b"] .toast-key { justify-content: center; padding: 10px 0; }
+.toast[data-look="card-b"] .toast-key + .toast-key { border-left: 1px solid var(--line-strong); }
+.toast[data-look="card-b"] .toast-key:hover { background: var(--wash-strong); }
+.toast[data-look="card-b"] .toast-clock { left: 0; right: 0; top: 0; }
+
+/* 3 · EDGE. An orange edge down the left is the clock: it shortens toward the
+   foot as the seconds go. The keys stand in a column on the right behind a
+   hairline, so the title gets the whole left side and the card stays short. */
+.toast[data-look="card-c"] {
+  width: 420px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "words keys";
+  column-gap: 18px;
+  align-items: center;
+  padding: 16px 18px 16px 22px;
 }
-.toast[data-look="solid"] .toast-key kbd { color: var(--bg); border-color: color-mix(in srgb, var(--bg) 35%, transparent); }
-.toast[data-look="solid"] .toast-key-word { color: color-mix(in srgb, var(--bg) 75%, transparent); }
-.toast[data-look="solid"] .toast-key:hover { background: color-mix(in srgb, var(--bg) 18%, transparent); }
-.toast[data-look="solid"] .toast-key:hover .toast-key-word { color: var(--bg); }
-.toast[data-look="solid"] .toast-key:hover kbd { color: var(--bg); border-color: var(--bg); }
+.toast[data-look="card-c"] .toast-words { grid-area: words; }
+.toast[data-look="card-c"] .toast-keys {
+  grid-area: keys; align-self: stretch;
+  flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px;
+  padding-left: 18px; border-left: 1px solid var(--line-strong);
+}
+.toast[data-look="card-c"] .toast-clock {
+  left: -1px; top: -1px; bottom: -1px; width: 2px; height: auto;
+  transform-origin: top;
+  animation-name: toast-drain-down;
+}
+
+/* 4 · GRID. Ember Grid's own corner marks, the L-shaped ticks on the main
+   pane, drawn on the card in place of a box, over a frosted ground. The
+   kicker is orange; the clock is a short rule inset along the foot. */
+.toast[data-look="card-d"] {
+  display: grid;
+  grid-template-areas: "words" "keys";
+  row-gap: 14px;
+  padding: 20px 24px 22px;
+  border-color: var(--line);
+  background:
+    linear-gradient(var(--text-faint), var(--text-faint)) left 6px top 6px / 10px 1px no-repeat,
+    linear-gradient(var(--text-faint), var(--text-faint)) left 6px top 6px / 1px 10px no-repeat,
+    linear-gradient(var(--text-faint), var(--text-faint)) right 6px top 6px / 10px 1px no-repeat,
+    linear-gradient(var(--text-faint), var(--text-faint)) right 6px top 6px / 1px 10px no-repeat,
+    linear-gradient(var(--text-faint), var(--text-faint)) left 6px bottom 6px / 10px 1px no-repeat,
+    linear-gradient(var(--text-faint), var(--text-faint)) left 6px bottom 6px / 1px 10px no-repeat,
+    linear-gradient(var(--text-faint), var(--text-faint)) right 6px bottom 6px / 10px 1px no-repeat,
+    linear-gradient(var(--text-faint), var(--text-faint)) right 6px bottom 6px / 1px 10px no-repeat,
+    color-mix(in srgb, var(--skin-solid) 86%, transparent);
+  backdrop-filter: blur(14px);
+}
+.toast[data-look="card-d"].toast-plain { padding: 16px 24px 18px; }
+.toast[data-look="card-d"] .toast-words { grid-area: words; }
+.toast[data-look="card-d"] .toast-line { color: var(--accent); }
+.toast[data-look="card-d"].toast-plain .toast-line { color: var(--text); }
+.toast[data-look="card-d"] .toast-keys { grid-area: keys; gap: 18px; }
+.toast[data-look="card-d"] .toast-clock { left: 24px; right: 24px; bottom: 10px; height: 1px; }
+
 
 /* It keeps the top bar's own 22px right margin so it lines up with the settings
    gear below it. It is the toast's shape because the toast is this app's

@@ -803,10 +803,10 @@ export default function App() {
   // can be photographed inside the real app rather than redrawn beside it.
   // Nothing in the app links to it.
   const [modeDraft] = useState(() => isModeVariant(new URLSearchParams(location.search).get('modes')));
-  // Dev aid for w-f0bfe32859: ?toasts=today|keys|card|solid draws the toast in
-  // one of the looks proposed, so each can be photographed in the real app.
-  // Removed once one is picked. Nothing in the app links to it.
-  const [toastLook] = useState(() => new URLSearchParams(location.search).get('toasts') ?? 'keys');
+  // Dev aid for w-f0bfe32859: ?toasts=today|card-a|card-b|card-c|card-d draws
+  // the toast in one of the cards proposed, so each can be photographed in the
+  // real app. Removed once one is picked. Nothing in the app links to it.
+  const [toastLook] = useState(() => new URLSearchParams(location.search).get('toasts') ?? 'card-a');
   const [modeDraftValue, setModeDraftValue] = useState<PermissionMode>('auto');
   // showToast is defined six hundred lines below, and the effect that brings
   // her back from an interruption sits beside the interruption rather than
@@ -6654,7 +6654,7 @@ export default function App() {
             <span className="toast-mark" aria-hidden="true" />
             <span className="toast-words">
               <span className="toast-line">{line}</span>
-              {about && <span className="toast-title">{clipToSentence(about.label || about.title, TOAST_TITLE)}</span>}
+              {about && <span className="toast-title">{about.label || about.title}</span>}
             </span>
             {(toast.goes || undoes) && (
               <span className="toast-keys">
@@ -6671,8 +6671,8 @@ export default function App() {
           </>
         );
         return toast.goes
-          ? <button key={toastShown.current} type="button" className="toast toast-goes" data-look={toastLook} onClick={() => openToastRow(toast.goes!)}>{face}</button>
-          : <div key={toastShown.current} className="toast" data-look={toastLook}>{face}</div>;
+          ? <button key={toastShown.current} type="button" className={`toast toast-goes${about ? '' : ' toast-plain'}`} data-look={toastLook} onClick={() => openToastRow(toast.goes!)}>{face}</button>
+          : <div key={toastShown.current} className="toast toast-plain" data-look={toastLook}>{face}</div>;
       })()}
       {/* AND NO TOAST FOR A NEW VERSION. It was the third of the four drawn for
           w-86452550e5 and the argument against it is the one she agreed with: a
