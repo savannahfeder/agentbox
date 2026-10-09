@@ -119,6 +119,8 @@ import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter
 import { BoxFilter } from './components/BoxFilter';
 import { itemPriority, moveProduct, placeScore } from '../../shared/rank.mjs';
 import { threadsMade, approvableFiled } from './threads-made';
+import { waitingCounts } from './threads-made';
+import { closeAsk, KEEP_OPEN } from './close-asks-first';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, chatProjects, chatTaskSharing, chatTranscript, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { isCleanRun, ruleIdOf, ruleLabel } from '../../shared/repeats.mjs';
@@ -129,7 +131,7 @@ import { Face, TeamContext, firstName, teamView } from './team/people';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
-import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, StateTabs } from './threads/Pages';
+import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, StateTabs, WaitingContext } from './threads/Pages';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
 import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, sorted as sortedByDisplay, type Display, type Privacy } from './threads/page-rules';
@@ -2327,6 +2329,19 @@ export default function App() {
     return m;
   }, [inbox, progress, snoozed, done]);
   const stateOfMine = useCallback((i: WorkItem) => tabState.get(i.id) ?? null, [tabState]);
+  // THE TASKS A THREAD FILED THAT STILL WAIT FOR A YES (w-d2744c6daa), off the
+  // same rule the Approve button reads. A close on a thread with any of these
+  // asks first (`markDone`), and the inbox row says how many (WaitingContext).
+  const waitingFiled = useCallback((item: WorkItem) => threadsMade(items, item).filter((i) => approvableFiled(i, stateOfMine(i))), [items, stateOfMine]);
+  const waitingByThread = useMemo(() => waitingCounts(items, stateOfMine), [items, stateOfMine]);
+  // Which thread's close is asking, by `product/id`; null while none is.
+  const [closeAskOn, setCloseAskOn] = useState<string | null>(null);
+  const keyOf = (item: WorkItem) => `${item.product}/${item.id}`;
+  // Leaving the thread drops its question; a close asked from the list opens
+  // the thread and asks in the same press, so the thread it opens keeps it.
+  useEffect(() => {
+    if (closeAskOn && (!focused || keyOf(focused) !== closeAskOn)) setCloseAskOn(null);
+  }, [focused?.id, focused?.product]);
   // J AND K WALK WHAT IS ON THE SCREEN. On the board that is the board's own
   // reading order, down each column and on to the next (`boardColumns`, the
   // same call InboxBoard draws). Walking the tab's list instead stopped J
@@ -3349,7 +3364,10 @@ export default function App() {
   // `stay` keeps the pane where it is, for the same reason `resolve` has one
   // (w-9cf2b43110): the No beside a thread this one filed closes THAT row, and
   // advancing would throw you off the thread you pressed from.
-  const markDone = useCallback(async (item: WorkItem, { stay }: { stay?: boolean } = {}) => {
+  //
+  // `force` is the close that answers the question below, and the No on a
+  // filed row, both of which have already decided.
+  const markDone = useCallback(async (item: WorkItem, { stay, force }: { stay?: boolean; force?: boolean } = {}) => {
     // AND DURING THE WALK, TWO OF ITS OWN ROWS SAY NO AND SAY WHY. One of them
     // is an agent stopped waiting on you, which is the move the walk is there
     // to teach people not to make, and closing it used to delete the beat that
@@ -3370,12 +3388,24 @@ export default function App() {
       if (since) await closeTroubleRow(item, since);
       return;
     }
+    // A CLOSE ON A THREAD WITH TASKS STILL WAITING FOR A YES ASKS FIRST
+    // (w-d2744c6daa). "I often miss these filed tasks from this thread": one
+    // waited 22 hours under a thread whose only option was "Close this task".
+    // Every close comes through here (E, that option, the button, ⌘K), so this
+    // is the one place the question can stand between a close and the tasks it
+    // would skip. From the list it opens the thread, which is where they are.
+    if (!force && waitingFiled(item).length) {
+      if (focused?.id !== item.id || focused?.product !== item.product) { setFocused(item); markSeen(item); }
+      setOptionSel(null);
+      setCloseAskOn(keyOf(item));
+      return;
+    }
     const undid = [{ product: item.product, id: item.id, words: 'Undid closing it' }];
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, status: 'done' });
       pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, undid, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'open' }); } });
     }, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`, undefined, stay, undefined, undid);
-  }, [deferCommit, closeAgentRow, closeTroubleRow, snap?.supervisor.spawnTrouble?.since, run, showToast, pushUndo]);
+  }, [deferCommit, closeAgentRow, closeTroubleRow, snap?.supervisor.spawnTrouble?.since, run, showToast, pushUndo, waitingFiled, focused, markSeen]);
 
   const resolve = useCallback(async (item: WorkItem, { stay }: { stay?: boolean } = {}) => {
     // `stay` IS FOR APPROVING SOMETHING THAT IS NOT THE ROW YOU ARE ON
@@ -3432,6 +3462,29 @@ export default function App() {
       await markDone(item);
     }
   }, [refresh, showToast, markDone]);
+
+  // THE ANSWER TO WHAT A CLOSE ASKED (w-d2744c6daa, ./close-asks-first.ts).
+  // Deciding each one keeps the thread open and brings the list into view;
+  // starting or dropping them does so one at a time through the same presses
+  // the rows carry, and then closes the thread for real. Each press commits the
+  // one before it (`deferCommit`), so Z takes back the close, the last thing.
+  const answerCloseAsk = useCallback(async (item: WorkItem, n: number) => {
+    const waiting = waitingFiled(item);
+    const option = closeAsk(waiting.length)?.options.find((o) => o.n === n);
+    if (!option) return;
+    setCloseAskOn(null);
+    setOptionSel(null);
+    if (option.act === 'decide') {
+      document.querySelector('.made-waiting')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+    for (const kid of waiting) {
+      if (option.act === 'start') await resolve(kid, { stay: true });
+      else await markDone(kid, { stay: true, force: true });
+    }
+    await markDone(item, { force: true });
+  }, [waitingFiled, resolve, markDone]);
+  const keepThreadOpen = useCallback(() => { setCloseAskOn(null); setOptionSel(null); }, []);
 
   // THERE IS NO DECLINE.
   //
@@ -4442,6 +4495,22 @@ export default function App() {
         // once rather than in each branch under it — keys.ts carries the
         // story of why that matters.
         if (docKind(openDoc?.src) === 'code' && changeOwnsKey(e.key)) return;
+        // WHILE A CLOSE IS ASKING ABOUT THE TASKS STILL WAITING (w-d2744c6daa),
+        // its question owns the keys the options would: the numbers and Enter
+        // answer it, the arrows walk it, and esc keeps the thread open rather
+        // than leaving it. Nothing is selected when it comes up, so Enter on
+        // arrival does nothing, the same promise the options make.
+        const asking = closeAskOn === keyOf(focused) ? closeAsk(waitingFiled(focused).length) : null;
+        if (asking) {
+          const ns = asking.options.map((o) => o.n);
+          if (e.key === 'Escape') { e.preventDefault(); keepThreadOpen(); }
+          else if (e.key === 'ArrowDown') { e.preventDefault(); setOptionSel((s) => ns[Math.min(ns.indexOf(s ?? -1) + 1, ns.length - 1)]); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); setOptionSel((s) => { const i = ns.indexOf(s ?? -1); return i <= 0 ? null : ns[i - 1]; }); }
+          else if (e.key === 'Enter') { e.preventDefault(); if (optionSel !== null) answerCloseAsk(focused, optionSel); }
+          else if (/^[1-9]$/.test(e.key)) answerCloseAsk(focused, Number(e.key));
+          else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }
+          return;
+        }
         // Arrows walk the options; Enter sends ONLY a visible selection.
         // Nothing is pre-selected when a task opens, so Enter on arrival is
         // inert: an approval always requires a deliberate arrow or number.
@@ -4602,7 +4671,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, boardCols, stops, keyCard, walkPlace, goToStop, openTeammateCard]);
+  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, boardCols, stops, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, waitingFiled, answerCloseAsk, keepThreadOpen]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
@@ -5000,6 +5069,7 @@ export default function App() {
     <TeamContext.Provider value={team}>
     <ChatAgentsContext.Provider value={chatAgents}>
     <LiveContext.Provider value={liveIds}>
+    <WaitingContext.Provider value={waitingByThread}>
     <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${workspaceCollapsed ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}`}>
       {signInGate && <SignInPage signedOut={signedOutHere} error={snap?.team?.error ?? null} waitingUrl={snap?.team?.signingIn?.url ?? null} />}
       {/* THE TOP BAR IS NOT DRAWN ON AN OPENED TASK.
@@ -5577,6 +5647,11 @@ export default function App() {
                      would be from its own row — and a closed one is no longer
                      a proposal, so the thread stops coming back. */
                   onRejectFiled={(i) => markDone(i, { stay: true })}
+                  // The question a close asks while tasks still wait (w-d2744c6daa).
+                  closeAsk={(() => {
+                    const asked = closeAskOn === keyOf(focused) ? closeAsk(waitingFiled(focused).length) : null;
+                    return asked && { ...asked, onPick: (n: number) => answerCloseAsk(focused, n), keep: { label: KEEP_OPEN, onKeep: keepThreadOpen } };
+                  })()}
                   onNotice={showToast}
                   /*
                    * What THIS row's agents really run as, so the reply footer
@@ -6680,6 +6755,7 @@ export default function App() {
       {/* ⌘F, on every screen, for the same reason. */}
       <FindBar />
     </div>
+    </WaitingContext.Provider>
     </LiveContext.Provider>
     </ChatAgentsContext.Provider>
     </TeamContext.Provider>

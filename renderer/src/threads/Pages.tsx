@@ -11,6 +11,7 @@ import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../p
 import { Face, TeamContext, firstName } from '../team/people';
 import { PriorityIcon } from '../components/Priority';
 import { notStarted, rowTitle } from '../list-rules';
+import { toApproveWords } from '../threads-made';
 import { DONE } from '../done-word';
 import {
   boardColumns, columnTo, DEFAULT_COLUMN_ORDER, filteredEmptyWords, finishedAt, isDirect, isFiltered, nextPrivacy, projectChoices, slotUnder,
@@ -73,6 +74,10 @@ export function StateGlyph({ state, live = false }: { state: ThreadStateWord; li
 
 /** The threads an agent is on right now, by id (App.tsx provides it). */
 export const LiveContext = createContext<Set<string>>(new Set());
+
+/** How many tasks each thread filed are waiting for a yes, by `product/id`
+ *  (App.tsx provides it, off `waitingCounts` in ../threads-made). */
+export const WaitingContext = createContext<Map<string, number>>(new Map());
 
 // THE APP'S OWN PRIORITY BARS. Urgent is a fourth bar, never an exclamation
 // mark in a box (w-bba20a03f5, Priority.tsx), whatever the drawing showed.
@@ -414,6 +419,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
 }) {
   const when = tab === 'done' ? finishedAt(item) : item.updatedAt;
   const liveIds = useContext(LiveContext);
+  const waiting = useContext(WaitingContext);
   const team = useContext(TeamContext);
   // WHO SEES IT, AT A GLANCE AND ONE CLICK FROM CHANGING (2026-10-01). One
   // mark after the title, always: the people on a thread the team or chosen
@@ -457,7 +463,10 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // comes and goes with an unrelated control cannot be read. Both follow the
   // click at once, the way the Share button does.
   const lock = seen === 'private';
-  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} where={product?.name ?? ''} person={person}
+  // AND HOW MANY TASKS IT FILED STILL WAIT FOR A YES (w-d2744c6daa), in the
+  // faint words a repeating task uses for its schedule: "a little bit of text
+  // that gives you extra information if you need to know."
+  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} aside={toApproveWords(waiting.get(`${item.product}/${item.id}`))} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} where={product?.name ?? ''} person={person}
     priority={item.priority ?? 0} updatedAt={when} now={now} action={action} />;
 }
 

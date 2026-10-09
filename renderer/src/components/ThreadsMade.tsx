@@ -44,6 +44,16 @@ export function ThreadsMade({ rows, onOpen, onApprove, onReject, label }: {
   label?: string;
 }) {
   if (!rows.length) return null;
+  // WHILE ANY OF THEM WAITS FOR A YES, THE LIST SAYS SO (w-d2744c6daa): "I
+  // often miss these filed tasks... they're not very visible and it's really
+  // easy to skip them." One had waited 22 hours under a closed thread. Chosen
+  // off seven rounds of drawings: the list's outer border goes orange, the
+  // label reads "Still waiting on you" in white, and the waiting rows come
+  // first. Only a row this list can actually answer counts, so a list drawn
+  // without the press, or one holding a review, stays quiet.
+  const canPress = (r: MadeRow) => !!onApprove && !!r.approve;
+  const waiting = rows.some(canPress);
+  const shown = waiting ? [...rows.filter(canPress), ...rows.filter((r) => !canPress(r))] : rows;
   // THE PRESS IS THE STATE WORD, NOT A SECOND THING BESIDE IT (2026-10-05).
   //
   // It first shipped as a button to the right of the word, which meant every
@@ -57,11 +67,11 @@ export function ThreadsMade({ rows, onOpen, onApprove, onReject, label }: {
   // ends at the same right-hand edge. The press wears the app's own square
   // capitals in the accent, chosen off four drawings.
   return (
-    <div className="made">
-      {label && <div className="made-label">{label}</div>}
+    <div className={waiting ? 'made made-waiting' : 'made'}>
+      {(waiting || label) && <div className="made-label">{waiting ? 'Still waiting on you' : label}</div>}
       <div className="made-list">
-        {rows.map((r) => {
-          const press = !!onApprove && !!r.approve;
+        {shown.map((r) => {
+          const press = canPress(r);
           return (
             <div className="made-row" key={r.id}>
               {/* The word stays INSIDE the press that opens the thread, so on
