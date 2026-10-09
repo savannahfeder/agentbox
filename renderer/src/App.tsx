@@ -63,7 +63,7 @@ import { approvalReads } from './approval-card';
 // one it took went. Only the second is raised from here, because by the time
 // there is anything to confirm the card has closed.
 import { sentLine } from './compose-says';
-import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, isProposal, maskedAncestors, notStarted, parkedByAgent, replyClearsSchedule, rowTitle, statusForReply, stoppable, threadMasked, threadsOwedAnAnswer, withdrawReply } from './list-rules';
+import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, isProposal, proposingThreads, maskedAncestors, notStarted, parkedByAgent, replyClearsSchedule, rowTitle, statusForReply, stoppable, threadMasked, threadsOwedAnAnswer, withdrawReply } from './list-rules';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { opensATextField } from './keys';
 import { sidebarFits, useRoomyToggle, useWindowWidth } from './room';
@@ -1784,7 +1784,11 @@ export default function App() {
     // both is how one query becomes two confusing inbox items. The rule itself
     // is threadMasked in list-rules, pinned there against her real store.
     const masked = threadMasked(candidates, liveRows);
-    const hasChildHere = (id: string) => masked.has(id);
+    // EXCEPT A THREAD WITH A TASK STILL WAITING FOR A YES (w-d2744c6daa): with
+    // one task running and two waiting, the mask hid the thread and left the
+    // two waiting under a thread in no list she reads (list-rules.ts).
+    const proposing = proposingThreads(items);
+    const hasChildHere = (i: WorkItem) => masked.has(i.id) && !proposing.has(`${i.product}/${i.id}`);
     // Priority order, the same score the supervisor spawns by, from the same
     // module (`score` above): a product's place in the user's running order
     // is worth a hundred item points, the item's own priority breaks ties,
@@ -1796,7 +1800,7 @@ export default function App() {
     // carries priority 1, so the whole sweep sits underneath everything that is
     // actually asking her something rather than on top of it.
     const asking = agentList.filter((r) => r.id !== pendingId && r.agent && reachesInbox(r.agent, now, agentMode));
-    const rows = [...candidates.filter((i) => !hasChildHere(i.id)), ...asking]
+    const rows = [...candidates.filter((i) => !hasChildHere(i)), ...asking]
       .sort(byRunningOrder(score));
     // AND ABOVE ALL OF THEM, WHEN NOTHING IS RUNNING, THE ROW THAT SAYS SO.
     //
@@ -1845,7 +1849,7 @@ export default function App() {
     const ordinary = urgent.length ? rest.filter((i) => !isUrgentRow(i)) : rest;
     const top = [...(troubleItem ? [troubleItem] : []), ...fresh];
     return [...top, ...urgent, ...ordinary];
-  }, [inboxCandidates, liveRows, agentList, agentMode, score, now, pendingId, troubleItem, seen]);
+  }, [inboxCandidates, liveRows, agentList, agentMode, score, now, pendingId, troubleItem, seen, items]);
 
   // BEAT EIGHT ENDS WHEN THE INBOX IS EMPTY, and both ways of ending a task get
   // there: closing one takes it out of the list, and replying to one puts her
