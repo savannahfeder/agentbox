@@ -22,7 +22,12 @@
 import { Worker } from 'node:worker_threads';
 import * as folders from './task-folders.mjs';
 
-const JOBS = new Set(['restoreTaskFolder', 'releaseTaskFolder', 'parkTaskFolder', 'listTaskFolders']);
+const JOBS = new Set([
+  'restoreTaskFolder', 'releaseTaskFolder', 'parkTaskFolder', 'listTaskFolders',
+  // Looking over every copy of the project, which is a `git worktree list` plus
+  // a `stat` each and belongs on this thread for the same reason as the rest.
+  'inventoryWorktrees', 'strayWorktrees', 'pruneMissingWorktrees',
+]);
 
 let worker = null;
 let broken = false;

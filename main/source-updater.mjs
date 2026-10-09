@@ -55,7 +55,13 @@ const SAY = {
 // on this Mac, and the restart below runs that build. Counted as her changes,
 // they made every update after the first say "changes of your own" for good
 // (tests/a-build-does-not-stop-the-next-update.test.mjs).
-const isBuildOutput = (file) => /^shared\/[^/]+\.generated\.[cm]?[jt]s$/.test(file);
+//
+// THE LOCKFILE IS NPM'S, TOO (2026-10-07). The restart's `npm install` rewrote
+// package-lock.json (this npm drops its `libc` lines), and the card never came
+// back while main ran 21 commits ahead. An edit to the dependencies themselves
+// is in package.json, which still blocks
+// (tests/a-package-install-does-not-stop-the-next-update.test.mjs).
+const isBuildOutput = (file) => file === 'package-lock.json' || /^shared\/[^/]+\.generated\.[cm]?[jt]s$/.test(file);
 // The status code is one or two letters and `gitIn` trims the output, which
 // takes the leading space off the first line, so it is matched, not sliced.
 const changedPaths = (porcelain) => String(porcelain ?? '').split('\n').filter(Boolean).map((l) => l.replace(/^[ MADRCUT?!]{1,2} /, '').replace(/^"|"$/g, ''));
@@ -251,6 +257,9 @@ export function createSourceUpdater({
         set({ phase: 'ready', error: `The new packages would not install: ${failureLine(installed.out)}` });
         return;
       }
+      // What the install rewrote goes back, so the folder is left as main has
+      // it and anything else that fast-forwards it cannot trip on the file.
+      await git(['checkout', '--', 'package-lock.json']);
     }
     const built = await npm(['run', 'build']);
     if (built.code !== 0) {
