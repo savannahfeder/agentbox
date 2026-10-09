@@ -51,7 +51,7 @@ import type { RunningSession, WorkItem } from './types';
 // would be worse than the silence it replaces.
 // `next` is a queued task she pushed with Run now (w-87ff499077): still
 // waiting, but first in line, and the word changing is how the press shows.
-export type LiveState = 'working' | 'shipping' | 'next' | 'queued' | 'signin' | 'paused' | 'silent' | 'idle';
+export type LiveState = 'working' | 'shipping' | 'waiting' | 'next' | 'queued' | 'signin' | 'paused' | 'silent' | 'idle';
 
 export interface LiveLine {
   state: LiveState;
@@ -70,6 +70,13 @@ export interface LiveFacts {
   signInNeeded?: Record<string, string>;
   /** The id is on `supervisor.shipping`: the app's ship queue still owes it a ship. */
   shipping?: boolean;
+  /**
+   * The threads this one is waiting on that are still alive (`stillWaitingOn`,
+   *  next-move.ts). A row reaches In progress on this and nothing else would
+   *  have told you so: the line used to read "No agent is on this, and none is
+   *  waiting to start", which is true and is the sentence the next-move work
+   *  exists to stop printing (w-fe48447cab). */
+  waitingOn?: readonly string[];
   /** `supervisor.runNow`: the queued ids she pushed with Run now. */
   runNow?: string[];
   /** `supervisor.stalled`: a worker died on it. The stalled bar owns this. */
@@ -137,6 +144,10 @@ export function shortWord(state: LiveState, helpers = 0): string {
   }
   if (state === 'working') return 'Working';
   if (state === 'shipping') return 'Shipping';
+  // NOT "Blocked", which is the ledger's word for a thread an agent stopped on
+  // and already means something else on these rows. This one is moving; it is
+  // just moving somewhere else first.
+  if (state === 'waiting') return 'Waiting';
   if (state === 'next') return 'Up next';
   if (state === 'queued') return 'Queued';
   if (state === 'signin') return 'Signed out';
@@ -204,7 +215,7 @@ export function cameBackEmpty(
 export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null {
   const {
     session = null, queued = [], runNow = [], stalled = false, paused = false, silent = null, signInNeeded = {},
-    inProgress = false, scheduledUntil = 0, now = Date.now(), shipping = false,
+    inProgress = false, scheduledUntil = 0, now = Date.now(), shipping = false, waitingOn = [],
   } = facts;
 
   // An imported Claude Code session is not one of ours and has no place in any
@@ -290,6 +301,30 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
     return {
       state: 'shipping',
       line: `${Name} is shipping this. It comes back to you once it is live, or goes back to its agent if it fails.`,
+    };
+  }
+
+  // IT IS WAITING ON ANOTHER THREAD (w-fe48447cab), which is the reason it is
+  // in this list at all and the reason nothing is running on it. Without this
+  // the row read "No agent is on this, and none is waiting to start": true,
+  // and the exact shape of sentence this vocabulary was invented to stop —
+  // the app admitting nothing is happening while it knows precisely what the
+  // thread is behind.
+  //
+  // UNDER THE SESSION AND THE SHIP, over everything below, which is the order
+  // `nextMove` asks the holders in: a fact about THIS row beats a fact about
+  // another one, and nothing below here is a fact about either.
+  //
+  // IT COUNTS AND DOES NOT NAME. One thread or six, the fix is the same and it
+  // is on the thread's own summary (Blocked by), where the names have room and
+  // are already drawn. A list of ids in a line read in a list of twenty is
+  // the dense screen this app refuses.
+  if (waitingOn.length) {
+    return {
+      state: 'waiting',
+      line: waitingOn.length === 1
+        ? 'Waiting on another thread. It carries on by itself once that one is finished.'
+        : `Waiting on ${waitingOn.length} other threads. It carries on by itself once they are finished.`,
     };
   }
 
