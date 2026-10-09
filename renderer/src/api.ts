@@ -94,7 +94,7 @@ const emptySettings: Settings = {
     // A screen that could not reach the main process says the switch is on and
     // that there is nowhere to send to, which is the truth about a copy that
     // cannot even read its own settings.
-    diagnostics: true, diagnosticsDestination: false, adhdMode: false,
+    diagnostics: true, diagnosticsDestination: false, adhdMode: false, cornerTag: true,
     storePath: '', homePath: '', claudeBin: '', claudeFound: false, claudeCertain: false, claudeInstallUrl: '',
     standingLines: 0,
     messageRulesLines: 0, projectsWithInstructions: 0, projectCount: 0,

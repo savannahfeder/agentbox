@@ -63,7 +63,7 @@ import { approvalReads } from './approval-card';
 // one it took went. Only the second is raised from here, because by the time
 // there is anything to confirm the card has closed.
 import { sentLine } from './compose-says';
-import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, isProposal, maskedAncestors, notStarted, parkedByAgent, replyClearsSchedule, statusForReply, stoppable, threadMasked, threadsOwedAnAnswer, withdrawReply } from './list-rules';
+import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, isProposal, maskedAncestors, notStarted, parkedByAgent, replyClearsSchedule, rowTitle, statusForReply, stoppable, threadMasked, threadsOwedAnAnswer, withdrawReply } from './list-rules';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { opensATextField } from './keys';
 import { sidebarFits, useRoomyToggle, useWindowWidth } from './room';
@@ -2784,6 +2784,24 @@ export default function App() {
     prevInboxIds.current = ids;
     window.zero?.badge?.(inbox.length);
 
+    // THE CORNER TAG (w-dafae58a23) says the same thing as the inbox, from
+    // over whatever app she is in: what is ready for her, longest wait first,
+    // and how many are working. Working agents are only a count, because
+    // twenty running is ordinary and only what is ready is worth a line.
+    const productName = (slug: string) => snap.products.find((p) => p.slug === slug)?.name ?? slug;
+    window.zero?.cornerTag?.({
+      ready: [
+        ...inbox.map((i) => ({
+          id: i.id,
+          title: rowTitle(i),
+          says: i.status === 'blocked' ? 'needs you' : 'is ready for you',
+          since: i.wrote?.status?.ts ?? i.updatedAt,
+        })),
+        ...(snap.approvals ?? []).map((a) => ({ id: a.id, title: productName(a.product ?? ''), says: 'needs a yes', open: null })),
+      ],
+      working: runningRows.length,
+    });
+
     const askIds = new Set((snap.approvals ?? []).map((a) => a.id));
     const knownAsks = prevAskIds.current;
     const freshAsks = (snap.approvals ?? []).filter((a) => isNew(knownAsks, a.id));
@@ -2800,7 +2818,18 @@ export default function App() {
       })),
     ];
     if (arrivals.length) window.zero?.notify?.(arrivals);
-  }, [snap, inbox]);
+  }, [snap, inbox, runningRows]);
+
+  // The corner tag's "Turn off…" lands on the switch that turns it off.
+  useEffect(() => {
+    const off = window.zero?.onOpenSettings?.(({ pane }) => {
+      setTeamOpen(false);
+      setSettingsPane(pane ?? null);
+      setSettingsVisit((n) => n + 1);
+      setSettingsOpen(true);
+    }) ?? (() => {});
+    return off;
+  }, []);
 
   useEffect(() => { setOptionSel(null); }, [focused?.id]);
 
