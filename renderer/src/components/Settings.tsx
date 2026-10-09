@@ -27,8 +27,9 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel } from '../types';
+import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel, UpdateState } from '../types';
 import { api, RESTART_NOTE } from '../api';
+import { updateLook } from '../update-row';
 import { InstructionSettings, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
 import type {Usage, WorkspaceSettings} from '../types';
@@ -842,9 +843,64 @@ const CodexCli = (props: EngineConnection) => (
   <Connection copy={CODEX} check={api.recheckCodex} {...props} />
 );
 
-/* THE UPDATES GROUP IS GONE (w-5737fe67cf, 2026-09-23). The app still keeps
-   itself current on its own (main/updater.mjs), and a version that is waiting
-   still reaches the user as a row in the inbox (../update-row.ts). */
+/* THE UPDATES GROUP CAME BACK, AS ONE ROW WITH ONE BUTTON (w-39d6c237f7,
+   2026-10-07). It was taken out on 2026-09-23 (w-5737fe67cf) because the app
+   keeps itself current on its own and a waiting version already reaches you in
+   the sidebar, so the group was four rows of bookkeeping about something that
+   needed no decision. What was missing is the one verb: "a way to pull a new
+   version on demand, as many apps do, instead of waiting for the automatic
+   check."
+
+   SO IT IS A BUTTON AND THE ANSWER TO IT, and no more. The version this copy is
+   running is the row's label, what the last check found is the sentence under
+   it, and the button either looks now or restarts onto what is already on the
+   disk. The words are all ../update-row.ts, shared with ⌘K.
+
+   IT WORKS THE SAME ON BOTH KINDS OF COPY. Installed, the check is a release
+   feed (main/updater.mjs); run from a checkout, it is `git fetch` against the
+   branch (main/source-updater.mjs). Both answer the same door and the same
+   shape, so there is nothing here that knows which one it is talking to.
+
+   NOTHING IS ASSUMED ABOUT THE PRESS. The check's own answer is drawn, and the
+   moment the window's snapshot moves, the snapshot wins: that is the rule the
+   whole screen is built on, and here it matters more than anywhere, because the
+   download that follows a check reports its progress through the snapshot and
+   nothing else. */
+function Updates({ state }: { state?: UpdateState | null }) {
+  // WHAT THE CHECK JUST ANSWERED, HELD ONLY UNTIL THE SNAPSHOT CATCHES UP.
+  // Stamped with the snapshot it was asked against, so a push that arrives
+  // afterwards replaces it rather than being drawn over by an older answer.
+  const [found, setFound] = useState<{ was: string; got: UpdateState } | null>(null);
+  const [checking, setChecking] = useState(false);
+  const key = JSON.stringify(state ?? null);
+  const shown = found && found.was === key ? found.got : (state ?? found?.got ?? null);
+  const look = updateLook(shown, { checking });
+
+  const press = async () => {
+    if (look.busy) return;
+    if (look.restart) { void api.updateInstall(); return; }
+    setChecking(true);
+    try {
+      const got = await api.updateCheck();
+      setFound({ was: key, got });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <Group id="updates" label="Updates">
+      <Row
+        label={shown?.currentVersion ? `${Name} ${shown.currentVersion}` : Name}
+        desc={look.sentence}
+      >
+        <button type="button" className="set-ghost" disabled={look.busy} onClick={() => void press()}>
+          {look.button}
+        </button>
+      </Row>
+    </Group>
+  );
+}
 
 /* ---------------------------- the mark, changed --------------------------- */
 
@@ -995,7 +1051,7 @@ function paneFrom(want: string, has: { team: boolean }): Pane {
 
 /* --------------------------------- screen --------------------------------- */
 
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, onClose }: {
+export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, update = null, onClose }: {
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
@@ -1035,6 +1091,13 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   /** Who is signed in, for the Account group on General. Absent when nobody
    *  is, and then there is no group. */
   account?: { email: string; team?: string | null; onSignOut: () => void };
+  /**
+   * WHETHER A NEWER AGENTBOX IS WAITING, as the whole app already reads it
+   *  (the sidebar card and ⌘K read the same field). Handed in rather than
+   *  fetched, so the Updates row redraws off the snapshot like every other row
+   *  on this screen; the button's own answer is only ever held until the next
+   *  snapshot arrives. Null on a build with no updater behind it. */
+  update?: UpdateState | null;
   onClose: () => void;
 }) {
   const [model, setModel] = useState<SettingsModel | null>(null);
@@ -1409,6 +1472,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
             <Group id="storage" label={`Where ${NAME} keeps things on this computer`}>
               <Row label="Your projects, tasks and documents" desc={w.storePath} />
             </Group>
+            {/* THE VERSION AND THE WAY TO ASK FOR A NEWER ONE (w-39d6c237f7).
+                Under the folders and above Account, because it is the same kind
+                of fact as the folders: something about this install rather than
+                something to decide. */}
+            <Updates state={update} />
             {/* SIGN OUT IS THE LAST THING ON THE PAGE (w-a09476712f), where
                 "How do i log out" looks for it: "should be at bottom of
                 settings page". Your account menu in the sidebar's corner has

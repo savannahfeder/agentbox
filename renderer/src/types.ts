@@ -653,13 +653,17 @@ export interface Snapshot {
     byItem: Record<string, string>;
   };
   /**
-   * WHICH SUBSCRIPTION THE AGENTS ARE RUNNING ON (w-e217e577e5, 2026-10-07), for
-   *  the line in the sidebar that says so. Answered whole by
-   *  `Supervisor#runsOnAccount`, for the reason `engines` is: which account the
-   *  fleet spends is `_narrowToChosen`'s rule, pinned to that file. Null, or
-   *  absent on an older payload, on a Mac where nothing readable is signed in,
-   *  and then nothing new is drawn. The words are shared/runs-on.mjs. */
-  runsOn?: { engine: string; plan: string | null } | null;
+   * WHETHER THIS MAC WAS ALREADY SIGNED INTO A CODING AGENT, AND WHICH
+   *  (w-e217e577e5, 2026-10-07), for the one line the walk says about it.
+   *  Answered whole by `Supervisor#runsOnAccount`, for the reason `engines` is:
+   *  which account the fleet spends is `_narrowToChosen`'s rule, pinned to that
+   *  file. Null, or absent on an older payload, on a Mac where nothing readable
+   *  is signed in, and then nothing is said. The words are shared/runs-on.mjs.
+   *
+   *  NO PLAN RIDES HERE. It did for a few hours, so the sidebar could print a
+   *  tier; that row and the tier both came out the same day. What somebody pays
+   *  for is on each agent's own page in Settings. */
+  runsOn?: { engine: string } | null;
   // `outsideAgents` is how many of her own Claude Code sessions the inbox
   // takes: all of them, only the ones stopped on a question, or none. It rides
   // the snapshot because the inbox reads it on every draw. How much of the

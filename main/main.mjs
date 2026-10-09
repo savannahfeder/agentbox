@@ -863,7 +863,7 @@ async function createWindow() {
   // a locked screen all read the same from in there). The renderer says what
   // arrived; main/notify.mjs decides. tell me when I am in another app, never
   // while I am in Agentbox.
-  installNotifier({ app, window, Notification, powerMonitor, ipcMain });
+  installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage });
   // Asked for once by the renderer as it mounts, rather than pushed on
   // did-finish-load, which races the first effects and would drop the very
   // message it exists to deliver.

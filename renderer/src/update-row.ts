@@ -14,7 +14,7 @@
 // for as long as it waits, and an installed app applies it on quit.
 
 import type { UpdateState } from './types';
-import { NAME } from '../../shared/product-name.mjs';
+import { NAME, Name } from '../../shared/product-name.mjs';
 
 /** The id an update row had. Not in any ledger and never will be. */
 export const UPDATE_ID = 'update';
@@ -58,6 +58,102 @@ export const SAY = {
   restart: 'Restart to update',
   installing: `Updating. ${NAME} restarts by itself in about a minute.`,
 } as const;
+
+// ASKING NOW, RATHER THAN WAITING FOR THE CLOCK (w-39d6c237f7, 2026-10-07).
+// "A way to pull a new version on demand, as many apps do, instead of waiting
+// for the automatic check." The words below are the whole of what the button
+// and its row say, in one place because three surfaces say them: the Settings
+// row, its button, and the answer ⌘K puts in a toast.
+export const CHECK_SAY = {
+  /** The button, when pressing it means look now. */
+  check: 'Check for updates',
+  /** And while it is looking, downloading, or rebuilding: nothing to press. */
+  checking: 'Checking',
+  downloading: 'Downloading',
+  updating: 'Updating',
+  looking: 'Looking for a new version.',
+  /** Before the first check of the run has answered. */
+  idle: `${Name} looks for a new version on its own.`,
+  current: `${Name} is up to date.`,
+  /** The check came back with no phase and no reason, which should not happen. */
+  unknown: 'Could not check for updates.',
+} as const;
+
+/**
+ * WHAT THE SCREEN SAYS IT FOUND, AND WHAT THE BUTTON SAYS.
+ *
+ *  One function for the whole of it, because the alternative is each surface
+ *  working the phases out again. The automatic check is SILENT when it fails
+ *  (point 2 at the top of main/updater.mjs), so these sentences are the only
+ *  place a person ever learns why: `error` and `unsupported` carry main's own
+ *  reason through untouched, and neither may read as a healthy check.
+ *
+ *  `checking` is the press that has not answered yet. The phase on disk is
+ *  still whatever the last check left, and a row that went on saying "up to
+ *  date" for the second the request takes would read as the button doing
+ *  nothing.
+ *
+ *  THE TWO KINDS OF COPY DIFFER IN ONE PLACE ONLY: an installed app has a
+ *  version number and comes back in seconds; a copy run from a checkout
+ *  (main/source-updater.mjs) has a count of changes and rebuilds for about a
+ *  minute. Both are `ready`.
+ */
+export type UpdateLook = {
+  /** What it found, one sentence. */
+  sentence: string;
+  /** The button's words. */
+  button: string;
+  /** Pressing it restarts onto the new version rather than looking again. */
+  restart: boolean;
+  /** Nothing to press: a check, a download or a rebuild is under way. */
+  busy: boolean;
+};
+
+export function updateLook(
+  state: UpdateState | null | undefined,
+  { checking = false }: { checking?: boolean } = {},
+): UpdateLook {
+  const installing = !!state?.installing;
+  const phase = checking && !installing ? 'checking' : (state?.phase ?? 'idle');
+  const ready = phase === 'ready';
+  const source = !!state?.source;
+  const busy = phase === 'checking' || phase === 'downloading' || installing;
+  const button = ready ? SAY.restart
+    : installing ? CHECK_SAY.updating
+    : phase === 'checking' ? CHECK_SAY.checking
+    : phase === 'downloading' ? CHECK_SAY.downloading
+    : CHECK_SAY.check;
+  return { sentence: sentenceFor(phase, state, source), button, restart: ready, busy };
+}
+
+function sentenceFor(phase: string, state: UpdateState | null | undefined, source: boolean): string {
+  // THE REBUILD FIRST, because a copy run from source is `installing` with
+  // `ready` still just behind it, and the press has to be seen to have landed.
+  if (state?.installing) return SAY.installing;
+  if (phase === 'ready') {
+    // A RESTART THAT DID NOT FINISH KEEPS ITS OWN WORDS. The sidebar card says
+    // this; the row says it the same way, because it is the same failure.
+    if (state?.error) return `${state.error.replace(/\.?$/, '.')} Pressing it again tries again.`;
+    const how = source ? 'Restarting takes about a minute.' : 'Restarting takes a few seconds.';
+    const what = source
+      ? (typeof state?.behind === 'number' && state.behind > 0
+        ? `${state.behind} new ${state.behind === 1 ? 'change' : 'changes'}.`
+        : 'A new version is ready.')
+      : (state?.newVersion ? `Version ${state.newVersion} has downloaded.` : 'A new version has downloaded.');
+    return `${what} ${how}`;
+  }
+  if (phase === 'downloading') {
+    return typeof state?.percent === 'number'
+      ? `Downloading the new version, ${state.percent}%.`
+      : 'Downloading the new version.';
+  }
+  if (phase === 'checking') return CHECK_SAY.looking;
+  if (phase === 'current') return CHECK_SAY.current;
+  // MAIN'S OWN REASON, UNTOUCHED. `shortError` in main/updater.mjs and `SAY` in
+  // main/source-updater.mjs are both already sentences a person can read.
+  if (phase === 'error' || phase === 'unsupported') return state?.error || CHECK_SAY.unknown;
+  return CHECK_SAY.idle;
+}
 
 /**
  * WHAT CHANGED, for a copy run from source (main/source-updater.mjs): the
