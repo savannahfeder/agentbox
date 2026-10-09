@@ -198,6 +198,17 @@ export function updateShape(wanted: string): UpdateState {
 export const api = {
   isFixtures: useFixtures,
 
+  // IS A SCREEN READER RUNNING. Asked by the terminal pane before it builds an
+  // xterm, so the accessibility tree is built for the people it is for rather
+  // than for everybody (main/ipc.mjs 'zero:assistiveTech').
+  //
+  // Every failure is "no": fixtures, a preload from before this channel
+  // existed, or a refused call. A terminal that cannot ask the question still
+  // has to open, and this is awaited inside the effect that builds one.
+  async assistiveTech(): Promise<boolean> {
+    if (useFixtures) return false;
+    try { return !!(await window.zero?.assistiveTech?.()); } catch { return false; }
+  },
   async snapshot(): Promise<Snapshot> {
     if (emptyFixtures) {
       const empty = { ...structuredClone(fixtureSnapshot), items: [], approvals: [], supervisor: { paused: false, running: [], capacity: 3 } };
@@ -1012,7 +1023,9 @@ export const api = {
     return zero.projectInstructionsWrite({ product, text });
   },
 
-  async createProduct(p: { name: string; repoPath?: string | null }) {
+  // `ofMany` says this one is part of a press that connects several folders and
+  // will count itself once (main/ipc.mjs); it changes nothing about the project.
+  async createProduct(p: { name: string; repoPath?: string | null; ofMany?: boolean }) {
     if (useFixtures) return null;
     return window.zero!.createProduct(p);
   },

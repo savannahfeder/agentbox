@@ -1,3 +1,4 @@
+import { harnessFor } from './harnesses.mjs';
 // THE NAME ON THE ROW, WRITTEN RATHER THAN TAKEN FROM THE FIRST SENTENCE.
 //
 // A dictated message keeps its first line as its title, verbatim and forever
@@ -188,10 +189,7 @@ export function codexNameArgs(item) {
 }
 
 function codexArgs(prompt) {
-  return [
-    'exec', '--skip-git-repo-check', '--ephemeral', '--ignore-user-config', '--ignore-rules',
-    '-s', 'read-only', '-c', 'model_reasoning_effort=low', prompt,
-  ];
+  return harnessFor('codex').smallModelArgs(prompt);
 }
 
 /**
@@ -218,11 +216,13 @@ export function nameRow(item, opts = {}) {
  */
 export function askSmallModel(prompt, clean, { claudeBin, codexBin = null, engine = 'claude', model = NAME_MODEL, timeoutMs = NAME_TIMEOUT_MS, env } = {}) {
   return new Promise((resolve) => {
-    const bin = engine === 'codex' ? codexBin : claudeBin;
+    let harness;
+    try { harness = harnessFor(engine); } catch { return resolve(''); }
+    const bin = harness.binary({ claudeBin, codexBin });
     if (!bin) return resolve('');
     let child;
     try {
-      child = spawn(bin, engine === 'codex' ? codexArgs(prompt) : ['-p', prompt, '--model', model], {
+      child = spawn(bin, harness.smallModelArgs(prompt, model), {
         // Somewhere that is nobody's project. A naming call must not pick up a
         // CLAUDE.md, a settings file or a hook from whatever folder it lands in.
         cwd: '/tmp',

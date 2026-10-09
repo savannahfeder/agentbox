@@ -12,6 +12,7 @@ import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../p
 import { Face, TeamContext, firstName } from '../team/people';
 import { PriorityIcon } from '../components/Priority';
 import { notStarted, rowTitle } from '../list-rules';
+import { toApproveWords } from '../threads-made';
 import { DONE } from '../done-word';
 import {
   boardColumns, columnTo, conversationSlugs, DEFAULT_COLUMN_ORDER, entryScore, filteredEmptyWords, finishedAt, isDirect, isFiltered, nextPrivacy, placesForDrop, projectChoices, slotUnder,
@@ -74,6 +75,23 @@ export function StateGlyph({ state, live = false }: { state: ThreadStateWord; li
 
 /** The threads an agent is on right now, by id (App.tsx provides it). */
 export const LiveContext = createContext<Set<string>>(new Set());
+
+/** How many tasks each thread filed are waiting for a yes, by `product/id`
+ *  (App.tsx provides it, off `waitingCounts` in ../threads-made). */
+export const WaitingContext = createContext<Map<string, number>>(new Map());
+
+/**
+ * The threads waiting on ANOTHER THREAD that is still alive, by id
+ * (w-fe48447cab). A different question from `WaitingContext` above, which
+ * counts what a thread has filed and is waiting for YOU to say yes to.
+ *
+ * It is here for the reason `LiveContext` is: the fact is worked out once, in
+ * App.tsx off `stillWaitingOn`, and every surface that draws a row reads that
+ * one set. Without it this row reached In progress wearing nothing, which is
+ * the whole complaint the next-move work came out of — a thread in a list
+ * with no word for why it is there.
+ */
+export const WaitingOnThreadContext = createContext<Set<string>>(new Set());
 
 // THE APP'S OWN PRIORITY BARS. Urgent is a fourth bar, never an exclamation
 // mark in a box (w-bba20a03f5, Priority.tsx), whatever the drawing showed.
@@ -360,9 +378,16 @@ export const RepeatMark = () => <svg className="th-repeat" width="13" height="13
   <path d="M13 6.5A5.5 5.5 0 0 0 3.2 4.8M3 2.5v2.6h2.6" /><path d="M3 9.5a5.5 5.5 0 0 0 9.8 1.7M13 13.5v-2.6h-2.6" />
 </svg>;
 
-export function RowCells({ live = false, lead, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, aside, where, person, priority, updatedAt, when, now, action }: {
+export function RowCells({ live = false, lead, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, waitingOnThread = false, aside, where, person, priority, updatedAt, when, now, action }: {
   /** An agent is on this thread right now: a turning mark before its name. */
   live?: boolean;
+  /**
+   * It is waiting on another thread (w-fe48447cab): the same faint words
+   * `held` uses, because it is the same kind of fact — this thread is not
+   * moving yet and here is what has to happen first. It says the state and
+   * not the names: those are on the thread's own summary, under Blocked by,
+   * where there is room for them. */
+  waitingOnThread?: boolean;
   title: ReactNode; hidden?: boolean; lock?: boolean; shared?: boolean; where: ReactNode; person?: ReactNode;
   /** How many people a thread shared with chosen people reaches; 0 for the team. */
   chosen?: number;
@@ -381,7 +406,7 @@ export function RowCells({ live = false, lead, title, hidden = false, lock = fal
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
         people with a small count beside them for a thread only a few people
         see. The whole team, the default, carries nothing (2026-10-02). */}
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live ? <StateGlyph state="running" live /> : lead}{title}{aside && <span className="th-aside">{aside}</span>}{held && <span className="th-aside">not started</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}</div>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live ? <StateGlyph state="running" live /> : lead}{title}{aside && <span className="th-aside">{aside}</span>}{held && <span className="th-aside">not started</span>}{waitingOnThread && <span className="th-aside">waiting</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}</div>
     <div className="th-cell-proj">{where}</div>
     {person !== undefined && <div className="th-cell-person">{person}</div>}
     <div className={`th-cell-prio${id === 'urgent' ? ' urgent' : ''}`}>{id && <><PriorityMark id={id} />{priorityLabelOf(id)}</>}</div>
@@ -415,6 +440,8 @@ export function ThreadCells({ item, product, now, person, tab }: {
 }) {
   const when = tab === 'done' ? finishedAt(item) : item.updatedAt;
   const liveIds = useContext(LiveContext);
+  const waiting = useContext(WaitingContext);
+  const waitingOnThread = useContext(WaitingOnThreadContext);
   const team = useContext(TeamContext);
   // WHO SEES IT, AT A GLANCE AND ONE CLICK FROM CHANGING (2026-10-01). One
   // mark after the title, always: the people on a thread the team or chosen
@@ -458,7 +485,10 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // comes and goes with an unrelated control cannot be read. Both follow the
   // click at once, the way the Share button does.
   const lock = seen === 'private';
-  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} where={product?.name ?? ''} person={person}
+  // AND HOW MANY TASKS IT FILED STILL WAIT FOR A YES (w-d2744c6daa), in the
+  // faint words a repeating task uses for its schedule: "a little bit of text
+  // that gives you extra information if you need to know."
+  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} aside={toApproveWords(waiting.get(`${item.product}/${item.id}`))} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} waitingOnThread={waitingOnThread.has(item.id)} where={product?.name ?? ''} person={person}
     priority={item.priority ?? 0} updatedAt={when} now={now} action={action} />;
 }
 

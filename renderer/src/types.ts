@@ -345,6 +345,9 @@ export interface SupervisorStatus {
   // Rows nothing can start because their tool is signed out, id -> the tool's
   // name. Said instead of "queued", which would promise an agent that cannot come.
   signInNeeded?: Record<string, string>;
+  // Rows the app's ship queue still owes a ship (main/ship-queue.mjs). Waiting
+  // on the app, not on a person: In progress, reading "Shipping".
+  shipping?: string[];
   // Of those, the ones pushed with Run now from the three-dot menu: next to
   // start, ahead of every project and tag (supervisor.runNow).
   runNow?: string[];
@@ -1004,6 +1007,10 @@ declare global {
   interface Window {
     zero?: {
       snapshot(): Promise<Snapshot>;
+      // Whether a screen reader is running, which is what decides xterm's
+      // accessibility tree. Optional: a preload from before this channel
+      // existed has no such function, and `api.assistiveTech` reads that as no.
+      assistiveTech?(): Promise<boolean>;
       olderItems?(p: { offset: number; limit: number }): Promise<{ items: WorkItem[]; more: boolean }>;
       crash?(p: { name: string; message: string; stack: string }): Promise<unknown>;
       // A count. The name is checked against the approved list in the main
