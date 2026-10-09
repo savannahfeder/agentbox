@@ -6667,6 +6667,7 @@ export default function App() {
                 )}
               </span>
             )}
+            {about && <span className="toast-project">{about.productName}</span>}
             <span className="toast-clock" aria-hidden="true" style={{ animationDuration: `${toast.goes ? 6000 : 2500}ms` }} />
           </>
         );

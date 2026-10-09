@@ -4318,7 +4318,8 @@ img.app-mark { opacity: 1; border-radius: 0; }
   row-gap: 0;
   padding: 0;
 }
-.toast[data-look="soft-d"] .toast-title { grid-area: title; padding: 14px 16px 0; }
+/* Margin, not padding: a clamped title's third line shows through padding. */
+.toast[data-look="soft-d"] .toast-title { grid-area: title; margin: 14px 16px 0; }
 .toast[data-look="soft-d"] .toast-line { grid-area: line; padding: 4px 16px 13px; }
 .toast[data-look="soft-d"] .toast-clock {
   display: block; grid-area: rule;
@@ -4330,6 +4331,86 @@ img.app-mark { opacity: 1; border-radius: 0; }
 .toast[data-look="soft-d"] .toast-keys { grid-area: keys; justify-self: start; padding: 10px 16px 11px; gap: 16px; }
 .toast[data-look="soft-d"].toast-plain .toast-clock { display: none; }
 .toast[data-look="soft-d"].toast-plain .toast-line { padding: 0; }
+
+.toast[data-look] .toast-project { display: none; }
+
+/* E · A WITH ITS TIMER (round four, asked for by name: "add that little
+   orange timer that tells you how much time is left"). A as it was, and a
+   thin orange line along the card's foot that shortens over the six seconds
+   O and the click are offered for. Z outlives it; see the undo window. */
+.toast[data-look="soft-e"] {
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "title title" "line keys";
+  row-gap: 8px;
+  column-gap: 16px;
+  padding-bottom: 15px;
+}
+.toast[data-look="soft-e"] .toast-title { grid-area: title; }
+.toast[data-look="soft-e"] .toast-line { grid-area: line; }
+.toast[data-look="soft-e"] .toast-keys { grid-area: keys; }
+.toast[data-look="soft-e"] .toast-clock {
+  display: block;
+  position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+  background: var(--accent); opacity: .7;
+  transform-origin: left;
+  animation: toast-drain linear forwards;
+}
+
+/* F · D WITHOUT ITS LINE. "Started in Agentbox Team" read as one line too
+   many, so the project is only its name, and it rides on the keys' row,
+   faint and at the far end, where it costs no height. Title, rule, keys. */
+.toast[data-look="soft-f"] {
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "title title" "rule rule" "keys project";
+  row-gap: 0;
+  padding: 0;
+}
+.toast[data-look="soft-f"] .toast-line { display: none; }
+.toast[data-look="soft-f"].toast-plain .toast-line { display: block; }
+.toast[data-look="soft-f"] .toast-title { grid-area: title; margin: 14px 16px 13px; }
+.toast[data-look="soft-f"] .toast-clock {
+  display: block; grid-area: rule;
+  height: 1px; margin: 0 16px;
+  background: var(--accent); opacity: .55;
+  transform-origin: left;
+  animation: toast-drain linear forwards;
+}
+.toast[data-look="soft-f"] .toast-keys { grid-area: keys; justify-self: start; padding: 10px 16px 11px; gap: 16px; }
+.toast[data-look="soft-f"] .toast-project {
+  display: block; grid-area: project; justify-self: end;
+  padding: 10px 16px 11px 0;
+  font-size: 12px; color: var(--text-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.toast[data-look="soft-f"].toast-plain .toast-clock { display: none; }
+
+/* G · F, WITH THE NAME BESIDE THE TITLE. The same, but the project sits in
+   the title's top right corner, small and faint, the way a mail app puts the
+   time beside the sender; the keys' row is left with the keys alone. */
+.toast[data-look="soft-g"] {
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "title project" "rule rule" "keys keys";
+  row-gap: 0;
+  column-gap: 12px;
+  padding: 0;
+}
+.toast[data-look="soft-g"] .toast-line { display: none; }
+.toast[data-look="soft-g"].toast-plain .toast-line { display: block; }
+.toast[data-look="soft-g"] .toast-title { grid-area: title; margin: 14px 0 13px 16px; }
+.toast[data-look="soft-g"] .toast-project {
+  display: block; grid-area: project; align-self: start;
+  padding: 16px 16px 0 0;
+  font-size: 12px; color: var(--text-faint); white-space: nowrap;
+}
+.toast[data-look="soft-g"] .toast-clock {
+  display: block; grid-area: rule;
+  height: 1px; margin: 0 16px;
+  background: var(--accent); opacity: .55;
+  transform-origin: left;
+  animation: toast-drain linear forwards;
+}
+.toast[data-look="soft-g"] .toast-keys { grid-area: keys; justify-self: start; padding: 10px 16px 11px; gap: 16px; }
+.toast[data-look="soft-g"].toast-plain .toast-clock { display: none; }
 
 
 /* It keeps the top bar's own 22px right margin so it lines up with the settings
