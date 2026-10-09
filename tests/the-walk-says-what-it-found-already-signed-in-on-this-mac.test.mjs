@@ -39,18 +39,27 @@ const walk = (extra = {}) => renderToStaticMarkup(createElement(Onboarding, {
 }));
 
 describe('the folder screen on a Mac that was already set up', () => {
-  it('says which plan the agents will run on', () => {
-    const html = walk({ runsOn: { engine: 'claude', plan: 'Max 20x' } });
-    expect(html).toContain('Your agents will run on the Claude Max 20x plan already signed in on this Mac.');
+  it('says it found an account of yours, and names no plan', () => {
+    const html = walk({ runsOn: { engine: 'claude' } });
+    expect(html).toContain('Your agents will run on the Claude account already signed in on this Mac.');
+    // THE TIER NEVER REACHES THIS SCREEN EITHER. The sidebar row that printed
+    // one was taken out the day it shipped ("very critically, I want to get rid
+    // of that Claude Max 20x plan"), and a line here that quietly kept saying
+    // it would be the same mistake on a different screen. Handed one anyway, on
+    // an old payload or by a caller that has not caught up, it is ignored.
+    const withTier = walk({ runsOn: { engine: 'claude', plan: 'Max 20x' } });
+    expect(withTier).not.toContain('Max 20x');
+    expect(withTier).toContain('Your agents will run on the Claude account already signed in on this Mac.');
   });
 
-  it('names the account alone when the plan string cannot be read', () => {
-    const html = walk({ runsOn: { engine: 'codex', plan: null } });
+  it('says ChatGPT for a Mac signed into Codex', () => {
+    const html = walk({ runsOn: { engine: 'codex' } });
     expect(html).toContain('Your agents will run on the ChatGPT account already signed in on this Mac.');
+    expect(html).not.toContain('Codex');
   });
 
   it('says nothing at all on a Mac with nothing signed in', () => {
-    for (const runsOn of [null, undefined, { engine: null, plan: null }]) {
+    for (const runsOn of [null, undefined, { engine: null }]) {
       const html = walk({ runsOn });
       expect(html).not.toContain('already signed in on this Mac');
     }
@@ -61,7 +70,7 @@ describe('the folder screen on a Mac that was already set up', () => {
     // the only door there is: a pick the app says no to. With no main process
     // behind it the pick cannot happen here, so the claim this test can make is
     // the structural one -- there is ONE note element, not two.
-    const html = walk({ runsOn: { engine: 'claude', plan: 'Max 20x' } });
+    const html = walk({ runsOn: { engine: 'claude' } });
     expect(html.match(/class="fr-note/g) ?? []).toHaveLength(1);
   });
 });

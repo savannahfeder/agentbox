@@ -1,0 +1,68 @@
+/* THE CORNER TAG (w-dafae58a23). One look on every page behind it: the window
+   cannot see what it floats over, so it never tries to adapt to it, and the
+   silver glass and its grey marks stay the same on a black editor and a white
+   document alike. Approved over eight rounds of drawings in the product's
+   designs folder; change it there first. */
+
+html, body, #root { margin: 0; padding: 0; background: transparent; overflow: hidden; height: 100%; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; -webkit-font-smoothing: antialiased; user-select: none; cursor: default; }
+
+.ct-glass {
+  position: absolute;
+  color: #1d1d1f;
+  background: rgba(246, 246, 250, 0.82);
+  backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.10);
+}
+.ct-glass::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.35));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+}
+
+/* ---- the tag ---- */
+.ct-tag {
+  height: 26px; padding: 0 11px 0 8px; border-radius: 13px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 7px; font-size: 12.5px; white-space: nowrap;
+  cursor: grab; transition: background-color 120ms ease;
+}
+.ct-tag .ct-words { font-weight: 600; }
+.ct-tag.working .ct-words { font-weight: 500; color: rgba(29, 29, 31, 0.72); }
+.ct-tag:hover, .ct-tag.is-hover, .ct-tag.is-open { background: rgba(252, 252, 254, 0.9); }
+.ct-tag.is-dragging { cursor: grabbing; }
+
+/* The mark and the grip share one slot, so swapping them never changes the
+   tag's width and never moves the words. Pointing at the tag shows the grip:
+   the one hint that it can be picked up, and gone again when the pointer is. */
+.ct-mark { position: relative; width: 11px; height: 11px; flex: none; }
+.ct-state, .ct-grip { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; transition: opacity 120ms ease; }
+.ct-grip { opacity: 0; }
+.ct-tag:hover .ct-state, .ct-tag.is-hover .ct-state, .ct-tag.is-dragging .ct-state { opacity: 0; }
+.ct-tag:hover .ct-grip, .ct-tag.is-hover .ct-grip, .ct-tag.is-dragging .ct-grip { opacity: 1; }
+
+/* Ready is a full dot, working the same grey half full. Still: nothing here
+   moves on its own, because moving is what pulls an eye off its work. */
+.ct-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: rgba(29, 29, 31, 0.52); }
+.ct-half { flex: none; display: block; }
+
+/* ---- the list ---- */
+.ct-card { border-radius: 14px; padding: 9px 8px 8px; box-sizing: border-box; width: max-content; max-width: 440px; min-width: 240px; }
+.ct-line {
+  all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 9px; width: 100%;
+  font-size: 13px; white-space: nowrap; padding: 5px 6px; border-radius: 7px; cursor: pointer;
+}
+.ct-line:hover { background: rgba(29, 29, 31, 0.06); }
+.ct-line .ct-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.ct-line .ct-says { color: rgba(29, 29, 31, 0.72); }
+.ct-line .ct-when { margin-left: auto; padding-left: 14px; font-size: 12px; color: rgba(29, 29, 31, 0.52); }
+.ct-quiet { font-size: 12.5px; color: rgba(29, 29, 31, 0.52); }
+.ct-static { padding: 5px 6px; }
+.ct-mark-sp { width: 7px; flex: none; }
+
+/* Hide it for a while, or go and turn it off. Small and last, so the list
+   reads first. */
+.ct-foot { display: flex; align-items: center; gap: 2px; margin: 6px 0 0; padding: 7px 6px 0; border-top: 1px solid rgba(29, 29, 31, 0.10); font-size: 11.5px; color: rgba(29, 29, 31, 0.52); white-space: nowrap; }
+.ct-foot > span:first-child { margin-right: 2px; }
+.ct-foot button { all: unset; cursor: pointer; padding: 2px 6px; border-radius: 5px; color: rgba(29, 29, 31, 0.72); }
+.ct-foot button:hover { background: rgba(29, 29, 31, 0.07); color: #1d1d1f; }
+.ct-foot .ct-sep { flex: 1; min-width: 16px; }

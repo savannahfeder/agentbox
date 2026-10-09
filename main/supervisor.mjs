@@ -40,7 +40,7 @@ import { buildSessionArgs, CLAUDE_MODES, permissionMode } from './settings.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, productRankScore } from '../shared/rank.mjs';
+import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, placedScore, productRankScore } from '../shared/rank.mjs';
 import { keysForAgents } from '../shared/shortcuts.mjs';
 import { isCleanRun, ruleIdOf } from '../shared/repeats.mjs';
 import { mayRunHere } from '../shared/team-rules.mjs';
@@ -51,6 +51,19 @@ import { mayRunHere } from '../shared/team-rules.mjs';
 // (main/store/work-items.mjs stamps it from this).
 function teamPersonEnv() {
   return process.env.AGENTBOX_PERSON_ID ? { AGENTBOX_PERSON_ID: process.env.AGENTBOX_PERSON_ID } : {};
+}
+
+/**
+ * WHY A FOLDER WAS REFUSED, IN WORDS, when it was refused rather than failed.
+ * `ensureTaskFolder` answers `{ taken: false, reason, heldBy }` when somebody
+ * else owns the folder (main/task-folders.mjs), and that answer is the one
+ * thing the row cannot work out for itself: a pid naming the other copy of the
+ * app is the difference between "this machine is broken" and "something else is
+ * already working here".
+ */
+function whoHasIt(made) {
+  if (made?.taken !== false) return '';
+  return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
 import { agentSpokeSince, answerSettled, answerTs, stoppedByHer } from '../shared/answers.mjs';
 import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
@@ -445,6 +458,8 @@ export class Supervisor {
       // the inbox: this is a filing decision about a list that had grown to
       // twenty two chips, not an off switch. Pausing is the off switch.
       this.hiddenProducts = new Set(state.hiddenProducts ?? []);
+      // Threads she dragged to a place of their own in the list (`_score`).
+      this.threadPlaces = Object.fromEntries(Object.entries(state.threadPlaces ?? {}).filter(([, v]) => Number.isFinite(v)));
     } catch {
       this._handledAnswers = new Set();
       this._heardAnswers = {};
@@ -458,6 +473,7 @@ export class Supervisor {
       this._profileCooldown = {};
       this.productOrder = [];
       this.hiddenProducts = new Set();
+      this.threadPlaces = {};
     }
     // WHICH ROWS NOTHING HAS BEEN ABLE TO RUN ON, as of the last tick, for the
     // line above her list. Deliberately NOT persisted: it is derived from
@@ -1395,6 +1411,41 @@ export class Supervisor {
     } catch (e) { console.warn('zero: could not say the model is for another engine:', e.message); }
   }
 
+  /**
+   * A ROW THAT COULD NOT GET ITS OWN FOLDER SAYS SO ON THE ROW, and stays open.
+   *
+   * Written the same way as the cross-engine model refusal above, for the same
+   * reason: the answer is not a narrower plan, it is no run at all, and a
+   * refusal nobody is told about is indistinguishable from the app being
+   * broken. Before this, the three places that could not make a folder all
+   * answered by running in the checkout the app is built from and printing one
+   * line to a console nobody has open (w-5952e6de3e, 2026-10-07).
+   *
+   * Said once per row, because a tick that keeps asking must not keep writing.
+   */
+  _couldNotGetAFolder(item, error) {
+    this._folderRefused ??= new Set();
+    if (this._folderRefused.has(item?.id)) return;
+    const why = String(error?.message ?? error ?? '').trim();
+    try {
+      this.store.recordSessionResult(item.product, item.id, {
+        result: `This task did not start, because it could not be given a folder of its own to work in${why ? `: ${why}` : '.'}\n\nIt is not run in the checkout ${Name} itself is built from. Two agents in one folder cannot be told apart afterwards, so the change card for this task would show another task's edits as if they were this one's, and that is worse than waiting.\n\nThe usual causes are a full disk, a path the app cannot write to, a file named in .worktreeinclude that cannot be carried into a folder, and another copy of ${Name} over the same checkout standing in that folder already. Then reply here and it will try again.`,
+        status: 'open',
+      });
+      // MARKED AS SAID ONLY ONCE IT HAS BEEN SAID. Marking first means a store
+      // write that failed -- which is likeliest during exactly the disk trouble
+      // that caused this -- would silence every later attempt as well.
+      this._folderRefused.add(item?.id);
+    } catch (e) { console.warn('zero: could not say the folder failed:', e.message); }
+  }
+
+  /**
+   * A folder that WAS made clears the refusal, so if this row ever fails again
+   * it is told again. Only a repeat inside one unbroken run of failures is
+   * swallowed, which is the tick asking over and over rather than news.
+   */
+  _gotAFolderAfterAll(id) { this._folderRefused?.delete(id); }
+
   // WHERE THE SESSION ACTUALLY IS, checked rather than assumed. The CLI keeps
   // one transcript per session under its profile's home, in a directory named
   // after the working directory with every character that is not a letter or a
@@ -1510,15 +1561,35 @@ export class Supervisor {
    */
   workFolderFor(item, product) {
     const base = this.productFolder(product);
+    // A PROJECT WITH NO REPOSITORY NEVER PROMISED ISOLATION, and has run in the
+    // product folder since before folders existed. That is the absence of a
+    // promise, not a broken one, and it stays exactly as it was.
     if (!this._folderRow(item, product)) return base;
     // Already made, off this thread, by the spawn that is asking (`_folderFirst`).
     const made = this._madeFolders?.get(item.id);
     if (made) return made;
-    try { return restoreTaskFolder(base, item.id)?.path ?? base; }
-    catch (error) {
-      console.warn(`zero: ${item.id} is running in the shared checkout:`, error.message);
-      return base;
-    }
+    // AND A ROW THAT WAS PROMISED A FOLDER EITHER GETS ONE OR DOES NOT RUN.
+    //
+    // This used to answer a failure with the shared checkout and a
+    // `console.warn`, which is the one back door under every other guarantee in
+    // this file. main/git-change.mjs says the cost in its own words: "In a
+    // checkout two agents share, a file the other one wrote inside this run's
+    // window is inside this run's window, and no reading of the disk can tell
+    // them apart." So the card somebody reads can carry another agent's edits,
+    // and the only notice was printed into a terminal nobody has open. Running
+    // is not better than not running when the result is a card that lies.
+    // Found 2026-10-07 reviewing with Codex (w-5952e6de3e).
+    //
+    // A NULL IS THE SAME ANSWER AS A THROW. `restoreTaskFolder` returns null
+    // when the repoPath is not a repository, and `?? base` turned that into
+    // permission to use the checkout. A REFUSAL IS THE SAME ANSWER AGAIN:
+    // taking a folder can be refused outright now (another app process over
+    // this checkout is standing in it, or somebody locked it by hand), and
+    // that refusal carries no path for exactly this reason.
+    const asked = restoreTaskFolder(base, item.id);
+    const folder = asked?.path ?? null;
+    if (!folder) throw Error(`no folder could be made for ${item.id} in ${base}${whoHasIt(asked)}`);
+    return folder;
   }
 
   /**
@@ -1639,14 +1710,44 @@ export class Supervisor {
     const entry = { item, opts, engine };
     this._preparing.set(item.id, entry);
     folderJob('restoreTaskFolder', base, item.id)
-      .then((made) => made?.path ?? base, (error) => {
-        console.warn(`zero: ${item.id} is running in the shared checkout:`, error.message);
-        return base;
-      })
-      .then((cwd) => {
+      // A FAILURE HERE ENDS THE SPAWN. It used to hand back the shared checkout
+      // and go on to start the worker in it, which is `workFolderFor`'s back
+      // door with a session actually started behind it. `null` carries the
+      // refusal through the same chain, so the bookkeeping below runs either
+      // way: the slot goes back, their reply goes back in line, and the row
+      // says what happened. Found 2026-10-07 reviewing with Codex.
+      // THE FAILURE IS CARRIED, NOT ACTED ON HERE. Saying it in this handler
+      // would say it about a row that may have been stopped or closed in the
+      // meantime, and `recordSessionResult` writes `status: 'open'`, so a
+      // refusal arriving late would REOPEN a row somebody had finished with.
+      // It is reported below, after the one check that knows whether this
+      // attempt is still the current one (Codex's review, 2026-10-07).
+      // A REFUSAL IS A FAILURE WITH A NAME ON IT: the folder exists and belongs
+      // to somebody else, so `whoHasIt` turns that answer into the words the
+      // row carries rather than a bare "no folder could be made".
+      .then(
+        (made) => ({
+          cwd: made?.path ?? null,
+          failed: made?.taken === false ? Error(`no folder could be made for ${item.id}${whoHasIt(made)}`) : null,
+        }),
+        (error) => ({ cwd: null, failed: error }),
+      )
+      .then(({ cwd, failed }) => {
         // Stopped, or the app quit, while the folder was being made.
         if (this._preparing.get(item.id) !== entry) return;
         this._preparing.delete(item.id);
+        if (!cwd) {
+          // A null with no error behind it is the folder thread answering that
+          // the repoPath is not a repository at all.
+          this._couldNotGetAFolder(entry.item, failed ?? Error('no folder could be made'));
+          // THEIR WORDS ARE NOT DELIVERED BY A WORKER THAT NEVER STARTED. The
+          // queue writes the delivery mark before the spawn and that mark is
+          // persisted, so leaving it standing records the reply as handed over
+          // for good. Same accounting as the cross-engine model refusal.
+          if (entry.opts?.continuation && entry.item?.answer) this.redeliverAnswer(entry.item, entry.item.answer);
+          this.onChange?.();
+          return;
+        }
         // AND A SESSION THAT ARRIVED WHILE WE WERE BUILDING ALREADY HAS THIS
         // ROW. Starting a second one here is what gave w-4d722ecf92 two workers
         // and had the second one's claim refused. A spawn cannot reach this
@@ -1654,6 +1755,7 @@ export class Supervisor {
         // skips it entirely, so the one place that starts a worker without
         // anybody having just checked asks for itself.
         if (this.sessions.has(item.id)) { this.onChange?.(); return; }
+        this._gotAFolderAfterAll(item.id);
         this._madeFolders.set(item.id, cwd);
         try { this.spawnWorker(entry.item, entry.opts); }
         catch (error) { console.warn(`zero: could not start ${item.id}:`, error.message); }
@@ -1747,6 +1849,11 @@ export class Supervisor {
     if (!product?.repoPath || base !== product.repoPath) return 0;
     const busy = (id) => this.sessions.has(id) || !!this._preparing?.has(id);
     let put = 0;
+    // AND WHILE WE ARE HERE, WHAT ELSE IS HOLDING THE DISK (w-330eea6c66). This
+    // is the only place that already walks a project's folders on a clock, and
+    // the strays are deliberately not in the list below: they are nobody's row,
+    // so they are shown and never swept.
+    await this.lookOverTheProjectsFolders(product, base);
     for (const folder of await folderJob('listTaskFolders', base)) {
       // OUR OWN PID IS NOT SOMEBODY ELSE. Every folder is locked by the process
       // that made it, which is this one, so treating any lock as a live holder
@@ -1774,9 +1881,50 @@ export class Supervisor {
       // reading it is an agent's folder deleted while it works (w-4d722ecf92).
       if (item?.claim && !item.claimExpired) continue;
       if (busy(folder.id)) continue;
-      if ((await folderJob('parkTaskFolder', base, folder.id)).parked) put += 1;
+      // THE PATH WE WERE HANDED, not the row id alone. Parking used to rebuild
+      // `.claude/worktrees/<id>` from the id, so the folder it committed in and
+      // removed was not necessarily the one this loop looked at (w-330eea6c66).
+      if ((await folderJob('parkTaskFolder', base, folder.id, { path: folder.path })).parked) put += 1;
     }
     return put;
+  }
+
+  /**
+   * EVERY COPY OF A PROJECT ON THE DISK, INCLUDING THE ONES THE APP DID NOT MAKE
+   * (w-330eea6c66).
+   *
+   * MEASURED 2026-10-07: thirteen worktrees of one repository sat outside the
+   * app's own home holding about 740 MB, made by hand by sessions rather than by
+   * the app, and nothing in the app could list, show or sweep one. This is the
+   * showing half: the strays are remembered here so a page can name them without
+   * reading the disk on the window's thread.
+   *
+   * IT ONLY EVER LOOKS. Removing a folder somebody made on purpose is not the
+   * app's to do, and the folder is the only copy of whatever is uncommitted in
+   * it. The one thing it does change is bookkeeping with nothing behind it: a
+   * registration whose folder has gone, which is what refuses the next
+   * `worktree add` at that path (one of the thirteen was under `/private/tmp`,
+   * which macOS purges).
+   */
+  async lookOverTheProjectsFolders(product, base) {
+    try {
+      const dropped = await folderJob('pruneMissingWorktrees', base);
+      if (dropped.length) console.warn(`zero: dropped ${dropped.length} worktree registration(s) in ${base} pointing at nothing`);
+      const strays = await folderJob('strayWorktrees', base);
+      this._strayFolders ??= new Map();
+      // By checkout rather than by product, so two products registering the same
+      // one do not count its folders twice.
+      this._strayFolders.set(product.repoPath, strays.map((w) => ({ ...w, project: product.name || product.slug })));
+    } catch (error) {
+      console.warn('zero: could not look over the project´s folders:', error.message);
+    }
+  }
+
+  /** Copies of a project on this disk the app did not make, as the last sweep found them. */
+  strayFolders() {
+    const out = [];
+    for (const list of this._strayFolders?.values() ?? []) out.push(...list);
+    return out;
   }
 
   profileHoldingSession(sessionId, itemId, product) {
@@ -2971,8 +3119,28 @@ export class Supervisor {
   // One product's medium outranks another's urgent when it sits above it.
   // Ties break oldest-first so nothing starves. The item's own number is hers
   // alone now (itemPriority); an agent's tag no longer moves anything.
+  // A THREAD DRAGGED IN THE LIST RUNS WHERE IT WAS PUT (w-6e5b532a95): its
+  // place replaces the score outright (`placedScore`, shared/rank.mjs).
   _score(item) {
-    return productRankScore(this.productOrder, item.product) + itemPriority(item);
+    return placedScore(this.threadPlaces[item.id], productRankScore(this.productOrder, item.product) + itemPriority(item));
+  }
+
+  // Places as a patch: a number sets one, null forgets it. Kept here beside
+  // the project order, on this Mac, because both are one person's running
+  // order and a teammate's list must not move when you drag yours.
+  setThreadPlaces(patch) {
+    for (const [id, place] of Object.entries(patch ?? {})) {
+      if (place === null) delete this.threadPlaces[id];
+      else if (Number.isFinite(place)) this.threadPlaces[id] = place;
+    }
+    this._saveState();
+    this.onChange?.();
+  }
+
+  // The snapshot's items with each one's place on it, which is all the screen
+  // needs to sort by it. A row with no place is handed back untouched.
+  withPlaces(items) {
+    return items.map((i) => (Number.isFinite(this.threadPlaces[i.id]) ? { ...i, place: this.threadPlaces[i.id] } : i));
   }
 
   /* ----------------------- auth profiles (subscriptions) ------------------ */
@@ -3689,6 +3857,7 @@ export class Supervisor {
         heardAnswers: Object.fromEntries(Object.entries(this._heardAnswers ?? {}).slice(-500)),
         productOrder: this.productOrder,
         hiddenProducts: [...this.hiddenProducts],
+        threadPlaces: this.threadPlaces,
         liveSessions: this._liveSessions,
         rowSessions: this._rowSessions,
         compactions: this._compactions,
@@ -5492,17 +5661,17 @@ export class Supervisor {
   }
 
   /**
-   * WHICH SUBSCRIPTION THE FLEET IS SPENDING, for the one line that says so
-   * (w-e217e577e5, 2026-10-07). Null on a Mac where nothing readable is signed
-   * in, and then nothing is drawn anywhere.
+   * WHICH SUBSCRIPTION THE FLEET IS SPENDING, for the one line the walk says
+   * about it (w-e217e577e5, 2026-10-07). Null on a Mac where nothing readable is
+   * signed in, and then nothing is said anywhere.
    *
    * IT IS ANSWERED HERE FOR THE REASON `engineFacts` IS. Which engine a row runs
    * on needs the capability gate, and which ACCOUNT it runs on needs
    * `_narrowToChosen`, the rule that one account picked in Settings is the only
    * one the fleet uses. A corner that worked either out for itself could name
    * the subscription this app is deliberately not spending, which is the one
-   * mistake this line must never make: somebody reads it to find out whose money
-   * is going.
+   * mistake this line must never make: somebody reads it to find out whether any
+   * account of theirs got connected at all.
    *
    * THE FIRST OF THE POOL, which is the account the next spawn goes to on a Mac
    * with nothing picked (`_pickProfile` round-robins from there). Two accounts
@@ -6447,6 +6616,26 @@ export class Supervisor {
     if (this._folderFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly })) return;
     if (this._photoFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly })) return;
 
+    // THE ROW'S OWN FOLDER, RESOLVED BEFORE ANYTHING IS ALLOCATED FOR THE RUN.
+    // Everything downstream follows this one word: the snapshot the change card
+    // is built from, the built-in terminal, /diff, and the folder the next reply
+    // resumes into. It is asked here, ahead of the plan and the per-run
+    // permission files, because it can now REFUSE: a row promised a folder and
+    // denied one does not run at all, and a refusal after those files are
+    // written leaks a pair of them every time (Codex's review, 2026-10-07).
+    //
+    // `remoteOnly` arrives here too, having skipped both preparatory gates
+    // above, so this is the one place every spawn passes through.
+    let cwd;
+    try { cwd = this.workFolderFor(item, product); }
+    catch (error) {
+      this._couldNotGetAFolder(item, error);
+      if (continuation && item.answer) this.redeliverAnswer(item, item.answer);
+      this.onChange?.();
+      return;
+    }
+    this._gotAFolderAfterAll(item.id);
+
     const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine, shipFailure });
     const { args } = plan;
     // ONE RUN, ONE PAIR OF FILES. The MCP config and the settings used to be a
@@ -6458,11 +6647,6 @@ export class Supervisor {
     const spawnFiles = [];
     this.prepareClaudePermissions(plan, product, runId, spawnFiles);
 
-    // THE ROW'S OWN FOLDER, and the shared checkout only when it cannot have
-    // one. Everything downstream follows this one word: the snapshot the change
-    // card is built from, the built-in terminal, /diff, and the folder the next
-    // reply resumes into.
-    const cwd = this.workFolderFor(item, product);
     // Workers bill to the founder's Claude subscription (the CLI's own OAuth
     // login), never an API key. An ANTHROPIC_API_KEY in the inherited env
     // would silently override that, so strip anything that could redirect

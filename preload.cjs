@@ -114,6 +114,9 @@ contextBridge.exposeInMainWorld('zero', {
   agentThreads: () => ipcRenderer.invoke('zero:agent-threads'),
   importThreads: (payload) => ipcRenderer.invoke('zero:import-threads', payload ?? {}),
   badge: (count) => ipcRenderer.invoke('zero:badge', count),
+  // What the corner tag says when she is in another app: what is ready for
+  // her, and how many are working (main/corner-tag.mjs).
+  cornerTag: (state) => ipcRenderer.invoke('zero:corner-tag', state),
   // Whether this page came up from ⌘R, and which build it is running.
   bootInfo: () => ipcRenderer.invoke('zero:boot-info'),
   // KEEPING AGENTBOX CURRENT (main/updater.mjs). The state of it rides the
@@ -218,6 +221,7 @@ contextBridge.exposeInMainWorld('zero', {
   resumeItems: (payload) => ipcRenderer.invoke('zero:resume-items', payload),
   redeliver: (payload) => ipcRenderer.invoke('zero:redeliver', payload),
   setProductOrder: (payload) => ipcRenderer.invoke('zero:set-product-order', payload),
+  setThreadPlaces: (payload) => ipcRenderer.invoke('zero:set-thread-places', payload),
   setProductHidden: (payload) => ipcRenderer.invoke('zero:set-product-hidden', payload),
   approve: (payload) => ipcRenderer.invoke('zero:approve', payload),
   // What was just decided, and on which card. The Cmd+Y chord is caught in the
@@ -263,6 +267,12 @@ contextBridge.exposeInMainWorld('zero', {
     const handler = (_e, payload) => fn(payload);
     ipcRenderer.on('zero:open-item', handler);
     return () => ipcRenderer.removeListener('zero:open-item', handler);
+  },
+  // The corner tag's "Turn off…": opens Settings at the switch that does it.
+  onOpenSettings: (fn) => {
+    const handler = (_e, payload) => fn(payload);
+    ipcRenderer.on('zero:open-settings', handler);
+    return () => ipcRenderer.removeListener('zero:open-settings', handler);
   },
   // The window moved to a screen that wants the other set of theme pictures.
   // Only main can see which physical display a window is on, and only main can
