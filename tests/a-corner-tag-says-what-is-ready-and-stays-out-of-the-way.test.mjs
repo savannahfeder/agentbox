@@ -13,7 +13,7 @@
 // not, midnight, and a tag dragged to every quarter of the screen.
 import { describe, expect, it } from 'vitest';
 import {
-  HIDE_CHOICES, hiddenUntil, tagSays, tagShows, waitedFor, cardLines,
+  HIDE_CHOICES, hiddenUntil, tagSays, tagShows, waitedFor, cardLines, readyNow, RECENT_MS,
   restingSpot, keepCorner, cardPlacement, MARGIN,
 } from '../shared/corner-tag.mjs';
 
@@ -21,8 +21,8 @@ const area = { x: 0, y: 0, width: 1728, height: 1080 };
 
 describe('what the tag says', () => {
   it('names the agents ready for you when there are any', () => {
-    expect(tagSays({ ready: 2, working: 18 })).toEqual({ kind: 'ready', text: '2 ready for you' });
-    expect(tagSays({ ready: 1, working: 0 })).toEqual({ kind: 'ready', text: '1 ready for you' });
+    expect(tagSays({ ready: 2, working: 18 })).toEqual({ kind: 'ready', text: '2 ready' });
+    expect(tagSays({ ready: 1, working: 0 })).toEqual({ kind: 'ready', text: '1 ready' });
   });
 
   it('says how many are working when none is ready', () => {
@@ -101,11 +101,12 @@ describe('the list under the tag', () => {
     expect(waitedFor(undefined, now)).toBe('');
   });
 
-  it('puts the longest wait first and keeps the list short', () => {
+  it('puts the newest first and keeps the list short', () => {
     const ready = Array.from({ length: 7 }, (_, i) => ({ id: `w-${i}`, title: `T${i}`, says: 'is ready for you', since: now - i * 60_000 }));
     const { lines, more } = cardLines(ready, now);
-    expect(lines.map((l) => l.id)).toEqual(['w-6', 'w-5', 'w-4', 'w-3', 'w-2']);
-    expect(lines[0].waited).toBe('6 min');
+    expect(lines.map((l) => l.id)).toEqual(['w-0', 'w-1', 'w-2', 'w-3', 'w-4']);
+    expect(lines[0].waited).toBe('now');
+    expect(lines[4].waited).toBe('4 min');
     expect(more).toBe(2);
   });
 
@@ -113,6 +114,38 @@ describe('the list under the tag', () => {
     const { lines, more } = cardLines([{ id: 'a', title: 'A', says: 'needs a yes', since: now }], now);
     expect(lines).toHaveLength(1);
     expect(more).toBe(0);
+  });
+});
+
+describe('only what is fresh counts (the first version counted the whole inbox)', () => {
+  const now = Date.UTC(2026, 9, 8, 12, 0, 0);
+  const hour = 60 * 60_000;
+
+  it('keeps what became ready in the last day, newest first', () => {
+    const r = readyNow([
+      { id: 'old', since: now - 3 * 24 * hour },
+      { id: 'an-hour', since: now - hour },
+      { id: 'just-now', since: now - 60_000 },
+    ], now);
+    expect(r.map((x) => x.id)).toEqual(['just-now', 'an-hour']);
+  });
+
+  it('draws the line at a day: one minute inside counts, one minute past does not', () => {
+    const r = readyNow([
+      { id: 'inside', since: now - RECENT_MS + 60_000 },
+      { id: 'past', since: now - RECENT_MS - 60_000 },
+    ], now);
+    expect(r.map((x) => x.id)).toEqual(['inside']);
+  });
+
+  it('always counts an agent stopped on a yes, which has no moment it became ready', () => {
+    const r = readyNow([{ id: 'ask', since: undefined }, { id: 'old', since: now - 5 * 24 * hour }], now);
+    expect(r.map((x) => x.id)).toEqual(['ask']);
+  });
+
+  it('counts nothing from an inbox of only old threads', () => {
+    const old = Array.from({ length: 22 }, (_, i) => ({ id: `w-${i}`, since: now - (2 + i) * 24 * hour }));
+    expect(readyNow(old, now)).toHaveLength(0);
   });
 });
 

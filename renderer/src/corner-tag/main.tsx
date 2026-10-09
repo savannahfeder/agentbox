@@ -1,15 +1,15 @@
 // THE CORNER TAG'S PAGES (w-dafae58a23). One page, drawn twice: `?part=tag` is
 // the tag itself and `?part=card` is the list that opens beside it, each in its
-// own window (main/corner-tag.mjs) so the tag never moves when the list opens.
-// shared/corner-tag.mjs owns the words and the rules; this is the drawing and
-// the pointer.
+// own window (main/corner-tag.mjs), each window exactly the size of what it
+// shows, on the system's own frosted material. shared/corner-tag.mjs owns the
+// words and the rules; this is the drawing and the pointer.
 //
-// THE POINTER, settled with Codex after a real-Electron run:
-// - Pointing at the tag only shows that it moves: a grip takes the place of
-//   its mark and the cursor becomes a hand. Nothing opens on a pass, because a
-//   pointer crossing the corner on its way somewhere is not a request.
-// - A click opens the list, and a second click shuts it.
-// - Press and move, and it drags instead; it never opens on a drag.
+// THE POINTER, settled with Codex and then with real mouse events:
+// - The tag is movable as it is, with nothing drawn to say so: press and move.
+// - A click (press and let go without moving) opens the list; a second shuts it.
+// - The page only reports the button going down and coming up. The drag in
+//   between is read off the real cursor by the main process, because a real
+//   drag must not depend on this page being sent every move.
 // - Off both the tag and the list for a moment, and the list shuts.
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -24,42 +24,52 @@ type Bridge = {
   onState: (fn: (s: State) => void) => () => void;
   onOpen: (fn: (open: boolean) => void) => () => void;
   onReset: (fn: () => void) => () => void;
+  onDragging: (fn: (dragging: boolean) => void) => () => void;
   ready: (part: Part) => Promise<unknown>;
   size: (part: Part, w: number, h: number) => Promise<unknown>;
-  solid: (part: Part, solid: boolean) => Promise<unknown>;
   hover: (part: Part, inside: boolean) => Promise<unknown>;
   toggle: () => Promise<unknown>;
-  dragStart: () => Promise<unknown>;
-  drag: (dx: number, dy: number) => Promise<unknown>;
-  dragEnd: () => Promise<unknown>;
+  press: (x: number, y: number) => Promise<unknown>;
+  release: (cancelled?: boolean) => Promise<unknown>;
   go: (id: string | null) => Promise<unknown>;
   hide: (choice: string) => Promise<unknown>;
   settings: () => Promise<unknown>;
   menu: () => Promise<unknown>;
 };
 
-const PAD = 16;
-// Far enough that a click with a shaky hand is still a click.
-const DRAG_FROM_PX = 6;
-
 const bridge = (window as unknown as { cornerTag?: Bridge }).cornerTag ?? null;
 const params = new URLSearchParams(location.search);
 const part: Part = params.get('part') === 'card' ? 'card' : 'tag';
 
-// For pictures and for working on the page without the app: ?demo=ready,
-// ?demo=working, with -open to show the list or -hover to show the grip.
-function demoState(): { state: State; open: boolean; hover: boolean } | null {
+// For pictures and for working on the page without the app: ?demo=ready or
+// ?demo=working, with -open to show the list; ?theme=dark|light; ?copy= to try
+// other words for the tag. Without the system material, a demo draws its own
+// stand-in blur.
+function demoState(): { state: State; open: boolean } | null {
   const demo = params.get('demo');
   if (!demo) return null;
   const now = Date.now();
   const n = Number(params.get('n') ?? 2);
   const titles = ['Pricing page', 'Login redirect', 'Onboarding emails', 'A much longer thread title that will not fit on one line', 'Settings page', 'Competitor research', 'Release notes'];
   const ready = demo.startsWith('ready') ? Array.from({ length: n }, (_, i) => ({
-    id: `demo-${i}`, title: titles[i % titles.length], says: i === 1 ? 'needs a yes' : 'is ready for you', since: now - [12, 3, 25, 40, 7, 61, 90][i % 7] * 60_000,
+    id: `demo-${i}`, title: titles[i % titles.length], says: i === 1 ? 'needs a yes' : 'is ready for you', since: now - [2, 9, 25, 40, 70, 95, 130][i % 7] * 60_000,
   })) : [];
-  return { state: { ready, working: demo.startsWith('ready') ? 20 - n : 20, now }, open: demo.endsWith('-open'), hover: demo.endsWith('-hover') };
+  return { state: { ready, working: demo.startsWith('ready') ? 20 - n : 20, now }, open: demo.endsWith('-open') };
 }
 const demo = demoState();
+const theme = params.get('theme');
+document.documentElement.classList.toggle('ct-demo', !!demo);
+if (theme === 'dark' || theme === 'light') document.documentElement.dataset.theme = theme;
+if (demo && params.get('corners') === 'sharp') document.documentElement.dataset.corners = 'sharp';
+
+// Other words for the tag, for the pictures that compare them.
+const COPY: Record<string, (n: number) => string> = {
+  ready: (n) => `${n} ready`,
+  waiting: (n) => `${n} waiting`,
+  foryou: (n) => `${n} for you`,
+  needyou: (n) => `${n} need you`,
+  done: (n) => `${n} done`,
+};
 
 function useTagState() {
   const [state, setState] = useState<State>(demo?.state ?? { ready: [], working: 0, now: Date.now() });
@@ -70,104 +80,83 @@ function useTagState() {
 function Half({ size = 11 }: { size?: number }) {
   return (
     <svg className="ct-half" width={size} height={size} viewBox="0 0 12 12" aria-hidden>
-      <circle cx="6" cy="6" r="5.2" fill="none" stroke="rgba(29,29,31,.52)" strokeWidth="1.3" />
-      <path d="M6 2.4a3.6 3.6 0 0 1 0 7.2z" fill="rgba(29,29,31,.52)" />
+      <circle cx="6" cy="6" r="5.2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M6 2.4a3.6 3.6 0 0 1 0 7.2z" fill="currentColor" />
     </svg>
   );
 }
 
-// Six dots: the sign, everywhere, for "this can be picked up and moved".
-function Grip() {
-  return (
-    <svg className="ct-grip" width="11" height="11" viewBox="0 0 11 11" aria-hidden>
-      {[2.5, 5.5, 8.5].map((y) => [3.5, 7.5].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.05" fill="rgba(29,29,31,.55)" />))}
-    </svg>
-  );
-}
-
-/* --------------------------------- the tag --------------------------------- */
-function Tag({ state, forceOpen = false, forceHover = false }: { state: State; forceOpen?: boolean; forceHover?: boolean }) {
-  const [open, setOpen] = useState(forceOpen);
-  const [dragging, setDragging] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const press = useRef<{ x: number; y: number; id: number; dragging: boolean } | null>(null);
-  const says = tagSays({ ready: state.ready.length, working: state.working });
-
-  useEffect(() => bridge?.onOpen((o) => setOpen(!!o)), []);
-  useEffect(() => bridge?.onReset(() => { press.current = null; setDragging(false); setOpen(false); }), []);
-
-  // The window is sized to the tag; tell it whenever the words change length.
+// The window is sized to what it shows; tell it whenever that changes.
+function useReportSize(ref: React.RefObject<HTMLElement>, which: Part, key: unknown) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el || !bridge) return;
-    const report = () => { const r = el.getBoundingClientRect(); bridge.size('tag', r.width, r.height); };
+    const report = () => { const r = el.getBoundingClientRect(); bridge.size(which, r.width, r.height); };
     report();
     const ro = new ResizeObserver(report);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [says?.text]);
+  }, [key]);
+}
+
+/* --------------------------------- the tag --------------------------------- */
+function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }) {
+  const [open, setOpen] = useState(forceOpen);
+  const [dragging, setDragging] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const pressed = useRef(false);
+  const counts = { ready: state.ready.length, working: state.working };
+  const says = tagSays(counts);
+  const copy = params.get('copy');
+  const text = says && says.kind === 'ready' && copy && COPY[copy] ? COPY[copy](counts.ready) : says?.text;
+
+  useEffect(() => bridge?.onOpen((o) => setOpen(!!o)), []);
+  useEffect(() => bridge?.onDragging((d) => setDragging(!!d)), []);
+  useEffect(() => bridge?.onReset(() => { pressed.current = false; setDragging(false); setOpen(false); }), []);
+  // Escape shuts the list, once a click has made the tag the active window.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape' && open) bridge?.toggle(); };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [open]);
+  useReportSize(ref, 'tag', text);
 
   if (!says) return null;
 
-  // However a press ends (let go, cancelled, or the pointer taken away before
-  // it became a drag), it is over, and the tag re-reads where the pointer is.
-  const endPress = () => {
-    const p = press.current;
-    press.current = null;
-    setDragging(false);
-    if (p?.dragging) bridge?.dragEnd();
-    const over = !!ref.current?.matches(':hover');
-    bridge?.solid('tag', over);
-    bridge?.hover('tag', over);
+  const letGo = (cancelled: boolean) => {
+    if (!pressed.current) return;
+    pressed.current = false;
+    bridge?.release(cancelled);
   };
 
   return (
     <div
       ref={ref}
       role="button"
-      aria-label={`${says.text}. Click to open, drag to move.`}
+      aria-label={`${text}. Click to open, drag to move.`}
       aria-expanded={open}
-      className={`ct-glass ct-tag ${says.kind}${open ? ' is-open' : ''}${dragging ? ' is-dragging' : ''}${forceHover ? ' is-hover' : ''}`}
-      style={demo ? { position: 'relative' } : { left: PAD, top: PAD }}
-      // The one line of instruction, and only for someone who rests on it.
-      title={dragging || open ? '' : 'Click to open, drag to move'}
-      onPointerEnter={() => { bridge?.solid('tag', true); bridge?.hover('tag', true); }}
-      onPointerLeave={() => { if (press.current) return; bridge?.solid('tag', false); bridge?.hover('tag', false); }}
+      className={`ct-glass ct-tag ${says.kind}${open ? ' is-open' : ''}${dragging ? ' is-dragging' : ''}`}
+      style={demo ? { position: 'relative' } : undefined}
+      onPointerEnter={() => bridge?.hover('tag', true)}
+      onPointerLeave={() => { if (!pressed.current) bridge?.hover('tag', false); }}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
         e.currentTarget.setPointerCapture(e.pointerId);
-        press.current = { x: e.screenX, y: e.screenY, id: e.pointerId, dragging: false };
-      }}
-      onPointerMove={(e) => {
-        const p = press.current;
-        if (!p || !bridge) return;
-        const dx = e.screenX - p.x;
-        const dy = e.screenY - p.y;
-        if (!p.dragging) {
-          if (Math.hypot(dx, dy) < DRAG_FROM_PX) return;
-          p.dragging = true;
-          setDragging(true);
-          bridge.dragStart();
-        }
-        bridge.drag(dx, dy);
+        pressed.current = true;
+        // Where the button went down, so a drag starts from there and not from
+        // wherever the cursor has got to by the time this arrives.
+        bridge?.press(e.screenX, e.screenY);
       }}
       onPointerUp={(e) => {
-        const p = press.current;
-        if (!p) return;
-        const wasDrag = p.dragging;
-        if (e.currentTarget.hasPointerCapture(p.id)) e.currentTarget.releasePointerCapture(p.id);
-        endPress();
-        if (!wasDrag) bridge?.toggle();
+        letGo(false);
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
       }}
-      onPointerCancel={endPress}
-      onLostPointerCapture={() => { if (press.current) endPress(); }}
+      onPointerCancel={() => letGo(true)}
+      onLostPointerCapture={() => letGo(true)}
       onContextMenu={(e) => { e.preventDefault(); bridge?.menu(); }}
     >
-      <span className="ct-mark">
-        <span className="ct-state">{says.kind === 'ready' ? <span className="ct-dot" /> : <Half />}</span>
-        <Grip />
-      </span>
-      <span className="ct-words">{says.text}</span>
+      {says.kind === 'ready' ? <span className="ct-dot" /> : <Half />}
+      <span className="ct-words">{text}</span>
     </div>
   );
 }
@@ -206,22 +195,19 @@ function CardBody({ state }: { state: State }) {
 
 function Card({ state }: { state: State }) {
   const ref = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el || !bridge) return;
-    const report = () => { const r = el.getBoundingClientRect(); bridge.size('card', r.width, r.height); };
-    report();
-    const ro = new ResizeObserver(report);
-    ro.observe(el);
-    return () => ro.disconnect();
+  useReportSize(ref, 'card', null);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') bridge?.toggle(); };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
   }, []);
   return (
     <div
       ref={ref}
       className="ct-glass ct-card"
-      style={demo ? { position: 'relative' } : { left: PAD, top: PAD }}
-      onPointerEnter={() => { bridge?.solid('card', true); bridge?.hover('card', true); }}
-      onPointerLeave={() => { bridge?.solid('card', false); bridge?.hover('card', false); }}
+      style={demo ? { position: 'relative' } : undefined}
+      onPointerEnter={() => bridge?.hover('card', true)}
+      onPointerLeave={() => bridge?.hover('card', false)}
     >
       <CardBody state={state} />
     </div>
@@ -235,9 +221,9 @@ function Page() {
   // bottom-right of the page, the way the corner rests by default.
   if (demo) {
     return (
-      <div style={{ position: 'absolute', right: PAD, bottom: PAD, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+      <div style={{ position: 'absolute', right: 16, bottom: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
         {demo.open && <Card state={state} />}
-        <Tag state={state} forceOpen={demo.open} forceHover={demo.hover} />
+        <Tag state={state} forceOpen={demo.open} />
       </div>
     );
   }
