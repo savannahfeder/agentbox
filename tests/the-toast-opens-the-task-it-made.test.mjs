@@ -34,13 +34,14 @@ describe('the toast can carry a way in', () => {
   it('outlives noticing it, which 2.5 seconds did not', () => {
     // Her report is that she sometimes does not notice this one go past at all,
     // and a toast she is meant to CLICK has to survive reaching the trackpad.
-    expect(app).toContain('setTimeout(() => setToast(null), goes ? 6000 : 2500);');
+    expect(app).toContain('setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);');
+    expect(app).toContain('const TOAST_GOES_MS = 6000;');
   });
 
   it('stays a plain announcement when there is nowhere to go', () => {
     // Nothing that is only telling her something grows a pointer or a ring.
     // Since w-f0bfe32859 it is drawn in parts, and still a div.
-    expect(app).toContain(': <div key={toastShown.current} className="toast toast-plain" data-look={toastLook}>{face}</div>;');
+    expect(app).toContain(': <div key={toastShown.current} className="toast toast-plain">{face}</div>;');
   });
 
   it('says out loud that it is pressable', () => {

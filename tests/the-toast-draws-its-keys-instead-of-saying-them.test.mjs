@@ -12,7 +12,46 @@
 // middle keeps its words, because that is the toast explaining something.
 
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
 import { toastParts } from '../renderer/src/toast-parts';
+
+const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+const css = fs.readFileSync(new URL('../renderer/src/styles.css', import.meta.url), 'utf8');
+const rule = (sel) => css.match(new RegExp(`(^|\\n)${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{[^}]*\\}`))?.[0] ?? '';
+
+// THE CARD SHE PICKED, out of fourteen drawn over four rounds: the task's
+// title first, one quiet line under it with the keys on its right, bottom
+// right of the window, and a thin orange timer along the foot ("that little
+// orange timer that tells you how much time is left").
+describe('the card she picked', () => {
+  it('reads the task title first, then where it went', () => {
+    const title = app.indexOf('{about && <span className="toast-title">{about.label || about.title}</span>}');
+    const line = app.indexOf('<span className="toast-line">{line}</span>');
+    expect(title).toBeGreaterThan(-1);
+    expect(line).toBeGreaterThan(title);
+    expect(rule('.toast')).toContain('grid-template-areas: "title title" "line keys";');
+  });
+
+  it('sits bottom right, out of the middle of the page', () => {
+    expect(rule('.toast')).toContain('right: 56px;');
+    expect(rule('.toast')).toContain('bottom: 56px;');
+  });
+
+  it('runs its timer only when there is something to run out', () => {
+    // A toast that only announces something has nothing to open, so no timer.
+    expect(app).toContain('{toast.goes && <span className="toast-clock" aria-hidden="true" style={{ animationDuration: `${TOAST_GOES_MS}ms` }} />}');
+    expect(rule('.toast-clock')).toContain('background: var(--accent);');
+    expect(rule('.toast-clock')).toContain('animation: toast-drain linear forwards;');
+  });
+
+  it('leaves nothing of the looks it was picked from', () => {
+    // The ?toasts= switch and the hook that let the pictures be taken.
+    expect(app).not.toContain('toastLook');
+    expect(app).not.toContain('__showToast');
+    // Only the toast's own looks: `data-look-switching` is the theme picker's.
+    expect(css).not.toContain('.toast[data-look');
+  });
+});
 
 describe('splitting the undo clause off a toast', () => {
   it('the new-task toast', () => {

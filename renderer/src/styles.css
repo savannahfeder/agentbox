@@ -4034,16 +4034,33 @@ img.app-mark { opacity: 1; border-radius: 0; }
 /* --------------------------------- toast ---------------------------------- */
 .toast {
   position: fixed;
-  bottom: 58px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-raised);
+  bottom: 56px;
+  right: 56px;
+  /* THE CARD (w-f0bfe32859), picked out of fourteen drawn over four rounds.
+     Bottom right, out of the middle of what she is reading. The task's title
+     is read first and is the heaviest thing on it; under it one quiet line,
+     where it went on the left and the keys on the right; a thin orange line
+     along the foot is the time left to open it. Warm (the grey every menu
+     floats on), soft border, no capitals. Her words on the round before:
+     "not overwhelmingly distracting ... that's what makes it appealing". */
+  width: 360px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "title title" "line keys";
+  row-gap: 8px;
+  column-gap: 16px;
+  align-items: center;
+  padding: 14px 16px 15px;
+  background: var(--pop);
   border: 1px solid var(--line);
   color: var(--text);
-  padding: 9px 18px;
   border-radius: var(--radius);
+  font: inherit;
   font-size: 13.5px;
-  box-shadow: var(--shadow-md);
+  line-height: 1.3;
+  text-align: left;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
   /* ABOVE THE SETUP SCREENS, WHICH IS THE WHOLE POINT OF A TOAST. This was 60
      while `.fr-screen` was 300 with an opaque background, so every message the
      app tried to give somebody during the first run was painted underneath the
@@ -4056,7 +4073,7 @@ img.app-mark { opacity: 1; border-radius: 0; }
 }
 
 /* AND IT GETS OUT OF THE COMPOSER'S WAY WHILE THE REPLY BOX IS OPEN. The toast
-   sits at the bottom centre, which is exactly where the reply card is, so a
+   sits at the bottom, which is exactly where the reply card is, so a
    message raised BY the reply box lands ON it. Photographed at 900x900: the
    mode toast sat across the Send button for its whole 2.5 seconds, at the
    moment somebody has just picked a mode and is reaching for the send key. That
@@ -4069,348 +4086,66 @@ img.app-mark { opacity: 1; border-radius: 0; }
 */
 .app.composing .toast { bottom: auto; top: 74px; }
 
-/* THE ONE THAT OPENS THE TASK IT IS ABOUT. A `<button>` inherits none of the
-   div's type, so the face is restated rather than assumed, and the only things
-   added to it are the pointer, the focus ring and the words on the end.
-   Everything positional is above and shared, including the lift out of the
-   composer's way, because that rule is written against `.toast`.
-*/
-.toast-goes {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font: inherit;
-  font-size: 13.5px;
-  line-height: 1.3;
-  cursor: pointer;
-  text-align: left;
-}
-.toast-goes:hover .toast-go { color: var(--text); }
+/* THE ONE THAT OPENS THE TASK IT IS ABOUT: the whole card is the target, so
+   it is a `<button>`, and only the pointer and the focus ring are added. */
+.toast-goes { cursor: pointer; }
 .toast-goes:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-/* IT SAYS WHAT THE CLICK DOES, because a pill that is quietly pressable is one
-   nobody presses. Underlined rather than boxed: the pill is already a box, and a
-   second box inside it reads as a button inside a button. */
-.toast-go { color: var(--text-dim); text-decoration: underline; white-space: nowrap; }
 
-/* THE TOAST'S PARTS (w-f0bfe32859): the sentence, the task it is about, and
-   its keys as caps. Which of them a look shows is the look's business; the
-   three below are the proposals, picked between and then cut to one. The
-   keycap is the app's own (.row-keys kbd): square, faint, one drawing of a key
-   everywhere. */
-.toast[data-look] {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font: inherit;
-  font-size: 13.5px;
-  line-height: 1.3;
-  text-align: left;
-  white-space: nowrap;
+/* The title wraps to two lines and stops, never cut at a character count,
+   and never leaves one word alone on its second line. */
+.toast-title {
+  grid-area: title;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 500;
+  color: var(--text);
+  text-wrap: pretty;
 }
-.toast[data-look] .toast-mark,
-.toast[data-look] .toast-title,
-.toast[data-look] .toast-clock { display: none; }
-.toast-words { display: flex; flex-direction: column; min-width: 0; }
-.toast-line, .toast-title { overflow: hidden; text-overflow: ellipsis; }
-.toast-keys { display: inline-flex; align-items: center; gap: 14px; flex: 0 0 auto; }
-.toast-key { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-.toast-key kbd {
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-dim);
-  border: 1px solid var(--line-strong);
-  border-radius: 0;
-  padding: 0 5px;
-  line-height: 16px;
-}
-.toast-key-word { font-size: 12.5px; color: var(--text-faint); }
-.toast-key:hover .toast-key-word { color: var(--text); }
-.toast-key:hover kbd { border-color: var(--text-faint); color: var(--text); }
-@keyframes toast-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
-
-@keyframes toast-drain-down { from { transform: scaleY(1); } to { transform: scaleY(0); } }
-
-/* THE CARD (picked over Keys and Solid). Bottom right, out of the middle of
-   what she is reading, and it says WHICH task: the sentence becomes a kicker
-   in the app's own caps (the tabs, the column heads) over the task's title,
-   which wraps to two lines rather than being cut at a character count. A
-   toast with no task in it has no kicker to be, so its sentence takes the
-   title's place. The four below share all of that and differ in how the keys
-   and the clock are carried. */
-.toast[data-look^="card"] {
-  left: auto;
-  right: 56px;
-  bottom: 56px;
-  transform: none;
-  width: 380px;
-  padding: 0;
-  white-space: normal;
-  background: var(--skin-solid);
-  border: 1px solid var(--line-strong);
-  box-shadow: var(--shadow-lg);
-}
-.toast[data-look^="card"] .toast-words { gap: 6px; }
-.toast[data-look^="card"] .toast-line {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.toast-line {
+  grid-area: line;
+  font-size: 12.5px;
   color: var(--text-faint);
   white-space: nowrap;
-}
-.toast[data-look^="card"] .toast-title {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
-  font-size: 14.5px;
-  line-height: 1.4;
-  font-weight: 500;
-  color: var(--text);
-  /* No one-word second line ("…the last email / used"). */
-  text-wrap: pretty;
+  text-overflow: ellipsis;
 }
-/* A plain message has no keys row, so no gap is held open for one. */
-.toast[data-look^="card"].toast-plain { width: auto; max-width: 380px; row-gap: 0; align-items: center; }
-.toast[data-look^="card"].toast-plain .toast-line {
+/* ITS KEYS ARE DRAWN, NOT SPELT OUT, in the app's own keycap (.row-keys kbd):
+   square, faint, one drawing of a key everywhere. */
+.toast-keys { grid-area: keys; justify-self: end; display: inline-flex; align-items: center; gap: 12px; }
+.toast-key { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.toast-key kbd {
   font-family: inherit;
-  font-size: 14px;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--text);
-  white-space: normal;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-faint);
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  padding: 0 4px;
+  line-height: 15px;
 }
-.toast[data-look^="card"] .toast-clock {
-  display: block;
+.toast-key-word { font-size: 12px; color: var(--text-faint); }
+.toast-key:hover .toast-key-word { color: var(--text); }
+.toast-key:hover kbd { border-color: var(--text-faint); color: var(--text); }
+/* THE TIMER her words asked for: "that little orange timer that tells you how
+   much time is left". It is the six seconds the card, and O, can open the
+   task. Z is not on it: Z undoes long after the card has gone. */
+.toast-clock {
   position: absolute;
+  left: 0; right: 0; bottom: 0;
   height: 2px;
   background: var(--accent);
+  opacity: .7;
   transform-origin: left;
   animation: toast-drain linear forwards;
 }
-
-/* 1 · QUIET. The card as drawn first, tightened: a small orange dot on the
-   kicker's line, the caps under the title, the clock along the foot. */
-.toast[data-look="card-a"] {
-  display: grid;
-  grid-template-columns: 6px 1fr;
-  grid-template-areas: "mark words" ". keys";
-  column-gap: 12px;
-  row-gap: 14px;
-  align-items: start;
-  padding: 16px 20px 18px 16px;
-}
-.toast[data-look="card-a"] .toast-mark {
-  display: block; grid-area: mark;
-  width: 6px; height: 6px; margin-top: 4px;
-  border-radius: 50%; background: var(--accent);
-}
-.toast[data-look="card-a"].toast-plain { padding: 14px 20px 15px 16px; }
-.toast[data-look="card-a"].toast-plain .toast-mark { margin-top: 0; }
-.toast[data-look="card-a"] .toast-words { grid-area: words; }
-.toast[data-look="card-a"] .toast-keys { grid-area: keys; gap: 18px; }
-.toast[data-look="card-a"] .toast-clock { left: 0; right: 0; bottom: 0; }
-
-/* THE SOFT CARDS (round three). Quiet was kept for being calm and turned down
-   for being cold, with the wrong order and things in the wrong places. So:
-   the title is read first and is the heaviest thing on the card; the line
-   about it is plain words, not monospace capitals; the ground is the warm grey
-   every menu floats on (--pop) behind a soft border; the keys are drawn
-   smaller and lighter and sit on the line they belong to. Orange is spent
-   once, small. The four differ only in arrangement. */
-.toast[data-look^="soft"] {
-  left: auto;
-  right: 56px;
-  bottom: 56px;
-  transform: none;
-  width: 360px;
-  padding: 14px 16px;
-  white-space: normal;
-  background: var(--pop);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-lg);
-  display: grid;
-  align-items: center;
-}
-.toast[data-look^="soft"] .toast-words { display: contents; }
-.toast[data-look^="soft"] .toast-title {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-size: 14px;
-  line-height: 1.4;
-  font-weight: 500;
-  color: var(--text);
-  text-wrap: pretty;
-}
-.toast[data-look^="soft"] .toast-line { font-size: 12.5px; color: var(--text-faint); white-space: nowrap; }
-.toast[data-look^="soft"] .toast-keys { gap: 12px; justify-self: end; }
-.toast[data-look^="soft"] .toast-key { gap: 5px; }
-.toast[data-look^="soft"] .toast-key kbd { font-size: 10.5px; color: var(--text-faint); line-height: 15px; padding: 0 4px; }
-.toast[data-look^="soft"] .toast-key-word { font-size: 12px; }
-/* A small check, drawn rather than typed so every font draws the same one. */
-.toast[data-look^="soft"] .toast-mark { width: 14px; height: 14px; position: relative; }
-.toast[data-look^="soft"] .toast-mark::before {
-  content: "";
-  position: absolute; left: 4.5px; top: 1px;
-  width: 4.5px; height: 8.5px;
-  border: solid var(--accent);
-  border-width: 0 1.75px 1.75px 0;
-  transform: rotate(45deg);
-}
-/* A message with no task: its sentence is the title, nothing else to place. */
-.toast[data-look^="soft"].toast-plain { width: auto; max-width: 360px; display: flex; gap: 10px; padding: 11px 16px; }
-.toast[data-look^="soft"].toast-plain .toast-line { font-size: 13.5px; color: var(--text); white-space: normal; }
-
-/* A · TITLE FIRST. The task's title on top, and under it one quiet line:
-   where it went on the left, the keys on the right. No mark, no clock. */
-.toast[data-look="soft-a"] {
-  grid-template-columns: 1fr auto;
-  grid-template-areas: "title title" "line keys";
-  row-gap: 8px;
-  column-gap: 16px;
-}
-.toast[data-look="soft-a"] .toast-title { grid-area: title; }
-.toast[data-look="soft-a"] .toast-line { grid-area: line; }
-.toast[data-look="soft-a"] .toast-keys { grid-area: keys; }
-
-/* B · CHECK. The same, with a small orange check beside the title, the way a
-   Mac notification puts its icon by the first line. The text keeps one edge;
-   the check hangs in the margin to its left. */
-.toast[data-look="soft-b"] {
-  grid-template-columns: 14px 1fr auto;
-  grid-template-areas: "mark title title" ". line keys";
-  column-gap: 12px;
-  row-gap: 8px;
-  padding-left: 14px;
-}
-.toast[data-look="soft-b"] .toast-mark { display: block; grid-area: mark; align-self: start; margin-top: 2px; }
-.toast[data-look="soft-b"].toast-plain .toast-mark { display: block; margin-top: 0; }
-.toast[data-look="soft-b"] .toast-title { grid-area: title; }
-.toast[data-look="soft-b"] .toast-line { grid-area: line; }
-.toast[data-look="soft-b"] .toast-keys { grid-area: keys; }
-
-/* C · HEADER. A small header line, check and "Started in …" on the left,
-   the keys on the right, like the top of a message; the title below it
-   gets the card's full width and a little more size. */
-.toast[data-look="soft-c"] {
-  grid-template-columns: 14px 1fr auto;
-  grid-template-areas: "mark line keys" "title title title";
-  column-gap: 6px;
-  row-gap: 8px;
-  padding: 12px 16px 15px 12px;
-}
-.toast[data-look="soft-c"] .toast-mark { display: block; grid-area: mark; }
-.toast[data-look="soft-c"].toast-plain .toast-mark { display: block; }
-.toast[data-look="soft-c"] .toast-line { grid-area: line; }
-.toast[data-look="soft-c"] .toast-keys { grid-area: keys; }
-.toast[data-look="soft-c"] .toast-title { grid-area: title; font-size: 14.5px; padding-left: 4px; }
-
-/* D · RULE. Title and where it went stacked, then a hairline, then the keys.
-   The hairline is the clock: a thin orange rule that shortens over the six
-   seconds, the only moving thing, at the place the eye leaves the card. */
-.toast[data-look="soft-d"] {
-  grid-template-columns: 1fr;
-  grid-template-areas: "title" "line" "rule" "keys";
-  row-gap: 0;
-  padding: 0;
-}
-/* Margin, not padding: a clamped title's third line shows through padding. */
-.toast[data-look="soft-d"] .toast-title { grid-area: title; margin: 14px 16px 0; }
-.toast[data-look="soft-d"] .toast-line { grid-area: line; padding: 4px 16px 13px; }
-.toast[data-look="soft-d"] .toast-clock {
-  display: block; grid-area: rule;
-  height: 1px; margin: 0 16px;
-  background: var(--accent); opacity: .55;
-  transform-origin: left;
-  animation: toast-drain linear forwards;
-}
-.toast[data-look="soft-d"] .toast-keys { grid-area: keys; justify-self: start; padding: 10px 16px 11px; gap: 16px; }
-.toast[data-look="soft-d"].toast-plain .toast-clock { display: none; }
-.toast[data-look="soft-d"].toast-plain .toast-line { padding: 0; }
-
-.toast[data-look] .toast-project { display: none; }
-
-/* E · A WITH ITS TIMER (round four, asked for by name: "add that little
-   orange timer that tells you how much time is left"). A as it was, and a
-   thin orange line along the card's foot that shortens over the six seconds
-   O and the click are offered for. Z outlives it; see the undo window. */
-.toast[data-look="soft-e"] {
-  grid-template-columns: 1fr auto;
-  grid-template-areas: "title title" "line keys";
-  row-gap: 8px;
-  column-gap: 16px;
-  padding-bottom: 15px;
-}
-.toast[data-look="soft-e"] .toast-title { grid-area: title; }
-.toast[data-look="soft-e"] .toast-line { grid-area: line; }
-.toast[data-look="soft-e"] .toast-keys { grid-area: keys; }
-.toast[data-look="soft-e"] .toast-clock {
-  display: block;
-  position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
-  background: var(--accent); opacity: .7;
-  transform-origin: left;
-  animation: toast-drain linear forwards;
-}
-
-/* F · D WITHOUT ITS LINE. "Started in Agentbox Team" read as one line too
-   many, so the project is only its name, and it rides on the keys' row,
-   faint and at the far end, where it costs no height. Title, rule, keys. */
-.toast[data-look="soft-f"] {
-  grid-template-columns: auto 1fr;
-  grid-template-areas: "title title" "rule rule" "keys project";
-  row-gap: 0;
-  padding: 0;
-}
-.toast[data-look="soft-f"] .toast-line { display: none; }
-.toast[data-look="soft-f"].toast-plain .toast-line { display: block; }
-.toast[data-look="soft-f"] .toast-title { grid-area: title; margin: 14px 16px 13px; }
-.toast[data-look="soft-f"] .toast-clock {
-  display: block; grid-area: rule;
-  height: 1px; margin: 0 16px;
-  background: var(--accent); opacity: .55;
-  transform-origin: left;
-  animation: toast-drain linear forwards;
-}
-.toast[data-look="soft-f"] .toast-keys { grid-area: keys; justify-self: start; padding: 10px 16px 11px; gap: 16px; }
-.toast[data-look="soft-f"] .toast-project {
-  display: block; grid-area: project; justify-self: end;
-  padding: 10px 16px 11px 0;
-  font-size: 12px; color: var(--text-faint);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
-}
-.toast[data-look="soft-f"].toast-plain .toast-clock { display: none; }
-
-/* G · F, WITH THE NAME BESIDE THE TITLE. The same, but the project sits in
-   the title's top right corner, small and faint, the way a mail app puts the
-   time beside the sender; the keys' row is left with the keys alone. */
-.toast[data-look="soft-g"] {
-  grid-template-columns: 1fr auto;
-  grid-template-areas: "title project" "rule rule" "keys keys";
-  row-gap: 0;
-  column-gap: 12px;
-  padding: 0;
-}
-.toast[data-look="soft-g"] .toast-line { display: none; }
-.toast[data-look="soft-g"].toast-plain .toast-line { display: block; }
-.toast[data-look="soft-g"] .toast-title { grid-area: title; margin: 14px 0 13px 16px; }
-.toast[data-look="soft-g"] .toast-project {
-  display: block; grid-area: project; align-self: start;
-  padding: 16px 16px 0 0;
-  font-size: 12px; color: var(--text-faint); white-space: nowrap;
-}
-.toast[data-look="soft-g"] .toast-clock {
-  display: block; grid-area: rule;
-  height: 1px; margin: 0 16px;
-  background: var(--accent); opacity: .55;
-  transform-origin: left;
-  animation: toast-drain linear forwards;
-}
-.toast[data-look="soft-g"] .toast-keys { grid-area: keys; justify-self: start; padding: 10px 16px 11px; gap: 16px; }
-.toast[data-look="soft-g"].toast-plain .toast-clock { display: none; }
+@keyframes toast-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+/* A message with no task: its sentence is the whole card. */
+.toast-plain { width: auto; max-width: 360px; display: flex; gap: 12px; padding: 11px 16px; }
+.toast-plain .toast-line { font-size: 13.5px; color: var(--text); white-space: normal; }
 
 
 /* It keeps the top bar's own 22px right margin so it lines up with the settings

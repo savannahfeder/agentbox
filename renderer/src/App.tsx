@@ -158,6 +158,9 @@ interface Snooze { [id: string]: number }
  *  for stopping on a sentence, or failing that on a word. 48 holds every
  *  practice row's first sentence and most real ones. */
 const TOAST_TITLE = 48;
+// How long a toast that goes somewhere stays up, and so how long its orange
+// timer runs. One number for both, or the line and the card disagree.
+const TOAST_GOES_MS = 6000;
 
 /**
  * How long a message she sent to a running agent is held after the row has
@@ -803,10 +806,6 @@ export default function App() {
   // can be photographed inside the real app rather than redrawn beside it.
   // Nothing in the app links to it.
   const [modeDraft] = useState(() => isModeVariant(new URLSearchParams(location.search).get('modes')));
-  // Dev aid for w-f0bfe32859: ?toasts=today|card-a|soft-a|soft-b|soft-c|soft-d draws
-  // the toast in one of the cards proposed, so each can be photographed in the
-  // real app. Removed once one is picked. Nothing in the app links to it.
-  const [toastLook] = useState(() => new URLSearchParams(location.search).get('toasts') ?? 'card-a');
   const [modeDraftValue, setModeDraftValue] = useState<PermissionMode>('auto');
   // showToast is defined six hundred lines below, and the effect that brings
   // her back from an interruption sits beside the interruption rather than
@@ -3121,13 +3120,9 @@ export default function App() {
     toastShown.current += 1;
     setToast({ text, goes });
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), goes ? 6000 : 2500);
+    toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);
   }, []);
   showToastRef.current = showToast;
-  // Part of the ?toasts= dev aid above, and removed with it.
-  useEffect(() => {
-    if (new URLSearchParams(location.search).has('toasts')) (window as unknown as { __showToast: typeof showToast }).__showToast = showToast;
-  }, [showToast]);
 
   // ⌘R says so, and says which build it landed on. A reload onto an identical
   // screen was indistinguishable from a chord that did nothing, and the other
@@ -6640,22 +6635,19 @@ export default function App() {
           a middle dot and an underlined link, three registers in one pill. The
           sentence now stands alone and O and Z are keycaps on the end. Undo is
           its own target, so a click on it takes the thing back rather than
-          opening it; anywhere else on a toast with somewhere to go opens it. */}
-      {toast && toastLook === 'today' && (toast.goes
-        ? <button type="button" className="toast toast-goes" onClick={() => openToastRow(toast.goes!)}>{toast.text}<span className="toast-go">Open it</span></button>
-        : <div className="toast">{toast.text}</div>)}
-      {toast && toastLook !== 'today' && (() => {
+          opening it; anywhere else on a toast with somewhere to go opens it.
+          AND IT NAMES THE TASK: the row's own title is the card's first line,
+          and the sentence ("Started in Agentbox Team") the quiet one under it,
+          picked out of fourteen drawings over four rounds. */}
+      {toast && (() => {
         const { line, undo: undoes } = toastParts(toast.text);
         const about = toast.goes
           ? [...inbox, ...progress, ...snoozed, ...done].find((i) => i.id === toast.goes!.id && i.product === toast.goes!.product)
           : undefined;
         const face = (
           <>
-            <span className="toast-mark" aria-hidden="true" />
-            <span className="toast-words">
-              <span className="toast-line">{line}</span>
-              {about && <span className="toast-title">{about.label || about.title}</span>}
-            </span>
+            {about && <span className="toast-title">{about.label || about.title}</span>}
+            <span className="toast-line">{line}</span>
             {(toast.goes || undoes) && (
               <span className="toast-keys">
                 {toast.goes && <span className="toast-key"><kbd>O</kbd><span className="toast-key-word">Open</span></span>}
@@ -6667,13 +6659,15 @@ export default function App() {
                 )}
               </span>
             )}
-            {about && <span className="toast-project">{about.productName}</span>}
-            <span className="toast-clock" aria-hidden="true" style={{ animationDuration: `${toast.goes ? 6000 : 2500}ms` }} />
+            {/* THE TIMER: how long the card, and O, can still open the task.
+                Only on a toast that goes somewhere; an announcement has
+                nothing to run out. Same six seconds as the timer below. */}
+            {toast.goes && <span className="toast-clock" aria-hidden="true" style={{ animationDuration: `${TOAST_GOES_MS}ms` }} />}
           </>
         );
         return toast.goes
-          ? <button key={toastShown.current} type="button" className={`toast toast-goes${about ? '' : ' toast-plain'}`} data-look={toastLook} onClick={() => openToastRow(toast.goes!)}>{face}</button>
-          : <div key={toastShown.current} className="toast toast-plain" data-look={toastLook}>{face}</div>;
+          ? <button key={toastShown.current} type="button" className={`toast toast-goes${about ? '' : ' toast-plain'}`} onClick={() => openToastRow(toast.goes!)}>{face}</button>
+          : <div key={toastShown.current} className="toast toast-plain">{face}</div>;
       })()}
       {/* AND NO TOAST FOR A NEW VERSION. It was the third of the four drawn for
           w-86452550e5 and the argument against it is the one she agreed with: a
