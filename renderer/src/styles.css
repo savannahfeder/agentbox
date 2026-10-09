@@ -4034,8 +4034,11 @@ img.app-mark { opacity: 1; border-radius: 0; }
 /* --------------------------------- toast ---------------------------------- */
 .toast {
   position: fixed;
-  bottom: 56px;
-  right: 56px;
+  bottom: 30px;
+  right: 30px;
+  /* IN THE CORNER, ON THE CORNER MARK. 56px floated it 34px inside the pane
+     ("too much padding from bottom corner"); the pane's edge is 22px in and
+     its corner mark 8px further, so 30 puts the card's corner on the mark. */
   /* THE CARD (w-f0bfe32859), picked out of fourteen drawn over four rounds.
      Bottom right, out of the middle of what she is reading. The task's title
      is read first and is the heaviest thing on it; under it one quiet line,
