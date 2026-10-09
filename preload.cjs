@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('zero', {
   assistiveTech: () => ipcRenderer.invoke('zero:assistiveTech'),
   olderItems: (payload) => ipcRenderer.invoke('zero:older-items', payload),
   dashboard: (slug) => ipcRenderer.invoke('zero:dashboard', slug),
+  composerCatalog: (payload) => ipcRenderer.invoke('zero:composer-catalog', payload),
   commandCatalog: (payload) => ipcRenderer.invoke('zero:command-catalog', payload),
   remoteControl: (payload) => ipcRenderer.invoke('zero:remote-control', payload),
   command: (payload) => ipcRenderer.invoke('zero:command', payload),

@@ -1,3 +1,4 @@
+import { readComposerCatalog, composerReferences, readPageReferences, readBrowserTabs } from '../shared/composer-catalog.mjs';
 import { claudeActivity, codexActivity, currentActivity } from './agent-activity.mjs';
 import { taskRemoteControl } from './task-remote-control.mjs';
 import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mjs';
@@ -5165,6 +5166,29 @@ export class Supervisor {
     return { args, command: !!command, ...(review ? { reviewTarget: reviewTarget(review.args) } : {}), resumeProfile, prompt, system, resumeId, model, effort, product: product?.slug ?? null, answerMode: item?.answerMode ?? null, ...(pictures.length ? { pictures } : {}) };
   }
 
+  async composerCatalog(product, id, engine = null) {
+    const item = id ? this.store.readItem(product, id) : null;
+    if (id ? !item || this._engineFor(item) !== 'codex' : engine !== 'codex') return [];
+    const entry = this._codexServer(this._codexHome());
+    await entry.handshake;
+    const cwd = this.productFolder(this.store.listProducts().find(p => p.slug === product)) ?? this.config.home ?? os.homedir();
+    const rows = await readComposerCatalog(entry.client, cwd);
+    try {
+      const read = await entry.client.request('config/read', {});
+      rows.push(...await readBrowserTabs(read.config?.mcp_servers));
+    } catch { /* A closed browser does not hide the other integrations. */ }
+    if (this.config.codexPlugins === true) {
+      try {
+        if (!entry.catalogThread) entry.catalogThread = entry.client.request('config/read', {}).then(read =>
+          entry.client.startThread({ ...workerThreadParams({ cwd, plugins: true, mcpServers: mcpServerNames(read) }), ephemeral: true })
+        ).catch(error => { entry.catalogThread = null; throw error; });
+        const { threadId } = await entry.catalogThread;
+        rows.push(...await readPageReferences(entry.client, threadId));
+      } catch { /* Apps and skills still work when Pages are unavailable. */ }
+    }
+    return rows;
+  }
+
   commandCatalog(product, id) {
     const item = this.store.readItem(product, id);
     return item && this._engineFor(item) !== 'codex' ? this._nativeCommands?.[id] ?? [] : [];
@@ -6123,6 +6147,7 @@ export class Supervisor {
       cwd,
       model: word || null,
       instructions: plan?.system ?? null,
+      plugins: this.config.codexPlugins === true,
       mcpServers,
       storeServer,
       // WHAT SHE PICKED, AND IT IS ASKED FOR HERE FOR THE SAME REASON THE MODEL
@@ -6157,6 +6182,7 @@ export class Supervisor {
     return {
       input: [
         { type: 'text', text: plan?.prompt ?? '' },
+        ...composerReferences(plan?.prompt ?? ''),
         ...pictures.map((abs) => ({ type: 'localImage', path: abs })),
       ],
       ...(effort ? { effort } : {}),
@@ -6362,7 +6388,7 @@ export class Supervisor {
       // and a reading belongs to the one that gave it.
       onNotification: (method, params) => this._codexUsage().saw(method, params, home),
     });
-    const handshake = client.initialize();
+    const handshake = client.initialize({ experimentalApi: true });
     // The rejection is kept for the workers that chain off it and ALSO swallowed
     // here, because a handshake nobody happens to await yet is still an
     // unhandled rejection, and an unhandled rejection takes the app down. This

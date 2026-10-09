@@ -91,12 +91,12 @@ describe('Codex inside the ChatGPT app', () => {
     expect(found).toMatchObject({ path: mine, from: 'app' });
   });
 
-  it('loses to a real install', () => {
+  it('is preferred to an automatically discovered standalone install', () => {
     const found = findCodexBin({
       home: HOME, env: {}, shellLookup: noShell, readdir: () => [],
       exists: only(CHATGPT, `${HOME}/.local/bin/codex`),
     });
-    expect(found).toMatchObject({ path: `${HOME}/.local/bin/codex`, from: 'disk' });
+    expect(found).toMatchObject({ path: CHATGPT, from: 'app' });
   });
 
   it('does not take the ChatGPT app itself for Codex', () => {

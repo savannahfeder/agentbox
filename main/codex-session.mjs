@@ -334,7 +334,7 @@ const plainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
  * result -- see `sayUnasked` below -- so a flag that stops working is a line on
  * the run rather than a silence.
  */
-export function workerThreadParams({ cwd, model = null, instructions = null, mcpServers = [], storeServer = null, mode = null } = {}) {
+export function workerThreadParams({ cwd, model = null, instructions = null, mcpServers = [], storeServer = null, mode = null, plugins = false } = {}) {
   // THE MODE SHE PICKED, OR THE PAIR OF CONSTANTS. `mode` is one of the three in
   // shared/codex-modes.mjs, and it decides BOTH the sandbox and the approval
   // policy, because on this engine those two are one choice rather than two
@@ -354,8 +354,8 @@ export function workerThreadParams({ cwd, model = null, instructions = null, mcp
       mcp_servers: mcpIsolation(mcpServers, storeServer),
       projects: projectIsolation(cwd),
       // Plugins can contribute MCP servers outside config.mcp_servers.
-      // Keep this worker on the same explicit integration boundary.
-      features: { apps: false, plugins: false, remote_plugin: false },
+      // Load installed integrations only when the workspace explicitly requests them.
+      features: { apps: plugins === true, plugins: plugins === true, remote_plugin: plugins === true },
     },
   };
   if (model) params.model = model;

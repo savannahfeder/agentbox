@@ -41,7 +41,9 @@ import { CLAUDE_COMMANDS, commandHint, commandMatches } from '../../shared/claud
 import { CODEX_MODE_COMMAND, CODEX_MODE_HINT, codexMenuRowsFor } from '../../shared/codex-modes.mjs';
 import type { ClaudeCommand } from '../../shared/claude-commands.mjs';
 
+export type CatalogEntry = {kind: string; name: string; description: string; insert: string; icon: string | null};
 export type SlashRow =
+  | {kind: 'reference'; entry: CatalogEntry}
   /**
    * One of Claude Code's six permission modes, or `null` for the way back to
    *  the project's own setting. Picking it sets a value and empties the box. */
@@ -58,6 +60,7 @@ export type SlashRow =
 
 /** A stable key for React, and for a test that wants to name a row. */
 export function rowKey(row: SlashRow): string {
+  if (row.kind === 'reference') return `reference:${row.entry.insert}`;
   if (row.kind === 'mode') return `mode:${row.mode ?? 'clear'}`;
   if (row.kind === 'codexMode') return `codex:${row.mode ?? 'clear'}`;
   return `cmd:${row.cmd.name}`;
@@ -187,6 +190,7 @@ export function holdingHint(cmd: ClaudeCommand): string {
  *  MODE_WORDS is still exported and still used by the toast, where the name is
  *  the whole of what there is room to say. */
 export function rowSays(row: SlashRow): { typed: string; says: string } {
+  if (row.kind === 'reference') return { typed: row.entry.name, says: `${row.entry.kind === 'skill' ? 'Skill' : row.entry.kind === 'plugin' ? 'Plugin' : row.entry.kind === 'page' ? 'Page' : row.entry.kind === 'tab' ? 'Tab' : 'App'} · ${row.entry.description}` };
   if (row.kind === 'command') return { typed: `/${row.cmd.name}`, says: commandHint(row.cmd) };
   if (row.mode === null) return { typed: CLEAR_COMMAND, says: CLEAR_HINT };
   if (row.kind === 'codexMode') return { typed: CODEX_MODE_COMMAND[row.mode], says: CODEX_MODE_HINT[row.mode] };

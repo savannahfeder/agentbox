@@ -21,6 +21,7 @@ export const REQUEST_CHANNELS = {
   // The next page of old finished threads, at the foot of Done and All.
   olderItems: 'zero:older-items',
   dashboard: 'zero:dashboard',
+  composerCatalog: 'zero:composer-catalog',
   commandCatalog: 'zero:command-catalog',
   remoteControl: 'zero:remote-control',
   command: 'zero:command',

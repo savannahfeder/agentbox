@@ -1022,6 +1022,7 @@ declare global {
       dashboard(slug: string): Promise<any>;
       terminal(p: {product:string;id:string;action:'open'|'read'|'write'|'resize'|'close';data?:string;cols?:number;rows?:number;offset?:number}): Promise<any>;
       agentUpdate?(p:{engine:string;action:'check'|'recheck'|'start'|'status'|'refresh'}):Promise<any>;
+      composerCatalog(p: {product: string; id: string; engine?: string}): Promise<{kind: string; name: string; description: string; insert: string; icon: string | null}[]>;
       commandCatalog(p: {product: string; id: string}): Promise<string[]>;
       command(p: {product: string; id: string; text: string}): Promise<{state: string; at: number; text?: string; name?: string}>;
       compact(p: { product: string; id: string }): Promise<{state: string; at: number}>;

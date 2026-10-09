@@ -1,3 +1,4 @@
+import {IntegrationPicker} from '../components/IntegrationPicker';
 // THE NEW THREAD CARD, drawn as an email (w-e731ca9376, approved 2026-10-01).
 //
 // To, then Model, then the message, then a bar of three square chips (project,
@@ -812,6 +813,8 @@ export function ThreadComposer({
           </div>
         )}
 
+        <div className="tc-reference-anchor">
+        {!person && <IntegrationPicker product={product?.slug ?? ''} engine={pick.engine} text={text} setText={setText} input={textRef} />}
         <textarea
           ref={textRef}
           className="tc-text"
@@ -830,6 +833,7 @@ export function ThreadComposer({
             await addFiles(e.dataTransfer.files);
           }}
         />
+        </div>
         {!person && <AttachRow attachments={attachments} onRemove={(i) => setAttachments((x) => x.filter((_, j) => j !== i))} />}
 
         {refusal && <div className="tc-note">{refusal}</div>}

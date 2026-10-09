@@ -123,6 +123,8 @@ const DEFAULTS = {
   // "2026-09-04T09:30:00Z". Anything else -- true, "yes", "1", or a shape
   // `Date.parse` would merely guess at -- is read as off.
   engineChoice: null,
+  // Installed Codex apps/plugins may be enabled explicitly for worker chats.
+  codexPlugins: false,
 };
 
 /**

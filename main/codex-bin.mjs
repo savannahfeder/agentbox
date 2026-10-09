@@ -144,13 +144,18 @@ function defaultReaddir(dir) {
 // THE COPY THE CHATGPT APP CARRIES INSIDE ITSELF. Somebody who has only ever
 // used Codex in the ChatGPT app has this and nothing else (w-9f6975906c,
 // measured 2026-10-05: codex-cli 0.158.0-alpha.2, sharing the CLI's sign-in).
-// Searched LAST, after the shell, because it moves with the app's releases.
+// Preferred over automatic CLI discovery: the desktop release can offer models
+// an older standalone CLI does not. An explicit configured binary still wins.
 //
 // AND THE ONE THE CODEX DESKTOP APP CARRIES (w-d5d632e503). Its reported place,
 // not measured on a Mac here: none of the Macs this was written on had the app.
 // A path that is not there costs one missed `exists`.
 export function appCopyPaths(home = os.homedir()) {
-  const inside = ['ChatGPT.app/Contents/Resources/codex-cli/bin/codex', 'Codex.app/Contents/Resources/codex'];
+  const inside = [
+    'Codex.app/Contents/Resources/codex',
+    'ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex',
+    'ChatGPT.app/Contents/Resources/codex-cli/bin/codex',
+  ];
   return inside.flatMap((p) => [path.join('/Applications', p), path.join(home, 'Applications', p)]);
 }
 
@@ -220,17 +225,18 @@ export function findCodexBin({
     };
   }
 
-  const searched = [...candidatePaths(home), ...versionedPaths(home, readdir)];
-  for (const candidate of searched) {
+  const appPaths = appCopyPaths(home);
+  for (const candidate of appPaths) {
+    if (exists(candidate)) return { path: candidate, found: true, certain: true, from: 'app', searched: appPaths, evidence: null };
+  }
+
+  const searched = [...appPaths, ...candidatePaths(home), ...versionedPaths(home, readdir)];
+  for (const candidate of searched.slice(appPaths.length)) {
     if (exists(candidate)) return { path: candidate, found: true, certain: true, from: 'disk', searched, evidence: null };
   }
 
   const fromShell = shellSaid(shellLookup());
   if (fromShell.path) return { path: fromShell.path, found: true, certain: true, from: 'shell', searched, evidence: null };
-
-  for (const candidate of appCopyPaths(home)) {
-    if (exists(candidate)) return { path: candidate, found: true, certain: true, from: 'app', searched, evidence: null };
-  }
 
   // NOT FOUND, AND WHETHER THAT IS KNOWN. Every cheap path missed and every
   // shell we could reach missed, so the last question is whether this Mac shows

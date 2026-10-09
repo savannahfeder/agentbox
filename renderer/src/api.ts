@@ -459,6 +459,10 @@ export const api = {
     if(!window.zero?.terminal) throw new Error(`Restart ${NAME} to use the terminal.`);
     return window.zero.terminal(p);
   },
+  async composerCatalog(p: {product: string; id: string; engine?: string}) {
+    if (useFixtures) return [];
+    return window.zero!.composerCatalog(p);
+  },
   async commandCatalog(p: {product: string; id: string}): Promise<string[]> {
     if (useFixtures) return ['code-review','loop','simplify','verify'];
     return window.zero!.commandCatalog(p);

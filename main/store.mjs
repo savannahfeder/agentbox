@@ -1380,6 +1380,8 @@ export class Store {
     let refreshed = 0;
     for (const item of this.listAllWorkItems(now)) {
       if (!isCodexMirrorRow(item) || item.status === 'done') continue;
+      // A reply here continues the task in Agentbox; the original Codex snapshot no longer owns its result.
+      if (item.answer && item.answer !== '(withdrawn)' && item.wrote?.answer?.source === 'founder') continue;
       const t = byId.get(codexIdOf(item));
       if (!t) continue;
       const patch = codexMirrorPatch(t);

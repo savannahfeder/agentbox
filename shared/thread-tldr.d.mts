@@ -1,0 +1,1 @@
+export function threadTldr(events?:Array<{at?:number;kind?:string;who?:string;text?:string}>,outcome?:{at:number;text:string}|null,options?:{running?:boolean}):{at:number;context:string;text:string}|null;

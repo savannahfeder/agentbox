@@ -1,3 +1,4 @@
+import {completionQuery, completionMatches, insertCompletion} from '../../../shared/composer-catalog.mjs';
 import { RemoteControl } from './RemoteControl';
 import {DirectReview} from './DirectReview';
 import {MessageFiles} from './MessageFiles';
@@ -40,7 +41,7 @@ import {
 /*
  * THE ROW'S TWO WORDS COME FROM `rowSays` NOW, not from six constants pulled
    apart here. One list, one row shape (w-23a7b3f568, 2026-08-27). */
-import { commandBeingWritten, enterWaitsForWords, holdingHint, rowKey, rowSays, slashRows, type SlashRow } from '../slash-menu';
+import { commandBeingWritten, enterWaitsForWords, holdingHint, rowKey, rowSays, slashRows, type SlashRow, type CatalogEntry } from '../slash-menu';
 import { commandDraft } from '../../../shared/claude-commands.mjs';
 import { CompactionResult, runCompaction, runCommand } from './CompactionResult';
 import { codexCommand, COMPACTION_COPY } from '../../../shared/codex-commands.mjs';
@@ -1911,7 +1912,7 @@ function SlashMenu({ rows, at, onPick, onHover }: {
             onMouseDown={(e) => { e.preventDefault(); onPick(row); }}
             onMouseEnter={() => onHover(i)}
           >
-            <span className="slash-cmd">{typed}</span>
+            <span className="slash-cmd">{row.kind === 'reference' && row.entry.icon && /^(https:\/\/|data:image\/)/.test(row.entry.icon) && <img className="completion-logo" src={row.entry.icon} alt="" onError={e => { e.currentTarget.hidden = true; }} />}{typed}</span>
             <span className="slash-hint">{says}</span>
           </button>
         );
@@ -2123,6 +2124,28 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // pointing at nothing once the list shortens to two.
   const [slashAt, setSlashAt] = useState(0);
   const [nativeNames, setNativeNames] = useState<string[]>([]);
+  const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState('');
+  const [caret, setCaret] = useState(text.length);
+  const [dismissedCompletion, setDismissedCompletion] = useState<string | null>(null);
+  const completion = !item.agent && (runningEngine ?? DEFAULT_ENGINE) === 'codex' ? completionQuery(text, caret) : null;
+  const discoveringReferences = !!completion;
+  useEffect(() => {
+    if (item.agent || (runningEngine ?? DEFAULT_ENGINE) !== 'codex') return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const reload = async () => {
+      setCatalogLoading(true);
+      try { const rows = await api.composerCatalog(item); if (!stopped) { setCatalog(rows); setCatalogError(''); } }
+      catch { if (!stopped) setCatalogError('Could not load Codex integrations. Retry by reopening the picker.'); }
+      finally { if (!stopped) { setCatalogLoading(false); if (discoveringReferences) timer = setTimeout(reload, 15000); } }
+    };
+    void reload();
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [item.product, item.id, runningEngine, discoveringReferences]);
+  useEffect(() => { setCatalog([]); setCatalogError(''); }, [item.product, item.id, runningEngine]);
+
   // While the box starts with a slash, not only while the menu is open: once
   // she types past /loop the box still has to know /loop is a command.
   const discoveringCommands = !item.agent && (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE && text.startsWith('/');
@@ -2303,7 +2326,11 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
      six modes: `/context` is not a word Codex knows, and `--permission-mode` is
      not a flag it takes. On a Codex row this list is empty and `slashOpen`
      below is therefore false, which is the whole of the behaviour. */
+  const references: SlashRow[] = completion && dismissedCompletion !== text
+    ? completionMatches(catalog, completion.trigger, completion.query).map((entry: CatalogEntry) => ({kind: 'reference', entry})) : [];
   const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames);
+  if (completion?.trigger === '@') menuRows.splice(0, menuRows.length, ...references);
+  else menuRows.push(...references);
   // OPENED BY THE SLASH AND BY NOTHING ELSE, since 2026-08-26. It used to open
   // from the footer chip too; the chip is gone (see the note where it stood)
   // and with it went `chipOpen` and the click-away that shut it.
@@ -2323,7 +2350,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // The cursor goes back to the top whenever the list changes underneath it,
   // because row three of four is row three of nothing once the query narrows
   // the list to two.
-  useEffect(() => { setSlashAt(0); }, [query, nativeNames]);
+  useEffect(() => { setSlashAt(0); }, [query, nativeNames, completion?.query, completion?.trigger]);
   /*
    * THE TOAST, AND WHY IT SAYS WHAT IT SAYS.
    *
@@ -2385,6 +2412,14 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
    *  menu closed, nothing else moved. What answers that now is the faint words
    *  after the caret saying what the command takes and that ⌘↵ runs it. */
   const pickRow = (row: SlashRow) => {
+    if (row.kind === 'reference') {
+      if (!completion) return;
+      const next = insertCompletion(text, completion, row.entry.insert);
+      const end = completion.start + row.entry.insert.length + 1;
+      setText(next); setCaret(end); setDismissedCompletion(null);
+      requestAnimationFrame(() => { ref.current?.focus(); ref.current?.setSelectionRange(end, end); });
+      return;
+    }
     if (row.kind === 'mode' || row.kind === 'codexMode') { pickMode(row.mode); return; }
     if (enterWaitsForWords(row)) { setText(commandDraft(row.cmd)); ref.current?.focus(); }
   };
@@ -2447,6 +2482,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
       {/* THE MENU RIDES ON THE CARD, NOT ON THE BOX, and it opens upward for
           the same reason the priority drawer does: the reply box is at the
           bottom of the window and there is nothing under it. */}
+      {completion && dismissedCompletion !== text && !slashOpen && (
+        <div className="slash-menu completion-status" role="status">{catalogError || (catalogLoading ? 'Loading Codex integrations…' : 'No matching integrations')}</div>
+      )}
       {slashOpen && (
         <SlashMenu rows={menuRows} at={slashAt} onPick={pickRow} onHover={setSlashAt} />
       )}
@@ -2470,8 +2508,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
         className={`dock-input${chat.live ? ' with-mentions' : ''}`}
         ref={ref}
         value={text}
-        onChange={(e) => { changeText(e.target.value); chat.track(e.target); }}
-        onSelect={(e) => chat.track(e.currentTarget)}
+        onChange={(e) => { changeText(e.target.value); setCaret(e.target.selectionStart); setDismissedCompletion(null); chat.track(e.target); }}
+        onSelect={(e) => { setCaret(e.currentTarget.selectionStart); chat.track(e.currentTarget); }}
         onScroll={(e) => chat.track(e.currentTarget)}
         onClick={(e) => chat.click(e.currentTarget)}
         /* * ONE CLEAR SENTENCE. The old placeholder was unclear about what it even meant,
@@ -2494,6 +2532,11 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           // key.
           // The @ menu and a mention's card take their keys first, and only
           // while one of them is up.
+          if (completion?.trigger === '@' && slashOpen) {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setSlashAt(at => (at + (e.key === 'ArrowDown' ? 1 : -1) + menuRows.length) % menuRows.length); return; }
+            if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); pickRow(menuRows[Math.min(slashAt, menuRows.length - 1)]); return; }
+            if (e.key === 'Escape') { e.preventDefault(); setDismissedCompletion(text); return; }
+          }
           if (chat.keyDown(e)) return;
           if (e.key === 'Tab' && e.shiftKey && canSetMode) {
             e.preventDefault();

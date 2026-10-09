@@ -41,7 +41,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  findCodexBin, candidatePaths, versionedPaths, evidencePaths, installEvidence,
+  findCodexBin, candidatePaths, appCopyPaths, versionedPaths, evidencePaths, installEvidence,
   resolveCodexBin, forgetCodexBin, INSTALL_URL,
 } from '../main/codex-bin.mjs';
 import {
@@ -92,7 +92,7 @@ describe('finding Codex', () => {
       home: HOME, exists: only(odd), shellLookup: () => ({ path: odd, answered: true }),
     });
     expect(found).toMatchObject({ path: odd, found: true, from: 'shell' });
-    expect(found.searched).toEqual(candidatePaths(HOME));
+    expect(found.searched).toEqual([...appCopyPaths(HOME), ...candidatePaths(HOME)]);
   });
 
   // NOT FOUND IS A SENTENCE, NOT A GUESS. The failure this rules out is the
