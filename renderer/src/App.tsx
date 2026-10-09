@@ -803,7 +803,7 @@ export default function App() {
   // can be photographed inside the real app rather than redrawn beside it.
   // Nothing in the app links to it.
   const [modeDraft] = useState(() => isModeVariant(new URLSearchParams(location.search).get('modes')));
-  // Dev aid for w-f0bfe32859: ?toasts=today|card-a|card-b|card-c|card-d draws
+  // Dev aid for w-f0bfe32859: ?toasts=today|card-a|soft-a|soft-b|soft-c|soft-d draws
   // the toast in one of the cards proposed, so each can be photographed in the
   // real app. Removed once one is picked. Nothing in the app links to it.
   const [toastLook] = useState(() => new URLSearchParams(location.search).get('toasts') ?? 'card-a');

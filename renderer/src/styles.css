@@ -4213,71 +4213,123 @@ img.app-mark { opacity: 1; border-radius: 0; }
 .toast[data-look="card-a"] .toast-keys { grid-area: keys; gap: 18px; }
 .toast[data-look="card-a"] .toast-clock { left: 0; right: 0; bottom: 0; }
 
-/* 2 · BUTTONS. The keys become the card's own footer, split in two, the way a
-   Mac notification carries its buttons: each half is a target the size of a
-   finger, and Undo is plainly not the same press as Open. The clock runs
-   along the top edge, where the eye enters the card. */
-.toast[data-look="card-b"] { display: flex; flex-direction: column; align-items: stretch; }
-.toast[data-look="card-b"] .toast-words { padding: 18px 20px 16px; }
-.toast[data-look="card-b"] .toast-line { color: var(--accent); }
-.toast[data-look="card-b"].toast-plain .toast-line { color: var(--text); }
-.toast[data-look="card-b"] .toast-keys { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; border-top: 1px solid var(--line-strong); }
-.toast[data-look="card-b"] .toast-key { justify-content: center; padding: 10px 0; }
-.toast[data-look="card-b"] .toast-key + .toast-key { border-left: 1px solid var(--line-strong); }
-.toast[data-look="card-b"] .toast-key:hover { background: var(--wash-strong); }
-.toast[data-look="card-b"] .toast-clock { left: 0; right: 0; top: 0; }
-
-/* 3 · EDGE. An orange edge down the left is the clock: it shortens toward the
-   foot as the seconds go. The keys stand in a column on the right behind a
-   hairline, so the title gets the whole left side and the card stays short. */
-.toast[data-look="card-c"] {
-  width: 420px;
+/* THE SOFT CARDS (round three). Quiet was kept for being calm and turned down
+   for being cold, with the wrong order and things in the wrong places. So:
+   the title is read first and is the heaviest thing on the card; the line
+   about it is plain words, not monospace capitals; the ground is the warm grey
+   every menu floats on (--pop) behind a soft border; the keys are drawn
+   smaller and lighter and sit on the line they belong to. Orange is spent
+   once, small. The four differ only in arrangement. */
+.toast[data-look^="soft"] {
+  left: auto;
+  right: 56px;
+  bottom: 56px;
+  transform: none;
+  width: 360px;
+  padding: 14px 16px;
+  white-space: normal;
+  background: var(--pop);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
   display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-areas: "words keys";
-  column-gap: 18px;
   align-items: center;
-  padding: 16px 18px 16px 22px;
 }
-.toast[data-look="card-c"] .toast-words { grid-area: words; }
-.toast[data-look="card-c"] .toast-keys {
-  grid-area: keys; align-self: stretch;
-  flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px;
-  padding-left: 18px; border-left: 1px solid var(--line-strong);
+.toast[data-look^="soft"] .toast-words { display: contents; }
+.toast[data-look^="soft"] .toast-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 500;
+  color: var(--text);
+  text-wrap: pretty;
 }
-.toast[data-look="card-c"] .toast-clock {
-  left: -1px; top: -1px; bottom: -1px; width: 2px; height: auto;
-  transform-origin: top;
-  animation-name: toast-drain-down;
+.toast[data-look^="soft"] .toast-line { font-size: 12.5px; color: var(--text-faint); white-space: nowrap; }
+.toast[data-look^="soft"] .toast-keys { gap: 12px; justify-self: end; }
+.toast[data-look^="soft"] .toast-key { gap: 5px; }
+.toast[data-look^="soft"] .toast-key kbd { font-size: 10.5px; color: var(--text-faint); line-height: 15px; padding: 0 4px; }
+.toast[data-look^="soft"] .toast-key-word { font-size: 12px; }
+/* A small check, drawn rather than typed so every font draws the same one. */
+.toast[data-look^="soft"] .toast-mark { width: 14px; height: 14px; position: relative; }
+.toast[data-look^="soft"] .toast-mark::before {
+  content: "";
+  position: absolute; left: 4.5px; top: 1px;
+  width: 4.5px; height: 8.5px;
+  border: solid var(--accent);
+  border-width: 0 1.75px 1.75px 0;
+  transform: rotate(45deg);
 }
+/* A message with no task: its sentence is the title, nothing else to place. */
+.toast[data-look^="soft"].toast-plain { width: auto; max-width: 360px; display: flex; gap: 10px; padding: 11px 16px; }
+.toast[data-look^="soft"].toast-plain .toast-line { font-size: 13.5px; color: var(--text); white-space: normal; }
 
-/* 4 · GRID. Ember Grid's own corner marks, the L-shaped ticks on the main
-   pane, drawn on the card in place of a box, over a frosted ground. The
-   kicker is orange; the clock is a short rule inset along the foot. */
-.toast[data-look="card-d"] {
-  display: grid;
-  grid-template-areas: "words" "keys";
-  row-gap: 14px;
-  padding: 20px 24px 22px;
-  border-color: var(--line);
-  background:
-    linear-gradient(var(--text-faint), var(--text-faint)) left 6px top 6px / 10px 1px no-repeat,
-    linear-gradient(var(--text-faint), var(--text-faint)) left 6px top 6px / 1px 10px no-repeat,
-    linear-gradient(var(--text-faint), var(--text-faint)) right 6px top 6px / 10px 1px no-repeat,
-    linear-gradient(var(--text-faint), var(--text-faint)) right 6px top 6px / 1px 10px no-repeat,
-    linear-gradient(var(--text-faint), var(--text-faint)) left 6px bottom 6px / 10px 1px no-repeat,
-    linear-gradient(var(--text-faint), var(--text-faint)) left 6px bottom 6px / 1px 10px no-repeat,
-    linear-gradient(var(--text-faint), var(--text-faint)) right 6px bottom 6px / 10px 1px no-repeat,
-    linear-gradient(var(--text-faint), var(--text-faint)) right 6px bottom 6px / 1px 10px no-repeat,
-    color-mix(in srgb, var(--skin-solid) 86%, transparent);
-  backdrop-filter: blur(14px);
+/* A · TITLE FIRST. The task's title on top, and under it one quiet line:
+   where it went on the left, the keys on the right. No mark, no clock. */
+.toast[data-look="soft-a"] {
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "title title" "line keys";
+  row-gap: 8px;
+  column-gap: 16px;
 }
-.toast[data-look="card-d"].toast-plain { padding: 16px 24px 18px; }
-.toast[data-look="card-d"] .toast-words { grid-area: words; }
-.toast[data-look="card-d"] .toast-line { color: var(--accent); }
-.toast[data-look="card-d"].toast-plain .toast-line { color: var(--text); }
-.toast[data-look="card-d"] .toast-keys { grid-area: keys; gap: 18px; }
-.toast[data-look="card-d"] .toast-clock { left: 24px; right: 24px; bottom: 10px; height: 1px; }
+.toast[data-look="soft-a"] .toast-title { grid-area: title; }
+.toast[data-look="soft-a"] .toast-line { grid-area: line; }
+.toast[data-look="soft-a"] .toast-keys { grid-area: keys; }
+
+/* B · CHECK. The same, with a small orange check beside the title, the way a
+   Mac notification puts its icon by the first line. The text keeps one edge;
+   the check hangs in the margin to its left. */
+.toast[data-look="soft-b"] {
+  grid-template-columns: 14px 1fr auto;
+  grid-template-areas: "mark title title" ". line keys";
+  column-gap: 12px;
+  row-gap: 8px;
+  padding-left: 14px;
+}
+.toast[data-look="soft-b"] .toast-mark { display: block; grid-area: mark; align-self: start; margin-top: 2px; }
+.toast[data-look="soft-b"].toast-plain .toast-mark { display: block; margin-top: 0; }
+.toast[data-look="soft-b"] .toast-title { grid-area: title; }
+.toast[data-look="soft-b"] .toast-line { grid-area: line; }
+.toast[data-look="soft-b"] .toast-keys { grid-area: keys; }
+
+/* C · HEADER. A small header line, check and "Started in …" on the left,
+   the keys on the right, like the top of a message; the title below it
+   gets the card's full width and a little more size. */
+.toast[data-look="soft-c"] {
+  grid-template-columns: 14px 1fr auto;
+  grid-template-areas: "mark line keys" "title title title";
+  column-gap: 6px;
+  row-gap: 8px;
+  padding: 12px 16px 15px 12px;
+}
+.toast[data-look="soft-c"] .toast-mark { display: block; grid-area: mark; }
+.toast[data-look="soft-c"].toast-plain .toast-mark { display: block; }
+.toast[data-look="soft-c"] .toast-line { grid-area: line; }
+.toast[data-look="soft-c"] .toast-keys { grid-area: keys; }
+.toast[data-look="soft-c"] .toast-title { grid-area: title; font-size: 14.5px; padding-left: 4px; }
+
+/* D · RULE. Title and where it went stacked, then a hairline, then the keys.
+   The hairline is the clock: a thin orange rule that shortens over the six
+   seconds, the only moving thing, at the place the eye leaves the card. */
+.toast[data-look="soft-d"] {
+  grid-template-columns: 1fr;
+  grid-template-areas: "title" "line" "rule" "keys";
+  row-gap: 0;
+  padding: 0;
+}
+.toast[data-look="soft-d"] .toast-title { grid-area: title; padding: 14px 16px 0; }
+.toast[data-look="soft-d"] .toast-line { grid-area: line; padding: 4px 16px 13px; }
+.toast[data-look="soft-d"] .toast-clock {
+  display: block; grid-area: rule;
+  height: 1px; margin: 0 16px;
+  background: var(--accent); opacity: .55;
+  transform-origin: left;
+  animation: toast-drain linear forwards;
+}
+.toast[data-look="soft-d"] .toast-keys { grid-area: keys; justify-self: start; padding: 10px 16px 11px; gap: 16px; }
+.toast[data-look="soft-d"].toast-plain .toast-clock { display: none; }
+.toast[data-look="soft-d"].toast-plain .toast-line { padding: 0; }
 
 
 /* It keeps the top bar's own 22px right margin so it lines up with the settings
