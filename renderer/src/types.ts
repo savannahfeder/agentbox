@@ -1004,6 +1004,10 @@ declare global {
   interface Window {
     zero?: {
       snapshot(): Promise<Snapshot>;
+      // Whether a screen reader is running, which is what decides xterm's
+      // accessibility tree. Optional: a preload from before this channel
+      // existed has no such function, and `api.assistiveTech` reads that as no.
+      assistiveTech?(): Promise<boolean>;
       olderItems?(p: { offset: number; limit: number }): Promise<{ items: WorkItem[]; more: boolean }>;
       crash?(p: { name: string; message: string; stack: string }): Promise<unknown>;
       // A count. The name is checked against the approved list in the main

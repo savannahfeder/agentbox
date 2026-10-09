@@ -360,6 +360,21 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:older-items', (_e, { offset = 0, limit = 50 } = {}) =>
     store.listOlderItems({ offset: Number(offset) || 0, limit: Math.min(Number(limit) || 50, 200) }));
 
+  // IS ANYBODY ACTUALLY USING A SCREEN READER. Asked by the terminal pane
+  // before it builds an xterm, because xterm's accessibility tree is what
+  // `screenReaderMode` turns on and we used to turn it on for everybody.
+  // Electron's own words beside this property: "Rendering accessibility tree
+  // can significantly affect the performance of your app. It should not be
+  // enabled by default." It also carried xterm's 'invalid range' bug to an
+  // install that had no use for it (one crash report, 2026-10-08).
+  //
+  // Absent on Linux and before `ready`, where absent means no, and reading it
+  // may not throw: this is on the path that opens a terminal, and a terminal
+  // that cannot ask the question still has to open.
+  ipcMain.handle('zero:assistiveTech', () => {
+    try { return !!host.app?.accessibilitySupportEnabled; } catch { return false; }
+  });
+
   ipcMain.handle('zero:snapshot', () => {
     const now = Date.now();
     const items = store.listItems(now);
