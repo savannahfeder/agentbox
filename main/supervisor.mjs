@@ -6969,6 +6969,7 @@ export class Supervisor {
       if (exited) return;
       exited = true;
       if (how?.transportFault) session.transportFault = true;
+      this.memoryGateTurnEnded(session);
       session.exitFailed = !!(signal || code !== 0 || session.transportFault || session.resultIsError || session.result == null);
       this.count?.('run_finished', runEndedProps(session, Date.now()));
       onLine(`session exited (${code})`);
@@ -7733,6 +7734,29 @@ export class Supervisor {
     } catch { return null; }
   }
 
+  /**
+   * Is this HER urgent row, for the memory gate (w-713aba0c89)? Read live, so a
+   * row raised to Urgent jumps the queue on its next command. A row that cannot
+   * be read is not urgent.
+   */
+  memoryGateUrgent(product, itemId) {
+    if (!product || !itemId) return false;
+    try {
+      const item = this.store.readItem?.(product, itemId);
+      return item ? isUrgent(item) : false;
+    } catch { return false; }
+  }
+
+  /**
+   * A Codex worker's turn is over, so the gate lets go of every slot its thread
+   * still holds (w-713aba0c89). Codex sends no "after" report for a command that
+   * failed; a Claude worker's grants go with its own process instead.
+   */
+  memoryGateTurnEnded(session) {
+    if (session?.engine !== 'codex' || !session.sessionId) return;
+    try { this._memoryGate?.releaseSession(session.sessionId); } catch { /* the gate is going too */ }
+  }
+
   memoryGateSlots() {
     const n = Number(this.config.memoryGateSlots);
     return Number.isFinite(n) && n >= 1 ? Math.round(n) : autoSlots(os.totalmem());
@@ -7797,6 +7821,7 @@ export class Supervisor {
       gate: { slots: this.memoryGateSlots() },
       scoreFor: (product, itemId) => this.memoryGateScore(product, itemId),
       ownerOf: (sessionId) => this.memoryGateOwner(sessionId),
+      urgentFor: (product, itemId) => this.memoryGateUrgent(product, itemId),
       log: (line) => console.log(`zero: ${line}`),
     });
     this._memoryGate = server;
