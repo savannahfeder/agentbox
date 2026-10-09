@@ -143,14 +143,19 @@ describe('it shows up when something needs you, and only then', () => {
     expect(r.windows).toHaveLength(0);
   });
 
-  it('may take focus, so a press never hands it to the app window; floats over full-screen apps; is the system material', () => {
+  // The system's frosted material only comes with the system's own rounded
+  // corners or square ones, and the approved tag has small 6px corners, so the
+  // window is clear and unrounded and the page draws the glass and the corners.
+  it('may take focus, so a press never hands it to the app window; floats over full-screen apps; draws its own corners', () => {
     const r = rig();
     r.showTag();
     const o = r.win().opts;
     expect(o.focusable).toBe(true);
     expect(o.type).toBe('panel');
     expect(o.acceptFirstMouse).toBe(true);
-    expect(o.vibrancy).toBe('popover');
+    expect(o.vibrancy).toBeUndefined();
+    expect(o.transparent).toBe(true);
+    expect(o.roundedCorners).toBe(false);
     expect(o.hasShadow).toBe(true);
     expect(r.win().top).toEqual([true, 'floating']);
     expect(r.win().everywhere[1]).toMatchObject({ visibleOnFullScreen: true, skipTransformProcessType: true });

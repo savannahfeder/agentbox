@@ -1,7 +1,7 @@
 /* THE CORNER TAG (w-dafae58a23). Each window is exactly its tag or its list,
-   on the system's own frosted material (main/corner-tag.mjs), which blurs what
-   is behind and follows the Mac's dark and light mode. This page draws only a
-   faint tint and the words on top of it.
+   clear and unrounded (main/corner-tag.mjs), so this page draws everything:
+   the glass, its small corners, and the words. It follows the Mac's dark and
+   light mode.
 
    Dark mode is its own look, not the light one: in the light silver the tag
    glared off a dark screen. Approved over rounds of drawings in the product's
@@ -12,8 +12,9 @@
   --ct-dim: rgba(29, 29, 31, 0.68);
   --ct-faint: rgba(29, 29, 31, 0.48);
   --ct-mark: rgba(29, 29, 31, 0.42);
-  --ct-tint: rgba(255, 255, 255, 0.22);
-  --ct-tint-hover: rgba(255, 255, 255, 0.4);
+  --ct-tint: rgba(243, 244, 247, 0.95);
+  --ct-tint-hover: rgba(249, 249, 251, 0.97);
+  --ct-edge: rgba(0, 0, 0, 0.17);
   --ct-rule: rgba(29, 29, 31, 0.10);
   --ct-press: rgba(29, 29, 31, 0.06);
 }
@@ -23,8 +24,9 @@
     --ct-dim: rgba(255, 255, 255, 0.62);
     --ct-faint: rgba(255, 255, 255, 0.44);
     --ct-mark: rgba(255, 255, 255, 0.42);
-    --ct-tint: rgba(255, 255, 255, 0.02);
-    --ct-tint-hover: rgba(255, 255, 255, 0.08);
+    --ct-tint: rgba(39, 39, 43, 0.95);
+    --ct-tint-hover: rgba(50, 50, 55, 0.96);
+    --ct-edge: rgba(255, 255, 255, 0.08);
     --ct-rule: rgba(255, 255, 255, 0.10);
     --ct-press: rgba(255, 255, 255, 0.07);
   }
@@ -34,8 +36,9 @@
   --ct-dim: rgba(255, 255, 255, 0.62);
   --ct-faint: rgba(255, 255, 255, 0.44);
   --ct-mark: rgba(255, 255, 255, 0.42);
-  --ct-tint: rgba(255, 255, 255, 0.02);
-  --ct-tint-hover: rgba(255, 255, 255, 0.08);
+  --ct-tint: rgba(39, 39, 43, 0.95);
+  --ct-tint-hover: rgba(50, 50, 55, 0.96);
+  --ct-edge: rgba(255, 255, 255, 0.08);
   --ct-rule: rgba(255, 255, 255, 0.10);
   --ct-press: rgba(255, 255, 255, 0.07);
 }
@@ -43,19 +46,18 @@
 html, body, #root { margin: 0; padding: 0; background: transparent; overflow: hidden; height: 100%; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; -webkit-font-smoothing: antialiased; user-select: none; cursor: default; color: var(--ct-ink); }
 
-.ct-glass { position: absolute; left: 0; top: 0; color: var(--ct-ink); background: var(--ct-tint); }
-
-/* A demo has no system material behind it, so it draws a stand-in: the same
-   blur and tint, by CSS, over whatever page it sits on. Pictures only. */
-.ct-demo .ct-glass {
-  background: rgba(246, 246, 250, 0.7);
+/* The glass: nearly solid, so what is behind never shows through as words,
+   with a hairline edge drawn inside, because the window ends at the glass. */
+.ct-glass {
+  position: absolute; left: 0; top: 0; color: var(--ct-ink); background: var(--ct-tint);
   backdrop-filter: blur(28px) saturate(180%);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 0 0 0.5px var(--ct-edge);
 }
-:root.ct-demo[data-theme='dark'] .ct-glass {
-  background: rgba(48, 48, 54, 0.62);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 0 0.5px rgba(255, 255, 255, 0.12);
-}
+
+/* A demo is a page, not a window, so it draws the drop shadow the system
+   gives the real one. Pictures only. */
+.ct-demo .ct-glass { box-shadow: inset 0 0 0 0.5px var(--ct-edge), 0 8px 24px rgba(0, 0, 0, 0.18); }
+:root.ct-demo[data-theme='dark'] .ct-glass { box-shadow: inset 0 0 0 0.5px var(--ct-edge), 0 8px 24px rgba(0, 0, 0, 0.35); }
 
 /* ---- the tag ---- */
 .ct-tag {
@@ -70,42 +72,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif
 
 /* Ready is a full dot, working the same grey half full. Still: nothing here
    moves on its own, because moving is what pulls an eye off its work. */
-/* The ready dot. In dark mode it is the one she approved: soft white with a
-   faint glow. A white dot on the light glass read as an empty ring, so light
-   mode keeps the soft grey she liked there. */
-.ct-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--ct-mark); }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .ct-dot { background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.55); }
-}
-:root[data-theme='dark'] .ct-dot { background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.55); }
-
-/* Pictures only: the light-mode pearl. She picked the mother-of-pearl sheen
-   (C) and found its glow a little dark at the edges; C1 to C4 lighten it. */
-:root[data-dot^='sheen'] .ct-dot { width: 8px; height: 8px; }
-:root[data-dot='sheen'] .ct-dot {
-  background: radial-gradient(circle at 32% 28%, #fff 0 22%, #f6eaf4 45%, #dde4f3 72%, #b9c2d8 100%);
-  box-shadow: 0 0 0 0.5px rgba(60, 70, 90, 0.14), 0 0 8px 2px rgba(165, 145, 215, 0.6);
-}
-/* C1: the same, every edge a step lighter. */
-:root[data-dot='sheen1'] .ct-dot {
-  background: radial-gradient(circle at 32% 28%, #fff 0 24%, #f7eef6 48%, #e6ebf6 74%, #ccd3e3 100%);
-  box-shadow: 0 0 0 0.5px rgba(60, 70, 90, 0.09), 0 0 8px 2px rgba(180, 165, 228, 0.42);
-}
-/* C2: no outline at all, the glow wider and paler. */
-:root[data-dot='sheen2'] .ct-dot {
-  background: radial-gradient(circle at 32% 28%, #fff 0 26%, #f8f0f7 50%, #e9eef7 76%, #d6dcea 100%);
-  box-shadow: 0 0 10px 3px rgba(195, 180, 240, 0.38);
-}
-/* C3: a blush glow, nearly white, so the lilac is a hint. */
-:root[data-dot='sheen3'] .ct-dot {
+/* The waiting dot. Light mode: a pearl, faintly pink and blue, with a blush
+   glow (she picked it, "C3", from full-screen pictures on 2026-10-08; a plain
+   white dot read as an empty ring and a grey one as dull). Dark mode: the soft
+   white dot with a faint glow she approved. */
+.ct-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex: none;
   background: radial-gradient(circle at 32% 28%, #fff 0 24%, #f8eef6 48%, #e7ecf6 74%, #d3d9e7 100%);
   box-shadow: 0 0 0 0.5px rgba(60, 70, 90, 0.08), 0 0 8px 2px rgba(232, 208, 240, 0.85);
 }
-/* C4: a thin white rim, then a faint lilac haze outside it. */
-:root[data-dot='sheen4'] .ct-dot {
-  background: radial-gradient(circle at 32% 28%, #fff 0 24%, #f6edf6 48%, #e3e9f5 74%, #cfd6e5 100%);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.95), 0 0 0 1.5px rgba(60, 70, 90, 0.06), 0 0 9px 3px rgba(190, 172, 235, 0.32);
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .ct-dot { width: 7px; height: 7px; background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.55); }
 }
+:root[data-theme='dark'] .ct-dot { width: 7px; height: 7px; background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.55); }
 .ct-half { flex: none; display: block; color: var(--ct-mark); }
 
 /* ---- the list ---- */
@@ -121,7 +100,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif
 .ct-quiet { font-size: 12.5px; color: var(--ct-faint); }
 .ct-line.ct-quiet { color: var(--ct-faint); }
 .ct-static { padding: 5px 6px; }
-.ct-mark-sp { width: 7px; flex: none; }
+.ct-mark-sp { width: 8px; flex: none; }
 
 /* Hide it for a while, or go and turn it off. Small and last, so the list
    reads first. */

@@ -1,7 +1,7 @@
 // THE CORNER TAG'S PAGES (w-dafae58a23). One page, drawn twice: `?part=tag` is
 // the tag itself and `?part=card` is the list that opens beside it, each in its
 // own window (main/corner-tag.mjs), each window exactly the size of what it
-// shows, on the system's own frosted material. shared/corner-tag.mjs owns the
+// shows, drawing its own glass. shared/corner-tag.mjs owns the
 // words and the rules; this is the drawing and the pointer.
 //
 // THE POINTER, settled with Codex and then with real mouse events:
@@ -42,9 +42,7 @@ const params = new URLSearchParams(location.search);
 const part: Part = params.get('part') === 'card' ? 'card' : 'tag';
 
 // For pictures and for working on the page without the app: ?demo=ready or
-// ?demo=working, with -open to show the list; ?theme=dark|light; ?copy= to try
-// other words for the tag. Without the system material, a demo draws its own
-// stand-in blur.
+// ?demo=working, with -open to show the list; ?theme=dark|light.
 function demoState(): { state: State; open: boolean } | null {
   const demo = params.get('demo');
   if (!demo) return null;
@@ -60,16 +58,6 @@ const demo = demoState();
 const theme = params.get('theme');
 document.documentElement.classList.toggle('ct-demo', !!demo);
 if (theme === 'dark' || theme === 'light') document.documentElement.dataset.theme = theme;
-if (demo && params.get('dot')) document.documentElement.dataset.dot = params.get('dot')!;
-
-// Other words for the tag, for the pictures that compare them.
-const COPY: Record<string, (n: number) => string> = {
-  ready: (n) => `${n} ready`,
-  waiting: (n) => `${n} waiting`,
-  foryou: (n) => `${n} for you`,
-  needyou: (n) => `${n} need you`,
-  done: (n) => `${n} done`,
-};
 
 function useTagState() {
   const [state, setState] = useState<State>(demo?.state ?? { ready: [], working: 0, now: Date.now() });
@@ -107,8 +95,7 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
   const pressed = useRef(false);
   const counts = { ready: state.ready.length, working: state.working };
   const says = tagSays(counts);
-  const copy = params.get('copy');
-  const text = says && says.kind === 'ready' && copy && COPY[copy] ? COPY[copy](counts.ready) : says?.text;
+  const text = says?.text;
 
   useEffect(() => bridge?.onOpen((o) => setOpen(!!o)), []);
   useEffect(() => bridge?.onDragging((d) => setDragging(!!d)), []);

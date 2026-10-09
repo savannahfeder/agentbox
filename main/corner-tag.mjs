@@ -113,11 +113,11 @@ export function createCornerTag({
       frame: false,
       transparent: true,
       backgroundColor: '#00000000',
-      // The system's own frosted material, which blurs what is behind and
-      // follows dark and light mode; the page draws only a faint tint on it.
-      vibrancy: 'popover',
-      visualEffectState: 'active',
-      roundedCorners: true,
+      // Clear and unrounded: the page draws the glass and its small corners.
+      // The system's frosted material would blur what is behind, but it comes
+      // only with the system's own rounder corners or square ones, and the
+      // approved tag has neither.
+      roundedCorners: false,
       hasShadow: true,
       resizable: false,
       movable: false,

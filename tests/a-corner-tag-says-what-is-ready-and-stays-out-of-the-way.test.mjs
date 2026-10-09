@@ -1,6 +1,6 @@
 // THE CORNER TAG (w-dafae58a23). In another app there was no way to tell
 // whether any agent needed you, so agents sat idle without you knowing. The
-// answer is a small tag in a corner of the screen: "2 ready for you" when an
+// answer is a small tag in a corner of the screen: "2 waiting" when an
 // agent has something for you, "20 working" when none does, nothing at all
 // when nothing is running. It must never become a nag: it hides for 5 minutes,
 // 30 minutes or the rest of the day and then comes back, it is turned off only
@@ -20,9 +20,11 @@ import {
 const area = { x: 0, y: 0, width: 1728, height: 1080 };
 
 describe('what the tag says', () => {
-  it('names the agents ready for you when there are any', () => {
-    expect(tagSays({ ready: 2, working: 18 })).toEqual({ kind: 'ready', text: '2 ready' });
-    expect(tagSays({ ready: 1, working: 0 })).toEqual({ kind: 'ready', text: '1 ready' });
+  // "Waiting" was picked over "ready", "need you" and "for you", on full-screen
+  // pictures, 2026-10-08: it says an agent is held up on you without nagging.
+  it('says how many agents are waiting on you when there are any', () => {
+    expect(tagSays({ ready: 2, working: 18 })).toEqual({ kind: 'ready', text: '2 waiting' });
+    expect(tagSays({ ready: 1, working: 0 })).toEqual({ kind: 'ready', text: '1 waiting' });
   });
 
   it('says how many are working when none is ready', () => {

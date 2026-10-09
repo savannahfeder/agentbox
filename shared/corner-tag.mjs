@@ -38,9 +38,10 @@ export function hiddenUntil(choice, now) {
 }
 
 /** The words on the tag, or null when there is nothing to say. Short, because
- *  "22 ready for you" in the corner of a full screen was more than it needed. */
+ *  "22 ready for you" in the corner of a full screen was more than it needed;
+ *  "waiting" was picked over "ready" and "need you". */
 export function tagSays({ ready = 0, working = 0 } = {}) {
-  if (ready > 0) return { kind: 'ready', text: `${ready} ready` };
+  if (ready > 0) return { kind: 'ready', text: `${ready} waiting` };
   if (working > 0) return { kind: 'working', text: `${working} working` };
   return null;
 }
