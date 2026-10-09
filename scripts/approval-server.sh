@@ -29,15 +29,39 @@ case "$here" in
   *app.asar.unpacked/scripts)
     res="$(cd "$here/../.." && pwd)"
     app="$(cd "$res/.." && pwd)"
-    exe="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist" 2>/dev/null)"
-    [ -x "$app/MacOS/$exe" ] || exe="$(ls "$app/MacOS" 2>/dev/null | head -1)"
+    exe="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist" 2>/dev/null || true)"
+    # A missing PlistBuddy leaves exe empty, and `[ -x dir/ ]` is true because
+    # a directory is executable. Require a regular file, then the one binary
+    # sitting in MacOS/.
+    if [ ! -f "$app/MacOS/$exe" ] || [ ! -x "$app/MacOS/$exe" ]; then
+      exe="$(ls "$app/MacOS" 2>/dev/null | head -1)"
+    fi
     exec env ELECTRON_RUN_AS_NODE=1 "$app/MacOS/$exe" "$res/app.asar/main/approval-prompt-server.mjs"
     ;;
   *)
-    # Running from source: node is nvm-only on this machine, and MCP servers
-    # boot from a bare login shell, so resolve it the same way the store
-    # launcher does.
-    export PATH="$HOME/.nvm/versions/node/$(ls "$HOME/.nvm/versions/node" 2>/dev/null | tail -1)/bin:$PATH"
-    exec node "$(cd "$here/.." && pwd)/main/approval-prompt-server.mjs"
+    # RUNNING FROM SOURCE, AND THIS LINE USED TO ASSUME NVM. It prepended
+    # $HOME/.nvm/versions/node/<newest>/bin and exec'd node. On a Mac that
+    # installed node by Homebrew, Volta, asdf or not at all, that folder is
+    # absent, PATH is untouched, and an MCP server booting from a bare login
+    # shell has no node on it: the exec failed and every agent died the same
+    # four-second death described at the top of this file. Reported from
+    # source on 2026-10-07 (issue 21).
+    #
+    # So the app hands its own binary down in ZERO_APPROVALS_RUNTIME, and
+    # ELECTRON_RUN_AS_NODE=1 makes that binary a node, exactly as the packaged
+    # branch above does. Nothing on the machine is needed.
+    server="$(cd "$here/.." && pwd)/main/approval-prompt-server.mjs"
+    if [ -f "$ZERO_APPROVALS_RUNTIME" ] && [ -x "$ZERO_APPROVALS_RUNTIME" ]; then
+      exec env ELECTRON_RUN_AS_NODE=1 "$ZERO_APPROVALS_RUNTIME" "$server"
+    fi
+    # Nobody handed one down, so this is somebody running the script by hand.
+    # A node already on PATH wins; nvm's newest is the last resort, for the
+    # bare login shell that has never sourced nvm.
+    if ! command -v node >/dev/null 2>&1; then
+      nvm="$HOME/.nvm/versions/node"
+      newest="$(ls "$nvm" 2>/dev/null | tail -1)"
+      [ -n "$newest" ] && export PATH="$nvm/$newest/bin:$PATH"
+    fi
+    exec node "$server"
     ;;
 esac

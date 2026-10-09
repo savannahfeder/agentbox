@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { harnessDefinition } from '../../shared/harness-definitions.mjs';
 import { resolveCodexBin } from '../codex-bin.mjs';
+import { codexLaunchEnv } from '../codex-launch-env.mjs';
 import { codexModels, codexDefaultModel, codexModelLevels } from '../codex-models.mjs';
 import { codexTranscriptFile, workerThreadParams } from '../codex-session.mjs';
 import { compactCodexThread } from '../codex-compaction.mjs';
@@ -13,6 +14,7 @@ const definition = harnessDefinition('codex');
 export const codexHarness = {
   ...definitionMethods(definition),
   discover: resolveCodexBin,
+  launchEnv: codexLaunchEnv,
   models: (options = {}) => codexModels(options),
   defaultModel: (options = {}) => codexDefaultModel(options),
   workspaceModel: sup => sup._codexWorkspaceModel(),

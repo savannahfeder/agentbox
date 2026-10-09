@@ -5,7 +5,7 @@ import { codexHarness } from './harnesses/codex.mjs';
 
 export const HARNESS_OPERATIONS = Object.freeze([
   'discover', 'binary', 'install', 'signIn', 'signInStatus', 'signInFiles',
-  'workerEnv', 'profileEnv', 'profiles', 'signedIn', 'accountKey',
+  'workerEnv', 'launchEnv', 'profileEnv', 'profiles', 'signedIn', 'accountKey',
   'models', 'defaultModel', 'workspaceModel', 'profileHome', 'effortLevels', 'usage', 'spawn', 'readers',
   'subscribe', 'attachInput', 'tooling', 'transcript', 'change', 'release',
   'compact', 'settleApproval', 'approvalChanged', 'memoryGate', 'updatePlan',

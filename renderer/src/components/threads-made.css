@@ -8,6 +8,12 @@
 .thread-block .made { margin: 12px 0 0; }
 .made-label { margin-bottom: 8px; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 .made-list { border: 1px solid var(--line); border-radius: var(--radius); }
+/* WHILE A TASK IN IT WAITS FOR A YES (./ThreadsMade.tsx, w-d2744c6daa): the
+   outer border in the accent and the label in white. Only the border: the
+   label went orange in one drawing and read as "a bit too much", and white is
+   what was kept. The rows' own lines stay grey. */
+.made-waiting .made-list { border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+.made-waiting .made-label { color: var(--text); }
 /* The row holds the two presses. Its right-hand padding is all that stands
    between the state word (or the press that replaces it) and the list's edge,
    so every row ends in the same place whichever of the two it carries. 10px

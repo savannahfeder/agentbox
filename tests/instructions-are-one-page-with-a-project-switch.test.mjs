@@ -62,8 +62,8 @@ describe('the switch in the heading', () => {
 });
 
 describe('each scope shows only its own instructions', () => {
-  it('shows the three shared sections for every project', () => {
-    expect(sectionsFor(EVERY)).toEqual(['rules', 'messages', 'adhd']);
+  it('shows the combined instructions and ADHD mode for every project', () => {
+    expect(sectionsFor(EVERY)).toEqual(['rules', 'adhd']);
   });
 
   it('shows only the project file for a project, nothing shared', () => {

@@ -30,7 +30,7 @@
 // ever set by a fall-through (the 2026-08-10 bug).
 
 import { useEffect, useRef, useState } from 'react';
-import { parseRepeat, parseWhen } from '../format';
+import { parseWhen, readRule } from '../format';
 import { useKeepInWindow } from '../keep-in-window';
 import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mjs';
 
@@ -124,7 +124,7 @@ export function repeatPresets(now = Date.now()): Array<{ label: string; rule: Re
 export function readWhen(raw: string, now = Date.now()): WhenValue | null {
   const trimmed = (raw ?? '').trim();
   if (!trimmed) return null;
-  const asRule = parseRepeat(trimmed);
+  const asRule = readRule(trimmed);
   if (asRule && 'rule' in asRule) return { runAt: 0, repeat: asRule.rule };
   const asMoment = parseWhen(trimmed, now);
   if (asMoment) return { runAt: asMoment.ts, repeat: null };

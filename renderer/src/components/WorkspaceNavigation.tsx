@@ -139,6 +139,21 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
       {updateCard && updateView}
       <div className="workspace-utilities th-side-foot">
         {!updateCard && updateView}
+        {/* THE SIDEBAR NEVER SAYS WHICH PLAN YOU ARE ON (w-e217e577e5,
+            2026-10-07, and this is a standing rule rather than one round's
+            taste). A row reading "Claude · Max 20x" shipped here for a few
+            hours and came straight back out, in her words: "we have to get rid
+            of this. It should never say that on the sidebar."
+
+            What the row was answering is real and is NOT this: a new user ran
+            an agent and thought "where are the tokens coming from? I didn't
+            even connect my account." That is a question somebody asks ONCE, on
+            their first day, and the answer belongs in the walk, where it is now
+            (Onboarding.tsx, the folder screen). A permanent row is the wrong
+            shape for a one-time surprise, and a plan tier printed on a glance
+            surface for ever is billing detail in the corner of the eye.
+
+            Nothing goes in this foot that is not a thing you press. */}
         {/* FEEDBACK, THE TOP ROW OF THE FOOT (w-1b574413db, 2026-10-04),
             wearing the folded paper plane picked from 24 drawings. It opens
             the feedback card over whatever is on screen, so it never lights.

@@ -218,30 +218,21 @@ describe('the menu is one list', () => {
     expect(menu).not.toContain('text-align: right');
   });
 
-  it('runs a command on Enter and empties the box on a mode', () => {
+  it('puts a command in the box and empties the box on a mode', () => {
     // THE MEASUREMENT, ENFORCED. A command eats the message it is attached to,
     // so it cannot be a value carried on her reply the way a mode is; it has to
     // become the reply.
     //
-    // AND ENTER SENDS THAT REPLY. The bug was real on every one of the eight.
-    // Measured in the running app before the change: Enter left `/usage ` in
-    // the box, closed the menu and sent NOTHING, and only Cmd+Enter ever sent.
-    // So the one key anybody presses on a highlighted row did nothing visible.
+    // AND SEND, NOT THE PICK, SENDS IT (w-2c8ef9ed9e). Enter ran a command from
+    // w-5d1ad29efa until /loop started with nothing to loop on. Every command
+    // now goes into the box and waits; the box says faintly that ⌘↵ runs it.
+    // tests/enter-on-a-command-that-wants-words-waits-for-send.test.mjs.
     const focus = read('renderer/src/components/Focus.tsx');
     // Both mode kinds take the same branch: a mode is a value, not a message,
     // whichever engine's vocabulary it belongs to.
     expect(focus).toContain("if (row.kind === 'mode' || row.kind === 'codexMode') { pickMode(row.mode); return; }");
-    expect(focus).toContain('send(`/${row.cmd.name}`);');
-  });
-
-  it('still completes a command into the box on Tab, for the ones that take an argument', () => {
-    // The old reasoning for filling the box was real: half of the eight take an
-    // argument. It is Tab's job now rather than Enter's, which is Claude Code's
-    // own division of the same two keys.
     expect(commandDraft({ name: 'model' })).toBe('/model ');
-    const focus = read('renderer/src/components/Focus.tsx');
-    expect(focus).toContain("if (how === 'fill') { setText(commandDraft(row.cmd)); ref.current?.focus(); return; }");
-    expect(focus).toContain("pickRow(menuRows[slashAt] ?? menuRows[0], e.key === 'Tab' ? 'fill' : 'run');");
+    expect(focus).toContain('if (enterWaitsForWords(row)) { setText(commandDraft(row.cmd)); ref.current?.focus(); }');
   });
 
   it('sends the command itself rather than whatever the box held a render ago', () => {

@@ -36,9 +36,9 @@ export const COPY = {
   chatgptPlans: 'A paid ChatGPT plan',
   both: 'Both',
   bothPlans: 'Agents use whichever has room left',
-  notSure: 'I am not sure, check this Mac for me',
-  checking: 'Checking this Mac…',
-  nothingHere: 'Nothing is set up on this Mac yet. Pick the plan you pay for above.',
+  notSure: 'I am not sure, check this computer for me',
+  checking: 'Checking this computer…',
+  nothingHere: 'Nothing is set up on this computer yet. Pick the plan you pay for above.',
   privacy: `You sign in on Claude's or OpenAI's own page. ${NAME} never sees your password.`,
 
   setupHead: (name: string) => `Setting up ${name}.`,

@@ -42,9 +42,9 @@ const personalProduct = () => ({ slug: 'personal', name: 'Personal', dir: person
 
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-row-chat-'));
-  // 2026-10-07: seven fixtures tried writing into the real Claude home.
-  // Preserve the default-profile lookup against an isolated home instead.
-  vi.spyOn(os, 'homedir').mockReturnValue(path.join(tmp, 'home'));
+  // Desktop-launch verification exposed writes into the real CLI home
+  // on 2026-10-07. This account belongs to the fixture, like the second one.
+  vi.spyOn(os, 'homedir').mockReturnValue(tmp);
   home = path.join(os.homedir(), '.claude');
   second = path.join(tmp, 'claude-second');
   fs.mkdirSync(appFolder(), { recursive: true });

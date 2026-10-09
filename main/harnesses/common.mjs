@@ -5,6 +5,7 @@ export function definitionMethods(definition) {
   return {
     ...definition,
     binary: config => config?.[definition.binKey] ?? null,
+    launchEnv: (_bin, env) => ({ ...env }),
     install: () => ({ file: definition.installer.shell, args: ['-c', `curl -fsSL ${definition.installer.url} | ${definition.installer.pipe}`] }),
     signIn: bin => ({ file: bin, args: [...definition.loginArgs] }),
     signInStatus: bin => ({ file: bin, args: [...definition.statusArgs] }),

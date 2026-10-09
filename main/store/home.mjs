@@ -15,7 +15,10 @@
 // and repeat rules all sat in it.
 //
 // So this is the same convention, one name over: a dot-folder in her home
-// named after this app.
+// named after this app. On Linux a fresh install does not get that dot-folder,
+// and it does not get a visible folder of the app's name in $HOME. Application
+// data belongs in $XDG_DATA_HOME (see defaultStoreRoot). An existing dot-folder
+// is still read, so a store already on disk is not orphaned.
 //
 // WHAT MOVES AND WHAT DOES NOT, because the line is not "everything of ours".
 // The app's own RECORDS move: the work item ledger, session traces, run
@@ -37,7 +40,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { WAS, envNames, nameSlug, readEnv } from '../../shared/product-name.mjs';
+import { Name, WAS, envNames, nameSlug, readEnv } from '../../shared/product-name.mjs';
 
 const isDir = (dir) => { try { return fs.statSync(dir).isDirectory(); } catch { return false; } };
 
@@ -61,6 +64,25 @@ export function storeRootEnv(storeRoot) {
   return env;
 }
 
+// Where a config that names no store keeps the inbox.
+//
+// macOS, and anything that is not Linux: a folder of the app's name in the
+// home directory. That is the folder this app has used since 2026-09-22.
+// Linux: $XDG_DATA_HOME/<slug>, or ~/.local/share/<slug> when the variable is
+// unset, blank, or not an absolute path. A visible directory in $HOME is not
+// where an application writes. Measured 2026-10-07: a config that named no
+// store created one.
+//
+// The home and the environment are arguments so a test can ask about another
+// machine. A caller that passes a stand-in home must pass an environment that
+// belongs to it. This function does not decide that; it uses the env it is given.
+export function defaultStoreRoot({ home = os.homedir(), platform = process.platform, env = process.env } = {}) {
+  if (platform !== 'linux') return path.join(home, Name);
+  const given = typeof env?.XDG_DATA_HOME === 'string' ? env.XDG_DATA_HOME.trim() : '';
+  const base = given && path.isAbsolute(given) ? given : path.join(home, '.local', 'share');
+  return path.join(base, nameSlug);
+}
+
 // One env var, for tests and for anyone who keeps their home somewhere else.
 // Read at call time rather than captured, because a test sets it per case.
 //
@@ -74,15 +96,25 @@ export function storeRootEnv(storeRoot) {
 // store goes missing on the release that renames the app.
 // `homeDir` is injected so a test can ask what this answers on a machine with
 // an old dot-folder on it, without one having to exist on the machine running
-// the test. Production never passes it.
-export function appHome(homeDir = os.homedir()) {
-  const override = readEnv('HOME');
+// the test. `platform` and `env` are the same kind of injection: this suite
+// runs on a Mac and still has to answer a Linux home. Production passes neither.
+export function appHome(homeDir = os.homedir(), { platform = process.platform, env } = {}) {
+  const override = readEnv('HOME', env);
   if (override) return override;
   const here = path.join(homeDir, `.${nameSlug}`);
   if (isDir(here)) return here;
   for (const was of WAS) {
     const older = path.join(homeDir, `.${was.toLowerCase()}`);
     if (isDir(older)) return older;
+  }
+  // A fresh Linux directory has nothing of ours on disk yet. The answer has to
+  // be the same path loadConfig opens, or the desktop and this lookup write two
+  // stores. The machine's own XDG_DATA_HOME is an absolute path in the real
+  // home; applying it to a stand-in home writes that stand-in's store there.
+  // A caller that passes `env` is asking about that environment, not this one.
+  if (platform === 'linux') {
+    const real = env === undefined && path.resolve(homeDir) === path.resolve(os.homedir());
+    return defaultStoreRoot({ home: homeDir, platform: 'linux', env: real ? process.env : (env ?? {}) });
   }
   return here;
 }

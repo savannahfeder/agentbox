@@ -3,8 +3,7 @@
 // noon", read by ../when-words.ts) with a live preview of exactly when the
 // item comes due.
 //
-// NOT a reminder, and the copy must never drift back into calling it one.So a
-// scheduled item RUNS at its moment.
+// An inbox reminder: the existing thread returns without running an agent.
 
 import { useMemo } from 'react';
 import type { WorkItem } from '../types';
@@ -51,7 +50,7 @@ export function Snooze({ item, count = 1, onPick, onNow, onClose }: {
 
   return (
     <SchedulePicker<number>
-      title="Schedule"
+      title="Snooze"
       subtitle={scheduleSubtitle(item, count)}
       placeholder="Try: 30m, 3h, 8am, tomorrow, next week"
       hintWhenRefused="try 3h, 8am, tomorrow"

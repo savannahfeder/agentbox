@@ -358,7 +358,7 @@ describe('the settings row', () => {
     expect(set).toMatch(/const label = found \? copy\.connected : certain \? copy\.missing : copy\.unsure;/);
     expect(set.match(/const label = found \?/g)).toHaveLength(1);
     expect(set).toContain('unsure: `${Name} could not check`');
-    expect(set).toContain('unsureSay: `${Name} has not been able to look for Claude Code on this Mac.');
+    expect(set).toContain('unsureSay: `${Name} has not been able to look for Claude Code on this computer.');
   });
 
   it('offers the download only where the sentence is true', () => {

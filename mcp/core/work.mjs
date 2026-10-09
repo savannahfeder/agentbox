@@ -168,6 +168,22 @@ export function saidToClose(item, words) {
 }
 
 /*
+ * A PUT-OFF THE USER ASKED FOR IS THEIRS (w-d6ea290028).
+ *
+ * A runAt an agent writes brakes workers and never hides the row
+ * (`parkedByAgent`, list-rules.ts), so an agent cannot take its own question
+ * out of the inbox. But "remind me in 4 days" asks for exactly that, and the
+ * row sat in Needs you wearing Scheduled until Sunday, with the user unsure
+ * whether closing it would lose the reminder.
+ *
+ * So a worker that quotes the user's own words asking for the put-off, in
+ * `deferBecause`, checked exactly as `closeBecause` is, has the moment written
+ * as the user's. That is what hides a row until it comes due, puts it in
+ * Scheduled, and lets the user's L move it again.
+ */
+const DEFERRED_AS_AGENT = 'The put-off was saved as YOURS, not theirs, so the row stays in their inbox until then: the words in deferBecause are not ones they wrote on this row. If they did ask for it to be put off, send runAt again with deferBecause set to their exact words.';
+
+/*
  * A SUMMARY LINE IS SHORT ENOUGH TO READ (w-b51b2e1c86). An agent's problem,
  * progress or solution over SUMMARY_WORDS words is taken out of the write and
  * the rest lands; the agent is told which line, how long, and to send it again.
@@ -356,13 +372,24 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
         // fence below still catches the case where somebody else took over.
       }
 
-      const { closeBecause, ...asked } = patch;
+      const { closeBecause, deferBecause, ...asked } = patch;
       let leftOpen = false;
       if (asked.status === 'done') {
         const before = readWorkItem(holding.dir, id);
         if (herRow(before) && !saidToClose(before, closeBecause)) {
           delete asked.status;
           leftOpen = true;
+        }
+      }
+      let theirMoment = 0;
+      let deferredAsAgent = null;
+      if (deferBecause !== undefined && Number.isFinite(asked.runAt) && asked.runAt > 0) {
+        const before = readWorkItem(holding.dir, id);
+        if (herRow(before) && saidToClose(before, deferBecause)) {
+          theirMoment = asked.runAt;
+          delete asked.runAt;
+        } else {
+          deferredAsAgent = { deferredAsAgent: DEFERRED_AS_AGENT };
         }
       }
       const summaryTooLong = takeOverLong(asked);
@@ -389,6 +416,10 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
         holding.pending = false;
       }
 
+      // Only now, past the fence, so a session that lost the row cannot still
+      // put it away in the user's name.
+      if (theirMoment) item = updateWorkItem(holding.dir, id, { runAt: theirMoment }, { source: 'founder' });
+
       // FINISHING A ROW GIVES THE CLAIM BACK NOW, not in five minutes. It used
       // to drop the row from this map and leave the claim line standing, so the
       // ledger went on reading "held by <this session>" for a full lease after
@@ -411,9 +442,9 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder } = {})
           holding.live = false;
           stopTimer();
         }
-        return { ...item, leftOpen: LEFT_OPEN, ...summaryTooLong };
+        return { ...item, leftOpen: LEFT_OPEN, ...deferredAsAgent, ...summaryTooLong };
       }
-      return { ...item, ...summaryTooLong };
+      return { ...item, ...deferredAsAgent, ...summaryTooLong };
     },
 
     release(id) {

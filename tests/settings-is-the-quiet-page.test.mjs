@@ -24,9 +24,10 @@ describe('the instructions are the field, not a button', () => {
   // The Settings screen itself still has no Edit button. The Instructions page
   // does, since one page of rendered sections with Edit was picked over the
   // always-open boxes (w-4cbcd888ae), and that page is its own file.
-  it('opens both workspace files on the page', () => {
+  it('opens the combined workspace instructions on the page', () => {
     expect(settings).toContain('<InstructionSettings projects={projects}');
-    expect(read('renderer/src/components/InstructionSettings.tsx')).toContain('How agents write to you');
+    expect(read('renderer/src/components/InstructionSettings.tsx')).toContain('General agent instructions');
+    expect(read('renderer/src/components/InstructionSettings.tsx')).not.toContain("id:'messages'");
   });
 
   it('names the file under each box, because the box is the file', () => {

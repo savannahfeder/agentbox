@@ -112,11 +112,14 @@ describe('a file the build writes', () => {
   });
 
   it('still lets a real edit block the update', async () => {
+    // Not the lockfile: npm rewrites that one, and it no longer counts
+    // (a-package-install-does-not-stop-the-next-update.test.mjs).
+    commit(theirs, 'notes.txt', 'x\n', 'A file of hers');
     seedGenerated();
     commit(theirs, 'a.txt', 'a\n', 'New');
     git(theirs, 'push', '-q', 'origin', 'main');
     fs.writeFileSync(path.join(mine, GEN), 'export const READ_AT = "2026-10-02";\n');
-    fs.writeFileSync(path.join(mine, 'package-lock.json'), '{"edited":true}\n');
+    fs.writeFileSync(path.join(mine, 'notes.txt'), 'edited\n');
     const { u } = make({ npm: fakeNpm().npm });
     expect((await u.check()).phase).toBe('unsupported');
   });

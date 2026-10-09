@@ -28,7 +28,7 @@
 //   hours, somewhere there... Even 3 days is ancient tbh".
 //
 // Nothing here deletes anything. A proposal nobody ever answers sits in Later
-// for good and its thread keeps asking.
+// for good. Its thread keeps asking until you close it yourself.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import {
@@ -136,10 +136,8 @@ describe('silence brings the thread back after a day', () => {
     expect(owed([mum, proposal({ ...old, answer: '(rejected)', status: 'done' })]).has('w-mum')).toBe(false);
   });
 
-  it('asks a thread that was closed, because closing it answered nothing', () => {
-    // The press that files a thread away is a reflex (E), and the whole point
-    // of the deadline is that forgetting costs nothing.
-    expect(owed([{ ...mum, status: 'done' }, proposal({ createdAt: now - 25 * HOUR })]).has('w-mum')).toBe(true);
+  it('asks a thread an agent finished, until you close it yourself', () => {
+    expect(owed([{ ...mum, status: 'done', wrote: { status: { source: 'agent', ts: now - HOUR } } }, proposal({ createdAt: now - 25 * HOUR })]).has('w-mum')).toBe(true);
   });
 
   it('says nothing about a thread whose proposals are all answered', () => {

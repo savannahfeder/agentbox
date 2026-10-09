@@ -303,8 +303,14 @@ describe(`the text ${NAME} ships`, () => {
   // options, and never offering what the run already did. Measured on her
   // store that day: 248 of 825 rows drawing a pick were drawing one an agent
   // had already acted on, her "Shipped" thread asking whether to ship among them.
+  //
+  // Raised from 6100 to 6700 for 663 characters (w-630e526abe): what the pane
+  // can show, a picture where it is named, a folder as a grid, a design page
+  // beside the message. A run comparing three fixes wrote all three
+  // explanations first and stacked the screenshots below, because nothing told
+  // it the pane would draw each picture wherever it put one.
   it('stays small enough to sit on every run', () => {
-    expect(shipped.length).toBeLessThan(6100);
+    expect(shipped.length).toBeLessThan(6700);
   });
 
   // THE SECOND COPY IS NOT ASKED FOR ANY MORE, AND THAT REPLACES THE RULE THAT

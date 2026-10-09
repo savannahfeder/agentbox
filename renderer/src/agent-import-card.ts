@@ -89,7 +89,7 @@ export const CARD = {
    * offered to bring agents across without saying across from where, and to
    * where, and nothing on the card answered that. `COPY.bringHead` in
    * renderer/src/onboarding.ts is the same sentence and moves with it. */
-  head: 'Add the agents already on this Mac.',
+  head: 'Add the agents already on this computer.',
   /**
    * No project at all and no folder to make one out of. The rows have nowhere
    *  to go, so the card does not draw a button it cannot honour. */
@@ -137,7 +137,7 @@ export const CARD = {
   /** The foot, word for word the walk's, because it is the same promise. */
   foot: 'Each one you keep lands in your inbox, and your agent files stay where they are.',
   go: 'Add them',
-  reading: 'Reading this Mac…',
+  reading: 'Reading this computer…',
 };
 
 /* ------------------------- WHERE THE ROWS CAN LAND ------------------------- */

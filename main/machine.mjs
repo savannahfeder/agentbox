@@ -156,5 +156,5 @@ export function perAccountAgents(total, accounts) {
 export function machineNote({ slots, memGb, cores, known = true }, at = 0) {
   if (!known) return null;
   if (at && at <= slots) return null;
-  return `This Mac has ${memGb} GB and ${cores} cores, so we suggest ${slots} at once. Go higher if you want to.`;
+  return `This computer has ${memGb} GB and ${cores} cores, so we suggest ${slots} at once. Go higher if you want to.`;
 }

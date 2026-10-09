@@ -5,21 +5,24 @@
 // Everyone and project pickers over a board or a list. The rules they follow
 // are in ./page-rules.ts; the look is ./pages.css, ported from the drawings
 // she approved.
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useRowDrag } from './row-drag';
 import type { Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName } from '../team/people';
 import { PriorityIcon } from '../components/Priority';
 import { notStarted, rowTitle } from '../list-rules';
+import { toApproveWords } from '../threads-made';
 import { DONE } from '../done-word';
 import {
-  boardColumns, columnTo, DEFAULT_COLUMN_ORDER, filteredEmptyWords, finishedAt, isDirect, isFiltered, nextPrivacy, projectChoices, slotUnder,
+  boardColumns, columnTo, conversationSlugs, DEFAULT_COLUMN_ORDER, entryScore, filteredEmptyWords, finishedAt, isDirect, isFiltered, nextPrivacy, placesForDrop, projectChoices, slotUnder,
   timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type Privacy, type UpdatedWindow,
 } from './page-rules';
 import { messageLine, messagePriority, rowSharing, sharePatch } from './page-rules';
 import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
 import { stopKey } from './walk-rules';
+import { cardClickIntent, cardsUnder, clickMarks, marqueeBox, marqueeMarks, type Box } from './board-select';
 import { shownToPeople } from '../../../shared/thread-cards.mjs';
 import { api } from '../api';
 import './pages.css';
@@ -72,6 +75,23 @@ export function StateGlyph({ state, live = false }: { state: ThreadStateWord; li
 
 /** The threads an agent is on right now, by id (App.tsx provides it). */
 export const LiveContext = createContext<Set<string>>(new Set());
+
+/** How many tasks each thread filed are waiting for a yes, by `product/id`
+ *  (App.tsx provides it, off `waitingCounts` in ../threads-made). */
+export const WaitingContext = createContext<Map<string, number>>(new Map());
+
+/**
+ * The threads waiting on ANOTHER THREAD that is still alive, by id
+ * (w-fe48447cab). A different question from `WaitingContext` above, which
+ * counts what a thread has filed and is waiting for YOU to say yes to.
+ *
+ * It is here for the reason `LiveContext` is: the fact is worked out once, in
+ * App.tsx off `stillWaitingOn`, and every surface that draws a row reads that
+ * one set. Without it this row reached In progress wearing nothing, which is
+ * the whole complaint the next-move work came out of — a thread in a list
+ * with no word for why it is there.
+ */
+export const WaitingOnThreadContext = createContext<Set<string>>(new Set());
 
 // THE APP'S OWN PRIORITY BARS. Urgent is a fourth bar, never an exclamation
 // mark in a box (w-bba20a03f5, Priority.tsx), whatever the drawing showed.
@@ -358,9 +378,16 @@ export const RepeatMark = () => <svg className="th-repeat" width="13" height="13
   <path d="M13 6.5A5.5 5.5 0 0 0 3.2 4.8M3 2.5v2.6h2.6" /><path d="M3 9.5a5.5 5.5 0 0 0 9.8 1.7M13 13.5v-2.6h-2.6" />
 </svg>;
 
-export function RowCells({ live = false, lead, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, aside, where, person, priority, updatedAt, when, now, action }: {
+export function RowCells({ live = false, lead, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, waitingOnThread = false, aside, where, person, priority, updatedAt, when, now, action }: {
   /** An agent is on this thread right now: a turning mark before its name. */
   live?: boolean;
+  /**
+   * It is waiting on another thread (w-fe48447cab): the same faint words
+   * `held` uses, because it is the same kind of fact — this thread is not
+   * moving yet and here is what has to happen first. It says the state and
+   * not the names: those are on the thread's own summary, under Blocked by,
+   * where there is room for them. */
+  waitingOnThread?: boolean;
   title: ReactNode; hidden?: boolean; lock?: boolean; shared?: boolean; where: ReactNode; person?: ReactNode;
   /** How many people a thread shared with chosen people reaches; 0 for the team. */
   chosen?: number;
@@ -379,7 +406,7 @@ export function RowCells({ live = false, lead, title, hidden = false, lock = fal
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
         people with a small count beside them for a thread only a few people
         see. The whole team, the default, carries nothing (2026-10-02). */}
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live ? <StateGlyph state="running" live /> : lead}{title}{aside && <span className="th-aside">{aside}</span>}{held && <span className="th-aside">not started</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}</div>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}`}>{live ? <StateGlyph state="running" live /> : lead}{title}{aside && <span className="th-aside">{aside}</span>}{held && <span className="th-aside">not started</span>}{waitingOnThread && <span className="th-aside">waiting</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}</div>
     <div className="th-cell-proj">{where}</div>
     {person !== undefined && <div className="th-cell-person">{person}</div>}
     <div className={`th-cell-prio${id === 'urgent' ? ' urgent' : ''}`}>{id && <><PriorityMark id={id} />{priorityLabelOf(id)}</>}</div>
@@ -413,6 +440,8 @@ export function ThreadCells({ item, product, now, person, tab }: {
 }) {
   const when = tab === 'done' ? finishedAt(item) : item.updatedAt;
   const liveIds = useContext(LiveContext);
+  const waiting = useContext(WaitingContext);
+  const waitingOnThread = useContext(WaitingOnThreadContext);
   const team = useContext(TeamContext);
   // WHO SEES IT, AT A GLANCE AND ONE CLICK FROM CHANGING (2026-10-01). One
   // mark after the title, always: the people on a thread the team or chosen
@@ -456,7 +485,10 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // comes and goes with an unrelated control cannot be read. Both follow the
   // click at once, the way the Share button does.
   const lock = seen === 'private';
-  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} where={product?.name ?? ''} person={person}
+  // AND HOW MANY TASKS IT FILED STILL WAIT FOR A YES (w-d2744c6daa), in the
+  // faint words a repeating task uses for its schedule: "a little bit of text
+  // that gives you extra information if you need to know."
+  return <RowCells live={liveIds.has(item.id)} title={rowTitle(item)} aside={toApproveWords(waiting.get(`${item.product}/${item.id}`))} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} waitingOnThread={waitingOnThread.has(item.id)} where={product?.name ?? ''} person={person}
     priority={item.priority ?? 0} updatedAt={when} now={now} action={action} />;
 }
 
@@ -468,7 +500,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
  *  it, the private ones included; with a teammate in view, those wear a lock
  *  and every card names its person. Whose threads is picked on the header's
  *  filters button (w-14bb56c833), so the columns start right under it. */
-export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, selectedCard = null, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns, projectOrder }: {
+export function InboxBoard({ items, products, display, now, onOpenItem, stateOf, cards = [], picked, onOpenCard, selected, selectedCard = null, columnOrder = DEFAULT_COLUMN_ORDER, onReorderColumns, projectOrder, onPlaces, marked, onMark }: {
   items: WorkItem[]; products: Product[]; display: Display; now: number; onOpenItem: (item: WorkItem) => void;
   /** The column each thread sits in, by the Inbox tabs' rule (App.tsx). */
   stateOf?: (item: WorkItem) => ThreadStateWord | null;
@@ -481,6 +513,13 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
   columnOrder?: ThreadStateWord[]; onReorderColumns?: (order: ThreadStateWord[]) => void;
   /** Your running order of projects, which Sort by Priority reads first. */
   projectOrder?: string[];
+  /** Where a card dragged up or down its column goes to be kept
+   *  (w-6e5b532a95). Absent where the order is not yours to set. */
+  onPlaces?: (places: Record<string, number>, dropped: string) => void;
+  /** The threads picked for a bulk command (App.tsx's `multiSel`), and where a
+   *  new pick goes: ⌘- or Shift-click on a card, or a box dragged across the
+   *  board's empty space (board-select.ts, w-2e3819913c). */
+  marked?: ReadonlySet<string>; onMark?: (ids: Set<string>) => void;
 }) {
   const liveIds = useContext(LiveContext);
   const team = useContext(TeamContext);
@@ -590,10 +629,26 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   });
+  // A CARD CARRIED UP OR DOWN ITS OWN COLUMN (w-6e5b532a95) keeps that place,
+  // worked out by the same rule as a row in the list. Not across columns: a
+  // column is a thread's state, and dragging does not change what state is.
+  const direct = useMemo(() => conversationSlugs(products), [products]);
+  const cardDrag = useRowDrag(onPlaces ? (id, beforeId, drawn) => {
+    const col = columns.find((c) => c.rows.some((e) => e.item?.id === id));
+    if (!col) return;
+    // In the order the cards were drawn, so the neighbours are the two the gap was between.
+    const byId = new Map(col.rows.filter((e) => e.item).map((e) => [e.item!.id, e]));
+    const rows = drawn.flatMap((d) => { const e = byId.get(d); return e ? [{ id: d, score: entryScore(e, projectOrder, direct) }] : []; });
+    const places = placesForDrop(rows, id, beforeId);
+    if (places) onPlaces(places, id);
+  } : undefined, 'copy');
   const sharing = (it: WorkItem) => rowSharing(it, products.find((p) => p.slug === it.product), team ? { me, since } : null);
   const isSelected = (e: BoardEntry) => (e.card
     ? selectedCard === stopKey({ card: e.card })
     : !selectedCard && !!e.item && !!selected && e.item.id === selected.id && e.item.product === selected.product);
+  // The card you are on, if it is one of yours on this board: the first Shift-
+  // or ⌘-click takes it into the pick (board-select.ts `clickMarks`).
+  const cursorId = !selectedCard && selected && columns.some((c) => c.rows.some((r) => !!r.item && isSelected(r))) ? selected.id : null;
   // The keyboard's card stays on the screen as J, K and the arrows move it,
   // and only when it moves, so a refresh never scrolls the board out from
   // under the pointer. Before the frame is drawn, not after: after, a card
@@ -611,11 +666,61 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
     const first = col?.querySelector('.th-card') === card;
     (first ? col?.querySelector('.th-col-h') ?? card : card).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }, [selected?.id, selected?.product, selectedCard]);
-  return <div className="list hm-me">
+  // A BOX DRAGGED ACROSS THE BOARD'S EMPTY SPACE PICKS EVERY CARD IT CROSSES
+  // (w-2e3819913c): "highlight the background, just like in PowerPoint". It is
+  // measured in the board's own coordinates, so the board scrolling under the
+  // pointer cannot throw it off, and the pick follows the box as it is drawn.
+  // A press that barely moves is a click on empty space, which clears the pick.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [band, setBand] = useState<Box | null>(null);
+  const markNow = useRef(onMark);
+  markNow.current = onMark;
+  const startBand = (e: ReactPointerEvent) => {
+    if (!onMark || e.button !== 0) return;
+    // Cards open and headings carry their column; only the ground draws a box.
+    if ((e.target as Element).closest('.th-card, .th-col-h, button, a, input, textarea')) return;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    e.preventDefault();
+    const at = (ev: { clientX: number; clientY: number }) => {
+      const r = wrap.getBoundingClientRect();
+      return { x: ev.clientX - r.left, y: ev.clientY - r.top };
+    };
+    const start = at(e);
+    const before = new Set(marked ?? []);
+    const add = e.shiftKey || e.metaKey || e.ctrlKey;
+    let moved = false;
+    const move = (ev: PointerEvent) => {
+      const p = at(ev);
+      if (!moved && Math.hypot(p.x - start.x, p.y - start.y) < 4) return;
+      moved = true;
+      const b = marqueeBox(start, p);
+      setBand(b);
+      const r = wrap.getBoundingClientRect();
+      const under = [...wrap.querySelectorAll<HTMLElement>('[data-board-id]')].map((el) => {
+        const c = el.getBoundingClientRect();
+        return { id: el.dataset.boardId ?? '', box: { left: c.left - r.left, top: c.top - r.top, right: c.right - r.left, bottom: c.bottom - r.top } };
+      });
+      markNow.current?.(marqueeMarks(before, cardsUnder(b, under), add));
+    };
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', stop);
+      setBand(null);
+    };
+    const up = () => { stop(); if (!moved && !add && before.size) markNow.current?.(new Set()); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', stop);
+  };
+  return <div className={`list hm-me th-board-wrap${band ? ' banding' : ''}`} ref={wrapRef} onPointerDown={startBand}>
+    {band && <div className="th-band" aria-hidden="true" style={{ left: band.left, top: band.top, width: band.right - band.left, height: band.bottom - band.top }} />}
     <div className={`th-board${dragging ? ' dragging' : ''}`} ref={boardRef}>
     {columns.map((col) => {
       const rows = col.rows;
-      return <div key={col.state} className={`th-col${dragging === col.state ? ' lifted' : ''}`}
+      const movable = !!onPlaces && col.state !== 'done' && display.sort === 'priority';
+      return <div key={col.state} className={`th-col${dragging === col.state ? ' lifted' : ''}`} data-drag-scope=""
         ref={(el) => { if (el) colEls.current.set(col.state, el); else colEls.current.delete(col.state); }}>
         {/* Your own board says what the tab says: what waits on you needs you.
             The heading is the handle: grab it to move the whole column. */}
@@ -650,7 +755,29 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
         {/* A card says who can see it the way a row does: the lock on what
             only you can see, the people mark on what a few chosen people
             can, and nothing on what the whole team can, the default. */}
-        {rows.map((e) => <button type="button" key={e.key} className={`th-card${isSelected(e) ? ' selected' : ''}`} onClick={() => (e.item ? onOpenItem(e.item) : e.card && onOpenCard?.(e.card))}>
+        {/* ⌘- or Shift-click adds the card to the pick or takes it away
+            (board-select.ts); a plain click opens it, as before. A teammate's
+            card is never picked: no bulk command can act on their thread. */}
+        {/* While anything is picked a card is filled or plain, never just
+            outlined: the keyboard's edge beside the fill read as "not picked"
+            on a card that was (w-2e3819913c, 2026-10-07). */}
+        {rows.map((e) => {
+          const pick = !!e.item && !!onMark;
+          const on = pick && !!marked?.has(e.item!.id);
+          const edge = isSelected(e) && !marked?.size;
+          return <button type="button" key={e.key} className={`th-card${edge ? ' selected' : ''}${on ? ' picked' : ''}`}
+          {...(pick ? { 'data-board-id': e.item!.id, 'aria-pressed': on } : {})}
+          // A plain press and a pull up or down carries the card to a new
+          // place in its column (w-6e5b532a95); ⌘ or Shift never starts one.
+          {...(movable && e.item ? { 'data-drag-id': e.item.id, onPointerDown: (ev: ReactPointerEvent<HTMLButtonElement>) => cardDrag.onPointerDown(e.item!.id, ev) } : {})}
+          onClick={(ev) => {
+            if (cardDrag.swallowsClick()) return;
+            if (pick && cardClickIntent({ shift: ev.shiftKey, meta: ev.metaKey, ctrl: ev.ctrlKey }) === 'toggle') {
+              onMark!(clickMarks(marked ?? new Set(), e.item!.id, cursorId));
+              return;
+            }
+            if (e.item) onOpenItem(e.item); else if (e.card) onOpenCard?.(e.card);
+          }}>
           <div className="t">{e.message
             ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} />
             : <TitleThenMark title={e.title ?? ''} mark={
@@ -659,7 +786,8 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           </div>
           <div className="m">{e.live && <StateGlyph state="running" live />}{e.priority !== null && <PriorityMark id={priorityIdOf(e.priority)} />}<span className="p">{e.project}</span>
             {withOthers && <Face person={e.ownerId ? team?.byId.get(e.ownerId) ?? null : null} me={e.ownerId === me} />}</div>
-        </button>)}
+        </button>;
+        })}
       </div>;
     })}
   </div></div>;

@@ -91,7 +91,7 @@ describe('the three states, and only three', () => {
   });
 
   it('never says not found off a search that came back unsure', () => {
-    expect(copy('missing')).toBe('Claude Code is not on this Mac');
+    expect(copy('missing')).toBe('Claude Code is not on this computer');
     expect(copy('unsure')).toBe(`${Name} could not check`);
     // The unsure sentence has to say, in as many words, that this is not a no.
     expect(copy('unsureSay')).toContain('not the same as it being missing');
@@ -163,8 +163,8 @@ describe('it is said in English', () => {
     // vocabularies. Since 2026-10-01 the walk names Codex beside Claude Code,
     // because either one runs the app, and this card says only what it knows:
     // with Codex on the Mac, "your agents run on it" would be false here.
-    expect(onboarding).toContain('missing: `${Name} could not find Claude Code or Codex on this Mac, and your agents run on one of them.`');
-    expect(copy('missingSay')).toContain(`${Name} could not find Claude Code on this Mac.`);
+    expect(onboarding).toContain('missing: `${Name} could not find Claude Code or Codex on this computer, and your agents run on one of them.`');
+    expect(copy('missingSay')).toContain(`${Name} could not find Claude Code on this computer.`);
     expect(copy('missingSay')).not.toContain('your agents run on it');
     expect(copy('missingSay')).toContain('Install it, then check again.');
   });
@@ -210,7 +210,7 @@ describe('where it lives', () => {
   });
 
   it('is not left behind in the group about folders', () => {
-    const folders = settings.slice(settings.indexOf('<Group id="storage" label={`Where ${NAME} keeps things on this Mac`}>'));
+    const folders = settings.slice(settings.indexOf('<Group id="storage" label={`Where ${NAME} keeps things on this computer`}>'));
     expect(folders.length).toBeLessThan(settings.length);
     const group = folders.slice(0, folders.indexOf('</Group>'));
     expect(group).not.toContain('claudeFound');

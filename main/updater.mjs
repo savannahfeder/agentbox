@@ -96,7 +96,13 @@ export function describe(state) {
   };
 }
 
-export function createUpdater({ app, log = console, onChanged = () => {} }) {
+/**
+ * `autoUpdater` is a SEAM FOR THE TESTS and nothing else. The real one is
+ * required below; passing one in is how the failure paths get tested without a
+ * packaged build, a signed release and a network, which is the only reason the
+ * download bug (see the swallow in `check`) went seven reports unnoticed.
+ */
+export function createUpdater({ app, log = console, onChanged = () => {}, autoUpdater: given = null }) {
   let state = {
     phase: 'idle',
     currentVersion: app.getVersion(),
@@ -117,12 +123,14 @@ export function createUpdater({ app, log = console, onChanged = () => {} }) {
   // Loaded lazily and inside a try, so a build that somehow shipped without the
   // dependency degrades to "no updates" instead of failing to boot at all. The
   // app not starting is a strictly worse outcome than the app not updating.
-  let autoUpdater = null;
-  try {
-    ({ autoUpdater } = require('electron-updater'));
-  } catch (e) {
-    set({ phase: 'unsupported', error: 'This build has no updater in it.' });
-    log.warn?.('[updater] electron-updater is not available:', e?.message ?? e);
+  let autoUpdater = given;
+  if (!autoUpdater) {
+    try {
+      ({ autoUpdater } = require('electron-updater'));
+    } catch (e) {
+      set({ phase: 'unsupported', error: 'This build has no updater in it.' });
+      log.warn?.('[updater] electron-updater is not available:', e?.message ?? e);
+    }
   }
 
   if (autoUpdater) {
@@ -184,7 +192,23 @@ export function createUpdater({ app, log = console, onChanged = () => {} }) {
     if (state.phase === 'ready') return describe(state);
     if (state.phase === 'checking' || (state.phase === 'downloading' && !manual)) return describe(state);
     try {
-      await autoUpdater.checkForUpdates();
+      const found = await autoUpdater.checkForUpdates();
+      // THE DOWNLOAD IS A SECOND PROMISE AND NOBODY WAS HOLDING IT. With
+      // `autoDownload` on, electron-updater starts the download inside the
+      // check and hands it back here as `downloadPromise`; its own
+      // `downloadUpdate` dispatches the `error` event and then RE-THROWS. The
+      // await above resolves on the RESULT, not on the download, so a failed
+      // download had nowhere to land but `unhandledRejection` — and
+      // `main/crash-report.mjs` files one of those as a crash.
+      //
+      // That is 7 of the 14 crash reports of launch week (PostHog, 2026-10-08)
+      // and not one of them was a crash: five are Squirrel's read-only volume
+      // error from an app run out of the disk image, two are a dropped
+      // connection, and in every one of them the app carried on running. The
+      // failure is ALREADY on screen by the time we get here, because the
+      // `error` handler above set it, so there is nothing left to do with this
+      // rejection but stop it being mistaken for a crash.
+      found?.downloadPromise?.catch?.(() => {});
     } catch (e) {
       set({ phase: 'error', error: shortError(e), checkedAt: Date.now() });
     }

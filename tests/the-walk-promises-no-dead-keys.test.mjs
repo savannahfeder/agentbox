@@ -172,7 +172,7 @@ describe('a Mac with no agent files is offered nothing at all', () => {
     // was the rule that walked a Mac with nothing to import straight past this
     // card, which is the whole reason a tester was never shown it. See the
     // note on it in onboarding.ts.
-    expect(logic).toContain("bringHead: 'Add the agents already on this Mac.'");
+    expect(logic).toContain("bringHead: 'Add the agents already on this computer.'");
   });
 
   // AND SINCE 2026-08-28 THE CARD APPEARS ON THAT MAC TOO. The rule above

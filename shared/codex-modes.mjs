@@ -71,7 +71,7 @@ export const CODEX_MODES = {
     label: 'Full access',
     sandbox: 'danger-full-access',
     approvalPolicy: 'never',
-    what: 'Anything, anywhere on this Mac, without asking.',
+    what: 'Anything, anywhere on this computer, without asking.',
   },
 };
 

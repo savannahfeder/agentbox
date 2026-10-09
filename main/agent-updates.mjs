@@ -23,7 +23,7 @@ export async function installedAgent(engine,config){
  if(!bin)throw Error('This agent is not installed.');
  const home=config.home||os.homedir();
  const settings=harness.updateSettings({home});
- const env=terminalEnv();
+ const env=harness.launchEnv(bin,terminalEnv());
  // Version inspection must not itself auto-update anything.
  const {stdout}=await exec(bin,['--version'],{timeout:8000,maxBuffer:16384,env:{...env,DISABLE_AUTOUPDATER:'1'}});
  const version=stdout.match(/\b\d+\.\d+\.\d+(?:-[\w.-]+)?\b/)?.[0];
