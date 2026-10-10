@@ -43,6 +43,7 @@ structure. It does not validate remote URLs or heading fragments. Run
 `npm run test:changed` while iterating, `npm run typecheck` for renderer types,
 and `npx vitest run --maxWorkers=4 --minWorkers=1` before completing a code change.
 Bounded workers avoid overwhelming shared development machines. CI also tests
-Linux and macOS. For visible changes, manually exercise the affected workflow
+Linux and macOS. The full Linux suite also requires zsh for the shell-profile
+integration test; CI installs it explicitly. For visible changes, manually exercise the affected workflow
 and include results in the pull request. Record failures and limitations rather
 than calling an unrun check successful.
