@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 export function testsThatRead(changed, root = process.cwd()) {
-  const sources = changed.filter((f) => f && !f.startsWith('tests/'));
+  const sources = changed.filter(Boolean);
   if (!sources.length) return [];
   const patterns = sources.map((f) => {
     const name = path.basename(f);

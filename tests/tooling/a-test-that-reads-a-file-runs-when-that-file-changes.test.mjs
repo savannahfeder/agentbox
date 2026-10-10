@@ -80,3 +80,19 @@ describe('the check an agent makes before it reports', () => {
     expect(rules).not.toMatch(/vitest related --run/);
   });
 });
+
+// Subprocess fixtures are dependencies too: Vitest cannot follow their paths.
+describe('tests that launch changed fixtures', () => {
+  const root = repo({
+    'tests/consumer.test.mjs': "spawn(process.execPath, ['tests/fixtures/fake-server.mjs'])",
+    'tests/nested/joined.test.mjs': "spawn(process.execPath, [path.join('fixtures', 'fake-server.mjs')])",
+    'tests/other.test.mjs': "spawn(process.execPath, ['fixtures/other-fake-server.mjs'])",
+  });
+  it('includes both whole-path and joined-path fixture consumers', () => {
+    expect(testsThatRead(['tests/fixtures/fake-server.mjs'], root))
+      .toEqual(['tests/consumer.test.mjs', 'tests/nested/joined.test.mjs']);
+  });
+  it('does not match a different fixture with a similar suffix', () => {
+    expect(testsThatRead(['tests/fixtures/fake-server.mjs'], root)).not.toContain('tests/other.test.mjs');
+  });
+});
