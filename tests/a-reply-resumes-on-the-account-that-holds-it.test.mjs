@@ -57,7 +57,7 @@ function makeSupervisor() {
   return sup;
 }
 
-const row = (extra = {}) => ({ id: 'w-1', product: 'acme', title: 'Reply Alisha Jain for tax stuff', ...extra });
+const row = (extra = {}) => ({ id: 'w-1', product: 'acme', title: 'Reply about the project', ...extra });
 
 describe('which account a resumed reply goes back to', () => {
   it('picks the account whose home actually holds the transcript', () => {

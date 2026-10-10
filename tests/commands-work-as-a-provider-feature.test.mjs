@@ -54,7 +54,7 @@ function taskFixture(engine='codex') {
 }
 describe('task command persistence and isolation',()=>{
  it('persists model and effort through the store without sending an agent message',async()=>{
-  const {sup,writes,item}=taskFixture('claude-code');
+  const {sup,writes,item}=taskFixture('claude');
   expect((await taskCommand(sup,'p','one','/model opus')).state).toBe('done');
   expect((await taskCommand(sup,'p','one','/effort high')).state).toBe('done');
   expect(item).toMatchObject({model:'opus',effort:'high'});
@@ -62,7 +62,7 @@ describe('task command persistence and isolation',()=>{
   expect(sup._codexServer).not.toHaveBeenCalled();
  });
  it('does not write unrecognized models or effort',async()=>{
-  const {sup,writes}=taskFixture('claude-code');
+  const {sup,writes}=taskFixture('claude');
   expect((await taskCommand(sup,'p','one','/model not-a-model')).state).toBe('failed');
   expect((await taskCommand(sup,'p','one','/effort banana')).state).toBe('failed');
   expect(writes).not.toHaveBeenCalled();
@@ -79,7 +79,7 @@ describe('task command persistence and isolation',()=>{
   expect(sup._codexServer).not.toHaveBeenCalled();
  });
  it('forwards discovered custom Claude commands and no unadvertised ones',async()=>{
-  const {sup}=taskFixture('claude-code');
+  const {sup}=taskFixture('claude');
   expect((await taskCommand(sup,'p','one','/my-plugin:check now')).state).toBe('forward');
   expect((await taskCommand(sup,'p','one','/invented now')).state).toBe('failed');
  });

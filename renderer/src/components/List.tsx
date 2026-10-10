@@ -139,7 +139,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, shipping, waitingOnThread, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder }: {
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -173,11 +173,6 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   signInNeeded?: Record<string, string>;
   /** `supervisor.shipping`: rows the app's ship queue still owes a ship. */
   shipping?: string[];
-  /**
-   * The rows waiting on another thread that is still alive (`stillWaitingOn`,
-   *  next-move.ts), handed in rather than worked out here: the list and the
-   *  pane have to say the same word about one row (w-fe48447cab). */
-  waitingOnThread?: string[];
   // A RUN ENDED ON THIS ROW AND WROTE NOTHING DOWN, keyed by id. The half of
   // it that matters most is that this is visible in the inbox without opening
   // anything. Not `stalled`, which is a worker that died and
@@ -773,8 +768,6 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                           ? <span className="time" title={`${signInNeeded[item.id]} is signed out, so nothing can start. Sign in again and this starts on its own.`}>signed out</span>
                         : shipping?.includes(item.id)
                           ? <span className="time" title="The app is shipping this. It comes back to you once it is live, or goes back to its agent if it fails.">shipping</span>
-                        : waitingOnThread?.includes(item.id)
-                          ? <span className="time" title="This thread is waiting on another one. It carries on by itself once that one is finished.">waiting</span>
                         : queued?.includes(item.id)
                           ? <span className="time">queued</span>
                           : paused && view === 'progress'

@@ -3,6 +3,8 @@ import {createPortal} from 'react-dom';
 import {api} from '../api';
 import {commandRunning,whenACommandFinishes} from '../../../shared/terminal-state.mjs';
 import {linksAtRow} from '../../../shared/terminal-links.mjs';
+import {inputQueue} from '../../../shared/terminal-input.mjs';
+import {dragSize,readSavedSize,SIZE_KEY} from '../../../shared/terminal-size.mjs';
 import {CrossIcon} from './CrossIcon';
 import '@xterm/xterm/css/xterm.css';
 import './task-terminal.css';
@@ -34,7 +36,32 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
   const [error,setError]=useState('');const [cwd,setCwd]=useState('');
   const [exited,setExited]=useState(false);const [processName,setProcessName]=useState('Shell');
   const [revision,setRevision]=useState(0);const host=useRef<HTMLDivElement>(null);
+  const panel=useRef<HTMLElement>(null);
+  const [size,setSize]=useState<{height?:number;width?:number}>(()=>readSavedSize(localStorage.getItem(SIZE_KEY)));
   useEffect(()=>{views.set(key,{open,placement});},[key,open,placement]);
+  // THE SIZE SHE DRAGGED IT TO, on the page it sits in: the side terminal's
+  // width is also the room the conversation gives up beside it, and that rule
+  // is on the page, not on the terminal (task-terminal.css).
+  useEffect(()=>{
+    localStorage.setItem(SIZE_KEY,JSON.stringify(size));
+    const page=panel.current?.parentElement;if(!page)return;
+    for(const [name,value] of [['--task-terminal-h',size.height],['--task-terminal-w',size.width]] as const){if(value)page.style.setProperty(name,`${value}px`);else page.style.removeProperty(name);}
+    return ()=>{page.style.removeProperty('--task-terminal-h');page.style.removeProperty('--task-terminal-w');};
+  },[size,open,placement]);
+  const dimension=placement==='bottom'?'height':'width';
+  // DRAG THE EDGE that faces the page: the top at the bottom, the left at the
+  // side. The pointer is captured, so a fast drag that leaves the edge keeps
+  // going, and shared/terminal-size.mjs keeps it from swallowing the page.
+  function drag(e:React.PointerEvent<HTMLDivElement>){
+    const page=panel.current?.parentElement;if(e.button!==0||!panel.current||!page)return;
+    e.preventDefault();
+    const grip=e.currentTarget,tall=dimension==='height',rect=panel.current.getBoundingClientRect();
+    const start=tall?rect.height:rect.width,room=tall?page.clientHeight:page.clientWidth,from=tall?e.clientY:e.clientX;
+    grip.setPointerCapture(e.pointerId);grip.classList.add('dragging');
+    const move=(m:PointerEvent)=>{const next=dragSize(dimension,start,from-(tall?m.clientY:m.clientX),room);setSize(s=>({...s,[dimension]:next}));};
+    const up=()=>{grip.classList.remove('dragging');grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',up);grip.removeEventListener('pointercancel',up);};
+    grip.addEventListener('pointermove',move);grip.addEventListener('pointerup',up);grip.addEventListener('pointercancel',up);
+  }
   useEffect(()=>{onOpenChange?.(open);},[open,onOpenChange]);
   // ⌘K's "Open Terminal" row opens it; ⌘J is a switch, the way ⌘J is a switch
   // in every editor she already uses. The two events stay separate because a
@@ -79,11 +106,14 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
         const row=(y:number)=>{const line=buf().getLine(y);return line?{text:line.translateToString(!buf().getLine(y+1)?.isWrapped),wrapped:line.isWrapped}:undefined;};
         terminal.registerLinkProvider({provideLinks:(y,show)=>{const found=linksAtRow(row,y-1);show(found.length?found.map(l=>({range:l.range,text:l.url,activate:()=>{window.open(l.url,'_blank');}})):undefined);}});
         const watch=whenACommandFinishes(()=>finished.current?.());
-        let offset=0,ready=false,token='',input=Promise.resolve();
+        let offset=0,ready=false,token='';
         const report=(e:unknown)=>{if(!cancelled)setError(e instanceof Error?e.message:String(e));};
         const resize=()=>{if(!ready||cancelled||!host.current?.clientWidth||!host.current?.clientHeight)return;fit.fit();if(ready)void api.terminal({product,id,action:'resize',cols:Math.max(2,Math.min(500,terminal.cols)),rows:Math.max(2,Math.min(300,terminal.rows))}).catch(report);};
         const observer=new ResizeObserver(resize);observer.observe(host.current);
-        const subscription=terminal.onData(data=>{input=input.then(async()=>{for(let i=0;i<data.length;i+=16384)await api.terminal({product,id,action:'write',data:data.slice(i,i+16384)});}).catch(report);});
+        // Keys typed while one write travels go out together as the next
+        // (shared/terminal-input.mjs), so holding Delete never builds a queue.
+        const input=inputQueue(data=>api.terminal({product,id,action:'write',data}),{onError:report});
+        const subscription=terminal.onData(data=>input.push(data));
         dispose=()=>{if(ready)screenCache.set(key,{token,screen:serializer.serialize({scrollback:1000}),offset,cols:terminal.cols,rows:terminal.rows});observer.disconnect();subscription.dispose();terminal.dispose();};
         const consume=async(state:any)=>{if(cancelled)return;setCwd(state.cwd);setProcessName(state.process);setExited(state.exited);watch(state.process,state.exited);if(state.truncated){terminal.reset();terminal.writeln('[Earlier terminal output omitted]');}await new Promise<void>(resolve=>terminal.write(state.data,resolve));offset=state.offset;};
         let initial=await api.terminal({product,id,action:'open'});
@@ -91,8 +121,12 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
         token=initial.token;const cached=screenCache.get(key);
         if(cached?.token===token){terminal.resize(cached.cols,cached.rows);await new Promise<void>(resolve=>terminal.write(cached.screen,resolve));initial=await api.terminal({product,id,action:'read',offset:cached.offset});}
         await consume(initial);ready=true;resize();terminal.focus();
-        const poll=async()=>{try{const state=await api.terminal({product,id,action:'read',offset});await consume(state);if(!cancelled)timer=setTimeout(poll,150);}catch(e){report(e);}};
-        timer=setTimeout(poll,150);
+        // EACH READ WAITS IN MAIN for the shell's next output and comes back the
+        // moment there is some, so an echo is on screen as soon as the shell
+        // prints it (main/task-terminals.mjs, `read`). A main that cannot wait
+        // answers without `live`, and the old 150ms poll carries on.
+        const poll=async()=>{try{const state=await api.terminal({product,id,action:'read',offset,wait:1000});await consume(state);if(!cancelled)timer=setTimeout(poll,state.live?0:150);}catch(e){report(e);}};
+        timer=setTimeout(poll,0);
       }catch(e){if(!cancelled)setError(e instanceof Error?e.message:String(e));}
     })();
     return ()=>{cancelled=true;if(timer)clearTimeout(timer);dispose();};
@@ -100,7 +134,9 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
   async function end(){try{await api.terminal({product,id,action:'close'});views.set(key,{open:false,placement});setExited(true);setProcessName('Ended');setOpen(false);}catch(e){setError(String(e));}}
   async function restart(){try{await api.terminal({product,id,action:'close'});setRevision(v=>v+1);}catch(e){setError(String(e));}}
   const toggle=<button className={`icon-btn terminal-header-control${open?' on':''}`} data-hint="terminal" data-hint-align="right" title={open?'Hide terminal':'Open terminal'} aria-label={open?'Hide terminal':'Open terminal'} aria-expanded={open} onClick={()=>setOpen(!open)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3m6 0h4"/></svg></button>;
-  return <>{headerTarget&&createPortal(toggle,headerTarget)}{open&&<section className={`task-terminal task-terminal-${placement}`} aria-label="Task terminal">
+  return <>{headerTarget&&createPortal(toggle,headerTarget)}{open&&<section ref={panel} className={`task-terminal task-terminal-${placement}${size[dimension]?' task-terminal-sized':''}`} aria-label="Task terminal">
+    <div className="task-terminal-grip" role="separator" aria-orientation={dimension==='height'?'horizontal':'vertical'} aria-label="Resize terminal" title="Drag to resize. Double-click to reset."
+      onPointerDown={drag} onDoubleClick={()=>setSize(s=>{const next={...s};delete next[dimension];return next;})}/>
     <TerminalToolbar cwd={cwd} processName={processName} exited={exited} placement={placement}
       onStop={()=>void api.terminal({product,id,action:'write',data:'\x03'}).catch(e=>setError(String(e)))}
       onEnd={()=>void end()}

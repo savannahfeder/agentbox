@@ -63,7 +63,7 @@ import { approvalReads } from './approval-card';
 // one it took went. Only the second is raised from here, because by the time
 // there is anything to confirm the card has closed.
 import { sentLine } from './compose-says';
-import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, isProposal, notStarted, parkedByAgent, replyClearsSchedule, rowTitle, statusForReply, stillWaitingOn, stoppable, threadsOwedAnAnswer, withdrawReply } from './list-rules';
+import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, isProposal, notStarted, parkedByAgent, replyClearsSchedule, rowTitle, statusForReply, stoppable, threadsOwedAnAnswer, withdrawReply } from './list-rules';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { opensATextField } from './keys';
 import { sidebarFits, useRoomyToggle, useWindowWidth } from './room';
@@ -132,7 +132,7 @@ import { Face, TeamContext, firstName, teamView } from './team/people';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
-import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, StateTabs, WaitingContext, WaitingOnThreadContext } from './threads/Pages';
+import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, StateTabs, WaitingContext } from './threads/Pages';
 import { isCarrying } from './threads/row-drag';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
@@ -1749,34 +1749,6 @@ export default function App() {
   // not on her, so In progress reading "Shipping" and out of Needs you until
   // they have shipped or gone back to their agent.
   const shippingIds = useMemo(() => new Set(snap?.supervisor.shipping ?? []), [snap?.supervisor.shipping]);
-  // AND THE THREADS A THREAD IS WAITING ON (w-fe48447cab). `blockedBy` has been
-  // on the ledger since the team version landed and every worker's brief asks
-  // for it, and no list had ever read it, so a thread whose own agent had
-  // written down that it cannot move sat in Needs you next to the ones that
-  // genuinely needed a decision.
-  //
-  // The window is the only place that can answer this, because the question is
-  // about ANOTHER row: `stillWaitingOn` throws away every blocker that has
-  // finished and every blocker this window cannot see, so nothing is ever
-  // hidden behind a row that is not on the screen.
-  const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
-  const waitingOn = useCallback((i: WorkItem) => stillWaitingOn(i, byId), [byId]);
-  // The same answer as a set, for every surface that draws a row, so the list's
-  // word, the table row's word and the pane's sentence cannot come from three
-  // readings of it. `waitingIds` is the array the list prop wants.
-  const waitingSet = useMemo(
-    () => new Set(items.filter((i) => stillWaitingOn(i, byId).length).map((i) => i.id)),
-    [items, byId],
-  );
-  const waitingIds = useMemo(() => [...waitingSet], [waitingSet]);
-  // AND THE RUN QUEUE'S OWN REPORT, which it has always made and no list has
-  // read: the rows it is about to spawn on, and the ones pushed with Run now.
-  // `nextMove` keeps it UNDER its reading of the row rather than over it, so
-  // this can only ever add a worker nobody had promised, never take one away.
-  const queuedIds = useMemo(
-    () => new Set([...(snap?.supervisor.queued ?? []), ...(snap?.supervisor.runNow ?? [])]),
-    [snap?.supervisor.queued, snap?.supervisor.runNow],
-  );
 
   const inboxCandidates = useMemo(() => items.filter((i) => {
     if (i.id === pendingId) return false; // action held in the grace window: already sent, as far as the inbox is concerned
@@ -1799,8 +1771,8 @@ export default function App() {
     // without this line the agent-to-agent rows came back the moment a project
     // was shared with somebody.
     if (shared === true) return i.status !== 'done' && !(hiddenAt(i) > now) && !isProposal(i);
-    return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now, waitingOn: waitingOn(i), queued: queuedIds.has(i.id) });
-  }), [items, hiddenAt, scope, now, pendingId, teamInbox, liveIds, shippingIds, waitingOn, queuedIds]);
+    return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now });
+  }), [items, hiddenAt, scope, now, pendingId, teamInbox, liveIds, shippingIds]);
 
   // WHAT MATTERS MOST, ONE COPY, read by every list that claims to be in an
   // order. A product's place in her running order is worth a hundred item
@@ -1997,7 +1969,7 @@ export default function App() {
       if (isDirect(snap?.products.find((p) => p.slug === i.product))) return false;
       // A task you gave a teammate is moving, for you, until it is done.
       if (team && heldByAPerson(i) && isShared(team.products.get(i.product))) return i.status !== 'done';
-      return belongsInProgress(i, { deferredUntil, now, live: liveIds.has(i.id), shipping: shippingIds.has(i.id), waitingOn: waitingOn(i), queued: queuedIds.has(i.id) });
+      return belongsInProgress(i, { deferredUntil, now, live: liveIds.has(i.id), shipping: shippingIds.has(i.id) });
     }),
     ...agentList.filter((r) => r.agent && progressAfterReply(r.agent, now, agentMode)),
     // IN THE ORDER THEY WILL RUN IN, which is the one thing this list is for.
@@ -2010,7 +1982,7 @@ export default function App() {
     // Same score as the inbox and as the supervisor, so the top of this list is
     // what the fleet takes next. Recency only breaks a tie now.
   ].sort(byRunningOrder(score)),
-  [items, agentList, agentMode, scope, pendingId, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, waitingOn, queuedIds]);
+  [items, agentList, agentMode, scope, pendingId, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds]);
 
   // NOT A ROW THAT STILL NEEDS HER (2026-10-01): an agent's done on her own
   // thread waits in Needs you until she closes it, and Done counted it too,
@@ -3167,7 +3139,7 @@ export default function App() {
     const tasks = items
       .filter((i) => i.product === slug && i.id !== pendingId)
       .filter((i) => belongsOnTheRail(i, {
-        deliveredThrough, hiddenUntil: hiddenAt(i), deferredUntil: dueAt(i), now, live: liveIds.has(i.id), shipping: shippingIds.has(i.id), waitingOn: waitingOn(i), queued: queuedIds.has(i.id),
+        deliveredThrough, hiddenUntil: hiddenAt(i), deferredUntil: dueAt(i), now, live: liveIds.has(i.id), shipping: shippingIds.has(i.id),
       }))
       .map((i) => ({
         key: i.id,
@@ -3186,7 +3158,7 @@ export default function App() {
         open: () => openAgent(a.pid),
       }));
     return [...tasks, ...sessions].sort((x, y) => y.at - x.at);
-  }, [railItem?.product, items, snap?.agents, pendingId, deliveredThrough, hiddenAt, dueAt, now, markSeen, openAgent, liveIds, shippingIds, waitingOn]);
+  }, [railItem?.product, items, snap?.agents, pendingId, deliveredThrough, hiddenAt, dueAt, now, markSeen, openAgent, liveIds, shippingIds]);
 
   // (legal/privacy.html, 5.1). One place, on the id changing, rather than a
   // call beside each of the dozen things that open a task: a count added at
@@ -4299,13 +4271,9 @@ export default function App() {
     // that the row goes back to her inbox, and there is no row: the session
     // belongs to whatever started it, and Agentbox killing somebody's terminal
     // is not a thing this build does.
-    (item: WorkItem) => !item.agent && stoppable(item, { deferredUntil: dueAt(item), now, live: liveIds.has(item.id), shipping: shippingIds.has(item.id), waitingOn: waitingOn(item), queued: queuedIds.has(item.id) }),
-    [dueAt, now, liveIds, shippingIds, waitingOn, queuedIds],
+    (item: WorkItem) => !item.agent && stoppable(item, { deferredUntil: dueAt(item), now, live: liveIds.has(item.id) }),
+    [dueAt, now, liveIds],
   );
-  // THE TWO MOVERS A STOP CANNOT REACH are both handed in above and both
-  // refused in `stoppable` itself, which is the only place that judgement is
-  // made: stopping the row does not stop a push in flight, and it does not
-  // finish the other thread this one waits on.
 
   // Resume: `ids` for the rows she ticked, null for everything stranded.
   const resumeAgents = useCallback(async (ids: string[] | null) => {
@@ -5200,7 +5168,6 @@ export default function App() {
     <TeamContext.Provider value={team}>
     <ChatAgentsContext.Provider value={chatAgents}>
     <LiveContext.Provider value={liveIds}>
-    <WaitingOnThreadContext.Provider value={waitingSet}>
     <WaitingContext.Provider value={waitingByThread}>
     <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${workspaceCollapsed ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}`}>
       {signInGate && <SignInPage signedOut={signedOutHere} error={snap?.team?.error ?? null} waitingUrl={snap?.team?.signingIn?.url ?? null} />}
@@ -5865,12 +5832,8 @@ export default function App() {
                     paused: snap.supervisor.paused,
                     running: snap.supervisor.running.length,
                     capacity: snap.supervisor.capacity,
-                    inProgress: belongsInProgress(focused, { deferredUntil: dueAt(focused), now, live: liveIds.has(focused.id), shipping: shippingIds.has(focused.id), waitingOn: waitingOn(focused), queued: queuedIds.has(focused.id) }),
+                    inProgress: belongsInProgress(focused, { deferredUntil: dueAt(focused), now, live: liveIds.has(focused.id), shipping: shippingIds.has(focused.id) }),
                     shipping: shippingIds.has(focused.id),
-                    // AND WHAT IT IS WAITING ON (w-fe48447cab). It is why this
-                    // row is in In progress at all, so it is the one thing the
-                    // line there has to be able to say.
-                    waitingOn: waitingOn(focused),
                     // A run ended on this row and wrote nothing down. The pane
                     // says so wherever the row is sitting, which is why this one
                     // fact is read above the In progress test in live-line.
@@ -5962,7 +5925,6 @@ export default function App() {
                   queued={snap.supervisor.queued}
                   signInNeeded={snap.supervisor.signInNeeded}
                   shipping={snap.supervisor.shipping}
-                  waitingOnThread={waitingIds}
                   silent={snap.supervisor.silent}
                   paused={snap.supervisor.paused}
                   multiSel={multiSel}
@@ -6248,7 +6210,7 @@ export default function App() {
                 session: snap.supervisor.running.find((r) => r.itemId === target.id) ?? null,
                 queued: snap.supervisor.queued,
                 runNow: snap.supervisor.runNow,
-                inProgress: belongsInProgress(target, { deferredUntil: dueAt(target), now, live: liveIds.has(target.id), shipping: shippingIds.has(target.id), waitingOn: waitingOn(target), queued: queuedIds.has(target.id) }),
+                inProgress: belongsInProgress(target, { deferredUntil: dueAt(target), now, live: liveIds.has(target.id) }),
               }, () => { setModal(null); void runNow(target); }),
               { id: 'done', label: target.agent ? DONE.verb : `${DONE.verb} Task`, keyHint: 'E', run: () => { setModal(null); markDone(target); } },
               { id: 'reply', label: 'Reply', keyHint: 'R', run: () => { open(); setModal('reply'); } },
@@ -6931,7 +6893,6 @@ export default function App() {
       <FindBar />
     </div>
     </WaitingContext.Provider>
-    </WaitingOnThreadContext.Provider>
     </LiveContext.Provider>
     </ChatAgentsContext.Provider>
     </TeamContext.Provider>

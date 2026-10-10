@@ -44,7 +44,7 @@ import { addClaudeAccount, addCodexAccount, outsideAgentsMode, permissionMode, r
 import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './project-identity.mjs';
 import { ClaudeUsage } from './claude-usage.mjs';
 import { usageEngine } from '../shared/usage.mjs';
-import { DEFAULT_ENGINE } from '../shared/engines.mjs';
+import { DEFAULT_ENGINE, isEngine } from '../shared/engines.mjs';
 import * as agents from './agents.mjs';
 import { findAgentFolders, readAgentFiles, readFolderAgents } from './agent-files.mjs';
 import { readSessionThreads } from './agent-sessions.mjs';
@@ -264,6 +264,12 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     onChange: push,
   });
 
+  ipcMain.handle('zero:refresh-usage', async event => {
+    if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) throw Error('Usage refresh is only available in the main app window.');
+    const result = await usage.refreshNow();
+    return result.reading ? { ...result, reading: { engine: DEFAULT_ENGINE, ...result.reading } } : result;
+  });
+
   // Agents this run has already counted. In memory on purpose: a fresh launch
   // seeing the same agent again is a fresh fact about the app being used.
   const seenAgents = new Set();
@@ -349,13 +355,13 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   });
   ipcMain.handle('zero:terminal',(_event,payload={})=>{
     if(_event.senderFrame?.parent || (_event.sender && _event.sender!==window.webContents)) throw Error('Terminal is only available in the main app window.');
-    const {product,id,action,data,cols,rows,offset}=payload;
+    const {product,id,action,data,cols,rows,offset,wait}=payload;
     if(typeof product!=='string'||typeof id!=='string'||!id||id.length>300)throw Error('Invalid task.');
     const key=JSON.stringify({product,id});
     if(product==='@agent-update')return agentUpdates.terminal(id,payload);
     switch(action){
       case 'open':return terminals.open(key);
-      case 'read':return terminals.read(key,offset);
+      case 'read':return terminals.read(key,offset,wait);
       case 'write':terminals.write(key,data);return true;
       case 'resize':terminals.resize(key,cols,rows);return true;
       case 'close':terminals.close(key);return true;
@@ -1379,9 +1385,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // rest of the app runs on it without a restart.
   const engineSetup = createEngineSetup({
     find: (engine) => {
-      if (engine === 'claude') { const s = recheckClaude(config); return { found: s.claudeFound, path: s.claudeBin }; }
-      const s = recheckCodex(config);
-      return { found: s.found, path: s.bin };
+      const finders = {
+        claude: () => { const s = recheckClaude(config); return { found: s.claudeFound, path: s.claudeBin }; },
+        codex: () => { const s = recheckCodex(config); return { found: s.found, path: s.bin }; },
+      };
+      return finders[engine]?.() ?? { found: false, path: null };
     },
     // WHICH ONE IS SIGNED IN, kept on the config for the run that reads it
     // (`Supervisor#_enginesFound`) and never saved: it changes outside the app.
@@ -1400,7 +1408,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // A sign-in left waiting on the browser is not left running after the app.
   app.on('will-quit', () => { engineSetup.cancel('claude'); engineSetup.cancel('codex'); });
   ipcMain.handle('zero:engine-setup', async (_e, { action, engine } = {}) => {
-    if (engine !== 'claude' && engine !== 'codex') return { ok: false, error: 'Unknown coding agent.' };
+    if (!isEngine(engine)) return { ok: false, error: 'Unknown coding agent.' };
     try {
       if (action === 'ready') return { ok: true, ...(await engineSetup.readiness(engine)) };
       if (action === 'start') return { ok: true, ...engineSetup.start(engine) };
