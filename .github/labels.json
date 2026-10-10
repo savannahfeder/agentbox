@@ -1,0 +1,17 @@
+[
+  {
+    "name": "bug",
+    "color": "d73a4a",
+    "description": "Unexpected behavior with reproduction steps"
+  },
+  {
+    "name": "enhancement",
+    "color": "a2eeef",
+    "description": "Feature or behavior proposal"
+  },
+  {
+    "name": "documentation",
+    "color": "0075ca",
+    "description": "Guides and reference improvements"
+  }
+]

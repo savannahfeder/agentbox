@@ -10,7 +10,9 @@
 
 <!-- The tests you added, and what you tried by hand. -->
 
-- [ ] I added tests and ran `npm run test:changed`
+- [ ] I added regression tests for behavior changes and ran `npm run test:changed`
+- [ ] I ran `npm run check:contribution` for contributor documentation/forms
+- [ ] I listed checks run, manual verification, and any unresolved failures
 - [ ] I read every line of this change myself, including any an AI wrote
 - [ ] It adds no new dependency, or I explain each one below
 - [ ] It sends nothing new off the machine, or I explain what and why below

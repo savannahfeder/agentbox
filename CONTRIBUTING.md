@@ -1,59 +1,52 @@
 # Contributing to Agentbox
 
-Thank you for wanting to help. Pull requests are welcome, and every one is read
-by a person before it is merged.
+Agentbox is open source under GPL-3.0-or-later. Contributions are welcome.
+## Start here
 
-## Before you start
+Discuss substantial changes in an issue before implementation. Keep each pull
+request focused on one problem, with a clear explanation and validation evidence.
+See the [documentation index](docs/README.md) and [development guide](docs/development.md).
 
-- **For anything bigger than a small fix, open an issue first.** A short note
-  saying what you want to change and why saves you from building something we
-  then cannot take.
-- **One change per pull request.** A pull request that does one thing is
-  reviewed in a day; one that does five waits until someone has an afternoon.
-
-## Making the change
-
-```
-npm install
-npm run dev          # the app, with hot reload
-npm run test:changed # the tests for what you changed
+```sh
+npm ci
+ZERO_FIXTURES=1 ZERO_NO_SUPERVISOR=1 npm run dev
 ```
 
-- **Every change comes with tests.** Write the test first and watch it fail,
-  then make it pass. Cover the case you fixed, the cases either side of it, and
-  a case that must not match.
-- **Tests are named as sentences** that say the behaviour
-  (`a-reply-moves-the-agent-row.test.mjs`), and open with a comment saying what
-  was wrong and how you know.
-- **Run `npm run test:changed`** before you push. The full suite runs on GitHub
-  for your pull request.
-- **Read [CLAUDE.md](CLAUDE.md)**. It is short, and it holds the rules that are
-  not obvious from the code: nothing an agent starts may drive the user's own
-  browser (`--chrome`), no API key ever goes into a worker's environment, and
-  nothing personal is committed.
+Use Node 22 and npm. Fixture development does not require a provider account.
+Installation downloads Electron and native dependencies; Linux may need build
+tools for node-pty. Read the development guide before using a real store.
 
-## Using AI to write it
+## Validate your change
 
-Fine, and expected: this is an app for running coding agents. But you are the
-author. Read every line before you open the pull request, run it, and say in
-the description what you checked by hand.
+Write regression tests before behavior changes and observe them fail. Cover
+boundaries and cases that must not match. Name tests as sentences and explain
+what failed in an opening comment. Documentation changes need link and form
+validation; they do not need tests that assert prose verbatim.
 
-## What happens after you open one
+```sh
+npm run check:contribution
+npm run test:changed
+npm run typecheck
+npx vitest run --maxWorkers=4 --minWorkers=1
+```
 
-1. GitHub runs the tests. For a first contribution GitHub waits for a
-   maintainer to start that run, which happens once the change has been read.
-2. The change is reviewed for safety first (what it sends, reads, runs or
-   installs) and then for whether it fits the app.
-3. You get one of three answers: merged, a request for specific changes, or a
-   closed pull request with the reason. Small style fixes may be made on our
-   side rather than asked of you.
+Read [CLAUDE.md](CLAUDE.md) for engineering constraints. AI assistance is welcome;
+you remain responsible for reviewing every line, running checks, and explaining
+manual verification. Never include credentials, personal stores, machine paths,
+or private vulnerability details in a contribution.
 
-## Licence
+## Submit and review
 
-Agentbox is GPL-3.0-or-later. By opening a pull request you agree that your
-contribution is licensed under the same terms.
+Create a feature branch in your fork, commit, push, and open a pull request.
+External contributors should use this normal GitHub workflow; `npm run ship`
+is an upstream maintainer tool, not a prerequisite for contribution.
+CI runs tests on Linux and macOS. GitHub may require maintainer approval before
+running workflows from a new contributor. Reviews assess correctness, safety,
+maintainability, and fit. Review timing depends on maintainer availability.
+Address feedback on the same branch and report any checks you could not run.
 
-## Security problems
+## Licence and security
 
-Please do not open a public issue or pull request for a security problem. See
-[SECURITY.md](SECURITY.md).
+Contributions are licensed under the project's GPL-3.0-or-later terms.
+Report vulnerabilities privately using [SECURITY.md](SECURITY.md), rather than
+public issues or pull requests. For usage questions, search existing GitHub issues before opening a new one.

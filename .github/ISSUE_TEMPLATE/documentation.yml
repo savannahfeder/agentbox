@@ -1,0 +1,19 @@
+name: Documentation issue
+description: Report a missing or incorrect guide
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not include secrets or security vulnerability details. Follow SECURITY.md for vulnerabilities."
+  - type: input
+    id: location
+    attributes:
+      label: "Guide or topic"
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: "What is missing or incorrect?"
+    validations:
+      required: true
