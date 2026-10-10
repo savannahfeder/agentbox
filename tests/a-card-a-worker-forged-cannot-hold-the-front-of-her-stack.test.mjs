@@ -171,8 +171,8 @@ describe('a request nobody is waiting on any more', () => {
   it('waits out the whole of both engines\' deadlines before it does', () => {
     // The one number this file leans on, checked rather than trusted: the TTL
     // is a second copy of "fifteen minutes" and it must never be the shorter
-    // one. main/approval-prompt-server.mjs holds the Claude side's copy.
-    const server = fs.readFileSync(path.join(here, '..', 'main', 'approval-prompt-server.mjs'), 'utf8');
+    // one. main/approval-ask.mjs holds the copy every engine but Codex asks with.
+    const server = fs.readFileSync(path.join(here, '..', 'main', 'approval-ask.mjs'), 'utf8');
     expect(REQUEST_TTL_MS).toBeGreaterThan(APPROVAL_TIMEOUT_MS);
     expect(server).toMatch(/TIMEOUT_MS = 15 \* 60_000/);
     expect(REQUEST_TTL_MS).toBeGreaterThan(15 * 60_000);

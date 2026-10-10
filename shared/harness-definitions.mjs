@@ -75,6 +75,57 @@ export const HARNESS_DEFINITIONS = freeze([
     // false until somebody turns it on deliberately.
     admitted: false,
   },
+  {
+    // GROK BUILD, AND NOT OFFERED YET -- the same `admitted: false` as OpenCode,
+    // for the same reason: offering a provider is a product decision.
+    //
+    // ITS HEADLESS STREAM IS CLAUDE CODE'S. Measured on grok 1.0.46,
+    // `grok -p --output-format streaming-messages-json` prints the same
+    // system/assistant/user/result lines Claude Code's stream-json does, so the
+    // adapter reads it with Claude Code's readers and only the command line
+    // differs (main/grok.mjs says which flags it takes, refuses and renames).
+    //
+    // IT SIGNS IN WITH ITS OWN grok.com LOGIN, kept in its own ~/.grok. An
+    // inherited xAI key would move a run onto metered billing, so the scrub
+    // takes those out along with Anthropic's.
+    id: 'grok', label: 'Grok Build', word: 'Grok Build', binKey: 'grokBin',
+    homeEnv: null, accountPrefix: 'grok:', package: null, casks: [],
+    commandMenu: 'local', commandRoute: 'local',
+    installer: null, loginArgs: [], statusArgs: [], credentialFiles: [],
+    scrubPatterns: ['^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$', '^XAI_', '^GROK_API_KEY$'],
+    // No stream-json input (a reply waits for the run to end and resumes it),
+    // no fork, no plan-limit endpoint. Its slash words (`/skill-name`) are read
+    // from the message text and never advertised, so they are passed through.
+    capabilities: { nativeCommands: false, fork: false, nativeReview: false, remoteControl: false, inlineImages: false, claudeEffort: false, planLimits: false, forwardsUnknownCommands: true },
+    imageInstruction: 'Open each one with the read tool, at the absolute path below.',
+    admitted: false,
+  },
+  {
+    // PI, AND NOT OFFERED YET either. pi prints its own JSON events
+    // (`pi -p --mode json`); the adapter rewrites each into the Claude Code line
+    // that means the same as it arrives (main/pi.mjs), so the readers are
+    // Claude Code's again.
+    //
+    // pi CAN READ A PROVIDER KEY OUT OF ITS ENVIRONMENT, like OpenCode, so the
+    // scrub is as wide as OpenCode's: no key Agentbox inherited reaches it, and
+    // pi bills through whatever the person logged it in to (~/.pi/agent).
+    id: 'pi', label: 'pi', word: 'pi', binKey: 'piBin',
+    homeEnv: null, accountPrefix: 'pi:', package: '@earendil-works/pi-coding-agent', casks: [],
+    commandMenu: 'local', commandRoute: 'local',
+    installer: null, loginArgs: [], statusArgs: [], credentialFiles: [],
+    scrubPatterns: [
+      '^ANTHROPIC_', '^CLAUDE_CODE_', '^CLAUDECODE$', '^CLAUDE_PID$', '^CLAUDE_EFFORT$', '^CLAUDE_CONFIG_DIR$',
+      '^OPENAI_', '^CODEX_', '^OPENROUTER_', '^GEMINI_', '^GOOGLE_',
+      '^AWS_', '^AZURE_', '^GROQ_', '^MISTRAL_', '^DEEPSEEK_', '^XAI_', '^CEREBRAS_',
+      '^TOGETHER_', '^FIREWORKS_', '^DEEPINFRA_', '^NVIDIA_',
+      '_API_KEY$', '_ACCESS_TOKEN$',
+    ],
+    // pi reads `/skill:name` from the message text, so unknown slash words go
+    // to it as typed.
+    capabilities: { nativeCommands: false, fork: false, nativeReview: false, remoteControl: false, inlineImages: false, claudeEffort: false, planLimits: false, forwardsUnknownCommands: true },
+    imageInstruction: 'Open each one with the read tool, at the absolute path below.',
+    admitted: false,
+  },
 ]);
 export function harnessDefinition(id = 'claude') {
   return HARNESS_DEFINITIONS.find(h => h.id === id) ?? null;

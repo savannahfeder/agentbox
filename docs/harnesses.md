@@ -138,6 +138,59 @@ Sources: [OpenCode providers](https://opencode.ai/docs/providers/),
 [Conductor's OpenCode harness](https://www.conductor.build/docs/reference/harnesses/opencode),
 [Conductor providers](https://www.conductor.build/docs/guides/providers).
 
+## Grok Build and pi: what was measured
+
+Both are registered and **not admitted**, the same as OpenCode
+(`admitted: false`, shared/harness-definitions.mjs), so no row can choose them
+and no picker draws them. Each is one adapter (`main/harnesses/grok.mjs`,
+`main/harnesses/pi.mjs`) over the module that holds what was measured
+(`main/grok.mjs`, `main/pi.mjs`), plus one data row each. No existing file grew
+an engine branch; the one shared change is a capability,
+`forwardsUnknownCommands`, read by `main/task-commands.mjs`.
+
+**Grok Build's headless stream is Claude Code's.** `grok -p --output-format
+streaming-messages-json` prints the same system/assistant/user/result lines as
+Claude Code's stream-json, so the adapter uses Claude Code's readers and only
+translates the command line. Which flags Grok takes, refuses and renames was
+measured one flag at a time against grok 1.0.46 and is written at the top of
+`main/grok.mjs`.
+
+**pi prints its own events** (`pi -p --mode json`). Each line is rewritten as
+it arrives into the Claude Code line that means the same (`piToClaude`), so the
+readers are Claude Code's here too. pi is a Node script, and an app opened from
+the Dock has no shell PATH, so the folder its node lives in goes first on the
+worker's PATH (without it the run dies with "env: node: No such file or
+directory").
+
+**Neither has `--permission-prompt-tool`, so the cards come another way.**
+Grok gets a PreToolUse hook in `~/.grok/hooks` that does nothing unless
+Agentbox started the run; pi gets an extension loaded for each run with `-e`.
+Both call one helper, `main/agent-approval-cli.mjs`, which writes the card into
+the same spool and waits for the same signed answer Claude Code's approval
+server does (the shared part moved into `main/approval-ask.mjs`). `<engine>Ask`
+in the config decides when: before risky actions (default), before every
+action, or never.
+
+**Live, through the adapters, on 2026-10-10** (grok 1.0.50, pi 1.0.4), with a
+temporary store:
+
+- **pi:** start, then resume on the same session with its context kept. A shell
+  call raised one card; denied, the tool returned the denial note and nothing
+  ran; allowed, it ran and printed its output.
+- **Grok Build:** start, then resume on the same session with its context kept.
+  Under "every action", each tool call raised a card. Denied, Grok received
+  "Hook denied: <note>" and kept trying other tools, raising 22 cards before it
+  stopped. Allowed, one card and the command ran. One of three resumes printed
+  nothing for three minutes and was stopped; the other two resumed normally.
+
+**Declared missing rather than faked:** input into a live run (neither takes
+stream-json input, so a reply waits for the run to end and resumes it), fork,
+usage and plan limits, and a sign-in command (both sign in from their own
+terminal UI). **Still ahead before admission:** discovery and enrollment in
+`main/config.mjs` (each adapter's `discover` already finds the binary), the
+Settings pages, picker entries and per-engine model menus that the earlier
+version of these engines had, and the product review this file asks for.
+
 The useful precedent from T3 Code is an adapter between provider behavior and
 orchestration. Herdr keeps agents in normal terminals and uses detection
 manifests or reported states; Agentbox continues to use structured protocols.
