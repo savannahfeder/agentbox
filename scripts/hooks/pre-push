@@ -130,12 +130,16 @@ refuse() {
   exit 1
 }
 
+# Bound local workers on shared machines; callers can explicitly choose another cap.
+export VITEST_MAX_FORKS="${VITEST_MAX_FORKS:-2}"
+export VITEST_MIN_FORKS="${VITEST_MIN_FORKS:-1}"
+
 # A PUSH RUNS THE TESTS FOR WHAT IT CHANGED, NOT ALL OF THEM (2026-10-01).
 #
 # Running all 618 files on every push, with several agents pushing at once,
 # took 170 to 1964 seconds against about 25 on a quiet Mac, and agents spent
-# most of their run waiting here. GitHub runs the whole suite on every push to
-# the public repo, so this runs `vitest related` on the files the push carries:
+# most of their run waiting here. GitHub runs the whole suite on pull requests
+# and main, so this runs `vitest related` on the files the push carries:
 # their own tests and every test that imports them. The whole suite still runs
 # here when the push touches what every test depends on, when what changed
 # cannot be told, or when AGENTBOX_PUSH_FULL_SUITE is set.
@@ -162,7 +166,7 @@ else
       full_because="what this push changes cannot be told from here"
       break
     fi
-    if [ -n "$(git diff --name-only --diff-filter=D "$base" "$local_sha" | grep -E '\.(mjs|cjs|js|jsx|ts|tsx)$')" ]; then
+    if [ -n "$(git diff --name-only --diff-filter=D "$base" "$local_sha" | grep -E '\.(mjs|cjs|js|jsx|mts|cts|ts|tsx)$')" ]; then
       full_because="it deletes code something else may import"
       break
     fi
@@ -173,25 +177,38 @@ $refs
 EOF
 fi
 changed=$(printf '%s\n' "$changed" | sed '/^$/d' | sort -u)
-if [ -z "$full_because" ] && printf '%s\n' "$changed" | grep -qE '^(package(-lock)?\.json|vitest\.config\.mjs|tests/agentbox-home\.setup\.mjs|tests/app-home\.mjs|scripts/hooks/)'; then
+if [ -z "$full_because" ] && printf '%s\n' "$changed" | grep -qE '^(package(-lock)?\.json|vitest\.config\.mjs|tests/agentbox-home\.setup\.mjs|tests/app-home\.mjs|scripts/hooks/|scripts/lib/(test-plan|tests-that-read)\.mjs|scripts/test-what-changed\.mjs)'; then
   full_because="it changes what every test depends on"
 fi
-code=$(printf '%s\n' "$changed" | grep -E '\.(mjs|cjs|js|jsx|ts|tsx|json|css|html)$' || true)
+# The shell runner cannot preserve arbitrary filename word boundaries. Prefer
+# complete coverage over accidentally handing Vitest a split or quoted path.
+if [ -z "$full_because" ] && printf '%s\n' "$changed" | grep -q '[[:space:]"*?[]'; then
+  full_because="a changed path cannot be safely represented by the shell selector"
+fi
+code=$(printf '%s\n' "$changed" | grep -E '\.(mjs|cjs|js|jsx|mts|cts|ts|tsx|json|css|html)$' || true)
+
+# Text readers matter for documentation too, and a failed discovery must not
+# become an empty selection. Paths with unsafe shell boundaries fell back above.
+readers=""
+if [ -z "$full_because" ] && [ -n "$changed" ]; then
+  if ! readers=$(node scripts/lib/tests-that-read.mjs $changed); then
+    full_because="source-reader discovery failed"
+  elif printf '%s\n' "$readers" | grep -q '[[:space:]"*?[]'; then
+    full_because="source-reader paths cannot be safely represented by the shell selector"
+  fi
+fi
 
 if [ -n "$full_because" ]; then
   runargs="run"
   echo "pre-push: running the whole suite, because $full_because..."
-elif [ -z "$code" ]; then
-  echo "pre-push: this push changes no code, so there is nothing to test here."
-  echo "GitHub runs the whole suite on it after the push."
+elif [ -z "$code" ] && [ -z "$readers" ]; then
+  echo "pre-push: this push changes no code with identified tests, so there is nothing to test here."
+  echo "GitHub runs the whole suite on pull requests and main."
   exit 0
 else
-  # And the tests that read a changed file as text, which `related` cannot
-  # see: three of them shipped red in a359d81 (scripts/lib/tests-that-read.mjs).
-  readers=$(node scripts/lib/tests-that-read.mjs $code 2>/dev/null || true)
   runargs="related --run --passWithNoTests $(printf '%s\n' "$code" $readers | tr '\n' ' ')"
-  echo "pre-push: running the tests for the $(printf '%s\n' "$code" | wc -l | tr -d ' ') file(s) this push changes."
-  echo "GitHub runs the whole suite on it after the push."
+  echo "pre-push: running affected importing and source-reading tests."
+  echo "GitHub runs the whole suite on pull requests and main."
 fi
 started=$(date +%s)
 

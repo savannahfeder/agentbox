@@ -4,7 +4,7 @@
 // here read a source file with readFileSync instead and check what it says,
 // and those are invisible to it: on 2026-10-04 a359d81 shipped with three of
 // them red because a change to Thread.tsx ran one test file, not four
-// (tests/a-test-that-reads-a-file-runs-when-that-file-changes.test.mjs).
+// (tests/tooling/a-test-that-reads-a-file-runs-when-that-file-changes.test.mjs).
 //
 // A test reads a file when its text names it the ways tests here do: the
 // repo path ('renderer/src/components/Thread.tsx'), a URL ending in it, or
@@ -30,13 +30,26 @@ export function testsThatRead(changed, root = process.cwd()) {
     // longer quoted path or URL after a slash.
     return new RegExp(`['"\`](?:[^'"\`\\n]*/)?${escape(name)}['"\`]`);
   });
-  let files = [];
-  try { files = fs.readdirSync(path.join(root, 'tests')).filter((f) => f.endsWith('.test.mjs')); } catch { return []; }
+  // Match Vitest's nested tests/** scope, but never walk symlinked directories.
+  function walk(dir, prefix = 'tests') {
+    const found = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const relative = `${prefix}/${entry.name}`;
+      if (entry.isDirectory()) found.push(...walk(path.join(dir, entry.name), relative));
+      else if (entry.isFile() && entry.name.endsWith('.test.mjs')) found.push(relative);
+    }
+    return found;
+  }
+  let files;
+  try { files = walk(path.join(root, 'tests')).sort(); } catch (error) {
+    if (error.code === 'ENOENT' && !fs.existsSync(path.join(root, 'tests'))) return [];
+    throw error;
+  }
   const out = [];
   for (const f of files) {
     let text = '';
-    try { text = fs.readFileSync(path.join(root, 'tests', f), 'utf8'); } catch { continue; }
-    if (patterns.some((re) => re.test(text))) out.push(`tests/${f}`);
+    text = fs.readFileSync(path.join(root, f), 'utf8');
+    if (patterns.some((re) => re.test(text))) out.push(f);
   }
   return out;
 }

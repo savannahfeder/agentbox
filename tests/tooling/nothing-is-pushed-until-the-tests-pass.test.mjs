@@ -22,7 +22,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const HOOK = path.join(root, 'scripts/hooks/pre-push');
 const INSTALLER = path.join(root, 'scripts/install-hooks.mjs');
 
@@ -95,7 +95,7 @@ function flakyVitest(dir, { redFiles, stillRedOnRetry = false }) {
 /**
  * Runs the real hook the way git runs it: cwd at the tree root, refs on stdin,
  *  and git's own variables in the environment. */
-function runHook(dir, stdin, env = {}, args = []) {
+function runHook(dir, stdin, env = {}, args = [], { readerError = false } = {}) {
   const hook = path.join(dir, 'pre-push');
   fs.copyFileSync(HOOK, hook);
   fs.chmodSync(hook, 0o755);
@@ -103,6 +103,10 @@ function runHook(dir, stdin, env = {}, args = []) {
   // the throwaway repo needs it too.
   fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
   fs.copyFileSync(path.join(root, 'scripts/red-test-files.mjs'), path.join(dir, 'scripts/red-test-files.mjs'));
+  fs.mkdirSync(path.join(dir, 'scripts/lib'), { recursive: true });
+  const reader = path.join(dir, 'scripts/lib/tests-that-read.mjs');
+  if (readerError) fs.writeFileSync(reader, 'process.exit(1);');
+  else fs.copyFileSync(path.join(root, 'scripts/lib/tests-that-read.mjs'), reader);
   const r = spawnSync(hook, args, { cwd: dir, input: stdin, encoding: 'utf8', env: { ...process.env, AGENTBOX_PUSH_FULL_SUITE: '', ...env } });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }
@@ -217,6 +221,19 @@ describe('the hook decides whether the push happens', () => {
     expect(seen.filter((l) => l.startsWith('GIT_'))).toEqual([]);
   });
 
+  it('bounds workers by default while preserving a deliberate override', () => {
+    const dir = tmpRepo('workers');
+    const bin = path.join(dir, 'node_modules/.bin/vitest');
+    fs.mkdirSync(path.dirname(bin), { recursive: true });
+    fs.writeFileSync(bin, '#!/bin/sh\necho "$VITEST_MAX_FORKS/$VITEST_MIN_FORKS" > workers-seen\nexit 0\n');
+    fs.chmodSync(bin, 0o755);
+    const refs = `refs/heads/main ${SHA} refs/heads/main ${ZERO}\n`;
+    expect(runHook(dir, refs, { VITEST_MAX_FORKS: '', VITEST_MIN_FORKS: '' }).code).toBe(0);
+    expect(fs.readFileSync(path.join(dir, 'workers-seen'), 'utf8').trim()).toBe('2/1');
+    expect(runHook(dir, refs, { VITEST_MAX_FORKS: '4', VITEST_MIN_FORKS: '1' }).code).toBe(0);
+    expect(fs.readFileSync(path.join(dir, 'workers-seen'), 'utf8').trim()).toBe('4/1');
+  });
+
   it('costs nothing when git hands it nothing, which is what a rejected branch looks like', () => {
     const dir = tmpRepo('empty');
     fakeVitest(dir, { exitCode: 1 });
@@ -328,6 +345,28 @@ describe('a push tests what it changed', () => {
     expect(calls()[0]).not.toContain('related');
   });
 
+  it('runs a nested source-reading test for a documentation-only push', () => {
+    const { dir, calls } = repoWithBase('doc-reader');
+    const base = commit(dir, { 'tests/docs/guide.test.mjs': "readFileSync('docs/notes.md')" });
+    const head = commit(dir, { 'docs/notes.md': 'updated guide' });
+    runHook(dir, `refs/heads/main ${head} refs/heads/main ${base}\n`);
+    expect(calls()[0]).toContain('tests/docs/guide.test.mjs');
+  });
+
+  it('runs the whole suite when source-reader discovery fails', () => {
+    const { dir, calls, base } = repoWithBase('reader-error');
+    const head = commit(dir, { 'main/a.mjs': 'export const a = 9;' });
+    runHook(dir, `refs/heads/main ${head} refs/heads/main ${base}\n`, {}, [], { readerError: true });
+    expect(calls()[0]).not.toContain('related');
+  });
+
+  it('runs the whole suite when a changed path contains spaces', () => {
+    const { dir, calls, base } = repoWithBase('path-space');
+    const head = commit(dir, { 'main/space in name.mjs': 'export const value = 1;' });
+    runHook(dir, `refs/heads/main ${head} refs/heads/main ${base}\n`);
+    expect(calls()[0]).not.toContain('related');
+  });
+
   it('runs the whole suite when asked to', () => {
     const { dir, calls, base } = repoWithBase('forced');
     const head = commit(dir, { 'main/a.mjs': 'export const a = 5;\n' });
@@ -417,7 +456,7 @@ describe('the hook is switched on without anyone remembering to', () => {
 // with a stranger's commits, including folders that are not repositories at all.
 describe('the first task s sentence is about the folder, not about wherever we were started from', () => {
   it('says a folder that is not a repository was last touched, whatever GIT_DIR says', async () => {
-    const { lastCommit } = await import('../main/first-run.mjs');
+    const { lastCommit } = await import('../../main/first-run.mjs');
     const notARepo = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-notarepo-'));
     fs.writeFileSync(path.join(notARepo, 'main.py'), 'print(1)\n');
 
@@ -432,7 +471,7 @@ describe('the first task s sentence is about the folder, not about wherever we w
   });
 
   it('still gives git s own answer for a folder that really is a repository', async () => {
-    const { lastCommit } = await import('../main/first-run.mjs');
+    const { lastCommit } = await import('../../main/first-run.mjs');
     const repo = tmpRepo('realrepo');
     fs.writeFileSync(path.join(repo, 'a.txt'), 'hello\n');
     execFileSync('git', ['add', '-A'], { cwd: repo });

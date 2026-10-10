@@ -22,9 +22,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import picomatch from 'picomatch';
 import { fileURLToPath } from 'node:url';
-import config, { SUITE_INCLUDE, SUITE_EXCLUDE } from '../vitest.config.mjs';
+import config, { SUITE_INCLUDE, SUITE_EXCLUDE } from '../../vitest.config.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 // What vitest would actually decide about a path, include and exclude together.
 const wouldRun = (p) =>

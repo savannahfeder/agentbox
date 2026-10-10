@@ -1,4 +1,5 @@
-// A PULL REQUEST FROM A FORK RUNS THE TESTS, AND RUNS THEM WITH NO KEYS.
+// PRs from forks retain read-only validation; feature pushes must not duplicate
+// the Linux, macOS, or build jobs already run for the PR.
 //
 // w-bde446f1aa, 2026-10-07. The workflow ran on `push` only, and a push to a
 // fork happens in the fork, so not one of the outside pull requests open that
@@ -14,8 +15,10 @@
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
+import { load } from 'js-yaml';
 
 const workflow = fs.readFileSync('.github/workflows/tests.yml', 'utf8');
+const config = load(workflow);
 const dependabot = fs.readFileSync('.github/dependabot.yml', 'utf8');
 const code = workflow.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
 
@@ -24,14 +27,11 @@ describe('the tests workflow', () => {
     expect(code).toMatch(/^on:[\s\S]*^\s{2}pull_request:/m);
   });
 
-  it('still runs on every push', () => {
-    expect(code).toMatch(/^\s{2}push:\n\s{4}branches: \['\*\*'\]/m);
-  });
-
-  // A branch of this repository is already run by its push; only a fork's
-  // pull request needs the second trigger, so one commit is never paid twice.
-  it('runs the pull request trigger only for forks', () => {
-    expect(code).toContain("if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository");
+  it('runs pushes to main and pull requests without duplicating feature-branch jobs', () => {
+    expect(config.on.push.branches).toEqual(['main']);
+    expect(config.on).toHaveProperty('pull_request');
+    expect(config.on).toHaveProperty('workflow_dispatch');
+    for (const job of Object.values(config.jobs)) expect(job.if).toBeUndefined();
   });
 
   it('gives the job a read-only token', () => {

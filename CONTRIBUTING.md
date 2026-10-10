@@ -32,6 +32,9 @@ npm run test:changed # the tests for what you changed
   browser (`--chrome`), no API key ever goes into a worker's environment, and
   nothing personal is committed.
 
+See [docs/testing.md](docs/testing.md) for affected-test selection, full-suite
+fallbacks, and profiling.
+
 ## Using AI to write it
 
 Fine, and expected: this is an app for running coding agents. But you are the
