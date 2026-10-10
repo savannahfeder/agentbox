@@ -37,6 +37,11 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      # A shell-profile integration test exercises macOS-style zsh on Linux too.
+      - name: Install test shell
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes zsh
       - run: npm ci
       - run: npm test -- --reporter=basic
 

@@ -47,7 +47,9 @@ explicitly requests a full push check. Set `VITEST_MAX_FORKS` and
 
 Pull requests run the complete suite on Linux and macOS, plus typechecking and a build. Pushes to main validate the merged result.
 Feature-branch pushes do not duplicate the PR jobs. A branch without a PR can
-be checked through the manual workflow. Fork PRs receive no release credentials.
+be checked through the manual workflow. Fork PRs receive no release credentials. The Linux test job installs zsh because
+the shell-profile integration test exercises a real interactive zsh session.
+Install zsh locally when running the complete suite on Linux.
 
 Use affected tests during development and for a narrow final local check.
 Run full locally for shared infrastructure, dependency changes, deleted source,

@@ -34,6 +34,12 @@ describe('the tests workflow', () => {
     for (const job of Object.values(config.jobs)) expect(job.if).toBeUndefined();
   });
 
+  it('provides zsh for the real shell-profile integration test on Linux', () => {
+    const commands = config.jobs['vitest-linux'].steps.map(step => step.run || '').join('\n');
+    expect(commands).toMatch(/apt-get install[^\n]*\bzsh\b/);
+    expect(config.jobs.vitest.steps.map(step => step.run || '').join('\n')).not.toMatch(/apt-get/);
+  });
+
   it('gives the job a read-only token', () => {
     expect(code).toMatch(/^permissions:\n\s{2}contents: read$/m);
     expect(code).not.toMatch(/contents: write|pull-requests: write|id-token: write/);
