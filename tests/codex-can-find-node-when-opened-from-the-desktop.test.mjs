@@ -14,6 +14,7 @@ import { refreshAgentModels } from '../main/refresh-agent-models.mjs';
 import { askSmallModel } from '../main/row-label.mjs';
 import { installedAgent } from '../main/agent-updates.mjs';
 import { codexLaunchEnv } from '../main/codex-launch-env.mjs';
+import { waitFor } from './waiting.mjs';
 
 const dirs = [];
 const setups = [];
@@ -63,12 +64,10 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
 }
 
 async function settled(setup) {
-  for (let n = 0; n < 200; n++) {
+  return waitFor('Codex setup to finish', () => {
     const state = setup.status('codex');
-    if (state.phase === 'ready' || state.phase === 'failed') return state;
-    await new Promise(resolve => setTimeout(resolve, 10));
-  }
-  return setup.status('codex');
+    return state.phase === 'ready' || state.phase === 'failed' ? state : false;
+  });
 }
 
 describe('Codex opened from the desktop', () => {
