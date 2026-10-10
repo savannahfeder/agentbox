@@ -1,5 +1,6 @@
 // A command is an operation, never prose asking a model to imitate a CLI.
 import { CLAUDE_COMMANDS, commandWords } from './claude-commands.mjs';
+import { harnessDefinition } from './harness-definitions.mjs';
 const command = (name, description, argumentHint = null, aliases = []) => ({ name, description, menuDescription: null, whole: true, argumentHint, aliases });
 export const CODEX_COMMANDS = [
  command('model','Show models or change this task’s model','[model]'),
@@ -23,12 +24,18 @@ export const LOCAL_COMMANDS = CODEX_COMMANDS.filter(c=>['model','effort','diff',
 // is refused on Codex for now, in a sentence that says why, because that call
 // has never been made against a real server here.
 const FORK = command('fork','Start a new task from this conversation','<what to try instead>');
+const COMMAND_MENUS = {
+ codex: CODEX_COMMANDS,
+ claude: [command('remote-control','Continue this conversation in Claude on another device',null,['rc']),FORK,...CLAUDE_COMMANDS.map(c=>LOCAL_COMMANDS.find(l=>l.name===c.name)??c),...LOCAL_COMMANDS.filter(l=>!CLAUDE_COMMANDS.some(c=>c.name===l.name))],
+ local: LOCAL_COMMANDS,
+};
 export function providerCommands(engine) {
  // NOT ON THE CODEX MENU, because this menu's rule is that it offers nothing
  // that engine cannot run, and Codex forking is not connected yet. Typed there
  // it gets the ordinary unavailable refusal, which points at the native Codex
  // client, where `codex fork` genuinely works.
- return engine==='codex' ? CODEX_COMMANDS : [command('remote-control','Continue this conversation in Claude on another device',null,['rc']),FORK,...CLAUDE_COMMANDS.map(c=>LOCAL_COMMANDS.find(l=>l.name===c.name)??c),...LOCAL_COMMANDS.filter(l=>!CLAUDE_COMMANDS.some(c=>c.name===l.name))];
+ const definition = harnessDefinition(engine) ?? harnessDefinition();
+ return COMMAND_MENUS[definition.commandMenu] ?? [];
 }
 export function providerCommand(text, engine) {
  if(typeof text!=='string')return null;
@@ -38,7 +45,8 @@ export function providerCommand(text, engine) {
  const cmd=providerCommands(engine).find(c=>commandWords(c).includes(word));
  if(!cmd) return {name:word,args,route:'unavailable'};
  if(cmd.name==='fork')return {name:'fork',args,route:'fork'};
- return {name:cmd.name,args,route:cmd.name==='remote-control'?'remote':engine==='codex'?'codex':LOCAL_COMMANDS.some(c=>c.name===cmd.name)?'local':'claude'};
+ const route = (harnessDefinition(engine) ?? harnessDefinition()).commandRoute;
+ return {name:cmd.name,args,route:cmd.name==='remote-control'?'remote':route==='codex'?'codex':LOCAL_COMMANDS.some(c=>c.name===cmd.name)?'local':route};
 }
 export function reviewTarget(args='') {
  args=args.trim();

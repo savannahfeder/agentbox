@@ -134,6 +134,18 @@ export function createSourceUpdater({
   log = console,
   onChanged = () => {},
   npm = defaultNpm(appDir),
+  // THE STEP `npm start` DOES AND THIS DID NOT. A from-source run gets its
+  // name, icon and bundle id from scripts/brand-electron.mjs, which npm runs
+  // before Electron. An update does not go through npm: it builds and calls
+  // app.relaunch(), which re-executes the same binary. So the branding had
+  // never once run on a self-restart, and a fix to it could sit on disk for
+  // days without reaching the bundle (measured 2026-10-09, with the
+  // Info.plist four days older than the fix meant to change it).
+  // Imported here and not at the top of the file: scripts/ is deliberately not
+  // in the downloadable build (`build.files`, and a test holds it there), and
+  // a static import would stop that build booting at all. This path only ever
+  // runs from source, where the script is on disk.
+  brand = async () => (await import('../scripts/brand-electron.mjs')).brandElectron(),
   relaunch = () => { app?.relaunch(); app?.quit(); },
 } = {}) {
   const git = gitIn(appDir);
@@ -266,6 +278,11 @@ export function createSourceUpdater({
       set({ phase: 'ready', error: `The new code would not build: ${failureLine(built.out)}` });
       return;
     }
+    // Before the relaunch, never after: the next launch is the one that reads
+    // the Info.plist. And never fatally, for the reason brand-electron.mjs
+    // opens with about itself — an app that does not come back up is worse
+    // than one wearing the wrong icon.
+    try { await brand(); } catch (e) { log.warn?.('[source-updater] could not rebrand the bundle:', e?.message ?? e); }
     log.info?.('[source-updater] built', state.newVersion, '- relaunching');
     relaunch();
   }

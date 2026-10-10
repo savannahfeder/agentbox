@@ -110,6 +110,7 @@ export interface AgentTurnLike {
 // ONE THING THE AGENT RAN, between two messages. Shape B.
 export interface AgentWorkLike {
   kind: 'work';
+  standalone?: true;
   at: number;
   verb: string;
   subject: string;

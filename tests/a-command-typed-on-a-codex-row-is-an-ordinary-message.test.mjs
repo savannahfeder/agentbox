@@ -124,24 +124,21 @@ describe('what the thread calls a blocked row after a slash command', () => {
     }
   });
 
-  it('says it stopped and asked you on a Codex row, which is what happened', () => {
-    // Codex knows none of the eight. `/usage` reached it as her message, the
-    // brief rode with it, and the row came back blocked for the ordinary
-    // reason: it has something to ask her.
-    expect(lineFor('/usage', 'codex')).toBe('It stopped and asked you');
-    expect(lineFor('/context', 'codex')).toBe('It stopped and asked you');
+  it('keeps the ordinary Codex answer without pretending delivery asked a question', () => {
+    // Codex knows none of the eight. The system's blocked line delivers the
+    // answer; only an agent's own blocked line says it stopped for help.
+    expect(lineFor('/usage', 'codex')).toBe('It came back to you');
+    expect(lineFor('/context', 'codex')).toBe('It came back to you');
   });
 
-  it('leaves every other blocked row saying exactly what it said, on both', () => {
+  it('leaves an ordinary delivered answer as the last event, on both', () => {
     for (const engine of [...ONE_ENGINE, 'codex']) {
-      expect(lineFor('Yes, merge it.', engine), String(engine)).toBe('It stopped and asked you');
-      expect(lineFor('/deploy the thing', engine), String(engine)).toBe('It stopped and asked you');
+      expect(lineFor('Yes, merge it.', engine), String(engine)).toBe('It came back to you');
+      expect(lineFor('/deploy the thing', engine), String(engine)).toBe('It came back to you');
     }
   });
 
-  // AND NOTHING ELSE IN THE THREAD MOVED. The engine reaches exactly one
-  // sentence; a row's whole history on Codex is otherwise the history it was.
-  it('changes that one line and no other', () => {
+  it('adds the command acknowledgement only on Claude, preserving the rest of the history', () => {
     const lines = [
       { ts: 1000, source: 'founder', patch: { title: 'A row', body: 'Do the thing' } },
       { ts: 2000, source: 'agent', claim: { holder: 's-1', leaseUntil: 3000 } },
@@ -152,9 +149,9 @@ describe('what the thread calls a blocked row after a slash command', () => {
     ];
     const claude = threadEvents(lines, DEFAULT_ENGINE).map((e) => e.said);
     const codex = threadEvents(lines, 'codex').map((e) => e.said);
-    expect(claude.slice(0, -1)).toEqual(codex.slice(0, -1));
+    expect(claude.slice(0, -1)).toEqual(codex);
     expect(claude.at(-1)).toBe('It answered you');
-    expect(codex.at(-1)).toBe('It stopped and asked you');
+    expect(codex.at(-1)).toBe('It came back to you');
   });
 
   it('is asked with the row\'s own engine all the way down from the pane', () => {
@@ -239,15 +236,15 @@ describe('a Mac with one coding agent is exactly where it was', () => {
     expect(answers).toEqual(new Set([true, false]));
   });
 
-  // The blocked sentence as the old code chose it: on `commandPrompt` alone,
-  // with no engine in the question. It is the whole of what changed here.
+  // A command gets an acknowledgement. Ordinary replies finish with the
+  // answer itself, not a system status that pretends the agent asked for help.
   //
   // ON THE TRIMMED REPLY, because that is what the old code was asking. That
   // is pre-existing, it is the same on both engines, and modelling it any
   // other way here would make this file assert a change it is not making.
-  const wasSaid = (text) => (commandPrompt(text.trim()) !== null ? 'It answered you' : 'It stopped and asked you');
+  const wasSaid = (text) => (commandPrompt(text.trim()) !== null ? 'It answered you' : 'It came back to you');
 
-  it('says what it used to about every reply on such a Mac', () => {
+  it('acknowledges commands and leaves ordinary replies at the answer on such a Mac', () => {
     const ledger = (answer) => [
       { ts: 1000, source: 'agent', patch: { title: 'A row', body: 'Say merge it.' } },
       { ts: 2000, source: 'founder', patch: { answer } },
@@ -264,6 +261,6 @@ describe('a Mac with one coding agent is exactly where it was', () => {
 
   it('and those fixtures really do produce both sentences', () => {
     expect(new Set(TEXTS.filter(Boolean).map(wasSaid)))
-      .toEqual(new Set(['It answered you', 'It stopped and asked you']));
+      .toEqual(new Set(['It answered you', 'It came back to you']));
   });
 });

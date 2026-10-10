@@ -32,9 +32,20 @@ describe('the card she picked', () => {
     expect(rule('.toast')).toContain('grid-template-areas: "title title" "line keys";');
   });
 
-  it('sits bottom right, out of the middle of the page', () => {
-    expect(rule('.toast')).toContain('right: 56px;');
-    expect(rule('.toast')).toContain('bottom: 56px;');
+  // "the placement of the toast is weird, too much padding from bottom
+  // corner". At 56px it floated 34px inside the pane, whose edge is 22px in
+  // from the window (measured on the built app at 1512x945). At 30px its
+  // corner lands on the pane's own corner mark, which sits 8px in from the
+  // pane's corner; 34 and 38 were tried and left the mark peeking out beside
+  // it, which reads as a mistake.
+  it('sits in the bottom right corner, on the pane\'s corner mark', () => {
+    expect(rule('.toast')).toContain('right: 30px;');
+    expect(rule('.toast')).toContain('bottom: 30px;');
+  });
+
+  it('is not back at the distance that read as too much padding', () => {
+    expect(rule('.toast')).not.toContain('right: 56px;');
+    expect(rule('.toast')).not.toContain('bottom: 56px;');
   });
 
   it('runs its timer only when there is something to run out', () => {

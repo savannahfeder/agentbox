@@ -98,6 +98,8 @@ describe('where it goes', () => {
   it('lets the config point a copy somewhere else', () => {
     expect(feedbackUrl({ feedbackUrl: 'https://mine.example/f' }, baked, {})).toBe('https://mine.example/f');
   });
+  // Only reachable when the shipped address is passed over on purpose; every
+  // real copy falls back to FEEDBACK_ADDRESS (feedback-sends-from-every-copy).
   it('has nowhere to send when neither is set, and a blank does not count', () => {
     expect(feedbackUrl({}, null, {})).toBe(null);
     expect(feedbackUrl({ feedbackUrl: '  ' }, null, {})).toBe(null);

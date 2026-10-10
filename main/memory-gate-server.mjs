@@ -104,6 +104,10 @@ export class MemoryGateServer {
     // the app-server's own `thread.id`. Answering null means "not this app's",
     // and such a command is let straight through.
     ownerOf = null,
+    // IS THIS ROW HER URGENT ONE (w-713aba0c89), asked live on every command so
+    // a row raised to Urgent counts at once. Only the app answers it: nothing in
+    // a worker's own request can make its command urgent.
+    urgentFor = null,
     readPressure = readMacPressure,
     sampleProcesses = listProcesses,
     pollMs = 2_000,
@@ -132,6 +136,7 @@ export class MemoryGateServer {
     this.sharedGrantMs = Number.isFinite(sharedGrantMs) ? sharedGrantMs : this.gate.maxWaitMs;
     this.scoreFor = scoreFor;
     this.ownerOf = ownerOf;
+    this.urgentFor = urgentFor;
     this.readPressure = readPressure;
     this.sampleProcesses = sampleProcesses;
     this.pollMs = pollMs;
@@ -299,7 +304,24 @@ export class MemoryGateServer {
     let owner;
     try { owner = this.ownerOf(session); } catch { return null; }
     if (!owner?.item) return null;
-    return { item: String(owner.item), product: owner.product ?? null };
+    return { item: String(owner.item), product: owner.product ?? null, session };
+  }
+
+  /**
+   * A CODEX THREAD'S TURN IS OVER: LET GO OF EVERY GRANT IT STILL HOLDS
+   * (w-713aba0c89). Codex sends no "after" report for a command that failed, so
+   * such a grant outlives its command, and on a shared app-server nothing else
+   * ever sees it end. A turn that has ended is waiting on none of its commands.
+   * Only grants that named this thread are touched: a Claude worker's names its
+   * row, and goes when its own process does.
+   */
+  releaseSession(session) {
+    if (typeof session !== 'string' || !session) return;
+    for (const r of [...this.gate.running.values()]) {
+      if (r.session !== session) continue;
+      this.grants.delete(r.id);
+      this.gate.finish(r.id);
+    }
   }
 
   _pre(body, req, res) {
@@ -315,10 +337,12 @@ export class MemoryGateServer {
     const id = String(hook.tool_use_id || `${body.ppid}-${Date.now()}-${Math.random()}`);
     const live = typeof this.scoreFor === 'function' ? this.scoreFor(whose.product, whose.item) : null;
     const score = Number.isFinite(live) ? live : Number(body.score) || 0;
+    let urgent = false;
+    try { urgent = typeof this.urgentFor === 'function' && this.urgentFor(whose.product, whose.item) === true; } catch { urgent = false; }
     this.counts.asked++;
     let answered = false;
     this.gate.submit({
-      id, command, score, item: whose.item, product: whose.product,
+      id, command, score, urgent, item: whose.item, product: whose.product, session: whose.session ?? null,
       background: !!hook?.tool_input?.run_in_background,
     }, (decision) => {
       answered = true;
@@ -456,7 +480,10 @@ export class MemoryGateServer {
         stack.push(...(children.get(p.pid) ?? []));
       }
       for (const g of grants) {
-        if (grants.length > 1) g.ambiguous = true;
+        if (grants.length > 1) {
+          g.ambiguous = true;
+          this.gate.share(g.id, anchorPid);
+        }
         this.gate.observe(g.id, Math.round(mb));
         // NOTHING RUNNING UNDER IT FOR A WHILE: its "after" report was lost
         // (the hook was killed, the agent crashed mid-call). Every running

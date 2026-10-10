@@ -5,10 +5,13 @@
 // to as a secret (`FEEDBACK_TO`, cloud/supabase/functions/feedback), so the
 // address is in no file of this public repository and no install can show it.
 //
-// WHERE IT GOES IS BAKED IN, like the analytics key (main/analytics.mjs): the
-// release writes `bakedFeedbackUrl` into the packaged package.json, a copy run
-// from source carries none, and a `feedbackUrl` in zero.config.json outranks
-// both. A copy with nowhere to send says so in words rather than pretending.
+// WHERE IT GOES SHIPS IN THE CODE (w-58e758c81e, 2026-10-09). It used to be
+// baked only into the packaged Mac app, so the npm package and a git clone,
+// the two installs the README offers, told everyone who pressed Send that
+// feedback was not set up, and lost what they wrote. FEEDBACK_ADDRESS is the
+// server function, not an inbox. A `feedbackUrl` in zero.config.json, the
+// FEEDBACK_URL variable, or a `bakedFeedbackUrl` in a packaged package.json
+// still outrank it.
 //
 // It is not behind the diagnostics switch. That switch is about what Agentbox
 // sends on its own; this is something a person typed and pressed Send on.
@@ -16,11 +19,13 @@ import { createRequire } from 'node:module';
 import { checkFeedback } from '../shared/feedback.mjs';
 import { Name, readEnv } from '../shared/product-name.mjs';
 
+export const FEEDBACK_ADDRESS = 'https://lywvthwkhkfzhqivvond.supabase.co/functions/v1/feedback';
+
 function bakedUrl() {
   try {
-    return createRequire(import.meta.url)('../package.json')?.bakedFeedbackUrl ?? null;
+    return createRequire(import.meta.url)('../package.json')?.bakedFeedbackUrl ?? FEEDBACK_ADDRESS;
   } catch {
-    return null;
+    return FEEDBACK_ADDRESS;
   }
 }
 
