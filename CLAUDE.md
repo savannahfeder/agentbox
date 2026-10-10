@@ -19,7 +19,8 @@ rules that are not obvious from them.
 - Name the test file after the behaviour, as a sentence
   (`a-reply-moves-the-agent-row.test.mjs`), and open it with a comment saying
   what broke and how you measured it.
-- Before you report, run the tests for what you changed: `npm run test:changed`
+- Before you report, run the tests for the complete PR diff with an explicit
+  base when needed (`npm run test:changed -- --base upstream/main`): `npm run test:changed`
   (or `npm run test:changed <files>`). That is your own tests, every test that
   imports those files, and every test that reads one of them as text —
   `vitest related` alone misses that last kind, which is how three red tests

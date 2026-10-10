@@ -50,7 +50,7 @@ try {
     try { return git(['config', '--get', 'core.hooksPath']); } catch { return ''; }
   })();
   if (current === HOOKS_DIR) {
-    say('the pre-push hook is already on. The whole suite runs before any push.');
+    say('the pre-push hook is already on. Affected tests run before pushes; shared inputs require the full suite.');
     process.exit(0);
   }
   if (current && current !== HOOKS_DIR) {
@@ -58,7 +58,7 @@ try {
     process.exit(0);
   }
   git(['config', 'core.hooksPath', HOOKS_DIR]);
-  say('pre-push hook is on. The whole suite now runs before any push from this checkout.');
+  say('pre-push hook is on. Affected tests now run before pushes; shared inputs require the full suite.');
 } catch (err) {
   say(`could not set core.hooksPath (${err.message.split('\n')[0]}). No hook installed.`);
 }
