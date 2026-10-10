@@ -3,6 +3,8 @@
 import { claudeHarness } from './harnesses/claude.mjs';
 import { codexHarness } from './harnesses/codex.mjs';
 import { openCodeHarness } from './harnesses/opencode.mjs';
+import { grokHarness } from './harnesses/grok.mjs';
+import { piHarness } from './harnesses/pi.mjs';
 
 export const HARNESS_OPERATIONS = Object.freeze([
   'discover', 'binary', 'install', 'signIn', 'signInStatus', 'signInFiles',
@@ -45,6 +47,7 @@ export function createHarnessRegistry(adapters) {
 // name gets the real adapter, and it is deliberately absent from `ENGINES`
 // (shared/engines.mjs) so no row can choose it and no picker draws it until
 // that is turned on deliberately. The two decisions are separate on purpose.
-const registry = createHarnessRegistry([claudeHarness, codexHarness, openCodeHarness]);
+// Grok Build and pi are registered and not admitted, the same way.
+const registry = createHarnessRegistry([claudeHarness, codexHarness, openCodeHarness, grokHarness, piHarness]);
 export const harnessFor = id => registry.get(id);
 export const supportsHarnessOperation = (id, name) => registry.supports(id, name);
