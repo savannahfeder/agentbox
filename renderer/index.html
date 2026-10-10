@@ -2,7 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- maximum-scale stops iOS zooming in on a rotation or a tapped field and
+         staying zoomed; iOS still lets a person pinch to zoom. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
+    <!-- A phone that adds this page to its home screen opens it like an app
+         (main/phone-link.mjs). The desktop window ignores all four. The status
+         bar is solid, not translucent: translucent drew the page from under it
+         but sized it without it, leaving a black strip at the foot on an
+         iPhone (2026-10-09). -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Agentbox" />
+    <link rel="apple-touch-icon" href="/phone-icon.png" />
     <title>Agentbox</title>
   </head>
   <body>

@@ -1006,6 +1006,26 @@ export interface RepeatRule {
   lastOccurrence?: string;
 }
 
+/** Which address the phone QR code carries (main/phone-link.mjs). */
+export type PhoneRoute = 'wifi' | 'tailscale';
+export type PhoneDevice = { id: string; name: string; ip: string | null; firstSeen: number; lastSeen: number; live: boolean; alerts: boolean; alertError: string | null };
+export type PhoneLink = {
+  on: boolean;
+  listening: boolean;
+  error: string | null;
+  port: number;
+  /** The code carries an https address (Tailscale's certificate). */
+  secure: boolean;
+  /** Tailscale is still putting the https address up. */
+  settingUp: boolean;
+  via: PhoneRoute | null;
+  routes: Array<{ via: PhoneRoute; host: string }>;
+  url: string | null;
+  /** The QR code as an svg document. */
+  qr: string | null;
+  devices: PhoneDevice[];
+};
+
 declare global {
   interface Window {
     zero?: {
