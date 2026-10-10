@@ -180,6 +180,9 @@ export function runNodes(session: TraceSession): AgentEvent[] {
       // its status back are how a session talks to the app; they are the first
       // two lines of nearly every thread and they say nothing about the work.
       if (parts && isBookkeeping(parts[1])) continue;
+      // The supervisor saves a diff for the code viewer. Its trace entry keeps
+      // that file discoverable, but it is not a file the agent wrote.
+      if (parts?.[1] === 'Write' && /(?:^|\/)runs\/[^/]+\/the-change-it-made\.change$/.test(parts[2].trim())) continue;
       out.push(parts
         ? workLine(line.at, parts[1], parts[2])
         : workLine(line.at, '', line.text));
@@ -202,6 +205,7 @@ export function runNodes(session: TraceSession): AgentEvent[] {
 function saidLine(event: ThreadEvent): AgentWork {
   return {
     kind: 'work',
+    standalone: true,
     at: event.at,
     verb: event.said,
     subject: event.words ?? '',

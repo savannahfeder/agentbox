@@ -519,9 +519,10 @@ export function createCodexWorker({
   // read loop, so anything the server packs in BEHIND the response is caught,
   // and a `ready` that somehow came in AHEAD of it would belong to no watched
   // thread and be dropped -- costing a healthy worker its run at the deadline.
-  // The resume road has no such window, because `resumeThread` watches before
-  // it sends. If a Codex release ever reorders that, this is the sentence that
-  // says where to look.
+  // The resume road watches before sending, but an already-loaded thread does
+  // not repeat startup notifications. On 2026-10-07, 11 resumes of one loaded
+  // thread died at this deadline. Check that thread's current MCP connection
+  // on resume as well as listening for startup changes.
   let storeIsUp = !requireMcpServer;
   let storeTrouble = '';
   const waiting = [];
@@ -581,6 +582,39 @@ export function createCodexWorker({
       const timer = setTimeout(() => done(false), mcpReadyMs);
       timer?.unref?.();
       waiting.push(done);
+      if (resumeThreadId) {
+        const checkExistingStore = async () => {
+          let cursor;
+          const seen = new Set();
+          do {
+            if (ended || settled || storeIsUp) return;
+            const inventory = await server.request('mcpServerStatus/list', {
+              threadId: worker.threadId,
+              serverName: requireMcpServer,
+              detail: 'toolsAndAuthOnly',
+              ...(cursor ? { cursor } : {}),
+            });
+            if (ended || settled || storeIsUp) return;
+            const store = inventory?.data?.find(s => s.name === requireMcpServer);
+            // Newer Codex reports connection state. Older versions only offer
+            // discovered tools; a configured name alone is never proof.
+            if (store?.runtimeStatus === 'connected'
+              || (store && store.runtimeStatus == null && Object.keys(store.tools ?? {}).length > 0)) {
+              readStoreStatus({ name: requireMcpServer, status: 'ready' });
+              return;
+            }
+            if (store?.runtimeStatus) storeTrouble = `its connection is ${store.runtimeStatus}`;
+            cursor = inventory?.nextCursor;
+            if (cursor && seen.has(cursor)) throw new Error('store inventory repeated its pagination cursor');
+            if (cursor) seen.add(cursor);
+          } while (cursor);
+        };
+        // The existing deadline still owns the wait, even if this RPC hangs.
+        // A startup notification can also settle it while inventory is read.
+        checkExistingStore().catch(err => {
+          if (!ended && !settled && !storeIsUp) storeTrouble = err?.message ?? String(err);
+        });
+      }
     });
   };
 
@@ -595,6 +629,7 @@ export function createCodexWorker({
   const end = (code, signal = null, how = null) => {
     if (ended) return;
     ended = true;
+    for (const wake of waiting.splice(0)) wake(false);
     if (worker.threadId) { try { server.unwatch(worker.threadId); } catch { /* already gone */ } }
     worker.emit('exit', code, signal, how);
   };

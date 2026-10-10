@@ -92,6 +92,16 @@ for (const [size, name] of [
 }
 execFileSync('iconutil', ['-c', 'icns', iconset, '-o', path.join(repo, 'build', 'icon.icns')]);
 fs.rmSync(iconset, { recursive: true, force: true });
+
+// AND THE SAME DRAWING AS A PNG, because a notification banner cannot use the
+// .icns. Measured 2026-10-07 in the Electron the app runs from:
+// nativeImage.createFromPath on build/icon.icns returns an empty 0x0 image, so
+// the mark main/notify.mjs attaches to a banner has to be a png. It is written
+// here, from the same rasterised source, so it cannot drift from the icns the
+// way a hand-exported file would.
+const mark = path.join(repo, 'build', 'notification-icon.png');
+execFileSync('sips', ['-z', '256', '256', source, '--out', mark], { stdio: 'ignore' });
+console.log(`  build/notification-icon.png  256x256`);
 console.log(`\nbuild/icon.icns  (${(fs.statSync(path.join(repo, 'build', 'icon.icns')).size / 1024).toFixed(0)} KB)`);
 app.exit(0);
 }

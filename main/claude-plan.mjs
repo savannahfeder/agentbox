@@ -71,6 +71,9 @@ export function planLabel(raw) {
   if (!s) return null;
   const bare = s.replace(/^default_/, '').replace(/^claude_/, '');
   if (!bare) return null;
+  // Claude's saved Enterprise tier includes an internal name. Keep the raw
+  // tier for capacity decisions, but show only the subscription name.
+  if (bare === 'raven_enterprise') return 'Enterprise';
   return bare
     .split('_')
     .filter(Boolean)
@@ -95,25 +98,13 @@ export function isMaxTier(raw) {
  *  as it was". */
 export function readPlan(profile, { home = os.homedir(), file = null } = {}) {
   const at = file ?? planFile(profile, home);
+  const none = { known: false, max: false, label: null, tier: null, from: null, file: at };
   let account = null;
   try {
     account = JSON.parse(fs.readFileSync(at, 'utf8'))?.oauthAccount ?? null;
   } catch {
-    return planOfAccount(null, at);
+    return none;
   }
-  return planOfAccount(account, at);
-}
-
-/**
- * THE SAME ANSWER OFF AN `oauthAccount` SOMEBODY ALREADY HAS IN HAND.
- *
- *  Lifted out of `readPlan` so a caller that has read the file for its own
- *  reasons (main/runs-on.mjs, which also wants to know whether there is a login
- *  in there at all) does not carry a second copy of the tier ordering. One copy
- *  of that rule, and the file read stays in one place per caller.
- */
-export function planOfAccount(account, at = null) {
-  const none = { known: false, max: false, label: null, tier: null, from: null, file: at };
   if (!account || typeof account !== 'object') return none;
   // THE ORDER IS MOST SPECIFIC FIRST. A rate limit tier names the plan AND its
   // size (`max_20x` against `max_5x`), which is the thing worth showing; the

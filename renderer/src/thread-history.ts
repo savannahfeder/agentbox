@@ -398,6 +398,12 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
         continue;
       }
       if (status === 'blocked') {
+        // recordSessionResult delivers the agent's answer, then parks the
+        // thread with a system status. That is delivery, not a question.
+        if (line.source === 'system' && !askedACommand && events.at(-1)?.field === 'result') {
+          askedACommand = false;
+          continue;
+        }
         // HER OWN BLOCKED IS NOT THE AGENT STOPPING. She has no control that
         // writes it; the one thing that does is a Z putting a row back where
         // her reply found it (`withdrawReply`), and it read as "It stopped and

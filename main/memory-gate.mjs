@@ -33,6 +33,15 @@
 //     trips its own time limits, and stays frozen forever if the app dies.
 //   - No command waits forever. After `maxWaitMs` the agent is told no, with a
 //     reason it can act on, and the hook's own time limit sits above that.
+//   - AN URGENT ROW DOES NOT QUEUE (w-713aba0c89). Her only Urgent row on
+//     2026-10-07 was first in line for 34 minutes while no slot came free, so
+//     first in line bought nothing. Its commands now run whatever the slots and
+//     whatever "tight" says, and wait only while memory is critical. They still
+//     take a slot while they run, so everything else waits behind them.
+//   - COMMANDS MEASURED AS ONE FIGURE HOLD ONE SLOT (w-713aba0c89). Every Codex
+//     thread runs under one app-server, so two Codex commands at once read as
+//     the same number, and a `cat` beside a test run used to hold a slot of its
+//     own off the test run's gigabyte. A command known heavy still holds its own.
 
 import { CommandHistory, HEAVY_MB } from './memory-gate-history.mjs';
 import { NAME } from '../shared/product-name.mjs';
@@ -66,11 +75,23 @@ export const DEFAULTS = {
   agingMs: 5 * 60_000,
 };
 
-export function refusal(waitedMs) {
+/**
+ * IT SAYS WHICH OF THE TWO REASONS IT WAS (w-8386b3fd47). This sentence is the
+ * only account an agent ever gets of why its command did not run, and it used to
+ * blame memory either way. Two sessions were refused ordinary file reads while
+ * the coordinator itself reported normal pressure and 42% free, read the
+ * sentence, believed the machine was out of memory and spent their turns looking
+ * for a fault that was not there. A queue behind heavier work and a computer that
+ * is genuinely short are different things to be told.
+ */
+export function refusal(waitedMs, pressure = 'normal') {
   const minutes = Math.max(1, Math.round(waitedMs / 60_000));
-  return `This computer is short of memory, so ${NAME} held this command for ${minutes} minute${minutes === 1 ? '' : 's'} `
-    + 'while heavier work ran, and it still cannot start it. Do not retry it straight away. Carry on with anything '
-    + 'that does not need it, or end your turn and say you are waiting for memory.';
+  const held = `${NAME} held this command for ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const why = pressure === 'normal'
+    ? `${held} behind heavier work that has not finished, and it still cannot start it.`
+    : `This computer is short of memory, so ${held} while heavier work ran, and it still cannot start it.`;
+  return `${why} Do not retry it straight away. Carry on with anything that does not need it, `
+    + 'or end your turn and say what you are waiting for.';
 }
 
 export class MemoryGate {
@@ -109,6 +130,8 @@ export class MemoryGate {
       product: req.product ?? null,
       command: String(req.command ?? ''),
       score: Number.isFinite(Number(req.score)) ? Number(req.score) : 0,
+      urgent: req.urgent === true,
+      session: req.session ?? null,
       background: !!req.background,
       cls: this.history.classify(req.command),
       arrived: this.clock(),
@@ -131,6 +154,17 @@ export class MemoryGate {
     const r = this.running.get(String(id));
     if (!r || !Number.isFinite(mb)) return;
     r.peakMb = Math.max(r.peakMb ?? 0, mb);
+  }
+
+  /**
+   * This running command's memory reading is shared with others on the same
+   * agent process (`group`), so it is not its own figure. Nothing clears it.
+   */
+  share(id, group) {
+    const r = this.running.get(String(id));
+    if (!r || r.shared === group) return;
+    r.shared = group;
+    this._pump();
   }
 
   tick() { this._pump(); }
@@ -172,18 +206,25 @@ export class MemoryGate {
     for (const w of [...this.waiting.values()]) {
       if (now - w.arrived >= this.maxWaitMs) {
         this.waiting.delete(w.id);
-        for (const r of w.replies) r({ allow: false, reason: refusal(now - w.arrived) });
+        for (const r of w.replies) r({ allow: false, reason: refusal(now - w.arrived, this.pressure) });
       }
     }
     if (this.pressure === 'critical') return;
     let slotsUsed = 0;
     let lightUsed = 0;
+    const sharedGroups = new Set();
     for (const r of this.running.values()) {
-      if (this._holdsSlot(r, now)) slotsUsed++;
-      else if (r.cls === 'light') lightUsed++;
+      if (this._holdsSlot(r, now)) {
+        if (r.shared != null && r.cls !== 'heavy') {
+          if (sharedGroups.has(r.shared)) continue;
+          sharedGroups.add(r.shared);
+        }
+        slotsUsed++;
+      } else if (r.cls === 'light') lightUsed++;
     }
     let blocked = false;
     for (const w of this._ordered(now)) {
+      if (w.urgent) { this._admit(w, now); slotsUsed++; continue; }
       if (w.cls === 'light') {
         if (lightUsed < this.lightLane) { this._admit(w, now); lightUsed++; }
         continue;
@@ -199,7 +240,7 @@ export class MemoryGate {
     this.waiting.delete(w.id);
     this.running.set(w.id, {
       id: w.id, item: w.item, product: w.product, command: w.command, cls: w.cls,
-      background: w.background, startedAt: now, peakMb: null,
+      urgent: w.urgent, session: w.session, background: w.background, startedAt: now, peakMb: null, shared: null,
     });
     for (const r of w.replies) r({ allow: true, cls: w.cls });
   }
