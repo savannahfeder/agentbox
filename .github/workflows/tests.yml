@@ -10,18 +10,15 @@
 # payment method on it. A red cross on every push that means nothing at all is
 # the symptom to recognise.
 #
-# macOS AND NOT LINUX, ON PURPOSE. The app ships an arm64 dmg and nothing else,
-# and the suite is written against that: the Claude Code search asks a login
-# zsh, the fresh-user home links a macOS keychain, and a good number of the
-# test files reason about `/Users`, `darwin`, zsh or the keychain. Running the
-# suite somewhere the app never runs would tell you about that machine rather
-# than about the app. Nobody has measured whether it would pass on Linux and
-# this comment is not a claim that it would not.
+# LINUX AND MACOS. The suite runs on both. Omarchy and other Linux machines
+# use bash when zsh is absent, `~/.agentbox`, and Control-K for the palette.
+# The macOS job stays because the app still ships an arm64 dmg, and that job
+# still covers login zsh, the keychain, and `/Users`. A green run on one
+# machine does not stand in for the other.
 #
-# A macOS minute costs about ten Linux ones, so this is the expensive runner to
-# be on. It is worth knowing what the job actually takes before turning it on
-# for a busy fork: a whole job, checkout and `npm ci` included, has measured at
-# about a minute and a half.
+# A macOS minute costs about ten Linux ones, so the macOS runner is the
+# expensive one. A whole macOS job, checkout and `npm ci` included, has
+# measured at about a minute and a half.
 #
 # `push` ON EVERY BRANCH, AND `pull_request` FOR FORKS ONLY. A push covers any
 # branch of this repository that later becomes a pull request, so running both
@@ -69,6 +66,21 @@ jobs:
       # `npm ci` and not `npm install`: the lockfile is the point of running
       # this at all, and an install that quietly resolves something newer is a
       # green run against a tree nobody has.
+      - run: npm ci
+
+      - run: npx vitest run --reporter=basic
+
+  vitest-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
       - run: npm ci
 
       - run: npx vitest run --reporter=basic

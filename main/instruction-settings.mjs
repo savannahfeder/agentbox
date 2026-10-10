@@ -1,15 +1,9 @@
 // A fixed allowlist exposes the instruction files, never arbitrary paths.
 // Defaults are shipped separately so an edited live file can always be reset.
 //
-// THERE ARE THREE OF THEM NOW, NOT FOUR (w-3dc46f3a67). Five editable layers of
-// prompts was too many for a person to manage, so some were merged.
-//
-// A person opening that page is answering two questions, what should agents do
-// and how should they talk to me, so the writing rules and the finishing rules
-// became ONE document: `message-rules.md`, "How agents write to you". In
-// practice a rules file is mostly about how agents write to the person rather
-// than what they do, which is why the two were one thing all along.
-// `joinMessageRules` below carries the two old files into the new one.
+// General and writing instructions are one user document (w-fb0fe5e85a).
+// The old message id remains available for callers from an older renderer;
+// once migrated, it reads, saves and restores the general instructions.
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -25,6 +19,14 @@ import {nameSlug} from '../shared/product-name.mjs';
 const files = {rules:'founder.md',messages:'message-rules.md',adhd:'adhd-mode.md',system:'worker.md'};
 // The two names the joined document replaced, read only by the migration.
 const WAS_MESSAGES = ['writing-rules.md','finishing.md'];
+const UNIFIED = '.unified-agent-instructions';
+export function agentInstructionsUnified(appDir) {
+ return fs.existsSync(path.join(appDir,'briefs',UNIFIED));
+}
+function sectionFor(appDir,id) {
+ fileFor(id);
+ return id==='messages' && agentInstructionsUnified(appDir) ? 'rules' : id;
+}
 const defaults = JSON.parse(fs.readFileSync(fileURLToPath(new URL('../shared/instruction-defaults.json',import.meta.url)),'utf8'));
 function fileFor(id) {
  if (!Object.hasOwn(files,id)) throw new Error('Unknown instruction section');
@@ -36,6 +38,7 @@ function fileFor(id) {
 // them, so they ride on every run from the checkout and never sit in the box.
 const boxDefault=(id)=>(id==='rules'||id==='messages') ? '' : defaults[id];
 export function readInstruction(appDir,id,shippedDir=appDir) {
+ id=sectionFor(appDir,id);
  const file=fileFor(id);
  const defaultText=boxDefault(id);
  let text=defaultText;
@@ -68,7 +71,7 @@ const KEEP=20;
 const QUIET_MS=10*60*1000;
 function historyDir(appDir,id) {return path.join(appDir,HISTORY,id);}
 export function listVersions(appDir,id) {
- fileFor(id);
+ id=sectionFor(appDir,id);
  const dir=historyDir(appDir,id);
  let names;
  try {names=fs.readdirSync(dir);} catch(e) {if(e.code!=='ENOENT') throw e; return [];}
@@ -79,7 +82,7 @@ export function listVersions(appDir,id) {
  }).filter(Boolean).sort((a,b)=>b.ts-a.ts);
 }
 export function readVersion(appDir,id,ts) {
- fileFor(id);
+ id=sectionFor(appDir,id);
  const at=Number(ts);
  if(!Number.isFinite(at)) throw new Error('Unknown version');
  return {text:fs.readFileSync(path.join(historyDir(appDir,id),`${at}.md`),'utf8')};
@@ -102,6 +105,7 @@ function keepVersion(appDir,id,now=Date.now(),always=false) {
  } catch(e) {console.warn(`${nameSlug}: could not keep a restore point for ${id}: ${e.message}`);}
 }
 export function writeInstruction(appDir,id,text,now=Date.now()) {
+ id=sectionFor(appDir,id);
  const file=fileFor(id);
  if(typeof text!=='string') throw new Error('Instructions must be text');
  keepVersion(appDir,id,now);
@@ -150,6 +154,7 @@ export function carryHerBriefsAcross(fromDir,toDir) {
  if(!fromDir||!toDir||path.resolve(fromDir)===path.resolve(toDir)) return carried;
  for(const [id,file] of Object.entries(files)) {
   try {
+   if(id==='messages' && agentInstructionsUnified(toDir)) continue;
    const target=path.join(toDir,'briefs',file);
    if(fs.existsSync(target)) continue;
    let text;
@@ -196,6 +201,7 @@ export function carryHerBriefsAcross(fromDir,toDir) {
  */
 export function joinMessageRules(shippedDir,toDir) {
  try {
+  if(agentInstructionsUnified(toDir)) return null;
   const target=path.join(toDir,'briefs',files.messages);
   if(fs.existsSync(target)) return null;
   const read=(name)=>{try {return fs.readFileSync(path.join(toDir,'briefs',name),'utf8');} catch {return null;}};
@@ -225,6 +231,7 @@ export function joinMessageRules(shippedDir,toDir) {
  */
 export function setAsideShippedMessageRules(shippedDir,toDir) {
  try {
+  if(agentInstructionsUnified(toDir)) return false;
   const target=path.join(toDir,'briefs',files.messages);
   if(path.resolve(shippedDir)===path.resolve(toDir)||!fs.existsSync(target)) return false;
   const read=(name)=>{try {return fs.readFileSync(path.join(shippedDir,'briefs',name),'utf8').trim();} catch {return '';}};
@@ -239,5 +246,34 @@ export function setAsideShippedMessageRules(shippedDir,toDir) {
  } catch(e) {
   console.warn(`${nameSlug}: could not set aside the shipped message rules: ${e.message}`);
   return false;
+ }
+}
+
+// Runs after the older migrations, before the supervisor or editors read.
+// Original message files and their histories remain on disk for recovery.
+// The completion marker prevents later boots reimporting them after an edit
+// or an intentional empty save. A failed save leaves both originals active.
+export function unifyAgentInstructions(shippedDir,toDir) {
+ try {
+  if(path.resolve(shippedDir)===path.resolve(toDir)||agentInstructionsUnified(toDir)) return null;
+  const general=readInstruction(toDir,'rules').text;
+  const writing=readInstruction(toDir,'messages').text;
+  if(writing.trim()) {
+   // If the combined save succeeded but completion was interrupted, the exact
+   // old text is already at the end. Retrying must not append it again.
+   const combined=general.endsWith(writing) ? general : general ? `${general}\n\n${writing}` : writing;
+   keepVersion(toDir,'rules',Date.now(),true);
+   keepVersion(toDir,'messages',Date.now(),true);
+   if(combined!==general) writeInstruction(toDir,'rules',combined);
+  }
+  const marker=path.join(toDir,'briefs',UNIFIED);
+  fs.mkdirSync(path.dirname(marker),{recursive:true});
+  const temporary=`${marker}.tmp-${process.pid}`;
+  fs.writeFileSync(temporary,'1\n','utf8');
+  fs.renameSync(temporary,marker);
+  return {general:general.length,writing:writing.length};
+ } catch(e) {
+  console.warn(`${nameSlug}: could not combine the agent instructions: ${e.message}`);
+  return null;
  }
 }

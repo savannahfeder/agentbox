@@ -7,6 +7,10 @@ export interface WorkItem {
   id: string;
   product: string;
   productName: string;
+  // WHERE SHE DRAGGED IT IN THE LIST (w-6e5b532a95), on the scale of the score
+  // it would otherwise sort by, which it replaces. Kept by the supervisor, on
+  // this Mac; absent on every row nobody has dragged.
+  place?: number;
   // WHAT PEOPLE PUT ON EACH MESSAGE IN A CONVERSATION (w-560647d4db): by the
   // message's line uid, then by emoji, then the people on it. Folded out of the
   // presses the ledger holds (shared/work-items.mjs); absent on every row
@@ -341,6 +345,9 @@ export interface SupervisorStatus {
   // Rows nothing can start because their tool is signed out, id -> the tool's
   // name. Said instead of "queued", which would promise an agent that cannot come.
   signInNeeded?: Record<string, string>;
+  // Rows the app's ship queue still owes a ship (main/ship-queue.mjs). Waiting
+  // on the app, not on a person: In progress, reading "Shipping".
+  shipping?: string[];
   // Of those, the ones pushed with Run now from the three-dot menu: next to
   // start, ahead of every project and tag (supervisor.runNow).
   runNow?: string[];
@@ -654,6 +661,18 @@ export interface Snapshot {
     workspace: string;
     byItem: Record<string, string>;
   };
+  /**
+   * WHETHER THIS MAC WAS ALREADY SIGNED INTO A CODING AGENT, AND WHICH
+   *  (w-e217e577e5, 2026-10-07), for the one line the walk says about it.
+   *  Answered whole by `Supervisor#runsOnAccount`, for the reason `engines` is:
+   *  which account the fleet spends is `_narrowToChosen`'s rule, pinned to that
+   *  file. Null, or absent on an older payload, on a Mac where nothing readable
+   *  is signed in, and then nothing is said. The words are shared/runs-on.mjs.
+   *
+   *  NO PLAN RIDES HERE. It did for a few hours, so the sidebar could print a
+   *  tier; that row and the tier both came out the same day. What somebody pays
+   *  for is on each agent's own page in Settings. */
+  runsOn?: { engine: string } | null;
   // `outsideAgents` is how many of her own Claude Code sessions the inbox
   // takes: all of them, only the ones stopped on a question, or none. It rides
   // the snapshot because the inbox reads it on every draw. How much of the
@@ -764,6 +783,12 @@ export interface ProjectSettings {
   permissionArgs: string[] | null;
   /** This project's own Codex mode, or 'workspace' when it has no opinion. */
   codexMode: CodexModeId | 'workspace';
+  /**
+   * The one Claude account this project's agents run on, or 'any' when it runs
+   * on whichever has room. Never a login that has since been signed out: the
+   * supervisor answers 'any' for a tie it can no longer honour.
+   */
+  account?: string;
   // The user's rules for this project, as they sit on disk. Empty means the file does
   // not exist, and a project without one is briefed exactly as it always was.
   instructions: string;
@@ -820,6 +845,11 @@ export interface WorkspaceSettings {
    * STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mjs). `now` is one
    * sentence about what is left right now, null while it is off. */
   leftovers?: { on: boolean; now: string | null };
+  /**
+   * COPIES OF A PROJECT THE APP DID NOT MAKE (main/task-folders.mjs). Null, and
+   * so no row at all, whenever there are none: the app shows these and never
+   * removes one, so there is nothing on the row to decide. */
+  strayFolders?: { count: number; now: string } | null;
   capacity: number;
   running: number;
   model: string | null;
@@ -895,6 +925,8 @@ export interface WorkspaceSettings {
   // Whether the ADHD mode rules ride under "How agents write to you". Off
   // unless she turned it on (w-5737fe67cf).
   adhdMode?: boolean;
+  // The corner tag over other apps (w-dafae58a23). On unless she turned it off.
+  cornerTag?: boolean;
   outsideAgents: AgentMode;
   accounts: AccountSetting[];
   /**
@@ -977,6 +1009,10 @@ declare global {
   interface Window {
     zero?: {
       snapshot(): Promise<Snapshot>;
+      // Whether a screen reader is running, which is what decides xterm's
+      // accessibility tree. Optional: a preload from before this channel
+      // existed has no such function, and `api.assistiveTech` reads that as no.
+      assistiveTech?(): Promise<boolean>;
       olderItems?(p: { offset: number; limit: number }): Promise<{ items: WorkItem[]; more: boolean }>;
       crash?(p: { name: string; message: string; stack: string }): Promise<unknown>;
       // A count. The name is checked against the approved list in the main
@@ -986,7 +1022,7 @@ declare global {
       agentReveal(p: { pid: number }): Promise<{ ok: boolean; name?: string; reason?: string }>;
       agentConversation(p: { pid: number; sessionId: string | null; cwd: string }): Promise<AgentConversation>;
       dashboard(slug: string): Promise<any>;
-      terminal(p: {product:string;id:string;action:'open'|'read'|'write'|'resize'|'close';data?:string;cols?:number;rows?:number;offset?:number}): Promise<any>;
+      terminal(p: {product:string;id:string;action:'open'|'read'|'write'|'resize'|'close';data?:string;cols?:number;rows?:number;offset?:number;wait?:number}): Promise<any>;
       agentUpdate?(p:{engine:string;action:'check'|'recheck'|'start'|'status'|'refresh'}):Promise<any>;
       commandCatalog(p: {product: string; id: string}): Promise<string[]>;
       command(p: {product: string; id: string; text: string}): Promise<{state: string; at: number; text?: string; name?: string}>;
@@ -996,6 +1032,7 @@ declare global {
       answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string }): Promise<WorkItem>;
       sendNow(p: { product: string; id: string }): Promise<{ ok: boolean; interrupted: boolean }>;
       setProductOrder(p: { order: string[] }): Promise<unknown>;
+      setThreadPlaces(p: { places: Record<string, number | null> }): Promise<unknown>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
       compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
       // Feedback to the Agentbox team (main/feedback.mjs). Optional: an older
@@ -1089,6 +1126,13 @@ declare global {
       // itself, which is the only way the page hears about the chord at all.
       onApprovalAnswered?(fn: (a: { id: string; allow: boolean }) => void): () => void;
       badge?(count: number): Promise<void>;
+      // The corner tag over other apps (main/corner-tag.mjs).
+      cornerTag?(state: {
+        ready: { id: string; title: string; says: string; since?: number; open?: string | null }[];
+        working: number;
+      }): Promise<void>;
+      // The corner tag's "Turn off…": open Settings on this page.
+      onOpenSettings?(fn: (p: { pane?: string }) => void): () => void;
       // screenDetail is which set of theme pictures this screen wants, 'soft' or
       // 'sharp' (main/screen-detail.mjs). It rides here rather than being
       // pushed because the answer is needed on the first paint.

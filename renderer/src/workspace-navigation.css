@@ -29,6 +29,15 @@
 @media(max-width:700px) { .app.workspace-layout { --workspace-width: 38px; } .workspace-layout .workspace-section span, .workspace-layout .workspace-navigation button > span, .workspace-layout .workspace-search kbd { display: none; } .workspace-layout .workspace-footer { flex-direction: column; align-items: stretch; } }
 
 .workspace-layout::after { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 40px; -webkit-app-region: drag; }
+/* NO TRAFFIC LIGHTS on Linux or Windows, so the 40px above is an empty band
+   over the pane. The top inset matches the bottom one. The drag strip is that
+   same height: any taller and it covers the top of the pane and eats the
+   clicks there. preload.cjs sets this on every window but the Mac's. The Mac
+   rules above stay at 40. */
+:root[data-window="flat"] .app.workspace-layout { padding-top: 22px; }
+:root[data-window="flat"] .workspace-layout::before { top: 22px; }
+:root[data-window="flat"] .workspace-navigation { top: 32px; }
+:root[data-window="flat"] .workspace-layout::after { height: 22px; }
 
 /* The task stays inside the same raised foreground as the list. */
 .workspace-layout .focus-pane { position: relative; min-height: 0; }
@@ -192,11 +201,12 @@
 .workspace-collapsed .workspace-usage { display: none; }
 @media(max-width:700px) { .workspace-usage { display: none; } }
 /* THE INSTRUCTIONS PAGE IS ONE PAGE (w-4cbcd888ae, 2026-10-01). Picked from
-   three drawn in the real app: a heading that says who the page is for, a
-   short list of sections on the left, and one card holding every section as a
-   page you read. It is wider than the other settings pages because what it
+   three drawn in the real app: a heading that says who the page is for and
+   one card holding the instructions as a page you read. The section sidebar
+   was removed when the user instructions became one file. It is wider than
+   the other settings pages because what it
    shows is documents, not rows. */
-.set-inner.instructions-page { max-width:1200px; }
+.set-inner.instructions-page { max-width:920px; }
 /* THE HEADING IS THE SWITCH. A dotted underline did not read as something to
    click, so the words carry a solid underline and an arrow after them. */
 .instr-lead { font-size:20px; font-weight:600; letter-spacing:-.012em; margin:0 0 24px; color:var(--text); }
@@ -211,13 +221,8 @@
 .instr-scope-menu button { display:block; width:100%; text-align:left; font:inherit; color:var(--text-dim); background:none; border:0; border-radius:var(--radius); padding:7px 10px; cursor:pointer; }
 .instr-scope-menu button:hover, .instr-scope-menu button[aria-checked="true"] { background:var(--wash); color:var(--text); }
 .instr-scope-menu hr { border:0; border-top:1px solid var(--line); margin:5px 4px; }
-/* The sections down the left, and the card. The left column is there on a
-   project too, empty, so switching does not move the card. */
-.instr-body { display:grid; grid-template-columns:220px minmax(0,1fr); gap:24px; align-items:start; }
-.instr-toc button { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.instr-toc { position:sticky; top:0; display:flex; flex-direction:column; gap:2px; }
-.instr-toc button { font:inherit; font-size:13px; text-align:left; color:var(--text-dim); background:none; border:0; border-radius:var(--radius); padding:7px 10px; cursor:pointer; }
-.instr-toc button:hover { background:var(--wash); color:var(--text); }
+/* A single readable column for shared and project instructions. */
+.instr-body { width:100%; }
 .instr-card { border:1px solid var(--line); border-radius:var(--radius); background:var(--film-strong); }
 .instr-part { padding:16px 26px 22px; scroll-margin-top:16px; }
 .instr-part + .instr-part { border-top:1px solid var(--line); }

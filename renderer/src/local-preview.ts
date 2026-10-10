@@ -17,6 +17,11 @@ export const SLOW_AFTER_MS = 8000;
 export const PROBE_TIMEOUT_MS = 4000;
 /** How often a down or slow address is asked again. */
 export const RECHECK_MS = 2000;
+/**
+ * A local app is a whole app, so its frame lets it do what a tab would: post a
+ * sign-in form, ask a confirm(), hand a new-tab link to the browser.
+ */
+export const LOCAL_APP_SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads';
 
 type FetchLike = (url: string, init: RequestInit) => Promise<unknown>;
 

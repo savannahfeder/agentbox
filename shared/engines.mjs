@@ -1,3 +1,4 @@
+import { HARNESS_DEFINITIONS } from './harness-definitions.mjs';
 // WHICH CODING AGENT A TASK IS HANDED TO.
 //
 // AND THE PREMISE SHE GAVE FOR IT DID NOT HOLD. Measured head to head on her
@@ -44,11 +45,25 @@
 // main/codex.mjs when that comes back, because the renderer must never import
 // spawn code.
 
-/** The engines, in the order the picker draws them. */
-export const ENGINES = [
-  { id: 'claude', label: 'Claude Code', word: 'Claude Code' },
-  { id: 'codex', label: 'Codex', word: 'Codex' },
-];
+/**
+ * The engines, in the order the picker draws them.
+ *
+ * ADMITTED ONES ONLY, and that word is doing real work as of 2026-10-07. A
+ * harness being integrated and a harness being offered are two different
+ * decisions, and this list is the second one. OpenCode is registered in
+ * main/harnesses.mjs, its transport is measured and tested, and it is
+ * deliberately absent from here -- so `ENGINE_IDS`, `isEngine`, `engineFor`,
+ * the composer's picker, the Settings row and the byline all behave as if it
+ * were not there, while `harnessFor('opencode')` works for anything that asks
+ * for it by name. Without this filter, adding the definition alone would have
+ * put a third word in front of every user the moment it landed.
+ *
+ * docs/harnesses.md holds the bar a harness clears before `admitted` goes
+ * true, and the product review that turning it on requires.
+ */
+export const ENGINES = HARNESS_DEFINITIONS
+  .filter(({ admitted }) => admitted !== false)
+  .map(({ id, label, word }) => ({ id, label, word }));
 
 export const ENGINE_IDS = ENGINES.map((e) => e.id);
 

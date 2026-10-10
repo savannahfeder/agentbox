@@ -34,9 +34,8 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { DEMO_DOCS, DEMO_ENV, DEMO_PRODUCTS, demoLedgerLines } from '../shared/demo-world.mjs';
 import { prepareHome } from '../shared/fresh-user-home.mjs';
-import { Name } from '../shared/product-name.mjs';
 import { relaunchCommand } from './fresh-user.mjs';
-import { encodeProjectPath, storeRootEnv } from './store/home.mjs';
+import { defaultStoreRoot, encodeProjectPath, storeRootEnv } from './store/home.mjs';
 import { NAME, nameSlug } from '../shared/product-name.mjs';
 
 /**
@@ -87,22 +86,21 @@ export function clearDemoHomes() {
 /**
  * Where the demo copy will keep its store, and where it will keep its own
  *  records. Both are derived from the throwaway home rather than configured,
- *  because the copy derives them the same way from the same home: `storeRoot`
- *  defaults to `<home>/<Name>` (main/config.mjs) and the app's home defaults
- *  to `<home>/.agentbox` (main/store/home.mjs).
+ *  because the copy derives them the same way from the same home. Both are
+ *  `defaultStoreRoot` for that home with no inherited data directory: on
+ *  macOS a folder of the app's name, on Linux the XDG path under the
+ *  throwaway. Passing the machine's XDG_DATA_HOME would seed the demo into
+ *  the real store.
  *
- *  THE FOLDER IS READ FROM THE SAME CONSTANT AS THAT DEFAULT, not spelled out
- *  again. It was the literal 'the app' mirroring what config.mjs then said,
- *  and when that default was renamed on 2026-09-22 this line went on pointing
- *  at the old folder: the demo copy would have written its store to one place
- *  and looked for it in another. Two literals that have to agree is the defect;
- *  one import is the fix. */
+ *  THE FOLDER IS THAT FUNCTION, not a second spelling of it. A literal next
+ *  to the default is how the demo once wrote its store in one place and
+ *  looked for it in another. */
 export function demoPaths(home) {
-  const storeRoot = path.join(home, Name);
+  const storeRoot = defaultStoreRoot({ home, env: {} });
   return {
     storeRoot,
     accountRoot: path.join(storeRoot, 'accounts', DEMO_ACCOUNT),
-    appHome: path.join(home, `.${nameSlug}`),
+    appHome: storeRoot,
   };
 }
 
@@ -192,7 +190,12 @@ export function seedDemoStore(home, { now = Date.now() } = {}) {
  *  standing in an invented store. */
 export function demoEnv(home, env = process.env) {
   const { appHome } = demoPaths(home);
-  return { ...env, HOME: home, CFFIXED_USER_HOME: home, ...storeRootEnv(appHome), [DEMO_ENV]: '1' };
+  const next = { ...env, HOME: home, CFFIXED_USER_HOME: home, ...storeRootEnv(appHome), [DEMO_ENV]: '1' };
+  // The copy's store is defaultStoreRoot of ITS home. The parent's
+  // XDG_DATA_HOME is the real data directory, and leaving it set points the
+  // demo at that directory. The other base directories go for the same reason.
+  for (const key of ['XDG_DATA_HOME', 'XDG_CONFIG_HOME', 'XDG_STATE_HOME', 'XDG_CACHE_HOME']) delete next[key];
+  return next;
 }
 
 /**

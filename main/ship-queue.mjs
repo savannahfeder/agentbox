@@ -77,15 +77,17 @@ export const wantsShipping = (item) => labelsOf(item).includes(SHIP_LABEL);
 export const withoutShipLabel = (item) => labelsOf(item).filter((l) => l !== SHIP_LABEL);
 
 /**
- * The next task to ship, oldest ask first, or null.
+ * Every task this queue still owes a ship, whether or not a session is on it.
  *
- * Only a row of a project that ships, marked `ship`, with no session on it
- * (an agent still working may yet commit), and with a task folder to ship from.
+ * A row of a project that ships, marked `ship`, not yet handled for that
+ * marking, and with a task folder to ship from. THE WINDOW READS THIS TOO
+ * (w-0c1ba766eb): a row on this list is waiting on the app, not on a person,
+ * so it is In progress and not Needs you until the queue has dealt with it.
  */
-export function nextToShip(items, products, settings, { isLive = () => false, folderFor, handled = {} }) {
+export function waitingToShip(items, products, settings, { folderFor, handled = {} }) {
   const bySlug = new Map(products.map((p) => [p.slug, p]));
-  const ready = items
-    .filter((i) => wantsShipping(i) && i.status !== 'done' && !isLive(i) && !(markedAt(i) <= (handled[keyOf(i)] ?? -1)))
+  return items
+    .filter((i) => wantsShipping(i) && i.status !== 'done' && !(markedAt(i) <= (handled[keyOf(i)] ?? -1)))
     .map((item) => {
       const product = bySlug.get(item.product);
       const script = product ? shipScriptFor(product, settings) : null;
@@ -93,6 +95,14 @@ export function nextToShip(items, products, settings, { isLive = () => false, fo
       return script && cwd && fs.existsSync(cwd) ? { item, product, script, cwd } : null;
     })
     .filter(Boolean);
+}
+
+/**
+ * The next task to ship, oldest ask first, or null: one the queue owes, with
+ * no session on it (an agent still working may yet commit).
+ */
+export function nextToShip(items, products, settings, { isLive = () => false, folderFor, handled = {} }) {
+  const ready = waitingToShip(items, products, settings, { folderFor, handled }).filter(({ item }) => !isLive(item));
   ready.sort((a, b) => markedAt(a.item) - markedAt(b.item));
   return ready[0] ?? null;
 }
@@ -188,7 +198,7 @@ export function failureReply(output) {
     ...(died ? [
       '',
       'Its test run DIED rather than going red: nothing it printed names a failing',
-      'test. Look for what killed the run. This Mac runs a dozen agents at once, so',
+      'test. Look for what killed the run. This computer runs a dozen agents at once, so',
       'a worker that was starved or timed out is likelier than a bug in your change.',
       'Run the tests for your change again before you go looking for one.',
     ] : []),
@@ -253,6 +263,14 @@ export class ShipQueue {
     const done = () => writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(next.item)]: markedAt(next.item) });
     this.busy = this.ship(next).then(done, done).finally(() => { this.busy = null; });
     return this.busy;
+  }
+
+  /** The ids of the rows still waiting on this queue, for the window. */
+  waitingIds(items, products) {
+    const settings = readShipSettings(this.userDir);
+    if (!Object.keys(settings).length) return [];
+    return waitingToShip(items, products, settings, { folderFor: this.folderFor, handled: readHandled(this.userDir) })
+      .map(({ item }) => item.id);
   }
 
   async ship({ item, product, script, cwd }) {

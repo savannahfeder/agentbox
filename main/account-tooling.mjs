@@ -198,7 +198,8 @@ function list(names) {
 const identityCache = new Map();
 
 export function accountIdentity(dir, { home = os.homedir() } = {}) {
-  const file = path.join(dir || defaultClaudeHome(home), '.claude.json');
+  let file = path.join(dir || defaultClaudeHome(home), '.claude.json');
+  if (!dir && !fs.existsSync(file)) file = path.join(home, '.claude.json');
   // Cached on the file's own mtime rather than on a timer. That file is ~120 KB
   // on this machine and the settings page re-reads on every poll, so parsing it
   // each time would be real work for an answer that changes about twice a

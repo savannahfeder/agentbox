@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import defaults from '../../../shared/instruction-defaults.json';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { api } from '../api';
-import { EVERY, resolveScope, scopeChoices, scopeWords, sectionsFor, startsWriting, type Scope, type SectionId } from '../instruction-scope';
+import { EVERY, resolveScope, scopeChoices, scopeWords, startsWriting, type Scope } from '../instruction-scope';
 import type { ProjectSettings } from '../types';
 type Section = {id:string;label:string;description?:string;defaultText:string};
 // The name chosen on w-3dc46f3a67, and it has to be the SAME name here, in
@@ -12,13 +12,6 @@ type Section = {id:string;label:string;description?:string;defaultText:string};
 // rules" while ⌘K said something else, and the cost of that was the box not
 // being found at all.
 const rules:Section = {id:'rules',label:'General agent instructions',defaultText:''};
-// One document since w-3dc46f3a67: the messages during a task and the last one
-// of every task were two boxes, and a real instructions file is mostly about
-// how agents write to the user anyway.
-// ONLY THE USER'S WORDS SINCE w-3ec9f07978. It opened on the app's own message
-// rules, which the inbox reads every message by, so editing them broke it.
-// Those ride on every run from the checkout now and never sit here.
-const messages:Section = {id:'messages',label:'How agents write to you',description:'Your own rules for how agents write to you. They go on top of the app’s built-in rules, which stay out of here because the inbox relies on them.',defaultText:''};
 // ADHD MODE (w-5737fe67cf). Its own file so edits to it never mix with the
 // user's own rules and are still there next time. Whether it rides at all is a
 // workspace setting, which is the switch on its section.
@@ -27,7 +20,6 @@ const adhd:Section = {id:'adhd',label:'ADHD mode',defaultText:defaults.adhd};
 // brief every project worker is spawned with. Somebody editing it by accident
 // breaks their own inbox with no way to see why.
 const system:Section = {id:'system',label:'System prompt',description:`${Name}’s task-brief template for project work. Keep the template placeholders for task context. Personal tasks use your message directly. The coding provider’s own system instructions are managed by that provider.`,defaultText:defaults.system};
-const SHARED:Record<Exclude<SectionId,'project'>,Section> = {rules,messages,adhd};
 const fixtureText = new Map<string,string>();
 const preview = () => new URLSearchParams(location.search).has('fixtures') || !window.zero;
 // What every section's writing surface needs, whichever file is under it.
@@ -240,29 +232,23 @@ function ScopeSwitch({scope,projects,onScope}:{scope:Scope;projects:ProjectSetti
   </div>}
  </span></h1>;
 }
-/* ONE PAGE (w-4cbcd888ae, 2026-10-01). Picked from three drawn in the real
-   app. Who it is for is the heading. On every project the three shared
-   sections sit in one card in the order an agent reads them, with a short list
-   on the left that jumps to each. On a project the card holds that project's
-   own file and nothing else, at the same left edge so switching does not jump.
-   The task brief is ours, behind Advanced, where it always was. */
+/* One document for all the user's rules, followed by the optional ADHD mode.
+   The heading switches projects. Sections already visible need no sidebar.
+   The app's task brief remains behind Advanced. */
 export function InstructionSettings({projects=[],scope:asked=EVERY,onScope,onSaved=()=>{}}:{projects?:ProjectSettings[];scope?:Scope;onScope?:(s:Scope)=>void;onSaved?:()=>void}){
  const [own,setOwn]=useState<Scope>(asked);
  useEffect(()=>setOwn(asked),[asked]);
  const scope=resolveScope(own,projects);
  const pick=(s:Scope)=>{setOwn(s);onScope?.(s);};
  const project=projects.find(p=>p.slug===scope);
- const ids=sectionsFor(scope);
  const [showAdvanced,setShowAdvanced]=useState(false);
- const jump=(id:string)=>document.getElementById(`instr-${id}`)?.scrollIntoView({block:'start',behavior:'smooth'});
  return <div className="set-inner instructions-page">
   <ScopeSwitch scope={scope} projects={projects} onScope={pick}/>
   <div className="instr-body">
-   <nav className="instr-toc" aria-label="Sections">{scope===EVERY && ids.map(id=><button key={id} type="button" onClick={()=>jump(id)}>{SHARED[id as keyof typeof SHARED].label}</button>)}</nav>
    <div>
     <div className="instr-card">
      {scope===EVERY
-      ? <><SharedPart section={rules}/><SharedPart section={messages}/><AdhdPart/></>
+      ? <><SharedPart section={rules}/><AdhdPart/></>
       : project && <ProjectPart project={project} onSaved={onSaved}/>}
     </div>
     {scope===EVERY && <div className="instruction-advanced">

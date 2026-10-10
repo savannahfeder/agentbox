@@ -92,6 +92,30 @@ describe('task routing',()=>{
   expect(sup.compactItem('p','w-1').state).toBe('unavailable');
   expect(sup._codexServer).not.toHaveBeenCalled();
  });
+ // 2026-10-07: adapter dispatch resolved the default three times. A default
+ // change could select the wrong adapter or leave Codex holding its lock.
+ it.each(['before the request starts','while the request is pending'])('keeps the original account when the default changes %s',async when=>{
+  const {sup,server}=supervisorFixture();let engine='codex',handlers;
+  sup._engineFor=vi.fn(()=>engine);
+  sup._releaseIdleCodex=vi.fn();
+  server.request.mockImplementation(async method=>method==='thread/read'?{thread:{turns:[]}}:{});
+  server.resumeThread=vi.fn(async(_params,watch)=>{handlers=watch;return {thread:{id:'thread-a'}};});
+  server.unwatch=vi.fn();
+  expect(sup.compactItem('p','w-1').state).toBe('running');
+  if(when==='before the request starts')engine='claude';
+  await flush();
+  engine='claude';
+  if(handlers){
+   handlers.onNotification('turn/started',{threadId:'thread-a',turn:{id:'compact-own'}});
+   handlers.onNotification('turn/completed',{threadId:'thread-a',turn:{id:'compact-own',status:'completed'}});
+  }
+  await flush();
+  expect(sup._codexServer).toHaveBeenCalledWith('/profile/account-a');
+  expect(sup.compactionStatus('p','w-1').state).toBe('done');
+  expect(sup._compactionJobs.size).toBe(0);
+  expect(sup._releaseIdleCodex).toHaveBeenCalledWith('account-a');
+  expect(sup._engineFor).toHaveBeenCalledTimes(1);
+ });
 });
 
 import { slashRows } from '../renderer/src/slash-menu.ts';

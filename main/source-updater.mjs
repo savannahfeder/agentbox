@@ -55,7 +55,13 @@ const SAY = {
 // on this Mac, and the restart below runs that build. Counted as her changes,
 // they made every update after the first say "changes of your own" for good
 // (tests/a-build-does-not-stop-the-next-update.test.mjs).
-const isBuildOutput = (file) => /^shared\/[^/]+\.generated\.[cm]?[jt]s$/.test(file);
+//
+// THE LOCKFILE IS NPM'S, TOO (2026-10-07). The restart's `npm install` rewrote
+// package-lock.json (this npm drops its `libc` lines), and the card never came
+// back while main ran 21 commits ahead. An edit to the dependencies themselves
+// is in package.json, which still blocks
+// (tests/a-package-install-does-not-stop-the-next-update.test.mjs).
+const isBuildOutput = (file) => file === 'package-lock.json' || /^shared\/[^/]+\.generated\.[cm]?[jt]s$/.test(file);
 // The status code is one or two letters and `gitIn` trims the output, which
 // takes the leading space off the first line, so it is matched, not sliced.
 const changedPaths = (porcelain) => String(porcelain ?? '').split('\n').filter(Boolean).map((l) => l.replace(/^[ MADRCUT?!]{1,2} /, '').replace(/^"|"$/g, ''));
@@ -128,6 +134,18 @@ export function createSourceUpdater({
   log = console,
   onChanged = () => {},
   npm = defaultNpm(appDir),
+  // THE STEP `npm start` DOES AND THIS DID NOT. A from-source run gets its
+  // name, icon and bundle id from scripts/brand-electron.mjs, which npm runs
+  // before Electron. An update does not go through npm: it builds and calls
+  // app.relaunch(), which re-executes the same binary. So the branding had
+  // never once run on a self-restart, and a fix to it could sit on disk for
+  // days without reaching the bundle (measured 2026-10-09, with the
+  // Info.plist four days older than the fix meant to change it).
+  // Imported here and not at the top of the file: scripts/ is deliberately not
+  // in the downloadable build (`build.files`, and a test holds it there), and
+  // a static import would stop that build booting at all. This path only ever
+  // runs from source, where the script is on disk.
+  brand = async () => (await import('../scripts/brand-electron.mjs')).brandElectron(),
   relaunch = () => { app?.relaunch(); app?.quit(); },
 } = {}) {
   const git = gitIn(appDir);
@@ -251,12 +269,20 @@ export function createSourceUpdater({
         set({ phase: 'ready', error: `The new packages would not install: ${failureLine(installed.out)}` });
         return;
       }
+      // What the install rewrote goes back, so the folder is left as main has
+      // it and anything else that fast-forwards it cannot trip on the file.
+      await git(['checkout', '--', 'package-lock.json']);
     }
     const built = await npm(['run', 'build']);
     if (built.code !== 0) {
       set({ phase: 'ready', error: `The new code would not build: ${failureLine(built.out)}` });
       return;
     }
+    // Before the relaunch, never after: the next launch is the one that reads
+    // the Info.plist. And never fatally, for the reason brand-electron.mjs
+    // opens with about itself — an app that does not come back up is worse
+    // than one wearing the wrong icon.
+    try { await brand(); } catch (e) { log.warn?.('[source-updater] could not rebrand the bundle:', e?.message ?? e); }
     log.info?.('[source-updater] built', state.newVersion, '- relaunching');
     relaunch();
   }

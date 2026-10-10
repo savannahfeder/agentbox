@@ -66,7 +66,7 @@ describe('the last card asks one thing and the celebration is in her own project
       show: true, blocked: false, go: true,
       head: COPY.bringHead, line: COPY.agentsOffer,
     });
-    expect(COPY.bringHead).toBe('Add the agents already on this Mac.');
+    expect(COPY.bringHead).toBe('Add the agents already on this computer.');
     // It says the tutorial is over in so many words since 2026-10-01: a
     // persona test read the old ending as no ending at all.
     expect(COPY.finishHead).toBe('You finished the tutorial.');

@@ -1,5 +1,22 @@
 .task-terminal {flex-shrink:0;display:flex;flex-direction:column;min-height:0;background:var(--bg);color:var(--text);border-top:1px solid var(--line);}
-.task-terminal-bottom {height:280px;max-height:45vh;}
+/* `--task-terminal-h` and `--task-terminal-w` are the size she dragged it to,
+   set on the page it sits in (TaskTerminal.tsx). Until she drags, the old fixed
+   sizes; once she has, the cap is the page less a strip to read. */
+.task-terminal-bottom {position:relative;height:var(--task-terminal-h,280px);max-height:45vh;}
+.task-terminal-bottom.task-terminal-sized {max-height:calc(100% - 120px);}
+/* THE EDGE TO DRAG: an invisible strip over the border that faces the page.
+   No handle drawn on it (her call, 2026-10-08: "like vscode doesn't make it
+   THAT obvious its draggable. we want it clean"). The cursor says it drags, and
+   the border goes a shade brighter once the pointer rests on it, the way
+   VS Code's sash does, and stays so for the whole drag. */
+.task-terminal-grip {position:absolute;z-index:6;}
+.task-terminal-grip::before {content:'';position:absolute;background:transparent;transition:background-color 120ms ease;}
+.task-terminal-grip:hover::before {background:var(--line-strong);transition-delay:300ms;}
+.task-terminal-grip.dragging::before {background:var(--line-strong);transition-delay:0ms;}
+.task-terminal-bottom > .task-terminal-grip {left:0;right:0;top:-4px;height:7px;cursor:row-resize;}
+.task-terminal-bottom > .task-terminal-grip::before {left:0;right:0;top:3px;height:1px;}
+.task-terminal-side > .task-terminal-grip {top:0;bottom:0;left:-4px;width:7px;cursor:col-resize;}
+.task-terminal-side > .task-terminal-grip::before {top:0;bottom:0;left:3px;width:1px;}
 .task-terminal-toolbar {display:flex;align-items:center;gap:14px;min-height:42px;flex-shrink:0;flex-wrap:wrap;padding:0 22px;border-bottom:1px solid var(--line);font-size:12px;}
 .task-terminal-toolbar strong {font-weight:500;}
 .task-terminal-folder {color:var(--text-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
@@ -32,8 +49,10 @@
 .task-terminal-screen .xterm {height:100%;max-width:none!important;margin:0!important;padding:0!important;}
 .task-terminal-message {padding:8px 22px;font-size:12px;color:var(--text-dim);}
 .task-terminal-message button {font:inherit;color:var(--text);background:transparent;border:1px solid var(--line);border-radius:4px;padding:3px 7px;cursor:pointer;}
-.focus-pane:has(> .task-terminal-side) {padding-right:min(44%,540px);}
-.task-terminal-side {position:absolute;right:0;top:0;bottom:0;width:min(44%,540px);border-top:0;border-left:1px solid var(--line);}
+.focus-pane:has(> .task-terminal-side) {padding-right:min(var(--task-terminal-w,min(44%,540px)),calc(100% - 320px));}
+.task-terminal-side {position:absolute;right:0;top:0;bottom:0;width:min(var(--task-terminal-w,min(44%,540px)),calc(100% - 320px));border-top:0;border-left:1px solid var(--line);}
 .task-terminal-side .task-terminal-toolbar {gap:7px;padding:0 12px;flex-wrap:wrap;}
-@media(max-width:850px){.focus-pane:has(> .task-terminal-side){padding-right:0;}.task-terminal-side{position:static;width:auto;height:280px;border-left:0;border-top:1px solid var(--line);}}
+/* Where the side terminal is laid under the page instead, it has no left edge to drag. */
+@media(max-width:850px){.focus-pane:has(> .task-terminal-side){padding-right:0;}.task-terminal-side{position:static;width:auto;height:280px;border-left:0;border-top:1px solid var(--line);}.task-terminal-side > .task-terminal-grip{display:none;}}
+.agent-update-panel .task-terminal-side > .task-terminal-grip {display:none;}
 .task-terminal-screen .xterm-viewport {background-color:transparent!important;}
