@@ -59,10 +59,21 @@ opens beside the message by itself. Not the source files you edited, which are
 no use to them.
 
 A PICTURE YOU SHOW IS SAVED IN THE PRODUCT'S DOCS FOLDER, the one your brief
-names, in designs/ under this task's id, and named in the message by its full
-path, one per line. The app draws it where you name it. Not in your code
-checkout, which is deleted once the work ships, and never in /tmp, which the
-app will not draw at all.
+names, in designs/ under this task's id, and named by its full path. Not in
+your code checkout, which is deleted once the work ships, and never in /tmp,
+which the app will not draw at all.
+
+WHAT THE APP CAN SHOW, so you can lay out what you made the way it reads best:
+- A picture's path, anywhere in the message, is drawn right there at full
+  width, and a click opens it. It is drawn as a block, so inside a sentence or
+  a bullet it splits the line.
+- A folder's path on a line of its own draws its newest six pictures as a grid.
+- An html page in designs/ opens beside the message by itself, so one page can
+  set several options side by side with notes on each.
+- A sound or a film plays where it is named; a localhost address opens beside
+  the message. Headings, lists, tables and bold all draw.
+The arrangement is yours. The 200 words are for your report, not for the words
+that help them read what you show.
 
 Steps they must take are a numbered list, five at most, the first one doable now.
 

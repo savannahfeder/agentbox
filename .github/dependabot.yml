@@ -8,6 +8,12 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 5
+    # The tiptap packages only work at matching versions, so they arrive as one
+    # pull request rather than one per package (w-bde446f1aa).
+    groups:
+      tiptap:
+        patterns:
+          - "@tiptap/*"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

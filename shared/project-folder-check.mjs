@@ -78,7 +78,7 @@ export function checkProjectFolder(folder, { home = '' } = {}) {
     return {
       ok: false,
       reason: 'home',
-      say: 'That is your whole home folder. Agents would work across everything on this Mac, and macOS will ask you about Downloads, Music and every app you have. Pick the folder your project’s code is in.',
+      say: 'That is your whole home folder. Agents would work across everything on this computer, and the system will ask you about Downloads, Music and every app you have. Pick the folder your project’s code is in.',
     };
   }
 
@@ -86,7 +86,7 @@ export function checkProjectFolder(folder, { home = '' } = {}) {
     return {
       ok: false,
       reason: 'guarded',
-      say: `${rel} holds a lot more than one project, and macOS guards it, so choosing it means a run of permission panels. Pick the folder inside it that your project’s code is in.`,
+      say: `${rel} holds a lot more than one project, and the system guards it, so choosing it means a run of permission panels. Pick the folder inside it that your project’s code is in.`,
     };
   }
 
@@ -94,7 +94,7 @@ export function checkProjectFolder(folder, { home = '' } = {}) {
     return {
       ok: false,
       reason: 'system',
-      say: `${p} is part of macOS rather than one of your projects. Pick the folder your project’s code is in.`,
+      say: `${p} is part of the system rather than one of your projects. Pick the folder your project’s code is in.`,
     };
   }
 

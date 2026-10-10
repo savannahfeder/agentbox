@@ -44,6 +44,9 @@ describe('resolveTheme', () => {
     ));
     const guilty = walk(src).filter((f) => {
       if (f.endsWith('theme.ts')) return false; // its comment says why it is gone
+      // The corner tag is its own small window, approved to follow the Mac's
+      // mode (corner-tag.css, w-dafae58a23). This rule is about the main window.
+      if (f.includes(`${path.sep}corner-tag${path.sep}`)) return false;
       return /prefers-color-scheme|matchMedia/.test(fs.readFileSync(f, 'utf8'));
     });
     expect(guilty.map((f) => path.relative(root, f))).toEqual([]);

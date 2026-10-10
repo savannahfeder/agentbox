@@ -1,0 +1,25 @@
+# THE LOCAL FILES A NEW TASK FOLDER NEEDS, which git does not track and a fresh
+# worktree therefore does not have. .gitignore pattern syntax; only files git
+# already ignores are eligible, so nothing here can shadow the commit.
+#
+# Conductor and Claude Code read this same file for the same purpose, so this is
+# one list and not a list per tool.
+#
+# NAMES, NOT CONTENTS. Committing this is committing the fact that a file is
+# needed, which is the same thing .gitignore commits.
+
+# Dependencies. Cloned, so on APFS the blocks are shared and this costs no disk.
+/node_modules
+
+# The app's own configuration. Without it loadConfig() falls back to defaults,
+# which is a different app from the one in the checkout beside it: measured
+# 2026-10-07, five of the seven task folders then live had no copy of this.
+zero.config.json
+
+# DELIBERATELY NOT HERE, so nobody adds them back wondering why:
+#   cloud/team.config.json  belongs to the Mac, not the folder, and is read off
+#                           the home directory (tests/the-team-key-belongs-to-
+#                           the-mac-not-the-folder).
+#   renderer/dist           build output. A copy of it is some OTHER commit's
+#                           build, and `npm start` builds it anyway.
+#   main/window-helper      nothing in the app references it any more.

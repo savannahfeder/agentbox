@@ -71,6 +71,9 @@ export function planLabel(raw) {
   if (!s) return null;
   const bare = s.replace(/^default_/, '').replace(/^claude_/, '');
   if (!bare) return null;
+  // Claude's saved Enterprise tier includes an internal name. Keep the raw
+  // tier for capacity decisions, but show only the subscription name.
+  if (bare === 'raven_enterprise') return 'Enterprise';
   return bare
     .split('_')
     .filter(Boolean)

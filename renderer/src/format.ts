@@ -254,6 +254,21 @@ export function parseRepeat(raw: string): RepeatParse {
   return null;
 }
 
+/**
+ * A rule typed ALONE in a box, which is every picker that asks how often: the
+ * When picker (`readWhen`) and the composer's Repeat it page. The same grammar
+ * as `parseRepeat`, with one difference. A box holds nothing but the rule, so a
+ * time after the rhythm is the time even without "at": "every day 5pm" is
+ * five, where at the top of a message the "5pm" would be the task and the
+ * hour would default to eight (tests/repeat-it-takes-a-rule-in-words.test.mjs).
+ */
+export function readRule(raw: string): RepeatParse {
+  const phrase = (raw ?? '').trim().replace(/\s+/g, ' ');
+  if (!phrase) return null;
+  const timed = phrase.match(/^(.+?) (?:at )?(\d{1,2}(?::\d{2})? ?(?:am|pm)?)$/i);
+  return (timed && parseRepeat(`${timed[1]} at ${timed[2]}`)) || parseRepeat(phrase);
+}
+
 // Which of the three shapes the words asked for, and at what hour. The default
 // is 8am, the hour every day-shaped answer in parseWhen already lands on, and
 // that default is part of the contract rather than an accident.

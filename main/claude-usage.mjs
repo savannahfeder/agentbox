@@ -78,21 +78,33 @@ export class ClaudeUsage {
    * app is running, and the settings screen already promises that works.
    * @param { => void} [how.onChange] Told when a new reading lands, so the
    * window redraws, including a new checked time on unchanged percentages.
+   * @param { => { profile: string, env?: object }} [how.account] WHOSE LIMIT
+   * IS READ, asked each time. It used to be nobody's in particular: the
+   * command ran with the app's own environment, which is the default login,
+   * so a Mac with a second account picked as In use showed "No usage reading
+   * yet" for good, because the default one was at its limit and Claude Code
+   * printed no limits for it (2026-10-08, Claude Code 2.1.293). `profile` is
+   * the account's name ('default' or its CLAUDE_CONFIG_DIR) and `env` is the
+   * environment to run it in. Supervisor.usageAccount is the real one.
    */
-  constructor({ bin, profile = () => 'default', onChange = () => {}, run = execFile, now = () => Date.now(), where = usageCwd } = {}) {
+  constructor({ bin, onChange = () => {}, run = execFile, now = () => Date.now(), where = usageCwd, account = () => ({ profile: 'default' }) } = {}) {
     this._bin = bin;
-    this._profile = profile;
-    this._account = null;
+    this._selectedProfile = null;
     this._generation = 0;
     this._pending = null;
     this._onChange = onChange;
     this._run = run;
     this._now = now;
     this._where = where;
-    /** @type {{ limits: any[], at: number, zone: string|null }|null} */
+    this._account = account;
+    /** @type {{ limits: any[], at: number, zone: string|null, profile: string }|null} */
     this._last = null;
     this._busy = false;
     this._missedUntil = 0;
+  }
+
+  _who() {
+    try { return this._account() ?? { profile: 'default' }; } catch { return { profile: 'default' }; }
   }
 
   /**
@@ -112,13 +124,13 @@ export class ClaudeUsage {
   // another coding process merely to populate the sidebar.
   peek() {
     this._syncProfile();
-    return this._last ? { limits: this._last.limits, at: this._last.at, profile: this._account } : null;
+    return this._last ? { limits: this._last.limits, at: this._last.at, profile: this._last.profile } : null;
   }
 
   _syncProfile() {
-    const account = this._profile() || 'default';
-    if (account !== this._account) {
-      this._account = account;
+    const account = this._who().profile || 'default';
+    if (account !== this._selectedProfile) {
+      this._selectedProfile = account;
       this._generation++;
       this._last = null;
       this._missedUntil = 0;
@@ -168,12 +180,12 @@ export class ClaudeUsage {
       // Failed or unreadable output cannot acquire a fresh checked time.
       const limits = err ? [] : readUsage(stdout, this._now(), localZone());
       if (!limits.length) { this._missed(); resolve(failure()); return; }
-      this._last = { limits, at: this._now(), zone: localZone() };
+      this._last = { limits, at: this._now(), zone: localZone(), profile };
       resolve({ ok: true, reading: this.peek() });
       // Even unchanged percentages now have a newly checked time to draw.
       this._onChange();
     };
-    const env = { ...process.env };
+    const env = { ...(this._who().env ?? process.env) };
     for (const key of Object.keys(env)) {
       if (/^ANTHROPIC_|^CLAUDE_CODE_/.test(key) || ['CLAUDECODE', 'CLAUDE_PID', 'CLAUDE_EFFORT', 'CLAUDE_CONFIG_DIR'].includes(key)) delete env[key];
     }

@@ -949,7 +949,7 @@ export const COPY = {
   getStarted: 'Get started',
   page: 'Set up your first project.',
   folderQ: 'Where is your code?',
-  folderPick: 'Choose a folder on this Mac',
+  folderPick: 'Choose a folder on this computer',
   // THE SENTENCE MOVED OUT OF THE CARD. It is a quiet line under the card.
   folderClause: 'This is the folder the agents will run in.',
   folderAgain: 'Choose a different one',
@@ -978,7 +978,7 @@ export const COPY = {
   nameGo: 'Continue',
   // CLAUDE CODE MISSING IS THE LINE ONLY. One quiet line here and
   // no screen of its own anywhere: the walk never stops and never gains a step.
-  missing: `${Name} could not find Claude Code or Codex on this Mac, and your agents run on one of them.`,
+  missing: `${Name} could not find Claude Code or Codex on this computer, and your agents run on one of them.`,
   missingLink: 'Get Claude Code',
   nameQ: 'What is this project called?',
   // The clause is kept here and drawn nowhere, because deleting the words is
@@ -1050,7 +1050,7 @@ export const COPY = {
     // ideally with no commas or periods in it.
     {
       head: 'Write a thread and an agent picks it up',
-      line: 'It works on your Mac and writes back here when it finishes or gets stuck',
+      line: 'It works on your computer and writes back here when it finishes or gets stuck',
       piece: 'list' as const,
     },
     {
@@ -1238,7 +1238,7 @@ export const COPY = {
      agent files already on this Mac an inbox in Agentbox, so that is what the two lines say
      now, and the folder-to-folder metaphor is gone.
   */
-  bringHead: 'Add the agents already on this Mac.',
+  bringHead: 'Add the agents already on this computer.',
   agentsOffer: `${Name} watches them and puts what they send you in your inbox.`,
   // ONE LINE, AND IT IS AT THE BOTTOM.So agentsRead, at the foot, is the only
   // sentence under the list. The deleted copy is in decisions.md, 08-21,

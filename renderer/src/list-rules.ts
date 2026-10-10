@@ -54,6 +54,7 @@ export interface InboxItem {
   result?: string;
   answeredThrough?: number;
   runAt?: number;
+  snoozedUntil?: number;
   /** 'later' while a thread sits in Later, written down and not begun. */
   start?: 'later' | 'now';
   /** The thread this one was filed under: what makes it a proposal. */
@@ -163,7 +164,8 @@ export function parkedByAgent(i: InboxItem, now = Date.now()): boolean {
 // release and never written. It is hers by definition, so it counts.
 export function hiddenUntil(i: InboxItem, legacySnooze = 0): number {
   const mine = i.wrote?.runAt?.source === 'founder' ? i.runAt ?? 0 : 0;
-  return Math.max(mine, legacySnooze);
+  const reminder = i.wrote?.snoozedUntil?.source === 'founder' ? i.snoozedUntil ?? 0 : 0;
+  return Math.max(mine, reminder, legacySnooze);
 }
 
 // `hiddenUntil` is HER deferral only: the caller passes the founder-set runAt
@@ -176,9 +178,12 @@ export function hiddenUntil(i: InboxItem, legacySnooze = 0): number {
 // running list). Nothing else here can see that, and the status cannot stand
 // in for it: a worker writes blocked or done, or leaves its answer, and then
 // keeps running while it writes its last message.
+//
+// `shipping` is whether the app's ship queue still owes this row a ship (the
+// supervisor's `shipping` list), which nothing here can see either.
 export function belongsInInbox(
   i: InboxItem,
-  { deliveredThrough = 0, hiddenUntil = 0, now = Date.now(), live = false } = {},
+  { deliveredThrough = 0, hiddenUntil = 0, now = Date.now(), live = false, shipping = false } = {},
 ): boolean {
   // ADDED TO LATER AND NOT STARTED (w-afb66e6661). It is written down on
   // purpose and waits for a person rather than a clock, so it is in Later and
@@ -189,6 +194,12 @@ export function belongsInInbox(
   // exited. It is In progress until then (`belongsInProgress`), and the
   // branches below decide the moment it is not.
   if (live) return false;
+  // THE APP IS STILL TO SHIP IT (w-0c1ba766eb). "It's waiting on us so it
+  // only needs our review when it's finished": a row marked to ship reached
+  // Needs you as finished work while the next move was the app's, and its only
+  // option was "Close this task". It comes back the moment the queue has dealt
+  // with it, shipped or handed back to its agent.
+  if (shipping) return false;
   if (hiddenUntil > now) return false;    // she put it away herself
   // One run of a repeating task that a worker EXPLICITLY marked clean. This is
   // the only place in the app where finishing hides something, so it is keyed on a
@@ -303,6 +314,11 @@ export const PROPOSAL_PATIENCE = 24 * 3_600_000;
  * It names a thread it can see in `items`: a proposal whose parent is not
  * there has nothing to come back, which is why `isProposal` refuses to hide
  * one in the first place.
+ *
+ * A thread YOU closed stays closed. The reminder used to bypass the inbox's
+ * archive rule, returning one Done thread after eight closes (2026-10-07).
+ * An agent finishing is still news; your closure settles the reminder without
+ * answering or deleting its proposals. Reopening deliberately enables it again.
  */
 export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?: string }>(
   items: readonly T[],
@@ -313,7 +329,10 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
   for (const i of items) {
     if (!isProposal(i)) continue;
     if (now - (i.createdAt ?? 0) <= PROPOSAL_PATIENCE) continue;
-    if (i.parent && byId.has(i.parent)) owed.add(i.parent);
+    const parent = i.parent ? byId.get(i.parent) : undefined;
+    if (!parent) continue;
+    if (parent.status === 'done' && parent.wrote?.status?.source === 'founder') continue;
+    owed.add(parent.id);
   }
   return owed;
 }
@@ -335,7 +354,7 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
 // silence it bought was indistinguishable from being ignored.
 export function belongsInProgress(
   i: InboxItem,
-  { deferredUntil = 0, now = Date.now(), live = false } = {},
+  { deferredUntil = 0, now = Date.now(), live = false, shipping = false } = {},
 ): boolean {
   // Nothing is coming on a thread nobody has started: In progress promises a
   // worker, and this one is waiting for you to say go (w-afb66e6661).
@@ -344,6 +363,8 @@ export function belongsInProgress(
   // agent that has written blocked, done or a moment to wake at is still
   // working until it exits (w-bc976fd247, and `live` above belongsInInbox).
   if (live) return true;
+  // And so is the app's ship queue, which owes this row a ship (w-0c1ba766eb).
+  if (shipping) return true;
   if (deferredUntil > now) return false;
   if (i.status === 'claimed') return true;
   // The promise this list makes has been kept: a session acted on her answer
@@ -402,9 +423,7 @@ export function stoppable(
 // it is largely the inbox repeated down the side of the screen, often more than
 // twice as many rows. So the rule is the union of three lists (in progress,
 // scheduled, inbox) and nothing of its own, because a fourth definition of what is live is
-// a fourth answer to one question. It is the same union `liveRows` in App.tsx
-// already takes for the thread mask, and that reads this now rather than
-// keeping a second copy of it.
+// a fourth answer to one question.
 //
 // THIS DOES NOT REPLACE `onTheRail` IN shared/agents.mjs. That one still rules
 // the SESSIONS beside these rows, which are her own terminals and have no work
@@ -412,9 +431,9 @@ export function stoppable(
 // were spawned for, which is what they already are in her inbox.
 export function belongsOnTheRail(
   i: InboxItem,
-  { deliveredThrough = 0, hiddenUntil = 0, deferredUntil = 0, now = Date.now(), live = false } = {},
+  { deliveredThrough = 0, hiddenUntil = 0, deferredUntil = 0, now = Date.now(), live = false, shipping = false } = {},
 ): boolean {
-  if (belongsInProgress(i, { deferredUntil, now, live })) return true;
+  if (belongsInProgress(i, { deferredUntil, now, live, shipping })) return true;
   if (hiddenUntil > now && i.status !== 'done') return true;  // the user's own, put off: Scheduled
   return belongsInInbox(i, { deliveredThrough, hiddenUntil, now });
 }
@@ -451,107 +470,14 @@ export function withdrawReply(statusWhenReplied: string): { answer: string; stat
 // So replying clears the schedule, whoever set it. It costs the approve-Friday-run-Monday case, which is now made by answering and
 // then pressing S, and the undo on the reply puts the old moment back.
 export function replyClearsSchedule(i: InboxItem, now = Date.now()): boolean {
-  return (i.runAt ?? 0) > now;
+  return Math.max(i.runAt ?? 0, i.snoozedUntil ?? 0) > now;
 }
 
-/* --------------------- one thread, one row, ONE ACTION -------------------- */
-// A bulk action once landed every write, and still a row APPEARED where the
-// list had just been cleared.
-//
-// The inbox shows a thread as ONE row: a parent whose child ask is also here is
-// represented by that child and hidden (`hasChildHere`, App.tsx). Snoozing the
-// child takes it out of the list, which UNMASKS the parent, and the parent
-// arrives on the same refresh looking exactly like a row the action skipped.
-// Measured across every bulk burst in a real store: 0, 1 or 2 rows are visible
-// after a burst that were not visible before, and every one is a parent
-// unmasked by its own child in that same burst.
-//
-// So the row she selected was never one item.
-//
-// This returns the rows hiding BEHIND the ones she acted on. It walks up the
-// parent chain only while each ancestor is itself a candidate, because that is
-// exactly when the mask applies: an ancestor the inbox was never going to show
-// (already done, already deferred, filed) is not hidden by her row and must not
-// be dragged along by it.
-//
-// NOT the other repair, which was to widen the mask so a parent stays hidden
-// while its child sits in Scheduled. Scheduled lists what SHE deferred, and a
-// masked parent carries no moment of its own, so that fix puts the parent in
-// neither list and she cannot reach it at all. Moving the thread together keeps
-// every row somewhere she can see it.
-// ONE THREAD, ONE ROW, AND THE MASK HOLDS WHEN THE FRONT ROW LEAVES.
-//
-// The mask used to read the LIST: hide a parent while a child is sitting in the
-// inbox. So the instant the child left the inbox the parent stepped forward,
-// wearing whatever it said the day it was written. Measured over 72 hours of
-// real ledgers: nearly a fifth of the returns to the inbox were a row unmasked
-// this way, about half of them saying nothing new. Answering, archiving or
-// snoozing the child all did it, which is why the rows just cleared were the
-// ones that looked duplicated.
-//
-// So the mask reads the CONVERSATION instead: a row stays hidden while any
-// descendant of it is still LIVE, where live means present in one of the three
-// places she looks (inbox, In progress, her own Scheduled). Answering a child
-// moves it from the inbox to In progress, so the parent stays put.
-//
-// Two things hold the line, and neither is optional:
-//
-//   1. A row is only ever hidden BY A ROW SHE CAN SEE. The descendant doing the
-//      hiding is in the inbox, in In progress, or in Scheduled, so the
-//      conversation always has somewhere to be reached from. This is the trap
-//      the earlier repair fell into (see maskedAncestors below): widening the
-//      mask to cover a child in Scheduled without moving the parent too put the
-//      parent in NEITHER list, and she could not reach it at all.
-//   2. The climb stops at the first ancestor that is not itself live. "The
-//      thread" is the nearest live chain, never every descendant: dozens of
-//      rows in one product can hang off one founding directive, and a rule
-//      that hid a row while any descendant anywhere is alive would hide almost
-//      the whole product behind one of them. Same walk as maskedAncestors, so the
-//      bulk action and the mask cannot disagree about what a thread is.
-//
-// Ancestors only. Two live asks under one root are siblings and neither hides
-// the other; nothing here hides a row from anything except its own past.
-export function threadMasked<T extends { id: string; parent?: string }>(
-  candidates: T[],
-  live: T[],
-): Set<string> {
-  const liveById = new Map(live.map((l) => [l.id, l]));
-  const isCandidate = new Set(candidates.map((c) => c.id));
-  const masked = new Set<string>();
-  for (const start of live) {
-    let cur: T = start;
-    const seen = new Set<string>([cur.id]); // a parent cycle is corrupt data, not a hang
-    while (cur.parent) {
-      const p = liveById.get(cur.parent);
-      if (!p || seen.has(p.id)) break;      // the chain is dead above here: climb no further
-      seen.add(p.id);
-      if (isCandidate.has(p.id)) masked.add(p.id);
-      cur = p;
-    }
-  }
-  return masked;
-}
-
-export function maskedAncestors<T extends { id: string; parent?: string }>(
-  targets: T[],
-  candidates: T[],
-): T[] {
-  const byId = new Map(candidates.map((c) => [c.id, c]));
-  const taken = new Set(targets.map((t) => t.id));
-  const out: T[] = [];
-  for (const t of targets) {
-    let cur: T = byId.get(t.id) ?? t;
-    const seen = new Set<string>([cur.id]); // a parent cycle is corrupt data, not a hang
-    while (cur.parent) {
-      const p = byId.get(cur.parent);
-      if (!p || seen.has(p.id)) break;
-      seen.add(p.id);
-      if (!taken.has(p.id)) { taken.add(p.id); out.push(p); }
-      cur = p;
-    }
-  }
-  return out;
-}
+/* --------------- a thread spawned from another is just a thread ----------- */
+// There used to be a rule here that hid a thread while any thread spawned from
+// it was still in a list, so a conversation read as one row. It hid an urgent
+// thread with a fresh answer on it behind one the user had put off for three
+// days (w-2eb0e716dd). Every thread now shows by its own rules above.
 
 /* ------------------------------- the click ------------------------------- */
 export type ClickTarget = 'row' | 'box';

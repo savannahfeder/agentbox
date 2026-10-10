@@ -9,7 +9,7 @@ function setup(profile = 'default') {
   let selected = profile, clock = 1_000_000;
   const calls = [], changed = vi.fn();
   const usage = new ClaudeUsage({
-    bin: () => '/bin/claude', profile: () => selected, now: () => clock,
+    bin: () => '/bin/claude', account: () => ({ profile: selected }), now: () => clock,
     where: () => '/empty', onChange: changed,
     run: (bin, args, opts, done) => calls.push({ bin, args, opts, done }),
   });

@@ -637,7 +637,7 @@ export function groupWork(events, { min = RUN_MIN } = {}) {
   for (const e of events ?? []) {
     // SOMETHING SHE DID IS NOT THE AGENT'S WORK and never folds into it: three
     // snoozes are three lines, not one "You put it off" (w-49b4e45403).
-    if (e && e.kind === 'work' && !e.yours) { run.push(e); continue; }
+    if (e && e.kind === 'work' && !e.yours && !e.standalone) { run.push(e); continue; }
     flush();
     out.push(e);
   }

@@ -1,0 +1,121 @@
+/* THE CORNER TAG (w-dafae58a23). Each window is exactly its tag or its list,
+   clear and unrounded (main/corner-tag.mjs), so this page draws everything:
+   the glass, its small corners, and the words. It follows the Mac's dark and
+   light mode.
+
+   Dark mode is its own look, not the light one: in the light silver the tag
+   glared off a dark screen. Approved over rounds of drawings in the product's
+   designs folder; change it there first. */
+
+:root {
+  --ct-ink: #1d1d1f;
+  --ct-dim: rgba(29, 29, 31, 0.68);
+  --ct-faint: rgba(29, 29, 31, 0.48);
+  --ct-mark: rgba(29, 29, 31, 0.42);
+  --ct-tint: rgba(243, 244, 247, 0.95);
+  --ct-tint-hover: rgba(249, 249, 251, 0.97);
+  /* The edge, drawn here since the window has no system outline. Light: a
+     hairline as dark as the one macOS drew. */
+  --ct-edge: inset 0 0 0 0.5px rgba(0, 0, 0, 0.15);
+  --ct-rule: rgba(29, 29, 31, 0.10);
+  --ct-press: rgba(29, 29, 31, 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ct-ink: rgba(255, 255, 255, 0.86);
+    --ct-dim: rgba(255, 255, 255, 0.62);
+    --ct-faint: rgba(255, 255, 255, 0.44);
+    --ct-mark: rgba(255, 255, 255, 0.42);
+    --ct-tint: rgba(39, 39, 43, 0.95);
+    --ct-tint-hover: rgba(50, 50, 55, 0.96);
+    --ct-edge: inset 0 0 0 0.5px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px rgba(255, 255, 255, 0.13);
+    --ct-rule: rgba(255, 255, 255, 0.10);
+    --ct-press: rgba(255, 255, 255, 0.07);
+  }
+}
+:root[data-theme='dark'] {
+  --ct-ink: rgba(255, 255, 255, 0.86);
+  --ct-dim: rgba(255, 255, 255, 0.62);
+  --ct-faint: rgba(255, 255, 255, 0.44);
+  --ct-mark: rgba(255, 255, 255, 0.42);
+  --ct-tint: rgba(39, 39, 43, 0.95);
+  --ct-tint-hover: rgba(50, 50, 55, 0.96);
+  --ct-edge: inset 0 0 0 0.5px rgba(0, 0, 0, 0.6), inset 0 0 0 1.5px rgba(255, 255, 255, 0.13);
+  --ct-rule: rgba(255, 255, 255, 0.10);
+  --ct-press: rgba(255, 255, 255, 0.07);
+}
+
+html, body, #root { margin: 0; padding: 0; background: transparent; overflow: hidden; height: 100%; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; -webkit-font-smoothing: antialiased; user-select: none; cursor: default; color: var(--ct-ink); }
+
+/* The glass: nearly solid, so what is behind never shows through as words,
+   with its edge drawn inside, because the window ends at the glass. Dark mode
+   has a black hairline and a soft light band, the shape of the outline macOS
+   drew when the window had a system shadow, at about half its strength.
+   Pictures draw exactly this and nothing more: the real window adds nothing. */
+.ct-glass {
+  position: absolute; left: 0; top: 0; color: var(--ct-ink); background: var(--ct-tint);
+  backdrop-filter: blur(28px) saturate(180%);
+  box-shadow: var(--ct-edge);
+}
+
+
+/* ---- the tag ---- */
+.ct-tag {
+  height: 28px; padding: 0 12px 0 10px; border-radius: 6px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 7px; font-size: 12.5px; white-space: nowrap;
+  transition: background-color 120ms ease;
+}
+.ct-tag .ct-words { font-weight: 600; }
+.ct-tag.working .ct-words { font-weight: 500; color: var(--ct-dim); }
+.ct-tag:hover, .ct-tag.is-open { background: var(--ct-tint-hover); }
+.ct-tag.is-dragging { cursor: grabbing; }
+
+/* The way into the app, always at the tag's end: a hairline and a chevron
+   (she kept both, 2026-10-08, picking the chevron over an arrow on full-screen
+   pictures for how it sits). A click anywhere on the tag opens the app; the
+   chevron says so. */
+.ct-go { display: flex; align-items: center; gap: 8px; margin-left: 1px; color: var(--ct-dim); }
+.ct-go::before { content: ''; width: 1px; height: 14px; background: var(--ct-rule); }
+.ct-tag { padding-right: 9px; }
+.ct-go svg { display: block; }
+
+/* Ready is a full dot, working the same grey half full. Still: nothing here
+   moves on its own, because moving is what pulls an eye off its work. */
+/* The waiting dot. Light mode: a pearl, faintly pink and blue, with a blush
+   glow (she picked it, "C3", from full-screen pictures on 2026-10-08; a plain
+   white dot read as an empty ring and a grey one as dull). Dark mode: the soft
+   white dot with a faint glow she approved. */
+.ct-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 32% 28%, #fff 0 24%, #f8eef6 48%, #e7ecf6 74%, #d3d9e7 100%);
+  box-shadow: 0 0 0 0.5px rgba(60, 70, 90, 0.08), 0 0 8px 2px rgba(232, 208, 240, 0.85);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .ct-dot { width: 7px; height: 7px; background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.55); }
+}
+:root[data-theme='dark'] .ct-dot { width: 7px; height: 7px; background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.55); }
+.ct-half { flex: none; display: block; color: var(--ct-mark); }
+
+/* ---- the list ---- */
+.ct-card { border-radius: 8px; padding: 9px 8px 8px; box-sizing: border-box; width: max-content; max-width: 440px; min-width: 240px; }
+.ct-line {
+  all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 9px; width: 100%;
+  font-size: 13px; white-space: nowrap; padding: 5px 6px; border-radius: 4px; cursor: pointer; color: var(--ct-ink);
+}
+.ct-line:hover { background: var(--ct-press); }
+.ct-line .ct-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.ct-line .ct-says { color: var(--ct-dim); }
+.ct-line .ct-when { margin-left: auto; padding-left: 14px; font-size: 12px; color: var(--ct-faint); }
+.ct-quiet { font-size: 12.5px; color: var(--ct-faint); }
+.ct-line.ct-quiet { color: var(--ct-faint); }
+.ct-static { padding: 5px 6px; }
+.ct-mark-sp { width: 8px; flex: none; }
+
+/* Hide it for a while, or go and turn it off. Small and last, so the list
+   reads first. */
+.ct-foot { display: flex; align-items: center; gap: 2px; margin: 6px 0 0; padding: 7px 6px 0; border-top: 1px solid var(--ct-rule); font-size: 11.5px; color: var(--ct-faint); white-space: nowrap; }
+.ct-foot > span:first-child { margin-right: 2px; }
+.ct-foot button { all: unset; cursor: pointer; padding: 2px 6px; border-radius: 5px; color: var(--ct-dim); }
+.ct-foot button:hover { background: var(--ct-press); color: var(--ct-ink); }
+.ct-foot .ct-sep { flex: 1; min-width: 16px; }

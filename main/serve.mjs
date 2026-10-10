@@ -32,6 +32,7 @@ import { spawn } from 'node:child_process';
 import { loadConfig } from './config.mjs';
 import { Store } from './store.mjs';
 import { Supervisor } from './supervisor.mjs';
+import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mjs';
 import { registerIpc } from './ipc.mjs';
 import { reportFromRenderer } from './crash-report.mjs';
 import * as workItemsDisk from './store/work-items.mjs';
@@ -137,6 +138,7 @@ function readVersion() {
  */
 function answerWhatOnlyTheWindowAnswered(ipcMain) {
   ipcMain.handle('zero:badge', () => null);
+  ipcMain.handle('zero:corner-tag', () => null);
   ipcMain.handle('zero:notify', () => null);
   ipcMain.handle('zero:boot-info', () => ({ reloaded: false, builtAt: null, recovered: null }));
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); return null; });
@@ -152,11 +154,17 @@ function answerWhatOnlyTheWindowAnswered(ipcMain) {
  */
 export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, userDir = dataDir } = {}) {
   const config = loadConfig(dataDir);
+  // The browser editor uses the same user files as the desktop. Finish the
+  // older migrations first so only user content enters the combined file.
+  carryHerBriefsAcross(appDir, userDir);
+  joinMessageRules(appDir, userDir);
+  setAsideShippedMessageRules(appDir, userDir);
+  unifyAgentInstructions(appDir, userDir);
   // THE APP'S OWN HOME IS THE STORE ROOT, BEFORE ANYTHING OPENS THE STORE, as
   // main/main.mjs does for the desktop. The ledgers live under the home the
   // store reads from this variable, and every worker is handed `storeRoot` as
   // that same variable. Without this line the two disagreed: the copy wrote its
-  // rows wherever an inherited variable pointed (or `~/.agentbox`), each worker
+  // rows wherever an inherited variable pointed (or a dot-folder in $HOME), each worker
   // looked under `storeRoot`, and every store call answered "no work item".
   // tests/an-agent-in-a-browser-copy-can-reach-its-own-work-item.test.mjs.
   // Rows already written under the old home come along, or they would vanish.
@@ -224,6 +232,9 @@ export function createServer({ channels, token, listeners = new Set(), dist = pa
     // an EventSource. It guards the two doors that reach the store. The built
     // screen is the same public files for everybody, and its own script and
     // style requests carry no token, so asking for one there drew a blank tab.
+    // NOR DOES THE PAGE ITSELF ASK: the tab takes the token out of its address
+    // bar on load, so a reload asks for `/` bare, and refusing that drew
+    // "Wrong or missing token" on every reload (tests/a-browser-tab-survives-a-reload).
     const guarded = url.pathname === '/events' || url.pathname.startsWith('/api/');
     const given = req.headers['x-agentbox-token'] || url.searchParams.get('token');
     if (guarded && given !== token) {

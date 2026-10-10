@@ -371,8 +371,10 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
       continue;
     }
 
-    if (has(patch, 'runAt')) {
-      const runAt = Number(patch.runAt) || 0;
+    // runAt lines remain readable as legacy snoozes; new reminders have
+    // their own field so the worker never mistakes one for an instruction.
+    if (has(patch, 'snoozedUntil') || has(patch, 'runAt')) {
+      const runAt = Number(has(patch, 'snoozedUntil') ? patch.snoozedUntil : patch.runAt) || 0;
       if (!runAt) {
         if (mine && replied && replied.by === markBy && at - replied.at <= REPLY_LIFTS_MS) continue;
         events.push({ at, who, said: mine ? 'You brought it back' : 'It let this run now' });
@@ -396,6 +398,12 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
         continue;
       }
       if (status === 'blocked') {
+        // recordSessionResult delivers the agent's answer, then parks the
+        // thread with a system status. That is delivery, not a question.
+        if (line.source === 'system' && !askedACommand && events.at(-1)?.field === 'result') {
+          askedACommand = false;
+          continue;
+        }
         // HER OWN BLOCKED IS NOT THE AGENT STOPPING. She has no control that
         // writes it; the one thing that does is a Z putting a row back where
         // her reply found it (`withdrawReply`), and it read as "It stopped and

@@ -1,5 +1,6 @@
 import { RemoteControl } from './RemoteControl';
 import {DirectReview} from './DirectReview';
+import {MessageFiles} from './MessageFiles';
 import {reviewLabEnabled, reviewContextDraft} from '../review-lab';
 import { sourceReference } from '../source-reference.mjs';
 import { TaskTerminal } from './TaskTerminal';
@@ -39,12 +40,12 @@ import {
 /*
  * THE ROW'S TWO WORDS COME FROM `rowSays` NOW, not from six constants pulled
    apart here. One list, one row shape (w-23a7b3f568, 2026-08-27). */
-import { rowKey, rowSays, slashRows, type SlashRow } from '../slash-menu';
+import { commandBeingWritten, enterWaitsForWords, holdingHint, rowKey, rowSays, slashRows, type SlashRow } from '../slash-menu';
 import { commandDraft } from '../../../shared/claude-commands.mjs';
 import { CompactionResult, runCompaction, runCommand } from './CompactionResult';
 import { codexCommand, COMPACTION_COPY } from '../../../shared/codex-commands.mjs';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
-import { ago, dayLabel, itemOptions, offerIsLive, optionsFrom, parseOptions, parseRepeat } from '../format';
+import { ago, dayLabel, itemOptions, offerIsLive, optionsFrom, parseOptions, parseRepeat, type ParsedOption } from '../format';
 import { ruleIdOf } from '../../../shared/repeats.mjs';
 import { WhenPicker } from './When';
 import { ModelPicker } from './Model';
@@ -424,7 +425,7 @@ function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 // not the user's, and it is the part that was unnecessary. `filesFromRuns` stays,
 // because App.tsx still reads it to choose the design a card opens itself on.
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onReopen, onSnooze, onReveal, onOpenItem, onApproveFiled, onRejectFiled, onNotice, onHandToAgent, onAddPeople }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, interruptedFrom, onBackToInterrupted, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onRedeliver, onUnschedule, onClose, onResolve, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onReopen, onSnooze, onReveal, onOpenItem, onApproveFiled, onRejectFiled, closeAsk, onNotice, onHandToAgent, onAddPeople }: {
   previewSample?: string;
   /**
    * A MESSAGE FROM A PERSON IS NOT WORK UNTIL SHE SAYS SO. The one line under
@@ -496,6 +497,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // is about. A proposal nobody answers brings this thread back a day later,
   // so there has to be a way to settle one without starting it.
   onRejectFiled?: (item: WorkItem) => void;
+  /**
+   * THE QUESTION A CLOSE ASKS when tasks this thread filed are still waiting
+   * (w-d2744c6daa, ../close-asks-first.ts). While it is up it stands where the
+   * thread's own options stand, and the number keys answer it (App.tsx).
+   */
+  closeAsk?: { ask: string; options: ParsedOption[]; onPick: (n: number) => void; keep: { label: string; onKeep: () => void } } | null;
   // Said out loud when a file a worker named is not in this product. Nothing
   // else on the card can tell her a chip failed.
   onNotice: (text: string) => void;
@@ -1502,7 +1509,19 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             Everywhere but full screen, where the pane's body is not on the
             screen at all and the offer keeps its old home on the reply card
             (see `offerInPane` for the whole of that). */}
-        {offerInPane && (
+        {/* AND WHILE A CLOSE IS ASKING ABOUT THE TASKS STILL WAITING, ITS
+            QUESTION STANDS HERE INSTEAD (w-d2744c6daa), on any row, offer or
+            not, because the close is what raised it. */}
+        {closeAsk && !fullScreenDoc && (
+          <OptionsOffer
+            ask={closeAsk.ask} askAll={closeAsk.ask} options={closeAsk.options}
+            peekOption={null} askPeek={false}
+            selectedOption={selectedOption} selRef={selRef}
+            onPick={closeAsk.onPick} onOptionEnter={() => {}} onAskEnter={() => {}}
+            setPeek={() => {}} setAskPeek={() => {}} keep={closeAsk.keep}
+          />
+        )}
+        {offerInPane && (closeAsk ? null : (
           <OptionsOffer
             ask={ask} askAll={askAll} options={options}
             peekOption={peekOption} askPeek={askPeek}
@@ -1510,7 +1529,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             onPick={onPick} onOptionEnter={onOptionEnter} onAskEnter={onAskEnter}
             setPeek={setPeek} setAskPeek={setAskPeek}
           />
-        )}
+        ))}
 
         {!agent && <RemoteControl key={`remote:${item.product}:${item.id}`} product={item.product} id={item.id} />}
         {!agent && <CompactionResult engine={runningEngine ?? 'claude-code'} key={`${item.product}:${item.id}`} item={item} />}
@@ -1557,7 +1576,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           that already linked it. Measured on w-d161451598: one path,
           three drawings, 34px. Tidy drops that line and keeps the frame, which
           is still what draws the document when it is NOT already open. */}
-      {inlineArtifacts && <div className="artifact-entry-list" aria-label="Attachments">{previewPaths.map(path =>
+      {/* THE FILES A MESSAGE NAMES ARE SMALL FRAMED TILES (w-9ed13d72b3), and
+          a file nothing can read gets none. The big review card below is
+          only the review lab's sample now. */}
+      {inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths} revision={item.updatedAt} openDoc={openDoc} onOpen={path => onOpenArtifact?.(path, 'beside')} />}
+      {inlineArtifacts && previewSample && <div className="artifact-entry-list" aria-label="Attachments">{previewPaths.map(path =>
         <DirectReview key={path} product={product} path={path} revision={item.updatedAt} open={openDoc === path}
           onOpen={()=>onOpenArtifact?.(path, 'beside')}
           onAddContext={reviewLabEnabled(api.isFixtures,location.search) ? action=>{
@@ -1619,7 +1642,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             {scheduledByAgent ? 'let it run now' : 'back to inbox'}
             <span className="dim">
               {' · '}
-              {scheduledByAgent ? 'the agent paused this until' : 'scheduled for'} {whenLabel(scheduledUntil!)}
+              {(item.snoozedUntil ?? 0) > Date.now() ? 'snoozed until' : scheduledByAgent ? 'the agent paused this until' : 'scheduled for'} {whenLabel(scheduledUntil!)}
             </span>
           </button>
         )}
@@ -1699,7 +1722,16 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               its old terms: it comes up with the box and goes when the box
               folds. It follows nobody down a page, because in that mode there
               is no page of conversation on the screen. */}
-          {offerInDock && (
+          {closeAsk && fullScreenDoc && (
+            <OptionsOffer
+              ask={closeAsk.ask} askAll={closeAsk.ask} options={closeAsk.options}
+              peekOption={null} askPeek={false}
+              selectedOption={selectedOption} selRef={selRef}
+              onPick={closeAsk.onPick} onOptionEnter={() => {}} onAskEnter={() => {}}
+              setPeek={() => {}} setAskPeek={() => {}} keep={closeAsk.keep}
+            />
+          )}
+          {offerInDock && (closeAsk ? null : (
             <OptionsOffer
               ask={ask} askAll={askAll} options={options}
               peekOption={peekOption} askPeek={askPeek}
@@ -1707,7 +1739,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               onPick={onPick} onOptionEnter={onOptionEnter} onAskEnter={onAskEnter}
               setPeek={setPeek} setAskPeek={setAskPeek}
             />
-          )}
+          ))}
           {/* NO REPLY BOX ON THE TROUBLE ROW EITHER, and for the same reason as
               the one below: there is nobody on the other end of it. A box that
               looks like it sends is the failure this codebase cares about most.
@@ -2091,7 +2123,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // pointing at nothing once the list shortens to two.
   const [slashAt, setSlashAt] = useState(0);
   const [nativeNames, setNativeNames] = useState<string[]>([]);
-  const discoveringCommands = !item.agent && (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE && slashQuery(text) !== null;
+  // While the box starts with a slash, not only while the menu is open: once
+  // she types past /loop the box still has to know /loop is a command.
+  const discoveringCommands = !item.agent && (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE && text.startsWith('/');
   useEffect(() => {
     setNativeNames([]);
     if (!discoveringCommands) return;
@@ -2274,6 +2308,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // from the footer chip too; the chip is gone (see the note where it stood)
   // and with it went `chipOpen` and the click-away that shut it.
   const slashOpen = menuRows.length > 0;
+  // The command waiting on her words, once Enter has put it in the box.
+  const holding = !item.agent ? commandBeingWritten(text, claudeCode, nativeNames) : null;
   // WHAT THIS SEND WILL ACTUALLY RUN AS: the mode picked for this one message
   // if there is one, otherwise whatever the fleet is set to. Never a guess and
   // never a blank: a footer that says nothing when nothing is picked is the
@@ -2337,49 +2373,20 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
    *  A MODE sets a value and empties the box, because it is a thing she is
    *  saying about the message she is about to write.
    *
-   *  A COMMAND RUNS. Enter on it sends it, the same beat, with no second key.
+   *  A COMMAND IS PUT IN THE BOX AND WAITS FOR SEND, every one of them, the
+   *  way a terminal does (w-2c8ef9ed9e). Enter on /loop used to start a loop
+   *  with nothing to loop on. Picking a command, by Enter, Tab or a click,
+   *  writes it with its trailing space; she adds whatever it takes; Send runs
+   *  it. slash-menu.ts `enterWaitsForWords` says why it is every command
+   *  rather than a list.
    *
-   * IT USED TO ONLY FILL THE BOX, and that was wrong, and it is the row this
-   * change is on. Measured in the running app before the change
-   * (`scripts/probe-a-slash-command-on-enter.mjs`): Enter left `/usage ` in the
-   * box, closed the menu, and sent nothing. A second Enter typed a newline.
-   * Only Cmd+Enter ever sent, so the one key anybody presses on a highlighted
-   * menu row did nothing she could see.
-   *
-   *  The old reasoning was that half of the eight take an argument she still has
-   *  to type, and that is true and it is what TAB is for now. Tab completes the
-   *  command into the box with its trailing space and waits; Enter runs it. That
-   *  is Claude Code's own division of the same two keys, so there is nothing new
-   *  to learn, and typing `/model opus` by hand still works because the space
-   *  closes the menu and Cmd+Enter still sends.
-   *
-   *  A command bare is never destructive and usually still answers: measured
-   *  against 2.1.251 on 2026-08-29, `/model` prints the current model and its
-   *  usage line, `/effort` and `/goal` print theirs, `/mcp` prints the server
-   *  count, and `/usage` and `/context` print the tables she is asking for.
-   *
-   * Nothing is announced by a run, because the answer itself arrives in the
-   * thread on this row within a few seconds, which is the confirmation. */
-  const pickRow = (row: SlashRow, how: 'run' | 'fill' = 'run') => {
+   *  Enter on a command ran it from w-5d1ad29efa until then, because Enter
+   *  that only filled the box looked like a dead key: `/usage ` appeared, the
+   *  menu closed, nothing else moved. What answers that now is the faint words
+   *  after the caret saying what the command takes and that ⌘↵ runs it. */
+  const pickRow = (row: SlashRow) => {
     if (row.kind === 'mode' || row.kind === 'codexMode') { pickMode(row.mode); return; }
-    if (how === 'fill') { setText(commandDraft(row.cmd)); ref.current?.focus(); return; }
-    /*
-     * A COMMAND THAT REQUIRES AN ARGUMENT RUNS TOO, AND IS TOLD WHAT IT WANTS.
-       This line used to fill the box for those instead, which on `/fork` means
-       replacing the text she just typed with the same text and a space: the
-       menu closes, nothing else moves, and the key looks broken: typing /fork
-       and pressing return did nothing. It is the same fault w-5d1ad29efa fixed for the commands that take nothing,
-       one case further along. Both of the commands this reaches refuse
-       harmlessly and say what they want, which is something she can act on.
-       Tab still completes into the box for somebody who knows the word. */
-    if (providerCommand(`/${row.cmd.name}`, runningEngine ?? 'claude-code')?.route !== 'claude') { void send(`/${row.cmd.name}`); return; }
-    /*
-     * The box is emptied AND the command is handed to `send` by hand. Both,
-       because they answer two different questions: the box has to stop showing
-       a command that has already gone, and the send cannot wait a render for
-       state React has not applied yet. */
-    setText('');
-    send(`/${row.cmd.name}`);
+    if (enterWaitsForWords(row)) { setText(commandDraft(row.cmd)); ref.current?.focus(); }
   };
   // TYPING IT STRAIGHT THROUGH. Somebody who already knows the word does not
   // want a menu; they want to type /auto and a space and carry on writing the
@@ -2443,6 +2450,16 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
       {slashOpen && (
         <SlashMenu rows={menuRows} at={slashAt} onPick={pickRow} onHover={setSlashAt} />
       )}
+      {/* THE COMMAND THE BOX IS HOLDING, SAID IN THE BOX (w-2c8ef9ed9e). Once
+          Enter has put `/loop ` there the menu closes on the space, so what she
+          still has to write is drawn faintly after the caret, the way a
+          terminal draws a command's argument hint, and goes as she types. */}
+      {holding && /^\/\S+\s*$/.test(text) && (
+        <div className="dock-ghost" style={{ top: ref.current?.offsetTop ?? 0 }} aria-hidden>
+          <span className="dock-ghost-typed">{text.endsWith(' ') ? text : `${text} `}</span>
+          {holdingHint(holding)}
+        </div>
+      )}
       {/* AGENTS IN A CONVERSATION (w-7b9cb8636a): the @ menu, a mention's
           card, and the mentions drawn as chips under the text. Nothing here
           draws outside a conversation with a person. */}
@@ -2493,14 +2510,13 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             if (e.key === 'ArrowDown') { e.preventDefault(); setSlashAt((i) => (i + 1) % menuRows.length); return; }
             if (e.key === 'ArrowUp') { e.preventDefault(); setSlashAt((i) => (i - 1 + menuRows.length) % menuRows.length); return; }
             /*
-             * ENTER RUNS THE ROW AND TAB COMPLETES IT, which is the whole of
-               w-5d1ad29efa. They used to be the same key doing the same thing,
-               and that thing was "fill the box", so Enter on `/usage` showed her
-               nothing. On a MODE row both still set the mode: a mode is not a
-               message and there is nothing to run. */
+             * ENTER AND TAB BOTH PICK THE ROW, and neither sends: a command
+               goes into the box and waits for Send, a mode is set (pickRow).
+               ⌘↵ falls through to Send, so `/usage` typed out and sent still
+               runs in one key. */
             if ((e.key === 'Enter' && !e.metaKey && !e.ctrlKey) || e.key === 'Tab') {
               e.preventDefault();
-              pickRow(menuRows[slashAt] ?? menuRows[0], e.key === 'Tab' ? 'fill' : 'run');
+              pickRow(menuRows[slashAt] ?? menuRows[0]);
               return;
             }
             if (e.key === 'Escape') {

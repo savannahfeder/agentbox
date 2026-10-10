@@ -4,34 +4,30 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import crypto from 'node:crypto';
 import { SCHEMA_VERSION, validateCreation, creationText, TEXT_CREATION_KINDS } from '../../shared/contracts.mjs';
 import { assertInside, assertCreationDir, deniesGitOrEnvPath } from './paths.mjs';
 import { migrateIndex } from './migrate.mjs';
 import { withProjectLockSync } from './project-lock.mjs';
-import { Name, readEnv } from '../../shared/product-name.mjs';
+import { readEnv } from '../../shared/product-name.mjs';
+import { defaultStoreRoot } from './home.mjs';
 
-// The machine-wide root: ASTRAL_HOME, else the folder named below. This is
-// where device-local files live (settings.json, ui-state.json, usage.json,
-// .runtime-pids, ...) and where a founder's PRE-account projects sit until they
-// are migrated into an account space. It is NEVER account-scoped: those files
-// stay global (Phase 1).
+// The machine-wide root: the store-home variable, else the same default
+// loadConfig uses when a config names no store. This is where device-local
+// files live (settings.json, ui-state.json, usage.json, .runtime-pids, ...)
+// and where a founder's PRE-account projects sit until they are migrated into
+// an account space. It is NEVER account-scoped: those files stay global
+// (Phase 1).
 //
-// THE FALLBACK IS THE APP'S OWN NAME NOW, where it used to be an older
-// product's folder.
+// THE FALLBACK IS defaultStoreRoot. On macOS that is a folder of the app's
+// name. On Linux it is the XDG data directory. A visible folder in $HOME was
+// the fallback until 2026-10-07, and a config that named no store created one.
 //
-// NOTHING WAS DELETED AND NOTHING MOVED. That folder is still on disk exactly
-// as it was. What changed is that this app stops reaching for it by default.
 // Her live store is named in zero.config.json and handed to every worker as
-// the app's own home variable, so this line was never the path she runs on; it
-// was only ever
-// the answer for an install carrying no config at all.
-//
-// An older product's HOME env var used to sit between these two. It is gone:
-// nothing sets it any more now that the store server carries the app's own name.
+// the app's own home variable, so this line is only ever the answer for an
+// install carrying no config and no store-home variable.
 export function legacyRoot() {
-  return readEnv('HOME') || path.join(os.homedir(), Name);
+  return readEnv('HOME') || defaultStoreRoot();
 }
 
 // The account currently signed in, if any. Set once at boot and re-resolved on
