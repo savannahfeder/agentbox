@@ -1,8 +1,15 @@
 # agentbox: notes for agents working in this repo
 
-agentbox is a macOS inbox over a store on disk: work items in, headless
-`claude -p` and Codex workers out, one per item. Read the code and git for the
-current state; this file only holds the rules that are not obvious from them.
+agentbox is an inbox over a store on disk, on Linux and on macOS: work items
+in, headless `claude -p` and Codex workers out, one per item. On Linux the
+store is `$XDG_DATA_HOME/agentbox` (`~/.local/share/agentbox` when that
+variable is unset), the shell is the one that exists, and the palette
+chord is Ctrl+K. Installing a checkout on Linux puts `agentbox` on
+`~/.local/bin` and writes the launcher entry at `$XDG_DATA_HOME/applications`
+(`~/.local/share/applications` when unset). The entry runs `agentbox`, which
+starts this checkout. The Mac app, the dmg, and the Darwin paths
+stay. Read the code and git for the current state; this file only holds the
+rules that are not obvious from them.
 
 ## Every change lands with tests, and you run all of them
 
@@ -61,6 +68,24 @@ on, never ours.
 
 Workers run on the user's own Claude or Codex subscription. Never pass an API
 key into a worker's environment.
+
+## A BUILD NEVER WRITES A TRACKED FILE (2026-10-07)
+
+`npm run build` reads the installed Claude Code for the commands the reply box
+offers and the models the picker draws. It used to write what it found over two
+TRACKED files, and so every folder that had ever run the app reported itself
+dirty for a version number and a date: `releaseTaskFolder` answered
+"uncommitted" and never reclaimed a folder, `parkTaskFolder` committed nobody's
+work, and a change card's diff carried two files nobody had touched.
+
+The build now writes `shared/*.local.json`, which is gitignored. The committed
+`shared/claude-*.generated.mjs` tables are still the floor, and `npm run
+read:claude` is the one thing that updates them, so adopting a new reading is a
+decision somebody makes rather than a side effect of a build. Every refusal is
+unchanged: a build still stops, with the name in the error, when a command the
+menu offers or an alias the picker offers has gone. If a build says the committed
+table is behind, run `npm run read:claude` and commit the diff; do not reach for
+the build.
 
 ## One-off harnesses go in `scripts/scratch/`
 

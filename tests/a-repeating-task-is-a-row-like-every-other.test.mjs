@@ -53,7 +53,14 @@ describe('in the table, a repeating task is one row in the columns', () => {
   });
 
   it('fills the same cells as the row beneath it: title, project, priority, when', () => {
-    const row = ruleRow(draw());
+    // The row asks the clock itself. Freeze it on the Sunday evening this
+    // file's NOW already names, so "Tomorrow" does not depend on when the
+    // suite happens to run.
+    const clock = Date.now;
+    Date.now = () => NOW;
+    let row;
+    try { row = ruleRow(draw()); }
+    finally { Date.now = clock; }
     expect(row).toMatch(/th-grid/);
     expect(row).toMatch(/th-cell-title[\s\S]*Check for new video skills/);
     expect(row).toMatch(/th-cell-proj[^>]*>Northwind Video</);

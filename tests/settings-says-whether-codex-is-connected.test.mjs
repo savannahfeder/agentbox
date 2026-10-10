@@ -160,7 +160,7 @@ describe('the three states, in Claude Code\'s own vocabulary', () => {
 
   // The same rule, unchanged, for Codex.
   it('never says not on this Mac off a search that came back unsure', () => {
-    expect(copy('missing')).toBe('Codex is not on this Mac');
+    expect(copy('missing')).toBe('Codex is not on this computer');
     expect(copy('unsure')).toBe(`${Name} could not check`);
     expect(copy('unsureSay')).toContain('not the same as it being missing');
   });

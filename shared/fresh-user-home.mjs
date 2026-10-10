@@ -13,7 +13,9 @@
 // would take her real setup with it, which is not a thing a test may cost. So
 // NOTHING IS DELETED, EVER. A second copy is launched inside a fresh home under
 // /tmp and all three land in there: fresh settings, no config file so it falls
-// to DEFAULTS, and an empty store at `<throwaway>/<Name>`.
+// to DEFAULTS, and an empty store at that home's defaultStoreRoot. On macOS
+// that is `<throwaway>/<Name>`. On Linux it is `<throwaway>/.local/share/<slug>`,
+// and only when the copy was not handed the real XDG_DATA_HOME.
 //
 // WHY IT DOES NOT KILL HER AGENTS, which is the whole reason it is usable.
 // `main.mjs` quits on `app.requestSingleInstanceLock`, and that lock is keyed
@@ -180,6 +182,15 @@ export const NOT_INHERITED = Object.freeze([
   // Where her own Claude Code and Codex sign-ins live, when she has moved them.
   'CLAUDE_CONFIG_DIR',
   'CODEX_HOME',
+  // The Linux store default reads XDG_DATA_HOME. A fresh copy that inherited
+  // the real one would write its empty store into her data directory, which is
+  // the 2026-09-27 bug again with a different variable. The other base
+  // directories go for the same reason. XDG_RUNTIME_DIR stays: it is this
+  // login's bus socket, not a directory we keep the inbox in.
+  'XDG_DATA_HOME',
+  'XDG_CONFIG_HOME',
+  'XDG_STATE_HOME',
+  'XDG_CACHE_HOME',
 ]);
 
 /**

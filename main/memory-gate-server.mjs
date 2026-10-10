@@ -104,6 +104,10 @@ export class MemoryGateServer {
     // the app-server's own `thread.id`. Answering null means "not this app's",
     // and such a command is let straight through.
     ownerOf = null,
+    // IS THIS ROW HER URGENT ONE (w-713aba0c89), asked live on every command so
+    // a row raised to Urgent counts at once. Only the app answers it: nothing in
+    // a worker's own request can make its command urgent.
+    urgentFor = null,
     readPressure = readMacPressure,
     sampleProcesses = listProcesses,
     pollMs = 2_000,
@@ -113,6 +117,12 @@ export class MemoryGateServer {
     lockPort = DEFAULT_LOCK_PORT,
     idleReleaseMs = 30_000,
     maxGrantMs = 3 * 60 * 60_000,
+    // How long a grant may hold a slot when its end can never be observed,
+    // because its memory reading is shared with another command on the same
+    // agent process. Null means the longest the gate will make anything wait:
+    // a grant nobody can see the end of must not outlive the wait it causes,
+    // or a queue is refused one by one while a phantom holds the slot.
+    sharedGrantMs = null,
     clock = Date.now,
     log = () => {},
   } = {}) {
@@ -123,8 +133,10 @@ export class MemoryGateServer {
     this.idleReleaseMs = idleReleaseMs;
     this.maxGrantMs = maxGrantMs;
     this.gate = new MemoryGate({ ...gate, history: this.history, clock });
+    this.sharedGrantMs = Number.isFinite(sharedGrantMs) ? sharedGrantMs : this.gate.maxWaitMs;
     this.scoreFor = scoreFor;
     this.ownerOf = ownerOf;
+    this.urgentFor = urgentFor;
     this.readPressure = readPressure;
     this.sampleProcesses = sampleProcesses;
     this.pollMs = pollMs;
@@ -292,7 +304,24 @@ export class MemoryGateServer {
     let owner;
     try { owner = this.ownerOf(session); } catch { return null; }
     if (!owner?.item) return null;
-    return { item: String(owner.item), product: owner.product ?? null };
+    return { item: String(owner.item), product: owner.product ?? null, session };
+  }
+
+  /**
+   * A CODEX THREAD'S TURN IS OVER: LET GO OF EVERY GRANT IT STILL HOLDS
+   * (w-713aba0c89). Codex sends no "after" report for a command that failed, so
+   * such a grant outlives its command, and on a shared app-server nothing else
+   * ever sees it end. A turn that has ended is waiting on none of its commands.
+   * Only grants that named this thread are touched: a Claude worker's names its
+   * row, and goes when its own process does.
+   */
+  releaseSession(session) {
+    if (typeof session !== 'string' || !session) return;
+    for (const r of [...this.gate.running.values()]) {
+      if (r.session !== session) continue;
+      this.grants.delete(r.id);
+      this.gate.finish(r.id);
+    }
   }
 
   _pre(body, req, res) {
@@ -308,10 +337,12 @@ export class MemoryGateServer {
     const id = String(hook.tool_use_id || `${body.ppid}-${Date.now()}-${Math.random()}`);
     const live = typeof this.scoreFor === 'function' ? this.scoreFor(whose.product, whose.item) : null;
     const score = Number.isFinite(live) ? live : Number(body.score) || 0;
+    let urgent = false;
+    try { urgent = typeof this.urgentFor === 'function' && this.urgentFor(whose.product, whose.item) === true; } catch { urgent = false; }
     this.counts.asked++;
     let answered = false;
     this.gate.submit({
-      id, command, score, item: whose.item, product: whose.product,
+      id, command, score, urgent, item: whose.item, product: whose.product, session: whose.session ?? null,
       background: !!hook?.tool_input?.run_in_background,
     }, (decision) => {
       answered = true;
@@ -341,13 +372,20 @@ export class MemoryGateServer {
     this.grants.delete(id);
     const was = this.gate.finish(id);
     if (!was) return;
-    if (grant?.ambiguous) return;
-    this.history.record(was.command, {
-      peakMb: was.peakMb,
+    // A SHARED READING IS NOT NO READING (w-5601e99977). Every Codex thread of
+    // a login runs under one `codex app-server`, so two Codex commands at once
+    // are measured together and neither may claim the figure. How long each
+    // took is its own, though, and a run that was over inside QUICK_MS counts
+    // as light on that alone, so `onlyIfLight` files that verdict and nothing
+    // else. Before this, Codex taught the history almost nothing and rode on
+    // what Claude workers taught it.
+    const filed = this.history.record(was.command, {
+      peakMb: grant?.ambiguous ? null : was.peakMb,
       durationMs: Number(hook.duration_ms) || null,
       background: was.background,
+      onlyIfLight: !!grant?.ambiguous,
     });
-    this.dirty = true;
+    if (filed) this.dirty = true;
   }
 
   /* ------------------------------ measuring ------------------------------ */
@@ -374,7 +412,8 @@ export class MemoryGateServer {
    * One look at every process. Each grant finds the agent process it belongs to
    * (the nearest `claude` or `codex` above the hook), and is measured as the
    * new processes under that agent since it was granted. Two grants on one
-   * agent at once share what they find and teach the history nothing.
+   * agent at once share what they find, so neither claims that figure; each
+   * still teaches the history how long it took (`_post`).
    */
   _sample(procs) {
     const byPid = new Map(procs.map((p) => [p.pid, p]));
@@ -387,9 +426,23 @@ export class MemoryGateServer {
     const now = this.clock();
     for (const grant of this.grants.values()) {
       if (!this.gate.running.has(grant.id)) { this.grants.delete(grant.id); continue; }
-      // The last resort, for a grant whose agent could never be found: no
-      // report back and nothing to measure for three hours is over.
-      if (!grant.anchor && now - grant.startedAt >= this.maxGrantMs) {
+      // THE BACKSTOPS THAT DO NOT DEPEND ON WHAT IS RUNNING (w-5601e99977).
+      // Both of the other releases need a reading of the grant's own
+      // processes, and a Codex grant never gets one: its anchor is the shared
+      // app-server, where a sibling thread's work keeps the reading above zero
+      // for good. So a grant that was ever measured together with another
+      // (`ambiguous`, which nothing clears) is let go after `sharedGrantMs`,
+      // and no grant at all outlives `maxGrantMs`. This used to be checked
+      // only while no anchor had been found, so a Codex command whose "after"
+      // report was lost held one of two heavy slots until the app-server was
+      // replaced.
+      //
+      // LETTING A SLOT GO IS NOT LETTING GO OF THE MACHINE. Nothing is
+      // stopped, and if the command really is still running and really is big,
+      // the kernel's own pressure reading holds the next heavy command back
+      // anyway.
+      const held = now - grant.startedAt;
+      if (held >= this.maxGrantMs || (grant.ambiguous && held >= this.sharedGrantMs)) {
         this.grants.delete(grant.id);
         this.gate.finish(grant.id);
         continue;
@@ -427,7 +480,10 @@ export class MemoryGateServer {
         stack.push(...(children.get(p.pid) ?? []));
       }
       for (const g of grants) {
-        if (grants.length > 1) g.ambiguous = true;
+        if (grants.length > 1) {
+          g.ambiguous = true;
+          this.gate.share(g.id, anchorPid);
+        }
         this.gate.observe(g.id, Math.round(mb));
         // NOTHING RUNNING UNDER IT FOR A WHILE: its "after" report was lost
         // (the hook was killed, the agent crashed mid-call). Every running

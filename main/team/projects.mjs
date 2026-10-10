@@ -100,7 +100,7 @@ export function markShared(dir, { teamId, visibility = 'team', people = [], shar
   if (!project) throw new Error(`no project.json in ${dir}`);
   // Sharing it would put every line of it in the cloud, which is the one thing
   // this project exists to make hard. A thread in it is shared one at a time.
-  if (project[PERSONAL_FLAG] === true) throw new Error(`${PERSONAL_NAME} stays on this Mac. Share a thread in it instead.`);
+  if (project[PERSONAL_FLAG] === true) throw new Error(`${PERSONAL_NAME} stays on this computer. Share a thread in it instead.`);
   const projectId = project.team?.projectId || crypto.randomUUID();
   project.team = {
     projectId, teamId, visibility: visibility === 'people' ? 'people' : 'team', people: [...new Set(people)],

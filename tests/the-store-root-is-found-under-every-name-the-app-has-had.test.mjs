@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { legacyRoot } from '../main/store/project.mjs';
-import { appHome, storeRootEnv } from '../main/store/home.mjs';
+import { appHome, defaultStoreRoot, storeRootEnv } from '../main/store/home.mjs';
 import { WAS, ENV_PREFIX, envName, envNames, nameSlug, readEnv } from '../shared/product-name.mjs';
 
 const held = {};
@@ -73,14 +73,17 @@ describe('the two functions that read it', () => {
     expect(legacyRoot()).toBe('/Zero/older');
   });
 
-  it('legacyRoot falls back to a folder in her home when nothing is set', () => {
-    expect(legacyRoot().startsWith(os.homedir())).toBe(true);
+  it('legacyRoot falls back to the default store when nothing is set', () => {
+    expect(legacyRoot()).toBe(defaultStoreRoot());
   });
 
-  it('appHome answers the app-named dot-folder when nothing is set', () => {
+  it('appHome answers the fresh default when nothing is set', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'store-root-'));
     try {
-      expect(appHome(tmp)).toBe(path.join(tmp, `.${nameSlug}`));
+      const expected = process.platform === 'linux'
+        ? path.join(tmp, '.local', 'share', nameSlug)
+        : path.join(tmp, `.${nameSlug}`);
+      expect(appHome(tmp)).toBe(expected);
     } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
   });
 });

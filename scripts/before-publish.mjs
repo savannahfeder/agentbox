@@ -69,17 +69,19 @@ function wouldShip(changed) {
     // If npm cannot tell us, the honest answer is the cautious one.
     return changed;
   }
-  // THE FILES THE PUBLISH ITSELF REWRITES, which would otherwise make every
-  // attempt poison the next one. `prepack` runs `npm run build`, and the build
-  // reads the installed Claude Code and writes what it found into
-  // shared/*.generated.*. So a failed publish leaves those modified, and the
-  // next publish refuses because of dirt the last publish made. Measured
-  // 2026-09-28: one failed attempt left claude-models.generated.mjs changed by
-  // a version number, and that alone blocked the retry.
+  // THE FILES A PUBLISH USED TO REWRITE, which made every attempt poison the
+  // next one. `prepack` runs `npm run build`, and the build read the installed
+  // Claude Code and wrote what it found over shared/*.generated.*. So a failed
+  // publish left those modified and the next publish refused because of dirt the
+  // last publish had made. Measured 2026-09-28: one failed attempt left
+  // claude-models.generated.mjs changed by a version number, and that alone
+  // blocked the retry.
   //
-  // They are safe to ignore here BECAUSE the build rewrites them anyway. What
-  // ships is whatever the build produces on the machine publishing, every time,
-  // committed or not, so a difference in the working tree changes nothing.
+  // THE BUILD NO LONGER WRITES THEM (w-6bbb709b1f): it writes
+  // shared/*.local.json, which is gitignored, and `npm run read:claude` is what
+  // updates the committed tables. This filter stays as the belt for a folder an
+  // OLDER build already dirtied, and because what ships is whatever the build
+  // produces on the machine publishing, so a difference here changes nothing.
   return changed.filter((f) => packed.has(f) && !/\.generated\./.test(f));
 }
 

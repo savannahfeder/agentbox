@@ -100,19 +100,29 @@ describe('the models she is offered come off the Claude Code she has', () => {
 describe('the committed table is the floor, never an empty picker', () => {
   const built = CLAUDE_MODELS.map((m) => ({ alias: m.alias, id: m.id, label: m.label }));
 
+  // AND `local` IS NAMED IN EVERY ONE OF THESE, which is not noise. Since
+  // w-6bbb709b1f the build writes what it read into shared/claude-models.local.json
+  // instead of over the committed table, and that file is the floor when it
+  // exists. It exists on any machine that has built, and not in a fresh clone, so
+  // a test that left it to the default would pass in CI and fail on the Mac that
+  // runs the app. Naming a path that is not there is what makes these three about
+  // the COMMITTED table. The other floor has its own tests in
+  // a-build-does-not-rewrite-a-tracked-file.test.mjs.
+  const noLocal = { local: '/no/such/claude-models.local.json' };
+
   it('falls back on a Mac with no Claude Code', () => {
-    expect(claudeModels({ bin: null })).toMatchObject({ models: built, source: 'built' });
+    expect(claudeModels({ bin: null, ...noLocal })).toMatchObject({ models: built, source: 'built' });
   });
 
   it('falls back when the path is gone', () => {
-    expect(claudeModels({ bin: '/no/such/claude' })).toMatchObject({ models: built, source: 'built' });
+    expect(claudeModels({ bin: '/no/such/claude', ...noLocal })).toMatchObject({ models: built, source: 'built' });
   });
 
   it('falls back when the binary carries no catalog this can read', () => {
     // A future Claude Code that keeps its models somewhere else. The picker is
     // then a release behind, which is survivable; an empty picker is not, because
     // she cannot send a task at all.
-    expect(claudeModels({ bin: binWith('nothing in here looks like a model catalog') }))
+    expect(claudeModels({ bin: binWith('nothing in here looks like a model catalog'), ...noLocal }))
       .toMatchObject({ models: built, source: 'built' });
   });
 });

@@ -58,7 +58,7 @@ export function agentImportRow(agent, { projectName = null, home = '' } = {}) {
   const inProject = projectName ? ` here in ${projectName}` : '';
   const scopeLine = agent?.scope === 'project'
     ? 'It works in this project only.'
-    : 'It works in every project on this Mac.';
+    : 'It works in every project on this computer.';
   const body = [
     `**Tell ${title} what to do first, in one sentence.**`,
     ...(line ? [line] : []),

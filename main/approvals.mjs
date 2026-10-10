@@ -387,12 +387,20 @@ const REQUEST_SUFFIX = '.request.json';
  * FORWARD to now. A worker can therefore make its own request look younger than
  * it is, which costs it the front of the stack, and can never make it look
  * older. Nanoseconds because APFS keeps them and two files written back to back
- * differ by about 170 microseconds; equal stamps keep `readdir` order, which is
- * as good as anything when two things really did happen at once.
+ * differ by about 170 microseconds.
+ *
+ * A coarse clock stamps both files the same. tmpfs does this: two writes in
+ * one poll share a ctime, and `readdir` then comes back in name order, which
+ * is the forgery the paragraph above is about. The inode breaks that tie.
+ * The kernel assigns it, a later create in a fresh directory gets a higher
+ * one, and a worker cannot move it backwards. Equal inode and equal ctime
+ * keep the order we already had.
  */
 function bornAt(dir, name) {
-  try { return fs.lstatSync(path.join(dir, name), { bigint: true }).ctimeNs; }
-  catch { return 2n ** 63n; } // gone or unreadable: never in front of something real
+  try {
+    const st = fs.lstatSync(path.join(dir, name), { bigint: true });
+    return { ctime: st.ctimeNs, ino: st.ino };
+  } catch { return { ctime: 2n ** 63n, ino: 2n ** 63n }; } // gone or unreadable: never in front of something real
 }
 
 export function listPending(storeRoot, { now = Date.now } = {}) {
@@ -409,7 +417,8 @@ export function listPending(storeRoot, { now = Date.now } = {}) {
   for (const { f } of names
     .filter((f) => !seenAt.has(prefix + f.slice(0, -REQUEST_SUFFIX.length)))
     .map((f) => ({ f, born: bornAt(dir, f) }))
-    .sort((a, b) => (a.born < b.born ? -1 : a.born > b.born ? 1 : 0))) {
+    .sort((a, b) => (a.born.ctime < b.born.ctime ? -1 : a.born.ctime > b.born.ctime ? 1
+      : a.born.ino < b.born.ino ? -1 : a.born.ino > b.born.ino ? 1 : 0))) {
     seenAt.set(prefix + f.slice(0, -REQUEST_SUFFIX.length), { at, seq: sightings += 1 });
   }
   const present = new Set();
