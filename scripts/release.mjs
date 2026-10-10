@@ -212,13 +212,13 @@ if (analyticsKey) {
 } else {
   console.log('→ no analytics key, so this build will send nothing');
 }
-// Not a stop like the analytics key: a build without it still works, and its
-// Feedback card says in words that feedback is not set up.
+// Not a stop like the analytics key: a build without it sends to the address
+// that ships in the code (FEEDBACK_ADDRESS in main/feedback.mjs).
 if (feedbackUrl) {
   args.push(`-c.extraMetadata.bakedFeedbackUrl=${feedbackUrl}`);
   console.log('→ baking the feedback address into the build');
 } else {
-  console.log(`→ no feedback address (${envName('FEEDBACK_URL')} or "feedbackUrl" in zero.config.json), so the Feedback card will say it is not set up`);
+  console.log(`→ no feedback address (${envName('FEEDBACK_URL')} or "feedbackUrl" in zero.config.json), so the Feedback card sends to the one in main/feedback.mjs`);
 }
 if (noSign) {
   console.log('→ packaging, unsigned');
