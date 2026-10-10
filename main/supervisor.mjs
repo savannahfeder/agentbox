@@ -3389,7 +3389,40 @@ export class Supervisor {
       const stamp = signInStamp(this._signInFilesFor(profile));
       this._profileTrouble[profile].stamp = Math.max(stamp, had?.stamp ?? 0);
     }
+    // When the limit says it resets, so `_forgetResetLimits` can let it go then.
+    if (cause === 'at-limit') {
+      const resetsAt = limitResetMoment(raw);
+      if (resetsAt) this._profileTrouble[profile].resetsAt = resetsAt;
+    }
     return cause;
+  }
+
+  /**
+   * A LIMIT THAT HAS RESET IS NOT A LIMIT ANY MORE.
+   *
+   * Trouble is cleared by a session surviving on the account, and for a limit
+   * that can never come when she has picked another account to run: nothing
+   * starts on this one again. The Accounts page then said "At its limit" about
+   * a login whose weekly limit had reset two days before. So a limit that named
+   * its reset is believed until that moment and no longer. If it is in fact
+   * still capped, the next run on it dies in seconds and files it again.
+   *
+   * A limit with no reset in it, and anything waiting on a person, is left
+   * alone: the clock says nothing about those.
+   */
+  _forgetResetLimits(now = Date.now()) {
+    let forgot = false;
+    for (const [key, trouble] of Object.entries(this._profileTrouble ?? {})) {
+      if (trouble?.cause !== 'at-limit') continue;
+      // A record saved before `resetsAt` was kept is read from its own words,
+      // at the moment it was last seen.
+      const resetsAt = trouble.resetsAt ?? limitResetMoment(trouble.raw, trouble.at);
+      if (!resetsAt || now < resetsAt + LIMIT_RESET_GRACE_MS) continue;
+      delete this._profileTrouble[key];
+      forgot = true;
+    }
+    if (forgot) this._saveState();
+    return forgot;
   }
 
   _clearProfileTrouble(profile) {
@@ -4309,6 +4342,7 @@ export class Supervisor {
     // Has a login landed since an account was found signed out? Ahead of the
     // brake below, which would otherwise hold the fleet past the sign-in.
     try { this._noticeSignIns(); } catch (e) { console.warn('zero: could not look for a sign-in:', e.message); }
+    try { this._forgetResetLimits(); } catch (e) { console.warn('zero: could not let a reset limit go:', e.message); }
     // A COOLDOWN STOPS THE SPAWNING AND IT MUST NOT STOP THE TELLING. The brake
     // goes on when there is no healthy account left anywhere, for up to half an
     // hour, which is precisely the half hour her tasks are all stuck and the
