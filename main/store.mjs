@@ -202,7 +202,7 @@ export class Store {
     return all;
   }
 
-  // THE NEXT PAGE OF FINISHED THREADS THE SNAPSHOT'S 8 MB READ LEFT OUT
+  // THE NEXT PAGE OF FINISHED THREADS OUTSIDE THE SNAPSHOT'S RECENT WINDOW
   // (`readOlderWorkItems`), newest finished first, for the Done and All tabs
   // as she scrolls to their foot (w-fda2165ec6). Archived projects stay out,
   // as they do of `listItems`.

@@ -8,8 +8,9 @@
 //
 // Her answer was that old threads need not load up front: "if you're
 // scrolling or whatever more should populate as needed". So the snapshot keeps
-// its 8 MB read and the rest is asked for a page at a time, newest finished
-// first. Archived projects stay hidden, which was the other half of her answer.
+// a window of complete finished items and the rest is asked for a page at a
+// time, newest finished first. Active state is always folded from the full
+// ledger. Archived projects stay hidden, which was the other half of her answer.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -66,11 +67,11 @@ function seedBigLedger(slug = 'astral') {
 }
 
 describe('a ledger past the 8 MB read', () => {
-  it('really does lose its oldest threads from the snapshot (the bug as measured)', () => {
+  it('pages old finished threads without showing a partially folded row', () => {
     const { old, straddler } = seedBigLedger();
     const shown = store.listItems(T0 + 60 * MIN);
     for (const id of old) expect(shown.find((i) => i.id === id)).toBeUndefined();
-    expect(shown.find((i) => i.id === straddler)?.title).toBe('');
+    expect(shown.find((i) => i.id === straddler)).toBeUndefined();
   });
 
   it('hands back the finished threads it cut off, newest finished first, with their project', () => {
