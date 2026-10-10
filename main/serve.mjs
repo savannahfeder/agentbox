@@ -136,12 +136,14 @@ function readVersion() {
  *  same scrubbed path as the desktop's, which writes nothing until crash
  *  reports are set up for this process.
  */
-function answerWhatOnlyTheWindowAnswered(ipcMain) {
+export function answerWhatOnlyTheWindowAnswered(ipcMain) {
   ipcMain.handle('zero:badge', () => null);
   ipcMain.handle('zero:corner-tag', () => null);
   ipcMain.handle('zero:notify', () => null);
   ipcMain.handle('zero:boot-info', () => ({ reloaded: false, builtAt: null, recovered: null }));
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); return null; });
+  // The phone door belongs to the desktop app (main/phone-link.mjs); a tab is told there is none.
+  ipcMain.handle('zero:phone-link', () => null);
 }
 
 /**
@@ -223,8 +225,17 @@ const MIME = {
  *  `listeners` is the Set off `broadcastingWindow`, which is where the pushes
  *  going the other way are waiting for somewhere to go.
  */
-export function createServer({ channels, token, listeners = new Set(), dist = path.join(repoRoot, 'renderer', 'dist') }) {
-  return http.createServer(async (req, res) => {
+export function createServer(options) {
+  return http.createServer(createHandler(options));
+}
+
+/**
+ * The same door as a bare request handler, so main/phone-link.mjs can put its
+ * own server in front of it. `token` may be a function, read on every request,
+ * so a key that is reset stops working at once.
+ */
+export function createHandler({ channels, token, listeners = new Set(), dist = path.join(repoRoot, 'renderer', 'dist') }) {
+  return async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
 
     // The token rides in a header on api calls and in the query on the event
@@ -237,7 +248,7 @@ export function createServer({ channels, token, listeners = new Set(), dist = pa
     // "Wrong or missing token" on every reload (tests/a-browser-tab-survives-a-reload).
     const guarded = url.pathname === '/events' || url.pathname.startsWith('/api/');
     const given = req.headers['x-agentbox-token'] || url.searchParams.get('token');
-    if (guarded && given !== token) {
+    if (guarded && given !== (typeof token === 'function' ? token() : token)) {
       res.writeHead(403, { 'content-type': 'text/plain' });
       res.end('Wrong or missing token. Use the url the terminal printed.');
       return;
@@ -317,7 +328,7 @@ export function createServer({ channels, token, listeners = new Set(), dist = pa
       res.writeHead(200, { 'content-type': MIME[path.extname(file)] ?? 'application/octet-stream' });
       res.end(buf);
     });
-  });
+  };
 }
 
 function readBody(req) {

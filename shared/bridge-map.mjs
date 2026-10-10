@@ -136,6 +136,9 @@ export const REQUEST_CHANNELS = {
   setThreadPlaces: 'zero:set-thread-places',
   setProductHidden: 'zero:set-product-hidden',
   approve: 'zero:approve',
+  // The phone door's Settings page (main/phone-link.mjs): its state, on, off,
+  // a new key, and which address the QR code carries. The desktop window only.
+  phoneLink: 'zero:phone-link',
 };
 
 /** Told rather than asked: the app talks and the screen listens. */
@@ -150,6 +153,8 @@ export const PUSH_CHANNELS = {
   onScreenDetail: 'zero:screen-detail',
   onEscapeBrowser: 'zero:escape-browser',
   onKeyInTheFile: 'zero:key-in-the-file',
+  // A phone connected, left, or the key changed.
+  onPhoneChanged: 'zero:phone-changed',
 };
 
 // THE FEW THAT ARE NOT A STRAIGHT HANDOVER. Each is called with bare values

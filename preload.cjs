@@ -226,6 +226,13 @@ contextBridge.exposeInMainWorld('zero', {
   setThreadPlaces: (payload) => ipcRenderer.invoke('zero:set-thread-places', payload),
   setProductHidden: (payload) => ipcRenderer.invoke('zero:set-product-hidden', payload),
   approve: (payload) => ipcRenderer.invoke('zero:approve', payload),
+  // The phone door (main/phone-link.mjs): { action: 'status' | 'on' | 'off' | 'reset' | 'via', via }.
+  phoneLink: (payload) => ipcRenderer.invoke('zero:phone-link', payload),
+  onPhoneChanged: (fn) => {
+    const handler = () => fn();
+    ipcRenderer.on('zero:phone-changed', handler);
+    return () => ipcRenderer.removeListener('zero:phone-changed', handler);
+  },
   // What was just decided, and on which card. The Cmd+Y chord is caught in the
   // main process (it has to outrank the game), so this is the only way the page
   // can know a press landed; the card's exit is drawn from it.

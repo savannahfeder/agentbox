@@ -27,7 +27,9 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel, UpdateState } from '../types';
+import type { AgentMode, CodexModeId, PermissionMode, PhoneLink, PhoneRoute, ProjectSettings, Settings as SettingsModel, UpdateState } from '../types';
+import { ago } from '../format';
+import { ALERTS_SAY, alertsState, testAlert, turnOffAlerts, turnOnAlerts, type AlertsState } from '../phone-alerts';
 import { api, RESTART_NOTE } from '../api';
 import { updateLook } from '../update-row';
 import { InstructionSettings, sizeLabel } from './InstructionSettings';
@@ -588,6 +590,136 @@ function Reading({ running, capacity, gate }: {
 
 /** A page: its title, the sentence under it when there is one worth saying,
  *  and its groups. */
+/* --------------------------------- phone --------------------------------- */
+// THE PHONE DOOR (main/phone-link.mjs). Off until turned on. The QR code is the
+// key, so it is drawn only on this page and only while the door is open.
+const PHONE_ROUTE_OPTIONS: Array<{ value: PhoneRoute; label: string }> = [
+  { value: 'tailscale', label: 'Tailscale, secure' },
+  { value: 'wifi', label: 'Same Wi-Fi, not secure' },
+];
+
+/** The Phone page as the phone itself draws it: this phone's alerts. */
+function PhoneAlertsPage() {
+  const [state, setState] = useState<AlertsState | null>(null);
+  const [said, setSaid] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { void alertsState().then(setState); }, []);
+  const run = async (fn: () => Promise<AlertsState>) => {
+    setBusy(true); setSaid(null);
+    try { setState(await fn()); } catch (e) { setSaid(String((e as Error).message ?? e)); } finally { setBusy(false); }
+  };
+  return (
+    <Page title="Phone">
+      <Group id="phone-alerts" label="Alerts on this phone">
+        <Row label={state === 'on' ? 'Alerts are on' : 'Alerts'} desc={said ?? (state ? ALERTS_SAY[state] : 'Checking…')}>
+          {(state === 'on' || state === 'off') && (
+            <Switch on={state === 'on'} busy={busy} label="Alerts" onChange={(v) => void run(v ? turnOnAlerts : turnOffAlerts)} />
+          )}
+        </Row>
+        {state === 'on' && (
+          <Row label="Send a test alert" desc="Lock the phone after tapping, and it should arrive within a few seconds.">
+            <button type="button" className="set-ghost" disabled={busy} onClick={() => { setBusy(true); void testAlert().then((ok) => setSaid(ok ? 'Sent.' : 'The computer could not send it.')).catch((e) => setSaid(String(e.message ?? e))).finally(() => setBusy(false)); }}>Send test</button>
+          </Row>
+        )}
+      </Group>
+    </Page>
+  );
+}
+
+function PhonePage() {
+  const [link, setLink] = useState<PhoneLink | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const run = useCallback(async (action: 'status' | 'on' | 'off' | 'reset' | 'via', via?: PhoneRoute) => {
+    setBusy(true);
+    try { setLink(await api.phoneLink({ action, via })); } finally { setBusy(false); }
+  }, []);
+  useEffect(() => {
+    void run('status');
+    const off = api.onPhoneChanged(() => { void api.phoneLink({ action: 'status' }).then(setLink); });
+    // "Last seen" moves without a push.
+    const tick = window.setInterval(() => { setNow(Date.now()); void api.phoneLink({ action: 'status' }).then(setLink); }, 15_000);
+    return () => { off(); window.clearInterval(tick); };
+  }, [run]);
+
+  if (link === undefined) return <Page title="Phone">{null}</Page>;
+  if (link === null) {
+    // On the phone itself: its own alerts. Anywhere else (a browser tab on
+    // the computer) there is nothing to set here.
+    if (document.documentElement.dataset.door === 'phone') return <PhoneAlertsPage />;
+    return (
+      <Page title="Phone">
+        <Group>
+          <Row label="Set up from the desktop app" desc={`A phone is connected from the ${Name} app's own window, not from a browser tab.`} />
+        </Group>
+      </Page>
+    );
+  }
+  const hasTailscale = link.routes.some((r) => r.via === 'tailscale');
+  const reset = () => {
+    if (window.confirm('Make a new key? Every connected phone is disconnected and has to scan the new code.')) void run('reset');
+  };
+  return (
+    <Page title="Phone" lede={`Use this inbox on your phone. Scan the code with the phone's camera, then add the page to the home screen and it opens like an app.`}>
+      <Group id="phone" label="Phone access">
+        <Row label="Let phones connect" desc={link.on ? (link.error ?? (link.listening ? `Open on port ${link.port}.` : 'Starting…')) : 'Off. Nothing outside this computer can reach the inbox.'}>
+          <Switch on={link.on} busy={busy} label="Let phones connect" onChange={(v) => void run(v ? 'on' : 'off')} />
+        </Row>
+        {link.on && (
+          <Row
+            label="Reach it over"
+            desc={link.via === 'tailscale'
+              ? link.settingUp
+                ? 'Setting up a secure address with Tailscale…'
+                : link.secure
+                  ? 'A secure address only your own devices on Tailscale can reach. Works anywhere your phone has Tailscale on.'
+                  : 'Works anywhere your phone has Tailscale on, but without a secure address, so the phone shows Not Secure.'
+              : hasTailscale
+                ? 'Works only on the same Wi-Fi, and the phone shows Not Secure because nothing is encrypted. Pick Tailscale for a secure address that also works away from home.'
+                : 'Works only on the same Wi-Fi, and the phone shows Not Secure because nothing is encrypted. Install Tailscale on both for a secure address.'}
+          >
+            <Picker bare label="Reach it over" value={link.via ?? 'wifi'} options={PHONE_ROUTE_OPTIONS.filter((o) => link.routes.some((r) => r.via === o.value))} onChange={(v) => void run('via', v)} />
+          </Row>
+        )}
+      </Group>
+      {link.on && (
+        <Group id="phone-code" label="Scan with your phone">
+          {link.qr && link.url ? (
+            <div className="set-row set-phone-qr">
+              <img alt="QR code that opens this inbox on a phone" src={`data:image/svg+xml;utf8,${encodeURIComponent(link.qr)}`} />
+              <div className="set-row-desc">
+                Anyone who scans this code can run agents on this computer, so treat it like a password. If it was seen by someone else, reset the key.
+                <br />
+                <code>{link.url.replace(/token=.*/, 'token=…')}</code>
+              </div>
+            </div>
+          ) : (
+            <Row label="No network" desc="This computer is not on Wi-Fi or Tailscale right now, so a phone has no way to reach it." />
+          )}
+          <Row label="Reset key" desc="Makes a new code. Every phone is disconnected until it scans again.">
+            <button type="button" className="set-ghost" disabled={busy} onClick={reset}>Reset key</button>
+          </Row>
+        </Group>
+      )}
+      {link.on && (
+        <Group id="phone-devices" label="Connected devices">
+          {link.devices.length === 0 ? (
+            <Row label="None yet" desc="A phone shows here as soon as it opens the inbox." />
+          ) : link.devices.map((d) => (
+            <Row
+              key={d.id}
+              label={d.name}
+              desc={`${d.live ? 'Connected now' : `Last seen ${ago(d.lastSeen, now)} ago`}${d.ip ? ` · ${d.ip}` : ''} · first seen ${ago(d.firstSeen, now)} ago${d.alerts ? ' · alerts on' : ''}${d.alertError ? ` · last alert failed: ${d.alertError}` : ''}`}
+            >
+              {d.alerts && <button type="button" className="set-ghost" disabled={busy} onClick={() => void api.phoneLink({ action: 'stop-alerts', device: d.id }).then(setLink)}>Stop alerts</button>}
+            </Row>
+          ))}
+        </Group>
+      )}
+    </Page>
+  );
+}
+
 const Page = ({ title, lede, children }: { title: string; lede?: string; children: ReactNode }) => (
   <div className="set-inner">
     <h1 className="set-title">{title}</h1>
@@ -1065,6 +1197,7 @@ function NavIcon({ id }: { id: SettingsPageId }) {
     general: <><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1" /><circle cx="15" cy="7" r="2" /><circle cx="9" cy="12" r="2" /><circle cx="17" cy="17" r="2" /></>,
     appearance: <><circle cx="12" cy="12" r="8" /><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none" /></>,
     shortcuts: <><rect x="3.5" y="6.5" width="17" height="11" rx="2" /><path d="M7.5 10.5h.01M11 10.5h.01M14.5 10.5h.01M8.5 14h7" /></>,
+    phone: <><rect x="7" y="3" width="10" height="18" rx="2.2" /><path d="M11 17.5h2" /></>,
     claude: <><rect x="3.5" y="5" width="17" height="14" rx="2" /><path d="m7.5 10 2.5 2-2.5 2M12.5 14.5h4" /></>,
     codex: <><path d="m9 8-4 4 4 4M15 8l4 4-4 4" /></>,
     running: <><circle cx="12" cy="12" r="8" /><path d="M10.5 9.2v5.6l4.5-2.8z" /></>,
@@ -1791,6 +1924,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
             is what a person actually presses, grouped by the moment they would
             want it; ../shortcuts.ts holds the list. Every key on it works today
             (`tests/the-shortcuts-page-lists-keys-that-work.test.mjs`). */}
+        {pane === 'phone' && <PhonePage />}
         {pane === 'shortcuts' && (
           <div className="set-inner set-keys-page">
             <h1 className="set-title">Shortcuts</h1>

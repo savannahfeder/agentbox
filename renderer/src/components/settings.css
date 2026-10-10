@@ -217,3 +217,9 @@
   0%, 30% { border-color: var(--text-faint); box-shadow: 0 0 0 3px var(--wash); }
   100% { border-color: var(--line); box-shadow: 0 0 0 3px transparent; }
 }
+
+/* The phone page's QR code: white behind it whatever the theme, because a
+   phone camera reads dark on light, and big enough to scan off a laptop. */
+.set-phone-qr { display: flex; gap: 18px; align-items: center; }
+.set-phone-qr img { width: 168px; height: 168px; flex: none; background: #fff; border-radius: 10px; padding: 8px; }
+.set-phone-qr code { font-size: 11px; opacity: .7; word-break: break-all; }

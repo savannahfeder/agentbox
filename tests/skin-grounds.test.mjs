@@ -146,6 +146,9 @@ const ANSWERS = {
   // third card is what this table exists to stop. Their own checks are at the
   // foot of this file.
   '.modal': 'opaque',
+  // A PHONE WHOSE KEY WAS RESET (renderer/src/browser-bridge.ts). It covers an
+  // inbox that can no longer answer, so nothing of it may show through.
+  '#phone-locked-out': 'opaque',
   // THE APP DRAWN BEHIND THE WALK'S THEME STEP. Shot that way once, on the
   // day it was built: the tab strip printed twice on one line.
   '.fr-look-app': 'photograph',

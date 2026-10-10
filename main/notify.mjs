@@ -171,8 +171,11 @@ export function createNotifier({ window, Notification, powerMonitor, icon = null
   };
 }
 
-export function installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage }) {
+// `onArrivals` hears every arrival too, for the phone's alerts
+// (main/phone-link.mjs), which make their own call about speaking.
+export function installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage, onArrivals = () => {} }) {
   if (Notification.isSupported && !Notification.isSupported()) {
+    ipcMain.handle('zero:notify', (_e, payload = {}) => { try { onArrivals(Array.isArray(payload.arrivals) ? payload.arrivals : []); } catch {} });
     return { add() {}, seen() {} };
   }
   // app.getAppPath() is the repo from source and the asar inside the bundle
@@ -187,7 +190,9 @@ export function installNotifier({ app, window, Notification, powerMonitor, ipcMa
   // locked would sit in Notification Center after she is back at the row.
   try { powerMonitor.on('unlock-screen', () => { if (window.isFocused()) notifier.seen(); }); } catch {}
   ipcMain.handle('zero:notify', (_e, payload = {}) => {
-    notifier.add(Array.isArray(payload.arrivals) ? payload.arrivals : []);
+    const arrivals = Array.isArray(payload.arrivals) ? payload.arrivals : [];
+    try { onArrivals(arrivals); } catch {}
+    notifier.add(arrivals);
   });
   return notifier;
 }
