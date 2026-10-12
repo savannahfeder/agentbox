@@ -95,7 +95,7 @@ describe('adding OpenCode touched no existing engine branch', () => {
     // transports, which is the promise written at the top of it.
     const definitions = read('shared/harness-definitions.mjs');
     expect(definitions).not.toMatch(/require\(|child_process|node:fs|node:http|fetch\(/);
-    expect(HARNESS_DEFINITIONS).toHaveLength(3);
+    expect(HARNESS_DEFINITIONS.map(h => h.id)).toContain('opencode');
     expect(Object.isFrozen(harnessDefinition('opencode'))).toBe(true);
   });
 

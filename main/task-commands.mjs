@@ -76,6 +76,10 @@ export async function taskCommand(sup, productSlug, id, text) {
  if(!item||item.agent)return publish('failed','This task is not available.');
  const engine=sup._engineFor(item), harness=harnessFor(engine), op=providerCommand(text,engine);
  if(!op)return publish('failed','Enter a slash command.');
+ // AN ENGINE THAT READS ITS OWN SLASH WORDS from the message text and never
+ // advertises them (pi's `/skill:name`, Grok's `/skill-name`) gets a word this
+ // app does not know as typed, rather than a refusal. A capability, not a name.
+ if(harness.capabilities.forwardsUnknownCommands && op.route === 'unavailable') return publish('forward');
  if(harness.capabilities.nativeCommands && op.route === 'unavailable' && (sup._nativeCommands?.[id]?.includes(op.name) || (op.name === 'review' && sup._nativeCommands?.[id]?.includes('code-review')))) return publish('forward');
  if(op.route==='unavailable')return publish('failed',`/${op.name} is not supported in ${NAME} yet. Your draft has been kept. Use the native ${harness.label} client for this command.`,op.name);
  if(op.route==='remote'){if(op.args)return publish('failed','Run /remote-control on its own.',op.name);sup.remoteControl(productSlug,id,'toggle').catch(()=>{});return publish('done','',op.name);}
