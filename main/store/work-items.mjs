@@ -23,11 +23,10 @@ import {
 } from '../../shared/work-items.mjs';
 
 const LEDGER = 'work-items.jsonl';
-// Never load an unbounded jsonl into memory: past this, read only the trailing
-// window. The fold tolerates the torn leading line that produces, exactly as
-// records.mjs and the chat log already do.
+// The window controls which FINISHED items load up front, never the state
+// used for reads or mutation decisions. Complete state is folded from bounded
+// chunks so a long history does not require retaining its raw text.
 const MAX_LEDGER_BYTES = 8 * 1024 * 1024;
-const warnedOversize = new Set();
 
 // THE LEDGER LIVES IN THE APP'S HOME, NOT IN THE FOLDER SHE UPLOADS FILES TO.
 // It used to be `<product>/work-items.jsonl`, and on a product with no code repo
@@ -84,15 +83,11 @@ function writeLine(file, obj) {
 }
 
 /* --------------------------------- reading ------------------------------- */
-function readLines(file) {
+function readWindowLines(file) {
   let text;
   try {
     const size = fs.statSync(file).size;
     if (size > MAX_LEDGER_BYTES) {
-      if (!warnedOversize.has(file)) {
-        warnedOversize.add(file);
-        console.warn(`work-items: ${file} is ${size} bytes; reading only the last ${MAX_LEDGER_BYTES}`);
-      }
       const fd = fs.openSync(file, 'r');
       try {
         const buf = Buffer.allocUnsafe(MAX_LEDGER_BYTES);
@@ -109,6 +104,42 @@ function readLines(file) {
     throw err;
   }
   return text.split('\n').filter((l) => l && Buffer.byteLength(l, 'utf8') <= MAX_LINE_BYTES);
+}
+
+// Decode only whole records: a UTF-8 character can span read chunks. Oversize
+// records are discarded until their newline, without retaining their remainder.
+function* readLines(file) {
+  let fd;
+  try { fd = fs.openSync(file, 'r'); } catch (err) {
+    if (err.code === 'ENOENT') return;
+    throw err;
+  }
+  try {
+    const size = fs.fstatSync(fd).size;
+    const chunk = Buffer.allocUnsafe(64 * 1024);
+    let offset = 0, bytes = 0, parts = [], oversized = false;
+    while (offset < size) {
+      const count = fs.readSync(fd, chunk, 0, Math.min(chunk.length, size - offset), offset);
+      if (!count) break;
+      offset += count;
+      let start = 0;
+      while (start < count) {
+        const newline = chunk.indexOf(10, start);
+        const end = newline >= 0 && newline < count ? newline : count;
+        const piece = chunk.subarray(start, end);
+        bytes += piece.length;
+        if (bytes > MAX_LINE_BYTES) { oversized = true; parts = []; }
+        else if (!oversized && piece.length) parts.push(Buffer.from(piece));
+        if (end < count) {
+          if (!oversized && bytes) yield Buffer.concat(parts, bytes).toString('utf8');
+          bytes = 0; parts = []; oversized = false;
+        }
+        start = end + 1;
+      }
+    }
+    // Preserve the existing tolerance for a valid final record without newline.
+    if (!oversized && bytes) yield Buffer.concat(parts, bytes).toString('utf8');
+  } finally { fs.closeSync(fd); }
 }
 
 /* --------------------------- the fold, kept warm -------------------------- */
@@ -139,6 +170,7 @@ function readLines(file) {
 // against its own `now` (`aged` below). Handing out the cached objects
 // themselves would let one caller's edit become every later caller's truth.
 const folded = new Map();
+const windowed = new Map();
 const MAX_FOLDS_HELD = 64;
 
 function ledgerStamp(file) {
@@ -166,6 +198,19 @@ function foldedLedger(file) {
   return items;
 }
 
+// Only complete finished items from the recent window enter the initial
+// snapshot. Older and partially windowed finished items remain in history.
+function recentFinished(file, items) {
+  if (fs.statSync(file).size <= MAX_LEDGER_BYTES) return items;
+  const stamp = ledgerStamp(file);
+  const held = windowed.get(file);
+  if (held?.stamp === stamp) return held.items;
+  const recent = foldWorkItems(readWindowLines(file), 0);
+  if (windowed.size >= MAX_FOLDS_HELD) windowed.delete(windowed.keys().next().value);
+  windowed.set(file, {stamp, items: recent});
+  return recent;
+}
+
 // One item as of `now`: a copy, with the lease rule that `foldWorkItems` applies
 // at the end of its own pass applied here instead. The two mutable fields a
 // caller can reach through a spread are copied with it.
@@ -182,50 +227,29 @@ function aged(item, now) {
   return out;
 }
 
-/** Every work item in one product, folded. */
+/** All active work plus recent complete finished items, folded from full state. */
 export function readWorkItems(projectDir, now = Date.now()) {
+  const file = ledgerPath(projectDir);
+  const items = foldedLedger(file);
+  if (!items.size) return [];
+  const recent = recentFinished(file, items);
   const out = [];
-  for (const item of foldedLedger(ledgerPath(projectDir)).values()) out.push(aged(item, now));
+  for (const item of items.values()) {
+    if (item.status === 'done' && recent.get(item.id)?.createdAt !== item.createdAt) continue;
+    out.push(aged(item, now));
+  }
   return out;
 }
 
-/**
- * THE FINISHED THREADS THE 8 MB READ CUT OFF, read only when somebody asks.
- *
- * `readLines` keeps a ledger's trailing 8 MB, so a thread whose lines all came
- * before that is in no fold, and one whose first lines did is folded without
- * them (a blank title, the wrong `createdAt`). Measured 2026-10-07
- * (w-fda2165ec6): 155 finished threads gone and 21 blank on one 12.8 MB
- * ledger. Her call was that these load as she scrolls rather than up front, so
- * the snapshot keeps its window and this reads the whole file, once per
- * change of the file, for the Done and All tabs' next page.
- *
- * Finished threads only: this is history, and it is where the tabs that ask
- * for it go. A ledger that fits in the window has nothing to give.
- */
-const wholeFolds = new Map();
+/** Finished items omitted from the initial snapshot, with complete state. */
 export function readOlderWorkItems(projectDir, now = Date.now()) {
   const file = ledgerPath(projectDir);
-  let size;
-  try { size = fs.statSync(file).size; } catch { return []; }
-  if (size <= MAX_LEDGER_BYTES) return [];
-  const stamp = ledgerStamp(file);
-  let whole = wholeFolds.get(file);
-  if (!whole || whole.stamp !== stamp) {
-    let lines;
-    try { lines = fs.readFileSync(file, 'utf8').split('\n').filter((l) => l && Buffer.byteLength(l, 'utf8') <= MAX_LINE_BYTES); } catch { return []; }
-    // Few ledgers are ever this big; hold the latest fold of each, no more.
-    if (wholeFolds.size >= 8) wholeFolds.delete(wholeFolds.keys().next().value);
-    whole = { stamp, items: foldWorkItems(lines, 0) };
-    wholeFolds.set(file, whole);
-  }
-  const windowed = foldedLedger(file);
+  const items = foldedLedger(file);
+  if (!items.size) return [];
+  const recent = recentFinished(file, items);
   const out = [];
-  for (const item of whole.items.values()) {
-    if (item.status !== 'done') continue;
-    const seen = windowed.get(item.id);
-    // In the window whole: the snapshot already has it right.
-    if (seen && seen.createdAt === item.createdAt) continue;
+  for (const item of items.values()) {
+    if (item.status !== 'done' || recent.get(item.id)?.createdAt === item.createdAt) continue;
     out.push(aged(item, now));
   }
   return out;
@@ -365,7 +389,11 @@ export function releaseWorkItem(projectDir, id, { epoch, now = Date.now() } = {}
 // are allowed, but a release or another holder ends this run's ownership.
 export function releaseRunClaim(projectDir, id, { afterEpoch, startedAt, now = Date.now() } = {}) {
   if (!Number.isFinite(afterEpoch) || !Number.isFinite(startedAt)) return null;
-  const lines = readLines(ledgerPath(projectDir)).map(normalizeLine).filter(line => line?.id === id);
+  const lines = [];
+  for (const raw of readLines(ledgerPath(projectDir))) {
+    const line = normalizeLine(raw);
+    if (line?.id === id) lines.push(line);
+  }
   const item = foldWorkItems(lines, now).get(id);
   if (!item?.claim) return item;
   const claims = lines.filter(line => line.claim && !line.heartbeat && line.epoch > afterEpoch);
@@ -440,4 +468,4 @@ export function readLinesFrom(projectDir, offset = 0) {
 }
 
 export { LEASE_MS };
-export const _internals = { appendLine, readLines, ledgerPath, forgetFolds: () => folded.clear() };
+export const _internals = { appendLine, readLines, ledgerPath, forgetFolds: () => { folded.clear(); windowed.clear(); } };

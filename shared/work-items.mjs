@@ -524,7 +524,7 @@ function rollUpReactions(presses) {
 export function foldWorkItems(lines, now = Date.now()) {
   const items = new Map();
 
-  for (const raw of Array.isArray(lines) ? lines : []) {
+  for (const raw of lines && typeof lines !== 'string' && typeof lines[Symbol.iterator] === 'function' ? lines : []) {
     const line = normalizeLine(raw);
     if (!line) continue;
 
@@ -709,7 +709,7 @@ const THREAD_FIELDS = ['body', 'note', 'result', 'answer'];
 
 export function threadOf(lines, id) {
   const turns = [];
-  for (const raw of Array.isArray(lines) ? lines : []) {
+  for (const raw of lines && typeof lines !== 'string' && typeof lines[Symbol.iterator] === 'function' ? lines : []) {
     const line = normalizeLine(raw);
     if (!line || line.id !== id) continue;
     // A heartbeat carries a patch it never meant (see the fold), so it would
