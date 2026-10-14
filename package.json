@@ -155,6 +155,7 @@
         "NSDocumentsFolderUsageDescription": "Agentbox needs this to let your agents work in a project you keep in Documents.",
         "NSDownloadsFolderUsageDescription": "Agentbox needs this to let your agents work in a project you keep in Downloads.",
         "NSRemovableVolumesUsageDescription": "Agentbox needs this to let your agents work in a project you keep on an external disk.",
+        "NSMicrophoneUsageDescription": "Agentbox uses your microphone only when you start dictation or a voice call.",
         "NSAppleEventsUsageDescription": "Agentbox needs this when an agent you started asks another app to do something."
       },
       "category": "public.app-category.productivity",

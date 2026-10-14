@@ -31,7 +31,7 @@ import { pollEvery, oneAtATime } from '../phone-polls';
 import { changePathFor, type Change } from '../code-artifact';
 import { filedOnTurn } from '../filed-in-thread';
 import { itemThread, type PendingSaid } from '../item-thread';
-import { resultLeads } from '../recap';
+import { threadTldr } from '../../../shared/thread-tldr.mjs';
 import { withoutTrailingWork } from '../trailing-work';
 import { marksFor, readUndoMarks, UNDO_MARKS_EVENT, type UndoMark } from '../undo-marks';
 import type { LedgerLine } from '../thread-history';
@@ -62,7 +62,7 @@ const REFRESH_MS = 8_000;
 // screen is the kind of drift this row exists to end.
 const THEM = 'The agent';
 
-export function ItemThread({ item, engine, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled,onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread }: {
+export function ItemThread({ item, engine, session, statusText, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled,onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread }: {
   // A CHAT'S THREAD, IN THE PANEL BESIDE IT (w-920461cbe6). The pane owns which
   // one is open and how wide it is; this draws it, because this is where the
   // replies were read. `host` is the pane the panel is drawn into. Absent
@@ -79,6 +79,7 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
     fresh?: Record<string, number>;
   };
   item: WorkItem;
+  statusText?: string | null;
   // THE THREADS THIS ONE FILED, EACH ON THE TURN THAT FILED IT (w-2e13752a85).
   // They used to be one block under the whole conversation, which left the
   // morning's three threads standing over the composer all evening. The rule
@@ -297,27 +298,23 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
     <ThreadsMade rows={rows} label="Filed from this thread" onOpen={(id) => onOpenFiled?.(id)} onApprove={onApproveFiled} onHere={onHereFiled} />
   );
 
-  // THE ANSWER, WHOLE, AT THE FOOT OF THE CONVERSATION.
-  //
-  // A row still in flight keeps the label, which is the only thing telling the
-  // two apart. What changed is where they sit. They used to be instead of the
-  // conversation; they are now under it, and the thread above no longer draws
-  // this message twice.
-  const answer = outcome && (
-    resultLeads(item) && outcome.field === 'result'
-      ? <div className="outcome">{md(clean(outcome.text))}</div>
-      : (
-        <div className="appendix appendix-foot">
-          <div className="appendix-label">{outcome.field === 'result' ? 'Result' : 'Latest checkpoint'}</div>
-          {md(clean(outcome.text))}
-        </div>
-      )
-  );
+  const tldr = !chat ? threadTldr(events, outcome ? { ...outcome, text: clean(outcome.text) } : null, { running: !!session, statusText }) : null;
+  const answer = <>
+    {tldr && <section className="appendix appendix-foot thread-tldr" aria-label="Aktueller Kurzstand" key={`${item.product}:${item.id}`}>
+      <div className="appendix-label">TL;DR · aktueller Stand</div>
+      {tldr.context && <p className="thread-tldr-context">{tldr.context}</p>}
+      <p>{tldr.text}</p>
+    </section>}
+    {outcome && <details className="appendix thread-result-details" key={`result:${item.product}:${item.id}`}>
+      <summary>{tldr && tldr.at !== outcome.at ? 'Früheres Ergebnis' : 'Vollständige Antwort'}</summary>
+      {md(clean(outcome.text))}
+    </details>}
+  </>;
 
   return (
     <>
       <Thread
-        events={events}
+        events={outcome ? [...events, { at: outcome.at, who: 'it', text: clean(outcome.text) }] : events}
         omitted={omitted}
         chat={chat}
         name={THEM}

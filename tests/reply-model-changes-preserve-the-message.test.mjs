@@ -1,0 +1,3 @@
+// Model changes must not leave an empty composer and no visible pending reply.
+import fs from 'node:fs';import {it,expect} from 'vitest';
+it('keeps a model-picked reply visible on its own thread',()=>{const app=fs.readFileSync('renderer/src/App.tsx','utf8');const branch=app.slice(app.indexOf('const talking = isDirect',app.indexOf('const answerWith')),app.indexOf('/* ------------------------ answering one',app.indexOf('const answerWith')));expect(branch).toContain('setSending((q) => [...q, mine]);');expect(branch).not.toContain('if (talking) setSending');expect(branch).toContain('|| !!pick');});

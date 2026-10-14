@@ -44,6 +44,9 @@ contextBridge.exposeInMainWorld('zero', {
   assistiveTech: () => ipcRenderer.invoke('zero:assistiveTech'),
   olderItems: (payload) => ipcRenderer.invoke('zero:older-items', payload),
   dashboard: (slug) => ipcRenderer.invoke('zero:dashboard', slug),
+  transcribeAudio: (payload) => ipcRenderer.invoke('zero:transcribe-audio', payload),
+  desktopLive: (payload) => ipcRenderer.invoke('zero:desktop-live', payload),
+  composerCatalog: (payload) => ipcRenderer.invoke('zero:composer-catalog', payload),
   commandCatalog: (payload) => ipcRenderer.invoke('zero:command-catalog', payload),
   remoteControl: (payload) => ipcRenderer.invoke('zero:remote-control', payload),
   command: (payload) => ipcRenderer.invoke('zero:command', payload),
@@ -113,7 +116,7 @@ contextBridge.exposeInMainWorld('zero', {
   importAgents: (payload) => ipcRenderer.invoke('zero:import-agents', payload ?? {}),
   // The Claude Code threads she started herself in the last few days, which is
   // what she meant by her agents, and taking one as a task.
-  agentThreads: () => ipcRenderer.invoke('zero:agent-threads'),
+  agentThreads: (p) => ipcRenderer.invoke('zero:agent-threads', p),
   importThreads: (payload) => ipcRenderer.invoke('zero:import-threads', payload ?? {}),
   badge: (count) => ipcRenderer.invoke('zero:badge', count),
   // What the corner tag says when she is in another app: what is ready for

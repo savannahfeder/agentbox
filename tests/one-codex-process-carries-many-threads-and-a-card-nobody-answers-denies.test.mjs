@@ -159,6 +159,15 @@ async function withThread(handlers = {}, { threadId = 'T-A', codex = fakeCodex()
 /* ------------------------------ the handshake ----------------------------- */
 
 describe('opening one app-server', () => {
+  it('opts into the APIs needed to read integration references without model turns', async () => {
+    const codex = fakeCodex();
+    const client = createCodexAppServer({ transport: codex.child });
+    const opening = client.initialize({ experimentalApi: true });
+    expect(codex.sent[0].params.capabilities).toEqual({ experimentalApi: true });
+    codex.say({ jsonrpc: '2.0', id: codex.sent[0].id, result: {} });
+    await opening;
+  });
+
   it('sends initialize with a clientInfo the server can name us by, and resolves on its answer', async () => {
     const codex = fakeCodex();
     const client = createCodexAppServer({ transport: codex.child });

@@ -79,6 +79,7 @@ const BUILDING = '.building-';
 
 const git = (cwd, args) => execFileSync('git', args, {
   cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+  timeout: args[0] === 'worktree' && args[1] !== 'list' ? 30_000 : 2_000, killSignal: 'SIGKILL',
 }).trim();
 
 /**

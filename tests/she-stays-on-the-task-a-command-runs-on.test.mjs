@@ -113,7 +113,7 @@ describe('the app is wired to all three', () => {
     // her inbox, waiting for a table that was never coming. The word is handed
     // in from the pane, which is where main's answer already is.
     expect(app).toMatch(/const stay = staysOnTheTask\(item, text, engine\)/);
-    expect(app).toMatch(/if \(!stay\) leaveResolved\(item\)/);
+    expect(app).toMatch(/if \(!stay && !background\) leaveResolved\(item\)/);
   });
 
   it('and the pane it stays on is refreshed from the store, or the answer never lands on it', () => {

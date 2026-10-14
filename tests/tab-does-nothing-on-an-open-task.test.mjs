@@ -77,7 +77,7 @@ describe('the top strip while a task is open', () => {
   it('takes nothing away from the rest of the app', () => {
     // One screen goes quiet. The switch still owns everything else, and the
     // row hints under the pointer are untouched.
-    expect(app).toContain('onHover={keyHints ? setHoveredId : undefined}');
+    expect(app).toContain('onHover={setHoveredId}');
     expect(app).toMatch(/<Settings[\s\S]{0,400}keyHints=\{keyHints\}/);
   });
 });

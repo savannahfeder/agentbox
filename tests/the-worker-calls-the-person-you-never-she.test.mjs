@@ -32,9 +32,8 @@ let appDir;
 const makeSupervisor = (config = {}) => {
   appDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-you-app-'));
   fs.mkdirSync(path.join(appDir, 'briefs'), { recursive: true });
-  for (const f of fs.readdirSync(path.join(REPO, 'briefs'))) {
-    fs.copyFileSync(path.join(REPO, 'briefs', f), path.join(appDir, 'briefs', f));
-  }
+  // Other tests create and remove ignored founder overrides in parallel.
+  fs.copyFileSync(path.join(REPO, 'briefs', 'worker.md'), path.join(appDir, 'briefs', 'worker.md'));
   const store = { listItems: () => [], listProducts: () => [], isDue: () => true };
   return new Supervisor({ storeRoot: root, maxConcurrentSessions: 3, ...config }, store, appDir);
 };

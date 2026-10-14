@@ -123,11 +123,12 @@ export function noProjectYet(
  * THE UNDO IS SAID OUT LOUD, unchanged, because a way back she cannot see is
  * one she will not take.
  */
-export function sentLine(p: { to: string; when?: string | null; held?: boolean }): string {
+export function sentLine(p: { to: string; when?: string | null; held?: boolean; todo?: boolean }): string {
   // "Started in", because "Sent to Office admin" read as a message to a person.
   // And "Added to Later" for the one answer on the Send later menu with no
   // moment in it (w-afb66e6661): it did not start, so saying it did is a lie,
   // and it is not scheduled either.
+  if (p.todo) return `Als To-do gespeichert in ${p.to} · Z zum Rückgängigmachen`;
   if (p.held) return `Added to Later in ${p.to} · Z to undo`;
   const where = p.when ? `Scheduled in ${p.to}` : `Started in ${p.to}`;
   return `${p.when ? `${where} · ${p.when}` : where} · Z to undo`;

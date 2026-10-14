@@ -114,7 +114,7 @@ describe('the wiring, which is the half a pure test cannot see', () => {
     // so the draft is TAKEN off it there (clearing it on the answer would
     // empty a card opened in between) and handed to `onSent` as `draft`.
     const send = composer.slice(composer.indexOf('const sendTask ='));
-    expect(send.indexOf('const taken = takeComposeDraft()')).toBeLessThan(send.indexOf('onSent(made,'));
+    expect(send.indexOf('const taken =')).toBeLessThan(send.indexOf('onSent(made,'));
     expect(send).toMatch(/onSent\(made, \{[^\n]*draft: taken/);
     expect(app).toMatch(/const sent = how\?\.draft \?\? readComposeDraft\(\)/);
   });

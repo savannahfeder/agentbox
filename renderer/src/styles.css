@@ -8734,6 +8734,80 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .fp-use { background: var(--accent); border-color: transparent; color: var(--on-solid); }
 .fp-use:disabled { opacity: .45; cursor: default; }
 
+.completion-logo { width: 20px; height: 20px; object-fit: contain; vertical-align: middle; margin-right: 8px; border-radius: var(--radius); }
+
+.completion-status { padding: 12px 16px; color: var(--text-dim); }
+
+.tc-reference-anchor { position: relative; }
+.tc-integration-menu { bottom: auto; top: calc(100% + 4px); max-height: 35vh; }
+
+.thread-tldr p { margin: 8px 0; }
+.thread-tldr-context { color: var(--text-dim); font-size: .9em; }
+.thread-result-details { margin-top: 12px; }
+.thread-result-details > summary { cursor: pointer; color: var(--text-dim); }
+
+.quick-project { display: flex; flex-direction: column; gap: 16px; padding: 28px; max-width: 480px; }
+.quick-project label { display: flex; flex-direction: column; gap: 8px; }
+.quick-project input { width: 100%; padding: 12px; color: var(--text); background: transparent; border: 1px solid var(--line); font: inherit; }
+.quick-project button { padding: 10px; }
+
+.desktop-live-launch .live-start {width:100%;display:flex;align-items:center;gap:10px;padding:12px 16px;border:0;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer;}
+.desktop-live-launch .live-start:hover {background:var(--surface);}
+.live-panel {position:fixed;z-index:1000;left:20px;bottom:24px;width:min(420px,calc(100vw - 40px));max-height:55vh;padding:16px;background:var(--bg);color:var(--text);border:1px solid var(--line);box-shadow:var(--shadow-card);border-radius:12px;}
+.live-panel[hidden] {display:none;}
+.live-heading {display:flex;align-items:center;gap:8px;justify-content:space-between;}
+.live-panel button {background:transparent;color:inherit;border:1px solid var(--line);border-radius:var(--radius);padding:6px;cursor:pointer;}
+.live-panel audio {width:100%;height:32px;margin:10px 0;}
+.live-log {overflow:auto;max-height:30vh;font-size:13px;line-height:1.5;overflow-wrap:anywhere;}
+.live-panel.compact .live-log,.live-panel.compact form,.live-panel.compact audio {display:none;}
+.live-panel form {display:flex;gap:8px;margin-bottom:10px;}
+.live-panel input {min-width:0;flex:1;padding:8px;background:transparent;color:inherit;border:1px solid var(--line);border-radius:var(--radius);}
+
+.desktop-live-launch .live-panel.compact {position:static;width:auto;max-height:none;margin:4px 8px;padding:6px 8px;box-shadow:none;border-radius:var(--radius);}
+.desktop-live-launch .live-panel.compact .live-heading {gap:4px;font-size:11px;}
+.desktop-live-launch .live-panel.compact [role="status"] {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.desktop-live-launch:has(.live-panel.compact:not([hidden]))>.live-start:disabled {display:none;}
+.workspace-collapsed .desktop-live-launch .live-panel.compact {margin:4px 0;padding:4px;}
+.workspace-collapsed .desktop-live-launch .live-panel.compact .live-heading {flex-direction:column;}
+.workspace-collapsed .desktop-live-launch .live-panel.compact [role="status"] {display:none;}
+@media(max-width:700px) {
+ .desktop-live-launch .live-panel.compact {margin:4px 0;padding:4px;}
+ .desktop-live-launch .live-panel.compact .live-heading {flex-direction:column;}
+ .desktop-live-launch .live-panel.compact [role="status"] {display:none;}
+}
+
+.row-hover-preview { display: block; pointer-events: auto; white-space: normal; width: min(420px, calc(100vw - 24px)); max-height: min(360px, calc(100vh - 24px)); overflow: auto; box-sizing: border-box; }
+.row-hover-tldr { color: var(--text-dim); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.row-hover-tldr strong { color: var(--text-faint); font-size: 11px; margin-right: 8px; }
+.row-hover-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.row-hover-actions .row-key { display: inline-flex; align-items: flex-start; gap: 8px; white-space: normal; text-align: left; max-width: 100%; margin: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: transparent; color: var(--text-dim); font: inherit; font-size: 12px; cursor: pointer; }
+.row-hover-actions .row-key span { overflow-wrap: anywhere; min-width: 0; }
+.row-hover-actions .row-key:hover, .row-hover-actions .row-key:focus-visible { border-color: var(--text-faint); color: var(--text); }
+
+.dictation-buttons {display:inline-flex;gap:6px;align-items:center;font-size:12px;}
+.dictation-buttons button {font:inherit;background:transparent;color:var(--text-dim);border:1px solid var(--line);padding:5px 8px;cursor:pointer;}
+.dictation-jobs {position:fixed;bottom:16px;left:16px;z-index:1000;max-width:min(260px,calc(100vw - 32px));max-height:35vh;overflow:auto;padding:8px;background:var(--skin-solid);border:1px solid var(--line);font-size:12px;}
+
+.dictation-jobs textarea {display:block;width:100%;box-sizing:border-box;min-height:60px;}
+
+.live-heading button[aria-label="Call beenden"] {flex-shrink:0;white-space:nowrap;}
+
+.ia-search {width:100%;box-sizing:border-box;padding:10px 12px;margin:8px 0 14px;background:transparent;color:var(--text);border:1px solid var(--line);font:inherit;}
 /* THE PHONE WHOSE KEY WAS RESET (renderer/src/browser-bridge.ts). */
 #phone-locked-out { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 32px; background: var(--surface); color: var(--text); font: 16px/1.45 system-ui, sans-serif; text-align: center; }
 #phone-locked-out p { margin-top: 8px; opacity: .8; }
+
+.dictation-waveform {width:clamp(96px,18vw,240px);height:36px;min-width:0;color:var(--text-dim);flex:1 1 120px;}
+.dictation-buttons:has(.dictation-waveform) {max-width:100%;gap:8px;}
+@media(max-width:600px){.dictation-waveform{width:96px;flex-basis:96px}.dictation-buttons:has(.dictation-waveform){flex-wrap:wrap}}
+
+/* Recording owns the footer; the settings return as soon as it stops. */
+.compose-sentence:has(.dictation-waveform) .compose-clauses,
+.compose-sentence:has(.dictation-waveform) > .dock-send,
+.compose-sentence:has(.dictation-waveform) > .dock-stop { display: none; }
+.dictation-buttons:has(.dictation-waveform) { flex: 1; min-width: 0; flex-wrap: nowrap; }
+.dictation-buttons:has(.dictation-waveform) button { flex: 0 0 36px; height: 36px; padding: 0; white-space: nowrap; }
+
+.model-usage { display: grid; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: normal; max-width: 310px; font-size: 12px; }
+.model-usage small { display: block; opacity: .7; font-size: 11px; line-height: 1.4; }
+.model-usage-limit { display: grid; gap: 2px; }

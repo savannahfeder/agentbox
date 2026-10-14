@@ -1,3 +1,4 @@
+import {buildControlTools} from './control-tools.mjs';
 // The protocol layer: tool names, schemas, descriptions, result formatting.
 //
 // Everything below is a thin call into mcp/core. Keeping the two apart is what
@@ -259,6 +260,6 @@ export function buildTools({ holder } = {}) {
   return {
     account,
     claims,
-    tools: tools.map((t) => ({ ...t, run: guard(t.run) })),
+    tools: [...tools,...buildControlTools(account)].map((t) => ({ ...t, run: guard(t.run) })),
   };
 }

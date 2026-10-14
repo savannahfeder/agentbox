@@ -415,6 +415,16 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 /* A teammate's row has no select box: nothing on this Mac can act on it. */
 .th-their-row .mark { visibility: hidden; }
 
+.th-cell-proj select {max-width:100%;width:100%;background:transparent;border:1px solid transparent;color:inherit;font:inherit;cursor:pointer;padding:2px;}
+.th-cell-proj select:hover,.th-cell-proj select:focus-visible {border-color:var(--line-strong);}
+.th-cell-proj select option {background:var(--bg);color:var(--text);}
+.th-pop {max-height:calc(100vh - 130px);overflow:auto;}
+.saved-filters {padding:8px 16px;display:grid;gap:6px;}
+.saved-filters form,.saved-filter {display:flex;gap:6px;}
+.saved-filters input {min-width:0;flex:1;border:1px solid var(--line);padding:6px;background:transparent;color:var(--text);font:inherit;}
+.saved-filters button {padding:6px;border:1px solid var(--line);background:transparent;color:var(--text-dim);font:inherit;cursor:pointer;}
+.saved-filter button:first-child {flex:1;text-align:left;}
+@media(max-width:700px){.th-right {flex-wrap:wrap;justify-content:flex-end;}}
 /* WHERE THREADS RUN: the cloud button and its menu (threads/Pages.tsx). */
 .th-cloud.count { width: auto; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px 0 9px; font: inherit; font-size: 13px; }
 .th-cloud.count b { font-weight: 400; color: var(--text); font-variant-numeric: tabular-nums; }

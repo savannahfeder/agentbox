@@ -100,8 +100,10 @@ describe('the card hands over before it waits on anything', () => {
 
     it(`${name}: the draft is taken off the card before the first await, and put back on a failure`, () => {
       const send = body(name);
-      expect(send.indexOf('const taken = takeComposeDraft()')).toBeGreaterThan(-1);
-      expect(send.indexOf('const taken = takeComposeDraft()')).toBeLessThan(send.indexOf('await '));
+      expect(send.indexOf('const taken =')).toBeGreaterThan(-1);
+      expect(send.indexOf('const taken =')).toBeLessThan(send.indexOf('await '));
+      expect(send).toContain('takeComposeDraft()');
+      if (name === 'sendTask') expect(send).toContain('const taken = background ?');
       expect(send).toMatch(/saveComposeDraft\(taken\)/);
       // Nothing clears the draft after the send lands: by then it may be a
       // second card's words.

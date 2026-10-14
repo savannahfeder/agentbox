@@ -24,6 +24,8 @@ export interface Display {
   sort: 'priority' | 'updated';
   priorities: PriorityId[];
   projects: string[];
+  projectMode?: 'all' | 'selected';
+  excludedProjects?: string[];
   updated: UpdatedWindow;
   /** Absent on a display saved before the choice existed, which reads as All. */
   privacy?: Privacy;
@@ -114,6 +116,8 @@ export function readDisplay(page: PageId, store: Pick<Storage, 'getItem'> | null
         : d.sort === 'updated' || d.sort === 'priority' ? d.sort : DEFAULT_DISPLAY[page].sort,
       priorities: Array.isArray(d.priorities) ? d.priorities.filter((p: unknown) => ['urgent', 'high', 'medium', 'low'].includes(p as string)) : [],
       projects: Array.isArray(d.projects) ? d.projects.filter((p: unknown) => typeof p === 'string') : [],
+      ...(d.projectMode === 'all' || d.projectMode === 'selected' ? {projectMode: d.projectMode} : {}),
+      ...(Array.isArray(d.excludedProjects) ? {excludedProjects: d.excludedProjects.filter((p: unknown) => typeof p === 'string')} : {}),
       updated: d.updated === 'today' || d.updated === 'week' ? d.updated : 'any',
     };
   } catch {
@@ -126,7 +130,7 @@ export function writeDisplay(page: PageId, d: Display, store: Pick<Storage, 'set
 }
 
 /** Whether any filter is on, which is what puts the dot on the Display icon. */
-export const isFiltered = (d: Display) => d.priorities.length > 0 || d.projects.length > 0 || d.updated !== 'any'
+export const isFiltered = (d: Display) => d.priorities.length > 0 || d.projects.length > 0 || d.projectMode === 'selected' || !!d.excludedProjects?.length || d.updated !== 'any'
   || d.privacy === 'shared' || d.privacy === 'private';
 
 const startOfDay = (now: number) => { const t = new Date(now); t.setHours(0, 0, 0, 0); return t.getTime(); };
@@ -136,10 +140,10 @@ const startOfDay = (now: number) => { const t = new Date(now); t.setHours(0, 0, 
  *  A MESSAGE TO YOU PASSES THE PROJECT FILTER (w-5a432fb112): `direct` names
  *  the conversation projects, which no chip offers, so any lit chip hid every
  *  message. "Messages to me ARE my tasks." */
-export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt'>, d: Display, now: number, seen?: Seen | null, direct?: ReadonlySet<string>): boolean {
+export function keeps(item: Pick<WorkItem, 'priority' | 'product' | 'updatedAt' | 'displayProject'>, d: Display, now: number, seen?: Seen | null, direct?: ReadonlySet<string>): boolean {
   if (!keepsPrivacy(seen, d.privacy)) return false;
   if (d.priorities.length && !d.priorities.includes(priorityIdOf(item.priority))) return false;
-  if (d.projects.length && item.product && !d.projects.includes(item.product) && !direct?.has(item.product)) return false;
+  if (item.product && !projectSelected(d, item.displayProject || item.product) && !direct?.has(item.product)) return false;
   if (d.updated === 'today' && !(item.updatedAt >= startOfDay(now))) return false;
   if (d.updated === 'week' && !(item.updatedAt >= now - 7 * 86_400_000)) return false;
   return true;
@@ -393,14 +397,15 @@ export function filteredEmptyWords(view: TabName | string, hidden: number): { he
  */
 export function projectChoices(
   products: Product[],
-  items: Pick<WorkItem, 'product' | 'updatedAt' | 'agent'>[],
+  items: Pick<WorkItem, 'product' | 'updatedAt' | 'agent' | 'displayProject'>[],
   { picked = [], limit = 8 }: { picked?: string[]; limit?: number } = {},
 ): { shown: Product[]; rest: Product[] } {
   const last = new Map<string, number>();
   for (const i of items) {
     if (i.agent) continue;
-    const was = last.get(i.product) ?? 0;
-    if (i.updatedAt > was) last.set(i.product, i.updatedAt);
+    const group=i.displayProject||i.product;
+    const was = last.get(group) ?? 0;
+    if (i.updatedAt > was) last.set(group, i.updatedAt);
   }
   const ranked = products
     .filter((p) => !isDirect(p) && !(p as { practice?: boolean }).practice)
@@ -811,4 +816,27 @@ export function conversationWith(personIds: string | string[], { products, items
   if (!record) return null;
   return items.filter((i) => i.product === record.slug && !i.agent)
     .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0] ?? null;
+}
+
+
+export function projectSelected(d: Display, slug: string): boolean {
+  return d.projectMode === 'selected' || (!d.projectMode && d.projects.length > 0)
+    ? d.projects.includes(slug) : !d.excludedProjects?.includes(slug);
+}
+export function toggleProject(d: Display, slug: string): Display {
+  const flip = (values: string[]) => values.includes(slug) ? values.filter(v => v !== slug) : [...values, slug];
+  return d.projectMode === 'selected' || (!d.projectMode && d.projects.length > 0)
+    ? {...d, projectMode:'selected', projects:flip(d.projects)}
+    : {...d, projectMode:'all', projects:[], excludedProjects:flip(d.excludedProjects ?? [])};
+}
+export type SavedFilter = {id:string;name:string;display:Display};
+export function readSavedFilters(page:PageId, store:Pick<Storage,'getItem'>|null=typeof localStorage==='undefined'?null:localStorage):SavedFilter[] {
+  try {
+    const rows=JSON.parse(store?.getItem(`threads.savedFilters.${page}`)??'[]');
+    if(!Array.isArray(rows))return [];
+    return rows.filter(r=>r&&typeof r.id==='string'&&typeof r.name==='string'&&r.name.trim()&&r.display&&typeof r.display==='object').map(r=>({id:r.id,name:r.name.slice(0,80),display:{...readDisplay(page,{getItem:()=>JSON.stringify({...r.display,v:DISPLAY_VERSION})}),privacy:['private','shared'].includes(r.display.privacy)?r.display.privacy:'any'}}));
+  }catch{return []}
+}
+export function writeSavedFilters(page:PageId, filters:SavedFilter[], store:Pick<Storage,'setItem'>|null=typeof localStorage==='undefined'?null:localStorage) {
+  try{store?.setItem(`threads.savedFilters.${page}`,JSON.stringify(filters))}catch{/* unavailable storage */}
 }

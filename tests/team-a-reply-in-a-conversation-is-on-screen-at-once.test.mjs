@@ -27,7 +27,7 @@ describe('a reply in a conversation', () => {
   });
 
   it('comes off the screen again when Z takes it back', () => {
-    expect(quiet).toMatch(/const restore = \(\): Restored => \{\s*setSending\(\(q\) => q\.filter\(\(s\) => s !== mine\)\)/);
+    expect(quiet).toMatch(/const restore = \(failed=false\): Restored => \{\s*setSending\(\(q\) => q\.filter\(\(s\) => s !== mine\)\)/);
   });
 
   it('is cleared once the written copy has landed', () => {
@@ -47,8 +47,8 @@ describe('a reply in a conversation', () => {
     expect(landed.events.find((e) => e.text === 'Hey!').pending).toBeFalsy();
   });
 
-  it('leaves a reply to an ordinary thread as it was', () => {
-    // Only a conversation is drawn early; a task row still leaves the inbox.
-    expect(quiet).not.toMatch(/^\s*setSending\(\(q\) => \[\.\.\.q, mine\]\);/m);
+  it('also draws a reply to an ordinary thread immediately', () => {
+    // The pending bubble now covers task replies as well as conversations.
+    expect(quiet).toMatch(/^\s*if \(stay\) setSending\(\(q\) => \[\.\.\.q, mine\]\);/m);
   });
 });

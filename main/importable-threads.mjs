@@ -23,15 +23,16 @@ import { readCodexThreads } from './codex-threads.mjs';
 export const OLDER_DAYS = 90;
 export const OLDER_MOST = 20;
 
-export function readImportableThreads({ config = null, supervisor = null, env = process.env, shellEnv, home = os.homedir(), now = Date.now() } = {}) {
+export function readImportableThreads({ config = null, supervisor = null, env = process.env, shellEnv, home = os.homedir(), now = Date.now(), query = '' } = {}) {
   const { dirs, codexDirs } = appSessionFolders({ config, supervisor, env, home, ...(shellEnv ? { shellEnv } : {}) });
   const read = (days, max) => {
     let claude = [];
     let codex = [];
     try { ({ threads: claude } = readSessionThreads({ home, dirs, now, days, ...(max ? { max } : {}) })); } catch { claude = []; }
-    try { ({ threads: codex } = readCodexThreads({ home, codexDirs, now, days })); } catch { codex = []; }
-    return [...claude, ...codex].sort((a, b) => (b.when ?? 0) - (a.when ?? 0));
+    try { ({ threads: codex } = readCodexThreads({ home, codexDirs, now, days, query })); } catch { codex = []; }
+    return [...claude, ...codex].filter(t=>!query||String(t.title).toLocaleLowerCase().includes(query.toLocaleLowerCase())).sort((a, b) => (b.when ?? 0) - (a.when ?? 0));
   };
+  if(query)return read(36500);
   const recent = read(RECENT_DAYS);
   if (recent.length) return recent;
   return read(OLDER_DAYS, OLDER_MOST).slice(0, OLDER_MOST);

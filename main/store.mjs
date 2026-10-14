@@ -5,6 +5,9 @@
 
 import fs from 'node:fs';
 import os from 'node:os';
+import { codexFolder } from './codex-folder.mjs';
+import {syncDesktopProjects} from './desktop-projects.mjs';
+import {codexHome} from './codex-models.mjs';
 import path from 'node:path';
 import { loadStore } from './store-modules.mjs';
 import { Repeats } from './repeats.mjs';
@@ -83,6 +86,10 @@ export class Store {
   // count a shared project you archived as here or it joins it a second time.
   listProducts({ includeArchived = false } = {}) {
     const root = this.config.accountRoot;
+    if(this.config.syncDesktopProjects===true && !this.config.products.length && Date.now()-(this._desktopProjectsAt??0)>2000){
+      this._desktopProjectsAt=Date.now();
+      try{syncDesktopProjects(root,codexHome({configured:this.config.codexHome,home:this.config.home}),{home:this.config.home??os.homedir()});}catch{/* keep the existing inbox available */}
+    }
     let entries = [];
     try {
       entries = fs.readdirSync(root, { withFileTypes: true });
@@ -116,6 +123,7 @@ export class Store {
         name: project.name || entry.name,
         oneLiner: project.oneLiner || '',
         repoPath: project.repoPath || null,
+        ...(project.externalProject ? {externalProject:project.externalProject} : {}),
         // THE MARK SHE CHOSE FOR THIS PROJECT, already a url the window can
         // draw, or null on every project that has never been given one, which is
         // what makes the rail draw its burst instead (main/project-identity.mjs).
@@ -336,7 +344,7 @@ export class Store {
   // `inReplyTo` makes the answer a reply in a thread (w-920461cbe6): the uid
   // of the message it answers, on THE SAME LINE as the words, so the reply's
   // own uid (what its reactions hang off) is the line that says where it goes.
-  answerItem(slug, id, { answer, status, priority, permissionMode, model, effort, inReplyTo }) {
+  answerItem(slug, id, { answer, status, priority, permissionMode, model, effort, engine, inReplyTo }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     let item = null;
@@ -349,8 +357,10 @@ export class Store {
     // is said everywhere else here: `modelForEngine` (shared/engines.mjs) reads
     // the empty string as nothing chosen, where a JSON null would have to be
     // special-cased in both engines' argument builders.
+    if (engine !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { engine: engine ?? '' }, { source: 'founder' });
     if (model !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { model: model ?? '' }, { source: 'founder' });
     if (effort !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { effort: effort ?? '' }, { source: 'founder' });
+    if (answer && answer !== '(withdrawn)' && item?.start === 'manual') item = workItemsDisk.updateWorkItem(dir, id, {start: 'now'}, {source: 'founder'});
     if (answer) item = workItemsDisk.updateWorkItem(dir, id, inReplyTo ? { answer, inReplyTo } : { answer }, { source: 'founder' });
     // A REPLY ON A RUN THAT FINISHED QUIETLY MAKES IT NEWS AGAIN (w-5e3f2e047f).
     // A quiet run is kept out of her inbox, and a repeating task now opens on
@@ -530,12 +540,13 @@ export class Store {
   // person's own words; on the summary the later write wins either way
   // (SHARED_FIELDS in shared/work-items.mjs).
   threadEdit(slug, id, patch) {
+    if(patch?.displayProject!==undefined && (typeof patch.displayProject!=='string' || !this.listProducts().some(p=>p.slug===patch.displayProject)))throw new Error('Choose an existing project.');
     // `start` is how a thread leaves Later: the summary and the thread page
     // both write 'now' on it, which is what makes `isDue` true again.
     // `label` is a rename (w-ab3d51dc7d): the name every row shows. Never
     // `title`, which is the message the thread was started with and briefs
     // every run. Written on her authority, it outranks the namer's.
-    const fields = ['problem', 'progress', 'solution', 'visibility', 'visibleTo', 'priority', 'blockedBy', 'blocks', 'start', 'label'];
+    const fields = ['problem', 'progress', 'solution', 'visibility', 'visibleTo', 'priority', 'blockedBy', 'blocks', 'start', 'label', 'displayProject'];
     const allowed = Object.fromEntries(Object.entries(patch ?? {}).filter(([k]) => fields.includes(k)));
     if ('label' in allowed) {
       allowed.label = String(allowed.label ?? '').replace(/\s+/g, ' ').trim();
@@ -551,7 +562,13 @@ export class Store {
     // The 'founder' label is the human-in-the-loop marker: only items the
     // founder composed (or explicitly approved) execute; agent-filed items
     // are proposals until then.
-    const allLabels = [...new Set(['founder', ...(labels ?? [])])];
+    const product = this.listProducts().find(p => p.slug === slug);
+    if(product?.externalProject?.source==='chatgpt'&&!product.repoPath){
+      const repoPath=codexFolder(`${product.name}-${product.slug.slice(-8)}`);
+      patchProjectAt(product.dir,{repoPath});
+    }
+    const personal = product?.personal;
+    const allLabels = [...new Set(['founder', ...(personal ? ['projectless'] : []), ...(labels ?? [])])];
     const created = workItemsDisk.createWorkItem(
       dir,
       { title, kind, priority, labels: allLabels },
@@ -567,6 +584,7 @@ export class Store {
       // "Add it to Later" on the card: the thread exists now and starts when
       // she says, which is the one answer on that menu with no clock in it.
       ...(start === 'later' ? { start: 'later' } : {}),
+      ...(start === 'manual' ? {start: 'manual', status: 'blocked'} : {}),
       // WHICH MODEL SHE CHOSE FOR THIS ONE, on founder authority like the rest
       // of her content (2026-08-26).It is a Claude Code alias, and the spawn
       // hands it to `--model`.
@@ -671,13 +689,15 @@ export class Store {
   //
   // `repoPath` is optional and stays optional. Cleared on the card, the project
   // is made without a folder, exactly as it was before this change.
-  createProduct({ name, repoPath }) {
+  createProduct({ name, repoPath, codexFolder: makeFolder = false }) {
+    if (typeof name !== 'string' || !name.trim() || name.length > 100) throw Error('Please enter a project name (up to 100 characters).');
+    name = name.trim();
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
     if (!slug) throw new Error('a product needs a name');
     const dir = path.join(this.config.accountRoot, slug);
     if (fs.existsSync(path.join(dir, 'project.json'))) throw new Error(`product ${slug} already exists`);
 
-    let repo = typeof repoPath === 'string' ? repoPath.trim() : '';
+    let repo = makeFolder ? codexFolder(name) : typeof repoPath === 'string' ? repoPath.trim() : '';
     if (repo) {
       repo = path.resolve(repo.startsWith('~') ? path.join(os.homedir(), repo.slice(1)) : repo);
       // AND IT IS NOT THE WHOLE MAC. The picker refuses these already;
@@ -1403,6 +1423,8 @@ export class Store {
     let refreshed = 0;
     for (const item of this.listAllWorkItems(now)) {
       if (!isCodexMirrorRow(item) || item.status === 'done') continue;
+      // A reply here continues the task in Agentbox; the original Codex snapshot no longer owns its result.
+      if (item.answer && item.answer !== '(withdrawn)' && item.wrote?.answer?.source === 'founder') continue;
       const t = byId.get(codexIdOf(item));
       if (!t) continue;
       const patch = codexMirrorPatch(t);

@@ -533,6 +533,14 @@ export const api = {
     if(!window.zero?.terminal) throw new Error(`Restart ${NAME} to use the terminal.`);
     return window.zero.terminal(p);
   },
+  async desktopLive(p: {sdp: string}) {
+    if (!window.zero?.desktopLive) throw Error(`Restart ${Name} to use GPT Live.`);
+    return window.zero.desktopLive(p);
+  },
+  async composerCatalog(p: {product: string; id: string; engine?: string}) {
+    if (useFixtures) return [];
+    return window.zero!.composerCatalog(p);
+  },
   async commandCatalog(p: {product: string; id: string}): Promise<string[]> {
     if (useFixtures) return ['code-review','loop','simplify','verify'];
     return window.zero!.commandCatalog(p);
@@ -563,7 +571,7 @@ export const api = {
   // once instead of after it (main/claude-input.mjs `interrupt`).
   // `inReplyTo` is the uid of the message a reply in a thread answers
   // (w-920461cbe6); main keeps it only in a conversation between people.
-  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string }): Promise<WorkItem | null> {
+  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; model?: string | null; effort?: string | null; engine?: string | null; now?: boolean; inReplyTo?: string }): Promise<WorkItem | null> {
     if (useFixtures) return null;
     return window.zero!.answer(p);
   },
@@ -628,7 +636,7 @@ export const api = {
     await window.zero.setThreadPins({ pins });
   },
 
-  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem | null> {
+  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'manual' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem | null> {
     // FIXTURES ANSWER WITH THE TASK, the way the real store does. Returning
     // null here meant the send had nothing to point at, and the caller reads
     // that as "no task was made" and puts no way back on the undo pile — so the
@@ -645,6 +653,7 @@ export const api = {
         status: 'open', title: p.title, body: p.body, kind: p.kind ?? 'directive',
         labels: ['founder'], priority: p.priority ?? 5, epoch: 1, claim: null,
         ...(p.runAt ? { runAt: p.runAt } : {}),
+        ...(p.start ? {start:p.start,...(p.start==='manual'?{status:'blocked' as const}:{})} : {}),
         ...(p.model ? { model: p.model } : {}),
         // AND THE ENGINE, WHICH THIS DROPPED ON THE FLOOR. `engine` was not even
         // in the param type above, so a card that visibly picked Codex made a
@@ -1143,9 +1152,7 @@ export const api = {
     return zero.projectInstructionsWrite({ product, text });
   },
 
-  // `ofMany` says this one is part of a press that connects several folders and
-  // will count itself once (main/ipc.mjs); it changes nothing about the project.
-  async createProduct(p: { name: string; repoPath?: string | null; ofMany?: boolean }) {
+  async createProduct(p: { name: string; repoPath?: string | null; codexFolder?: boolean; ofMany?: boolean }) {
     if (useFixtures) return null;
     return window.zero!.createProduct(p);
   },
@@ -1280,7 +1287,7 @@ export const api = {
   // `agentFolders`: a main process too old to have the channel, or a walk that
   // threw on a folder it could not read, both mean the card draws the agent
   // files it always drew and says nothing it cannot back up.
-  async agentThreads(): Promise<SessionThread[]> {
+  async agentThreads(p: {query?:string} = {}): Promise<SessionThread[]> {
     if (useFixtures) {
       if (emptyFixtures || params.has('noThreads')) return [];
       return fixtureSessionThreads();
@@ -1288,7 +1295,7 @@ export const api = {
     const zero = window.zero as any;
     if (!zero?.agentThreads) return [];
     try {
-      const r = await zero.agentThreads();
+      const r = p.query ? await zero.agentThreads(p) : await zero.agentThreads();
       return Array.isArray(r?.threads) ? r.threads : [];
     } catch { return []; }
   },

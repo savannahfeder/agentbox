@@ -250,8 +250,9 @@ export const ENGINES = {
     // one the Codex desktop app carries (w-d5d632e503, its reported place rather
     // than one measured here). A path that is not there costs one `exists`.
     appCopies: (home) => [
-      'ChatGPT.app/Contents/Resources/codex-cli/bin/codex',
       'Codex.app/Contents/Resources/codex',
+      'ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex',
+      'ChatGPT.app/Contents/Resources/codex-cli/bin/codex',
     ].flatMap((p) => [path.join('/Applications', p), path.join(home, 'Applications', p)]),
     // BOTH HOMES ARE LOOKED IN WHEN CODEX_HOME IS SET, on purpose: a CODEX_HOME
     // inherited from somewhere else is not proof the ordinary directory is gone,
@@ -511,6 +512,11 @@ export function findEngine(key, {
     };
   }
 
+  // Desktop Codex can expose newer models than a standalone CLI; explicit pins still win.
+  const appPaths = key === 'codex' ? spec.appCopies(home, readdir) : [];
+  for (const candidate of appPaths) {
+    if (exists(candidate)) return { path:candidate, found:true, certain:true, from:'app', searched:appPaths, evidence:null };
+  }
   // THE SHELL FIRST. It is the only source that knows where their tools are.
   // The default probe reads the real environment and the real disk, exactly as
   // both old finders' defaults did: a test that wants to put a tool somewhere
@@ -521,7 +527,7 @@ export function findEngine(key, {
   const fromShell = askedShell(lookup);
   // Computed either way, because a caller that wants to say where we looked
   // wants it most on the answer it is going to draw.
-  const searched = spec.candidates(home, readdir);
+  const searched = [...appPaths, ...spec.candidates(home, readdir)];
   if (fromShell.path) {
     return { path: fromShell.path, found: true, certain: true, from: 'shell', searched, evidence: null };
   }

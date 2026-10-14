@@ -84,7 +84,7 @@ describe('the wiring from the reply box is present in the source', () => {
     // missing: the footer read "Medium priority. Runs once. Opus 5.", where
     // the card beside it says "On Opus 5." One word cannot mean two things in
     // two boxes she uses together.
-    expect(focus).toMatch(/\{'On '\}\s*\n\s*<ModelPicker/);
+    expect(focus).toMatch(/\{' On '\}\s*\n\s*<ModelPicker/);
   });
 
   it("shows the row's own model rather than a default", () => {
@@ -93,7 +93,7 @@ describe('the wiring from the reply box is present in the source', () => {
   });
 
   it('sends it only on a deliberate pick', () => {
-    expect(focus).toContain('touched ? { model, effort } : undefined');
+    expect(focus).toContain('touched ? { model, effort, engine: runningEngine } : undefined');
   });
 
   it('promises only what it can keep, on a running row as well as an idle one', () => {
@@ -103,7 +103,7 @@ describe('the wiring from the reply box is present in the source', () => {
   });
 
   it('carries it through the bridge on both send paths', () => {
-    expect(app.match(/\.\.\.\(pick \? \{ model: pick\.model, effort: pick\.effort \} : \{\}\),/g) ?? [])
+    expect(app.match(/\.\.\.\(pick \? \{ model: pick\.model, effort: pick\.effort, .*? \} : \{\}\),/g) ?? [])
       .toHaveLength(2);
     expect(ipc).toMatch(/zero:answer'[^)]*model, effort/s);
   });

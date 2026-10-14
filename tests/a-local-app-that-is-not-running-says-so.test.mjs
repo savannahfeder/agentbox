@@ -98,7 +98,7 @@ it('only shows the frame once the address has answered, never an error page behi
 it('wires the check into the pane, drops the frame while nothing answers, and offers Try again',()=>{
  const pane=fs.readFileSync(new URL('../renderer/src/components/DocPane.tsx',import.meta.url),'utf8');
  expect(pane).toContain('useLocalPreview(');
- expect(pane).toMatch(/app\.phase !== 'down'\) && <iframe/);
+ expect(pane).toMatch(/app\.phase !== 'down'\) && \(website \? <WebsiteView/);
  expect(pane).toContain('<LocalPreviewStatus status={liveStatus} onRetry={app.retry} />');
  const view=fs.readFileSync(new URL('../renderer/src/components/LocalPreviewStatus.tsx',import.meta.url),'utf8');
  expect(view).toContain('Try again');

@@ -7,6 +7,7 @@ export interface WorkItem {
   id: string;
   product: string;
   productName: string;
+  displayProject?: string;
   // WHERE SHE DRAGGED IT IN THE LIST (w-6e5b532a95), on the scale of the score
   // it would otherwise sort by, which it replaces. Kept by the supervisor, on
   // this Mac; absent on every row nobody has dragged.
@@ -57,7 +58,7 @@ export interface WorkItem {
   // written down and deliberately not begun: it waits for a person rather than
   // a clock, lives in Later, and nothing runs on it. 'now' is how it is
   // started; absent is an ordinary thread that began when it was sent.
-  start?: 'later' | 'now';
+  start?: 'later' | 'manual' | 'now';
   // Which model this runs on, when she chose one on the card: a Claude Code
   // alias, depending on the engine beside it. The two vocabularies do not
   // overlap, which is why the pair only means anything read together
@@ -1022,6 +1023,7 @@ export interface RepeatRule {
   id: string;
   product: string;
   productName: string;
+  displayProject?: string;
   title: string;
   body?: string;
   priority?: number;
@@ -1083,6 +1085,9 @@ declare global {
       dashboard(slug: string): Promise<any>;
       terminal(p: {product:string;id:string;action:'open'|'read'|'write'|'resize'|'close';data?:string;cols?:number;rows?:number;offset?:number;wait?:number}): Promise<any>;
       agentUpdate?(p:{engine:string;action:'check'|'recheck'|'start'|'status'|'refresh'}):Promise<any>;
+      transcribeAudio(p:{audio:ArrayBuffer;mime:string}):Promise<{text:string}>;
+      desktopLive(p: {sdp: string}): Promise<{transport: {sdp: string}}>;
+      composerCatalog(p: {product: string; id: string; engine?: string}): Promise<{kind: string; name: string; description: string; insert: string; icon: string | null}[]>;
       commandCatalog(p: {product: string; id: string}): Promise<string[]>;
       command(p: {product: string; id: string; text: string}): Promise<{state: string; at: number; text?: string; name?: string}>;
       compact(p: { product: string; id: string }): Promise<{state: string; at: number}>;
@@ -1094,7 +1099,7 @@ declare global {
       setThreadPlaces(p: { places: Record<string, number | null> }): Promise<unknown>;
       setThreadPins?(p: { pins: Record<string, true | null> }): Promise<unknown>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
-      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
+      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'manual' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
       // Feedback to the Agentbox team (main/feedback.mjs). Optional: an older
       // main process under a newer window has no such door.
       sendFeedback?(p: { text: string; files: { name: string; type: string; size: number; data: string }[] }): Promise<{ ok: boolean; error?: string }>;
@@ -1126,7 +1131,7 @@ declare global {
       setRepeat(p: { product: string; id: string; rule: Partial<RepeatShape & { title: string; body: string; priority: number }> }): Promise<RepeatRule>;
       endRepeat(p: { product: string; id: string }): Promise<RepeatRule>;
       pauseSupervisor(paused: boolean): Promise<SupervisorStatus>;
-      createProduct(p: { name: string; repoPath?: string | null }): Promise<{ slug: string }>;
+      createProduct(p: { name: string; repoPath?: string | null; codexFolder?: boolean }): Promise<{ slug: string }>;
       // THE FIRST RUN. Both optional for the same reason chooseFolder is: a
       // page kept alive by ⌘R can be attached to a main process built before
       // either channel existed, and the walk has to fall back rather than
@@ -1252,7 +1257,7 @@ export type ThreadEditPatch = Partial<{
   /** A rename: the name every row shows. The title stays the message. */
   label: string;
   /** 'now' is how a thread leaves Later and starts (w-afb66e6661). */
-  start: 'later' | 'now';
+  start: 'later' | 'manual' | 'now';
   visibility: 'team' | 'people' | 'private'; visibleTo: string[]; priority: number;
-  blockedBy: string[]; blocks: string[];
+  blockedBy: string[]; blocks: string[]; displayProject: string;
 }>;

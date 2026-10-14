@@ -81,7 +81,7 @@ describe('the row is in ⌘K and can be found by the words she would type', () =
 
   it('is wired to a real card rather than to a toast', () => {
     expect(palette).toContain('run: onImportAgents,');
-    expect(app).toContain('onImportAgents={() => { setModal(null); setImportAgents(true); }}');
+    expect(app).toContain('onImportAgents={() => { setModal(null); setImportChatsOnly(false);setImportAgents(true); }}');
     expect(app).toContain('<ImportAgents');
   });
 });

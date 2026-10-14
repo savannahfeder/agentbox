@@ -11,13 +11,18 @@
 // there is no session to switch mid-flight; choosing here says which model
 // picks the task up, and nothing about a run already going.
 
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
   defaultModelFor, engineModelChoices, engineModelLabel, type ModelChoice,
 } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortShown, type EffortChoice } from '../effort';
 import { useKeepInWindow } from '../keep-in-window';
 import {useAgentUpdates} from './AgentUpdates';
+import type {Usage} from '../types';
+import {api} from '../api';
+import {limitRows} from '../../../shared/usage.mjs';
+export const ModelUsageContext=createContext<Usage[]>([]);
+
 
 // THE EFFORT LIVES IN HERE TOO.The levels sit under a hairline at the foot of
 // this drawer, as a strip, and the sentence outside stays "On Fable 5.1."
@@ -57,6 +62,19 @@ export function ModelPicker({ value, onChange, title, onOpenChange, engine = nul
    *  (the reply box's folded pill, Focus.tsx). Read once, on mount. */
   openAtStart?: boolean;
 }) {
+  const readings=useContext(ModelUsageContext);
+  const reading=readings.find(r=>r.engine==='claude');
+  const [fresh,setFresh]=useState<Usage|null>(null);
+  const [checking,setChecking]=useState(false);
+  const [usageError,setUsageError]=useState('');
+  const current=fresh && (!reading || (fresh.profile===reading.profile && fresh.at>reading.at)) ? fresh : reading;
+  const usageRows=limitRows(current?.limits??[],Date.now());
+  const refreshUsage=async()=>{
+    if(checking)return;
+    setChecking(true);setUsageError('');
+    try{const result=await api.refreshUsage();if(result.ok&&result.reading)setFresh(result.reading);else setUsageError(result.error||'Usage unavailable');}
+    catch{setUsageError('Usage unavailable');}finally{setChecking(false);}
+  };
   const [open, setOpen] = useState(openAtStart);
   const {updates,start}=useAgentUpdates();
   const updateEngine=engine==='codex'?'codex':'claude';
@@ -77,7 +95,7 @@ export function ModelPicker({ value, onChange, title, onOpenChange, engine = nul
   const lit = effortShown(effort, efforts, defaultEffortFor(engine, value, { codexModels, codexDefault }));
 
   useEffect(() => { onOpenChange?.(open); }, [open]);
-  useKeepInWindow(wrap, open, [rows.length, efforts.length,showUpdate]);
+  useKeepInWindow(wrap, open, [rows.length, efforts.length,showUpdate,current,checking,usageError]);
 
   useEffect(() => {
     if (!open) return;
@@ -94,10 +112,17 @@ export function ModelPicker({ value, onChange, title, onOpenChange, engine = nul
   const pick = (id: string) => { onChange(id === fallback ? null : id); setOpen(false); };
 
   return (
-    <span className="compose-word-wrap" ref={wrap}>
+    <span className="compose-word-wrap" ref={wrap} onKeyDown={e=>{if(open&&e.key==='Escape'){e.preventDefault();e.stopPropagation();setOpen(false);}}}>
       {open && (
         <span className="prio-menu model-menu" role="listbox" aria-label="Model">
           {showUpdate&&<span className="model-update-row"><span>{updateEngine==='codex'?'Codex':'Claude Code'}</span><button type="button" title={`Update ${updateEngine==='codex'?'Codex':'Claude Code'} in the app terminal`} onClick={()=>{setOpen(false);start(updateEngine);}}>{update.state==='running'?'Updating…':'Update now'}</button></span>}
+          {updateEngine==='claude' && <span className="model-usage" role="group" aria-label="Claude usage">
+            <span className="model-update-row"><strong>Claude usage</strong><button type="button" disabled={checking} onClick={()=>void refreshUsage()}>{checking?'Checking…':'Refresh'}</button></span>
+            <small>{current?.limits.length ? `Account: ${current.profile||'default'} · Last reading ${new Date(current.at).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}` : 'Usage unknown. Refresh to check.'}</small>
+            {usageRows.map(r=><span className="model-usage-limit" key={r.key}><span>{r.name}: <strong>{r.used}% used{r.used>=100?' · Limit reached':''}</strong></span>{r.when&&<small>{r.when}</small>}</span>)}
+            <small>Shared limits apply to all models. Model-specific limits are shown only when reported. A reading does not confirm model access.</small>
+            {usageError&&<small role="status">{usageError}</small>}
+          </span>}
           {rows.map((m, i) => (
             <button
               key={m.id}

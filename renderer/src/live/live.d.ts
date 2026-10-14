@@ -1,0 +1,2 @@
+export type LiveControl = {isActive:()=>boolean;context:(result:unknown)=>void;destroy:()=>void};
+export function setupLive(options: {el:(tag:string,props?:Record<string,any>,...children:any[])=>HTMLElement;api:(path:string,data:{sdp:string})=>Promise<unknown>;execute:(action:any)=>Promise<unknown>;toast:(text:string)=>void;available:()=>boolean;recording:()=>boolean;mount:HTMLElement}):LiveControl;

@@ -1,3 +1,5 @@
+import { codexFolder } from './codex-folder.mjs';
+import { catalogDeadline, readComposerCatalog, composerReferences, readPageReferences, readBrowserTabs } from '../shared/composer-catalog.mjs';
 import { currentActivity } from './agent-activity.mjs';
 import { harnessFor, supportsHarnessOperation } from './harnesses.mjs';
 import { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/claude-stream.mjs';
@@ -333,6 +335,8 @@ export function storeGrantUnderAnyOfOurNames(args, storeServer = STORE_SERVER) {
 function engineOf(engine) {
   return isEngine(engine) ? engine : DEFAULT_ENGINE;
 }
+
+const BUSY_CODEX_THREAD = /codex app-server refused thread\/resume: thread \S+ already has an active writer/i;
 
 export class Supervisor {
   constructor(config, store, appDir, dataDir = appDir, userDir = dataDir) {
@@ -696,6 +700,19 @@ export class Supervisor {
    * the same file) buys one two-second try and no more: the stamp moves with
    * it, and the next lift needs the next write.
    */
+  _noticeLimitResets() {
+    let lifted = false;
+    for (const [key, trouble] of Object.entries(this._profileTrouble ?? {})) {
+      const until = this._profileCooldown?.[key] ?? 0;
+      if (trouble?.cause !== 'at-limit' || !until || until > Date.now()) continue;
+      this._clearProfileTrouble(key);
+      if (!key.startsWith('codex:')) this._spawnCooldownUntil = 0;
+      lifted = true;
+    }
+    if (lifted) this._saveState();
+    return lifted;
+  }
+
   _noticeSignIns() {
     let lifted = false;
     for (const [key, trouble] of Object.entries(this._profileTrouble ?? {})) {
@@ -850,6 +867,7 @@ export class Supervisor {
       // flight, which is never what "resume" meant.
       if (this.sessions.has(item.id)) { out.working += 1; continue; }
 
+      if (item.start === 'manual') { this.store.threadEdit(item.product, item.id, {start: 'now'}); item.start = 'now'; }
       if (item.status !== 'open') this.store.answerItem(item.product, item.id, { status: 'open' });
       const prefix = `${item.product}:${item.id}:`;
       for (const key of [...this._handledAnswers]) if (key.startsWith(prefix)) this._handledAnswers.delete(key);
@@ -1573,7 +1591,7 @@ export class Supervisor {
     try {
       this.store.recordSessionResult(item.product, item.id, {
         result: `This task did not start, because it could not be given a folder of its own to work in${why ? `: ${why}` : '.'}\n\nIt is not run in the checkout ${Name} itself is built from. Two agents in one folder cannot be told apart afterwards, so the change card for this task would show another task's edits as if they were this one's, and that is worse than waiting.\n\nThe usual causes are a full disk, a path the app cannot write to, a file named in .worktreeinclude that cannot be carried into a folder, and another copy of ${Name} over the same checkout standing in that folder already. Then reply here and it will try again.`,
-        status: 'open',
+        status: 'blocked',
       });
       // MARKED AS SAID ONLY ONCE IT HAS BEEN SAID. Marking first means a store
       // write that failed -- which is likeliest during exactly the disk trouble
@@ -1686,6 +1704,7 @@ export class Supervisor {
    * files exactly as the last session left them, uncommitted work included.
    */
   workFolderFor(item, product) {
+    if (product?.personal && !product.repoPath && item.labels?.includes('projectless')) return codexFolder(item.title || 'Chat', { at: item.createdAt, id: item.id });
     const base = this.productFolder(product);
     // A PROJECT WITH NO REPOSITORY NEVER PROMISED ISOLATION, and has run in the
     // product folder since before folders existed. That is the absence of a
@@ -1869,7 +1888,7 @@ export class Supervisor {
         if (!cwd) {
           // A null with no error behind it is the folder thread answering that
           // the repoPath is not a repository at all.
-          this._couldNotGetAFolder(entry.item, failed ?? Error('no folder could be made'));
+          this._couldNotGetAFolder(entry.item, failed ?? Error(`The project folder is not a Git repository: ${base}. Choose the folder containing the project's code.`));
           // THEIR WORDS ARE NOT DELIVERED BY A WORKER THAT NEVER STARTED. The
           // queue writes the delivery mark before the spawn and that mark is
           // persisted, so leaving it standing records the reply as handed over
@@ -2666,11 +2685,13 @@ export class Supervisor {
     // A plan without the model counts only when another login has it, which
     // is when `noteExitForBackoff` names the account (w-f1c00e679d).
     const planWithout = seen?.saidWhy === 'model-not-on-plan' && !!seen.account;
-    if (!seen?.saidTs || !(needsHerHands(seen.saidWhy) || seen.saidWhy === 'at-limit' || planWithout)) return false;
+    if (!seen?.saidTs || !(needsHerHands(seen.saidWhy) || seen.saidWhy === 'at-limit' || seen.saidWhy === 'interrupted' || planWithout)) return false;
     return (item.wrote?.result?.ts ?? 0) <= seen.saidTs;
   }
 
   restingUntil(item) {
+    const busyUntil = this._busyThreadUntil?.[`${item.product}:${item.id}`] ?? 0;
+    if (busyUntil > Date.now()) return busyUntil;
     const seen = this._fruitless[`${item.product}:${item.id}`];
     const runs = this._emptyRuns(item);
     if (!runs) return 0;
@@ -2812,6 +2833,7 @@ export class Supervisor {
   }
 
   sayTheRunDied(item, session) {
+    if (session.modelFallback || session.busyThread) return;
     try {
       // THE STDERR LINES, not simply the last thing in the tail. By the time
       // this runs the exit handler has already appended its own lines, so
@@ -3191,7 +3213,7 @@ export class Supervisor {
    *   on arrival: it never got as far as being a session, so what it proves is
    *   that the machine is broken, not that this row has nothing in it.
    */
-  noteFreshRun(item, { everRan = true, account = null } = {}) {
+  noteFreshRun(item, { everRan = true, account = null, interrupted = false } = {}) {
     const key = `${item.product}:${item.id}`;
     // Re-read: `item` is the snapshot taken at spawn, and the whole question is
     // what the session did to the row since.
@@ -3229,7 +3251,7 @@ export class Supervisor {
     // moment it is back (`restingUntil`), rather than fifteen minutes after
     // she has signed in again.
     if (account) runs = Math.min(runs, 1);
-    this._fruitless[key] = { runs, endedAt: Date.now(), founderAt, ...(account ? { account } : {}) };
+    this._fruitless[key] = { runs, endedAt: Date.now(), founderAt, ...(account ? { account } : {}), ...(interrupted ? { interrupted: true } : {}) };
     this._saveState();
     return 'rested';
   }
@@ -3653,6 +3675,9 @@ export class Supervisor {
     let forgot = false;
     const home = this.config.home || os.homedir();
     for (const [key, trouble] of Object.entries(this._profileTrouble ?? {})) {
+      if (key.startsWith('codex:') && trouble?.cause === 'unknown' && (BUSY_CODEX_THREAD.test(trouble.raw ?? '') || troubleCause(trouble.raw) === 'interrupted')) {
+        this._clearProfileTrouble(key); forgot = true; continue;
+      }
       if (trouble?.cause !== 'subscription-ended') continue;
       if (readPlan(key, { home }).ended) continue;
       this._clearProfileTrouble(key);
@@ -4351,12 +4376,55 @@ export class Supervisor {
     // its three tries. The error result names its cause whatever the length.
     const lastFailure = (session.tail ?? []).filter((l) => l && !l.startsWith('session exited') && !l.startsWith('fast exit')).slice(-1)[0];
     const refusedBy = session.resultIsError ? troubleCause(session.result) : null;
+    // Another writer owns this thread, not the entire subscription.
+    if (engine === 'codex' && BUSY_CODEX_THREAD.test(lastFailure ?? '')) {
+      session.busyThread = true; session.transportFault = true;
+      session.accountFault = { cause: 'interrupted', account: null };
+      this._busyThreadUntil ??= {};
+      this._busyThreadUntil[`${session.product}:${session.itemId}`] = Date.now() + 60_000;
+      return;
+    }
+    // A dropped connection is retried with the same conversation, not charged to the task.
+    const networkFault = session.transportFault || refusedBy === 'interrupted'
+      || (!quickButReal && troubleCause((session.tail ?? []).filter(l => l.startsWith('stderr: ')).join('\n').slice(-1000)) === 'interrupted');
+    if (networkFault) {
+      const account = this._accountKey(engine, session.profile);
+      // Preserve an existing login/policy block; reconnecting cannot repair it.
+      if (!needsHerHands(this._profileTrouble?.[account]?.cause)) {
+        this._noteProfileTrouble(account, 'connection lost');
+        this._profileStrikes ??= {};
+        const strikes = this._profileStrikes[account] = (this._profileStrikes[account] ?? 0) + 1;
+        this._profileCooldown ??= {};
+        this._profileCooldown[account] = Date.now() + Math.min(30_000 * strikes, 60_000);
+      }
+      session.accountFault = { cause: 'interrupted', account };
+      return;
+    }
     // THE LOGIN'S PLAN DOES NOT INCLUDE THE MODEL (w-f1c00e679d). Nothing is
     // wrong with the login, which still runs every other model, so it is not
     // struck, benched or filed as trouble. The model is struck off it instead,
     // and when another login has the model the death is the account's, not the
     // row's: the row wakes at once and the pick takes it there.
     const planRefused = refusedBy === 'model-not-on-plan' || troubleCause(lastFailure) === 'model-not-on-plan';
+    if (planRefused && engine === 'claude' && (session.resultIsError || String(lastFailure ?? '').startsWith('stderr:'))) {
+      const item = this.store.readItem?.(session.product, session.itemId);
+      // An old refusal must not overwrite a newer manual choice or reopen a finished task.
+      if (item && ['open', 'claimed'].includes(item.status) && item.engine === 'claude' && item.model === session.model) {
+        const sonnet = /^(?:sonnet|claude-sonnet(?:-|$))/.test(String(session.model ?? ''));
+        const next = !sonnet ? { engine: 'claude', model: 'sonnet' }
+          : this.config.codexBin && this._codexLoginWithModel('gpt-6.1-sol') ? { engine: 'codex', model: 'gpt-6.1-sol' } : null;
+        if (next) {
+          this.store.answerItem(item.product, item.id, next);
+          const notice = `Model fallback: ${session.model} is unavailable on this account. Continuing with ${next.engine === 'claude' ? 'Claude Code' : 'Codex'} ${next.model}, using this chat's existing context.`;
+          session.modelFallback = { ...next, notice };
+          session.accountFault = { cause: 'model-not-on-plan', account: this._accountKey(engine, session.profile) };
+          this.store.recordSessionResult(item.product, item.id, { result: notice, status: null });
+          onLine(notice);
+          this._saveState();
+        }
+      }
+      return;
+    }
     if (planRefused && engine === 'codex') {
       const account = this._accountKey(engine, session.profile);
       const said = `${session.result ?? ''}\n${lastFailure ?? ''}`;
@@ -4398,7 +4466,7 @@ export class Supervisor {
         this._profileCooldown[account] = resetAt + LIMIT_RESET_GRACE_MS;
       } else {
         this._strikeProfile(account, {
-          hard: needsHerHands(cause),
+          hard: needsHerHands(cause) || cause === 'at-limit',
           rest: cause === 'signed-out' ? SIGNED_OUT_REST_MS : undefined,
         });
       }
@@ -4964,7 +5032,7 @@ export class Supervisor {
     if (this.firstRunHolding()) return;
     // Has a login landed since an account was found signed out? Ahead of the
     // brake below, which would otherwise hold the fleet past the sign-in.
-    try { this._noticeSignIns(); } catch (e) { console.warn('zero: could not look for a sign-in:', e.message); }
+    try { this._noticeLimitResets(); this._noticeSignIns(); } catch (e) { console.warn('zero: could not look for a sign-in:', e.message); }
     try { this._forgetResetLimits(); } catch (e) { console.warn('zero: could not let a reset limit go:', e.message); }
     try { this._forgetRenewedSubscriptions(); } catch (e) { console.warn('zero: could not let a renewed subscription back in:', e.message); }
     // A COOLDOWN STOPS THE SPAWNING AND IT MUST NOT STOP THE TELLING. The brake
@@ -5545,8 +5613,9 @@ export class Supervisor {
     //
     //   `rowSessionFor` itself, which returns null unless the row, the product,
     //   the folder and the transcript on disk all still agree.
-    const rowChat = continuation && !resumeSessionId
-      && item.answer && item.answer !== '(withdrawn)'
+    const retryInterrupted = this._fruitless?.[`${item.product}:${item.id}`]?.interrupted === true;
+    const rowChat = !resumeSessionId
+      && (retryInterrupted || (continuation && item.answer && item.answer !== '(withdrawn)'))
       ? this.rowSessionFor(item, product)
       : null;
     // WHICH SESSION THIS IS, if it is not a new one. A worker resumes when the
@@ -5609,7 +5678,9 @@ export class Supervisor {
     // THE TWO KINDS OF RESUME SAY DIFFERENT THINGS, and handing a finished
     // session the interrupted wording would tell it to go looking for a step it
     // never left half-done. `replyBrief` is the one for a chat.
-    if (rowChat) prompt = this.replyBrief(item, { product });
+    if (rowChat) prompt = retryInterrupted && !continuation
+      ? this.resumeBrief(item, { continuation, product })
+      : this.replyBrief(item, { product });
     // A FORK IS NOT AN INTERRUPTED SESSION AND MUST NOT BE TOLD IT IS. It is
     // the old conversation under a new id, on a new row, and the one thing it
     // cannot work out for itself is that it has moved.
@@ -5817,7 +5888,31 @@ export class Supervisor {
        never noticed because it reads `item.answerMode` directly, a few hundred
        lines up.
      */
-    return { args, command: !!command, ...(review ? { reviewTarget: reviewTarget(review.args) } : {}), resumeProfile, prompt, system, resumeId, model, effort, product: product?.slug ?? null, answerMode: item?.answerMode ?? null, ...(pictures.length ? { pictures } : {}) };
+    return { args, recovery: !!resumeId && !forkFrom && (!rowChat || (retryInterrupted && !continuation)) && !shipFailure && !command, command: !!command, ...(review ? { reviewTarget: reviewTarget(review.args) } : {}), resumeProfile, prompt, system, resumeId, model, effort, product: product?.slug ?? null, answerMode: item?.answerMode ?? null, ...(pictures.length ? { pictures } : {}) };
+  }
+
+  async composerCatalog(product, id, engine = null) {
+    const item = id ? this.store.readItem(product, id) : null;
+    if (id ? !item || this._engineFor(item) !== 'codex' : engine !== 'codex') return [];
+    const entry = this._codexServer(this._codexHome());
+    await entry.handshake;
+    const cwd = this.productFolder(this.store.listProducts().find(p => p.slug === product)) ?? this.config.home ?? os.homedir();
+    const rows = await readComposerCatalog(entry.client, cwd);
+    const extras = await Promise.allSettled([
+      catalogDeadline((async () => {
+        const read = await entry.client.request('config/read', {});
+        return readBrowserTabs(read.config?.mcp_servers);
+      })()),
+      ...(this.config.codexPlugins === true ? [catalogDeadline((async () => {
+        if (!entry.catalogThread) entry.catalogThread = entry.client.request('config/read', {}).then(read =>
+          entry.client.startThread({ ...workerThreadParams({ cwd, plugins: true, mcpServers: mcpServerNames(read) }), ephemeral: true })
+        ).catch(error => { entry.catalogThread = null; throw error; });
+        const { threadId } = await entry.catalogThread;
+        return readPageReferences(entry.client, threadId);
+      })())] : []),
+    ]);
+    rows.push(...extras.flatMap(result => result.status === 'fulfilled' ? result.value : []));
+    return rows;
   }
 
   commandCatalog(product, id) {
@@ -6787,6 +6882,7 @@ export class Supervisor {
       cwd,
       model: word || null,
       instructions: plan?.system ?? null,
+      plugins: this.config.codexPlugins === true,
       mcpServers,
       storeServer,
       // WHAT SHE PICKED, AND IT IS ASKED FOR HERE FOR THE SAME REASON THE MODEL
@@ -6820,9 +6916,10 @@ export class Supervisor {
     const pictures = Array.isArray(plan?.pictures) ? plan.pictures : [];
     return {
       input: [
-        { type: 'text', text: plan?.prompt ?? '' },
+        ...(!plan?.recovery ? [{ type: 'text', text: plan?.prompt ?? '' }, ...composerReferences(plan?.prompt ?? '')] : []),
         ...pictures.map((abs) => ({ type: 'localImage', path: abs })),
       ],
+      ...(plan?.recovery ? { additionalContext: { agentbox_resume: { kind: 'application', value: plan.prompt } } } : {}),
       ...(effort ? { effort } : {}),
     };
   }
@@ -7074,7 +7171,7 @@ export class Supervisor {
       // and a reading belongs to the one that gave it.
       onNotification: (method, params) => this._codexUsage().saw(method, params, home),
     });
-    const handshake = client.initialize();
+    const handshake = client.initialize({ experimentalApi: true });
     // The rejection is kept for the workers that chain off it and ALSO swallowed
     // here, because a handshake nobody happens to await yet is still an
     // unhandled rejection, and an unhandled rejection takes the app down. This
@@ -7923,7 +8020,7 @@ export class Supervisor {
         // Claude Code announces itself with `session_id` on its first line of
         // output, so a session with neither died before the CLI was running.
         const everRan = session.sessionId != null || session.result != null;
-        const outcome = this.noteFreshRun(item, { everRan, account: session.accountFault?.account ?? null });
+        const outcome = this.noteFreshRun(item, { everRan, account: session.accountFault?.account ?? null, interrupted: session.accountFault?.cause === 'interrupted' });
         if (outcome === 'rested') {
           const until = this.restingUntil(item);
           if (until > Date.now()) onLine(`nothing moved on this row; resting ${Math.round((until - Date.now()) / 60_000)}m`);

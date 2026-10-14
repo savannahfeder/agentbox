@@ -358,10 +358,10 @@ describe('the new-task card, which is the one she came back about twice', () => 
   // a project is now the Mac's own folder window and draws nothing. What is
   // left to guard is that it does not come back as a surface with its own
   // look: no card in that component, and no skin rule naming its old class.
-  it('has no new-project card to keep on the same rule', () => {
+  it('keeps the quick project card on the compose surface', () => {
     const np = fs.readFileSync(path.join(root, 'renderer/src/components/NewProject.tsx'), 'utf8');
     expect(np, 'a card is back in NewProject; if it stays it belongs on .modal.compose')
-      .not.toMatch(/className="modal/);
+      .toContain('className="modal compose quick-project"');
     expect(
       skinRules.some((r) => r.sel.includes('np-card')),
       'np-card has a skin rule again, which is a ground of its own for a card that no longer exists',

@@ -357,9 +357,11 @@ describe('the concise answer, at the foot of the conversation', () => {
   it('is drawn in the block the pane already had', () => {
     const view = read('renderer/src/components/ItemThread.tsx');
     expect(view).toMatch(/built\.outcome|outcome\s*[,}]/);
-    expect(view).toContain('className="outcome"');
+    expect(view).toContain('threadTldr(events');
     expect(view).toContain('appendix-label');
-    expect(view).toContain('Latest checkpoint');
+    expect(view).toContain('TL;DR · aktueller Stand');
+    expect(view).toContain('Vollständige Antwort');
+    expect(view).toContain('Früheres Ergebnis');
     // Both the closed-row outcome and the in-flight label survive in the sheet.
     const css = read('renderer/src/styles.css');
     expect(css).toMatch(/^\.outcome \{/m);

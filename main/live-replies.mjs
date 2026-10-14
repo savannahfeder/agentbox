@@ -33,12 +33,13 @@ export function liveReplyBrief(answer) {
 }
 
 export function submitReply(supervisor, payload, commit) {
-  const { product, id, answer, status, permissionMode, now = false } = payload;
+  const { product, id, answer, status, permissionMode, engine, model, now = false } = payload;
   const key = JSON.stringify([product, id]);
   const sends = supervisor._replySends ??= new Map();
   const previous = sends.get(key) ?? Promise.resolve();
   const session = supervisor.sessions?.get(id);
-  const live = session?.product === product && typeof session.child?.steer === 'function'
+  const changedProvider = !!session && ((engine != null && engine !== session.engine) || (model !== undefined && model !== session.model));
+  const live = !changedProvider && session?.product === product && typeof session.child?.steer === 'function'
     && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)';
   // Observe rejections immediately, including when an earlier reply is still
   // waiting. The ordered commit below rethrows them to their own caller.
@@ -84,6 +85,9 @@ export function submitReply(supervisor, payload, commit) {
         supervisor.redeliverAnswer(item, item.answer);
         if (!session.stoppedByUs) supervisor.deliverMidflightReply({ ...item, answer: null, wrote: {} }, null);
       }
+    }
+    if (!steered && item && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)') {
+      supervisor.runNow?.(product, id);
     }
     return item;
   });

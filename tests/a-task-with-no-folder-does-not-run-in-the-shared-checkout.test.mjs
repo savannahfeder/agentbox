@@ -197,7 +197,7 @@ describe('a row whose folder failed on the folder thread', () => {
     expect(redelivered).toEqual([{ id: 'w-async-nofolder', answer: 'carry on' }]);
     // And the row stays open, saying what happened, in words about a folder.
     const told = said.find((s) => s.id === 'w-async-nofolder');
-    expect(told.status).toBe('open');
+    expect(told.status).toBe('blocked');
     expect(told.result).toMatch(/folder/i);
   });
 

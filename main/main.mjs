@@ -696,6 +696,7 @@ async function createWindow() {
   let pushUpdate = () => {};
   const updater = app.isPackaged ? createUpdater({
     app,
+    repository: config.updateRepository,
     place: createPlace({ app }),
     onChanged: () => pushUpdate(),
   }) : createSourceUpdater({
@@ -991,6 +992,11 @@ async function createWindow() {
   // works as before. Every webview this window attaches gets it, the junk
   // browser included, which is what "never" asks for.
   window.webContents.on('will-attach-webview', (_e, webPreferences) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+    webPreferences.webSecurity = true;
     webPreferences.autoplayPolicy = 'document-user-activation-required';
   });
 

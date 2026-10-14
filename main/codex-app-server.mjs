@@ -744,7 +744,7 @@ export function createCodexAppServer({
      * can never overtake the response, and it is never sent at all if the
      * server refused the handshake.
      */
-    initialize: () => send('initialize', { clientInfo }, () => notify('initialized')),
+    initialize: (capabilities = null) => send('initialize', { clientInfo, ...(capabilities ? { capabilities } : {}) }, () => notify('initialized')),
 
     /**
      * Start a thread and watch it from the instant the server names it.

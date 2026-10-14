@@ -303,4 +303,14 @@ describe('the store, end to end', () => {
     // A reader that throws costs nothing.
     expect(scanCodex({ store: s, readThreads: () => { throw new Error('no codex'); } })).toEqual({ refreshed: 0, retold: 0, threads: 0 });
   });
+  it('never overwrites a conversation continued inside Agentbox with its original import', async () => {
+    const { s, slug, zero } = await store();
+    const t = thread('t1', zero);
+    const { ids } = s.importCodexThreads(slug, [t], { now: NOW });
+    s.answerItem(slug, ids[0], { answer: 'Check the mobile login next.', status: 'open' });
+    s.modules.workItemsDisk.updateWorkItem(s.productDir(slug), ids[0], { result: 'Mobile login verified.' }, { source: 'agent', now: NOW + 2000 });
+    expect(s.refreshCodexMirrors([t], { now: NOW + 3000 })).toBe(0);
+    expect(s.readItem(slug, ids[0]).result).toBe('Mobile login verified.');
+  });
+
 });

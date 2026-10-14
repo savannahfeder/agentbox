@@ -348,7 +348,7 @@ describe('the wiring the card needs is really there', () => {
     expect(card).toContain('api.importThreads({ product: slug, threads: load.ids })');
     expect(api).toContain("zero.agentThreads()");
     expect(api).toContain("zero.importThreads(p)");
-    expect(preload).toContain("ipcRenderer.invoke('zero:agent-threads')");
+    expect(preload).toContain("ipcRenderer.invoke('zero:agent-threads', p)");
     expect(preload).toContain("ipcRenderer.invoke('zero:import-threads'");
     expect(ipc).toContain("ipcMain.handle('zero:agent-threads'");
     expect(ipc).toContain("ipcMain.handle('zero:import-threads'");

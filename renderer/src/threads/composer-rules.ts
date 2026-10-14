@@ -214,7 +214,7 @@ export function threadMessage(text: string, attachments: ReadonlyArray<{ name: s
 // `team` is read loosely on purpose: main writes `direct` on a Direct project's
 // team record (main/team/projects.mjs), and the renderer's Product type has not
 // grown the field yet, so the rule asks for it rather than assuming it.
-interface ProjectLike { slug: string; practice?: boolean; team?: object | null }
+interface ProjectLike { slug: string; personal?: boolean; practice?: boolean; team?: object | null }
 const isDirect = (p: ProjectLike) => (p.team as { direct?: unknown } | null | undefined)?.direct === true;
 
 /**
@@ -236,6 +236,7 @@ export function startingProject<T extends ProjectLike>(
   { defaultProduct, remembered }: { defaultProduct?: string | null; remembered?: string | null },
 ): T | null {
   return offered.find((p) => p.slug === defaultProduct)
+    ?? offered.find((p) => p.personal)
     ?? offered.find((p) => p.slug === remembered)
     ?? offered.find((p) => !p.practice)
     ?? offered[0]

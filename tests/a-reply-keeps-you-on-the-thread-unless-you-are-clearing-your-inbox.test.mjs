@@ -45,7 +45,7 @@ describe('after a reply', () => {
 
 describe('App.tsx asks it', () => {
   it('for a typed reply', () => {
-    expect(app).toMatch(/const stay = staysOnTheTask\(item, text, engine\) \|\| talking \|\| !movesOn\(item\);/);
+    expect(app).toMatch(/const stay = staysOnTheTask\(item, text, engine\) \|\| talking \|\| !!pick \|\| !movesOn\(item\);/);
   });
   it('for a picked option', () => {
     expect(app).toMatch(/`Option \$\{option\.n\} → \$\{item\.productName\}`, undefined, !movesOn\(item\),/);

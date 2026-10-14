@@ -48,7 +48,7 @@ function git(cwd, args, { maxBuffer = 64 * 1024 * 1024 } = {}) {
   return execFileSync('git', ['--no-pager', '-c', 'diff.mnemonicPrefix=false', ...args], {
     cwd,
     encoding: 'utf8',
-    maxBuffer,
+    maxBuffer, timeout: 2_000, killSignal: 'SIGKILL',
     stdio: ['ignore', 'pipe', 'ignore'],
   });
 }

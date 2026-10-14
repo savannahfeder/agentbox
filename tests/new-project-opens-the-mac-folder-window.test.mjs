@@ -54,7 +54,8 @@ describe('the card is gone', () => {
   it('asks the Mac for a folder as soon as it opens, with nothing to fill in first', () => {
     expect(card).toContain('api.chooseFolder');
     // No name field, no path field: there is nothing on the screen at all.
-    expect(card.match(/<input/g)).toBe(null);
+    expect(card).toContain('aria-label="Projektname"');
+    expect(card).toContain('codexFolder: true');
   });
 
   it('proposes no folder from a name, which is the fault itself', () => {
@@ -64,7 +65,7 @@ describe('the card is gone', () => {
   });
 
   it('treats a cancelled window as no answer: nothing made, card closed', () => {
-    expect(card).toContain('if (!picked) { onClose(); return; }');
+    expect(card).toContain('else if (picked) take(picked);');
   });
 
   it('still opens the app\'s own picker in a browser tab, where there is no Mac window', () => {

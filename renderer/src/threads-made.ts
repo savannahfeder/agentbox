@@ -28,7 +28,7 @@ export const stateWord = (state: ThreadStateWord | null | undefined): string => 
  * Worked out once for the whole list, off the same rule the Approve button
  * reads, so the row and the button inside it cannot disagree.
  */
-export function waitingCounts<T extends Pick<WorkItem, 'id' | 'product' | 'status' | 'kind' | 'labels' | 'answer'> & { parent?: string; start?: 'later' | 'now' }>(
+export function waitingCounts<T extends Pick<WorkItem, 'id' | 'product' | 'status' | 'kind' | 'labels' | 'answer'> & { parent?: string; start?: 'later' | 'manual' | 'now' }>(
   items: readonly T[],
   stateOf: (item: T) => ThreadStateWord | null,
 ): Map<string, number> {
@@ -83,7 +83,7 @@ export const toApproveWords = (n: number | undefined): string => (n ? `${n} task
  * in Needs you is not waiting on a press, whatever its fields say yet.
  */
 export function approvableFiled(
-  i: Pick<WorkItem, 'status' | 'kind' | 'labels' | 'answer'> & { start?: 'later' | 'now' },
+  i: Pick<WorkItem, 'status' | 'kind' | 'labels' | 'answer'> & { start?: 'later' | 'manual' | 'now' },
   state: ThreadStateWord | null,
 ): boolean {
   // WAITING OR LATER, since w-9cf2b43110's second half: a proposal is no

@@ -88,9 +88,7 @@ describe('a browser tab, pointed at a local agentbox', () => {
     // the one only a desktop can answer. Counted off the map rather than typed,
     // because a number typed here is edited to pass rather than read.
     const { REQUEST_CHANNELS, PUSH_CHANNELS, DESKTOP_ONLY } = await import('../shared/bridge-map.mjs');
-    const expected = Object.keys(REQUEST_CHANNELS).length
-      + Object.keys(PUSH_CHANNELS).length
-      + DESKTOP_ONLY.length;
+    const expected = new Set([...Object.keys(REQUEST_CHANNELS), ...Object.keys(PUSH_CHANNELS), ...DESKTOP_ONLY]).size;
     expect(Object.keys(bridge).length).toBe(expected);
     expect(typeof bridge.snapshot).toBe('function');
     expect(typeof bridge.onChanged).toBe('function');

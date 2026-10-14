@@ -70,3 +70,11 @@ export function nextAfterAdvance<T extends { id: string }>(rows: T[], pending: A
   const item = remaining[index];
   return item ? { item, index } : null;
 }
+
+/** Move on immediately while the submitted dictation is still transcribing. */
+export function nextAfterDictation<T extends {id:string;product:string;start?:string}>(rows:T[],current:{id:string;product:string}):T|null {
+  const waiting=rows.filter(i=>i.start!=='manual');
+  const at=waiting.findIndex(i=>i.id===current.id&&i.product===current.product);
+  const remaining=waiting.filter(i=>i.id!==current.id||i.product!==current.product);
+  return remaining[Math.min(Math.max(0,at),remaining.length-1)]??null;
+}

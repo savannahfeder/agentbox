@@ -685,6 +685,6 @@ describe('the wiring from the reply box is present in the source', () => {
     expect(ipc).toMatch(/zero:answer'[^)]*permissionMode/s);
     // `inReplyTo` rides beside it since threads (w-920461cbe6): a reply in a
     // thread is still this one call, naming the message it answers.
-    expect(ipc).toContain('store.answerItem(product, id, { answer, status, priority, permissionMode, model, effort, inReplyTo: thread })');
+    expect(ipc).toContain('store.answerItem(product, id, { answer, status, priority, permissionMode, model, effort, engine, inReplyTo: thread })');
   });
 });

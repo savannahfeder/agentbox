@@ -206,7 +206,7 @@ describe('the sign-in check tells the app what it found', () => {
 /* ======================= the Codex desktop app ========================= */
 
 describe('the Codex finder', () => {
-  it('looks inside the Codex desktop app, after ChatGPT', () => {
+  it('looks inside the Codex desktop app before ChatGPT', () => {
     const paths = appCopyPaths('/Users/stranger');
     expect(paths).toContain('/Applications/Codex.app/Contents/Resources/codex');
     expect(paths).toContain('/Users/stranger/Applications/Codex.app/Contents/Resources/codex');

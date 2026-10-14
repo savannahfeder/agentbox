@@ -1,3 +1,7 @@
+import {ModelUsageContext} from './components/Model';
+import {DictationStatus} from './components/Dictation';
+import {DesktopLive} from './components/DesktopLive';
+import {desktopLiveActions,desktopLiveView,desktopLiveRows} from '../../shared/desktop-live-actions.mjs';
 import { previewFocus } from './preview-focus';
 import { usePhoneBack, onPhone } from './phone-screen';
 import { holdsReplies, writeHeldWhenHidden } from './phone-holds';
@@ -20,10 +24,10 @@ import { readySkin, swapLook } from './look-switch';
 import type { AnswerMode, Approval, PermissionMode, Product, RepeatRule, RepeatShape, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import { api } from './api';
 import { setClaudeModels } from './models';
-import { advanceAfter, advanceLandsHere, replyMovesOn, nextAfterAdvance, type Advance } from './advance';
+import { advanceAfter, nextAfterDictation, advanceLandsHere, replyMovesOn, nextAfterAdvance, type Advance } from './advance';
 import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
-import { isTroubleRow, troubleRow } from './trouble-row';
+import { isTroubleRow } from './trouble-row';
 import { importAnswer, isImportRow, isNotImportedRow, justImported, type ImportChoice } from './import-row';
 import { Focus } from './components/Focus';
 import { TicketItems } from './components/TicketReference';
@@ -323,15 +327,7 @@ export default function App() {
   if (!hints.current) hints.current = hintScheduler(setShownHint);
   useEffect(() => { hints.current?.point(pointedHint); }, [pointedHint]);
   useEffect(() => () => hints.current?.stop(), []);
-  // THE SWITCH OVER ALL OF IT. Off means the row keeps
-  // saying its product and its time under the pointer, the tabs say nothing,
-  // and the two corner buttons stop printing their key in the Mac's label.
-  //
-  // It takes the pointer-follows-the-keys half with it, and that is the point
-  // rather than a side effect: the keys reach the pointed row BECAUSE the row
-  // under the pointer is drawing a promise about them. With nothing drawn there
-  // is no promise, so the keyboard's own row is the honest target again, which
-  // is what the app did before this. `hoveredId` is simply never set.
+  // Cosmetic hints can be hidden; the row preview still names the keyboard target.
   const [keyHints, setKeyHints] = useState(() => localStorage.getItem(HINTS_KEY) !== '0');
   const setHints = useCallback((v: boolean) => {
     setKeyHints(v);
@@ -350,6 +346,7 @@ export default function App() {
   // that made them. A failed live reply reads it to decide whether she is
   // still on that conversation or has gone somewhere else.
   const focusedNow = useRef<WorkItem | null>(null);
+  const liveState = useRef<{current: WorkItem | null; rows: WorkItem[]}>({current:null,rows:[]});
   focusedNow.current = focused;
   // THE ROW SHE IS WATCHING A COMMAND ANSWER ON. Set when she sends one of
   // Claude Code's eight from an open task, cleared when she leaves it. It is
@@ -518,6 +515,7 @@ export default function App() {
   // the same reason `newProject` has one: ⌘K closes the modal stack on its
   // way out, and this card is opened FROM ⌘K.
   const [importAgents, setImportAgents] = useState(false);
+  const [importChatsOnly,setImportChatsOnly]=useState(false);
   // The project just made, handed to the composer so the task she was in the
   // middle of writing is now addressed to it.
   const [pickProject, setPickProject] = useState<string | null>(null);
@@ -1742,12 +1740,8 @@ export default function App() {
   // the moment the first of them got stuck, so a new failure gives it a new
   // one and the row comes back; closing it and having it reappear on the next
   // tick would be the app arguing with her.
-  const troubleItem = useMemo(() => {
-    const t = snap?.supervisor.spawnTrouble;
-    if (!t) return null;
-    if (troubleClosed === t.since) return null;
-    return troubleRow(t, items);
-  }, [snap?.supervisor.spawnTrouble, items, troubleClosed]);
+  // Global trouble belongs in diagnostics, not among the user's chats.
+  const troubleItem = useMemo<WorkItem | null>(() => null, []);
 
   // A NEWER AGENTBOX IS NOT A ROW. It was one until 2026-10-01; it is a card in
   // the sidebar now (components/SidebarUpdate.tsx, w-7a39dace23).
@@ -3411,7 +3405,7 @@ export default function App() {
     item: WorkItem,
     run: () => Promise<void>,
     toast: string,
-    restore?: () => Restored,
+    restore?: (failed?:boolean) => Restored,
     // ONE SEND DOES NOT LEAVE THE TASK, and it is the only one: a command she
     // sent to watch the answer come back (./stay-with-a-command). The pane
     // stays open on the row, so there is nothing to advance to and nothing to
@@ -3432,13 +3426,14 @@ export default function App() {
     // What the thread says if a Z inside the grace window takes this back,
     // when nothing has reached the ledger to say it (./undo-marks).
     undid?: UndidSpec[],
+    background=false,
     // How long it is held. A reply from a phone is not (./phone-holds); its
     // Undo then takes back the written reply, which its own undo entry does.
     holdMs: number = UNDO_GRACE_MS,
   ) => {
     await flushPending(); // a new action commits the previous one immediately
-    if (!stay) leaveResolved(item);
-    setModal(null);
+    if (!stay && !background) leaveResolved(item);
+    if (!background) setModal(null);
     setPendingId(item.id); // out of the inbox NOW; the write can wait, the signal cannot
     // "PRESS Z", NOT A BARE LETTER. The toast used to read "Closed: Added the
     // sign-in route. Tests g · Z to undo": the title had been cut mid-word at
@@ -3450,20 +3445,23 @@ export default function App() {
     // A pick she is still looking at needs no way in: `stay` means the pane
     // never left the row.
     showToast(`${toast} · press Z to undo`, stay ? undefined : goes);
-    if (holdMs <= 0) {
-      await run();
-      await refresh();
-      setPendingId((p) => (p === item.id ? null : p));
-      return;
-    }
+    const guardedRun = async () => {
+      try { await run(); }
+      catch (error) {
+        const back = restore?.(true);
+        if (!background && back && 'item' in back) { setFocused(back.item); setModal('reply'); }
+        else if (!background && back && 'compose' in back) setModal('compose');
+        showToast(`Could not save: ${(error as Error).message}.${back ? " Your draft has been restored." : ""}`, background ? goes : undefined);
+      } finally { setPendingId((p) => (p === item.id ? null : p)); }
+      try { await refresh(); } catch { showToast('Saved, but the view could not refresh. Please reload.'); }
+    };
+    if (holdMs <= 0) { await guardedRun(); return; }
     const timer = setTimeout(async () => {
       if (pendingRef.current?.timer !== timer) return;
       pendingRef.current = null;
-      await run();
-      await refresh();
-      setPendingId((p) => (p === item.id ? null : p));
+      await guardedRun();
     }, UNDO_GRACE_MS);
-    pendingRef.current = { item, timer, run, restore, undid };
+    pendingRef.current = { item, timer, run: guardedRun, restore, undid };
   }, [flushPending, leaveResolved, refresh, showToast]);
 
   // It closes the ROW and touches nothing else — no message, no signal, and the
@@ -3658,7 +3656,7 @@ export default function App() {
   // lives in `leaveResolved` above and still covers every way a row leaves her
   // inbox.
 
-  const answerWith = useCallback(async (item: WorkItem, text: string, priority?: number, sent?: SentDraft, mode?: AnswerMode | null, engine?: string | null, pick?: { model: string | null; effort: string | null }) => {
+  const answerWith = useCallback(async (item: WorkItem, text: string, priority?: number, sent?: SentDraft, mode?: AnswerMode | null, engine?: string | null, pick?: { model: string | null; effort: string | null; engine?: string | null; background?: boolean }) => {
     // AN AGENT ROW IS NOT WORK OF HERS TO CLOSE, DEFER OR RESTART. It stands
     // for a session running outside Agentbox; the only two things that mean
     // anything to it are a reply and being taken to its window.
@@ -3692,7 +3690,7 @@ export default function App() {
     const putBack = (error: unknown) => {
       restoreFailedDraft(item, sent?.words ?? text, sent?.attachments ?? []);
       const here = focusedNow.current?.id === item.id && focusedNow.current?.product === item.product;
-      if (here) {
+      if (here && !pick?.background) {
         setModal('reply');
         showToast((error as Error)?.message || 'Could not send. Your message is back in the reply box.');
       } else {
@@ -3732,8 +3730,7 @@ export default function App() {
     // true and stops saying it the moment it stops being true.
     const isRunning = snap?.supervisor.running.some((run) => run.itemId === item.id && run.product === item.product);
     if (isRunning) {
-      setFollowing({ product: item.product, id: item.id });
-      setModal(null);
+      if (!pick?.background) {setFollowing({ product: item.product, id: item.id });setModal(null);}
       // ON THE SCREEN BEFORE ANYTHING IS ASKED OF ANYBODY. The moment she
       // presses send, her message is the last thing in the conversation, where
       // she is already looking, and it says in its own head that the agent has
@@ -3796,7 +3793,7 @@ export default function App() {
           // mid-flight; the pick lands on the row and the next run reads it.
           // The drawer says "Which model this conversation runs on" rather than
           // anything about this message, for exactly this case.
-          ...(pick ? { model: pick.model, effort: pick.effort } : {}),
+          ...(pick ? { model: pick.model, effort: pick.effort, ...(pick.engine ? {engine: pick.engine} : {}) } : {}),
         }),
         // NOTHING IS TAKEN OFF THE SCREEN HERE. The row is re-read, the
         // committed copy of this message arrives with it, and `itemThread`
@@ -3893,7 +3890,7 @@ export default function App() {
     // up.
     // A REPLY IN A CONVERSATION STAYS IN THE CONVERSATION (2026-10-01):
     // sending a message to a person must not jump to another page.
-    const stay = staysOnTheTask(item, text, engine) || talking || !movesOn(item);
+    const stay = staysOnTheTask(item, text, engine) || talking || !!pick || !movesOn(item);
     // Held, and so saying "press Z to undo", only where it really is held: a
     // phone writes it at once and has no Z (./phone-holds).
     const mine = { product: item.product, id: item.id, at: Date.now(), text, held: holdsReplies(onPhone()) };
@@ -3904,8 +3901,9 @@ export default function App() {
     // thinking does it actually show my message." A reply that moves her on
     // leaves no thread on the screen to draw it in.
     if (stay) setSending((q) => [...q, mine]);
-    const restore = (): Restored => {
+    const restore = (failed=false): Restored => {
       setSending((q) => q.filter((s) => s !== mine));
+      if(failed){restoreFailedDraft(item,sent?.words ?? text,sent?.attachments ?? []);return {item};}
       return restoreDraft(item, sent?.words ?? text, sent?.attachments ?? []) ? { item } : null;
     };
     // A REPLY IS A CLAIM ON NOW, so it cancels a schedule rather than queueing
@@ -3915,7 +3913,7 @@ export default function App() {
     const wasScheduled = replyClearsSchedule(item, Date.now());
     const priorRunAt = item.runAt ?? 0;
     const priorSnooze = item.snoozedUntil ?? 0;
-    if (stay) setFollowing({ product: item.product, id: item.id });
+    if (stay && !pick?.background) setFollowing({ product: item.product, id: item.id });
     const undid = [{ product: item.product, id: item.id, words: 'Undid your reply' }];
     await deferCommit(item, async () => {
       // In a conversation, any agent it mentions starts now and the message is
@@ -3943,7 +3941,7 @@ export default function App() {
           // drawer; the store writes it onto the item BEFORE the answer, so the
           // run this reply starts reads the model she just chose rather than the
           // one it was on (main/store.mjs, answerItem).
-          ...(pick ? { model: pick.model, effort: pick.effort } : {}),
+          ...(pick ? { model: pick.model, effort: pick.effort, ...(pick.engine ? {engine: pick.engine} : {}) } : {}),
         });
       } catch (error) {
         setSending((q) => q.filter((s) => s !== mine));
@@ -3972,7 +3970,7 @@ export default function App() {
         // means what it always meant.
         setFollowing(null);
       } });
-    }, talking ? 'Sent' : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id }, undid, holdsReplies(onPhone()) ? UNDO_GRACE_MS : 0);
+    }, talking ? 'Sent' : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id }, undid, !!pick?.background, holdsReplies(onPhone()) ? UNDO_GRACE_MS : 0);
   }, [deferCommit, snap?.supervisor.running, snap?.products, showToast, refresh, markSeen, pushUndo, startChatAgents, fire, movesOn]);
 
   /* ------------------------ answering one of her agents -------------------- */
@@ -3983,7 +3981,7 @@ export default function App() {
   // a message that went nowhere is the exact failure this app cares about most:
   // when the system swallows something the user wrote, they cannot tell it
   // from the work not happening.
-  const replyToAgent = useCallback(async (item: WorkItem, text: string) => {
+  const replyToAgent = useCallback(async (item: WorkItem, text: string, reportFailure = false) => {
     const agent = item.agent;
     if (!agent) return;
     setModal(null);
@@ -3993,6 +3991,7 @@ export default function App() {
     // list instead.
     leaveResolved(item);
     const out = await api.agentReply({ pid: agent.pid, text });
+    if(reportFailure && !out?.ok)throw Error(out?.reason ?? 'The message could not be handed over.');
     // Two true sentences, never one hopeful one. A failed hand-over says so; a
     // send says Sent, which is what it says everywhere else in this app; and a
     // session seen going back to work says the better thing.
@@ -4162,7 +4161,7 @@ export default function App() {
   }, []);
 
   // The reminder survives restarts without stopping or restarting an agent.
-  const snoozeUntil = useCallback(async (target: WorkItem | WorkItem[], ts: number, label: string) => {
+  const snoozeUntil = useCallback(async (target: WorkItem | WorkItem[], ts: number, label: string, reportFailure = false) => {
     const picked = Array.isArray(target) ? target : [target];
     const list = picked;
     setModal(null);
@@ -4176,6 +4175,7 @@ export default function App() {
     } catch (err) {
       showToast(`Could not move it to Later: ${(err as Error)?.message ?? 'the store refused the write'}`);
       refresh();
+      if(reportFailure)throw err;
       return;
     }
     // THE MOMENT IS KEPT, SO THE ROW IS GONE AND THE NEXT TASK IS HERS. The
@@ -4851,12 +4851,15 @@ export default function App() {
           else if (pointed && view === 'inbox') markDone(pointed);
           break;
         case 'r': case 'R': if (!multiSel.size && pointed && view === 'inbox') { e.preventDefault(); setFocused(pointed); markSeen(pointed); setModal('reply'); } break;
-        // 1 AND 2 ANSWER A CODEX CONVERSATION'S ROW WITHOUT OPENING IT, and I
-        // brings a declined one back from Closed. Only on those rows: on every
-        // other row they stay dead, as they were. They were Y and N until
-        // w-fb9051e597, which freed N for a new task.
-        case '1': if (!multiSel.size && pointed && isImportRow(pointed)) { e.preventDefault(); void answerImport(pointed, 'yes'); } break;
-        case '2': if (!multiSel.size && pointed && isImportRow(pointed)) { e.preventDefault(); void answerImport(pointed, 'no'); } break;
+        case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
+          if (!multiSel.size && pointed) {
+            if (isImportRow(pointed) && (e.key === '1' || e.key === '2')) {
+              e.preventDefault(); void answerImport(pointed, e.key === '1' ? 'yes' : 'no');
+            } else if (hoveredId === pointed.id && offerIsLive(pointed) && itemOptions(pointed).some((o) => o.n === Number(e.key))) {
+              e.preventDefault(); void pickOption(pointed, Number(e.key));
+            }
+          }
+          break;
         case 'i': case 'I': if (!multiSel.size && pointed && view === 'done' && isNotImportedRow(pointed)) { e.preventDefault(); void answerImport(pointed, 'yes'); } break;
         // L swallows its own keystroke up at the guard, not here: this branch
         // and the focus-mode one both open the picker (renderer/src/keys.ts).
@@ -4887,7 +4890,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, boardCols, stops, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow]);
+  }, [modal, newProject, hoveredId, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, boardCols, stops, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
@@ -5086,6 +5089,16 @@ export default function App() {
       showToast(`Not set: ${(err as Error).message}`);
     }
   };
+
+  liveState.current = {current: focused ? items.find(i => i.id === focused.id && i.product === focused.product) ?? focused : null, rows: desktopLiveRows(inbox,progress)};
+  const liveExecute = desktopLiveActions({
+    state: () => liveState.current,
+    open: (item: WorkItem | null) => { liveState.current.current = item; setFocused(item); if(item)markSeen(item); },
+    details: async (item: WorkItem) => ({result: item.result, history: await api.itemHistory({product:item.product,id:item.id})}),
+    done: async (item: WorkItem) => {await markDone(item, {stay:true});await flushPending();if(!item.agent){const snapshot=await api.snapshot();if(snapshot.items.find(i=>i.id===item.id&&i.product===item.product)?.status!=='done')throw Error('Die Aufgabe wurde nicht als erledigt gespeichert.');}},
+    reply: async (item: WorkItem, text: string) => {if(item.agent)await replyToAgent(item,text,true);else await answerWith(item,text);await flushPending();},
+    later: (item: WorkItem, minutes: number) => snoozeUntil(item, Date.now()+minutes*60000, `in ${minutes} minutes`, true),
+  });
 
   const clearedToday = useMemo(() => {
     const start = new Date(); start.setHours(0, 0, 0, 0);
@@ -5319,6 +5332,7 @@ export default function App() {
   // `.toast` in the stylesheet and says why it moves to the top rather than
   // merely further up.
   return (
+    <ModelUsageContext.Provider value={snap.usageByEngine ?? (snap.usage ? [snap.usage] : [])}>
     <TeamContext.Provider value={team}>
     <ChatAgentsContext.Provider value={chatAgents}>
     <LiveContext.Provider value={liveIds}>
@@ -5346,6 +5360,7 @@ export default function App() {
           the sidebar for the single-player launch (w-1b574413db, 2026-10-04).
           `onInvite` is still handed in, for the account menu. */}
       {workspaceNavigation && <WorkspaceNavigation
+        live={<DesktopLive execute={liveExecute} context={desktopLiveView(liveState.current.current,liveState.current.rows)} onNotice={showToast}/>}
         update={announcesUpdate(snap?.update, { walking, closed: '' }) ? { installing: !!snap?.update?.installing, version: snap?.update?.newVersion, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
         onUpdate={() => { void api.updateInstall(); }}
         /* AND THE COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS
@@ -5609,6 +5624,7 @@ export default function App() {
               items={items}
               onSearch={openSearch}
               onCompose={() => setModal('compose')}
+              onImport={() => {setImportChatsOnly(true);setImportAgents(true)}}
               shown={displayedBox.length + theirRows.length}
               total={(mineShown ? shownBox.length : 0) + theirRows.length}
               tab={view}
@@ -5920,6 +5936,7 @@ export default function App() {
                      byte-identical to today's. */
                   engineChoice={(snap.engines?.choices?.length ?? 1) > 1}
                   runningEngine={runningEngine}
+                  engineChoices={snap.engines?.choices}
                   productDir={snap.products.find((p) => p.slug === focused.product)?.dir ?? null}
                   repoDir={snap.products.find((p) => p.slug === focused.product)?.repoPath ?? null}
                   selectedOption={optionSel}
@@ -5960,6 +5977,11 @@ export default function App() {
                     answerWith(focused, text, priority, sent, mode, runningEngine, pick);
                   }}
                   onReplyClose={() => setModal(null)}
+                  onDictationQueued={() => {
+                    const next = nextAfterDictation(shownInbox, focused);
+                    setModal(null); setFocused(next);
+                    if (next) markSeen(next);
+                  }}
                   onStop={() => stopAgent(focused)}
                   onRunNow={() => runNow(focused)}
                   onPin={focused.agent ? undefined : (pin) => pinThread(focused.id, pin, true)}
@@ -6037,7 +6059,7 @@ export default function App() {
                   // her own filter, over a tab that still read 13.
                   hiddenNow > 0
                     ? <FilteredEmpty view={view} hidden={hiddenNow}
-                        onClear={() => setInboxDisplay({ ...inboxDisplay, priorities: [], projects: [], updated: 'any', privacy: 'any' })} />
+                        onClear={() => setInboxDisplay({ ...inboxDisplay, priorities: [], projects: [], excludedProjects: [], projectMode: 'all', updated: 'any', privacy: 'any' })} />
                     // "Nothing needs you" is about you alone; with a teammate
                     // on the page the quiet line says it instead.
                     : view === 'inbox' && !withOthers
@@ -6102,7 +6124,12 @@ export default function App() {
                   emptyText={olderMore !== false && search !== null ? 'Searching older threads…' : search ? `Nothing matches “${search}”.` : undefined}
                   keyView={view}
                   hoveredId={hoveredId}
-                  onHover={keyHints ? setHoveredId : undefined}
+                  onHover={setHoveredId}
+                  onDone={markDone}
+                  onLater={openSnooze}
+                  onProjectChange={async(item,project)=>{const result=await api.threadEdit(item.product,item.id,{displayProject:project});if(!result.ok){showToast(result.error||'Project assignment failed.');return false;}await refresh();return true;}}
+                  onReply={(item) => { setFocused(item); markSeen(item); setModal('reply'); }}
+                  onPick={pickOption}
                   onSelect={(i) => { setCardSel(null); setSelected(i); }}
                   onOpenRepeat={openRepeat}
                   onOpen={(item) => { setCardSel(null); setFocused(item); markSeen(item); }}
@@ -6205,7 +6232,7 @@ export default function App() {
             // On the Inbox the tab moves to where it did land, Running or
             // Scheduled, so she sees the row arrive instead of an unchanged page.
             if (how.kind === 'task' && workspaceNavigation && !teamOpen && !focused && (['inbox', 'progress', 'snoozed'] as View[]).includes(view)) {
-              setView(later ? 'snoozed' : 'progress');
+              setView(how.start === 'manual' ? 'inbox' : later ? 'snoozed' : 'progress');
               setSelected(0);
               setMultiSel(new Set());
             }
@@ -6222,7 +6249,7 @@ export default function App() {
           onSent={async (made, how) => {
             // Everywhere but the tutorial the card closed on Send (onSending),
             // and closing anything here would close what she opened since.
-            if (walkCard) { setComposeInitial(null); setModal(null); }
+            if (!how?.background) { if (walkCard) { setComposeInitial(null); setModal(null); } }
             const sent = how?.draft ?? readComposeDraft();
             // THE TUTORIAL'S OWN TASK, AND IT LEAVES NO TOAST AND NO UNDO.
             // The walk goes on from here with the ringed sentence beside the
@@ -6263,6 +6290,7 @@ export default function App() {
               to: to ?? slug,
               when: how?.runAt ? whenLabel({ runAt: how.runAt, repeat: null }) : null,
               held: how?.start === 'later',
+              todo: how?.start === 'manual',
             }), made?.id ? { product: made.product, id: made.id } : undefined);
             await refresh();
           }}
@@ -6278,7 +6306,7 @@ export default function App() {
         <Palette
           onFirstRun={walkAgain}
           onTutorial={() => startTutorial(comeBackTo(snap.products, productFilter, rememberedProject()))}
-          onImportAgents={() => { setModal(null); setImportAgents(true); }}
+          onImportAgents={() => { setModal(null); setImportChatsOnly(false);setImportAgents(true); }}
           onFreshUser={openAsNewUser}
           onDemo={openDemoInbox}
           products={rankedProducts}
@@ -6555,6 +6583,7 @@ export default function App() {
        */}
       {importAgents && (
         <ImportAgents
+          chatsOnly={importChatsOnly}
           products={snap.products}
           filter={productFilter}
           onNewProject={() => { setImportAgents(false); setNewProject(true); }}
@@ -6581,9 +6610,9 @@ export default function App() {
       {newProject && (
         <NewProject
           onRefused={(say) => showToast(say)}
-          onCreate={async ({ name, repoPath }) => {
+          onCreate={async ({ name, repoPath, codexFolder }) => {
             try {
-              const made = await api.createProduct({ name, repoPath }) as { slug?: string } | null;
+              const made = await api.createProduct({ name, repoPath, codexFolder }) as { slug?: string } | null;
               setNewProject(false);
               const slug = made?.slug ?? null;
               // The composer remembers by slug, so the project just made is the
@@ -6592,7 +6621,7 @@ export default function App() {
               // The folder as the person writes it, `~` and all, the way the
               // rail and Settings write one. It is the only confirmation of
               // WHICH folder they picked, so it is worth reading.
-              showToast(`New project: ${name} · its code is in ${shortFolder(repoPath)}`);
+              showToast(`New project: ${name} · its code is in ${repoPath ? shortFolder(repoPath) : '~/Documents/Codex'}`);
               await refresh();
               /* * AND THE TUTORIAL OFFERS ITSELF HERE.
 
@@ -6630,6 +6659,7 @@ export default function App() {
               // exists". Picking the same folder twice is the common one.
               setNewProject(false);
               showToast(whyNotMade((err as Error).message, name));
+              if (codexFolder) { setNewProject(true); throw err; }
             }
           }}
           onClose={() => setNewProject(false)}
@@ -7060,7 +7090,7 @@ export default function App() {
           inside the sidebar would be clipped by the sidebar. Which component it
           is for is `data-hint` on that component, and what it says is
           `hint-plate.ts`. */}
-      {hintsOn && shownHint && HINTS[shownHint.id] && (
+      {hintsOn && shownHint && HINTS[shownHint.id] && !(shownHint.id === 'row' && hoveredId) && (
         <HintPlate
           lines={HINTS[shownHint.id]}
           comp={shownHint.el.getBoundingClientRect()}
@@ -7081,10 +7111,12 @@ export default function App() {
       <ZoomPercent />
       {/* ⌘F, on every screen, for the same reason. */}
       <FindBar />
+      <DictationStatus />
     </div>
     </WaitingContext.Provider>
     </LiveContext.Provider>
     </ChatAgentsContext.Provider>
     </TeamContext.Provider>
+    </ModelUsageContext.Provider>
   );
 }

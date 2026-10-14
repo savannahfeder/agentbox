@@ -1,3 +1,5 @@
+import {desktopLiveSession,desktopTranscribe} from './desktop-live.mjs';
+import {openWebsite} from './open-website.mjs';
 import { openSourceFile } from './open-source-file.mjs';
 import {submitReply} from './live-replies.mjs';
 import { createEngineSetup } from './engine-setup.mjs';
@@ -584,6 +586,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     }
   });
 
+  ipcMain.handle('zero:transcribe-audio', (_e, {audio,mime}) => desktopTranscribe(config.desktopLive,audio,mime));
+  ipcMain.handle('zero:desktop-live', (_e, {sdp}) => desktopLiveSession(config.desktopLive, sdp));
+  ipcMain.handle('zero:composer-catalog', (_e, { product, id, engine }) => supervisor.composerCatalog(product, id, engine));
   ipcMain.handle('zero:command-catalog', (_e, { product, id }) => supervisor.commandCatalog(product, id));
   ipcMain.handle('zero:remote-control', (_e, {product,id,action}) => supervisor.remoteControl(product,id,action));
   ipcMain.handle('zero:command', (_e, { product, id, text }) => supervisor.commandItem(product, id, text));
@@ -594,7 +599,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // answered at once (supervisor.sendNow).
   ipcMain.handle('zero:send-now', (_e, { product, id }) => supervisor.sendNow(product, id));
 
-  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, model, effort, now, inReplyTo }) => {
+  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, model, effort, engine, now, inReplyTo }) => {
     if (isAgentRow(id)) return { ok: false };
     // A level picked from ⌘K arrives here with no words, and gives way the
     // same as one picked on the summary (zero:thread-edit). A reply that
@@ -641,7 +646,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // handing them over in one call and writing the model afterwards would be a
     // race the run usually wins, so she would pick a model and watch the old one
     // take the task. `answerItem` writes both, and it writes the model first.
-    const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,now:!!now},()=>store.answerItem(product, id, { answer, status, priority, permissionMode, model, effort, inReplyTo: thread }));
+    if (engine !== undefined && !supervisor.engineChoices().some((choice) => choice.id === engine)) throw Error('This agent is not available.');
+    const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,engine,model,now:!!now},()=>store.answerItem(product, id, { answer, status, priority, permissionMode, model, effort, engine, inReplyTo: thread }));
     // A REPLY ON A ROW A TEAMMATE GAVE YOU HANDS IT BACK TO THEM, so the
     // conversation moves to their inbox instead of sitting in both
     // (shared/team-rules.mjs handedOnByReply). Archiving hands nothing on.
@@ -853,7 +859,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // attempted. A row scheduled for later is not woken for, because it is not
     // due; the timer is what serves those.
     // Nothing to wake for a thread added to Later: it starts when she says.
-    if (start !== 'later' && (!runAt || runAt <= Date.now())) supervisor.wake();
+    if (start !== 'manual' && start !== 'later' && (!runAt || runAt <= Date.now())) supervisor.wake();
     return out;
   });
 
@@ -1015,8 +1021,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // an archive, so it does not collide with what done means on a work item.
   ipcMain.handle('zero:end-repeat', (_e, { product, id }) => store.endRepeat(product, id));
 
-  ipcMain.handle('zero:create-product', (_e, { name, repoPath, ofMany }) => {
-    const out = store.createProduct({ name, repoPath });
+  ipcMain.handle('zero:create-product', (_e, { name, repoPath, codexFolder, ofMany }) => {
+    const out = store.createProduct({ name, repoPath, codexFolder, ofMany });
     // (privacy page 5.1). The count is the whole payload; the path it was
     // connected to never leaves.
     //
@@ -1166,12 +1172,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // 'codex'`, land under the project whose folder they ran in exactly as the
   // Claude Code ones do, and the ones the user said not now to are here too, so
   // there is a way back to them.
-  // EVERY FOLDER EITHER TOOL KEEPS SESSIONS IN (main/agent-homes.mjs), not only
-  // ~/.claude and ~/.codex, which is where the import used to look and nothing
-  // else (w-e46f2e9cea).
-  const readAllThreads = () => readImportableThreads({ config, supervisor });
-  ipcMain.handle('zero:agent-threads', () => {
-    const threads = readAllThreads();
+  const readAllThreads = (query = '') => readImportableThreads({ config, supervisor, query });
+  ipcMain.handle('zero:agent-threads', (_e, {query} = {}) => {
+    const search=typeof query==='string' ? query.trim().slice(0,160) : '';
+    const threads = readAllThreads(search.length>=2?search:'');
     lastThreads = threads;
     // Each one already in the inbox says so, and the card leaves it out
     // (w-db6f5e331e). The walk's folder suggestions still read all of them.
@@ -1770,7 +1774,12 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   ipcMain.handle('zero:open-artifact', async (_e, { product, src, mode }) => {
     const { shell } = await import('electron');
     if (typeof src !== 'string' || !src) return { ok: false, error: 'no path' };
-    if (/^https?:/.test(src)) { if (mode !== 'resolve') shell.openExternal(src); return { ok: true, opened: src } }
+    if (/^https?:/.test(src)) {
+      try {
+        if (mode !== 'resolve') await openWebsite(src, {external: (url) => shell.openExternal(url)});
+        return { ok: true, opened: src, url: src };
+      } catch (error) { return {ok:false,error:error.message}; }
+    }
     const found = resolveArtifact({
       src,
       product,

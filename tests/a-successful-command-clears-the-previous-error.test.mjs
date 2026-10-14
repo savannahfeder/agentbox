@@ -31,7 +31,7 @@ import {providerCommand,reviewTarget} from '../shared/provider-commands.mjs';
 // replaced. Built-in Claude commands and Codex review used to bypass dispatch.
 it.each([['claude','/reload-skills'],['codex','/review --base main'],['claude','/project-proof']])('the composer dispatches %s %s before forwarding',async(runningEngine,text)=>{
  const source=fs.readFileSync(new URL('../renderer/src/components/Focus.tsx',import.meta.url),'utf8');
- const body=source.slice(source.indexOf('  const send = async (spoken?: string) => {'),source.indexOf('  const hasDraft =',source.indexOf('  const send = async (spoken?: string) => {')));
+ const body=source.slice(source.indexOf('  const send = async (spoken?: string, background=false) => {'),source.indexOf('  const hasDraft =',source.indexOf('  const send = async (spoken?: string, background=false) => {')));
  const runCommand=vi.fn(async()=>({state:'forward'})),onSend=vi.fn();
  const context={text,runningEngine,item:{id:'one',product:'p'},attachments:[],ref:{current:{value:text}},providerCommand,reviewTarget,codexCommand:()=>null,runCommand,onSend,onNotice:vi.fn(),clearDraft:vi.fn(),setText:vi.fn(),persistAttachments:async()=>'',prio:null,repeat:null,mode:null,
  // The reply box's model drawer. `touched` false is the box nobody opened,

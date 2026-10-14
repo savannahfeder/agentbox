@@ -54,6 +54,12 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       const turn = { id: `tu-${++n}`, status: 'inProgress', items: [] };
       reply({ turn });
       send({ method: 'turn/started', params: { threadId, turn } });
+      if (fs.existsSync(path.join(home, 'offline'))) {
+        log('turn offline');
+        return send({ method: 'turn/completed', params: { threadId, turn: { ...turn, status: 'failed', error: {
+          message: 'stream disconnected before completion: ECONNRESET', codexErrorInfo: 'streamDisconnected',
+        } } } });
+      }
       if (signedIn) {
         log('turn ok');
         send({ method: 'item/completed', params: { threadId, item: { type: 'agentMessage', id: `it-${n}`, text: 'Done. The checkout button works now.', phase: 'final_answer' } } });

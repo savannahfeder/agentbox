@@ -1,0 +1,2 @@
+import fs from 'node:fs';import {it,expect} from 'vitest';
+it('accepts the null choice EnginePicker emits for Claude instead of ignoring it',()=>{const focus=fs.readFileSync(new URL('../renderer/src/components/Focus.tsx',import.meta.url),'utf8');expect(focus).toContain('const engine=id ?? DEFAULT_ENGINE;setProvider(engine)');expect(focus).toContain('readLastModel(undefined,engine,codexModelDefault)');});

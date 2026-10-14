@@ -105,13 +105,19 @@ export function describe(state) {
   };
 }
 
+export function githubUpdateFeed(repository) {
+  if (repository == null) return null;
+  if (!/^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(repository.owner ?? '') || !/^[A-Za-z0-9_.-]+$/.test(repository.repo ?? '')) throw Error('Choose a valid GitHub update repository.');
+  return {provider:'github',owner:repository.owner,repo:repository.repo};
+}
+
 /**
  * `autoUpdater` is a SEAM FOR THE TESTS and nothing else. The real one is
  * required below; passing one in is how the failure paths get tested without a
  * packaged build, a signed release and a network, which is the only reason the
  * download bug (see the swallow in `check`) went seven reports unnoticed.
  */
-export function createUpdater({ app, log = console, onChanged = () => {}, autoUpdater: given = null, place = null }) {
+export function createUpdater({ app, repository = null, log = console, onChanged = () => {}, autoUpdater: given = null, place = null }) {
   // READ ONCE, at construction (main/where-it-runs-from.mjs says why the
   // bundle cannot move under a running process). A build with no place passed
   // in — the tests, and `main/serve.mjs` — simply never offers the move.
@@ -149,6 +155,10 @@ export function createUpdater({ app, log = console, onChanged = () => {}, autoUp
     }
   }
 
+  if (autoUpdater) {
+    try { const feed=githubUpdateFeed(repository); if(feed) autoUpdater.setFeedURL(feed); }
+    catch(e) { autoUpdater=null; set({phase:'unsupported',error:'The selected update feed could not be configured.'}); }
+  }
   if (autoUpdater) {
     // Quiet by construction. `autoDownload` is the only one of these that is
     // already the default; the rest are here because their defaults interrupt.

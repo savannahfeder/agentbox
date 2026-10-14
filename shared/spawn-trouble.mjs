@@ -129,15 +129,18 @@ const AT_LIMIT = [
 // the single biggest cause of a dead run anywhere in the app is her own Mac
 // going to sleep mid-response, 133 runs across 63 rows.
 const INTERRUPTED = [
+  /the connection to codex app-server is corrupt/i,
   /went to sleep/i,
   /connection (closed|lost|dropped)/i,
   /response stopped arriving/i,
   /may be incomplete/i,
-  /econnreset|enotfound|etimedout|econnrefused|enetunreach|ehostunreach|eai_again/i,
+  /econnreset|enotfound|etimedout|econnrefused|enetunreach|ehostunreach|enetdown|eai_again/i,
   // Codex also prefixes non-network failures with "stream disconnected".
   // Match the request failure itself so incomplete responses keep their limit.
   /error sending request for url/i,
   /failed to send websocket request/i,
+  /httpConnectionFailed|connection error|fetch failed/i,
+  /^\s*stream ?disconnected(?: before completion)?[.!]?\s*$/i,
   /unable to connect/i,
   /can.{0,3}t reach the api/i,
   /timed out/i,
@@ -176,6 +179,8 @@ const WORKSPACE = [
 // a ChatGPT account." The second line is ours, thrown before the thread starts
 // by `codexModelRefusal` when the login's own list already says so.
 const MODEL_NOT_ON_PLAN = [
+  /(?:do not|don't|does not) have access to (?:the )?model\b/i,
+  /model[^\n]{0,160}(?:not available (?:for|on|with) (?:your|this) (?:subscription|plan)|does not exist or you do not have access)/i,
   /model is not supported when using codex with a chatgpt account/i,
   /not a model the plan of the codex account/i,
 ];

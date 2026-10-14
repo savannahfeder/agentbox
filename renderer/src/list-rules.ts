@@ -56,7 +56,7 @@ export interface InboxItem {
   runAt?: number;
   snoozedUntil?: number;
   /** 'later' while a thread sits in Later, written down and not begun. */
-  start?: 'later' | 'now';
+  start?: 'later' | 'manual' | 'now';
   /** The thread this one was filed under: what makes it a proposal. */
   parent?: string;
   /** The threads this one waits on. Written by whoever set the wait. */
@@ -193,6 +193,7 @@ export function belongsInInbox(
   // ADDED TO LATER AND NOT STARTED (w-afb66e6661). It is written down on
   // purpose and waits for a person rather than a clock, so it is in Later and
   // nowhere else. Not a deferral: there is no moment to come back at.
+  if (i.start === 'manual') return i.status !== 'done';
   if (notStarted(i)) return false;
   // AN AGENT IS STILL WORKING ON IT (w-bc976fd247). A row that set itself
   // blocked sat in Needs you wearing the turning mark until its session
@@ -414,6 +415,7 @@ export function belongsInProgress(
 ): boolean {
   // Nothing is coming on a thread nobody has started: In progress promises a
   // worker, and this one is waiting for you to say go (w-afb66e6661).
+  if (i.start === 'manual') return false;
   if (notStarted(i)) return false;
   // A session on it is the promise kept, whatever the status says yet: an
   // agent that has written blocked, done or a moment to wake at is still

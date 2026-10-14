@@ -203,6 +203,15 @@ matter:
   variable is unset.
 - `claudeBin`: the binary to run. The app finds `claude` itself if you leave
   this alone.
+- `desktopLive`: optional connection to an already configured GPT Live companion
+  service: `{ "url": "http://127.0.0.1:8818", "origin": "https://your-private-host",
+  "accessFile": "/absolute/path/to/access.json" }`. The service must accept
+  `POST /api/live-session` with `{sdp, desktop: true}`, authenticate the
+  `agentbox_session` cookie from the access file's `session` field, and return
+  `{transport: {sdp}}`. Its delegated `agentbox_action` tool supports `read`,
+  `review`, `details`, `open`, `next`, `previous`, `done`, `reply`, and `later`
+  (minutes from now in `text`). API keys and service credentials stay outside
+  the renderer and repository. The companion service is deployed separately.
 - `maxConcurrentSessions`: how many agents run at once. The queue absorbs the
   rest, in priority order.
 - `sessionArgs`: what a spawned session may do. **The default grants only the

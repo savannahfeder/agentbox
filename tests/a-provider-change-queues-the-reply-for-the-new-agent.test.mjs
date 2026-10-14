@@ -1,0 +1,3 @@
+// A reply naming another provider/model must wait for the next run, not steer the old harness.
+import {it,expect,vi} from 'vitest';import {submitReply} from '../main/live-replies.mjs';
+for(const pick of [{engine:'claude',model:'sonnet'},{engine:'codex',model:'gpt-6.1-sol'}])it(`queues ${pick.engine}/${pick.model} without steering Astra`,async()=>{const steer=vi.fn(),commit=vi.fn().mockResolvedValue({product:'qa',id:'w-qa',answer:'new'}),supervisor={sessions:new Map([['w-qa',{product:'qa',engine:'codex',model:'gpt-6-astra',child:{steer}}]])};await submitReply(supervisor,{product:'qa',id:'w-qa',answer:'new',...pick},commit);expect(steer).not.toHaveBeenCalled();expect(commit).toHaveBeenCalledOnce();});

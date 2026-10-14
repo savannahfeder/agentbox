@@ -5,12 +5,12 @@
 
 import { useContext, useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { Product, RepeatRule, RunningSession, ThreadCard, View, WorkItem } from '../types';
-import { ago, dayLabel, previewText, stamp } from '../format';
+import { ago, dayLabel, itemOptions, offerIsLive, previewText, stamp } from '../format';
 import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitle, walkRowKeys } from '../list-rules';
 import { isUrgentRow } from '../interrupt';
 // THE SAME PREDICATE THE PANE USES, not a second copy of the rule. The row and
 // the pane disagreeing about one fact on one screen is what this import fixes.
-import { cameBackEmpty } from '../live-line';
+import { cameBackEmpty, liveLine } from '../live-line';
 import { agentAtWork, engineWordFor } from '../byline';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
 import { isTroubleRow, TROUBLE_ID } from '../trouble-row';
@@ -23,6 +23,8 @@ import { Face, TeamRowEnd, type TeamView } from '../team/people';
 import { RepeatMark, RowCells, TableHead, ThreadCells, WaitingContext } from '../threads/Pages';
 import { toApproveWords } from '../threads-made';
 import type { MixedRow } from '../threads/people-rules';
+import { threadTldr } from '../../../shared/thread-tldr.mjs';
+import {RowHoverPreview} from './RowHoverPreview';
 import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mjs';
 
@@ -139,7 +141,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, atLimit, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, atLimit, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, onReply, onPick, onDone, onLater, onProjectChange, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder }: {
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -223,6 +225,11 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
    * breaks. */
   walk?: { key: string | null; rows: string[] } | null;
   onHover?: (id: string | null) => void;
+  onProjectChange?: (item:WorkItem,project:string)=>Promise<boolean>;
+  onDone?: (item: WorkItem) => void;
+  onLater?: (item: WorkItem) => void;
+  onReply?: (item: WorkItem) => void;
+  onPick?: (item: WorkItem, n: number) => void;
   // THE YES OR NO ON A CODEX CONVERSATION'S ROW, and the Import on one she
   // declined. A click on the keycap sends the same word the key does.
   onAnswerImport?: (item: WorkItem, choice: ImportChoice) => void;
@@ -488,7 +495,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                    the hover in App, and only a pointer that actually moves
                    takes it back. */
                 onMouseMove={() => { if (hoveredId !== item.id) onHover?.(item.id); }}
-                onMouseLeave={() => { if (hoveredId === item.id) onHover?.(null); }}
+                onMouseLeave={(e) => { if (hoveredId === item.id && (!(e.relatedTarget instanceof Element) || !e.relatedTarget.closest('.row-hover-preview'))) onHover?.(null); }}
                 onClick={(e) => {
                   if (drag.swallowsClick()) return;
                   const intent = clickIntent('row', { shift: e.shiftKey, meta: e.metaKey, ctrl: e.ctrlKey });
@@ -497,6 +504,29 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                   onSelect(index); onOpen(item);
                 }}
               >
+                {hoveredId === item.id && !checked && !multiSel.size && !walk && !isImportRow(item) && (
+                  <RowHoverPreview id={item.id} onClose={() => onHover?.(null)}>
+                    <div className="row-hover-tldr"><strong>TL;DR</strong> {threadTldr(
+                      (['body', 'answer', 'note', 'result'] as const).map((field) => ({
+                        who: field === 'answer' || (field === 'body' && item.wrote?.body?.source === 'founder') ? 'you' : 'it',
+                        text: item[field], at: item.wrote?.[field]?.ts ?? 0,
+                      })), null, { running: running.some((r) => r.itemId === item.id), statusText: liveLine(item, { session: running.find(r => r.itemId === item.id), queued, signInNeeded, atLimit, paused, stalled: stalled?.includes(item.id), silent: silent?.[item.id], shipping: shipping?.includes(item.id), inProgress: view === 'progress', scheduledUntil: snoozes?.[item.id] })?.line },
+                    )?.text || rowSummary(item, view) || 'Noch kein Ergebnis.'}</div>
+                    <div className="row-hover-actions">
+                      <button type="button" className="row-key" onClick={() => {onSelect(index);onOpen(item)}}><kbd>↵</kbd><span>Open task</span></button>
+                      {(keyView ?? view) === 'inbox' && <><button type="button" className="row-key" disabled={!onDone} onClick={() => onDone?.(item)}><kbd>E</kbd><span>Mark done</span></button><button type="button" className="row-key" disabled={!onLater} onClick={() => onLater?.(item)}><kbd>L</kbd><span>Schedule for later</span></button></>}
+                      {offerIsLive(item) && !item.agent && !made && itemOptions(item).map((option) => (
+                        <button type="button" className="row-key" key={option.n}
+                          aria-label={`Option ${option.n}: ${option.text}`}
+                          onClick={() => onPick?.(item, option.n)}>
+                          <kbd>{option.n}</kbd><span>{option.text}</span>
+                        </button>
+                      ))}
+                      {(keyView ?? view) === 'inbox' && <button type="button" className="row-key"
+                        aria-label="Antworten (R)" onClick={() => onReply?.(item)}><kbd>R</kbd><span>Antworten</span></button>}
+                    </div>
+                  </RowHoverPreview>
+                )}
                 {/* THE ONE THING THAT IS NOT A MESSAGE STANDS IN THE MESSAGE'S OWN
                    SELECT-BOX STRIP: a rule at the row's left edge, in the app's own faint
                    ink, beginning where the subject begins and ending where the preview
@@ -535,7 +565,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                   // THE TABLE ROW (the team version): the same row, its select
                   // box and its keys, with the approved columns instead of a
                   // title over a summary.
-                  <ThreadCells item={item} product={products.find((p) => p.slug === item.product)} now={Date.now()} tab={view}
+                  <ThreadCells item={item} products={products} onProjectChange={onProjectChange} product={products.find((p) => p.slug === item.product)} now={Date.now()} tab={view}
                     person={withPerson ? personCell?.(team?.me ?? null) : undefined} />
                 ) : <>
                 <div className="row-main">

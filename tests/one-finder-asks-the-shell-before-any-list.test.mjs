@@ -68,7 +68,7 @@ describe('the shell is asked before any list', () => {
     expect(found).toMatchObject({ path: theirs, found: true, from: 'shell', certain: true });
   });
 
-  it.each(['claude', 'codex'])('asks the shell before it stats anything, for %s', (key) => {
+  it.each(['claude', 'codex'])('asks the shell before the ordinary list, after desktop overrides for %s', (key) => {
     const order = [];
     findEngine(key, {
       home: HOME,
@@ -77,7 +77,8 @@ describe('the shell is asked before any list', () => {
       dangles: never,
       shellLookup: () => { order.push('shell'); return { path: null, answered: true }; },
     });
-    expect(order[0]).toBe('shell');
+    if(key==='codex')expect(order.slice(0,6).every(x=>x.startsWith('exists '))).toBe(true);
+    else expect(order[0]).toBe('shell');
   });
 
   // THE LIST IS NOT GONE, it is demoted. This is the GUI launch it was written

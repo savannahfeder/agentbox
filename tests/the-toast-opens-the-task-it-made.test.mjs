@@ -66,7 +66,7 @@ describe('the toast after an answer carries the same way in', () => {
   it('deferCommit takes a destination', () => {
     // Followed, since w-c78d1e1607, by what the thread says if a Z takes it back.
     // Then, since 2026-10-13, how long it is held: a phone's reply is not.
-    expect(app).toMatch(/goes\?: \{ product: string; id: string \},[\s\S]{0,300}?undid\?: UndidSpec\[\],[\s\S]{0,300}?holdMs: number = UNDO_GRACE_MS,\s*\) => \{/);
+    expect(app).toMatch(/goes\?: \{ product: string; id: string \},[\s\S]{0,300}?undid\?: UndidSpec\[\],[\s\S]{0,300}?background=false,[\s\S]{0,300}?holdMs: number = UNDO_GRACE_MS,\s*\) => \{/);
     expect(app).toContain('showToast(`${toast} · press Z to undo`, stay ? undefined : goes);');
   });
 

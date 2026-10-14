@@ -76,7 +76,7 @@ describe('the card', () => {
     expect(card).not.toContain('DOOR.pick');
   });
   it('starts with every line ticked, and keeps only what was unticked', () => {
-    expect(card).toContain('const picked = useMemo(() => lines.map((l) => l.path).filter((p) => !unticked.has(p)), [lines, unticked]);');
+    expect(card).toContain('chatsOnly?selectedChats.has(p):!unticked.has(p)');
   });
   // Carried over from a-project-is-a-thing-you-can-tick.test.mjs, which pinned
   // the two-screen card and was retired with it. These two still hold.

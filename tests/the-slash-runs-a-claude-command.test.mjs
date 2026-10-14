@@ -242,7 +242,7 @@ describe('the menu is one list', () => {
     // why `send` grew an argument, and it fails silently if anybody takes it
     // away again: the reply would go out empty or stale.
     const focus = read('renderer/src/components/Focus.tsx');
-    expect(focus).toContain('const send = async (spoken?: string) => {');
+    expect(focus).toContain('const send = async (spoken?: string, background=false) => {');
     expect(focus).toContain('const words = (spoken ?? text).trim();');
   });
 });
