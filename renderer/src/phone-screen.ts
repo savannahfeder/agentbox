@@ -14,8 +14,11 @@
 import { useEffect, useRef } from 'react';
 
 export const onPhone = () => typeof document !== 'undefined' && document.documentElement.dataset.door === 'phone';
+// The phone with the Mac shut, which reads her rows online rather than her
+// Mac (cloud-bridge.ts): what she sends waits there for her Mac.
+export const onCloudPhone = () => typeof document !== 'undefined' && document.documentElement.dataset.via === 'cloud';
 
-type HistoryLike = { readonly state: unknown; pushState(state: unknown, title: string): void; back(): void };
+type HistoryLike = { readonly state: unknown; pushState(state: unknown, title: string): void; replaceState(state: unknown, title: string): void; back(): void };
 type WindowLike = {
   history: HistoryLike;
   addEventListener(name: 'popstate', fn: (e: { state: unknown }) => void): void;
@@ -23,6 +26,9 @@ type WindowLike = {
 };
 
 const MARK = 'agentbox-thread';
+const FLOOR = 'agentbox-floor';
+const INBOX = 'agentbox-inbox';
+const marked = (state: unknown, mark: string) => !!(state as Record<string, unknown> | null)?.[mark];
 
 /**
  * One step in the history while a thread is open. `sync(open)` follows the
@@ -31,7 +37,11 @@ const MARK = 'agentbox-thread';
  */
 export function createPhoneBack(win: WindowLike, close: () => void) {
   let pushed = false;
+  // A back WE asked for, still on its way. A browser's back arrives later; a
+  // thread opened in between must not be closed by it.
+  let ours = false;
   const onPop = () => {
+    if (ours) { ours = false; return; }
     if (!pushed) return;
     pushed = false;
     close();
@@ -44,12 +54,37 @@ export function createPhoneBack(win: WindowLike, close: () => void) {
         pushed = true;
       } else if (!open && pushed) {
         pushed = false;
-        if ((win.history.state as Record<string, unknown> | null)?.[MARK]) win.history.back();
+        if (marked(win.history.state, MARK)) { ours = true; win.history.back(); }
       }
     },
     stop() { win.removeEventListener('popstate', onPop); },
   };
 }
+
+/**
+ * A FLOOR UNDER THE INBOX, on the home-screen app (2026-10-13). Behind the
+ * app's first screen is the empty page iOS opened it from, and a back onto it
+ * leaves a white page with no way back but closing the app. So the first
+ * screen becomes a floor with the inbox one step above it; a back from the
+ * inbox lands on the floor and is put straight back. Safe to call again after
+ * a reload: an entry already marked is left as it is.
+ */
+export function holdTheFloor(win: WindowLike) {
+  const state = win.history.state;
+  if (marked(state, FLOOR)) win.history.pushState({ [INBOX]: true }, '');
+  else if (!marked(state, INBOX) && !marked(state, MARK)) {
+    win.history.replaceState({ [FLOOR]: true }, '');
+    win.history.pushState({ [INBOX]: true }, '');
+  }
+  const onPop = (e: { state: unknown }) => {
+    if (marked(e.state, FLOOR)) win.history.pushState({ [INBOX]: true }, '');
+  };
+  win.addEventListener('popstate', onPop);
+  return () => win.removeEventListener('popstate', onPop);
+}
+
+/** May the home-screen swipe go back? Only over a thread's own step; any other back leaves the app. */
+export const swipeMayGoBack = (state: unknown) => marked(state, MARK);
 
 /** The thread open on the screen as a step in the history, on a phone only. */
 export function usePhoneBack(open: boolean, close: () => void) {
@@ -231,6 +266,7 @@ export function installPhoneScreen() {
   // already lands on the history step above, so it needs nothing from here.
   const standalone = (navigator as { standalone?: boolean }).standalone === true;
   if (!standalone) return;
+  holdTheFloor(window);
   let start: { x: number; y: number } | null = null;
   let pane: HTMLElement | null = null;
   addEventListener('touchstart', (e) => {
@@ -253,7 +289,7 @@ export function installPhoneScreen() {
     el.style.transition = 'transform .18s ease';
     el.style.transform = go ? `translateX(${innerWidth}px)` : '';
     setTimeout(() => {
-      if (go) history.back();
+      if (go && swipeMayGoBack(history.state)) history.back();
       el.style.transform = '';
       el.style.transition = '';
     }, go ? 170 : 200);

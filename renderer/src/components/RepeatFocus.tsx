@@ -27,6 +27,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { SEND } from '../this-keyboard';
 import remarkGfm from 'remark-gfm';
 import type { RepeatRule, WorkItem } from '../types';
 import { ago, dayLabel, stamp } from '../format';
@@ -233,8 +234,8 @@ function RuleComposer({ message, onSave, onClose }: {
           className="dock-send"
           onClick={save}
           disabled={!changed || !text.trim()}
-          title="Save · ⌘↵"
-        >Save <kbd>⌘↵</kbd></button>
+          title={`Save · ${SEND}`}
+        >Save <kbd>{SEND}</kbd></button>
       </div>
     </>
   );

@@ -355,8 +355,8 @@ describe('the settings row', () => {
     // Three states, decided in one expression, with `found` the only route to
     // the confident sentence and `certain` the only route to the flat no. ONE
     // expression, for every engine drawn through this card.
-    expect(set).toMatch(/const label = found \? copy\.connected : certain \? copy\.missing : copy\.unsure;/);
-    expect(set.match(/const label = found \?/g)).toHaveLength(1);
+    expect(set).toContain("if (found) return trouble ? 'trouble' : 'connected';\n  return certain ? 'missing' : 'unsure';");
+    expect(set.match(/connectionState\(\{ found, certain, trouble \}\)/g)).toHaveLength(1);
     expect(set).toContain('unsure: `${Name} could not check`');
     expect(set).toContain('unsureSay: `${Name} has not been able to look for Claude Code on this computer.');
   });
@@ -373,6 +373,6 @@ describe('the settings row', () => {
   // unsure answer drawn in the live colour is the confident yes this whole
   // file exists to prevent, one surface further on.
   it('never draws an unsure answer as a confident yes', () => {
-    expect(set).toMatch(/<span className=\{`set-dot \$\{found \? 'live' : ''\}`\} \/>/);
+    expect(set).toContain("<span className={`set-dot ${state === 'connected' ? 'live' : ''}`} />");
   });
 });

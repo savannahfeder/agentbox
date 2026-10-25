@@ -71,7 +71,7 @@ describe('1. the walk is never a blank screen', () => {
 
   it('names the tab as well as the key, where the strip has names', () => {
     const labels = [...pages.slice(pages.indexOf('export const INBOX_TABS')).matchAll(/label: '([^']+)'|label: DONE\.short/g)]
-      .slice(0, 5).map((m) => m[1] ?? 'Done');
+      .slice(0, TEAM_TABS.length).map((m) => m[1] ?? 'Done');
     expect(TEAM_TABS.map((v) => TEAM_TAB_NAMES[v])).toEqual(labels);
     const tabs = ['inbox', 'progress', 'snoozed', 'done'];
     const named = coach('where', 0, { view: 'inbox', tabs, tabNames: TEAM_TAB_NAMES });

@@ -48,8 +48,8 @@ export function wantsPriority(item, product, me) {
   // AND NEVER OVER THE LEVEL THE SENDER PICKED (w-7ba439c883). A message now
   // crosses carrying how urgent the person who wrote it thought it was, and a
   // guess from here would overwrite it: the sender's line is composeItem's, so
-  // it claims no authority the fold would defend, and a level written from here
-  // counts for nothing anyway (an agent's tag, shared/rank.mjs itemPriority).
+  // it claims no authority the fold would defend, and a guess from here is not
+  // what the sender said.
   // A row nobody chose a level for is composeItem's 0, so a number above it is
   // exactly "somebody picked one", and `by` says it was not this Mac.
   if (set?.by && set.by !== me && Number.isFinite(item.priority) && item.priority > 0) return false;

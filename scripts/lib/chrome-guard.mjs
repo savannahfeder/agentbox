@@ -29,7 +29,11 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const PREFIX = '/tmp/shot-profile-';
-const CHROME = '/Applications/Google Chrome.app';
+// The Linux box the QA sessions run on has no Chrome at a Mac path, so the
+// binary is an env override there. Everything below still only ever touches a
+// browser running on one of our own throwaway profiles.
+export const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const OURS = process.env.CHROME || '/Applications/Google Chrome.app';
 
 // Every process on the box, as {pid, ppid, command}. `ps` is the only thing that
 // sees processes this one did not start, which is the whole point of the sweep.
@@ -48,7 +52,7 @@ export function processes() {
 
 // Deliberately narrow: a real Chrome binary AND one of our throwaway profiles.
 // Her own browsing Chrome runs from ~/Library and never matches.
-export const isOurChrome = (p) => p.command.startsWith(CHROME) && p.command.includes(`--user-data-dir=${PREFIX}`);
+export const isOurChrome = (p) => p.command.startsWith(OURS) && p.command.includes(`--user-data-dir=${PREFIX}`);
 
 export const profileOf = (command) => command.match(/--user-data-dir=(\/tmp\/shot-profile-[A-Za-z0-9]+)/)?.[1];
 

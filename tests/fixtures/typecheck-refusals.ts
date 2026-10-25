@@ -13,6 +13,7 @@
 // the renderer's typecheck.
 import { unleaked } from '../../shared/agents.mjs';
 import { REQUEST_CHANNELS } from '../../shared/bridge-map.mjs';
+import { checkKit, runOfClaim } from '../../shared/cloud-kit.mjs';
 import { CODEX_DEFAULT_MODE, codexModeWords } from '../../shared/codex-modes.mjs';
 import { ALL_SCHEMES, IMG_SCHEME } from '../../shared/schemes.mjs';
 import type { AgentEvent } from '../../renderer/src/types';
@@ -26,6 +27,14 @@ export const mode: number = CODEX_DEFAULT_MODE; // TS2322
 export const words: number = codexModeWords('auto'); // TS2322
 export const img: number = IMG_SCHEME; // TS2322
 export const every: number = ALL_SCHEMES; // TS2322
+
+// AND SO DOES THE CLOUD KIT, the fifth one, which the screen started importing
+// on 2026-10-24 with no declaration beside it. A claim that is not the cloud's
+// answers null, and a kit the cloud will not start answers why in words, so
+// both of these reads are wrong on purpose: an `any` would let the screen take
+// every reply for the cloud's and never say which kit was refused.
+export const run: string = runOfClaim('cloud:1'); // TS2322
+export const refused: number = checkKit({}); // TS2322
 
 // AND THE EVENT UNION IS STILL A UNION. An event is either a message or a
 // thing the agent ran, so reading a message's words off one that has not been

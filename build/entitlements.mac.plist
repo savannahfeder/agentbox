@@ -17,5 +17,9 @@
        an unsigned child would make every agent fail to start. -->
   <key>com.apple.security.cs.allow-dyld-environment-variables</key>
   <true/>
+  <!-- A voice note records from the microphone; the hardened runtime refuses
+       it without this, whatever the person allows in System Settings. -->
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
 </dict>
 </plist>

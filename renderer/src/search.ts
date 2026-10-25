@@ -1,75 +1,18 @@
-// PURE. Task search: which rows a query keeps, what order they come in, and
-// what each kept row says.
+// Pure task search: which rows a query keeps, their order, and what each kept
+// row says.
 //
-// The approved design: design B, entry point E1 (a magnifier
-// in the corner), key `/`. The drawing is
-// designs/2026-08-13-search-b-in-the-real-ui.html in the Agentbox docs.
+// It reads every project and every tab, closed included, because most tasks in
+// a store in use are closed. Nothing here takes a view or a product filter. It
+// reads the whole task: label, title, body, result, latest checkpoint and the
+// user's reply. A kept row's summary is the sentence the words were found in.
 //
-// Three things that drawing settles, and they are still the frame of this file:
+// The match is shown in ink, not colour, because the list's one colour is the
+// rule under a selected title. `splitHits` hands the row matched and unmatched
+// runs, and the stylesheet dims the unmatched ones.
 //
-//   EVERY PROJECT AND EVERY TAB, CLOSED INCLUDED. In a store in real use the
-//   great majority of tasks are closed, so a search that reads only the tab she
-//   is standing on is a search that misses most of what she is looking for. Nothing
-//   here takes a view or a product filter, on purpose: there is no argument
-//   that could narrow it.
-//
-//   THE WHOLE TASK, NOT THE TITLE. Titles are labels; the sentence she
-//   remembers is almost always in the body or in a result.
-//
-//   THE ROW SAYS WHY IT MATCHED. The summary under a hit is the sentence the
-//   words were actually found in, not the row's usual summary. Without that, a
-//   result list is a list of titles that look unrelated to the query.
-//
-// The match itself is carried in INK, never colour: the list spends exactly one
-// colour and it is the rule under a selected title. So this file hands the row
-// its text already split into matched and unmatched runs (`splitHits`), and the
-// stylesheet makes the matched run full-strength inside a dimmed line. No new
-// colour enters the list.
-/* ------------------------------------------------------------------------ */
-// WHAT CHANGED.
-//
-// Measured on a real store of several hundred tasks: "how to work" kept 316
-// rows, and 4 of them contain that phrase. The words
-// were looked for one at a time, anywhere, INSIDE other words, so "to" was
-// found in "into", "customer" and "stopped"; and the survivors were then sorted
-// by recency alone, which put the second row that actually says "how to work"
-// at rank 10, under three hundred rows that do not say it.
-//
-// So two rules were added and one was left alone on purpose:
-//
-//   A WORD IS FOUND AT THE START OF A WORD. Prefixes stay in, because she is
-//   typing and "conver" has to find "conversion" before she finishes it. What
-//   goes is the middle of a word: "to" is in "today" and is not in "into". On
-//   that store this alone took "how to work" from 316 rows to 189.
-//
-//   THE PHRASE OUTRANKS THE WORDS. Rows carrying the typed words together, in
-//   the order they were typed, sort above rows that merely contain all of them,
-//   and a hit in the title sorts above a hit in the prose.
-//
-// NOTHING IS DROPPED FOR RANKING LOW.A row that matched yesterday still
-// matches; it is underneath, under its own label, not gone. The only rows this
-// change removes from a list are the ones that never really matched, the
-// "stopped" that answered "to".
-/* ------------------------------------------------------------------------ */
-// THE WHOLE CONVERSATION. This is the next one, and it was the
-// biggest left.
-//
-// A task holds five pieces of writing: the title, the body, her reply, the
-// agent's result and the agent's latest checkpoint. This file read three. The
-// two it skipped are the two carrying the NEWEST words on the row: a checkpoint
-// is what the reading pane leads with while a run is still going, and a reply
-// is the only place the user's own words are ever written down.
-//
-// Measured on a real store: most rows carry a checkpoint and a reply, and
-// most checkpoints and many replies hold five or more substantial words
-// written nowhere else on the row. Taking a four word run out of the middle of
-// a reply and searching for it found nothing on well over half of the rows
-// that could be tested that way, and the same held for checkpoints.
-//
-// A hit in either sits on the same rungs as one in the prose, because to her
-// they are the same task. The one visible difference is that a summary lifted
-// out of her own reply says so: an unlabelled sentence under a row reads as
-// something an agent wrote, and the pane already calls hers "You said".
+// A term matches at the start of a word, not inside one: "to" finds "today"
+// but not "into". The phrase outranks the loose words, and a title hit
+// outranks a prose hit. Nothing is dropped for ranking low.
 
 import { searchText } from './format';
 import { rowSummary, SUMMARY_BUDGET } from './list-rules';
@@ -78,50 +21,39 @@ import { ticketQuery } from './ticket-references';
 export interface Searchable {
   id: string;
   title?: string;
-  // The written name the list draws instead of the title. Searched alongside
-  // it, never instead of it (haystack, below).
+  // The written name the list draws instead of the title. Searched as well as
+  // the title, never instead of it.
   label?: string;
   body?: string;
   result?: string;
-  // The agent's latest checkpoint and her own reply. See THE WHOLE
-  // CONVERSATION above: these are the two newest fields a row has, and search
-  // used to read neither of them.
+  // The agent's latest checkpoint and the user's own reply.
   note?: string;
   answer?: string;
   status?: string;
   updatedAt?: number;
 }
 
-// HOW WELL A ROW MATCHED IS THE ORDER AND NOTHING ELSE. This used to be a
-// second output, a band, which the list printed as the headings "Best matches"
-// and "Also mentions these words".So the ranking stayed and the labels went:
-// the best answers are still first, the list just does not announce it.
+// How well a row matched sets only the order. The list prints no headings for
+// it (tests/a-result-list-has-no-headings.test.mjs).
 export interface SearchHit<T> {
   item: T;
   // The sentence the query was found in, ready for the row's summary line.
   summary: string;
 }
 
-/* ------------------------------- the query ------------------------------- */
-// A query is its words AND, separately, the whole thing as one phrase. Both are
-// needed downstream: the words decide what is kept, the phrase decides what
-// comes first and what gets lit as a single run.
+// The words decide what is kept. The phrase decides what comes first and what
+// lights as one run.
 export interface Query {
   terms: string[];
-  // The typed words as one string, when there is more than one of them. Empty
-  // for a single word, because a one-word phrase is just the word.
+  // The typed words as one string when there are several, empty for one word.
   phrase: string;
-  // She wrapped it in double quotes, which means only the phrase will do.
+  // The query was wrapped in double quotes, so only the phrase will do.
   quoted: boolean;
 }
 
-// Everything that reads text here reads it folded, and folding is 1:1 ON
-// PURPOSE: `splitHits` slices the ORIGINAL string at offsets found in the
-// folded one, so a fold that changed the length would light the wrong letters.
-// That rules out stripping accents by NFD, which is why it is not done. It
-// costs little today: accented words are rare in task text. Curly quotes are
-// common, and a straight apostrophe is what a keyboard types, so those are
-// folded.
+// Folding must keep the length, because `splitHits` slices the original string
+// at offsets found in the folded one. That rules out stripping accents by NFD.
+// Curly quotes and dashes fold to what a keyboard types.
 const FOLDED: Record<string, string> = {
   '‘': "'", '’': "'", 'ʼ': "'",
   '“': '"', '”': '"',
@@ -132,17 +64,14 @@ export function fold(text: string): string {
   return text.toLowerCase().replace(/[‘’ʼ“”–—]/g, (c) => FOLDED[c]);
 }
 
-// Whitespace-separated terms, ALL of which must appear. AND rather than OR
-// because narrowing is the entire point of typing a second word: with OR,
-// "conversion rate" would return strictly more rows than "conversion", which
-// reads as the search being broken.
+// Whitespace-separated terms, all of which must appear, because a second word
+// is typed to narrow the list.
 export function queryTerms(query: string): string[] {
   return parseQuery(query).terms;
 }
 
 export function parseQuery(query: string): Query {
   const folded = fold(query).trim();
-  // "in quotes" means she wants that group of characters and nothing looser.
   const quoted = folded.length > 2 && folded.startsWith('"') && folded.endsWith('"');
   const inner = (quoted ? folded.slice(1, -1) : folded).trim();
   const terms = normalize((ticketQuery(inner) ?? inner).replace(/"/g, ' ').split(/\s+/));
@@ -150,41 +79,24 @@ export function parseQuery(query: string): Query {
   return { terms, phrase, quoted: quoted && terms.length > 0 };
 }
 
-// Case is folded HERE and in every function that takes terms, rather than once
-// at the door. Four functions in this file take a term list, they are called
-// from three different places, and a caller that hands one of them a raw
-// capital gets silence rather than an error: no match, no highlight, no way to
-// tell that from a store with nothing in it.
+// Every function that takes terms folds them itself, because a raw capital
+// from a caller gives no match and no error.
 function normalize(terms: string[]): string[] {
   return terms.map((t) => fold(t)).filter(Boolean);
 }
 
-/* ------------------------------- the match ------------------------------- */
-// Everything the row is made of. Product name is deliberately NOT in here: a
-// product's rows are already one keystroke away through the filter, and folding
-// it in means typing "astral" returns three hundred rows whose titles have
-// nothing to do with what was typed, which is the shape of a broken search.
+// What a row is searched over. The product name is left out: a product's rows
+// are one keystroke away through the filter, and including it makes a product
+// name match every row of that product.
 //
-// The title and the prose are kept apart because a hit in the title is worth
-// more than a hit in paragraph nine, and joined for the phrase test.
-//
-// EVERY RUN OF WHITESPACE BECOMES ONE SPACE, and that is what makes a phrase
-// findable at all. Her prose is markdown and markdown wraps: "the How to\nwork
-// section" is one sentence to a reader and three words with a newline in the
-// middle to `indexOf`, so a phrase test against the raw text misses exactly the
-// rows a phrase search exists to find. Nothing is sliced out of this string, it
-// is only ever asked yes or no, so collapsing it costs no offsets.
-//
-// `body` and `result` are the SAME strings in their original case, already cut
-// into sentences, kept here so the summary line neither strips the markdown nor
-// re-splits the prose on every keystroke. Measured over a store of several
-// hundred rows: stripping and splitting on every keystroke was 22ms a letter, caching
-// both is 4ms, and 16.7ms is one frame.
+// The title is kept apart because a title hit ranks higher. In `all`, every
+// run of whitespace becomes one space so a phrase is found across a markdown
+// line wrap; `all` is only tested, never sliced, so that costs no offsets. The
+// sentence lists are cached so the summary does not strip markdown and
+// re-split prose on every keystroke.
 interface Hay { title: string; all: string; body: Line[]; result: Line[]; note: Line[]; answer: Line[] }
 
-// One sentence, kept twice: as written, because that is what the row
-// prints, and folded flat, because that is what the query is asked of. Both, so
-// that neither the printing nor the asking has to redo the other's work.
+// One sentence as written, for printing, and folded flat, for matching.
 interface Line { raw: string; folded: string }
 
 function squash(text: string): string {
@@ -195,29 +107,22 @@ function splitLines(text: string): Line[] {
   return splitSentences(text).map((raw) => ({ raw, folded: squash(fold(raw)) }));
 }
 
-// Rebuilding this per keystroke was costing real time: typing "how to work"
-// one letter at a time cost 245ms of search over several hundred rows,
-// almost all of it `plainText` stripping the same markdown eleven times. The
-// item objects do not change while she types, so they are the cache key, and a
-// WeakMap means a row that leaves the store takes its haystack with it.
+// Keyed by the item object, which does not change while the user types. A
+// WeakMap lets a row that leaves the store take its haystack with it.
 const HAY = new WeakMap<object, Hay>();
 
 function haystack(i: Searchable): Hay {
   const cached = HAY.get(i as object);
   if (cached) return cached;
-  // BOTH NAMES, BECAUSE A ROW NOW HAS TWO. The list draws the written label
-  // (rowTitle, list-rules.ts) and the row keeps her own title underneath it, so
-  // searching only one of them loses her a row whichever one she remembered.
-  // The two are joined with a full stop for the same reason the prose below is:
-  // no phrase may be found straddling the seam between them.
+  // The list draws the label (rowTitle, list-rules.ts) with the title under it,
+  // so both are searched.
   const title = squash(fold([i.label, i.title].filter(Boolean).join(' . ')));
   const body = searchText(i.body);
   const result = searchText(i.result);
   const note = searchText(i.note);
   const answer = searchText(i.answer);
-  // Joined with a full stop rather than a space so that no phrase can be found
-  // straddling the seam between two fields: "the page" ending one and "is done"
-  // opening the next is not a row that says "the page is done".
+  // Fields, and the label and title above, are joined with ' . ' so no phrase
+  // is found straddling the seam between two of them.
   const prose = [body, result, note, answer].filter(Boolean).join(' . ');
   const all = `${fold(i.id)} . ${title} . ${squash(fold(prose))}`;
   const hay: Hay = {
@@ -232,17 +137,15 @@ function haystack(i: Searchable): Hay {
   return hay;
 }
 
-// A letter or a digit. Anything else ends a word, so a term is findable after a
-// bracket, a slash, a dash or a quote: "(idle-time)" contains "time".
+// Anything but a letter or a digit ends a word, so "(idle-time)" contains
+// "time".
 function isWordChar(c: string): boolean {
   return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
 }
 
-// Where `needle` starts a word in `hay`, at or after `from`; -1 for nowhere.
-// A PREFIX COUNTS, the middle of a word does not. This is the whole of the
-// "into" fix, and the prefix half is what keeps search live while she is still
-// typing the word she wants. Pass `whole` to require the far end of the word
-// too, which is what every term except the one under her cursor gets.
+// Where `needle` starts a word in `hay`, at or after `from`, or -1. A prefix
+// counts and the middle of a word does not. `whole` also requires the word to
+// end there.
 export function wordStart(hay: string, needle: string, from = 0, whole = false): number {
   if (!needle) return -1;
   let at = hay.indexOf(needle, from);
@@ -255,13 +158,9 @@ export function wordStart(hay: string, needle: string, from = 0, whole = false):
   return -1;
 }
 
-// ONLY THE LAST WORD MAY BE HALF TYPED. She is typing left to right, so the
-// word under her cursor is the only one that is plausibly unfinished, and every
-// word before it she has already finished and moved past. Measured in the real
-// app: letting all three of "how to work" match as prefixes lit the
-// "to" inside "tonight" and inside "too", which is a quieter version of the
-// original noise. Requiring the earlier words whole costs nothing she was
-// using and takes that noise out.
+// Only the last term may be a prefix, since it is the one still being typed.
+// Earlier terms must be whole words, so "to" in "how to work" does not light
+// "tonight".
 function termAt(hay: string, terms: string[], i: number, from = 0): number {
   return wordStart(hay, terms[i], from, i < terms.length - 1);
 }
@@ -276,12 +175,13 @@ export function matches(i: Searchable, terms: string[]): boolean {
   return hasEvery(haystack(i).all, wanted);
 }
 
-/* ------------------------------ the ranking ------------------------------ */
-// Four rungs, and the gap that matters to her is the one between 2 and 1: at 2
-// and above the row SAYS what was typed, at 1 it merely contains the words.
+// Higher sorts first. At 2 and above the row says what was typed; at 1 it only
+// contains the words.
 //
+//   6  the ticket id, exactly
+//   5  a ticket id that starts with the query
 //   4  the phrase, in the title
-//   3  the phrase, in the body or the result
+//   3  the phrase, anywhere else
 //   2  every word, all of them in the title
 //   1  every word, somewhere
 //   0  not a match
@@ -300,24 +200,15 @@ function score(i: Searchable, q: Query): number {
   return 0;
 }
 
-// The rung one row lands on for one query, which is the whole of what ranking
-// means here and the only handle a test has on it. 0 is not a match at all.
-// Nothing draws this: it decides the order and then it is gone.
+// The rung one row lands on for one query, exported for tests. 0 is not a
+// match.
 export function searchScore(i: Searchable, query: string): number {
   return score(i, parseQuery(query));
 }
 
-/* ------------------------------ the results ------------------------------ */
-// Best first, then newest. It used to be newest only, on the reasoning that the
-// list groups by day and a relevance sort tears those groups into a repeating
-// stack of the same three labels. The reasoning was sound and the conclusion
-// was wrong: the tearing is real, so THE LIST STOPS GROUPING BY DAY while a
-// query is up and prints no heading at all instead. Every row still prints its
-// own timestamp on the right, so nothing about when it happened is lost.
-//
-// AN EMPTY QUERY IS EVERY TASK, NOT NO TASKS, and in her usual order. Opening
-// search used to hand back nothing, so the list she was reading vanished and
-// the screen read as an empty store until something was typed.
+// Best first, then newest. The list stops grouping by day while a query is up,
+// because a relevance sort would tear the day groups apart; each row still
+// shows its own time. An empty query returns every task, newest first.
 export function searchItems<T extends Searchable>(items: T[], query: string): Array<SearchHit<T>> {
   const q = parseQuery(query);
   if (q.terms.length === 0) {
@@ -332,33 +223,17 @@ export function searchItems<T extends Searchable>(items: T[], query: string): Ar
     .map(({ item }) => ({ item, summary: hitSummary(item, q.terms, q.phrase) }));
 }
 
-/* ------------------------- why this row matched -------------------------- */
-// The sentence the words were found in. Read in the row's own order of
-// importance: on anything finished the result is the news, so it is asked
-// first, exactly as rowSummary does it. When the only hit is in the title the
-// row keeps its ordinary summary, because the title is already on screen with
-// the match lit up in it and repeating it underneath says nothing.
-//
-// The checkpoint and her reply are asked LAST, and in that order. The task is
-// what the row is about, so a phrase written in both the ask and the progress
-// note summarises off the ask; and between the two of them the checkpoint is
-// the newer word, the one the pane itself would be showing her.
-//
-// AND NOTHING ON THIS LINE IS LABELLED, including the sentences out of her own
-// reply. It carried a "You said: " prefix for one day. The line is the sentence
-// that matched, whole, and the pane says the rest when she opens the row.
-//
-// AND THE PHRASE IS ASKED OF EVERY FIELD BEFORE ANY WORD IS ASKED OF ONE. This
-// file has always said that is the rule; until 2026-08-28 it was applied inside
-// a field and not across them, so one word early beat the whole phrase late.
+// The sentence the words were found in. On a finished row the result is asked
+// first, as rowSummary does. The checkpoint comes after body and result, and
+// the user's reply last. The phrase is asked of every field before any single
+// word is asked of one. A title-only hit keeps the ordinary summary, since the
+// title already shows the match. The line carries no label.
 export function hitSummary(i: Searchable, terms: string[], phrase = ''): string {
   const idQuery = terms.length === 1 ? ticketQuery(terms[0]) : null;
   if (idQuery && fold(i.id).startsWith(idQuery)) return i.id;
   const finished = i.status === 'done';
   const { body, result, note, answer } = haystack(i);
   const ordered = finished ? [result, body, note] : [body, result, note];
-  // Two passes over the same fields: the phrase everywhere, then the words
-  // everywhere. Her reply comes last in both.
   for (const only of phrase ? ['phrase', 'words'] : ['words']) {
     const wantPhrase = only === 'phrase';
     for (const sentences of ordered) {
@@ -371,16 +246,9 @@ export function hitSummary(i: Searchable, terms: string[], phrase = ''): string 
   return rowSummary(i, finished ? 'done' : 'inbox');
 }
 
-// The first sentence containing the query, windowed so the match is visible.
-// THE PHRASE IS ASKED FOR FIRST, across the whole text, before any single word
-// is: for "how to work" the first sentence containing "to" is nearly always a
-// sentence about something else, and a summary that answers her phrase with an
-// unrelated line is the row failing to say why it is in the list.
-//
-// Clipping from the left (what the row does at rest) is wrong here: the
-// sentence that matched is often two hundred characters long with the words at
-// the end, and a summary that cuts them out is a row that cannot say why it is
-// in the list.
+// The first sentence with the phrase, else the first with a word, windowed
+// around the match rather than clipped from the left, so the match still shows
+// when it sits at the end of a long sentence.
 export function matchedSentence(
   text: string,
   terms: string[],
@@ -390,12 +258,8 @@ export function matchedSentence(
   return text ? pickSentence(splitLines(text), terms, phrase, budget) : '';
 }
 
-// The same, over prose already cut into sentences, which is how the row asks it
-// so that hundreds of bodies are not re-split on every keystroke.
-//
-// `phraseOnly` is how hitSummary walks every field looking for the phrase
-// before it lets any field answer with a single word. On its own this function
-// cannot know there is a better sentence two fields along.
+// The same, over sentences already split. `phraseOnly` lets hitSummary look
+// for the phrase in every field before any field answers with a single word.
 function pickSentence(
   lines: Line[],
   terms: string[],
@@ -403,15 +267,14 @@ function pickSentence(
   budget: number,
   phraseOnly = false,
 ): string {
-  // Before she types there is nothing to look for, and walking every sentence
-  // of every row to find nothing is the whole cost of merely opening search.
+  // With nothing typed, skip walking every sentence of every row.
   const wanted = normalize(terms);
   if (!phrase && wanted.length === 0) return '';
   if (phrase) {
     for (const line of lines) {
-      // Asked of the FOLDED sentence so a wrapped phrase is still found, but
-      // the WINDOW is placed off a single word, which cannot straddle a
-      // newline and so cannot be at a shifted offset in the real string.
+      // Matched on the folded sentence so a wrapped phrase is found. The
+      // window is placed from a single word, whose offset carries to the raw
+      // string.
       if (wordStart(line.folded, phrase) < 0) continue;
       return windowAround(line.raw, Math.max(0, firstHit(line, wanted)), budget);
     }
@@ -428,21 +291,14 @@ function splitSentences(text: string): string[] {
   return text.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
 }
 
-// THE LONGEST WORD DECIDES, not the leftmost. She types "how to work" and a
-// sentence's leftmost hit is nearly always "to"; windowing there shows her a
-// run-up to a two-letter word she did not mean. The longest term is the one
-// carrying the meaning, so the window is built around that and the shorter
-// words come along inside it.
-// THE LONGEST WORD DECIDES WHERE THE WINDOW SITS, not the leftmost. She types
-// "how to work" and a sentence's leftmost hit is nearly always "to"; windowing
-// there shows her a run-up to a two-letter word she did not mean. So the terms
-// are tried longest first, while each keeps the whole-word rule its POSITION in
-// the query earns it.
+// The longest term places the window, not the leftmost, which is usually a
+// short word like "to". Each term keeps the whole-word rule its position in
+// the query gives it.
 function firstHit(line: Line, terms: string[]): number {
   const order = terms.map((t, i) => i).sort((a, b) => terms[b].length - terms[a].length);
   for (const i of order) {
-    // The raw sentence and the folded one only differ where a newline was
-    // squashed, and a single word never contains one, so the offset carries.
+    // Folded offsets match the raw sentence only up to the first run of two
+    // or more whitespace characters, which `squash` shortens.
     const at = termAt(line.folded, terms, i);
     if (at >= 0) return at;
   }
@@ -467,11 +323,8 @@ function windowAround(sentence: string, hit: number, budget: number): string {
   return `${start > 0 ? '…' : ''}${sentence.slice(start, end).trim()}${end < sentence.length ? '…' : ''}`;
 }
 
-/* ----------------------------- the highlight ----------------------------- */
 // Text split into runs, each marked hit or not, so the row can draw the match
-// without anything downstream having to parse the query again. Returns a single
-// unmarked run when nothing matches, which is what a title-only or body-only
-// row needs on its other line.
+// without parsing the query again. Nothing matching gives one unmarked run.
 export interface Run { text: string; hit: boolean }
 
 export function splitHits(text: string, terms: string[], phrase = ''): Run[] {
@@ -479,10 +332,8 @@ export function splitHits(text: string, terms: string[], phrase = ''): Run[] {
   const wanted = normalize(terms);
   if (wanted.length === 0) return [{ text, hit: false }];
   const lower = fold(text);
-  // Every word-start occurrence of every term AND of the phrase, then merged,
-  // so "how to work" lights as one run rather than three words with two gaps,
-  // and so overlapping terms ("con" and "conversion") light one run rather than
-  // nesting two.
+  // Spans for every term and for the phrase, merged so "how to work" lights as
+  // one run and overlapping terms do not nest.
   const spans: Array<[number, number]> = [];
   const push = (needle: string, find: (from: number) => number) => {
     let at = find(0);

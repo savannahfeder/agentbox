@@ -24,9 +24,11 @@ describe('the app a stranger downloads is called Powerup', () => {
     expect(pkg.build.productName).toBe(NAME);
     // The window's own title bar. It said the app until the first rename landed,
     // so the app shipped under the internal name for as long as there was a
-    // build. It reads the name now rather than holding one.
+    // build. It reads the name now rather than holding one, and since a
+    // throwaway copy's window says so in its own title (main/new-user-window.mjs)
+    // the name is handed there rather than written on the window.
     const main = fs.readFileSync(path.join(repo, 'main', 'main.mjs'), 'utf8');
-    expect(main).toMatch(/title: NAME,/);
+    expect(main).toMatch(/name: NAME,/);
     expect(main).not.toMatch(/title: 'Zero'/);
     for (const was of WAS) expect(main).not.toContain(`title: '${was}'`);
   });
@@ -73,8 +75,10 @@ describe('the download opens on both kinds of Mac', () => {
     // electron-builder names the output folder after the arch it packed, so
     // release/mac-arm64 became release/mac-universal on the line above. Two
     // scripts had that folder written into them and would have gone on opening
-    // a stale app, or none, without saying so.
-    for (const f of ['scripts/fresh-user.mjs', 'scripts/prove-the-new-user-opens.mjs']) {
+    // a stale app, or none, without saying so. `npm run fresh` keeps its list
+    // in scripts/fresh-user-target.mjs since 2026-10-24, where the checkout it
+    // falls back to on Linux lives too.
+    for (const f of ['scripts/fresh-user-target.mjs', 'scripts/prove-the-new-user-opens.mjs']) {
       expect(fs.readFileSync(path.join(repo, f), 'utf8')).toContain('mac-universal');
     }
   });

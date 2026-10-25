@@ -60,11 +60,11 @@ describe('when Run now is offered', () => {
 });
 
 describe('⌘K', () => {
-  it('offers Run Now on a waiting task, findable by "run"', () => {
+  it('offers Run now on a waiting task, findable by "run"', () => {
     let ran = 0;
     const cmds = runNowCommands(task(), { queued: [], runNow: [], inProgress: true }, () => { ran += 1; });
     expect(cmds).toHaveLength(1);
-    expect(cmds[0].label).toBe('Run Now');
+    expect(cmds[0].label).toBe('Run now');
     expect(cmds[0].label.toLowerCase()).toContain('run');
     cmds[0].run();
     expect(ran).toBe(1);

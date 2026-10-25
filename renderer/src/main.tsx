@@ -12,6 +12,7 @@ import { applySkin, applyTune, normalizeSavedLook, resolveSkin, resolveTune, SKI
 // Same reason as the theme above: it moves the header and the width of the
 // words, so a frame drawn before it lands is a reflow.
 import { applyTaskShape, resolveTaskShape, TASK_SHAPE_KEY } from './task-shape';
+import { installPictureWatch } from './phone-files';
 
 // A thrown React error takes the screen down without taking the process down,
 // so nothing in the main process ever hears about it. These two lines are the
@@ -59,6 +60,8 @@ const paintTheLook = () => {
 
 const boot = () => {
   paintTheLook();
+  // A picture holds its place while it loads, in every window (phone.css).
+  installPictureWatch();
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <AgentUpdates><App /></AgentUpdates>

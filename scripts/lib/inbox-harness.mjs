@@ -7,7 +7,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { guard, sweep } from './chrome-guard.mjs';
+import { CHROME, guard, sweep } from './chrome-guard.mjs';
 import { foldWorkItems } from '../../shared/work-items.mjs';
 import { STORE_ROOT } from './machine-paths.mjs';
 
@@ -62,8 +62,10 @@ export async function openInbox({ dist, width = 1440, height = 944, snapshot }) 
 
   sweep();
   const profile = fs.mkdtempSync('/tmp/shot-profile-');
-  const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
-    '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+  // The browser the shot scripts share, which is an env override off this
+  // Mac's path (./chrome-guard.mjs).
+  const chrome = spawn(CHROME, [
+    '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-sandbox',
     '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
     `--window-size=${width},${height}`, 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });

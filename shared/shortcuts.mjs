@@ -93,6 +93,7 @@
 // touching it, so the row names no sections at all.
 
 import { NAME } from './product-name.mjs';
+import { chordOf, everyChord } from './key-caps.mjs';
 
 /** @type {import('./shortcuts.d.mts').ShortcutGroup[]} */
 export const SHORTCUTS = [
@@ -199,10 +200,11 @@ export const SHORTCUTS = [
       // (meta||ctrl) && 'k' → the palette, above every other branch, and
       // forwarded from inside an open file by main.mjs as well.
       { keys: ['⌘K', 'Ctrl+K'], join: 'or', what: `The command bar: everything ${NAME} can do, by name.` },
-      // 'n' in both branches → setModal('compose'). C does the same and is
-      // left off: N is the default (w-fb9051e597).
+      // 'n' in both branches → setModal('compose').
       // "Threads", not tasks, since w-ec62ab6b38.
       { keys: ['N'], what: 'Start a new thread.' },
+      // cloudChord in the chords → toggleCloudRef: the cloud on or off.
+      { keys: ['⌘C'], what: 'Turn the cloud on or off, when no text is selected.' },
       // '/' above the focused branch → openSearch
       { keys: ['/'], what: 'Search your threads.' },
       // '\\' above the focused branch → togglePanel
@@ -225,18 +227,24 @@ export function everyKey(groups = SHORTCUTS) {
 // moves here has moved for every agent on its next run. The closing line is
 // the point: an agent's own saved memory is read before anything we hand it,
 // and on 2026-10-04 one said "press S" three days after S stopped scheduling.
+// And in the glyphs of the keyboard in front of them: an agent telling
+// somebody on Linux to "press ⌘K" names a key they do not have, which is the
+// same mistake as a stale memory.
 /** The keys as one block of plain text, for an agent's system prompt. */
-export function keysForAgents(groups = SHORTCUTS) {
+export function keysForAgents(groups = SHORTCUTS, { mac = true } = {}) {
   const lines = [
     `The keys in ${NAME}, the app this person reads you in, as they are today.`,
     'When you tell them to press something, use these. Keys have moved before,',
     'so a key you remember from an earlier session, a memory or a note that',
-    'disagrees with this list is out of date. Anything without a key is in ⌘K',
-    'by name.',
+    'disagrees with this list is out of date. Anything without a key is in',
+    `${chordOf('⌘K', mac)} by name.`,
   ];
   for (const g of groups) {
     lines.push('', `${g.label}:`);
-    for (const k of g.keys) lines.push(`- ${k.keys.join(k.join ? ` ${k.join} ` : ' ')}: ${k.what}`);
+    for (const k of g.keys) {
+      const keys = everyChord(k.keys, mac);
+      lines.push(`- ${keys.join(k.join && keys.length > 1 ? ` ${k.join} ` : ' ')}: ${k.what}`);
+    }
   }
   return lines.join('\n');
 }

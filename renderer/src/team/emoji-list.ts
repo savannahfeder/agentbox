@@ -543,14 +543,17 @@ export const EMOJI_GROUPS: EmojiGroup[] = [
 ];
 
 /**
- * Every emoji whose words hold what was typed. A word that STARTS with it comes
- * first, so "ok" is 👌 before it is the 📖 in "book".
+ * Every emoji whose words hold what was typed. The one NAMED it comes first, so
+ * "eyes" is 👀 before 😍; then a word that STARTS with it, so "ok" is 👌 before
+ * it is the 📖 in "book".
  */
 export function findEmoji(typed: string): [string, string][] {
-  const q = typed.trim().toLowerCase();
+  // Slack names are typed between colons, ":eyes:".
+  const q = typed.trim().toLowerCase().replace(/^:+|:+$/g, '');
   if (!q) return [];
   const all = EMOJI_GROUPS.flatMap((group) => group.emoji);
-  const starts = all.filter(([, words]) => words.split(' ').some((word) => word.startsWith(q)));
-  const inside = all.filter((entry) => !starts.includes(entry) && entry[1].includes(q));
-  return [...starts, ...inside];
+  const named = all.filter(([, words]) => words.split(' ')[0] === q);
+  const starts = all.filter((entry) => !named.includes(entry) && entry[1].split(' ').some((word) => word.startsWith(q)));
+  const inside = all.filter((entry) => !named.includes(entry) && !starts.includes(entry) && entry[1].includes(q));
+  return [...named, ...starts, ...inside];
 }

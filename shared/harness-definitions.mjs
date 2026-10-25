@@ -13,6 +13,14 @@ export const HARNESS_DEFINITIONS = freeze([
     installer: { shell: '/bin/bash', url: 'https://claude.ai/install.sh', pipe: 'bash' },
     loginArgs: ['auth', 'login', '--claudeai'], statusArgs: ['auth', 'status', '--json'],
     credentialFiles: ['.claude.json', '.credentials.json'],
+    // THE OLDEST CLAUDE CODE THE WORKER LINE BELOW RUNS ON. Measured 2026-10-15
+    // by running the app's own line against npm releases on a stand-in model:
+    // 2.1.71 (2026-03-06) is the first that takes `--permission-mode auto`,
+    // which every worker is started with; 2.1.70 and older die in under a
+    // second on it. Every other flag is older still (`--effort` arrived after
+    // 2.1.8, `--include-partial-messages` after 1.0.90). shared/spawn-trouble.mjs
+    // names it when an older one refuses the line.
+    minVersion: '2.1.71',
     // HOW A WORKER IS STARTED, AS DATA. This was six hardcoded flag names in
     // main/supervisor.mjs, which made the cheapest possible new engine — one
     // that speaks this same stream-json and differs by a binary and the

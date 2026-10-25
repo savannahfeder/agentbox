@@ -13,6 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll } from 'vitest';
 import { setAppHome } from './app-home.mjs';
+import { keepAnswerModesIn } from '../main/answer-modes.mjs';
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-home-'));
 // UNDER EVERY NAME THIS APP HAS HAD, not just one. An agent session inherits
@@ -21,12 +22,23 @@ const home = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-home-'));
 // her real store. tests/app-home.mjs carries the measurement.
 setAppHome(home);
 
+// AND A FOLDER OF HER OWN for what a reply may do, as main/main.mjs gives the
+// app at start: until one is named, no mode is kept (main/answer-modes.mjs).
+const userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-user-'));
+keepAnswerModesIn({ userDir, storeRoot: home });
+
 // ONE CLOCK ZONE FOR EVERY RUN. The tests that check a time in words ("7:21 PM
 // today") are written in Pacific time, and passed only on a Mac set to it: on
 // GitHub's runners, which are on UTC, they read "2:21 AM today" and main was
 // red on every push (measured 2026-10-01, three tests in two files). Node
 // reads TZ whenever it changes, and this runs before each test file loads.
 process.env.TZ = 'America/Los_Angeles';
+
+// AND NO TEST SEES THIS MAC'S CLOUD RUNS. A Mac that has run
+// scripts/cloud-setup.mjs keeps ~/.agentbox/cloud.json, and a supervisor
+// built in a test would otherwise send its overflow to the developer's real
+// AWS account (docs/cloud/PLAN.md). A test that wants cloud runs names its own.
+process.env.AGENTBOX_CLOUD_CONFIG = path.join(home, 'no-cloud-runs-here.json');
 
 // NOBODY IS SIGNED IN. AGENTBOX_PERSON_ID names whoever is signed into the team
 // on this Mac; main sets it at sign-in (main/team/index.mjs) so the store server
@@ -53,4 +65,5 @@ delete process.env.AGENTBOX_PERSON_ID;
 
 afterAll(() => {
   try { fs.rmSync(home, { recursive: true, force: true }); } catch { /* best effort */ }
+  try { fs.rmSync(userDir, { recursive: true, force: true }); } catch { /* best effort */ }
 });

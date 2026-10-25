@@ -7,7 +7,7 @@
 // table is tried here against the real migrations, in an in-process Postgres
 // (PGlite) with Supabase's `auth` schema stood in: the two people in it, a
 // teammate who is not, and a stranger.
-import { it, expect, beforeAll } from 'vitest';
+import { it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,6 +72,7 @@ beforeAll(async () => {
   await as(MAYA, `insert into public.project_people (project_id, person_id) values ($1, $2)`, [TALK, THEO]);
   await put(MAYA, 'k2x9ab-q1w2e3-pasted-1042.png');
 }, 60_000);
+afterAll(() => db.close());
 
 it('lets the other person in the conversation read the picture', async () => {
   expect(await rows(THEO, `select name, data from public.message_files where project_id = $1`, [TALK]))

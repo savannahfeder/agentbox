@@ -26,10 +26,51 @@
 // and the first run have anywhere to be. The main process already knows the
 // difference and has always said so: `bootInfo.reloaded` is true only after the
 // ⌘R it was pressed for. That flag is the gate.
+//
+// AND SO IS THE HEARTBEAT, BECAUSE ⌘R IS NOT THE ONLY WAY A PAGE COMES BACK.
+// An update restarts the app and a crash takes the window with it, and to the
+// page that comes up afterwards both look exactly like opening Agentbox in the
+// morning. The flag cannot tell them apart, because the main process that
+// would have set it is the thing that died.
+//
+// The window can. It writes down that it is alive every few seconds, and a
+// load that finds a mark seconds old is coming back to a sitting already in
+// progress. Morning is hours, not seconds, so the rule above is untouched.
 
 import type { View } from './types';
 
 const KEY = 'zero.where';
+const ALIVE_KEY = 'zero.alive';
+
+/** How often the window says it is still here. */
+export const ALIVE_EVERY_MS = 10_000;
+
+/**
+ * How stale that mark may be and still mean "this is the same sitting". Wide
+ * enough for several missed beats, since a page can be held by a long render
+ * or by the app's own process frozen under it, and nowhere near the gap
+ * between two sittings.
+ */
+export const STILL_THIS_SITTING_MS = 90_000;
+
+/** Said on a beat for as long as the window is up. */
+export function markWindowAlive(storage: Pick<Storage, 'setItem'>, now = Date.now()): void {
+  try { storage.setItem(ALIVE_KEY, String(now)); } catch { /* a full disk is not worth a crash */ }
+}
+
+/**
+ * Is this page coming back to a sitting that was already going, or opening the
+ * app? Read BEFORE the first beat of this window, or it is reading itself.
+ */
+export function windowWasJustHere(storage: Pick<Storage, 'getItem'>, now = Date.now()): boolean {
+  let raw: string | null = null;
+  try { raw = storage.getItem(ALIVE_KEY); } catch { return false; }
+  const at = Number(raw);
+  if (!raw || !Number.isFinite(at)) return false;
+  // A mark ahead of now is a clock that moved, not a window that was here.
+  if (at > now) return false;
+  return now - at < STILL_THIS_SITTING_MS;
+}
 
 const VIEWS: readonly View[] = ['inbox', 'snoozed', 'progress', 'done'];
 

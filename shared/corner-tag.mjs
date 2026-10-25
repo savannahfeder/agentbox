@@ -1,11 +1,10 @@
 // THE CORNER TAG (w-dafae58a23): the rules, and nothing that touches a window.
 //
 // You lose track of agents once you are in another app, and the ones waiting on
-// you sit idle. The answer that survived eight rounds of drawings is a small tag
-// in a corner of the screen that says "2 ready for you" when an agent has
-// something for you and "20 working" when none does. Twenty agents running is
-// ordinary, so working agents are a count and never a list: only what is ready
-// for you is worth a line.
+// you sit idle. The answer is a small tag in a corner of the screen: the
+// nine-dot mark and how many started waiting since you last had the app in
+// front. When nothing is new it is gone (w-93b3a1a796), because a tag that is
+// always there is a tag nobody reads.
 //
 // It must never become a nag. So it hides for a while and comes back on its
 // own, there is no one-click way to make it gone for good (that becomes a thing
@@ -48,13 +47,60 @@ export function hiddenUntil(choice, now) {
   return 0;
 }
 
-/** The words on the tag, or null when there is nothing to say. Short, because
- *  "22 ready for you" in the corner of a full screen was more than it needed;
- *  "waiting" was picked over "ready" and "need you". */
-export function tagSays({ ready = 0, working = 0 } = {}) {
-  if (ready > 0) return { kind: 'ready', text: `${ready} waiting` };
-  if (working > 0) return { kind: 'working', text: `${working} working` };
+/**
+ * What the tag says: the mark and how many are new, or null, in which case it
+ * is gone. A working count kept it on screen all day and made it wallpaper
+ * (w-93b3a1a796), so working agents only appear in its list. "Waiting" won
+ * over "ready" and "need you", and is what the tag says aloud.
+ */
+export function tagSays({ ready = 0 } = {}) {
+  if (ready > 0) return { kind: 'ready', text: String(ready), label: `${ready} waiting` };
   return null;
+}
+
+/**
+ * A page's measurement of itself, in screen points. A page drawn at a zoom
+ * other than 100% measures in its own units, and the window and the Mac's
+ * glass are placed in points: at 87% the glass stood out past the tag
+ * (w-93b3a1a796). A zoom it cannot read counts as 100%.
+ */
+export function inPoints({ width, height, glass, radius }, zoom) {
+  const z = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+  return {
+    width: width * z,
+    height: height * z,
+    glass: glass && { x: glass.x * z, y: glass.y * z, width: glass.width * z, height: glass.height * z },
+    radius: Number.isFinite(radius) ? radius * z : radius,
+  };
+}
+
+/**
+ * What started waiting after you last looked, which is the last time the
+ * app's window was in front, and whatever a notification told you about since
+ * you were last at the app (`told`, { id, at }), dated from when it told you.
+ * Before you have ever looked, everything counts.
+ */
+export function newSince(ready, lookedAt, told = []) {
+  const toldAt = new Map();
+  for (const t of told ?? []) if (t?.id != null) toldAt.set(t.id, Number.isFinite(t.at) ? t.at : 0);
+  const out = [];
+  for (const r of ready ?? []) {
+    const own = Number.isFinite(r.since) ? r.since : null;
+    if (toldAt.has(r.id)) out.push(own != null && own >= toldAt.get(r.id) ? r : { ...r, since: toldAt.get(r.id) });
+    else if (!(lookedAt > 0) || (own != null && own > lookedAt)) out.push(r);
+  }
+  return out;
+}
+
+/**
+ * What is left once you have crossed some off the tray (`dismissed`, id to
+ * when). A thread stays off until it has something newer than that.
+ */
+export function notDismissed(list, dismissed = {}) {
+  return (list ?? []).filter((r) => {
+    const at = dismissed?.[r.id];
+    return !(Number.isFinite(at) && !(r.since > at));
+  });
 }
 
 /**
@@ -168,54 +214,77 @@ export function cardScale(scale) {
 }
 
 /**
- * THE NINE DOTS ARE WHOLE PIXELS, not a share of the tag (2026-10-13). They
- * used to be 2.7 and 0.95 points multiplied by the scale, which at 31px came
- * out as 2.99 and 1.05: every row and column rounded somewhere different, so
- * the gaps were uneven and a dot that small turned into an aliased square.
- * She caught it in the running app: "the dots aren't even here".
+ * THE NINE DOTS ARE ONE DRAWING, not nine boxes (2026-10-13).
  *
- * So each height gets a dot and a gap in whole pixels. Every track is then
- * identical at any pixel ratio, and a dot has enough pixels to be round.
+ * They were boxes in a grid, and twice the fix was to give the dot and the gap
+ * whole pixels. That only holds on a screen whose point is a whole device
+ * pixel. Hers is not: a Mac in a scaled mode draws 1.5 device pixels to the
+ * point, so a 3pt dot is 4.5 and a 1pt gap is 1.5, and the browser snaps every
+ * box on its own — 5,5,5 across with gaps of 2 and 1. Rasterised through the
+ * real page, 16 of 28 sizes came out uneven at that scale and none at 1x or
+ * 2x. "It's the same issue we've had six times before."
+ *
+ * An svg of nine circles on one pitch is rasterised in one go, so the spacing
+ * cannot round apart whatever the screen does, and the geometry can go back to
+ * the launch film's own: dots of 2.7 and gaps of 0.95 in a box of 10.
  */
-export const LATTICE_CELLS = {
-  31: { dot: 3, gap: 1 },
-  36: { dot: 4, gap: 1 },
-  42: { dot: 4, gap: 2 },
-  48: { dot: 5, gap: 2 },
-};
+export const LATTICE = { box: 10, dot: 2.7, gap: 0.95 };
 
-/** The dot and gap for a tag this tall. */
-export function latticeCell(height) {
-  const h = Number.isFinite(height) ? Math.round(height) : TAG_HEIGHTS[0].px;
-  if (LATTICE_CELLS[h]) return LATTICE_CELLS[h];
-  // A height nobody planned for still draws something even: about a tenth of
-  // the tag for a dot, a third of that for the gap, both whole.
-  const dot = Math.max(2, Math.round(h / 10));
-  return { dot, gap: Math.max(1, Math.round(dot / 3)) };
+/**
+ * The mark for a box this many points across, on a screen drawing this many
+ * device pixels to the point.
+ *
+ * THE PITCH IS A WHOLE NUMBER OF DEVICE PIXELS. That is the whole trick. Every
+ * dot then sits at the same distance from a device-pixel boundary as every
+ * other, so all nine are rasterised identically and the spacing cannot round
+ * apart — however the mark's own corner happens to land. Whole POINTS were the
+ * old rule, and a point on her screen is 1.5 device pixels, which is why it
+ * kept coming back.
+ */
+export function latticeGrid(box, dpr = 1) {
+  const px = Number.isFinite(dpr) && dpr > 0 ? dpr : 1;
+  const want = (Number.isFinite(box) && box > 0 ? box : LATTICE.box) * px;
+  // Both whole numbers either side of the film's dot and gap, and the pair
+  // whose mark comes closest to the size asked for — a dot and a gap rounded
+  // on their own can leave the mark a fifth too big, which shows.
+  const ideal = { dot: (want * LATTICE.dot) / LATTICE.box, gap: (want * LATTICE.gap) / LATTICE.box };
+  const ways = [];
+  for (const dot of [Math.floor(ideal.dot), Math.ceil(ideal.dot)]) {
+    for (const gap of [Math.floor(ideal.gap), Math.ceil(ideal.gap)]) {
+      const d = Math.max(2, dot);
+      const g = Math.max(1, Math.min(gap, d - 1));
+      ways.push({ dot: d, gap: g, side: 3 * d + 2 * g });
+    }
+  }
+  // A dot five times its gap is a mark whose dots all but touch, and one twice
+  // its gap is a loose one; the film's is 2.84. Keep inside that band if any
+  // pair can, and among those take the closest size.
+  const inBand = ways.filter((w) => w.dot / w.gap >= 2 && w.dot / w.gap <= 4);
+  const pick = (inBand.length ? inBand : ways)
+    .sort((a, b) => Math.abs(a.side - want) - Math.abs(b.side - want)
+      || Math.abs(a.dot / a.gap - LATTICE.dot / LATTICE.gap) - Math.abs(b.dot / b.gap - LATTICE.dot / LATTICE.gap));
+  const { dot, gap, side } = pick[0];
+  const pitch = dot + gap;
+  const at = [0, 1, 2].map((i) => dot / 2 + i * pitch);
+  return { dot, gap, pitch, side, size: side / px, dots: at.flatMap((cy) => at.map((cx) => ({ cx, cy }))) };
 }
 
 /**
- * What the tag counts and lists: everything waiting on you, newest first.
- * The first version put threads from weeks ago at the top of the list; the
- * second cut everything older than a day, and then a Needs you of 58 read
- * "3 waiting" in the corner (w-0961e5523b). So the count is the whole of it,
- * the same number the app shows, and only the order keeps the old ones out
- * of the way: the list shows the newest three and folds the rest into "and N
- * more". Something with no moment it became ready (an agent stopped on a
- * yes, right now) sorts as now.
+ * Newest first. Something with no moment it became ready (an agent stopped on
+ * a yes, right now) sorts as now.
  */
 export function readyNow(ready, now) {
   return [...(ready ?? [])]
     .sort((a, b) => (Number.isFinite(b.since) ? b.since : now) - (Number.isFinite(a.since) ? a.since : now));
 }
 
-/** Whether the tag is on screen right now. */
-export function tagShows({ on, hiddenUntil: until = 0, now, inApp, ready = 0, working = 0 }) {
+/** Whether the tag is on screen right now; `ready` is how many are new. */
+export function tagShows({ on, hiddenUntil: until = 0, now, inApp, ready = 0 }) {
   if (on === false) return false;
   if (until > now) return false;
   // In the app itself the inbox already says all of this, bigger.
   if (inApp) return false;
-  return !!tagSays({ ready, working });
+  return !!tagSays({ ready });
 }
 
 /** How long something has waited, in units. */

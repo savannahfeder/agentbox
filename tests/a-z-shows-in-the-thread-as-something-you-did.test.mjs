@@ -161,7 +161,8 @@ describe('the wiring in App.tsx', () => {
 
   it('leaves a mark past it, only once the undo has gone through, spanning its own writes', () => {
     const past = undo.slice(undo.indexOf('PAST THE GRACE WINDOW'));
-    expect(past).toMatch(/const from = Date\.now\(\);\s*\n\s*try \{\s*\n\s*await last\.run\(\);/);
+    // `outcome =`: a run may answer that it was too late (2026-10-16).
+    expect(past).toMatch(/const from = Date\.now\(\);\s*\n\s*(let outcome[^\n]*\n\s*)?try \{\s*\n\s*(outcome = )?await last\.run\(\);/);
     expect(past.indexOf('leaveUndoMarks(last.undid, from, Date.now())')).toBeGreaterThan(past.indexOf('} catch (err) {'));
   });
 

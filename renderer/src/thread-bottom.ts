@@ -235,9 +235,15 @@ const markOf = (el: HTMLElement): RestoreMark => {
  * component's own cleanup does when she leaves the task. Her scrolling up stops
  * it too, until she scrolls back down.
  */
-export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number } = {}): () => void {
+export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number; keepPlace?: boolean } = {}): () => void {
   if (!el) return () => {};
   const now = opts.now ?? (() => Date.now());
+  // KEEP HER PARAGRAPH WHERE IT IS WHEN ANYTHING ABOVE IT CHANGES HEIGHT, not
+  // only on a re-wrap. The desktop's browser does this itself (scroll
+  // anchoring); Safari on an iPhone does not, so there every picture or block
+  // above her that settled moved the words she was reading (2026-10-13,
+  // tests/a-thread-on-a-phone-holds-still-while-something-above-it-changes).
+  const keepPlace = opts.keepPlace === true;
   let live = true;
   // SHE IS AT THE BOTTOM UNTIL SHE ISN'T. A task opens at its end, so this
   // starts true and only something moving the box turns it off.
@@ -329,7 +335,11 @@ export function holdAtBottom(el: HTMLElement | null, opts: { now?: () => number 
     if (!rewrapped && hers() && mine >= 0 && Math.round(el.scrollTop) !== mine) {
       stuck = gapToBottom(el) <= LEAVE_SLACK;
     }
-    if (!stuck) { place = placeIn(el); return; }
+    if (!stuck) {
+      if (keepPlace && place && returnTo(el, place)) mine = Math.round(el.scrollTop);
+      place = placeIn(el);
+      return;
+    }
     const want = bottomOf(el);
     // Only write when it would actually move. A no-op write still fires a
     // scroll event, and a scroll event this thing has to reason about is worth

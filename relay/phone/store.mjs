@@ -38,3 +38,17 @@ export function keyFromHash(hash) {
   const m = /(?:^#|&)k=([A-Za-z0-9_-]{24,})/.exec(String(hash ?? ''));
   return m ? m[1] : null;
 }
+
+/**
+ * The key a page opened at `url` runs on. A code scanned now beats the one kept
+ * from an earlier code: a new key is a new room, so the old one would only ever
+ * hear "not connected" and the first page that stores the new key never runs.
+ */
+export async function keyFor(url, { read = readKey, write = writeKey } = {}) {
+  const kept = await read().catch(() => null);
+  let scanned = null;
+  try { scanned = url ? keyFromHash(new URL(url).hash) : null; } catch { /* not an address */ }
+  if (!scanned || scanned === kept) return kept;
+  await write(scanned).catch(() => {});
+  return scanned;
+}

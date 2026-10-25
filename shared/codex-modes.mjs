@@ -38,6 +38,57 @@ export const CODEX_MODE_ORDER = ['read-only', 'auto', 'full-access'];
 export const CODEX_DEFAULT_MODE = 'auto';
 
 /**
+ * WHO A SANDBOX ESCAPE IS ROUTED TO, in Codex's own three words. Read off
+ *  `codex app-server generate-json-schema` on codex-cli 0.160.0, 2026-10-09.
+ *  The schema's own description: "Configures who approval requests are routed to
+ *  for review. Examples include sandbox escapes, blocked network access, MCP
+ *  approval prompts, and ARC escalations. Defaults to `user`. `auto_review` uses
+ *  a carefully prompted subagent to gather relevant context and apply a
+ *  risk-based decision framework before approving or denying the request."
+ *
+ *  A value outside this list is not a near miss: `thread/start` refuses it and
+ *  the run is lost, so `codexReviewer` below falls back rather than passing one
+ *  through.
+ */
+export const CODEX_REVIEWERS = ['user', 'auto_review', 'guardian_subagent'];
+
+/**
+ * THE ONE THAT PUTS THE QUESTION IN FRONT OF A PERSON, which is the whole
+ *  reason this constant has a name instead of being a string in three places.
+ *  It is also the protocol's own default; Agentbox sends it explicitly anyway,
+ *  for the reason `codexReviewer` gives.
+ */
+export const ASKS_THE_PERSON = 'user';
+
+/**
+ * The reviewer to send, given whatever a caller asked for.
+ *
+ *  THE FIELD IS ALWAYS SENT, AND THAT IS THE POINT. It was absent before, so
+ *  the value came from a top-level `approvals_reviewer` in whichever Codex home
+ *  billed the run. Measured 2026-10-09 on codex-cli 0.160.0 against a real
+ *  app-server: with the field absent and that key set to `auto_review`, a
+ *  worker asked to write outside its workspace had the escalation APPROVED by
+ *  Codex's own subagent, wrote into the home directory, and reached three
+ *  external sites -- with ZERO approval cards raised and no server request on
+ *  the wire at all. The same run with `approvalsReviewer: 'user'` raised a card
+ *  reading "The sandbox blocked this write outside the workspace. Do you
+ *  approve...". The reproduction is `scripts/qa-codex-live.mjs approvals`.
+ *
+ *  So a file nobody in this app reads was deciding what a worker may do. Naming
+ *  the reviewer on every start takes that vote away, and `user` is the value,
+ *  because "ask" in a mode's own sentence has to mean asking the person.
+ *
+ *  THIS IS NOT A REVERSAL OF w-ca48e69535. That row put `auto_review` on `auto`
+ *  to stop two logins behaving differently -- a home with no config sent asks to
+ *  her inbox, a home with one did not. Naming the reviewer explicitly fixes that
+ *  same inconsistency and fixes it in the direction the mode already promised.
+ *  One mode, one behaviour, whichever account the run is on.
+ */
+export function codexReviewer(asked = null) {
+  return CODEX_REVIEWERS.includes(asked) ? asked : ASKS_THE_PERSON;
+}
+
+/**
  * THE PAIR EACH MODE REALLY IS. `sandbox` and `approvalPolicy` go straight into
  *  `thread/start`, so this table is the whole of the mapping and there is no
  *  second copy of it anywhere.
@@ -46,6 +97,11 @@ export const CODEX_DEFAULT_MODE = 'auto';
  *  the refusing, and `on-request` leaves the agent able to ASK to step outside
  *  rather than simply failing. On `full-access` there is nothing left to ask
  *  about, so it is `never`.
+ *
+ *  NO ROW NAMES A REVIEWER, because all three get the same one and a per-row
+ *  value is how the last hole stayed open: two of the three named none, fell
+ *  through to her config, and behaved differently from the one that did.
+ *  `codexPosture` supplies it, once, below.
  */
 export const CODEX_MODES = {
   'read-only': {
@@ -59,13 +115,7 @@ export const CODEX_MODES = {
     label: 'Auto',
     sandbox: 'workspace-write',
     approvalPolicy: 'on-request',
-    // WHO ANSWERS THOSE ASKS, SAID HERE RATHER THAN LEFT TO A FILE. This used
-    // to come only from `approvals_reviewer` in her `~/.codex/config.toml`, so
-    // a second login's home, which starts with no config at all, sent every ask
-    // to her inbox instead (2026-09-24, w-ca48e69535). One mode, one behaviour,
-    // whichever account the run is on.
-    approvalsReviewer: 'auto_review',
-    what: 'Works inside the project folder. Asks before going outside it or onto the network.',
+    what: 'Works inside the project folder. Asks you before going outside it or onto the network.',
   },
   'full-access': {
     label: 'Full access',
@@ -87,11 +137,17 @@ export function isCodexMode(word) {
  *  start one. The writers (main/settings.mjs) validate on the way IN, which is
  *  where a typo can still be reported to the person who made it.
  */
-export function codexPosture(mode) {
+export function codexPosture(mode, { reviewer = null } = {}) {
   const row = CODEX_MODES[mode] ?? CODEX_MODES[CODEX_DEFAULT_MODE];
-  const posture = { sandbox: row.sandbox, approvalPolicy: row.approvalPolicy };
-  if (row.approvalsReviewer) posture.approvalsReviewer = row.approvalsReviewer;
-  return posture;
+  // The reviewer is named on EVERY mode, `full-access` included. Its policy is
+  // `never` so it changes no behaviour there today, and that is exactly why it
+  // is named: one answer in the table rather than two, so a later change to the
+  // policy cannot silently hand the decision back to a config file.
+  return {
+    sandbox: row.sandbox,
+    approvalPolicy: row.approvalPolicy,
+    approvalsReviewer: codexReviewer(reviewer),
+  };
 }
 
 /** The label for a mode, for any surface that has to name one. */

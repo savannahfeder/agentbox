@@ -58,7 +58,10 @@ describe('the renderer cannot send anything', () => {
 describe('the list of what may be sent', () => {
   // Her seven, and since 2026-10-06 the five that count real use rather than
   // the walkthrough (tests/real-use-is-counted.test.mjs says why).
-  it('is her twelve and no more', () => {
+  // And since 2026-10-16 five about the minutes after setup
+  // (tests/what-people-do-after-setup-is-counted.test.mjs) and the switch
+  // going off (tests/turning-counts-off-sends-one-last-count.test.mjs).
+  it('is her eighteen and no more', () => {
     expect(Object.values(EVENTS)).toEqual([
       `${Name} was opened`,
       'First run finished',
@@ -72,6 +75,12 @@ describe('the list of what may be sent', () => {
       'A task was written',
       'An agent started work',
       'An agent stopped work',
+      `${Name} was quit`,
+      'The corner tag was hidden',
+      'The corner tag was turned off',
+      'Setup offered agents to import',
+      'Setup imported agents',
+      'Counts were turned off',
     ]);
   });
 
@@ -181,7 +190,7 @@ describe('her switch', () => {
     // config object: saveConfig writes the file AND mutates it in place.
     config.diagnostics = false;
     expect(a.enabled).toBe(false);
-    expect(a.reason).toBe('turned off');
+    expect(a.reason).toBe('is turned off');
     expect(a.track('app_opened')).toBe(false);
     expect(a.crashTransport({ kind: 'main-uncaught', upMs: 10 })).toBe(false);
     expect(client.sent).toHaveLength(1);
@@ -291,8 +300,8 @@ describe('the README, which is where the privacy notice lives', () => {
       .replace(Name.toLowerCase(), 'the app'));
     const missing = said.filter((sentence) => !text.includes(sentence));
     expect(missing).toEqual([]);
-    expect(text).toContain('twelve things');
-    expect(EVENT_NAMES).toHaveLength(12);
+    expect(text).toContain('eighteen things');
+    expect(EVENT_NAMES).toHaveLength(18);
   });
 
   it('promises no content leaves, which is what sanitize enforces', () => {

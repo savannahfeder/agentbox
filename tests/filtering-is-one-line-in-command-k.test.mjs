@@ -23,7 +23,9 @@ const palette = (props) => renderToStaticMarkup(createElement(Palette, new Proxy
   products: twenty, supervisorPaused: false, look: 'dark', order: [], ...props,
 }, { get: (t, k) => (k in t ? t[k] : noop), has: () => true })));
 
-const rows = (html) => [...html.matchAll(/<div class="palette-item[^"]*"><span>([^<]*)<\/span>/g)].map((m) => m[1]);
+// The label span carries a class since 2026-10-16 (w-6418318cd5), when the
+// row was taught not to wrap onto a second line.
+const rows = (html) => [...html.matchAll(/<div class="palette-item[^"]*"><span class="palette-label">([^<]*)<\/span>/g)].map((m) => m[1]);
 
 describe('the palette', () => {
   it('has one Filter line and no row per project', () => {

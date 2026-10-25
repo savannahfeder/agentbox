@@ -182,6 +182,6 @@ describe('the page', () => {
   it('keeps the app rules out of the combined user editor', () => {
     expect(page).not.toContain("id:'messages'");
     expect(section).not.toContain('defaults.system');
-    expect(page).toContain('instruction-advanced');
+    expect(page).toContain('instr-card instr-card-ours"><SharedPart section={system}/>');
   });
 });

@@ -100,8 +100,12 @@ describe('the row', () => {
   it('still says when it was updated, in the same cell the button covers on hover', () => {
     expect(draw(row())).toMatch(/th-cell-when num[^>]*><span class="th-when">1 day ago|th-cell-when num[^>]*><span class="th-when">Yesterday/);
   });
+  // Status joined the four on 2026-10-20 (w-ec2b04d449), picked out of five
+  // drawn options: "I actually quite like them all having separate status line
+  // options, which is option 4." Nothing else may join them. The time column
+  // is headed Sent since w-21b638d821.
   it('keeps exactly the approved columns', () => {
-    expect(text(renderToStaticMarkup(React.createElement(TableHead)))).toBe('Thread Project Priority Updated');
+    expect(text(renderToStaticMarkup(React.createElement(TableHead)))).toBe('Thread Status Project Priority Sent');
   });
 });
 

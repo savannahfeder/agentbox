@@ -116,9 +116,11 @@ describe('the dependency list', () => {
   });
 
   it('is short, because a long one here is the bug this file is about', () => {
-    // Five today. The number is a ceiling rather than an equality so that
-    // adding a real one is not a test edit, but doubling it is.
-    expect(Object.keys(pkg.dependencies).length).toBeLessThan(10);
+    // The number is a ceiling rather than an equality so that adding a real
+    // one is not a test edit, but doubling it is. Raised from 10 to 12 for the
+    // three AWS packages cloud runs talk to the sandbox and its storage with
+    // (main/cloud/aws.mjs), which run on every Mac that sends a thread there.
+    expect(Object.keys(pkg.dependencies).length).toBeLessThan(12);
   });
 
   it('keeps the packages the screen is built from, so this repo can still build', () => {

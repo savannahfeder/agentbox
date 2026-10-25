@@ -88,16 +88,16 @@ describe('where the question is wired', () => {
   const focus = read('renderer/src/components/Focus.tsx');
 
   it('stops every close at one place, markDone, unless the close was the answer', () => {
-    expect(app).toMatch(/const markDone = useCallback\(async \(item: WorkItem, \{ stay, force \}/);
-    expect(app).toMatch(/if \(!force && waitingFiled\(item\)\.length\)/);
+    expect(app).toMatch(/const markDone = useCallback\(async \(item: WorkItem, \{ stay, force, unshippedOk \}/);
+    expect(app).toMatch(/if \(unshipped \|\| \(!force && waitingFiled\(item\)\.length\)\)/);
   });
 
   it('closes for real once the question is answered, and only then', () => {
-    expect(app).toMatch(/markDone\(item, \{ force: true \}\)/);
+    expect(app).toMatch(/markDone\(item, \{ force: true, unshippedOk: true \}\)/);
   });
 
   it('gives the number keys, the arrows, Enter and esc to the question while it is up', () => {
-    expect(app).toMatch(/if \(asking\) \{/);
+    expect(app).toMatch(/if \(asking && closeAskOwnsKey\(e\.key\)\) \{/);
     expect(app).toMatch(/answerCloseAsk\(focused, /);
   });
 

@@ -105,7 +105,8 @@ describe('the thread page', () => {
   });
   it('draws the rail exactly when the summary is offered and closed', () => {
     expect(focus).toMatch(/summaryOffered && !summaryOpen && <SummaryRail /);
-    expect(focus).toContain("data-summary={summaryShown ? 'open' : summaryOffered ? 'rail' : undefined}");
+    // 'over' when opened without room (a-half-screen-window-fits-and-its-thread-reads).
+    expect(focus).toContain('data-summary={summaryPlace({ offered: summaryOffered, shown: summaryShown, fits: summaryFits(paneWidth) })}');
   });
   it('says the state under the title only when neither the panel nor the rail is there to say it', () => {
     expect(focus).toContain('lead={summarised && !summaryOffered ? <ThreadStateMark item={item} /> : null}');

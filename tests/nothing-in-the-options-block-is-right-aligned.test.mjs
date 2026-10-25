@@ -49,7 +49,7 @@ describe('the option rows', () => {
 describe('the heading above them', () => {
   it('holds nothing but the question, so there is no corner left standing empty', () => {
     const head = offer.slice(offer.indexOf('className={`opt-head'), offer.indexOf('{/* The card'));
-    expect(head).toContain("{ask || 'Their options · pick or write your own'}");
+    expect(head).toContain("{ask || 'Pick one, or write your own answer'}");
     expect(head).not.toContain('<button');
     expect(head).not.toContain('<svg');
   });

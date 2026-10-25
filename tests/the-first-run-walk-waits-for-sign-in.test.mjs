@@ -25,18 +25,19 @@ import { it, expect, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { signInAsk } from '../renderer/src/sign-in-ask.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const app = fs.readFileSync(path.join(ROOT, 'renderer/src/App.tsx'), 'utf8');
 
 describe('the first-run walk and the sign-in page', () => {
-  it('knows when a team build has nobody signed in, including while it is still finding out', () => {
-    const def = app.match(/const walkWaitsForSignIn = ([^;]+);/);
-    expect(def).not.toBeNull();
-    expect(def[1]).toContain('snap?.team?.configured');
-    expect(def[1]).toContain('!snap.team.signedIn');
+  it('knows when a build that can sign in has nobody signed in, including while it is still finding out', () => {
+    expect(app).toMatch(/const walkWaitsForSignIn = signInAsked\.walkWaits;/);
+    const team = { configured: true, signedIn: false };
+    expect(signInAsk({ team, fixtures: false, skipped: false, canSkip: true }).walkWaits).toBe(true);
     // not only once the first look is over: the walk was clickable in that gap
-    expect(def[1]).not.toContain('started');
+    expect(signInAsk({ team: { ...team, started: false }, fixtures: false, skipped: false, canSkip: true }).walkWaits).toBe(true);
+    expect(signInAsk({ team: { ...team, signedIn: true }, fixtures: false, skipped: false, canSkip: true }).walkWaits).toBe(false);
   });
 
   it('does not start the walk then', () => {
@@ -49,8 +50,9 @@ describe('the first-run walk and the sign-in page', () => {
     expect(app).toMatch(/\{inPractice && !walkWaitsForSignIn && <PracticeBand \/>\}/);
   });
 
-  it('a single-person build (no team cloud) still walks as before', () => {
-    // walkWaitsForSignIn is false whenever no team is configured
-    expect(app).toMatch(/const walkWaitsForSignIn = !api\.isFixtures && !!snap\?\.team\?\.configured &&/);
+  it('a build with nothing to sign in to, or a skipped sign-in, still walks as before', () => {
+    expect(signInAsk({ team: null, fixtures: false, skipped: false, canSkip: true }).walkWaits).toBe(false);
+    expect(signInAsk({ team: { configured: false, canSignIn: false, signedIn: false }, fixtures: false, skipped: false, canSkip: true }).walkWaits).toBe(false);
+    expect(signInAsk({ team: { configured: true, signedIn: false }, fixtures: false, skipped: true, canSkip: true }).walkWaits).toBe(false);
   });
 });

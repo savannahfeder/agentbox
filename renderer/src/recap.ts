@@ -1,44 +1,28 @@
-// PURE. What the top of the reading pane says, above the message itself.
+// PURE. Which words open the thread on a row that was filed from another one.
 //
-// Three different things used to compete for that space wearing the same grey
-// box: the parent row's agent message, the parent row's answer, and HER OWN
-// reply on this row. Read top to bottom the pane showed the agent at 27m, her
-// at 2m, then the agent again at 17m, so her newest words sat above a message
-// written before them, and a row she had already dealt with looked exactly like
-// a fresh ask.
+// Three different things used to compete for the space above the message,
+// wearing the same grey box: the parent row's agent message, the parent row's
+// answer, and the user's own reply on this row. Read top to bottom the pane
+// showed the agent at 27m, her at 2m, then the agent again at 17m, so her
+// newest words sat above a message written before them, and a row she had
+// already dealt with looked exactly like a fresh ask.
 //
-// Two rules, and the second is the one that saves the 45 seconds:
-//
-//   HER MOST RECENT WORDS, ONCE.  The user's last message in this thread is the
-//   only context worth the top of the screen. Everything else about the parent
-//   collapses to one clickable line, because the message below restates it
-//   anyway (which the old Origin's own comment already said).
-//
-//   A REPLY ON THIS ROW IS STATE, NOT CONTEXT.  If she has already answered
-//   this row, nothing is being asked of her. Quoting the user's reply back as a
-//   context block is what made a settled row read as live. It becomes one line
-//   that says she is done here, and the words are one click away.
+// Nothing is drawn there now. What survives is the one piece that was never
+// context about the row but the conversation's own first line: the words she
+// wrote on the parent that asked for this thread. Focus.tsx hands them to the
+// thread as its opening message.
 
 import type { WorkItem } from './types';
+import type { LedgerLine } from './thread-history';
 
-/* * `said` IS DATA FOR THE THREAD NOW, AND NEVER A BOX.
-
-   The shape survives because `openingSaid` in Focus.tsx uses it to put the
-   user's words at the TOP OF THE THREAD as its first message, which is where a
-   conversation's opening line belongs (w-23db941885). What is gone is the
-   other use: the block above an agent's message headed "You said", reading
-   her own last answer, or a whole directive body, back at her. `Recap` no longer draws that for any shape, so
-   nothing built here reaches her as a quotation.
-*/
+/* `said` IS DATA FOR THE THREAD, AND NEVER A BOX. `openingSaid` in Focus.tsx
+   puts these words at the TOP OF THE THREAD as its first message, which is
+   where a conversation's opening line belongs (w-23db941885). Nothing built
+   here reaches her as a quotation above the message. */
 export type Recap =
-  // She has answered THIS row. The pane's headline is that she is finished
-  // with it, not the text of her reply.
-  | { kind: 'replied'; text: string; at: number }
   // Her last words in the thread, said on the row before this one. FOR THE
-  // THREAD'S FIRST MESSAGE ONLY. The box above the message never prints these.
+  // THREAD'S FIRST MESSAGE ONLY. Nothing is drawn above the message.
   | { kind: 'said'; text: string; at: number; on: string }
-  // She has never spoken here. Name what this answers, in one line.
-  | { kind: 'origin'; title: string; at: number }
   | null;
 
 // '(withdrawn)' is the tombstone an undone send leaves behind. It is not words.
@@ -100,14 +84,46 @@ export function leadField(item: WorkItem): 'result' | 'note' | null {
   return null;
 }
 
-export function recapFor(item: WorkItem, parent: WorkItem | null): Recap {
-  const mine = words(item.answer);
-  if (mine) return { kind: 'replied', text: mine, at: when(item, 'answer') };
+// THE LAST THING SHE SAID ON A ROW AT OR BEFORE A MOMENT, read from its ledger
+// lines. A send she took back writes '(withdrawn)' over it, so that line takes
+// the reply it withdrew off the pile rather than being a reply itself.
+export function askedBefore(lines: readonly LedgerLine[], moment: number): { text: string; at: number } | null {
+  const pile: { text: string; at: number }[] = [];
+  for (const line of lines) {
+    if (line.ts > moment) continue;
+    const answer = line.patch?.answer;
+    if (typeof answer !== 'string') continue;
+    if (answer.trim() === '(withdrawn)') { pile.pop(); continue; }
+    const text = words(answer);
+    if (text) pile.push({ text, at: line.ts });
+  }
+  return pile[pile.length - 1] ?? null;
+}
+
+// A THREAD FILED FROM ANOTHER OPENS WITH THE MESSAGE THAT ASKED FOR IT. That is
+// the parent's reply at or before this row was filed, not its newest one: the
+// fold keeps only the newest, so every later reply on the parent used to
+// replace this thread's opening line with something written after it existed
+// (tests/a-filed-thread-opens-with-the-message-that-asked-for-it). When the
+// parent's newest reply is later than this row, only `parentLines` can say what
+// came before it, and until they are read this says nothing rather than
+// something wrong.
+export function recapFor(item: WorkItem, parent: WorkItem | null, parentLines?: readonly LedgerLine[]): Recap {
+  // A ROW SHE HAS ANSWERED OPENS ON NOTHING. Nothing is being asked of her
+  // here, so the parent's ask is no longer the thread's first line.
+  if (words(item.answer)) return null;
   if (!parent) return null;
 
   const onParent = words(parent.answer);
-  if (onParent) {
+  const repliedAt = parent.wrote?.answer?.ts;
+  const afterThis = onParent != null && Number.isFinite(repliedAt) && Number.isFinite(item.createdAt) && (repliedAt as number) > item.createdAt;
+  if (onParent && !afterThis) {
     return { kind: 'said', text: onParent, at: when(parent, 'answer'), on: parent.title };
+  }
+  if (afterThis) {
+    if (!parentLines) return null;
+    const asked = askedBefore(parentLines, item.createdAt);
+    if (asked) return { kind: 'said', text: asked.text, at: asked.at, on: parent.title };
   }
 
   // A directive is a row she composed, so its body is the user's words even though no
@@ -117,5 +133,8 @@ export function recapFor(item: WorkItem, parent: WorkItem | null): Recap {
     return { kind: 'said', text: composed, at: parent.createdAt, on: parent.title };
   }
 
-  return { kind: 'origin', title: parent.title, at: parent.updatedAt };
+  // An agent parent she never answered has no words of hers to open with. The
+  // title used to be drawn above the message in its place, and is now only in
+  // the breadcrumb (tests/nothing-is-quoted-above-the-message).
+  return null;
 }

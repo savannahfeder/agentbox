@@ -196,12 +196,20 @@ describe('2. her own hand brings a signed-out account back', () => {
     expect(sup._hasSlotFor('claude')).toBe(true);
   });
 
-  it('but not an account an admin switched off', () => {
+  // AN ADMIN'S BLOCK IS LIFTED FOR HER TOO (w-dac993a554), and it is one try
+  // that will fail. It used to be held back because the work would have gone
+  // to her other subscription instead; nothing goes anywhere else now, so
+  // refusing her the try would only mean refusing her the row's own words.
+  // What does not change is that NOTHING BUT HER HAND lifts it.
+  it('and nothing but her hand lifts an account an admin switched off', () => {
     const second = path.join(home, '.claude-second');
     sup = start(['default', second]);
     sup.noteExitForBackoff(deadOnArrival(ORG_BLOCKED, second));
-    sup.liftBrakeForHer();
+    vi.setSystemTime(T0 + MIN);
+    sup.wake();
     expect(sup._profileResting(second)).toBe(true);
+    sup.liftBrakeForHer();
+    expect(sup._profileResting(second)).toBe(false);
   });
 });
 

@@ -80,7 +80,16 @@ img.tm-av { background: var(--bg-selected); }
 .tm-tabs { display: flex; align-items: center; gap: 22px; }
 .tm-tab { display: inline-flex; align-items: baseline; gap: 8px; height: 30px; line-height: 30px; padding: 0; background: none; border: 0;
   border-bottom: 1px solid transparent; font: 11px/30px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); cursor: pointer; }
-.tm-tab b { font-weight: 400; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+/* Every count keeps the tint's room, so Needs You lighting moves nothing
+   (w-22da913d00). No letter spacing, or the digit sits left of the tint's middle. */
+.tm-tab b { font-weight: 400; color: var(--text-dim); font-variant-numeric: tabular-nums; display: inline-block; padding: 0 5px; line-height: 16px; border-radius: 2px; letter-spacing: 0; }
+/* NEWS ON A TAB YOU ARE NOT ON IS A DOT, NEVER A LIT COUNT (power test 3).
+   The tinted count was the brightest thing in the strip, so a tester read
+   NEEDS YOU 8 against the In progress list under it and said eight threads had
+   gone. The count now reads like every other tab's and the orange is a square
+   in the gutter, out of the text's way and taking no room of its own. */
+.tm-tab.fresh { position: relative; }
+.tm-tab.fresh::before { content: ''; position: absolute; left: -11px; top: 50%; margin-top: -2px; width: 5px; height: 5px; background: var(--accent); }
 .tm-tab.on { color: var(--text); border-bottom-color: var(--accent); }
 .tm-tab.on b { color: var(--text); }
 .tm-faces { margin-left: auto; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }

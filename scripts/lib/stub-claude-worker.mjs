@@ -43,6 +43,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { readWorld, worldTurn, worldAnswer, titleIn } from './stand-in-world.mjs';
 
 const argv = process.argv.slice(2);
 const say = (obj) => process.stdout.write(JSON.stringify(obj) + '\n');
@@ -174,6 +175,7 @@ let said = plan.say ?? 'the stub worker ran';
 //   [[stub:limit]]       run out of usage, as Claude Code says it
 //   [[stub:limit-first]] run out on the first attempt only, so a retry or a
 //                        second login can finish it
+//   [[stub:work-then-die]] run a tool, then die with no answer
 //
 // The words a limit is reported in are the CLI's own ("You've hit your session
 // limit · resets …"), which is what shared/spawn-trouble.mjs reads.
@@ -208,15 +210,26 @@ if (plan.receipts && process.env.ZERO_ITEM) {
 // time and leave another free.
 const loginName = process.env.CLAUDE_CONFIG_DIR ? path.basename(process.env.CLAUDE_CONFIG_DIR) : 'default';
 const limitOn = directive('stub:limit-on')?.[1];
-if (directive('stub:limit') || (directive('stub:limit-first') && attempt === 1) || (limitOn && limitOn === loginName)) {
+// What a power test's world says happens to this start (scripts/lib/stand-in-world.mjs).
+// Only a task run: the app's sign-in check times out at 15 s.
+const world = argv.includes('-p') ? readWorld(plan.world) : {};
+const turn = worldTurn(world, loginName);
+if (Object.keys(world).length) said = worldAnswer(said, turn, titleIn(promptText), attempt);
+if (directive('stub:limit') || (directive('stub:limit-first') && attempt === 1) || (limitOn && limitOn === loginName) || turn.limit) {
   say({ type: 'result', subtype: 'success', result: "You've hit your session limit · resets 11:59pm", is_error: true, session_id: sessionId });
   await Promise.race([inputEnded, wait(2000)]);
   process.exit(1);
 }
-if (directive('stub:hang')) {
+if (directive('stub:work-then-die') || turn.die) {
+  say({ type: 'assistant', session_id: sessionId, message: { content: [{ type: 'text', text: 'Starting on this now.' }] } });
+  say({ type: 'assistant', session_id: sessionId, message: { content: [{ type: 'tool_use', id: 'toolu_stub', name: 'Bash', input: { command: 'ls' } }] } });
+  await wait(200);
+  process.exit(1);
+}
+if (directive('stub:hang') || turn.hang) {
   while (!stopping) await wait(100);
 }
-const slow = Number(directive('stub:slow')?.[1]);
+const slow = Number(directive('stub:slow')?.[1]) || turn.delayMs;
 if (slow > 0) {
   const until = Date.now() + slow;
   while (!stopping && Date.now() < until) await wait(50);

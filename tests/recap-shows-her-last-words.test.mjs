@@ -1,10 +1,14 @@
-// The top of the reading pane shows her most recent words, once.
+// A filed thread opens with her own words, once.
 //
 // The bug it fixes: a question row showing "IN RESPONSE TO" (the parent's
 // agent message, 27m old) directly above "YOUR REPLY" (the user's answer on
 // this row, 2m old), directly above the agent's body (17m old). Three grey
 // boxes, two of them saying the same thing in the agent's voice, and the
 // user's newest words rendered above a message written before them.
+//
+// The last of those boxes is gone too (tests/nothing-is-quoted-above-the-
+// message), so what recapFor picks is only ever the thread's first message,
+// and every shape that fed a box now answers null.
 
 import { describe, it, expect } from 'vitest';
 import { recapFor, closedBy, resultLeads } from '../renderer/src/recap';
@@ -16,20 +20,17 @@ const row = (over = {}) => ({
 });
 
 describe('recapFor', () => {
-  it('a reply on THIS row is state: it leads, and the parent drops out', () => {
+  it('a reply on THIS row is state, not context: the parent drops out', () => {
     const parent = row({ id: 'w-0', kind: 'question', title: 'The earlier ask', body: 'agent prose' });
     const item = row({ answer: 'yes, go ahead', wrote: { answer: { ts: 5000, source: 'founder' } } });
-    expect(recapFor(item, parent)).toEqual({ kind: 'replied', text: 'yes, go ahead', at: 5000 });
-  });
-
-  it('her reply time is the reply, not the row being touched since', () => {
-    const item = row({ answer: 'ok', updatedAt: 9999, wrote: { answer: { ts: 4000, source: 'founder' } } });
-    expect(recapFor(item, null).at).toBe(4000);
+    expect(recapFor(item, parent)).toBeNull();
   });
 
   it('without a reply here, it shows what she said on the row before', () => {
     const parent = row({ id: 'w-0', title: 'The earlier ask', answer: 'do the first one', wrote: { answer: { ts: 3000, source: 'founder' } } });
-    expect(recapFor(row(), parent)).toEqual({
+    // Filed after that reply. One written after the thread was filed is not
+    // its ask (a-filed-thread-opens-with-the-message-that-asked-for-it).
+    expect(recapFor(row({ createdAt: 3500 }), parent)).toEqual({
       kind: 'said', text: 'do the first one', at: 3000, on: 'The earlier ask',
     });
   });
@@ -42,16 +43,16 @@ describe('recapFor', () => {
   });
 
   // The case that produced the cluttered screenshot: an agent question whose
-  // parent is another agent question. One line naming it, never its body, which
-  // the message below restates.
-  it('an agent parent she never answered collapses to a title', () => {
+  // parent is another agent question. She said nothing on either, so the
+  // thread has no first message of hers and opens on the agent.
+  it('an agent parent she never answered gives the thread nothing', () => {
     const parent = row({ id: 'w-0', kind: 'question', title: 'The earlier ask', body: 'a long agent message', updatedAt: 2500 });
-    expect(recapFor(row(), parent)).toEqual({ kind: 'origin', title: 'The earlier ask', at: 2500 });
+    expect(recapFor(row(), parent)).toBeNull();
   });
 
   it('a withdrawn send is a tombstone, not words', () => {
     const parent = row({ id: 'w-0', kind: 'question', title: 'The earlier ask', answer: '(withdrawn)' });
-    expect(recapFor(row({ answer: '(withdrawn)' }), parent).kind).toBe('origin');
+    expect(recapFor(row({ answer: '(withdrawn)' }), parent)).toBeNull();
   });
 
   it('no parent and no reply means nothing above the message', () => {

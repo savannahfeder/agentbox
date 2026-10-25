@@ -110,16 +110,16 @@ describe('resuming many ticked threads at once', () => {
     expect(spawned).toEqual(['w-workspace-medium', 'w-personal-low']);
   });
 
-  it('does not let a level an agent wrote outrank yours', () => {
-    // The must-not-match case: an agent tagging its own row 9 is not Urgent
-    // (itemPriority), so it does not jump the Medium she left alone.
+  it('ranks a level an agent wrote like yours', () => {
+    // A level counts whoever set it (w-5ac9c9006d, 2026-10-16), so an agent's
+    // nine starts first and the Medium waits.
     items = [
       row('w-team-medium', 'agentbox-team', 5, 1),
       { ...row('w-agent-nine', 'agentbox-team', 9, 2), wrote: { priority: { ts: 1, source: 'agent' } } },
       row('w-team-high', 'agentbox-team', 7, 3),
     ];
     sup.resumeItems(items.map((i) => i.id));
-    expect(spawned).toEqual(['w-team-high', 'w-team-medium']);
+    expect(spawned).toEqual(['w-agent-nine', 'w-team-high']);
   });
 
   it('keeps the oldest first between two threads of the same standing', () => {

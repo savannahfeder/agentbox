@@ -45,6 +45,22 @@ export function relaunchCommand({ execPath = process.execPath, argv = process.ar
 }
 
 /**
+ * THE NOTES ARE THE HONEST PART. Each is something a fresh copy can be missing
+ *  without looking broken, and a copy that quietly cannot run an agent is one
+ *  that lies, so they are said rather than assumed.
+ *
+ *  Pure, and reads nothing, because what it says about a missing Claude Code
+ *  otherwise depends on whether the computer running the test has one.
+ */
+export function freshUserNotes({ claudeBin, keychain, agents } = {}, { withTools = true, withAgents = true } = {}) {
+  const notes = [];
+  if (withTools && !claudeBin) notes.push('That copy has no Claude Code of its own, so its setup offers to set one up or to use ChatGPT.');
+  if (!keychain) notes.push('There is no ~/Library/Keychains here, so Claude Code will say it is not logged in.');
+  if (withAgents && !agents) notes.push('There is no ~/.claude on this computer, so it will have no agents to offer.');
+  return notes;
+}
+
+/**
  * Open one. Returns what happened, in the words the app will show her: this
  *  is reported to the window rather than thrown, because a row in ⌘K that
  *  fails silently is worse than one that says why.
@@ -90,15 +106,10 @@ export function openFreshUser({
     return { ok: false, error: `Could not start a second ${NAME}: ${err?.message ?? err}`, home: prepared.home };
   }
 
-  // THE NOTES ARE THE HONEST PART. Both of these are things a fresh copy can
-  // be missing without looking broken, and a test that quietly cannot run an
-  // agent is a test that lies. They are said rather than assumed.
-  const notes = [];
-  if (withTools && !prepared.claudeBin) notes.push('Claude Code is not at ~/.local/bin/claude, so agents will not run in it.');
-  if (!prepared.keychain) notes.push('There is no ~/Library/Keychains here, so Claude Code will say it is not logged in.');
-  if (withAgents && !prepared.agents) notes.push('There is no ~/.claude on this computer, so it will have no agents to offer.');
-
-  return { ok: true, home: prepared.home, agents: prepared.agents, notes, pid: child?.pid ?? null };
+  return {
+    ok: true, home: prepared.home, agents: prepared.agents, pid: child?.pid ?? null,
+    notes: freshUserNotes(prepared, { withTools, withAgents }),
+  };
 }
 
 /**

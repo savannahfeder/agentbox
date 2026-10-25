@@ -24,23 +24,23 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const src = (...p) => fs.readFileSync(path.join(here, '..', 'renderer', 'src', ...p), 'utf8');
 const app = src('App.tsx');
 
-const ORDER = ['inbox', 'progress', 'snoozed', 'done', 'all'];
+// All was the fifth until 2026-10-14 (the-threads-page-has-no-all-tab.test.mjs).
+const ORDER = ['inbox', 'progress', 'snoozed', 'done'];
 
 describe('the rotation Tab takes', () => {
   it('moves right one tab at a time', () => {
     expect(nextTab(ORDER, 'inbox')).toBe('progress');
     expect(nextTab(ORDER, 'progress')).toBe('snoozed');
     expect(nextTab(ORDER, 'snoozed')).toBe('done');
-    expect(nextTab(ORDER, 'done')).toBe('all');
   });
 
   it('wraps round at the right end rather than stopping', () => {
-    expect(nextTab(ORDER, 'all')).toBe('inbox');
+    expect(nextTab(ORDER, 'done')).toBe('inbox');
   });
 
   it('moves left on shift, and wraps at the left end', () => {
     expect(nextTab(ORDER, 'progress', true)).toBe('inbox');
-    expect(nextTab(ORDER, 'inbox', true)).toBe('all');
+    expect(nextTab(ORDER, 'inbox', true)).toBe('done');
   });
 
   // A tab the bar is not drawing is not a place Tab may land. If the view is

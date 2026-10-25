@@ -209,9 +209,11 @@ describe('each engine remembers its own shell answer', () => {
     forgetEngine('codex');
     const asks = { claude: 0, codex: 0 };
     const t0 = 3_000_000;
+    // Past the window the ask is in the background; counted the same here.
     const bare = (key) => ({
       home: HOME, env: {}, exists: never, dangles: never,
       shellLookup: () => { asks[key] += 1; return { path: null, answered: true }; },
+      shellLookupLater: () => { asks[key] += 1; return { path: null, answered: true }; },
     });
 
     resolveEngine('claude', null, { ...bare('claude'), now: t0 });

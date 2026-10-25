@@ -32,6 +32,8 @@
 // epoch, and neither erases the other. Same rule as beats in
 // shared/dashboard.mjs.
 
+import { resolveEdits } from './message-edits.mjs';
+
 /* ------------------------------- lifecycle ------------------------------- */
 // The only states the claim machinery reasons about. Everything else about what
 // a work item is (kind, labels) is free-form text the layer above interprets.
@@ -155,6 +157,16 @@ export const WORK_ITEM_FIELDS = [
   // mark on ONE line rather than a value the row holds, so the fold skips it;
   // the chat reads it per line (renderer/src/thread-history.ts).
   'inReplyTo',
+  // AN EDIT OR A DELETION OF ONE MESSAGE: `{ on, text }` or `{ on, gone: true }`,
+  // where `on` is the message's line uid. A delta like `react`, read back as
+  // `edits` and only from the message's own author (shared/message-edits.mjs).
+  'edit',
+  // WHICH COMMAND FROM HER PHONE WROTE THIS LINE (docs/cloud/PHONE-PLAN.md):
+  // the command's id, on the line of the reply or the new thread it made. It
+  // is how the computer, starting again after stopping half way through a
+  // command, knows for certain whether that command already landed, rather
+  // than guessing from the words (Codex's third review of step 1, finding 5).
+  'fromPhone',
 ];
 
 // THE SUMMARY IS SHARED BETWEEN THE PERSON AND THE AGENT. Everywhere else the
@@ -396,7 +408,7 @@ function coerceField(field, value) {
     // shared/effort-levels.mjs, and the spawn gates on them, so a value this
     // module does not recognise is a run at Claude Code's own choice rather
     // than a row that never runs.
-    case 'kind': case 'product': case 'parent': case 'engine': return str(value, MAX_SHORT);
+    case 'kind': case 'product': case 'parent': return str(value, MAX_SHORT);
     // THESE TWO ARE CLEARED BY WRITING '' AND SO '' IS A REAL VALUE, exactly
     // as runAt's 0 and start's 'now' are, and for the same reason: a field that
     // coerces to undefined is dropped by the fold, so without a falsy value
@@ -412,7 +424,12 @@ function coerceField(field, value) {
     // picking a model and pressing send lost the message, with nothing on
     // screen to say so. Five of the 14 crashes since the Oct 6 launch, on two
     // installs (PostHog, 2026-10-08).
-    case 'model': case 'effort': return clearable(value, MAX_SHORT);
+    //
+    // `engine` JOINED THEM WHEN A REPLY COULD FIRST CARRY ONE (w-c9da359466).
+    // It is written beside the model by the same call, so clearing it back to
+    // the workspace default would have thrown in exactly the place described
+    // above, before the answer was written, losing the message.
+    case 'model': case 'effort': case 'engine': return clearable(value, MAX_SHORT);
     case 'status': return WORK_ITEM_STATUSES.includes(value) ? value : undefined;
     case 'priority': return Number.isFinite(value) ? Math.trunc(value) : undefined;
     // When this item may next be acted on, in epoch ms. 0 means unscheduled,
@@ -440,10 +457,11 @@ function coerceField(field, value) {
     // A ts rather than a flag, so her NEXT answer outdates it by carrying a
     // later one, with nothing to clear and nobody who has to remember to.
     case 'answeredThrough': return Number.isFinite(value) ? Math.trunc(value) : undefined;
+    // An empty list is a real value: it is how the last label, `ship` above
+    // all, comes off.
     case 'labels': {
       if (!Array.isArray(value)) return undefined;
-      const labels = value.map((l) => str(l, MAX_SHORT)).filter(Boolean).slice(0, MAX_LABELS);
-      return labels.length ? labels : undefined;
+      return value.map((l) => str(l, MAX_SHORT)).filter(Boolean).slice(0, MAX_LABELS);
     }
     case 'assignee': case 'runner': return shortId(value) ?? undefined;
     case 'due': return calendarDay(value);
@@ -464,6 +482,15 @@ function coerceField(field, value) {
       return value.off === true ? { on, emoji, off: true } : { on, emoji };
     }
     case 'inReplyTo': return shortId(value) ?? undefined;
+    case 'edit': {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+      const on = shortId(value.on);
+      if (!on) return undefined;
+      if (value.gone === true) return { on, gone: true };
+      const text = str(value.text, MAX_TEXT_BYTES);
+      return text ? { on, text } : undefined;
+    }
+    case 'fromPhone': return typeof value === 'string' && /^[0-9a-f-]{8,64}$/i.test(value) ? value : undefined;
     case 'visibility': return value === 'private' || value === 'team' || value === 'people' ? value : undefined;
     // An empty list is a real value: it is how the last chosen person comes
     // off a thread, and the thread then reaches nobody until she names one.
@@ -521,12 +548,67 @@ function rollUpReactions(presses) {
   return out;
 }
 
-export function foldWorkItems(lines, now = Date.now()) {
-  const items = new Map();
+// Lease expiry is computed at READ time, never written. A held claim whose
+// lease has lapsed reads as open again, which is what makes an abandoned item
+// recoverable without anyone having to notice it was abandoned.
+//
+// The same derivation covers a released claim, and that is the point: only an
+// item still sitting at `claimed` with nobody holding it goes back to open.
+// Any status a worker or the founder actually chose (done, blocked, or one we
+// have not invented yet) is theirs, and nothing about giving a claim back
+// overwrites it.
+export function finishItem(raw, now = Date.now()) {
+  // A copy, one level deep, so the raw item can be folded on and a finished
+  // one handed out is never changed under its holder.
+  const item = {};
+  for (const [k, v] of Object.entries(raw)) {
+    item[k] = Array.isArray(v) ? [...v]
+      : v instanceof Map ? new Map(v)
+        : v instanceof Set ? new Set(v)
+          : v && Object.getPrototypeOf(v) === Object.prototype ? { ...v } : v;
+  }
+  item.claimExpired = !!(item.claim && item.claim.leaseUntil < now);
+  if (item.status === 'claimed' && (!item.claim || item.claimExpired)) item.status = 'open';
+  if (item.reacts) {
+    const chips = rollUpReactions(item.reacts);
+    delete item.reacts;
+    if (chips) item.reactions = chips;
+  }
+  const closes = item.closes;
+  delete item.closes;
+  const editLines = item.editLines;
+  delete item.editLines;
+  const edits = editLines ? resolveEdits(item.said ?? [], editLines) : null;
+  if (edits?.size) item.edits = Object.fromEntries(edits);
+  if (item.said) {
+    const said = edits?.size ? item.said.flatMap((s) => {
+      const e = s.uid ? edits.get(s.uid) : null;
+      if (!e) return [s];
+      return e.gone ? [] : [{ ...s, text: e.text.trim().slice(0, TALK_TEXT) }];
+    }) : item.said;
+    delete item.said;
+    if (Array.isArray(item.people) && item.people.length) {
+      item.talk = talkOf(said);
+      const settled = settledBy(closes ?? [], said);
+      if (settled) item.talk.settled = settled;
+    }
+  }
+  return item;
+}
 
+/** A line that writes the row's short name and nothing else (see the fold's foot). */
+function onlyTheName(line) {
+  if (line.claim || line.release || line.heartbeat) return false;
+  const fields = Object.keys(line.patch ?? {});
+  return fields.length === 1 && fields[0] === 'label';
+}
+
+/** Lines folded onto `items` in place, unfinished: `finishItem` makes each one readable. */
+export function foldRawInto(items, lines, touched = null) {
   for (const raw of Array.isArray(lines) ? lines : []) {
     const line = normalizeLine(raw);
     if (!line) continue;
+    touched?.add(line.id);
 
     let item = items.get(line.id);
     if (!item) {
@@ -584,6 +666,11 @@ export function foldWorkItems(lines, now = Date.now()) {
     if (line.by && words && words.trim()) {
       (item.said ??= []).push({ uid: line.uid ?? null, by: line.by, ts: line.ts, text: words.trim().slice(0, TALK_TEXT), inReplyTo: patch.inReplyTo ?? null, body: typeof patch.answer !== 'string' });
     }
+    // Who closed the chat and when, so `whatWaits` can tell a reopen by your own
+    // message (still settled) from an undo of the close (not).
+    if (line.by && typeof patch.status === 'string') {
+      (item.closes ??= []).push({ by: line.by, ts: line.ts, done: patch.status === 'done', spoke: !!(words && words.trim()) });
+    }
 
     for (const [field, value] of Object.entries(patch)) {
       // A REACTION IS ACCUMULATED, NOT HELD. Every other field below keeps one
@@ -605,6 +692,10 @@ export function foldWorkItems(lines, now = Date.now()) {
       // WHICH MESSAGE A REPLY ANSWERS belongs to that reply's line alone. Held
       // as a value, the row would carry the newest reply's parent forever.
       if (field === 'inReplyTo') continue;
+      if (field === 'edit') {
+        (item.editLines ??= []).push({ on: value.on, by: line.by ?? null, ts: line.ts, ...(value.gone ? { gone: true } : { text: value.text }) });
+        continue;
+      }
       const held = item.wrote[field];
       // There used to be an exception here, for machinery spending a one-off
       // permission mode over the founder's own grant. That field is not on the
@@ -617,34 +708,23 @@ export function foldWorkItems(lines, now = Date.now()) {
       if (line.by) item.wrote[field].by = line.by;
     }
 
-    item.updatedAt = Math.max(item.updatedAt, line.ts);
+    // THE APP WRITING A ROW'S NAME IS NOT NEWS ABOUT THE ROW. Lists break ties
+    // on `updatedAt`, so every unnamed thread the namer reached climbed to the
+    // top reading "updated just now". Read here rather than at the write, as
+    // the heartbeat rule above is, because the lines that did it are in the
+    // ledger already. Only the name ALONE: a line that carries it with anything
+    // else carries that too.
+    if (!onlyTheName(line)) item.updatedAt = Math.max(item.updatedAt, line.ts);
     if (line.ts < item.createdAt) item.createdAt = line.ts;
   }
 
-  // Lease expiry is computed at READ time, never written. A held claim whose
-  // lease has lapsed reads as open again, which is what makes an abandoned item
-  // recoverable without anyone having to notice it was abandoned.
-  //
-  // The same derivation covers a released claim, and that is the point: only an
-  // item still sitting at `claimed` with nobody holding it goes back to open.
-  // Any status a worker or the founder actually chose (done, blocked, or one we
-  // have not invented yet) is theirs, and nothing about giving a claim back
-  // overwrites it.
-  for (const item of items.values()) {
-    item.claimExpired = !!(item.claim && item.claim.leaseUntil < now);
-    if (item.status === 'claimed' && (!item.claim || item.claimExpired)) item.status = 'open';
-    if (item.reacts) {
-      const chips = rollUpReactions(item.reacts);
-      delete item.reacts;
-      if (chips) item.reactions = chips;
-    }
-    if (item.said) {
-      const said = item.said;
-      delete item.said;
-      if (Array.isArray(item.people) && item.people.length) item.talk = talkOf(said);
-    }
-  }
+}
 
+export function foldWorkItems(lines, now = Date.now()) {
+  const raw = new Map();
+  foldRawInto(raw, lines);
+  const items = new Map();
+  for (const [id, item] of raw) items.set(id, finishItem(item, now));
   return items;
 }
 
@@ -664,6 +744,23 @@ const TALK_KEEP = 100;
  * `whatWaits` (shared/team-rules.mjs) and the row's one line; the messages
  * themselves are read off the ledger by the thread view, as before.
  */
+/**
+ * For each person, the moment they last marked the chat done, or nothing if
+ * they reopened it since without saying anything (an undo). A reopen that
+ * carries their words keeps the moment: speaking is not taking the close back.
+ * So does one that follows their words since the close, because sending
+ * writes the message and the reopen as two lines (`answerItem`, main/store.mjs).
+ */
+function settledBy(closes, said = []) {
+  const at = {};
+  const spokeSince = (by, from, to) => said.some((s) => s.by === by && !s.body && s.ts > from && s.ts <= to);
+  for (const c of [...closes].sort((a, b) => a.ts - b.ts)) {
+    if (c.done) at[c.by] = c.ts;
+    else if (!c.spoke && !spokeSince(c.by, at[c.by], c.ts)) delete at[c.by];
+  }
+  return Object.keys(at).length ? at : null;
+}
+
 function talkOf(said) {
   const lines = [...said].sort((a, b) => a.ts - b.ts);
   const chat = [];

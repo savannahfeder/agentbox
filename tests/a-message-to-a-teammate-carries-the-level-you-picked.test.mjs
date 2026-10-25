@@ -151,9 +151,9 @@ describe('the Mac that receives one does not guess over the sender', () => {
 
 describe('the card says so', () => {
   const src = read('renderer/src/threads/ThreadComposer.tsx');
-  // The person branch of the bottom bar: everything between "{person ? (" and
+  // The person branch of the bottom bar: everything between "{person && sendAs === 'message' ? (" and
   // the agent's branch that follows it. It held a line and Send and no more.
-  const from = src.indexOf('{person ? (');
+  const from = src.indexOf("{person && sendAs === 'message' ? (");
   const messageBar = src.slice(from, src.indexOf('\n        ) : (', from));
 
   it('draws the one priority control on a message to a person', () => {

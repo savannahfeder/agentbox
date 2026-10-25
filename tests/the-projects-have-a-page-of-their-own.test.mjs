@@ -79,10 +79,12 @@ describe('the page itself', () => {
   });
 
   // THE FOLDER IS DRAWN, because it is the one thing that tells two projects of
-  // the same name apart, and her store has several such pairs.
+  // the same name apart, and her store has several such pairs. Since
+  // w-18bae174fe it is the project's code folder where it has one, and the
+  // store folder only where it has none (`where`).
   it('shows each project’s folder under its name', () => {
     const page = pageOf();
-    expect(page).toContain('shortPath(p.dir)');
+    expect(page).toContain('shortPath(where(p), home)');
   });
 
   // NO STATE WORDS ON A ROW (2026-10-02, w-bb5047e258). The row carried "2

@@ -1,6 +1,7 @@
 // 2026-09-15: Codex now offers /compact through its own IPC operation.
 // The historical notes below describe why the remaining Claude rows stay gated.
 import { providerCommands } from '../../shared/provider-commands.mjs';
+import { SEND } from './this-keyboard';
 // THE ONE LIST BEHIND THE "/" MENU, NOW THAT IT HOLDS TWO DIFFERENT VERBS.
 //
 // Of three ways of doing that, the one chosen keeps the six modes at the top
@@ -167,9 +168,9 @@ export function commandBeingWritten(text: string, claudeCode: boolean, nativeNam
  * WHAT THE BOX SAYS FAINTLY AFTER A COMMAND before she has written anything:
  *  what it takes, if it takes anything, and that Send runs it. */
 export function holdingHint(cmd: ClaudeCommand): string {
-  if (cmd.description === NATIVE_DESCRIPTION) return 'what it should do, then ⌘↵';
+  if (cmd.description === NATIVE_DESCRIPTION) return `what it should do, then ${SEND}`;
   const hint = cmd.argumentHint?.replace(/^[<[]|[>\]]$/g, '');
-  return hint ? `${hint}, then ⌘↵` : '⌘↵ to run';
+  return hint ? `${hint}, then ${SEND}` : `${SEND} to run`;
 }
 
 /**

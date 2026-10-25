@@ -66,10 +66,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /**
  * One setup per tool, held for the life of the app.
  *
- * `find(engine)` is the finder, looking again from scratch (the caller passes
- * `recheckClaude` / `recheckCodex`, which also move the config so the rest of
- * the app runs on what was just installed). `spawn` and `wait` are seams for
- * the tests; nothing in the app passes them.
+ * `find(engine)` is the finder, looking again from scratch, and may answer
+ * with a promise (the caller passes `lookAgainFor`, which also moves the
+ * config so the rest of the app runs on what was just installed). `spawn` and
+ * `wait` are seams for the tests; nothing in the app passes them.
  */
 export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {} } = {}) {
   const runEnv = terminalEnv(env);
@@ -109,7 +109,11 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
 
   async function go(j, run) {
     const live = () => j.run === run;
-    let hit = find(j.engine);
+    let hit = await find(j.engine);
+    if (!live()) return;
+    // The card's first row says Found or Install off this, because it ticks
+    // that row either way.
+    j.already = !!hit?.found;
     if (!hit?.found) {
       j.phase = 'installing';
       const { file, args } = installCommand(j.engine);
@@ -119,7 +123,7 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
       j.running = null;
       if (!live()) return;
       if (code !== 0) return fail(j, `The installer stopped: ${lastLine(j.log) || `exit ${code}`}`);
-      hit = find(j.engine);
+      hit = await find(j.engine);
       if (!hit?.found) return fail(j, 'The installer finished, but the app still cannot find it.');
     }
     j.bin = hit.path;
@@ -180,14 +184,14 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
     },
     status(engine) {
       const j = job(engine);
-      return { engine, phase: j.phase, error: j.error, log: j.log };
+      return { engine, phase: j.phase, error: j.error, log: j.log, bin: j.bin ?? null, already: !!j.already };
     },
     /**
      * WHETHER THIS TOOL CAN RUN AN AGENT RIGHT NOW: found, and signed in by its
      *  own account. The walk asks before it asks anything, so a Mac that is
      *  already set up never sees the plan question. */
     async readiness(engine) {
-      const hit = find(engine);
+      const hit = await find(engine);
       if (!hit?.found) return { engine, found: false, signedIn: false };
       try { return { engine, found: true, signedIn: await signedIn({ engine, log: '' }, hit.path) }; }
       catch (error) { return { engine, found: true, signedIn: false, error: error.message }; }

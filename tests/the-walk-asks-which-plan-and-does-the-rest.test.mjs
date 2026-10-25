@@ -37,12 +37,16 @@ describe('check this Mac for me', () => {
   it('ends the question when something turns out to be ready', () => {
     expect(afterCheck([r('claude', false, false), r('codex', true, true)])).toEqual({ t: 'ready' });
   });
-  it('goes straight to signing in the one that is there', () => {
-    expect(afterCheck([r('claude', true, false), r('codex', false, false)])).toEqual({ t: 'setup', plan: 'claude' });
-    expect(afterCheck([r('claude', false, false), r('codex', true, false)])).toEqual({ t: 'setup', plan: 'codex' });
+  // IT SAYS WHAT IT FOUND AND WAITS, where it used to start the sign-in itself
+  // (w-8656bdd97d). The setup card starts the tool's own login on its first
+  // render, so answering with a plan here put an OAuth page in somebody's
+  // browser before they had pressed anything.
+  it('says what it found when the one that is there is signed out', () => {
+    expect(afterCheck([r('claude', true, false), r('codex', false, false)])).toEqual({ t: 'found' });
+    expect(afterCheck([r('claude', false, false), r('codex', true, false)])).toEqual({ t: 'found' });
   });
-  it('signs in both when both are there', () => {
-    expect(afterCheck([r('claude', true, false), r('codex', true, false)])).toEqual({ t: 'setup', plan: 'both' });
+  it('says the same when both are there and both are signed out', () => {
+    expect(afterCheck([r('claude', true, false), r('codex', true, false)])).toEqual({ t: 'found' });
   });
   it('says so when there is nothing at all, rather than guessing a plan', () => {
     expect(afterCheck([r('claude', false, false), r('codex', false, false)])).toEqual({ t: 'nothing' });

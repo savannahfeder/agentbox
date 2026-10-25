@@ -34,6 +34,20 @@ const NARRATED = /^\d{2}:\d{2}:\d{2}\s{2}\S/m;
 
 const EXITED = /^# exited \((-?\d+)\)/m;
 
+// Written after the exit line's time when the person stopped the run (Stop,
+// Z, closing or putting off the thread): that end is not a death to report.
+export const STOPPED_ON_REQUEST = ' · stopped on request';
+const STOPPED = /^# exited \([^)]*\) \S+ · stopped on request$/m;
+
+// A tool call, as every engine traces one: `HH:MM:SS  [Bash] ls`. Text lines
+// do not count, because the CLI types its own refusals as the agent's words,
+// and neither does OpenCode's `[error]`.
+const TOOL_LINE = /^\d{2}:\d{2}:\d{2}\s{2}\[(?!error\])[^\]\s]+\]/m;
+
+export function tracesAToolCall(text) {
+  return TOOL_LINE.test(String(text ?? ''));
+}
+
 // THE DIAGNOSIS IS ON THE SECOND LINE, NOT THE FIRST, and reading only the
 // prefixed line loses it entirely. What the tool prints arrives as one chunk
 // and is written with one `stderr: ` in front of the whole chunk, so a refusal
@@ -94,8 +108,9 @@ function errorResult(raw) {
 
 /**
  * @param {string} text the whole trace file
- * @returns {{everRan: boolean, exitCode: number|null, stderr: string}}
+ * @returns {{everRan: boolean, worked: boolean, exitCode: number|null, stoppedOnRequest: boolean, stderr: string}}
  *   `stderr` is what the tool said about itself, from either place it says it.
+ *   `worked` means the agent called at least one tool before it ended.
  *   `everRan` false means the CLI never produced a first line: the process
  *   started and died before it was a session. `exitCode` null means the trace
  *   has no exit line at all, which is what a run killed with the app looks
@@ -106,7 +121,9 @@ export function readDeadRunTrace(text) {
   const exited = EXITED.exec(raw);
   return {
     everRan: NARRATED.test(raw),
+    worked: tracesAToolCall(raw),
     exitCode: exited ? Number(exited[1]) : null,
+    stoppedOnRequest: STOPPED.test(raw),
     stderr: [stderrChunks(raw), errorResult(raw)].filter(Boolean).join('\n').slice(-1000),
   };
 }
@@ -122,6 +139,6 @@ export function readDeadRunTrace(text) {
  * the supervisor has no business speaking over it.
  */
 export function traceShowsASilentDeath(trace) {
-  if (!trace || trace.exitCode == null) return false;
+  if (!trace || trace.exitCode == null || trace.stoppedOnRequest) return false;
   return !trace.everRan || trace.exitCode !== 0;
 }

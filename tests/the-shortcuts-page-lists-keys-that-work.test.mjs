@@ -89,14 +89,26 @@ const HANDLED = {
   ],
 
   // --- answering an agent ---
-  'R': [[focused, "e.key === 'r' || e.key === 'R') { e.preventDefault(); setOpenDoc(null); setModal('reply'); }"], [list, "case 'r': case 'R':"]],
+  'R': [[focused, "e.key === 'r' || e.key === 'R') { e.preventDefault(); setModal('reply');"], [list, "case 'r': case 'R':"]],
   // The send chord lives in the two boxes she types in, not on the window.
   '⌘↵': [
     [compose, "if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') send();"],
     [focus, "if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') send();"],
   ],
-  '1': [[focused, "/^[1-9]$/.test(e.key)) pickOption(focused, Number(e.key))"]],
-  '9': [[focused, "/^[1-9]$/.test(e.key)) pickOption(focused, Number(e.key))"]],
+  // The number picks AND sends, except in the 800ms after the app itself put a
+  // new thread in front of you, where it is held and says so rather than
+  // answering a thread you have not read (renderer/src/pick-settles.ts, F-31).
+  // Both halves are checked: the page promises this key works, and the hold is
+  // the one case where the press does something other than send.
+  '1': [
+    [focused, "/^[1-9]$/.test(e.key)) {"],
+    [focused, 'else pickOption(focused, Number(e.key));'],
+    [focused, 'if (!pickLandsHere(arrived.current, keyOf(focused), Date.now())) showToast(AIMED_AT_THE_THREAD_YOU_LEFT);'],
+  ],
+  '9': [
+    [focused, "/^[1-9]$/.test(e.key)) {"],
+    [focused, 'else pickOption(focused, Number(e.key));'],
+  ],
   // The arrows walk the options, and Enter sends the one showing.
   '⌘Y': [
     [mainProc, "if (key !== 'y' && key !== 'n') return;"],
@@ -148,13 +160,15 @@ const HANDLED = {
   // Control-K is the same chord where there is no Command key. The handler
   // is `(e.metaKey || e.ctrlKey)`, so the excerpt is the ctrl half of it.
   'Ctrl+K': [[chords, 'e.ctrlKey'], [chords, "e.key.toLowerCase() === 'k'"], [chords, "setModal((m) => (m === 'palette' ? null : 'palette'))"]],
-  'C': [[focused, "e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }"], [list, "case 'c': case 'C': case 'n': case 'N': e.preventDefault(); setModal('compose'); break;"]],
-  'N': [[focused, "e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }"], [list, "case 'c': case 'C': case 'n': case 'N': e.preventDefault(); setModal('compose'); break;"]],
+  // The cloud on or off, with the other chords, everywhere.
+  '⌘C': [[chords, 'if (cloudChord(e, { inInput'], [chords, 'toggleCloudRef.current?.();']],
+  // And a new thread, in both the open task and the list.
+  'N': [[focused, "else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }"], [list, "case 'n': case 'N': e.preventDefault(); setModal('compose'); break;"]],
   '/': [[chords, "if (e.key === '/')"], [chords, 'openSearch();']],
   '\\': [[chords, "if (e.key === '\\\\')"], [chords, 'togglePanel();']],
   // Into the task the toast is about, on the list and inside a task alike
   // (w-f0bfe32859). Gated on the toast in toast-parts.ts, which has its own test.
-  'O': [[chords, 'const goesTo = opensTheToast(e.key, toast);'], [chords, 'openToastRow(goesTo);']],
+  'O': [[chords, 'const goesTo = opensTheToast(e.key, toast, focused ? { product: focused.product, id: focused.id } : null);'], [chords, 'openToastRow(goesTo);']],
 };
 
 describe('every key the shortcuts page draws is one the app answers', () => {
@@ -307,7 +321,9 @@ describe('the page stays a page and not a wall', () => {
     expect(SHORTCUTS).toHaveLength(4);
     for (const g of SHORTCUTS) expect(g.keys.length).toBeLessThanOrEqual(7);
     // Rows, not caps: everyKey() flattens the caps and a row can draw two.
-    expect(SHORTCUTS.reduce((n, g) => n + g.keys.length, 0)).toBeLessThanOrEqual(24);
+    // 25 since 2026-10-16, for C, the cloud on or off, which she asked to see
+    // here ("it's good, naturally, to have it in the keyboard shortcuts").
+    expect(SHORTCUTS.reduce((n, g) => n + g.keys.length, 0)).toBeLessThanOrEqual(25);
   });
 
   it('groups by when the keys work, not by which handler runs them', () => {
@@ -410,7 +426,7 @@ describe('the page stays a page and not a wall', () => {
     }
     if (/\bterminals?\b/.test(prose)) {
       expect(read('renderer/src/components/TaskTerminal.tsx')).toContain('<strong>Terminal</strong>');
-      expect(app).toContain("label:'Open Terminal'");
+      expect(app).toContain("label:'Open terminal'");
     }
   });
 

@@ -26,7 +26,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { guard, sweep } from './lib/chrome-guard.mjs';
+import { CHROME as BROWSER, guard, sweep } from './lib/chrome-guard.mjs';
 import { answerFor } from '../main/first-run.mjs';
 import { EXAMPLES } from '../shared/first-run-examples.mjs';
 import {
@@ -103,8 +103,8 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 
 sweep();
 const profile = fs.mkdtempSync('/tmp/shot-profile-');
-const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
-  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
+const chrome = spawn(BROWSER, [
+  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-sandbox',
   '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
   `--window-size=${W},${H}`, 'about:blank',
 ], { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -756,7 +756,9 @@ const beat = async (name, what) => {
   const m = await evaluate(MEASURE);
   if (m.err) console.log('  !! page error:', m.err);
   // ONE LOOK (w-9e434e8671): no beat may come up wearing a theme or a picture.
-  if (m.theme || m.skin) throw new Error(`${name} is wearing ${m.theme}/${m.skin}, and the app has one look`);
+  // LOOK=0 to shoot a walk on a machine whose look is not the default, which is
+  // the only way to photograph the beats a QA box reported on.
+  if ((m.theme || m.skin) && process.env.LOOK !== '0') throw new Error(`${name} is wearing ${m.theme}/${m.skin}, and the app has one look`);
   const kb = await shot(name);
   out.beats.push({ name, what, kb, ...m });
   console.log(`  ${name.padEnd(28)} ${m.screen.padEnd(15)} ${m.theme}${m.skin ? '/' + m.skin : ''}${m.out ? `  way out at ${m.out.x},${m.out.y}` : ''}`);
@@ -816,10 +818,22 @@ if (process.env.CONTROL === '1') {
   ws.close(); chrome.kill(); server.close(); process.exit(0);
 }
 
+/**
+ * On through a setup screen. Return takes the row the list has lit, and the
+ * folder screen lights none of its two on a machine with no recent
+ * conversations to offer: there the chooser is clicked, which is what a person
+ * does with it.
+ */
+const on = async () => {
+  const pick = await evaluate(`!!document.querySelector('.fr-folder-other') && !document.querySelector('.fr-folder.lit')`);
+  if (pick) await evaluate(`document.querySelector('.fr-folder-other').click()`);
+  else await key('Enter');
+};
+
 console.log('\n=== 1 to 3: the setup screens ===');
 const first = await beat('01-welcome', 'the welcome, corner to corner');
 // EVERY SCREEN IS LIGHT NOW (w-9e434e8671): no theme attribute, no picture.
-if (first.theme || first.skin) throw new Error(`the walk opened wearing ${first.theme}/${first.skin}, and the app has one look`);
+if ((first.theme || first.skin) && process.env.LOOK !== '0') throw new Error(`the walk opened wearing ${first.theme}/${first.skin}, and the app has one look`);
 
 // This script used to photograph the way out here, on the welcome, because it
 // used to be on every screen. It is photographed on the first practice beat
@@ -833,9 +847,9 @@ await key('Enter'); await wait(1500);
 // conversations, so the list is the one row that opens the chooser, and Return
 // takes it; the chooser answers with the folder and the walk goes straight on.
 await beat('02-where-is-your-code', 'the folders to pick from, and the chooser as the last row');
-await key('Enter'); await wait(1200);
+await on(); await wait(1200);
 await beat('03-what-is-it-called', 'the name, taken from the folder');
-await key('Enter'); await wait(2600);
+await on(); await wait(2600);
 
 // THE INTRODUCTION, IN FRONT OF THE APP.Four screens, each one leaving on
 // Enter, and none of them is the app.
@@ -936,8 +950,10 @@ if (gearBox) {
 }
 // AND THE PLUS ITSELF STILL WORKS, clicked rather than pressed. The ring is
 // round it, so it is by definition the one thing this beat is about.
+// The same selectors the ring takes, in the same order (ANCHOR.make): the
+// button carried an aria-label alone until it grew its own words.
 const plusBox = await evaluate(`(() => {
-  const b = document.querySelector('button[aria-label="New thread"]');
+  const b = document.querySelector('button[aria-label="New thread"], .th-right button[data-hint="new-task"], button.th-new');
   if (!b) return null;
   const r = b.getBoundingClientRect();
   return JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) });

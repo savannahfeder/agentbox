@@ -105,6 +105,7 @@ import { Supervisor, readersFor } from '../main/supervisor.mjs';
 import { writeChangeForRun, readChange, changePath } from '../main/code-change.mjs';
 import { changeFromCodexTurn, SAYING_CAP } from '../main/codex.mjs';
 import { machineryPath } from '../main/store/home.mjs';
+import { __gitJobsIdle } from '../main/git-change-offthread.mjs';
 import { foldWorkItems } from '../shared/work-items.mjs';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -117,6 +118,8 @@ const tempDir = (prefix) => {
 const settle = async () => {
   for (let i = 0; i < 8; i += 1) await new Promise((resolve) => { setImmediate(resolve); });
 };
+// What a run changed is written on the git thread after the exit.
+const written = async () => { await settle(); await __gitJobsIdle(); await settle(); };
 
 beforeEach(() => { spawns.length = 0; appServers.length = 0; });
 afterAll(() => {
@@ -284,7 +287,7 @@ describe('what a finished codex run leaves on her card', () => {
       method: 'turn/completed',
       params: { threadId: 'T-CODEX', turn: { id: 'TURN-CODEX', status: 'completed', durationMs: 1000, items: [] } },
     });
-    await settle();
+    await written();
 
     const change = readChange(wrote(sup));
     expect(change.files.map((f) => f.path).sort()).toEqual(['math.js', 'notes.txt']);
@@ -341,7 +344,7 @@ describe('what a finished codex run leaves on her card', () => {
       method: 'turn/completed',
       params: { threadId: 'T-CODEX', turn: { id: 'TURN-CODEX', status: 'completed', durationMs: 1000, items: [] } },
     });
-    await settle();
+    await written();
 
     const change = readChange(wrote(sup));
     expect(change.files.map((f) => f.path).sort()).toEqual(['math.js', 'touched-by-sed.txt']);
@@ -356,7 +359,7 @@ describe('what a finished codex run leaves on her card', () => {
       method: 'turn/completed',
       params: { threadId: 'T-CODEX', turn: { id: 'TURN-CODEX', status: 'completed', durationMs: 1000, items: [] } },
     });
-    await settle();
+    await written();
 
     expect(fs.existsSync(wrote(sup))).toBe(false);
   });

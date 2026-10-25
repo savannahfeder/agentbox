@@ -73,9 +73,17 @@ export function noticeCodexAgents(threads, { count = null, seen = null, now = Da
   return sent;
 }
 
+// Answers at once for a reader that answers at once, and as a promise for one
+// that reads off the main process (readCodexThreadsOffThread).
 export function scanCodex({ store, readThreads = readCodexThreads, now = Date.now(), count = null, seen = null } = {}) {
-  let threads = [];
-  try { ({ threads } = readThreads({ now })); } catch { return { refreshed: 0, retold: 0, threads: 0 }; }
+  const none = { refreshed: 0, retold: 0, threads: 0 };
+  let read;
+  try { read = readThreads({ now }); } catch { return none; }
+  if (typeof read?.then === 'function') return read.then(({ threads }) => applyCodexThreads(threads, { store, now, count, seen }), () => none);
+  return applyCodexThreads(read?.threads ?? [], { store, now, count, seen });
+}
+
+function applyCodexThreads(threads, { store, now, count, seen }) {
   noticeCodexAgents(threads, { count, seen, now });
   const refreshed = store.refreshCodexMirrors(threads, { now });
   const retold = store.refreshCodexAsks(threads, { now });
@@ -87,8 +95,14 @@ export function startCodexWatch({ store, readThreads = readCodexThreads, pollMs 
   // as the Claude side's set is: a fresh launch seeing the same conversation
   // again is a fresh fact about the app being used.
   const seen = new Set();
+  // One scan at a time: a read slower than the minute must not stack up.
+  let scanning = null;
   const run = () => {
-    try { scanCodex({ store, readThreads, count, seen }); } catch (e) { console.warn('codex watch:', e?.message ?? e); }
+    if (scanning) return scanning;
+    scanning = Promise.resolve().then(() => scanCodex({ store, readThreads, count, seen }))
+      .catch((e) => console.warn('codex watch:', e?.message ?? e))
+      .finally(() => { scanning = null; });
+    return scanning;
   };
   const first = setTimeout(run, firstDelayMs);
   const timer = setInterval(run, pollMs);

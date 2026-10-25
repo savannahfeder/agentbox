@@ -12,27 +12,32 @@
 // place a grant is reviewed; what changed is that she edits them as fields on
 // the project they belong to instead of in a text editor.
 
+import { teammatesOn } from '../shared/teammates.mjs';
+import { phoneChoiceOf, phoneProjectsOf, withPhoneAll, withPhoneProject, phoneEligible } from '../shared/phone-snapshot.mjs';
 import fs from 'node:fs';
 import { harnessFor } from './harnesses.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { codexChoiceToOpen, saveConfig } from './config.mjs';
 import { forgetClaudeBin, INSTALL_URL } from './claude-bin.mjs';
+import { lookAgain } from './engine-bin.mjs';
 import { AGENT_MODES } from '../shared/agents.mjs';
 import { analyticsKey, diagnosticsOn } from './analytics.mjs';
 import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
 import { accountSentence, engineTroubleNote, refineCause } from '../shared/spawn-trouble.mjs';
 import { readPlan } from './claude-plan.mjs';
-import { effectiveProfiles } from './account-discovery.mjs';
+import { effectiveProfiles, troubleForProfile } from './account-discovery.mjs';
 import { machineSlots, machineNote, autoAgents, MAX_SLOTS } from './machine.mjs';
 import { shortPath } from './agent-files.mjs';
 import { NAME, Name } from '../shared/product-name.mjs';
 import { autoSlots } from './memory-gate.mjs';
 import { accountIdentity, claudeLoginCommand, duplicateAccountNote, linkAccountTooling, makeClaudeHome } from './account-tooling.mjs';
 import { isEngine } from '../shared/engines.mjs';
-import { codexAccount, codexLoginCommand, makeCodexHome } from './codex-account.mjs';
-import { codexDefaultModel, codexModels } from './codex-models.mjs';
+import { codexAccount, codexFreePlan, codexLoginCommand, makeCodexHome } from './codex-account.mjs';
+import { codexDefaultModel, codexModelsAcross } from './codex-models.mjs';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mjs';
+import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-permission.mjs';
+import { isPackagedElectron } from './team/session.mjs';
 import { claudeModels } from './claude-models.mjs';
 import { forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mjs';
 
@@ -215,6 +220,8 @@ export function buildSessionArgs(base, mode) {
   return [...model, ...(tools.length ? ['--allowedTools', ...tools] : []), ...grant, ...parsed.other];
 }
 
+export { cloudPermissionArgs } from './cloud-permission.mjs';
+
 // THE MODEL, WRITTEN BACK INTO THE SAME LIST buildSessionArgs READS FROM.The
 // screen had no control over this at all; the flag was already there and only
 // a text editor could change it.
@@ -247,10 +254,31 @@ export function setModelArg(base, model) {
 
 const lineCount = (text) => (text.trim() ? text.trim().split('\n').length : 0);
 
+// What launch found, or the last Check again, in the finder's own shape. For a
+// read nobody is looking at: the search starts a login shell on the window's
+// thread, and the phone reads settings every minute.
+function knownEngine(config, engine) {
+  if (engine === 'claude') {
+    return {
+      path: config.claudeBin ?? null,
+      found: !!config.claudeFound,
+      certain: config.claudeCertain !== false,
+      from: config.claudeBinConfigured ? 'settings' : (config.claudeFrom ?? null),
+    };
+  }
+  // recheckCodex moves codexBin and not codexFound, so the path is the answer.
+  return {
+    path: config.codexBin ?? null,
+    found: !!config.codexBin,
+    certain: config.codexCertain !== false,
+    from: config.codexBinConfigured ? 'settings' : (config.codexFrom ?? null),
+  };
+}
+
 // Claude Code: the path, whether it is really there, and where to get it when
 // it is not. One reader, here, so the screen and the config cannot disagree.
-export function claudeState(config) {
-  const found = harnessFor('claude').discover(config.claudeBinConfigured ?? null);
+export function claudeState(config, { search = true } = {}) {
+  const found = search ? harnessFor('claude').discover(config.claudeBinConfigured ?? null) : knownEngine(config, 'claude');
   return {
     claudeBin: found.path ?? config.claudeBin,
     claudeFound: found.found,
@@ -274,6 +302,20 @@ export function claudeState(config) {
 // `forgetClaudeBin` exists for.
 export function recheckClaude(config) {
   forgetClaudeBin();
+  return takeClaude(config);
+}
+
+/**
+ * Check again without holding the window: the shell is asked in the background
+ * and this settles once its answer is on the config. For every caller that can
+ * wait (the buttons, setup, the update check).
+ */
+export async function lookAgainFor(engine, config) {
+  await lookAgain(engine);
+  return engine === 'claude' ? takeClaude(config) : takeCodex(config);
+}
+
+function takeClaude(config) {
   const state = claudeState(config);
   // The config carries the path everything else spawns from, so a search that
   // has just found Claude Code updates it rather than leaving the rest of the
@@ -282,7 +324,10 @@ export function recheckClaude(config) {
   // And whether it is here at all, which is what decides that a Mac with only
   // Codex runs on Codex (`Supervisor#_enginesFound`). Only a certain answer
   // moves it, so an unsure search never takes Claude Code away from anybody.
-  if (state.claudeFound || state.claudeCertain) config.claudeFound = state.claudeFound;
+  if (state.claudeFound || state.claudeCertain) {
+    config.claudeFound = state.claudeFound;
+    config.claudeCertain = state.claudeCertain;
+  }
   return state;
 }
 
@@ -316,8 +361,8 @@ export function recheckClaude(config) {
  * checked by uninstalling Codex from the machine running the suite is a card
  * whose unsure state is not checked. Nothing in the app passes it.
  */
-export function codexState(config, where = {}) {
-  const found = harnessFor('codex').discover(config.codexBinConfigured ?? null, where);
+export function codexState(config, where = {}, { search = true } = {}) {
+  const found = search ? harnessFor('codex').discover(config.codexBinConfigured ?? null, where) : knownEngine(config, 'codex');
   return {
     // Empty rather than a path when there is nothing there, which is the same
     // asymmetry `config.codexBin` already keeps (main/config.mjs): a configured
@@ -335,8 +380,8 @@ export function codexState(config, where = {}) {
 }
 
 /** `codexState` under the names the walk's last card reads beside Claude's. */
-export function codexFoundState(config, where = {}) {
-  const state = codexState(config, where);
+export function codexFoundState(config, where = {}, how = {}) {
+  const state = codexState(config, where, how);
   return { codexFound: state.found, codexCertain: state.certain, codexInstallUrl: state.url };
 }
 
@@ -348,8 +393,13 @@ export function codexFoundState(config, where = {}) {
  *  without a restart. */
 export function recheckCodex(config) {
   forgetCodexBin();
+  return takeCodex(config);
+}
+
+function takeCodex(config) {
   const state = codexState(config);
   config.codexBin = state.found ? state.bin : null;
+  config.codexCertain = state.certain;
   // Found while the app is open, by this button or the plan setup: the choice
   // opens now, as it would have at the next launch (main/config.mjs).
   const opened = codexChoiceToOpen(config, state.found);
@@ -438,7 +488,19 @@ export function searchForEngineBin(config, engine) {
   return { ok: true, state };
 }
 
-export function readSettings({ config, supervisor, store }) {
+// THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Off unless someone turned them
+// on in Settings; only a real `true` counts. Multiplayer, the team version, is
+// the exception in a checkout, where it was always on.
+export function alphaFeatures(config, { packaged = isPackagedElectron() } = {}) {
+  return {
+    rooms: config?.alphaRooms === true,
+    teammates: teammatesOn(config),
+    multiplayer: packaged ? config?.alphaMultiplayer === true : config?.alphaMultiplayer !== false,
+  };
+}
+
+// `search: false` is for a read on a timer (`knownEngine`).
+export function readSettings({ config, supervisor, store }, { search = true } = {}) {
   const products = store.listProducts();
   const status = supervisor.status();
   const sessions = [...supervisor.sessions.values()];
@@ -469,10 +531,17 @@ export function readSettings({ config, supervisor, store }) {
   // waiting, because a page she chose to open interrupts nobody.
   const troubles = status.accountTrouble ?? {};
   const accounts = (profiles.length ? profiles : ['default']).map((profile) => {
-    const plan = readPlan(profile);
+    // THE HOME THE WORKSPACE IS CONFIGURED WITH, not this process's own. Both
+    // of these read a login out of a folder, and both of them defaulted to
+    // `os.homedir()` while the list of folders above came from `config.home`,
+    // so a workspace pointed anywhere else drew rows for its own folders and
+    // read somebody else's login into them.
+    const plan = readPlan(profile, { home: config.home });
     // A reason filed before an ended subscription had its own name still reads
     // as an admin's block; the login's file says which it is.
-    const filed = troubles[profile] ?? null;
+    // THE SUBSCRIPTION'S TROUBLE, not the folder's: one row stands for every
+    // folder holding this account (account-discovery.mjs says why).
+    const filed = troubleForProfile(troubles, profile, { home: config.home });
     const trouble = filed ? { ...filed, cause: refineCause(filed.cause, plan) } : null;
     const resting = (supervisor._profileCooldown?.[profile] ?? 0) >= now;
     // WHOSE SUBSCRIPTION THIS ROW IS, not merely which folder it lives in.
@@ -480,14 +549,18 @@ export function readSettings({ config, supervisor, store }) {
     // person that one of their accounts had been replaced by the other;
     // main/account-tooling.mjs has how that happens. Null when the
     // folder holds no login, and then the row reads as it always did.
-    const identity = accountIdentity(profile === 'default' ? null : profile);
+    const identity = accountIdentity(profile === 'default' ? null : profile, { home: config.home });
     return {
       profile,
       email: identity?.email ?? null,
       accountUuid: identity?.accountUuid ?? null,
-      // WHICH ONE RUNS, when she has picked one. False on every row while she
-      // has not, and then every account runs as it always has.
-      chosen: (config.activeAccount?.claude ?? null) === profile,
+      // WHICH ONE RUNS, AND ONE OF THEM ALWAYS DOES (w-dac993a554). This was
+      // false on every row until somebody picked, because until then every
+      // account really did take a share of the work. One account runs it now,
+      // so the supervisor is asked which rather than the config file: with
+      // nothing picked that is the primary login, and the page says so instead
+      // of leaving a person to guess which of their two plans is being spent.
+      chosen: (supervisor._profilesFor?.('claude') ?? [])[0] === profile,
       // The default profile is whatever ~/.claude holds; anything else is a
       // second logged-in home directory, and its path is the only name it has.
       label: profile === 'default' ? 'default' : path.basename(profile),
@@ -519,6 +592,8 @@ export function readSettings({ config, supervisor, store }) {
     };
   });
 
+  // On her phone: every project unless she kept it here (shared/phone-snapshot.mjs).
+  const phoneSlugs = new Set(phoneProjectsOf(config.phoneProducts, process.env.AGENTBOX_PERSON_ID, phoneEligible(products)));
   const projects = products.map((product) => {
     let instructions = '';
     try { instructions = supervisor.readProjectInstructions(product.slug); } catch {}
@@ -540,6 +615,9 @@ export function readSettings({ config, supervisor, store }) {
       // workspace default and never a strip of Claude Code jargon on a page
       // she opens to change her rules.
       autonomous: (config.autonomousProducts ?? []).includes(product.slug),
+      // ON HER PHONE WITH THE MAC SHUT (docs/cloud/PHONE-PLAN.md): its threads
+      // go up to her own rows online on every sync (main/phone-inbox.mjs).
+      onPhone: phoneSlugs.has(product.slug),
       permission: override ? permissionMode(override) : 'workspace',
       permissionArgs: override ?? null,
       codexMode: config.projectCodexMode?.[product.slug] ?? 'workspace',
@@ -564,6 +642,8 @@ export function readSettings({ config, supervisor, store }) {
   return {
     archivedProjects,
     workspace: {
+      // THE PHONE AS A WHOLE: on unless she turned it off (shared/phone-snapshot.mjs).
+      phoneAll: phoneChoiceOf(config.phoneProducts, process.env.AGENTBOX_PERSON_ID, phoneEligible(products)).all,
       agentsRunning: !supervisor.paused,
       // The number picked on the menu, for the whole computer, or what is
       // running as the limit now when nothing was picked.
@@ -608,9 +688,11 @@ export function readSettings({ config, supervisor, store }) {
       // comes back with ONE entry and this screen draws exactly what it drew
       // before. A page that derived its own list would offer her a choice the
       // supervisor is about to refuse.
-      ...engineSettings(supervisor, config),
+      ...engineSettings(supervisor, config, { search }),
       permission: permissionMode(workspaceArgs),
       permissionArgs: workspaceArgs,
+      cloudPermission: config.cloudPermission ?? CLOUD_CLAUDE_DEFAULT,
+      cloudCodexMode: config.cloudCodexMode ?? CLOUD_CODEX_DEFAULT,
       // ONE SWITCH FOR EVERYTHING THAT LEAVES THE MACHINE, and it is on when
       // Agentbox is installed (legal/privacy.html, section 10). Off stops the
       // counts AND the crash reports; there is deliberately no partial mode and
@@ -623,6 +705,8 @@ export function readSettings({ config, supervisor, store }) {
       // ADHD mode: whether the ADHD rules ride under hers (w-5737fe67cf). Off
       // unless she turned it on, so only `true` means on.
       adhdMode: config.adhdMode === true,
+      importNew: config.importNew === true,
+      alpha: alphaFeatures(config),
       // The corner tag over other apps (w-dafae58a23). On unless she turned it
       // off here, which is the only place it turns off for good.
       cornerTag: config.cornerTag !== false,
@@ -650,11 +734,11 @@ export function readSettings({ config, supervisor, store }) {
       // Looked up again on every read of this screen, not taken from boot.
       // Someone who reads "install it, then open this screen again" and does
       // exactly that has to see it turn found, without restarting the app.
-      ...claudeState(config),
+      ...claudeState(config, { search }),
       // AND WHETHER CODEX IS, because the app needs one of the two and not
       // both: the last card of the walk only shuts the inbox when neither is
       // here (renderer/src/App.tsx).
-      ...codexFoundState(config),
+      ...codexFoundState(config, {}, { search }),
       // AND WHAT THIS MAC'S CLAUDE CODE CALLS ITS MODELS.
       //
       // In the same trip, and for the same reason the line above is looked up
@@ -706,7 +790,7 @@ function engineTroubleFor(supervisor, engine) {
   return trouble ? engineTroubleNote(trouble.cause) : null;
 }
 
-function engineSettings(supervisor, config) {
+function engineSettings(supervisor, config, { search = true } = {}) {
   const choices = supervisor.engineChoices();
   const engine = supervisor.engineFacts().workspace;
   // WHETHER THIS MAC HAS ASKED TO HEAR ABOUT CODEX AT ALL, which is a different
@@ -731,7 +815,7 @@ function engineSettings(supervisor, config) {
   // links the install, which is the question that person had.
   const codexIsHome = engine === 'codex';
   const codex = {
-    ...codexState(config),
+    ...codexState(config, {}, { search }),
     trouble: engineTroubleFor(supervisor, 'codex'),
     account: codexAccount(supervisor._codexHome()),
     // EVERY CODEX LOGIN ON THE MAC, NOT JUST THE FIRST. The supervisor has
@@ -746,6 +830,7 @@ function engineSettings(supervisor, config) {
     return { engine, engineChoices: choices, codex, codexModels: [], codexModelDefault: null, codexModel: null };
   }
   const home = supervisor._codexHome();
+  const offered = supervisor._codexOfferHomes();
   return {
     engine,
     engineChoices: choices,
@@ -754,9 +839,12 @@ function engineSettings(supervisor, config) {
     // strip in the model drawer draws the picked model's list, so they travel
     // beside the name rather than as a list of their own that could disagree
     // with it.
-    codexModels: codexModels({ home }).map((m) => ({
+    codexModels: codexModelsAcross(offered).map((m) => ({
       id: m.id, label: m.label, levels: m.levels.map((l) => l.id), defaultLevel: m.defaultLevel,
     })),
+    // Set when every login offered is on ChatGPT's free plan, so the menu can
+    // say why Codex lists so few models.
+    codexFreePlan: codexFreePlan(offered),
     // What her own `codex` in a terminal runs, so the card's word and her
     // terminal cannot disagree. Null is a real answer and the card says
     // "Codex's own" for it rather than guessing (renderer/src/models.ts).
@@ -786,11 +874,14 @@ const withSlug = (list, slug, on) => {
 // `paused` and `driven` were the other three and all three are gone from the
 // app: the first two because she could not tell what they did and would never
 // have used them, the third because the self-driving it belonged to is deleted.
-export function setProjectSetting({ config, supervisor }, { product, key, value }) {
+export function setProjectSetting({ config, supervisor, store }, { product, key, value }) {
   if (!product) throw new Error('no project');
   switch (key) {
     case 'autonomous':
       saveConfig(config, { autonomousProducts: withSlug(config.autonomousProducts, product, !!value) });
+      break;
+    case 'phone':
+      saveConfig(config, { phoneProducts: withPhoneProject(config.phoneProducts, process.env.AGENTBOX_PERSON_ID, product, !!value, phoneEligible(store?.listProducts?.() ?? [])) });
       break;
     // WHICH OF HER CLAUDE CODE AGENTS THIS PROJECT TOOK. Names only: the files
     // stay where their author put them and Agentbox never copies or moves one,
@@ -869,7 +960,9 @@ export function setProjectSetting({ config, supervisor }, { product, key, value 
  * not signed in.
  */
 function codexAccountRows(supervisor) {
-  const chosen = supervisor.config.activeAccount?.codex ?? null;
+  // THE ONE THAT RUNS, the same way the Claude rows answer it: the supervisor's
+  // own pick, which is the chosen account or the primary login (w-dac993a554).
+  const chosen = supervisor._profilesFor?.('codex')?.[0] ?? null;
   return supervisor._codexProfiles().map((profile) => {
     const home = supervisor._codexProfileHome(profile);
     const id = codexAccount(home);
@@ -881,8 +974,7 @@ function codexAccountRows(supervisor) {
       planNamed: id?.planNamed ?? false,
       accountId: id?.accountId ?? null,
       signedIn: !!id,
-      // WHICH ONE RUNS. Null when she has never picked, and then every account
-      // runs and the card says so rather than marking one at random.
+      // WHICH ONE RUNS, and one of them always does (`chosen` above).
       chosen: chosen === profile,
     };
   });
@@ -927,9 +1019,12 @@ export function addCodexAccount({ config, supervisor }) {
  * ordinary reason for wanting it: a work login and a personal login, both
  * live, on one Mac.
  *
- * Everything else is the Codex flow exactly. Main makes the folder and
- * registers the profile, so the row appears immediately reading "Not signed
- * in"; the terminal is left with the browser half, which is genuinely hers.
+ * Main makes the folder and the terminal is left with the browser half, which
+ * is genuinely hers. UNLIKE CODEX, NOTHING IS WRITTEN INTO THE CONFIG: the
+ * folder is the shape main/account-discovery.mjs finds, so the account appears
+ * the moment its sign-in lands and never before. Registering it first put an
+ * abandoned sign-in in Settings as a "Not signed in" account and handed it
+ * every other task (tests/an-account-shows-once-and-only-once-it-is-signed-in).
  *
  * THE TOOLING IS LINKED AT CREATION, which the Codex side has no equivalent of.
  * `linkAccountTooling` otherwise runs at the first spawn, and the first thing
@@ -939,9 +1034,6 @@ export function addCodexAccount({ config, supervisor }) {
  */
 export function addClaudeAccount({ config, supervisor }) {
   const made = makeClaudeHome({ home: config.home });
-  const existing = (config.authProfiles ?? []).map((x) => x || 'default');
-  const list = existing.length ? existing : ['default'];
-  saveConfig(config, { authProfiles: [...list, made.profile] });
   // A failure here is a folder without her skills in it, which is a smaller
   // thing than a sign in that does not happen: the links are retried at every
   // spawn anyway.
@@ -1026,22 +1118,26 @@ export function leftoverSettings({ config, supervisor }) {
   // Codex, 2026-10-05).
   if (!on) {
     if (total && stoppable) {
-      now = `Right now finished agents have left ${total} program${total === 1 ? '' : 's'} running; turning this on stops ${stoppable === total ? (total === 1 ? 'it' : 'them') : `${stoppable} of them`}, two hours from then.`;
+      now = `Right now finished agents have left ${total} program${total === 1 ? '' : 's'} running; turning this on stops ${stoppable === total ? (total === 1 ? 'it' : 'them') : `${stoppable} of them`} when you close their tasks.`;
     }
     return { on, now };
   }
   {
     if (!total) now = 'Nothing left running by finished agents.';
     else {
-      const next = list.filter((l) => l.programs && l.stopsAt).map((l) => l.stopsAt).sort((a, b) => a - b)[0];
+      const timed = list.filter((l) => l.programs && l.stopsAt);
+      const next = timed.map((l) => l.stopsAt).sort((a, b) => a - b)[0];
+      const soon = timed.reduce((n, l) => n + l.programs, 0);
+      const open = stoppable - soon;
       const when = (ms) => {
         const m = Math.max(1, Math.round((ms - Date.now()) / 60_000));
         return m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} m` : ''}` : `${m} m`;
       };
-      now = `Finished agents have left ${total} program${total === 1 ? '' : 's'} running.`;
-      if (stoppable) now += ` ${stoppable} ${next && next > Date.now() ? `stop in ${when(next)}` : 'are stopping'}`;
-      if (kept) now += `${stoppable ? ';' : ''} ${kept} ${kept === 1 ? 'is' : 'are'} kept`;
-      now += '.';
+      const parts = [];
+      if (soon) parts.push(`${soon} ${next > Date.now() ? `stop${soon === 1 ? 's' : ''} in ${when(next)}` : `${soon === 1 ? 'is' : 'are'} stopping`}`);
+      if (open) parts.push(`${open} stop${open === 1 ? 's' : ''} when you close ${open === 1 ? 'its task' : 'their tasks'}`);
+      if (kept) parts.push(`${kept} ${kept === 1 ? 'is' : 'are'} kept`);
+      now = `Finished agents have left ${total} program${total === 1 ? '' : 's'} running. ${parts.join('; ')}.`;
       const survivors = s?.survivors?.length ?? 0;
       if (survivors) now += ` ${survivors} did not stop when asked.`;
     }
@@ -1077,8 +1173,31 @@ export function strayFolderSettings({ supervisor }, home = os.homedir()) {
   return { count, now };
 }
 
-export function setWorkspaceSetting({ config, supervisor }, { key, value }) {
+export function cornerTagTurnedOff({ key, value } = {}) {
+  return key === 'cornerTag' && !value;
+}
+
+export function countsTurnedOff({ key, value } = {}) {
+  return key === 'diagnostics' && !value;
+}
+
+export function setWorkspaceSetting({ config, supervisor, store }, { key, value }) {
   switch (key) {
+    // EVERY PROJECT ON HER PHONE, or none (shared/phone-snapshot.mjs). Which
+    // ones she keeps here is remembered either way.
+    case 'phoneAll':
+      saveConfig(config, { phoneProducts: withPhoneAll(config.phoneProducts, process.env.AGENTBOX_PERSON_ID, !!value, phoneEligible(store?.listProducts?.() ?? [])) });
+      break;
+    // THE DROPDOWN'S WHOLE ANSWER AT ONCE: on or off, and which projects stay
+    // on this computer. Only project slugs that exist are kept.
+    case 'phoneProjects': {
+      const person = process.env.AGENTBOX_PERSON_ID;
+      if (!person) throw new Error('sign in first');
+      const every = phoneEligible(store?.listProducts?.() ?? []);
+      const except = Array.isArray(value?.except) ? value.except.filter((s) => every.includes(s)) : [];
+      saveConfig(config, { phoneProducts: { owner: person, all: value?.all !== false, except } });
+      break;
+    }
     case 'agentsRunning':
       supervisor.paused = !value;
       supervisor.onChange?.();
@@ -1139,6 +1258,43 @@ export function setWorkspaceSetting({ config, supervisor }, { key, value }) {
       break;
     // STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mjs). Turning it
     // on records the moment, which is the earliest the clock may start from.
+    // WHERE THREADS RUN (renderer/src/cloud-menu.ts): 'mac' turns cloud runs
+    // off, 'full' sends what does not fit here, 'all' sends everything first.
+    // Read by the supervisor per call, so it takes effect on the next tick.
+    case 'cloudRuns': {
+      const map = { mac: false, full: null, all: 'all' };
+      if (!(value in map)) throw new Error(`unknown cloud mode: ${value}`);
+      // Turning the cloud on to one meaning makes that the one C goes back to.
+      const patch = value === 'mac' ? { cloudRuns: false } : { cloudRuns: map[value], cloudWhenOn: value };
+      saveConfig(config, patch);
+      Object.assign(config, patch);
+      supervisor.wake?.();
+      supervisor.onChange?.();
+      break;
+    }
+    // WHAT "ON" MEANS (renderer/src/cloud-menu.ts): kept while the cloud is
+    // off, and taking effect at once while it is on.
+    case 'cloudWhenOn': {
+      if (value !== 'full' && value !== 'all') throw new Error(`unknown meaning of on: ${value}`);
+      const patch = config.cloudRuns === false ? { cloudWhenOn: value } : { cloudWhenOn: value, cloudRuns: value === 'all' ? 'all' : null };
+      saveConfig(config, patch);
+      Object.assign(config, patch);
+      supervisor.wake?.();
+      supervisor.onChange?.();
+      break;
+    }
+    // THE CLOUD'S OWN MODE PER ENGINE, CLOUD_SAME for this computer's, or null
+    // for the cloud's default (main/cloud-permission.mjs).
+    case 'cloudPermission':
+    case 'cloudCodexMode': {
+      const known = key === 'cloudPermission' ? CLAUDE_MODES.includes(value) : isCodexMode(value);
+      if (value != null && value !== CLOUD_SAME && !known) throw new Error(`unknown permission mode: ${value}`);
+      const patch = { [key]: value ?? null };
+      saveConfig(config, patch);
+      Object.assign(config, patch);
+      supervisor.onChange?.();
+      break;
+    }
     case 'cleanupLeftovers':
       saveConfig(config, value ? { cleanupLeftovers: true, cleanupLeftoversSince: Date.now() } : { cleanupLeftovers: false });
       supervisor.setLeftoverCleanup?.(!!value)?.catch?.((e) => console.warn('zero: leftovers:', e.message));
@@ -1162,6 +1318,26 @@ export function setWorkspaceSetting({ config, supervisor }, { key, value }) {
     case 'adhdMode':
       saveConfig(config, { adhdMode: !!value });
       break;
+    // New chats from Claude Code and Codex come in on their own
+    // (main/new-chats-watch.mjs), only those started after it went on.
+    case 'importNew':
+      if (!value) saveConfig(config, { importNew: false });
+      else if (config.importNew !== true) saveConfig(config, { importNew: true, importNewSince: Date.now() });
+      break;
+    // Rooms is read on every snapshot.
+    case 'alphaRooms':
+      saveConfig(config, { alphaRooms: !!value });
+      supervisor.onChange?.();
+      break;
+    case 'alphaTeammates':
+      saveConfig(config, { alphaTeammates: !!value });
+      supervisor.onChange?.();
+      supervisor.wake?.();
+      break;
+    case 'alphaMultiplayer':
+      saveConfig(config, { alphaMultiplayer: !!value });
+      supervisor.onChange?.();
+      break;
     // THE CORNER TAG (w-dafae58a23). Turning it back on also ends any hide, so
     // the switch does what it says the moment she flips it.
     case 'cornerTag':
@@ -1175,15 +1351,15 @@ export function setWorkspaceSetting({ config, supervisor }, { key, value }) {
     // in one object keyed by engine is what stops a Codex pick being read as a
     // Claude one, which is the collision `_accountKey` exists to prevent.
     //
-    // NULL CLEARS IT, and clearing means every account runs again, which is what
-    // this machine did before she ever picked. `Supervisor#_narrowToChosen` also
-    // ignores a name that no longer exists, so a login she removes cannot wedge
-    // the fleet.
+    // NULL CLEARS IT, and clearing means the primary login runs the work again.
+    // `Supervisor#_theOneAccount` also ignores a name that no longer exists, so
+    // a login she removes cannot wedge the fleet.
     case 'activeAccount': {
       const engineId = value?.engine;
       if (!isEngine(engineId)) throw new Error(`unknown coding agent: ${engineId}`);
       const profile = typeof value?.profile === 'string' && value.profile ? value.profile : null;
       saveConfig(config, { activeAccount: { ...(config.activeAccount ?? {}), [engineId]: profile } });
+      supervisor.accountChosen?.(engineId, profile);
       supervisor.onChange?.();
       break;
     }

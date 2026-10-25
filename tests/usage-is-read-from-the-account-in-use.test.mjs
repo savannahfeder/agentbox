@@ -26,8 +26,8 @@ import path from 'node:path';
 import { ClaudeUsage, STALE_MS } from '../main/claude-usage.mjs';
 import { Supervisor } from '../main/supervisor.mjs';
 
-const OUT = 'Current session: 24% used · resets Oct 8 at 10:40pm\nCurrent week (all models): 4% used · resets Oct 15 at 4pm\n';
-const OTHER = 'Current session: 90% used · resets Oct 8 at 10:40pm\n';
+const OUT = JSON.stringify({ rate_limits_available: true, rate_limits: { five_hour: { utilization: 24 }, seven_day: { utilization: 4 } } });
+const OTHER = JSON.stringify({ rate_limits_available: true, rate_limits: { five_hour: { utilization: 90 } } });
 
 function reader({ account, answer = () => OUT, clock = { t: 1_000 } }) {
   const calls = [];

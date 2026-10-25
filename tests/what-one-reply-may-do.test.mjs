@@ -27,6 +27,7 @@ import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mjs';
 import { buildLine, foldWorkItems, normalizeLine, pickFields, CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
 import { machineryPath } from '../main/store/home.mjs';
+import { answerModesFile } from '../main/answer-modes.mjs';
 import { buildSessionArgs, parseSessionArgs, permissionMode } from '../main/settings.mjs';
 import { nameSlug } from '../shared/product-name.mjs';
 
@@ -157,13 +158,10 @@ describe('a forged ledger line cannot grant a permission', () => {
     expect(store.readItem(slug, row.id).answerMode).toBe('plan');
   });
 
-  // Where it does live, and what that is and is not. This is not a wall: a
-  // worker that goes looking can write this file too, because anything that can
-  // run commands can write any file this user owns. Claude Code has the
-  // identical property. What changed is the cost, from one more line in a file
-  // the worker appends to anyway, in its own working directory, to a deliberate
-  // reach into the app's own storage.
-  it('keeps it in the app storage instead, out of the folder a worker runs in', () => {
+  // Where it does live: her own folder, which no worker is granted. It used to
+  // be the app's own home, which the app makes the store root, and that is
+  // granted (tests/a-worker-cannot-set-its-own-permission-mode).
+  it('keeps it in her own folder instead, out of the folders a worker is granted', () => {
     const row = store.composeItem(slug, { title: 'a row', body: 'text' });
     store.answerItem(slug, row.id, { answer: 'go', permissionMode: 'plan' });
 
@@ -171,8 +169,10 @@ describe('a forged ledger line cannot grant a permission', () => {
     expect(ledger).not.toContain('answerMode');
     expect(ledger).not.toContain('plan');
 
-    const kept = JSON.parse(fs.readFileSync(path.join(process.env.ASTRAL_HOME, 'answer-modes.json'), 'utf8'));
+    const kept = JSON.parse(fs.readFileSync(answerModesFile(), 'utf8'));
     expect(kept[`${slug}/${row.id}`].mode).toBe('plan');
+    expect(answerModesFile().startsWith(tmp + path.sep)).toBe(false);
+    expect(answerModesFile().startsWith(process.env.ASTRAL_HOME + path.sep)).toBe(false);
     // Not in her product folder, which is what a worker's cwd is on a product
     // with no code repo registered.
     expect(fs.readdirSync(dir)).not.toContain('answer-modes.json');
@@ -198,7 +198,7 @@ describe('a forged ledger line cannot grant a permission', () => {
   it('keeps one a day old, because a mode belongs to the thread now', () => {
     const row = store.composeItem(slug, { title: 'a row', body: 'text' });
     store.answerItem(slug, row.id, { answer: 'go', permissionMode: 'default' });
-    const file = path.join(process.env.ASTRAL_HOME, 'answer-modes.json');
+    const file = answerModesFile();
     const all = JSON.parse(fs.readFileSync(file, 'utf8'));
     all[`${slug}/${row.id}`].at = Date.now() - (25 * 60 * 60 * 1000);
     fs.writeFileSync(file, JSON.stringify(all));
@@ -212,7 +212,7 @@ describe('a forged ledger line cannot grant a permission', () => {
   it('forgets one no run has touched for a month', () => {
     const row = store.composeItem(slug, { title: 'a row', body: 'text' });
     store.answerItem(slug, row.id, { answer: 'go', permissionMode: 'bypassPermissions' });
-    const file = path.join(process.env.ASTRAL_HOME, 'answer-modes.json');
+    const file = answerModesFile();
     const all = JSON.parse(fs.readFileSync(file, 'utf8'));
     all[`${slug}/${row.id}`].at = Date.now() - (31 * 24 * 60 * 60 * 1000);
     fs.writeFileSync(file, JSON.stringify(all));
@@ -225,7 +225,7 @@ describe('a forged ledger line cannot grant a permission', () => {
   it('a run on the thread puts the clock back to now', () => {
     const row = store.composeItem(slug, { title: 'a row', body: 'text' });
     store.answerItem(slug, row.id, { answer: 'go', permissionMode: 'acceptEdits' });
-    const file = path.join(process.env.ASTRAL_HOME, 'answer-modes.json');
+    const file = answerModesFile();
     const all = JSON.parse(fs.readFileSync(file, 'utf8'));
     all[`${slug}/${row.id}`].at = Date.now() - (29 * 24 * 60 * 60 * 1000);
     fs.writeFileSync(file, JSON.stringify(all));
@@ -465,6 +465,7 @@ describe('clearing a mode puts the row back on the project setting', () => {
         // undefined so the child exiting does not throw past the assertion.
         _fruitless: {},
         _profileCooldown: {},
+        _liveSessions: {},
         emit: () => {},
         tick: () => {},
         // `true` exits 0 at once and emits a real 'spawn' event before it does.
@@ -480,7 +481,7 @@ describe('clearing a mode puts the row back on the project setting', () => {
       // something this test can WAIT FOR rather than something it hopes
       // happened. AWAITED, NOT SLEPT: a fixed sleep is a test that passes
       // because the machine was fast enough this time.
-      const modeFile = path.join(process.env.ASTRAL_HOME, 'answer-modes.json');
+      const modeFile = answerModesFile();
       const key = `${slug}/${row.id}`;
       const stamped = () => {
         try { return JSON.parse(fs.readFileSync(modeFile, 'utf8'))[key]; } catch { return undefined; }
@@ -685,6 +686,8 @@ describe('the wiring from the reply box is present in the source', () => {
     expect(ipc).toMatch(/zero:answer'[^)]*permissionMode/s);
     // `inReplyTo` rides beside it since threads (w-920461cbe6): a reply in a
     // thread is still this one call, naming the message it answers.
-    expect(ipc).toContain('store.answerItem(product, id, { answer, status, priority, permissionMode, model, effort, inReplyTo: thread })');
+    // And `fromPhone` since the phone with the computer closed: the id of the
+    // phone command a reply came from (main/phone-inbox.mjs).
+    expect(ipc).toContain('store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone })');
   });
 });

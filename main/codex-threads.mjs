@@ -24,11 +24,13 @@
 // table. It is not read: Electron ships no sqlite, the file is written live
 // under WAL, and the two plain files carry what the row needs.
 import fs from 'node:fs';
+import { Worker } from 'node:worker_threads';
 import os from 'node:os';
 import path from 'node:path';
 import { RECENT_DAYS, isScratchFolder, shortFolder, threadTitle } from './agent-sessions.mjs';
 import { codexDataDirs } from './agent-homes.mjs';
 import { WAS_SLUGS, nameSlug } from '../shared/product-name.mjs';
+import { howTheChatEnded } from '../shared/agent-import.mjs';
 
 export const CODEX_RECENT_DAYS = RECENT_DAYS;
 /** The originator Codex records for a run this app started (CLIENT_INFO.name), now and before. */
@@ -164,7 +166,25 @@ const partsOf = (payload) => (Array.isArray(payload?.content) ? payload.content 
  *  `message` with a `role` and a `content` array of `input_text`, `input_image`
  *  and `output_text` parts. Current Codex threads are paginated, and a build
  *  that read only legacy showed "Codex has not answered yet." on every row. */
+// Each transcript as last read, kept while its size and time are unchanged:
+// her Codex folder can hold thousands of them, and reading every one again
+// each minute held the app for seconds.
+const ROLLOUTS_KEPT = 5000;
+const rollouts = new Map();
+
 export function readRollout(file) {
+  let st = null;
+  try { st = fs.statSync(file); } catch { return null; }
+  const kept = rollouts.get(file);
+  if (kept && kept.size === st.size && kept.mtimeMs === st.mtimeMs) return kept.value;
+  const value = readRolloutAfresh(file);
+  rollouts.delete(file);
+  rollouts.set(file, { size: st.size, mtimeMs: st.mtimeMs, value });
+  if (rollouts.size > ROLLOUTS_KEPT) rollouts.delete(rollouts.keys().next().value);
+  return value;
+}
+
+function readRolloutAfresh(file) {
   let text = '';
   try {
     const fd = fs.openSync(file, 'r');
@@ -179,6 +199,8 @@ export function readRollout(file) {
   let meta = null;
   let prompt = '';
   let last = '';
+  // Whether the person wrote after Codex's last answer, so it is not waiting.
+  let herTurnLast = false;
   let turns = 0;
   let images = 0;
   let lastActive = 0;
@@ -213,11 +235,12 @@ export function readRollout(file) {
       if (p.type === 'user_message') {
         const said = cleanPrompt(p.message);
         if (!prompt && said && !isInjected(said)) prompt = said;
+        if (said && !isInjected(said)) herTurnLast = true;
         turns += 1;
         sawEventTurns = true;
       } else if (p.type === 'agent_message') {
         const said = cleanAnswer(p.message);
-        if (said) last = said;
+        if (said) { last = said; herTurnLast = false; }
       }
       continue;
     }
@@ -231,16 +254,17 @@ export function readRollout(file) {
         .filter(Boolean);
       if (!hers.length) continue; // a turn made of nothing but Codex's own preamble
       if (!prompt) prompt = hers.join('\n\n').trim();
+      herTurnLast = true;
       if (!sawEventTurns) turns += 1;
     } else if (p.role === 'assistant') {
       const said = cleanAnswer(partsOf(p).filter((c) => c.type === 'output_text').map((c) => c.text ?? '').join('\n'));
-      if (said) last = said;
+      if (said) { last = said; herTurnLast = false; }
     }
   }
   if (!meta || !meta.id) return null;
   let mtime = 0;
   try { mtime = fs.statSync(file).mtimeMs; } catch { mtime = 0; }
-  return { ...meta, prompt, last, turns, images, lastActive, path: file, mtime };
+  return { ...meta, prompt, last, herTurnLast, turns, images, lastActive, path: file, mtime };
 }
 
 /**
@@ -319,6 +343,50 @@ function readOneCodexHome(codexDir, { home, days, now, cutoff, index, byId, skip
       prompt: r.prompt,
       last: r.last,
       live: isLive(r.mtime, now),
+      ...(r.herTurnLast ? { waiting: false, ask: '' } : howTheChatEnded(r.last)),
+      lastSaid: r.last,
+      firstSaid: r.prompt,
     });
   }
+}
+
+// THE SAME READ IN A THREAD OF ITS OWN, for the watch that runs every minute:
+// a first read of a large Codex folder takes seconds, and on the main process
+// that is seconds of the app not answering. One worker, kept for the life of
+// the app, so its transcripts stay remembered between reads. Where a worker
+// cannot start, the read runs here as before.
+const OFF_THREAD_DEADLINE_MS = 5 * 60_000;
+let worker = null;
+let asked = 0;
+const waiting = new Map();
+export function readCodexThreadsOffThread(opts = {}) {
+  try {
+    if (!worker) {
+      worker = new Worker(new URL('./codex-threads-worker.mjs', import.meta.url));
+      worker.unref();
+      worker.on('message', ({ id, ok, value, error }) => {
+        const w = waiting.get(id);
+        if (!w) return;
+        waiting.delete(id);
+        clearTimeout(w.timer);
+        if (ok) w.resolve(value); else w.reject(new Error(error));
+      });
+      const fail = (err) => {
+        for (const w of waiting.values()) { clearTimeout(w.timer); w.reject(err); }
+        waiting.clear();
+        worker = null;
+      };
+      worker.on('error', fail);
+      worker.on('exit', () => fail(new Error('the Codex reader stopped')));
+    }
+  } catch {
+    return Promise.resolve().then(() => readCodexThreads(opts));
+  }
+  const id = (asked += 1);
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { waiting.delete(id); reject(new Error('the Codex reader did not answer in time')); }, OFF_THREAD_DEADLINE_MS);
+    timer.unref?.();
+    waiting.set(id, { resolve, reject, timer });
+    worker.postMessage({ id, opts });
+  });
 }

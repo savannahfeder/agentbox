@@ -15,14 +15,24 @@
 // readings:
 //
 //   ready    something is here and signed in, so there is no question to ask
-//   setup    a tool IS on this computer, just signed out, so we already know
-//            which plan they have and asking is asking a question we can answer
+//   found    a tool IS on this computer, just signed out, so the screen already
+//            knows which plan is here and which is not
 //   nothing  the machine really is empty, and the question is the right one
 //
 // Only `nothing` was ever reaching the screen as a question worth asking. On a
 // machine with Codex sitting on the disk signed out, the walk drew three plans
 // and let somebody pick Claude -- and then went off to install Claude Code,
 // which is the "select something we cant run" in their note.
+//
+// WHAT `found` MEANT UNTIL 2026-10-24, AND WHY IT DOES NOT NOW (w-8656bdd97d).
+// It was `{ t: 'setup', plan }`, handed straight to `onPick`, which mounts the
+// setup card, which starts the tool's own login on its first render. A tester
+// on a fresh Linux copy pressed Get started and had a ChatGPT OAuth page open
+// in the browser with nothing in between. The founder's rule survives whole: it
+// is about what the screen KNOWS, and the found screen says it on the rows --
+// Sign in beside the plan that is on the disk, Set up beside the one that is
+// not -- so nobody picks blind. Knowing which plan somebody has is not the same
+// as signing them in to it without being asked.
 //
 // So the step runs `afterCheck` ON ARRIVAL, against the reading the welcome
 // step already took, and only asks when asking is the honest thing to do.
@@ -50,8 +60,7 @@ describe('it looks before it trusts the answer', () => {
   });
 
   it('does not ask when the answer is on the disk already, signed out', () => {
-    expect(afterCheck([r('claude', false, false), r('codex', true, false)]))
-      .toEqual({ t: 'setup', plan: 'codex' });
+    expect(afterCheck([r('claude', false, false), r('codex', true, false)])).toEqual({ t: 'found' });
   });
 
   it('asks only when the computer really is empty', () => {
@@ -74,8 +83,10 @@ describe('it looks before it trusts the answer', () => {
   it('is handed that reading by the walk rather than taking its own', () => {
     const walk = read('renderer/src/components/Onboarding.tsx');
     // `askMac` keeps the readings now, not the boolean it used to reduce them
-    // to, so the question has the answer the instant it is drawn.
-    expect(walk).toMatch(/needsPlan\(/);
+    // to, so the question has the answer the instant it is drawn -- and the
+    // walk sorts them with the same `afterCheck` the screen does, rather than
+    // with a second rule of its own that could disagree with it.
+    expect(walk).toMatch(/afterCheck\(/);
     expect(walk).toMatch(/look=\{askMac\}/);
   });
 
@@ -133,8 +144,11 @@ describe('what the one line underneath says', () => {
 });
 
 describe('the rows the question is left with', () => {
-  it('is the three plans and the one way out', () => {
-    expect(planRows().map((x) => x.key)).toEqual(['claude', 'codex', 'both', 'mine']);
+  // AND THE WAY PAST IT (w-8656bdd97d). This screen had none, so a new user
+  // who did not want to sign in right now was held on the walk's one
+  // unskippable step; `PlanBar` on the inbox is where Not now comes back.
+  it('is the three plans, the one way out and the way past', () => {
+    expect(planRows().map((x) => x.key)).toEqual(['claude', 'codex', 'both', 'mine', 'skip']);
   });
 
   // THE CASE THAT MUST NOT MATCH. "I am not sure, check this computer for me"

@@ -30,7 +30,7 @@
 // ever set by a fall-through (the 2026-08-10 bug).
 
 import { useEffect, useRef, useState } from 'react';
-import { parseWhen, readRule } from '../format';
+import { dayAndTime, parseWhen, readRule } from '../format';
 import { useKeepInWindow } from '../keep-in-window';
 import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mjs';
 
@@ -77,9 +77,7 @@ const fmt = (ts: number) => new Date(ts).toLocaleTimeString(undefined, {
   hour: 'numeric', minute: '2-digit',
 }).toUpperCase();
 
-const fmtDay = (ts: number) => new Date(ts).toLocaleString(undefined, {
-  weekday: 'short', hour: 'numeric', minute: '2-digit',
-}).toUpperCase();
+const fmtDay = (ts: number) => dayAndTime(ts).toUpperCase();
 
 // The top half. Snooze's presets, which is the point: "In 30 minutes" is
 // already the first thing S offers on an inbox row, and this is the same

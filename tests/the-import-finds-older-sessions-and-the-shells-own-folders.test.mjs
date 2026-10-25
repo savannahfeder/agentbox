@@ -70,14 +70,14 @@ describe('when nothing is from the last ten days', () => {
   it('offers the newest older sessions instead, and setup shows the card', async () => {
     claudeSession(path.join(home, '.claude'), { id: 'eleven', when: NOW - 11 * DAY });
     codexSession(path.join(home, '.codex'), { id: 'forty', when: NOW - 40 * DAY });
-    const threads = read();
+    const threads = await read();
     expect(threads.map((t) => t.id)).toEqual(['eleven', 'forty']);
     expect((await setupCard(threads)).show).toBe(true);
   });
 
-  it('offers at most twenty, newest first', () => {
+  it('offers at most twenty, newest first', async () => {
     for (let i = 0; i < 25; i++) claudeSession(path.join(home, '.claude'), { id: `s${String(i).padStart(2, '0')}`, when: NOW - (11 + i) * DAY });
-    const threads = read();
+    const threads = await read();
     expect(threads).toHaveLength(20);
     expect(threads[0].id).toBe('s00');
     expect(threads[19].id).toBe('s19');
@@ -85,21 +85,21 @@ describe('when nothing is from the last ten days', () => {
 
   it('still goes no further back than ninety days', async () => {
     claudeSession(path.join(home, '.claude'), { id: 'ancient', when: NOW - 91 * DAY });
-    expect(read()).toEqual([]);
+    expect(await read()).toEqual([]);
     expect((await setupCard([])).skip).toBe(true);
   });
 
-  it('still refuses the app\'s own runs among the older sessions', () => {
+  it('still refuses the app\'s own runs among the older sessions', async () => {
     claudeSession(path.join(home, '.claude'), { id: 'ours', entrypoint: 'sdk-cli', when: NOW - 12 * DAY });
-    expect(read()).toEqual([]);
+    expect(await read()).toEqual([]);
   });
 });
 
 describe('when something is from the last ten days', () => {
-  it('offers only those, exactly as before, and leaves the older ones out', () => {
+  it('offers only those, exactly as before, and leaves the older ones out', async () => {
     claudeSession(path.join(home, '.claude'), { id: 'today', when: NOW - 60_000 });
     claudeSession(path.join(home, '.claude'), { id: 'old', when: NOW - 20 * DAY });
-    expect(read().map((t) => t.id)).toEqual(['today']);
+    expect((await read()).map((t) => t.id)).toEqual(['today']);
   });
 });
 
@@ -150,14 +150,14 @@ describe('the folders only the login shell knows', () => {
     expect(await readShellDataDirs({ env: { SHELL: '/bin/bash' }, platform: 'linux', run })).toEqual({ CLAUDE_CONFIG_DIR: '/home/a/claude' });
   });
 
-  it('and the import reads sessions in the folder the shell named', () => {
+  it('and the import reads sessions in the folder the shell named', async () => {
     claudeSession(path.join(away, 'claude-config'), { id: 'shell', when: NOW - 60_000 });
-    expect(read().map((t) => t.id)).toEqual([]);
-    expect(read({ shellEnv: { CLAUDE_CONFIG_DIR: path.join(away, 'claude-config') } }).map((t) => t.id)).toEqual(['shell']);
+    expect((await read()).map((t) => t.id)).toEqual([]);
+    expect((await read({ shellEnv: { CLAUDE_CONFIG_DIR: path.join(away, 'claude-config') } })).map((t) => t.id)).toEqual(['shell']);
   });
 
-  it('and the same for Codex', () => {
+  it('and the same for Codex', async () => {
     codexSession(path.join(away, 'codex-home'), { id: 'cx', when: NOW - 60_000 });
-    expect(read({ shellEnv: { CODEX_HOME: path.join(away, 'codex-home') } }).map((t) => t.id)).toEqual(['cx']);
+    expect((await read({ shellEnv: { CODEX_HOME: path.join(away, 'codex-home') } })).map((t) => t.id)).toEqual(['cx']);
   });
 });

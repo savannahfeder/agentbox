@@ -8,7 +8,8 @@ export function placeScore(order: string[], slug: string, direct?: ReadonlySet<s
 
 export const DEFAULT_PRIORITY: number;
 
-export function itemPriority(item: { priority?: number; wrote?: Record<string, { source?: string } | undefined> } | null | undefined): number;
+export function itemPriority(item: { priority?: number | null; wrote?: Record<string, { source?: string } | undefined> } | null | undefined): number;
+export function shownPriority(item: { priority?: number | null; wrote?: Record<string, { source?: string } | undefined> } | null | undefined, conversation?: boolean): number | null;
 export const URGENT_PRIORITY: number;
 export function isUrgent(item: { priority?: number; wrote?: Record<string, { source?: string } | undefined> } | null | undefined): boolean;
 

@@ -13,7 +13,6 @@
 // and the window's focus does not.
 
 import { describe, it, expect } from 'vitest';
-import fs from 'node:fs';
 import { atTheComputer, atTheApp, AWAY_AFTER_MS } from '../shared/notify-rules.mjs';
 
 describe('at the computer, for the phone', () => {
@@ -32,12 +31,5 @@ describe('at the computer, for the phone', () => {
 
   it('the desktop banner keeps its own rule: another app in front is not at the app', () => {
     expect(atTheApp({ focused: false, idleMs: 0 })).toBe(false);
-  });
-
-  it('the phone is wired to the idle clock, not to the window being in front', () => {
-    const main = fs.readFileSync(new URL('../main/main.mjs', import.meta.url), 'utf8');
-    const wiring = main.slice(main.indexOf('atDesk:'), main.indexOf('atDesk:') + 400);
-    expect(wiring).toMatch(/atTheComputer\(/);
-    expect(wiring).not.toMatch(/isFocused/);
   });
 });

@@ -41,7 +41,7 @@ const walk = (extra = {}) => renderToStaticMarkup(createElement(Onboarding, {
 describe('the folder screen on a Mac that was already set up', () => {
   it('says it found an account of yours, and names no plan', () => {
     const html = walk({ runsOn: { engine: 'claude' } });
-    expect(html).toContain('Your agents will run on the Claude account already signed in on this Mac.');
+    expect(html).toContain('Your agents will run on the Claude account already signed in on this computer.');
     // THE TIER NEVER REACHES THIS SCREEN EITHER. The sidebar row that printed
     // one was taken out the day it shipped ("very critically, I want to get rid
     // of that Claude Max 20x plan"), and a line here that quietly kept saying
@@ -49,19 +49,20 @@ describe('the folder screen on a Mac that was already set up', () => {
     // an old payload or by a caller that has not caught up, it is ignored.
     const withTier = walk({ runsOn: { engine: 'claude', plan: 'Max 20x' } });
     expect(withTier).not.toContain('Max 20x');
-    expect(withTier).toContain('Your agents will run on the Claude account already signed in on this Mac.');
+    expect(withTier).toContain('Your agents will run on the Claude account already signed in on this computer.');
   });
 
   it('says ChatGPT for a Mac signed into Codex', () => {
     const html = walk({ runsOn: { engine: 'codex' } });
-    expect(html).toContain('Your agents will run on the ChatGPT account already signed in on this Mac.');
+    expect(html).toContain('Your agents will run on the ChatGPT account already signed in on this computer.');
     expect(html).not.toContain('Codex');
   });
 
   it('says nothing at all on a Mac with nothing signed in', () => {
     for (const runsOn of [null, undefined, { engine: null }]) {
       const html = walk({ runsOn });
-      expect(html).not.toContain('already signed in on this Mac');
+      // The present wording, or this would pass however the screen spoke.
+      expect(html).not.toContain('already signed in on this computer');
     }
   });
 

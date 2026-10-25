@@ -95,21 +95,25 @@ describe('what a press writes down', () => {
     return { home, config: { home, appDir }, supervisor: { onChange: () => changes.push(1) }, changes };
   };
 
-  it('registers the new login beside the first one', () => {
+  // NOTHING IS REGISTERED: the folder is found once it is signed in, so an
+  // abandoned sign-in is never listed as an account
+  // (tests/an-account-shows-once-and-only-once-it-is-signed-in).
+  it('lists the new login beside the first once it is signed in, and not before', () => {
     const { config, supervisor, home } = bench();
     const made = addClaudeAccount({ config, supervisor });
-    // 'default' is ~/.claude, which is the account every other one is a second
-    // of, and it has to stay in the list or adding a second would replace the
-    // first rather than join it.
-    expect(config.authProfiles).toEqual(['default', made.profile]);
-    expect(effectiveProfiles(config.authProfiles, { home })).toContain(made.profile);
+    forgetDiscovery();
+    expect(effectiveProfiles(config.authProfiles, { home })).not.toContain(made.profile);
+    fs.writeFileSync(path.join(made.home, '.claude.json'), JSON.stringify({
+      oauthAccount: { emailAddress: 'work@example.com', accountUuid: 'work-1' },
+    }));
+    expect(effectiveProfiles(config.authProfiles, { home })).toEqual(['default', made.profile]);
   });
 
-  it('keeps every profile she configured herself, in her order', () => {
+  it('leaves every profile she configured herself as it was', () => {
     const { config, supervisor } = bench();
     config.authProfiles = ['default', '/somewhere/.claude-work'];
-    const made = addClaudeAccount({ config, supervisor });
-    expect(config.authProfiles).toEqual(['default', '/somewhere/.claude-work', made.profile]);
+    addClaudeAccount({ config, supervisor });
+    expect(config.authProfiles).toEqual(['default', '/somewhere/.claude-work']);
   });
 
   it('tells the supervisor, so the fleet uses it without a restart', () => {
@@ -142,8 +146,8 @@ describe('the door on the screen', () => {
 
   it('is one Add account row drawn for whichever agent the card is', () => {
     expect(settings).not.toContain("{agent.engine === 'codex' && (");
-    // A row of the agent's own page since the redraw (w-ccadd13c46).
-    expect(settings).toContain('<button type="button" className="set-ghost" onClick={() => onAdd(agent)}>Add</button>');
+    // The Add account tile of the Signed in card, on either agent's page.
+    expect(settings).toContain('onAdd={() => void addAccount(agent)}');
   });
 
   it('asks main for the right kind of account', () => {

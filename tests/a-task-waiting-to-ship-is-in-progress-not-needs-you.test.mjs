@@ -132,9 +132,8 @@ describe('which rows the queue still owes a ship', () => {
     expect(ids([row('w-a'), row('w-b')])).toEqual(['w-a', 'w-b']);
   });
 
-  it('is never a row without the label, a finished one, one on a project that does not ship, or one with no folder', () => {
+  it('is never a row without the label, one on a project that does not ship, or one with no folder', () => {
     expect(ids([row('w-a', { labels: [] })])).toEqual([]);
-    expect(ids([row('w-a', { status: 'done' })])).toEqual([]);
     expect(ids([row('w-a', { product: 'other' })])).toEqual([]);
     expect(ids([row('w-z')])).toEqual([]);
     expect(waitingToShip([row('w-a')], products(), {}, { folderFor })).toEqual([]);
@@ -150,6 +149,9 @@ describe('which rows the queue still owes a ship', () => {
     fs.writeFileSync(path.join(userDir, 'ship.json'), JSON.stringify(settings));
     const q = new ShipQueue({ store: {}, userDir, folderFor, isLive: () => false });
     expect(q.waitingIds([row('w-a'), row('w-b', { labels: [] })], products())).toEqual(['w-a']);
+    // A closed one still ships (tests/a-thread-closed-while-it-waits-to-ship-still-ships), from Done.
+    expect(ids([row('w-b', { status: 'done' })])).toEqual(['w-b']);
+    expect(q.waitingIds([row('w-b', { status: 'done' })], products())).toEqual([]);
     fs.writeFileSync(path.join(userDir, 'ship-handled.json'), JSON.stringify({ 'team/w-a': 50 }));
     expect(q.waitingIds([row('w-a')], products())).toEqual([]);
   });

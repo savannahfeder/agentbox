@@ -186,11 +186,17 @@ elif [ -z "$code" ]; then
   echo "GitHub runs the whole suite on it after the push."
   exit 0
 else
-  # And the tests that read a changed file as text, which `related` cannot
-  # see: three of them shipped red in a359d81 (scripts/lib/tests-that-read.mjs).
-  readers=$(node scripts/lib/tests-that-read.mjs $code 2>/dev/null || true)
-  runargs="related --run --passWithNoTests $(printf '%s\n' "$code" $readers | tr '\n' ' ')"
-  echo "pre-push: running the tests for the $(printf '%s\n' "$code" | wc -l | tr -d ' ') file(s) this push changes."
+  # WHAT THIS PUSH CAN AFFORD TO WAIT FOR (scripts/lib/tests-the-push-runs.mjs).
+  # `related` reaches most of the suite for a core file — 216 of 1,207 files
+  # name main/supervisor.mjs — so over the cap it hands back the files most
+  # about the change and GitHub runs the lot after the push. It names the tests
+  # that read a changed file as text too, which `related` cannot see.
+  runargs=$(node scripts/lib/tests-the-push-runs.mjs $code | tr '\n' ' ') || runargs=""
+  if [ -z "$runargs" ]; then
+    readers=$(node scripts/lib/tests-that-read.mjs $code 2>/dev/null || true)
+    runargs="related --run --passWithNoTests $(printf '%s\n' "$code" $readers | tr '\n' ' ')"
+    echo "pre-push: running the tests for the $(printf '%s\n' "$code" | wc -l | tr -d ' ') file(s) this push changes."
+  fi
   echo "GitHub runs the whole suite on it after the push."
 fi
 started=$(date +%s)

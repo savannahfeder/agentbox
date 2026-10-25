@@ -34,7 +34,7 @@ const CONFIG_NAME = 'zero.config.json';
  */
 export const DEFAULT_SESSIONS_AT_ONCE = 3;
 
-const DEFAULTS = {
+export const DEFAULTS = {
   // ONE ACCOUNT FOLDER PER INSTALL, AND NOBODY ELSE'S.
   //
   // This was a literal id for most of the app's life, which meant every copy
@@ -76,6 +76,16 @@ const DEFAULTS = {
   // commands may run at once; null is Auto, one per 8 GB.
   memoryGate: false,
   memoryGateSlots: null,
+  // RUN THE OVERFLOW IN THE CLOUD (docs/cloud/PLAN.md). Null is "when this Mac
+  // has been set up for it": nothing happens anywhere until somebody has run
+  // scripts/cloud-setup.mjs and an account has signed in from the cloud menu,
+  // and before that the app is exactly the app it was. `false` turns it off
+  // even then.
+  // `maxCloudSessions` is the cloud's own cap, apart from this Mac's. Null is
+  // what this Mac can carry: 50 through the shared host (about 11 MB a run),
+  // 20 where each run needs a relay of its own (about 110 MB a run).
+  cloudRuns: null,
+  maxCloudSessions: null,
   // STOP WHAT FINISHED AGENTS LEAVE RUNNING (main/leftovers.mjs). Its own
   // switch, off until somebody turns it on; `cleanupLeftoversSince` is the
   // moment they did, so nothing is stopped sooner than the idle time after it.

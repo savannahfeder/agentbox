@@ -4,7 +4,7 @@ import {it,expect} from 'vitest';
 import {createCodexWorker} from '../main/codex-session.mjs';
 async function setup(){let handlers;const calls=[];const server={startThread:async(p,h)=>{handlers=h;return {threadId:'thread'};},startTurn:async()=>({turn:{id:'turn'}}),unwatch(){},steerTurn:async(...args)=>{calls.push(args);return {turnId:'turn'};}};
  const worker=createCodexWorker({server});worker.stderr.on('data',()=>{});await new Promise(r=>setImmediate(r));return {worker,server,calls,notify:(m,p)=>handlers.onNotification(m,p)};}
-it('delivers a correction to exactly the active turn',async()=>{const s=await setup();await s.worker.steer('change direction');expect(s.calls).toEqual([['thread','turn','change direction']]);});
+it('delivers a correction to exactly the active turn',async()=>{const s=await setup();await s.worker.steer('change direction');expect(s.calls).toEqual([['thread','turn','change direction',[]]]);});
 it('refuses ended turns and mismatched acceptance',async()=>{const s=await setup();s.server.steerTurn=async()=>({turnId:'other'});await expect(s.worker.steer('x')).rejects.toThrow();s.notify('turn/completed',{turn:{id:'turn',status:'completed'}});await expect(s.worker.steer('x')).rejects.toThrow();});
 it('does not report success for transport failures',async()=>{const s=await setup();s.server.steerTurn=async()=>{throw Error('disconnected');};await expect(s.worker.steer('x')).rejects.toThrow('disconnected');});
 

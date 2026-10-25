@@ -74,9 +74,15 @@ describe('the wiring from the reply box is present in the source', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
   const ipc = fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8');
 
-  it("draws the card's own drawer in the reply box", () => {
-    expect(focus).toContain('<ModelPicker');
-    expect(focus).toContain("import { ModelPicker } from './Model';");
+  it("draws the card's own menu in the reply box", () => {
+    // It is the card's OWN menu since w-e1a42f6b21, not a twin of it: the few
+    // models she uses, each wearing its agent, then All models, then the
+    // strip. Before that the reply box had a flatter drawer of its own, which
+    // is why a reply could not move a thread to the other coding agent.
+    expect(focus).toContain('<ReplyModel');
+    expect(focus).toContain("import { ReplyModel } from './ReplyModel';");
+    const reply = fs.readFileSync(new URL('../renderer/src/components/ReplyModel.tsx', import.meta.url), 'utf8');
+    expect(reply).toContain("import { ModelMenu } from '../threads/ModelMenu';");
   });
 
   it("reads as the card's own clause, preposition and all", () => {
@@ -84,16 +90,23 @@ describe('the wiring from the reply box is present in the source', () => {
     // missing: the footer read "Medium priority. Runs once. Opus 5.", where
     // the card beside it says "On Opus 5." One word cannot mean two things in
     // two boxes she uses together.
-    expect(focus).toMatch(/\{'On '\}\s*\n\s*<ModelPicker/);
+    expect(focus).toMatch(/\{'On '\}\s*\n\s*<ReplyModel/);
   });
 
   it("shows the row's own model rather than a default", () => {
-    expect(focus).toContain('const [model, setModel] = useState<string | null>(item.model ?? null);');
-    expect(focus).toContain('const [effort, setEffort] = useState<string | null>(item.effort ?? null);');
+    // Through `replyOpensOn`, which is where the '' the store writes to clear a
+    // model stopped being read as a model whose name is the empty string
+    // (tests/a-reply-goes-out-on-the-model-you-picked).
+    expect(focus).toContain('const [model, setModel] = useState<string | null>(() => replyOpensOn(item, readDraftPick(item)).pick.model);');
+    expect(focus).toContain('const [effort, setEffort] = useState<string | null>(() => replyOpensOn(item, readDraftPick(item)).pick.effort);');
   });
 
   it('sends it only on a deliberate pick', () => {
-    expect(focus).toContain('touched ? { model, effort } : undefined');
+    // And through `pickToSend`, because the drawer reports the engine's own
+    // default as null and the store reads a null model as "clear it". The
+    // agent the menu is showing goes with it, so a pick that crosses moves
+    // the thread (w-e1a42f6b21).
+    expect(focus).toContain('pickToSend({ model, effort }, { engine: engineShown, was: engineNow, engineCount: engineRows.length })');
   });
 
   it('promises only what it can keep, on a running row as well as an idle one', () => {
@@ -103,8 +116,9 @@ describe('the wiring from the reply box is present in the source', () => {
   });
 
   it('carries it through the bridge on both send paths', () => {
-    expect(app.match(/\.\.\.\(pick \? \{ model: pick\.model, effort: pick\.effort \} : \{\}\),/g) ?? [])
-      .toHaveLength(2);
-    expect(ipc).toMatch(/zero:answer'[^)]*model, effort/s);
+    // The pick is spread whole, so the agent rides with the model and the
+    // level rather than being dropped by a hand-written field list.
+    expect(app.match(/\.\.\.\(pick \?\? \{\}\),/g) ?? []).toHaveLength(2);
+    expect(ipc).toMatch(/zero:answer'[^)]*engine, model, effort/s);
   });
 });

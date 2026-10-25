@@ -15,6 +15,7 @@
 
 import { useEffect, useState } from 'react';
 import { TWEAKS, type TweakValues } from '../tweaks';
+import { chord } from '../this-keyboard';
 
 export function Tweaks({ values, onPreview, onPick, onHide }: {
   values: TweakValues;
@@ -88,7 +89,7 @@ export function Tweaks({ values, onPreview, onPick, onHide }: {
         <button
           type="button"
           className="tweaks-close"
-          title="Hide until reload (⌘K brings it back)"
+          title={`Hide until reload (${chord('⌘K')} brings it back)`}
           aria-label="Hide tweaks"
           onClick={onHide}
         >

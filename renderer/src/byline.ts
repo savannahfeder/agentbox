@@ -31,6 +31,7 @@
 import { liveLine, shortSpan, shortWord, type LiveFacts, type LiveState } from './live-line';
 import { ago } from './format';
 import { engineLabel } from '../../shared/engines.mjs';
+import { engineModelLabel, type ModelChoice } from './models';
 import type { WorkItem } from './types';
 
 /* ------------------------------ where it is ------------------------------- */
@@ -154,6 +155,25 @@ export function engineWordFor(facts: EngineFacts = {}): string | null {
 }
 
 /**
+ * WHAT WROTE THIS ANSWER, over the answer itself.
+ *
+ * The agent is named by the rule above, which is silent on a Mac with one of
+ * them. The model and the agent are named only where the row NAMED them: a
+ * default nobody chose is a guess, and this line is read as a record. Null is
+ * "nothing true to say", and the thread keeps the word it always had.
+ */
+export function ranWords({ engineChoice, ran, codexModels = [], codexDefault = null }: {
+  engineChoice?: boolean;
+  ran?: { engine?: string; model?: string };
+  codexModels?: ModelChoice[];
+  codexDefault?: string | null;
+}): string | null {
+  const agent = ran?.engine ? engineWordFor({ engineChoice, engine: ran.engine }) : null;
+  const model = ran?.model ? engineModelLabel(ran.engine ?? null, ran.model, { codexModels, codexDefault }) : null;
+  return [agent, model].filter(Boolean).join(', ') || null;
+}
+
+/**
  * WHICH CODING AGENT IS ON THIS ROW RIGHT NOW, in the one word she reads
  * everywhere else. Null on every Mac with one agent, which is almost all of
  * them.
@@ -198,6 +218,10 @@ export interface BylineFacts {
   /** Null on any Mac with one coding agent; see `engineWordFor` above. */
   engineWord: string | null;
   /**
+   * "In the cloud" while this run is in a cloud sandbox (docs/cloud/PLAN.md),
+   *  and null everywhere else, so a run on this Mac reads exactly as before. */
+  placeWord: string | null;
+  /**
    * "3m", "Aug 13" — when the row last really changed. NULL while a run is
    *  up, because the span above is the reading then and two clocks on one line
    *  is the thing she could not read. */
@@ -229,6 +253,7 @@ export function bylineFacts(
   const stateWord = live ? shortWord(live.state, facts.session?.helpers ?? 0) : null;
 
   const project = item.productName?.trim() || null;
+  const inTheCloud = facts.session?.where === 'cloud';
 
   return {
     project,
@@ -238,8 +263,10 @@ export function bylineFacts(
     stateWord,
     span,
     engineWord,
+    placeWord: inTheCloud ? 'In the cloud' : null,
     age: span ? null : ago(lastChange(item), now),
-    line: (project ? `${project}. ` : '') + spokenLine({ where, live: live?.line ?? null, engineWord, span }),
+    line: (project ? `${project}. ` : '') + spokenLine({ where, live: live?.line ?? null, engineWord, span })
+      + (inTheCloud ? ' It is running in the cloud.' : ''),
   };
 }
 
@@ -259,7 +286,7 @@ export function bylineFacts(
 /** The fact beside the state word, when there is one it does not already say. */
 function besideTheState(f: BylineFacts): string | null {
   if (f.state === 'working') return f.stateWord && f.stateWord !== 'Working' ? f.stateWord.replace(/ Working$/, '') : null;
-  if (f.state === 'idle') return null;
+  if (f.state === 'idle' || f.state === 'elsewhere') return null;
   return f.stateWord;
 }
 
@@ -269,7 +296,7 @@ function besideTheState(f: BylineFacts): string | null {
  * `age` is the clock already put into words by the caller.
  */
 export function stateLedParts(f: BylineFacts, age: string | null): (string | null)[] {
-  return [f.project, f.where === 'blocked' ? f.whereWord : null, besideTheState(f), f.engineWord, age];
+  return [f.project, f.where === 'blocked' ? f.whereWord : null, besideTheState(f), f.placeWord, f.engineWord, age];
 }
 
 /**

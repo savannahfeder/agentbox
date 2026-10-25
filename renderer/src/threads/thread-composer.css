@@ -12,13 +12,19 @@
    step lighter than the card, hairlines one step lighter than the card's own
    edge. */
 
-.tc-card {
+/* ON THE CARD AND WHEREVER ELSE THE CARD'S MENU IS DRAWN. The reply box draws
+   the model menu now (components/ReplyModel.tsx) and it is NOT inside the
+   card, so a menu whose fill was declared on `.tc-card` alone came out
+   transparent over the conversation: the thread's own words read straight
+   through the model list (w-e1a42f6b21). */
+.tc-card, .tc-menu {
   --tc-modal: var(--bg-raised);
   --tc-pop: var(--bg-selected);
   --tc-hair: var(--line);
 }
 :root[data-skin] .tc-card { --tc-modal: var(--skin-solid, var(--bg-raised)); }
-:root[data-skin="ember-grid"] .tc-card { --tc-modal: #2d2b29; --tc-pop: var(--pop); --tc-hair: #3b3937; }
+:root[data-skin="ember-grid"] .tc-card,
+:root[data-skin="ember-grid"] .tc-menu { --tc-modal: #2d2b29; --tc-pop: var(--pop); --tc-hair: #3b3937; }
 
 /* One raised surface over a lighter veil, centred a little above the middle
    the way the old card was (styles.css, .compose-backdrop). */
@@ -82,6 +88,16 @@
 .tc-text::placeholder { color: var(--text-faint); }
 .tc-card .attach-row { padding: 0 18px 10px; }
 .tc-note { padding: 0 18px 10px; font-size: 13px; line-height: 19px; color: var(--text-dim); }
+/* THE NOTE'S OWN ACTION IS A WORD IN ITS SENTENCE, NOT A CONTROL ON THE BAR.
+   Unstyled, a <button> in here draws as the browser's white slab, which in a
+   dark window reads as a broken app. Both notes that offer something use this
+   (the conversation to open, and a pasted list to split). */
+.tc-note button {
+  background: none; border: 0; padding: 0; margin: 0; border-radius: 0;
+  color: var(--text); font: inherit; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-strong);
+}
+.tc-note button:hover, .tc-note button:focus-visible { text-decoration-color: currentColor; outline: none; }
 
 /* -------------------------------- the bar -------------------------------- */
 .tc-bar { display: flex; align-items: center; gap: 8px; padding: 12px 14px 12px 18px; border-top: 1px solid var(--tc-hair); position: relative; }
@@ -201,6 +217,10 @@
    as the value above them: the menu's border (1), padding (5) and the row's own
    padding (10) are taken back out of its left edge. */
 .tc-drop { top: calc(100% + 8px); left: -16px; }
+/* THE REPLY BOX RAISES THE SAME MENU, because its word is in the sentence at
+   the foot of the window and a menu dropping from there opens off the screen.
+   `fitMenu` still has the last word when the window is short. */
+.tc-drop-up { top: auto; bottom: calc(100% + 8px); }
 .tc-drop .tc-row.on .tc-row-label { font-weight: 600; }
 /* The To menu hangs its glyphs where the field hangs its own, 27px left of the
    name, so the names line up and so do the faces. */
@@ -219,6 +239,11 @@
 /* flex: 1 so one column, on a Mac with one engine, fills the menu rather than
    lighting a row half its width (w-db6f5e331e). */
 .tc-col { display: flex; flex-direction: column; gap: 1px; min-width: 176px; flex: 1; }
+
+/* "Free plan" and "Update" beside a column's agent name. Line height 1 so the
+   heading stays the height of its neighbour and the rows below stay level. */
+.tc-head-side { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; line-height: 1; }
+.tc-head-tag { font: inherit; font-size: 11.5px; letter-spacing: 0.02em; text-transform: none; color: var(--text-faint); }
 
 /* The effort strip at the foot of the model menu, as the old drawer drew it,
    with its first word on the menu's own left line. */
@@ -271,3 +296,8 @@
 .tc-add { width: 28px; height: 28px; margin-left: 6px; border: 1px dashed var(--line-strong); border-radius: var(--radius); background: none; color: var(--text-dim); font: inherit; font-size: 15px; cursor: pointer; }
 .tc-add:hover { color: var(--text); border-style: solid; background: var(--wash); }
 .tc-continues button { background: none; border: 0; padding: 0; font: inherit; color: var(--text); text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; cursor: pointer; }
+
+/* A DAY NOBODY SET (w-c34591721f). "No Deadline" is a real answer rather than
+   an empty field — most tasks never carry a day — so it is drawn in the ink a
+   placeholder uses: present, readable, and not asking for anything. */
+.tc-word-text.tc-unset { color: var(--text-faint); }

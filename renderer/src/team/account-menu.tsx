@@ -15,14 +15,17 @@ import { Face } from './people';
 import { STATUS_PROMPT, StatusComposer, saying } from './status';
 import { holdsUntil } from '../../../shared/team-status.mjs';
 import { SettingsIcon } from '../components/SettingsIcon';
+import { GoInvisible, GhostIcon, EyeOffSmall, type Invisible } from './rooms/GoInvisible';
 
 const InviteIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="10" cy="8.5" r="3.5"/><path d="M3.5 20c.7-3.4 3.3-5.3 6.5-5.3 1.4 0 2.6.3 3.7.9"/><path d="M18 14v6M15 17h6"/></svg>;
 const SignOutIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4h4.5v16H14M10 8l-4 4 4 4M6 12h10"/></svg>;
 /** A small smiley, picked over a dot, a clock and a pencil (2026-10-04). */
 const StatusIcon = () => <svg className="th-acct-smile" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M8.8 14c.8 1.1 1.9 1.7 3.2 1.7s2.4-.6 3.2-1.7"/><path d="M9.5 10h.01M14.5 10h.01" strokeWidth="2"/></svg>;
 
-export function AccountMenu({ me, now, collapsed, onAccount, onInvite, onSettings, onSignOut }: {
+export function AccountMenu({ me, now, collapsed, onAccount, onInvite, onSettings, onSignOut, invisible = null }: {
   me: Person; now: number; collapsed: boolean;
+  /** Rooms (alpha): going invisible, and coming back. */
+  invisible?: Invisible | null;
   /** The header: your name and email, opening Settings -> Team. */
   onAccount?: () => void;
   onInvite?: () => void; onSettings?: () => void; onSignOut?: () => void;
@@ -30,8 +33,9 @@ export function AccountMenu({ me, now, collapsed, onAccount, onInvite, onSetting
   const [open, setOpen] = useState(false);
   // The menu, or the box you write a status in, which takes the menu's place.
   const [writing, setWriting] = useState(false);
+  const [going, setGoing] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
-  const close = () => { setOpen(false); setWriting(false); };
+  const close = () => { setOpen(false); setWriting(false); setGoing(false); };
 
   // A press anywhere else, or Escape, puts it away. Escape is heard on the way
   // UP, so a menu inside this one (when a status ends) can take its own
@@ -50,13 +54,15 @@ export function AccountMenu({ me, now, collapsed, onAccount, onInvite, onSetting
   return <div className="th-me-wrap" ref={wrap}>
     <button type="button" className="th-me-btn" aria-label="Your account" aria-haspopup="menu" aria-expanded={open}
       title={collapsed ? 'Your account' : undefined} onClick={() => (open ? close() : setOpen(true))}>
-      <Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span>
+      <Face person={me} me /><span>{me.name || me.email}{invisible?.on ? <small className="th-me-invis"><EyeOffSmall />Invisible</small> : <small>{me.email}</small>}</span>
     </button>
-    {open && (writing
+    {open && going && invisible && <GoInvisible now={now} onGo={(m) => { close(); invisible.onGo(m); }} />}
+    {open && !going && (writing
       ? <div className="th-me-pop">
           <StatusComposer person={me} now={now} onDone={close} />
         </div>
       : <AccountMenuList me={me} now={now} onStatus={() => setWriting(true)}
+          onInvisible={invisible ? (invisible.on ? go(invisible.onComeBack) : () => setGoing(true)) : undefined} invisibleOn={!!invisible?.on}
           onAccount={go(onAccount)} onInvite={go(onInvite)} onSettings={go(onSettings)} onSignOut={go(onSignOut)} />)}
   </div>;
 }
@@ -64,8 +70,8 @@ export function AccountMenu({ me, now, collapsed, onAccount, onInvite, onSetting
 /** What the menu holds, top to bottom: who you are, what you are up to,
  *  Invite people, Settings, and Sign out last behind a hairline. A row whose
  *  door was not handed in is not drawn. */
-export function AccountMenuList({ me, now, onStatus, onAccount, onInvite, onSettings, onSignOut }: {
-  me: Person; now: number; onStatus: () => void;
+export function AccountMenuList({ me, now, onStatus, onAccount, onInvite, onSettings, onSignOut, onInvisible, invisibleOn = false }: {
+  me: Person; now: number; onStatus: () => void; onInvisible?: () => void; invisibleOn?: boolean;
   onAccount?: () => void; onInvite?: () => void; onSettings?: () => void; onSignOut?: () => void;
 }) {
   const said = saying(me, now);
@@ -78,6 +84,7 @@ export function AccountMenuList({ me, now, onStatus, onAccount, onInvite, onSett
     <button type="button" role="menuitem" className={`th-acct-row th-acct-status${said ? ' said' : ''}`} onClick={onStatus}>
       <StatusIcon /><span>{said ? `${said.text}${held ? ` · ${held}` : ''}` : STATUS_PROMPT}</span>
     </button>
+    {onInvisible && <button type="button" role="menuitem" className="th-acct-row" onClick={onInvisible}><GhostIcon /><span>{invisibleOn ? 'Come back' : 'Go invisible'}</span></button>}
     {onInvite && <button type="button" role="menuitem" className="th-acct-row" onClick={onInvite}><InviteIcon /><span>Invite people</span></button>}
     {onSettings && <button type="button" role="menuitem" className="th-acct-row" onClick={onSettings}><SettingsIcon /><span>Settings</span></button>}
     {onSignOut && <>

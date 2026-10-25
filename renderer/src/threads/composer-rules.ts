@@ -50,9 +50,21 @@ function claudeAliasOf(model: string): string {
 
 const keyOf = (p: ModelPick) => `${p.engine}:${p.model}`;
 
+/** How far back "the ones you use" looks: the last forty threads that named a
+ *  model. A count with no window lets a model you have finished with hold a row
+ *  for ever on the strength of a month nobody remembers. */
+const WINDOW = 40;
+
 /**
- * THE RECENT ROWS: the three most recently used distinct models, newest first,
- * read off the work items she already has.
+ * THE RECENT ROWS: the models you are using now, read off the work items you
+ * already have. The one you picked LAST is first, because that is what Recent
+ * promises; after it, the ones you reach for most often in the window above,
+ * ties going to whichever was used more recently.
+ *
+ * It was the three most recent DISTINCT models and nothing else, and three
+ * one-off picks on replies pushed out the model behind six of that morning's
+ * threads: "I have to go to All models (13 more) to get Opus" (power-test-2,
+ * issue 42).
  *
  * An item that named no model ran on a default nobody chose, so it says nothing
  * about what she uses and is skipped. An item that wrote no engine (it is only
@@ -79,14 +91,21 @@ export function recentModels(
   const used = items
     .filter((i) => typeof i.model === 'string' && i.model)
     .slice()
-    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-  for (const i of used) {
-    const model = i.model as string;
-    const engine: Harness = i.engine === 'codex' || i.engine === 'claude' ? i.engine : harnessOf(model, codexModels);
-    if (engine === 'codex' && !codexOffered) continue;
-    if (engine === 'claude' && !claudeOffered) continue;
-    add({ engine, model: engine === 'claude' ? claudeAliasOf(model) : model });
+    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+    .slice(0, WINDOW)
+    .map((i) => {
+      const model = i.model as string;
+      const engine: Harness = i.engine === 'codex' || i.engine === 'claude' ? i.engine : harnessOf(model, codexModels);
+      return { pick: { engine, model: engine === 'claude' ? claudeAliasOf(model) : model }, at: i.createdAt ?? 0 };
+    })
+    .filter(({ pick }) => (pick.engine === 'codex' ? codexOffered : claudeOffered));
+  const tally = new Map<string, { pick: ModelPick; count: number; last: number }>();
+  for (const { pick, at } of used) {
+    const row = tally.get(keyOf(pick)) ?? { pick, count: 0, last: 0 };
+    tally.set(keyOf(pick), { pick, count: row.count + 1, last: Math.max(row.last, at) });
   }
+  if (used[0]) add(used[0].pick);
+  for (const row of [...tally.values()].sort((a, b) => b.count - a.count || b.last - a.last)) add(row.pick);
   // A MAC WITHOUT CLAUDE CODE IS OFFERED NO CLAUDE MODEL (w-db6f5e331e): it
   // has nothing to run one in, and the menu is a list of what it can run.
   if (!claudeOffered) {
@@ -120,6 +139,26 @@ export function moreCount(recent: readonly ModelPick[], all: { claude: readonly 
 export const sameModel = (a: ModelPick | null | undefined, b: ModelPick | null | undefined) =>
   !!a && !!b && a.engine === b.engine && a.model === b.model;
 
+// ONE AGENT IS NOT A CHOICE: there the card keeps the word and the single row
+// it has always drawn (tests/one-coding-agent-draws-nothing-new).
+
+type EngineRow = { id: string; label: string };
+
+/** The agents To offers, or nothing where there is only one. */
+export function agentChoices(engines?: readonly EngineRow[]): { id: Harness; label: string }[] {
+  const rows = engines ?? [];
+  if (rows.length < 2) return [];
+  return rows
+    .filter((e) => e.id === 'claude' || e.id === 'codex')
+    .map((e) => ({ id: e.id as Harness, label: e.label }));
+}
+
+/** The word on the To field: the agent's name, or "Agent" where there is one. */
+export function agentWordFor(engines: readonly EngineRow[] | undefined, engine: Harness): string {
+  const rows = agentChoices(engines);
+  return rows.find((e) => e.id === engine)?.label ?? 'Agent';
+}
+
 /**
  * WHAT A SEND SAYS ABOUT THE HARNESS, by the rules the old card followed and
  * explained at length (components/Compose.tsx, `send`):
@@ -145,6 +184,9 @@ export function harnessFields({ engine, model, effort, engineCount, codexDefault
     ...(effort ? { effort } : {}),
   };
 }
+
+// The same question on a REPLY is ../reply-pick.ts, `pickToSend`: there the
+// row already has answers to it, so every field is explicit and null clears.
 
 /* ------------------------------- send later ------------------------------- */
 
@@ -203,10 +245,18 @@ export function momentFromWords(text: string, now = Date.now()): { ts: number; h
  * in ../message-split.ts, which never drops a word she typed. Files with no
  * words are titled by the first file. Null when there is nothing to send.
  */
-export function threadMessage(text: string, attachments: ReadonlyArray<{ name: string }>): { title: string; body: string } | null {
+export function threadMessage(
+  text: string,
+  attachments: ReadonlyArray<{ name: string }>,
+  named?: { encode: (words: string) => string; plain: (words: string) => string },
+): { title: string; body: string } | null {
   const trimmed = (text ?? '').trim();
   if (!trimmed && !attachments.length) return null;
-  return splitMessage(trimmed || `Attached: ${attachments[0]?.name}`);
+  const sent = named ? named.encode(trimmed) : trimmed;
+  if (sent === trimmed) return splitMessage(trimmed || `Attached: ${attachments[0]?.name}`);
+  // A thread named in the first line would leave the body with the title
+  // lifted out, and the title is plain words, so the body keeps every line.
+  return { title: splitMessage(named!.plain(trimmed)).title, body: sent };
 }
 
 /* -------------------------------- projects -------------------------------- */
@@ -353,4 +403,111 @@ export function readVisibility(store?: KeyStore, project?: string | null): Visib
 
 export function writeVisibility(v: Visibility, store?: KeyStore, project?: string | null): void {
   try { storeOf(store)?.setItem?.(visibilityKey(project), v); } catch { /* the card still sends */ }
+}
+
+/* ---------------------- send as a task, or as a message ------------------- */
+// A TO-DO IS A TASK YOU GIVE YOURSELF (w-c34591721f, approved 2026-10-17), and
+// the same gesture gives one to a teammate. The store already knew how to hold
+// that — `assignee` means the person who has to act next, a row held by a
+// person never starts an agent, and it sits in that one person's inbox until
+// it is done (shared/team-rules.mjs). The card simply had no way to say it.
+//
+// So a card addressed to a person asks one more question, SEND AS, and a task
+// gets one more row, DUE ON. Everything general stays on the bar: the project,
+// the urgency and who can see it are the same whatever this is.
+
+export type SendAs = 'message' | 'task';
+
+/** What DUE ON reads when nobody has set a day. Her words, her capitals. */
+export const NO_DEADLINE = 'No Deadline';
+
+const dayKey = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/**
+ * The days the picker offers: today, tomorrow, and the rest of the week by
+ * name. A calendar day, never a time — a task is due ON a day, and an hour is
+ * a promise neither Mac can keep across two time zones.
+ */
+export function dueChoices(now = new Date()): { key: string | null; label: string }[] {
+  const out: { key: string | null; label: string }[] = [{ key: null, label: NO_DEADLINE }];
+  for (let i = 0; i < 7; i += 1) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+    out.push({
+      key: dayKey(d),
+      label: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString(undefined, { weekday: 'long' }),
+    });
+  }
+  return out;
+}
+
+/**
+ * THE RESTING WORD IS AN ANSWER, NOT A BLANK. Most tasks will never carry a
+ * day, so "No Deadline" is what the row says at rest: it completes the card
+ * instead of asking for something. "Not set" and "None" were drawn too and
+ * both read as a field somebody failed to fill in.
+ *
+ * A day the picker never offered still reads as a day rather than as nothing,
+ * because the card can be reopened on a thread dated from somewhere else.
+ */
+export function dueWords(due: string | null, now = new Date()): string {
+  if (!due) return NO_DEADLINE;
+  return dueChoices(now).find((c) => c.key === due)?.label ?? due;
+}
+
+/**
+ * What a task given to a person is composed with. A day nobody set is not sent
+ * at all: a field set to nothing and a field nobody touched are different
+ * things on disk, and the store keeps what it is given.
+ */
+export function taskFields({ personId, due }: { personId: string; due: string | null }):
+  { assignee: string; due?: string } {
+  return { assignee: personId, ...(due ? { due } : {}) };
+}
+
+/* ------------------------------ the keyboard ------------------------------ */
+
+/** What has the keyboard while the card is open. */
+export type Keyboard = 'a field' | 'the card' | 'nothing' | 'away';
+
+/**
+ * TYPING ON THIS CARD IS TYPING, NEVER A PRESS (w-abed8ae491).
+ *
+ * The card sent tasks half-written. Measured on the real card: four Tabs out of
+ * the message box land on Send, and Space there sends whatever is in the box —
+ * one thread's entire brief was the word "Make". A click on the card's own
+ * padding puts the keyboard on BODY, where every character typed afterwards is
+ * dropped in silence. Escape out of a menu puts it on the chip that opened the
+ * menu, where a space opens the menu again and a letter can land on a row.
+ *
+ * So a character with no chord on it goes to the message wherever the keyboard
+ * happens to be sitting, and the control under it never hears it. Two
+ * exceptions, both of them somebody typing on purpose: a caret already in a
+ * field, and an open menu, whose rows are picked with Enter and whose find box
+ * takes letters.
+ *
+ * The cost is Enter and Space opening a menu from a focused trigger. The arrow
+ * keys do that (`triggerKeys` in ./ThreadComposer.tsx) and ⌘↵ is printed on
+ * Send, so nothing on the card is out of the keyboard's reach.
+ */
+export function keyOnTheNewThreadCard(
+  { key, meta, ctrl, alt, menuOpen, on }: {
+    key: string; meta?: boolean; ctrl?: boolean; alt?: boolean; menuOpen: boolean; on: Keyboard;
+  },
+): 'the message' | 'leave it' {
+  if (meta || ctrl || alt) return 'leave it';
+  if (key.length !== 1 && key !== 'Enter') return 'leave it';
+  if (menuOpen || on === 'a field' || on === 'away') return 'leave it';
+  return 'the message';
+}
+
+/**
+ * Which rows the head draws. To an agent it is still To and Model, untouched.
+ * To a person it is To and Send As, and the day appears only once it is a
+ * task, because a message has nothing to be due.
+ */
+export function headRows({ person, kind }: { person: boolean; kind: SendAs }):
+  ('to' | 'model' | 'sendAs' | 'dueOn')[] {
+  if (!person) return ['to', 'model'];
+  return kind === 'task' ? ['to', 'sendAs', 'dueOn'] : ['to', 'sendAs'];
 }

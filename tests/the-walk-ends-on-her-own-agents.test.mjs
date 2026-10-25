@@ -238,7 +238,12 @@ describe('where it sits in the walk', () => {
     //
     // AND SINCE w-e46f2e9cea THE LINE IS PICKED BY `listLine`, which says "From
     // the last 10 days" unless the card had to reach back for older sessions.
-    expect(ia).toContain('{read && some && <p className="ia-line">{listLine(threads ?? [])}</p>}');
+    // AND NOT OVER A SEARCH (w-6418318cd5). The name field puts matches from
+    // months ago on the card; "From the last 10 days" over those is the same
+    // contradiction this file is about, pointing the other way.
+    // The third argument is w-6418318cd5: a chat kept out of a search is on
+    // this list too, so the line owns up to it rather than saying ten days.
+    expect(ia).toContain('{read && some && !searching && <p className="ia-line">{listLine(threads ?? [], Date.now(), kept.length > 0)}</p>}');
     expect(ia.split('listLine(').length - 1).toBe(1);
     expect(ia).not.toContain('COPY.agentsRead');
   });

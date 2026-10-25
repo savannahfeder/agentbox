@@ -16,6 +16,8 @@
 //                private thread publishes no card at all (decided 2026-10-01
 //                from user research): not a wordless one, not a count.
 
+import { shownPriority } from './rank.mjs';
+
 export const THREAD_STATES = ['waiting', 'running', 'scheduled', 'done'];
 
 /** Which of the four states a thread is in. */
@@ -245,7 +247,8 @@ export function cardsFor({ products, readItems, now = Date.now(), since = null }
       // team. Never an empty list, which would have to mean both. Both clouds
       // carry it and refuse to show the card to anybody else.
       people: shownToPeople(item, product).length ? shownToPeople(item, product) : null,
-      state, priority: Number.isFinite(item.priority) ? item.priority : null,
+      // The level it runs at, so a teammate reads what the owner reads.
+      state, priority: shownPriority(item),
       problem: s.problem || null, progress: s.progress || null, solution: s.solution || null,
       blockedBy: linked(item.blockedBy), blocks: linked(item.blocks), updatedAt: item.updatedAt ?? now,
     });

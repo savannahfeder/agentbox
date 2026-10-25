@@ -9,9 +9,11 @@
 // runs whole inside a worker thread, and if the thread cannot start the job
 // runs here, the old way.
 import { Worker } from 'node:worker_threads';
-import * as change from './git-change.mjs';
+import * as git from './git-change.mjs';
+import { saveRunChange } from './run-change.mjs';
 
-const JOBS = new Set(['snapshotRepo']);
+const change = { ...git, saveRunChange };
+const JOBS = new Set(['snapshotRepo', 'saveRunChange']);
 
 let worker = null;
 let broken = false;
@@ -55,6 +57,11 @@ function thread() {
   return worker;
 }
 
+/** Settles once no job is waiting on the thread. */
+export async function __gitJobsIdle() {
+  while (waiting.size) await new Promise((resolve) => { setTimeout(resolve, 10); });
+}
+
 /** Run one of git-change.mjs's exports without blocking this thread. */
 export function gitJob(name, ...args) {
   if (!JOBS.has(name)) return Promise.reject(new Error(`not a git job: ${name}`));
@@ -65,6 +72,13 @@ export function gitJob(name, ...args) {
     const id = ++seq;
     waiting.set(id, job);
     w.ref();
-    w.postMessage({ id, name, args });
+    try {
+      w.postMessage({ id, name, args });
+    } catch (error) {
+      // Arguments a thread cannot be handed (a function, say) run here.
+      waiting.delete(id);
+      if (!waiting.size) w.unref();
+      runHere(job);
+    }
   });
 }

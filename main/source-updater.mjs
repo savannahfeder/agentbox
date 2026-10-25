@@ -33,6 +33,7 @@
 import { execFile, execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { describe } from './updater.mjs';
+import { loginShell } from './shell-path.mjs';
 
 const FIRST_CHECK_MS = 20_000;
 const EVERY_MS = 30 * 60 * 1000;
@@ -103,19 +104,26 @@ function collect(bin, args, { cwd, timeout }) {
 
 // WHICH npm. Started with `npm start`, the process carries npm's own path in
 // its environment, so that one is used and nvm or a version manager never
-// matters. Started any other way, her login shell is asked, the way
-// main/claude-bin.mjs finds Claude Code. The arguments are fixed strings from
-// this file, never anything read from disk.
+// matters. Started any other way, their login shell is asked, the way
+// main/claude-bin.mjs finds Claude Code, and only a shell this machine has: a
+// Linux launcher start carries no SHELL, so the old `|| '/bin/zsh'` was a path
+// to nothing and every update on a box without zsh failed in two seconds. With
+// no shell at all, npm on PATH is the better guess. The arguments are fixed
+// strings from this file, never anything read from disk.
+export function npmCommand(args, { env = process.env, exists = fs.existsSync } = {}) {
+  const node = env.npm_node_execpath;
+  const cli = env.npm_execpath;
+  if (node && cli && exists(node) && exists(cli)) return [node, [cli, ...args]];
+  const shell = loginShell(env, exists);
+  if (!exists(shell)) return ['npm', args];
+  return [shell, ['-lic', `npm ${args.join(' ')}`]];
+}
+
 export function defaultNpm(appDir, env = process.env) {
   return (args) => {
     const timeout = args[0] === 'install' ? INSTALL_MS : BUILD_MS;
-    const node = env.npm_node_execpath;
-    const cli = env.npm_execpath;
-    if (node && cli && fs.existsSync(node) && fs.existsSync(cli)) {
-      return collect(node, [cli, ...args], { cwd: appDir, timeout });
-    }
-    const shell = env.SHELL || '/bin/zsh';
-    return collect(shell, ['-lic', `npm ${args.join(' ')}`], { cwd: appDir, timeout });
+    const [bin, argv] = npmCommand(args, { env });
+    return collect(bin, argv, { cwd: appDir, timeout });
   };
 }
 

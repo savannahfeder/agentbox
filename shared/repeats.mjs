@@ -24,11 +24,21 @@ export function ruleIdOf(item) {
   return found ? found.slice(REPEAT_LABEL_PREFIX.length) : null;
 }
 
+// THE STANDING INSTRUCTION: the words every run after this one is briefed with.
+// `serve` copies this into each occurrence's body under the protocol, and the
+// store tool an agent changes it through reads and writes the same thing, so
+// what the tool shows a run is what the next run gets.
+export function standingInstruction(rule) {
+  return rule?.body ?? rule?.title;
+}
+
 // A clean run is one the worker EXPLICITLY marked clean. Everything else is news
 // and reaches her, including a run that died without saying anything: this
 // predicate exists to hide, never to show, so it fails open by construction.
 export function isCleanRun(item) {
-  return !!ruleIdOf(item) && (item?.labels ?? []).includes(CLEAN_LABEL);
+  const labels = item?.labels ?? [];
+  const aRun = !!ruleIdOf(item) || labels.some((l) => typeof l === 'string' && (l.startsWith('teammate:') || l === 'teammate-offer'));
+  return aRun && labels.includes(CLEAN_LABEL);
 }
 
 // THE THREAD AN OPENED REPEATING TASK LANDS ON: its latest run, an ordinary

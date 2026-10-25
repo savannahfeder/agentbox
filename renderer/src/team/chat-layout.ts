@@ -40,3 +40,11 @@ export function chatLayout(events: readonly Said[], now = Date.now()): ChatSlot[
   }
   return out;
 }
+
+/** The index of the last message, past anything done after it; -1 when there is none. */
+export function newestSaid(events: readonly { kind?: string }[]): number {
+  for (let n = events.length - 1; n >= 0; n--) {
+    if (events[n].kind !== 'work' && events[n].kind !== 'run') return n;
+  }
+  return -1;
+}

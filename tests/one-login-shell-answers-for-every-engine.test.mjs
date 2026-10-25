@@ -155,15 +155,17 @@ describe('what it seeds, and what it refuses to seed', () => {
   // `now - at < TTL` is true for any answer stamped in the FUTURE, and the
   // warm-up stamps real clock time; anything asking with a synthetic `now`
   // would then read it as fresh forever. An answer from ahead of the question
-  // is not an answer.
+  // is not fresh: it is handed back, since something is held, and the shell is
+  // asked again in the background (tests/finding-a-coding-agent-never-holds-the-window).
   it('does not read an answer stamped after the question as fresh', () => {
     warmShellAnswers({ now: 9_000_000, env: {}, exists: () => true, run: () => '/x/claude\n' });
-    let asked = 0;
+    const asked = { now: 0, later: 0 };
     resolveEngine('claude', null, {
       now: 1_000, home: HOME, env: {}, exists: never, dangles: never,
-      shellLookup: () => { asked += 1; return { path: null, answered: true }; },
+      shellLookup: () => { asked.now += 1; return { path: null, answered: true }; },
+      shellLookupLater: () => { asked.later += 1; return { path: null, answered: true }; },
     });
-    expect(asked).toBe(1);
+    expect(asked).toEqual({ now: 0, later: 1 });
   });
 
   it('is what the config asks for before it resolves either engine', async () => {

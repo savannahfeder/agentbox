@@ -1,0 +1,16 @@
+/* A thread named in a text box (ThreadMentions.tsx). The mirror holds the
+   field's own words, invisible, behind the field, so a chip drawn on them sits
+   exactly under the name; typing, the caret and selection stay the field's. */
+.thread-mirror {
+  position: absolute; z-index: 0; box-sizing: border-box; overflow: hidden; pointer-events: none;
+  border-style: solid; border-color: transparent;
+  white-space: pre-wrap; overflow-wrap: break-word; color: transparent;
+}
+.over-threads { position: relative; z-index: 1; }
+.mention-chip.thread-chip { border-radius: var(--radius); box-shadow: none; background: var(--wash-strong); }
+
+.thread-menu.drop { bottom: auto; }
+.thread-menu .mention-icon { flex: none; width: 14px; height: 14px; margin: 0; }
+.thread-menu .mention-row.cursor .mention-icon { color: var(--text-dim); }
+.thread-menu .mention-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread-menu .mention-hint { flex: none; }

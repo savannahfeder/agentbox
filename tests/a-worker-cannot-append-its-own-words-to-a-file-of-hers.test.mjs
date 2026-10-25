@@ -66,7 +66,7 @@ describe('a Codex decision, with log.jsonl symlinked at a file of hers', () => {
     const { root, bystander, log } = planted();
     fs.symlinkSync(bystander, log); // the attack
 
-    const cards = createCodexApprovals({ storeRoot: root, uuid: () => 'card-1', timeoutMs: 60_000, pollMs: 60_000 });
+    const cards = createCodexApprovals({ storeRoot: root, uuid: () => 'card-1', pollMs: 60_000 });
     const asked = cards.scope({ product: 'agentbox', item: 'w-1' }).handle(...commandAsk('rm -rf ~/Zero'));
     cards.settle('card-1', false, 'no');
     await asked;
@@ -80,7 +80,7 @@ describe('a Codex decision, with log.jsonl symlinked at a file of hers', () => {
     const { root, bystander, log } = planted();
     fs.symlinkSync(bystander, log);
 
-    const cards = createCodexApprovals({ storeRoot: root, uuid: () => 'card-1', timeoutMs: 60_000, pollMs: 60_000 });
+    const cards = createCodexApprovals({ storeRoot: root, uuid: () => 'card-1', pollMs: 60_000 });
     const asked = cards.scope({ product: 'agentbox', item: 'w-1' }).handle(...commandAsk('rm -rf ~/Zero'));
     cards.settle('card-1', false, 'no');
     await asked;
@@ -99,7 +99,7 @@ describe('a Codex decision, with log.jsonl symlinked at a file of hers', () => {
     // of every decision she has ever made.
     const { root, log } = planted();
 
-    const cards = createCodexApprovals({ storeRoot: root, uuid: () => 'card-1', now: () => 1234, timeoutMs: 60_000, pollMs: 60_000 });
+    const cards = createCodexApprovals({ storeRoot: root, uuid: () => 'card-1', now: () => 1234, pollMs: 60_000 });
     const asked = cards.scope({ product: 'agentbox', item: 'w-1' }).handle(...commandAsk('git push'));
     cards.settle('card-1', true, null);
     await asked;
@@ -113,7 +113,7 @@ describe('a Codex decision, with log.jsonl symlinked at a file of hers', () => {
   it('appends, so two decisions are two lines', async () => {
     const { root, log } = planted();
     let n = 1;
-    const cards = createCodexApprovals({ storeRoot: root, uuid: () => `card-${n}`, timeoutMs: 60_000, pollMs: 60_000 });
+    const cards = createCodexApprovals({ storeRoot: root, uuid: () => `card-${n}`, pollMs: 60_000 });
     const scope = cards.scope({ product: 'agentbox', item: 'w-1' });
     const first = scope.handle(...commandAsk('git status'));
     cards.settle('card-1', true, null);

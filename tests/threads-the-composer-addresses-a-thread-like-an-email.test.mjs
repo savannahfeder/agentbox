@@ -28,8 +28,16 @@ const fakeStore = () => {
 };
 
 describe('the title', () => {
-  it('is the first line, and the rest is the body', () => {
-    expect(threadMessage('Draft the renewal\nAt 8% over last year.', [])).toEqual({ title: 'Draft the renewal', body: 'At 8% over last year.' });
+  // The first line is a subject only when a blank line sets it apart, since
+  // w-c9da359466: a pasted stack trace has no blank line in it and was losing
+  // its first line (tests/a-pasted-stack-trace-keeps-its-first-line).
+  it('is the first line, and a blank line under it starts the body', () => {
+    expect(threadMessage('Draft the renewal\n\nAt 8% over last year.', [])).toEqual({ title: 'Draft the renewal', body: 'At 8% over last year.' });
+  });
+
+  it('labels a block of text with its first line and keeps all of it', () => {
+    const block = 'Draft the renewal\nAt 8% over last year.';
+    expect(threadMessage(block, [])).toEqual({ title: 'Draft the renewal', body: block });
   });
 
   it('is derived by the same split the old card used, word for word', () => {

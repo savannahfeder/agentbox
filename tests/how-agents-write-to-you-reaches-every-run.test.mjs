@@ -194,12 +194,11 @@ describe(`the text ${NAME} ships`, () => {
     expect(shipped).toContain('(recommended)');
   });
 
-  // The hole the real test found (2026-08-23). A run that had edited a file
-  // and left it uncommitted still called itself settled and offered her
-  // nothing, and the old wording allowed it.
-  it('makes a run that changed something always offer a pick', () => {
-    expect(shipped).toContain('IF YOUR RUN CHANGED ANYTHING, THERE IS SOMETHING TO DECIDE');
-    expect(shipped).toMatch(/only run that ends with no options\s+is one that changed nothing/);
+  // Unapproved changes still need a decision; already authorized work does not.
+  it('offers a pick for unapproved changes without asking again for authorized actions', () => {
+    expect(shipped).toContain('IF YOUR RUN LEAVES AN UNAPPROVED CHANGE, THERE IS SOMETHING TO DECIDE');
+    expect(shipped).toContain('Already authorized actions do not create another decision');
+    expect(shipped).toContain('When an approval is\nstill required, offer it explicitly');
   });
 
   // The hole SHE found (w-1df18b337a, 2026-10-05): a thread said "Shipped" and
@@ -309,8 +308,15 @@ describe(`the text ${NAME} ships`, () => {
   // beside the message. A run comparing three fixes wrote all three
   // explanations first and stacked the screenshots below, because nothing told
   // it the pane would draw each picture wherever it put one.
+  // The autonomy rules distinguish ordinary handoffs from already authorized work.
+  //
+  // Raised from 8000 to 8700 for 647 characters (w-65bcefb857): offer choices
+  // whenever the next reply is clear, the reply after steps included, and stack
+  // designs to choose between. Measured on her store that day: 8 of 23 open
+  // answers offered no choices, most of them steps she had to take, so the
+  // one-at-a-time page drew an empty reply box where a number would have done.
   it('stays small enough to sit on every run', () => {
-    expect(shipped.length).toBeLessThan(6700);
+    expect(shipped.length).toBeLessThan(8700);
   });
 
   // THE SECOND COPY IS NOT ASKED FOR ANY MORE, AND THAT REPLACES THE RULE THAT

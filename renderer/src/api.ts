@@ -4,17 +4,18 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { AgentConversation, AnswerMode, DemoOpened, FolderListing, FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, Settings, Snapshot, TeamCallResult, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, WorkItem } from './types';
+import type { AccountUsageReading, AgentConversation, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FolderListing, FreshUser, PermissionMode, PhoneLink, PhoneRoute, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeamMessageFile, ThreadEditPatch, UpdateState, Usage, UsageLimit, WorkItem } from './types';
 import type { LedgerLine } from './thread-history';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
 import type { EngineSetupState } from './plan-setup';
-import { fixtureAgents, fixtureSnapshot, fixtureDashboards, fixtureRepeats, fixtureRuns, fixtureMock, fixtureMockDashboards, fixtureTraces, fixtureHistory, fixtureSettings, fixtureConversation, fixtureAgentFiles, fixtureSessionThreads } from './fixtures';
+import { fixtureAgents, fixtureSnapshot, fixtureDashboards, fixtureRepeats, fixtureRuns, fixtureMock, fixtureMockDashboards, fixtureTraces, fixtureHistory, fixtureSettings, fixtureConversation, fixtureAgentFiles, fixtureSessionThreads, fixtureSearchableThreads } from './fixtures';
 import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from './fixtures';
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
 import { USAGE_UNREADABLE } from '../../shared/usage.mjs';
+import { accountSentence } from '../../shared/spawn-trouble.mjs';
 import { MOVE_SAY } from '../../shared/where-it-runs-from.mjs';
 // THE SECOND FRONT DOOR, AND IT HAS TO BE BUILT BEFORE THE LINE BELOW RUNS.
 // `useFixtures` reads `window.zero` once, at module load, and on the desktop
@@ -23,8 +24,10 @@ import { MOVE_SAY } from '../../shared/where-it-runs-from.mjs';
 // body that imports them, so calling it here means no other file has to
 // remember to, and no import order anywhere can get it wrong.
 import { installBrowserBridge } from './browser-bridge';
+import { installCloudBridge } from './cloud-bridge';
 
-installBrowserBridge();
+// The Mac's own page first; the phone with the Mac shut only on its own site.
+if (!installBrowserBridge()) installCloudBridge();
 
 // A team call, in words: a build or a window with no team door says so rather
 // than throwing somewhere the person cannot see. Below the bridge's install,
@@ -42,7 +45,7 @@ async function teamCall(fn: () => Promise<TeamCallResult>): Promise<TeamCallResu
 // it runs.
 const search = typeof location === 'undefined' ? '' : location.search;
 const params = new URLSearchParams(search);
-const modelUpdateFixture=updateFixture(params.get('modelUpdates')==='fail');
+const modelUpdateFixture=updateFixture(params.get('modelUpdates')==='fail',['claude','codex'].includes(params.get('modelUpdates')??'')?params.get('modelUpdates'):null);
 const useFixtures = params.has('fixtures') || typeof window === 'undefined' || !window.zero;
 const emptyFixtures = params.get('fixtures') === 'empty';
 // ?working=3 puts three running agents into ?fixtures=empty. The empty
@@ -96,7 +99,7 @@ const emptySettings: Settings = {
     // A screen that could not reach the main process says the switch is on and
     // that there is nowhere to send to, which is the truth about a copy that
     // cannot even read its own settings.
-    diagnostics: true, diagnosticsDestination: false, adhdMode: false, cornerTag: true,
+    diagnostics: true, diagnosticsDestination: false, adhdMode: false, importNew: false, cornerTag: true,
     storePath: '', homePath: '', claudeBin: '', claudeFound: false, claudeCertain: false, claudeInstallUrl: '',
     standingLines: 0,
     messageRulesLines: 0, projectsWithInstructions: 0, projectCount: 0,
@@ -116,6 +119,36 @@ const fixtureSettingsState: any = structuredClone(fixtureSettings);
 // she runs, which leaves the object exactly as ./fixtures wrote it.
 const engineSettings = fixtureEngineSettings(engineFixtures);
 if (engineSettings) Object.assign(fixtureSettingsState.workspace, structuredClone(engineSettings));
+// &codexPlan=free is a Mac whose Codex logins are all on ChatGPT's free plan,
+// the paid one having ended Oct 18 2026: the three models that plan lists
+// (w-62f14f8b3e).
+if (params.get('codexPlan') === 'free') {
+  Object.assign(fixtureSettingsState.workspace, {
+    codexModels: [
+      { id: 'gpt-6-luna', label: 'GPT-6-Luna', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' },
+      { id: 'gpt-5.6-terra', label: 'GPT-5.6-Terra', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' },
+      { id: 'gpt-5.6-luna', label: 'GPT-5.6-Luna', levels: ['low', 'medium', 'high', 'xhigh'], defaultLevel: 'medium' },
+    ],
+    codexModelDefault: 'gpt-6-luna',
+    codexFreePlan: { endedAt: Date.parse('2026-10-18T19:00:00Z') },
+  });
+}
+// The Codex page as it was reported on 2026-10-25, with ?engines=codex:
+// &codexaccounts=two is two logins here with the free one in use,
+// &codextrouble a Codex that is found but failing, and &codexmonth a free
+// plan's monthly reading.
+if (params.get('codexaccounts') === 'two' && fixtureSettingsState.workspace.codex) {
+  fixtureSettingsState.workspace.codex.accounts = [
+    { profile: 'default', email: 'work@example.com', name: null, plan: 'Free', accountId: null, signedIn: true, chosen: true },
+    { profile: 'codex-2', email: 'you@example.com', name: null, plan: 'Plus', accountId: null, signedIn: true, chosen: false },
+  ];
+}
+if (params.has('codextrouble') && fixtureSettingsState.workspace.codex) {
+  fixtureSettingsState.workspace.codex.trouble = `Codex sessions are dying on arrival, so its tasks are not moving. ${NAME} keeps trying.`;
+}
+const codexMonth = params.has('codexmonth')
+  ? [{ span: 'month', qualifier: null, name: 'This month', percent: 27, resetsText: null, resetsOn: null, resetsAt: Date.now() + (24 * 24 + 4) * 3_600_000, zone: null }] as unknown as UsageLimit[]
+  : null;
 // &memory=held draws the Running page the way it read when memory ran out on
 // 2026-10-11 (w-ec27ff1a51): six running, memory tight, commands waiting, and
 // new agents held. &memory=fine is the same page with memory back to normal.
@@ -154,6 +187,58 @@ if (accountTroubleNotes[accountTrouble]) {
   });
 }
 
+// ?accounts=two: two logins, the second picked and nearly empty, the first full,
+// and the cloud's two unnamed logins at their limit (2026-10-16).
+const twoLogins = params.get('accounts') === 'two';
+if (twoLogins) {
+  const [first, second] = fixtureSettingsState.workspace.accounts;
+  if (first) first.chosen = false;
+  if (second) second.chosen = true;
+  // &cloudperm=<mode> and &cloudcodexmode=<mode> draw the cloud on its own
+  // permission modes; unset, on the cloud's defaults.
+  fixtureSettingsState.workspace.permission = 'auto';
+  fixtureSettingsState.workspace.cloudPermission = (params.get('cloudperm') as PermissionMode | 'same' | null) || 'bypassPermissions';
+  fixtureSettingsState.workspace.cloudCodexMode = (params.get('cloudcodexmode') as CodexModeId | 'same' | null) || 'full-access';
+  // &account=at-limit: the full first login also carries main's at-limit trouble, as it does once a run on it hits the limit.
+  if (accountTrouble === 'at-limit' && first) {
+    first.trouble = { cause: 'at-limit', since: Date.now(), note: accountSentence('at-limit') };
+  }
+}
+
+function fixtureAccountUsage(): AccountUsageReading[] {
+  const now = Date.now();
+  const at = (h: number, m = 0) => { const d = new Date(now); d.setHours(h, m, 0, 0); return d.getTime(); };
+  const limit = (span: 'session' | 'week', percent: number, resetsText: string, resetsAt: number, qualifier: string | null = null) => ({
+    span, qualifier, percent, resetsText, resetsOn: span === 'week' ? 'Oct 22' : null, resetsAt, zone: null,
+    name: span === 'session' ? 'This session' : qualifier === 'Fable' ? 'This week, Fable' : 'This week',
+  });
+  const [first, second] = fixtureSettingsState.workspace.accounts;
+  const week = now + 6 * 86_400_000;
+  // &usagefail: the first login's last refresh failed, so it keeps a reading two hours old.
+  const failed = params.has('usagefail') ? { at: now - 2 * 3_600_000, error: USAGE_UNREADABLE } : { at: now - 60_000 };
+  // &fablefull: the first login has room in its session and week and none left on Fable.
+  const firstLimits = params.has('fablefull')
+    ? [limit('session', 30, '5:09pm', at(17, 9)), limit('week', 60, '11:59am', week, 'all models'), limit('week', 100, '11:59am', week, 'Fable')]
+    : [limit('session', twoLogins ? 100 : 42, '5:09pm', at(17, 9)), limit('week', 15, '11:59am', week, 'all models'), limit('week', 24, '11:59am', week, 'Fable')];
+  return [
+    { profile: first.profile, ...failed, limits: firstLimits },
+    { profile: second.profile, at: now - 60_000, limits: [limit('session', 5, '8pm', at(20)), limit('week', 9, '4pm', week, 'all models'), limit('week', 6, '4pm', week, 'Fable')] },
+  ];
+}
+
+// &codexaccounts=two: the Plus login not in use has its own session and week.
+function fixtureCodexAccountUsage(): AccountUsageReading[] {
+  if (params.get('codexaccounts') !== 'two') return [];
+  const now = Date.now();
+  const window = (span: 'session' | 'week', percent: number, resetsAt: number) => ({
+    span, qualifier: null, name: span === 'session' ? 'This session' : 'This week', percent, resetsText: null, resetsOn: null, resetsAt, zone: null,
+  });
+  return [
+    ...(codexMonth ? [{ profile: 'default', limits: codexMonth, at: now }] : []),
+    { profile: 'codex-2', at: now - 3 * 3_600_000, limits: [window('session', 12, now + 2 * 3_600_000), window('week', 31, now + 4 * 86_400_000)] },
+  ];
+}
+
 function fixtureWrite(scope: 'project' | 'workspace', p: any): Settings {
   const w = fixtureSettingsState.workspace;
   if (scope === 'workspace') {
@@ -164,7 +249,7 @@ function fixtureWrite(scope: 'project' | 'workspace', p: any): Settings {
     } else if (p.key === 'memoryGate' && w.memoryGate) {
       w.memoryGate = { ...w.memoryGate, on: !!p.value, now: p.value ? 'Memory is fine. Nothing heavy running.' : null };
     } else if (p.key === 'cleanupLeftovers' && w.leftovers) {
-      w.leftovers = { on: !!p.value, now: p.value ? 'Finished agents have left 6 programs running. 4 stop in 1 h 40 m; 2 are kept.' : null };
+      w.leftovers = { on: !!p.value, now: p.value ? 'Finished agents have left 6 programs running. 4 stop when you close their tasks; 2 are kept.' : null };
     } else if (p.key === 'memoryGateSlots' && w.memoryGate) {
       w.memoryGate = { ...w.memoryGate, slots: p.value === null ? null : Math.max(1, Math.min(w.memoryGate.slotsMax, Number(p.value) || 1)) };
     } else if (p.key === 'activeAccount') {
@@ -325,20 +410,131 @@ export const api = {
       // is a real state worth being able to look at, and it is not the state
       // every other fixtures screenshot wants a card floating over.
       if (!params.has('approvals')) base.approvals = [];
+      // &cloud=mac|full|all draws the cloud button set up, two accounts in,
+      // three threads running there, so its menu can be looked at.
+      const cloud = params.get('cloud');
+      if (params.get('accounts') === 'two') {
+        const until = new Date(); until.setHours(17, 10, 0, 0);
+        // A cloud reading carries the instant of each reset and no text (readReplyHeaders).
+        const on = (days: number, h: number, m = 0) => { const d = new Date(); d.setDate(d.getDate() + days); d.setHours(h, m, 0, 0); return d.getTime(); };
+        // &cloudread draws the cloud logins as they will read once the cloud
+        // reports each one's email and usage; without it, as they read today.
+        const read = params.has('cloudread');
+        base.cloud = {
+          // &cloudmode=mac draws the same accounts with the cloud turned off.
+          setUp: true, mode: params.get('cloudmode') === 'mac' ? 'mac' : params.get('cloudmode') === 'all' ? 'all' : 'full', whenOn: 'full', running: 0,
+          month: { runs: 14, agentHours: 1.2, estimatedCost: 0.16, costPerAgentHour: 0.13 },
+          accounts: [
+            {
+              // Read two hours ago, as the reported screenshot's was; the same login here was read since.
+              engine: 'claude', key: 'a1', name: read ? 'you@example.com' : null, plan: read ? 'Max 20x' : null, ready: false, state: 'limited' as any, limitedUntil: until.getTime(),
+              profile: read ? fixtureSettingsState.workspace.accounts[0]?.profile ?? null : null, readAt: read ? Date.now() - 2 * 3_600_000 : null,
+              limits: read ? [
+                { span: 'session', qualifier: null, name: 'This session', percent: 100, resetsText: null, resetsOn: null, resetsAt: until.getTime(), zone: null },
+                { span: 'week', qualifier: 'all models', name: 'This week', percent: 31, resetsText: null, resetsOn: null, resetsAt: on(2, 11, 59), zone: null },
+              ] : null,
+            },
+            {
+              engine: 'claude', key: 'a2', name: read ? 'work@example.com' : null, plan: read ? 'Max 20x' : null, ready: true, state: 'ready',
+              profile: read ? fixtureSettingsState.workspace.accounts[1]?.profile ?? null : null, readAt: read ? Date.now() - 3 * 60_000 : null,
+              limits: read ? [
+                { span: 'session', qualifier: null, name: 'This session', percent: 12, resetsText: null, resetsOn: null, resetsAt: on(0, 20), zone: null },
+                { span: 'week', qualifier: 'all models', name: 'This week', percent: 9, resetsText: null, resetsOn: null, resetsAt: on(2, 16), zone: null },
+              ] : null,
+            },
+            // &cloudcodex adds a Codex login in the cloud, so the Codex page draws its cloud rows.
+            // &cloudcodex=<email> names it.
+            ...(params.has('cloudcodex') ? [{ engine: 'codex' as const, key: 'c1', name: params.get('cloudcodex') || null, ready: true, state: 'ready' as const }] : []),
+            // &cloudonly adds a Claude login signed in nowhere here, whose last look failed.
+            // Its email is unknown: the cloud's token cannot read it, and no folder here names it.
+            ...(params.has('cloudonly') ? [{
+              engine: 'claude' as const, key: 'a3', name: null, plan: null, ready: true, state: 'ready' as const, profile: null,
+              readAt: Date.now() - 2 * 3_600_000, readError: 'The cloud could not be reached. Try again.',
+              limits: [
+                { span: 'session' as const, qualifier: null, name: 'This session', percent: 40, resetsText: null, resetsOn: null, resetsAt: on(0, 23), zone: null },
+                { span: 'week' as const, qualifier: 'all models', name: 'This week', percent: 22, resetsText: null, resetsOn: null, resetsAt: on(2, 16), zone: null },
+              ],
+            }] : []),
+            // &cloudmissing leaves the work login out of the cloud, so it is only on this computer
+            // (&cloudmissing=a1 the other one). &cloudstopped has the work login's cloud sign-in stop working.
+          ].filter((a) => !(params.has('cloudmissing') && a.key === (params.get('cloudmissing') || 'a2')))
+            .map((a) => (params.has('cloudstopped') && a.key === 'a2' ? { ...a, ready: false, state: 'broken' as const } : a))
+            // Marked as the app marks it (Supervisor#_cloudAccounts): the first of each engine that still works.
+            .map((a, _, all) => ({ ...a, inUse: all.find((b) => b.engine === a.engine && b.state !== 'broken') === a })),
+          // &cloudsigning has a Claude sign-in waiting on its code, as Add to cloud leaves one.
+          signIns: params.has('cloudsigning')
+            ? [{ engine: 'claude' as const, key: 'acct-new', state: 'needs-code' as const, url: 'https://claude.ai/oauth/authorize', code: null, message: null, attempt: 'signin-1' }]
+            : [],
+        } as typeof base.cloud;
+      } else if (cloud === 'new') {
+        // &cloud=new draws Agentbox Cloud offered with nobody signed in: the
+        // button's dot, its invitation, and the sign-in page it opens.
+        base.cloud = { setUp: false, offered: true, mode: 'full', whenOn: 'full', running: 0, month: { runs: 0, agentHours: 0, estimatedCost: 0, costPerAgentHour: 0 }, accounts: [], signIns: [] } as typeof base.cloud;
+      } else if (cloud === 'mac' || cloud === 'full' || cloud === 'all') {
+        base.cloud = {
+          setUp: true, mode: cloud, whenOn: cloud === 'all' ? 'all' : 'full', running: 3,
+          month: { runs: 6, agentHours: 2.4, estimatedCost: 0.31, costPerAgentHour: 0.13 },
+          accounts: [
+            { engine: 'claude', key: 'a1', name: 'me@example.com', ready: true, state: 'ready' },
+            { engine: 'claude', key: 'a2', name: null, ready: true, state: 'ready' },
+          ],
+          signIns: [],
+        } as typeof base.cloud;
+        // And the first running thread is one of the three in the cloud.
+        if (base.supervisor.running[0]) (base.supervisor.running[0] as { where?: string }).where = 'cloud';
+        // &cloudlimit draws both cloud accounts at their usage limit for two hours.
+        if (params.has('cloudlimit') && base.cloud) {
+          base.cloud.running = 0;
+          base.cloud.accounts = (base.cloud.accounts ?? []).map((a) => ({ ...a, ready: false, state: 'limited' as const, limitedUntil: Date.now() + 2 * 3600_000 }));
+        }
+        // &dup draws the second cloud account as the same account as the first.
+        const accounts = base.cloud?.accounts;
+        if (params.has('dup') && accounts?.[1]) {
+          accounts[1] = { ...accounts[1], ready: false, state: 'duplicate' as const, duplicateOf: accounts[0].key };
+        }
+        // &kept draws that thread kept on this Mac instead.
+        const first = base.supervisor.running[0];
+        if (params.has('kept') && first) {
+          delete (first as { where?: string }).where;
+          const kept = base.items.find((i) => i.id === first.itemId);
+          if (kept) kept.onMac = true;
+        }
+      }
+      // &cloud=managed draws Agentbox Cloud signed in through its server, and
+      // &noroom=hours|agents the server saying it had no room a moment ago.
+      if (cloud === 'managed') {
+        base.cloud = { setUp: true, managed: true, mode: 'full', whenOn: 'full', running: 0, month: { runs: 4, agentHours: 1.6, estimatedCost: 0, costPerAgentHour: 0 }, accounts: [{ engine: 'claude', key: 'a1', name: 'me@example.com', ready: true, state: 'ready' }], signIns: [] } as typeof base.cloud;
+      }
+      const room = params.get('noroom');
+      if (base.cloud && (room === 'hours' || room === 'agents')) base.cloud.noRoom = { error: room, message: null };
+      // &macfull draws this Mac running all it can, two threads queued behind it.
+      if (params.has('macfull')) {
+        const queued = base.items.filter((i) => /^(Can the welcome email|Bring back a list)/.test(i.title)).map((i) => i.id);
+        base.supervisor.queued = queued;
+        base.supervisor.capacity = base.supervisor.running.filter((r) => (r as { where?: string }).where !== 'cloud').length;
+      }
       return fixtureSecondEngine(base, engineFixtures);
     }
     return window.zero!.snapshot();
   },
 
-  async refreshUsage(): Promise<{ ok: boolean; reading?: Usage; error?: string }> {
+  async refreshUsage(engine: 'claude' | 'codex' = 'claude'): Promise<{ ok: boolean; reading?: Usage; error?: string }> {
     if (useFixtures) {
       if (params.get('account') === 'unreadable') return { ok: false, error: USAGE_UNREADABLE };
-      const reading = fixtureSnapshot.usageByEngine?.find(r => r.engine === 'claude') ?? (fixtureSnapshot.usage?.engine === 'claude' ? fixtureSnapshot.usage : null);
+      if (codexMonth && engine === 'codex') return { ok: true, reading: { engine, limits: codexMonth, profile: 'default', at: Date.now() } };
+      const reading = fixtureSnapshot.usageByEngine?.find(r => r.engine === engine) ?? (fixtureSnapshot.usage?.engine === engine ? fixtureSnapshot.usage : null);
       return reading ? { ok: true, reading: { ...structuredClone(reading), profile: 'default', at: Date.now() } } : { ok: false, error: 'No usage reading yet.' };
     }
     if (!window.zero?.refreshUsage) return { ok: false, error: RESTART_NOTE };
-    try { return await window.zero.refreshUsage(); }
+    try { return await window.zero.refreshUsage({ engine }); }
     catch { return { ok: false, error: USAGE_UNREADABLE }; }
+  },
+
+  /** Every Claude or Codex login's own usage, for Settings. Empty from a main process that predates it. */
+  async accountUsage(p: { refresh?: boolean; engine?: 'claude' | 'codex' } = {}): Promise<AccountUsageReading[]> {
+    if (useFixtures) return p.engine === 'codex' ? fixtureCodexAccountUsage() : fixtureAccountUsage();
+    if (!window.zero?.accountUsage) return [];
+    try { return (await window.zero.accountUsage(p)).readings ?? []; } catch { return []; }
   },
 
   // THE NEXT PAGE OF FINISHED THREADS THE SNAPSHOT LEFT OUT (w-fda2165ec6),
@@ -509,7 +705,10 @@ export const api = {
   // one), so a build carrying this channel can be talking to a process that has
   // never heard of it. That answers empty rather than throwing: the door says
   // the app needs reopening, and nothing else on the task is affected.
-  async itemHistory(p: { product: string; id: string }): Promise<{ ok: boolean; lines: LedgerLine[]; error?: string }> {
+  // `before` keeps only the lines written at or before that moment, so a
+  // thread's history as it stood when another was filed from it is not cut off
+  // by the 400 newest lines (renderer/src/recap.ts, recapFor).
+  async itemHistory(p: { product: string; id: string; before?: number }): Promise<{ ok: boolean; lines: LedgerLine[]; error?: string }> {
     if (useFixtures) return { ok: true, lines: (fixtureHistory as any)[p.id] ?? [] };
     const zero = window.zero as any;
     if (!zero?.itemHistory) return { ok: false, lines: [], error: `quit and reopen ${NAME} to see this` };
@@ -556,14 +755,16 @@ export const api = {
     }
     return window.zero!.compactionStatus(p);
   },
-  // `model` and `effort` are the reply box's drawer: which model picks up the
-  // run this reply starts. Undefined means she never opened it and the row
-  // keeps what it had; null clears it back to the engine's own choice.
+  // `engine`, `model` and `effort` are which coding agent and which model pick
+  // up the run this reply starts. Undefined means the drawer was never opened
+  // and the row keeps what it had; null clears it back to the engine's own
+  // choice. `engine` is set by ⌘K (w-c9da359466) and by the reply box's menu,
+  // which lists both agents' models (w-e1a42f6b21).
   // `now` cuts the running agent's current step so this message is answered at
   // once instead of after it (main/claude-input.mjs `interrupt`).
   // `inReplyTo` is the uid of the message a reply in a thread answers
   // (w-920461cbe6); main keeps it only in a conversation between people.
-  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string }): Promise<WorkItem | null> {
+  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean }): Promise<WorkItem | null> {
     if (useFixtures) return null;
     return window.zero!.answer(p);
   },
@@ -605,16 +806,33 @@ export const api = {
   // A chip put on or taken off one message. `on` is the uid of the ledger line
   // the message was written as (w-560647d4db).
   async teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamReact(p)); },
+  async teamEdit(p: { product: string; id: string; on: string; text?: string; gone?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamEdit(p)); },
   // A MESSAGE TO A PERSON (people get messages, never tasks), at the level the
   // sender picked. The level counts on the first message of a conversation and
   // is ignored after, which is the main process's rule (main/team/index.mjs).
   // And the files the card carries, saved into the conversation once the main
   // process knows which one it is.
   async teamMessage(to: string | string[], body: string, priority?: number, files?: TeamMessageFile[]): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessage({ to, body, priority, files })); },
+  // Rooms (alpha): every call goes through one door (main/ipc.mjs ROOM_OPS).
+  async teammates<T = unknown>(op: string, args: Record<string, unknown> = {}): Promise<TeammatesResult<T>> {
+    if (!window.zero?.teammates) return { ok: false, error: 'Teammates are not available here.' };
+    try { return (await window.zero.teammates({ op, args })) as TeammatesResult<T>; } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  },
+  async rooms<T = unknown>(op: string, ...args: unknown[]): Promise<RoomsResult<T>> {
+    if (!window.zero?.rooms) return { ok: false, error: 'This build has no team cloud set up.' };
+    try { return (await window.zero.rooms({ op, args })) as RoomsResult<T>; } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  },
   // An edit to a thread's summary, visibility or priority, made in place.
   async threadEdit(product: string, id: string, patch: ThreadEditPatch): Promise<{ ok: boolean; error?: string }> {
     if (useFixtures || !window.zero?.threadEdit) return { ok: true };
     try { return await window.zero.threadEdit({ product, id, patch }); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  },
+  // Move a thread to another project (shared/move-thread.mjs). Answers with
+  // the row it became there, or with the reason in words: only a thread
+  // nothing has ever run on can go, and main asks that again before it writes.
+  async moveItem(product: string, id: string, to: string): Promise<{ ok: boolean; error?: string; item?: WorkItem; from?: string; to?: string }> {
+    if (useFixtures || !window.zero?.moveItem) return { ok: false, error: `Quit and reopen ${NAME} to move a thread.` };
+    try { return await window.zero.moveItem({ product, id, to }); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   },
   // Threads dragged to a place of their own in the list (w-6e5b532a95).
   async setThreadPlaces(places: Record<string, number | null>): Promise<void> {
@@ -626,6 +844,12 @@ export const api = {
   async setThreadPins(pins: Record<string, true | null>): Promise<void> {
     if (useFixtures || !window.zero?.setThreadPins) return;
     await window.zero.setThreadPins({ pins });
+  },
+
+  /** Keep a thread on this Mac whatever the cloud is set to, or let it go again. */
+  async setThreadOnMac(onMac: Record<string, true | null>): Promise<void> {
+    if (useFixtures || !window.zero?.setThreadOnMac) return;
+    await window.zero.setThreadOnMac({ onMac });
   },
 
   async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem | null> {
@@ -990,8 +1214,18 @@ export const api = {
     if (useFixtures && engineFixtures === 'nowhere') {
       return { engine, phase: 'idle', error: null, log: '', found: false, signedIn: false };
     }
-    // AND THE MACHINE THE QUESTION MUST NOT ASK: Codex on the disk, signed out.
-    // `afterCheck` reads this as "we already know which plan they have".
+    /*
+     * AND THE MACHINE MOST PEOPLE ARRIVE ON (w-e217e577e5): Claude signed in
+     * already, nothing else here. Every fixture copy answers `assumeReady` for
+     * BOTH agents, which is a machine almost nobody has, so the screen that
+     * says what was found could only ever be photographed saying it found two.
+     */
+    if (useFixtures && engineFixtures === 'ready') {
+      const mine = engine === 'claude';
+      return { engine, phase: mine ? 'ready' : 'idle', error: null, log: '', found: mine, signedIn: mine };
+    }
+    // AND THE MACHINE THAT MUST NOT BE SIGNED IN FOR: Codex on the disk, signed
+    // out. `afterCheck` reads this as `found`, which draws and starts nothing.
     if (useFixtures && engineFixtures === 'signedout') {
       return { engine, phase: 'idle', error: null, log: '', found: engine === 'codex', signedIn: false };
     }
@@ -1000,7 +1234,11 @@ export const api = {
     try {
       const r = await zero.engineSetup({ action, engine });
       if (!r?.ok) return { ...assumeReady, phase: 'failed', found: false, signedIn: false, error: r?.error ?? 'Setup could not start.' };
-      return { engine, phase: r.phase ?? 'idle', error: r.error ?? null, log: r.log ?? '', found: !!r.found, signedIn: !!r.signedIn };
+      return {
+        engine, phase: r.phase ?? 'idle', error: r.error ?? null, log: r.log ?? '',
+        found: !!r.found, signedIn: !!r.signedIn,
+        bin: r.bin ?? null, already: !!r.already,
+      };
     } catch (e) {
       return { ...assumeReady, phase: 'failed', found: false, signedIn: false, error: String((e as Error)?.message ?? e) };
     }
@@ -1113,6 +1351,47 @@ export const api = {
     } catch {
       return { added: 0, already: 0 };
     }
+  },
+
+  /** The cloud menu's sign-in for one account, made in the cloud: start, paste Claude's code, or cancel. */
+  async cloudSignIn(p: { action: 'start' | 'code' | 'cancel' | 'remove'; engine: 'claude' | 'codex'; key?: string | null; code?: string }): Promise<{ ok: boolean; key?: string | null; error?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudSignIn) return { ok: false, error: RESTART_NOTE };
+    return zero.cloudSignIn(p);
+  },
+
+  /** Signing in to Agentbox Cloud itself, on the app's sign-in page: Google, email, or a new account. */
+  async cloudAccountSignIn(p: { method: 'google' | 'email' | 'sign-up' | 'agree'; email?: string; password?: string; name?: string; acceptTerms?: boolean }): Promise<{ ok: boolean; confirm?: boolean; needsTerms?: boolean; error?: string; cancelled?: boolean }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudAccountSignIn) return { ok: false, error: RESTART_NOTE };
+    return zero.cloudAccountSignIn(p);
+  },
+  async cloudAccountCancel(): Promise<void> { await (window.zero as any)?.cloudAccountCancel?.(); },
+  async cloudAccountReopen(): Promise<void> { await (window.zero as any)?.cloudAccountReopen?.(); },
+  async cloudAccountSignOut(): Promise<void> { await (window.zero as any)?.cloudAccountSignOut?.(); },
+  async cloudAccountPlan(): Promise<CloudPlan> {
+    // &cloudplan=pro draws someone on Pro, 6 running and 88 of 400 hours used.
+    if (useFixtures) return params.get('cloudplan') === 'pro'
+      ? { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 }
+      : { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };
+    return (await (window.zero as any)?.cloudAccountPlan?.()) ?? { signedIn: false };
+  },
+  async cloudAccountPay(plan: 'pro' | 'plus' | 'max'): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudAccountPay) return { ok: false, message: RESTART_NOTE };
+    return zero.cloudAccountPay({ plan });
+  },
+  async cloudAccountBilling(): Promise<{ ok: boolean; error?: string; message?: string }> {
+    const zero = window.zero as any;
+    if (!zero?.cloudAccountBilling) return { ok: false, message: RESTART_NOTE };
+    return zero.cloudAccountBilling();
+  },
+
+  /** Claude's sign-in code from the clipboard, while a sign-in waits for one; else null. */
+  async cloudClipboardCode(): Promise<string | null> {
+    const zero = window.zero as any;
+    if (!zero?.cloudClipboardCode) return null;
+    try { return (await zero.cloudClipboardCode())?.code ?? null; } catch { return null; }
   },
 
   async setWorkspaceSetting(p: { key: string; value: unknown }): Promise<Settings> {
@@ -1293,16 +1572,38 @@ export const api = {
     } catch { return []; }
   },
 
+  /**
+   * EVERYTHING THE NAME FIELD CAN FIND, which is a year rather than ten days.
+   *
+   *  Taken once, the first time somebody types into the field, and held by the
+   *  main process for the life of the window, so the keystrokes after it cost
+   *  nothing. `reached` is the moment the read gave up at and zero when it got
+   *  through the lot; the card prints it rather than answering "no such chat"
+   *  over a read that stopped months ago. */
+  async searchAgentThreads(p: { again?: boolean } = {}): Promise<{ threads: SessionThread[]; reached: number }> {
+    if (useFixtures) {
+      if (emptyFixtures || params.has('noThreads')) return { threads: [], reached: 0 };
+      return { threads: fixtureSearchableThreads(), reached: 0 };
+    }
+    const zero = window.zero as any;
+    if (!zero?.searchAgentThreads) return { threads: [], reached: 0 };
+    try {
+      const r = await zero.searchAgentThreads(p);
+      return { threads: Array.isArray(r?.threads) ? r.threads : [], reached: Number(r?.reached ?? 0) };
+    } catch { return { threads: [], reached: 0 }; }
+  },
+
   // Ids only; the thread itself is the main process's own copy, so a row never
   // names a conversation off a screen that has been open since this morning.
-  async importThreads(p: { product: string; threads: string[] }): Promise<{ added: number; already: number }> {
-    if (useFixtures) return { added: p.threads.length, already: 0 };
+  async importThreads(p: { product: string; threads: string[]; land?: 'sorted' | 'inbox' }): Promise<{ added: number; already: number; done: number }> {
+    if (useFixtures) return { added: p.threads.length, already: 0, done: 0 };
     const zero = window.zero as any;
-    if (!zero?.importThreads) return { added: 0, already: 0 };
+    if (!zero?.importThreads) return { added: 0, already: 0, done: 0 };
     try {
       const r = await zero.importThreads(p);
-      return { added: Number(r?.added ?? 0), already: Number(r?.already ?? 0) };
-    } catch { return { added: 0, already: 0 }; }
+      // `done` is how many were filed in Done; an older main sends none.
+      return { added: Number(r?.added ?? 0), already: Number(r?.already ?? 0), done: Number(r?.done ?? 0) };
+    } catch { return { added: 0, already: 0, done: 0 }; }
   },
 
   async pauseSupervisor(paused: boolean) {

@@ -49,6 +49,10 @@ designs/w-a863b48784/raw-hi/*.png
 # This is what stops `git add -A` committing them.
 wt/
 
+# The tray's Liquid Glass is compiled from main/native/liquid-glass by
+# scripts/build-liquid-glass.mjs on every build, for the same reason.
+main/native/*/build/
+
 # The window helper is compiled from main/window-helper.swift by
 # scripts/build-window-helper.mjs on every build. A checked-in binary is a thing
 # nobody can review and everybody has to trust.
@@ -97,6 +101,9 @@ briefs/founder.md
 # lives only on the machines that run that version; a checkout without it is
 # the single-person app. `cloud/team.config.example.json` shows the shape.
 cloud/team.config.json
+# Agentbox Cloud's sign-in settings carry the same address and key; a release
+# build writes them into the app (main/cloud/account.mjs).
+cloud/cloud.public.json
 
 # WHAT THE BUILD READ OFF THE CLAUDE CODE ON THIS MACHINE.
 #
@@ -121,3 +128,6 @@ relay/dist/
 relay/.wrangler/
 relay/node_modules/
 relay/relay.local.json
+# The phone site as built (scripts/build-phone-site.mjs): it carries the team
+# cloud's address, which is never committed.
+phone-site/

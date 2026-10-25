@@ -30,7 +30,8 @@ import { fileURLToPath } from 'node:url';
 
 import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
-import { mediaResponse, mediaType } from './img-scheme.mjs';
+import { mediaResponse, mediaType, servable } from './img-scheme.mjs';
+import { readPictureShape } from './picture-shape.mjs';
 import { loadConfig } from './config.mjs';
 import { Store } from './store.mjs';
 import { Supervisor } from './supervisor.mjs';
@@ -40,7 +41,9 @@ import { reportFromRenderer } from './crash-report.mjs';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mjs';
 import { loadCloudConfig, supabaseSession, headlessSessionFile } from './team/session.mjs';
+import { roomsSetup } from './team/room-setup.mjs';
 import { appHome, carryMisplacedMachinery, storeRootEnv } from './store/home.mjs';
+import { keepAnswerModesIn } from './answer-modes.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.dirname(here);
@@ -143,6 +146,8 @@ export function answerWhatOnlyTheWindowAnswered(ipcMain) {
   ipcMain.handle('zero:corner-tag', () => null);
   ipcMain.handle('zero:notify', () => null);
   ipcMain.handle('zero:boot-info', () => ({ reloaded: false, builtAt: null, recovered: null }));
+  // A room invite link only ever opens the desktop app.
+  ipcMain.handle('zero:take-join', () => null);
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); return null; });
   // The phone door belongs to the desktop app (main/phone-link.mjs); a tab is told there is none.
   ipcMain.handle('zero:phone-link', () => null);
@@ -175,6 +180,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   const inheritedHome = appHome();
   Object.assign(process.env, storeRootEnv(config.storeRoot));
   carryMisplacedMachinery(inheritedHome, config.storeRoot);
+  keepAnswerModesIn({ userDir, storeRoot: config.storeRoot });
   const store = await new Store(config).init();
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   const window = broadcastingWindow();
@@ -196,6 +202,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
     accountRoot: config.accountRoot,
     stateFile: teamStateFile(config.storeRoot),
     onChange: () => ipc?.push?.(),
+    rooms: roomsSetup({ config, store, supervisor, userDir }),
   }) : null;
   // AND IT STOPS ITS OWN WORKERS ON THE WAY OUT, as main/main.mjs does for the
   // desktop. Control-C reaches the whole process group, so without this each
@@ -211,6 +218,23 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
 
 /** A token in the url, because the port alone is not a door key. */
 export const newToken = () => crypto.randomBytes(24).toString('base64url');
+
+/**
+ * THE PICTURES A TAB MAY DRAW: the desktop window's own rule (`servable`,
+ * main/img-scheme.mjs) over its own roots (`imageRoots`, main/main.mjs), so a
+ * door opened for a screenshot can never hand out `zero.config.json`.
+ *
+ * Pictures only. A whole document is served under a grant the pane opens one
+ * at a time (main/doc-scheme.mjs) and this copy opens none.
+ */
+export function picturesTheAppOwns({ config, store }) {
+  return {
+    allows: (kind, file) => kind === 'img' && servable(file, [
+      config?.accountRoot,
+      ...(store?.listProducts?.() ?? []).map((p) => p.repoPath),
+    ].filter(Boolean)),
+  };
+}
 
 /**
  * THE KEY THAT ONLY READS FILES. A design page runs its own scripts and can
@@ -254,14 +278,24 @@ const MIME = {
  */
 async function answerFile(req, res, url, { token, files }) {
   const [, , key, kind, ...rest] = url.pathname.split('/');
-  if (kind !== 'doc' && kind !== 'img') { res.writeHead(404).end('No such kind of file.'); return; }
+  if (kind !== 'doc' && kind !== 'img' && kind !== 'shape') { res.writeHead(404).end('No such kind of file.'); return; }
   if (!sameKey(key, fileKey(typeof token === 'function' ? token() : token))) { res.writeHead(403).end('Wrong key.'); return; }
   let file;
   try { file = path.normalize('/' + rest.map(decodeURIComponent).join('/')); } catch { res.writeHead(400).end('Bad path.'); return; }
-  if (!path.isAbsolute(file) || !files.allows(kind, file)) { res.writeHead(403).end('Not available.'); return; }
+  // A shape is asked of a picture, under the picture's own rule.
+  if (!path.isAbsolute(file) || !files.allows(kind === 'shape' ? 'img' : kind, file)) { res.writeHead(403).end('Not available.'); return; }
   let stat;
   try { stat = await fs.promises.stat(file); } catch { res.writeHead(404).end('Not there.'); return; }
   if (!stat.isFile()) { res.writeHead(404).end('Not there.'); return; }
+  // ITS WIDTH AND HEIGHT, so a picture the phone has never seen holds its
+  // place before its last byte comes (main/picture-shape.mjs).
+  if (kind === 'shape') {
+    const shape = await readPictureShape(file).catch(() => null);
+    if (!shape) { res.writeHead(404).end('Not a picture this can measure.'); return; }
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify(shape));
+    return;
+  }
   const media = mediaType(file);
   if (media) {
     const out = await mediaResponse(file, req.headers.range);
@@ -316,6 +350,14 @@ export function createHandler({ channels, token, listeners = new Set(), dist = p
     // NOR DOES THE PAGE ITSELF ASK: the tab takes the token out of its address
     // bar on load, so a reload asks for `/` bare, and refusing that drew
     // "Wrong or missing token" on every reload (tests/a-browser-tab-survives-a-reload).
+    //
+    // AND THE HOST HEADER IS NOT CHECKED, asked and answered 2026-10-24.
+    // Refusing a Host that is not localhost is the usual guard against a page
+    // whose own name resolves to this machine, and it cannot go here:
+    // main/phone-link.mjs serves this same handler to a phone through a relay
+    // or over Tailscale, where the Host is neither. The token is the key,
+    // whatever name the request arrives under
+    // (tests/the-doing-half-runs-with-no-electron).
     const guarded = url.pathname === '/events' || url.pathname.startsWith('/api/') || url.pathname === '/file-key';
     const given = req.headers['x-agentbox-token'] || url.searchParams.get('token');
     if (guarded && !sameKey(given, typeof token === 'function' ? token() : token)) {

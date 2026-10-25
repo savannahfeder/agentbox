@@ -27,6 +27,6 @@ export function offersRunNow(item: WorkItem, facts: RunNowFacts): boolean {
 
 export function runNowCommands(item: WorkItem, facts: RunNowFacts, run: () => void) {
   return offersRunNow(item, facts)
-    ? [{ id: 'run-now', label: 'Run Now', keywords: 'start go next urgent jump queue', run }]
+    ? [{ id: 'run-now', label: 'Run now', keywords: 'start go next urgent jump queue', run }]
     : [];
 }

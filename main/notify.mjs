@@ -52,10 +52,15 @@ export function markFor({ root, createFromPath }) {
 // with one sound instead of four rewrites and four chimes.
 const COALESCE_MS = 1500;
 
-export function createNotifier({ window, Notification, powerMonitor, icon = null, coalesceMs = COALESCE_MS }) {
+// `onChange` hears that what it has told you about changed: the tray counts
+// all of it (main/corner-tag.mjs), so a banner never speaks for a thread the
+// tray leaves out.
+export function createNotifier({ window, Notification, powerMonitor, icon = null, coalesceMs = COALESCE_MS, onChange = () => {} }) {
   // Everything she has not seen since she last had the window, keyed by id so
   // a repeated push is idempotent. Insertion order is arrival order.
   const unseen = new Map();
+  const toldAt = new Map();
+  const changed = () => { try { onChange(); } catch { /* the tray catches up on its next look */ } };
   let live = null;      // the one notification currently on screen, if any
   let timer = null;
   // HOW MANY TIMES SHE HAS BEEN INTERRUPTED SINCE SHE LAST HAD THE WINDOW.
@@ -83,11 +88,14 @@ export function createNotifier({ window, Notification, powerMonitor, icon = null
   // dropped rather than banked: showing them later, when she steps away, would
   // be telling her about work she already watched arrive.
   const seen = () => {
+    const had = unseen.size > 0;
     unseen.clear();
+    toldAt.clear();
     if (timer) { clearTimeout(timer); timer = null; }
     spoke = false;
     spokeAsk = false;
     takeDown();
+    if (had) changed();
   };
 
   const speak = () => {
@@ -156,34 +164,42 @@ export function createNotifier({ window, Notification, powerMonitor, icon = null
       // Asked before banking anything, so that a burst arriving while she is
       // at the app is dropped rather than saved up for when she leaves.
       if (atTheApp({ focused: focused(), idleMs: idleMs() })) return seen();
+      let banked = false;
       for (const a of arrivals) {
         if (!a || !a.id || unseen.has(a.id)) continue;
         unseen.set(a.id, a);
+        toldAt.set(a.id, Date.now());
+        banked = true;
       }
+      if (banked) changed();
       if (!unseen.size || timer) return;
       timer = setTimeout(speak, coalesceMs);
     },
     // The window came forward. Whatever was on screen is now behind her.
     seen,
+    // What it has told you about, or is about to, since you were last at the
+    // app, and when each arrived.
+    told: () => [...toldAt].map(([id, at]) => ({ id, at })),
     // Tests, and nothing else.
     _pending: () => [...unseen.values()],
     _spoken: () => ({ spoke, spokeAsk }),
   };
 }
 
-// `onArrivals` hears every arrival too, for the phone's alerts
-// (main/phone-link.mjs), which make their own call about speaking.
-export function installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage, onArrivals = () => {} }) {
+// `onArrivals` hears every arrival too, with the inbox they arrived in, for
+// the phone's alerts (main/phone-alerts.mjs), which make their own call.
+const needsYouOf = (payload) => (Array.isArray(payload.needsYou) ? payload.needsYou : []);
+export function installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage, onArrivals = () => {}, onChange = () => {} }) {
   if (Notification.isSupported && !Notification.isSupported()) {
-    ipcMain.handle('zero:notify', (_e, payload = {}) => { try { onArrivals(Array.isArray(payload.arrivals) ? payload.arrivals : []); } catch {} });
-    return { add() {}, seen() {} };
+    ipcMain.handle('zero:notify', (_e, payload = {}) => { try { onArrivals(Array.isArray(payload.arrivals) ? payload.arrivals : [], needsYouOf(payload)); } catch {} });
+    return { add() {}, seen() {}, told: () => [] };
   }
   // app.getAppPath() is the repo from source and the asar inside the bundle
   // when it is packaged, and the mark sits at the same place in both.
   const icon = nativeImage
     ? markFor({ root: app.getAppPath(), createFromPath: (p) => nativeImage.createFromPath(p) })
     : null;
-  const notifier = createNotifier({ window, Notification, powerMonitor, icon });
+  const notifier = createNotifier({ window, Notification, powerMonitor, icon, onChange });
   window.on('focus', () => notifier.seen());
   // Unlocking with Agentbox already the front app never fires 'focus' (it never
   // lost it), so without this the banner that fired while the screen was
@@ -191,7 +207,7 @@ export function installNotifier({ app, window, Notification, powerMonitor, ipcMa
   try { powerMonitor.on('unlock-screen', () => { if (window.isFocused()) notifier.seen(); }); } catch {}
   ipcMain.handle('zero:notify', (_e, payload = {}) => {
     const arrivals = Array.isArray(payload.arrivals) ? payload.arrivals : [];
-    try { onArrivals(arrivals); } catch {}
+    try { onArrivals(arrivals, needsYouOf(payload)); } catch {}
     notifier.add(arrivals);
   });
   return notifier;

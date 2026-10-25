@@ -127,6 +127,8 @@ const READY = (now) => ({ ready: [
   { id: 'w-1', title: 'Pricing page', says: 'is ready for you', since: now - 60_000 },
   { id: 'w-old', title: 'Last week', says: 'is ready for you', since: now - 6 * 24 * 3600_000 },
 ], working: 18 });
+// One that started waiting at `at`, after you last left the app.
+const NEW = (at) => ({ id: 'w-new', title: 'Login redirect', says: 'is ready for you', since: at });
 
 describe('it shows up when something needs you, and only then', () => {
   it('appears once its page is ready, when something is ready and you are in another app', () => {
@@ -183,12 +185,16 @@ describe('it shows up when something needs you, and only then', () => {
     expect(r.windows).toHaveLength(0);
   });
 
-  it('steps aside while you are in the app, and comes back when you leave it', () => {
+  it('steps aside while you are in the app, and comes back for what arrives after you leave it', () => {
     const r = rig({ focused: true });
     r.call('zero:corner-tag', READY(1_000_000));
     expect(r.windows).toHaveLength(0);
     r.main.focused = false;
     r.mainListeners.blur();
+    // What waited while you were in the app, you have seen (w-93b3a1a796).
+    expect(r.windows).toHaveLength(0);
+    r.advance(5 * 60_000);
+    r.call('zero:corner-tag', { ready: [...READY(1_000_000).ready, NEW(r.clock())], working: 18 });
     r.call('corner-tag:ready', { part: 'tag' });
     expect(r.win().visible).toBe(true);
     r.main.focused = true;
@@ -460,6 +466,9 @@ describe('the list shuts when the pointer has gone', () => {
     expect(r.win().sent.map((s) => s[0])).toContain('corner-tag:reset');
     r.main.focused = false;
     r.mainListeners.blur();
+    expect(r.win().visible).toBe(false);
+    r.advance(60_000);
+    r.call('zero:corner-tag', { ready: [...READY(1_000_000).ready, NEW(r.clock())], working: 18 });
     expect(r.win().visible).toBe(true);
     expect(r.win('card').visible).toBe(false);
   });

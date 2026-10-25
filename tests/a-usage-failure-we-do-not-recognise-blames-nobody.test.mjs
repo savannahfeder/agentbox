@@ -14,7 +14,7 @@ import { accountSentence } from '../shared/spawn-trouble.mjs';
 
 // What `claude -p /usage` printed for the lapsed login, minus the breakdown.
 const NO_LIMITS = "You are currently using your subscription to power your Claude Code usage\n\nWhat's contributing to your limits usage?\n";
-const LIMITS = 'Current session: 32% used · resets Oct 11 at 6pm (America/Los_Angeles)\n';
+const LIMITS = JSON.stringify({ rate_limits_available: true, rate_limits: { five_hour: { utilization: 32, resets_at: '2026-10-12T01:00:00Z' } } });
 
 const usage = (run) => new ClaudeUsage({ bin: () => '/bin/claude', run, where: () => '/tmp' });
 const answers = (err, stdout) => (_bin, _args, _opts, done) => done(err, stdout);

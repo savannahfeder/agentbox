@@ -1,17 +1,8 @@
-// THE FIRST RUN, on the screen. The logic with no window in it is in
-// ../onboarding.ts; this is the part that draws.
-//
-// Two halves, and they are different on purpose:
-//
-//   1. The three setup screens (welcome, folder, name) are a surface of their
-//      own, over an app that has nothing in it yet. Corner to corner is hers.
-//   2. The example task is NOT a screen. It is the real command bar, the real
-//      compose card, the real In progress tab and the real reading pane, with
-//      ONE ringed sentence beside whichever of them she is looking at. Her
-//      whole complaint on 08-21 was a sentence floating in the middle of the
-//      window with nothing holding it, so nothing here is positioned off the
-//      window: every tether is measured off the app's own rectangle, live, and
-//      re-measured when the window changes size.
+// The first run as drawn. The logic with no window in it is in ../onboarding.ts.
+// The setup screens (welcome, folder, name) are their own surface over an empty
+// app. The example task is not a screen. It is the real app with one ringed
+// sentence beside the part being taught, so every tether is measured off the
+// app's own rectangles, live, and again when the window changes size.
 
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { TeamContext } from '../team/people';
@@ -21,7 +12,7 @@ import {
   anyAgents, clearOf, finishCard, forgetAgentsWhileLookingAgain, gateRows,
   forgetFoldersWhileLookingAgain, keepSecondRead, keyName, keyToken, padFor,
   practising, pressAtWrongRow, pressCounts, readAgentsAgain, roomFor, strayClick,
-  swallowPress, wrongPress,
+  swallowPress, walkProjects, wrongPress,
   coach, nextStep, nextTab, recentFolders, ring, runOf, shortPath, stepBack,
   type AgentFile, type Coach, type FirstRun, type Rect, type RecentFolder, type Step,
 } from '../onboarding';
@@ -32,34 +23,15 @@ import { PRACTICE_NAME, PRACTICE_ROWS, PRACTICE_TASK } from '../../../shared/fir
 import { AppMark } from './AppMark';
 import { SidebarIcon } from './SidebarIcon';
 import { AskList, PlanQuestion, PlanSetupCard } from './PlanSetup';
-import { needsPlan, type Plan } from '../plan-setup';
+import { afterCheck, type EngineSetupState, type Plan } from '../plan-setup';
 import { NAME, Name } from '../../../shared/product-name.mjs';
-import { foundOnThisMac, type RunsOn } from '../../../shared/runs-on.mjs';
+import { foundOnThisComputer, type RunsOn } from '../../../shared/runs-on.mjs';
+import { chord, sayKeys } from '../this-keyboard';
 
-/**
- * THE ONE PROJECT THE LAST CARD MAY FILE INTO.
- *
- *  HER OWN, AND ONLY IT. The practice project is still in the app's list at
- *  this point and is archived a moment later by `finishRun`, so offering to
- *  file her agents into it would be a row landing in an inbox about to be
- *  swept. One project also means the home-folder section states where its rows
- *  go without drawing a picker to change it.
- *
- *  AND IT IS NAMED FROM THE WALK WHEN THE APP HAS NOT CAUGHT UP. The last step
- *  begins and the card is drawn in the same frame; the app's product list is a
- *  poll behind. MEASURED driving the real walk with this returning a filtered
- *  empty list: the card said "Make a project and they have an inbox" over a
- *  project she had made four screens earlier, and door one filed her folder
- *  agents while quietly dropping her home folder set, because that set's inbox
- *  is this project and there was no project to name. The walk made it and still
- *  holds its name and its folder, so it can say so before the list agrees. */
-function walkProject(products: Project[], run: FirstRun): Project[] {
-  const mine = products.filter((p) => p.slug === run.product);
-  if (mine.length || !run.product) return mine;
-  return [{ slug: run.product, name: run.name, repoPath: run.folder }];
-}
+/** What the walk knows about each coding agent on this computer. */
+type Readings = Array<Pick<EngineSetupState, 'engine' | 'found' | 'signedIn'>>;
 
-/** THE FOLDER GLYPH, the same one the setup card draws. */
+/** The same folder glyph the setup card draws. */
 function FolderGlyph() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -90,63 +62,16 @@ function SkipGlyph() {
 
 
 /**
- * THE QUIET WAY OUT.
+ * The quiet way out of the walk: one dim word in the practice strip, with no
+ * key cap so it never competes with the card's key. It shows only on the
+ * `practising` beats, and never without Claude Code, because the app holds the
+ * inbox shut then and leaving would change nothing.
  *
- *  So the rule is `practising`: the eleven beats the practice band is up for,
- *  from making the first task to ⌘K. The welcome, the folder, the name, the
- *  look and the three introduction slabs have none, and neither does the finish
- *  card, which is one press from the end with the confetti already falling.
- *  `hand` is the door into the practice round and it has none either: it is one
- *  press from `make`, so nobody is ever more than one press away from it.
- *
- * AND IT SITS IN THE PRACTICE STRIP, NOT IN THE CORNER OF THE APP. It was 22px
- * from the bottom right corner of the window, which during the tutorial is the
- * corner the reading pane's reply box and the app's own footer are in. The band
- * is a 38px strip the app is pushed down by, so nothing of hers is ever under
- * it, and the capsule in the middle of it is the only other thing in there.
- *
- *  ONE DIM WORD, WITH NO KEY ON IT. A cap would make it the thing to press, and
- *  every card in this walk is trying to be the thing to press. There is no
- *  keyboard route INTO it on purpose — and, since 2026-08-28, a keyboard route
- *  back OUT of the card it opens, which is a different thing and is below.
- *
- *  AND IT IS NOT SHOWN WHEN LEAVING WOULD DO NOTHING. Without Claude Code the
- *  app holds the inbox shut, so skipping the walk lands on the same held
- *  screen; a way out that does not let anybody out is worse than none.
- *
- * ---------------------------------------------------------------------------
- * WHAT MARGARETTE FOUND
- *
- * She is not an engineer and she was the first person outside the building to
- * walk this.
- *
- *  FOUR THINGS WERE HOLDING HER IN, and only the first is the one that made the
- *  card never appear. All four are fixed here or beside here.
- *
- *    1. The press never reached the page. The practice strip is a native drag
- *       region and the button sat inside it; the whole story is on
- *       `PracticeBand` below, and the fix is that the strip's drag lane now
- *       stops short of this button.
- *    2. Escape did nothing. Nothing listened for it. She said the word out loud
- *       and pressed the key. It closes the card now, and closing the card is
- *       all it does: Escape is how a dialog is dismissed everywhere on this
- *       machine, so it may not be a second way of leaving the walk.
- *    3. The card opened on "Keep going", focused, first, and drawn. Somebody
- *       who has just pressed Skip has already answered the question. The card
- *       stays — the founder settled on 2026-08-25 that skipping should be
- *       possible and low-key, and a walk that vanishes on one stray press is
- *       worse — but it opens on the door out. "Keep going" is still right
- *       there, one Tab or one click away, and is now the quiet one.
- *    4. Return did nothing either, which is worse than either button being
- *       wrong. The coaching card installs a capture-phase keydown listener that
- *       eats every cap the beat did not ask for, and Return on the `make` beat
- *       is a wrong cap, so `preventDefault` cancelled the focused button's own
- *       activation. That is fixed one file over, in `pressCounts`: a press
- *       inside this card is a press at THIS card and never at the walk.
- *
- *  The listener here is CAPTURE PHASE and it stops the event dead, for the same
- *  reason: Escape reaches App.tsx's own handlers as well, and the walk must not
- *  close a task or a palette on the way to closing this card. */
+ * The card it opens is focused on leaving, since the person already pressed
+ * Skip. Escape only closes the card. The listener is capture phase and stops
+ * the event, so App.tsx's own Escape handlers do not also close a task or a
+ * palette. Return works here because `pressCounts` treats a press inside this
+ * card as a press at the card, not at the walk. */
 export function WayOut({ run, blocked, onLeave }: {
   run: { step: Step; practice: string | null } | null;
   /** Claude Code is missing, so there is nothing to be let out into. */
@@ -176,21 +101,8 @@ export function WayOut({ run, blocked, onLeave }: {
         <div className="fr-stay-scrim" role="dialog" aria-modal="true" aria-label={COPY.leaveHead}>
           <div className="fr-stay">
             <div className="fr-stay-head">{COPY.leaveHead}</div>
-            <div className="fr-stay-line">{COPY.leaveLine}</div>
+            <div className="fr-stay-line">{sayKeys(COPY.leaveLine)}</div>
             <div className="fr-stay-row">
-              {/* THE ONE THAT LEAVES IS FIRST AND IT IS FOCUSED, because she
-                  pressed Skip. It was the other way round until a tester,
-                  and the argument for that arrangement was that the friendly
-                  shape of this card is one that recommends by drawing rather
-                  than by telling anybody off. The drawing is still how it
-                  recommends; what changed is WHICH one it recommends, and the
-                  answer to that is not the walk's to have. She said what she
-                  wanted before the card was ever on the screen.
-
-                  IT IS STILL NOT A SHOVE OUT OF THE DOOR. Nothing here got
-                  louder: the same two words, the same outline, the same quiet
-                  second button, no colour and no alarm. "Keep going" is one
-                  Tab away and is the card's whole reason for existing. */}
               <button type="button" className="fr-stay-go" autoFocus onClick={onLeave}>
                 {COPY.leaveGo}
               </button>
@@ -205,29 +117,15 @@ export function WayOut({ run, blocked, onLeave }: {
   );
 }
 
-/* * THE DOTS ARE GONE, AND THEY ARE NOT COMING BACK. Nineteen small marks used to sit across
- the foot of every screen in this walk, counting the beat.
-
-   a tester asked the same question out loud on her onboarding call on 08-24
-   ("what are the little dots at the bottom?"), and the answer built for that
-   row was a hover and an accessible name saying which step of how many. Two
-   people not understanding a thing is not a labelling problem, so the mark
-   itself is off the screen rather than explained.
-
-   `BEAT` and `N_BEATS` in ../onboarding stay, because the walk still has an
-   order and the tests still hold it to that order. NOTHING DRAWS THEM.
-
-   `DOTS_BOTTOM` and `dotsBottom` went with the component. They existed to lift
-   the row of dots off the reply box on the one beat that draws one, and there
-   is no row to lift any more.
-*/
+// THE DOTS ARE GONE, AND THEY ARE NOT COMING BACK. The walk used to count
+// its beats with a row of dots at the foot. Two people asked what they were;
+// people not understanding a thing is not a labelling problem, so the dots
+// went rather than gaining a tooltip.
 
 /**
- * THE THING, NOT ITS BOX. `.focus-actions` is a flex row as wide as the whole
- *  text column, so a ring drawn round it is a ring round nothing: that is the
- *  365 pixel miss the elbow had. An element that carries its own words IS the
- *  thing and is measured whole. An element that only holds other elements is a
- *  box, and what gets measured is the run of what is inside it. */
+ * The rectangle of the thing, not its box. An element with its own text is
+ * measured whole. An element that only holds others, like the full-width
+ * `.focus-actions` row, is measured by the run of its children. */
 function anchorOf(el: Element): Rect | null {
   const r = el.getBoundingClientRect();
   if (!r.width || !r.height) return null;
@@ -236,8 +134,6 @@ function anchorOf(el: Element): Rect | null {
     (n) => n.nodeType === 3 && (n.nodeValue ?? '').trim() !== '',
   );
   if (ownWords) return box;
-  // The measuring itself is in ../onboarding.ts, so it can be tested against
-  // the real rectangles rather than eyeballed in a window.
   return runOf(box, [...el.children].map((k) => {
     const b = k.getBoundingClientRect();
     return { x: b.left, y: b.top, w: b.width, h: b.height, position: getComputedStyle(k).position };
@@ -245,13 +141,8 @@ function anchorOf(el: Element): Rect | null {
 }
 
 /**
- * WHAT IS BESIDE THE THING. The ring grows with what it rings, and beside a
- *  button in a row of buttons there is nowhere to grow into: measured on the
- *  built walk, "close this task" and "esc back" are 10px apart. So its
- *  neighbours are measured the same way the thing itself is, off the run of
- *  their real children rather than off the flex box round them, and the pad
- *  stops halfway. Anything positioned out of flow is furniture and is skipped,
- *  which is the same rule runOf already uses. */
+ * The in-flow siblings of the ringed element, measured like `anchorOf`, so the
+ * ring's padding can stop halfway to its neighbours in a tight row of buttons. */
 function neighboursOf(el: Element): Rect[] {
   const parent = el.parentElement;
   if (!parent) return [];
@@ -262,13 +153,9 @@ function neighboursOf(el: Element): Rect[] {
 }
 
 /**
- * IS THERE ALREADY INK HERE. Everything on this screen is inside something, so
- *  "is an element under this point" answers yes everywhere and is useless. What
- *  matters is whether the point lands on WORDS, so this walks the stack under it
- *  and takes the first element carrying text of its own. The walk itself, its
- *  ring and its way out do not count, and neither does the thing being pointed
- *  at:
- *  a sentence is allowed to sit under the row it is about. */
+ * The first element under the point that has text of its own, ignoring the
+ * walk's own ring, tether and way out, and the thing being pointed at, since a
+ * sentence may sit under the row it is about. */
 function inkAt(x: number, y: number, mine: Element | null): DOMRect | null {
   const stack = typeof document.elementsFromPoint === 'function'
     ? document.elementsFromPoint(x, y)
@@ -284,15 +171,6 @@ function inkAt(x: number, y: number, mine: Element | null): DOMRect | null {
   return null;
 }
 
-/**
- * THE SOFT RING. Hers out of six shapes, 08-21. A ring round the thing itself,
- * the sentence directly under it on the thing own left edge, and no line
- * anywhere: there is nothing to route, so the pointing cannot go wrong, and it
- * looks the same in a small window as in a large one. The glow on the sentence
- * is hers in the same breath, and it is deliberately slight. */
-/**
- * THE FIRST SELECTOR THAT MATCHES, IN THE ORDER GIVEN. Measured on,
- * 2026-08-21. */
 function firstOf(selectors: string[]): Element | null {
   for (const sel of selectors) {
     const el = document.querySelector(sel);
@@ -302,75 +180,55 @@ function firstOf(selectors: string[]): Element | null {
 }
 
 /**
- * ONE KEY CAP, WITH ITS NAME ON IT WHEN THE GLYPH DOES NOT SAY ITS OWN NAME.
- *
- *  THE NAME GOES INSIDE THE CAP, not beside it. A word next to a bordered box
- *  is two things to read and invites the question of whether the word is part
- *  of the sentence; a word inside the border is the key, drawn the way the key
- *  is labelled on the keyboard she is looking at. It is also why this is one
- *  component rather than a second way of drawing a key: every cap in the walk
- *  goes through here, so a cap can never appear with the name and without it on
- *  two screens of the same walk.
- *
- *  WHICH CAPS GET A NAME IS `keyName` IN onboarding.ts and the reasoning is
- *  written out there. In short: ⇥ and ↵, and nothing with a letter on it. */
+ * One key cap, with the key's name inside it when the glyph does not say it
+ * (`keyName` in onboarding.ts decides which). Every cap in the walk is drawn
+ * here so they all look the same, and every one is in the glyphs the keyboard
+ * in front of it has: ⌘↵ on a Mac, Ctrl+Enter where there is no ⌘. */
 export function Cap({ cap, className }: { cap: string; className?: string }) {
-  const name = keyName(cap);
+  const shown = chord(cap);
+  const name = keyName(shown);
   return (
     <kbd className={className}>
-      {cap}
+      {shown}
       {name ? <span className="fr-cap-word">{name}</span> : null}
     </kbd>
   );
 }
 
 /**
- * THE CARD ITSELF. Two lines, and the key in the loud one is drawn as a key.
- * the accompanying text was "the biggest weakness", so the quiet line says
- * where you are and the loud line says the one thing to press, and neither has
- * to do the other's job. */
+ * The coaching card. The quiet line says where you are and the loud line says
+ * the one key to press. */
 function Card({ say, beat, pointed, knock = 0, onNext, onSkip }: {
   say: Coach;
-  /**
-   * WHAT NEXT DOES, on the two look-around cards (2026-10-06). ↵ does the same
-   * and never reaches the app, where it would open whichever row is selected. */
+  /** Next on the look-around cards. ↵ does the same and never reaches the app,
+   * where it would open the selected row. */
   onNext?: () => void;
   /** The quiet way past this one card, drawn on every coaching card. */
   onSkip?: () => void;
-  /**
-   * HOW MANY STRAY CLICKS THE WALK HAS ANSWERED ON THIS BEAT, from `Ringed`.
-   *  It rides into the same counter a wrong KEY bumps, so the cap answers a
-   *  click on the wrong thing with the one gesture it already has for pressing
-   *  the wrong thing. Two rules that feel like two rules is what the founder
-   *  asked us not to build; there is one answer here and it is hers. */
+  /** Stray clicks answered on this beat, from `Ringed`. Added to the same
+   * counter a wrong key bumps, so both get the same pulse. */
   knock?: number;
-  /**
-   * THE ROWS THIS BEAT'S KEY IS RIGHT FOR, and the row the keys would land on.
-   *  The right key aimed at a row the beat is not about is answered exactly as a
-   *  wrong key is, and for the reason `pressAtWrongRow` gives: the alternative
-   *  is the app printing a second instruction under a card that is still giving
-   *  the first one, which is what she photographed on 2026-08-27. */
+  /** The rows this beat's key is right for, and the row the keys would land
+   * on. The right key at the wrong row is answered as a wrong key
+   * (see `pressAtWrongRow`). */
   beat?: string[];
   pointed?: string | null;
 }) {
-  // HER TWO NOTES ON THE FEEL, BUILT RATHER THAN DESCRIBED (2026-08-23).
-  // A wrong press pulses the cap and never shakes it; a cap nobody has touched
-  // starts breathing after four seconds. `onboarding.ts` holds the rules and
-  // the reasons.
+  // A wrong press pulses the cap, and an untouched cap starts breathing after
+  // a while. The rules are in onboarding.ts.
   const [wrong, setWrong] = useState(0);
   const [breathe, setBreathe] = useState(false);
-  // WHERE THE KEYS WOULD LAND, READ AT THE MOMENT OF THE PRESS. A ref rather
-  // than a dependency: the pointed row changes every time the mouse crosses a
-  // row, and re-registering the listener on each of those would restart the
-  // breathing clock at somebody who is standing still.
+  // A ref, not an effect dependency: the pointed row changes whenever the mouse
+  // crosses a row, and re-registering the listener would restart the breathing
+  // clock.
   const aim = useRef<{ beat: string[]; pointed: string | null }>({ beat: [], pointed: null });
   aim.current = { beat: beat ?? [], pointed: pointed ?? null };
   const next = useRef(onNext);
   next.current = onNext;
-  // ANY KEY, OR A CLICK INSIDE WHAT IS RINGED, MOVES ON (2026-10-06). Before
-  // the field rule below, because on the ⌘K beat the typing cursor is in the
-  // list's own search field and every key lands there. A lone modifier is not
-  // a press. Nothing reaches the list, so no command runs by accident.
+  // On an any-key card, any key or a click in the palette moves on, and the
+  // event is stopped so no command runs by accident. This is registered before
+  // the field rule below because on the ⌘K beat the cursor is in the palette's
+  // search field.
   useEffect(() => {
     if (!say.anyKey) return;
     const move = (e: Event) => {
@@ -402,9 +260,7 @@ function Card({ say, beat, pointed, knock = 0, onNext, onSkip }: {
     setBreathe(false);
     if (!say.key) return;
     let live = true;
-    // THE CLOCK RESTARTS ON EVERY PRESS, right or wrong. Somebody pressing
-    // things is somebody who has found the cap, and breathing at them is the
-    // walk nagging.
+    // The breathing clock restarts on every press, right or wrong.
     let idle = setTimeout(() => { if (live) setBreathe(true); }, BREATHE_AFTER_MS);
     const on = (e: KeyboardEvent) => {
       if (!pressCounts(e.target)) return;
@@ -412,7 +268,6 @@ function Card({ say, beat, pointed, knock = 0, onNext, onSkip }: {
       setBreathe(false);
       clearTimeout(idle);
       idle = setTimeout(() => { if (live) setBreathe(true); }, BREATHE_AFTER_MS);
-      // ↵ ON A CARD WITH ITS OWN NEXT IS THE CARD'S, and stops here.
       if (say.next && keyToken(e) === say.key && next.current) {
         e.preventDefault();
         e.stopPropagation();
@@ -420,24 +275,11 @@ function Card({ say, beat, pointed, knock = 0, onNext, onSkip }: {
         next.current();
         return;
       }
-      // A WRONG PRESS IS ANSWERED AND THEN STOPPED.This used to pulse the cap
-      // and then hand the press to the app exactly as it would have had it,
-      // which is how one stray E closed a real row and took the lesson with it.
-      //
-      // ON THE WAY DOWN, NOT ON THE WAY UP. The listener is in the capture
-      // phase, so it runs before the app's own window handlers no matter which
-      // order the two were registered in, and `stopImmediatePropagation` stops
-      // the ones sharing this window with it. `swallowPress` decides; the rule
-      // and everything it deliberately lets through are in `onboarding.ts`. AND
-      // THE RIGHT KEY ON THE WRONG ROW IS THE SAME ANSWER. E is the key this
-      // beat asks for, so `wrongPress` below says nothing about it and the
-      // press used to go through to the app, where `closingRefused` stopped it
-      // and printed a sentence in a toast. The card was still saying press E at
-      // the time.
-      //
-      // Same treatment as her wrong key, so there is one instruction on the
-      // screen and never two: the press does not reach the app, the cap pulses,
-      // and the ring stays on the row the beat is about.
+      // A wrong press pulses the cap and is stopped before the app sees it, and
+      // so is the right key aimed at the wrong row. The listener is capture
+      // phase so it runs before the app's window handlers whatever the
+      // registration order. `swallowPress` in onboarding.ts decides what is
+      // stopped.
       if (keyToken(e) === say.key && pressAtWrongRow(aim.current.beat, aim.current.pointed)) {
         setWrong((n) => n + 1);
         if (pressCounts(e.target)) {
@@ -448,7 +290,7 @@ function Card({ say, beat, pointed, knock = 0, onNext, onSkip }: {
         return;
       }
       if (!wrongPress(say.key, e)) return;
-      // THE BEAT'S SECOND KEY IS NOT A WRONG ONE (2026-10-06): E beside R.
+      // A beat's second key, like E beside R, is not a wrong press.
       if (say.alt && keyToken(e) === say.alt) return;
       setWrong((n) => n + 1);
       if (swallowPress(say.key, e, e.target)) {
@@ -460,20 +302,13 @@ function Card({ say, beat, pointed, knock = 0, onNext, onSkip }: {
     window.addEventListener('keydown', on, true);
     return () => { live = false; clearTimeout(idle); window.removeEventListener('keydown', on, true); };
   }, [say.key, say.next]);
-  // The count is the key on the element, so two wrong presses in a row really
-  // are two pulses: a class toggled off and on again inside one frame is a
-  // class React never draws.
-  //
-  // A WRONG KEY AND A STRAY CLICK COUNT INTO THE SAME NUMBER, which is what
-  // makes them one answer rather than two.
+  // Wrong keys and stray clicks share one count. It keys the cap, so each one
+  // replays the pulse, where a class toggled off and on in one frame is never
+  // drawn.
   const pulse = wrong + knock;
   return (
     <>
-      {/* AND A BEAT MAY HAVE NO GREY LINE AT ALL (w-45e9cd9573, 2026-08-28). Three beats say
-         nothing here now, so the span is not drawn rather than drawn empty: an empty one is
-         still a 21px block above the instruction, which reads as a card that lost a
-         sentence.
-       */}
+      {/* Not drawn when empty, because an empty span still takes a line. */}
       {say.quiet ? <span className="fr-quiet">{say.quiet}</span> : null}
       <span className={say.quiet ? 'fr-loud' : 'fr-loud fr-alone'}>
         {say.lead}
@@ -486,8 +321,8 @@ function Card({ say, beat, pointed, knock = 0, onNext, onSkip }: {
         )}
         {say.tail}
       </span>
-      {/* THE LOOK AROUND'S OWN WAY ON (2026-10-06). The cap rides on the button
-          so the key and the click are one thing on the card. */}
+      {/* On look-around cards the cap sits on the Next button, so the key and
+          the click read as one control. */}
       {say.next && onNext ? (
         <button type="button" className="fr-next" onClick={onNext}>
           Next
@@ -500,56 +335,18 @@ function Card({ say, beat, pointed, knock = 0, onNext, onSkip }: {
           )}
         </button>
       ) : null}
-      {/* AND NOTHING UNDER THE LIGHTS ANY MORE. There was a third line here, a `why` under a
-         hairline rule, and it is gone from every beat of the walk (w-9a6ea066d6,
-         2026-08-28). What each of the four `why` lines said is folded into the two that
-         remain; `coach` in onboarding.ts names them one by one.
-       */}
       {say.caps && say.key ? <Lights of={say.caps} cap={say.key} left={beat?.length} /> : null}
-      {/* THE WAY PAST THIS ONE CARD (2026-10-06), hers: "a very subtle little
-          button on each card that allows you to skip it". Small, dim, in the
-          card's corner, so the instruction stays the thing to read. */}
       {onSkip ? <button type="button" className="fr-skip-step" onClick={onSkip}>Skip this step</button> : null}
     </>
   );
 }
 
 /**
- * THE LIGHTS.
- *
- *  WHAT FILLS THEM IS THE APP, NOT A COUNTER OF KEY PRESSES. The beat is over
- *  when three rows have gone, so the lights count the rows that are left rather
- *  than the times somebody hit E. A press that closed nothing, an E typed into
- *  a field, a row closed with the mouse instead: all three would put a counter
- *  out of step with the screen, and a progress bar that disagrees with what is
- *  in front of you is worse than none.
- *
- *  AND IT COUNTS THE BEAT'S OWN ROWS, NOT EVERY ROW ON THE SCREEN. This read
- *  `document.querySelectorAll('.list-pane .row').length` and subtracted it from
- *  the number of lights, which is right only while the list holds exactly the
- *  rows this beat is about. It has not held that since the snooze row went in
- *  on 2026-08-24: the clearing beat draws TWO lights over FOUR rows, so `2 - 4`
- *  is negative, the floor at zero catches it, and neither light has ever filled
- *  in on anybody's walk. MEASURED 2026-08-27: four rows nothing lit, three rows
- *  nothing lit, two rows nothing lit. The shot in the harness called
- *  "the first light filled in" is a photograph of two empty keys.
- *
- *  `left` is `beat.length` from the app, which is the finished rows still in
- *  the drawn inbox. So this is still the app being read rather than a tally of
- *  key presses, which is the part that matters and the reason for the paragraph
- *  above; it is just being read off the right rows. The DOM count stays as the
- *  fallback for a caller that names no rows.
- *
- *  It reads the list on the same 200ms beat `Ringed` re-measures on, for the
- *  same reason: nothing tells this component that a row went.
- *
- *  AND THESE CAPS ARE NOT NAMED, unlike the one in the line above them. A light
- *  is a counter, not an instruction: the line has already said which key and,
- *  where the glyph needed it, what the key is called (`Cap`, and `keyName` in
- *  onboarding.ts). Printing the name twice on the same card would widen a row
- *  of two boxes into a row of two sentences, on the one beat the founder
- *  already told us carries too much text. The only beat with lights is `clear`,
- *  whose cap is E, which has no name in the map anyway. */
+ * Progress dots that count the beat's rows still in the inbox, not key
+ * presses, so they never disagree with the screen. `left` is `beat.length`
+ * from the app. Counting every `.list-pane .row` is only a fallback, because
+ * the list holds rows the beat is not about. With no `left` it polls every
+ * 200ms, since nothing tells this component a row went. */
 function Lights({ of, cap, left: given }: { of: number; cap: string; left?: number }) {
   const [seen, setSeen] = useState(of);
   useEffect(() => {
@@ -562,9 +359,6 @@ function Lights({ of, cap, left: given }: { of: number; cap: string; left?: numb
   const left = given ?? seen;
   const lit = Math.max(0, Math.min(of, of - left));
   return (
-    // DOTS, NOT KEYS (2026-10-01). Two more E caps under "Press E to close it"
-    // showed a persona test "E E", two keys where one was meant. A dot is a count
-    // and nothing else; the key is already named once on the line above.
     <span className="fr-lights" aria-hidden="true" data-key={cap}>
       {Array.from({ length: of }, (_, i) => (
         <i key={i} className={i < lit ? 'fr-dot fr-lit' : 'fr-dot'} />
@@ -574,48 +368,10 @@ function Lights({ of, cap, left: given }: { of: number; cap: string; left?: numb
 }
 
 /**
- * WHERE THE CARD SETTLES. Her first complaint about it was never the ring, it
- *  was "they're sometimes touching the borders of their tasks", so after the
- *  card is placed it is pushed down off anything the app drew with a border of
- *  its own until it clears by FLOOR. Measured in the window rather than
- *  guessed, because the thing it has to clear is whatever she has on screen. */
-/**
- * AND THE OTHER WAY, WHEN THE CARD RUNS OFF THE BOTTOM OF THE WINDOW.
- *
- *  `ring` decides whether the card goes under the thing or over it by asking
- *  whether TWO LINES fit below (`LINE_H * 2 + 16 <= view.h`), and that estimate
- *  is the whole of it. Most beats really are two lines and it has been right
- *  since the walk was built. Beat thirteen's second half is not: it carries a
- *  quiet line, a lead line and a `why` under a rule, five lines all told, and
- *  the thing it points at is the strip of options on the floor of the reading
- *  pane. Photographed on 2026-08-24 at 1752x986: the ring finished at 904, the
- *  card started at 922 with 64px of room, and the sentence printed at 1113 with
- *  the bottom half of it off the screen.
- *
- *  MEASURED, NOT ESTIMATED AGAIN. A second guess at how tall a card is going to
- *  be would be the same bug with a better number in it. This runs after the
- *  card is really on the screen, reads its real height, and lifts it by exactly
- *  what hangs over. Nothing moves on any beat that already fits, which is every
- *  beat that was ever shot before this one. */
-/*
- * AND THE SECOND WAY A CARD OVERHANGS IS ONTO THE THING IT IS ABOUT. `ring`
- * places the sentence above rather than below when two lines will not fit
- * under the thing, and it reserves exactly ONE line of room up there (`ty = y
- * - TEXT_GAP - LINE_H`). That is the same estimate the paragraph above says
- * never to make twice: a card is a quiet line and a loud line and its own
- * padding, so one line of room leaves the bottom of it on top of whatever the
- * ring is round.
- *
- *  MEASURED on the beat that teaches how a task ends, the first beat ever to
- *  flip above, at 1752x986: the ring on the reply box ran 885 to 955, the card
- *  started at 845, and its bottom printed 27 points inside the box the same
- *  sentence invites her to type in. The rig prints that overlap as `overDock`
- *  and it is the number this clears.
- *
- *  So the same measurement the window overhang gets: read the card's real
- *  height once it is on the screen, and take whichever of the two overhangs is
- *  worse. A beat whose card sits under its ring is untouched, which is every
- *  beat but one. */
+ * Lifts a placed card by its real, measured height when it hangs off the
+ * bottom of the window or, for a card placed above its ring, onto the ringed
+ * thing. `ring` only estimates card height, so this runs once the card is on
+ * the screen. */
 function lift(card: HTMLElement | null, geo: { ring: { y: number }; below: boolean } | null = null): number {
   if (!card) return 0;
   card.style.removeProperty('--fr-lift');
@@ -624,83 +380,37 @@ function lift(card: HTMLElement | null, geo: { ring: { y: number }; below: boole
   const onto = geo && !geo.below ? Math.round(box.bottom - (geo.ring.y - TEXT_GAP)) : 0;
   const over = Math.max(off, onto);
   if (over <= 0) return 0;
-  // Never off the top instead: a card that has nowhere to go stays where it is
-  // and loses its bottom, which is at least the half with the key in it.
+  // Never off the top. A card with nowhere to go loses its bottom instead,
+  // which keeps the line with the key.
   const up = Math.min(over, Math.max(0, box.top - FLOOR));
   if (up <= 0) return 0;
   card.style.setProperty('--fr-lift', `${-up}px`);
   return up;
 }
 
-/* * ------------------- THE LIST OPENS A GAP FOR THE CARD ---------------------
- w-45e9cd9573, 2026-08-28.
-
-   WHAT WAS MEASURED, on the built walk at 1752x986, as the distance from the
-   edge of the ring to the edge of the card:
-
-     eighteen beats     18px
-     the note           99px
-     the snooze beat   107px
-     the second close  182px
-     the first close   256px
-
-   Eighteen is the design. 256 is a card sitting under four rows saying "This
-   one is finished", with the ring on the first row and three other rows in
-   between, each of them a candidate for "this one". The card was nearer the
-   rows it did NOT mean than the one it did.
-
-   WHY IT HAPPENED, and the old fix was right about the problem. `UNDER` drops
-   the card below the whole stack, because a card hung 18px under the first of
-   four rows prints across the second and third: "two of the three tasks she was
-   being told to clear sat behind the words telling her to clear them". So the
-   choice was cover a row or leave the ring behind, and it took the second.
-
-   THIS IS THE THIRD OPTION AND IT COSTS NOTHING. The rows under the ringed one
-   slide down by exactly the height of the card, the card sits in the gap they
-   left, 18px under its own ring, and nothing is covered. It is the app making
-   room for the sentence rather than the sentence going to find room, which is
-   what "the user stays in flow" asks for: the eye never leaves the row it is
-   being told about.
-
-   The rows move, they do not disappear, and they come straight back when the
-   beat does. `clearRoom` runs on every placement and on unmount, so a beat that
-   ends leaves no attribute and no variable behind.
-*/
-
+/** Puts back a list that an older build shifted down to make room for the
+ * card. It runs on every placement and on unmount. */
 function clearRoom(): void {
   for (const el of document.querySelectorAll('[data-fr-room]')) el.removeAttribute('data-fr-room');
   const pane = document.querySelector('.list-pane') as HTMLElement | null;
   pane?.style.removeProperty('--fr-room');
 }
 
-/* `makeRoom`, which slid the rows under the ringed one down by the card's
-   height, is deleted (w-ec62ab6b38). The card floats over the list now; see
-   the comment where it was called. `clearRoom` above stays so a list left
-   shifted by an older build is put back. */
-
 /**
- * WHERE A CARD THAT SITS BESIDE ITS RING STARTS. The right edge of the tab
- *  strip, or of the ring if the strip is somehow not drawn, plus a gap. Read
- *  off the strip rather than off the ring so the card holds one position
- *  across all three of the beat's presses. */
-/*
- * THE BAR IT STANDS OFF IS A PARAMETER, AND THE TAB TOUR IS THE ONLY CALLER
-    LEFT (w-175e109e7c, 2026-09-01). It became a parameter on 2026-08-28 for the
-    beat that teaches how a task ends, which had the tab tour's shape: a ring on
-    one control in a row of them, where hanging the card off that one control
-    prints it over its neighbour.
-
-    That beat no longer stands beside anything. The row of buttons it was about
-    was taken out of the reading pane on 2026-08-27, so its ring is the reply box
-    now and its card goes above rather than beside. The argument stays because
-    the next beat that needs it will need it for the same reason, and the tabs
-    stay the default because they are what is asking today. */
+ * Where a card beside its ring starts: past the right edge of the bar `sel`,
+ * or of the ring if that is further, plus a gap. Reading the bar keeps the
+ * card in one place across every press of the tab tour. */
 function besideLeft(geo: { ring: { x: number; w: number } }, sel = '.tabs'): number {
   const all = [...document.querySelectorAll(sel)];
   const bar = all.length ? all[all.length - 1].getBoundingClientRect().right : 0;
   return Math.round(Math.max(geo.ring.x + geo.ring.w + 10, bar) + 26);
 }
 
+/**
+ * Pushes a placed card down until it clears anything bordered just above it
+ * (`FLOOR_OF`) by `FLOOR`. It only looks at gaps of -40 to 200px, so a card
+ * lying fully over a row is left alone rather than pushed further into the
+ * list. */
 function settle(card: HTMLElement | null): number {
   if (!card) return 0;
   card.style.removeProperty('--fr-drop');
@@ -724,32 +434,13 @@ function settle(card: HTMLElement | null): number {
 }
 
 /**
- * THE VEIL, WITH ITS HOLE ON THE RING.
- *
- *  The hole is a mask rather than a cut, so its edge is a fade and not a
- *  rectangle: a hard-edged spotlight is the shape every other product's tour
- *  uses and it is what her design law calls a dense screen.
- *
- *  AN ELLIPSE ROUND THE RING, NOT A CIRCLE ON ITS LONGEST SIDE. A row in the
- *  list is about a thousand pixels wide, so a circle big enough to clear it is
- *  bigger than the window and nothing is dimmed at all. */
-/*
- * AND IT IS WHAT THE WALK ANSWERS A STRAY CLICK WITH. a tester clicked into
- * other agents' conversations while the card told her what to press, and the
- * founder's answer is that the walk should not let her. A click that does
- * nothing AT ALL is a dead app, so the refusal has to say something, and the
- * one thing worth saying is where to look: for 620ms — WRONG_MS, the same half
- * second a wrong key gets — the veil deepens, so everything she reached for
- * goes quiet and the one thing she is meant to press does not.
- *  the wrong thing — everything else recedes from it instead. */
+ * The dimming veil, with a soft elliptical hole on the ring. An ellipse,
+ * because a circle wide enough for a list row is wider than the window. A
+ * stray click deepens it briefly, so the eye goes back to the ringed thing. */
 function Veil({ box, knocked = '' }: {
   box: { x: number; y: number; w: number; h: number } | null;
-  /**
-   * ' fr-knock' while the walk is answering a stray click, and empty the rest
-   *  of the time. It arrives as the class rather than as a count because the
-   *  caller keys this component on the same count, and one number cannot be
-   *  read two ways in one place without somebody later reading it the wrong
-   *  one. */
+  /** ' fr-knock' while a stray click is being answered, otherwise empty. A
+   * class, not a count, because the caller already keys this on the count. */
   knocked?: string;
 }) {
   if (!box) return <div className={`fr-veil${knocked}`} aria-hidden="true" />;
@@ -766,28 +457,6 @@ function Veil({ box, knocked = '' }: {
   );
 }
 
-/*
- * AND ONE BEAT PUTS THE CARD BESIDE THE RING RATHER THAN UNDER IT.
-   Everything the walk points at until the last beat sits in the middle of the
-   window with room under it, so hanging the card off the bottom of the ring has
-   always been right. The tab strip is not like that: it is the top inch of the
-   window and what is directly under it is the list, so a card hung under a tab
-   lands on the rows.
-
-   PHOTOGRAPHED BEFORE IT WAS FIXED (2026-08-24, 1752x986): on the In progress
-   tab the card printed over the one row it was talking about, "Delete 340 lines
-   of dead code?", and on Closed it covered the first of the three. A card
-   describing something it is standing on top of is the fault this whole round
-   is about, so it cannot ship on the beat that fixes it.
-
-   `settle` does not catch this and should not be widened to. It exists for a
-   card resting just BELOW a row and touching it, and its window is a gap of
-   -40 to 200; a card fully over a row measures -192 and is skipped on purpose,
-   because a general "push it clear" rule would push this one further into the
-   list rather than out of it.
-
-   So the card goes to the right of the ring, vertically centred on it, out in
-   the empty half of the strip the tabs live in. */
 /** How long a beat may have nothing to point at before its card is printed anyway. */
 const ADRIFT_MS = 900;
 
@@ -797,9 +466,7 @@ function adriftAt(): { x: number; y: number; w: number } {
   const r = pane ? pane.getBoundingClientRect() : null;
   const bar = document.querySelector('.th-bar');
   const head = bar ? bar.getBoundingClientRect().bottom + 28 : (r && r.height > 0 ? r.top + 48 : 120);
-  // AND UNDER THE ROWS, NOT ON THEM (2026-10-06). The ⌘K beat has nothing to
-  // ring in the default layout and its card was printed across the first two
-  // threads of the list. Below the last row, while that still leaves room.
+  // Below the last row when there is room, so the card does not cover threads.
   const rows = document.querySelector('.list-pane .list');
   const under = rows ? rows.getBoundingClientRect().bottom + 28 : 0;
   const top = under > head && under < window.innerHeight - 200 ? under : head;
@@ -821,54 +488,36 @@ function Ringed({
   onNext?: () => void;
   /** The quiet "Skip this step". See `Card`. */
   onSkip?: () => void;
-  /**
-   * THE LIST OPENS A GAP RATHER THAN THE CARD LEAVING ITS RING. See
-   *  `makeRoom` above for the measurements. This is set on the beats that ring
-   *  one row out of a stack, and it REPLACES `underSel` on them: a beat cannot
-   *  do both, because dropping the card below rows that have just moved down
-   *  chases them down the window. */
+  /** Set on beats that ring one row out of a stack. It overrides `underSel`,
+   * so the card stays by its ring instead of dropping below the stack. */
   makesRoom?: boolean;
   beside?: boolean;
-  /**
-   * Stand the card off the RING rather than off the tab strip. Only the last
-   *  beat wants this; see the note beside `left` below. */
+  /** Stand the card off the ring rather than off a bar of controls. */
   besideRing?: boolean;
-  /** WHICH ROW OF CONTROLS TO CLEAR, when it is not the tabs. See `besideLeft`. */
+  /** The bar of controls to clear when it is not the tabs. See `besideLeft`. */
   besideOf?: string;
-  /*
-   * Passed straight through to the card, which is where the press is answered.
-     See `Card` and `pressAtWrongRow`. */
+  /** Passed through to `Card`, which answers the press. */
   beat?: string[]; pointed?: string | null;
-  /**
-   * WHETHER THE APP IS HELD TO THIS BEAT, which is `practising` and nothing
-   *  else: the eleven beats the practice band is up for. The setup screens, the
-   *  look picker, the introduction slabs and the finish card are not the app
-   *  and have nothing to wander into. */
+  /** Hold the app to this beat. True exactly when `practising`. */
   hold?: boolean;
   /** The second thing this beat is about, when its card names one. `ALSO`. */
   also?: string[];
 }) {
   const [geo, setGeo] = useState<ReturnType<typeof ring> | null>(null);
-  // WHERE THE CARD GOES WHEN THE THING IT POINTS AT IS NOT ON THE SCREEN.
+  // Where the card goes when the thing it points at is not on the screen.
   const [adrift, setAdrift] = useState<{ x: number; y: number; w: number } | null>(null);
   const lostAt = useRef<number | null>(null);
   const cardRef = useRef<HTMLParagraphElement>(null);
-  // HOW MANY STRAY CLICKS THIS BEAT HAS ANSWERED. It is a count rather than a
-  // flag for the reason the cap's own count is: the class comes off with the
-  // element, so two clicks in a row really are two answers, where a class
-  // toggled off and on inside one frame is a class React never draws.
+  // Stray clicks answered on this beat. A count, not a flag, because the count
+  // keys the element: two quick clicks remount it twice, where a class toggled
+  // off and on in one frame is never drawn.
   const [knock, setKnock] = useState(0);
   useEffect(() => { setKnock(0); }, [selector.join('|')]);
 
   useLayoutEffect(() => {
     let live = true;
-    /* A BEAT WITH NOTHING TO POINT AT STILL SAYS WHAT TO DO (2026-10-01).
-       This returned nothing, and a persona test on the team build sat on a
-       blank inbox for over thirty seconds after "Start the tutorial", because
-       the first beat's button was drawn under a name this list did not know.
-       So after a short grace, long enough for the render between two beats,
-       the card is printed with no ring at the top of the list. It stays quiet
-       while something else is open over the app, which is the rule below. */
+    // A beat with nothing to point at still prints its card, with no ring,
+    // after ADRIFT_MS, unless something is open over the app.
     const lost = () => {
       setGeo(null);
       if (document.querySelector('.modal-backdrop')) { lostAt.current = null; setAdrift(null); return; }
@@ -880,13 +529,8 @@ function Ringed({
       if (!live) return;
       const el = firstOf(selector);
       if (!el) { lost(); return; }
-      // AND NOT OVER WHATEVER SHE HAS OPENED ON TOP OF THE APP.The walk draws
-      // at z-index 301, above the palette and the compose card, so a ring
-      // round a row behind ⌘K cut across the palette and its sentence ran
-      // underneath it. When something is open over the app the coaching line
-      // draws only if the thing it is pointing at is INSIDE that thing, which
-      // is the compose card step, and otherwise it waits. The walk has not
-      // stopped, it is just not talking over her.
+      // The walk draws above any modal, so while one is open it draws only if
+      // its target is inside that modal, and otherwise waits.
       const over = [...document.querySelectorAll(".modal-backdrop")];
       if (over.length && !over.some((o) => o.contains(el))) { lostAt.current = null; setAdrift(null); setGeo(null); return; }
       const box = anchorOf(el);
@@ -898,24 +542,13 @@ function Ringed({
       const view = { w: window.innerWidth, h: window.innerHeight };
       const room = roomFor(box, neighboursOf(el));
       const g = ring(box, { left: br ? br.left : 0, right: br ? br.right : view.w }, view, room);
-      // A CARD UNDER A WIDE THING COVERS WHAT IS UNDER THE WIDE THING. On beat
-      // nine the ring is on the first of three waiting rows and the card landed
-      // squarely on the second and third, so two of the three tasks she was
-      // being told to clear sat behind the words telling her to clear them.
+      // With `underSel`, the card drops below that whole element so it does not
+      // cover the rows under the ringed one.
       const under = underSel && !makesRoom ? document.querySelector(underSel) : null;
       if (under) g.text.y = Math.round(under.getBoundingClientRect().bottom + padFor(box) + TEXT_GAP);
-      // AND THEN LOOK WHETHER ANYTHING IS ALREADY THERE. Three points across the
-      // first line, because one point in the middle of a line misses a title
-      // that stops short of it. Four tries, so a stack of rows is walked rather
-      // than only its first.
-      //
-      // A BEAT THAT OPENS A GAP DOES NOT ALSO RUN THIS, and that is not a
-      // preference. The rows below the ring have moved down by the height of
-      // the card; if the card then walked down off the ink it finds, the next
-      // pass would move the rows again from the card's new place and the two
-      // would chase each other down the window. The gap already guarantees
-      // there is nothing under the card, which is the only thing this loop is
-      // for.
+      // Step the card down off any text already there. It probes three points
+      // across the first line, since a short title can miss the middle one, and
+      // tries four times so it can walk past a stack of rows.
       if (g.below && !under && !makesRoom) {
         for (let i = 0; i < 4; i += 1) {
           const xs = [g.text.x + 4, g.text.x + Math.min(g.text.w, 300) / 2, g.text.x + Math.min(g.text.w, 300) - 4];
@@ -929,64 +562,32 @@ function Ringed({
         }
       }
       setGeo(g);
-      // AND THE GAP IS RE-OPENED ON EVERY PASS OF THIS LOOP, not only when this
-      // component happens to render. It was in a layout effect for one build
-      // and photographed: on the FIRST shot of the clearing beat the four rows
-      // sat at 258, 333 and 408, exactly where they start, and on the next shot
-      // of the SAME beat they were at 456, 531 and 605 with the gap fully open.
-      // The rows arrive at that beat, so React builds new elements for them,
-      // and an attribute this file put on the old element goes with it. The
-      // mark has to be re-applied against whatever is on the screen now, which
-      // is the same reason everything else here is measured on a loop rather
-      // than remembered.
-      // THE LIST NO LONGER MOVES (w-ec62ab6b38, 2026-09-28). The tutorial card
-      // is an overlay, and opening a gap for it made it take up space and push
-      // the list out of the way. So the card still sits just under the row it
-      // names and floats over the rows below; `makeRoom` is never called.
+      // The card floats over the rows below its ring. The list never moves.
       clearRoom();
     };
     measure();
-    // The thing being pointed at moves: the compose card grows as she types,
-    // the reading pane actions sit wherever the body ended. A frame loop is
-    // the only honest way to stay on it, and it stops when the step does.
+    // The target moves (the compose card grows as she types), so it is
+    // re-measured on a timer until the step ends.
     const t = setInterval(measure, 200);
     window.addEventListener('resize', measure);
     return () => { live = false; clearInterval(t); window.removeEventListener('resize', measure); };
   }, [selector.join('|'), boundsSel, underSel, makesRoom]);
 
-  // AND ONCE MORE THE MOMENT THE CARD IS REALLY ON THE SCREEN, so the first
-  // frame of a beat does not wait up to 200ms for the loop above. Its depth is
-  // the card's own height and nothing but the card knows that, which is why
-  // this runs after the placement rather than inside it, the same as `lift`.
   useLayoutEffect(() => {
     clearRoom();
   });
-  // AND THE GAP CLOSES WHEN THE WALK STOPS, whatever happened. Nothing in the
-  // list is left transformed and no variable is left on the pane.
   useLayoutEffect(() => () => clearRoom(), []);
 
-  // WHETHER THE RING IS ACTUALLY ON THE SCREEN, read at the moment of a click
-  // rather than watched. A ref so the listener below is registered once per
-  // beat: `geo` is re-measured every 200ms and a dependency on it would tear
-  // the listener down and stand it up again five times a second.
+  // A ref, so the click listener below is registered once per beat rather
+  // than every time `geo` is re-measured.
   const drawn = useRef(false);
   drawn.current = !!geo;
 
-  /* --------------- AND A CLICK IS HELD THE WAY A KEY IS ------------------ */
-  /* CAPTURE PHASE, ON THE WINDOW.
-
-     AND IT HOLDS NOTHING WHILE THERE IS NOTHING DRAWN TO POINT AT. `drawn` is
-     false in the render between two beats and while something the beat is not
-     about is open over the app. In that state the walk has no ring to send
-     anybody back to, so a swallowed click would be a click that did nothing
-     with nothing to look at, which is the dead app this is trying not to be.
-  */
-  // AND A LOOK-AROUND CARD HOLDS EVERY CLICK ON THE APP (2026-10-06). Its ring
-  // is something to look at, the list or the tabs, not something to press:
-  // a click on a thread inside the ringed list opened it, and the walk was
-  // left with no way back. Hers: "I clicked into a page prematurely and got
-  // stuck here". Only its own Next moves it on, so a click anywhere else
-  // nudges the card the way a wrong key does.
+  // Stray clicks are held in the capture phase on the window, the way a wrong
+  // key is. Nothing is held while no ring is drawn, since there would be
+  // nothing to send the eye back to. A look-around card holds every click on
+  // the app, because its ring is something to look at, and only its Next
+  // moves on.
   const lookOnly = useRef(false);
   lookOnly.current = !!say.next;
   useEffect(() => {
@@ -1004,9 +605,8 @@ function Ringed({
       if (!stray) return;
       e.stopPropagation();
       e.stopImmediatePropagation();
-      // ONE PRESS OF THE MOUSE IS ONE ANSWER. All five events are the same
-      // press arriving five times, so the walk answers on the last of them
-      // that means "she pressed this", and stops the other four in silence.
+      // One mouse press arrives as several HELD_EVENTS. All are stopped, and
+      // only the click is answered.
       if (e.type === 'click') {
         e.preventDefault();
         setKnock((n) => n + 1);
@@ -1016,14 +616,11 @@ function Ringed({
     return () => { for (const t of HELD_EVENTS) window.removeEventListener(t, on, true); };
   }, [hold, selector.join('|'), (also ?? []).join('|')]);
 
-  // The floor is measured off the card once it is really on the screen, so it
-  // runs after every placement rather than inside the one that made it.
+  // Runs after every render, because it needs the card's real height.
   useLayoutEffect(() => { settle(cardRef.current); lift(cardRef.current, geo); });
 
-  // AND THE FLOATING CARD DIMS WHAT IT FLOATS OVER (w-58c8f466e7). It drew
-  // the card alone, so at the ⌘K beat the words sat at full strength on top
-  // of the board's first cards: "the Command-K thing looks a little funky".
-  // There is no ring to leave a hole for, so the whole window is dimmed.
+  // A card with no ring dims the whole window, so its words do not sit on top
+  // of the app at full strength.
   if (!geo) {
     if (!adrift) return null;
     return (
@@ -1039,13 +636,8 @@ function Ringed({
     );
   }
   const pad = 10;
-  // WHAT A STRAY CLICK IS ANSWERED WITH, and it is three parts of one gesture,
-  // all of them 620ms and none of them a word: the veil deepens so what she
-  // reached for goes quiet, the ring swells once so the thing to press does
-  // not, and the cap pulses exactly as it does for a wrong key. No modal, no
-  // sentence, no alarm colour — the walk says no in the language it already
-  // has. The count is the element's key on both, so the second click really is
-  // a second answer.
+  // A stray click deepens the veil, swells the ring once and pulses the cap,
+  // with no words. `knock` keys the veil and the halo so each click replays it.
   const knocked = knock ? ' fr-knock' : '';
   return (
     <>
@@ -1062,37 +654,21 @@ function Ringed({
         />
       </svg>
       {beside ? (
-        // 18 clear of the ring's own halo, and centred on the ring rather than
-        // aligned to its top, so a two-line card and a five-line one both sit
-        // level with the tab and neither reaches the list. The half it is
-        // centred by is in the class's transform, not here, because the drop
-        // and the lift ride in that same transform.
+        // Vertically centred on the ring. The half-height shift is in the
+        // class's transform, because the drop and the lift use that transform
+        // too.
         <p
           ref={cardRef}
           className="fr-tether beside"
           style={{
-            // CLEAR OF THE WHOLE STRIP, NOT JUST OF THE RING. Ringing In
-            // progress and hanging the card 18 off its own right edge printed
-            // the card over Closed, which is the next tab the same beat is
-            // about to send somebody to. Shot that way once.
-            //
-            // And clearing the strip has a second effect worth more than the
-            // first: the card lands in the SAME PLACE all three times. Three
-            // presses, one card that does not move, and only the ring travels.
-            // AND THE LAST BEAT STANDS OFF ITS OWN RING INSTEAD OF OFF THE
-            // STRIP. The palette is a panel in the middle of the window, not a
-            // row of tabs along the top, so there is no strip to clear and the
-            // rule above would drop the card on top of the commands.
-            // Photographed that way once: the card covered the search field and
-            // the first command in the list it was talking about. `besideRing`
-            // puts it in the empty half of the window to the right of the
-            // panel, where it covers nothing.
+            // Clear of the whole tab strip, so the card covers no tab and stays
+            // put while the ring moves. With `besideRing` (the palette) it
+            // stands off the ring instead, because there is no strip to clear.
             left: besideRing ? Math.round(geo.ring.x + geo.ring.w + 26) : besideLeft(geo, besideOf),
             top: geo.ring.y + geo.ring.h / 2,
             maxWidth: besideRing
               ? Math.max(240, window.innerWidth - (geo.ring.x + geo.ring.w + 26) - 40)
-              // No wider than an ordinary card (2026-10-06): beside the tab
-              // strip it ran on across the header and over Search.
+              // No wider than an ordinary card, so it stays off the header.
               : Math.max(240, Math.min(TEXT_MAX + 60, window.innerWidth - besideLeft(geo, besideOf) - 200)),
           }}
           role="status"
@@ -1111,120 +687,39 @@ function Ringed({
   );
 }
 
-/* * BEAT EIGHT'S SECOND HALF IS GONE, AND `Centred` WITH IT. It was the empty inbox held for
- four seconds under a card reading "This is inbox zero. Get back here every day.", the one
- beat with no ring because there was nothing left to point at.
-*/
-
-
-/* * --------------------------- THE LAST QUESTION -----------------------------
-   THIS CARD IS THE AGENTS QUESTION AND NOTHING ELSE, SINCE 2026-08-24.
-
-   What he read was a headline saying he was ready, a line about inbox zero, a
-   rule, and then, four rows down, the only thing on it that wanted an answer.
-   Nothing about it looked like a question, so he treated it as one of the
-   hundred success pages he has pressed past this year, which is exactly what it
-   was shaped like.
-
-   So the celebration came off it and went where she asked for it: `Landed`
-   below, over her own inbox, in her own project. What is left here is one
-   question, and the first line of the card is that question.
-
-   AND A MAC WITH NO AGENT FILES GETS NO CARD AT ALL. That is the same rule she
-   set on 2026-08-23 — a screen offering an import to somebody with nothing to
-   import is a screen that contradicts itself — read one step further along now
-   that the celebration is not holding the card up on its own. `finishCard`
-   answers `straightIn` and the walk ends itself.
-
- AND A MAC WITH NO AGENT FILES IS OFFERED NOTHING. There is no offer to draw when there is
- nothing behind it, so that state is not reworded here, it is gone: the card is the ending
- and nothing else.
-
- The button is a real button, and the return key ends it too.
-
- AND ON A MAC WITH NO CLAUDE CODE ON IT, THIS CARD IS NOT AN ENDING AT ALL.
-
-   So the card has two shapes and `finishCard` in ../onboarding picks between
-   them. The ending she approved is untouched and it is what almost everybody
-   sees. The other one has no confetti, no headline about being ready, no
-   agents to import and no way into the inbox: it names the one thing standing
-   in the way, and its two buttons are get it and check again.
-*/
-/* * THE LAST CARD OF THE WALK, AND IT IS THE IMPORT CARD NOW (
-   2026-08-27).
-
-   She was right. Six rounds of this row rebuilt the agent import — two doors, a
-   section per project, nothing ticked at open — and every one of them rebuilt
-   the card ⌘K opens. This screen kept a second, older copy: one flat list under
-   a two-sided switch, everything ticked, no way to reach a folder that was not
-   already a project. The note at the top of ../agent-import-card.ts argued the
-   walk's shape was right inside a setup, where there is one project and one
-   folder. That argument is now overruled by the person it was written for, and
-   it was wrong on its own terms anyway: the Mac she ran this on had four agents
-   in her home folder and dev folders full of others that the walk's card could
-   not see or offer.
-
-   So this component keeps the three things that are the WALK's and hands the
-   rest to <ImportAgents walk={...}>: the gate when Claude Code is missing, the
-   straight-in when there is nothing to offer, and ending the walk.
-
-   WHAT WENT WITH THE OLD MARKUP, and it is written down in decisions.md rather
-   than only deleted: the `all`/`project` switch with its counts, the two empty
-   sides (`agentsNoneAll`, `agentsNoneHere`), and everything-ticked-at-open. The
-   new card opens with nothing ticked, which she approved on 08-26 and which is
-   what makes one project one press.
-*/
+/**
+ * The walk's last card. It is the same import card ⌘K opens
+ * (`<ImportAgents walk>`), plus what belongs to the walk: the gate when Claude
+ * Code is missing, going straight in when there is nothing to import, and
+ * ending the walk. `finishCard` in ../onboarding picks the shape. */
 function Finished({
   found, folders, claude, products, project, onDone, onFiled, onProjectMade, onRecheck,
 }: {
   found: { user: AgentFile[]; project: AgentFile[] } | null;
-  /**
-   * Every folder on this Mac with agents in it, read by the walk a beat early.
-   *  Null while it is still reading. */
+  /** Every folder on this Mac with agents in it, read a beat early. Null while
+   * still reading. */
   folders: AgentFolder[] | null;
-  /*
-   * `kept` was here and it is deleted. It was the
-     list of agents to file when the walk ended, it has been the shared empty
-     array since the import card started filing its own, and the last thing
-     reading it was a button this card no longer draws. */
-  /**
-   * Whether Claude Code is missing, and where to get it. `missing` is only
-   *  ever true here after the whole search has run and come back sure, and this
-   *  card is the only screen in the walk that reads it. Nothing less than
-   *  certainty closes the gate: a Mac that shows any sign of Claude Code at all
-   *  leaves this false and gets the ending. */
+  /** Whether Claude Code is missing, and where to get it. `missing` is true
+   * only once the whole search has come back sure, so any sign of Claude Code
+   * gets the ending. */
   claude: { missing: boolean; url: string };
-  /**
-   * HER OWN PROJECT, AND ONLY IT. The practice project is still in the app's
-   *  list at this point — it is archived by `finishRun` a moment later — and a
-   *  card offering to file her agents into "Wt 77df" is the same fault as the
-   *  tutorial project's name on a screen headed "This is a practice project".
-   *  One project also means the home-folder section states where its rows go
-   *  without drawing a picker to change it. */
+  /** The walk's own project first, then the others, never the practice one (`walkProjects`). */
   products: { slug: string; name: string; repoPath: string | null }[];
   project: string | null;
   /** The way out with nothing brought in, and the end of the walk. */
   onDone: (chosen: string[]) => void;
-  /**
-   * The import card filed them itself, into however many inboxes, making the
-   *  projects it needed. Nothing is left to file, so this ends the walk without
-   *  a second import, and says whether anything landed so the confetti knows. */
-  onFiled: (p: { added: number; already: number; inboxes: number; made: string[]; noun?: string }) => void;
+  /** The import card has already filed the agents, so this only ends the walk
+   * and reports what landed, for the confetti. */
+  onFiled: (p: { added: number; already: number; inboxes: number; made: string[]; noun?: string; done?: number }) => void;
   /** A project was made on the card. The app redraws its sidebar. */
   onProjectMade?: (slug: string) => void;
-  /**
-   * Look for Claude Code again, from scratch. Answers with whether it is
-   *  still missing, so the card can say something different the second time. */
+  /** Look for Claude Code again from scratch. Resolves to whether it is still
+   * missing. */
   onRecheck: () => Promise<boolean>;
 }) {
-  // WHAT COUNTS AS SOMETHING TO OFFER IS WIDER THAN IT WAS. It used to be her
-  // home folder and this project's folder, which is all the old card could
-  // draw. The new card reaches every folder on the Mac with agents in it, so a
-  // Mac whose agents are all in ~/Desktop/dev/whatever now gets the offer
-  // instead of being walked straight past it.
-  // Conversations are importable without any Claude agent files. In particular,
-  // a Codex-only Mac has no files in ~/.claude/agents. Wait for this read before
-  // deciding an empty finish card can be skipped.
+  // Conversations can be imported with no agent files at all (a Codex-only Mac
+  // has nothing in ~/.claude/agents), so wait for this read before skipping an
+  // empty finish card.
   const [threads, setThreads] = useState<SessionThread[] | null>(null);
   useEffect(() => {
     let live = true;
@@ -1235,8 +730,6 @@ function Finished({
   }, []);
   const some = (!!found && anyAgents(found)) || !!folders?.some((f) => f.count > 0);
   const card = finishCard(claude, { read: found !== null && folders !== null, some }, threads);
-  // The two things the gate needs to remember: whether a search is running
-  // right now, and whether one has already come back empty.
   const [checking, setChecking] = useState(false);
   const [tried, setTried] = useState(false);
   const recheck = async () => {
@@ -1246,15 +739,9 @@ function Finished({
     try { setTried(await onRecheck()); }
     finally { setChecking(false); }
   };
-  // AND THE THIRD MOVE: SHOW IT WHERE THE FILE IS (w-ce8c1a9275). This card is
-  // the one screen in the app that will not let anybody past it, so it is the
-  // worst place to have no answer except "wait for a release". The panel opens
-  // in the main process and the choice is applied there in the same call, so no
-  // path off anybody's disk crosses the bridge (main/ipc.mjs, `zero:engine-bin`).
-  //
-  // A REFUSAL IS WORDS. Picking a folder by mistake at a file panel is ordinary,
-  // and it replaces the "still nothing here" line rather than adding a row to a
-  // card that is already the only thing standing in somebody's way.
+  // "Show me where it is" opens a file panel in the main process and applies
+  // the choice there in the same call, so no path crosses the bridge
+  // (`zero:engine-bin` in main/ipc.mjs).
   const [pointing, setPointing] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
   const point = async () => {
@@ -1264,37 +751,19 @@ function Finished({
     try {
       const { api } = await import('../api');
       const r = await api.engineBin('claude');
-      // ONE LINE UNDER THE BUTTONS, NEVER TWO. "Still nothing here" is about the
-      // last search and the refusal is about the panel just now, so the newest
-      // one replaces the other rather than stacking under it on a card that is
-      // already the only thing standing in somebody's way.
+      // One note under the rows: a refusal replaces "still nothing here".
       if (r?.refused) { setRefused(r.refused); setTried(false); }
-      // Cancelling changed nothing, so there is nothing to look at again.
       if (!r?.canceled && !r?.refused) setTried(await onRecheck());
     } finally {
       setPointing(false);
     }
   };
-  // THE STRAIGHT-IN IS GONE. A Mac with no agent files used to end the walk
-  // here with no card at all, and MEASURED on that Mac it meant the person with
-  // no agents yet was never told Agentbox takes them. The card below is drawn on
-  // every Mac now, and on an empty one it answers rather than offers. See
-  // `finishCard` in ../onboarding.
-  //
-  // AND NOTHING TO BRING IN GOES STRAIGHT ON (2026-10-06): see `finishCard`.
   const skip = !!card.skip;
   useEffect(() => { if (skip) onDone([]); }, [skip]);
-  // NOTHING AT ALL WHILE HER MAC IS STILL BEING READ. An empty veil over the app
-  // for a frame would be a flicker on the way into her own inbox.
+  // Nothing at all while the Mac is still being read, so no veil flickers.
   if (!card.show) return null;
 
-  // HER AGENTS, ON THE CARD SHE APPROVED, and it is the same component ⌘K
-  // opens. Everything above this line is the walk's: the gate and the read.
-  // Everything below it is the import, empty or full, and the import card owns
-  // the keyboard while it is up — ⌘↵ is its first door, or the way on when there
-  // is no door, and Escape steps back off its second screen.
-  // NO VEIL UNDER IT. The card's own backdrop dims the app, as it does from ⌘K;
-  // a veil as well dimmed it twice, and at 299 it was drawn over the card.
+  // No veil under the import card. Its own backdrop already dims the app.
   if (!card.blocked) {
     return (
       <>
@@ -1309,36 +778,15 @@ function Finished({
           }}
           onDone={onFiled}
           onProjectMade={onProjectMade}
-          // Neither can happen in here: she has a project, because she made one
-          // four screens ago, and there is no closing a card that is a step of
-          // the walk. Both are the component's ⌘K doors and both are dead ends
-          // on purpose rather than by omission.
+          // No-ops on purpose. The walk already made a project, and a step of
+          // the walk cannot be closed.
           onNewProject={() => {}}
           onClose={() => {}}
         />
       </>
     );
   }
-  /*
-   * THE GATE IS A QUESTION SCREEN, NOT A CARD (w-ce8c1a9275, 2026-10-09).
-   *
-   * It used to be the ending's own 520px panel with three buttons crammed in a
-   * row. The founder, on a photograph of that: "UI wise this is very rough. In
-   * onboarding we already have a component for geting setup/selecting your
-   * harness I feel like that's a better design an dpossibly placement."
-   *
-   * So it wears what the walk's other full-stop screens wear -- `fr-stack
-   * fr-stack-folders`, a title, a line, one card of rows, one quiet note -- and
-   * it is the plan question's twin, which is what it has always been in
-   * substance: nothing can run an agent here, so how would you like to get one.
-   *
-   * AND IT IS THE WHOLE OF WHAT IS LEFT HERE. The branch above returns the
-   * import card for every unblocked Mac, so the `fr-finish` panel under this
-   * was only ever drawn when blocked -- it was the gate, wearing the ending's
-   * clothes, which is exactly the roughness that was reported. There is no
-   * ending card to fall through to any more and `fr-finish` keeps its one real
-   * user, the practice band's sibling further down this file.
-   */
+  // The gate when Claude Code is missing, drawn like the plan question.
   if (card.blocked) {
     return (
       <>
@@ -1346,24 +794,14 @@ function Finished({
         <div className="fr-stack fr-stack-folders" role="status">
           <h1 className="fr-page">{card.head}</h1>
           <p className="fr-lede">{card.line}</p>
-          {/* Get it opens the install page, and is a real link so the address
-              is in the page. Check again really searches again: the remembered
-              shell answer is thrown away first, so somebody who installs Claude
-              Code and presses this straight away is answered by a search and
-              not by a thirty second old memory (main/settings.mjs,
-              `recheckClaude`). Show me where it is opens the panel in the main
-              process, which is the half that means nobody waits for a release. */}
+          {/* Check again drops the cached shell answer first and really
+              searches (`recheckClaude` in main/settings.mjs). */}
           <AskList
             rows={gateRows(claude.url, { checking, pointing })}
             label={card.head}
             busy={checking || pointing}
             onPick={(key) => { if (key === 'check') void recheck(); else void point(); }}
           />
-          {/* ONE LINE UNDERNEATH, the way the plan question has one. What it
-              says is the newest true thing: the panel's refusal, then "still
-              nothing here" after a search that missed, and otherwise the
-              reassurance. Repeating the headline's own sentence at somebody who
-              has just pressed something reads as a screen that did not notice. */}
           <p className={refused ? 'fr-note fr-refused' : 'fr-note'}>
             {refused ?? (tried && !checking ? COPY.gateStill : COPY.gateDo)}
           </p>
@@ -1374,53 +812,21 @@ function Finished({
 
 }
 
-/**
- * THE PRACTICE BAND. It is on the screen for every second the practice
- *  project is, and it is the whole of what tells somebody the app in front of
- *  them is not theirs yet.
- *
- * This draws nothing over the app at all: the app is full size and real, and
- * one strip sits above it saying whose it is.
- *
- *  WHY IT HAS TO BE SAID AT ALL is a tester, on a call: they saw a real task on a
- *  real screen and read it as work, then tried to answer the placeholder text.
- *
- *  It is rendered beside the walk rather than inside it because it belongs to
- *  the PROJECT and not to the step: it has to be there through six beats and
- *  through everything those beats open. */
-/* * ----------------------- LANDING IN HER OWN PROJECT ------------------------
-
- This is the end of the walk and it is the first second of the app. The practice project has
- just been archived, the agents she kept have just been filed, and what is on the screen
- behind these words is her own inbox in her own project.
-
-   NOTHING HAS TO BE PRESSED TO GET PAST IT, and that is the whole difference
-   from the card it came off. There is no veil, no panel and no button: the
-   words sit over the running app, the layer takes no clicks, and it takes
-   itself down. A key takes it down sooner, so somebody who starts working
-   straight away never has our confetti in the way of their first task.
-
-   THE LINE IS THE ONE THAT IS TRUE OF WHAT IS BEHIND IT. With agents kept, the
-   inbox behind these words has a row per agent in it, so it cannot say the
-   inbox is empty; that is w-27e3ab9c48's fault read on the new surface.
-*/
-/* LONG ENOUGH TO READ WHAT TO DO NEXT (2026-10-01). It was 5.2 seconds for two
-   lines; it carries two more now, the next thread and the Team page, and a
-   persona test reached the end of the tutorial with nothing saying it was over. Any key or any click
-   still takes it down at once, and the click still reaches the app. */
+/** How long the landing message stays up. Any key or click takes it down
+ * sooner. */
 export const LANDED_MS = 14_000;
 
+/**
+ * The end of the walk, over the person's own inbox: confetti and what to do
+ * next. It takes no clicks and nothing needs pressing, so it never blocks the
+ * first real task. */
 export function Landed({ agents, onGone }: {
-  /**
-   * Whether she kept any agents, which decides which of her two lines is
-   *  true of the inbox behind this. */
+  /** Whether any agents were kept, which picks the line that is true of the
+   * inbox behind it. */
   agents: boolean;
   onGone: () => void;
 }) {
-  // The pieces are drawn once and never again, so the burst does not restart
-  // under a re-render. Their spread is fixed here rather than in the
-  // stylesheet because each one needs its own drift. Same forty pieces and the
-  // same 1.6 seconds the finish card had.
+  // Computed once in a ref so a re-render does not restart the burst.
   const pieces = useRef<{ left: number; delay: number; drift: number; spin: number; hue: number; fall: number }[]>(
     Array.from({ length: 40 }, (_, i) => ({
       left: 4 + ((i * 97) % 92),
@@ -1434,9 +840,8 @@ export function Landed({ agents, onGone }: {
   const team = useContext(TeamContext);
   useEffect(() => {
     const t = setTimeout(onGone, LANDED_MS);
-    // ANY KEY TAKES IT DOWN, and the key still reaches the app underneath: this
-    // does not preventDefault and does not stop the event. Somebody who presses
-    // C to write their first task gets the compose card AND their screen back.
+    // Any key or press takes it down and still reaches the app, so the event is
+    // neither stopped nor prevented.
     const on = () => onGone();
     const armed = setTimeout(() => window.addEventListener('keydown', on), 0);
     const armedClick = setTimeout(() => window.addEventListener('pointerdown', on), 0);
@@ -1475,42 +880,18 @@ export function Landed({ agents, onGone }: {
   );
 }
 
+/**
+ * The strip above the app for as long as the practice project is up, saying
+ * the app in front of you is not yours yet. It belongs to the project, not to
+ * a step, so it is rendered beside the walk rather than inside it. */
 export function PracticeBand() {
   return (
     <div className="fr-band" role="note">
-      {/* THE PART OF THE STRIP THAT PICKS THE WINDOW UP, AND IT STOPS SHORT OF
-          THE WAY OUT (w-9a6ea066d6, 2026-08-28).
-
-          THE BAND WAS DRAGGABLE ACROSS THE WHOLE WINDOW AND SKIP SAT INSIDE IT.
-          A drag region in Electron is not a CSS effect, it is a native region on
-          the window: on macOS a mousedown inside it is taken by the window
-          server as "pick this window up" and the page is never told. `.fr-out`
-          already said `-webkit-app-region: no-drag`, and that was not enough,
-          because Electron builds ONE region by walking the reported rectangles
-          IN ORDER (shell/browser/ui/drag_util.mm, DraggableRegionsToSkRegion:
-          kUnion_Op for a draggable rect, kDifference_Op for a non-draggable
-          one). App.tsx draws <WayOut> before <PracticeBand>, so the button's
-          no-drag rect was subtracted first and the band's full-width drag rect
-          was added back over it a moment later. Measured on the built app by
-          scripts/shot-skip-really-skips.mjs:
-
-            no-drag  button.fr-out   36x38 at 1700,0
-            drag     div.fr-band   1752x38 at 0,0     <- puts it back
-
-          Skip was, natively, a piece of the title bar. There was nothing there
-          to press, which is exactly what she reported: no card, nothing.
-
-          SO THE FIX IS GEOMETRY, NOT ORDER. The strip itself no longer drags;
-          this lane does, and it stops 120px short of the right edge, so NO
-          draggable rectangle covers the button at all and the question of which
-          rectangle was reported first never has to be answered again. 120 is
-          the number because `.fr-out` sits 16px in from that edge and is one
-          short word wide, and because `.fr-band-pill` reserves 260px of the
-          window and is centred, so it keeps at least 130px of clear strip on
-          each side at every width the app will open at (980, main/main.mjs).
-          The window is still picked up by the strip everywhere else, which is
-          the whole of what the strip was for.
-       */}
+      {/* Only this lane drags the window, and it stops 120px short of the right
+          edge so no drag rectangle covers `.fr-out`. Electron merges drag
+          and no-drag rectangles in the order they are reported, so a no-drag
+          button inside a full-width drag strip can still be swallowed as title
+          bar, and on macOS the page never sees the press. */}
       <div className="fr-band-drag" aria-hidden="true" />
       <span className="fr-band-pill">
         <span className="fr-band-dot" aria-hidden="true" />
@@ -1521,31 +902,7 @@ export function PracticeBand() {
   );
 }
 
-/* * `folderOf` WAS HERE AND IT IS DELETED. The card that replaced it prints the real folder
- on EVERY section rather than one for the side you happen to be looking at, off
- `Destination.where` and `fold` in ../agent-import-card.ts. Same promise, kept in more
- places.
-*/
-
-/**
- * THE PART OF THE PRODUCT THE SLAB BESIDE IT IS TALKING ABOUT.
- *
- * NOTHING HERE IS A PICTURE AND NOTHING HERE IS SHRUNK. Every element below
- * wears the app's own class, so it is drawn by the app's own stylesheet at the
- * app's own size: a row is 19px of padding over a 15px title exactly as it is
- * in the inbox, because it is the same rule doing it. What makes it fit is the
- * right edge of the window, which cuts it off mid-row the way the real inbox is
- * cut off by the reading pane.
- *
- *  THE ROWS ARE THE PRACTICE ROWS, not invented ones. They are the same three
- *  she meets four screens later, so the introduction is a promise the walk then
- *  keeps rather than a separate piece of fiction. */
-/**
- * THE SIDEBAR, AS A STILL. The pictures before the tutorial used to draw the old
- *  top tab strip and the project rail, neither of which anybody sees after the
- *  walk (w-ec62ab6b38, 2026-09-28). This is the sidebar's own markup and
- *  classes, Inbox and In progress at the top and Closed at the foot, so the
- *  first sight of the app is the app they will use. */
+/** A still of the real sidebar, using its own markup and classes. */
 function PieceNav({ count = 0, on = 'inbox' }: { count?: number; on?: 'inbox' | 'progress' }) {
   const row = (view: 'inbox' | 'progress' | 'done', label: string, active = on === view) => (
     <button
@@ -1567,15 +924,8 @@ function PieceNav({ count = 0, on = 'inbox' }: { count?: number; on?: 'inbox' | 
   );
 }
 
-/**
- * MORE THAN ONE PROJECT IN THE FIRST PICTURE (w-ec62ab6b38). The product is an
- *  inbox for dozens of agents at once, and four rows from one pretend project
- *  said the opposite. The practice rows still come first, so the promise the
- *  tutorial keeps is intact; these sit under them, from invented projects.
- */
-// A TEAM'S WORK, NOT ONLY AN ENGINEER'S (2026-10-01). These were all code:
-// database drivers, push providers, React upgrades. They are the first picture
-// of the product, and most of the team it is for does not code.
+/** Rows from several invented projects, drawn under the practice rows in the
+ * first picture, so it shows many agents across many kinds of work. */
 const INTRO_MORE: Array<{ title: string; result: string; agoMs: number; project: string }> = [
   { title: 'Drafted the agenda for the offsite.', result: 'Three sessions and a working lunch. I left the dinner spot for you to pick.', agoMs: 38 * 60_000, project: 'Operations' },
   { title: 'Which launch date should we announce?', result: 'The 14th clears every review. The 7th is a week tighter but still possible.', agoMs: 44 * 60_000, project: 'Launch' },
@@ -1583,11 +933,8 @@ const INTRO_MORE: Array<{ title: string; result: string; agoMs: number; project:
   { title: 'Summarised this week of customer calls.', result: 'Five calls, and two of them asked for the same thing. One page of notes.', agoMs: 61 * 60_000, project: 'Research' },
 ];
 
-/**
- * THE SECOND SLIDE'S PICTURE: IN PROGRESS, FULL (w-ec62ab6b38). "You only see
- *  an agent when it needs you" is shown as the other half, the agents that do
- *  not need you, working on their own with their current step under each.
- */
+/** The second slide's In progress list: agents working on their own, each
+ * with its current step. */
 const INTRO_WORKING: Array<{ title: string; step: string; project: string }> = [
   { title: 'Tidy the vendor contact list.', step: 'Removing duplicates.', project: 'Operations' },
   { title: 'Draft the release notes for March.', step: 'Reading what changed this month.', project: 'Launch' },
@@ -1598,6 +945,10 @@ const INTRO_WORKING: Array<{ title: string; step: string; project: string }> = [
   { title: 'Write up the hiring plan.', step: 'Drafting the timeline.', project: 'Launch' },
 ];
 
+/**
+ * The part of the app an introduction slab is about, drawn with the app's own
+ * classes at full size and cut off by the window edge rather than shrunk. The
+ * rows are the practice rows the walk uses later. */
 function IntroPiece({ kind }: { kind: 'list' | 'ask' | 'empty' | 'progress' }) {
   if (kind === 'progress') {
     return (
@@ -1632,7 +983,7 @@ function IntroPiece({ kind }: { kind: 'list' | 'ask' | 'empty' | 'progress' }) {
               <span className="clause clause-project">For {PRACTICE_NAME}.</span>
             </span>
             <button className="dock-send" type="button" tabIndex={-1}>
-              Start it <kbd>⌘↵</kbd>
+              Start it <kbd>{chord('⌘↵')}</kbd>
             </button>
           </div>
         </div>
@@ -1644,11 +995,8 @@ function IntroPiece({ kind }: { kind: 'list' | 'ask' | 'empty' | 'progress' }) {
       <PieceNav count={kind === 'list' ? PRACTICE_ROWS.length + INTRO_MORE.length : 0} />
       {kind === 'list' ? (
         <div className="list-pane">
-          {/* .list IS WHERE THE ROW'S MEASUREMENTS LIVE: --gutter, --text-x and
-              --row-r are declared on it and nowhere else, so a row outside one
-              is drawn with no left inset and no right one. Measured the first
-              time this was shot without it: three titles hard against the card's
-              edge and the summaries touching them. */}
+          {/* Rows need a .list parent: --gutter, --text-x and --row-r are
+              declared only there. */}
           <div className="list">
             <div><div className="day-label">Today</div></div>
             {[...PRACTICE_ROWS.map((r) => ({ ...r, project: PRACTICE_NAME })), ...INTRO_MORE].map((r) => (
@@ -1666,14 +1014,7 @@ function IntroPiece({ kind }: { kind: 'list' | 'ask' | 'empty' | 'progress' }) {
           </div>
         </div>
       ) : (
-        // THE GOAL, AS A PICTURE: an inbox with nothing in it, because the whole
-        // lesson of the goal is getting to inbox zero. The "Active agents"
-        // list that stood under it was the project rail, which is retired, so
-        // it went with w-ec62ab6b38.
-        // THE APP'S OWN INBOX ZERO NOW (w-ec62ab6b38). The old "nothing is
-        // waiting on you" screen looked poor beside the app's real inbox zero.
-        // So it is the real idle page's markup and classes: the figure, the line
-        // saying seven agents are still at work, and the field for the next.
+        // The real inbox zero page's markup and classes.
         <div className="list-pane bare fr-piece-empty">
           <div className="zero-state idle">
             <div className="idle-zero-col">
@@ -1691,48 +1032,21 @@ function IntroPiece({ kind }: { kind: 'list' | 'ask' | 'empty' | 'progress' }) {
   );
 }
 
-/* THE THEME PICKER STOOD HERE. The walk no longer asks: Light, Dark and Match
-   system are chosen in Settings and in Command-K (w-9e434e8671). */
-
-/**
- * THE THREE INTRODUCTION SLABS, THE RULE, AND THE HAND-OFF.
- *
- * A tester asked for the same thing in their own words: they would rather meet the
- * lesson before the app opens at all.
- *
- *  THE SLAB IS WORDS ON THE LEFT AND THE PRODUCT ON THE RIGHT, which is hers of
- *  2026-08-24 and is what round two did. It is written up on `IntroPiece` above,
- *  including why a session took it off and why that was a misreading.
- *
- * the sentence in one corner and the way on in the other.
- *
- * AND NO COUNTER IN FRONT OF THE HEADING SINCE 2026-10-01. It printed "3 OF 3"
- * on this screen and the walk then showed the theme picker and the tutorial
- * card, so the number was the only thing on the screen saying how much was
- * left and it was wrong by two. The whole of why is in `COPY.introNext`'s
- * neighbour in onboarding.ts. */
+/** One introduction slab: words on the left, the app on the right, and Enter
+ * moves on. */
 function Slab({ head, line, piece, onNext }: {
   head: string; line: string;
   piece: 'list' | 'ask' | 'empty' | 'progress'; onNext: () => void;
 }) {
-  // ENTER CARRIES THE WHOLE WALK, the same rule every setup screen keeps: a
-  // walk you can finish without reaching for the mouse is the difference
-  // between a demo and a product. It is also the screen two beats before the
-  // one that asks somebody to put the mouse down.
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       if (e.key !== 'Enter') return;
       e.preventDefault();
       onNext();
     };
-    // AND IT LISTENS FROM THE NEXT TICK, NOT THIS ONE. Measured driving the
-    // built walk on 2026-08-23: one press of Enter on the name screen went
-    // straight past the first slab to the second, and one on the rule screen
-    // skipped the practice hand-off outright. React flushes this effect while
-    // the press that caused the render is still travelling, so the screen that
-    // just opened catches the key that opened it. Handing the listener to the
-    // next tick lets that press finish first. The same trick and the same
-    // reason as `walkAgain` in App.tsx.
+    // Listen from the next tick. React can run this effect while the Enter
+    // that opened this screen is still being dispatched, and that press would
+    // skip this screen too. `walkAgain` in App.tsx does the same.
     const t = setTimeout(() => window.addEventListener('keydown', on), 0);
     return () => { clearTimeout(t); window.removeEventListener('keydown', on); };
   }, [onNext]);
@@ -1751,13 +1065,11 @@ function Slab({ head, line, piece, onNext }: {
   );
 }
 
-/**
- * ONE STATEMENT AND ONE BUTTON. The rule and the hand-off are both this: no
- *  choice on them, nothing to read twice, and the same card shape the finish
- *  uses so the walk has one kind of card in it rather than three. */
+/** One statement and one button, in the finish card's shape. Used for the
+ * rule and the hand-off. */
 function Statement({ head, line, go, onNext, skip, onSkip }: {
   head: string; line: string; go: string; onNext: () => void;
-  /** A quiet second button under the main one (2026-10-06). */
+  /** A quiet second button under the main one. */
   skip?: string; onSkip?: () => void;
 }) {
   useEffect(() => {
@@ -1766,14 +1078,7 @@ function Statement({ head, line, go, onNext, skip, onSkip }: {
       e.preventDefault();
       onNext();
     };
-    // AND IT LISTENS FROM THE NEXT TICK, NOT THIS ONE. Measured driving the
-    // built walk on 2026-08-23: one press of Enter on the name screen went
-    // straight past the first slab to the second, and one on the rule screen
-    // skipped the practice hand-off outright. React flushes this effect while
-    // the press that caused the render is still travelling, so the screen that
-    // just opened catches the key that opened it. Handing the listener to the
-    // next tick lets that press finish first. The same trick and the same
-    // reason as `walkAgain` in App.tsx.
+    // Next tick, for the same reason as in `Slab`.
     const t = setTimeout(() => window.addEventListener('keydown', on), 0);
     return () => { clearTimeout(t); window.removeEventListener('keydown', on); };
   }, [onNext]);
@@ -1801,139 +1106,83 @@ export function Onboarding({
   onLeave?: () => void;
   /** Shut whatever is open over the app; the ⌘K beat's any-key press. */
   onShut?: () => void;
-  /** The quiet "Skip this step" on every coaching card (2026-10-06). */
+  /** The quiet "Skip this step" on every coaching card. */
   onSkipStep?: () => void;
   run: FirstRun;
-  /**
-   * EVERY PROJECT THE APP HAS. The last card files into one, so it needs the
-   *  name and the code folder; it takes only the one this walk made (see
-   *  `Finished`), and the app's whole list is what it takes it out of. */
+  /** Every project the app has; the last card files into them (`walkProjects`). */
   products: Project[];
-  /**
-   * WHETHER A TASK IS OPEN IN THE READING PANE RIGHT NOW. Beat fourteen is one
-   *  beat with two sentences, in the list and then in the pane, so it is the
-   *  one thing the walk needs to know about the screen behind it. */
+  /** Whether a task is open in the reading pane, for beats with a second half
+   * in the pane. */
   opened?: boolean;
-  /**
-   * The stopped row's own id, so beat fourteen rings THAT row rather than
-   *  whichever one the list happens to have left. Null before the rows exist. */
+  /** The stopped row's id, so its beat rings that row. Null before the rows
+   * exist. */
   waiting?: string | null;
-  /**
-   * The snoozeable row's own id, for the same reason `waiting` exists: beat
-   *  fourteen rings THAT row rather than whichever one is left after the two
-   *  finished ones have gone. Null before the rows exist. */
+  /** The snoozeable row's id, for the same reason as `waiting`. */
   later?: string | null;
-  /**
-   * WHETHER THE SNOOZE PICKER IS OPEN. Beat fourteen is one beat with two
-   *  sentences, the row and then the picker over it, the same shape as beat
-   *  fifteen's list and pane. */
+  /** Whether the snooze picker is open, for the snooze beat's second half. */
   picking?: boolean;
-  /**
-   * WHETHER THE COMMAND PALETTE IS OPEN. The last beat is one beat with two
-   *  sentences for the same reason the two above are: the second half is a
-   *  thing that opens over the app, and until 2026-08-28 the walk said nothing
-   *  at all once it was open. See `command` in `coach`. */
+  /** Whether the command palette is open, for the last beat's second half. */
   palette?: boolean;
   /** Whether the page is drawn as the board, for the board beat's second half. */
   board?: boolean;
   /** Whether the reply box is open, for the answer beat's second half. */
   replying?: boolean;
-  /**
-   * THE ROWS THE CURRENT BEAT'S KEY IS RIGHT FOR, in the order they are drawn,
-   *  and the row the row-keys would actually land on. Both come from the app,
-   *  because the app is what decides the second one: `pointed` is the row under
-   *  the POINTER when there is one and the keyboard's row otherwise.
-   *
-   * This pair is what stopped the screen giving two instructions at once. The
-   * ring goes round `beat[0]`; a press of the beat's key anywhere outside
-   * `beat` is answered by the cap and never reaches the app, so no toast can
-   * contradict the card. See `beatRows` and `pressAtWrongRow` in onboarding.ts.
-   * */
+  /** The rows the current beat's key is right for, in drawn order, and the
+   * row the row keys would land on (the row under the pointer, else the
+   * keyboard's). The ring goes round `beat[0]`, and the beat's key aimed
+   * outside `beat` never reaches the app. See `beatRows` and `pressAtWrongRow`
+   * in onboarding.ts. */
   beat?: string[];
   pointed?: string | null;
-  /**
-   * THE APP'S OWN Tab ROTATION, so the walk can say where the next press
-   *  lands without keeping a second copy of the order. The second copy is what
-   *  broke on 2026-08-24: the snooze beat put a Scheduled tab on the screen and
-   *  the tour still believed there were two other tabs. */
+  /** The app's own Tab rotation, so the walk keeps no second copy of it. */
   tabs?: string[];
-  /**
-   * WHICH TAB IS UP. Beat fifteen walks every other tab and comes back, and
-   *  both what the card says and where the ring sits are read off this rather
-   *  than off a count of presses, so the card can never get out of step with
-   *  the screen it is describing. */
+  /** Which tab is up. The tab tour reads the screen from this rather than
+   * counting presses. */
   view?: string;
   claude: { missing: boolean; url: string };
   home: string;
-  /**
-   * WHAT THIS MAC WAS ALREADY SIGNED INTO (w-e217e577e5, 2026-10-07), or null
-   *  because nothing is, which is the Mac that gets the plan question instead.
-   *
-   *  The walk is SILENT on a Mac that is already set up, by design: `needsPlan`
-   *  skips the question and the setup card both, which is right -- there is
-   *  nothing to ask -- and leaves nobody told. From a session with a new user:
-   *  "He didn't realize it auto-connected to Claude/Codex; he wasn't sure how it
-   *  was even running." So the folder screen says it once, in its own quiet
-   *  line, on the screen that is already about where the agents will run. */
+  /** What this Mac is already signed into, or null, which gets the plan
+   * question instead. A set-up Mac skips that question, so the folder screen
+   * says once where agents will run. */
   runsOn?: RunsOn | null;
   /** Something really happened: a folder chosen, a project made. */
   onEvent: (e: { t: 'start' } | { t: 'folder'; path: string } | { t: 'noFolder' } | { t: 'name'; name: string }) => void;
   /** Move to a step. Separate from onEvent because a move records nothing. */
   onStep: (step: FirstRun['step']) => void;
-  /* * * The name screen's Next: make the project for real, then walk on. Answers * with the
-     reason it did NOT happen, or null when it did.
-  */
+  /** The name screen's Next: make the project, then walk on. Resolves to the
+   * reason it was not made, or null when it was. */
   onSkipToApp: (p: { name: string; folder: string | null }) => Promise<string | null> | void;
-  /**
-   * THE HAND-OFF SCREEN'S ONE BUTTON: make the practice project for real, put
-   *  its three rows in it, and open it. It is the walk's second real write to
-   *  the store and the last one before the app itself takes over. */
+  /** The hand-off screen's button: make the practice project with its rows,
+   * and open it. */
   onPractice: () => void;
-  /**
-   * END THE WALK, with the agents named here still to be filed. That list is
-   *  empty on every path that reaches it now: `Open my inbox` on the last card
-   *  brings nothing in, and a Mac with no agents at all has nothing to bring.
-   *  The argument stays because the walk may end from three places and only one
-   *  of them is the import card. */
+  /** End the walk, filing the agents named. Every current caller passes an
+   * empty list. */
   onDone: (chosen: string[]) => void;
-  /**
-   * END THE WALK, WITH THE AGENTS ALREADY IN THEIR INBOXES. The import card
-   *  files them itself, into as many projects as it had to make, so there is
-   *  nothing here that could repeat the work correctly — it knows one project
-   *  and the card knew six. What it needs to know is whether anything landed,
-   *  because that is what the confetti is about. */
-  onFiled: (p: { added: number; already: number; inboxes: number; made: string[]; noun?: string }) => void;
-  /**
-   * A project was made on the last card, out of a folder with agents in it.
-   *  The app redraws its sidebar so it is there when the walk lets go. */
+  /** End the walk after the import card has filed the agents itself. Reports
+   * what landed, for the confetti. */
+  onFiled: (p: { added: number; already: number; inboxes: number; made: string[]; noun?: string; done?: number }) => void;
+  /** A project was made on the last card. The app redraws its sidebar. */
   onProjectMade?: (slug: string) => void;
-  /**
-   * Look for Claude Code again, from scratch, and answer with whether it is
-   *  still missing. Only the finish card uses it, and only when it is holding
-   *  the inbox shut. Optional so a test or a story can draw the walk without
-   *  standing a main process up behind it; the button is still real, it simply
-   *  reports that nothing changed. */
+  /** Look for Claude Code again from scratch. Resolves to whether it is still
+   * missing. Optional so a test can draw the walk with no main process. */
   onRecheck?: () => Promise<boolean>;
 }) {
   const nameRef = useRef<HTMLInputElement>(null);
-  // Null unless this Mac is signed into a team, which is the only time the
-  // walk names people (w-db6f5e331e).
+  // Null unless this Mac is signed into a team.
   const team = useContext(TeamContext);
   const [busy, setBusy] = useState(false);
-  // WHY THE PROJECT WAS NOT MADE, when it was not. Null the rest of the time.
+  // Why the project was not made, when it was not.
   const [notMade, setNotMade] = useState<string | null>(null);
   // Why a folder pick was turned down, on the screen that asked for it.
   const [refused, setRefused] = useState<string | null>(null);
   // Up when there is no Mac picker to open, which is a browser tab.
   const [browsing, setBrowsing] = useState(false);
-  // THE FOLDERS SHE ALREADY RUNS AGENTS IN (w-ec62ab6b38). Null while being
-  // read, so the list never flashes empty. Read from the welcome on, because
-  // the conversation walk takes about two seconds on a busy Mac and the
-  // welcome is where there is time to spare.
+  // Folders that already have agent conversations. Null while being read, so
+  // the list never flashes empty. Read from the welcome on, because the read
+  // can take seconds.
   const [recent, setRecent] = useState<RecentFolder[] | null>(null);
-  // NOTHING IS PICKED UNTIL THEY PICK IT (persona test, 2026-10-01): the first
-  // recent folder used to be lit, so the Return that left the welcome could
-  // land on a folder the person never chose. Arrow down lights the first.
+  // Nothing is lit until the person picks, so the Return that left the welcome
+  // cannot choose a folder. Arrow down lights the first.
   const [lit, setLit] = useState(-1);
   const wantsRecent = run.step === 'welcome' || run.step === 'folder';
   useEffect(() => {
@@ -1944,50 +1193,44 @@ export function Onboarding({
       .catch(() => { if (live) setRecent([]); });
     return () => { live = false; };
   }, [wantsRecent, recent, home]);
-  // WHETHER THIS MAC CAN RUN AN AGENT YET (w-9f6975906c), asked while the
-  // welcome is on screen, because each tool's own status check takes a few
-  // seconds and the welcome is where there is time to spare. Null until it
-  // answers; Get started waits for it only if it has not.
-  //
-  // IT KEEPS THE READINGS, NOT THE BOOLEAN (w-ce8c1a9275, 2026-10-09). It used
-  // to reduce the two to `needsPlan` here and throw the rest away, and the
-  // plan question was then asked with no idea what was on the machine. The
-  // founder: "I would think this step is actually better fit also checking
-  // first at the same time. Otherwise they may select something we cant run."
-  // `afterCheck` tells three cases apart from these same two readings, and
-  // only one of them is a question worth asking -- so the readings are what is
-  // cached, `begin` reduces them where it needs a yes or no, and the question
-  // is handed the whole thing as `look`.
-  //
-  // `fresh` THROWS THE CACHE AWAY, for the one caller that has just changed
-  // what it is a reading of: pointing at a file on the plan question. Reading
-  // the cached answer after that press would report the machine as it was
-  // before it.
-  const asked = useRef<Promise<Array<{ engine: 'claude' | 'codex'; found: boolean; signedIn: boolean }>> | null>(null);
+  // Whether Claude Code and Codex are found and signed in, asked while the
+  // welcome is up because each tool's status check takes a few seconds. The
+  // full readings are cached, not just the one boolean, because the plan question
+  // needs them as `look`. `fresh` drops the cache, for after pointing at a file
+  // on the plan question.
+  const asked = useRef<Promise<Readings> | null>(null);
   const askMac = (fresh = false) => {
     if (fresh || !asked.current) {
       asked.current = import('../api').then(({ api }) => Promise.all([
         api.engineSetup('ready', 'claude'), api.engineSetup('ready', 'codex'),
       ])).then((r) => r.map((x) => ({ engine: x.engine, found: !!x.found, signedIn: !!x.signedIn })))
-        // A probe that could not run says nothing about this machine, and the
-        // walk must not stop on it: an empty reading sends them to the
-        // question, which is the screen that can still get them out.
+        // A failed probe reads as empty, which sends them to the plan question
+        // rather than stopping the walk.
         .catch(() => []);
     }
     return asked.current;
   };
   useEffect(() => { if (run.step === 'welcome') void askMac(); }, [run.step]);
-  // The plan they picked, once they have. Null on the question.
   const [plan, setPlan] = useState<Plan | null>(null);
+  /*
+   * WHAT WAS FOUND, when something was (w-e217e577e5). A computer with a plan
+   * already signed in used to walk straight past the plan step and be told
+   * nothing at all, so the first anybody knew of it was an agent spending
+   * their tokens. Everybody meets the step now: it asks the question or it
+   * gives the answer, and this is which.
+   */
+  const [alreadyHere, setAlreadyHere] = useState<Readings | null>(null);
+  // ANYTHING FOUND AT ALL IS THE FOUND SCREEN, not only something signed in,
+  // and handing the reading in keeps the first frame the right one.
   const begin = async () => {
-    if (needsPlan(await askMac())) { setPlan(null); onStep('plan'); }
-    else onEvent({ t: 'start' });
+    const readings = await askMac();
+    setAlreadyHere(afterCheck(readings).t === 'nothing' ? null : readings);
+    setPlan(null);
+    onStep('plan');
   };
   const [now, setNow] = useState(() => Date.now());
-  // WHETHER THE TYPING CURSOR IS IN THE REPLY BOX (2026-10-06). The app's own
-  // `replying` is the box opened by R or a click; the box can also stay open
-  // and focused after that state has moved on, and a card saying "Press R"
-  // over a focused box is the one that typed an r onto the end of her reply.
+  // Whether focus is in the reply box. The app's `replying` can move on while
+  // the box stays focused, and then a "Press R" card would type an r into it.
   const [inReply, setInReply] = useState(false);
   useEffect(() => {
     const read = () => {
@@ -1999,28 +1242,16 @@ export function Onboarding({
     window.addEventListener('focusout', read);
     return () => { window.removeEventListener('focusin', read); window.removeEventListener('focusout', read); };
   }, []);
-  // HER AGENTS, read once. Null while it is being read, so the card never
-  // flashes an empty list at a Mac that has eight.
+  // The agent files, read once. Null while reading, so the card never flashes
+  // an empty list.
   const [found, setFound] = useState<{ user: AgentFile[]; project: AgentFile[] } | null>(null);
-  // Bumped when Check again turns Claude Code up. It is the one moment in the
-  // walk when a Mac that had nothing to import might now have something, and
-  // both reads below watch it.
+  // Bumped when Check again finds Claude Code, so both reads run again.
   const [lookedAgain, setLookedAgain] = useState(0);
-  // AND EVERY OTHER FOLDER ON THIS MAC WITH AGENTS IN IT, read at the same beat
-  // and for the same reason. The last card is the import card now and it
-  // reaches those folders, so a walk that only read the home folder and this
-  // project's would draw a card that fills in under her eyes on the last screen
-  // of a setup. Null while it is being read.
+  // Every folder on this Mac with agents in it, read early so the last card
+  // does not fill in while it is on screen. Null while reading.
   const [folders, setFolders] = useState<AgentFolder[] | null>(null);
-  // `kept` AND `NOTHING_KEPT` WERE HERE AND THEY ARE GONE. Nothing is left
-  // to file when the walk ends: the import card files its own, and the last
-  // reader of the empty list was an effect that ended the walk on a Mac with
-  // no agents, which is the behaviour this row reverses.
 
-  /**
-   * ON TO WHATEVER IS NEXT IN THE ONE LIST. Every Next in the walk goes
-   *  through here rather than naming the screen it hands to, so moving a screen
-   *  is one edit to `STEPS` and nothing else. See `nextStep`. */
+  // Every Next goes through `nextStep`, so the order lives only in `STEPS`.
   const go = (from: FirstRun['step']) => { const n = nextStep(from); if (n) onStep(n); };
 
   // The working line changes at fifteen seconds, so this step has a clock.
@@ -2032,51 +1263,14 @@ export function Onboarding({
 
   useEffect(() => { if (run.step === 'name') nameRef.current?.focus(); }, [run.step]);
 
-  /*
-   * ESCAPE IS NOT A WAY BACK ON THESE SCREENS, AND THAT IS DELIBERATE.
-   *
-   * There WAS a listener here for one afternoon, and there was a private one on
-   * the name field before that. Both are gone. Somebody halfway through setup
-   * presses Escape to shake off a folder chooser, a menu or a stray focus ring,
-   * and answering that press by walking them back a screen is the app deciding
-   * they meant something they did not.
-   *
-   * So the arrow is the whole of it, and `stepBack` is only asked WHETHER there
-   * is anywhere to go and WHERE, never by a key. Do not add one back without
-   * her: the walk's other Escape, the one that closes the leave card in
-   * `WayOut`, is a different screen and a different question. */
+  // Escape never steps back on the setup screens, because people press it to
+  // shake off a chooser or a menu. The back arrow is the only way back.
   const backTo = stepBack(run.step);
 
-  // THE LAST SCREEN READS HER MAC, once: her home folder, this project's
-  // folder, and every other folder on the disk that has agents in it.
-  //
-  // AND IT IS READ ONE BEAT EARLY, on ⌘K, so the finish card is whole the
-  // moment it appears. The offer is part of that card now, and a list of her
-  // agents popping into a card she is already reading is the same defect as a
-  // screen that says there are none before it has looked.
-  //
-  // NOTHING IS TICKED FROM THIS ANY MORE. The old card opened with everything
-  // on and remembered what she took last time (`chosenAtOpen`); the card she
-  // approved on 08-26 opens with nothing on, which is what makes one project
-  // one press, so what she took last time is no longer read here.
-  //
-  // AN EMPTY ANSWER IS NOT LATCHED, AND THAT IS ESTHER'S BULLET.
-  //
-  // The read ran ONCE and its result was kept whatever it was, so an empty
-  // `{user: [], project: []}` was a finished answer that could never be looked
-  // at again. a tester reached the last card on a Mac with no Claude Code on
-  // it, which is exactly the Mac with no `~/.claude/agents` on it either.
-  // Claude Code was then installed in front of her, she pressed Check again,
-  // the gate opened on the binary, and the offer stayed empty for the rest of
-  // the walk because this effect had already decided. Nothing on the screen
-  // said we had looked before there was anything to look at.
-  //
-  // So a read that FOUND something is final, and a read that found nothing is
-  // provisional: it is taken again when the last card opens, and again every
-  // time Check again turns Claude Code up, which is the exact moment a Mac
-  // that had no agents on it might have some. It is a directory listing, so
-  // asking twice costs nothing, and the beat-early read still fills the card
-  // for the normal case where she has agents all along.
+  // The agent files in the home and project folders, read one beat early (on
+  // ⌘K) so the finish card is whole when it appears. A read that found
+  // something is final. One that found nothing is read again on the last card
+  // and after Check again finds Claude Code, since installing it may add agents.
   const again = readAgentsAgain(found);
   useEffect(() => {
     if (run.step !== 'command' && run.step !== 'done') return;
@@ -2086,9 +1280,7 @@ export function Onboarding({
       const { api } = await import('../api');
       const r = await api.agentFiles({ folder: run.folder, product: run.product });
       if (!live) return;
-      // A second read that found nothing again is the same nothing, so the
-      // card is left exactly as it is rather than redrawn in a loop on the very
-      // Mac this rule exists for.
+      // A second empty read leaves state alone, so the effect does not loop.
       const now = { user: r.user, project: r.project };
       if (!keepSecondRead(found, now)) return;
       setFound(now);
@@ -2096,20 +1288,10 @@ export function Onboarding({
     return () => { live = false; };
   }, [run.step, run.folder, run.product, found, again, lookedAgain]);
 
-  // THE DISK SCAN IS ITS OWN READ, because it is much the slower of the two and
-  // the card must not wait on it to say what it already knows. Measured on the
-  // ⌘K card 2026-08-26 with twenty folders on the disk: the scan came back
-  // after the file read every time.
-  //
-  // AND IT WAITS FOR THE IMPORT CARD. It used to start one beat early, on the
-  // ⌘K card, so the import card would be whole when it opened. But this is the
-  // one read in the walk that leaves the folder she picked: it lists the folder
-  // BESIDE her project, and on a Mac where that is `~/Desktop/dev`, macOS puts
-  // up its Desktop panel. Measured on the "the app new user" build 2026-09-01
-  // 20:23:39: the panel landed on the ⌘K card, over a screen that says nothing
-  // about agents.So the permission is asked on the card that needs it, and the
-  // card fills in while it is on screen, which it already knows how to do
-  // (`folders` is null until then).
+  // The disk scan is a separate, slower read, so the card does not wait on it.
+  // It starts only on the last card because it lists folders beside the
+  // project, and under ~/Desktop macOS shows its folder permission prompt,
+  // which should appear on the card that needs it.
   useEffect(() => {
     if (run.step !== 'done') return;
     if (folders) return;
@@ -2123,9 +1305,6 @@ export function Onboarding({
     return () => { live = false; };
   }, [run.step, folders]);
 
-  // ENTER CARRIES THE WHOLE WALK. Every setup screen's one button is also the
-  // return key, because a walk you can finish without reaching for the mouse is
-  // the difference between a demo and a product.
   useEffect(() => {
     if (run.step !== 'welcome') return;
     const on = (e: KeyboardEvent) => {
@@ -2135,31 +1314,16 @@ export function Onboarding({
     return () => window.removeEventListener('keydown', on);
   }, [run.step, onEvent]);
 
-  // AND THE FOLDER SCREEN'S OWN ⌘↵. Measured on, 2026-08-21, off the shipping
-  // build: with a folder already chosen and Next live, ⌘↵ left the screen
-  // exactly where it was. Nothing listened for it. That is the same fault she
-  // reported one line above it on the ⌘O, and the walk's rule is that a hint
-  // on a key is a promise the key does something. Only with a folder in hand,
-  // because Next is dead without one. AND PLAIN ↵ AS WELL, from round four,
-  // because the card now shows a bare ↵ in its corner where the Command-Enter
-  // button used to be. A key drawn on a screen is a promise that the key does
-  // something; ⌘↵ still works, since it is the key every other screen in the
-  // walk takes.
-  //
-  // THE LIST TAKES THE KEYS NOW (w-ec62ab6b38). Arrows move the highlight down
-  // the recent folders and onto "Choose another folder"; Return takes the
-  // highlighted one. Armed on the next tick, like every screen of the walk, so
-  // the Return that arrived here does not also leave.
+  // The folder list's keys: arrows move the highlight through the recent
+  // folders, "Choose another folder" and the no-folder row, and Return takes
+  // it. Armed on the next tick so the Return that arrived here does not leave.
   const rows = recent?.length ?? 0;
   useEffect(() => {
     if (run.step !== 'folder' || recent === null) return;
     const on = (e: KeyboardEvent) => {
-      // One row past "Choose another folder": the way past for somebody with no folder.
       if (e.key === 'ArrowDown') { e.preventDefault(); setLit((i) => Math.min(rows + 1, i + 1)); }
       if (e.key === 'ArrowUp') { e.preventDefault(); setLit((i) => Math.max(0, i - 1)); }
-      // The row past the chooser is the way past with no folder.
       if (e.key === 'Enter' && lit > rows) { e.preventDefault(); skipFolder(); return; }
-      // Return with nothing lit picks nothing.
       if (e.key === 'Enter' && lit < 0) { e.preventDefault(); return; }
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -2174,26 +1338,16 @@ export function Onboarding({
   const pickFolder = async () => {
     const { api } = await import('../api');
     const { path: picked, refused: why, browse } = await api.chooseFolder(run.folder ?? undefined);
-    // NO MAC PICKER TO OPEN, which is a browser tab and not a failure. The app
-    // draws its own, on the same disk, through the same process.
+    // In a browser tab there is no Mac picker, so the app draws its own.
     if (browse) { setRefused(null); setBrowsing(true); return; }
-    // TURNED DOWN, AND SAID SO. This picker opens on the home folder, so
-    // pressing Open without navigating anywhere used to make the home folder
-    // the project. That is macOS asking about each guarded folder in turn,
-    // because the worker started in the home folder and listed it. Main refuses
-    // the path; this shows why.
+    // Main refuses some paths, such as the home folder, because a worker that
+    // starts there makes macOS ask about each protected folder in turn. Show
+    // the reason.
     if (why) { setRefused(why); return; }
-    // Cancelling is not an answer, so it changes nothing.
     if (picked) takeFolder(picked);
   };
 
-  // PICKING IS MOVING ON (w-ec62ab6b38). The old screen held a chosen folder in
-  // a box and waited for Submit, which is the step people could not read. A
-  // folder picked from the list or from the Mac chooser goes straight to the
-  // name, where the folder is shown again with a way to change it.
-  // NO FOLDER, AND THAT IS FINE (2026-10-01). The project is made without one
-  // and its agents work in a folder the app keeps for it, so somebody with no
-  // code folder still ends the setup with a project that works.
+  // With no folder, the project's agents work in a folder the app keeps for it.
   const skipFolder = () => {
     setRefused(null);
     onEvent({ t: 'noFolder' });
@@ -2212,31 +1366,12 @@ export function Onboarding({
     setNotMade(null);
     try {
       const why = await onSkipToApp({ name: run.name.trim(), folder: run.folder });
-      // A reason means the walk did not move, and the card is the only surface
-      // she can see while it is up. Nothing here throws: App.tsx catches and
-      // answers with words, so the one failure this screen has is a value.
+      // App.tsx catches and returns the reason as words, so failure is a value.
       if (why) setNotMade(why);
     } finally { setBusy(false); }
   };
 
-  // ---- the introduction, before the app is ever on the screen --------------
-  // Four slabs and the hand-off. Nothing here touches the store except the last
-  // button, and nothing here is the app.
-  //
-  // WHERE NEXT GOES IS READ OFF `STEPS`, NEVER OFF A LIST WRITTEN OUT HERE.
-  // This was `const next: Step[] = ['away', 'goal', 'hand']`, a second copy of
-  // the order kept in step with the real one by nothing at all, and adding the
-  // sidebar slab on 2026-08-24 broke it in both directions at once: slab two's
-  // Next skipped the new screen entirely, and slab four's Next ran off the end
-  // of the list and called `onStep(undefined)`, which stopped the walk dead on
-  // the last introduction screen. Both were photographed before either was
-  // noticed, which is the whole argument for driving it.
-  //
-  // IT READ `INTRO` FOR A DAY AND THAT WAS STILL A SECOND COPY, one screen
-  // long. Moving the look between the introduction and the hand-off on
-  // 2026-08-25 would have walked straight past it, because `INTRO` ends at the
-  // hand-off and knows nothing about what she put in front of it. `go` asks the
-  // walk's own order, which is the only list there is.
+  // The introduction slabs. Their Next uses `go`, never a local list of steps.
   const slab = SLAB_OF[run.step];
   if (slab != null) {
     const it = COPY.intro[slab];
@@ -2250,14 +1385,8 @@ export function Onboarding({
     );
   }
 
-  // THE MOUSE RULE HAD A SCREEN HERE AND SHE CUT IT.Its copy is in
-  // onboarding.ts where the deleted keys used to be, and in decisions.md
-  // verbatim.
-
-  // THE HAND-OFF. It says nothing in here is theirs and their own project is
-  // untouched, and it names NEITHER of them: naming the project they made one
-  // screen earlier is what put "Wt 77df" on a screen headed "This is a practice
-  // project". See COPY.handLine.
+  // The hand-off into the practice round. Its copy names no project, on
+  // purpose (see COPY.handLine).
   if (run.step === 'hand') {
     return (
       <Statement
@@ -2265,28 +1394,17 @@ export function Onboarding({
         line={COPY.handLine}
         go={COPY.handGo}
         onNext={onPractice}
-        // A WAY PAST IT ON THE PAGE ITSELF (2026-10-06), her words: "this is a
-        // tutorial page. Add a skip button, obviously a secondary button."
-        // The same exit as the corner Skip inside the tutorial.
+        // The same exit as the Skip in the practice strip.
         skip={COPY.handSkip}
         onSkip={onLeave}
       />
     );
   }
 
-  // ---- the app itself, with one card beside it -----------------------------
+  // The coached beats: the real app with one card beside it.
   if (COACHED.includes(run.step)) {
-    // HOW MANY FINISHED ROWS ARE LEFT, so the second clearing card says "too"
-    // rather than the first card word for word. `beat` is the list of rows this
-    // beat's key is right for and it is counted off the drawn inbox, so it is
-    // the same number the lights are showing. AND THE TAB STRIP GOES IN WITH
-    // IT, so the tab tour's sentences name the tab the next press really opens
-    // rather than the one that came next in a list. Same `tabs` the ring below
-    // is drawn off, which is the point of handing it to both.
-    // THE TEAM LAYOUT'S TAB STRIP, when it is the one on the screen. A card
-    // beside one of its tabs sits on the tabs after it, which is the "hints
-    // covered the tabs" a persona test reported, so there the card goes under
-    // the strip, and it names the tab as well as the key (2026-10-01).
+    // On the team layout's tab strip the card goes under the strip, since
+    // beside a tab it would cover the next ones, and it names the tab too.
     const teamStrip = run.step === 'where' && typeof document !== 'undefined'
       && !!document.querySelector('.th-bar .tm-tabs');
     const say = coach(run.step, run.sentAt ? now - run.sentAt : 0, {
@@ -2294,56 +1412,27 @@ export function Onboarding({
       tabNames: teamStrip ? TEAM_TAB_NAMES : undefined, team: !!team,
     });
     if (!say) return null;
-    // HER TASK'S OWN ROW FIRST. The walk knows which item it made, so on the
-    // two beats about that one row it points at it by id and falls back to the
-    // list only if it is not drawn yet. Without this the ring went round
-    // whatever was at the top of the list, which on a Mac with agents already
-    // running is somebody else's work.
+    // Ring the walk's own rows by id where it knows them, falling back to
+    // ANCHOR only until the row is drawn, so the ring never lands on someone
+    // else's work. The tab tour rings the tab the next press opens, from
+    // `nextTab`, which the card's words use too.
     const own = (run.step === 'working' || run.step === 'open') && run.item;
-    // AND THE SAME FOR THE STOPPED ROW ON BEAT FOURTEEN. Once it is open the
-    // strip of options wins, because that is what she is being told to press.
-    // AND ON BEAT FIFTEEN THE RING IS ON THE TAB THE PRESS GOES TO, which is
-    // the next one round the app's own rotation: Inbox, In progress, Closed and
-    // back. Ringing the tab somebody is standing on would tell them where they
-    // are, which they can see; ringing the next one tells them what Tab does,
-    // which is the beat.
-    // WHERE THE NEXT PRESS LANDS, read off the app's own rotation rather than
-    // worked out here. It was `progress, done, inbox` written down in this
-    // file, and the snooze beat put a Scheduled tab between the first two on
-    // 2026-08-24, so the ring pointed at the tab after the one Tab was actually
-    // about to open. Same shape of fault as the introduction's next list, found
-    // in the same run.
-    //
-    // AND IT MOVED OUT OF THIS FILE ON 2026-09-02, because the card's own
-    // sentences need the same answer and were working it out from a list of
-    // their own. `nextTab` in ../onboarding is the one copy now, and the ring
-    // and the words below cannot come apart.
     const goingTo = run.step === 'where' ? nextTab(tabs, view) : null;
-    // AND THE CLEARING BEAT RINGS THE ROW IT IS ABOUT. It used to ring
-    // `.list-pane .row`, which is whichever row the list drew first, over a
-    // card reading "close the two that are finished" — so the ring said one
-    // thing, the card said two, and neither said which. `beat[0]` is the
-    // first finished row still in the inbox, so the ring walks down them one
-    // press at a time the way it already does on the two beats below.
     const clearing = run.step === 'clear' ? beat?.[0] ?? null : null;
     const sel = own
       ? [`.list-pane .row[data-item-id="${run.item}"]`, ...ANCHOR[run.step] ?? []]
-      // THE BOARD ITSELF ONCE IT IS UP (2026-10-06), so the card sits under
-      // the columns rather than dropping off the View button onto Done.
       : run.step === 'board' && board
       ? ['.th-board', ...ANCHOR.board ?? []]
       : clearing
       ? [`.list-pane .row[data-item-id="${clearing}"]`, ...ANCHOR.clear ?? []]
       : run.step === 'unblock' && waiting && !opened
         ? [`.list-pane .row[data-item-id="${waiting}"]`, ...ANCHOR.unblock ?? []]
-        // AND BEAT FOURTEEN RINGS THE ROW THAT IS NOT FOR TODAY, until the
-        // picker is over it, at which point the picker is what the press is
-        // about and ANCHOR.snooze has it first.
+        // Once the snooze picker is open, ANCHOR.snooze rings it instead.
         : run.step === 'snooze' && later && !picking
           ? [`.list-pane .row[data-item-id="${later}"]`, ...ANCHOR.snooze ?? []]
           : goingTo
-            // THE TEAM LAYOUT'S TAB FIRST (2026-10-01): its strip has no
-            // data-tab, so `teamTab` finds the tab by its place in the strip.
+            // The team strip has no data-tab, so `teamTab` finds the tab by
+            // its place in the strip.
             ? [...(teamTab(goingTo) ? [teamTab(goingTo) as string] : []), `.workspace-navigation [data-tab="${goingTo}"]`, `.tabs .tab[data-tab="${goingTo}"]`, ...ANCHOR.where ?? []]
             : ANCHOR[run.step];
 
@@ -2351,69 +1440,33 @@ export function Onboarding({
     return (
       <Ringed
         selector={sel}
-        // THE TAB TOUR STANDS THE CARD OFF THE STRIP; THE PALETTE STANDS IT OFF
-        // ITSELF. Both are things the card must not land on top of, and they
-        // are different shapes, so they take the two different rules in
-        // `Ringed`. AND THE BEAT THAT TEACHES HOW A TASK ENDS IS NOT ONE OF
-        // THEM ANY MORE. It stood beside `.focus-actions button` from
-        // 2026-08-28, because its ring was round a close-this-task button in a
-        // row of buttons and a card under that button printed 12 and then 46
-        // points into the reply box. Both the button and the bar are gone from
-        // the reading pane since 2026-08-27, so that rule was aiming the card
-        // off an element the page no longer has, on a beat whose ring had
-        // stopped being drawn at all. The ring is the reply box itself now, and
-        // the reply box sits on the bottom edge of the window, so `ring`
-        // already flips the sentence above it into the empty middle of the
-        // pane. There is nothing beside it to stand off and nothing under it to
-        // cover: the overlap the rig prints as `overDock` is 0 by construction.
-        // AND THE LOOK AROUND'S TABS CARD, for the tour's reason: under the
-        // strip it printed over the first three thread titles (2026-10-06).
-        // Beside the team strip too on the look around: its ring is the whole
-        // strip, so there is no later tab for the card to land on, only the
-        // empty space to the right of All.
-        beside={(run.step === 'where' && !teamStrip) || run.step === 'tabs' || (run.step === 'command' && !!palette) || run.step === 'answer'}
-        // AND THE ANSWER BEAT STANDS OFF THE REPLY BOX TO ITS RIGHT
-        // (2026-10-06). Above the box it covered the agent's answer, the newest
-        // thing in the thread and the one thing she is there to read: all four
-        // persona testers and Codex named it, on the shorter summary especially.
+        // Beside the ring where a card underneath would cover what it is about:
+        // the old sidebar's tabs, the open palette, and the reply box on the
+        // answer beat. NOT beside the tab strip over a list: a card centred on
+        // a 54px strip is three times its height, so it spilled over the strip
+        // and onto the rows. Those two beats take `UNDER` instead.
+        beside={(run.step === 'where' && !teamStrip) || (run.step === 'command' && !!palette) || run.step === 'answer'}
+        // To the right of the reply box, because above it the card covered the
+        // agent's answer.
         besideRing={(run.step === 'command' && !!palette) || run.step === 'answer'}
-        // The tour's tabs are the sidebar's rows now, so the card stands off
-        // the sidebar's right edge and holds one x for every press.
-        besideOf={run.step === 'tabs' ? '.th-bar .tm-tabs, .workspace-navigation, .tabs' : run.step === 'where' ? '.workspace-navigation, .tabs' : undefined}
+        // The old sidebar's tabs are rows, so the card stands off the sidebar's
+        // right edge.
+        besideOf={run.step === 'where' ? '.workspace-navigation, .tabs' : undefined}
         boundsSel={BOUNDS[run.step]}
-        // AND THE CARD GOES UNDER THE WHOLE PICKER, NOT UNDER THE LIST INSIDE
-        // IT. The ring is on the options, which is what the press is about, but
-        // a card TEXT_GAP under the options prints across the last two of them
-        // — photographed on 2026-08-24 with "Tomorrow" half behind the words
-        // telling her to pick one. Same fault as the answer card covering two
-        // of three options a round earlier, and the same fix: clear the whole
-        // thing the ring is inside.
+        // Under the whole snooze picker, not just its options, so the card
+        // covers none of them.
         underSel={run.step === 'snooze' && picking ? '.modal.snooze' : UNDER[run.step]}
-        // AND ON THE TWO BEATS THAT RING ONE ROW OUT OF A STACK, THE LIST MOVES
-        // INSTEAD OF THE CARD. `UNDER` above put the card below every row so it
-        // covered none of them, and the price was the card ending up 256px from
-        // its own ring with three rows in between, each of them a candidate for
-        // the "this one" the card was talking about. Now the rows under the
-        // ringed one slide down by the card's height and the card sits in the
-        // gap, 18px under the row it names. See `makeRoom`.
-        //
-        // NOT WHILE THE PICKER IS OPEN. Then the ring is inside a modal over
-        // the list, the rows behind it are not what anybody is reading, and
-        // moving them would animate the room behind a screen she is looking at.
+        // On beats that ring one row of a stack, the card stays by its ring
+        // rather than dropping below `UNDER`. Not while the snooze picker is
+        // open, since the ring is then inside the modal.
         makesRoom={(run.step === 'clear' || (run.step === 'snooze' && !picking)) && !!UNDER[run.step]}
         say={say}
         beat={beat}
         pointed={pointed}
-        /* * AND THE APP IS HELD TO THIS BEAT WHILE THE PRACTICE BAND IS UP (w-9a6ea066d6,
-           2026-08-28).
-        */
         hold={practising(run)}
         also={ALSO[run.step]}
-        // THE LOOK AROUND MOVES ON BY ITSELF: the list, then the tabs, then the
-        // plus. Read off the walk's one order like every other Next.
-        // AND ON THE ⌘K LIST ANY PRESS SHUTS IT, which is what ends that beat.
+        // On the ⌘K beat any press shuts the palette, which ends the beat.
         onNext={say.next ? () => go(run.step) : say.anyKey ? onShut : undefined}
-        // EVERY CARD CAN BE SKIPPED (2026-10-06), quietly: see `skipStep`.
         onSkip={onSkipStep}
       />
     );
@@ -2425,26 +1478,18 @@ export function Onboarding({
         found={found}
         folders={folders}
         claude={claude}
-        products={walkProject(products, run)}
+        products={walkProjects(products, run)}
         project={run.product}
         onDone={onDone}
         onFiled={onFiled}
         onProjectMade={onProjectMade}
         onRecheck={async () => {
           const missing = onRecheck ? await onRecheck() : true;
-          // Claude Code has just turned up, so look at her agents again: the
-          // first read ran on a Mac that did not have it, and on such a Mac
-          // ~/.claude/agents does not exist either.
-          //
-          // AND FORGET THE EMPTY ANSWER FIRST. Keeping it let the card end the
-          // walk on the very press that was supposed to fill it, before the
-          // fresh read could land.
+          // Claude Code just turned up, so forget the empty agent reads and
+          // read again. Keeping an empty answer would end the walk before the
+          // fresh read lands.
           if (!missing) {
             setFound((f) => forgetAgentsWhileLookingAgain(f, missing));
-            // AND THE DISK SCAN IS FORGOTTEN WITH IT. It looks for folders that
-            // hold agent files, so on a Mac without Claude Code it came back
-            // empty for the same reason the file read did, and an empty scan
-            // kept is half of what sends her straight past the offer.
             setFolders((f) => forgetFoldersWhileLookingAgain(f, missing));
             setLookedAgain((n) => n + 1);
           }
@@ -2456,33 +1501,18 @@ export function Onboarding({
 
   if (run.step === 'landed') return null;
 
-  // ---- the three setup screens --------------------------------------------
   const folderShown = run.folder ? shortPath(run.folder, home) : null;
 
-  /* * THE WAY BACK, SAID OUT LOUD. The key above is the whole of
-     the behaviour; this is the half that makes it findable, and a tester is the
-     reason both are needed.
-
-     IT IS THE APP'S OWN BACK CONTROL AND NOTHING NEW.
-
-     That control already exists and she settled it twice. So this is that button, in that
-     stylesheet rule, with the walk's own class only for where it sits. Redrawing it would
-     have been the fourth round of a question she has answered twice.
-
-     TOP LEFT MEANS BESIDE THE WORDMARK, NOT AT THE CORNER. The window is
-     `titleBarStyle: 'hiddenInset'`, so the corner itself belongs to the red,
-     amber and green buttons; `.fr-brand` already starts at 64px to clear them
-     and the arrow takes that place with the mark moving along behind it.
-  */
+  // The app's own back control, beside the wordmark. The window uses
+  // `titleBarStyle: 'hiddenInset'`, so the corner belongs to the macOS window
+  // buttons.
   const backWord = backTo && (
     <button
       type="button"
       className="back-esc fr-back"
       onClick={() => onStep(backTo)}
-      /*
-       * No key is named, because none does this any more. A control that
-         promises esc and does nothing when it is pressed is the dead key
-         `tests/the-walk-promises-no-dead-keys.test.mjs` exists to forbid. */
+      // No key is named, since no key steps back. Pinned by
+      // tests/the-walk-promises-no-dead-keys.test.mjs.
       aria-label={COPY.back}
       title={COPY.back}
     >
@@ -2492,26 +1522,13 @@ export function Onboarding({
 
   return (
     <div className={backWord ? 'fr-screen has-back' : 'fr-screen'}>
-      {/* THE ARROW FIRST, THEN WHOSE APP THIS IS. One control for both setup
-          screens rather than one drawn inside each of them, because it belongs
-          to the WINDOW's corner and not to either card. The welcome screen has
-          nothing behind it, so `stepBack` answers null there and this is not
-          drawn at all. */}
       {backWord}
       <div className="fr-brand"><AppMark size={22} />{NAME}</div>
 
       {run.step === 'welcome' && (
-        // CORNER TO CORNER, chosen out of eight welcomes. The
-        // sentence in one corner, the way on in the other, and the whole window
-        // between them doing nothing, which is the point of it.
         <div className="fr-corner">
           <div>
             <h1 className="fr-head">{COPY.head}</h1>
-            {/* THE PRIVACY LINE IS GONE (w-ec62ab6b38, 2026-09-28). Three
-                stacks of text made the welcome cluttered, and the line about
-                the privacy policy was the most disruptive of them. What a released
-                build counts is still switchable in Settings, "Counts and crash
-                reports", and written out in the README's "What this sends". */}
             <p className="fr-sub">{COPY.headSub}</p>
           </div>
           <button className="fr-go" onClick={() => void begin()}>
@@ -2520,19 +1537,23 @@ export function Onboarding({
         </div>
       )}
 
-      {/* WHICH PLAN, THEN SETTING IT UP (w-9f6975906c). Only on a Mac where
-          nothing can run an agent yet; see `begin`. Both hand on to the folder
-          screen, and so does Skip, because a walk that traps somebody without
-          a plan is worse than one that lets them look around. */}
+      {/* The question on a computer that cannot run an agent yet, and what was
+          found on one that can (see `begin`). Every way out, Skip included,
+          goes on to the folder screen. */}
       {run.step === 'plan' && !plan && (
-        <PlanQuestion onPick={setPlan} onReady={() => onStep('folder')} look={askMac} />
+        <PlanQuestion
+          onPick={setPlan}
+          onReady={() => onStep('folder')}
+          onSkip={() => onStep('folder')}
+          look={askMac}
+          found={alreadyHere}
+        />
       )}
       {run.step === 'plan' && plan && (
         <PlanSetupCard plan={plan} onDone={() => onStep('folder')} onSkip={() => onStep('folder')} />
       )}
 
-      {/* The app's own picker, over the walk, when there is no Mac one. It
-          takes the whole screen the same way the Mac's dialog would. */}
+      {/* The app's own folder picker, when there is no Mac one. */}
       {browsing && (
         <FolderPicker
           startIn={run.folder ?? null}
@@ -2542,12 +1563,7 @@ export function Onboarding({
       )}
 
       {run.step === 'folder' && (
-        // REBUILT FROM SCRATCH (w-ec62ab6b38, 2026-09-28). The old screen was
-        // a heading, a box labelled "Where is your code?", a path that was also
-        // a button, and a Submit that only appeared after a pick. Now: the real
-        // question, one line under it, and the folders she already runs agents
-        // in as rows to click. The Mac chooser is the last row. A click is the
-        // answer; there is no Submit. The old markup is in decisions.md, 09-28.
+        // A click on a row is the answer. There is no Submit.
         <div className="fr-stack fr-stack-folders">
           <h1 className="fr-page">{COPY.folderHead}</h1>
           <p className="fr-lede">{COPY.folderLede}</p>
@@ -2563,14 +1579,15 @@ export function Onboarding({
                 aria-selected={lit === i}
                 className={`fr-folder${lit === i ? ' lit' : ''}${run.folder === f.folder ? ' on' : ''}`}
                 onMouseEnter={() => setLit(i)}
+                // Tab lights the row it lands on, so the arrows and the
+                // keyboard never disagree about which row Return takes.
+                onFocus={() => setLit(i)}
                 onClick={() => takeFolder(f.folder)}
               >
                 <span className="fr-fold"><FolderGlyph /></span>
                 <span className="fr-folder-name">{f.name}</span>
                 <span className="fr-folder-path">{f.short}</span>
-                {/* NO TOOL NAMES ON THE ROW (2026-10-01). It said which agent
-                    app the folder was found through, which means nothing to
-                    most of the team. The cell stays so the grid holds. */}
+                {/* Empty on purpose. The cell keeps the grid's columns. */}
                 <span className="fr-folder-via" />
                 <span className="fr-folder-key">{lit === i && <Cap cap="↵" />}</span>
               </button>
@@ -2581,6 +1598,7 @@ export function Onboarding({
               aria-selected={lit === (recent?.length ?? 0)}
               className={`fr-folder fr-folder-other${lit === (recent?.length ?? 0) ? ' lit' : ''}`}
               onMouseEnter={() => setLit(recent?.length ?? 0)}
+              onFocus={() => setLit(recent?.length ?? 0)}
               onClick={pickFolder}
             >
               <span className="fr-fold"><PlusGlyph /></span>
@@ -2593,6 +1611,7 @@ export function Onboarding({
               aria-selected={lit === (recent?.length ?? 0) + 1}
               className={`fr-folder fr-folder-other fr-folder-none${lit === (recent?.length ?? 0) + 1 ? ' lit' : ''}`}
               onMouseEnter={() => setLit((recent?.length ?? 0) + 1)}
+              onFocus={() => setLit((recent?.length ?? 0) + 1)}
               onClick={skipFolder}
             >
               <span className="fr-fold"><SkipGlyph /></span>
@@ -2600,30 +1619,17 @@ export function Onboarding({
               <span className="fr-folder-key">{lit === (recent?.length ?? 0) + 1 && <Cap cap="↵" />}</span>
             </button>
           </div>
-          {/* WHAT IT FOUND ALREADY SIGNED IN ON THIS MAC (w-e217e577e5,
-              2026-10-07). One line, in the note slot this screen already has,
-              on the screen that is already about where the agents will run.
-
-              HERE AND NOT ON THE WELCOME. The welcome lost its third stack of
-              text on purpose (w-ec62ab6b38: "three stacks of text made the
-              welcome cluttered"), and putting a new one back is that decision
-              undone. This screen is also the first one a Mac with a plan
-              already on it reaches, so the line is said as early as it can be.
-
-              It is never drawn beside a refusal: one quiet line under the card,
-              and a folder that was turned down is the more urgent of the two. */}
+          {/* One note under the card: a refusal, else what this Mac is
+              already signed into. That note lives here, not on the welcome,
+              to keep the welcome to two lines. */}
           {refused
             ? <p className="fr-note fr-refused">{refused}</p>
-            : foundOnThisMac(runsOn ?? {}) && <p className="fr-note">{foundOnThisMac(runsOn ?? {})}</p>}
+            : foundOnThisComputer(runsOn ?? {}) && <p className="fr-note">{foundOnThisComputer(runsOn ?? {})}</p>}
         </div>
       )}
 
       {run.step === 'name' && (
         <div className="fr-stack fr-stack-folders">
-          {/* NAME SECOND, ALREADY FILLED IN, unchanged since round two.
-              Rebuilt with the folder screen (w-ec62ab6b38): the question is
-              the heading, the field is the card, and the folder it is for sits
-              under it with a way back to change it. */}
           <h1 className="fr-page">{COPY.nameQ}</h1>
           {folderShown ? (
             <p className="fr-lede">
@@ -2643,32 +1649,16 @@ export function Onboarding({
               value={run.name}
               spellCheck={false}
               onChange={(e) => { setNotMade(null); onEvent({ t: 'name', name: e.target.value }); }}
-              // The suggested name is selected, so typing replaces it rather
-              // than running on from it ("My workOffice admin", a persona test).
+              // Select the suggested name so typing replaces it.
               onFocus={(e) => e.currentTarget.select()}
-              /*
-               * ESCAPE IS NOT HERE ANY MORE, and that is not a deletion of the
-                 behaviour. It used to be this field's own handler, which meant
-                 the walk's only backwards move lived inside a text box on the
-                 third screen and did not exist on the second one at all. It is
-                 one window listener now, above, so both setup screens have it
-                 and neither depends on where the focus happens to be
-                 (w-18f4ab24c0). */
               onKeyDown={(e) => {
                 if (e.key === 'Enter') { e.preventDefault(); make(); }
               }}
             />
-            {/* THE SAME BUTTON AS THE FOLDER CARD, in the same corner and with
-                the same word. Enter in the field still makes the project, and
-                this does the one thing Enter does. */}
             <button className="fr-submit" onClick={make} disabled={!run.name.trim() || busy}>
               {COPY.nameGo} <Cap cap="↵" />
             </button>
           </div>
-          {/* THE ONLY THING THIS SCREEN CAN GET WRONG, SAID WHERE SHE IS
-              LOOKING. Under the card, the same place and the same shape as the
-              Claude Code line on the screen before it, so there is one kind of
-              footnote in the walk rather than two. */}
           {notMade && (
             <p className="fr-note fr-notmade" role="alert">{notMade}</p>
           )}

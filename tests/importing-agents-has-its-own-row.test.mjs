@@ -61,8 +61,15 @@ const row = (() => {
 
 describe('the row is in ⌘K and can be found by the words she would type', () => {
   it('is there, and it says what it does', () => {
-    expect(row.label).toBe('Import agents from Claude Code or Codex');
+    // SHORTER SINCE 2026-10-16, because it was the longest label in the
+    // palette by twelve characters and wrapped onto a second line: "There is
+    // so much text that it's overflowing on both lines." Which tools it reads
+    // moved into the hint, where there was room for it.
+    // tests/a-palette-row-never-stacks-onto-two-lines keeps it from growing
+    // back.
+    expect(row.label).toBe('Import chats and agents');
     expect(row.hint).toBeTruthy();
+    expect(`${row.label} ${row.hint}`).toMatch(/Claude Code or Codex/);
   });
 
   it('is still found by "bring", which is what the row said until 08-25', () => {
@@ -106,7 +113,7 @@ describe('it is the walk\'s import, not a second one', () => {
     // agent files and her own threads, they land in one inbox, and `file` is
     // what puts them there. The channel is still the walk's.
     expect(card).toContain('api.importAgents({ product: slug, agents: load.names })');
-    expect(card).toContain('api.importThreads({ product: slug, threads: load.ids })');
+    expect(card).toContain("api.importThreads({ product: slug, threads: load.ids, land: 'sorted' })");
     expect(card).toContain('await file(slug, load);');
     expect(card).toContain('await file(slug, f.load);');
   });
@@ -208,7 +215,13 @@ describe('what it says afterwards is what really happened', () => {
 describe('the card offers no key and no button it cannot honour', () => {
   it('draws the button only when there is something to bring', () => {
     // One screen since w-db6f5e331e, so one condition: read, and something on it.
-    expect(card).toContain('{read && some && (\n          <div className="ia-foot ia-foot-one">');
+    //
+    // AND WHILE A SEARCH IS OPEN (w-6418318cd5), where there may be nothing
+    // ticked yet. The button stays drawn rather than appearing under the hand
+    // on the first tick, and `ready` still disables it, so it is a button that
+    // says "Nothing ticked" rather than one it cannot honour.
+    expect(card).toContain('{read && (some || searching) && (\n          <div className="ia-foot ia-foot-one">');
+    expect(card).toContain('disabled={!ready || busy}');
   });
 
   it('takes ⌘↵ and Escape, and leaves plain Enter to the ticks', () => {

@@ -13,6 +13,10 @@
 // does nothing worth doing is one more thing to read past.
 //
 // So: no chevron, no held state, and every option is on the screen always.
+//
+// The one-at-a-time page's choices sit fixed at the foot again, over the reply
+// box, so they fold from an arrow of their own, outside this block
+// (tests/a-little-arrow-folds-the-choices-at-the-foot).
 
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';

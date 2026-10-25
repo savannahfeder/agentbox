@@ -84,11 +84,13 @@ describe('a continuation that keeps dying eventually says so on the row', () => 
     expect(written).toHaveLength(0);
   });
 
+  // Nothing restarts it once we have stopped, so the hour is when to reply,
+  // not when it starts (tests/a-thread-the-app-stopped-trying-on-waits-in-needs-you).
   it('speaks once we have stopped trying, and names the limit', () => {
     for (let n = 0; n < 3; n += 1) { mark(); settleTheWayTheExitHandlerDoes(deadOnALimit()); }
     expect(written).toHaveLength(1);
     expect(written[0].result).toMatch(/at its usage limit/);
-    expect(written[0].result).toMatch(/starts again on its own at 6pm/);
+    expect(written[0].result).toMatch(/resets at 6pm\. Then reply here to start it again\./);
   });
 
   it('leaves the row open, because her answer still wants carrying', () => {

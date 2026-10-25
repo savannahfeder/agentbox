@@ -15,8 +15,11 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { bootHeadless, createServer, newToken } from '../main/serve.mjs';
+import { bootHeadless, createServer, newToken, picturesTheAppOwns } from '../main/serve.mjs';
 import { appHome } from '../main/store/home.mjs';
+import { learnShellDataDirs } from '../main/shell-path.mjs';
+import { startFreezeRecorder } from '../main/freeze-recorder.mjs';
+import { watchNewChatsFor } from '../main/new-chats-watch.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.dirname(here);
@@ -59,10 +62,22 @@ if (!fs.existsSync(path.join(dist, 'index.html'))) {
   process.exit(1);
 }
 
+// The login folders the shell profile names, read before the first worker can
+// start, as main/main.mjs does. The worker scrub keeps CLAUDE_CONFIG_DIR and
+// CODEX_HOME from reaching a worker by inheritance, so without this a copy's
+// workers signed in to ~/.claude and ~/.codex (w-6d8c543a43).
+await learnShellDataDirs();
 const booted = await bootHeadless({ dataDir, appDir, userDir: dataDir });
+// What held the thread each time it froze, as the desktop records it.
+startFreezeRecorder({
+  dir: path.join(dataDir, 'memory-log'),
+  appDir,
+  onFreeze: (f) => console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`),
+});
 // ZERO_NO_SUPERVISOR: the desktop already honors this (main/main.mjs). This
 // entry is the same inbox, so a launch that asks for no agents must not start
 // them here either.
+let newChatsWatch = null;
 if (!process.env.ZERO_NO_SUPERVISOR) {
   // Whoever was signed in to the team last time is signed in again.
   booted.team?.start().then(() => booted.supervisor.wake?.()).catch((err) => console.warn(`team: ${err.message}`));
@@ -70,6 +85,8 @@ if (!process.env.ZERO_NO_SUPERVISOR) {
   // tab only moved work when something woke the supervisor: a queued thread sat
   // queued and a scheduled one never fired (found 2026-10-01 on a test copy).
   booted.supervisor.start();
+  // The chats setup's "Keep bringing in new chats" tick asks for.
+  newChatsWatch = watchNewChatsFor({ store: booted.store, config: booted.config, supervisor: booted.supervisor });
 }
 const token = newToken();
 const server = createServer({
@@ -77,6 +94,10 @@ const server = createServer({
   token,
   listeners: booted.window.listeners,
   dist,
+  // The pictures in a thread: a tab cannot open `agentbox-img://`, which only
+  // the desktop window answers, so without this door every local picture is
+  // drawn as missing.
+  files: picturesTheAppOwns(booted),
 });
 
 const wanted = Number(flag('port', 0)) || 0;
@@ -99,6 +120,7 @@ server.on('error', (err) => {
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
     console.log('\n  Stopping.');
+    newChatsWatch?.stop();
     booted.host.app.quit();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 3000).unref();

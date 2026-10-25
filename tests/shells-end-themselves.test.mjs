@@ -65,7 +65,9 @@ describe('a shell nobody is watching ends itself', () => {
     expect(f.made[0].kill).not.toHaveBeenCalled();
   });
 
-  it('goes once that command finishes and nobody comes back', () => {
+  // Only because it printed nothing: a command that leaves output she has not
+  // seen keeps its shell (a-shell-waits-until-you-have-read-what-it-printed).
+  it('goes once that command finishes silently and nobody comes back', () => {
     const f = fixture();
     f.manager.open('p:a');
     f.made[0].process = 'npm';
@@ -133,7 +135,7 @@ describe('reopening one the app tidied away says so', () => {
     f.tick(11 * MINUTE);
     f.manager.sweepIdle();
     const back = f.manager.open('p:a');
-    expect(back.data).toContain('closed after ten minutes idle');
+    expect(back.data).toContain('closed after an hour idle');
     expect(back.data).toContain('This is a new one');
   });
 

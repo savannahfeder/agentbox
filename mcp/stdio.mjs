@@ -20,6 +20,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import path from 'node:path';
 import { buildTools } from './tools.mjs';
 import { NAME, Name, nameSlug } from '../shared/product-name.mjs';
 
@@ -27,8 +28,13 @@ const LOG = `[${nameSlug}-store]`;
 
 console.log = (...args) => console.error(LOG, ...args);
 
-async function main() {
-  const { account, tools, claims } = buildTools();
+/**
+ * One store server over `input` and `output`: this process's own stdio, or one
+ * cloud run's connection when many share a process (main/cloud/run.mjs), each
+ * holding its own claims (`holder`). Returns a close that gives them back.
+ */
+export async function serveStore({ input = process.stdin, output = process.stdout, holder, ownItem } = {}) {
+  const { account, tools, claims } = buildTools({ holder, ...(ownItem !== undefined ? { ownItem } : {}) });
 
   const server = new McpServer(
     { name: nameSlug, version: '1.0.0' },
@@ -45,23 +51,30 @@ async function main() {
     server.registerTool(tool.name, { description: tool.description, inputSchema: tool.schema }, tool.run);
   }
 
-  // Give held work items back promptly on a clean exit instead of making the
-  // next worker wait out a full lease. Best effort by design: the lease is the
-  // guarantee, and this is only the courtesy that makes the common case fast.
-  const goodbye = () => {
+  // Give held work items back promptly when the session ends instead of making
+  // the next worker wait out a full lease. Best effort by design: the lease is
+  // the guarantee, and this is only the courtesy that makes the common case fast.
+  const giveBack = () => {
     for (const id of claims.holding()) {
       try { claims.release(id); } catch { /* the lease will handle it */ }
     }
-    process.exit(0);
   };
-  process.on('SIGINT', goodbye);
-  process.on('SIGTERM', goodbye);
 
-  await server.connect(new StdioServerTransport());
+  await server.connect(new StdioServerTransport(input, output));
   console.error(`${LOG} serving account ${account.accountId} from ${account.root} (${tools.length} tools) for ${NAME}`);
+  return { close: async () => { giveBack(); await server.close().catch(() => {}); } };
 }
 
-main().catch((err) => {
+async function main() {
+  const { close } = await serveStore();
+  const goodbye = () => { close().finally(() => process.exit(0)); };
+  process.on('SIGINT', goodbye);
+  process.on('SIGTERM', goodbye);
+}
+
+// Started as a program (mcp/agentbox-mcp.sh), not imported by a cloud run's relay.
+const startedAsProgram = path.basename(process.argv[1] || '') === 'stdio.mjs';
+if (startedAsProgram) main().catch((err) => {
   // A startup failure is almost always configuration (no account, wrong
   // STORE_HOME), so it must be readable on stderr rather than a stack trace
   // the client swallows.

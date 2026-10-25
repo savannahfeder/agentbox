@@ -35,6 +35,35 @@ export function shiftFor(i: number, from: number, to: number, height: number): n
 /** Whether a drop from `from` in front of `to` would leave the row where it was. */
 export const stays = (from: number, to: number) => to === from || to === from + 1;
 
+/**
+ * HOW FAR A PRESS HAS TO TRAVEL BEFORE IT CARRIES ANYTHING (F-41). It used to
+ * be 4px, which is inside the drift of an ordinary click: rows in the list
+ * "often need two clicks to open", because the first one picked the row up and
+ * the click that ended it was swallowed.
+ */
+const LIFTS_AT = 8;
+
+/** Whether a press that has travelled this far from where it began is a carry. */
+export function lifts(dx: number, dy: number): boolean {
+  return Math.hypot(dx, dy) >= LIFTS_AT;
+}
+
+/**
+ * WHETHER THE CLICK A PRESS ENDS WITH STILL OPENS THE ROW.
+ *
+ * `lifted` is whether it ever picked the row up, `letGo` whether it ended by
+ * letting go rather than being called off with Escape, and `wandered` whether
+ * the row, while it was up, ever pointed at a place that was not its own.
+ *
+ * A carry that put the row back in its own slot moved nothing, so it is still
+ * a click. A cancelled one is spent either way: letting go after Escape must
+ * not open what the press was carrying.
+ */
+export function opensTheRow(p: { lifted: boolean; letGo: boolean; wandered: boolean }): boolean {
+  if (!p.lifted) return true;
+  return p.letGo && !p.wandered;
+}
+
 /** How far the list scrolls this frame with the pointer at `y`: toward the
  *  edge it is near, faster the nearer, and not at all away from both. */
 export function edgeScroll(y: number, top: number, bottom: number): number {
@@ -54,6 +83,8 @@ type Held = {
   startX: number; startY: number; scroll0: number; x: number; y: number; started: boolean;
   rows: { id: string; el: HTMLElement; top: number; bottom: number }[];
   from: number; to: number; frame: number;
+  /** Whether the row has ever pointed at a place that is not its own (`opensTheRow`). */
+  wandered: boolean;
   /** What rides the pointer, and where on it the pointer holds it. */
   preview: HTMLElement | null; gx: number; gy: number;
   /** Where the grab drifts to on the chip; equal to gx/gy for a card copy. */
@@ -166,6 +197,7 @@ export function useRowDrag(
   const paint = (h: Held) => {
     const ds = scrolled(h);
     h.to = landingRow(h.rows, h.y + ds);
+    if (!stays(h.from, h.to)) h.wandered = true;
     if (h.preview) h.preview.style.transform = `translate(${h.x - h.gx}px, ${h.y - h.gy}px)`;
     h.el.style.transform = `translateY(${slotOffset(h.rows, h.from, h.to)}px)`;
     h.rows.forEach((r, i) => { if (i !== h.from) r.el.style.transform = `translateY(${shiftFor(i, h.from, h.to, pitchOf(h))}px)`; });
@@ -217,7 +249,7 @@ export function useRowDrag(
     if (!h?.started) return;
     carrying -= 1;
     cancelAnimationFrame(h.frame);
-    swallow.current = true;
+    swallow.current = !opensTheRow({ lifted: true, letGo: keep, wandered: h.wandered });
     const was = new Map(h.rows.map((r) => { const b = r.el.getBoundingClientRect(); return [r.id, { top: b.top, left: b.left }]; }));
     if (keep && !stays(h.from, h.to)) {
       const beforeId = h.rows[h.to]?.id ?? null;
@@ -277,8 +309,8 @@ export function useRowDrag(
     h.x = x;
     h.y = y;
     if (!h.started) {
-      // A press that barely moves is a click, not a lift.
-      if (Math.hypot(x - h.startX, y - h.startY) < 4) return;
+      // A press that barely moves is a click, not a lift (`lifts`).
+      if (!lifts(x - h.startX, y - h.startY)) return;
       const els = [...(h.scope?.querySelectorAll<HTMLElement>('[data-drag-id]') ?? [])];
       // A second lift straight after a drop would measure rows mid-glide.
       for (const el of els) { el.getAnimations?.().forEach((a) => a.finish()); delete el.dataset.settling; }
@@ -355,7 +387,7 @@ export function useRowDrag(
     if (hit && hit !== e.currentTarget) return;
     const el = e.currentTarget;
     const scope = el.closest<HTMLElement>('[data-drag-scope]') ?? listRef.current;
-    held.current = { id, el, scope, scroller: null, startX: e.clientX, startY: e.clientY, scroll0: 0, x: e.clientX, y: e.clientY, started: false, rows: [], from: -1, to: -1, frame: 0, preview: null, gx: 0, gy: 0, gxEnd: 0, gyEnd: 0 };
+    held.current = { id, el, scope, scroller: null, startX: e.clientX, startY: e.clientY, scroll0: 0, x: e.clientX, y: e.clientY, started: false, rows: [], from: -1, to: -1, frame: 0, wandered: false, preview: null, gx: 0, gy: 0, gxEnd: 0, gyEnd: 0 };
     const onMove = (ev: PointerEvent) => move(ev.clientX, ev.clientY);
     // The list scrolling under a still pointer moves the slot too.
     const onScroll = () => { const h = held.current; if (h?.started) paint(h); };

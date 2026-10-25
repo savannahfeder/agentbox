@@ -74,7 +74,8 @@ describe('App.tsx uses both', () => {
     expect(app).toMatch(/onPhone\(\)\s*\?\s*writeHeldWhenHidden\(document,/);
   });
   it('hands a reply to a working agent over at once on a phone', () => {
-    expect(app).toMatch(/if \(!holdsReplies\(onPhone\(\)\)\) \{ void handOver\(\); return; \}/);
+    // Behind whatever was held before it, which is written first.
+    expect(app).toMatch(/if \(!holdsReplies\(onPhone\(\)\)\) \{ void handOverAfter\(\); return; \}/);
   });
   it('and writes any other reply at once on a phone', () => {
     expect(app).toMatch(/holdsReplies\(onPhone\(\)\) \? UNDO_GRACE_MS : 0/);

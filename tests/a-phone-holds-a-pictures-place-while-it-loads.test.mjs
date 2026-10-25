@@ -64,17 +64,17 @@ describe('a picture on a phone', () => {
 
 describe('the placeholder', () => {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-  const css = fs.readFileSync(path.join(root, 'renderer/src/phone.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-  const at = css.indexOf('@media (max-width: 700px), (max-height: 520px)');
-  const inside = css.slice(at);
-  const rule = (sel) => {
-    const m = inside.match(new RegExp(`([^{}]*${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^{}]*)\\{([^{}]*)\\}`));
-    return m ? m[2] : '';
-  };
+  // In the main stylesheet since every window got it
+  // (a-picture-on-its-way-holds-its-place-on-the-computer-too).
+  const inside = fs.readFileSync(path.join(root, 'renderer/src/styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  // Every rule naming it, joined: the button around a loading picture names it too.
+  const rule = (sel) => [...inside.matchAll(new RegExp(`([^{}]*${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^{}]*)\\{([^{}]*)\\}`, 'g'))]
+    .map((m) => m[2]).join(';');
 
   it('is a box of a picture\'s shape that shimmers, in a message, the picture view and an attachment', () => {
     const loading = rule('.inline-image[data-phone-img="loading"]');
-    expect(loading).toMatch(/aspect-ratio:\s*4\s*\/\s*3/);
+    // 4:3 until its first bytes give its own shape (a-picture-on-its-way-holds-the-columns-width-not-a-dot).
+    expect(loading).toMatch(/aspect-ratio:\s*auto\s+4\s*\/\s*3/);
     expect(loading).toMatch(/animation:\s*phone-shimmer/);
     expect(inside).toMatch(/\.doc-picture\[data-phone-img="loading"\]/);
     expect(inside).toMatch(/\.attach-row img\[data-phone-img="loading"\]/);

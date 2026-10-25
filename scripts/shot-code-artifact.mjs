@@ -103,7 +103,7 @@ const asked = [...new Set([
 ])];
 const resolved = {};
 for (const src of asked) {
-  const r = resolveArtifact({ src, product: SLUG, products: [product], accountRoot: ACCOUNT });
+  const r = await resolveArtifact({ src, product: SLUG, products: [product], accountRoot: ACCOUNT });
   if (r?.ok && r.path) resolved[src] = r.path;
 }
 // The change resolves like every other artifact now; this only guarantees it,

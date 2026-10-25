@@ -125,6 +125,25 @@ export function doItHereWords(child: Pick<WorkItem, 'id' | 'title'> & { body?: s
 
 type Write = { product: string; id: string; answer?: string; status?: 'open' | 'done' };
 
+/** The answer that starts a proposal (App.tsx `resolve`). */
+export const RUN_IT = 'Approved. Run it.';
+
+/**
+ * START ALL AND DISMISS ALL (w-fe64f35bdd): the writes that answer every
+ * proposal in one list, and the writes one Z makes to take them all back. The
+ * undo of a start is the one a single approval's undo makes; stopping whatever
+ * already started is the caller's.
+ */
+export function answerAllWrites(
+  kids: ReadonlyArray<Pick<WorkItem, 'id' | 'product'>>,
+  act: 'start' | 'dismiss',
+): { writes: Write[]; undo: Write[] } {
+  const at = (k: Pick<WorkItem, 'id' | 'product'>) => ({ product: k.product, id: k.id });
+  return act === 'start'
+    ? { writes: kids.map((k) => ({ ...at(k), answer: RUN_IT })), undo: kids.map((k) => ({ ...at(k), answer: '(withdrawn)', status: 'open' as const })) }
+    : { writes: kids.map((k) => ({ ...at(k), status: 'done' as const })), undo: kids.map((k) => ({ ...at(k), status: 'open' as const })) };
+}
+
 /** The two writes, PARENT FIRST: if the message does not get through, the
  *  proposal stays open rather than vanishing with nobody doing the work. Null
  *  when the parent given is not the thread that filed this one. */

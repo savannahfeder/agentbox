@@ -118,7 +118,8 @@ export function startPhoneAlerts(given: { token: string; device: string }, open:
   }
   const m = location.hash.match(/^#open=(.+)$/);
   if (m) {
-    history.replaceState(null, '', location.pathname + location.search);
+    // The entry's own mark stays: it may be the floor (./phone-screen).
+    history.replaceState(history.state, '', location.pathname + location.search);
     openItem(decodeURIComponent(m[1]));
   }
   void offerAlerts();

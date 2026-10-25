@@ -77,11 +77,19 @@ export type StoppedKey = (typeof STOPPED_WARNING_KEYS)[number];
  *  through added: a press that is refused and then quietly works on the second
  *  try is a key nobody can trust. "Press again" rather than "Press E again"
  *  because this is reached from the pane's own button and from ⌘K as well, and
- *  a button is pressed too. */
+ *  a button is pressed too.
+ *
+ *  `pressAgain` IS WHETHER THE PRESS WAS ACTUALLY HELD (w-c9da359466). On L it
+ *  is not: the box opens with this sentence inside it, because L opens a text
+ *  field and a swallowed L leaves the next word running as shortcuts (see
+ *  `openSnooze` in App.tsx). Telling somebody to press again while the box is
+ *  already open in front of them is the kind of line that teaches people to
+ *  stop reading these. */
 const COST: Record<StoppedKey, string> = { E: 'marking it done', L: 'putting it off' };
 
-export function stoppedWarning(key: StoppedKey): string {
-  return `This agent is waiting on your answer, and ${COST[key]} leaves it stuck. Press again to go ahead.`;
+export function stoppedWarning(key: StoppedKey, { pressAgain = true } = {}): string {
+  const lesson = `This agent is waiting on your answer, and ${COST[key]} leaves it stuck.`;
+  return pressAgain ? `${lesson} Press again to go ahead.` : lesson;
 }
 
 /**
@@ -141,5 +149,5 @@ export function holdForStoppedAgent(p: {
   if (p.warned || p.walking) return null;
   const stopped = p.rows.find(stoppedWaiting);
   if (!stopped) return null;
-  return { say: stoppedWarning(p.key), goes: { product: stopped.product, id: stopped.id } };
+  return { say: stoppedWarning(p.key, { pressAgain: p.key !== 'L' }), goes: { product: stopped.product, id: stopped.id } };
 }

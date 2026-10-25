@@ -41,9 +41,10 @@ describe('which tabs carry a number', () => {
     expect(tabs).toMatch(/!!counts\[/);
   });
 
-  it('still keeps all five tabs, in the order Tab moves along', () => {
+  // Four since All went on 2026-10-14 (the-threads-page-has-no-all-tab.test.mjs).
+  it('still keeps the four tabs, in the order Tab moves along', () => {
     const list = pages.slice(pages.indexOf('export const INBOX_TABS'), pages.indexOf('export function StateTabs'));
-    for (const view of ['inbox', 'progress', 'snoozed', 'done', 'all']) expect(list).toContain(`'${view}'`);
+    for (const view of ['inbox', 'progress', 'snoozed', 'done']) expect(list).toContain(`'${view}'`);
   });
 });
 

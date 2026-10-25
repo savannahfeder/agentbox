@@ -40,3 +40,14 @@ export function stepStop(stops: Stop[], from: Stop | null, dir: 1 | -1, fallback
   const next = (at >= 0 ? at : fallback) + dir;
   return next >= 0 && next < stops.length ? stops[next] : null;
 }
+
+/**
+ * THE STEP FROM A THREAD THAT HAS LEFT THE PAGE WHILE OPEN (w-0d55a2b160).
+ * Your reply to a person takes the thread out of Needs you and keeps you on it,
+ * so it sits nowhere in the list; `place` is where it sat. What slid into that
+ * place is the next one, and the one before it is the previous one.
+ */
+export function stepFromPlace(stops: Stop[], place: number, dir: 1 | -1): Stop | null {
+  const next = dir === 1 ? place : place - 1;
+  return next >= 0 && next < stops.length ? stops[next] : null;
+}

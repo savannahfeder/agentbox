@@ -300,19 +300,21 @@ describe('the traces that stop us claiming an empty machine', () => {
 describe('the shell answer is held briefly and the stat calls never are', () => {
   it('asks the shell once inside its window, and again after it', () => {
     forgetCodexBin();
-    let asks = 0;
+    const asks = { now: 0, later: 0 };
     const t0 = 2_000_000;
+    // After it, in the background (tests/finding-a-coding-agent-never-holds-the-window).
     const bare = {
       home: HOME, exists: never, dangles: never,
-      shellLookup: () => { asks += 1; return { path: null, answered: true }; },
+      shellLookup: () => { asks.now += 1; return { path: null, answered: true }; },
+      shellLookupLater: () => { asks.later += 1; return { path: null, answered: true }; },
     };
 
     resolveCodexBin(null, { ...bare, now: t0 });
     resolveCodexBin(null, { ...bare, now: t0 + 29_999 });
-    expect(asks).toBe(1);
+    expect(asks).toEqual({ now: 1, later: 0 });
 
     resolveCodexBin(null, { ...bare, now: t0 + 30_001 });
-    expect(asks).toBe(2);
+    expect(asks).toEqual({ now: 1, later: 1 });
     forgetCodexBin();
   });
 

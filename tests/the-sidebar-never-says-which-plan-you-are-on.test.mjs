@@ -96,10 +96,20 @@ describe('the words', () => {
   it('names the plan people pay for, not the tool underneath', () => {
     expect(words.runsOnName('claude')).toBe('Claude');
     expect(words.runsOnName('codex')).toBe('ChatGPT');
-    expect(words.foundOnThisMac({ engine: 'claude' }))
-      .toBe('Your agents will run on the Claude account already signed in on this Mac.');
-    expect(words.foundOnThisMac({ engine: 'codex' }))
-      .toBe('Your agents will run on the ChatGPT account already signed in on this Mac.');
+    expect(words.foundOnThisComputer({ engine: 'claude' }))
+      .toBe('Your agents will run on the Claude account already signed in on this computer.');
+    expect(words.foundOnThisComputer({ engine: 'codex' }))
+      .toBe('Your agents will run on the ChatGPT account already signed in on this computer.');
+  });
+
+  // AND IT SAYS IT ON A LINUX MACHINE TOO (w-e402a9ebaa, 2026-10-23). The
+  // sentence said "on this Mac" to somebody whose computer is not one, and it
+  // is the first thing the walk says about where the tokens come from.
+  it('names nobody else’s machine', () => {
+    for (const engine of ['claude', 'codex']) {
+      expect(words.foundOnThisComputer({ engine })).not.toContain('Mac');
+    }
+    expect(words.foundOnThisMac).toBeUndefined();
   });
 
   // THE TIER CANNOT COME BACK THROUGH THE WORDS. The two functions that drew it
@@ -107,7 +117,7 @@ describe('the words', () => {
   it('has no way left to put a plan in a sentence', () => {
     expect(words.runsOnLine).toBeUndefined();
     expect(words.runsOnTitle).toBeUndefined();
-    expect(words.foundOnThisMac({ engine: 'claude', plan: 'Max 20x' })).not.toContain('Max 20x');
+    expect(words.foundOnThisComputer({ engine: 'claude', plan: 'Max 20x' })).not.toContain('Max 20x');
   });
 
   // THE CASE THAT MUST NOT SAY ANYTHING. An engine nobody named is the shape
@@ -115,9 +125,9 @@ describe('the words', () => {
   it('says nothing at all about an engine it cannot name', () => {
     for (const engine of [null, undefined, '', 'gemini', 'CLAUDE']) {
       expect(words.runsOnName(engine)).toBe(null);
-      expect(words.foundOnThisMac({ engine })).toBe(null);
+      expect(words.foundOnThisComputer({ engine })).toBe(null);
     }
-    expect(words.foundOnThisMac()).toBe(null);
+    expect(words.foundOnThisComputer()).toBe(null);
   });
 });
 

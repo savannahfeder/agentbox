@@ -16,6 +16,16 @@
 .ts-st-need { background: var(--accent); }
 .ts-st-run { border: 1.5px solid var(--accent); background: conic-gradient(var(--accent) 0 50%, transparent 50% 100%); }
 .ts-st-wait { border: 1.5px solid var(--text-dim); }
+/* The row's Status column wears these same three (pages.css): an agent is on
+   it, it waits its turn, or nothing can start it. */
+.ts-st-working { border: 1.5px solid var(--accent); background: conic-gradient(var(--accent) 0 50%, transparent 50% 100%); }
+.ts-st-queued { border: 1.5px solid var(--text-faint); }
+.ts-st-held { border: 1.5px solid var(--accent); }
+.ts-st.live { animation: th-breathe 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .ts-st.live { animation: none; } }
+/* The list's cloud (pages.css .th-st-cloud), 14px wide, so the word starts where it does after a dot. */
+.ts-value .th-st-cloud { margin-right: 7px; }
+.ts-lead .th-st-cloud { margin-right: 6px; }
 .ts-st-sched { border: 1.5px dashed var(--text-faint); }
 .ts-st-done { background: var(--text-faint); }
 
@@ -83,8 +93,18 @@
 .focus-pane[data-summary="rail"] > .focus-scroll,
 .focus-pane[data-summary="rail"] > .focus-dock,
 .focus-pane[data-summary="rail"] > .keep-line,
-.focus-pane[data-summary="rail"] > .task-terminal { margin-right: var(--ts-rail-w); }
-.focus-pane[data-summary="rail"] { --keep-inset: max(32px, calc((100% - var(--ts-rail-w) - var(--read-w)) / 2 + 32px)); }
+.focus-pane[data-summary="rail"] > .task-terminal,
+.focus-pane[data-summary="over"] > .focus-scroll,
+.focus-pane[data-summary="over"] > .focus-dock,
+.focus-pane[data-summary="over"] > .keep-line,
+.focus-pane[data-summary="over"] > .task-terminal { margin-right: var(--ts-rail-w); }
+.focus-pane[data-summary="rail"],
+.focus-pane[data-summary="over"] { --keep-inset: max(32px, calc((100% - var(--ts-rail-w) - var(--read-w)) / 2 + 32px)); }
+/* OPENED WITHOUT ROOM, the panel lies over the conversation, which stays as
+   wide as it was under the rail, and the words under it dim. */
+.focus-pane[data-summary="over"] .ts-panel { background: var(--skin-solid, var(--bg)); z-index: 4; box-shadow: 0 18px 48px rgba(0, 0, 0, .45); }
+.ts-scrim { position: absolute; inset: 0; z-index: 3; background: rgba(0, 0, 0, .32); cursor: default; }
+:root[data-theme="light"] .ts-scrim { background: rgba(0, 0, 0, .12); }
 /* One button the height of the pane. Its marks stand in a column from the top,
    the panel's icon first; the strip washes under the pointer like the
    panel's own fields, and has no pressed look because it is never pressed:
@@ -127,7 +147,15 @@
    the way the lines under it do, with the pencil and nothing filled, and the
    negative margin pays for the box's padding so the name sits exactly where
    it did. */
-.ts-title { margin: 0 0 22px; font-size: 16px; font-weight: 500; line-height: 22px; letter-spacing: -.01em; color: var(--text); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ts-title { margin: 0 0 22px; font-size: 16px; font-weight: 500; line-height: 22px; letter-spacing: -.01em; color: var(--text); }
+/* THE CLAMP IS ON THE WORDS, NOT ON THE BOX AROUND THEM (w-c9da359466). It sat
+   on the h2, which is also the click target for a rename and so carries 6px of
+   padding, and `overflow: hidden` clips at the PADDING box: those 6px were a
+   window onto the line the clamp had just hidden. Three lines ending in "…"
+   and then the top third of a fourth, sliced through
+   (designs/w-811757c0b5/reply-cannot-switch-to-codex.jpg). Clipping an inner
+   span leaves the click box exactly the size it was. */
+.ts-title-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .ts-title[role="button"], .ts-title-edit { position: relative; box-sizing: border-box; margin: -7px -8px 15px; padding: 6px 28px 6px 8px; border: 1px solid transparent; border-radius: var(--radius); cursor: text; }
 .ts-title[role="button"]:focus-visible { outline: none; border-color: var(--line-strong); }
 /* The pencil follows the last word, rather than standing off at the edge. */
@@ -289,6 +317,10 @@
    either side of the slash are the 13 they were. */
 .thread-crumb > .back-esc.thread-crumb-back { position: static; flex: none; height: 28px; margin: 0; padding: 4px 8px 4px 4px; gap: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; }
 .thread-crumb > .back-esc.thread-crumb-back svg { flex: none; width: 13px; height: 13px; margin-right: 8px; }
+/* A conversation's faces and Add people, at the trail's far end (Byline.tsx ConversationAside). */
+.workspace-task-header:has(> .crumb-aside) { display: flex; align-items: center; gap: 16px; }
+.crumb-aside { margin-left: auto; display: flex; align-items: center; gap: 12px; flex: none; }
+.crumb-aside:empty { display: none; }
 .thread-crumb-from { flex: none; }
 .thread-crumb-sep { flex: none; margin: 0 7px 0 5px; }
 .thread-crumb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-dim); }

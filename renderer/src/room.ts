@@ -19,11 +19,19 @@ import { useCallback, useEffect, useState } from 'react';
  *  widening the window never opens the sidebar and closes the summary at once. */
 export const SIDEBAR_FOLDS_BELOW = 1180;
 
-/** The summary's 352 points and 520 of conversation beside it. */
-export const SUMMARY_NEEDS = 352 + 520;
+/** The summary's widest panel (368, in the Groups layout) and 520 of conversation beside it. */
+export const SUMMARY_NEEDS = 368 + 520;
 
 export const sidebarFits = (windowWidth: number) => windowWidth >= SIDEBAR_FOLDS_BELOW;
 export const summaryFits = (paneWidth: number) => paneWidth >= SUMMARY_NEEDS;
+
+/** Where the summary is drawn: beside the conversation, over it when opened
+ *  without room (beside it would leave the words a strip), or folded to its rail. */
+export function summaryPlace({ offered, shown, fits }: { offered: boolean; shown: boolean; fits: boolean }): 'open' | 'over' | 'rail' | undefined {
+  if (!offered) return undefined;
+  if (!shown) return 'rail';
+  return fits ? 'open' : 'over';
+}
 
 /** `override` is a click made while there was no room; null when there was none. */
 type Room = { choice: boolean; fits: boolean; override: boolean | null };

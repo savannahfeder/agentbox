@@ -19,7 +19,7 @@
 import { REQUEST_CHANNELS, PUSH_CHANNELS, WRAPPED_ARGS, DESKTOP_ONLY } from '../../shared/bridge-map.mjs';
 import { Name } from '../../shared/product-name.mjs';
 import { setIconCount, startPhoneAlerts } from './phone-alerts';
-import { installPhoneFiles, installPictureWatch } from './phone-files';
+import { installPhoneFiles } from './phone-files';
 import { installPhoneScreen } from './phone-screen';
 import { atMostEvery, PHONE_PUSH_MS } from './phone-polls';
 
@@ -86,7 +86,8 @@ function takeToken(): string | null {
   }
   if (fromUrl) {
     url.searchParams.delete('token');
-    history.replaceState(null, '', url.toString());
+    // The entry's own mark stays: on a phone it may be the floor (./phone-screen).
+    history.replaceState(history.state, '', url.toString());
     // Kept for the life of the tab only. A reload without the url is a reload
     // that cannot talk, and sessionStorage is what makes ⌘R survivable while
     // still being gone when the tab closes.
@@ -119,15 +120,17 @@ export function installBrowserBridge(): boolean {
     // The keyboard, the colour Safari paints round the page, and the
     // home-screen swipe back (phone-screen.ts).
     installPhoneScreen();
-    // A picture holds its place while it loads (phone-files.ts).
-    installPictureWatch();
-    // Pictures and design pages, from this computer under the file key, which
-    // reads files and nothing else (main/serve.mjs fileKey).
-    fetch('/file-key', { headers: { [TOKEN_HEADER]: token } })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((said) => { if (said?.key) installPhoneFiles(said.key); })
-      .catch(() => { /* pictures stay blank; everything else still works */ });
   }
+
+  // PICTURES, IN EVERY TAB AND NOT ONLY ON A PHONE (w-326fb83c0e). The window
+  // asks for them on the app's own scheme, which only Electron answers, so in
+  // the browser copy every local picture in a thread drew as missing. They come
+  // from this computer under the file key, which reads files and nothing else
+  // (main/serve.mjs fileKey).
+  fetch('/file-key', { headers: { [TOKEN_HEADER]: token } })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((said) => { if (said?.key) installPhoneFiles(said.key); })
+    .catch(() => { /* pictures stay blank; everything else still works */ });
 
   const ask = async (channel: string, payload?: unknown) => {
     const res = await fetch(`/api/${encodeURIComponent(channel)}`, {

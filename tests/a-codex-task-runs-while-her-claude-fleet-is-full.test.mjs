@@ -228,21 +228,21 @@ describe('the whole-mac ceiling', () => {
     expect(spawned).toEqual([]);
   });
 
-  // THE CASE THAT MUST NOT MATCH, and it is the whole reason the old number was
-  // wrong: a Claude login is not a Codex slot. Signing into a second Claude
-  // subscription doubles the Claude fleet and leaves Codex exactly where it was.
-  it('does not let a second claude login widen the codex fleet', () => {
+  // A SECOND LOGIN BUYS NO AGENTS AT ALL (w-dac993a554). It used to double the
+  // fleet on its own engine, which was the app offering twice the throughput
+  // for a second subscription: the limits it would have been spending "assume
+  // ordinary, individual usage" (code.claude.com/docs/en/legal-and-compliance).
+  // Work runs on one account, so the number is the number either way.
+  it('does not let a second claude login widen either fleet', () => {
     build([], { slots: 3, authProfiles: ['default', HER_SECOND_CLAUDE] });
-    expect(sup._capacityFor('claude')).toBe(6);
+    expect(sup._capacityFor('claude')).toBe(3);
     expect(sup._capacityFor('codex')).toBe(3);
   });
 
-  // And the same rule the other way round, which is the half her ask was about:
-  // a Codex login widens Codex and nothing else.
-  it('does not let a second codex login widen the claude fleet', () => {
+  it('does not let a second codex login widen either fleet', () => {
     build([], { slots: 3, codexProfiles: ['default', '/Users/her/.codex-second'] });
     expect(sup._capacityFor('claude')).toBe(3);
-    expect(sup._capacityFor('codex')).toBe(6);
+    expect(sup._capacityFor('codex')).toBe(3);
   });
 
   // A MAC WITH NO CODEX ON IT IS THE MAC EVERY OTHER TEST IN THIS SUITE MEANS,

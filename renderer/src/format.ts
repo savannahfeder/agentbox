@@ -1,4 +1,5 @@
 import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mjs';
+import { isShippedNote } from '../../shared/shipped-note.mjs';
 import { readMoment } from './when-words';
 // Time and grouping, Superhuman-style: terse, scannable, never a full date
 // where "3m" will do.
@@ -123,6 +124,23 @@ export function itemOptions(item: HasFields): ParsedOption[] {
   return parseOptions(item[optionsFrom(item)]);
 }
 
+// With the options strip riding on the composer, the field's own "## Options"
+// section would say everything twice; drop the heading and its numbered items
+// (prose after the list stays). Only called while the strip is visible, and
+// only on the field the offer actually came from: an answered item keeps the
+// list where it was written, as the record of what was offered.
+export function stripOptionsSection(body: string): string {
+  const lines = body.split('\n');
+  const out: string[] = [];
+  let inOptions = false;
+  for (const line of lines) {
+    if (/^#{1,4}\s/.test(line)) inOptions = /option/i.test(line);
+    else if (inOptions && line.trim() && !/^\s*\d+[.)]\s/.test(line)) inOptions = false;
+    if (!inOptions) out.push(line);
+  }
+  return out.join('\n');
+}
+
 // AND WHETHER THE OFFER IS STILL LIVE, which is not the same as whether she has
 // ever replied on this row.
 //
@@ -146,25 +164,66 @@ export function itemOptions(item: HasFields): ParsedOption[] {
 // offer that offers nothing of its own means the offer was acted on. A body's
 // offer is an agent's standing ask, so only a finished run (a newer result)
 // spends that one; a checkpoint saying "waiting on your pick" must not.
+//
+// EXCEPT THE APP'S OWN "SHIPPED TO MAIN" NOTE (w-639fc3b3a5). A run that ships
+// writes its offer and then the ship queue writes that note, so it always comes
+// last. It answers an offer only when the offer asked whether to ship.
 export function offerIsLive(item: HasFields & { answer?: string }): boolean {
-  if (!itemOptions(item).length) return false;
+  const options = itemOptions(item);
+  if (!options.length) return false;
   const field = optionsFrom(item);
   const offered = writtenAt(item, field);
   const later: OptionsField[] = field === 'body' ? ['result'] : ['result', 'note'];
-  if (later.some((f) => f !== field && writtenAt(item, f) > offered)) return false;
+  const afterTheShip = isShippedNote(item.note) && !options.some((o) => asksToShip(o.text));
+  if (later.some((f) => f !== field && writtenAt(item, f) > offered && !(f === 'note' && afterTheShip))) return false;
   if (!item.answer || item.answer === '(withdrawn)') return true;
   const spoke = item.wrote?.answer?.ts ?? 0;
   return offered > spoke;
 }
 
+/** Option `n`, only while the strip that draws it would, so no key picks an
+ *  offer a later note has made stale. */
+export function liveOption(item: HasFields & { answer?: string }, n: number): ParsedOption | null {
+  if (!offerIsLive(item)) return null;
+  return itemOptions(item).find((o) => o.n === n) ?? null;
+}
+
 // THE OPTION THAT CLOSES THE TASK (w-1df18b337a). Once a run has shipped, the
 // one honest next move is often to close the row, and agents are told to offer
 // exactly "Close this task". A pick is a reply, and a reply on a finished row
-// starts a run, so this is caught and done the way E does it instead. Only the
-// whole option: "Ship it, then close the task" is still a reply.
+// starts a run, so this is caught and done the way E does it instead. The words
+// alone or with a reason after them: "Ship it, then close the task" and "Close
+// this task, then file the follow-up" are still replies.
+const CLOSES = /^close (?:this|the) (?:task|thread)(?:$|\s*[,:;\p{Pd}](?!\s*(?:then|and|also)\b)|\s+(?:since|because|as|now that)\b)/iu;
 export function closesTheTask(option: string): boolean {
-  const words = option.replace(/\s*\(recommended\)\s*/i, '').trim().replace(/[.!]+$/, '');
-  return /^close (this|the) (task|thread)$/i.test(words);
+  return CLOSES.test(bareOption(option));
+}
+
+const bareOption = (option: string) => option.replace(/\s*\(recommended\)\s*/i, '').trim().replace(/[.!]+$/, '');
+
+// The option that IS the decision to ship: "Ship it", "Let it ship as built",
+// "Not now, just ship this", "Merge it". Leading words only: "re-ship", "before
+// anything ships" and "ship that too" are about some other work.
+const SHIPS = /^(?:(?:yes|no|not now|not yet|ok(?:ay)?)\s*[,:;\p{Pd}]?\s+)?(?:just\s+)?(?:ship\b|merge (?:it|this)\b|let (?:it|this|them|the\b[^,.;:]*?)\s+(?:ship|land)\b)/iu;
+const asksToShip = (option: string) => SHIPS.test(bareOption(option).replace(/^[*_\s]+/, ''));
+
+// THE OPTION THAT IS MEANINGLESS WITHOUT YOUR WORDS (w-c9da359466).
+//
+// Agents offer "Change something first" on nearly every run, and pressing 2
+// sent it, spent the offer and moved on to the next thread. The worker got
+// "change something first" with nothing to change: two testers in two runs,
+// one of them twice in the same session, each of them reaching for Z. "That
+// option is meaningless without my words."
+//
+// So the narrow case only: an option that asks for a change and names NONE.
+// "Change the empty state copy first" is a whole instruction and still sends.
+// Everything outside this list is untouched, because a pick that opens a box
+// instead of sending is the wrong surprise on an option that said enough.
+const SAYS_NOTHING = /^(?:change|revise|edit|adjust|tweak|amend|rework|redo|fix)\s+(?:something|anything|it|this|that|some of it|a few things|this (?:part|bit)|parts?|bits?)(?:\s+first)?$/i;
+
+export function needsYourWords(option: string): boolean {
+  const words = bareOption(option);
+  return SAYS_NOTHING.test(words) || /^(?:something|anything) else$/i.test(words);
 }
 
 // What Enter means in the schedule box, in one place so the key handler and the
@@ -307,6 +366,20 @@ function stamp2(ts: number, now: number): { ts: number; label: string } {
   const day = days === 0 ? 'today' : days === 1 ? 'tomorrow'
     : d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   return { ts, label: `${day}, ${time}` };
+}
+
+// A COMING MOMENT AS A DAY AND A CLOCK, for the hint beside a time. Inside the
+// coming six days the weekday names one day and stands alone ("Wed, 8:00 AM").
+// From seven days on, or once the moment has gone, it carries its date too:
+// "3 weeks" typed on a Thursday printed "THU 8:00 AM", which read as this
+// Thursday when it meant Thursday 5 Nov
+// (tests/a-later-time-weeks-away-says-its-date.test.mjs).
+export function dayAndTime(ts: number, now = Date.now()): string {
+  const days = Math.round((startOfDay(ts) - startOfDay(now)) / 86_400_000);
+  const dated = days < 0 || days >= 7;
+  return new Date(ts).toLocaleString(undefined, {
+    weekday: 'short', ...(dated ? { month: 'short', day: 'numeric' } : {}), hour: 'numeric', minute: '2-digit',
+  });
 }
 
 // Markdown out, one line in. ONE copy of this rule, because search reads the

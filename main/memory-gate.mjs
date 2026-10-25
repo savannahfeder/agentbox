@@ -206,7 +206,15 @@ export class MemoryGate {
     for (const w of [...this.waiting.values()]) {
       if (now - w.arrived >= this.maxWaitMs) {
         this.waiting.delete(w.id);
-        for (const r of w.replies) r({ allow: false, reason: refusal(now - w.arrived, this.pressure) });
+        for (const r of w.replies) {
+          r({
+            reason: refusal(now - w.arrived, this.pressure),
+            allow: false,
+            cls: w.cls,
+            waitedMs: now - w.arrived,
+            pressure: this.pressure,
+          });
+        }
       }
     }
     if (this.pressure === 'critical') return;
@@ -241,6 +249,11 @@ export class MemoryGate {
     this.running.set(w.id, {
       id: w.id, item: w.item, product: w.product, command: w.command, cls: w.cls,
       urgent: w.urgent, session: w.session, background: w.background, startedAt: now, peakMb: null, shared: null,
+      // Only the coordinator reads these, to write down what the grant cost.
+      // The pressure is what makes the wait mean anything: under `normal` only
+      // full slots can hold a command back, so the wait is evidence about
+      // `slots`; under `tight` nothing heavy starts whatever the count is.
+      waitedMs: now - w.arrived, pressureAt: this.pressure,
     });
     for (const r of w.replies) r({ allow: true, cls: w.cls });
   }

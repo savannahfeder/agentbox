@@ -57,9 +57,12 @@ function installMenuCall() {
 }
 
 describe('the Allow/Deny items in the Agents menu', () => {
+  // CommandOrControl: ⌘Y/⌘N on a Mac, Ctrl+Y/Ctrl+N on Linux, where a bare
+  // Command made the card's hint name two keys that do nothing.
   it('exist, on the chords she already knows', () => {
-    expect(menu).toMatch(/accelerator: 'Command\+Y'/);
-    expect(menu).toMatch(/accelerator: 'Command\+N'/);
+    expect(menu).toMatch(/accelerator: 'CommandOrControl\+Y'/);
+    expect(menu).toMatch(/accelerator: 'CommandOrControl\+N'/);
+    expect(menu).not.toMatch(/accelerator: 'Command\+[YN]'/);
     expect(menu).toMatch(/onApproval\?\.\(true\)/);
     expect(menu).toMatch(/onApproval\?\.\(false\)/);
   });

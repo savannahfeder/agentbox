@@ -74,25 +74,32 @@ export function AddPeople({ product, onAdd }: {
   </button>;
 }
 
+/** On a task a teammate gave you, the three ways to route it, which the strip
+ *  below and ⌘K both offer. None once you have chosen. */
+export function teamRouteChoices(item: WorkItem, team: TeamView | null): { route: 'agent' | 'me' | 'back'; label: string }[] {
+  if (!team || !teamHeld(item, team) || item.assignee !== team.me) return [];
+  // A message is talk, not a task (approved 2026-10-01): work comes out of it
+  // only by @-mentioning an agent in the reply box, which works in the project
+  // its mention names. There is no line under the conversation offering to
+  // hand it all to an agent (taken out 2026-10-05), and nothing else here.
+  if ((team.products.get(item.product) as { team?: { direct?: boolean } } | undefined)?.team?.direct) return [];
+  // Once you have chosen to keep it, the choices go away.
+  if (item.wrote?.assignee?.by === team.me) return [];
+  const from = (item.people ?? []).find((p) => p !== team.me) ?? item.createdBy ?? undefined;
+  return [
+    { route: 'agent', label: 'Give it to an agent' },
+    { route: 'me', label: 'Do it myself' },
+    { route: 'back', label: `Hand it back to ${firstName(team.byId.get(from ?? ''))}` },
+  ];
+}
+
 /** On a task a teammate gave you: give it to an agent, keep it, or hand it back. */
 export function TeamRouteStrip({ item }: { item: WorkItem }) {
   const team = useContext(TeamContext);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  if (!team || !teamHeld(item, team) || item.assignee !== team.me) return null;
-  // A message is talk, not a task (approved 2026-10-01): work comes out of it
-  // only by @-mentioning an agent in the reply box, which works in the project
-  // its mention names. There is no line under the conversation offering to
-  // hand it all to an agent (taken out 2026-10-05), and nothing else here.
-  if ((team.products.get(item.product) as { team?: { direct?: boolean } } | undefined)?.team?.direct) return null;
-  // Once you have chosen to keep it, the choices go away.
-  if (item.wrote?.assignee?.by === team.me) return null;
-  const from = (item.people ?? []).find((p) => p !== team.me) ?? item.createdBy ?? undefined;
-  const choices: [string, 'agent' | 'me' | 'back'][] = [
-    ['Give it to an agent', 'agent'],
-    ['Do it myself', 'me'],
-    [`Hand it back to ${firstName(team.byId.get(from ?? ''))}`, 'back'],
-  ];
+  const choices = teamRouteChoices(item, team);
+  if (!choices.length) return null;
   const route = async (r: 'agent' | 'me' | 'back') => {
     setBusy(true); setError(null);
     const out = await api.teamRoute({ product: item.product, id: item.id, route: r });
@@ -102,7 +109,7 @@ export function TeamRouteStrip({ item }: { item: WorkItem }) {
   const ask = (item.body ?? item.title).split('\n').find((l) => l.trim())?.replace(/\*\*/g, '').trim() ?? item.title;
   return <div className="opt-strip">
     <div className="opt-head opt-head-ask"><span>{ask}</span></div>
-    {choices.map(([label, r], i) => <button key={r} className="opt-row" disabled={busy} onClick={() => route(r)}>
+    {choices.map(({ label, route: r }, i) => <button key={r} className="opt-row" disabled={busy} onClick={() => route(r)}>
       <span className="opt-key">{i + 1}</span><span className="opt-text">{label}</span>
     </button>)}
     {error && <div className="opt-head"><span className="tm-error">{error}</span></div>}

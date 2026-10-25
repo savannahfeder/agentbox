@@ -22,7 +22,7 @@
 // timezone stamp it prints, and the refusal to count down from a stamp computed
 // somewhere else. What belongs to a LIMIT, any limit, is next door.
 
-import { instantIn, localZone, sessionLimit, untilReset, wallIn } from './usage.mjs';
+import { instantIn, localZone, resetDay, sessionLimit, toMinute, untilReset, wallIn } from './usage.mjs';
 
 /** One limit, as the CLI reported it. */
 // { span, qualifier, name, percent, resetsAt|null, resetsText, resetsOn, zone }
@@ -151,6 +151,47 @@ export function readUsage(text, now = Date.now(), zoneNow = localZone()) {
     });
   }
   return out;
+}
+
+/** Provider limits from Claude Code's get_usage response, without local activity estimates. */
+export function readUsageReport(value, now = Date.now()) {
+  let report = value;
+  if (typeof report === 'string') {
+    try { report = JSON.parse(report); } catch { return []; }
+  }
+  if (report?.rate_limits_available !== true || !report.rate_limits) return [];
+  const data = report.rate_limits;
+  const windows = [
+    ['session', null, data.five_hour],
+    ['week', 'all models', data.seven_day],
+    ['week', 'OAuth apps', data.seven_day_oauth_apps],
+    ['week', 'Opus', data.seven_day_opus],
+    ['week', 'Sonnet', data.seven_day_sonnet],
+    ...(Array.isArray(data.model_scoped) ? data.model_scoped : [])
+      .filter(row => typeof row?.display_name === 'string' && row.display_name.trim())
+      .map(row => ['week', row.display_name, row]),
+  ];
+  return windows.flatMap(([span, qualifier, row]) => {
+    const percent = row?.utilization;
+    // Over 100 is a limit past its allowance, which is full, not unreadable.
+    if (typeof percent !== 'number' || !Number.isFinite(percent) || percent < 0) return [];
+    const at = typeof row.resets_at === 'string' ? Date.parse(row.resets_at) : NaN;
+    // Whole percents, as the text report printed them; only a full limit reads 100, only an unused one 0.
+    const whole = percent === 0 || percent >= 100 ? Math.min(100, percent) : Math.min(99, Math.max(1, Math.round(percent)));
+    const known = Number.isFinite(at);
+    return [{ span, qualifier, name: limitName(span, qualifier), percent: whole, resetsAt: known ? at : null,
+      ...(known ? clockWords(at, now) : { resetsText: null, resetsOn: null }), zone: known ? localZone() : null }];
+  });
+}
+
+// The words the text report used to carry, in this machine's zone, so the
+// panel keeps saying "Resets 6:19pm" and not a countdown (limitRows, shared/usage.mjs).
+function clockWords(at, now) {
+  const d = new Date(toMinute(at));
+  const h = d.getHours();
+  const m = d.getMinutes();
+  const resetsText = `${h % 12 || 12}${m ? `:${String(m).padStart(2, '0')}` : ''}${h < 12 ? 'am' : 'pm'}`;
+  return { resetsText, resetsOn: resetDay(at, now) };
 }
 
 /**

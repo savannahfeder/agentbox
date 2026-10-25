@@ -37,6 +37,9 @@
 //   now carries a note pointing here. `esc` and a bare arrow are one key
 //   whatever their length, so only a real chord splits.
 
+import { capNameOf, capsOf } from '../../shared/key-caps.mjs';
+import { MAC } from './this-keyboard';
+
 /** One line of a plate: the caps to draw, and the fragment beside them. */
 export interface HintLine {
   /** The chord as the app writes it, e.g. '⌘⌥↓'. Split by `capsFor`. */
@@ -51,13 +54,12 @@ export interface HintLine {
  *  A chord becomes one cap per glyph. Anything that is a single key stays whole
  *  however many characters it is written with, which is what keeps `esc` from
  *  being drawn as three caps.
+ *
+ *  THE GLYPHS ARE THIS KEYBOARD'S (shared/key-caps.mjs): ⌘↵ on a Mac, Ctrl and
+ *  Enter where there is no Command key.
  */
-export function capsFor(key: string): string[] {
-  if (key.length <= 1) return [key];
-  // The words the app writes out for one physical key. Nothing else is
-  // multi-character and single-key.
-  if (key === 'esc') return [key];
-  return [...key];
+export function capsFor(key: string, mac: boolean = MAC): string[] {
+  return capsOf(key, mac);
 }
 
 /**
@@ -68,8 +70,8 @@ export function capsFor(key: string): string[] {
  *  because it shows the icon on the keyboard as well as the name". ↵ keeps its
  *  bare cap here; nobody asked for that one.
  */
-export function capWord(glyph: string): string | null {
-  return glyph === '⇥' ? 'Tab' : null;
+export function capWord(glyph: string, mac: boolean = MAC): string | null {
+  return capNameOf(glyph, mac);
 }
 
 /**
@@ -131,6 +133,8 @@ export const HINTS: Record<string, HintLine[]> = {
   // magnifier says what pressing it costs. A button she points at and gets
   // nothing from is the fault.
   commands: [{ key: '⌘K', what: 'Everything by name' }],
+  // The cloud button (threads/Pages.tsx): ⌘C turns the cloud on or off.
+  cloud: [{ key: '⌘C', what: 'Cloud on or off' }],
   search: [{ key: '/', what: 'Search your tasks' }],
   // A task she has opened.
   // THE MARK THAT FINISHED IT IS A ROW NOW (w-e731ca9376, 2026-10-01): Mark
@@ -142,6 +146,9 @@ export const HINTS: Record<string, HintLine[]> = {
   // w-a3482b8c2c it hangs from the summary's rail and the icon that closes it.
   summary: [{ key: 'S', what: 'Show or hide the summary' }],
   back: [{ key: 'esc', what: 'Go back one level' }],
+  // The up and down arrows on a thread in Needs you (w-65bcefb857).
+  'previous-thread': [{ key: 'K', what: 'Previous thread' }],
+  'next-thread': [{ key: 'J', what: 'Next thread' }],
 };
 
 export interface Rect { top: number; left: number; right: number; bottom: number; width: number; height: number }
@@ -165,7 +172,7 @@ export function placeHint(
   comp: Rect,
   plate: Size,
   viewport: Size,
-  align: 'left' | 'right' = 'left',
+  align: 'left' | 'right' | 'center' = 'left',
   /**
    * THE WORDS INSIDE THE COMPONENT, when it has any. The plate lines its own
    *  first CAP up with the first LETTER of these rather than with the edge of
@@ -193,9 +200,13 @@ export function placeHint(
   if (comp.width <= 0 && comp.height <= 0) return null;
   const rose = comp.bottom + HINT_GAP + plate.height > viewport.height - HINT_MARGIN;
   const top = rose ? comp.top - HINT_GAP - plate.height : comp.bottom + HINT_GAP;
+  // `center`: under the middle of a small square button, whose plate is
+  // wider than it and would otherwise hang off one side.
   const wanted = align === 'right'
     ? comp.right - plate.width
-    : (text ? text.left - inset : comp.left);
+    : align === 'center'
+      ? comp.left + comp.width / 2 - plate.width / 2
+      : (text ? text.left - inset : comp.left);
   const left = Math.max(HINT_MARGIN, Math.min(wanted, viewport.width - plate.width - HINT_MARGIN));
   return { top: Math.round(top), left: Math.round(left), rose };
 }

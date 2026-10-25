@@ -32,6 +32,12 @@
 // And the boundary that stops this from ever making things worse: when there is
 // no healthy account left, the chat is kept. Unpinning would lose the thread
 // and buy nothing, because there is nowhere better to send it.
+//
+// WHERE "SOMEWHERE BETTER" IS, SINCE w-dac993a554: the one account the fleet
+// runs on, and nowhere else. So a chat on THAT account is kept whatever is
+// wrong with it, including a usage limit, and a chat on a login the fleet is
+// not using is given up as soon as that login is benched -- which is what
+// somebody is asking for when they upgrade a plan and pick it in Settings.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -60,11 +66,12 @@ afterEach(() => {
 const productDir = () => path.join(tmp, 'agentbox');
 const product = () => ({ slug: 'agentbox', name: Name, dir: productDir() });
 
-function makeSupervisor() {
+function makeSupervisor(extra = {}) {
   const store = { listItems: () => [], listProducts: () => [product()], isDue: () => true };
   const sup = new Supervisor({
     storeRoot: tmp,
     authProfiles: ['default', blocked],
+    ...extra,
     // A home of this test's own, so the two accounts under test are the only
     // two accounts there are. Without it `discoverProfiles` walks the real
     // machine and quietly adds whatever logins the person running the suite
@@ -152,8 +159,12 @@ describe('the chats that stay exactly where they are', () => {
     }
   });
 
+  // A QUARANTINE ON THE ACCOUNT IN USE IS WAITED OUT, because that is where
+  // the work is going either way. Picked here, since one account runs the work
+  // now and a bench on a login nothing runs on is a different question
+  // (w-dac993a554).
   it('keeps the chat through a plain thirty-minute quarantine', () => {
-    const sup = makeSupervisor();
+    const sup = makeSupervisor({ activeAccount: { claude: blocked } });
     const item = rowWithChatOn(sup, blocked);
     sup._profileCooldown = { [blocked]: Date.now() + 30 * 60_000 };
     expect(planFor(sup, item).resumeProfile).toBe(blocked);

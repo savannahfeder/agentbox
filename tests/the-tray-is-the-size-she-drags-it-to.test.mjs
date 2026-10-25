@@ -85,11 +85,12 @@ describe('the corners she drags', () => {
     expect(page).toContain('bridge?.press(e.screenX, e.screenY, true, corner)');
   });
 
-  it('tells the main process the band, and what is under the pointer', () => {
-    expect(page).toContain('bridge.size(which, r.width, r.height');
+  it('tells the main process where the glass is, and what is under the pointer', () => {
+    expect(page).toContain('glass: { x: g.x - r.x, y: g.y - r.y, width: g.width, height: g.height }');
+    expect(page).toContain('bridge.size(which, m.width, m.height, m.glass, m.radius)');
     expect(page).toContain('bridge?.clickable(overUs(e))');
     expect(bridge).toContain('clickable: (on)');
-    expect(bridge).toContain('size: (part, width, height, frame)');
+    expect(bridge).toContain('size: (part, width, height, glass, radius)');
   });
 });
 

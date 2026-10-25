@@ -26,6 +26,15 @@ function Said({ parts }: { parts: (string | null)[] }) {
   return <span className="fm-said">{kept.join(' · ')}</span>;
 }
 
+/** A conversation's faces and Add people, at the end of its trail, now that no line under a title carries them. */
+export function ConversationAside({ item, onAddPeople }: { item: WorkItem; onAddPeople?: (who: { to: string; also: string[] }) => void }) {
+  const team = useContext(TeamContext);
+  return <span className="crumb-aside">
+    {teamHeld(item, team) && <TeamPeople item={item} />}
+    {onAddPeople && <AddPeople product={team?.products.get(item.product) ?? null} onAdd={onAddPeople} />}
+  </span>;
+}
+
 export function Byline({ item, facts, returned, lead, stateShown, onAddPeople }: {
   item: WorkItem;
   facts: LiveFacts & WhereFacts & EngineFacts;
@@ -104,7 +113,7 @@ export function Byline({ item, facts, returned, lead, stateShown, onAddPeople }:
           waiting for her, which is the one fact "last moved" would get wrong. */}
       {lead || stateShown
         ? <Said parts={stateLedParts(f, f.age ? `last moved ${f.age} ago` : null)} />
-        : <Said parts={[f.project, f.whereWord, f.engineWord, f.age
+        : <Said parts={[f.project, f.whereWord, f.placeWord, f.engineWord, f.age
           ? (isTroubleRow(item) ? `nothing has started for ${f.age}`
             : isUpdateRow(item) ? `downloaded ${f.age} ago`
               : `last moved ${f.age} ago`)

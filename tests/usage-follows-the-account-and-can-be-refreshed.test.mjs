@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ClaudeUsage, STALE_MS } from '../main/claude-usage.mjs';
 
-const output = percent => `Current session: 0% used\nCurrent week (all models): ${percent}% used`;
+const output = percent => JSON.stringify({ rate_limits_available: true, rate_limits: { five_hour: { utilization: 0 }, seven_day: { utilization: percent } } });
 function setup(profile = 'default') {
   let selected = profile, clock = 1_000_000;
   const calls = [], changed = vi.fn();

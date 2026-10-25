@@ -154,7 +154,8 @@ describe('who decides a command is urgent', () => {
     expect(s.status().waiting.map((w) => w.id)).toEqual(['u']);
   });
 
-  it('the supervisor answers from her priority, not from a number an agent wrote', () => {
+  // A level counts whoever set it (w-5ac9c9006d, 2026-10-16), an agent's too.
+  it('the supervisor answers from the row\'s priority, whoever wrote it', () => {
     const rows = {
       'w-hers': { id: 'w-hers', priority: 9, wrote: { priority: { source: 'founder' } } },
       'w-high': { id: 'w-high', priority: 7, wrote: { priority: { source: 'founder' } } },
@@ -164,7 +165,7 @@ describe('who decides a command is urgent', () => {
     const urgent = (id) => Supervisor.prototype.memoryGateUrgent.call(self, 'agentbox', id);
     expect(urgent('w-hers')).toBe(true);
     expect(urgent('w-high')).toBe(false);
-    expect(urgent('w-agent')).toBe(false);
+    expect(urgent('w-agent')).toBe(true);
     expect(urgent('w-gone')).toBe(false);
     expect(Supervisor.prototype.memoryGateUrgent.call({ store: { readItem: () => { throw new Error('x'); } } }, 'agentbox', 'w-hers')).toBe(false);
   });

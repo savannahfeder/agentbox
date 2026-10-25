@@ -12,13 +12,22 @@
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { EMOJI_GROUPS, findEmoji } from './emoji-list';
+import { chipPressed, onArrival, quickRow, readRecent, rememberEmoji } from './recent-emoji';
+import { searchKey } from './picker-keys';
+import { MoreMenu, type MoreItem } from './MessageMore';
 import './chat.css';
+
+// How many of your emoji sit on the bar itself, one press from a reaction.
+const QUICK = 3;
 
 // THE EMOJI ON OFFER FIRST: the ones a working chat actually uses, one press
 // away. Ordered as they are drawn, left to right. Everything else is behind the
 // + at the end of them (w-45cbac227a): "like in Slack ... hit Plus and then
 // see a more complete list".
 export const CHAT_EMOJI = ['👍', '🙏', '👀', '✅', '🎉', '❤️', '😄', '🤔'];
+
+/** The bar's emoji: your three latest, newest first, filled from the usual ones. */
+export const latestQuick = (store?: Parameters<typeof readRecent>[0]) => quickRow(readRecent(store), CHAT_EMOJI, QUICK);
 
 // The whole list's size, and how far it keeps from the window's edges.
 const EVERY_W = 320;
@@ -47,6 +56,7 @@ export function EmojiPick({ onPick, onClose, title = 'React' }: {
   const box = useRef<HTMLDivElement>(null);
   const every = useRef<HTMLDivElement>(null);
   const [all, setAll] = useState<CSSProperties | null>(null);
+  const [typed, setTyped] = useState('');
   // Clicking anywhere else closes it, which is the rule every other small
   // drawer in this app follows (Priority, Model, When). The whole list is
   // drawn elsewhere on the page, so a click in it is not "anywhere else".
@@ -60,15 +70,39 @@ export function EmojiPick({ onPick, onClose, title = 'React' }: {
     document.addEventListener('keydown', key);
     return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', key); };
   }, [onClose]);
+  // TYPING SEARCHES, as in Slack. Focus is still on whatever opened the
+  // picker, so without this a letter reaches the app's own keys and E closes
+  // the conversation. Taken at the window before the app's listeners hear it.
+  useEffect(() => {
+    const typing = (e: KeyboardEvent) => {
+      const ch = searchKey(e);
+      if (ch === null) return;
+      const field = every.current?.querySelector('.chat-emoji-search');
+      if (field && e.target === field) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setTyped((was) => was + ch);
+      if (!field) {
+        const r = box.current?.getBoundingClientRect();
+        if (r) setAll(placeEvery(r));
+      }
+    };
+    window.addEventListener('keydown', typing, true);
+    return () => window.removeEventListener('keydown', typing, true);
+  }, []);
   const more = () => {
-    if (all) { setAll(null); return; }
+    if (all) { setAll(null); setTyped(''); return; }
     const r = box.current?.getBoundingClientRect();
     if (r) setAll(placeEvery(r));
   };
+  // YOUR RECENT ONES FIRST (./recent-emoji.ts), read as the plate opens, and
+  // every pick from here or the full list is remembered.
+  const [recent] = useState(readRecent);
+  const pick = (emoji: string) => { rememberEmoji(emoji); onPick(emoji); };
   return (
     <div className="chat-emoji" ref={box} role="group" aria-label={title}>
-      {CHAT_EMOJI.map((emoji) => (
-        <button key={emoji} type="button" className="chat-emoji-one" title={emoji} onClick={() => onPick(emoji)}>
+      {quickRow(recent, CHAT_EMOJI).map((emoji) => (
+        <button key={emoji} type="button" className="chat-emoji-one" title={emoji} onClick={() => pick(emoji)}>
           {emoji}
         </button>
       ))}
@@ -77,7 +111,7 @@ export function EmojiPick({ onPick, onClose, title = 'React' }: {
           <path d="M8 3v10M3 8h10" />
         </svg>
       </button>
-      {all && createPortal(<EveryEmoji onPick={onPick} at={all} boxRef={every} />, document.body)}
+      {all && createPortal(<EveryEmoji onPick={pick} at={all} boxRef={every} recent={recent} typed={typed} onType={setTyped} />, document.body)}
     </div>
   );
 }
@@ -88,12 +122,29 @@ export function EmojiPick({ onPick, onClose, title = 'React' }: {
  * short list: the group jumps are drawn grey until pointed at, so the only
  * colour in the panel is the emoji you are choosing between.
  */
-export function EveryEmoji({ onPick, at, boxRef }: {
+export function EveryEmoji({ onPick, at, boxRef, recent = [], typed: given, onType }: {
   onPick: (emoji: string) => void;
   at?: CSSProperties;
   boxRef?: RefObject<HTMLDivElement>;
+  /** Yours, newest first, drawn above the groups as Slack draws them. */
+  recent?: string[];
+  /** The search, when the short list holds it so a key typed there lands here. */
+  typed?: string;
+  onType?: (typed: string) => void;
 }) {
-  const [typed, setTyped] = useState('');
+  const [own, setOwn] = useState('');
+  const typed = given ?? own;
+  const setTyped = onType ?? setOwn;
+  const field = useRef<HTMLInputElement>(null);
+  // Back into the box with the caret at the end whenever the search changes
+  // from outside it: opening with a letter already typed, or a letter typed
+  // after a group jump took focus away.
+  useEffect(() => {
+    const f = field.current;
+    if (!f || document.activeElement === f) return;
+    f.focus();
+    f.setSelectionRange(f.value.length, f.value.length);
+  }, [typed]);
   const [jumpTo, setJumpTo] = useState<string | null>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const found = typed.trim() ? findEmoji(typed) : null;
@@ -114,7 +165,7 @@ export function EveryEmoji({ onPick, at, boxRef }: {
         className="chat-emoji-search"
         placeholder="Search emoji"
         aria-label="Search emoji"
-        autoFocus
+        ref={field}
         value={typed}
         onChange={(e) => setTyped(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && found?.length) { e.preventDefault(); onPick(found[0][0]); } }}
@@ -132,12 +183,22 @@ export function EveryEmoji({ onPick, at, boxRef }: {
           ? (found.length
             ? <div className="chat-emoji-grid">{found.map(cell)}</div>
             : <div className="chat-emoji-none">No emoji for “{typed.trim()}”</div>)
-          : EMOJI_GROUPS.map((group) => (
-            <section key={group.name} data-group={group.name}>
-              <div className="chat-emoji-group">{group.name}</div>
-              <div className="chat-emoji-grid">{group.emoji.map(cell)}</div>
-            </section>
-          ))}
+          : <>
+            {recent.length > 0 && (
+              <section data-group="Recent">
+                <div className="chat-emoji-group">Recent</div>
+                <div className="chat-emoji-grid">{recent.map((emoji) => (
+                  <button key={emoji} type="button" className="chat-emoji-cell" title={emoji} onClick={() => onPick(emoji)}>{emoji}</button>
+                ))}</div>
+              </section>
+            )}
+            {EMOJI_GROUPS.map((group) => (
+              <section key={group.name} data-group={group.name}>
+                <div className="chat-emoji-group">{group.name}</div>
+                <div className="chat-emoji-grid">{group.emoji.map(cell)}</div>
+              </section>
+            ))}
+          </>}
       </div>
     </div>
   );
@@ -172,7 +233,7 @@ export function Reactions({ on, me, onReact }: {
             className={`chat-chip${mine ? ' mine' : ''}`}
             aria-pressed={mine}
             title={mine ? `You and ${who.length - 1} other${who.length === 2 ? '' : 's'}` : `${who.length}`}
-            onClick={() => onReact(emoji, mine)}
+            onClick={() => { chipPressed(emoji, mine); onReact(emoji, mine); }}
           >
             <span className="chat-chip-emoji">{emoji}</span>
             <span className="chat-chip-count">{who.length}</span>
@@ -184,21 +245,24 @@ export function Reactions({ on, me, onReact }: {
 }
 
 /**
- * THE BAR THAT APPEARS WHEN YOU POINT AT A MESSAGE: react, reply, and hand it
- * to an agent. Three actions and no more; the drawing's fourth glyph was an
- * overflow with nothing behind it yet, and a button that does nothing is worse
- * than a gap.
+ * THE BAR THAT APPEARS WHEN YOU POINT AT A MESSAGE: three quick reactions where
+ * the chat is wide, your most recent first, then react, reply, hand it to an
+ * agent, and the more menu (./MessageMore.tsx) for editing, copying, marking
+ * unread and deleting.
  *
  * It is absolutely positioned over the message's top edge rather than laid out
  * in the flow, so a message does not change height when the pointer crosses it.
- * It stays up while the emoji plate is open, because the plate hangs off it and
- * a bar that vanished the moment the pointer moved into its own menu would be
- * unusable.
+ * It stays up while the emoji plate or the menu is open, because both hang off
+ * it and a bar that vanished the moment the pointer moved into its own menu
+ * would be unusable.
  */
-export function MessageActions({ onReact, onQuote, replyLabel = 'Reply', onHandToAgent }: {
+export function MessageActions({ onReact, quick: withQuick = true, onQuote, replyLabel = 'Reply', onHandToAgent, more }: {
   onReact: (emoji: string) => void;
-  // Absent inside a thread's panel, where the reply box is right there and a
-  // reply to a reply would be a thread inside a thread (w-920461cbe6).
+  // False in a thread or a narrow panel, where three emoji crowd the bar over
+  // the message; React still opens them, recent ones first.
+  quick?: boolean;
+  // In a thread's panel this quotes into the thread's own box: a reply to a
+  // reply would be a thread inside a thread (w-920461cbe6).
   onQuote?: () => void;
   // "Reply in thread" where Reply opens the message's thread rather than
   // quoting it.
@@ -206,11 +270,25 @@ export function MessageActions({ onReact, onQuote, replyLabel = 'Reply', onHandT
   // Absent on a conversation where there is nothing to hand work to, which is
   // the single-person app: the two buttons left still stand.
   onHandToAgent?: () => void;
+  /** What the more menu offers on this message; no menu when empty. */
+  more?: MoreItem[];
 }) {
   const [picking, setPicking] = useState(false);
+  const [menu, setMenu] = useState<DOMRect | null>(null);
+  const bar = useRef<HTMLDivElement>(null);
+  const [recentRow, setRecentRow] = useState(latestQuick);
+  useEffect(() => {
+    const message = bar.current?.parentElement;
+    return message ? onArrival(message, () => setRecentRow(latestQuick())) : undefined;
+  }, []);
+  const quick = withQuick ? recentRow : [];
   return (
-    <div className={`chat-acts${picking ? ' open' : ''}`}>
+    <div className={`chat-acts${picking || menu ? ' open' : ''}`} ref={bar}>
       {picking && <EmojiPick onPick={(emoji) => { setPicking(false); onReact(emoji); }} onClose={() => setPicking(false)} />}
+      {quick.map((emoji) => (
+        <button key={emoji} type="button" className="chat-quick" title={`React with ${emoji}`} aria-label={`React with ${emoji}`}
+          onClick={() => { rememberEmoji(emoji); onReact(emoji); }}>{emoji}</button>
+      ))}
       <button type="button" className="chat-act" title="React" aria-label="React" onClick={() => setPicking((was) => !was)}>
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden="true">
           <path d="M14 8A6 6 0 1 1 8 2" />
@@ -239,6 +317,15 @@ export function MessageActions({ onReact, onQuote, replyLabel = 'Reply', onHandT
           <span className="chat-act-word">Hand to an agent</span>
         </button>
       )}
+      {more && more.length > 0 && (
+        <button type="button" className="chat-act chat-act-more" title="More" aria-label="More" aria-haspopup="menu" aria-expanded={!!menu}
+          onClick={(e) => setMenu(menu ? null : e.currentTarget.getBoundingClientRect())}>
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <rect x="2.4" y="7.2" width="1.6" height="1.6" /><rect x="7.2" y="7.2" width="1.6" height="1.6" /><rect x="12" y="7.2" width="1.6" height="1.6" />
+          </svg>
+        </button>
+      )}
+      {menu && more && <MoreMenu at={menu} items={more} onClose={() => setMenu(null)} />}
     </div>
   );
 }

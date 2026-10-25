@@ -2,15 +2,20 @@
 // send, then persisted into the product's attachments/ dir and embedded in
 // the body as markdown (relative paths: workers read them through the MCP,
 // the message view renders them).
+import { turnedName } from '../../shared/picture-formats.mjs';
 
 export interface PendingAttachment {
   name: string;
   dataBase64?: string;
   srcPath?: string;
   image: boolean;
+  /** A voice note's id in this Mac's store of unsent notes (team/voice-drafts.ts). */
+  draftId?: string;
+  /** In a room, the name it is stored under, the same on every try. */
+  storedAs?: string;
 }
 
-const isImageName = (name: string) => /\.(png|jpe?g|gif|webp)$/i.test(name);
+export const isImageName = (name: string) => /\.(png|jpe?g|gif|webp)$/i.test(name);
 
 function blobToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -26,7 +31,7 @@ export async function collectFiles(files: FileList | File[]): Promise<PendingAtt
   for (const file of Array.from(files)) {
     const path = window.zero?.pathForFile?.(file) ?? null;
     if (path) {
-      const image = isImageName(file.name);
+      let name = file.name || 'file';
       // A PICTURE SHE DRAGGED IN IS COPIED INSIDE BEFORE IT IS DRAWN.
       //
       // A dropped file comes with its real path, and the thumbnail below asks
@@ -36,15 +41,20 @@ export async function collectFiles(files: FileList | File[]): Promise<PendingAtt
       // next to the pasted ones, in a folder the app already serves and already
       // sweeps.
       //
-      // Only pictures: a file that draws no thumbnail has nothing to gain from
-      // being copied, and send-time saving reads whichever path is kept here.
-      // A staging that fails leaves the path exactly as it was, so the worst
-      // case is the broken thumbnail she has today and never a lost attachment.
+      // Only pictures, and the TIFF or HEIC that staging turns into one: a
+      // file that draws no thumbnail has nothing to gain from being copied,
+      // and send-time saving reads whichever path is kept here. A staging that
+      // fails leaves the path exactly as it was, so the worst case is the
+      // broken thumbnail she has today and never a lost attachment.
       let staged: string | null = null;
-      if (image) {
-        try { staged = (await window.zero?.stageAttachment?.({ name: file.name || 'file', srcPath: path }))?.path ?? null; } catch { staged = null; }
+      if (isImageName(name) || turnedName(name)) {
+        try {
+          const got = await window.zero?.stageAttachment?.({ name, srcPath: path });
+          staged = got?.path ?? null;
+          name = got?.name ?? name;
+        } catch { staged = null; }
       }
-      out.push({ name: file.name || 'file', srcPath: staged ?? path, image });
+      out.push({ name, srcPath: staged ?? path, image: isImageName(name) });
     } else {
       // No path means clipboard data (a pasted screenshot).
       //
@@ -60,11 +70,16 @@ export async function collectFiles(files: FileList | File[]): Promise<PendingAtt
       // (a browser build, an older main process that has no handler) the paste
       // still works exactly as it did, budget and all. Losing the screenshot
       // would be a worse failure than the one being fixed.
-      const name = file.name && file.name !== 'image.png' ? file.name : `pasted-${Date.now() % 100000}.png`;
-      const image = file.type.startsWith('image/') || isImageName(name);
+      let name = file.name && file.name !== 'image.png' ? file.name : `pasted-${Date.now() % 100000}.png`;
       const dataBase64 = await blobToBase64(file);
       let staged: string | null = null;
-      try { staged = (await window.zero?.stageAttachment?.({ name, dataBase64 }))?.path ?? null; } catch { staged = null; }
+      try {
+        const got = await window.zero?.stageAttachment?.({ name, dataBase64 });
+        staged = got?.path ?? null;
+        name = got?.name ?? name;
+      } catch { staged = null; }
+      // A TIFF staging could not turn is still a file: drawn, it is a broken picture.
+      const image = isImageName(name) || (file.type.startsWith('image/') && !turnedName(name));
       out.push(staged ? { name, srcPath: staged, image } : { name, dataBase64, image });
     }
   }
@@ -90,7 +105,10 @@ export async function persistAttachments(product: string, pending: PendingAttach
     product,
     files: pending.map(({ name, dataBase64, srcPath }) => ({ name, dataBase64, srcPath })),
   });
-  return saved
-    .map((s) => (s.image ? `![${s.name}](${s.rel})` : `[${s.name}](${s.rel})`))
-    .join('\n');
+  return attachmentLinks(saved);
+}
+
+/** Saved files as the message links them: a picture drawn, anything else a link. */
+export function attachmentLinks(saved: Array<{ rel: string; name: string; image: boolean }>): string {
+  return saved.map((s) => (s.image ? `![${s.name}](${s.rel})` : `[${s.name}](${s.rel})`)).join('\n');
 }

@@ -21,6 +21,7 @@
 // THE ICONS ARE GREY. The first drawing used the accent, which on this skin is
 // a red-orange, and a red mark reads as something broken.
 
+import type { ReactNode } from 'react';
 import { NAME } from '../../../shared/product-name.mjs';
 import { MOVE_SAY, SAY } from '../update-row';
 import { sayWhere } from '../../../shared/where-it-runs-from.mjs';
@@ -44,24 +45,26 @@ export const SIDE_SAY = {
 // in the same place, with the one press that fixes it for good, and the same ×
 // so it can be put away. The Settings row and ⌘K keep the offer after that:
 // unlike a waiting version, nothing else will ever install this one.
-export function SidebarMove({ place, error = null, collapsed, onMove, onClose }: {
+export function SidebarMove({ place, error = null, collapsed, rail = false, onMove, onClose }: {
   /** Which read-only place this is (shared/where-it-runs-from.mjs). */
   place: string | null;
   /** Why the last move did not work, if it did not. */
   error?: string | null;
   collapsed: boolean;
+  /** The sidebar widens under the pointer: the card rises out of the row (`RailCard`). */
+  rail?: boolean;
   onMove: () => void;
   onClose: () => void;
 }) {
   // THE CARD SAYS THE FACT AND THE BUTTON SAYS THE FIX. The Settings row has
   // the width for both sentences; here the long one ran to six lines.
   const why = error ? `${error.replace(/\.?$/, '.')} ${MOVE_SAY.retry}` : (sayWhere(place, { short: true }) ?? MOVE_SAY.cannotUpdateHere);
+  const row = <button type="button" className="sb-update-row" title={`${MOVE_SAY.button}. ${why}`} aria-label={MOVE_SAY.button} onClick={onMove}>
+    <MoveIcon /><span>{MOVE_SAY.button}</span>
+  </button>;
 
-  if (collapsed) {
-    return <button type="button" className="sb-update-row" title={`${MOVE_SAY.button}. ${why}`} aria-label={MOVE_SAY.button} onClick={onMove}>
-      <MoveIcon /><span>{MOVE_SAY.button}</span>
-    </button>;
-  }
+  if (rail) return <RailCard icon={<MoveIcon />} title={MOVE_SAY.title} text={why} closeTip={SIDE_SAY.moveCloseTip} onClose={onClose} row={row} />;
+  if (collapsed) return row;
 
   return <div className="sb-update-card">
     <div className="sb-update-card-title"><MoveIcon /><span>{MOVE_SAY.title}</span></div>
@@ -85,7 +88,28 @@ function CloseIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>;
 }
 
-export function SidebarUpdate({ installing, changes = [], error = null, collapsed, onRestart, onClose }: {
+/**
+ * THE CARD, IN THE SIDEBAR THAT WIDENS UNDER THE POINTER.
+ *
+ *  The row stays where it is in the foot list and becomes the card's button;
+ *  the rest of the card stands on the row's slot and grows upward, so nothing
+ *  below or under the pointer moves. The markup is the same narrow and wide,
+ *  and CSS hides the card while narrow (threads/pages.css).
+ */
+function RailCard({ icon, title, text, closeTip, changed, onClose, row }: {
+  icon: ReactNode; title: string; text: string; closeTip: string; changed?: string; onClose: () => void; row: ReactNode;
+}) {
+  return <div className="sb-update-slot">
+    <div className="sb-update-card sb-update-rise" title={changed || undefined}>
+      <div className="sb-update-card-title">{icon}<span>{title}</span></div>
+      <button type="button" className="sb-update-close" aria-label={SIDE_SAY.close} title={closeTip} onClick={onClose}><CloseIcon /></button>
+      <p>{text}</p>
+    </div>
+    {row}
+  </div>;
+}
+
+export function SidebarUpdate({ installing, changes = [], error = null, collapsed, rail = false, onRestart, onClose }: {
   installing: boolean;
   /** What changed, already counted (`changeLines`). Empty for an installed app. */
   changes?: string[];
@@ -93,20 +117,23 @@ export function SidebarUpdate({ installing, changes = [], error = null, collapse
   error?: string | null;
   /** The sidebar is shut: the restart row's icon only, no ×. */
   collapsed: boolean;
+  /** The sidebar widens under the pointer: the card rises out of the row (`RailCard`). */
+  rail?: boolean;
   onRestart: () => void;
   onClose: () => void;
 }) {
   const changed = changes.length ? `${SIDE_SAY.changed}\n${changes.map((c) => `- ${c}`).join('\n')}` : '';
+  const failed = error ? `${error.replace(/\.?$/, '.')} Pressing it again tries again.` : '';
 
-  if (collapsed) {
-    const tip = installing ? SAY.installing : [
-      error ? `${error.replace(/\.?$/, '.')} Pressing it again tries again.` : `${SAY.restart}. ${SIDE_SAY.how}`,
-      changed,
-    ].filter(Boolean).join('\n\n');
-    return <button type="button" className="sb-update-row" data-installing={installing || undefined} disabled={installing}
+  if (collapsed || rail) {
+    const tip = installing ? SAY.installing : [failed || `${SAY.restart}. ${SIDE_SAY.how}`, changed].filter(Boolean).join('\n\n');
+    const row = <button type="button" className="sb-update-row" data-installing={installing || undefined} disabled={installing}
       title={tip} aria-label={installing ? SIDE_SAY.installing : SAY.restart} onClick={onRestart}>
       <RestartIcon /><span>{installing ? SIDE_SAY.installing : SAY.restart}</span>
     </button>;
+    // While it rebuilds there is nothing to press, so there is no card to rise.
+    if (!rail || installing) return row;
+    return <RailCard icon={<RestartIcon />} title={SIDE_SAY.title} text={failed || SIDE_SAY.how} closeTip={SIDE_SAY.closeTip} changed={changed} onClose={onClose} row={row} />;
   }
 
   // Pointing at it names what changed: the card is narrow, and a list of

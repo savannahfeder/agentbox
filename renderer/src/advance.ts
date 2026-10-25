@@ -36,6 +36,19 @@ export function advanceAfter(p: { fromTask: boolean; index: number; id: string }
 }
 
 /**
+ * DOES A REPLY MOVE HER ON, or keep her on the thread (2026-10-13)? Where she
+ * opened it decides. Working through Needs you, it moves on to the next thread
+ * waiting, and from the last one to the empty inbox, where one thing at a time
+ * ends (w-65bcefb857). Opened from In progress or any other list, or from
+ * search or an alert, she stays: "I quite often will just stick with one chat"
+ * (tests/a-reply-keeps-you-on-the-thread-unless-you-are-clearing-your-inbox).
+ */
+export function replyMovesOn(p: { view: string; onBoard: boolean; index: number; searching?: boolean }): boolean {
+  // With search open, the tab under it is not where the work is happening.
+  return !p.searching && advanceLandsHere(p) && p.index >= 0;
+}
+
+/**
  * WHERE THE NEXT TASK IS OPENED: in the list on Needs you, and on the board
  *  always. The board hides the tabs but `view` still holds the one the list was
  *  last on, and testing that alone dropped her back on the board after every

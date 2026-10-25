@@ -34,6 +34,8 @@
 // that misses the reply box costs a toast instead of a decision. There is deliberately no outer limit now: an undo that
 // has to be confirmed by name cannot happen by accident, so an expiry would only
 // take something away from her for nothing.
+import { DONE } from './done-word';
+
 export const UNDO_STRAIGHT_AWAY_MS = 30_000;
 
 /**
@@ -100,6 +102,19 @@ export function undoAsk(undoes: string): string {
 }
 
 /**
+ * What Z inside the grace window says. Nothing was written, so the true answer
+ * depends on what was held: a reply's words are back in the box, a close
+ * leaves the thread open, and anything else changed nothing. `said` is the
+ * action's own toast ("Done: <title>", off ./done-word).
+ */
+export function graceUndoneLine(p: { said?: string; restored: boolean }): string {
+  if (p.restored) return 'Undone. Your message is back in the reply box.';
+  const closed = new RegExp(`^${DONE.verb}: (.+)$`).exec(p.said ?? '');
+  if (closed) return `Undone. Still open: ${closed[1]}`;
+  return 'Undone. Nothing changed.';
+}
+
+/**
  * WHAT A Z PUTS IN FRONT OF HER ONCE IT HAS RUN (w-7eb39d3c97).
  *
  * Inside the grace window the row was never written away, and Z has always
@@ -111,14 +126,21 @@ export function undoAsk(undoes: string): string {
  * new task card), and it wins, because her words are in it. Otherwise `brings`
  * is the row the entry put back, and that is opened. An entry that names no row
  * (a schedule, the update row) opens nothing and leaves her where she is.
+ *
+ * AND ONLY WHILE A TASK IS OPEN (F-50). Both cases above were met from inside
+ * one, where the row she wanted back was behind the task. Reading a list it is
+ * already in front of her, and a Z in the Later tab landed her in the thread
+ * with the breadcrumb still saying LATER. `restored` moves her either way:
+ * there is nowhere else her own words are on screen.
  */
 export function shownAfterUndo<I>(
   restored: { item: I } | { compose: true } | null | undefined,
   brings: I | undefined,
+  where: { onATask: boolean },
 ): { open: I | null; compose: boolean } {
   if (restored && 'item' in restored) return { open: restored.item, compose: false };
   if (restored) return { open: null, compose: true };
-  return { open: brings ?? null, compose: false };
+  return { open: (where.onATask && brings) || null, compose: false };
 }
 
 /**
@@ -131,6 +153,25 @@ export function shownAfterUndo<I>(
  */
 export function bringsBack<I>(rows: readonly I[]): I | undefined {
   return rows.length === 1 ? rows[0] : undefined;
+}
+
+/** What a close leaves in the thread when a Z takes it back. */
+export const UNDID_CLOSING = 'Undid closing it';
+
+type Row = { product: string; id: string };
+
+/**
+ * A close on the row a close is already holding is the same press again. On
+ * the board that row stays under the cursor, and a second close would first
+ * write the held one, so a Z in between reopened it and the second close shut
+ * it again.
+ */
+export function closesAgain(
+  held: { item: Row; undid?: readonly { product: string; id: string; words: string }[] } | null,
+  item: Row,
+): boolean {
+  if (!held || held.item.product !== item.product || held.item.id !== item.id) return false;
+  return !!held.undid?.some((u) => u.product === item.product && u.id === item.id && u.words === UNDID_CLOSING);
 }
 
 /** And what a Z says when there is nothing on the pile at all. */

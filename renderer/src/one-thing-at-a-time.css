@@ -1,0 +1,83 @@
+/* ONE THING AT A TIME (w-65bcefb857): "Name heads the page", picked in round eight. */
+
+/* The name is said once, on the page; the bar keeps the way back. A rename still opens its box there. */
+.app.one-at-a-time .thread-crumb-sep:has(+ .thread-crumb-name), .app.one-at-a-time .thread-crumb-name { display: none; }
+
+.one-nav { display: inline-flex; align-items: center; gap: 6px; margin-right: 6px; }
+.one-pos { margin-right: 8px; font: 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; }
+.one-step:disabled { opacity: .35; cursor: default; }
+.one-step:disabled:hover { color: var(--text-dim); border-color: var(--line); background: none; }
+
+.one-sum { margin-bottom: 26px; }
+/* The largest type on the page, so it is read before the question. The page
+   sits in .markdown, whose h2 is a small grey capital label. */
+.one-sum .one-title { margin: 0 0 10px; font-size: 27px; line-height: 1.25; font-weight: 500; letter-spacing: -0.015em; text-transform: none; color: var(--text); }
+.one-col { font-size: 15px; line-height: 1.55; color: var(--text-dim); white-space: pre-line; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* Cut text opens whole on a click, and folds back on another. */
+.one-cols.one-cut, .one-cols.one-whole { cursor: pointer; }
+.one-cols.one-cut:hover .one-col, .one-cols.one-whole:hover .one-col { color: var(--text); }
+.one-cols[role="button"]:focus-visible { outline: 2px solid var(--underline); outline-offset: 4px; }
+.one-cols.one-whole .one-col { -webkit-line-clamp: unset; overflow: visible; }
+.one-lab { margin-right: 10px; white-space: nowrap; font: 10.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint); }
+.one-earlier { margin-top: 6px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer;
+  text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; }
+.one-earlier:hover { color: var(--text); }
+.one-earlier:focus-visible { outline: 2px solid var(--underline); outline-offset: 2px; }
+
+/* What the app did after the answer, quiet under it. */
+.one-app-note { margin: 14px 0 0; font-size: 13px; color: var(--text-faint); }
+
+.one-answer .one-q { margin: 0 0 8px; font-size: 17px; line-height: 1.45; font-weight: 600; color: var(--text); }
+
+/* A page or a note the answer names, read in place at the page's width. */
+.one-file { margin: 28px 0 0; border: 1px solid var(--line-strong); }
+.one-filehead { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--wash); font: 12px var(--mono); color: var(--text-dim); }
+.one-filename { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.one-filefold { display: inline-flex; align-items: center; gap: 8px; min-width: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+.one-filefold:hover { color: var(--text); }
+.one-filefold svg { flex: none; }
+.one-folded .one-filehead { border-bottom: 0; }
+.one-fileopen { margin-left: auto; padding: 0; border: 0; background: none; font: inherit; font-family: Geist, 'Avenir Next', -apple-system, 'DejaVu Sans', sans-serif; font-size: 12.5px; color: var(--text-faint); cursor: pointer; }
+.one-fileopen:hover { color: var(--text); }
+.one-frame { display: block; width: 100%; height: 680px; border: 0; background: var(--bg); }
+.one-notebody { padding: 14px 22px 6px; }
+.one-notebody hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+
+/* The choices, as the app draws them but tighter, apart from the reply box at
+   the foot. A long one is cut to a line; hovering it shows it whole
+   (OptionsOffer's peek), and so does picking it out with the keys. */
+.one-choices > .opt-strip { margin: 0 0 10px; }
+.one-choices .opt-row { padding: 3px 14px; line-height: 20px; }
+/* Each number in a whole-pixel box, centred, level with the first line of its words. */
+.one-choices .opt-key { display: inline-flex; align-items: center; justify-content: center; align-self: flex-start;
+  box-sizing: border-box; width: 20px; height: 20px; padding: 0; line-height: 1; top: 0; }
+.one-choices > .opt-strip > .opt-row:first-of-type { padding-top: 7px; }
+.one-choices > .opt-strip > .opt-row:last-child { padding-bottom: 7px; }
+.one-choices .opt-text { -webkit-line-clamp: 1; }
+/* The small arrow in the box's corner folds it away. Folded, the reply box
+   carries the sign that it is there; the keys pick any choice either way, and
+   one picked out with the arrow keys brings the box back. */
+.one-choices { position: relative; }
+.one-choices .opt-row { padding-right: 44px; }
+.one-choices-fold { position: absolute; top: 6px; right: 8px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
+  border: none; background: transparent; color: var(--text-faint); border-radius: var(--radius); cursor: pointer; transition: color 0.15s, background 0.15s; }
+.one-choices-fold:hover { color: var(--text); background: var(--wash); }
+.one-choices-fold svg { width: 14px; height: 14px; }
+.one-choices-folded:not(:has(.opt-row.selected)) { display: none; }
+.one-choices-show { display: inline-flex; align-items: center; gap: 3px; margin: 0 8px 0 -4px; padding: 3px 6px; border-radius: var(--radius);
+  font: 11px var(--mono); color: var(--text-faint); cursor: pointer; transition: color 0.15s, background 0.15s; }
+.one-choices-show:hover { color: var(--text); background: var(--wash); }
+.one-choices-show svg { width: 13px; height: 13px; }
+.one-choices .opt-row.selected .opt-text { -webkit-line-clamp: unset; }
+
+/* The app's toast, on a thread's page: one line in the bar's empty middle,
+   first in the corner, instead of a card over the reply box. Specific enough
+   to beat the rules that lift the corner card off an open reply box. */
+.app.one-at-a-time .toast.toast-in-bar { position: relative; inset: auto; order: -1; width: auto; max-width: 520px; min-width: 0; margin-right: 6px;
+  grid-template-columns: minmax(0, auto) minmax(0, auto) auto; grid-template-areas: "title line keys"; column-gap: 12px;
+  padding: 4px 8px 5px 12px; background: none; box-shadow: none; font-size: 12.5px; }
+.app.one-at-a-time .toast.toast-in-bar .toast-title { -webkit-line-clamp: 1; font-size: 12.5px; font-weight: 400; }
+
+/* Where the last answer went, in the bar's empty middle beside the place in the queue. */
+.ts-top > .sent-line { margin: 0 16px 0 0; padding: 2px 4px 2px 12px; min-width: 0; max-width: 460px; background: none; font-size: 12.5px; }

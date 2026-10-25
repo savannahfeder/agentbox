@@ -23,6 +23,7 @@ import { mdToPmDoc, pmDocToMd } from '../editor/markdown';
 import { patchOriginal } from '../editor/patch-md';
 import { theAppKeepsThisKey } from '../../../shared/artifact-keys.mjs';
 import { api } from '../api';
+import { asksForANewTab } from '../link-click';
 
 const SAVE_DEBOUNCE_MS = 900;
 
@@ -175,12 +176,14 @@ export function DocText({ product, src, text, mtime, onSaved, onNotice }: {
   };
   const anchorAt = (e: React.MouseEvent) => (e.target as HTMLElement).closest?.('a') as HTMLAnchorElement | null;
 
-  const visit = () => {
-    if (!linkPop) return;
-    const url = linkPop.href;
+  const visitHref = (url: string) => {
     api.openArtifactExternally({ product, src: url }).then((r) => {
       if (!r.ok) onNotice(r.error ?? 'That link could not be opened.');
     });
+  };
+  const visit = () => {
+    if (!linkPop) return;
+    visitHref(linkPop.href);
     setLinkPop(null);
   };
   const copyLink = async () => {
@@ -260,7 +263,11 @@ export function DocText({ product, src, text, mtime, onSaved, onNotice }: {
       onMouseOut={(e) => { if (anchorAt(e)) scheduleClose(); }}
       onClick={(e) => {
         const a = anchorAt(e);
-        if (a) { e.preventDefault(); openFor(a, true); }
+        if (!a) return;
+        e.preventDefault();
+        const href = a.getAttribute('href') || '';
+        if (asksForANewTab(e)) { setLinkPop(null); visitHref(href); return; }
+        openFor(a, true);
       }}
     >
       <EditorContent editor={editor} className="doc-rich-content" />

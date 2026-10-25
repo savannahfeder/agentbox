@@ -175,13 +175,13 @@ export function codexImportRow(thread, { projectName, now = Date.now() } = {}) {
 /**
  * THE ROW ONCE THE USER SAID YES. Their prompt is the body and Codex's last message
  *  is the result, so the thread reads You, then Codex, the way it did over
- *  there. The result carries the one line that says where replies go. */
+ *  there. A reply on it carries the work on here. */
 export function codexMirrorPatch(thread) {
   const prompt = plainQuote(thread?.prompt);
   const last = plainQuote(thread?.last);
   return {
     body: prompt || String(thread?.title ?? '').trim(),
-    result: last ? `${last}\n\nRead from Codex. Replies happen there.` : 'Codex has not answered yet.\n\nRead from Codex. Replies happen there.',
+    result: last || 'Codex has not answered yet.',
     kind: 'directive',
     labels: [CODEX_MIRROR_LABEL, codexLabel(thread?.id)],
   };

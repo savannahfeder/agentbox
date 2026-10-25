@@ -116,10 +116,10 @@ describe('the words on the asking row', () => {
     expect(row.body).toContain('Codex has not answered yet.');
     expect(row.body).not.toContain('Codex last said');
   });
-  it('the row she reads after yes is her prompt, then Codex, then where replies go', () => {
+  it('the row she reads after yes is her prompt, then Codex', () => {
     const p = codexMirrorPatch(thread('t1', '/x/zero'));
     expect(p.body).toBe('I want to make my recipe app look a lot tidier.');
-    expect(p.result).toBe('Starting with the sidebar.\n\nRead from Codex. Replies happen there.');
+    expect(p.result).toBe('Starting with the sidebar.');
     expect(p.kind).toBe('directive');
     expect(p.labels).toEqual([CODEX_MIRROR_LABEL, 'codex:t1']);
   });
@@ -221,7 +221,7 @@ describe('the store, end to end', () => {
     expect(after.kind).toBe('directive');
     expect(after.body).toBe(t.prompt);
     expect(after.wrote.body.source).toBe('founder');
-    expect(after.result).toBe('Starting with the sidebar.\n\nRead from Codex. Replies happen there.');
+    expect(after.result).toBe('Starting with the sidebar.');
     expect(after.wrote.result.source).toBe('agent');
     expect(after.wrote.result.ts).toBeGreaterThan(after.wrote.body.ts);
     expect(after.labels).toEqual([CODEX_MIRROR_LABEL, 'codex:t1']);
@@ -286,7 +286,7 @@ describe('the store, end to end', () => {
     expect(all).toHaveLength(3);
     for (const row of all) { expect(isCodexMirrorRow(row)).toBe(true); expect(row.status).toBe('open'); }
     // Pressing again moves nothing.
-    expect(s.importCodexThreads(slug, [a, b, c], { now: NOW + 4000 })).toEqual({ ids: [], added: 0, already: 3 });
+    expect(s.importCodexThreads(slug, [a, b, c], { now: NOW + 4000 })).toEqual({ ids: [], added: 0, already: 3, done: 0 });
   });
 
   // The watch stopped asking on 2026-10-05 (w-db6f5e331e): importing is on

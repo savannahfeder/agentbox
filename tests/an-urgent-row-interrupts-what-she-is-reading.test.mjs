@@ -81,12 +81,13 @@ describe('when an urgent row may take the screen', () => {
     expect(ask({ reading, inbox: [row('w-same', 9)] })).toBeNull();
   });
 
-  // An agent cannot promote its own proposal into something that takes her
-  // screen. itemPriority discards an agent's number, and this is that rule
-  // reaching all the way to the front.
-  it('ignores a nine an agent wrote on its own row', () => {
+  // A LEVEL COUNTS WHOEVER SET IT (w-5ac9c9006d, 2026-10-16): an agent's nine
+  // is Urgent on screen, so it asks for her screen like hers. Its High does not.
+  it('takes a nine an agent wrote, and not its seven', () => {
     const agentRow = row('w-agent', 9, { wrote: { priority: { ts: NOW, source: 'agent' } } });
-    expect(ask({ reading: row('w-medium', 5), inbox: [agentRow] })).toBeNull();
+    expect(ask({ reading: row('w-medium', 5), inbox: [agentRow] })).toBe(agentRow);
+    const agentHigh = row('w-agent-high', 7, { wrote: { priority: { ts: NOW, source: 'agent' } } });
+    expect(ask({ reading: row('w-medium', 5), inbox: [agentHigh] })).toBeNull();
   });
 
   // Her compose box stamps priority as 'system', not 'founder'. Reading only

@@ -213,7 +213,7 @@ export function accountIdentity(dir, { home = os.homedir() } = {}) {
   try {
     const acct = JSON.parse(fs.readFileSync(file, 'utf8'))?.oauthAccount;
     if (acct?.emailAddress) {
-      value = { email: acct.emailAddress, accountUuid: acct.accountUuid ?? null };
+      value = { email: acct.emailAddress, accountUuid: acct.accountUuid ?? null, ...(acct.organizationUuid ? { organizationUuid: acct.organizationUuid } : {}) };
     }
   } catch {
     // A half-written file, or one Claude Code has changed the shape of. The
@@ -222,6 +222,34 @@ export function accountIdentity(dir, { home = os.homedir() } = {}) {
   }
   identityCache.set(file, { mtime, value });
   return value;
+}
+
+/**
+ * A CLOUD LOGIN'S NAME, from the one login here in the same organization. A
+ * cloud token can say its organization but not its email. Null when no login
+ * here is in it, or when two different emails are, so a team organization is
+ * never pinned on whichever member happens to be signed in here.
+ */
+export function nameForOrganization(org, identities) {
+  if (!org) return null;
+  const emails = new Set(identities.filter((id) => id?.organizationUuid === org && id.email).map((id) => id.email));
+  return emails.size === 1 ? [...emails][0] : null;
+}
+
+/**
+ * The folder here holding a cloud login, so the two share one reading. A login
+ * that says its email is that person in its organization; one that says only
+ * its organization is the one email here in it, and none when two people here
+ * share it.
+ */
+export function profileForCloudLogin(login, identities) {
+  return identities.find((id) => isCloudLoginOf(login, id, identities))?.profile ?? null;
+}
+
+/** Whether a cloud login is the same subscription as one login here, by `profileForCloudLogin`'s rule. */
+export function isCloudLoginOf({ org, email }, identity, identities) {
+  if (!org || !identity?.email || identity.organizationUuid !== org) return false;
+  return (email || nameForOrganization(org, identities)) === identity.email;
 }
 
 /**

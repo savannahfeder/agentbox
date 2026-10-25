@@ -107,7 +107,8 @@ describe('what the resumed conversation is told to do with them', () => {
     const sup = makeSupervisor();
     const brief = sup.replyBrief({ ...row, answer: 'a\n\nb' }, {}).replace(/\s+/g, ' ');
     expect(brief).toMatch(/newest message is the last one/i);
-    expect(brief).toMatch(/before you go back to anything you were doing/i);
+    expect(brief).toMatch(/Do what it asks first/i);
+    expect(brief).toMatch(/Earlier explicit autonomy for this objective still holds unless they change it/i);
     expect(brief).not.toMatch(/Read their words and carry on\./);
   });
 });

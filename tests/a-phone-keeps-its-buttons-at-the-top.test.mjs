@@ -207,7 +207,21 @@ describe('on a phone, the Superhuman way', () => {
 });
 
 describe('on the desktop', () => {
-  it('none of it applies: every rule in the file is inside the phone-sized block', () => {
-    expect(outside.replace(/\s+/g, '')).toBe('');
+  // Outside the phone-sized block is only what the phone link needs at any
+  // width, as a computer's browser opening it does (a-picture-on-its-way-holds-
+  // the-columns-width-not-a-dot): every selector there names the phone door,
+  // which the desktop window never carries, or it is a phone animation.
+  it('none of it applies: every rule is inside the phone-sized block or scoped to the phone door', () => {
+    const rest = outside.replace(/@keyframes phone-[\w-]+\s*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
+    const selectors = [...rest.matchAll(/([^{}]+)\{[^{}]*\}/g)].flatMap((m) => m[1].split(',').map((s) => s.trim()));
+    for (const s of selectors) expect(s).toMatch(/^:root(:root)*\[data-door="phone"\]\s/);
+    expect(rest.replace(/([^{}]+)\{[^{}]*\}/g, '').replace(/\s+/g, '')).toBe('');
+  });
+
+  it('and the guard still catches a rule that is neither', () => {
+    const { outside: leaked } = split(css + '\n.focus-scroll { overflow: hidden; }');
+    const rest = leaked.replace(/@keyframes phone-[\w-]+\s*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
+    const selectors = [...rest.matchAll(/([^{}]+)\{[^{}]*\}/g)].flatMap((m) => m[1].split(',').map((s) => s.trim()));
+    expect(selectors.some((s) => !/^:root(:root)*\[data-door="phone"\]\s/.test(s))).toBe(true);
   });
 });

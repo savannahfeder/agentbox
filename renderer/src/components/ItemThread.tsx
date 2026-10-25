@@ -27,18 +27,28 @@ import { TeamContext } from '../team/people';
 import { useReactionsNow, type Press } from '../team/reactions-now';
 import { api } from '../api';
 import { onPhone } from '../phone-screen';
-import { pollEvery } from '../phone-polls';
+import { pollEvery, oneAtATime } from '../phone-polls';
 import { changePathFor, type Change } from '../code-artifact';
 import { filedOnTurn } from '../filed-in-thread';
 import { itemThread, type PendingSaid } from '../item-thread';
 import { resultLeads } from '../recap';
 import { withoutTrailingWork } from '../trailing-work';
 import { marksFor, readUndoMarks, UNDO_MARKS_EVENT, type UndoMark } from '../undo-marks';
+import { ranWords } from '../byline';
+import { notShipped } from '../../../shared/not-shipped.mjs';
+import type { ModelChoice } from '../models';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
 import type { AgentTurn, RunningSession, WorkItem } from '../types';
-import { ActLine, Thread, ThreadWaiting } from './Thread';
+import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
+import { QueueAnswer, QueueSummary } from './OneThingAtATime';
+import { appWrote, earlierCount, earlierThan, newestAnswer, standsAt } from '../one-thing-at-a-time';
+import { rowTitle } from '../list-rules';
+import { askMarkUnread, say } from '../team/chat-events';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
+import { TeammatesContext } from '../teammates/row-lead';
+import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mjs';
+import { Name } from '../../../shared/product-name.mjs';
 
 // THE BACKSTOP, NOT THE HEARTBEAT.
 //
@@ -62,7 +72,9 @@ const REFRESH_MS = 8_000;
 // screen is the kind of drift this row exists to end.
 const THEM = 'The agent';
 
-export function ItemThread({ item, engine, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled,onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread }: {
+export function ItemThread({ item, engine, engineChoice, codexModels = [], codexModelDefault = null, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread, queue }: {
+  /** One thing at a time (w-65bcefb857): the summary on top, the newest answer, the rest folded. */
+  queue?: { context: string | null };
   // A CHAT'S THREAD, IN THE PANEL BESIDE IT (w-920461cbe6). The pane owns which
   // one is open and how wide it is; this draws it, because this is where the
   // replies were read. `host` is the pane the panel is drawn into. Absent
@@ -77,6 +89,8 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
     onSend: (uid: string, text: string) => unknown;
     /** New replies waiting on you, by thread (`whatWaits`). */
     fresh?: Record<string, number>;
+    /** First names of the people in the conversation, for the panel's @ menu. */
+    people?: string[];
   };
   item: WorkItem;
   // THE THREADS THIS ONE FILED, EACH ON THE TURN THAT FILED IT (w-2e13752a85).
@@ -90,6 +104,11 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
   onApproveFiled?: (id: string) => void;
   // And the one that does it in this thread instead (w-554834e749).
   onHereFiled?: (id: string) => void;
+  // And the one that drops it (w-fcb5fdc2e5).
+  onDismissFiled?: (id: string) => void;
+  // And the two on the count line that answer every proposal in one list (w-fe64f35bdd).
+  onStartAllFiled?: (ids: string[]) => void;
+  onDismissAllFiled?: (ids: string[]) => void;
   // IN A CHAT ONLY: put a message's words in the reply box as a quote, and turn
   // this conversation into work. The second was a line under the whole
   // conversation and is an action on one message now (w-560647d4db).
@@ -107,6 +126,12 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
   // thread-history.ts holds the whole of why. Null on every Mac with one coding
   // agent, where the thread reads exactly as it always did.
   engine?: string | null;
+  /** Whether this Mac has more than one coding agent, which is the only case
+   *  an answer is signed with one (byline.ts, `ranWords`). */
+  engineChoice?: boolean;
+  /** This Mac's Codex models, to turn a slug into the name she picked. */
+  codexModels?: ModelChoice[];
+  codexModelDefault?: string | null;
   // Non-null while a worker is on this row right now.
   session: RunningSession | null;
   // THE USER'S ASK, WHEN IT WAS TYPED ON THE ROW ABOVE THIS ONE.
@@ -144,7 +169,16 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
   // surfaces that sit outside the thread.
   clean: (text: string) => string;
 }) {
-  const [ledger, setLedger] = useState<{ lines: LedgerLine[]; error?: string } | null>(null);
+  const teammates = useContext(TeammatesContext);
+  const teammateId = teammateIdOf(item);
+  // The offer of a teammate is the app's own words, so it is signed with its name.
+  const teammate = teammateId ? teammates.get(teammateId) ?? null : (item.labels ?? []).includes(OFFER_LABEL) ? { name: Name } : null;
+  // Keyed to its row: the effect below empties it only after the first paint
+  // of a new row, and without the key that frame drew the last row's messages
+  // under this one's header (w-388be0a968).
+  const rowKey = `${item.product}\n${item.id}`;
+  const [loaded, setLedger] = useState<{ key: string; lines: LedgerLine[]; error?: string } | null>(null);
+  const ledger = loaded?.key === rowKey ? loaded : null;
   const [sessions, setSessions] = useState<TraceSession[]>([]);
   // EVERY FILE THIS ROW'S RUNS CHANGED, so a line in the conversation that says
   // it edited one can become a chip into it. Empty on the great majority of
@@ -160,6 +194,8 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
   // timer.
   const [whole, setWhole] = useState(false);
   useEffect(() => { setWhole(false); }, [item.product, item.id]);
+  const [earlierOpen, setEarlierOpen] = useState(false);
+  useEffect(() => { setEarlierOpen(false); }, [item.product, item.id]);
 
   // A REACTION SHOWS THE MOMENT IT IS PRESSED (w-45cbac227a), in the chat and in
   // the thread panel alike, rather than after the sync and the next snapshot.
@@ -202,13 +238,17 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
   // being one event behind is worse than being slow.
   useEffect(() => {
     let live = true;
-    const read = () => {
+    // ONE READ AT A TIME, the three together. On a phone a long thread's trace
+    // takes longer through the relay than the 2 s between pushes, and reads
+    // asked on top of each other piled up until the relay turned the phone
+    // away (../phone-polls, oneAtATime).
+    const read = oneAtATime(() => Promise.allSettled([
       api.itemHistory({ product: item.product, id: item.id })
-        .then((r) => { if (live) setLedger({ lines: r?.lines ?? [], error: r?.ok ? undefined : r?.error }); })
-        .catch((err) => { if (live) setLedger({ lines: [], error: String((err as Error)?.message ?? err) }); });
+        .then((r) => { if (live) setLedger({ key: rowKey, lines: r?.lines ?? [], error: r?.ok ? undefined : r?.error }); })
+        .catch((err) => { if (live) setLedger({ key: rowKey, lines: [], error: String((err as Error)?.message ?? err) }); }),
       api.sessionTrace({ product: item.product, id: item.id })
         .then((r) => { if (live) setSessions(r?.sessions ?? []); })
-        .catch(() => { if (live) setSessions([]); });
+        .catch(() => { if (live) setSessions([]); }),
       // The change is re-read on the same beat as the trace, because the run
       // that is writing the trace is the run that will write the change, and it
       // writes it the moment it exits. Without this she would have to leave the
@@ -220,8 +260,8 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
           const files = (r?.ok ? (r.change as Change | undefined)?.files : null) ?? [];
           setChanged(files.map((f) => f.path).filter(Boolean));
         })
-        .catch(() => { if (live) setChanged([]); });
-    };
+        .catch(() => { if (live) setChanged([]); }),
+    ]));
     read();
     // Only while something is running. A finished row does not change under
     // her, and a timer on every open task is a poll per row she reads.
@@ -290,7 +330,7 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
   // `atFoot` and is drawn under the checkpoint, which is that turn's last word.
   const made = filedOnTurn(events, filed);
   const madeList = (rows: typeof filed) => (
-    <ThreadsMade rows={rows} label="Filed from this thread" onOpen={(id) => onOpenFiled?.(id)} onApprove={onApproveFiled} onHere={onHereFiled} />
+    <ThreadsMade rows={rows} label="Filed from this thread" onOpen={(id) => onOpenFiled?.(id)} onApprove={onApproveFiled} onHere={onHereFiled} onDismiss={onDismissFiled} onStartAll={onStartAllFiled} onDismissAll={onDismissAllFiled} />
   );
 
   // THE ANSWER, WHOLE, AT THE FOOT OF THE CONVERSATION.
@@ -299,24 +339,83 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
   // two apart. What changed is where they sit. They used to be instead of the
   // conversation; they are now under it, and the thread above no longer draws
   // this message twice.
+  // What wrote one message, in the app's own words (byline.ts, `ranWords`).
+  const ranOf = (e: { ran?: { engine?: string; model?: string } }) =>
+    ranWords({ engineChoice, ran: e.ran, codexModels, codexDefault: codexModelDefault });
+  const ranSaid = outcome ? ranOf(outcome) : null;
+  const answerAt = answerTurn(events, omitted, chat);
+  const unshipped = outcome?.field === 'note' && !!notShipped(item);
   const answer = outcome && (
     resultLeads(item) && outcome.field === 'result'
-      ? <div className="outcome">{md(clean(outcome.text))}</div>
+      ? <div className="outcome" data-exchange={answerAt}>{md(clean(outcome.text))}</div>
       : (
-        <div className="appendix appendix-foot">
-          <div className="appendix-label">{outcome.field === 'result' ? 'Result' : 'Latest checkpoint'}</div>
+        <div className="appendix appendix-foot" data-exchange={answerAt}>
+          {/* The newest answer is lifted out of the stream to the foot of the
+              page, so it is signed in the label it already has rather than in
+              a byline of its own. */}
+          <div className={unshipped ? 'appendix-label appendix-unshipped' : 'appendix-label'}>
+            {outcome.field === 'result' ? 'Result' : unshipped ? 'Not shipped' : 'Latest checkpoint'}
+            {ranSaid && <span className="appendix-ran">{ranSaid}</span>}
+          </div>
           {md(clean(outcome.text))}
         </div>
       )
   );
 
+  // What can be done to a message, in the chat and in its thread alike.
+  const editMessage = (uid: string, change: { text: string } | { gone: true }) => {
+    void api.teamEdit({ product: item.product, id: item.id, on: uid, ...change })
+      .then((r) => { if (!r?.ok) say(r?.error ?? 'That change did not save.'); });
+  };
+  const markUnread = () => { askMarkUnread({ product: item.product, id: item.id }); };
+  const copied = () => say('Copied');
+
+  // With no answer to lead with, the page draws the conversation as it always is, under the summary.
+  // The app's own note ("Shipped to main as …") goes under the agent's answer rather than in its place.
+  const byApp = !!queue && appWrote(outcome, item.wrote);
+  const newest = queue ? newestAnswer(events, byApp ? null : outcome) : null;
+  // Answered since (a reply or a pick the agent is working on): drawn from that answer down.
+  const from = queue && newest && !earlierOpen ? standsAt(events, newest) : -1;
+  const queueHead = queue && (
+    <QueueSummary
+      key={`${item.product}:${item.id}`}
+      title={rowTitle(item)}
+      context={queue.context}
+      earlier={from >= 0 ? earlierThan(events, from) : newest ? earlierCount(events, byApp ? null : outcome) : 0}
+      steps={!!newest && (events.some((e) => e.kind === 'work') || after.length > 0)}
+      open={earlierOpen}
+      onToggle={() => { setEarlierOpen((open) => !open); setWhole(true); }}
+    />
+  );
+  // What you did after the answer, under it and in order.
+  const afterList = after.length > 0 && (
+    <div className={`act-after${chat ? ' is-chat' : ''}`}>
+      {after.map((act, i) => <ActLine key={`${act.at}-${i}`} act={act} />)}
+    </div>
+  );
+  if (queue && newest && !earlierOpen && from < 0) {
+    return (
+      <>
+        {queueHead}
+        <QueueAnswer text={clean(newest.text)} md={md} />
+        {byApp && outcome && <p className="one-app-note">{clean(outcome.text)}</p>}
+        {afterList}
+        {madeList(made.atFoot)}
+      </>
+    );
+  }
+
   return (
     <>
+      {queueHead}
       <Thread
-        events={events}
-        omitted={omitted}
+        events={from >= 0 ? events.slice(from) : events}
+        omitted={from >= 0 ? 0 : omitted}
         chat={chat}
-        name={THEM}
+        name={teammate?.name ?? THEM}
+        // AND WHAT THAT AGENT WAS, on the answers the row has a record for. A
+        // teammate's run is signed with its name.
+        nameOf={teammate ? () => teammate.name : ranOf}
         landOn={item.id}
         onWhole={() => setWhole(true)}
         onOpenOrigin={onOpenOrigin}
@@ -329,7 +428,7 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
         code={changed.length && onOpenDoc
           ? { paths: changed, open: (path) => onOpenDoc(changePathFor(item.id), path) }
           : null}
-        tail={(i) => { const rows = made.onTurn.get(i); return rows ? madeList(rows) : null; }}
+        tail={(i) => { const rows = made.onTurn.get(i + Math.max(from, 0)); return rows ? madeList(rows) : null; }}
         {...(chat ? {
           // ONLY IN A CHAT. The chips, the bar on pointing and the quote are
           // drawing A's, and a thread with an agent keeps exactly the screen it
@@ -340,6 +439,9 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
           onReact: chips.react,
           onQuote,
           onHandToAgent,
+          onEdit: editMessage,
+          onMarkUnread: markUnread,
+          onCopied: copied,
           ...(thread ? { replies: built.replies, openThread: thread.open, onOpenThread: thread.onOpen, freshThreads: thread.fresh } : {}),
         } : {})}
       />
@@ -347,12 +449,18 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
       {chat && thread && openParent && thread.host && createPortal(
         <ThreadPanel
           product={item.product}
+          id={item.id}
+          people={thread.people}
           parent={openParent}
           replies={built.replies[openParent.uid!] ?? []}
           md={(text) => md(clean(text))}
           width={thread.width}
           reactions={chips.reactions}
           onReact={chips.react}
+          onEdit={editMessage}
+          onMarkUnread={markUnread}
+          onCopied={copied}
+          onHandToAgent={onHandToAgent}
           onSend={(text) => thread.onSend(openParent.uid!, text)}
           onClose={thread.onClose}
           onResize={thread.onResize}
@@ -360,12 +468,7 @@ export function ItemThread({ item, engine, session, opening, sending, filed = []
         thread.host,
       )}
       {answer}
-      {/* What you did after that answer, under it and in order. */}
-      {after.length > 0 && (
-        <div className={`act-after${chat ? ' is-chat' : ''}`}>
-          {after.map((act, i) => <ActLine key={`${act.at}-${i}`} act={act} />)}
-        </div>
-      )}
+      {afterList}
       {/* AND WHAT THE NEWEST TURN FILED, under its own last word. */}
       {madeList(made.atFoot)}
     </>

@@ -1,11 +1,11 @@
 // THE CORNER TAG (w-dafae58a23). In another app there was no way to tell
 // whether any agent needed you, so agents sat idle without you knowing. The
-// answer is a small tag in a corner of the screen: "2 waiting" when an
-// agent has something for you, "20 working" when none does, nothing at all
-// when nothing is running. It must never become a nag: it hides for 5 minutes,
-// 30 minutes or the rest of the day and then comes back, it is turned off only
-// in Settings, it stays out of the way while you are in the app itself, and it
-// goes wherever you drag it.
+// answer is a small tag in a corner of the screen: the mark and how many are
+// waiting on you, and nothing at all when none is (w-93b3a1a796 took away
+// "20 working", which kept it on screen all day). It must never become a nag:
+// it hides for 5 minutes, 30 minutes or the rest of the day and then comes
+// back, it is turned off only in Settings, it stays out of the way while you
+// are in the app itself, and it goes wherever you drag it.
 //
 // Measured against shared/corner-tag.mjs, the rules the floating window and
 // its page both follow. The cases are the ones that decide what you see: the
@@ -22,14 +22,14 @@ const area = { x: 0, y: 0, width: 1728, height: 1080 };
 describe('what the tag says', () => {
   // "Waiting" was picked over "ready", "need you" and "for you", on full-screen
   // pictures, 2026-10-08: it says an agent is held up on you without nagging.
-  it('says how many agents are waiting on you when there are any', () => {
-    expect(tagSays({ ready: 2, working: 18 })).toEqual({ kind: 'ready', text: '2 waiting' });
-    expect(tagSays({ ready: 1, working: 0 })).toEqual({ kind: 'ready', text: '1 waiting' });
+  it('shows how many agents are waiting on you, and says "waiting" aloud', () => {
+    expect(tagSays({ ready: 2, working: 18 })).toEqual({ kind: 'ready', text: '2', label: '2 waiting' });
+    expect(tagSays({ ready: 1, working: 0 })).toEqual({ kind: 'ready', text: '1', label: '1 waiting' });
   });
 
-  it('says how many are working when none is ready', () => {
-    expect(tagSays({ ready: 0, working: 20 })).toEqual({ kind: 'working', text: '20 working' });
-    expect(tagSays({ ready: 0, working: 1 })).toEqual({ kind: 'working', text: '1 working' });
+  it('says nothing when agents are working and none is waiting', () => {
+    expect(tagSays({ ready: 0, working: 20 })).toBe(null);
+    expect(tagSays({ ready: 0, working: 1 })).toBe(null);
   });
 
   it('says nothing when nothing is running and nothing is waiting', () => {
@@ -42,9 +42,9 @@ describe('when the tag shows', () => {
   const now = 1_000_000;
   const base = { on: true, hiddenUntil: 0, now, inApp: false, ready: 2, working: 3 };
 
-  it('shows when it is on, not hidden, you are elsewhere and something is happening', () => {
+  it('shows when it is on, not hidden, you are elsewhere and something waits on you', () => {
     expect(tagShows(base)).toBe(true);
-    expect(tagShows({ ...base, ready: 0 })).toBe(true);
+    expect(tagShows({ ...base, ready: 0 })).toBe(false);
   });
 
   it('is on unless Settings turned it off', () => {

@@ -1,5 +1,6 @@
 import { previewFocus } from './preview-focus';
-import { usePhoneBack, onPhone } from './phone-screen';
+import { cloudChord, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
+import { usePhoneBack, onCloudPhone, onPhone } from './phone-screen';
 import { holdsReplies, writeHeldWhenHidden } from './phone-holds';
 import { pollEvery } from './phone-polls';
 import type {FocusControlStyle} from './focus-control';
@@ -15,30 +16,42 @@ import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { cursorIndex, cursorMark, type CursorMark } from './cursor-follows';
-import { flushSync } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AnswerMode, Approval, PermissionMode, Product, RepeatRule, RepeatShape, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
+import type { AnswerMode, Approval, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
+import type { ReplyPick } from './reply-pick';
 import { api } from './api';
-import { setClaudeModels } from './models';
-import { advanceAfter, advanceLandsHere, nextAfterAdvance, type Advance } from './advance';
+import { setClaudeModels, setCodexFreePlan } from './models';
+import { advanceAfter, advanceLandsHere, replyMovesOn, nextAfterAdvance, type Advance } from './advance';
+import { spotIn, stepIn } from './one-thing-at-a-time';
+import { AIMED_AT_THE_THREAD_YOU_LEFT, pickLandsHere, type Arrival } from './pick-settles';
 import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
 import { isTroubleRow, troubleRow } from './trouble-row';
 import { importAnswer, isImportRow, isNotImportedRow, justImported, type ImportChoice } from './import-row';
+import { lookedAtNow, needsYouLit } from './needs-you';
+import { arrivedAt, isUnread, readMoves, waitingSince } from './unread';
 import { Focus } from './components/Focus';
 import { TicketItems } from './components/TicketReference';
 import type { PendingSaid } from './item-thread';
 import { DocPane, type OpenDoc } from './components/DocPane';
 import { docKind, EVEN_SPLIT, escapeClosesDoc, escapeInTheFileClosesIt, focusIsInTheFile, readSplit, writeSplit } from './doc-pane';
 import { changeOwnsKey } from './code-keys';
-import { askStillStands, bringsBack, nextUndo, shownAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO } from './undo-window';
+import { askStillStands, bringsBack, closesAgain, graceUndoneLine, nextUndo, shownAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
+import { answeredAlready, TOO_LATE_TO_WITHDRAW } from './withdraw-send';
 import { addUndoMark, UNDO_MARKS_EVENT, type UndidSpec } from './undo-marks';
 import { whatTheFileSentUp } from '../../shared/artifact-keys.mjs';
-import { type Place, placeIsSomewhere, readPlace, writePlace, writeScroll } from './where-she-was';
+import { ALIVE_EVERY_MS, markWindowAlive, type Place, placeIsSomewhere, readPlace, windowWasJustHere, writePlace, writeScroll } from './where-she-was';
 import { documentCandidates } from './message-artifacts';
 import { filesFromRuns } from './run-files';
 import { Rail } from './components/Rail';
 import { ThreadComposer } from './threads/ThreadComposer';
+import { joinNames, projectsOffered, teammates } from './threads/composer-rules';
+import { chosenNames, whoSees } from './threads/summary-rules';
+import { shownToPeople } from '../../shared/thread-cards.mjs';
+import { changePathFor } from './code-artifact';
+import { teamRouteChoices } from './team/TeamFocus';
+import { SEE_SAID, threadCommands, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
 import { ImportAgents } from './components/ImportAgents';
@@ -57,9 +70,10 @@ import { LATER_KEYWORDS } from './palette-rows';
 import { announcesMove, announcesUpdate, isUpdateRow, CHECK_SAY, updateLook } from './update-row';
 // Inbox zero is `IdlePage`.
 import { IdlePage } from './components/IdlePage';
-import { ago, closesTheTask, itemOptions, offerIsLive, parseRepeat } from './format';
+import { ago, closesTheTask, itemOptions, liveOption, needsYourWords, offerIsLive, parseRepeat, type ParsedOption } from './format';
+import { SHIP_OFFER } from './ship-offer';
 import {
-  draftKey, hasDraft, restoreDraft, restoreFailedDraft, readComposeDraft, restoreComposeDraft, saveDraft, clearComposeDraft,
+  draftKey, hasDraft, readDraft, restoreDraft, restoreFailedDraft, readComposeDraft, restoreComposeDraft, saveDraft, clearComposeDraft,
   type SentDraft, type ComposeDraft,
 } from './drafts';
 import { approvalStage } from './approval-stage';
@@ -67,10 +81,14 @@ import { approvalReads } from './approval-card';
 // The new task card's two sentences: why it will not take one, and where the
 // one it took went. Only the second is raised from here, because by the time
 // there is anything to confirm the card has closed.
-import { sentLine } from './compose-says';
-import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, isProposal, notStarted, parkedByAgent, replyClearsSchedule, rowTitle, statusForReply, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
+import { sentLine, sendingLine } from './compose-says';
+import { wearJustMade, type JustMade } from './just-made';
+import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, isProposal, notStarted, parkedByAgent, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply, workMoving } from './list-rules';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
-import { opensATextField } from './keys';
+import { focusTheReplyBox } from './focus-at-end';
+import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
+import { modelCommands } from './thread-model-commands';
+import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mjs';
 import { sidebarFits, useRoomyToggle, useWindowWidth } from './room';
 import { isUrgentRow, taskToReturnTo, urgentInterruption } from './interrupt';
 import { DONE } from './done-word';
@@ -82,6 +100,7 @@ import { searchThreads, threadSearchDetails } from './threads/search';
 import { applyTheme, machineTheme, onMachineTheme, resolvePick, resolveTheme, THEME_KEY, type ThemePick } from './theme';
 import { hintScheduler, type HintScheduler } from './hint-timing';
 import { HINTS } from './hint-plate';
+import { MAC, chord, sayKeys } from './this-keyboard';
 import { HintPlate } from './components/HintPlate';
 import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, idleSkin, lookMeans, lookOf, resolveSkin, resolveSkinDetail, resolveTune, seedFirstRunLook, SKINS, storeTune, walkSkin, wornSkin, SKIN_KEY, TUNE_DEFAULT, TUNE_KEY, type Look, type SkinChoice, type SkinId, type SkinTune } from './skins';
 // THE SHAPE OF AN OPENED TASK IS STILL AN OPEN QUESTION. Six of them,
@@ -89,17 +108,30 @@ import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, idleSkin, lookMean
 import { resolveTaskShape, TASK_SHAPE_KEY, type TaskShape } from './task-shape';
 import { ComposeIcon } from './components/ComposeIcon';
 import { WorkspaceNavigation } from './components/WorkspaceNavigation';
+import { useRooms } from './team/rooms/useRooms';
+import { useTeammates } from './teammates/useTeammates';
+import { TeammatesContext } from './teammates/row-lead';
+import { ChatsContext, LAST_CHAT_KEY, type ChatsValue } from './teammates/ChatsColumn';
+import { queuedTeammateRun } from './teammates/chat-lines';
+import { RoomBoard } from './team/rooms/RoomBoard';
+import { directConversations } from './team/rooms/conversations';
+import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-rules';
+import { MARK_UNREAD, SAY } from './team/chat-events';
+import { MentionRows } from './team/rooms/MentionRows';
 import { FeedbackCard } from './components/FeedbackCard';
 import { searchFieldInStrip, workspaceDestinations, workspaceNavigationShown, workspacePageTitle } from './workspace-navigation.mjs';
 import { SettingsIcon } from './components/SettingsIcon';
 import { UsagePill } from './components/UsagePill';
 import { engineWordFor } from './byline';
+import { lastUsedEngine } from './usage-last-used';
 import { SearchIcon } from './components/SearchIcon';
 import { CrossIcon } from './components/CrossIcon';
 import { ZoomPercent } from './components/ZoomPercent';
 import { FindBar } from './components/FindBar';
 import { Landed, Onboarding, PracticeBand, WayOut } from './components/Onboarding';
 import { PlanBar, PlanSetupCard } from './components/PlanSetup';
+import { CloudSetup } from './components/CloudSetup';
+import { SETUP, newlyFailedSignIns } from './cloud-setup';
 import { AppMark } from './components/AppMark';
 import { needsPlan, type Plan } from './plan-setup';
 import { PRACTICE_REPLY, PRACTICE_ROWS, PRACTICE_SLUG } from '../../shared/first-run-practice.mjs';
@@ -116,7 +148,7 @@ import {
   waitingId, waitingIndex,
   finishFirstRun, finishedTheFirstRun, setupStepCount, forcedStep, readFirstRun, walkRows,
   saveFirstRun, START as RUN_START, stepTo, TASK_BODY, TASK_TITLE, whyNotMade, type FirstRun,
-  replyAnswered, replyWritten, skipStep, walkMayOpen,
+  replyAnswered, replyWritten, skipStep, tabStop, walkCoversTheApp, walkMayOpen,
 } from './onboarding';
 import { priorityCommands, priorityIdOf, priorityLabelOf, type PriorityId } from './priority';
 import { runNowCommands } from './run-now';
@@ -124,27 +156,35 @@ import { withOlder } from './older-threads';
 import { NO_FILTER, filterBox, filterMenu, filterTags, isFiltering, toggleFilter, clearFilterPart, type BoxFilter as BoxFilterState, type FilterPart, type Harness } from './box-filter';
 import { BoxFilter } from './components/BoxFilter';
 import { itemPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mjs';
-import { threadsMade, approvableFiled, doItHereWrites } from './threads-made';
+import { rankProducts } from './project-priority';
+import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
 import { waitingCounts } from './threads-made';
-import { closeAsk, KEEP_OPEN } from './close-asks-first';
+import { closeAsk, closeAskOwnsKey, KEEP_OPEN, unshippedAsk } from './close-asks-first';
+import { notShipped, shipItAsk } from '../../shared/not-shipped.mjs';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, chatProjects, chatTaskSharing, chatTranscript, taskBrief, taskTitle, withTask } from './team/agent-mentions';
 import { isCleanRun, ruleIdOf, ruleLabel, runToOpen } from '../../shared/repeats.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
+import { NOT_ANSWERING, NOT_ANSWERING_MS, RESTART_IT, RESTART_IT_MS, SEND_NOT_TAKEN } from './not-answering';
+import { TEAM_WAIT_MS } from './boot-waits';
+import { signInAsk, SIGN_IN_SKIPPED } from './sign-in-ask';
 import { isNew } from '../../shared/notify-rules.mjs';
 import { inMyInbox, isShared, heldByAPerson, runnerOf, iSpokeLast } from '../../shared/team-rules.mjs';
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
-import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, StateTabs, WaitingContext } from './threads/Pages';
+import { EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, CloudContext, CloudOfferContext, FreeAgentContext, StateTabs, WaitingContext } from './threads/Pages';
+import { cloudOffer, type OfferGo } from './cloud-upgrade';
+import { FleetContext, queuedWithHeld, type Fleet } from './fleet';
 import { isCarrying } from './threads/row-drag';
 import { MessagePerson, TeammateCard } from './threads/Summary';
 import { SignInPage } from './team/SignInPage';
-import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
-import { mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
-import { boardStops, listStops, stepStop, stopKey, type Stop } from './threads/walk-rules';
-import { opensTheToast, toastParts, type ToastGoes } from './toast-parts';
+import { DEFAULT_DISPLAY, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, readDisplay, readPrivacy, rowSharing, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
+import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
+import { boardStops, listStops, stepFromPlace, stepStop, stopKey, type Stop } from './threads/walk-rules';
+import { SAYS_UNDO, opensTheToast, saysWhereItWent, toastOpens, toastParts, type ToastGoes } from './toast-parts';
+import { SentLine } from './components/SentLine';
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
 
@@ -185,6 +225,17 @@ const WAITING_AT = waitingIndex(PRACTICE_ROWS);
 const LATER_AT = laterIndex(PRACTICE_ROWS);
 
 const SEEN_KEY = 'zero.seen';
+// When each thread was last opened, and when that started being kept: threads
+// older than it count as read, so the first launch does not dot everything.
+const SEEN_AT_KEY = 'zero.seenAt';
+const UNREAD_SINCE_KEY = 'zero.unreadSince';
+const unreadSince = (() => {
+  const kept = Number(localStorage.getItem(UNREAD_SINCE_KEY));
+  if (kept > 0) return kept;
+  const now = Date.now();
+  localStorage.setItem(UNREAD_SINCE_KEY, String(now));
+  return now;
+})();
 // WHAT COUNTS AS CLICKING SOMETHING RATHER THAN CLICKING NOTHING.
 //
 // This is the test for "has a function": a control, a link, a field, a row she
@@ -229,6 +280,29 @@ const liveAnswer = (i: WorkItem) => (i.answer && i.answer !== '(withdrawn)' ? i.
 // No project order yet, as one array, so the sorts that read it do not rerun
 // on every snapshot.
 const NO_ORDER: string[] = [];
+const NO_RUNNING: RunningSession[] = [];
+
+// THE SCREEN BEFORE THERE IS A SCREEN. The app's name in the faintest grey
+// there is, which is right for the half second it is usually up and reads as
+// an empty window for anything longer. It waits exactly as long as it ever
+// did; it stops being silent about it.
+function Booting() {
+  const [said, setSaid] = useState<string | null>(null);
+  useEffect(() => {
+    const slow = setTimeout(() => setSaid(NOT_ANSWERING), NOT_ANSWERING_MS);
+    const stuck = setTimeout(() => setSaid(RESTART_IT), RESTART_IT_MS);
+    return () => { clearTimeout(slow); clearTimeout(stuck); };
+  }, []);
+  // The sentence replaces the wordmark: the wordmark says the app is coming
+  // up, which the sentence contradicts, and together they put the name on the
+  // screen twice in two sizes.
+  return said
+    ? <div className="boot boot-stuck"><p>{said}</p></div>
+    : <div className="boot"><span>{NAME}</span></div>;
+}
+
+/** What Tab reaches inside a walk screen that is holding its own focus. */
+const FOCUSABLE = 'button, [role="option"], input, textarea, select, a[href], [tabindex]';
 
 export default function App() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
@@ -240,6 +314,10 @@ export default function App() {
   // because the snapshot arrives more than once and every arrival re-runs the
   // effect that reads this.
   const wasAt = useRef<Place | null>(readPlace(window.localStorage));
+  // AND WHETHER THE PAGE IS COMING BACK OR OPENING. Read here, on the way in,
+  // because the answer is how long ago the last window said it was alive and
+  // this one is about to say it (./where-she-was.ts).
+  const cameBack = useRef(windowWasJustHere(window.localStorage));
   // Whether that note has been acted on. STATE and not a ref, deliberately: the
   // boot screen below is held up until this turns true, and a ref that flips
   // without a render can leave the window on "the app" for good when the restore
@@ -341,6 +419,13 @@ export default function App() {
     if (!v) { setHoveredId(null); setPointedHint(null); hints.current?.stop(); }
   }, []);
   const [focused, setFocused] = useState<WorkItem | null>(null);
+  // A ⌘K row that acts on the open thread's page (Focus `pageAsk`), and what that
+  // page reports it draws (Focus `onShown`), which is when those rows are offered.
+  const [threadAsk, setThreadAsk] = useState<{ key: string; what: 'summary' | 'people' | 'rename'; at: number } | null>(null);
+  const [openShows, setOpenShows] = useState<{ key: string; change: boolean; summary: 'open' | 'closed' | null; ship: boolean } | null>(null);
+  useEffect(() => {
+    setThreadAsk((a) => (a && focused && a.key === `${focused.product}/${focused.id}` ? a : null));
+  }, [focused?.product, focused?.id]);
   // ON A PHONE AN OPEN THREAD IS A STEP IN THE HISTORY, so swiping back from
   // the left edge returns to the inbox (phone-screen.ts).
   usePhoneBack(!!focused, () => setFocused(null));
@@ -377,8 +462,16 @@ export default function App() {
   // In flight on ONE row, in the order she sent them. A message on its way to
   // another task is that task's conversation, not this one's.
   const sendingOn = useCallback(
-    (item: WorkItem): PendingSaid[] => sending.filter((s) => s.product === item.product && s.id === item.id),
-    [sending],
+    (item: WorkItem): PendingSaid[] => {
+      const here = sending.filter((s) => s.product === item.product && s.id === item.id);
+      // AND, ON THE PHONE WITH THE MAC SHUT, what she said here earlier that
+      // her Mac has not taken yet (renderer/src/cloud-bridge.ts). Once each:
+      // a send still in this page's own queue is not drawn twice.
+      const mine = new Set(here.map((s) => s.text.trim()));
+      const away = (snap?.phoneWaiting ?? []).filter((w) => w.product === item.product && w.id === item.id && !mine.has(w.text.trim()));
+      return [...here, ...away.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}), ...(w.cloud ? { cloud: true } : {}) }))];
+    },
+    [sending, snap?.phoneWaiting],
   );
   /*
    * WHICH CODING AGENT THE OPEN ROW REALLY RUNS ON, and it is main's answer
@@ -425,6 +518,18 @@ export default function App() {
   // <html>; this is the same answer in a form the JSX below can ask.
   const [taskShape] = useState<TaskShape>(() => resolveTaskShape(localStorage.getItem(TASK_SHAPE_KEY)));
   const [modal, setModal] = useState<Modal>(null);
+  // Read by a send that lands after its card has closed, which must not close
+  // or cover whatever has been opened since.
+  const modalNow = useRef<Modal>(null);
+  modalNow.current = modal;
+  // A new thread handed over and not taken yet. The card closes on Send rather
+  // than on the answer, so nothing else on the screen can report on it.
+  const waitingOnSend = useRef<number | null>(null);
+  const doneSending = useCallback(() => {
+    if (waitingOnSend.current !== null) clearTimeout(waitingOnSend.current);
+    waitingOnSend.current = null;
+  }, []);
+  useEffect(() => doneSending, [doneSending]);
   // A hint promises a key, so it may not be drawn where the key is swallowed.
   // A modal takes the keyboard whole, so nothing underneath one may advertise
   // anything, and the hint the pointer was already on has to go with it: the
@@ -565,21 +670,25 @@ export default function App() {
   // Drawn when it is open and nothing sits over it: an opened task or Settings
   // takes the page, and closing them returns to the Team page.
   const teamShown = teamOpen && !focused && !settingsOpen;
-  // THE SIGN-IN PAGE STANDS OVER EVERYTHING when a team build has nobody
-  // signed in, once the saved sign-in has been looked for (team/SignInPage.tsx).
-  // Signing out lands on it, and it says so.
-  const signInGate = !api.isFixtures && !!snap?.team?.configured && snap.team.started === true && !snap.team.signedIn;
+  // THE SIGN-IN PAGE STANDS OVER EVERYTHING when a build that can sign in has
+  // nobody signed in, once the saved sign-in has been looked for, until it is
+  // skipped (./sign-in-ask). Signing out lands on it, and it says so.
+  const [signInSkipped, setSignInSkipped] = useState(() => localStorage.getItem(SIGN_IN_SKIPPED) === '1');
+  const signInAsked = signInAsk({ team: snap?.team, fixtures: api.isFixtures, skipped: signInSkipped, canSkip: !onCloudPhone() });
+  const signInGate = signInAsked.page;
   // AND THE FIRST-RUN WALK WAITS FOR SOMEBODY TO BE SIGNED IN (2026-10-04).
   // It used to run underneath the sign-in page, invisible but live: on its
   // guided steps it holds every press not on what it points at, so Continue
   // with Google did nothing at all for the first teammate to install this, and
   // Return in the sign-in form went to the walk instead. It neither starts nor
-  // draws until someone is signed in, and picks up where it was after.
-  const walkWaitsForSignIn = !api.isFixtures && !!snap?.team?.configured && !snap.team.signedIn;
+  // draws until someone is signed in or skips, and picks up where it was after.
+  const walkWaitsForSignIn = signInAsked.walkWaits;
+  const skipSignIn = useCallback(() => { localStorage.setItem(SIGN_IN_SKIPPED, '1'); setSignInSkipped(true); }, []);
+  const askToSignIn = useCallback(() => { localStorage.removeItem(SIGN_IN_SKIPPED); setSignInSkipped(false); }, []);
   const wasSignedIn = useRef(false);
   const [signedOutHere, setSignedOutHere] = useState(false);
   useEffect(() => {
-    if (snap?.team?.signedIn) { wasSignedIn.current = true; setSignedOutHere(false); }
+    if (snap?.team?.signedIn) { wasSignedIn.current = true; setSignedOutHere(false); localStorage.removeItem(SIGN_IN_SKIPPED); setSignInSkipped(false); }
     else if (wasSignedIn.current && snap?.team?.started) setSignedOutHere(true);
   }, [snap?.team?.signedIn, snap?.team?.started]);
   const signInGateRef = useRef(false);
@@ -593,6 +702,14 @@ export default function App() {
      every time one of these opens. `./walk-scope.ts` is the rule. */
   // The plan the inbox bar is setting up, over the app (w-9f6975906c).
   const [setupPlan, setSetupPlan] = useState<Plan | null>(null);
+  // THE CLOUD'S OWN SETUP SCREEN, opened from the cloud menu's Set up, or by
+  // choosing to run in the cloud before it is set up (components/CloudSetup).
+  const [cloudSetupOpen, setCloudSetupOpen] = useState(false);
+  // Settings › Phone's own sign-in, for a build whose team version is off.
+  const [phoneSignInOpen, setPhoneSignInOpen] = useState(false);
+  useEffect(() => { if (snap?.team?.signedIn) setPhoneSignInOpen(false); }, [snap?.team?.signedIn]);
+  // The account a cloud sign-in started from Settings is for, so its page can say whom to sign in as.
+  const [cloudSignInAs, setCloudSignInAs] = useState<string | null>(null);
   const floatingRef = useRef<OpenOverTheApp>(NOTHING_OVER_THE_APP);
   floatingRef.current = { modal, settings: settingsOpen, importAgents, newProject, teamShown, setupPlan: !!setupPlan };
   // WHICH PAGE OF SETTINGS A PRESS ASKED FOR, when it asked for one. ⌘K's
@@ -653,6 +770,8 @@ export default function App() {
   //
   // It still starts up on a machine that has never been told otherwise.
   const [panelUp, setPanelUp] = useState(() => localStorage.getItem('powerup.sidebar.collapsed') !== 'true');
+  // With Groups on: the narrow sidebar is wide while pointed at.
+  const [railOpen, setRailOpen] = useState(false);
   // WHAT THE SIDEBAR WAS BEFORE A DOCUMENT TOOK THE WHOLE WINDOW, and null
   // whenever nothing has. The effect that fills it in sits further down beside
   // the artifact's own state; it is declared here because the line below has to
@@ -753,6 +872,9 @@ export default function App() {
     if (sk !== 'none') setTune(TUNE_DEFAULT[sk as SkinId]);
   }, [setTune]);
   const [seen, setSeen] = useState<Set<string>>(() => new Set(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]')));
+  // When Needs You was last on screen; something arriving after it lights the tab.
+  const [needsLookedAt, setNeedsLookedAt] = useState(() => Date.now());
+  const [seenAt, setSeenAt] = useState<Record<string, number>>(() => JSON.parse(localStorage.getItem(SEEN_AT_KEY) ?? '{}'));
   // Batch selection (Superhuman: cmd-A, shift-select, then act on all).
   const [multiSel, setMultiSel] = useState<Set<string>>(new Set());
   const [snoozes, setSnoozes] = useState<Snooze>(() => JSON.parse(localStorage.getItem(SNOOZE_KEY) ?? '{}'));
@@ -775,7 +897,9 @@ export default function App() {
      * (./undo-window).
      */
     undoes: string;
-    run: () => Promise<void>;
+    // `refused` when it found it could not be undone after all: the sentence
+    // to show, and the row to open. Nothing was changed.
+    run: () => Promise<void | { refused: string; open?: WorkItem }>;
     restore?: () => Restored;
     /** The row this puts back, which a Z opens once it has run (./undo-window, `shownAfterUndo`). */
     brings?: WorkItem;
@@ -821,7 +945,7 @@ export default function App() {
      time instead, against whatever the window is holding by then. A row that has
      since gone (she withdrew it with Z) simply does not answer the click.
   */
-  const [toast, setToast] = useState<{ text: string; goes?: { product: string; id: string } } | null>(null);
+  const [toast, setToast] = useState<{ text: string; goes?: ToastGoes } | null>(null);
   // Dev aid, the same shape again: ?modes=a,b,e draws one of the three unbuilt
   // treatments of the permission question (./components/ModeScreen.tsx), so it
   // can be photographed inside the real app rather than redrawn beside it.
@@ -836,6 +960,16 @@ export default function App() {
   // leave. Cmd+Y is caught in the main process, so this is the renderer's only
   // evidence the press landed at all.
   const [answered, setAnswered] = useState<{ id: string; allow: boolean } | null>(null);
+  // An answer that did not go (the phone's database, a card that moved) puts the card back and says why.
+  const answerCard = async (id: string, allow: boolean) => {
+    setAnswered({ id, allow });
+    const r = await window.zero?.approve?.({ id, allow });
+    if (r && (r as { ok?: boolean }).ok === false) {
+      setAnswered(null);
+      showToast(`Not answered: ${(r as { error?: string }).error ?? 'it did not go through'}`);
+    }
+    await refresh();
+  };
   // The card that held the stage when she pressed: the store push usually beats
   // the animation, and a card cannot finish leaving once the snapshot has
   // forgotten it exists.
@@ -844,13 +978,28 @@ export default function App() {
   // A task always opens with NOTHING selected: Enter can only ever send a
   // choice the user visibly made.
   const [optionSel, setOptionSel] = useState<number | null>(null);
-  // The item whose action is held in the grace window. The write waits for
-  // Z; the SIGNAL must not: the item leaves the inbox and shows under In
-  // progress immediately, because a sent thing still sitting in the inbox
-  // reads as not sent.
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  // The items whose action is held in the grace window, or written and not
+  // yet back in a snapshot. The write waits for Z; the SIGNAL must not: the
+  // item leaves the inbox and shows under In progress immediately, because a
+  // sent thing still sitting in the inbox reads as not sent. More than one,
+  // because a slow main process can still be writing the last one when the
+  // next is held.
+  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(() => new Set());
+  const holdRow = useCallback((id: string) => setPendingIds((s) => (s.has(id) ? s : new Set(s).add(id))), []);
+  const letRowGo = useCallback((id: string) => setPendingIds((s) => {
+    if (!s.has(id)) return s;
+    const next = new Set(s);
+    next.delete(id);
+    return next;
+  }), []);
+  // The last held action when it was an answer, which reads as queued while its row is held.
+  const [heldAnswer, setHeldAnswer] = useState<string | null>(null);
 
   const [run, setRun] = useState<FirstRun | null>(null);
+  // For the key handler, which is bound once and reads this rather than
+  // carrying the walk in its deps.
+  const walkScreenRef = useRef(false);
+  walkScreenRef.current = walkCoversTheApp(run);
   // THE FIRST SECOND OF HER OWN PROJECT. Null except for the five seconds after
   // the walk ends; see `Landed` in components/Onboarding.tsx for why the
   // confetti is here rather than on the card before it.
@@ -945,6 +1094,7 @@ export default function App() {
       // draws the table committed at build time, which is the same list it has
       // always drawn.
       setClaudeModels(s.workspace?.claudeModels);
+      setCodexFreePlan(s.workspace?.codexFreePlan);
       // And Codex's models, in the same trip rather than in one of their own.
       const models = s.workspace?.codexModels;
       if (Array.isArray(models)) setCodexModels(models);
@@ -1051,6 +1201,11 @@ export default function App() {
   // rectangle to hang off.
   useEffect(() => {
     if (!run) return;
+    // THE LOOK AROUND OPENS ON NEEDS YOU. These two drove nothing, so a
+    // tutorial taken a second time opened its first card on whatever tab the
+    // app was left on: measured on Later, over one scheduled row, while the
+    // badge beside it read NEEDS YOU 4.
+    if (run.step === 'tour' || run.step === 'tabs') { setFocused(null); setModal(null); setView('inbox'); setSelected(0); }
     // BEAT FOUR IS THE REAL, EMPTY INBOX.
     if (run.step === 'make') { setFocused(null); setModal(null); setView('inbox'); }
     // BOTH BEATS THE CARD IS OPEN FOR, not just the send. Somebody who quits
@@ -1479,6 +1634,9 @@ export default function App() {
   // per item. Resolving from the LIST leaves her in the list, which is
   // `advanceAfter` in ./advance and hers on.
   const advanceRef = useRef<Advance | null>(null);
+  /** The thread the advance last put in front of you, so a number aimed at the
+   *  one before it cannot answer this one (./pick-settles). */
+  const arrived = useRef<Arrival>(null);
   // The grace window: an action is held for a few seconds before anything is
   // written; Z inside the window cancels it completely. Short on purpose: a
   // stray agent start is cheap, unlike a stray email.
@@ -1492,6 +1650,8 @@ export default function App() {
     restore?: () => Restored;
     // What the thread says if this one is undone (./undo-marks).
     undid?: UndidSpec[];
+    // The action's own toast, so the undo can say what it left (graceUndoneLine).
+    said?: string;
   } | null>(null);
 
   const flushPending = useCallback(async () => {
@@ -1499,10 +1659,17 @@ export default function App() {
     if (!pending) return;
     pendingRef.current = null;
     clearTimeout(pending.timer);
-    await pending.run();
-    setPendingId(null);
-    await refreshRef.current?.();
-  }, []);
+    try {
+      await pending.run();
+    } catch (err) {
+      letRowGo(pending.item.id);
+      throw err;
+    }
+    // Let go only once the snapshot after the write is in, or the row is
+    // drawn open again for as long as that snapshot takes. Not waited for:
+    // the next write needs this one written, not redrawn.
+    void Promise.resolve(refreshRef.current?.()).catch(() => {}).finally(() => letRowGo(pending.item.id));
+  }, [letRowGo]);
 
   // A RELOAD WRITES WHAT IS HELD BEFORE IT HAPPENS (w-47218417a5). The window
   // above lives only in this page, so ⌘R inside it used to throw the close or
@@ -1532,13 +1699,26 @@ export default function App() {
   // A snapshot held back by a drag is asked for again shortly, so a reply or a
   // state change that arrived mid-drag is not left waiting for the next poll.
   const refreshAgain = useRef<() => void>(() => {});
+  // AND THREADS JUST MADE, which the computer has handed back and a snapshot
+  // asked for before the write may not carry yet (./just-made).
+  const justMade = useRef<JustMade[]>([]);
   const refresh = useCallback(async () => {
     const next = await api.snapshot();
-    if (isCarrying()) { setTimeout(() => refreshAgain.current(), 300); return; }
-    setSnap(next && { ...next, items: overlayPins(overlayPlaces(next.items, unsavedPlaces.current), unsavedPins.current) });
+    if (isCarrying()) { setTimeout(() => refreshAgain.current(), 300); return next; }
+    const worn = next ? wearJustMade(next.items, justMade.current, Date.now()) : null;
+    if (worn) justMade.current = worn.held;
+    setSnap(next && { ...next, items: overlayPins(overlayPlaces(worn!.items, unsavedPlaces.current), unsavedPins.current) });
+    return next;
+  }, []);
+  // A new thread in the list the moment the computer says it is written, a
+  // whole fetch sooner than the snapshot would bring it (w-461fbd8d2d).
+  const showJustMade = useCallback((made: WorkItem, name?: string) => {
+    const productName = made.productName ?? name;
+    justMade.current = [...justMade.current, { item: { ...made, ...(productName ? { productName } : {}) }, at: Date.now() }];
+    setSnap((s) => s && { ...s, items: wearJustMade(s.items, justMade.current, Date.now()).items });
   }, []);
   refreshAgain.current = () => { void refresh(); };
-  const refreshRef = useRef<() => Promise<void>>();
+  const refreshRef = useRef<() => Promise<unknown>>();
   refreshRef.current = refresh;
 
   useEffect(() => {
@@ -1686,7 +1866,12 @@ export default function App() {
   // THE TEAM, as the window reads it: who is signed in, their people, and
   // which projects are shared. Null when nobody is signed in, and then every
   // list below is exactly the single-person app's.
-  const team = useMemo(() => teamView(snap?.team, snap?.products ?? []), [snap?.team, snap?.products]);
+  const team = useMemo(() => {
+    const view = teamView(snap?.team, snap?.products ?? []);
+    return view ? { ...view, alsoById: roomMatesById(snap?.team?.rooms?.rooms ?? []) } : view;
+  }, [snap?.team, snap?.products]);
+  // "Maya", "Maya and Jun": who a message from the new thread card went to.
+  const firstNames = (ids: string[]) => joinNames(ids.map((id) => team?.byId.get(id)?.name?.split(/\s+/)[0]).filter(Boolean) as string[]);
   // A SHARED ROW IS IN ONE INBOX AT A TIME (shared/team-rules.mjs). A row given
   // to a person is theirs while it is open, whatever its kind, because a task a
   // teammate handed you is waiting on you the moment it arrives. Null means
@@ -1759,10 +1944,40 @@ export default function App() {
   // status says, until its session exits (w-bc976fd247). Up here because every
   // list below reads it.
   const liveIds = useMemo(() => new Set(runningRows.map((r) => r.itemId)), [runningRows]);
+  // AND THE THREADS WHOSE AGENT IS STOPPED ON A PERMISSION REQUEST. Each
+  // approval in the spool names the thread it came from, and that one fact
+  // turns a Working row into a row that needs you, in both lists.
+  // Not the one you have just answered: the spool carries it until the main
+  // process pushes, while its card is already leaving with a verdict on it
+  // (`approvalStage`), and a row still reading Needs you behind that card is
+  // the app disagreeing with itself.
+  const askingIds = useMemo(
+    () => new Set((snap?.approvals ?? [])
+      .filter((a) => a.id !== answered?.id)
+      .map((a) => a.item)
+      .filter((id): id is string => !!id)),
+    [snap?.approvals, answered?.id],
+  );
+  const asking = useCallback((i: { id: string }) => askingIds.has(i.id), [askingIds]);
+  // EVERYTHING THE SUPERVISOR KNOWS ABOUT EVERY THREAD, in one context, so the
+  // Status column on a row and the word on a card are the same answer
+  // (renderer/src/fleet.ts, w-ec2b04d449).
+  const fleet = useMemo((): Fleet => ({
+    sessions: new Map(runningRows.map((r) => [r.itemId, r])),
+    queued: queuedWithHeld(snap?.supervisor.queued, heldAnswer && pendingIds.has(heldAnswer) ? heldAnswer : null), remoteHeld: snap?.supervisor.remoteHeld, runNow: snap?.supervisor.runNow,
+    signInNeeded: snap?.supervisor.signInNeeded, atLimit: snap?.supervisor.atLimit,
+    shipping: snap?.supervisor.shipping, stalled: snap?.supervisor.stalled,
+    silent: snap?.supervisor.silent, paused: snap?.supervisor.paused,
+    asking: [...askingIds],
+    whyNotCloud: snap?.supervisor.whyNotCloud,
+  }), [runningRows, snap?.supervisor, heldAnswer, pendingIds, askingIds]);
+  const cloudIds = useMemo(() => new Set(runningRows.filter((r) => r.where === 'cloud').map((r) => r.itemId)), [runningRows]);
   // THE THREADS THE APP STILL HAS TO SHIP (w-0c1ba766eb). Waiting on the app,
   // not on her, so In progress reading "Shipping" and out of Needs you until
   // they have shipped or gone back to their agent.
   const shippingIds = useMemo(() => new Set(snap?.supervisor.shipping ?? []), [snap?.supervisor.shipping]);
+  // The threads nothing will start again on its own: Needs you, not In progress.
+  const stalledIds = useMemo(() => new Set(snap?.supervisor.stalled ?? []), [snap?.supervisor.stalled]);
   // AND THE THREADS A THREAD IS WAITING ON (w-5244c90c33). A waiting thread is
   // in Later and resumes by itself when they finish; only the window can see
   // the other rows, so it works this out and hands it to each list.
@@ -1770,15 +1985,25 @@ export default function App() {
   const waitingOn = useCallback((i: WorkItem) => waitsThatCanEnd(i, byId), [byId]);
 
   const inboxCandidates = useMemo(() => items.filter((i) => {
-    if (i.id === pendingId) return false; // action held in the grace window: already sent, as far as the inbox is concerned
+    if (pendingIds.has(i.id)) return false; // action held in the grace window: already sent, as far as the inbox is concerned
     if (i.product && scope && i.product !== scope) return false;
     // An agent is working on it right now: In progress, whatever it says
     // (`live` in list-rules, w-bc976fd247). Ahead of every branch here,
     // the team ones included, because none of them can see a session.
-    if (liveIds.has(i.id)) return false;
+    //
+    // Both vetoes carry the one exception the rule carries, and have to: these
+    // two lines answer before `belongsInInbox` is ever called, so without it
+    // the exception would hold in the rule and not in the app (w-fe48447cab).
+    // A row still asking you something is never hidden by either.
+    //
+    // A thread whose agent is stopped on a permission request carries the same
+    // exception: the session is live, and what it is doing is waiting for you.
+    // `asking` and not `stillAsksYou` because the question is not on the row at
+    // all, it is on a card with Allow and Deny on it.
+    if (liveIds.has(i.id) && !stillAsksYou(i) && !asking(i)) return false;
     // And the app is still to ship it, which is the same: nobody needs to look
     // until it has (`shipping` in list-rules, w-0c1ba766eb).
-    if (shippingIds.has(i.id)) return false;
+    if (shippingIds.has(i.id) && !stillAsksYou(i) && !asking(i)) return false;
     if (owedAnAnswer.has(i.id)) return true;
     // The rule itself lives in list-rules.ts, pure and pinned by tests. What
     // is left here is the view's own business: the grace window, the clock,
@@ -1789,9 +2014,12 @@ export default function App() {
     // (w-9cf2b43110). The team branch answers before the rule below does, so
     // without this line the agent-to-agent rows came back the moment a project
     // was shared with somebody.
+    // Above the team branch, which answers before the rule does: a permission
+    // request is not something a project's sharing has any view on.
+    if (asking(i)) return true;
     if (shared === true) return i.status !== 'done' && !(hiddenAt(i) > now) && !isProposal(i) && !waitsInLater(i, waitingOn(i));
-    return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now, waitingOn: waitingOn(i) });
-  }), [items, hiddenAt, scope, now, pendingId, teamInbox, liveIds, shippingIds, waitingOn]);
+    return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now, asking: asking(i), waitingOn: waitingOn(i), stopped: stalledIds.has(i.id) });
+  }), [items, hiddenAt, scope, now, pendingIds, teamInbox, liveIds, shippingIds, stalledIds, asking, waitingOn]);
 
   // WHAT MATTERS MOST, ONE COPY, read by every list that claims to be in an
   // order. A product's place in her running order is worth a hundred item
@@ -1822,7 +2050,7 @@ export default function App() {
     // question is an interruption like any other and sorts like one; a quiet one
     // carries priority 1, so the whole sweep sits underneath everything that is
     // actually asking her something rather than on top of it.
-    const asking = agentList.filter((r) => r.id !== pendingId && r.agent && reachesInbox(r.agent, now, agentMode));
+    const asking = agentList.filter((r) => !pendingIds.has(r.id) && r.agent && reachesInbox(r.agent, now, agentMode));
     const rows = [...inboxCandidates, ...asking]
       .sort(byRunningOrder(score));
     // AND ABOVE ALL OF THEM, WHEN NOTHING IS RUNNING, THE ROW THAT SAYS SO.
@@ -1872,7 +2100,7 @@ export default function App() {
     const ordinary = urgent.length ? rest.filter((i) => !isUrgentRow(i)) : rest;
     const top = [...(troubleItem ? [troubleItem] : []), ...fresh];
     return [...top, ...urgent, ...ordinary];
-  }, [inboxCandidates, agentList, agentMode, score, now, pendingId, troubleItem, seen]);
+  }, [inboxCandidates, agentList, agentMode, score, now, pendingIds, troubleItem, seen]);
 
   // BEAT EIGHT ENDS WHEN THE INBOX IS EMPTY, and both ways of ending a task get
   // there: closing one takes it out of the list, and replying to one puts her
@@ -1923,19 +2151,13 @@ export default function App() {
 
 
   // Every list of products the user picks from reads in their running order.
-  // Anything she has never placed follows it, alphabetically, so a brand new
-  // product is findable instead of appearing wherever the store listed it.
-  const rankedProducts = useMemo(() => {
-    const order = snap?.supervisor.productOrder ?? [];
-    const list = snap?.products ?? [];
-    const placed = order
-      .map((slug) => list.find((p) => p.slug === slug))
-      .filter((p): p is NonNullable<typeof p> => !!p);
-    const rest = list
-      .filter((p) => !order.includes(p.slug))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    return [...placed, ...rest];
-  }, [snap?.products, snap?.supervisor.productOrder]);
+  // Anything nobody has placed follows it, oldest first, so a project made
+  // today goes to the bottom instead of wherever its name happens to sort
+  // (`rankProducts`).
+  const rankedProducts = useMemo(
+    () => rankProducts(snap?.products ?? [], snap?.supervisor.productOrder ?? []),
+    [snap?.products, snap?.supervisor.productOrder],
+  );
 
   // AND THE REMEMBERED PROJECT IS NEVER A PRACTICE ONE ONCE THE WALK IS OVER.
   // `finishRun` hands the slot back to her own project at the end, which fixes
@@ -1979,16 +2201,16 @@ export default function App() {
       // The grace window: the write waits for Z, the signal must not, because a
       // sent thing still sitting in the inbox reads as not sent. A deferred row
       // is the exception, and it has somewhere to be: Scheduled.
-      if (i.id === pendingId && deferredUntil <= now) return true;
+      if (pendingIds.has(i.id) && deferredUntil <= now) return true;
       if (!teamProgress(i)) return false;
       // A MESSAGE IS NEVER RUNNING. Nothing is working on it; it waits on a
       // person, and the two persona tests both read "Running" there as an
       // agent at work. It shows in Needs you when it is yours to answer, and
-      // under All otherwise.
+      // in search otherwise.
       if (isDirect(snap?.products.find((p) => p.slug === i.product))) return false;
       // A task you gave a teammate is moving, for you, until it is done.
       if (team && heldByAPerson(i) && isShared(team.products.get(i.product))) return i.status !== 'done';
-      return belongsInProgress(i, { deferredUntil, now, live: liveIds.has(i.id), shipping: shippingIds.has(i.id) });
+      return belongsInProgress(i, { deferredUntil, now, live: liveIds.has(i.id), shipping: shippingIds.has(i.id), stopped: stalledIds.has(i.id) });
     }),
     ...agentList.filter((r) => r.agent && progressAfterReply(r.agent, now, agentMode)),
     // IN THE ORDER THEY WILL RUN IN, which is the one thing this list is for.
@@ -2000,8 +2222,53 @@ export default function App() {
     //
     // Same score as the inbox and as the supervisor, so the top of this list is
     // what the fleet takes next. Recency only breaks a tie now.
+    //
+    // THE TAB DRAWS IT NEWEST SENT FIRST since w-21b638d821 (`order` in
+    // threads/page-rules.ts): a queued row is told by its Status cell, and
+    // what you just sent is on top.
   ].sort(byRunningOrder(score)),
-  [items, agentList, agentMode, scope, pendingId, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds]);
+  [items, agentList, agentMode, scope, pendingIds, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, stalledIds]);
+
+  // WHAT OF IN PROGRESS IS ACTUALLY MOVING, for the empty inbox to say. The
+  // tab holds a thread waiting its turn beside one being worked on, and the
+  // line said the whole tab was running (`workMoving`, w-712fc99e8d).
+  const queuedIds = useMemo(() => new Set(snap?.supervisor.queued ?? []), [snap?.supervisor.queued]);
+  const moving = useMemo(
+    () => workMoving(progress, { live: liveIds, shipping: shippingIds, queued: queuedIds }),
+    [progress, liveIds, shippingIds, queuedIds],
+  );
+  // AGENTBOX CLOUD OFFERS ITSELF WHERE THE FOUNDER PUT IT (2026-10-13,
+  // cloud-upgrade.ts): threads queued while this Mac runs all it can say so,
+  // and the last row of In progress offers the cloud. The plan is read from
+  // the cloud server, again whenever it has had no room.
+  const [cloudPlan, setCloudPlan] = useState<CloudPlan | null>(null);
+  const cloudManaged = !!snap?.cloud?.managed;
+  const cloudRoom = snap?.cloud?.noRoom?.error ?? null;
+  useEffect(() => {
+    if (!cloudManaged) { setCloudPlan(null); return; }
+    let on = true;
+    const read = () => api.cloudAccountPlan().then((p) => { if (on) setCloudPlan(p); }, () => {});
+    void read();
+    const t = setInterval(read, 120_000);
+    return () => { on = false; clearInterval(t); };
+  }, [cloudManaged, cloudRoom]);
+  const localRunning = (snap?.supervisor.running ?? []).filter((r) => r.where !== 'cloud').length;
+  const macFull = !!snap && queuedIds.size > 0 && localRunning >= snap.supervisor.capacity;
+  const freeWaitIds = useMemo(() => (macFull || cloudRoom ? queuedIds : new Set<string>()), [macFull, cloudRoom, queuedIds]);
+  const cloudOfferNow = useMemo(
+    () => cloudOffer({ cloud: snap?.cloud ?? null, plan: cloudPlan, waiting: freeWaitIds.size, macFull }),
+    [snap?.cloud, cloudPlan, freeWaitIds, macFull],
+  );
+  const openCloudPlans = () => { setTeamOpen(false); setSettingsPane('cloud'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); };
+  const onCloudGo = async (go: OfferGo) => {
+    if (go.act === 'sign-in') setCloudSetupOpen(true);
+    else if (go.act === 'cloud-on') void api.setWorkspaceSetting({ key: 'cloudRuns', value: 'full' });
+    else if (go.act === 'plans') openCloudPlans();
+    else if (go.plan) {
+      const out = await api.cloudAccountPay(go.plan);
+      if (!out.ok) showToast(out.message || 'Stripe could not be opened. Try again.');
+    }
+  };
 
   // NOT A ROW THAT STILL NEEDS HER (2026-10-01): an agent's done on her own
   // thread waits in Needs you until she closes it, and Done counted it too,
@@ -2045,7 +2312,7 @@ export default function App() {
   const snoozed = useMemo(() => [
     // AND A FIFTH (w-5244c90c33): a thread waiting on another one, unless a
     // session or the ship queue has it, which is In progress.
-    ...items.filter((i) => (notStarted(i) || isProposal(i) || hiddenAt(i) > now
+    ...items.filter((i) => !queuedTeammateRun(i) && (notStarted(i) || isProposal(i) || hiddenAt(i) > now
         || (waitsInLater(i, waitingOn(i)) && !liveIds.has(i.id) && !shippingIds.has(i.id)))
       && (i.status !== 'done' || i.wrote?.status?.source !== 'founder')
       && (!scope || i.product === scope)),
@@ -2199,26 +2466,14 @@ export default function App() {
   // a waiting update is not something a filter should be able to hide. Search
   // ignores the filter, as it has always ignored the product filter, because
   // it reads every project and every tab on purpose.
-  // ALL (the team version, approved 2026-10-01): every open thread of yours,
-  // whatever it is waiting on, as one list.
-  // YOUR CONVERSATIONS INCLUDED. A conversation whose turn is the other
-  // person's is in no other tab (it is not running and it does not need you),
-  // so without this a message you just answered vanished from the Inbox
-  // altogether.
-  // AND DONE INCLUDED (w-fda2165ec6, 2026-10-07): "done and all don't contain
-  // most of my tasks". All held open threads only, about 40 of her 1,339.
-  // page-rules.ts `order` puts the open ones first and the finished after.
-  const allRows = useMemo(() => {
-    const seenIds = new Set<string>();
-    const talking = items.filter((i) => !i.agent && i.status !== 'done' && isDirect(snap?.products.find((p) => p.slug === i.product)));
-    return [...inbox, ...progress, ...snoozed, ...talking, ...done].filter((i) => (seenIds.has(i.id) ? false : (seenIds.add(i.id), true)));
-  }, [inbox, progress, snoozed, done, items, snap?.products]);
+  // NO ALL TAB (w-313907fa49, 2026-10-14). It was the other four as one list.
+  // The one thing only it held was a conversation whose turn is the other
+  // person's; that is now where the board already had it, in search.
   const wholeBox = view === 'inbox' ? inbox
     : view === 'snoozed' ? snoozed
       : view === 'progress' ? progress
-        : view === 'all' ? allRows
-          : done;
-  const shownBox = useMemo(() => filterBox(wholeBox, boxFilter), [wholeBox, boxFilter]);
+        : done;
+  const shownBox = useMemo(() => filterBox(wholeBox, boxFilter, directSlugs), [wholeBox, boxFilter, directSlugs]);
   // THE DISPLAY MENU'S FILTERS AND SORT, on top of the box (approved
   // 2026-10-01). Remembered per page; the Inbox is a list by default and the
   // Team a board.
@@ -2231,11 +2486,14 @@ export default function App() {
   // WHOSE THREADS ARE ON THE PAGE (w-05ff3d1438): the faces on the header's
   // View and filters button (w-14bb56c833). The Inbox and the Team page were one question on two pages; this
   // is the one page, and it opens as yours. Remembered between launches.
+  // With Rooms on, teammates' threads are on a room's board instead, and the
+  // pick kept here waits untouched for Rooms going off.
+  const roomsOn = !!snap?.alpha?.rooms && !!snap?.team?.rooms?.on;
   const everyone = useMemo(() => {
     if (!team) return [];
     const people = [...team.byId.values()];
-    return team.state.me && !team.byId.has(team.state.me.id) ? [team.state.me, ...people] : people;
-  }, [team]);
+    return inboxEveryone(team.state.me && !team.byId.has(team.state.me.id) ? [team.state.me, ...people] : people, team.me, roomsOn);
+  }, [team, roomsOn]);
   const [pickedRaw, setPickedRaw] = useState<string[] | null>(() => readPicked());
   const picked = useMemo(() => normalizePicked(pickedRaw, team?.me ?? null, everyone.map((p) => p.id)), [pickedRaw, team?.me, everyone]);
   const setPicked = useCallback((next: string[]) => { setPickedRaw(next); writePicked(next); setSelected(0); }, []);
@@ -2332,7 +2590,7 @@ export default function App() {
     [withOthers, cards, view, picked, team?.me, inboxDisplay, snap?.products, now],
   );
   const mixedRows = useMemo(
-    () => (withOthers ? mergeRows(displayedBox, theirRows, view === 'done' ? 'done' : inboxDisplay.sort, { order: projectOrder, products: snap?.products ?? [] }, view) : null),
+    () => (withOthers ? mergeRows(displayedBox, theirRows, view === 'done' ? 'done' : view === 'progress' ? 'updated' : inboxDisplay.sort, { order: projectOrder, products: snap?.products ?? [] }) : null),
     [withOthers, displayedBox, theirRows, inboxDisplay.sort, view, projectOrder, snap?.products],
   );
   // A teammate's thread opens as their card, over the page, and Back returns here.
@@ -2375,12 +2633,12 @@ export default function App() {
   // whole inbox, or the next task opened can be one she has hidden
   // (w-27759abd33).
   const shownInbox = useMemo(
-    () => sortedByDisplay(filterBox(inbox, boxFilter).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs)), inboxDisplay, undefined, projectOrder, directSlugs),
+    () => sortedByDisplay(filterBox(inbox, boxFilter, directSlugs).filter((i) => isTroubleRow(i) || isUpdateRow(i) || keepsDisplay(i, inboxDisplay, now, seenOf(i), directSlugs)), inboxDisplay, undefined, projectOrder, directSlugs),
     [inbox, boxFilter, inboxDisplay, now, projectOrder, directSlugs, seenOf],
   );
   const boxFilterMenu = useMemo(
-    () => (modal === 'filter' ? filterMenu(wholeBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i)), boxFilter, snap?.products ?? []) : null),
-    [modal, wholeBox, boxFilter, snap?.products],
+    () => (modal === 'filter' ? filterMenu(wholeBox.filter((i) => !isTroubleRow(i) && !isUpdateRow(i)), boxFilter, snap?.products ?? [], directSlugs) : null),
+    [modal, wholeBox, boxFilter, snap?.products, directSlugs],
   );
   // ONE RULE FOR WHERE A THREAD SITS, THE TABS' OWN (2026-10-01: the board
   // said Running for queued work the tab did not). Needs you wins, then
@@ -2401,7 +2659,12 @@ export default function App() {
   const waitingByThread = useMemo(() => waitingCounts(items, stateOfMine), [items, stateOfMine]);
   // Which thread's close is asking, by `product/id`; null while none is.
   const [closeAskOn, setCloseAskOn] = useState<string | null>(null);
+  const [closeAskWhy, setCloseAskWhy] = useState<'filed' | 'unshipped'>('filed');
+  // Bumped on every raise, so a second E on the same thread scrolls to it again.
+  const [closeAskRaised, setCloseAskRaised] = useState(0);
   const keyOf = (item: WorkItem) => `${item.product}/${item.id}`;
+  const askingToClose = (item: WorkItem) => (closeAskOn !== keyOf(item) ? null
+    : closeAskWhy === 'unshipped' ? unshippedAsk() : closeAsk(waitingFiled(item).length));
   // Leaving the thread drops its question; a close asked from the list opens
   // the thread and asks in the same press, so the thread it opens keeps it.
   useEffect(() => {
@@ -2695,8 +2958,15 @@ export default function App() {
   // still in the page and every letter she types goes into the file instead of
   // into the palette's field.
   useEffect(() => {
-    const off = (window.zero as any)?.onKeyInTheFile?.((k: { key: string; meta?: boolean; ctrl?: boolean }) => {
-      if (!focusIsInTheFile(document.activeElement)) return;
+    const off = (window.zero as any)?.onKeyInTheFile?.((k: { key: string; meta?: boolean; ctrl?: boolean; fromGuest?: boolean }) => {
+      // A KEY OUT OF A WEBVIEW NEEDS NO FOCUS CHECK, and must not be given
+      // one. The check below exists to stop a key being answered twice when
+      // the window's own handler also heard it. The window never hears a
+      // guest's keys: a webview is a separate WebContents, not a frame of
+      // this page, and `document.activeElement` stays on BODY while the guest
+      // holds the keyboard (measured in the running app). So main says where
+      // the key came from and only a frame's is checked.
+      if (!k.fromGuest && !focusIsInTheFile(document.activeElement)) return;
       const meant = whatTheFileSentUp(k);
       if (meant === 'close') {
         if (!escapeInTheFileClosesIt(openDoc)) return;
@@ -2825,10 +3095,9 @@ export default function App() {
     prevInboxIds.current = ids;
     window.zero?.badge?.(inbox.length);
 
-    // THE CORNER TAG (w-dafae58a23) says the same thing as the inbox, from
-    // over whatever app she is in: everything in Needs you, newest first, and
-    // how many are working. Working agents are only a count, because
-    // twenty running is ordinary and only what is ready is worth a line.
+    // THE CORNER TAG (w-dafae58a23) gets everything in Needs you with the
+    // moment each started waiting, and how many are working; it shows only
+    // what started after you last left the app (main/corner-tag.mjs).
     const productName = (slug: string) => snap.products.find((p) => p.slug === slug)?.name ?? slug;
     window.zero?.cornerTag?.({
       ready: [
@@ -2836,9 +3105,9 @@ export default function App() {
           id: i.id,
           title: rowTitle(i),
           says: i.status === 'blocked' ? 'needs you' : 'is ready for you',
-          since: i.wrote?.status?.ts ?? i.updatedAt,
+          since: waitingSince(i),
         })),
-        ...(snap.approvals ?? []).map((a) => ({ id: a.id, title: productName(a.product ?? ''), says: 'needs a yes', open: null })),
+        ...(snap.approvals ?? []).map((a) => ({ id: a.id, title: productName(a.product ?? ''), says: 'needs a yes', since: a.at, open: null })),
       ],
       working: runningRows.length,
     });
@@ -2849,16 +3118,20 @@ export default function App() {
     prevAskIds.current = askIds;
 
     const arrivals = [
-      ...fresh.map((i) => ({ id: i.id, title: i.title, product: i.product, productName: i.productName, kind: 'item' })),
+      ...fresh.map((i) => ({ id: i.id, title: rowTitle(i), product: i.product, productName: i.productName, kind: 'item' })),
       ...freshAsks.map((a) => ({
         id: a.id,
         title: String((a.input as any)?.description ?? (a.input as any)?.command ?? a.tool ?? 'a command'),
+        // The thread that is asking, which heads the phone's alert.
+        thread: (() => { const of = a.item ? snap.items.find((i) => i.id === a.item) : null; return of ? rowTitle(of) : null; })(),
+        item: a.item ?? null,
         product: a.product,
         productName: snap.products.find((p) => p.slug === a.product)?.name ?? a.product,
         kind: 'approval',
       })),
     ];
-    if (arrivals.length) window.zero?.notify?.(arrivals);
+    // With the inbox they arrived in, which the phone's alert counts on its icon.
+    if (arrivals.length) window.zero?.notify?.(arrivals, inbox.filter((i) => i.product).map((i) => ({ id: i.id, product: i.product as string })));
   }, [snap, inbox, runningRows]);
 
   // The corner tag's "Turn off…" lands on the switch that turns it off.
@@ -2946,12 +3219,29 @@ export default function App() {
   }, [modal]);
 
   useEffect(() => { localStorage.setItem(SEEN_KEY, JSON.stringify([...seen].slice(-2000))); }, [seen]);
+  useEffect(() => { if (view === 'inbox') setNeedsLookedAt((at) => lookedAtNow(inbox, at, Date.now())); }, [view, inbox]);
+  useEffect(() => {
+    const newest = Object.entries(seenAt).sort((a, b) => b[1] - a[1]).slice(0, 2000);
+    localStorage.setItem(SEEN_AT_KEY, JSON.stringify(Object.fromEntries(newest)));
+  }, [seenAt]);
   useEffect(() => { localStorage.setItem(SNOOZE_KEY, JSON.stringify(snoozes)); }, [snoozes]);
 
   /* -------------------------------- actions ------------------------------- */
   const markSeen = useCallback((item: WorkItem) => {
     setSeen((s) => new Set(s).add(item.id));
+    setSeenAt((m) => ({ ...m, [item.id]: Date.now() }));
   }, []);
+  const markUnseen = useCallback((item: WorkItem) => {
+    setSeen((s) => { const c = new Set(s); c.delete(item.id); return c; });
+    setSeenAt((m) => ({ ...m, [item.id]: 0 }));
+  }, []);
+  // An answer that lands on the thread you are reading is read already. Keyed
+  // on the answer's time, so Mark Unread on the open thread is not undone.
+  const focusedArrival = useMemo(() => {
+    if (!focused) return 0;
+    return arrivedAt(items.find((i) => i.id === focused.id && i.product === focused.product) ?? focused);
+  }, [focused, items]);
+  useEffect(() => { if (focused) markSeen(focused); }, [focusedArrival]); // eslint-disable-line react-hooks/exhaustive-deps
   // J AND K FROM AN OPEN THREAD OR AN OPEN TEAMMATE CARD (w-fb16bcaeba): open
   // the next stop, whoever's it is. Yours opens as your thread, theirs as
   // their card, exactly as a click on its row would.
@@ -2965,18 +3255,41 @@ export default function App() {
   // Where the keyboard is in the walk: their row, or your last one.
   const walkPlace = keyCard ? stops.findIndex((s) => s.card && stopKey(s) === cardSel) : stops.findIndex((s) => s.item === current);
 
-  // WHAT A CONVERSATION NEEDS TO BRING AN AGENT IN AND TO DRAW ITS ANSWER
-  // (w-7b9cb8636a, team/ChatAgents.tsx): the projects it can be sent to, the
-  // model lists, and the tasks themselves, read off this snapshot.
-  const chatAgents = useMemo<ChatAgentsValue>(() => ({
-    projects: chatProjects(snap?.products ?? [], snap?.supervisor.productOrder ?? [], snap?.supervisor.hiddenProducts ?? []),
-    codexModels,
-    codexDefault: codexModelDefault,
-    find: (product, id) => items.find((i) => i.id === id && i.product === product),
-    stateOf: stateOfMine,
-    filed: (task) => threadsMade(items, task),
-    open: (task) => { setFocused(task); markSeen(task); },
-  }), [snap?.products, snap?.supervisor.productOrder, snap?.supervisor.hiddenProducts, codexModels, codexModelDefault, items, stateOfMine, markSeen]);
+  // One thing at a time (w-65bcefb857): every thread in Needs you opens on it,
+  // however it was opened. Its place and its arrows are counted in Needs you,
+  // not in J and K's walk, which takes in teammates' rows.
+  const openInQueue = useCallback((item: WorkItem) => {
+    setFocused(item); markSeen(item);
+    const at = list.indexOf(item);
+    if (at >= 0) setSelected(at);
+  }, [list, markSeen]);
+  const queueSpot = spotIn(shownInbox, focused);
+  // And every thread with an agent is drawn on that page, Needs you or not; a
+  // conversation between people keeps its chat.
+  const onePage = !!focused && !directSlugs.has(focused.product);
+  const stepQueue = useCallback((dir: 1 | -1) => {
+    const to = focused && stepIn(shownInbox, focused, dir);
+    if (to) openInQueue(to);
+  }, [focused, shownInbox, openInQueue]);
+
+  // WHERE THE OPEN THREAD SAT, KEPT AFTER IT LEAVES THE LIST (w-0d55a2b160).
+  // A reply to a person keeps you on the thread and takes it out of Needs you
+  // (`iSpokeLast`), so J, K and E, which all count from the thread's place,
+  // found none: J did nothing, K opened the bottom row, E dropped you on the
+  // list. They count from here instead while you are still on it
+  // (`stepFromPlace`, and `noteAdvance` for E). Two places, because J and K
+  // walk what the page draws and E reopens a slot in Needs you.
+  const walkHeld = useRef<{ key: string; index: number } | null>(null);
+  const inboxPlace = useRef<{ id: string; index: number } | null>(null);
+  useEffect(() => {
+    // Leaving the thread forgets it: the place is only good while you are on it.
+    if (!focused) { walkHeld.current = null; inboxPlace.current = null; return; }
+    const key = stopKey({ item: focused });
+    const at = stops.findIndex((s) => stopKey(s) === key);
+    if (at >= 0) walkHeld.current = { key, index: at };
+    const inInbox = shownInbox.findIndex((i) => i.id === focused.id);
+    if (inInbox >= 0) inboxPlace.current = { id: focused.id, index: inInbox };
+  }, [focused, stops, shownInbox]);
 
   // THE AGENTS A MESSAGE MENTIONS START WHEN THE MESSAGE LANDS, after the undo
   // window, so a Z inside it leaves nothing behind. Each becomes a task in its
@@ -3009,6 +3322,22 @@ export default function App() {
     }
     return out;
   }, [snap?.products, team]);
+
+  // WHAT A CONVERSATION NEEDS TO BRING AN AGENT IN AND TO DRAW ITS ANSWER
+  // (w-7b9cb8636a, team/ChatAgents.tsx): the projects it can be sent to, the
+  // model lists, and the tasks themselves, read off this snapshot. `start` is
+  // for a reply in a thread, which is written at once rather than after the
+  // undo window the chat's own reply waits out.
+  const chatAgents = useMemo<ChatAgentsValue>(() => ({
+    projects: chatProjects(snap?.products ?? [], snap?.supervisor.productOrder ?? [], snap?.supervisor.hiddenProducts ?? []),
+    codexModels,
+    codexDefault: codexModelDefault,
+    find: (product, id) => items.find((i) => i.id === id && i.product === product),
+    stateOf: stateOfMine,
+    filed: (task) => threadsMade(items, task),
+    open: (task) => { setFocused(task); markSeen(task); },
+    start: startChatAgents,
+  }), [snap?.products, snap?.supervisor.productOrder, snap?.supervisor.hiddenProducts, codexModels, codexModelDefault, items, stateOfMine, markSeen, startChatAgents]);
 
   // AN URGENT ROW THAT ARRIVES WHILE SHE IS READING TAKES THE SCREEN.
   //
@@ -3171,9 +3500,9 @@ export default function App() {
     const slug = railItem?.product ?? null;
     if (!slug) return [];
     const tasks = items
-      .filter((i) => i.product === slug && i.id !== pendingId)
+      .filter((i) => i.product === slug && !pendingIds.has(i.id))
       .filter((i) => belongsOnTheRail(i, {
-        deliveredThrough, hiddenUntil: hiddenAt(i), deferredUntil: dueAt(i), now, live: liveIds.has(i.id), shipping: shippingIds.has(i.id), waitingOn: waitingOn(i),
+        deliveredThrough, hiddenUntil: hiddenAt(i), deferredUntil: dueAt(i), now, live: liveIds.has(i.id), shipping: shippingIds.has(i.id), waitingOn: waitingOn(i), stopped: stalledIds.has(i.id),
       }))
       .map((i) => ({
         key: i.id,
@@ -3192,7 +3521,7 @@ export default function App() {
         open: () => openAgent(a.pid),
       }));
     return [...tasks, ...sessions].sort((x, y) => y.at - x.at);
-  }, [railItem?.product, items, snap?.agents, pendingId, deliveredThrough, hiddenAt, dueAt, now, markSeen, openAgent, liveIds, shippingIds, waitingOn]);
+  }, [railItem?.product, items, snap?.agents, pendingIds, deliveredThrough, hiddenAt, dueAt, now, markSeen, openAgent, liveIds, shippingIds, stalledIds, waitingOn]);
 
   // (legal/privacy.html, 5.1). One place, on the id changing, rather than a
   // call beside each of the dozen things that open a task: a count added at
@@ -3228,13 +3557,114 @@ export default function App() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Counts toasts, so each new one is a new element and its clock starts over.
   const toastShown = useRef(0);
-  const showToast = useCallback((text: string, goes?: { product: string; id: string }) => {
+  const showToast = useCallback((text: string, goes?: ToastGoes) => {
     toastShown.current += 1;
     setToast({ text, goes });
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);
   }, []);
   showToastRef.current = showToast;
+  // A CHAT'S OWN ASKS (team/chat-events.ts): mark this conversation unread, and say a short note.
+  useEffect(() => {
+    const mark = (e: Event) => {
+      const want = (e as CustomEvent<{ product: string; id: string }>).detail;
+      const it = items.find((i) => i.id === want?.id && i.product === want?.product);
+      if (it) { markUnseen(it); showToast('Marked unread'); }
+    };
+    const note = (e: Event) => showToast(String((e as CustomEvent<string>).detail ?? ''));
+    window.addEventListener(MARK_UNREAD, mark);
+    window.addEventListener(SAY, note);
+    return () => { window.removeEventListener(MARK_UNREAD, mark); window.removeEventListener(SAY, note); };
+  }, [items, markUnseen, showToast]);
+
+  // ROOMS (alpha, team/rooms/useRooms.tsx). A room open is drawn in place of
+  // the list, so it shows only where the list would.
+  const directs = useMemo(() => (roomsOn ? directConversations({
+    items, products: snap?.products ?? [], me: snap?.team?.me?.id ?? null,
+    people: new Map((snap?.team?.people ?? []).map((p) => [p.id, p])), waiting: new Set(inbox.map((i) => i.id)),
+    // Mark Unread stores 0 (./unread.ts).
+    marked: new Set(Object.keys(seenAt).filter((id) => seenAt[id] === 0)),
+  }) : []), [roomsOn, items, snap?.products, snap?.team?.me?.id, snap?.team?.people, inbox, seenAt]);
+  const roomsUi = useRooms({
+    rooms: snap?.team?.rooms, on: !!snap?.alpha?.rooms, meId: snap?.team?.me?.id ?? null,
+    myName: snap?.team?.rooms?.me?.display_name ?? '', fullName: snap?.team?.me?.name ?? '', hasTeam: !!snap?.team?.team, now: Date.now(), toast: showToast,
+    directs,
+    onOpenDirect: (id) => { const item = items.find((i) => i.id === id); if (item) { setTeamOpen(false); setSettingsOpen(false); setFocused(item); markSeen(item); } },
+    onLeavePage: () => { setFocused(null); setFocusedRepeat(null); setTeamOpen(false); closeSearch(); },
+    // Teammates: the conversation you already have, or the new thread card addressed to them.
+    onTeamMessage: (ids) => {
+      const want = [...ids].sort().join(',');
+      const had = directs.find((d) => [...d.people].sort().join(',') === want);
+      if (had) { setFocused(had.item); markSeen(had.item); return; }
+      setComposeInitial({ to: ids[0], also: ids.slice(1) });
+      setModal('compose');
+    },
+    // A teammate's card opens over the room, and Back comes back to it.
+    renderBoard: (people, { later }) => <RoomBoard items={items} products={snap?.products ?? []} display={DEFAULT_DISPLAY.team} now={now} stateOf={stateOfMine} projectOrder={projectOrder}
+      cards={[...cards, ...roomMateCards(snap?.team?.rooms?.rooms ?? [])]} picked={people} onOpenCard={(c) => { if (!isPresenceCard(c)) openTeammateCard(c); }} columnOrder={columnOrder} later={later}
+      onOpenItem={(item) => { setFocused(item); markSeen(item); }} />,
+  });
+  const roomShown = !!roomsUi.openId && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
+  const teammateModels = useMemo(() => ({ engine: snap?.engines?.workspace ?? null, codex: codexModels, codexDefault: codexModelDefault ?? null }), [snap?.engines?.workspace, codexModels, codexModelDefault]);
+  const teammatesUi = useTeammates({
+    view: snap?.teammates, asking: (snap?.approvals ?? []).map((a) => a.item), running: snap?.supervisor?.running ?? NO_RUNNING, products: snap?.products ?? [], engines: snap?.engines?.choices ?? [],
+    models: teammateModels,
+    me: team?.byId.get(team.me ?? '')?.name ?? '',
+    mePic: team?.byId.get(team.me ?? '')?.avatarUrl ?? null,
+    onEnter: () => { roomsUi.leave(); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setFocusedRepeat(null); },
+    onOpenThread: (product, id) => {
+      const item = items.find((i) => i.id === id && i.product === product);
+      if (item) { setFocused(item); markSeen(item); }
+    },
+    onChanged: () => { void refresh(); },
+  });
+  // A group opened from anywhere takes the page from a teammate.
+  useEffect(() => { if (roomsUi.openId) teammatesUi.leave(); }, [roomsUi.openId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const teammatesById = useMemo(() => new Map((snap?.teammates?.list ?? []).map((t) => [t.id, t])), [snap?.teammates?.list]);
+  const teammatesShown = !!teammatesUi.open && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
+  // With teammates on, Groups is Chats: your AI teammates, people and groups
+  // in one list, and the sidebar's row opens the chat you had open last.
+  const chatsValue: ChatsValue | null = teammatesUi.live ? {
+    teammates: teammatesUi.list, groups: roomsUi.live ? roomsUi.groups : [], now,
+    onTeammate: (id) => teammatesUi.go(id), onNew: teammatesUi.onNew, onGroup: (key) => roomsUi.pickGroup(key),
+  } : null;
+  const openChats = () => {
+    let last: string | null = null;
+    try { last = localStorage.getItem(LAST_CHAT_KEY); } catch { /* opens the first chat */ }
+    const mate = last?.startsWith('teammate:') ? last.slice('teammate:'.length) : null;
+    if (mate && teammatesUi.list.some((t) => t.id === mate)) { teammatesUi.go(mate); return; }
+    if (last && !mate && roomsUi.groups.some((g) => g.key === last)) { roomsUi.pickGroup(last); return; }
+    teammatesUi.go(teammatesUi.list[0]?.id ?? 'new');
+  };
+
+  // C TURNS THE CLOUD ON OR OFF, from anywhere a key reaches (2026-10-16), and
+  // a note says which. Through a ref so the key handlers read the cloud as it
+  // is now. Nothing without a cloud set up.
+  const toggleCloudRef = useRef<(() => void) | null>(null);
+  toggleCloudRef.current = () => {
+    const cloud = snap?.cloud;
+    if (!cloud?.setUp) return;
+    const mode = cloudToggleTarget(cloud);
+    void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode });
+    showToast(cloudToggleNote(mode));
+  };
+
+  // A CLOUD ACCOUNT THAT WAS NOT ADDED, SAID THE MOMENT IT FAILS (2026-10-15):
+  // the check goes on behind her, so when it fails with the setup closed she
+  // is told once, here, and the cloud button keeps the way to try again. Not
+  // for failures already there when the app opened, and not twice.
+  const cloudFailuresSeen = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const cloud = snap?.cloud;
+    if (!cloud) return;
+    if (cloudFailuresSeen.current === null) {
+      cloudFailuresSeen.current = new Set(newlyFailedSignIns(new Set(), cloud).map((s) => s.attempt ?? s.key));
+      return;
+    }
+    const fresh = newlyFailedSignIns(cloudFailuresSeen.current, cloud);
+    for (const s of fresh) cloudFailuresSeen.current.add(s.attempt ?? s.key);
+    if (fresh.length && !cloudSetupOpen) showToast(SETUP.toastFailed(fresh[0].engine));
+  }, [snap?.cloud, cloudSetupOpen, showToast]);
 
   // THE FIRST PRESS THAT WOULD LEAVE A STOPPED AGENT STUCK, HELD ONCE.
   //
@@ -3296,6 +3726,21 @@ export default function App() {
   // She opened the lid. The app put the agents back on their work while she was
   // away from the screen, and this is the whole of what it says about it.
   useEffect(() => window.zero?.onRecovered?.((r) => { if (r?.text) showToast(r.text); }), [showToast]);
+  // A ROOM INVITE LINK (Rooms, alpha): the room is shown first, and joined on a yes.
+  const joinWaiting = useRef<string | null>(null);
+  const [joinTick, setJoinTick] = useState(0);
+  useEffect(() => {
+    const take = () => { void window.zero?.takeJoin?.().then((token) => { if (token) { joinWaiting.current = token; setJoinTick((n) => n + 1); } }).catch(() => {}); };
+    take();
+    return window.zero?.onJoinRoom?.(take);
+  }, []);
+  useEffect(() => {
+    const token = joinWaiting.current;
+    if (!token || !snap) return;
+    if (!roomsUi.live) { if (snap.alpha?.rooms === false || !snap.team?.signedIn) { joinWaiting.current = null; showToast('Turn on Rooms in Settings, Alpha features, to join a room'); } return; }
+    joinWaiting.current = null;
+    void roomsUi.join(token);
+  }, [joinTick, roomsUi.live, snap, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // BEING A BRAND NEW USER, ON THE APP SHE DOWNLOADED.`walkAgain` above is the
   // "at LEAST" half. This is the first half, and the difference between them
@@ -3358,7 +3803,10 @@ export default function App() {
   // cost her are in ./advance; what is here is only which state answers "was a
   // task open when she acted", and that is `focused`.
   const noteAdvance = useCallback((item: WorkItem) => {
-    const index = shownInbox.findIndex((i) => i.id === item.id);
+    // A thread your reply already took out of Needs you advances from the
+    // slot it was in, which is where you were working.
+    const at = shownInbox.findIndex((i) => i.id === item.id);
+    const index = at < 0 && focused?.id === item.id && inboxPlace.current?.id === item.id ? inboxPlace.current.index : at;
     advanceRef.current = advanceAfter({ fromTask: !!focused, index, id: item.id });
   }, [shownInbox, focused]);
 
@@ -3377,6 +3825,11 @@ export default function App() {
     noteAdvance(item);
     setFocused(null);
   }, [noteAdvance]);
+
+  // Whether a reply from inside this thread moves her on to the next (./advance).
+  const movesOn = useCallback((item: WorkItem) => replyMovesOn({
+    view, onBoard, index: shownInbox.findIndex((i) => i.id === item.id), searching: search !== null,
+  }), [view, onBoard, shownInbox, search]);
 
   // Every resolving action goes through here: the UI advances instantly, the
   // write happens after the grace window (unless Z cancels it first).
@@ -3409,10 +3862,15 @@ export default function App() {
     // Undo then takes back the written reply, which its own undo entry does.
     holdMs: number = UNDO_GRACE_MS,
   ) => {
-    await flushPending(); // a new action commits the previous one immediately
+    // A new action commits the previous one immediately, without waiting for
+    // it, so E moves on however busy main is
+    // (tests/e-never-waits-for-the-app.test.mjs). This action's write goes after it.
+    const flushed = flushPending().catch((err) => console.warn('a held action was not written', err));
     if (!stay) leaveResolved(item);
     setModal(null);
-    setPendingId(item.id); // out of the inbox NOW; the write can wait, the signal cannot
+    holdRow(item.id); // out of the inbox NOW; the write can wait, the signal cannot
+    // Only an answer passes `goes`, and only an answer starts an agent.
+    setHeldAnswer(goes ? item.id : null);
     // "PRESS Z", NOT A BARE LETTER. The toast used to read "Closed: Added the
     // sign-in route. Tests g · Z to undo": the title had been cut mid-word at
     // 32 characters, so "Tests green." came out "Tests g", and the bare Z ran
@@ -3420,24 +3878,28 @@ export default function App() {
     // (see markDone below) and the key is named as a press, so neither half can
     // be read as part of the other.
     //
-    // A pick she is still looking at needs no way in: `stay` means the pane
-    // never left the row.
-    showToast(`${toast} · press Z to undo`, stay ? undefined : goes);
-    if (holdMs <= 0) {
-      await run();
-      await refresh();
-      setPendingId((p) => (p === item.id ? null : p));
-      return;
-    }
-    const timer = setTimeout(async () => {
+    // A REPLY THAT KEEPS HER ON THE ROW NAMES IT TOO (w-5513afd09a). It used
+    // to name nothing when `stay` was set, so the moment she left the thread
+    // the toast had no O. The cap stays off while the row is the one open
+    // (toastOpens), which is the "needs no way in" this used to say.
+    showToast(`${toast} · press Z to undo`, goes && { ...goes, sent: true });
+    const afterTheLast = async () => { await flushed; await run(); };
+    const write = async () => {
+      try {
+        await afterTheLast();
+        await refresh();
+      } finally {
+        letRowGo(item.id);
+      }
+    };
+    if (holdMs <= 0) { await write(); return; }
+    const timer = setTimeout(() => {
       if (pendingRef.current?.timer !== timer) return;
       pendingRef.current = null;
-      await run();
-      await refresh();
-      setPendingId((p) => (p === item.id ? null : p));
+      void write();
     }, UNDO_GRACE_MS);
-    pendingRef.current = { item, timer, run, restore, undid };
-  }, [flushPending, leaveResolved, refresh, showToast]);
+    pendingRef.current = { item, timer, run: afterTheLast, restore, undid, said: toast };
+  }, [flushPending, leaveResolved, refresh, showToast, holdRow, letRowGo]);
 
   // It closes the ROW and touches nothing else — no message, no signal, and the
   // session goes on waiting exactly as it was. The way back is the undo below,
@@ -3452,7 +3914,7 @@ export default function App() {
       pushUndo({ label: `Back in your inbox: ${agent.name}`, undoes: `put ${agent.name} back in your inbox`, brings: item, run: async () => {
         await api.closeAgent({ key, through: 0 });
       } });
-    }, `Closed: ${agent.name}`);
+    }, `${DONE.verb}: ${agent.name}`);
   }, [deferCommit, pushUndo]);
 
   // AND CLOSING THE ROW THAT SAYS NOTHING IS RUNNING IS THE SAME KIND OF MOVE:
@@ -3466,7 +3928,7 @@ export default function App() {
     await deferCommit(item, async () => {
       setTroubleClosedAt(since);
       pushUndo({ label: 'Back in your inbox: what is not running', undoes: 'put the stopped tasks back in your inbox', run: async () => { setTroubleClosedAt(was); } });
-    }, 'Closed: what is not running');
+    }, `${DONE.verb}: what is not running`);
   }, [deferCommit, setTroubleClosedAt, troubleClosed, pushUndo]);
 
   // `stay` keeps the pane where it is, for the same reason `resolve` has one
@@ -3475,7 +3937,8 @@ export default function App() {
   //
   // `force` is the close that answers the question below, and the No on a
   // filed row, both of which have already decided.
-  const markDone = useCallback(async (item: WorkItem, { stay, force }: { stay?: boolean; force?: boolean } = {}) => {
+  // `unshippedOk` is the close that answered "its work never reached main".
+  const markDone = useCallback(async (item: WorkItem, { stay, force, unshippedOk }: { stay?: boolean; force?: boolean; unshippedOk?: boolean } = {}) => {
     // AND DURING THE WALK, TWO OF ITS OWN ROWS SAY NO AND SAY WHY. One of them
     // is an agent stopped waiting on you, which is the move the walk is there
     // to teach people not to make, and closing it used to delete the beat that
@@ -3508,17 +3971,23 @@ export default function App() {
     // Every close comes through here (E, that option, the button, ⌘K), so this
     // is the one place the question can stand between a close and the tasks it
     // would skip. From the list it opens the thread, which is where they are.
-    if (!force && waitingFiled(item).length) {
+    // And before that, a thread whose work never reached main
+    // (shared/not-shipped.mjs), whose last word may still say it ships.
+    const unshipped = !unshippedOk && !!notShipped(item);
+    if (unshipped || (!force && waitingFiled(item).length)) {
       if (focused?.id !== item.id || focused?.product !== item.product) { setFocused(item); markSeen(item); }
       setOptionSel(null);
+      setCloseAskWhy(unshipped ? 'unshipped' : 'filed');
       setCloseAskOn(keyOf(item));
+      setCloseAskRaised((n) => n + 1);
       return;
     }
-    const undid = [{ product: item.product, id: item.id, words: 'Undid closing it' }];
+    if (closesAgain(pendingRef.current, item)) return;
+    const undid = [{ product: item.product, id: item.id, words: UNDID_CLOSING }];
     await deferCommit(item, async () => {
-      await api.answer({ product: item.product, id: item.id, status: 'done' });
+      await api.answer({ product: item.product, id: item.id, status: 'done', ...(unshippedOk ? { closeUnshipped: true } : {}) });
       pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, undid, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'open' }); } });
-    }, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`, undefined, stay, undefined, undid);
+    }, `${DONE.verb}: ${clipToSentence(item.title, TOAST_TITLE)}`, undefined, stay, undefined, undid);
   }, [deferCommit, closeAgentRow, closeTroubleRow, snap?.supervisor.spawnTrouble?.since, run, showToast, pushUndo, nudgeOnStopped, waitingFiled, focused, markSeen]);
 
   const resolve = useCallback(async (item: WorkItem, { stay }: { stay?: boolean } = {}) => {
@@ -3528,7 +3997,7 @@ export default function App() {
     // advance off it; this one is reading the PARENT, and advancing would throw
     // them out of the thread they pressed from, which is the trip the button
     // exists to remove. The row the press was about still leaves the inbox and
-    // still says In progress, because that is `pendingId`'s work and not this
+    // still says In progress, because that is `pendingIds`'s work and not this
     // flag's.
     //
     // The palette's Approve. Question: send the recommended option. Review:
@@ -3571,7 +4040,7 @@ export default function App() {
     } else if (item.kind === 'review' && !item.answer) {
       await approveWith('Approved. Proceed as you proposed.', `Approved → ${item.productName} will enact it`);
     } else if (isProposal) {
-      await approveWith('Approved. Run it.', `Running → ${item.title.slice(0, 40)}`);
+      await approveWith(RUN_IT, `Running → ${item.title.slice(0, 40)}`);
     } else {
       await markDone(item);
     }
@@ -3596,17 +4065,49 @@ export default function App() {
     }, `Doing it in this thread: ${clipToSentence(child.title, TOAST_TITLE)}`, undefined, true, { product: parent.product, id: parent.id }, undid);
   }, [items, deferCommit, pushUndo]);
 
+  // START ALL AND DISMISS ALL (w-fe64f35bdd), from the count line over one
+  // list of proposals. Written at once rather than held like a single answer,
+  // because the hold keeps one row and these are many; the Z after it is a real
+  // cancel, the same one a single approval's late undo makes.
+  const answerAllFiled = useCallback(async (kids: WorkItem[], act: 'start' | 'dismiss') => {
+    if (!kids.length) return;
+    await flushPending();
+    const { writes, undo } = answerAllWrites(kids, act);
+    for (const w of writes) await api.answer(w);
+    const n = kids.length;
+    const start = act === 'start';
+    pushUndo({
+      label: start ? `${n} approvals withdrawn` : `Reopened ${n} proposals`,
+      undoes: start ? `take back those ${n} approvals and stop their agents` : `reopen those ${n} proposals`,
+      undid: kids.map((k) => ({ product: k.product, id: k.id, words: start ? 'Undid your approval' : 'Undid closing it' })),
+      run: async () => {
+        if (start) for (const k of kids) await (window.zero as any)?.stopSession?.({ product: k.product, id: k.id });
+        for (const w of undo) await api.answer(w);
+      },
+    });
+    showToast(`${start ? `Started ${n} threads` : `Dismissed ${n} proposals`} · press Z to undo`);
+    await refresh();
+  }, [flushPending, pushUndo, showToast, refresh]);
+
   // THE ANSWER TO WHAT A CLOSE ASKED (w-d2744c6daa, ./close-asks-first.ts).
   // Deciding each one keeps the thread open and brings the list into view;
   // starting or dropping them does so one at a time through the same presses
   // the rows carry, and then closes the thread for real. Each press commits the
   // one before it (`deferCommit`), so Z takes back the close, the last thing.
+  // `answerWith` is made further down.
+  const answerWithRef = useRef<((item: WorkItem, text: string) => Promise<unknown>) | null>(null);
   const answerCloseAsk = useCallback(async (item: WorkItem, n: number) => {
     const waiting = waitingFiled(item);
-    const option = closeAsk(waiting.length)?.options.find((o) => o.n === n);
+    const option = askingToClose(item)?.options.find((o) => o.n === n);
     if (!option) return;
     setCloseAskOn(null);
     setOptionSel(null);
+    if (option.act === 'ship') {
+      const words = shipItAsk(item);
+      if (words) await answerWithRef.current?.(item, words);
+      return;
+    }
+    if (option.act === 'close') { await markDone(item, { unshippedOk: true }); return; }
     if (option.act === 'decide') {
       document.querySelector('.made-waiting')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
       return;
@@ -3615,8 +4116,9 @@ export default function App() {
       if (option.act === 'start') await resolve(kid, { stay: true });
       else await markDone(kid, { stay: true, force: true });
     }
-    await markDone(item, { force: true });
-  }, [waitingFiled, resolve, markDone]);
+    // Work off main was asked about before this question could come up.
+    await markDone(item, { force: true, unshippedOk: true });
+  }, [waitingFiled, resolve, markDone, closeAskOn, closeAskWhy]);
   const keepThreadOpen = useCallback(() => { setCloseAskOn(null); setOptionSel(null); }, []);
 
   // THERE IS NO DECLINE.
@@ -3631,7 +4133,7 @@ export default function App() {
   // lives in `leaveResolved` above and still covers every way a row leaves her
   // inbox.
 
-  const answerWith = useCallback(async (item: WorkItem, text: string, priority?: number, sent?: SentDraft, mode?: AnswerMode | null, engine?: string | null, pick?: { model: string | null; effort: string | null }) => {
+  const answerWith = useCallback(async (item: WorkItem, text: string, priority?: number, sent?: SentDraft, mode?: AnswerMode | null, engine?: string | null, pick?: ReplyPick) => {
     // AN AGENT ROW IS NOT WORK OF HERS TO CLOSE, DEFER OR RESTART. It stands
     // for a session running outside Agentbox; the only two things that mean
     // anything to it are a reply and being taken to its window.
@@ -3769,7 +4271,7 @@ export default function App() {
           // mid-flight; the pick lands on the row and the next run reads it.
           // The drawer says "Which model this conversation runs on" rather than
           // anything about this message, for exactly this case.
-          ...(pick ? { model: pick.model, effort: pick.effort } : {}),
+          ...(pick ?? {}),
         }),
         // NOTHING IS TAKEN OFF THE SCREEN HERE. The row is re-read, the
         // committed copy of this message arrives with it, and `itemThread`
@@ -3797,24 +4299,26 @@ export default function App() {
       // second copy of it, so a Z inside it lands in `undo`'s first branch: a
       // perfect undo, nothing written, the message back in the reply box. The
       // flush first is what makes a second message sent inside the window hand
-      // the first one over rather than queue behind it.
+      // the first one over rather than queue behind it. It is not waited for
+      // (see deferCommit): the window opens now, the hand-over goes after it.
       //
       // NO TOAST. The message on the screen says it, where she is looking, and
       // the two bars this path used to raise are the ones w-87c4e7913c took
       // away.
-      await flushPending();
+      const flushed = flushPending().catch((err) => console.warn('a held action was not written', err));
+      const handOverAfter = async () => { await flushed; await handOver(); };
       // A PHONE HANDS IT OVER NOW: it has no Z, and a page put away inside
       // the window could lose the message (./phone-holds).
-      if (!holdsReplies(onPhone())) { void handOver(); return; }
+      if (!holdsReplies(onPhone())) { void handOverAfter(); return; }
       const timer = setTimeout(() => {
         if (pendingRef.current?.timer !== timer) return;
         pendingRef.current = null;
-        void handOver();
+        void handOverAfter();
       }, UNDO_GRACE_MS);
       pendingRef.current = {
         item,
         timer,
-        run: handOver,
+        run: handOverAfter,
         // THE WORDS AND THE PICTURES, and the bubble comes off the thread with
         // them: leaving it there would say Sending over a message that is not
         // going anywhere.
@@ -3854,19 +4358,6 @@ export default function App() {
     // A message to a person is held in `sending` like one to a running agent;
     // the written copy replaces it (item-thread.ts) and Z takes it off.
     const talking = isDirect(snap?.products.find((p) => p.slug === item.product));
-    const mine = { product: item.product, id: item.id, at: Date.now(), text, held: true };
-    if (talking) setSending((q) => [...q, mine]);
-    const restore = (): Restored => {
-      setSending((q) => q.filter((s) => s !== mine));
-      return restoreDraft(item, sent?.words ?? text, sent?.attachments ?? []) ? { item } : null;
-    };
-    // A REPLY IS A CLAIM ON NOW, so it cancels a schedule rather than queueing
-    // behind it. The rule and the reason are in list-rules; what is here is the
-    // write and the way back. The old moment rides on the undo, so answering
-    // something and still wanting it to run Monday at 6am costs one Z.
-    const wasScheduled = replyClearsSchedule(item, Date.now());
-    const priorRunAt = item.runAt ?? 0;
-    const priorSnooze = item.snoozedUntil ?? 0;
     // AND A COMMAND KEEPS HER ON THE ROW IT IS ABOUT TO ANSWER.Every other
     // reply hands work to somebody else and takes seconds to hours; this one
     // prints a table in four seconds and the table is the entire reason she
@@ -3879,7 +4370,24 @@ export default function App() {
     // up.
     // A REPLY IN A CONVERSATION STAYS IN THE CONVERSATION (2026-10-01):
     // sending a message to a person must not jump to another page.
-    const stay = staysOnTheTask(item, text, engine) || talking;
+    const stay = staysOnTheTask(item, text, engine) || talking || !movesOn(item);
+    // Held, and so saying "press Z to undo", only where it really is held: a
+    // phone writes it at once and has no Z (./phone-holds).
+    const mine = { product: item.product, id: item.id, at: Date.now(), text, held: holdsReplies(onPhone()) };
+    // EVERY REPLY IS DRAWN AT ONCE, including one that moves her on: O
+    // follows it back, and the thread must already hold it (w-388be0a968).
+    setSending((q) => [...q, mine]);
+    const restore = (): Restored => {
+      setSending((q) => q.filter((s) => s !== mine));
+      return restoreDraft(item, sent?.words ?? text, sent?.attachments ?? []) ? { item } : null;
+    };
+    // A REPLY IS A CLAIM ON NOW, so it cancels a schedule rather than queueing
+    // behind it. The rule and the reason are in list-rules; what is here is the
+    // write and the way back. The old moment rides on the undo, so answering
+    // something and still wanting it to run Monday at 6am costs one Z.
+    const wasScheduled = replyClearsSchedule(item, Date.now());
+    const priorRunAt = item.runAt ?? 0;
+    const priorSnooze = item.snoozedUntil ?? 0;
     if (stay) setFollowing({ product: item.product, id: item.id });
     const undid = [{ product: item.product, id: item.id, words: 'Undid your reply' }];
     await deferCommit(item, async () => {
@@ -3908,14 +4416,14 @@ export default function App() {
           // drawer; the store writes it onto the item BEFORE the answer, so the
           // run this reply starts reads the model she just chose rather than the
           // one it was on (main/store.mjs, answerItem).
-          ...(pick ? { model: pick.model, effort: pick.effort } : {}),
+          ...(pick ?? {}),
         });
       } catch (error) {
         setSending((q) => q.filter((s) => s !== mine));
         putBack(error);
         return;
       }
-      if (talking) setTimeout(() => setSending((q) => q.filter((s) => s !== mine)), LANDED_MS);
+      setTimeout(() => setSending((q) => q.filter((s) => s !== mine)), LANDED_MS);
       if (wasScheduled) {
         if (priorRunAt > Date.now()) await api.schedule({ product: item.product, id: item.id, runAt: 0 });
         if (priorSnooze > Date.now()) await api.snooze({ product: item.product, id: item.id, snoozedUntil: 0 });
@@ -3927,7 +4435,8 @@ export default function App() {
       pushUndo({ label: 'Reply withdrawn, back in your inbox', undoes: 'take back that reply and stop the agent', restore, undid, run: async () => {
         if (wasScheduled && priorRunAt) await api.schedule({ product: item.product, id: item.id, runAt: priorRunAt });
         if (wasScheduled && priorSnooze) await api.snooze({ product: item.product, id: item.id, snoozedUntil: priorSnooze });
-        await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
+        // `withdraw`: on the phone, take back the reply itself if her Mac has not taken it.
+        await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id, withdraw: true });
         // Put the thread back exactly where the reply found it. The rule and
         // what it cost are in list-rules (`withdrawReply`): restoring the
         // status only when the reply had changed one left an already-open row
@@ -3938,7 +4447,8 @@ export default function App() {
         setFollowing(null);
       } });
     }, talking ? 'Sent' : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id }, undid, holdsReplies(onPhone()) ? UNDO_GRACE_MS : 0);
-  }, [deferCommit, snap?.supervisor.running, snap?.products, showToast, refresh, markSeen, pushUndo, startChatAgents, fire]);
+  }, [deferCommit, snap?.supervisor.running, snap?.products, showToast, refresh, markSeen, pushUndo, startChatAgents, fire, movesOn]);
+  answerWithRef.current = answerWith;
 
   /* ------------------------ answering one of her agents -------------------- */
   // THE ONE THING AGENTBOX SAYS OUT LOUD TO THE REST OF HER MACHINE. The reply goes
@@ -3961,9 +4471,14 @@ export default function App() {
     // Two true sentences, never one hopeful one. A failed hand-over says so; a
     // send says Sent, which is what it says everywhere else in this app; and a
     // session seen going back to work says the better thing.
+    // AND IT NAMES THE ROW, WITH Z WHEN THERE IS ONE (w-5513afd09a). The row
+    // has just left her inbox for In progress, so O is the way after it, and Z
+    // already took it back below without the toast ever saying so.
+    const back = { product: item.product, id: item.id };
+    const z = out?.key ? ' · Z to undo' : '';
     if (!out?.ok) showToast(out?.reason ?? 'The message could not be handed over.');
-    else if (out.working) showToast(`${agent.name} is working on it`);
-    else showToast(`Sent → ${agent.name}`);
+    else if (out.working) showToast(`${agent.name} is working on it${z}`, back);
+    else showToast(`Sent → ${agent.name}${z}`, back);
     // AND THE ROW HAS MOVED, so there is a way back. The row is in In progress
     // now and it stays there until the session stops, which on a long job is a
     // while; a reply she did not mean to send would otherwise have no undo at
@@ -4005,6 +4520,17 @@ export default function App() {
     }
   }, [showToast]);
 
+  // WHAT THE OPEN THREAD IS OFFERING, which is not always what its ledger
+  // says. An agent's own offer is read off the row (format.ts); the one the app
+  // asks when a finished run left a change and said nothing is known only to
+  // the page drawing it, and comes back through `onShown` (./ship-offer.ts).
+  // The keys and the pick both read this, so a number can never answer
+  // something other than the row the pointer can see.
+  const offerNow = useCallback((item: WorkItem): ParsedOption[] => (
+    offerIsLive(item) ? itemOptions(item)
+      : openShows?.ship && openShows.key === keyOf(item) ? SHIP_OFFER : []
+  ), [openShows]);
+
   const pickOption = useCallback(async (item: WorkItem, n: number) => {
     // AN AGENT ROW IS NOT WORK OF HERS TO CLOSE, DEFER OR RESTART. It stands
     // for a session running outside Agentbox; the only two things that mean
@@ -4016,11 +4542,27 @@ export default function App() {
     // these would be a write into nothing. Both behave like a task in every way
     // she can see and in none that she cannot.
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
-    const option = itemOptions(item).find((o) => o.n === n);
+    // The agent's own offer, and whether it is still live is format.ts's to
+    // say; else the one the app asked for a finished run (./ship-offer.ts).
+    const option = liveOption(item, n) ?? offerNow(item).find((o) => o.n === n) ?? null;
     if (!option) return;
     // "Close this task" is done here, the way E does it, and never sent: as a
     // reply it would reopen the row and start a run to close it (format.ts).
     if (closesTheTask(option.text)) { await markDone(item); return; }
+    // "Change something first" ASKS A QUESTION, so it opens the box instead of
+    // sending (format.ts, needsYourWords). Its own words go in as the first
+    // line, so a send with nothing added does exactly what pressing 2 did
+    // before.
+    if (needsYourWords(option.text)) {
+      const words = option.text.replace(/\s*\(recommended\)\s*$/i, '').trim();
+      const kept = readDraft(item);
+      saveDraft(item, kept.trim() ? kept : `${words}\n\n`);
+      window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(item) }));
+      setFocused(item);
+      markSeen(item);
+      setModal('reply');
+      return;
+    }
     // A PICK IS A REPLY, so it reopens a finished thread exactly as typing one
     // does (statusForReply). It did not, and nothing showed that: the answer
     // was written to the ledger, the toast said it had been sent, and the
@@ -4032,9 +4574,17 @@ export default function App() {
     const status = statusForReply(item.status);
     // The option in the words the thread drew it with when it was picked.
     const undid = [{ product: item.product, id: item.id, words: 'Undid picking', choice: option.text.replace(/\s*\(recommended\)\s*$/i, '').trim() }];
+    // On the thread at once, as a typed reply is (w-388be0a968).
+    const answer = `Option ${option.n}: ${option.text}`;
+    const mine = { product: item.product, id: item.id, at: Date.now(), text: answer, held: holdsReplies(onPhone()) };
+    setSending((q) => [...q, mine]);
+    const letGo = () => setSending((q) => q.filter((s) => s !== mine));
+    const takeBack = (): Restored => { letGo(); return null; };
     await deferCommit(item, async () => {
-      await api.answer({ product: item.product, id: item.id, answer: `Option ${option.n}: ${option.text}`, ...(status ? { status } : {}) });
-      pushUndo({ label: `Option ${option.n} withdrawn, back in your inbox`, undoes: `take back option ${option.n}`, brings: item, undid, run: async () => {
+      try { await api.answer({ product: item.product, id: item.id, answer, ...(status ? { status } : {}) }); }
+      catch (error) { letGo(); throw error; }
+      setTimeout(letGo, LANDED_MS);
+      pushUndo({ label: `Option ${option.n} withdrawn, back in your inbox`, undoes: `take back option ${option.n}`, brings: item, undid, restore: takeBack, run: async () => {
         await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
         // Back exactly where the pick found it, the same one write a typed
         // reply's undo makes. Hardcoding 'open' was right while a pick could
@@ -4042,8 +4592,21 @@ export default function App() {
         // undone into her inbox instead of back into Done.
         await api.answer({ product: item.product, id: item.id, ...withdrawReply(item.status) });
       } });
-    }, `Option ${option.n} → ${item.productName}`, undefined, undefined, { product: item.product, id: item.id }, undid);
-  }, [deferCommit, pushUndo, markDone]);
+      // "Sent", because the arrow says where the answer went and nothing said
+      // what happened to it: "Option 1 → Practice" was read off the QA box as
+      // meaning nothing.
+    }, `Option ${option.n} sent → ${item.productName}`, takeBack, !movesOn(item), { product: item.product, id: item.id }, undid);
+  }, [deferCommit, pushUndo, markDone, markSeen, movesOn, offerNow]);
+
+  // A CLICK IS AIMED AT A PLACE ON THE SCREEN, so it carries the same guard the
+  // numbers have carried since ./pick-settles: answering from Needs you moves
+  // you on, and the next thread's strip is drawn in the place the pointer is
+  // already standing. The strip's own guard is the other half of F-48, for the
+  // rows moving under a pointer on one thread (components/Focus.tsx).
+  const pickAimedHere = useCallback((item: WorkItem, n: number) => {
+    if (!pickLandsHere(arrived.current, keyOf(item), Date.now())) { showToast(AIMED_AT_THE_THREAD_YOU_LEFT); return; }
+    void pickOption(item, n);
+  }, [pickOption, showToast]);
 
   /* ------------------------ the task she just wrote ------------------------ */
   // THE TASK SHE JUST MADE IS WHAT Z TAKES BACK.
@@ -4064,7 +4627,7 @@ export default function App() {
   // is the one question this card must never make her ask. The withdraw stops
   // the worker as well as closing the row: main/ipc.mjs kills the session on any
   // archive, and her archive outranks whatever a straggler writes afterwards.
-  const noteNewTask = useCallback((label: string, undoes: string, sent: ComposeDraft, withdraw: () => Promise<void>, undid?: UndidSpec[]) => {
+  const noteNewTask = useCallback((label: string, undoes: string, sent: ComposeDraft, withdraw: Undoable['run'], undid?: UndidSpec[]) => {
     pushUndo({
       label,
       undoes,
@@ -4088,7 +4651,41 @@ export default function App() {
     await refresh();
   }, [refresh, showToast]);
 
+  // WHICH MODEL, AND SO WHICH ENGINE, PICKS A THREAD UP NEXT (⌘K, by name
+  // only: thread-model-commands.ts). A field with no words, the way a level
+  // picked from ⌘K is, so it starts nothing and ends nothing.
+  const handToModel = useCallback(async (item: WorkItem, pick: { engine: string; model: string }, label: string) => {
+    await api.answer({ product: item.product, id: item.id, engine: pick.engine, model: pick.model });
+    showToast(`${label.replace(/^Model: /, '')} picks this up next`);
+    await refresh();
+  }, [refresh, showToast]);
+
+  // MOVE A THREAD TO ANOTHER PROJECT (shared/move-thread.mjs). The move is one
+  // write on each side, both in main, so there is one place that can refuse it
+  // and one answer to show when it does.
+  const moveToProject = useCallback(async (item: WorkItem, slug: string, name: string) => {
+    const out = await api.moveItem(item.product, item.id, slug);
+    if (!out.ok || !out.item) { showToast(out.error ?? 'That thread could not be moved.'); return; }
+    const made = out.item;
+    // Z PUTS IT BACK WHERE IT WAS. The ledger only grows, so the copy cannot be
+    // unwritten; it is closed, and the row that was here opens again, which is
+    // the state the move found.
+    pushUndo({
+      label: `Back in ${item.productName}`,
+      undoes: `put it back in ${item.productName}`,
+      brings: item,
+      run: async () => {
+        await api.answer({ product: made.product ?? slug, id: made.id, status: 'done' });
+        await api.answer({ product: item.product, id: item.id, status: 'open' });
+        await refresh();
+      },
+    });
+    showToast(`Moved to ${name}${SAYS_UNDO}`, { product: made.product ?? slug, id: made.id });
+    await refresh();
+  }, [pushUndo, refresh, showToast]);
+
   const [snoozeItem, setSnoozeItem] = useState<WorkItem | WorkItem[] | null>(null);
+  const [snoozeNote, setSnoozeNote] = useState<string | null>(null);
 
   const openSnooze = useCallback((item: WorkItem | WorkItem[]) => {
     // AN AGENT ROW TAKES THIS ONE. Closing, restarting and stopping still mean
@@ -4114,10 +4711,18 @@ export default function App() {
     // AND L EMPTIES THE ROW EXACTLY AS E DOES, so the real app's one nudge is
     // on this route too, in the same words with the verb changed. Putting a
     // stopped agent off until Friday leaves it as stuck as closing it does.
-    if (nudgeOnStopped(rows, 'L')) return;
+    //
+    // BUT IT IS CARRIED INTO THE BOX RATHER THAN SWALLOWING THE KEY. E opens
+    // nothing, so "press again" costs it one keystroke. L OPENS A TEXT FIELD,
+    // and a swallowed L leaves the next word running as shortcuts: in the
+    // built app, typing "every monday 9am" after it archived the thread on the
+    // "e" (renderer/src/keys.ts).
+    const lesson = holdForStoppedAgent({ rows, key: 'L', warned: stoppedWarned, walking: !!run });
+    if (lesson) { setStoppedWarned(true); rememberWarned(localStorage); }
+    setSnoozeNote(lesson?.say ?? null);
     setSnoozeItem(item);
     setModal('snooze');
-  }, [run, showToast, nudgeOnStopped]);
+  }, [run, showToast, stoppedWarned]);
 
   // Both kinds of snooze defer the interruption, leaving the work alone.
   // Threads keep their reminder in the ledger; outside agents have no ledger.
@@ -4150,10 +4755,16 @@ export default function App() {
     // from inside a task the picker is opened on `focused` and nothing else,
     // and a bulk schedule from the list has no task open to leave.
     leaveResolved(picked[0]);
+    // AND IT NAMES THE THREAD, the way every other toast of this family does
+    // ("Done: Add"). "Moved to Later. Back in 30 minutes" named nothing, so
+    // from the list, where the row vanishes as it is said, there was no telling
+    // which one had gone.
+    //
     // The COUNT IS WHAT SHE PICKED. A thread she moved as one row is one row to
     // her, so saying 13 after she selected 12 would report the repair as a
     // miscount and put the old doubt back in different words.
-    showToast(picked.length > 1 ? `${picked.length} moved to Later. Back ${label.toLowerCase()}` : `Moved to Later. Back ${label.toLowerCase()}`);
+    const moved = picked.length > 1 ? `${picked.length} threads` : clipToSentence(rowTitle(picked[0]), TOAST_TITLE);
+    showToast(`Later: ${moved}. Back ${label.toLowerCase()}${SAYS_UNDO}`);
     // Undo restores only inbox reminders. Execution schedules stay intact.
     const prior = new Map(list.map((i) => [i.id, (i.agent ? i.runAt : i.snoozedUntil) ?? 0]));
     // AND THE TASK IT PUTS BACK IS OPENED (w-874411cc63). Without `brings` the
@@ -4184,9 +4795,9 @@ export default function App() {
     // those words is true of it: it is starting for the first time.
     const allHeld = list.every((i) => notStarted(i));
     const one = allHeld ? 'Started' : allParked ? 'Running again' : 'Back in the inbox';
-    showToast(list.length > 1
+    const said = (list.length > 1
       ? `${list.length} ${allHeld ? 'started' : allParked ? 'running again' : 'back in the inbox'}`
-      : one);
+      : one) + SAYS_UNDO;
     // The old localStorage snoozes are still honored on read, so a row deferred
     // before this shipped needs clearing there too or it would not come back.
     setSnoozes((s) => {
@@ -4213,6 +4824,9 @@ export default function App() {
       for (const item of wasHeld) await api.threadEdit(item.product, item.id, { start: 'later' });
       refresh();
     } });
+    // After the entry, not before the writes above it: a toast promising Z
+    // while the pile still has the last action on top points the press at that.
+    showToast(said);
     refresh();
   }, [showToast, refresh, writeMoment, pushUndo]);
 
@@ -4226,7 +4840,11 @@ export default function App() {
     // the same sentence the single close gives. See `closingRefused`.
     const held = selectable.filter((i) => ids.has(i.id) && closingRefused(run, i.id, WAITING_AT, LATER_AT));
     if (held.length) { showToast(closingRefused(run, held[0].id, WAITING_AT, LATER_AT) as string); return; }
-    const targets = selectable.filter((i) => ids.has(i.id));
+    const ticked = selectable.filter((i) => ids.has(i.id));
+    // Work that never reached main is asked about one thread at a time.
+    const kept = ticked.filter((i) => !i.agent && notShipped(i));
+    const targets = ticked.filter((i) => !kept.includes(i));
+    if (kept.length && !targets.length) { showToast(kept.length === 1 ? 'Still open: its work never reached main' : `Still open: ${kept.length} threads whose work never reached main`); return; }
     // AND A TICKED SELECTION IS THE ONE ROUTE THAT NEVER POINTS AT A ROW, so
     // the real app's nudge is here as well: ticking four and pressing E is
     // exactly how somebody takes out a stopped agent without ever reading it.
@@ -4243,8 +4861,10 @@ export default function App() {
         else await api.answer({ product: item.product, id: item.id, status: 'open' });
       }
     } });
-    showToast(`Closed: ${targets.length} items`);
-    setMultiSel(new Set());
+    showToast((kept.length
+      ? `${DONE.verb}: ${targets.length} items. Still open: ${kept.length}, work never reached main`
+      : `${DONE.verb}: ${targets.length} items`) + SAYS_UNDO);
+    setMultiSel(new Set(kept.map((i) => i.id)));
     await refresh();
   }, [selectable, refresh, showToast, run, nudgeOnStopped]);
 
@@ -4283,6 +4903,15 @@ export default function App() {
     // row and started a fresh run on it two minutes later (2026-10-05).
     // tests/a-message-still-sending-lands-before-the-stop.test.mjs
     await flushPending();
+    // FROM THE PHONE WITH THE COMPUTER CLOSED the stop goes to her Mac, and the
+    // toast says it went rather than that it stopped (Codex's review of step 1,
+    // finding 7).
+    if (onCloudPhone()) {
+      try { await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id }); } catch (err) { showToast(`Not sent: ${String((err as Error)?.message ?? err)}`); return; }
+      showToast('Stop sent. Your Mac stops the agent when it gets it.');
+      await refresh();
+      return;
+    }
     const wasRunning = working(item);
     setFollowing({ product: item.product, id: item.id });
     await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id });
@@ -4298,12 +4927,13 @@ export default function App() {
   // refusal is either a race or a reason nothing can start it, said plainly.
   const runNow = useCallback(async (item: WorkItem) => {
     const r = await window.zero?.runNow?.({ product: item.product, id: item.id });
+    // Started, it names the thread for O (w-5513afd09a); a refusal names nothing.
     showToast(r?.ok ? 'Up next. It starts as soon as an agent is free.'
       : r?.reason === 'running' ? 'Already running.'
       : r?.reason === 'paused' ? 'Agents are paused. Turn them back on to run this.'
       : r?.reason === 'scheduled' ? 'This task is scheduled for later.'
       : r?.reason === 'held' ? 'Another session still holds this task. It starts when that lets go.'
-      : 'This task is no longer waiting.');
+      : 'This task is no longer waiting.', r?.ok ? { product: item.product, id: item.id } : undefined);
     await refresh();
   }, [refresh, showToast]);
 
@@ -4321,7 +4951,8 @@ export default function App() {
     // she can see and in none that she cannot.
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
     const r = await (window.zero as any)?.redeliver?.({ product: item.product, id: item.id });
-    showToast(r?.ok ? `A fresh agent is picking this up → ${item.productName}` : 'Nothing here to restart');
+    showToast(r?.ok ? `A fresh agent is picking this up → ${item.productName}` : 'Nothing here to restart',
+      r?.ok ? { product: item.product, id: item.id } : undefined);
     await refresh();
   }, [refresh, showToast]);
 
@@ -4337,7 +4968,7 @@ export default function App() {
     // she can see and in none that she cannot.
     if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
     await (window.zero as any)?.reopen?.({ product: item.product, id: item.id });
-    showToast(`Back in the queue → ${item.productName}`);
+    showToast(`Back in the queue → ${item.productName}`, { product: item.product, id: item.id });
     // Back in the queue is out of her inbox, so it hands her the next task
     // too.
     leaveResolved(item);
@@ -4353,8 +4984,8 @@ export default function App() {
     // that the row goes back to her inbox, and there is no row: the session
     // belongs to whatever started it, and Agentbox killing somebody's terminal
     // is not a thing this build does.
-    (item: WorkItem) => !item.agent && stoppable(item, { deferredUntil: dueAt(item), now, live: liveIds.has(item.id) }),
-    [dueAt, now, liveIds],
+    (item: WorkItem) => !item.agent && stoppable(item, { deferredUntil: dueAt(item), now, live: liveIds.has(item.id), stopped: stalledIds.has(item.id) }),
+    [dueAt, now, liveIds, stalledIds],
   );
 
   // Resume: `ids` for the rows she ticked, null for everything stranded.
@@ -4383,7 +5014,9 @@ export default function App() {
         .filter(Boolean).join(', ')
       : r?.working
         ? 'Already working on it'
-        : 'Nothing to resume');
+        : 'Nothing to resume',
+    // One thread put back on names it for O; several have no one place to go.
+    list.length === 1 && (started || queued) ? { product: list[0].product, id: list[0].id } : undefined);
     // PUTTING A WORKER BACK ON IT IS A WAY OUT OF HER INBOX TOO, and it was the
     // fifth. ⌘K offers "Resume This Agent" on a row she is reading, a worker
     // claims it, and the row moves to In progress — the same emptying as
@@ -4406,7 +5039,7 @@ export default function App() {
       pendingRef.current = null;
       clearTimeout(pending.timer);
       advanceRef.current = null;
-      setPendingId(null);
+      letRowGo(pending.item.id);
       // the draft has to be back on disk before the item is focused, because it
       // is the draft's presence that opens the reply dock (the effect below).
       // Otherwise she lands on a closed composer holding a message she cannot
@@ -4416,9 +5049,12 @@ export default function App() {
       // thread that she did it and took it back.
       const now = Date.now();
       leaveUndoMarks(pending.undid, now, now);
-      setFocused(pending.item);
-      showToast(restored ? 'Undone. Your message is back in the reply box.' : 'Undone. Nothing was sent.');
-      return;
+      // Opened in the same case as the late Z below (./undo-window): from a
+      // task, because the action moved her off it. From a list it is already
+      // back in front of her.
+      if (restored || focused) setFocused(pending.item);
+      showToast(graceUndoneLine({ said: pending.said, restored: !!restored }));
+      return 'done' as const;
     }
     // PAST THE GRACE WINDOW, Z REACHES THE LAST THING SHE DID, AND AFTER THIRTY
     // SECONDS IT ASKS BEFORE IT DOES IT. It used to act silently for the rest of
@@ -4434,14 +5070,14 @@ export default function App() {
     if (!last) {
       undoAskRef.current = null;
       showToast(NOTHING_TO_UNDO);
-      return;
+      return 'none' as const;
     }
     const asked = undoAskRef.current;
     const answeringIt = asked?.entry === last && askStillStands(asked.at, now);
     if (!instant && !answeringIt) {
       undoAskRef.current = { entry: last, at: now };
       showToast(undoAsk(last.undoes));
-      return;
+      return 'old' as const;
     }
     undoAskRef.current = null;
     // The close that put this row away also queued the step onto the next task.
@@ -4457,17 +5093,24 @@ export default function App() {
     // `from` is taken before the undo writes anything, so the mark it leaves
     // spans exactly its own lines and the thread can fold them under it.
     const from = Date.now();
+    let outcome: Awaited<ReturnType<Undoable['run']>>;
     try {
-      await last.run();
+      outcome = await last.run();
     } catch (err) {
       setUndoStack((u) => [...u, last]);
       showToast(`Could not undo that. ${(err as Error)?.message ?? err}`);
-      return;
+      return { failed: `Could not undo that. ${(err as Error)?.message ?? err}` };
+    }
+    if (outcome && 'refused' in outcome) {
+      showToast(outcome.refused);
+      await refresh();
+      if (outcome.open) { setFocused(outcome.open); markSeen(outcome.open); }
+      return { failed: outcome.refused };
     }
     leaveUndoMarks(last.undid, from, Date.now());
     const restored = last.restore?.();
     const item = restoredItem(restored ?? null);
-    const shown = shownAfterUndo(restored, last.brings);
+    const shown = shownAfterUndo(restored, last.brings, { onATask: !!focused });
     // Say what the undo actually did, AND WHERE THE WORDS WENT, because the two
     // boxes are different places and she has to be told which one to look in. A
     // bare "Undone" left her hunting for a task Z had silently pulled out of
@@ -4481,26 +5124,37 @@ export default function App() {
     // A withdrawn reply reopens where she was writing it, words and all. A
     // withdrawn new task reopens the card instead: there is no thread to go to,
     // and the whole point of the press was to add a sentence to what was written.
-    // AND A ROW IT PUT BACK IS OPENED, the same as a Z inside the grace window
-    // opens it. It used to be announced and left in the list, while she stayed
-    // on whatever the close had moved her to (w-7eb39d3c97).
+    // AND A ROW IT PUT BACK IS OPENED WHEN A TASK WAS COVERING THE LIST, the
+    // same as a Z inside the grace window opens it. It used to be announced and
+    // left in the list, while she stayed on whatever the close had moved her to
+    // (w-7eb39d3c97); from a list it moved her off one she had not left (F-50).
     if (shown.open) { setFocused(shown.open); markSeen(shown.open); }
     else if (shown.compose) { setFocused(null); setModal('compose'); }
-  }, [undoStack, refresh, showToast, markSeen, leaveUndoMarks]);
+    return 'done' as const;
+  }, [undoStack, focused, refresh, showToast, markSeen, leaveUndoMarks, letRowGo]);
 
   // INTO THE ROW THE TOAST IS ABOUT, from a click on it or from O
   // (w-f0bfe32859). One path, so the key can never open something the click
   // would not. The lookup is by id at the moment of the press, against whatever
   // the window holds by then; a row withdrawn with Z simply does not answer.
+  // `openRepeat` is defined well below; it is reached through this ref.
+  const openRepeatRef = useRef<((rule: RepeatRule) => void) | null>(null);
   const openToastRow = useCallback((to: ToastGoes) => {
+    setToast(null);
+    // A NEW REPEATING TASK OPENS AS ITSELF (w-5513afd09a), the way a click on
+    // it in Later does: its latest run if it has one, its own page if not.
+    if (to.repeat) {
+      const rule = repeats.find((r) => r.id === to.id && r.product === to.product);
+      if (rule) { setSearch(null); openRepeatRef.current?.(rule); }
+      return;
+    }
     const row = [...inbox, ...progress, ...snoozed, ...done]
       .find((i) => i.id === to.id && i.product === to.product);
-    setToast(null);
     if (!row) return;
     setSearch(null);
     setFocused(row);
     markSeen(row);
-  }, [inbox, progress, snoozed, done, markSeen]);
+  }, [inbox, progress, snoozed, done, markSeen, repeats]);
 
   /* ------------------------------- keyboard ------------------------------- */
   useEffect(() => {
@@ -4529,9 +5183,36 @@ export default function App() {
       // also a shortcut: E closes the task, S schedules it.
       const target = e.target as HTMLElement;
       const inInput = target?.tagName === 'TEXTAREA' || target?.tagName === 'INPUT' || !!target?.isContentEditable;
+      // Not under the walk's own screens: they are opaque and cover the
+      // window, so the palette this opened was drawn where nobody could see it,
+      // and the Escape after it closed that rather than anything visible. The
+      // beat that teaches ⌘K is the last one, standing on the real app.
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        if (walkScreenRef.current) return;
         e.preventDefault();
         setModal((m) => (m === 'palette' ? null : 'palette'));
+        return;
+      }
+      // A ROOM OWNS THE KEYBOARD WHILE IT IS OPEN, as Settings does: the list
+      // behind it is not on the screen. Escape goes back to the threads and
+      // Tab walks on along the tabs. N goes on to the room's branch below the
+      // guard, because it opens a text field, and \ to the sidebar key.
+      if (roomShown && e.key !== 'Tab' && e.key !== 'n' && e.key !== 'N' && e.key !== '\\') {
+        if (roomsUi.dialogOpen || modal || inInput || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.key === 'Escape') { e.preventDefault(); roomsUi.close(); }
+        if ((e.key === 'g' || e.key === 'G') && roomsUi.findGroup) { e.preventDefault(); roomsUi.findGroup(); }
+        return;
+      }
+      // So does a teammates page, which has no list for J, K or E to act on.
+      if (teammatesShown && e.key !== 'n' && e.key !== 'N' && e.key !== '\\') {
+        // Escape in an open dropdown closes the dropdown, not the page.
+        if (modal || inInput || target?.tagName === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.key === 'Escape') { e.preventDefault(); teammatesUi.leave(); }
+        return;
+      }
+      // G FINDS A GROUP from any page, as ⌘K finds a command.
+      if ((e.key === 'g' || e.key === 'G') && roomsUi.findGroup && !roomsUi.dialogOpen && !modal && !inInput && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault(); roomsUi.findGroup();
         return;
       }
       // ⌘J SHOWS AND HIDES THIS TASK'S TERMINAL.It is the chord VS Code,
@@ -4551,20 +5232,38 @@ export default function App() {
         window.dispatchEvent(new Event('task-terminal-toggle'));
         return;
       }
+      // A walk screen holds its own focus, the way a dialog does. It is fixed
+      // over an app that is still in the document, so the browser walked Tab
+      // into the sidebar behind it and the focus ring was drawn out of sight.
+      if (e.key === 'Tab' && walkScreenRef.current) {
+        const screen = document.querySelector('.fr-screen');
+        const inside = screen ? [...screen.querySelectorAll<HTMLElement>(FOCUSABLE)]
+          .filter((el) => el.tabIndex >= 0 && !el.hasAttribute('disabled')) : [];
+        const to = tabStop(inside.length, inside.indexOf(document.activeElement as HTMLElement), e.shiftKey);
+        if (to < 0) return;
+        e.preventDefault();
+        inside[to].focus();
+        return;
+      }
       // TAB MOVES ALONG THE STATE TABS: on the threads page it cycles Needs
-      // you, In progress, Scheduled, Done and All. Shift-Tab goes back, and
+      // you, In progress, Later and Done. Shift-Tab goes back, and
       // both wrap.
       //
       // ONLY WHERE THOSE TABS ARE ON THE SCREEN WITH NOTHING OVER THEM: not
       // from inside a field, not with a card or a menu open, not on an opened
       // task (pinned next door in tab-does-nothing-on-an-open-task.test.mjs),
-      // not while a search is up, and not in board view, which draws no tabs.
+      // not while a search is up, and not in board view or on a rooms page,
+      // which draw no tabs.
       // Everywhere else Tab goes on walking browser focus as it has since
       // 2026-09-14, and a field-level editor still eats its own first.
+      // And not under the walk, which was why Tab did nothing on the setup
+      // screens: the rotation ran on tabs nobody could see, blurring whatever
+      // the walk's own Tab had just reached. The walk is a form.
       if (e.key === 'Tab') {
         const onTheTabs = !inInput && !modal && !focused && !focusedRepeat && !inFullScreen
-          && !settingsOpen && !teamShown && !openCard
-          && search === null && inboxDisplay.view === 'list';
+          && !settingsOpen && !teamShown && !openCard && !roomsUi.dialogOpen
+          && !walkScreenRef.current
+          && search === null && inboxDisplay.view === 'list' && !roomShown;
         if (!onTheTabs) return;
         // Built, not left alone: the browser's own focus walk would otherwise
         // paint a ring on whatever it landed on behind the rotation.
@@ -4588,6 +5287,11 @@ export default function App() {
         setMultiSel((m) => m.size >= list.length && list.length > 0 ? new Set() : new Set(list.map((i) => i.id)));
         return;
       }
+      if (cloudChord(e, { inInput, selection: String(window.getSelection?.() ?? ''), modal: !!modal })) {
+        e.preventDefault();
+        toggleCloudRef.current?.();
+        return;
+      }
       // cmd-Y / cmd-N (answer the oldest approval card) live in the MAIN
       // process (before-input-event in main.mjs): menu accelerators and
       // renderer handlers both go quiet while an iframe holds focus, and these
@@ -4603,14 +5307,21 @@ export default function App() {
       // underneath one.
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (modal || inInput) {
-        if (e.key === 'Escape' && !inInput) setModal(null);
-        return;
+        // Typing owns the keyboard and a modal owns its screen, except for the
+        // reply box with the caret out of it (renderer/src/keys.ts).
+        const gate = keyWhileABoxIsOpen({ modal, inInput, key: e.key });
+        if (gate === 'close-the-modal') { setModal(null); return; }
+        if (gate === 'swallow') return;
       }
       // Everything above has returned for modals and for typing, so a shortcut
       // that opens a text field swallows its own keystroke HERE, once, ahead of
       // every branch that could open one. Doing it per branch is what let S
       // through in two places at once (renderer/src/keys.ts carries the story).
       if (opensATextField(e.key)) e.preventDefault();
+      // And the hand is back on the keys, so the pointer stops owning a row
+      // (keys.ts). Here, above the split, because Escape leaves a thread in
+      // one branch and the list in another and both hand the list back.
+      if (takesTheListBack(e.key)) setHoveredId(null);
       // THE PANEL KEY, above the branch that splits list from full screen,
       // because it means the same thing in both and a shortcut written once
       // cannot drift between them. \ is next to Return on the key she is
@@ -4637,7 +5348,7 @@ export default function App() {
       // it means the same thing on the list and inside a task (answering one
       // moves you on, and O brings you back to it). Only while a toast with
       // somewhere to go is up: the cap drawn on it is the only promise of it.
-      const goesTo = opensTheToast(e.key, toast);
+      const goesTo = opensTheToast(e.key, toast, focused ? { product: focused.product, id: focused.id } : null);
       if (goesTo) { e.preventDefault(); openToastRow(goesTo); return; }
       // AN OPEN REPEATING TASK IS A SCREEN, AND EVERY KEY STOPS HERE.
       //
@@ -4653,6 +5364,15 @@ export default function App() {
       // So this returns on everything, the way an open task does. It is placed
       // ABOVE the task branch rather than inside it because the two are
       // mutually exclusive states and only one of them owns the keyboard.
+      // N starts a thread from a room, as it does everywhere else.
+      if (roomShown) {
+        if ((e.key === 'n' || e.key === 'N') && !roomsUi.dialogOpen) setModal('compose');
+        return;
+      }
+      if (teammatesShown) {
+        if (e.key === 'n' || e.key === 'N') setModal('compose');
+        return;
+      }
       if (focusedRepeat) {
         if (e.key === 'Escape') { e.preventDefault(); setFocusedRepeat(null); setEditingRule(false); }
         // R means the same thing it means on a task: open the box and say the
@@ -4680,16 +5400,16 @@ export default function App() {
         // its question owns the keys the options would: the numbers and Enter
         // answer it, the arrows walk it, and esc keeps the thread open rather
         // than leaving it. Nothing is selected when it comes up, so Enter on
-        // arrival does nothing, the same promise the options make.
-        const asking = closeAskOn === keyOf(focused) ? closeAsk(waitingFiled(focused).length) : null;
-        if (asking) {
+        // arrival does nothing, the same promise the options make. Every other
+        // key falls through (w-23de8a26c0): E raises it again and scrolls to it.
+        const asking = askingToClose(focused);
+        if (asking && closeAskOwnsKey(e.key)) {
           const ns = asking.options.map((o) => o.n);
           if (e.key === 'Escape') { e.preventDefault(); keepThreadOpen(); }
           else if (e.key === 'ArrowDown') { e.preventDefault(); setOptionSel((s) => ns[Math.min(ns.indexOf(s ?? -1) + 1, ns.length - 1)]); }
           else if (e.key === 'ArrowUp') { e.preventDefault(); setOptionSel((s) => { const i = ns.indexOf(s ?? -1); return i <= 0 ? null : ns[i - 1]; }); }
           else if (e.key === 'Enter') { e.preventDefault(); if (optionSel !== null) answerCloseAsk(focused, optionSel); }
-          else if (/^[1-9]$/.test(e.key)) answerCloseAsk(focused, Number(e.key));
-          else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }
+          else answerCloseAsk(focused, Number(e.key));
           return;
         }
         // Arrows walk the options; Enter sends ONLY a visible selection.
@@ -4697,8 +5417,9 @@ export default function App() {
         // inert: an approval always requires a deliberate arrow or number.
         // The same test the strip draws itself with, or the number keys and
         // what she can see disagree. Her reply from Tuesday no longer buries an
-        // offer a worker wrote on Friday (format.ts, offerIsLive).
-        const opts = offerIsLive(focused) ? itemOptions(focused) : [];
+        // offer a worker wrote on Friday (format.ts, offerIsLive), and the one
+        // the app asks for a finished run is answered here too (./ship-offer).
+        const opts = offerNow(focused);
         // ESCAPE IS ONE WAY BACK, one step at a time: the document, then the
         // task, then the list. It has always meant "back" all the way out and
         // the pane is one more level in.
@@ -4723,16 +5444,23 @@ export default function App() {
         // The next one may be a teammate's, which opens as their card.
         else if (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') {
           e.preventDefault();
-          const target = stepStop(stops, { item: focused }, (e.key === 'j' || e.key === 'J') ? 1 : -1, walkPlace);
+          const dir = (e.key === 'j' || e.key === 'J') ? 1 : -1;
+          // Off the page because your reply took it there: from where it sat.
+          const key = stopKey({ item: focused });
+          const gone = !stops.some((s) => stopKey(s) === key) && walkHeld.current?.key === key;
+          const target = gone ? stepFromPlace(stops, walkHeld.current!.index, dir) : stepStop(stops, { item: focused }, dir, walkPlace);
           if (target) goToStop(target);
         }
         // E archives, unconditionally. It must never approve on her behalf.
         else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); markDone(focused); }
-        else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setOpenDoc(null); setModal('reply'); }
-        // N (AND THE OLDER C) MEAN THE SAME THING ON BOTH SCREENS. The + in
-        // the top bar is on this screen too and its tooltip says "New task
-        // (N)", so the key is already advertised here.
-        else if (e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }
+        // The page stays open: full screen draws the box under it.
+        // An open box focuses itself only when it opens, so R on one already
+        // there has to put the caret back (focus-at-end.ts).
+        else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setModal('reply'); if (modal === 'reply') focusTheReplyBox(); }
+        // N MEANS THE SAME THING ON BOTH SCREENS. The + in the top bar is on
+        // this screen too and its tooltip says "New task (N)", so the key is
+        // already advertised here.
+        else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }
         // L, NOT S, SINCE 2026-10-01. S was the schedule picker here and the
         // summary panel on the same screen (threads/Summary.tsx listens first
         // and eats it), so the two fought over one letter and a persona test
@@ -4740,7 +5468,17 @@ export default function App() {
         // schedules anywhere in the app.
         else if (e.key === 'l' || e.key === 'L') openSnooze(focused);
         else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }
-        else if (/^[1-9]$/.test(e.key)) pickOption(focused, Number(e.key));
+        // THE NUMBER IS SWALLOWED, because a pick can now open a text field
+        // and the key that opens one types itself into it otherwise: the box
+        // read "2Change something first" (renderer/src/keys.ts).
+        // AND IT DOES NOT ANSWER A THREAD THE APP HAS JUST PUT IN FRONT OF YOU
+        // (./pick-settles). Said out loud rather than going quiet, because a
+        // key that does nothing reads as a key that is broken.
+        else if (/^[1-9]$/.test(e.key)) {
+          e.preventDefault();
+          if (!pickLandsHere(arrived.current, keyOf(focused), Date.now())) showToast(AIMED_AT_THE_THREAD_YOU_LEFT);
+          else pickOption(focused, Number(e.key));
+        }
         return;
       }
       // A TEAMMATE'S CARD IS A SCREEN, LIKE AN OPEN THREAD (w-fb16bcaeba). It
@@ -4754,7 +5492,7 @@ export default function App() {
           const target = stepStop(stops, { card: openCard }, (e.key === 'j' || e.key === 'J') ? 1 : -1, walkPlace);
           if (target) goToStop(target);
         }
-        else if (e.key === 'c' || e.key === 'C' || e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }
+        else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }
         else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }
         return;
       }
@@ -4815,7 +5553,7 @@ export default function App() {
           else if (multiSel.size) batchDone(multiSel);
           else if (pointed && view === 'inbox') markDone(pointed);
           break;
-        case 'r': case 'R': if (!multiSel.size && pointed && view === 'inbox') { e.preventDefault(); setFocused(pointed); markSeen(pointed); setModal('reply'); } break;
+        case 'r': case 'R': if (!multiSel.size && pointed && replyKeyWorksIn(view)) { e.preventDefault(); setFocused(pointed); markSeen(pointed); setModal('reply'); } break;
         // 1 AND 2 ANSWER A CODEX CONVERSATION'S ROW WITHOUT OPENING IT, and I
         // brings a declined one back from Closed. Only on those rows: on every
         // other row they stay dead, as they were. They were Y and N until
@@ -4828,10 +5566,15 @@ export default function App() {
         // It was S until 2026-10-01; see the focus-mode branch above.
         case 'l': case 'L':
           if (multiSel.size) openSnooze(selectable.filter((i) => multiSel.has(i.id)));
-          else if (pointed && (view === 'inbox' || view === 'snoozed')) openSnooze(pointed);
+          // IN PROGRESS TAKES IT TOO, AND EVERY OTHER TAB SAYS SO. A running
+          // thread can be put off, because the schedule is about your inbox
+          // and not about the session (`openSnooze`); a closed one cannot, and
+          // the key used to answer that by going quiet.
+          else if (pointed && (view === 'inbox' || view === 'snoozed' || view === 'progress')) openSnooze(pointed);
+          else if (pointed) showToast('Later is for a thread that is still open.');
           break;
-        // N does the same as C: the letter she reached for (w-fb9051e597).
-        case 'c': case 'C': case 'n': case 'N': e.preventDefault(); setModal('compose'); break;
+        // N starts a thread (w-fb9051e597). C does nothing: the cloud is ⌘C.
+        case 'n': case 'N': e.preventDefault(); setModal('compose'); break;
         case 'z': case 'Z': undo(); break;
         // B FLIPS LIST AND BOARD (w-58c8f466e7): "I quite often switch between
         // board and list view". B for board; it shipped as V first and that
@@ -4852,7 +5595,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, boardCols, stops, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow]);
+  }, [modal, newProject, focused, focusedRepeat, inFullScreen, togglePanel, current, pointed, list, view, markDone, openSnooze, pickOption, offerNow, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, roomShown, roomsUi, teammatesShown, teammatesUi, boardCols, stops, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, closeAskWhy, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
@@ -4869,6 +5612,17 @@ export default function App() {
   useEffect(() => { setSelected((s) => Math.min(s, Math.max(0, list.length - 1))); }, [list.length]);
 
   /* ------------------------- ⌘R comes back here -------------------------- */
+  // A reload she asked for, and a restart or a crash she did not: all three put
+  // her back, and only opening the app in the morning does not.
+  const comingBack = reloaded === true || cameBack.current;
+  // SAYING THE WINDOW IS STILL HERE, which is how the next page to load tells
+  // those two apart (./where-she-was.ts).
+  useEffect(() => {
+    const beat = () => markWindowAlive(window.localStorage);
+    beat();
+    const timer = setInterval(beat, ALIVE_EVERY_MS);
+    return () => clearInterval(timer);
+  }, []);
   // WRITING IT DOWN. Every move she makes, into localStorage, because the whole
   // of React state is thrown away by the reload and nothing else survives it.
   // It costs one small JSON write per navigation, which is far less than the
@@ -4878,7 +5632,7 @@ export default function App() {
   // the reloaded page, which is the inbox with nothing open, overwrites the
   // note it is about to read.
   useEffect(() => {
-    if (reloaded === null || (reloaded && !restored)) return;
+    if (reloaded === null || (comingBack && !restored)) return;
     const place: Place = { view };
     // The scroll position is NOT set here, and leaving it out is what clears it:
     // she has moved, so whatever she had scrolled to belongs to where she was,
@@ -4897,16 +5651,17 @@ export default function App() {
   }, [reloaded, restored, view, focused?.id, focused?.product, focusedRepeat?.id,
     openDoc?.src, openDoc?.product, settingsOpen, search, current?.id]);
 
-  // READING IT BACK, once, on a reload and never on a fresh launch. Opening
-  // Agentbox in the morning still opens on the inbox: that is the design of the
-  // app and the reason the idle screen and the first run have anywhere to be.
-  // `bootInfo.reloaded` is true only for the ⌘R it was added for.
+  // READING IT BACK, once, on a page that is coming back and never on a fresh
+  // launch. Opening Agentbox in the morning still opens on the inbox: that is
+  // the design of the app and the reason the idle screen and the first run have
+  // anywhere to be. `comingBack` is the ⌘R the main process reports plus the
+  // restart and the crash it cannot (./where-she-was.ts).
   //
   // A row that is gone since — she answered it elsewhere, an agent closed it —
   // simply does not come back, and she lands on the tab it was in, which is
   // still nearer where she was than the inbox is.
   useEffect(() => {
-    if (restored || reloaded !== true || !snap) return;
+    if (restored || reloaded === null || !comingBack || !snap) return;
     // THE FIRST RUN OUTRANKS IT. The walk drives the app itself, tab by tab,
     // and a reload in the middle of it belongs to the walk rather than to
     // wherever she happened to be standing. This effect is declared below the
@@ -4969,7 +5724,12 @@ export default function App() {
   // Without this the reloaded window draws the inbox for a beat and then jumps,
   // which is the same lost-place fault in a shorter form.
   const restoring = reloaded === null
-    || (reloaded === true && !restored && placeIsSomewhere(wasAt.current));
+    || (comingBack && !restored && placeIsSomewhere(wasAt.current));
+  const [teamWaitOver, setTeamWaitOver] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setTeamWaitOver(true), TEAM_WAIT_MS);
+    return () => clearTimeout(t);
+  }, []);
 
   // NOTHING RESETS THE PANEL. There used to be an effect here putting it back
   // up every time she left a task, so "up by default" meant every time rather
@@ -4990,11 +5750,35 @@ export default function App() {
     if (!pending || !advanceLandsHere({ view, onBoard }) || focused) return;
     advanceRef.current = null;
     const next = nextAfterAdvance(shownInbox, pending);
+    // Nothing left: the empty inbox is where one at a time ends.
     if (!next) return;
+    // THE APP MOVED YOU, SO THE KEY THAT SENDS WAITS A MOMENT (./pick-settles).
+    // The one place a thread is put in front of you without your asking, and so
+    // the one place a number already on its way can answer a thread unread.
+    arrived.current = { key: keyOf(next.item), at: Date.now() };
     setFocused(next.item); markSeen(next.item);
     const at = onBoard ? list.findIndex((i) => i.id === next.item.id && i.product === next.item.product) : next.index;
     setSelected(at >= 0 ? at : 0);
   }, [shownInbox, view, onBoard, list, focused, markSeen]);
+
+  // A SEND THAT MOVED HER ON IS SAID ABOVE THE REPLY BOX of the thread it moved
+  // her to (./components/SentLine). The line keeps its own clock, which stops
+  // under the pointer, so the six-second one is cleared; leaving the thread or a
+  // newer note also takes it down.
+  const sentLineShown = !!toast && saysWhereItWent(toast, focused ? { product: focused.product, id: focused.id } : null);
+  const lineOn = useRef<{ at: string; toast: typeof toast } | null>(null);
+  useEffect(() => {
+    const at = focused ? `${focused.product}:${focused.id}` : null;
+    if (sentLineShown && at) {
+      if (toastTimer.current) { clearTimeout(toastTimer.current); toastTimer.current = null; }
+      lineOn.current = { at, toast };
+      return;
+    }
+    const was = lineOn.current;
+    if (!was) return;
+    lineOn.current = null;
+    if (toast === was.toast && was.at !== at) setToast(null);
+  }, [sentLineShown, focused, toast]);
 
   /* -------------------------------- render -------------------------------- */
   // (Hooks live ABOVE the boot return: below it, React counts them
@@ -5007,6 +5791,19 @@ export default function App() {
      same condition the task header and the terminal socket already use, named
      once so the corner cannot disagree with them about which screen this is. */
   const taskOpen = workspaceNavigation && !!focused && !settingsOpen;
+  const sentTo = sentLineShown && toast?.goes
+    ? [...inbox, ...progress, ...snoozed, ...done].find((i) => i.id === toast.goes!.id && i.product === toast.goes!.product)
+    : undefined;
+  const whereItWent = sentLineShown && toast?.goes ? (
+    <SentLine
+      key={toastShown.current}
+      title={sentTo ? sentTo.label || sentTo.title : 'the thread you left'}
+      undoes={toastParts(toast.text).undo}
+      onBack={() => openToastRow(toast.goes!)}
+      onUndo={() => { setToast(null); void undo(); }}
+      onClose={() => setToast(null)}
+    />
+  ) : null;
   const artifactView = artifactPlacement(artifactMode, artifactWidth);
   const [artifactHeader, setArtifactHeader] = useState<HTMLDivElement | null>(null);
   const readingWidth = 'balanced';
@@ -5188,8 +5985,9 @@ export default function App() {
   // own line above the boot check rather than another clause inside it: on a
   // fresh launch `restoring` is false before the first paint, and the line
   // below has to go on reading exactly as it always did.
-  if (restoring) return <div className="boot">{NAME}</div>;
-  if (!snap) return <div className="boot">{NAME}</div>;
+  if (restoring) return <Booting />;
+  if (!snap) return <Booting />;
+  if (snap.team?.settling && !teamWaitOver) return <Booting />;
 
   // Searching is never inbox zero, whatever the inbox holds: the zero state
   // takes the whole screen, and it appearing under a query she is typing would
@@ -5220,6 +6018,7 @@ export default function App() {
     if (latest) { setFocusedRepeat(null); setCardSel(null); setFocused(latest); markSeen(latest); }
     else { setFocused(null); setFocusedRepeat(rule); }
   };
+  openRepeatRef.current = openRepeat;
   // HER MESSAGE, SPLIT THE SAME WAY IT WAS SPLIT WHEN SHE TYPED IT. The label is
   // derived rather than kept, so the Later row and the instruction cannot drift
   // apart, and the next run reads the new body (main/repeats.mjs briefs it with
@@ -5243,7 +6042,47 @@ export default function App() {
     setRepeats(await api.repeats());
     showToast(`Ended: ${rule.title}`);
   };
-  const focusedRule = focused ? repeats.find((r) => r.product === focused.product && r.id === ruleIdOf(focused)) ?? null : null;
+  const ruleOf = (item: WorkItem) => repeats.find((r) => r.product === item.product && r.id === ruleIdOf(item)) ?? null;
+  const focusedRule = focused ? ruleOf(focused) : null;
+
+  const placeThread = (item: WorkItem, keep: boolean) => {
+    void api.setThreadOnMac({ [item.id]: keep ? true : null });
+    showToast(keep ? 'This thread now runs only on this Mac' : 'This thread can run on the cloud again');
+  };
+  // The write the summary panel's Visible to menu makes.
+  const seeThread = async (item: WorkItem, to: 'team' | 'private') => {
+    const out = await api.threadEdit(item.product, item.id, { visibility: to });
+    if (!out.ok) { showToast('That change did not save.'); return; }
+    showToast(SEE_SAID[to]);
+    await refresh();
+  };
+  // A ⌘K row from ./thread-commands, on the thread it was offered over. The
+  // rows that act on the thread's page open that thread first.
+  const runThreadCommand = (item: WorkItem, c: ThreadCommand) => {
+    setModal(null);
+    const onPage = (what: 'summary' | 'people' | 'rename') => {
+      if (!focused || keyOf(focused) !== keyOf(item)) { setFocused(item); markSeen(item); }
+      if (what !== 'summary') setOpenDoc(null);
+      setThreadAsk({ key: keyOf(item), what, at: Date.now() });
+    };
+    const d = c.does;
+    switch (d.act) {
+      case 'see': if (d.already) showToast(SEE_SAID[d.to]); else void seeThread(item, d.to); return;
+      case 'people': case 'rename': case 'summary': onPage(d.act); return;
+      case 'pin': pinThread(item.id, d.pin, true); showToast(d.pin ? 'Pinned to the top of your list' : 'Unpinned'); return;
+      case 'place': placeThread(item, d.keep); return;
+      case 'code': setOpenDoc({ product: item.product, src: changePathFor(item.id) }); return;
+      case 'end-repeat': { const rule = ruleOf(item); if (rule) void endRule(rule); return; }
+      case 'add-people': {
+        const who = peopleInConversation(team?.products.get(item.product), team?.me ?? null, team?.state.people ?? []);
+        if (who) addPeopleToConversation(who);
+        return;
+      }
+      case 'route':
+        void api.teamRoute({ product: item.product, id: item.id, route: d.route })
+          .then((out) => { if (!out.ok) showToast(out.error ?? 'That did not work.'); });
+    }
+  };
 
   // AND A VIEW WITH NOTHING IN IT DRAWS NO CARD EITHER. The other half of the
   // same directive: painting the sentence out of the empty pane leaves a large
@@ -5283,13 +6122,38 @@ export default function App() {
   // `modal === 'reply'` and nothing else; the rule that reads it sits beside
   // `.toast` in the stylesheet and says why it moves to the top rather than
   // merely further up.
+  // WITH GROUPS ON THE SIDEBAR STAYS NARROW (GroupsSidebar.tsx) and widens
+  // over the page while pointed at, holding Inbox, Groups and every group; it
+  // is never pinned open. A phone keeps its own top bar (phone.css).
+  const narrowSidebar = roomsUi.live && workspaceNavigation && !onPhone();
+  const sideFolded = narrowSidebar ? !railOpen : workspaceCollapsed;
+  // A teammate's direct record is one of your groups, so Groups is the page it is on.
+  const directOpen = !!focused && isDirect(snap?.products.find((p) => p.slug === focused.product));
+  const openView = (next: View) => { roomsUi.leave(); teammatesUi.leave(); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); };
+  // `asking` is on the class list for the same reason the composer is: the
+  // approval card stands in the corner the toast stands in and under it, so the
+  // toast covered Allow and Deny. Read off the same stage the card is drawn
+  // from below, so the class and the card cannot disagree about what is asked.
+  const stage = approvalStage(snap?.approvals, answered, frontApproval.current);
+  const cardOnScreen = !!stage.card;
+
   return (
     <TeamContext.Provider value={team}>
     <ChatAgentsContext.Provider value={chatAgents}>
     <LiveContext.Provider value={liveIds}>
+    <CloudContext.Provider value={cloudIds}>
+    <FleetContext.Provider value={fleet}>
     <WaitingContext.Provider value={waitingByThread}>
-    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${workspaceCollapsed ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}`}>
-      {signInGate && <SignInPage signedOut={signedOutHere} error={snap?.team?.error ?? null} waitingUrl={snap?.team?.signingIn?.url ?? null} />}
+    <TeammatesContext.Provider value={teammatesById}>
+    <ChatsContext.Provider value={chatsValue}>
+    <FreeAgentContext.Provider value={freeWaitIds}>
+    <CloudOfferContext.Provider value={cloudOfferNow ? { offer: cloudOfferNow, onGo: (go) => void onCloudGo(go) } : null}>
+    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={workspaceNavigation && openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app${workspaceNavigation ? ' workspace-layout' : ''}${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${railOpen ? ' gt-rail-open' : ''}` : ''}${workspaceNavigation && focused && !settingsOpen ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${sideFolded ? ' workspace-collapsed' : ''}${inFullScreen && !workspaceNavigation ? ' flat' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}`}>
+
+      {signInGate && <SignInPage onSkip={onCloudPhone() ? undefined : skipSignIn} signedOut={signedOutHere} error={snap?.team?.error ?? null} waitingUrl={snap?.team?.signingIn?.url ?? null} />}
+      {/* Dark's corner marks, outside the card. Their own element, because
+          `.workspace-layout::after` is the window's drag strip. */}
+      {workspaceNavigation && <div className="panel-marks" aria-hidden="true" />}
       {/* THE TOP BAR IS NOT DRAWN ON AN OPENED TASK.
 
           WHAT REPLACES IT IS NOT NOTHING, and the reason is three buttons this
@@ -5318,11 +6182,27 @@ export default function App() {
            offering the move. Null on every copy that can. */
         move={announcesMove(snap?.update, { walking, closed: '' }) ? { place: snap?.update?.place ?? null, error: snap?.update?.moveError ?? null } : null}
         onMove={() => { void api.updateMove(); }}
-        page={settingsOpen ? 'settings' : null} onFeedback={() => setFeedbackOpen(true)} teamPage={teamOpen && !settingsOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
+        /* WHAT IS LEFT OF YOUR LIMIT, in the slot the foot has held for it
+           since 2026-10-01 and nothing ever filled. Drawn unconditionally:
+           UsagePill is nothing at all until a reading lands. */
+        usage={<UsagePill
+          usage={snap.usage ?? null}
+          now={now}
+          sidebar
+          engineWord={engineWordFor({
+            engineChoice: (snap.engines?.choices?.length ?? 1) > 1,
+            engine: snap.usage?.engine ?? null,
+          })}
+          all={snap.usageByEngine ?? []}
+          recent={lastUsedEngine(snap)}
+        />}
+        page={settingsOpen ? 'settings' : null} inboxLabel={roomsUi.live ? 'Inbox' : undefined} invisible={roomsUi.invisible} onSignIn={signInAsked.sidebar ? askToSignIn : undefined} onFeedback={() => setFeedbackOpen(true)} teamPage={teamOpen && !settingsOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
         onInvite={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onSignOut={() => { void api.teamSignOut().then(() => refresh()); }}
-        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inbox.length} scheduledCount={scheduledCount} view={view} collapsed={workspaceCollapsed} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={next => { setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); }} />}
+        onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inbox.length + roomsUi.mentions.length} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onToggle={toggleWorkspace} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
+        teammates={narrowSidebar ? undefined : teammatesUi.rail(teammatesShown)} onTeammatesPage={teammatesShown}
+        rail={narrowSidebar} onHover={setRailOpen} groups={narrowSidebar ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown, teammatesUi.live ? openChats : undefined) : undefined} onGroupsPage={roomShown || directOpen} />}
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
           only part of our own document lying over the file, so a pointer
           brought up there wakes the marks that a pointer moving across the
@@ -5413,7 +6293,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">{openCard ? 'Threads' : 'Team'}</h1> : <h1 className="workspace-title">Threads</h1>)) : (
+        ) : workspaceNavigation ? (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (teamShown ? <h1 className="workspace-title">{openCard ? 'Threads' : 'Team'}</h1> : teammatesShown ? teammatesUi.title : narrowSidebar && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Threads</h1>)) : (
         <nav
           className="tabs"
           /* NO HINT ON THIS NAV. This older strip is the layout without the
@@ -5521,26 +6401,10 @@ export default function App() {
               one change made on top of it. Do not put them back the other way
               round.
            */}
-          {/* WHAT IS LEFT OF HER LIMIT, FIRST IN THE CORNER GROUP (w-86ee9da2c9).
-              It is a reading rather than a control, so it sits before the three
-              things that do something. Absent entirely until a figure has been
-              read, which on a fresh launch is a few seconds: the corner is
-              unchanged until then rather than holding a space for a number
-              nobody has.
-
-             IT NO LONGER OPENS SETTINGS (w-1b725b0e2a, 2026-09-01).
-           */}
-          {/* AND IT SAYS WHOSE LIMIT IT IS, WHERE THERE ARE TWO TO TELL APART (2026-09-05).
-             Nothing new is drawn there.
-           */}
-          {!workspaceNavigation && <UsagePill
-            usage={snap.usage ?? null}
-            now={now}
-            engineWord={engineWordFor({
-              engineChoice: (snap.engines?.choices?.length ?? 1) > 1,
-              engine: snap.usage?.engine ?? null,
-            })}
-          />}
+          {/* WHAT IS LEFT OF YOUR LIMIT IS NOT IN THIS CORNER ANY MORE: it is in
+              the sidebar's own slot, where it was approved (w-326fb83c0e). With
+              Groups on there is no sidebar and no reading, because a bare bar
+              between the search icon and New thread reads as a stray line. */}
           {/* AND THE SOCKET A THREAD'S OWN CONTROLS ARE TELEPORTED INTO: the
               thread's menu, which holds the code, the terminal and Done
               (w-e731ca9376, 2026-10-01). They are drawn by
@@ -5562,8 +6426,10 @@ export default function App() {
           {/* SEARCH, NEW THREAD AND DISPLAY (approved 2026-10-01): the whole of
               the right end on the Inbox, which is the one page of threads now
               (w-05ff3d1438). Display holds the view, the sort and the filters.
-              Not over a teammate's card or the team's setup. */}
-          {workspaceNavigation && !focused && !settingsOpen && !teamShown && (
+              Not over a teammate's card or the team's setup. Search is drawn
+              here only on the board; on the list it ends the tabs row
+              (w-3c51d02de5). */}
+          {workspaceNavigation && !focused && !settingsOpen && !teamShown && (teammatesShown ? teammatesUi.right : roomShown && roomsUi.heading?.right !== undefined ? roomsUi.heading.right : (
             <HeaderActions
               page="inbox"
               display={inboxDisplay}
@@ -5572,14 +6438,20 @@ export default function App() {
               // The projects she uses most come first in the menu, which takes
               // reading her threads (w-5a08121f99: about forty projects).
               items={items}
-              onSearch={openSearch}
               onCompose={() => setModal('compose')}
+              onSearch={inboxDisplay.view === 'board' ? openSearch : undefined}
               shown={displayedBox.length + theirRows.length}
               total={(mineShown ? shownBox.length : 0) + theirRows.length}
               tab={view}
               people={peoplePick}
+              cloud={snap.cloud ?? null}
+              onCloudMode={(mode) => { void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode }); }}
+              onCloudWhenOn={(mode) => { void api.setWorkspaceSetting({ key: 'cloudWhenOn', value: mode }); }}
+              onCloudSetUp={() => setCloudSetupOpen(true)}
+              filters={!roomShown}
+              view={roomShown ? roomsUi.viewButton : null}
             />
-          )}
+          ))}
           {!workspaceNavigation && !focused && !settingsOpen && !inPractice && (
             <BoxFilter
               filter={boxFilter}
@@ -5633,7 +6505,9 @@ export default function App() {
             aria-label="Commands"
             onClick={() => setModal('palette')}
           >
-            <span className="cmd-glyph" aria-hidden="true">⌘</span>
+            {/* The glyph is the key, so on a keyboard with no ⌘ it is the word
+                Ctrl: this is the one button whose whole job is to name it. */}
+            <span className={MAC ? 'cmd-glyph' : 'cmd-glyph cmd-word'} aria-hidden="true">{MAC ? '⌘' : 'Ctrl'}</span>
           </button>}
           {/* A corner button was built here as layer one for a keyboard-only toggle; she has
              the key, and a third permanent control beside the plus and the cog costs more
@@ -5725,10 +6599,11 @@ export default function App() {
                      same summary fields, and Message Maya in its top bar. */
                   <div className="th-card-page">
                     <div className="th-card-bar">
-                      {/* Back to Threads, with the same people picked. The
-                          page is called Threads since w-05ff3d1438: once a
-                          teammate is on it, it is more than an inbox. */}
-                      <button type="button" className="th-back" onClick={() => { setOpenCard(null); setTeamOpen(false); }}><span aria-hidden="true">←</span>Threads</button>
+                      {/* Back to Threads, with the same people picked, or to
+                          the room whose board it was opened from. The page is
+                          called Threads since w-05ff3d1438: once a teammate is
+                          on it, it is more than an inbox. */}
+                      <button type="button" className="th-back" onClick={() => { setOpenCard(null); setTeamOpen(false); }}><span aria-hidden="true">←</span>{roomsUi.roomName ?? 'Threads'}</button>
                       <MessagePerson person={team?.byId.get(openCard.personId) ?? null}
                         onMessage={() => {
                           const convo = conversationWith(openCard.personId, { products: snap.products, items, me: team?.me ?? null });
@@ -5770,9 +6645,9 @@ export default function App() {
           )
         ) : (
           <>
-            <main className={`list-pane${focused || focusedRepeat ? ' pinned' : ''}${bareView ? ' bare' : ''}`}>
-              {noPlan && !run && !focused && !focusedRepeat && <PlanBar onSetup={setSetupPlan} />}
-              {focusedRepeat ? (
+            <main className={`list-pane${focused || focusedRepeat ? ' pinned' : ''}${bareView ? ' bare' : ''}${roomShown ? ' rm-open' : ''}${teammatesShown ? ' tq-open' : ''}`}>
+              {noPlan && !run && !focused && !focusedRepeat && !teammatesShown && <PlanBar onSetup={setSetupPlan} />}
+              {teammatesShown ? teammatesUi.page : focusedRepeat ? (
                 <RepeatFocus
                   rule={focusedRepeat}
                   items={items}
@@ -5812,6 +6687,8 @@ export default function App() {
                   // its page.
                   onHandToAgent={handToAgent}
                   onAddPeople={addPeopleToConversation}
+                  queue={queueSpot ? { spot: queueSpot, onStep: stepQueue } : null}
+                  onePage={onePage}
                   headerTarget={workspaceNavigation ? taskHeader : null}
                   cornerHeaderTarget={cornerHeaderTarget}
                   // WHERE IT WAS OPENED FROM, in the tab strip's own words (so
@@ -5821,6 +6698,7 @@ export default function App() {
                   // is headed Threads (w-34eb858714).
                   crumbFrom={teamOpen ? 'Team' : search !== null ? 'Search'
                     : onBoard ? 'Threads'
+                    : directOpen && roomsUi.openId ? 'Groups'
                     : view === 'inbox' && team ? needsWord(picked, team.me)
                       : INBOX_TABS.find((t) => t.view === view)?.label}
                   inlineArtifacts={workspaceNavigation}
@@ -5860,10 +6738,16 @@ export default function App() {
                      basically rejecting it". A proposal is still closed from
                      its own row like any thread. */
                   onHereFiled={(i) => doItHere(i)}
+                  /* AND DROPPING ONE (w-fcb5fdc2e5): "I sometimes will just
+                     want to reject something." The close its own row makes,
+                     with its undo, without leaving this thread. */
+                  onDismissFiled={(i) => markDone(i, { stay: true, force: true })}
+                  onStartAllFiled={(kids) => answerAllFiled(kids, 'start')}
+                  onDismissAllFiled={(kids) => answerAllFiled(kids, 'dismiss')}
                   // The question a close asks while tasks still wait (w-d2744c6daa).
                   closeAsk={(() => {
-                    const asked = closeAskOn === keyOf(focused) ? closeAsk(waitingFiled(focused).length) : null;
-                    return asked && { ...asked, onPick: (n: number) => answerCloseAsk(focused, n), keep: { label: KEEP_OPEN, onKeep: keepThreadOpen } };
+                    const asked = askingToClose(focused);
+                    return asked && { ...asked, raised: closeAskRaised, onPick: (n: number) => answerCloseAsk(focused, n), keep: { label: KEEP_OPEN, onKeep: keepThreadOpen } };
                   })()}
                   onNotice={showToast}
                   /*
@@ -5903,12 +6787,14 @@ export default function App() {
                   onRedeliver={() => redeliver(focused)}
                   onClose={() => setFocused(null)}
                   onResolve={() => markDone(focused)}
-                  onPick={(n) => pickOption(focused, n)}
+                  onPick={(n) => pickAimedHere(focused, n)}
                   onReply={() => setModal('reply')}
-                  // The reply box's model drawer reads the same list the
-                  // new-task card does.
+                  // The reply box's model menu IS the new thread card's, so it
+                  // is handed the same four things the card is.
                   codexModels={codexModels}
                   codexModelDefault={codexModelDefault}
+                  engines={snap.engines?.choices}
+                  items={items}
                   onReplySend={(text, priority, repeat, sent, mode, pick) => {
                     // THE REPLY GOES WHERE THE ROW ACTUALLY LIVES. On an agent
                     // row there is no ledger to answer; the text is handed to
@@ -5926,6 +6812,12 @@ export default function App() {
                   onStop={() => stopAgent(focused)}
                   onRunNow={() => runNow(focused)}
                   onPin={focused.agent ? undefined : (pin) => pinThread(focused.id, pin, true)}
+                  place={focused.agent ? null : threadPlace(focused, snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null, snap.cloud ?? null)}
+                  onPlace={(keep) => placeThread(focused, keep)}
+                  pageAsk={threadAsk?.key === keyOf(focused) ? threadAsk : null}
+                  onAsked={() => setThreadAsk(null)}
+                  onShown={setOpenShows}
+                  aboveDock={whereItWent}
                   onReveal={() => revealAgent(focused)}
                   // Remind me later and stop this task are neither of the two
                   // ways a task ends, and the card beside the bar names exactly
@@ -5948,7 +6840,7 @@ export default function App() {
                     paused: snap.supervisor.paused,
                     running: snap.supervisor.running.length,
                     capacity: snap.supervisor.capacity,
-                    inProgress: belongsInProgress(focused, { deferredUntil: dueAt(focused), now, live: liveIds.has(focused.id), shipping: shippingIds.has(focused.id) }),
+                    inProgress: belongsInProgress(focused, { deferredUntil: dueAt(focused), now, live: liveIds.has(focused.id), shipping: shippingIds.has(focused.id), stopped: stalledIds.has(focused.id) }),
                     shipping: shippingIds.has(focused.id),
                     // A run ended on this row and wrote nothing down. The pane
                     // says so wherever the row is sitting, which is why this one
@@ -5963,7 +6855,7 @@ export default function App() {
                 {/* THE STATE TABS (approved 2026-10-01): Needs you, Running,
                     Scheduled, Done and All, on the Inbox itself. They replace
                     the sidebar places they used to be. */}
-                {workspaceNavigation && search === null && inboxDisplay.view === 'board' ? (
+                {workspaceNavigation && search === null && inboxDisplay.view === 'board' && !roomShown ? (
                   <InboxBoard items={items} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine} projectOrder={projectOrder}
                     cards={cards} picked={team ? picked : undefined}
                     onOpenCard={openTeammateCard}
@@ -5978,22 +6870,25 @@ export default function App() {
                     // and the arrows carry on from that card on the way back.
                     onOpenItem={(item) => { const i = list.indexOf(item); setCardSel(null); if (i >= 0) setSelected(i); setFocused(item); markSeen(item); }} />
                 ) : <>
-                {workspaceNavigation && search === null && (
+                {workspaceNavigation && search === null && !(roomShown && roomsUi.heading) && (
                   <StateTabs
                     view={view}
                     // Yours while you are on the page, and the picked teammates' added in.
                     counts={{
-                      inbox: (mineShown ? shownCount(inbox) : 0) + theirCount('inbox'),
+                      inbox: (mineShown ? shownCount(inbox) : 0) + theirCount('inbox') + roomsUi.mentions.length,
                       progress: (mineShown ? shownCount(progress) : 0) + theirCount('progress'),
                       snoozed: (mineShown ? shownCount(snoozed) : 0) + theirCount('snoozed'),
                       done: (mineShown ? shownCount(done) : 0) + theirCount('done'),
-                      all: (mineShown ? shownCount(allRows) : 0) + theirCount('all'),
                     }}
                     needs={team ? needsWord(picked, team.me) : undefined}
-                    onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
+                    lit={needsYouLit(inbox, needsLookedAt)}
+                    onView={(next) => { roomsUi.leave(); setView(next as View); setSelected(0); setMultiSel(new Set()); }}
+                    onSearch={openSearch}
                   />
                 )}
-                {workspaceNavigation && emptyView && !theirRows.length ? (
+                {roomShown ? roomsUi.page : <>
+                {snap.phoneStatus && <div className="phone-status" role="status">{snap.phoneStatus}</div>}
+                {workspaceNavigation && emptyView && !theirRows.length && !(view === 'inbox' && search === null && roomsUi.mentions.length) ? (
                   // A FILTER IS READ FIRST, so it can never fall through to
                   // "Nothing needs you" (w-5a08121f99). That sentence is a
                   // statement about her inbox and the page was saying it about
@@ -6007,12 +6902,15 @@ export default function App() {
                       // AND NOT UNDER THE LANDING (2026-10-06), which says the
                       // same thing louder: "Nothing needs you" and "You finished
                       // the tutorial" were drawn one on top of the other.
-                      ? run === null && !landing && <InboxClear running={progress.length} scheduled={snoozed.length} team={!!team}
+                      ? run === null && !landing && <InboxClear running={moving.running} queued={moving.queued} scheduled={snoozed.length} team={!!team}
                           onView={(next) => { setView(next as View); setSelected(0); setMultiSel(new Set()); }}
                           onCompose={() => setModal('compose')} />
                       : <EmptyTab view={view} />
                 ) : <List
+                  lead={view === 'inbox' && search === null && roomsUi.mentions.length
+                    ? <MentionRows mentions={roomsUi.mentions} faces={roomsUi.faces} now={now} onOpen={roomsUi.openMention} /> : null}
                   table={workspaceNavigation && search === null}
+                  unread={(item) => isUnread(item, seenAt, unreadSince)}
                   products={snap.products}
                   team={team}
                   mixed={search === null ? mixedRows : null}
@@ -6020,20 +6918,25 @@ export default function App() {
                   onOpenCard={openTeammateCard}
                   selectedCard={keyCard ? cardSel : null}
                   // The next page of old finished threads, at the foot of the
-                  // two tabs that hold them (w-fda2165ec6).
-                  onEnd={search === null && olderMore !== false && (view === 'done' || view === 'all') ? loadOlder : undefined}
+                  // tab that holds them (w-fda2165ec6).
+                  onEnd={search === null && olderMore !== false && view === 'done' ? loadOlder : undefined}
                   // DRAG A THREAD TO WHERE IT BELONGS (w-6e5b532a95), wherever
-                  // the list is in your running order: Sort by Priority, on the
-                  // three tabs still ahead of you, your own threads alone.
+                  // the list is in your running order: Sort by Priority, on
+                  // Needs you and Later, your own threads alone. In progress
+                  // runs by when you sent (w-21b638d821).
                   onReorder={search === null && !run && !withOthers && inboxDisplay.sort === 'priority'
-                    && (view === 'inbox' || view === 'progress' || view === 'snoozed') ? reorderThread : undefined}
+                    && (view === 'inbox' || view === 'snoozed') ? reorderThread : undefined}
                   items={list}
                   // Results are grouped and stamped like the inbox, whatever
                   // tab she opened search from. Scheduled would otherwise label
                   // every group "Returns …", which is a promise about rows that
                   // are mostly closed and not coming back at all.
                   view={search !== null ? 'inbox' : view}
-                  selected={selected}
+                  // `cursor` AND NOT `selected`: the place after the follow,
+                  // which is where the board is drawn too. The raw state is a
+                  // render behind it whenever the list changed under a cursor
+                  // nobody moved, and drew the highlight off its thread.
+                  selected={cursor}
                   seen={seen}
                   running={runningRows}
                   engineChoice={(snap.engines?.choices?.length ?? 1) > 1}
@@ -6077,11 +6980,13 @@ export default function App() {
                     setSelected(i);
                   }}
                   onRange={(i) => {
-                    const [lo, hi] = [Math.min(selected, i), Math.max(selected, i)];
+                    // From the highlight you can see, for the same reason.
+                    const [lo, hi] = [Math.min(cursor, i), Math.max(cursor, i)];
                     setMultiSel((m) => new Set([...m, ...list.slice(lo, hi + 1).map((x) => x.id)]));
                     setSelected(i);
                   }}
                 />}
+                </>}
                 </>}
                 </>
               )}
@@ -6120,8 +7025,18 @@ export default function App() {
           on the undo pile exactly as the old card's send did below. The draft
           is read FIRST, before the card clears it, because it is the only copy
           an undo can hand back. */}
+      {/* Rooms' dialogs: invite, start a room, join from a link. */}
+      {roomsUi.dialogs}
       {modal === 'compose' && (
         <ThreadComposer
+          agentMates={teammatesUi.live ? snap.teammates?.list.filter((t) => t.status === 'active') : undefined}
+          onToTeammate={async (to, text, product) => {
+            const r = await api.teammates<{ teammate?: { id: string } }>(to === 'new' ? 'describe' : 'post', to === 'new' ? { text, ...(product ? { product } : {}) } : { text, to: [to] });
+            if (!r.ok) return r.error;
+            void refresh();
+            teammatesUi.go(to === 'new' ? r.value?.teammate?.id ?? 'team' : to);
+            return null;
+          }}
           products={rankedProducts}
           items={items}
           engines={snap.engines?.choices}
@@ -6147,11 +7062,58 @@ export default function App() {
              exactly that), so the draft is still here afterwards and the
              project just made is the one the thread is addressed to. */
           onNewProject={() => setNewProject(true)}
-          onClose={() => { setModal(null); setComposeInitial(null); }}
-          onSent={async (made, how) => {
-            setComposeInitial(null);
-            const sent = readComposeDraft();
+          // And this is how the project just made reaches the open card, which
+          // read the remembered slot before that project existed (w-abed8ae491).
+          selectProject={pickProject}
+          onClose={() => { setModal(null); setComposeInitial(null); setPickProject(null); }}
+          // THE CARD CLOSES ON SEND, NOT ON THE ANSWER (w-461fbd8d2d). On the
+          // web and on a phone the answer is a round trip away, and for that
+          // long the card sat there as if Send had not worked. It goes now, the
+          // toast says where the thread is going, and the tab moves to where
+          // it will land, so the row arrives in front of her. The tutorial
+          // keeps the old order: its beat moves on from the card closing.
+          onSending={walkCard ? undefined : (how) => {
             setModal(null);
+            setComposeInitial(null);
+            setPickProject(null);
+            const later = (how.runAt != null && how.runAt > Date.now()) || how.start === 'later';
+            const to = how.kind === 'message'
+              ? firstNames(how.toMany ?? [how.to ?? ''])
+              : snap.products.find((x) => x.slug === how.product)?.name ?? how.product ?? '';
+            showToast(sendingLine({ kind: how.kind, to, held: how.start === 'later', scheduled: !!how.runAt, threads: how.threads }));
+            // AND IF THE APP NEVER TAKES IT, SAY THAT TOO. The line above is a
+            // sentence about the next half second, and it expires; a send the
+            // app has not taken by then is read as a send that never happened,
+            // and the task gets written out and sent again.
+            doneSending();
+            waitingOnSend.current = window.setTimeout(() => showToast(SEND_NOT_TAKEN), NOT_ANSWERING_MS);
+            // SHOW WHERE IT WENT (2026-10-01: a new thread looked as if it
+            // was never made, since it was not in the inbox). A thread sent to
+            // an agent is not waiting on her, so it never lands in Needs you.
+            // On the Inbox the tab moves to where it did land, Running or
+            // Scheduled, so she sees the row arrive instead of an unchanged page.
+            if (how.kind === 'task' && workspaceNavigation && !teamOpen && !focused && (['inbox', 'progress', 'snoozed'] as View[]).includes(view)) {
+              setView(later ? 'snoozed' : 'progress');
+              setSelected(0);
+              setMultiSel(new Set());
+            }
+          }}
+          // A send that did not stand puts the card back with the words in it,
+          // unless something else has been opened since; then the toast says
+          // where the words are.
+          onFailed={(said, back) => {
+            doneSending();
+            if (modalNow.current) { showToast(`${said} Your words are in the new thread card.`); return; }
+            setComposeInitial(back.to ? back : null);
+            setModal('compose');
+            showToast(said);
+          }}
+          onSent={async (made, how) => {
+            doneSending();
+            // Everywhere but the tutorial the card closed on Send (onSending),
+            // and closing anything here would close what she opened since.
+            if (walkCard) { setComposeInitial(null); setModal(null); }
+            const sent = how?.draft ?? readComposeDraft();
             // THE TUTORIAL'S OWN TASK, AND IT LEAVES NO TOAST AND NO UNDO.
             // The walk goes on from here with the ringed sentence beside the
             // row, and an undo key nobody has been taught yet, over a walk it
@@ -6163,14 +7125,16 @@ export default function App() {
               return;
             }
             if (how?.kind === 'message') {
-              const firsts = (how.toMany ?? [how.to ?? '']).map((id) => team?.byId.get(id)?.name?.split(/\s+/)[0]).filter(Boolean) as string[];
-              const said = firsts.length > 1 ? `${firsts.slice(0, -1).join(', ')} and ${firsts[firsts.length - 1]}` : firsts[0];
-              showToast(said ? `Sent to ${said}` : 'Message sent');
+              const said = firstNames(how.toMany ?? [how.to ?? '']);
+              // Named for O, like a new thread (w-5513afd09a). No Z: a message
+              // has reached the team cloud by now and there is no taking it back.
+              showToast(said ? `Sent to ${said}` : 'Message sent', how.made ? { product: how.made.product, id: how.made.id } : undefined);
               await refresh();
               return;
             }
             const slug = how?.product ?? made?.product ?? '';
             const to = snap.products.find((x) => x.slug === slug)?.name;
+            if (made?.id) showJustMade(made, to);
             if (how?.kind === 'repeat') {
               if (how.ruleId) {
                 noteNewTask(`Repeating task canceled: ${clipToSentence(how.title ?? '', TOAST_TITLE)}`, 'cancel that repeating task', sent, async () => {
@@ -6178,31 +7142,41 @@ export default function App() {
                   setRepeats(await api.repeats());
                 });
               }
-              showToast(`Repeating → ${to ?? slug} · Z to undo`);
+              // O opens the new repeating task, and Z is promised only when
+              // there is a rule for it to end (w-5513afd09a). The list of rules
+              // is read first, so O finds the one just made.
+              if (how.ruleId) setRepeats(await api.repeats());
+              showToast(how.ruleId ? `Repeating → ${to ?? slug} · Z to undo` : `Repeating → ${to ?? slug}`,
+                how.ruleId ? { product: slug, id: how.ruleId, repeat: true } : undefined);
               await refresh();
               return;
             }
             if (made?.id) {
-              noteNewTask(`Withdrawn: ${clipToSentence(made.title, TOAST_TITLE)}`, 'take back the task you just made', sent, async () => {
-                await api.answer({ product: made.product, id: made.id, status: 'done' });
-              }, [{ product: made.product, id: made.id, words: 'Undid sending it' }]);
+              // A SPLIT LIST IS ONE SEND AND SO ONE UNDO. Z takes back every
+              // thread it made: three rows left behind by a Z that reached one
+              // of them is worse than no Z at all. A thread an agent has
+              // already answered is left alone, and if that is all of them the
+              // Z is refused rather than claiming a withdrawal it did not make.
+              const all = [{ product: made.product, id: made.id }, ...(how?.alsoMade ?? [])];
+              const label = all.length > 1 ? `Withdrawn: ${all.length} threads` : `Withdrawn: ${clipToSentence(made.title, TOAST_TITLE)}`;
+              noteNewTask(label, all.length > 1 ? `take back those ${all.length} threads` : 'take back the task you just made', sent, async () => {
+                const rows = (await api.snapshot())?.items ?? [];
+                const rowOf = (one: { product: string; id: string }) => rows.find((i) => i.id === one.id && i.product === one.product);
+                const open = all.filter((one) => !answeredAlready(rowOf(one)));
+                if (!open.length) return { refused: TOO_LATE_TO_WITHDRAW, open: rowOf(all[0]) };
+                for (const one of open) await api.answer({ product: one.product, id: one.id, status: 'done' });
+              }, all.map((one) => ({ ...one, words: 'Undid sending it' })));
             }
+            // Read before the line is said: a tool with no login left in
+            // usage means nothing started, and the line has to say so.
+            const next = await refresh();
             showToast(sentLine({
               to: to ?? slug,
               when: how?.runAt ? whenLabel({ runAt: how.runAt, repeat: null }) : null,
               held: how?.start === 'later',
+              threads: how?.threads,
+              limit: made?.id ? next?.supervisor?.atLimit?.[made.id] : null,
             }), made?.id ? { product: made.product, id: made.id } : undefined);
-            // SHOW WHERE IT WENT (2026-10-01: a new thread looked as if it
-            // was never made, since it was not in the inbox). A thread sent to an agent is not
-            // waiting on her, so it never lands in Needs you. On the Inbox the
-            // tab moves to where it did land, Running or Scheduled, so she
-            // sees the row arrive instead of an unchanged page.
-            if (workspaceNavigation && !teamOpen && !focused && (['inbox', 'progress', 'snoozed'] as View[]).includes(view)) {
-              setView((how?.runAt && how.runAt > Date.now()) || how?.start === 'later' ? 'snoozed' : 'progress');
-              setSelected(0);
-              setMultiSel(new Set());
-            }
-            await refresh();
           }}
         />
       )}
@@ -6212,230 +7186,293 @@ export default function App() {
           a `scripted` prop for that now, so the tutorial opens the same card
           everybody else opens. Her words: "the tutorial is using the wrong
           component here, we no longer use this". */}
-      {modal === 'palette' && (
-        <Palette
-          onFirstRun={walkAgain}
-          onTutorial={() => startTutorial(comeBackTo(snap.products, productFilter, rememberedProject()))}
-          onImportAgents={() => { setModal(null); setImportAgents(true); }}
-          onFreshUser={openAsNewUser}
-          onDemo={openDemoInbox}
-          products={rankedProducts}
-          supervisorPaused={snap.supervisor.paused}
-          batch={multiSel.size > 0}
-          look={look}
-          machine={machine}
-          onSetLook={(l) => { setLook(l); setModal(null); }}
-          staleFiles={snap.restartNeeded?.files ?? []}
-          /*
-           * A newer Agentbox that has already downloaded itself. The palette is
-             the glance surface for it, not the rail (main/updater.mjs).
+      <Palette
+        open={modal === 'palette'}
+        cloud={snap.cloud?.setUp ? snap.cloud : null}
+        onCloudMode={(mode) => { setModal(null); void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode }); }}
+        onFirstRun={walkAgain}
+        onTutorial={() => startTutorial(comeBackTo(snap.products, productFilter, rememberedProject()))}
+        onImportAgents={() => { setModal(null); setImportAgents(true); }}
+        onFreshUser={openAsNewUser}
+        onDemo={openDemoInbox}
+        products={rankedProducts}
+        supervisorPaused={snap.supervisor.paused}
+        batch={multiSel.size > 0}
+        look={look}
+        machine={machine}
+        onSetLook={(l) => { setLook(l); setModal(null); }}
+        staleFiles={snap.restartNeeded?.files ?? []}
+        /*
+         * A newer Agentbox that has already downloaded itself. The palette is
+           the glance surface for it, not the rail (main/updater.mjs).
 
-             `closed` is empty ON PURPOSE and it is the whole of "rejecting an
-             update loses nothing": closing the row hides the ROW, and ⌘K goes
-             on carrying the restart for the version she closed. What it shares
-             with the row is the walk: ⌘K is a beat of the tutorial, and a
-             command about a new version appearing in the middle of the one she
-             is being taught is the same interruption the walk must not have. */
-          updateReady={announcesUpdate(snap.update, { walking, closed: '' })
-            ? (snap.update?.newVersion ?? null)
-            : null}
-          onInstallUpdate={() => { setModal(null); void api.updateInstall(); }}
-          /* LOOKING NOW, FROM ⌘K (w-39d6c237f7). The palette closes and the
-             answer arrives as a toast in the Settings row's own words, so the
-             two surfaces can never disagree about what was found. A check takes
-             a second or two against GitHub, so the toast says it is looking
-             first rather than leaving the press unanswered. */
-          onCheckUpdate={() => {
-            setModal(null);
-            showToast(CHECK_SAY.looking);
-            void api.updateCheck().then((got) => showToast(updateLook(got).sentence));
-          }}
-          /* AND THE MOVE, for a copy that cannot update itself from where it
-             is. A successful move relaunches the app, so there is nothing to
-             draw after it; a failure answers with its own reason and the
-             sidebar and Settings go on offering the press. */
-          moveToApplications={announcesMove(snap.update, { walking, closed: '' })}
-          onMoveToApplications={() => {
-            setModal(null);
-            void api.updateMove().then((got) => { if (!got.moved && got.error) showToast(got.error); });
-          }}
-          panelUp={panelShownNow}
-          onTogglePanel={() => { setModal(null); togglePanel(); }}
-          boardUp={inboxDisplay.view === 'board'}
-          onFlipView={!inFullScreen && search === null && !teamShown && !openCard
-            ? () => { setModal(null); setInboxDisplay(flipView(inboxDisplay)); setSelected(0); }
-            : undefined}
-          keyHints={keyHints}
-          onSetKeyHints={(v) => { setModal(null); setHints(v); }}
-          onSearch={openSearch}
-          itemCommands={(() => {
-            // A cmd-A (or shift-J/K) selection turns the palette into batch
-            // mode: every command it offers acts on the whole selection, and
-            // single-item commands (Reply, Approve) drop out rather than
-            // silently acting on one row of a many-row selection.
-            if (multiSel.size) {
-              const sel = selectable.filter((i) => multiSel.has(i.id));
-              const n = sel.length;
-              return [
-                ...(view !== 'snoozed'
-                  ? [{ id: 'done', label: `Close (${n} selected)`, keyHint: 'E', run: () => { setModal(null); batchDone(multiSel); } }]
-                  : []),
-                { id: 'snooze', label: `Later (${n} selected)`, keywords: LATER_KEYWORDS, keyHint: 'L', run: () => openSnooze(sel) },
-                ...(sel.some((i) => returnAt(i) > Date.now())
-                  ? [{ id: 'unsnooze', label: `Back to Inbox (${n} selected)`, run: () => unsnooze(sel) }]
-                  : []),
-                { id: 'read', label: `Mark Read (${n} selected)`, run: () => {
-                  setSeen((s) => new Set([...s, ...sel.map((i) => i.id)]));
-                  setMultiSel(new Set());
-                  setModal(null);
-                } },
-                // Resume only what she ticked. Some of what stops is work she
-                // has moved past, and all-or-nothing made her choose between
-                // restarting things she had written off and restarting nothing
-                // (2026-08-07). Counted by what will actually move, not by the
-                // ticks: a row a worker is already on is not resumed by asking.
-                //
-                // ONE command, deliberately. It used to reach only stalled rows,
-                // which left the ones that most need reviving (a worker's `done`
-                // over a live thread) unreachable by every path there is. Adding
-                // a second command for those put two matches under "resum",
-                // which is the choice this command was rewritten this morning to
-                // stop her having to make correctly at speed.
-                ...(sel.filter((i) => !working(i)).length
-                  ? [{ id: 'resume',
-                       label: `Resume Agents (${sel.filter((i) => !working(i)).length} of ${n} selected)`,
-                       run: () => { setModal(null); putAgentBackOn(sel.filter((i) => !working(i))); } }]
-                  : []),
-                ...priorityCommands(sel).map((c) => ({
-                  ...c, run: () => { setModal(null); void retag(sel, c.value); },
-                })),
-              ];
-            }
-            // The same row the hint and the keys are on, so ⌘K opened over a
-            // row cannot mean a different task than E pressed over it.
-            const target = focused ?? pointed;
-            if (!target) return [];
-            const options = itemOptions(target);
-            const recommended = options.find((o) => o.recommended) ?? options[0];
-            const open = () => { setFocused(target); markSeen(target); };
+           `closed` is empty ON PURPOSE and it is the whole of "rejecting an
+           update loses nothing": closing the row hides the ROW, and ⌘K goes
+           on carrying the restart for the version she closed. What it shares
+           with the row is the walk: ⌘K is a beat of the tutorial, and a
+           command about a new version appearing in the middle of the one she
+           is being taught is the same interruption the walk must not have. */
+        updateReady={announcesUpdate(snap.update, { walking, closed: '' })
+          ? (snap.update?.newVersion ?? null)
+          : null}
+        onInstallUpdate={() => { setModal(null); void api.updateInstall(); }}
+        /* LOOKING NOW, FROM ⌘K (w-39d6c237f7). The palette closes and the
+           answer arrives as a toast in the Settings row's own words, so the
+           two surfaces can never disagree about what was found. A check takes
+           a second or two against GitHub, so the toast says it is looking
+           first rather than leaving the press unanswered. */
+        onCheckUpdate={() => {
+          setModal(null);
+          showToast(CHECK_SAY.looking);
+          void api.updateCheck().then((got) => showToast(updateLook(got).sentence));
+        }}
+        /* AND THE MOVE, for a copy that cannot update itself from where it
+           is. A successful move relaunches the app, so there is nothing to
+           draw after it; a failure answers with its own reason and the
+           sidebar and Settings go on offering the press. */
+        moveToApplications={announcesMove(snap.update, { walking, closed: '' })}
+        onMoveToApplications={() => {
+          setModal(null);
+          void api.updateMove().then((got) => { if (!got.moved && got.error) showToast(got.error); });
+        }}
+        panelUp={panelShownNow}
+        onTogglePanel={() => { setModal(null); togglePanel(); }}
+        boardUp={inboxDisplay.view === 'board'}
+        onFlipView={!inFullScreen && search === null && !teamShown && !openCard
+          ? () => { setModal(null); setInboxDisplay(flipView(inboxDisplay)); setSelected(0); }
+          : undefined}
+        keyHints={keyHints}
+        onSetKeyHints={(v) => { setModal(null); setHints(v); }}
+        onSearch={openSearch}
+        itemCommands={(() => {
+          // A cmd-A (or shift-J/K) selection turns the palette into batch
+          // mode: every command it offers acts on the whole selection, and
+          // single-item commands (Reply, Approve) drop out rather than
+          // silently acting on one row of a many-row selection.
+          if (multiSel.size) {
+            const sel = selectable.filter((i) => multiSel.has(i.id));
+            const n = sel.length;
+            const moves = readMoves(sel, seenAt, unreadSince);
             return [
-              ...(focused
-                ? [{id:'remote-control',label:'Remote Control',keywords:'phone mobile continue claude rc',run:()=>{setModal(null);window.dispatchEvent(new Event('task-remote-control-open'));}}, {id:'open-terminal',label:'Open Terminal',keywords:'shell command console',run:()=>{setModal(null);window.dispatchEvent(new Event('task-terminal-open'));}}]
+              ...(view !== 'snoozed'
+                ? [{ id: 'done', label: `${DONE.verb} (${n} selected)`, keyHint: 'E', run: () => { setModal(null); batchDone(multiSel); } }]
                 : []),
-              // Approve lives here by NAME only, for everything resolve
-              // covers; no key drives it. E is archive, never approval.
-              ...(!target.agent && !target.answer && (target.kind === 'review' || (target.kind === 'question' && recommended)
-                || (target.status === 'open' && target.kind !== 'question' && !(target.labels ?? []).includes('founder')))
-                ? [{ id: 'approve',
-                    label: target.kind === 'question' ? 'Approve Recommended'
-                      : target.kind === 'review' ? 'Approve (Proceed as Proposed)' : 'Approve (Run It)',
-                    run: () => { setModal(null); resolve(target); } }]
+              { id: 'snooze', label: `Later (${n} selected)`, keywords: LATER_KEYWORDS, keyHint: 'L', run: () => openSnooze(sel) },
+              ...(sel.some((i) => returnAt(i) > Date.now())
+                ? [{ id: 'unsnooze', label: `Back to Inbox (${n} selected)`, run: () => unsnooze(sel) }]
                 : []),
-              // RUN NOW, by the same rule as the three-dot menu (run-now.ts).
-              // It had no entry here, and ⌘K is where she looked for it.
-              ...runNowCommands(target, {
-                session: snap.supervisor.running.find((r) => r.itemId === target.id) ?? null,
-                queued: snap.supervisor.queued,
-                runNow: snap.supervisor.runNow,
-                inProgress: belongsInProgress(target, { deferredUntil: dueAt(target), now, live: liveIds.has(target.id) }),
-              }, () => { setModal(null); void runNow(target); }),
-              { id: 'done', label: target.agent ? DONE.verb : `${DONE.verb} Task`, keyHint: 'E', run: () => { setModal(null); markDone(target); } },
-              { id: 'reply', label: 'Reply', keyHint: 'R', run: () => { open(); setModal('reply'); } },
-              // Carry on with this row. Offered on ANY status a worker is not
-              // already on, because the row that needed it most was `done`:
-              // filed by the worker that answered her one-word question, and
-              // then unreachable by every path that spawns anything. Resume is
-              // for a row that has STOPPED. A row already under way is
-              // excluded, and the stop above is what it gets instead.
-              ...(!target.agent && !working(target) && !stoppableNow(target)
-                ? [{ id: 'resume-any',
-                     label: target.status === 'done' ? 'Resume This Agent (Reopen and Carry On)' : 'Resume This Agent',
-                     run: () => { setModal(null); putAgentBackOn([target]); } }]
+              ...(moves.read
+                ? [{ id: 'read', label: `Mark read (${n} selected)`, run: () => { sel.forEach(markSeen); setMultiSel(new Set()); setModal(null); } }]
                 : []),
-              // No Decline here, by design. Close This Task above
-              // is the one way to say no.
-              seen.has(target.id)
-                ? { id: 'unread', label: 'Mark Unread', run: () => { setSeen((s) => { const c = new Set(s); c.delete(target.id); return c; }); setModal(null); } }
-                : { id: 'read', label: 'Mark Read', run: () => { markSeen(target); setModal(null); } },
-              ...(returnAt(target) > Date.now()
-                ? [{
-                    id: 'unsnooze',
-                    label: parkedByAgent(target, now) ? 'Let It Run Now' : 'Back to Inbox',
-                    keyHint: 'E',
-                    run: () => unsnooze(target),
-                  }]
+              ...(moves.unread
+                ? [{ id: 'unread', label: `Mark unread (${n} selected)`, run: () => { sel.forEach(markUnseen); setMultiSel(new Set()); setModal(null); } }]
                 : []),
-              { id: 'snooze', label: 'Later', keywords: LATER_KEYWORDS, keyHint: 'L', run: () => openSnooze(target) },
-              // THE FIRST PLACE SHE LOOKED. It asked `supervisor.running`, so on
-              // a task she had just composed there was no Stop in ⌘K at all —
-              // and, because nothing was running, the one agent command that DID
-              // appear was "Resume This Agent". It now asks the same question
-              // the tab asks.
+              // Resume only what she ticked. Some of what stops is work she
+              // has moved past, and all-or-nothing made her choose between
+              // restarting things she had written off and restarting nothing
+              // (2026-08-07). Counted by what will actually move, not by the
+              // ticks: a row a worker is already on is not resumed by asking.
               //
-              // A stop that only says "stopped" reads as parked, and a parked
-              // row is one that gets forgotten for days. The row does land in the inbox (the
-              // IPC parks it blocked, and `belongsInInbox` ends on exactly
-              // that), so this is the surface catching up with what already
-              // happens.
-              //
-              // So the two surfaces carry the same promise in different lengths
-              // on purpose: the footer button has a whole row to itself and
-              // keeps her longer sentence, the ⌘K row sits in a column of short
-              // commands and must not stick out of it. Her exact string, and
-              // the agent variant shortened the same way, since it is the same
-              // row with a worker running.
-              ...(stoppableNow(target)
-                ? [{ id: 'stop',
-                     label: working(target)
-                       ? 'Stop Agent (Moves to Inbox)'
-                       : 'Stop Task (Moves to Inbox)',
-                     hint: working(target) ? undefined : 'nothing has started on it yet',
-                     run: () => { setModal(null); stopAgent(target); } }]
+              // ONE command, deliberately. It used to reach only stalled rows,
+              // which left the ones that most need reviving (a worker's `done`
+              // over a live thread) unreachable by every path there is. Adding
+              // a second command for those put two matches under "resum",
+              // which is the choice this command was rewritten this morning to
+              // stop her having to make correctly at speed.
+              ...(sel.filter((i) => !working(i)).length
+                ? [{ id: 'resume',
+                     label: `Resume agents (${sel.filter((i) => !working(i)).length} of ${n} selected)`,
+                     run: () => { setModal(null); putAgentBackOn(sel.filter((i) => !working(i))); } }]
                 : []),
-              ...(target.status === 'blocked'
-                ? [{ id: 'send-back', label: 'Send Back to Agent', run: () => { setModal(null); sendBack(target); } }]
-                : []),
-              ...(snap.supervisor.stalled?.includes(target.id)
-                ? [{ id: 'redeliver', label: 'Restart the Agent (It Stopped)', run: () => { setModal(null); redeliver(target); } }]
-                : []),
-              ...(!focused ? [{ id: 'open', label: 'Open', keyHint: '↵', run: () => { setModal(null); open(); } }] : []),
-              // ⌘K is the ONLY keyboard route to a level now: the ⌘1..4 chord
-              // was removed on her word. It had no entry here once, and the
-              // one place she went looking for it was the one place it was
-              // missing.
-              ...priorityCommands([target]).map((c) => ({
-                ...c, run: () => { setModal(null); void retag([target], c.value); },
+              ...priorityCommands(sel, directSlugs).map((c) => ({
+                ...c, run: () => { setModal(null); void retag(sel, c.value); },
               })),
             ];
-          })()}
-          filtering={isFiltering(boxFilter)}
-          // "Filter…" hands the keyboard straight to the corner's menu, so ⌘K
-          // is one line however many projects she has (w-aa3fa4cbf0).
-          onOpenFilter={() => setModal('filter')}
-          onClearFilter={() => { setBoxFilter(NO_FILTER); setModal(null); }}
-          onView={(v) => { setView(v); setModal(null); setSelected(0); }}
-          onPause={async (paused) => { await api.pauseSupervisor(paused); setModal(null); await refresh(); }}
-          order={snap.supervisor.productOrder ?? []}
-          onRankFirst={async (slug) => {
-            setModal(null);
-            // The palette can only say "put this at the top", because a running
-            // order is not something to type your way through one step at a
-            // time. Fine grained ordering is the drag in the composer.
-            const next = moveProduct(rankedProducts.map((p) => p.slug), slug, 0);
-            await (window.zero as any)?.setProductOrder?.({ order: next });
-            const name = snap.products.find((p) => p.slug === slug)?.name ?? slug;
-            showToast(`${name} is now first`);
-            await refresh();
-          }}
-          onResume={() => { setModal(null); resumeAgents(null); }}
-          onNewProject={() => { setModal(null); setNewProject(true); }}
-          onStanding={() => setModal('standing')}
-          onSettings={() => { setModal(null); setSettingsPane(null); setSettingsOpen(true); }}
-          onShortcuts={() => { setModal(null); setSettingsPane('shortcuts'); setSettingsOpen(true); }}
-          onOpenProjects={() => { setModal(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
-          onClose={() => setModal(null)}
-        />
-      )}
+          }
+          // The same row the hint and the keys are on, so ⌘K opened over a
+          // row cannot mean a different task than E pressed over it.
+          const target = focused ?? pointed;
+          if (!target) return [];
+          const options = itemOptions(target);
+          const recommended = options.find((o) => o.recommended) ?? options[0];
+          const open = () => { setFocused(target); markSeen(target); };
+          const moveRefusal = whyItCannotMove(target as never, { live: liveIds.has(target.id) });
+          return [
+            ...(focused
+              ? [{id:'remote-control',label:'Remote control',keywords:'phone mobile continue claude rc',run:()=>{setModal(null);window.dispatchEvent(new Event('task-remote-control-open'));}}, {id:'open-terminal',label:'Open terminal',keywords:'shell command console',run:()=>{setModal(null);window.dispatchEvent(new Event('task-terminal-open'));}}]
+              : []),
+            // Approve lives here by NAME only, for everything resolve
+            // covers; no key drives it. E is archive, never approval.
+            ...(!target.agent && !target.answer && (target.kind === 'review' || (target.kind === 'question' && recommended)
+              || (target.status === 'open' && target.kind !== 'question' && !(target.labels ?? []).includes('founder')))
+              ? [{ id: 'approve',
+                  label: target.kind === 'question' ? 'Approve recommended'
+                    : target.kind === 'review' ? 'Approve (proceed as proposed)' : 'Approve (run it)',
+                  run: () => { setModal(null); resolve(target); } }]
+              : []),
+            // RUN NOW, by the same rule as the three-dot menu (run-now.ts).
+            // It had no entry here, and ⌘K is where she looked for it.
+            ...runNowCommands(target, {
+              session: snap.supervisor.running.find((r) => r.itemId === target.id) ?? null,
+              queued: snap.supervisor.queued,
+              runNow: snap.supervisor.runNow,
+              inProgress: belongsInProgress(target, { deferredUntil: dueAt(target), now, live: liveIds.has(target.id), stopped: stalledIds.has(target.id) }),
+            }, () => { setModal(null); void runNow(target); }),
+            // "Mark done" is what the thread's own menu calls this (threads/ThreadMenu).
+            { id: 'done', label: target.agent ? DONE.verb : `Mark ${DONE.verb.toLowerCase()}`, keyHint: 'E', run: () => { setModal(null); markDone(target); } },
+            { id: 'reply', label: 'Reply', keyHint: 'R', run: () => { open(); setModal('reply'); } },
+            // Carry on with this row. Offered on ANY status a worker is not
+            // already on, because the row that needed it most was `done`:
+            // filed by the worker that answered her one-word question, and
+            // then unreachable by every path that spawns anything. Resume is
+            // for a row that has STOPPED. A row already under way is
+            // excluded, and the stop above is what it gets instead.
+            ...(!target.agent && !working(target) && !stoppableNow(target)
+              ? [{ id: 'resume-any',
+                   label: target.status === 'done' ? 'Resume this agent (reopen and carry on)' : 'Resume this agent',
+                   run: () => { setModal(null); putAgentBackOn([target]); } }]
+              : []),
+            // No Decline here, by design. Close This Task above
+            // is the one way to say no.
+            isUnread(target, seenAt, unreadSince)
+              ? { id: 'read', label: 'Mark read', run: () => { markSeen(target); setModal(null); } }
+              : { id: 'unread', label: 'Mark unread', run: () => { markUnseen(target); setModal(null); } },
+            ...(returnAt(target) > Date.now()
+              ? [{
+                  id: 'unsnooze',
+                  label: parkedByAgent(target, now) ? 'Let it run now' : 'Back to Inbox',
+                  keyHint: 'E',
+                  run: () => unsnooze(target),
+                }]
+              : []),
+            { id: 'snooze', label: 'Later', keywords: LATER_KEYWORDS, keyHint: 'L', run: () => openSnooze(target) },
+            // WHAT THE THREAD'S OWN CONTROLS DO (w-e85916b92c): its summary
+            // panel, three-dot menu, S key, Add people and a teammate's strip.
+            ...(() => {
+              const project = team?.products.get(target.product) ?? null;
+              const page = !target.agent && !isTroubleRow(target) && !isUpdateRow(target) && !isDirect(project ?? undefined);
+              const live = target.status !== 'done' && !target.agent && !isTroubleRow(target) && !isUpdateRow(target);
+              const key = keyOf(target);
+              return threadCommands({
+                seen: team && page ? whoSees(target, team.state.since ?? null, project) : null,
+                chosen: team ? chosenNames(shownToPeople(target, project), team.byId) : undefined,
+                teammates: !!team && teammates(team.state.people ?? [], team.me).length > 0,
+                pinned: live ? !!target.pinned : null,
+                place: live ? threadPlace(target, snap.supervisor.running.find((r) => r.itemId === target.id) ?? null, snap.cloud ?? null) : null,
+                open: focused && keyOf(focused) === key && openShows?.key === key ? openShows : null,
+                rename: page,
+                repeats: !!ruleOf(target),
+                addPeople: !!peopleInConversation(project, team?.me ?? null, team?.state.people ?? []),
+                routes: teamRouteChoices(target, team),
+              }).map((c) => ({ id: c.id, label: c.label, hint: c.hint, keywords: c.keywords, keyHint: c.keyHint, run: () => runThreadCommand(target, c) }));
+            })(),
+            // WHICH MODEL, AND SO WHICH ENGINE, PICKS THIS THREAD UP NEXT
+            // (thread-model-commands.ts). Not on an agent row, which stands
+            // for a session running outside Agentbox and takes only words.
+            ...(target.agent ? [] : modelCommands(target, { items, codexModels, codexDefault: codexModelDefault, engines: snap.engines?.choices ?? [] }).map((c) => ({
+              id: c.id, label: c.label, hint: c.hint, keywords: c.keywords,
+              run: () => { setModal(null); void handToModel(target, c.pick, c.label); },
+            }))),
+            // AND WHICH PROJECT IT IS FILED IN (power-test-1, issue 20): "Move
+            // to project… for a thread I filed in the wrong project". One row
+            // per project, the way `Rank <project> first` already does it, so
+            // typing "move" brings the whole set up and no second card opens.
+            //
+            // WHEN IT CANNOT MOVE, THE WORD STILL FINDS SOMETHING THAT SAYS SO,
+            // and the reason is the row's own hint rather than a sentence you
+            // have to press for. Only a thread nothing has run on can go
+            // (shared/move-thread.mjs), and a "move" that matched nothing is
+            // the complaint this answers. The press says it again because a
+            // narrow window cuts the hint and not the toast.
+            ...(moveRefusal
+              ? [{ id: 'move-refused', label: 'Move to another project', keywords: MOVE_KEYWORDS, hint: moveRefusal, run: () => { setModal(null); showToast(moveRefusal); } }]
+              // The same list the new thread card offers (projectsOffered): a
+              // conversation with a person is not a project to file work in,
+              // and the practice project runs nothing.
+              : projectsOffered(rankedProducts).filter((p) => p.slug !== target.product && !p.practice).map((p) => ({
+                  id: `move-${p.slug}`,
+                  label: `Move to ${p.name}`,
+                  keywords: MOVE_KEYWORDS,
+                  run: () => { setModal(null); void moveToProject(target, p.slug, p.name); },
+                }))),
+            // THE FIRST PLACE SHE LOOKED. It asked `supervisor.running`, so on
+            // a task she had just composed there was no Stop in ⌘K at all —
+            // and, because nothing was running, the one agent command that DID
+            // appear was "Resume This Agent". It now asks the same question
+            // the tab asks.
+            //
+            // A stop that only says "stopped" reads as parked, and a parked
+            // row is one that gets forgotten for days. The row does land in the inbox (the
+            // IPC parks it blocked, and `belongsInInbox` ends on exactly
+            // that), so this is the surface catching up with what already
+            // happens.
+            //
+            // So the two surfaces carry the same promise in different lengths
+            // on purpose: the footer button has a whole row to itself and
+            // keeps her longer sentence, the ⌘K row sits in a column of short
+            // commands and must not stick out of it. Her exact string, and
+            // the agent variant shortened the same way, since it is the same
+            // row with a worker running.
+            ...(stoppableNow(target)
+              ? [{ id: 'stop',
+                   label: working(target)
+                     ? 'Stop Agent (Moves to Inbox)'
+                     : 'Stop Task (Moves to Inbox)',
+                   hint: working(target) ? undefined : 'nothing has started on it yet',
+                   run: () => { setModal(null); stopAgent(target); } }]
+              : []),
+            ...(target.status === 'blocked'
+              ? [{ id: 'send-back', label: 'Send back to agent', run: () => { setModal(null); sendBack(target); } }]
+              : []),
+            ...(snap.supervisor.stalled?.includes(target.id)
+              ? [{ id: 'redeliver', label: 'Restart the agent (it stopped)', run: () => { setModal(null); redeliver(target); } }]
+              : []),
+            ...(!focused ? [{ id: 'open', label: 'Open', keyHint: '↵', run: () => { setModal(null); open(); } }] : []),
+            // ⌘K is the ONLY keyboard route to a level now: the ⌘1..4 chord
+            // was removed on her word. It had no entry here once, and the
+            // one place she went looking for it was the one place it was
+            // missing.
+            ...priorityCommands([target], directSlugs).map((c) => ({
+              ...c, run: () => { setModal(null); void retag([target], c.value); },
+            })),
+          ];
+        })()}
+        filtering={isFiltering(boxFilter)}
+        // "Filter…" hands the keyboard straight to the corner's menu, so ⌘K
+        // is one line however many projects she has (w-aa3fa4cbf0).
+        onOpenFilter={() => setModal('filter')}
+        onClearFilter={() => { setBoxFilter(NO_FILTER); setModal(null); }}
+        onView={(v) => { setView(v); setModal(null); setSelected(0); }}
+        onPause={async (paused) => { await api.pauseSupervisor(paused); setModal(null); await refresh(); }}
+        order={snap.supervisor.productOrder ?? []}
+        onRankFirst={async (slug) => {
+          setModal(null);
+          // The palette can only say "put this at the top", because a running
+          // order is not something to type your way through one step at a
+          // time. Fine grained ordering is the drag in the composer.
+          const next = moveProduct(rankedProducts.map((p) => p.slug), slug, 0);
+          await (window.zero as any)?.setProductOrder?.({ order: next });
+          const name = snap.products.find((p) => p.slug === slug)?.name ?? slug;
+          showToast(`${name} is now first`);
+          await refresh();
+        }}
+        onResume={() => { setModal(null); resumeAgents(null); }}
+        onNewProject={() => { setModal(null); setNewProject(true); }}
+        onNewThread={() => setModal('compose')}
+        onStanding={() => setModal('standing')}
+        onSettings={() => { setModal(null); setSettingsPane(null); setSettingsOpen(true); }}
+        onUsage={() => { setModal(null); setTeamOpen(false); setSettingsPane('claude'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
+        roomsOn={roomsUi.live}
+        groups={roomsUi.groups}
+        onGroups={() => { setModal(null); roomsUi.openTab(); }}
+        onPickGroup={(key) => { setModal(null); roomsUi.pickGroup(key); }}
+        teammates={teammatesUi.live ? snap?.teammates?.list ?? [] : null}
+        onTeammates={(which) => { setModal(null); teammatesUi.go(which); }}
+        onPauseTeammate={(id, paused) => { setModal(null); void api.teammates('update', { id, patch: { paused } }).then(() => refresh()); }}
+        onShortcuts={() => { setModal(null); setSettingsPane('shortcuts'); setSettingsOpen(true); }}
+        onOpenProjects={() => { setModal(null); setTeamOpen(false); setSettingsPane('projects'); setSettingsOpen(true); }}
+        onClose={() => setModal(null)}
+      />
       {/* SETTINGS, as a screen over everything. Not inside the modal stack:
           its own General pane opens the standing-instructions box, and a single
           state for both would have that box close the screen it was opened
@@ -6455,6 +7492,13 @@ export default function App() {
           tune={tune}
           onSetTune={setTune}
           onResetTune={resetTune}
+          cloud={snap.cloud?.setUp ? snap.cloud : null}
+          onCloudSignIn={(key, email) => {
+            void api.cloudSignIn({ action: 'start', engine: 'claude', key });
+            setCloudSignInAs(email);
+            setCloudSetupOpen(true);
+          }}
+          cloudPlans={snap.cloud?.managed || snap.cloud?.offered ? { signedIn: !!snap.cloud?.managed, onSignIn: () => { setSettingsOpen(false); setCloudSetupOpen(true); } } : null}
           startPane={settingsPane}
           onNewProject={() => setNewProject(true)}
           // The Priority page: the same running order every project list
@@ -6469,6 +7513,7 @@ export default function App() {
              has no team in it, and this keeps the team's code in the team's
              files. No team cloud, no pane and no Team row. */
           teamPane={snap?.team?.configured ? <TeamPage team={snap?.team} inviteFocus={inviteFocus} /> : undefined}
+          roomsPane={roomsUi.settingsPane}
           // WHO SEES A PROJECT'S THREADS (w-b989839656): the button beside a
           // project's name and the Projects list's column, only while someone
           // is signed in to a team, handed in for the same reason as the pane.
@@ -6482,6 +7527,10 @@ export default function App() {
           projectWho={team ? (product: Product) => <ProjectWho product={product} /> : undefined}
           // SIGN OUT AT THE FOOT OF SETTINGS (w-a09476712f): "should be at
           // bottom of settings page". Only while someone is signed in.
+          // HER PHONE WITH THE MAC SHUT: the projects she puts on it, on the
+          // Phone page, only while she is signed in.
+          phoneCloud={snap?.team?.signedIn ? { site: snap.team.phoneSite ?? null, siteQr: snap.team.phoneSiteQr ?? null } : undefined}
+          onPhoneSignIn={snap?.team && !snap.team.signedIn ? () => setPhoneSignInOpen(true) : undefined}
           account={snap?.team?.signedIn && snap.team.me ? { email: snap.team.me.email, team: snap.team.team?.name ?? null, onSignOut: () => { void api.teamSignOut().then(() => refresh()); } } : undefined}
           // THE VERSION AND THE CHECK FOR A NEWER ONE (w-39d6c237f7), off the
           // same snapshot field the sidebar card and ⌘K read.
@@ -6502,9 +7551,9 @@ export default function App() {
              because she opened this card to bring agents in and making the
              project was a step on the way rather than the errand. */
           onProjectMade={(slug) => { rememberProject(slug); refresh(); }}
-          onDone={async ({ added, already, name, inboxes, made, noun }) => {
+          onDone={async ({ added, already, name, inboxes, made, noun, done }) => {
             setImportAgents(false);
-            showToast(importedLine({ added, already, name, inboxes, made, noun }));
+            showToast(importedLine({ added, already, name, inboxes, made, noun, done }));
             await refresh();
           }}
           onClose={() => setImportAgents(false)}
@@ -6657,8 +7706,9 @@ export default function App() {
               return whyNotMade((err as Error).message, name);
             }
           }}
-          // The tutorial page's own Skip, the same exit as the corner one.
-          onLeave={() => finishRun([], { celebrate: false })}
+          // The tutorial page's own Skip still ends on setup's last screen,
+          // the chats waiting on you, which closes itself when there are none.
+          onLeave={() => setRun((r) => (r ? stepTo(r, 'done') : r))}
           // Any press on the ⌘K list shuts it, which ends that beat.
           onShut={() => setModal(null)}
           // "Skip this step" on every card (2026-10-06), hers: "make sure
@@ -6699,20 +7749,22 @@ export default function App() {
             fire({ t: 'practice', product: slug ?? '', examples: made?.examples ?? [], backdrop: made?.backdrop ?? [] });
           }}
           /*
-           * AND REACHING THIS CARD IS BEING SHOWN AROUND. The
-             new project offer is never asked of somebody who has just walked
-             the whole thing; the quiet way out below passes nothing, because
-             skipping is not practising. */
-          onDone={(chosen) => finishRun(chosen, { practised: true })}
+           * AND REACHING THIS CARD AFTER THE PRACTICE ROUND IS BEING SHOWN
+             AROUND. The new project offer is never asked of somebody who has
+             just walked the whole thing. Skipping the tutorial also ends here
+             (it has no practice project), and skipping is not practising, nor
+             "You finished the tutorial". */
+          onDone={(chosen) => { const practised = !!runRef.current?.practice; finishRun(chosen, { practised, celebrate: practised }); }}
           /*
            * THE IMPORT CARD ENDED THE WALK AND HAD ALREADY FILED. Nothing is
              imported here a second time; the toast is the same sentence ⌘K
              says, because it is the same press. */
-          onFiled={({ added, already, inboxes, made, noun }) => {
-            finishRun([], { filed: added, practised: true });
+          onFiled={({ added, already, inboxes, made, noun, done }) => {
+            const practised = !!runRef.current?.practice;
+            finishRun([], { filed: added, practised, celebrate: practised });
             if (added || already) {
               showToast(importedLine({
-                added, already, name: made.length === 1 ? made[0] : '', inboxes, made, noun,
+                added, already, name: made.length === 1 ? made[0] : '', inboxes, made, noun, done,
               }));
             }
           }}
@@ -6748,6 +7800,24 @@ export default function App() {
           />
         </div>
       )}
+      {/* Offered and nobody signed in yet: the app's own sign-in page first.
+          Signing in sets the cloud up, and the same open state then shows
+          the setup's accounts. */}
+      {phoneSignInOpen && snap?.team && !snap.team.signedIn && (
+        <SignInPage purpose="phone" waitingUrl={snap.team.signingIn?.url ?? null} onClose={() => setPhoneSignInOpen(false)} onSignedIn={() => setPhoneSignInOpen(false)} />
+      )}
+      {cloudSetupOpen && !snap.cloud?.setUp && snap.cloud?.offered && (
+        <SignInPage purpose="cloud" onClose={() => setCloudSetupOpen(false)} onSignedIn={() => setCloudSetupOpen(true)} />
+      )}
+      {cloudSetupOpen && snap.cloud?.setUp && (
+        <CloudSetup
+          cloud={snap.cloud}
+          plan={cloudPlan}
+          signInAs={cloudSignInAs}
+          onMode={(mode) => { void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode }); }}
+          onClose={() => { setCloudSetupOpen(false); setCloudSignInAs(null); }}
+        />
+      )}
       {/* THE TUTORIAL, OFFERING ITSELF ON A NEW PROJECT (w-9a6ea066d6).
           Out here beside the walk's own cards rather than in the modal stack,
           because it is not one of her modals: nothing opened it, ⌘K does not
@@ -6766,7 +7836,7 @@ export default function App() {
             // tester's call; it also needed the word to type after it.
             rememberOffered(localStorage);
             setOffer(null);
-            showToast(WALK_COPY.offerLater);
+            showToast(sayKeys(WALK_COPY.offerLater));
           }}
         />
       )}
@@ -6789,7 +7859,7 @@ export default function App() {
         // out of existence. approval-stage.ts decides that, and in particular
         // decides that the next card does NOT slide forward until this one has
         // gone.
-        const { card: a, verdict, waiting } = approvalStage(snap.approvals, answered, frontApproval.current);
+        const { card: a, verdict, waiting } = stage;
         if (!a) return null;
         // WHAT IT IS ASKING AND WHAT IT IS ASKING ABOUT, and neither is
         // hardcoded any more: "asks to run" over a diff is a lie, and it is the
@@ -6923,9 +7993,9 @@ export default function App() {
                   {/* The acknowledgement starts on the press, not on the round
                       trip: main answers the file and echoes the same verdict
                       back, so the click and the chord land on one behaviour. */}
-                  <button className="approval-allow" onClick={async () => { setAnswered({ id: a.id, allow: true }); await window.zero?.approve?.({ id: a.id, allow: true }); await refresh(); }}>Allow</button>
-                  <button className="approval-deny" onClick={async () => { setAnswered({ id: a.id, allow: false }); await window.zero?.approve?.({ id: a.id, allow: false }); await refresh(); }}>Deny</button>
-                  <span className="approval-hint">⌘Y / ⌘N · {a.tool}</span>
+                  <button className="approval-allow" onClick={() => void answerCard(a.id, true)}>Allow</button>
+                  <button className="approval-deny" onClick={() => void answerCard(a.id, false)}>Deny</button>
+                  <span className="approval-hint">{chord('⌘Y')} / {chord('⌘N')} · {a.tool}</span>
                 </div>
               </div>
             </div>
@@ -6937,7 +8007,16 @@ export default function App() {
         <Snooze
           item={Array.isArray(snoozeItem) ? snoozeItem[0] : snoozeItem}
           count={Array.isArray(snoozeItem) ? snoozeItem.length : 1}
+          note={snoozeNote ?? undefined}
           onPick={(ts, label) => snoozeUntil(snoozeItem, ts, label)}
+          /* A RHYTHM TYPED HERE MAKES THE THREAD REPEAT (w-c9da359466), down
+             the one road every repeat goes down, so the Later box and the
+             reply box cannot disagree about what "every monday 9am" does. One
+             thread only: one rhythm over a dozen ticked rows would be a dozen
+             repeating tasks nobody asked for. */
+          onRepeat={!Array.isArray(snoozeItem) && !snoozeItem.agent
+            ? (rule) => { setModal(null); setSnoozeItem(null); void applyRepeat(snoozeItem, rule); }
+            : undefined}
           onNow={(Array.isArray(snoozeItem) ? snoozeItem : [snoozeItem]).some((i) => returnAt(i) > Date.now())
             ? () => unsnooze(snoozeItem)
             : undefined}
@@ -6960,17 +8039,29 @@ export default function App() {
           and the sentence ("Started in Agentbox Team") the quiet one under it,
           picked out of fourteen drawings over four rounds. */}
       {toast && (() => {
+        // Said above the reply box instead, or about to be: the frame between
+        // leaving the answered thread and opening the next one.
+        if (sentLineShown) return null;
+        if (toast.goes?.sent && advanceRef.current && !focused) return null;
         const { line, undo: undoes } = toastParts(toast.text);
-        const about = toast.goes
-          ? [...inbox, ...progress, ...snoozed, ...done].find((i) => i.id === toast.goes!.id && i.product === toast.goes!.product)
-          : undefined;
+        const about: { label?: string; title: string } | undefined = !toast.goes
+          ? undefined
+          : toast.goes.repeat
+            ? repeats.find((r) => r.id === toast.goes!.id && r.product === toast.goes!.product)
+            : [...inbox, ...progress, ...snoozed, ...done].find((i) => i.id === toast.goes!.id && i.product === toast.goes!.product);
+        // No O over the thread it names while that thread is the one open
+        // (toastOpens): a reply that kept her there names it for after she leaves.
+        const here = focused ? { product: focused.product, id: focused.id } : null;
+        const opens = toastOpens(toast, here);
+        // On a thread's page it sits in the bar's empty middle, off the reply box.
+        const toastInBar = !!cornerHeaderTarget && (!!queueSpot || onePage) && !onPhone();
         const face = (
           <>
             {about && <span className="toast-title">{about.label || about.title}</span>}
             <span className="toast-line">{line}</span>
-            {(toast.goes || undoes) && (
+            {(opens || undoes) && (
               <span className="toast-keys">
-                {toast.goes && <span className="toast-key"><kbd>O</kbd><span className="toast-key-word">Open</span></span>}
+                {opens && <span className="toast-key"><kbd>O</kbd><span className="toast-key-word">Open</span></span>}
                 {undoes && (
                   <span className="toast-key toast-undo" role="button" tabIndex={-1}
                     onClick={(e) => { e.stopPropagation(); setToast(null); void undo(); }}>
@@ -6985,9 +8076,10 @@ export default function App() {
             {toast.goes && <span className="toast-clock" aria-hidden="true" style={{ animationDuration: `${TOAST_GOES_MS}ms` }} />}
           </>
         );
-        return toast.goes
-          ? <button key={toastShown.current} type="button" className={`toast toast-goes${about ? '' : ' toast-plain'}`} onClick={() => openToastRow(toast.goes!)}>{face}</button>
-          : <div key={toastShown.current} className="toast toast-plain">{face}</div>;
+        const card = toast.goes
+          ? <button key={toastShown.current} type="button" className={`toast toast-goes${about ? '' : ' toast-plain'}${toastInBar ? ' toast-in-bar' : ''}`} onClick={() => openToastRow(toast.goes!)}>{face}</button>
+          : <div key={toastShown.current} className={`toast toast-plain${toastInBar ? ' toast-in-bar' : ''}`}>{face}</div>;
+        return toastInBar && cornerHeaderTarget ? createPortal(card, cornerHeaderTarget) : card;
       })()}
       {/* AND NO TOAST FOR A NEW VERSION. It was the third of the four drawn for
           w-86452550e5 and the argument against it is the one she agreed with: a
@@ -7002,7 +8094,7 @@ export default function App() {
         <HintPlate
           lines={HINTS[shownHint.id]}
           comp={shownHint.el.getBoundingClientRect()}
-          align={shownHint.el.dataset.hintAlign === 'right' ? 'right' : 'left'}
+          align={shownHint.el.dataset.hintAlign === 'right' ? 'right' : shownHint.el.dataset.hintAlign === 'center' ? 'center' : 'left'}
           /* `data-hint-text` names the words inside the component, so the plate
              lines up with the title rather than with the card's edge: a plate
              is expected to be left-aligned with the text, not pushed past it. */
@@ -7020,7 +8112,13 @@ export default function App() {
       {/* ⌘F, on every screen, for the same reason. */}
       <FindBar />
     </div>
+    </CloudOfferContext.Provider>
+    </FreeAgentContext.Provider>
+    </ChatsContext.Provider>
+    </TeammatesContext.Provider>
     </WaitingContext.Provider>
+    </FleetContext.Provider>
+    </CloudContext.Provider>
     </LiveContext.Provider>
     </ChatAgentsContext.Provider>
     </TeamContext.Provider>

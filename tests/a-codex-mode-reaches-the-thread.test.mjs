@@ -51,8 +51,7 @@ describe('the three modes are Codex\'s own settings', () => {
 
   it('never names a reviewer Codex does not take', () => {
     for (const id of CODEX_MODE_ORDER) {
-      const reviewer = CODEX_MODES[id].approvalsReviewer;
-      if (reviewer !== undefined) expect(REVIEWERS, id).toContain(reviewer);
+      expect(REVIEWERS, id).toContain(codexPosture(id).approvalsReviewer);
     }
   });
 
@@ -75,10 +74,19 @@ describe('the mode reaches the thread', () => {
   // w-ca48e69535: auto on a second Codex login carded the user for
   // almost every step, because the reviewer lived only in the first login's
   // config.toml. The thread has to carry it, so any account behaves the same.
-  it('auto hands its asks to Codex\'s own reviewer, on any account', () => {
-    expect(params('auto')).toMatchObject({ approvalsReviewer: 'auto_review' });
-    expect(params('read-only')).not.toHaveProperty('approvalsReviewer');
-    expect(params('full-access')).not.toHaveProperty('approvalsReviewer');
+  //
+  // IT CARRIES IT ON ALL THREE NOW, AND THE VALUE CHANGED (w-36c51443df). This
+  // test used to assert `auto_review` on `auto` and NO FIELD AT ALL on the other
+  // two, which is the same defect this row was written to close from the other
+  // side: an absent field means the login's own `approvals_reviewer` decides,
+  // and on a real Mac that key said `auto_review` -- so a worker left its
+  // sandbox and wrote into the home directory with zero cards raised. The
+  // original requirement, one behaviour on any account, is unchanged and is
+  // better served by naming the reviewer everywhere.
+  it('hands its asks to her, on any account and on every mode', () => {
+    for (const id of CODEX_MODE_ORDER) {
+      expect(params(id), id).toMatchObject({ approvalsReviewer: 'user' });
+    }
   });
 
   // The whole point of the picker: two different modes must not produce the

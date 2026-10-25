@@ -48,13 +48,25 @@ describe('the tests that read a changed file', () => {
   });
 });
 
-describe('both ship checks use it', () => {
+// THE GATE THAT BLOCKS A PUSH USES IT. Since 2026-10-19 there is one such
+// gate: the hook. The ship script ran the same selection first and the push
+// ran it again, so it no longer selects anything
+// (tests/a-ship-runs-the-tests-once-not-twice).
+describe('the gate that blocks a push uses it', () => {
   const here = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-  it('the ship script', () => {
-    expect(fs.readFileSync(path.join(here, 'scripts', 'ship.mjs'), 'utf8')).toMatch(/testsThatRead\(/);
+  const read = (...f) => fs.readFileSync(path.join(here, ...f), 'utf8');
+
+  it('through what the hook asks for its test files', () => {
+    expect(read('scripts', 'hooks', 'pre-push')).toMatch(/tests-the-push-runs\.mjs/);
+    expect(read('scripts', 'lib', 'tests-the-push-runs.mjs')).toMatch(/testsThatRead\(/);
   });
-  it('the push hook', () => {
-    expect(fs.readFileSync(path.join(here, 'scripts', 'hooks', 'pre-push'), 'utf8')).toMatch(/tests-that-read\.mjs/);
+
+  it('and still names it directly, for a checkout that has no such helper', () => {
+    expect(read('scripts', 'hooks', 'pre-push')).toMatch(/tests-that-read\.mjs/);
+  });
+
+  it('and the ship script selects no tests at all, so it cannot skip them', () => {
+    expect(read('scripts', 'ship.mjs')).not.toMatch(/vitest/);
   });
 });
 

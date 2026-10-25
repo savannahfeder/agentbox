@@ -25,11 +25,11 @@ afterEach(() => { while (open.length) open.pop().close(); });
 
 const sub = (n) => ({ endpoint: `https://web.push.apple.com/${n}`, keys: { p256dh: `BP${n}`, auth: `au${n}` } });
 
-function make(port, { file } = {}) {
+function make({ file } = {}) {
   const sent = [];
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-phone-'));
   const link = createPhoneLink({
-    file: file ?? path.join(dir, 'phone-link.json'), channels: new Map(), listeners: new Set(), port,
+    file: file ?? path.join(dir, 'phone-link.json'), channels: new Map(), listeners: new Set(), port: 0,
     interfaces: () => ({ en0: [{ family: 'IPv4', internal: false, address: '192.168.1.20' }] }),
     log: {}, tailscale: null, warm: () => {}, coalesceMs: 10, atDesk: () => false,
     send: async (s, body) => { sent.push({ endpoint: s.endpoint, body: JSON.parse(body) }); },
@@ -49,8 +49,13 @@ function alerts(port, link, device, body) {
   });
 }
 
+// Resolves with the state, because `port: 0` means only the socket knows
+// which port the door ended up on.
 const listening = (link) => new Promise((resolve) => {
-  const wait = async () => ((await link.status()).listening ? resolve() : setTimeout(wait, 10));
+  const wait = async () => {
+    const s = await link.status();
+    return s.listening ? resolve(s) : setTimeout(wait, 10);
+  };
   wait();
 });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -58,12 +63,12 @@ const withAlerts = async (link) => (await link.status()).devices.filter((d) => d
 
 describe('alerts go to one phone', () => {
   it('three home-screen icons signed up: one alert, to the newest', async () => {
-    const { link, sent } = make(41960);
+    const { link, sent } = make();
     await link.act({ action: 'on' });
-    await listening(link);
-    await alerts(41960, link, 'wifi-icon', { action: 'subscribe', subscription: sub(1) });
-    await alerts(41960, link, 'tailscale-icon', { action: 'subscribe', subscription: sub(2) });
-    await alerts(41960, link, 'relay-icon', { action: 'subscribe', subscription: sub(3) });
+    const { port } = await listening(link);
+    await alerts(port, link, 'wifi-icon', { action: 'subscribe', subscription: sub(1) });
+    await alerts(port, link, 'tailscale-icon', { action: 'subscribe', subscription: sub(2) });
+    await alerts(port, link, 'relay-icon', { action: 'subscribe', subscription: sub(3) });
     expect(await withAlerts(link)).toEqual(['relay-icon']);
     link.arrivals([{ id: 'w-1', title: 'The build is green', kind: 'item' }]);
     await wait(60);
@@ -71,11 +76,11 @@ describe('alerts go to one phone', () => {
   });
 
   it('the same icon signing up again keeps its alerts', async () => {
-    const { link, sent } = make(41961);
+    const { link, sent } = make();
     await link.act({ action: 'on' });
-    await listening(link);
-    await alerts(41961, link, 'ph', { action: 'subscribe', subscription: sub(1) });
-    await alerts(41961, link, 'ph', { action: 'subscribe', subscription: sub(1) });
+    const { port } = await listening(link);
+    await alerts(port, link, 'ph', { action: 'subscribe', subscription: sub(1) });
+    await alerts(port, link, 'ph', { action: 'subscribe', subscription: sub(1) });
     expect(await withAlerts(link)).toEqual(['ph']);
     link.arrivals([{ id: 'w-1', title: 'x', kind: 'item' }]);
     await wait(60);
@@ -83,13 +88,13 @@ describe('alerts go to one phone', () => {
   });
 
   it('an older icon asking whether alerts are on is told they are off, so it can take them back', async () => {
-    const { link } = make(41962);
+    const { link } = make();
     await link.act({ action: 'on' });
-    await listening(link);
-    await alerts(41962, link, 'old', { action: 'subscribe', subscription: sub(1) });
-    await alerts(41962, link, 'new', { action: 'subscribe', subscription: sub(2) });
-    expect(JSON.parse((await alerts(41962, link, 'old', { action: 'state' })).body)).toEqual({ on: false });
-    expect(JSON.parse((await alerts(41962, link, 'new', { action: 'state' })).body)).toEqual({ on: true });
+    const { port } = await listening(link);
+    await alerts(port, link, 'old', { action: 'subscribe', subscription: sub(1) });
+    await alerts(port, link, 'new', { action: 'subscribe', subscription: sub(2) });
+    expect(JSON.parse((await alerts(port, link, 'old', { action: 'state' })).body)).toEqual({ on: false });
+    expect(JSON.parse((await alerts(port, link, 'new', { action: 'state' })).body)).toEqual({ on: true });
   });
 
   it('a file that already holds three keeps only the newest when the app starts', async () => {
@@ -103,7 +108,7 @@ describe('alerts go to one phone', () => {
         b: { sub: sub(2), name: 'Device', since: 2000 },
       },
     }));
-    const { link } = make(41963, { file });
+    const { link } = make({ file });
     expect(await withAlerts(link)).toEqual(['c']);
   });
 
@@ -111,7 +116,7 @@ describe('alerts go to one phone', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'one-phone-file-'));
     const file = path.join(dir, 'phone-link.json');
     fs.writeFileSync(file, JSON.stringify({ on: false, key: 'k'.repeat(32), alerts: { only: { sub: sub(1), name: 'Device', since: 5 } } }));
-    const { link } = make(41964, { file });
+    const { link } = make({ file });
     expect(await withAlerts(link)).toEqual(['only']);
   });
 });

@@ -13,8 +13,10 @@
 //   - it is its own switch, off by default; with it off leftovers are only
 //     reported;
 //   - a task's programs may be stopped only after its run has explicitly ended
-//     in this app (or its worker is verified gone), 2 hours after that, or 10
-//     minutes while memory is tight, never earlier than when the switch went on;
+//     in this app (or its worker is verified gone), 2 minutes after the task is
+//     closed, or 10 minutes after the run while memory is tight, never earlier
+//     than when the switch went on (it was 2 hours after the run until
+//     w-7b5b89d886; see a-task-keeps-what-it-runs-until-you-close-it);
 //   - starting a run on the task cancels it at once, inside the app, before the
 //     worker is spawned;
 //   - nothing protected is ever stopped: AGENTBOX_KEEP=1, anything run from an
@@ -93,7 +95,8 @@ describe('the cleaner', () => {
   const NODE = '/Users/x/.nvm/versions/node/v22/bin/node';
   const p = (pid, ppid, item, extra = {}) => ({ pid, ppid, mb: 100, start: sec(T0 - 5 * HOUR), exe: NODE, item, product: 'demo', keep: false, cmd: 'node server.mjs', ...extra });
 
-  function harness(procs, { pressure = 'normal', onSince = T0 - 10 * HOUR, owns = () => true } = {}) {
+  // Every task here was closed at T0 unless a test says otherwise.
+  function harness(procs, { pressure = 'normal', onSince = T0 - 10 * HOUR, owns = () => true, closedAt = () => T0 } = {}) {
     let now = T0;
     let list = procs;
     let level = pressure;
@@ -109,6 +112,7 @@ describe('the cleaner', () => {
       enabledSince: onSince,
       live: (item) => live.has(item),
       owns,
+      closedAt,
     });
     const h = {
       cleaner: make(), signals, live,
@@ -124,11 +128,11 @@ describe('the cleaner', () => {
   }
   const night = () => [p(30788, 1, 'w-done'), p(31907, 30788, null, { cmd: 'next-server' })];
 
-  it('stops a finished task\'s programs, and what hides its tag under them, two hours after the run ended', async () => {
+  it('stops a closed task\'s programs, and what hides its tag under them, two minutes after it closed', async () => {
     const h = harness(night());
     h.cleaner.ended('w-done');
-    // `settle` looks twice a minute apart, so this last look is at 1 h 59 m.
-    h.advance(118 * MIN); await h.settle();
+    // `settle` looks twice a minute apart, so this last look is at 1 m.
+    await h.settle();
     expect(h.signals).toEqual([]);
     h.advance(1 * MIN); await h.settle();
     expect(h.signals.map(([pid, s]) => `${pid}:${s}`).sort()).toEqual(['30788:SIGTERM', '31907:SIGTERM']);
@@ -141,12 +145,12 @@ describe('the cleaner', () => {
     expect(h.signals.length).toBe(2);
   });
 
-  it('never earlier than two hours after the switch went on, whenever the run ended', async () => {
-    const h = harness(night(), { onSince: T0 });
+  it('never earlier than two minutes after the switch went on, however long ago the task closed', async () => {
+    const h = harness(night(), { onSince: T0 + HOUR, closedAt: () => T0 - 24 * HOUR });
     h.cleaner.ended('w-done');
-    h.advance(60 * MIN); await h.settle();
+    h.advance(HOUR); await h.tick();
     expect(h.signals).toEqual([]);
-    h.advance(61 * MIN); await h.settle();
+    h.advance(MIN); await h.settle();
     expect(h.signals.length).toBe(2);
   });
 
@@ -195,12 +199,11 @@ describe('the cleaner', () => {
     expect(h.cleaner.status().leftovers.map((l) => l.item)).toEqual(['w-done']);
   });
 
-  it('a task of this app with leftovers and no session is recorded as ended, and gets a full two hours from then', async () => {
-    const h = harness(night());
+  it('a task of this app with leftovers and no session is recorded as ended, and gets the full two minutes from then', async () => {
+    const h = harness(night(), { closedAt: () => T0 - 24 * HOUR });
     await h.settle();
-    h.advance(100 * MIN); await h.settle();
     expect(h.signals).toEqual([]);
-    h.advance(25 * MIN); await h.settle();
+    h.advance(MIN); await h.settle();
     expect(h.signals.length).toBe(2);
   });
 
@@ -296,7 +299,7 @@ describe('the cleaner', () => {
     h.cleaner.ended('w-done');
     h.advance(30 * MIN); await h.settle();
     const s = h.cleaner.status();
-    expect(s.leftovers).toEqual([expect.objectContaining({ item: 'w-done', programs: 2, stopsAt: T0 + 2 * HOUR })]);
+    expect(s.leftovers).toEqual([expect.objectContaining({ item: 'w-done', programs: 2, stopsAt: T0 + 2 * MIN })]);
   });
 });
 
@@ -319,12 +322,13 @@ describe('the app', () => {
     expect(sup.leftoverBriefNote({ id: 'w-x' }, { fresh: true })).toBe(null);
   });
 
-  it('with it on, a fresh agent is told what happens to what it leaves running, and how to keep something', async () => {
+  it('with it on, a fresh agent is told what happens to what it leaves running, and is not asked to choose what stays', async () => {
     const { sup } = await app({ cleanupLeftovers: true, cleanupLeftoversSince: T0 });
     await sup.setLeftoverCleanup(true);
     const note = sup.leftoverBriefNote({ id: 'w-x' }, { fresh: true });
-    expect(note).toMatch(/AGENTBOX_KEEP=1/);
-    expect(note).toMatch(/two hours/);
+    expect(note).toMatch(/keeps running while this task is open/);
+    expect(note).toMatch(/when the person closes it/);
+    expect(note).not.toMatch(/AGENTBOX_KEEP|two hours/);
     await sup.setLeftoverCleanup(false);
   });
 
@@ -419,7 +423,7 @@ describe('a program that renames itself', () => {
     const signals = [];
     const cleaner = new LeftoverCleaner({
       list: async () => list, kill: (pid, sig) => signals.push([pid, sig]), clock: () => now,
-      readPressure: async () => 'normal', enabledSince: 0, owns: () => true,
+      readPressure: async () => 'normal', enabledSince: 0, owns: () => true, closedAt: () => T0,
     });
     cleaner.ended('w-done');
     await cleaner.tick();
@@ -442,7 +446,7 @@ describe('what the code review found', () => {
     const signals = [];
     const c = new LeftoverCleaner({
       list: async () => (typeof list === 'function' ? list() : list), kill: (pid, sig) => signals.push([pid, sig]), clock: () => now,
-      readPressure: async () => 'normal', enabledSince: 0, owns: () => true, ...extra,
+      readPressure: async () => 'normal', enabledSince: 0, owns: () => true, closedAt: () => T0, ...extra,
     });
     return { c, signals, advance: (ms) => { now += ms; } };
   }
@@ -523,7 +527,7 @@ describe('what the code review found', () => {
     const { leftoverSettings } = await import('../main/settings.mjs');
     const status = { leftovers: [{ item: 'w-a', programs: 38, kept: 2, oldest: Date.now() - 3 * 24 * HOUR, stopsAt: null }], survivors: [] };
     const off = leftoverSettings({ config: { cleanupLeftovers: false }, supervisor: { leftoverStatus: () => status } }).now;
-    expect(off).toBe('Right now finished agents have left 40 programs running; turning this on stops 38 of them, two hours from then.');
+    expect(off).toBe('Right now finished agents have left 40 programs running; turning this on stops 38 of them when you close their tasks.');
   });
 });
 
@@ -567,7 +571,7 @@ describe('what the second review found', () => {
     const signals = [];
     const c = new LeftoverCleaner({
       list: async () => [p(40, 1, 'w-done', { exe: 'Some Renamed App' }), p(41, 40, null), p(50, 1, 'w-done')],
-      kill: (pid, sig) => signals.push([pid, sig]), clock: () => now, readPressure: async () => 'normal', enabledSince: 0, owns: () => true,
+      kill: (pid, sig) => signals.push([pid, sig]), clock: () => now, readPressure: async () => 'normal', enabledSince: 0, owns: () => true, closedAt: () => T0,
     });
     c.ended('w-done');
     now += 3 * HOUR; await c.tick();
@@ -593,7 +597,7 @@ describe('6. every run is told the rule while it is on', () => {
     const store = { listItems: () => [], listProducts: () => [], isDue: () => true, readItem: () => null };
     const sup = new Supervisor({ storeRoot: tmp, home: tmp, cleanupLeftovers: true, cleanupLeftoversSince: T0 }, store, root, tmp, tmp);
     await sup.setLeftoverCleanup(true);
-    expect(sup.leftoverBriefNote({ id: 'w-x' }, { fresh: false })).toMatch(/AGENTBOX_KEEP=1/);
+    expect(sup.leftoverBriefNote({ id: 'w-x' }, { fresh: false })).toMatch(/stopped when the person closes it/);
     await sup.setLeftoverCleanup(false);
     expect(sup.leftoverBriefNote({ id: 'w-x' }, { fresh: true })).toBe(null);
   });

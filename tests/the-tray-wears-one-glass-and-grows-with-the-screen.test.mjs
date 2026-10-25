@@ -21,7 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { LATTICE_CELLS, TAG_BASE, TAG_HEIGHTS, latticeCell, tagHeight, tagScale } from '../shared/corner-tag.mjs';
+import { LATTICE, TAG_BASE, TAG_HEIGHTS, latticeGrid, tagHeight, tagScale } from '../shared/corner-tag.mjs';
 import { Lattice, markMoves } from '../renderer/src/corner-tag/lattice.tsx';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -87,46 +87,34 @@ describe('what the mark does, and when', () => {
   });
 });
 
-describe('the nine dots sit on whole pixels', () => {
-  // In the running app the mark came out crooked — "the dots aren't even here"
-  // — because a dot was 2.7 points times the scale: 2.99px at 31, 3.47 at 36.
-  // Every row and column rounded somewhere different.
-  it('gives every step a whole dot and a whole gap', () => {
-    for (const { px } of TAG_HEIGHTS) {
-      const { dot, gap } = latticeCell(px);
-      expect(Number.isInteger(dot)).toBe(true);
-      expect(Number.isInteger(gap)).toBe(true);
-      expect(dot).toBeGreaterThan(gap);
+describe('the nine dots are one drawing', () => {
+  // The mark came out crooked twice, and whole pixels for the dot and the gap
+  // only fixed it on a screen whose point is a whole device pixel. Hers draws
+  // 1.5 of one, so every box snapped on its own and the gaps rounded apart:
+  // "it's the same issue we've had six times before". One svg cannot.
+  it('puts the nine centres on a single pitch, on any screen', () => {
+    for (const dpr of [1, 1.5, 2]) {
+      const { dots, pitch } = latticeGrid(LATTICE.box, dpr);
+      expect(dots).toHaveLength(9);
+      const xs = [...new Set(dots.map((d) => d.cx))].sort((a, b) => a - b);
+      expect([dpr, xs[1] - xs[0], xs[2] - xs[1]]).toEqual([dpr, pitch, pitch]);
     }
   });
 
   it('keeps the mark about a third of the tag at every step', () => {
     for (const { px } of TAG_HEIGHTS) {
-      const { dot, gap } = latticeCell(px);
-      const box = 3 * dot + 2 * gap;
-      expect(box / px).toBeGreaterThan(0.3);
-      expect(box / px).toBeLessThan(0.45);
+      for (const dpr of [1, 1.5, 2]) {
+        const { size } = latticeGrid(LATTICE.box * (px / TAG_BASE), dpr);
+        expect([px, dpr, size / px > 0.3 && size / px < 0.45]).toEqual([px, dpr, true]);
+      }
     }
   });
 
-  it('grows with the tag and never shrinks as it goes up', () => {
-    const boxes = TAG_HEIGHTS.map(({ px }) => { const c = latticeCell(px); return 3 * c.dot + 2 * c.gap; });
-    expect([...boxes].sort((a, b) => a - b)).toEqual(boxes);
-    expect(Object.keys(LATTICE_CELLS).map(Number)).toEqual(TAG_HEIGHTS.map((s) => s.px));
-  });
-
-  it('still answers for a height nobody planned for', () => {
-    const { dot, gap } = latticeCell(55);
-    expect(Number.isInteger(dot)).toBe(true);
-    expect(Number.isInteger(gap)).toBe(true);
-    expect(latticeCell(undefined)).toEqual(LATTICE_CELLS[31]);
-  });
-
-  it('is drawn from those two numbers and nothing else', () => {
-    expect(css).toContain('grid-template-columns: repeat(3, var(--ct-dot))');
-    expect(css).toContain('gap: var(--ct-gap)');
-    expect(css).not.toContain('2.7px');
-    expect(css).not.toContain('0.95px');
+  it('is drawn as one shape, sized by the drawing and not by the stylesheet', () => {
+    expect(css).not.toContain('--ct-dot');
+    expect(css).not.toContain('--ct-gap');
+    expect(css).not.toContain('grid-template-columns: repeat(3');
+    expect(css).toContain('.ct-lat circle');
   });
 });
 
@@ -136,7 +124,7 @@ describe('the nine dots', () => {
   it('draws nine dots with the centre one always filled, lit or not', () => {
     for (const lit of [true, false]) {
       const out = html({ lit, move: 'none', beat: 0 });
-      expect((out.match(/<i/g) ?? []).length).toBe(9);
+      expect((out.match(/<circle/g) ?? []).length).toBe(9);
       expect(out).toContain('ct-heart');
       expect(out).not.toContain('data-hole');
     }
@@ -183,7 +171,6 @@ describe('one glass, whatever the Mac is set to', () => {
     // happened when it went further (2026-10-13).
     expect(Math.max(...fill(''))).toBeLessThan(0.8);
     expect(Math.min(...fill(''))).toBeGreaterThan(0.65);
-    expect(Math.max(...fill('-quiet'))).toBeLessThan(0.62);
     expect(Math.min(...fill('-hover'))).toBeGreaterThan(0.85);
   });
 
@@ -195,8 +182,6 @@ describe('one glass, whatever the Mac is set to', () => {
     expect(css).not.toContain('inset 0 0 0 0.5px');
     const alpha = (name) => Number(css.match(new RegExp(`--ct-line${name}: rgba\\([^)]+\\)`))[0].split(',').pop().trim().replace(')', ''));
     expect(alpha('-bottom')).toBeGreaterThan(alpha(''));
-    expect(alpha('-quiet-bottom')).toBeGreaterThan(alpha('-quiet'));
-    expect(alpha('')).toBeGreaterThan(alpha('-quiet'));
     // and it stays faint: an edge, not a frame ("a bit too prominent/visible")
     expect(alpha('-bottom')).toBeLessThan(0.25);
     expect(alpha('')).toBeLessThan(0.18);

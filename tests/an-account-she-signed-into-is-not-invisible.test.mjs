@@ -171,16 +171,15 @@ describe('what must NOT join', () => {
 });
 
 describe('her own file is a decision, not a suggestion', () => {
-  it('keeps every profile she configured, in her order', () => {
+  // She has BOTH duplicates in her config. They used to be kept, as a choice
+  // she had typed; the founder's call on 2026-10-14 is that one account signed
+  // in twice shows once (tests/an-account-shows-once-and-only-once-it-is-signed-in).
+  it('keeps her order, and lists one subscription once', () => {
     signedIn('.claude', 'you@example.com', PERSONAL);
     const second = signedIn('.claude-second', 'you@example.com', PERSONAL);
     const work = signedIn('.claude-work', 'work@example.com', WORK);
-
-    // She has BOTH duplicates in her config. Discovery adds; it never removes,
-    // because a folder she typed in is a choice and the Agents page already
-    // says out loud when two rows are one subscription.
     expect(effectiveProfiles(['default', second], { home }))
-      .toEqual(['default', second, work]);
+      .toEqual(['default', work]);
   });
 
   it('does not add a folder she had already configured', () => {
@@ -247,27 +246,35 @@ describe('a login that lands while the app is running', () => {
 });
 
 // THE WIRING ITSELF, because a rule nothing calls is a rule that does not run.
-// The supervisor is what decides where a spawn goes, and until 2026-08-31 it
+// The supervisor is what knows which accounts exist, and until 2026-08-31 it
 // read the config key straight. If this goes red, the module above is still
-// perfect and a second account is still idle.
+// perfect and a second account is still invisible.
+//
+// WHAT IT IS FOR CHANGED ON w-dac993a554: an account found here is one somebody
+// can SEE and PICK, not one the fleet starts spreading work over. Work runs on
+// the account in use (`_theOneAccount`).
 describe('the fleet asks the disk, not the config file', () => {
-  it('will spawn on an account she signed into but never configured', async () => {
+  it('knows an account she signed into but never configured, and can be pointed at it', async () => {
     signedIn('.claude', 'you@example.com', PERSONAL);
     const work = signedIn('.claude-work', 'work@example.com', WORK);
 
     const { Supervisor } = await import('../main/supervisor.mjs');
     const store = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-store-'));
-    const sup = new Supervisor(
-      { storeRoot: store, maxConcurrentSessions: 3, authProfiles: ['default'], home },
+    const make = (extra) => new Supervisor(
+      { storeRoot: store, maxConcurrentSessions: 3, authProfiles: ['default'], home, ...extra },
       { listItems: () => [], listProducts: () => [] },
       '/nonexistent-app',
     );
+    const sup = make();
 
     expect(sup._profiles()).toEqual(['default', work]);
-    // And it is spawnable: nothing is resting, so both accounts are in the pool
-    // the round-robin picks from.
-    expect(sup._liveProfiles()).toEqual(['default', work]);
+    // Work goes to the primary login until somebody says otherwise, and then
+    // to the one they picked -- which is the found account, really spawnable.
+    expect(sup._liveProfiles()).toEqual(['default']);
+    const picked = make({ activeAccount: { claude: work } });
+    expect(picked._liveProfiles()).toEqual([work]);
     sup.stop?.();
+    picked.stop?.();
     fs.rmSync(store, { recursive: true, force: true });
   });
 });

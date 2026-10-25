@@ -257,8 +257,8 @@ export const fixtureSnapshot: Snapshot = {
     {
       // STOPPED: she answered, a worker took it, and that worker died without
       // finishing. Three of these were on her screen at once, which is what
-      // resuming-by-selection is for. In Progress shows them beside the live
-      // ones, and only a fixture that HAS them lets that screen be reviewed.
+      // resuming-by-selection is for. Needs you shows them, since nothing will
+      // start them again, and only a fixture that HAS them lets that be reviewed.
       id: 'w-i9', product: 'onboard', productName: 'Onboard', status: 'open', kind: 'design',
       title: 'Design the build menu: what resources make, and what unlocks it',
       answer: 'Option 1: One design pass, delivered as an HTML page you read.',
@@ -531,12 +531,20 @@ export const fixtureHistory: Record<string, Array<Record<string, any>>> = {
       },
     },
   ],
+  // AND THE MODEL IT RAN ON, which is a fact of the ledger and so a fact of
+  // this fixture: an answer is signed with the model the row named when the
+  // run that wrote it started (w-e1a42f6b21), and without a model on the
+  // ledger here there was nowhere that could be reviewed.
   'w-p1': [
     {
       id: 'w-p1', ts: now - 17 * min, source: 'agent',
       patch: {
         title: 'Six schedules, no session: something is eating the build menu\'s hour',
         status: 'open', kind: 'task', priority: 2, parent: 'w-p0',
+        // The agent is on the ledger as well as the model, which is what a
+        // card writes on a Mac that offers a choice; on a Mac with one agent
+        // nothing is drawn from it (byline.ts, `ranWords`).
+        model: 'opus', engine: 'claude',
         body: 'The menu has been scheduled six times and has never started. I do not know why yet.',
       },
     },
@@ -560,10 +568,14 @@ export const fixtureHistory: Record<string, Array<Record<string, any>>> = {
       patch: {
         title: 'The card art is finished and nothing is built. The build menu is the step you named before code.',
         status: 'open', kind: 'question', priority: 2,
+        model: 'opus', engine: 'claude',
         body: 'You said "not yet, we still need to design and plan before building."',
       },
     },
     { id: 'w-p0', ts: now - 31 * min, source: 'agent', epoch: 4, claim: { holder: 'mcp-38801', leaseUntil: now - 26 * min }, patch: { status: 'claimed' } },
+    // A finished answer, so the block at the foot of a thread has a fixture
+    // too: it is lifted out of the stream and it wears what wrote it.
+    { id: 'w-p0', ts: now - 28 * min, source: 'agent', epoch: 4, patch: { result: 'The build menu is the step you named before code, and the art is done. Approving this gets you one page that says what it makes.' } },
     { id: 'w-p0', ts: now - 27 * min, source: 'agent', epoch: 4, patch: { status: 'done' } },
   ],
 };
@@ -834,7 +846,7 @@ export const fixtureSettings = {
     agentsRunning: true,
     sessionsAtOnce: 3,
     memoryGate: { on: false, slots: null, slotsAuto: 2, slotsMax: 12, now: null },
-    leftovers: { on: false, now: 'Right now finished agents have left 40 programs running; turning this on stops them, two hours from then.' },
+    leftovers: { on: false, now: 'Right now finished agents have left 40 programs running; turning this on stops them when you close their tasks.' },
     // COPIES OF A PROJECT NOBODY'S TASK OWNS (main/settings.mjs,
     // `strayFolderSettings`). A fixture because the row is absent whenever there
     // are none, which is most of the time and all of a fresh install: without
@@ -974,9 +986,9 @@ export const fixtureSettings = {
 //   ?engines=codex    two agents, workspace moved to Codex. The screen the
 //                     shipped bug was on.
 
-export type FixtureEngineWorld = 'missing' | 'claude' | 'codex' | 'nowhere' | 'chosen' | 'signedout';
+export type FixtureEngineWorld = 'missing' | 'claude' | 'codex' | 'nowhere' | 'chosen' | 'signedout' | 'ready';
 
-const ENGINE_WORLDS: FixtureEngineWorld[] = ['missing', 'claude', 'codex', 'nowhere', 'chosen', 'signedout'];
+const ENGINE_WORLDS: FixtureEngineWorld[] = ['missing', 'claude', 'codex', 'nowhere', 'chosen', 'signedout', 'ready'];
 
 /**
  * The world one url asks for, or null for the Mac she has. A word nothing
@@ -1096,16 +1108,30 @@ export function fixtureEngineSettings(world: FixtureEngineWorld | null): Partial
    * thing standing between them and a choice they cannot undo.
    */
   /*
-   * THE MACHINE THE PLAN QUESTION EXISTS TO NOT ASK (w-ce8c1a9275): Codex is on
-   * the disk and signed out. `needsPlan` is true, so the walk opens this step --
-   * and `afterCheck` knows which plan they have, so the step must not ask. It
-   * had no fixture world, so that branch could not be driven in a browser.
+   * THE MACHINE THAT MUST NOT BE SIGNED IN FOR: Codex is on the disk and signed
+   * out. `afterCheck` answers `found`, so the step draws what it found -- Sign
+   * in beside ChatGPT, Set up beside Claude -- and opens no browser until a row
+   * is pressed. This is the only world where that can be driven in a browser.
    */
   if (world === 'signedout') {
     return {
       claudeFound: false, claudeCertain: true, claudeBin: '/Users/you/.local/bin/claude',
       codexFound: false, codexCertain: true, codexInstallUrl: CODEX_INSTALL_URL,
       codex: { found: true, certain: true, bin: CODEX_BIN, url: CODEX_INSTALL_URL, trouble: null },
+    };
+  }
+  /*
+   * THE MACHINE MOST PEOPLE ARRIVE ON (w-e217e577e5): Claude signed in
+   * already, nothing else here. Every other world answers this question with a
+   * machine that has a problem, so the screen that says what it FOUND could
+   * only be drawn on the default, where both agents are ready at once, which
+   * is a machine almost nobody has.
+   */
+  if (world === 'ready') {
+    return {
+      claudeFound: true, claudeCertain: true, claudeBin: '/Users/you/.local/bin/claude',
+      codexFound: false, codexCertain: true, codexInstallUrl: CODEX_INSTALL_URL,
+      codex: { found: false, certain: true, bin: '', url: CODEX_INSTALL_URL, trouble: null },
     };
   }
   if (world === 'nowhere') {
@@ -1170,7 +1196,9 @@ export function fixtureSecondEngine(snap: Snapshot, world: FixtureEngineWorld | 
   // `nowhere` and `chosen` are the same: they are about WHERE the agents are,
   // not about which one a row runs on, so the rows they describe are the ones
   // already up (w-ce8c1a9275).
-  if (!world || world === 'missing' || world === 'nowhere' || world === 'chosen' || world === 'signedout') return snap;
+  // `ready` belongs with them: it says what is on the machine, not which agent
+  // any row runs on.
+  if (!world || world === 'missing' || world === 'nowhere' || world === 'chosen' || world === 'signedout' || world === 'ready') return snap;
   const byItem = OFF_THE_WORKSPACE[world];
   const engineOf = (id: string) => byItem[id] ?? world;
   return {
@@ -1263,6 +1291,39 @@ export function fixtureSessionThreads() {
     path: `/Users/you/.claude/projects/${where.folderName}/${id}.jsonl`,
     ...where,
   }));
+}
+
+/**
+ * WHAT THE NAME FIELD SEARCHES, on a fake disk (w-6418318cd5).
+ *
+ *  The nine above are all inside a week, because they are the card's own
+ *  ten-day list. The point of the field is the ones that are not, so this is
+ *  that list with months of older chats under it: without them a photograph of
+ *  the search shows a search that found nothing a search was needed for. */
+export function fixtureSearchableThreads() {
+  const now = Date.now();
+  const day = 24 * 3600 * 1000;
+  const zero = { folder: '/Users/you/Desktop/dev/zero', folderName: 'zero', short: '~/Desktop/dev/zero' };
+  const dd = { folder: '/Users/you/Desktop/dev/harbour', folderName: 'harbour', short: '~/Desktop/dev/harbour' };
+  const older: [string, string, number, typeof zero, 'terminal' | 'codex'][] = [
+    ['o1', 'Open the pricing page in a second window so I can compare them', 19, zero, 'terminal'],
+    ['o2', 'the opening animation on the booster is too slow, can you halve it', 34, zero, 'codex'],
+    ['o3', 'Reopen the old onboarding and tell me which screen the drop-off is on', 58, dd, 'terminal'],
+    ['o4', 'open a port for the preview and keep it running while I test', 96, zero, 'codex'],
+    ['o5', 'Work out why the welcome email opens at 11% and the rest at 40%', 131, dd, 'terminal'],
+    ['o6', 'open the stripe dashboard numbers and put them beside ours', 204, dd, 'terminal'],
+  ];
+  return [
+    ...fixtureSessionThreads(),
+    ...older.map(([id, title, ago, where, source]) => ({
+      id,
+      source,
+      title,
+      when: now - ago * day,
+      path: `/Users/you/.claude/projects/${where.folderName}/${id}.jsonl`,
+      ...where,
+    })),
+  ];
 }
 
 import { NAME } from '../../shared/product-name.mjs';

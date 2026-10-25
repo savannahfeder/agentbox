@@ -53,10 +53,14 @@ describe('which task ships next', () => {
     expect(nextToShip([row('w-a')], products(), {}, { folderFor })).toBeNull();
   });
 
-  it('is never a task without the label, a finished one, or one an agent is still on', () => {
+  it('is never a task without the label, or one an agent is still on', () => {
     expect(nextToShip([row('w-a', { labels: [] })], products(), settings, { folderFor })).toBeNull();
-    expect(nextToShip([row('w-a', { status: 'done' })], products(), settings, { folderFor })).toBeNull();
     expect(nextToShip([row('w-a')], products(), settings, { folderFor, isLive: () => true })).toBeNull();
+  });
+
+  // tests/a-thread-closed-while-it-waits-to-ship-still-ships says why.
+  it('is a finished one too, once its agent marked it ready', () => {
+    expect(nextToShip([row('w-a', { status: 'done' })], products(), settings, { folderFor })?.item.id).toBe('w-a');
   });
 
   it('is never a task with no folder to ship from', () => {

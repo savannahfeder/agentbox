@@ -163,7 +163,15 @@ describe('the fleet, on a real refusal', () => {
     refuse();
     sup._forgetRenewedSubscriptions();
     expect(sup._profileTrouble.default?.cause).toBe('subscription-ended');
-    fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify({ oauthAccount: paying }));
+    const file = path.join(home, '.claude.json');
+    fs.writeFileSync(file, JSON.stringify({ oauthAccount: paying }));
+    // THE PLAN IS CACHED ON THIS FILE'S mtime (main/claude-plan.mjs). Both
+    // writes here land inside one millisecond often enough that the second
+    // read came back from the cache still lapsed, and this test failed about
+    // two runs in three. A real renewal is minutes apart; the clock is moved
+    // on by hand so the read is a read.
+    const after = new Date(Date.now() + 1_000);
+    fs.utimesSync(file, after, after);
     sup._forgetRenewedSubscriptions();
     expect(sup._profileTrouble.default).toBeUndefined();
   });

@@ -1,0 +1,58 @@
+/* A voice note, in the chat and in the composer (./VoiceNote.tsx,
+   ./ChatTools.tsx). Square and monochrome like the rest of a chat: the bars
+   already played are the text colour, the rest faint. */
+
+.voice-note {
+  display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px 0 6px;
+  border: 1px solid var(--line); background: var(--wash); box-sizing: border-box;
+  max-width: 100%; min-width: 0;
+}
+.voice-play {
+  flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+  appearance: none; border: 1px solid var(--line-strong); border-radius: 0; cursor: pointer;
+  background: var(--wash-strong); color: var(--text);
+}
+.voice-play:hover { border-color: var(--text-faint); }
+.voice-play:disabled { cursor: default; color: var(--text-faint); }
+.voice-play:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 1px; }
+.voice-play svg { width: 12px; height: 12px; }
+
+/* 2px bars 2px apart at full width; in a narrow chat the spacing goes first,
+   then the bars thin, so the note fits in the room chat beside the board. */
+.voice-bars {
+  flex: 0 1 auto; width: 174px; min-width: 100px; display: flex; align-items: center; justify-content: space-between; gap: 1px; height: 24px;
+  cursor: pointer; outline: none;
+}
+.voice-bars:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 3px; }
+.voice-bars span { flex: 0 1 2px; min-width: 1px; min-height: 2px; background: var(--text-faint); opacity: .55; }
+.voice-bars span.played { background: var(--text); opacity: 1; }
+
+.voice-time { flex: none; min-width: 30px; font: 11px var(--mono); letter-spacing: .03em; color: var(--text-dim); text-align: right; }
+
+/* The speed is always there, so it is found without looking for it; a speed
+   other than 1× reads brighter. */
+.voice-speed {
+  flex: none; height: 20px; min-width: 34px; padding: 0 5px;
+  appearance: none; border: 1px solid var(--line); border-radius: 0; cursor: pointer;
+  background: none; color: var(--text-dim); font: 10.5px var(--mono);
+}
+.voice-speed.set { color: var(--text); border-color: var(--line-strong); }
+.voice-speed:hover { color: var(--text); border-color: var(--line-strong); }
+.voice-speed:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 1px; }
+
+.voice-note.missing .voice-bars span { opacity: .3; }
+
+/* Waiting in the box to be sent, with the cross that takes it out. */
+.attach-voice { display: inline-flex; align-items: stretch; min-width: 0; max-width: 100%; }
+.attach-voice .voice-note { flex: 0 1 auto; }
+.attach-voice-remove {
+  flex: none; width: 28px; appearance: none; border: 1px solid var(--line); border-left: 0; border-radius: 0; cursor: pointer;
+  background: var(--wash); color: var(--text-faint); font: inherit; font-size: 15px; line-height: 1;
+}
+.attach-voice-remove:hover { color: var(--text); border-color: var(--line-strong); }
+/* A thread panel dragged to its narrowest has no room for the speed of a
+   note you have not sent yet; the sent note keeps it. */
+@container (width < 300px) { .attach-voice .voice-speed { display: none; } }
+
+/* In a sent message the note sits on its own line under any words. */
+.chat-msg .typed-embed .voice-note, .rm-cm .voice-note { margin-top: 6px; }

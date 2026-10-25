@@ -29,7 +29,7 @@ const app = fs.readFileSync(path.join(root, 'renderer/src/App.tsx'), 'utf8');
 
 describe('on the board', () => {
   // Her case: the list was last on another tab, then B.
-  it.each(['done', 'all', 'progress', 'snoozed'])('advances when the hidden tab is %s', (view) => {
+  it.each(['done', 'progress', 'snoozed'])('advances when the hidden tab is %s', (view) => {
     expect(advanceLandsHere({ view, onBoard: true })).toBe(true);
   });
 
@@ -45,7 +45,7 @@ describe('in the list', () => {
 
   // The case that must NOT change: the Done and All tabs are not the inbox, so
   // finishing a task there is not working down it.
-  it.each(['done', 'all', 'progress', 'snoozed'])('does not advance on the %s tab', (view) => {
+  it.each(['done', 'progress', 'snoozed'])('does not advance on the %s tab', (view) => {
     expect(advanceLandsHere({ view, onBoard: false })).toBe(false);
   });
 });

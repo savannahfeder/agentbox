@@ -31,9 +31,23 @@ try {
   process.exit(0);
 }
 
-const hook = path.join(root, HOOKS_DIR, 'pre-push');
+// AN ABSOLUTE PATH, NOT 'scripts/hooks'. Git resolves a relative hooksPath
+// against whatever working tree runs the command, so the same shared config
+// pointed every task folder at ITS OWN scripts/hooks -- a worker's to edit, and
+// run as the app by any git the app ran there. Resolved off the COMMON dir so a
+// linked worktree points at the primary checkout's hooks, not its own.
+let hooksPath;
+try {
+  const common = git(['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  hooksPath = path.resolve(common, '..', HOOKS_DIR);
+} catch (err) {
+  say(`could not resolve the hooks directory (${err.message.split('\n')[0]}). No hook installed.`);
+  process.exit(0);
+}
+
+const hook = path.join(hooksPath, 'pre-push');
 if (!fs.existsSync(hook)) {
-  say(`${HOOKS_DIR}/pre-push is missing, so nothing was turned on.`);
+  say(`${hook} is missing, so nothing was turned on.`);
   process.exit(0);
 }
 
@@ -49,15 +63,17 @@ try {
   const current = (() => {
     try { return git(['config', '--get', 'core.hooksPath']); } catch { return ''; }
   })();
-  if (current === HOOKS_DIR) {
+  if (current === hooksPath) {
     say('the pre-push hook is already on. The whole suite runs before any push.');
     process.exit(0);
   }
+  // The old relative default is the one value this script replaces; anything
+  // else somebody chose on purpose and is left alone.
   if (current && current !== HOOKS_DIR) {
     say(`core.hooksPath is set to "${current}", which somebody chose on purpose. Leaving it alone.`);
     process.exit(0);
   }
-  git(['config', 'core.hooksPath', HOOKS_DIR]);
+  git(['config', 'core.hooksPath', hooksPath]);
   say('pre-push hook is on. The whole suite now runs before any push from this checkout.');
 } catch (err) {
   say(`could not set core.hooksPath (${err.message.split('\n')[0]}). No hook installed.`);

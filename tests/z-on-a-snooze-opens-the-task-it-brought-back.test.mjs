@@ -26,16 +26,19 @@ const app = fs.readFileSync(path.join(here, '..', 'renderer', 'src', 'App.tsx'),
 
 const one = { id: 'w-1', product: 'p', title: 'The task she put off' };
 const two = { id: 'w-2', product: 'p', title: 'Another' };
+// She put it off from inside a task, which moved her to the next one. A Z from
+// a LIST opens nothing: tests/a-z-in-a-list-puts-the-row-back-without-opening-it.
+const ON_A_TASK = { onATask: true };
 
 describe('which task an undo hands back', () => {
   it('is the task, when it put back exactly one', () => {
     expect(bringsBack([one])).toBe(one);
-    expect(shownAfterUndo(null, bringsBack([one]))).toEqual({ open: one, compose: false });
+    expect(shownAfterUndo(null, bringsBack([one]), ON_A_TASK)).toEqual({ open: one, compose: false });
   });
 
   it('is none of them, when it put back several at once', () => {
     expect(bringsBack([one, two])).toBeUndefined();
-    expect(shownAfterUndo(null, bringsBack([one, two]))).toEqual({ open: null, compose: false });
+    expect(shownAfterUndo(null, bringsBack([one, two]), ON_A_TASK)).toEqual({ open: null, compose: false });
   });
 
   it('is nothing, when it put back nothing', () => {

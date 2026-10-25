@@ -94,6 +94,14 @@ export function setClaudeModels(rows: ModelChoice[] | null | undefined): void {
 /** The Claude Code rows in force right now. */
 export function claudeModelRows(): ModelChoice[] { return LIVE ?? BUILT_MODELS; }
 
+// Set beside `setClaudeModels`, for the same reason: every model menu draws it.
+let CODEX_FREE: { endedAt: number | null } | null = null;
+/** When every Codex login here is on ChatGPT's free plan, and the latest paid plan's end. */
+export function setCodexFreePlan(fact: { endedAt?: number | null } | null | undefined): void {
+  CODEX_FREE = fact && typeof fact === 'object' ? { endedAt: Number.isFinite(fact.endedAt) ? Number(fact.endedAt) : null } : null;
+}
+export function codexFreePlan(): { endedAt: number | null } | null { return CODEX_FREE; }
+
 /**
  * @deprecated for new code: it is a snapshot of the committed table taken at
  * import time, so it cannot see a `claude update`. Call `claudeModelRows`.

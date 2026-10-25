@@ -38,8 +38,14 @@ import type { ParsedOption } from '../format';
 
 export function OptionsOffer({
   ask, askAll, options, peekOption, askPeek,
-  selectedOption, selRef, onPick, onOptionEnter, onAskEnter, setPeek, setAskPeek, keep,
+  selectedOption, selRef, onPick, onOptionEnter, onAskEnter, setPeek, setAskPeek, keep, stripRef, onOver, bare = false,
 }: {
+  stripRef?: React.RefObject<HTMLDivElement>;
+  /** Whether the pointer is standing on the strip. A click is refused while
+   *  the rows have just moved under it (../pick-settles.ts). */
+  onOver?: (over: boolean) => void;
+  /** No heading: on the one-at-a-time page the question is already the page's headline. */
+  bare?: boolean;
   /** A last row keyed esc that answers by doing nothing: the question a close
    *  asks when tasks are still waiting (../close-asks-first.ts). */
   keep?: { label: string; onKeep: () => void };
@@ -58,7 +64,12 @@ export function OptionsOffer({
   setAskPeek: (open: boolean) => void;
 }) {
   return (
-    <div className="opt-strip">
+    <div
+      className="opt-strip"
+      ref={stripRef}
+      onMouseEnter={() => onOver?.(true)}
+      onMouseLeave={() => onOver?.(false)}
+    >
       {/* THE HEADING IS THE QUESTION, NOT THE NAME OF THE CONTROL. It comes off
           the same field the options came off, so the two can never be from
           different rounds (ask-line.ts).
@@ -71,13 +82,18 @@ export function OptionsOffer({
           padding before it crosses the words, and a card that opens
           only on the glyphs themselves blinks shut in the gaps between
           the two lines. */}
-      <div
-        className={`opt-head ${ask ? 'opt-head-ask' : ''}`}
-        onMouseEnter={(e) => onAskEnter(e.currentTarget)}
-        onMouseLeave={() => setAskPeek(false)}
-      >
-        <span>{ask || 'Their options · pick or write your own'}</span>
-      </div>
+      {!bare && (
+        <div
+          className={`opt-head ${ask ? 'opt-head-ask' : ''}`}
+          onMouseEnter={(e) => onAskEnter(e.currentTarget)}
+          onMouseLeave={() => setAskPeek(false)}
+        >
+          {/* The heading is drawn in capitals, where the old fallback's "THEIR"
+              named nobody on the screen and its middot joined a noun to an
+              instruction. */}
+          <span>{ask || 'Pick one, or write your own answer'}</span>
+        </div>
+      )}
       {/* The card, drawn FIRST so it is the strip's first child: appended
           last it stole the last row's 4px of bottom padding and the
           strip measured 4px short. It is out of the flow entirely

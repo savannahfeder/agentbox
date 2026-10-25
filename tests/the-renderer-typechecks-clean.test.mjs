@@ -92,7 +92,7 @@ describe('the renderer typechecks clean', () => {
         return m ? `${i + 1}:${m[1]}` : null;
       })
       .filter(Boolean);
-    expect(wanted.length).toBe(7);
+    expect(wanted.length).toBe(9);
 
     const out = typecheck(join(here, 'fixtures', 'typecheck-refusals.tsconfig.json'));
     const got = lines(out)

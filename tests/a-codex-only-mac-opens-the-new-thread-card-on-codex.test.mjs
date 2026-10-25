@@ -43,9 +43,12 @@ describe('the engine a new thread card opens on', () => {
     expect(card).toMatch(/recentModels\(items, \{ codexModels, codexDefault, codexOffered, claudeOffered \}\)/);
     expect(card).toMatch(/allModels\(\{ codexModels, codexOffered, claudeOffered \}\)/);
     // Seen in the real app: All models drew an empty CLAUDE CODE heading
-    // beside the Codex list. A column is drawn only when it has rows.
-    expect(card).toMatch(/\{every\.claude\.length > 0 && \(/);
-    expect(card).toMatch(/\{every\.codex\.length > 0 && \(/);
+    // beside the Codex list. A column is drawn only when it has rows. The
+    // drawing moved into ./ModelMenu.tsx on w-e1a42f6b21, where the reply box
+    // draws the same menu; the rule did not move with it.
+    const menu = fs.readFileSync(new URL('../renderer/src/threads/ModelMenu.tsx', import.meta.url), 'utf8');
+    expect(menu).toMatch(/\{every\.claude\.length > 0 && \(/);
+    expect(menu).toMatch(/\{every\.codex\.length > 0 && \(/);
   });
 });
 

@@ -26,6 +26,19 @@ const PASS = ['accept', 'content-type', 'range', 'user-agent', 'if-none-match', 
  * 30 s the room gives a Mac to start answering (relay/room.mjs).
  */
 const WAIT_MS = 10_000;
+/**
+ * THE LINK IS CHECKED, NOT TRUSTED (tests/the-computer-notices-a-dead-relay-link-and-reconnects).
+ * A socket that carries nothing cannot tell this end it has died: a laptop that
+ * slept or changed networks kept one it believed open while the relay had let
+ * it go, and phones were told the computer was not connected. So this end says
+ * "ping" this often and the relay answers "pong" without waking the room.
+ */
+export const PING_MS = 25_000;
+/** How long past a ping's turn a missing pong is allowed before the link is called dead. */
+export const PONG_GRACE_MS = 10_000;
+/** What the platform sends as text on the socket. Never a request: those are bytes. */
+const PING = 'ping';
+const PONG = 'pong';
 /** What the phone does not want back: the relay's stream is its own framing. */
 const DROP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'content-length', 'content-encoding']);
 
@@ -34,9 +47,14 @@ const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0'))
 
 export function createRelayClient({
   relayUrl, key, port, WebSocketImpl = globalThis.WebSocket, fetchImpl = (...a) => globalThis.fetch(...a),
-  log = console, onChange = () => {}, waitMs = WAIT_MS,
+  log = console, onChange = () => {}, waitMs = WAIT_MS, pingMs = PING_MS, graceMs = PONG_GRACE_MS,
 }) {
   let ws = null;
+  let pinger = null;
+  /** When the relay last answered a ping on this link; null until it ever has. */
+  let ponged = null;
+  /** When the ping timer last ran, to tell a sleep from a slow tick. */
+  let ticked = 0;
   let want = false;
   let connected = false;
   let error = null;
@@ -147,6 +165,10 @@ export function createRelayClient({
   }
 
   async function onMessage(sock, data) {
+    if (typeof data === 'string') {
+      if (data === PONG) ponged = Date.now();
+      return;
+    }
     const bytes = data instanceof ArrayBuffer ? new Uint8Array(data)
       : data instanceof Uint8Array ? data
         : new Uint8Array(await data.arrayBuffer());
@@ -178,6 +200,49 @@ export function createRelayClient({
     }
   }
 
+  // Two ways a link is known dead without waiting on the operating system: a
+  // relay that has answered pings stops answering, or this timer ran far too
+  // late, which is a laptop waking from sleep with every socket gone under it.
+  // A relay that never answers (one deployed before pings) is only ever judged
+  // by the second, so an old relay is not mistaken for a dead link.
+  function startPinging(sock) {
+    stopPinging();
+    ponged = null;
+    ticked = Date.now();
+    pinger = setInterval(() => {
+      const now = Date.now();
+      const slept = now - ticked > pingMs * 2;
+      ticked = now;
+      const silent = ponged !== null && now - ponged > pingMs + graceMs;
+      if (slept || silent) {
+        log.info?.(`[relay] the link went quiet (${slept ? 'woke from sleep' : 'no answer to ping'}); reconnecting`);
+        replace(sock);
+        return;
+      }
+      send(sock, PING);
+    }, pingMs);
+  }
+
+  function stopPinging() {
+    if (pinger) clearInterval(pinger);
+    pinger = null;
+  }
+
+  /** Let a dead link go and open a new one now, not after the backoff. */
+  function replace(sock) {
+    if (ws !== sock) return;
+    stopPinging();
+    ws = null;
+    connected = false;
+    for (const c of live.values()) c.abort();
+    live.clear();
+    try { sock.close(4002, 'No answer; reconnecting.'); } catch { /* already gone */ }
+    if (timer) { clearTimeout(timer); timer = null; }
+    retry = 1000;
+    onChange();
+    void connect();
+  }
+
   function schedule() {
     if (!want || timer) return;
     timer = setTimeout(() => { timer = null; void connect(); }, retry);
@@ -198,12 +263,14 @@ export function createRelayClient({
       connected = true;
       error = null;
       retry = 1000;
+      startPinging(sock);
       onChange();
     };
     sock.onmessage = (event) => { if (ws === sock) void onMessage(sock, event.data); };
     sock.onerror = () => { if (ws === sock && !connected) error = 'Could not reach the relay.'; };
     sock.onclose = (event) => {
       if (ws !== sock) return;
+      stopPinging();
       ws = null;
       const was = connected;
       connected = false;
@@ -226,6 +293,7 @@ export function createRelayClient({
     stop() {
       want = false;
       gen += 1;
+      stopPinging();
       if (timer) { clearTimeout(timer); timer = null; }
       const sock = ws;
       ws = null;

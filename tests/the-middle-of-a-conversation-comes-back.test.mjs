@@ -278,8 +278,9 @@ describe('the ask she typed opens the conversation', () => {
     // The words go one way only: into the thread, as the opening message.
     expect(focus).toMatch(/const openingSaid = !agent && said\?\.kind === 'said'/);
     expect(focus).toMatch(/opening=\{openingSaid\}/);
-    // And the box is not drawn when they did.
-    expect(focus).toMatch(/recap=\{openingSaid \? null : recapFor\(item, parent\)\}/);
+    // And there is no box left to draw over it at all
+    // (tests/nothing-is-quoted-above-the-message).
+    expect(focus).not.toMatch(/<Recap\b/);
   });
 
   it('draws it as a message, not as a heading over the conversation', () => {

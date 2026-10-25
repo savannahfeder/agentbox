@@ -137,7 +137,8 @@ describe('the board draws what is picked', () => {
 
 describe('the app hands the board the same pick the list uses', () => {
   const app = readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-  const board = app.slice(app.indexOf('<InboxBoard'), app.indexOf('/>', app.indexOf('<InboxBoard')));
+  // The Inbox's board. A room's board picks nothing: the room owns the keyboard, so E and L never reach it.
+  const board = app.split('<InboxBoard').slice(1).map((s) => s.slice(0, s.indexOf('/>'))).find((b) => b.includes('selected={current}')) ?? '';
 
   it('passes the selection that ⌘K, E and L already act on', () => {
     expect(board).toMatch(/marked=\{multiSel\}/);

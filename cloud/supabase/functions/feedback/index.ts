@@ -25,12 +25,22 @@ const MAX_REQUEST = Math.ceil((LIMITS.bytes * 4) / 3) + LIMITS.text * 6 + 64 * 1
 
 type File = { name: string; type: string; data: string };
 
+// The phone website posts here from its own origin, so a browser has to be let
+// in. Any origin: the function takes no sign-in and anyone can already call it,
+// so a browser gets nothing a script does not.
+const CORS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'POST, OPTIONS',
+  'access-control-allow-headers': 'content-type',
+};
+
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  new Response(JSON.stringify(body), { status, headers: { ...CORS, 'content-type': 'application/json' } });
 
 const escape = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method !== 'POST') return json({ ok: false, error: 'POST only' }, 405);
   const to = Deno.env.get('FEEDBACK_TO');
   const from = Deno.env.get('FEEDBACK_FROM');

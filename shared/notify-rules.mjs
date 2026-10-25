@@ -87,14 +87,15 @@ export function clip(text, max = 120) {
 // main/notify.mjs resets this the moment she has the window, so the next time
 // she walks away she can be told again.
 //
-// THE ONE EXCEPTION, and it is here because an approval card has a clock on it.
-// A finished agent waits as long as it takes. An approval is a worker frozen
-// mid-run with her as the only way through, and it is DENIED AUTOMATICALLY
-// after fifteen minutes (TIMEOUT_MS, main/approval-prompt-server.mjs). If the
-// first banner of the stretch was a finished agent, an approval landing twenty
-// minutes later would die unheard under a strict one-and-done rule. So an
-// approval gets to speak once more, and that is the cap: at most two in one
-// stretch away, never more.
+// THE ONE EXCEPTION, and it is here because an approval is the one thing in the
+// inbox that nothing else can move. A finished agent has said its piece and the
+// thread is readable without her. An approval is a worker frozen mid-run with
+// her as the only way through, and it waits exactly that long: no clock answers
+// it (main/codex-approvals.mjs). If the first banner of the stretch was a
+// finished agent, an approval landing twenty minutes later would die unheard
+// under a strict one-and-done rule, and the run would still be standing there
+// when she got back. So an approval gets to speak once more, and that is the
+// cap: at most two in one stretch away, never more.
 export function shouldSpeak({ spoke = false, spokeAsk = false, waiting = [] } = {}) {
   const items = (waiting ?? []).filter(Boolean);
   if (!items.length) return false;
@@ -145,4 +146,22 @@ export function banner(waiting) {
     // window comes forward, so that one only needs the window.
     open: lead.kind === 'approval' ? null : (lead.id ?? null),
   };
+}
+
+// THE PHONE'S ALERT IS HEADED BY THE THREAD (2026-10-13). On a phone the
+// banner is read in a stack of others, and she asked for the bold line to be
+// "the specific chat title so I know which thread we're talking about". iOS
+// wraps the body and gives the title a line of its own, so the macOS reason
+// above for keeping a name out of the title does not hold there. The sentence
+// moves under it. An approval names the thread that is asking (`thread`) and
+// what it wants to run; with no thread to name, it is the desktop's words.
+export function phoneBanner(waiting) {
+  const say = banner(waiting);
+  if (!say) return null;
+  const items = waiting.filter(Boolean);
+  const asks = items.filter((i) => i.kind === 'approval');
+  const lead = asks.length ? asks[0] : items[items.length - 1];
+  const name = clip(asks.length ? lead.thread : lead.title, 80);
+  if (!name) return say;
+  return { title: name, body: asks.length ? `Waiting on you: ${say.body}` : say.title, open: say.open };
 }

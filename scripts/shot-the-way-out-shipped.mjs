@@ -70,7 +70,7 @@ console.log(`card: ${String(item.title).slice(0, 70)}`);
 const asked = [...new Set([DOC, ...referencedFiles(item.body, item.result, item.note, item.answer)])];
 const resolved = {};
 for (const src of asked) {
-  const r = resolveArtifact({ src, product: SLUG, products: [product], accountRoot: ACCOUNT });
+  const r = await resolveArtifact({ src, product: SLUG, products: [product], accountRoot: ACCOUNT });
   if (r?.ok && r.path) resolved[src] = r.path;
 }
 if (!resolved[DOC]) throw new Error(`${DOC} did not resolve`);

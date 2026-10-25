@@ -16,7 +16,9 @@
 // So an installed build never loads a team key, whatever is on the Mac, and the
 // keychain is only reached for when there is a team to keep a sign-in for. A
 // checkout (npm run app) still finds the Mac's key, so the team version can
-// still be run from source.
+// still be run from source. Since 2026-10-23 a build carries its own cloud for
+// the phone, and the team version is an alpha switch
+// (tests/multiplayer-is-an-alpha-feature-in-the-installed-app).
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';

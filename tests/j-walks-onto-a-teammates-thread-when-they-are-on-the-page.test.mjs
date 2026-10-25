@@ -93,7 +93,9 @@ describe('the board, with a teammate on the page', () => {
   const stateOf = (i) => i._state;
   const display = { view: 'board', sort: 'priority', priorities: [], projects: [], updated: 'any', privacy: 'any' };
   const items = [item('w-mine', 5, 3), item('r-mine', 5, 3, 'running')];
-  const cols = (picked) => boardColumns({ items, products, display, now: NOW, stateOf, cards: [card('w-theirs', 'm', 9, 1), card('r-theirs', 'm', 2, 1, 'running')], picked, me: 'me' });
+  // Their In progress card is older than yours: that column runs newest sent
+  // first (w-21b638d821), and this is about the walk, not the order.
+  const cols = (picked) => boardColumns({ items, products, display, now: NOW, stateOf, cards: [card('w-theirs', 'm', 9, 1), card('r-theirs', 'm', 2, 5, 'running')], picked, me: 'me' });
 
   it('walks down each column and on, their cards in place', () => {
     expect(boardStops(cols(['me', 'm'])).map(name)).toEqual(['m:w-theirs', 'w-mine', 'r-mine', 'm:r-theirs']);

@@ -94,7 +94,7 @@ describe('the corner is filled, not emptied', () => {
   // still holds is that the corner never went empty on the way.
   it('the new message card draws a control where the line was', () => {
     const src = read('renderer/src/threads/ThreadComposer.tsx');
-    const from = src.indexOf('{person ? (');
+    const from = src.indexOf("{person && sendAs === 'message' ? (");
     const bar = src.slice(from, src.indexOf('\n        ) : (', from));
     expect(bar).toMatch(/\{priorityChip\}/);
   });

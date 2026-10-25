@@ -1,4 +1,5 @@
 import { Name } from '../../../shared/product-name.mjs';
+import { SEND } from '../this-keyboard';
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
 import { FEEDBACK_LIMITS, checkFeedback } from '../../../shared/feedback.mjs';
 import { CrossIcon } from './CrossIcon';
@@ -146,7 +147,7 @@ export function FeedbackCard({ onClose, onSend }: { onClose: () => void; onSend:
             </button>
             <span className="fb-hint">or paste, or drop files here</span>
             <input ref={picker} type="file" multiple hidden onChange={(e) => { void add(e.target.files); e.target.value = ''; }} />
-            <button className="dock-send" onClick={() => void send()} disabled={!canSend} title="Send · ⌘↵">{sending ? 'Sending' : 'Send'} <kbd>⌘↵</kbd></button>
+            <button className="dock-send" onClick={() => void send()} disabled={!canSend} title={`Send · ${SEND}`}>{sending ? 'Sending' : 'Send'} <kbd>{SEND}</kbd></button>
           </div>
         </div>
         {dragging && <div className="fb-drop" aria-hidden="true">

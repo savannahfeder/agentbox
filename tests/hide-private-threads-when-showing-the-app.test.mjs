@@ -163,14 +163,15 @@ describe('the Privacy line in View and filters', () => {
     const buttons = [...line(menu(pick)).matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g)].map((m) => m[1]);
     expect(buttons).toEqual(['Private', 'Shared']);
   });
-  it('sits above Updated, just under Project', () => {
+  // The time line is headed Sent since w-21b638d821.
+  it('sits above Sent, just under Project', () => {
     const products = [northwind, { slug: 'meadow', name: 'Meadow' }];
     const items = [item(), item({ id: 'w-2', product: 'meadow' })];
     const html = renderToStaticMarkup(React.createElement(DisplayMenu, { page: 'inbox', display: display(), onDisplay: () => {}, products, items, people: pick }));
-    expect(html).toMatch(/>Project<[\s\S]*>Privacy<[\s\S]*>Updated</);
+    expect(html).toMatch(/>Project<[\s\S]*>Privacy<[\s\S]*class="lab">Sent</);
   });
-  it('sits above Updated when there is no Project line too', () => {
-    expect(menu(pick)).toMatch(/>Privacy<[\s\S]*>Updated</);
+  it('sits above Sent when there is no Project line too', () => {
+    expect(menu(pick)).toMatch(/>Privacy<[\s\S]*class="lab">Sent</);
   });
   it('lights nothing by default, and the one picked when one is', () => {
     expect(lit(menu(pick))).toEqual([]);

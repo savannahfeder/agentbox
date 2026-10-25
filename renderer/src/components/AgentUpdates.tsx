@@ -5,6 +5,7 @@ import {pollEvery} from '../phone-polls';
 import {TaskTerminal} from './TaskTerminal';
 type Update={engine:string;state:string;message?:string;installed?:string;latest?:string};
 const Context=createContext<{updates:Record<string,Update>;start:(engine:string)=>void}>({updates:{},start:()=>{}});
+export const AgentUpdatesContext=Context;
 export const useAgentUpdates=()=>useContext(Context);
 export function AgentUpdates({children}:{children:ReactNode}){
  const [updates,setUpdates]=useState<Record<string,Update>>({});

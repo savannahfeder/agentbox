@@ -172,13 +172,17 @@ describe('an account that is resting', () => {
 
 describe('the whole-Mac ceiling when capacity shrinks under live sessions', () => {
   // The exact shape the removed conjunct was called unreachable for.
-  // 2 Claude logins x 3 = 6, Codex 1 x 3 = 3, nine on the Mac. Four Claude and
-  // three Codex sessions are up, seven of nine. The Codex login is quarantined:
-  // Codex capacity falls to 0 and the Mac's ceiling with it, to six -- but the
-  // three Codex threads it was counting are STILL RUNNING. Load seven, ceiling
-  // six, and Claude is under its own cap of six with four.
+  // Five slots an engine, ten on the Mac. Four Claude and three Codex sessions
+  // are up, seven of ten. The Codex login is quarantined: Codex capacity falls
+  // to 0 and the Mac's ceiling with it, to five -- but the three Codex threads
+  // it was counting are STILL RUNNING. Load seven, ceiling five, and Claude is
+  // under its own cap of five with four.
+  //
+  // IT USED TO BE BUILT OUT OF TWO CLAUDE LOGINS, back when a second login
+  // doubled an engine's cap. One account runs the work now (w-dac993a554), so
+  // the same shape is made with the number of agents instead.
   const overTheCeiling = () => {
-    build([], { authProfiles: ['default', HER_SECOND_CLAUDE], slots: 3 });
+    build([], { authProfiles: ['default', HER_SECOND_CLAUDE], slots: 5 });
     fill(4, 'claude');
     fill(3, 'codex');
     quarantine('codex');
@@ -187,7 +191,7 @@ describe('the whole-Mac ceiling when capacity shrinks under live sessions', () =
   it('is really crossed by a cooldown, so this is not a hypothetical', () => {
     overTheCeiling();
     expect(sup._load()).toBe(7);
-    expect(sup._capacity()).toBe(6);
+    expect(sup._capacity()).toBe(5);
     // And the per-engine test on its own would say yes.
     expect(sup._loadFor('claude')).toBeLessThan(sup._capacityFor('claude'));
   });

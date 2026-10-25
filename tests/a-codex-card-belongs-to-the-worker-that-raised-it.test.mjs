@@ -162,7 +162,7 @@ describe('one worker own cards', () => {
   beforeEach(() => {
     storeRoot = root();
     n = 0;
-    cards = createCodexApprovals({ storeRoot, uuid: () => `card-${n += 1}`, timeoutMs: 60_000, pollMs: 60_000 });
+    cards = createCodexApprovals({ storeRoot, uuid: () => `card-${n += 1}`, pollMs: 60_000 });
   });
 
   const raise = (scope, command) => scope.handle(...commandAsk(command));
@@ -234,7 +234,7 @@ describe(`an approval ${NAME} cannot draw a card for`, () => {
   it('is still refused, and now says so on the pipe the run is diagnosed from', async () => {
     const storeRoot = root();
     const said = [];
-    const cards = createCodexApprovals({ storeRoot, timeoutMs: 60_000, pollMs: 60_000 });
+    const cards = createCodexApprovals({ storeRoot, pollMs: 60_000 });
     const scope = cards.scope({ product: 'agentbox', item: 'w-one', say: (line) => said.push(line) });
 
     // A patch this worker never saw the item for, which is the one fileChange
@@ -250,7 +250,7 @@ describe(`an approval ${NAME} cannot draw a card for`, () => {
 
   it('says it for a permissions request too', async () => {
     const said = [];
-    const cards = createCodexApprovals({ storeRoot: root(), timeoutMs: 60_000, pollMs: 60_000 });
+    const cards = createCodexApprovals({ storeRoot: root(), pollMs: 60_000 });
     const scope = cards.scope({ product: 'agentbox', item: 'w-one', say: (line) => said.push(line) });
     await scope.handle('item/permissions/requestApproval', { threadId: 'T' });
     expect(said.join('\n')).toMatch(/item\/permissions\/requestApproval/);
@@ -260,7 +260,7 @@ describe(`an approval ${NAME} cannot draw a card for`, () => {
   // line on stderr.
   it('says nothing for a command it can draw', async () => {
     const said = [];
-    const cards = createCodexApprovals({ storeRoot: root(), uuid: () => 'card-1', timeoutMs: 60_000, pollMs: 60_000 });
+    const cards = createCodexApprovals({ storeRoot: root(), uuid: () => 'card-1', pollMs: 60_000 });
     const scope = cards.scope({ product: 'agentbox', item: 'w-one', say: (line) => said.push(line) });
     scope.handle(...commandAsk('ls'));
     expect(said).toEqual([]);

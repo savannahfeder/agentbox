@@ -39,6 +39,8 @@ flag="${3:-0}"
 git_dir=$(git rev-parse --absolute-git-dir 2>/dev/null) || exit 0
 common_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 0
 [ "$git_dir" = "$common_dir" ] || exit 0
+# A thread's folder laid down by a cloud run (see pre-commit).
+case "$(git rev-parse --show-toplevel 2>/dev/null)" in */.claude/worktrees/*) exit 0 ;; esac
 
 branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo '')
 [ "$branch" = "main" ] && exit 0

@@ -166,7 +166,7 @@ describe('every line says a key the app really has', () => {
   // top bar printed one letter for two different things. Scheduling is L
   // everywhere now and S belongs to the summary.
   it('runs C, E, L and the terminal chord', () => {
-    expect(app).toMatch(/case 'c': case 'C': case 'n': case 'N': e\.preventDefault\(\); setModal\('compose'\);/);
+    expect(app).toMatch(/case 'n': case 'N': e\.preventDefault\(\); setModal\('compose'\);/);
     expect(HINTS['new-task'][0].key).toBe('N');
     expect(HINTS.row.map((l) => l.key)).toEqual(['↵', 'E', 'L']);
     expect(HINTS.terminal[0].key).toBe('⌘J');

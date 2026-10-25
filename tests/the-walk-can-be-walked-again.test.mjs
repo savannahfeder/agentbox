@@ -78,7 +78,7 @@ describe('walking the onboarding again', () => {
 
   it('is wired to a handler that resets the walk and not the store', () => {
     expect(app).toContain('onFirstRun={walkAgain}');
-    const fn = app.slice(app.indexOf('const walkAgain = useCallback'), app.indexOf('}, []);', app.indexOf('const walkAgain = useCallback')));
+    const fn = app.slice(app.indexOf('const walkAgain = useCallback'), app.indexOf('\n  }, [', app.indexOf('const walkAgain = useCallback')));
     expect(fn).toContain('restartFirstRun(localStorage)');
     expect(fn).toContain('setRun({ ...RUN_START })');
     // Nothing in it may reach the store or the main process.

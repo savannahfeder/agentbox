@@ -17,6 +17,10 @@
 //   live          the browser copy on stand-ins, every drive: Codex, six at
 //                 once, logins out of usage, a quit and a Control-C mid-run,
 //                 replies landing where they were sent. ~10 min.
+//   setups        the real Claude Code on homes set up the way other people
+//                 set theirs up (hooks, connected tools, a key in a settings
+//                 file, two logins), against a stand-in model: a task and a
+//                 reply each (check-setups.mjs). Nothing billed. ~40 s a setup.
 //   real          the agent drives again on the Claude Code and Codex this Mac
 //                 has, signed in as they are, with one-word tasks. ~5-10 min.
 //   installed     the real .app, opened with `open` on a throwaway home, and
@@ -54,10 +58,10 @@ export const LIVE_FILES = [
   /^(main|shared|bin|renderer|mcp)\//,
   /^preload\.cjs$/,
   /^package(-lock)?\.json$/,
-  /^scripts\/lib\/stub-claude-worker\.mjs$/,
+  /^scripts\/lib\/(stub-claude-worker|claude-stub-model|stand-in-world)\.mjs$/,
   /^\.claude\/skills\/verify-agentbox\/scripts\//,
 ];
-export function layersFor(files, { all = false, quick = false, real = true, installed = true, breaker = true } = {}) {
+export function layersFor(files, { all = false, quick = false, real = true, installed = true, breaker = true, setups = true } = {}) {
   const hit = (rules) => files.filter((f) => rules.some((r) => r.test(f)));
   const machines = hit(MACHINE_FILES);
   const live = hit(LIVE_FILES);
@@ -71,6 +75,9 @@ export function layersFor(files, { all = false, quick = false, real = true, inst
       ? on(all ? '--all' : `touches how the app finds or starts a tool: ${machines.slice(0, 3).join(', ')}${machines.length > 3 ? ' …' : ''}`)
       : off('nothing here changes how the app finds or starts Claude Code or Codex'),
     live: appChanges ? on(liveWhy) : off('only docs, tests or scripts changed, which a user never runs'),
+    // Free (a stand-in model) but a real Claude Code per setup, about 40 s each.
+    setups: !appChanges ? off('nothing a user runs changed')
+      : quick ? off('--quick') : !setups ? off('--no-setups') : on('most bugs that reached people were about how their Claude Code was set up'),
     real: !appChanges ? off('nothing a user runs changed')
       : quick ? off('--quick') : !real ? off('--no-real') : on('every deploy runs real Claude Code and Codex'),
     installed: !appChanges ? off('nothing a user runs changed')
@@ -84,7 +91,7 @@ export function layersFor(files, { all = false, quick = false, real = true, inst
 // the reset it was told, so nothing can run after it on the same copy.
 export const DRIVE_ORDER = [
   'inbox-opens', 'new-thread', 'reply', 'codex-thread', 'many-at-once', 'reply-lands-where-shown',
-  'one-login-runs-out', 'restart-mid-run', 'ctrl-c-mid-run', 'every-login-runs-out',
+  'one-login-runs-out', 'restart-mid-run', 'ctrl-c-mid-run', 'undo-says-what-happened', 'every-login-runs-out',
 ];
 // On real Claude Code and Codex: the agent drives, with one-word tasks.
 export const REAL_ORDER = ['new-thread', 'reply', 'codex-thread', 'many-at-once'];
@@ -112,6 +119,7 @@ if (isMain) {
   const layers = layersFor(files ?? [], {
     all, quick: args.includes('--quick'),
     real: !args.includes('--no-real'), installed: !args.includes('--no-installed'), breaker: !args.includes('--no-breaker'),
+    setups: !args.includes('--no-setups'),
   });
   const out = path.join('/tmp', 'agentbox-verify', 'runs', `${new Date().toISOString().replace(/[:.]/g, '-')}-verify`);
   fs.mkdirSync(out, { recursive: true });
@@ -148,6 +156,8 @@ if (isMain) {
     }
   };
   if (layers.live.run) onCopy('live', [], drives('live', DRIVE_ORDER));
+  // Brings each copy up and down itself, one setup at a time.
+  if (layers.setups.run) results.push(['setups', node('check-setups.mjs', ['--out', path.join(out, 'setups')], 'other people\'s Claude Code setups')]);
   if (layers.real.run) onCopy('real', ['--real'], drives('real', REAL_ORDER));
   if (layers.installed.run) onCopy('installed', ['--installed'], drives('installed', INSTALLED_ORDER));
   // On a fresh stand-in copy, where it can make agents hang or run out on

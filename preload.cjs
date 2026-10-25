@@ -40,7 +40,8 @@ contextBridge.exposeInMainWorld('zero', {
   terminal: (payload) => ipcRenderer.invoke('zero:terminal', payload),
   agentUpdate: (payload) => ipcRenderer.invoke('zero:agent-update', payload),
   snapshot: () => ipcRenderer.invoke('zero:snapshot'),
-  refreshUsage: () => ipcRenderer.invoke('zero:refresh-usage'),
+  refreshUsage: (p) => ipcRenderer.invoke('zero:refresh-usage', p),
+  accountUsage: (payload) => ipcRenderer.invoke('zero:account-usage', payload),
   assistiveTech: () => ipcRenderer.invoke('zero:assistiveTech'),
   olderItems: (payload) => ipcRenderer.invoke('zero:older-items', payload),
   dashboard: (slug) => ipcRenderer.invoke('zero:dashboard', slug),
@@ -75,8 +76,14 @@ contextBridge.exposeInMainWorld('zero', {
   teamSync: () => ipcRenderer.invoke('zero:team-sync'),
   teamRoute: (payload) => ipcRenderer.invoke('zero:team-route', payload),
   teamReact: (payload) => ipcRenderer.invoke('zero:team-react', payload),
+  teamEdit: (payload) => ipcRenderer.invoke('zero:team-edit', payload),
+  micAccess: () => ipcRenderer.invoke('zero:mic-access'),
   teamMessage: (payload) => ipcRenderer.invoke('zero:team-message', payload),
+  rooms: (payload) => ipcRenderer.invoke('zero:rooms', payload),
+  teammates: (payload) => ipcRenderer.invoke('zero:teammates', payload),
+  takeJoin: () => ipcRenderer.invoke('zero:take-join'),
   threadEdit: (payload) => ipcRenderer.invoke('zero:thread-edit', payload),
+  moveItem: (payload) => ipcRenderer.invoke('zero:move-item', payload),
   // Repeating tasks. A rule, not a work item, so it has its own channels
   // rather than a flag on compose.
   repeats: () => ipcRenderer.invoke('zero:repeats'),
@@ -114,6 +121,9 @@ contextBridge.exposeInMainWorld('zero', {
   // The Claude Code threads she started herself in the last few days, which is
   // what she meant by her agents, and taking one as a task.
   agentThreads: () => ipcRenderer.invoke('zero:agent-threads'),
+  // Every chat the card's name field can search, which reaches a year back
+  // rather than ten days. Read once and kept by the window (w-6418318cd5).
+  searchAgentThreads: (payload) => ipcRenderer.invoke('zero:search-agent-threads', payload ?? {}),
   importThreads: (payload) => ipcRenderer.invoke('zero:import-threads', payload ?? {}),
   badge: (count) => ipcRenderer.invoke('zero:badge', count),
   // What the corner tag says when she is in another app: what is ready for
@@ -131,7 +141,7 @@ contextBridge.exposeInMainWorld('zero', {
   // What just arrived, not what to say about it. Whether she is looking at the
   // window is a fact only the main process holds, so the page reports and does
   // not decide (main/notify.mjs).
-  notify: (arrivals) => ipcRenderer.invoke('zero:notify', { arrivals }),
+  notify: (arrivals, needsYou) => ipcRenderer.invoke('zero:notify', { arrivals, needsYou }),
   stopSession: (payload) => ipcRenderer.invoke('zero:stop-session', payload),
   runNow: (payload) => ipcRenderer.invoke('zero:run-now', payload),
   reopen: (payload) => ipcRenderer.invoke('zero:reopen', payload),
@@ -172,6 +182,15 @@ contextBridge.exposeInMainWorld('zero', {
   claudeAddAccount: () => ipcRenderer.invoke('zero:claude-add-account'),
   setProjectSetting: (payload) => ipcRenderer.invoke('zero:settings-set-project', payload),
   setWorkspaceSetting: (payload) => ipcRenderer.invoke('zero:settings-set-workspace', payload),
+  cloudSignIn: (payload) => ipcRenderer.invoke('zero:cloud-signin', payload),
+  cloudAccountSignIn: (payload) => ipcRenderer.invoke('zero:cloud-account-sign-in', payload),
+  cloudAccountCancel: () => ipcRenderer.invoke('zero:cloud-account-cancel'),
+  cloudAccountReopen: () => ipcRenderer.invoke('zero:cloud-account-reopen'),
+  cloudAccountSignOut: () => ipcRenderer.invoke('zero:cloud-account-sign-out'),
+  cloudAccountPlan: () => ipcRenderer.invoke('zero:cloud-account-plan'),
+  cloudAccountPay: (payload) => ipcRenderer.invoke('zero:cloud-account-pay', payload),
+  cloudAccountBilling: () => ipcRenderer.invoke('zero:cloud-account-billing'),
+  cloudClipboardCode: () => ipcRenderer.invoke('zero:cloud-clipboard-code'),
   // What a project is CALLED, and the mark beside the name. Not settings: both
   // are written into the project's own project.json and travel with the folder.
   // `projectIcon` opens the picker itself, so no path off her disk ever crosses
@@ -232,6 +251,7 @@ contextBridge.exposeInMainWorld('zero', {
   setProductOrder: (payload) => ipcRenderer.invoke('zero:set-product-order', payload),
   setThreadPlaces: (payload) => ipcRenderer.invoke('zero:set-thread-places', payload),
   setThreadPins: (payload) => ipcRenderer.invoke('zero:set-thread-pins', payload),
+  setThreadOnMac: (payload) => ipcRenderer.invoke('zero:set-thread-on-mac', payload),
   setProductHidden: (payload) => ipcRenderer.invoke('zero:set-product-hidden', payload),
   approve: (payload) => ipcRenderer.invoke('zero:approve', payload),
   // The phone door (main/phone-link.mjs): { action: 'status' | 'on' | 'off' | 'reset' | 'via', via }.
@@ -276,6 +296,12 @@ contextBridge.exposeInMainWorld('zero', {
     const handler = (_e, payload) => fn(payload);
     ipcRenderer.on('zero:recovered', handler);
     return () => ipcRenderer.removeListener('zero:recovered', handler);
+  },
+  // A room invite link opened the app (Rooms, alpha).
+  onJoinRoom: (fn) => {
+    const handler = (_e, payload) => fn(payload);
+    ipcRenderer.on('zero:join-room', handler);
+    return () => ipcRenderer.removeListener('zero:join-room', handler);
   },
   // She clicked the banner. The window is already coming forward; this says
   // which row it was about, so she lands on it rather than on wherever she

@@ -173,10 +173,12 @@ describe('the Claude Code sessions the import offers', () => {
     expect(ids()).toEqual(expect.arrayContaining(['term-1', 'vscode-1', 'second-1', 'envdir-1', 'xdg-1']));
   });
 
-  it('marks the editor session as one, so the row says where it came from', () => {
-    expect(found.threads.find((t) => t.id === 'vscode-1').source).toBe('editor');
-    const row = threadImportRow(found.threads.find((t) => t.id === 'vscode-1'), { now: NOW });
-    expect(row.body).toContain('in your code editor');
+  // The row is the chat itself since w-62228098e6: it opens on what was typed
+  // into the editor rather than on a note saying where it came from.
+  it('marks the editor session as one, and its row opens on what was typed there', () => {
+    const editor = found.threads.find((t) => t.id === 'vscode-1');
+    expect(editor.source).toBe('editor');
+    expect(threadImportRow(editor).body).toBe(editor.firstSaid || editor.title);
   });
 
   it('offers a session found in two folders once, as its newest copy', () => {

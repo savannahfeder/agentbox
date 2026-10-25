@@ -4,40 +4,30 @@
 // with Claude Code 2.1.293: `claude -p /usage` on that login printed only the
 // "What's contributing" breakdown and no limits, and any real prompt on it
 // answered "Your organization has disabled Claude subscription access for
-// Claude Code". The app already had that account filed as org-blocked; the
-// usage box just never asked. Now it says the account's own sentence.
+// Claude Code". The account's tile says its own sentence in place of meters.
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
-import { ClaudeUsageSection } from '../renderer/src/components/Settings';
+import { PlaceTiles } from '../renderer/src/components/Settings';
 
-const now = 1_000_000;
 const blocked = 'Signed in, but its organization has turned Claude Code off. Only an admin of that workspace can turn it back on.';
-const reading = { engine: 'claude', profile: 'default', at: now - 60_000, limits: [{ span: 'week', qualifier: 'all models', name: 'This week', percent: 40 }] };
-const draw = (props = {}) => renderToStaticMarkup(React.createElement(ClaudeUsageSection, { reading: null, profile: 'default', email: 'one@example.test', now, ...props }));
+const limits = [{ span: 'week', qualifier: 'all models', name: 'This week', percent: 40, resetsText: null, resetsOn: null, resetsAt: null, zone: null }];
+const account = (extra) => ({ key: 'one', name: 'one@example.test', about: ['Max 20x'], ...extra });
+const draw = (a) => renderToStaticMarkup(React.createElement(PlaceTiles, { accounts: [account(a)] }));
 
-it('says why there is no reading when the account in use cannot run', () => {
+it('says why there is no reading when the account cannot run', () => {
   const html = draw({ trouble: blocked });
   expect(html).toContain('its organization has turned Claude Code off');
   expect(html).not.toContain('No usage reading yet');
-  expect(html).toContain('Refresh');
 });
 
-it('still says no reading yet when nothing is wrong with the account', () => {
-  const html = draw({ trouble: null });
-  expect(html).toContain('No usage reading yet');
-  expect(html).not.toContain('organization');
+it('keeps the command that signs a signed-out account back in', () => {
+  const html = draw({ trouble: 'Signed out.', cmd: 'CLAUDE_CONFIG_DIR=~/.claude-2 claude' });
+  expect(html).toContain('CLAUDE_CONFIG_DIR=~/.claude-2 claude');
 });
 
-it('keeps the meters of a reading it has, with the trouble beside them', () => {
-  const html = draw({ reading, trouble: 'At its limit. It rejoins on its own when the limit resets.' });
-  expect(html).toContain('40% used');
-  expect(html).toContain('At its limit');
-  expect(html).not.toContain('No usage reading yet');
-});
-
-it('never shows another account’s trouble once the reading belongs to this one', () => {
-  const html = draw({ reading, trouble: null });
-  expect(html).toContain('40% used');
+it('keeps the meters of a healthy account, with no trouble beside them', () => {
+  const html = draw({ limits });
+  expect(html).toContain('40%');
   expect(html).not.toContain('organization');
 });

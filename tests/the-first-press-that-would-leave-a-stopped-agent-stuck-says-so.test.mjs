@@ -99,8 +99,14 @@ describe('the first press that would leave one stuck says so instead', () => {
     // ONE LESSON, TWO VERBS. E and L say the same thing about this row, and two
     // wordings of it is two lessons; only the verb for what the key does may
     // differ. Same rule as STOPPED_REFUSAL in onboarding.ts.
+    //
+    // The way through is the one part that is not the lesson, and since
+    // w-c9da359466 it differs: E holds the press and says "press again", L
+    // opens the box with this sentence inside it and so has nothing to ask
+    // for. The lesson itself still has to match word for word.
     expect(e).not.toBe(l);
-    expect(e.replace('marking it done', '')).toBe(l.replace('putting it off', ''));
+    const lesson = (say) => say.replace('marking it done', '').replace('putting it off', '').replace(' Press again to go ahead.', '');
+    expect(lesson(e)).toBe(lesson(l));
   });
 
   it('and it says how to go ahead, because the press after this one lands', () => {
@@ -170,8 +176,13 @@ describe('every way a stopped row could leave the inbox goes past the nudge', ()
     expect(app).toMatch(/const batchDone[\s\S]{0,1600}?nudgeOnStopped\(targets, 'E'\)/);
   });
 
+  // L reaches the same guard by name rather than through `nudgeOnStopped`,
+  // because it CARRIES the sentence into the box instead of holding the press:
+  // L opens a text field, and a swallowed L leaves the next word running as
+  // shortcuts (w-c9da359466, renderer/src/keys.ts).
   it('and the snooze picker does, because L empties the row exactly as E does', () => {
-    expect(app).toMatch(/const openSnooze[\s\S]{0,2400}?nudgeOnStopped\(rows, 'L'\)/);
+    expect(app).toMatch(/const openSnooze[\s\S]{0,2400}?holdForStoppedAgent\(\{ rows, key: 'L'/);
+    expect(app).toMatch(/const openSnooze[\s\S]{0,2600}?setSnoozeNote\(lesson\?\.say/);
   });
 
   it('and all three go through one guard, which says it and writes it down once', () => {

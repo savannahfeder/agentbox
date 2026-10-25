@@ -12,6 +12,10 @@
 // A quoted name is required, so a comment that merely says "Thread" does not
 // count, and 'AgentThread.tsx' is not 'Thread.tsx'.
 //
+// A test that runs `git ls-files` with no path reads every tracked file, so it
+// runs for any source change
+// (tests/a-test-that-reads-every-file-runs-on-every-change.test.mjs).
+//
 // Usage: node scripts/lib/tests-that-read.mjs <changed files...>
 //   prints one test file per line.
 
@@ -20,6 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const READS_EVERY_FILE = /\[\s*['"]ls-files['"]\s*\]/;
 
 export function testsThatRead(changed, root = process.cwd()) {
   const sources = changed.filter((f) => f && !f.startsWith('tests/'));
@@ -36,7 +41,7 @@ export function testsThatRead(changed, root = process.cwd()) {
   for (const f of files) {
     let text = '';
     try { text = fs.readFileSync(path.join(root, 'tests', f), 'utf8'); } catch { continue; }
-    if (patterns.some((re) => re.test(text))) out.push(`tests/${f}`);
+    if (READS_EVERY_FILE.test(text) || patterns.some((re) => re.test(text))) out.push(`tests/${f}`);
   }
   return out;
 }

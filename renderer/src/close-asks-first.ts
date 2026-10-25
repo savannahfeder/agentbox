@@ -11,7 +11,7 @@
 // `answerCloseAsk` does what the answer says; this is only the words.
 import type { ParsedOption } from './format';
 
-export type CloseAct = 'decide' | 'start' | 'drop';
+export type CloseAct = 'decide' | 'start' | 'drop' | 'ship' | 'close';
 export interface CloseOption extends ParsedOption { act: CloseAct }
 export interface CloseAsk { ask: string; options: CloseOption[] }
 
@@ -46,5 +46,23 @@ export function closeAsk(waiting: number): CloseAsk | null {
   };
 }
 
+/** For a thread whose work never reached main (shared/not-shipped.mjs). */
+export function unshippedAsk(): CloseAsk {
+  return {
+    ask: "This thread's work never reached main.",
+    options: [
+      { n: 1, text: 'Have the agent ship it', recommended: true, act: 'ship' },
+      { n: 2, text: 'Close it anyway', recommended: false, act: 'close' },
+    ],
+  };
+}
+
 /** The row under the options that keeps the thread open, keyed esc. */
 export const KEEP_OPEN = 'Keep this thread open';
+
+/** The keys the question answers with while it is up. Every other key keeps
+ *  its usual meaning: the question can be off screen, and a key that silently
+ *  does nothing gives no hint that it is there. */
+export function closeAskOwnsKey(key: string): boolean {
+  return key === 'Escape' || key === 'Enter' || key === 'ArrowUp' || key === 'ArrowDown' || /^[1-9]$/.test(key);
+}

@@ -29,6 +29,8 @@ export interface ChatAgentsValue {
   stateOf: (item: WorkItem) => ThreadStateWord | null;
   filed: (item: WorkItem) => WorkItem[];
   open: (item: WorkItem) => void;
+  /** Start every agent a message mentions; the message as it is to be written. */
+  start?: (item: WorkItem, text: string) => Promise<string>;
 }
 export const ChatAgentsContext = createContext<ChatAgentsValue | null>(null);
 
@@ -121,8 +123,12 @@ export function useChatMentions({ on, where, text, setText, input, people }: {
     const at = el.selectionStart;
     const hit = mentions.findIndex((m) => at > m.start && at <= m.end);
     if (hit < 0) { setCardFor(null); return; }
-    const chip = layer.current?.querySelector<HTMLElement>(`[data-mention="${hit}"]`);
-    const card = el.closest('.dock-card')?.getBoundingClientRect();
+    // In the chat's editor the chip is drawn on the words themselves
+    // (./chat-editor.ts), so it is found in the card rather than in the layer.
+    // A thread's box (./ThreadPanel.tsx) is the card there.
+    const host = el.closest('.dock-card, .chat-thread-box');
+    const chip = (layer.current ?? host)?.querySelector<HTMLElement>(`[data-mention="${hit}"]`);
+    const card = host?.getBoundingClientRect();
     setCardX(chip && card ? Math.max(0, chip.getBoundingClientRect().left - card.left - 4) : 12);
     setCardFor(hit);
   };
@@ -206,7 +212,7 @@ function MentionCard({ x, mention, pick, ctx, onProject, onPick, onClose }: {
   useEffect(() => {
     const away = (e: MouseEvent) => {
       const t = e.target as HTMLElement;
-      if (box.current?.contains(t) || t.closest?.('.dock-input')) return;
+      if (box.current?.contains(t) || t.closest?.('.dock-input, .chat-thread-input')) return;
       onClose();
     };
     document.addEventListener('mousedown', away);
@@ -246,13 +252,13 @@ const Chevron = () => <svg className="car" viewBox="0 0 10 10" width="10" height
  * where it works and on what, what it said (or where it is if it has not said
  * anything yet), and the threads it filed in the list a task draws them in.
  */
-export function AgentAnswers({ text, md }: { text: string; md: (t: string) => ReactNode }) {
+export function AgentAnswers({ text, md, newest = false }: { text: string; md: (t: string) => ReactNode; newest?: boolean }) {
   const links = agentLinks(text).filter((l) => l.task && l.project);
   if (!links.length) return null;
-  return <>{links.map((l) => <AgentAnswer key={l.task!} link={l} md={md} />)}</>;
+  return <>{links.map((l) => <AgentAnswer key={l.task!} link={l} md={md} newest={newest} />)}</>;
 }
 
-function AgentAnswer({ link, md }: { link: AgentLink; md: (t: string) => ReactNode }) {
+function AgentAnswer({ link, md, newest }: { link: AgentLink; md: (t: string) => ReactNode; newest: boolean }) {
   const ctx = useContext(ChatAgentsContext);
   const team = useContext(TeamContext);
   const task = ctx?.find(link.project!, link.task!);
@@ -265,7 +271,7 @@ function AgentAnswer({ link, md }: { link: AgentLink; md: (t: string) => ReactNo
   const filed = task ? ctx!.filed(task) : [];
   const rows = (filed.length ? filed : task ? [task] : []).map((i) => ({ id: i.id, title: i.label || i.title, state: ctx!.stateOf(i) }));
   const said = task?.result
-    ? <ChatFold>{md(task.result)}</ChatFold>
+    ? <ChatFold newest={newest}>{md(task.result)}</ChatFold>
     : <div className="msg-body chat-agent-state">{
       !task && !card ? `Asked to work in ${where}. Only people in that project can open it.`
         : state === 'running' ? `Working on it in ${where}.`

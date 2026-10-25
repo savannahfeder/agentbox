@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { SettingsIcon } from './SettingsIcon';
 import type { TeamState, View } from '../types';
 import { Face } from '../team/people';
@@ -9,6 +9,7 @@ import { AppMark } from './AppMark';
 import { SidebarMove, SidebarUpdate } from './SidebarUpdate';
 import { changeLines, closedHere, readMoveClosed, readUpdateClosed, writeMoveClosed, writeUpdateClosed } from '../update-row';
 import { AccountMenu } from '../team/account-menu';
+import type { Invisible } from '../team/rooms/GoInvisible';
 /** ONE NUMBER IN THE SIDEBAR, ON INBOX, AND IT IS DRAWN IN THE TAB'S OWN TYPE.
  *
  *  w-5f02e7b525. Only Inbox shows a number, like a classic email client, and of
@@ -40,7 +41,17 @@ import { AccountMenu } from '../team/account-menu';
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove }: {
+export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, onSignIn, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove, invisible = null, inboxLabel = 'Threads', rail = false, onHover, groups = null, onGroupsPage = false, teammates = null, onTeammatesPage = false }: {
+  /** Each teammate's row under Groups (renderer/src/teammates), and whether one of their pages is up. */
+  teammates?: ReactNode; onTeammatesPage?: boolean;
+  /** The first row's name: Threads, or Inbox while its page holds groups too. */
+  inboxLabel?: string;
+  /** With Groups on (w-dcaa2c122e): narrow, wide only while pointed at, with no way to pin it open. */
+  rail?: boolean; onHover?: (on: boolean) => void;
+  /** Groups' rows under Inbox, and whether a group is the page, which unlights Inbox. */
+  groups?: ReactNode; onGroupsPage?: boolean;
+  // ROOMS (alpha): going invisible from your account menu.
+  invisible?: Invisible | null;
   // A NEW VERSION WAITING (SidebarUpdate.tsx). Null when there is none.
   // `version` is what its × closes, until a newer one arrives.
   update?: { installing: boolean; version?: string | null; changes?: string[]; behind?: number | null; error?: string | null } | null; onUpdate?: () => void;
@@ -63,7 +74,7 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   // box. It is no longer a row here (w-1b574413db: single-player for launch);
   // your account menu still offers it. `onAccount` is your own row, which
   // opens the same pane without the cursor in the email box.
-  team?: TeamState | null; onInvite?: () => void; onAccount?: () => void; onFeedback?: () => void;
+  team?: TeamState | null; onInvite?: () => void; onAccount?: () => void; onSignIn?: () => void; onFeedback?: () => void;
   // The last row of your account menu.
   onSignOut?: () => void;
   view: View; collapsed: boolean; onToggle: () => void; onView: (view: View) => void; onSearch: () => void; onCompose: () => void;
@@ -74,24 +85,33 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   const [updateClosed, setUpdateClosed] = useState(() => readUpdateClosed());
   const closeUpdate = () => { const version = update?.version ?? ''; setUpdateClosed(version); writeUpdateClosed(globalThis.localStorage, version); };
   const showUpdate = !!update && !!onUpdate && !closedHere(update, updateClosed);
-  const updateCard = showUpdate && !collapsed;
+  // The rail widens under the pointer, so the card there stays in the row's
+  // place in the foot list and grows upward (SidebarUpdate.tsx, `RailCard`).
+  const asRow = collapsed || rail;
+  const updateCard = showUpdate && !asRow;
   const updateView = showUpdate && update && onUpdate && <SidebarUpdate installing={update.installing} changes={changeLines(update)} error={update.error ?? null}
-    collapsed={collapsed} onRestart={onUpdate} onClose={closeUpdate} />;
+    collapsed={collapsed} rail={rail} onRestart={onUpdate} onClose={closeUpdate} />;
   // THE MOVE CARD STANDS WHERE THE UPDATE CARD WOULD, and never both: a
   // version on the disk is the news, and a copy that cannot update itself
   // never has one. The place whose card was closed is kept under its own key.
   const [moveClosed, setMoveClosed] = useState(() => readMoveClosed());
   const closeMove = () => { const place = move?.place ?? ''; setMoveClosed(place); writeMoveClosed(globalThis.localStorage, place); };
   const showMove = !showUpdate && !!move && !!onMove && moveClosed !== (move.place ?? '');
-  const moveCard = showMove && !collapsed;
+  const moveCard = showMove && !asRow;
   const moveView = showMove && move && onMove && <SidebarMove place={move.place} error={move.error ?? null}
-    collapsed={collapsed} onMove={onMove} onClose={closeMove} />;
+    collapsed={collapsed} rail={rail} onMove={onMove} onClose={closeMove} />;
   const waiting = Number.isFinite(inboxCount) ? Math.max(0, Math.floor(inboxCount)) : 0;
   const waitingDescription = `${waiting} ${waiting === 1 ? 'thread' : 'threads'} waiting`;
   // ONE PAGE OF YOUR THREADS (approved 2026-10-01). In progress, Scheduled and
   // Closed are tabs on the Inbox now, not places in the sidebar, so the Inbox
   // tab is lit on every one of them.
-  const inboxLit = !page && (['inbox', 'progress', 'snoozed', 'done', 'all'] as string[]).includes(view);
+  const inboxLit = !page && !onGroupsPage && !onTeammatesPage && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view);
+  // A pointer passing over on its way somewhere else does not open it.
+  const hoverAt = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hover = rail && onHover ? {
+    onMouseEnter: () => { hoverAt.current = setTimeout(() => onHover(true), 140); },
+    onMouseLeave: () => { if (hoverAt.current) clearTimeout(hoverAt.current); hoverAt.current = null; onHover(false); },
+  } : {};
   const me = team?.signedIn ? team.me : null;
   const teamName = team?.team?.name ?? Name;
   // A team wears its initial. With no team the corner names the app itself, so
@@ -118,17 +138,17 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   // `:last-child` rule close the gap under Settings (workspace-navigation.css).
   const corner = me
     ? (onAccount
-      ? <AccountMenu me={me} now={Date.now()} collapsed={collapsed} onAccount={onAccount} onInvite={onInvite} onSettings={onSettings} onSignOut={onSignOut} />
+      ? <AccountMenu me={me} now={Date.now()} collapsed={collapsed} onAccount={onAccount} onInvite={onInvite} onSettings={onSettings} onSignOut={onSignOut} invisible={invisible} />
       : <><Face person={me} me /><span>{me.name || me.email}<small>{me.email}</small></span></>)
     : team?.configured && onTeam
       ? <button type="button" className="th-me-signin" aria-label="Sign in to your team" onClick={onTeam}>Sign in to your team</button>
       : null;
-  return <aside className="workspace-navigation" aria-label="Workspace">
+  return <aside className={`workspace-navigation${rail ? ' gt-rail-nav' : ''}`} aria-label="Workspace" {...hover}>
     {/* THE TOGGLE SITS BESIDE THE TEAM'S NAME, at the top, where sidebars keep
         it (2026-10-01). Collapsed, the mark itself is the way back
         open, and shows the sidebar icon under the pointer. */}
     <div className="th-team" title={collapsed ? undefined : teamName}>
-      {collapsed ? (
+      {rail ? <>{mark}<span className="th-team-name">{teamName}</span></> : collapsed ? (
         <button type="button" className="workspace-toggle th-mark-btn" data-hint="sidebar" aria-label="Expand sidebar" title="Expand sidebar" onClick={onToggle}>
           {mark}
           <span className="th-mark-open" aria-hidden="true"><SidebarToggleIcon collapsed /></span>
@@ -140,12 +160,14 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
       </>}
     </div>
     <nav className="workspace-tabs" aria-label="Threads">
-      <button data-tab="inbox" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label="Threads" aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `Threads · ${waitingDescription}` : collapsed ? 'Threads' : undefined} onClick={() => onView('inbox')}><SidebarIcon view="inbox" /><span>Threads</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
+      <button data-tab="inbox" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label={inboxLabel} aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `${inboxLabel} · ${waitingDescription}` : collapsed ? inboxLabel : undefined} onClick={() => onView('inbox')}><SidebarIcon view="inbox" /><span>{inboxLabel}</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
       {/* THERE IS NO TEAM TAB (w-05ff3d1438, 2026-10-01). The Team page and
           the Inbox were one question on two pages, so they are one page: the
           faces at the end of the Inbox's tab bar pick whose threads are on
           it. `onTeam` is still the sign-in link at the foot. */}
     </nav>
+    {groups}
+    {teammates}
     <div className="workspace-bottom">
       {/* The card sits above the foot list; with the sidebar shut it is a
           row inside it (SidebarUpdate.tsx). */}
@@ -176,6 +198,7 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
             INVITE PEOPLE LEFT THE SIDEBAR THE SAME DAY: "we're in
             single-player mode for what we're going to launch soon." Inviting
             is still in your account menu and in Settings. */}
+        {onSignIn && <button aria-label="Sign in" title="Sign in" onClick={onSignIn}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><g transform="translate(12 12) scale(.8) translate(-12 -12)" strokeWidth="1.5625"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.3-6 8-6s6.8 2 8 6"/></g></svg><span>Sign in</span></button>}
         {onFeedback && <button aria-label="Feedback" title="Feedback" onClick={onFeedback}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><g transform="translate(12 12) scale(.8) translate(-12 -12)" strokeWidth="1.5625"><path d="M2.5 11.5 21.5 3l-5 18-5-6.5z"/><path d="M11.5 14.5 21.5 3"/><path d="m11.5 14.5-1.2 6 3-3.6"/></g></svg><span>Feedback</span></button>}
         {onInstructions && <button aria-label="Instructions" aria-current={page === 'instructions' ? 'page' : undefined} title="Instructions for every agent" onClick={onInstructions}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 16h6"/></svg><span>Instructions</span></button>}
         {onSettings && <button aria-label="Settings" aria-current={page === 'settings' ? 'page' : undefined} title="Settings" onClick={onSettings}><SettingsIcon/><span>Settings</span></button>}

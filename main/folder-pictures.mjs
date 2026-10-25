@@ -17,10 +17,10 @@ import { servable } from './img-scheme.mjs';
 
 const PICTURE = /\.(png|jpe?g|gif|webp|avif)$/i;
 
-export function folderPictures({ src, product, products = [], accountRoot, storeRoot, limit = 60, fs = fsDefault }) {
+export async function folderPictures({ src, product, products = [], accountRoot, storeRoot, limit = 60, fs = fsDefault }) {
   if (typeof src !== 'string' || !src.trim()) return { ok: false, error: 'No folder was named.' };
   const named = src.replace(/\/+$/, '');
-  const found = resolveArtifact({ src: named, product, products, accountRoot, storeRoot, fs });
+  const found = await resolveArtifact({ src: named, product, products, accountRoot, storeRoot, fs });
   if (!found.ok) return { ok: false, error: found.error };
   const own = products.find((p) => p.slug === product) ?? null;
   const roots = [accountRoot, own?.dir, own?.repoPath].filter(Boolean);

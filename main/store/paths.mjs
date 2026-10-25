@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { MACHINERY } from './home.mjs';
 
 // The .git / .env deny-list, shared by EVERY creation-file access point: the
 // agent tools (main/agent/tools.mjs), the folder-backed materialize walk
@@ -29,6 +30,16 @@ export function deniesGitOrEnvPath(rel) {
   if (rel == null) return false;
   const norm = normalizeForDenyCheck(rel);
   return GIT_PATH_RE.test(norm) || ENV_PATH_RE.test(norm);
+}
+
+// True iff any segment of `rel` is a MACHINERY name (main/store/home.mjs). A
+// document written to one of those names is swept into the real ledger by
+// ensureMachineryDir, so the store write boundary must reserve them. Normalized
+// like deniesGitOrEnvPath so case or a backslash cannot alias one. null -> false.
+const MACHINERY_SET = new Set(MACHINERY);
+export function deniesMachineryPath(rel) {
+  if (rel == null) return false;
+  return normalizeForDenyCheck(rel).split('/').some((seg) => MACHINERY_SET.has(seg));
 }
 
 // Containment: resolve rel against root; realpath the nearest EXISTING

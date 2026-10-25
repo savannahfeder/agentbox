@@ -1,93 +1,26 @@
-// A CODEX TURN, IN THE WORDS AGENTBOX ALREADY DRAWS.
+// Readers that turn Codex app-server notifications into the same session
+// fields, trace lines, tail and code artifact that the Claude Code readers
+// produce, so nothing downstream needs to know which engine ran. They take
+// `(method, params)` because the transport (main/codex-app-server.mjs) has
+// already parsed each event. Each reader catches its own errors, because one
+// that throws inside the supervisor's stream loop goes silent for the rest of
+// the session.
 //
-// main/codex-app-server.mjs is the transport: one child process speaking
-// newline-delimited JSON-RPC 2.0, approvals answered or refused, threads
-// routed. It hands its caller notifications and nothing else. THIS file is the
-// layer above it, and its whole job is that a Codex run reaches her page
-// looking like every other run.
+// Facts about the Codex protocol that the code depends on:
 //
-// The supervisor runs four independent readers over every line a Claude Code
-// worker prints (main/supervisor.mjs:4085-4290), and a fifth reader over the
-// finished session (main/code-change.mjs):
+// - A `fileChange` `diff` is a unified diff for an `update` but raw file
+//   content for an `add`, so `hunksFor` checks the string, not the kind.
+// - There is no `turn/failed` notification. A failure is `turn/completed` with
+//   `turn.status: "failed"` and `turn.error`. `turn/failed` is still handled in
+//   case a release adds it.
+// - `TurnStatus` is completed, interrupted, failed or inProgress. An
+//   interrupted turn has no answer, the same as a failed one.
+// - `move_path` exists only on the `update` kind, so a rename is an update
+//   that moved.
+// - `reasoning` items arrive empty, so they are not traced.
 //
-//   captureStream       -> session.sessionId, session.result, session.resultIsError
-//   streamingText       -> session.saying, the sentence being typed right now
-//   traceStreamLine     -> the persisted trace, "HH:MM:SS  [Bash] <cmd>"
-//   summarizeStreamLine -> the short In Progress tail
-//   changeFromTranscript-> the artifact she opens, files and hunks and rows
-//
-// Each has a twin below producing THE SAME OUTPUT SHAPE, so a later slice can
-// swap readers per engine and nothing downstream — the thread, the byline, the
-// file chips, the diff pane, the header arithmetic — needs to know which engine
-// ran. That is not a tidiness preference.
-//
-// ONE STRUCTURAL DIFFERENCE, AND IT IS IN EVERY SIGNATURE HERE. Claude Code's
-// readers take a raw LINE and parse it themselves, five times over, because
-// stdout is where the events arrive. app-server's events arrive already parsed:
-// the transport does the framing, the JSON and the routing, and calls
-// `onNotification(method, params)`. So every reader below takes `(method,
-// params)` instead of a line, and none of them contains a `JSON.parse`. The
-// try/catch is still there, because a reader that throws inside the
-// supervisor's stdout loop takes the reader out for the rest of the session,
-// which is a worker that keeps running and reports nothing — the exact silent
-// shape CLAUDE.md files under "A WORKER THAT DID NOT FINISH DELIVERED NOTHING".
-//
-// `git show 258d71d^:main/codex.mjs` is the 08-25 original, worth reading for
-// intent. ITS EVENT PARSING IS OBSOLETE TWICE OVER: it targeted `codex exec
-// --json`, whose item types are snake_case (`agent_message`, `file_change`) and
-// which carries neither `phase` nor a real diff. One thing is carried over
-// deliberately and credited here rather than rediscovered — see the trace.
-//
-// ------------------------------------------------------------------------
-// MEASURED ON THIS MAC 2026-09-04 AGAINST codex-cli 0.148.0, over a 223-frame
-// capture of one real turn, plus the CLI's own
-// `codex app-server generate-json-schema` dump for the cases that turn did not
-// produce. Six things differ from the written brief, and each is a whole
-// feature that fails silently rather than loudly:
-//
-// 1. A `fileChange` OF KIND `add` IS NOT A DIFF. The `update` entry read
-//    "@@ -1 +1 @@\n-...\n+...\n"; the `add` entry in the same event was the
-//    string "hello\n" — raw file content, no `@@` header. A reader that
-//    assumes a unified diff per file finds zero hunks in every file a run
-//    creates. `hunksFor` therefore branches on the EVIDENCE IN THE STRING, not
-//    on the kind word, which also means a `delete` (which that run did not
-//    produce) is read correctly whichever of the two shapes it turns out to be.
-//
-// 2. THERE IS NO `turn/failed` NOTIFICATION. `ServerNotification` lists
-//    `turn/started`, `turn/completed` and `turn/moderationMetadata`, and the
-//    string "turn/failed" appears in none of the schema files. Failure arrives
-//    as `turn/completed` with `turn.status: "failed"` and a populated
-//    `turn.error` — "Only populated when the Turn's status is failed". A reader
-//    waiting for `turn/failed` marks every failed run a success. It is still
-//    ANSWERED below, because a notification we drop is a run that reads as
-//    unfinished forever, and being wrong in that direction costs nothing.
-//
-// 3. `TurnStatus` HAS FOUR VALUES: completed | interrupted | failed |
-// inProgress. `interrupted` is what `turn/interrupt` leaves behind and it is a
-// run with no answer exactly as much as `failed` is.
-//
-// 4. A COMMAND IN FLIGHT IS `inProgress`, camelCase, not `in_progress`.
-//    `CommandExecutionStatus` = inProgress | completed | failed | declined, and
-//    `declined` is the status an approval this app refuses produces.
-//
-// 5. `reasoning` ITEMS WERE EMPTY — all five of them, `summary: []` and
-//    `content: []`. See the trace for what that settles.
-//
-// 6. `move_path` EXISTS ONLY ON THE `update` KIND. `PatchChangeKind` is a
-//    three-way union and only `UpdatePatchChangeKind` carries the field. A
-//    rename is an update that moved; `add` and `delete` have nothing but
-//    `type`.
-//
-// WHAT THIS FILE DELIBERATELY DOES NOT READ, so the next slice does not have to
-// re-derive that it is missing rather than broken. 0.148.0's `ThreadItem` union
-// has eighteen members; five are handled here and the rest are ignored. The one
-// that will matter first is `mcpToolCall` (`{server, tool, arguments, status,
-// result, error, durationMs}`), because the store is an MCP server and a
-// worker's claim/update/finish calls are therefore invisible in a Codex trace
-// today where they are `[mcp__<store>__update_item]` lines in a Claude one.
-// It is left out because no measured run has produced one and this repo's rule
-// is that a mapping is verified by running it; `plan`, `webSearch`,
-// `subAgentActivity` and `contextCompaction` are the same. None of them throws.
+// Item types not handled here, such as `mcpToolCall`, `plan` and `webSearch`,
+// are ignored.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -95,85 +28,36 @@ import { shortPath } from './code-change.mjs';
 import { filesFromPatch } from './git-change.mjs';
 
 /**
- * A block of prose long enough that keeping it in memory is a bug rather than
- * a feature. Her longest single line of agent prose over 1,664 traces is 423
- * characters, so this is fifty times the worst real one; past it the block is
- * dropped and the trace is left to deliver it whole, which costs her the live
- * view of one paragraph and cannot cost the process anything.
- *
- * AND IT IS NOW THE ONLY COPY. It was written twice for one slice, because the
- * supervisor kept a module-private `const` that the reader slice was not
- * allowed to edit. Two copies of a rule become two different rules within a
- * week, and this pair drifting apart would be a live sentence one engine drops
- * at 20,000 characters and the other keeps, sitting under its own traced copy
- * on her screen forever. main/supervisor.mjs imports this one.
+ * The longest live sentence kept in memory. Past it the live text is dropped
+ * and the trace delivers the block whole. This is the only copy; the Claude
+ * Code stream reader (main/harnesses/claude-stream.mjs) imports it.
  */
 export const SAYING_CAP = 20_000;
 
 /**
- * The two guards that decide whether a path belongs in her artifact at all.
- *
- * COPIED, CHARACTER FOR CHARACTER, from `collector` in main/code-change.mjs,
- * which is module-private there and which this slice may not modify. CLAUDE.md
- * is right that two copies of a rule become two different rules within a week,
- * so the copies are EXPORTED and
- * tests/a-codex-turn-reads-like-every-other-run-on-her-page.test.mjs asserts
- * they still match the source text of the original. Edit either and the other
- * goes red naming the file it has to move with.
- *
- * They matter more here than they do there. Codex reports an absolute path for
- * every file it touches, including its own /tmp scratch, so these are the
- * common case rather than the corner one.
+ * Paths that never belong in a run's code artifact. Copied from main/code-change.mjs;
+ * tests/a-codex-turn-reads-like-every-other-run-on-her-page.test.mjs checks the
+ * two copies still match.
  */
 export const NOT_CODE = /(^|\/)(node_modules|\.git)\//;
 export const SCRATCH = /^\/(private\/)?(tmp|var\/folders)\//;
 
-/* =============================== the answer =============================== */
-
 /**
- * The final word of a turn, and the id a reply resumes.
- *
- * THE HARD DIFFERENCE FROM CLAUDE CODE, AND THE WHOLE REASON THIS FUNCTION IS
- * NOT A RENAME OF `captureStream`: app-server has no `result` event. Claude
- * Code's stream ends with one `{type:'result'}` line carrying the answer and an
- * `is_error` flag, and `captureStream` keys on it. There is nothing shaped like
- * that here. What replaces it is `phase` on an `agentMessage`: measured over
- * one real turn, five agent messages, four of them `commentary` and EXACTLY ONE
- * `final_answer`.
- *
- * So the answer is the final_answer message and nothing else. The 08-25 build
- * took the LAST message it saw, because `codex exec` gave it no phase to read;
- * doing that here puts a progress note on her row as the worker's finished
- * word, and `awaitingHer` (supervisor.mjs) then reports a row as waiting on her
- * when the work never finished. That is her 2026-08-06 incident — a `done` she
- * never saw — arriving through a new door.
- *
- * LAST-WINS SURVIVES AS THE COMPATIBILITY PATH AND ONLY THAT. The schema says
- * plainly that "providers do not emit this consistently, so callers must treat
- * None as 'phase unknown' and keep compatibility behavior for legacy models".
- * An unphased message therefore sets the answer — but never over a real
- * final_answer, and never after one has arrived.
- *
- * A TURN THAT ENDS WITH NO FINAL ANSWER GETS NO RESULT, ON PURPOSE. That is
- * what `saidNothingSheCanUse` is for: `result == null` is the first of the
- * three shapes CLAUDE.md names, "said nothing at all -> the supervisor speaks
- * for it", and there is already a writer for it in OUR words. Inventing a
- * result here would take that row away from the writer that exists and hand her
- * a guess in the agent's voice. The one thing worth doing is looking once more
- * where the answer might still be: `turn/completed` carries `turn.items`, and
- * in the measured run that array held exactly the final agentMessage even
- * though `itemsView` was "summary". So a run whose item events were missed
- * still has its answer in the last frame, for free.
+ * Sets the session's id and its final answer. app-server has no `result`
+ * event, so the answer is the `agentMessage` with `phase: "final_answer"`.
+ * A `commentary` message is never the answer, or a progress note would read as
+ * the finished word. A message with no phase still counts, because Codex's
+ * schema says older models may not send one, but never over a final answer.
+ * A turn that ends with no final answer gets no result, so the supervisor's own
+ * "said nothing" handling takes over.
  */
 export function captureCodexEvent(session, method, params) {
   try {
     if (!session || typeof method !== 'string') return;
     const p = params ?? {};
 
-    // The id `thread/resume` takes, and it is at `params.thread.id`. There is
-    // no `params.threadId` on this notification; reading the one that does not
-    // exist leaves every session unresumable with no symptom until she types a
-    // reply on a finished row.
+    // The id `thread/resume` takes is at `params.thread.id`. This notification
+    // has no `params.threadId`.
     if (method === 'thread/started') {
       const id = p.thread?.id;
       if (id) session.sessionId = String(id);
@@ -211,21 +95,18 @@ export function captureCodexEvent(session, method, params) {
         session.codexFinalAnswer = true;
         return;
       }
-      // A turn that failed after saying something still failed, and her row
-      // must not read as answered because a message got through first.
+      // A turn that failed after a message got through still failed.
       session.result = turnTrouble(turn, status);
       session.resultIsError = true;
     }
-  } catch { /* a reader that throws is a session that goes quiet */ }
+  } catch { /* see the note at the top of this file */ }
 }
 
-/** completed | interrupted | failed | inProgress, defaulting to the method. */
 function turnStatus(method, turn) {
   if (typeof turn?.status === 'string') return turn.status;
   return method === 'turn/failed' ? 'failed' : 'completed';
 }
 
-/** Why a turn did not finish, in whatever words the server gave us. */
 function turnTrouble(turn, status) {
   const why = String(turn?.error?.message ?? '').trim();
   const more = String(turn?.error?.additionalDetails ?? '').trim();
@@ -234,11 +115,8 @@ function turnTrouble(turn, status) {
 }
 
 /**
- * The final answer inside a turn's own item list, or null.
- *
- * ONLY a `final_answer` counts, never the last message in the list. The list
- * arrives as a summary view and a summary of a turn that narrated and then
- * died is narration.
+ * The final answer in `turn.items`, which still holds it when the item events
+ * were missed. Only a `final_answer` counts, never the last message.
  */
 function finalAnswerIn(items) {
   if (!Array.isArray(items)) return null;
@@ -250,30 +128,16 @@ function finalAnswerIn(items) {
   return null;
 }
 
-/* ============================ the live sentence =========================== */
-
 /**
- * THE SENTENCE THE AGENT IS TYPING RIGHT NOW, over app-server's own deltas.
+ * The sentence the agent is typing now, built from `item/agentMessage/delta`.
+ * Returns true when `session.saying` changed.
  *
- * Claude Code's half of that is `streamingText` reading
- * `--include-partial-messages` frames; `item/agentMessage/delta` is the same
- * channel here, 157 frames in the measured turn, with the text at
- * `params.delta`.
- *
- * The three rules are the supervisor's, unchanged, and each of them is load
- * bearing (see supervisor.mjs:4131 for the long form):
- *
- * - ONE BLOCK AT A TIME. An `item/started` for an agentMessage starts the next
- *   one from empty, so the live string and the string the trace will carry are
- *   the same string, and the thread can drop the live copy the moment the
- *   traced one arrives rather than guessing.
- * - NOT CLEARED WHEN THE MESSAGE FINISHES. The trace is written on one channel
- *   and read on another; clearing here blinks the sentence off her screen for
- *   however long the read takes and then puts it back.
- * - DROPPED AT THE CAP, NEVER CUT. A cut string never matches the traced one
- *   and would sit under it on her screen forever.
- *
- * Returns true when the string moved, which is what earns a push.
+ * - Each agentMessage starts from empty, so the live text matches the traced
+ *   block and the thread can drop it when the trace arrives.
+ * - It is not cleared when the message finishes, or it would blink off screen
+ *   until the trace is read.
+ * - Past `SAYING_CAP` it is dropped, never cut, because a cut string never
+ *   matches the traced one.
  */
 export function codexStreamingText(session, method, params) {
   try {
@@ -281,9 +145,8 @@ export function codexStreamingText(session, method, params) {
     const p = params ?? {};
 
     if (method === 'item/started') {
-      // Only prose resets it. A command starting or a patch being applied
-      // means this turn has moved on from talking, and the block already typed
-      // stays on screen until the trace delivers the same words.
+      // Only a new message resets it. A command or patch starting leaves the
+      // typed block on screen until the trace delivers it.
       if (p.item?.type !== 'agentMessage') return false;
       session.saying = '';
       session.sayingAt = Date.now();
@@ -302,44 +165,14 @@ export function codexStreamingText(session, method, params) {
   }
 }
 
-/* ================================ the trace =============================== */
-
 /**
- * The persisted trace line, in the format renderer/src/run-files.ts parses:
- * `/^\d\d:\d\d:\d\d {2}(.*)$/`, with a tool in brackets and its key argument
- * after it. Fuller than the tail, because "tool: Bash" answers nothing when the
- * founder asks what a session actually did.
+ * One persisted trace line, in the format renderer/src/run-files.ts parses:
+ * `HH:MM:SS  [Tool] argument`.
  *
- * ONLY `item/completed` IS TRACED, AND THE 08-25 BUILD ALREADY KNEW WHY: the
- * same item arrives on `item/started` with an empty output and again on
- * `item/completed` with the real one. Tracing both puts every command on her
- * page twice — three commands became six lines in the measured turn.
- *
- * A READ DONE WITH `sed` IS TRACED AS THE SHELL COMMAND IT WAS. Codex reads and
- * searches by running shell commands rather than by calling tools named Read
- * and Grep, so its work lines really are `[Bash] sed -n '1,200p' math.js` where
- * Claude Code's would be `[Read] math.js`. Rewriting one into the other is
- * Agentbox claiming a tool call Codex never made — and the command is also the
- * thing an approval card is raised about, so the honest spelling is the only
- * one that stays true next to the card. Her peers instruction cuts this way as
- * well as the other: equivalent does not mean identical.
- *
- * AND THE BRACKETS ON A FILE CHANGE ARE `Write` AND `Edit` ANYWAY, which is the
- * same call read the other way round. The bracket is the trace's own shared
- * vocabulary — `[Bash]` is already Claude Code's word for a shell command and
- * both engines use it — and renderer/src/run-files.ts matches
- * `/^(Write|Edit|NotebookEdit)$/` on it to find the files a run made for her.
- * A Codex worker that wrote her an .html through its patch tool would lose the
- * chip on its card under any other word. THAT is what marking Codex as lesser
- * would actually look like in the product. `Delete` and `Move` are new words
- * because Claude Code has no tool that does either, so there is nothing to
- * borrow and nothing to misrepresent.
- *
- * NOTHING IS WRITTEN FOR A `reasoning` ITEM. Claude Code's trace carries no
- * thinking, one surface should not grow two vocabularies, and the measurement
- * settles it besides: all five reasoning items in the captured turn had
- * `summary: []` and `content: []`, so a reasoning line would have been five
- * bare timestamps in a twenty-eight second run.
+ * Only `item/completed` is traced, because `item/started` carries the same item
+ * with empty output. Codex reads files with shell commands, and they are traced
+ * as `[Bash]`, the command it really ran. File changes use `Write` and `Edit`,
+ * because run-files.ts finds a run's files by those words.
  */
 export function traceCodexEvent(method, params) {
   try {
@@ -379,10 +212,8 @@ export function traceCodexEvent(method, params) {
       if (!turn || typeof turn !== 'object') return null;
       const status = turnStatus(method, turn);
       const bad = status !== 'completed';
-      // Claude Code's footer counts turns; Codex has exactly one turn per run,
-      // so that number would read "1 turns" forever and tell her nothing. The
-      // duration goes in its place, which is the fact the turn actually
-      // carries (`durationMs`, 27746 in the measured run).
+      // A Codex run is always one turn, so the footer shows the duration where
+      // Claude Code's shows a turn count.
       const span = Number.isFinite(turn.durationMs) ? `${(turn.durationMs / 1000).toFixed(1)}s` : '?s';
       const said = bad ? turnTrouble(turn, status) : (finalAnswerIn(turn.items) ?? '');
       return `\n${at}  == RESULT (${status}${bad ? ' ERROR' : ''} · ${span}) ==\n${said.slice(0, 4000)}`;
@@ -394,21 +225,14 @@ export function traceCodexEvent(method, params) {
   }
 }
 
-/** The changes on a fileChange item, always an array. */
 function changesOf(item) {
   return Array.isArray(item?.changes) ? item.changes : [];
 }
 
 /**
- * WHAT ONE FILE CHANGE DID, IN ONE WORD, AND THE ONLY COPY OF THAT RULE. Null
- * when the change names no file, which is the one shape that cannot be said out
- * loud at all.
- *
- * Exported because main/codex-approvals.mjs needs the same four words on the
- * approval card she reads BEFORE a patch is applied. A second copy of it would
- * be one edit away from a trace line saying `[Write]` under a card that said
- * `Edit` about the same change. `move_path` lives only on the `update` kind
- * (measurement 6 at the top of this file), so a rename is an update that moved.
+ * What one file change did, as Write, Delete, Move or Edit, or null when it
+ * names no file. The approval card in main/codex-approvals.mjs uses the same
+ * function, so the card and the trace use the same word.
  */
 export function fileVerbWord(change) {
   const from = String(change?.path ?? '').trim();
@@ -422,20 +246,15 @@ export function fileVerbWord(change) {
   return null;
 }
 
-/** One file change as its bracket and its path. Null when there is no path. */
 function fileVerb(change) {
   const word = fileVerbWord(change);
   if (!word) return null;
   const from = String(change.path).trim().slice(0, 200);
-  // Both ends of a move, because the path she would go looking for is the one
-  // it is at now and the one above it is the one it left.
   if (word === 'Move') return `[Move] ${from} -> ${String(change.kind.move_path).trim().slice(0, 200)}`;
   return `[${word}] ${from}`;
 }
 
-/* ================================= the tail =============================== */
-
-/** The In Progress tail wants the gist, in the same words Claude Code's does. */
+/** The short In Progress tail, in the same words the Claude Code reader uses. */
 export function summarizeCodexEvent(method, params) {
   try {
     const p = params ?? {};
@@ -471,59 +290,25 @@ export function summarizeCodexEvent(method, params) {
   }
 }
 
-/* =============================== the change =============================== */
-
 /**
- * HOW MANY FRAMES OF ONE RUN ARE WORTH HOLDING FOR ITS ARTIFACT.
- *
- * The other engine's conversation is on disk and is read once at the exit, so
- * it costs nothing while the run goes on. There is no such file here: an
- * app-server notification is delivered once and gone, so the only place the
- * conversation half of a Codex artifact can be assembled from is memory.
- *
- * The measured turn was 223 frames end to end and left five of the two kinds
- * this keeps, so five thousand is more than twenty times a whole real run's
- * frames and a thousand times its edits. Past it nothing further is kept and
- * the artifact is short by whatever came after -- which is a partial card and
- * not a broken one, because the DISK half is read independently and wins
- * wherever the two disagree (`mergeChange`, main/code-change.mjs). Growing
- * without a bound is the alternative, and a run that edits in a loop would take
- * her app down with it.
+ * The most frames one run keeps for its code artifact. app-server events are
+ * not saved to disk, so this half of the artifact can only be built from
+ * memory. Past the cap the artifact is partial, and the disk half read by
+ * `mergeChange` (main/code-change.mjs) still wins where the two disagree.
  */
 export const CHANGE_FRAME_CAP = 5_000;
 
 /**
- * AND HOW MANY BYTES, BECAUSE A FRAME CAP IS NOT A MEMORY CAP.
- *
- * The count above bounds how MANY frames are kept and says nothing about how
- * big each one is, and each one may carry up to the transport's own frame limit
- * (MAX_FRAME_LENGTH, 16 MiB). Five thousand of those is eighty gigabytes, which
- * is not a bound at all: it is her app dying on the exact run this cap was
- * written to survive, the one that edits in a loop.
- *
- * Sixteen mebibytes, which is one whole frame's worth of everything. The
- * measured turn's five kept frames were a few kilobytes between them, so this
- * is thousands of times a real run and still a number the process can hold. Past
- * it nothing further is kept and the artifact is short by whatever came after --
- * a partial card and not a broken one, because the DISK half is read
- * independently and wins wherever the two disagree (`mergeChange`,
- * main/code-change.mjs).
+ * The most characters of diff and text one run keeps, because a frame can be
+ * as large as the transport's 16 MiB frame limit, so a frame count alone does
+ * not bound memory.
  */
 export const CHANGE_BYTE_CAP = 16 * 1024 * 1024;
 
 /**
- * KEEP THE FRAMES THE ARTIFACT WILL NEED, AND NOTHING ELSE.
- *
- * Two kinds out of the eighteen in `ThreadItem`: the `fileChange` items, which
- * are the edits themselves, and the `agentMessage` items, which are where the
- * sentence beside a hunk comes from. Their ORDER is the whole of how the second
- * attaches to the first (`changeFromCodexTurn` takes the nearest preceding
- * message), so they are kept in one list rather than two.
- *
- * Called on the session's own event path, so it is written to be unable to
- * throw there: a reader that throws inside the supervisor's stream loop takes
- * itself out for the rest of the session, which is a worker that keeps running
- * and reports nothing.
+ * Keeps the `fileChange` and `agentMessage` frames the artifact needs, in one
+ * list, because `changeFromCodexTurn` pairs each change with the message just
+ * before it.
  */
 export function rememberCodexChange(session, method, params) {
   try {
@@ -532,28 +317,17 @@ export function rememberCodexChange(session, method, params) {
     if (type !== 'fileChange' && type !== 'agentMessage') return;
     const kept = session.codexChange ?? (session.codexChange = []);
     if (kept.length >= CHANGE_FRAME_CAP) return;
-    // AND THE SIZE OF WHAT IS ALREADY HELD, WHICH THE COUNT DOES NOT BOUND.
-    // A fileChange frame carries the whole per-file diff, so five thousand of
-    // them is only a bound if each one is small, and the one run this cap was
-    // written for -- the one that edits in a loop -- is exactly the run where
-    // they are not. Measured off the frame itself rather than off a guess: a
-    // diff is a string, and its length is the number that matters.
     const size = frameSize(params);
     const held = session.codexChangeBytes ?? 0;
     if (held + size > CHANGE_BYTE_CAP) return;
     session.codexChangeBytes = held + size;
     kept.push({ method, params });
-  } catch { /* an artifact is never worth a session */ }
+  } catch { /* see the note at the top of this file */ }
 }
 
 /**
- * Roughly how much of one frame this is going to hold on to.
- *
- * The two fields that actually carry weight are the per-file `diff` and the
- * agent's `text`; everything else on a `ThreadItem` is ids and enums. Counted
- * rather than JSON.stringify'd because this runs on the session's own event
- * path, once per item, and serialising a ten-megabyte diff to measure it is the
- * cost the cap exists to avoid.
+ * Roughly how big one frame is: the length of its `text` and each `diff`.
+ * Not JSON.stringify, which would cost the very memory the cap guards.
  */
 function frameSize(params) {
   const item = params?.item ?? {};
@@ -563,34 +337,17 @@ function frameSize(params) {
 }
 
 /**
- * WHAT THE RUN CHANGED, in the shape main/code-change.mjs already produces.
+ * What the run changed, in exactly the shape main/code-change.mjs produces:
+ * `{files:[{path, abs, hunks:[{rows, plus, minus, said?, at?}], plus, minus,
+ * at}], roots, plus, minus, editCount, withProse, startedAt, endedAt}`.
  *
- * The pane that draws it (renderer/src/components/CodeArtifact.tsx), the
- * arithmetic under it (renderer/src/code-artifact.ts) and the chip on the card
- * (renderer/src/run-files.ts) are untouched by this slice, so matching the
- * shape exactly IS the deliverable: `{files:[{path, abs, hunks:[{rows, plus,
- * minus, said?, at?}], plus, minus, at}], roots, plus, minus, editCount,
- * withProse, startedAt, endedAt}`.
- *
- * AND CODEX HANDS US THE HALF THAT WAS EXPENSIVE. The 08-25 build needed a
- * 161-line V4A patch parser to reconstruct what a run had changed out of
- * `codex exec`'s patch text. `item/completed` now carries a real per-file diff,
- * so the rows come out of the same unified-diff reader git's own changes go
- * through (`filesFromPatch`, main/git-change.mjs) rather than a second copy of
- * one. The only thing synthesized is the two-line file header that reader
- * expects; the hunk bodies are the server's own bytes.
- *
- * `events` are the notifications as the transport delivered them, `{method,
- * params}`, in order. `roots` are the checkouts this run's work happened in and
- * `since` is the moment to start from, both exactly as code-change.mjs means
- * them. `rememberCodexChange` below is what collects them.
+ * `events` are the `{method, params}` frames `rememberCodexChange` kept, in
+ * order. `roots` and `since` mean what they mean in code-change.mjs.
  */
 export function changeFromCodexTurn(events, { roots = [], since = 0 } = {}) {
   const into = collector({ roots });
-  // The agent's own sentence beside the hunk. Claude Code takes it from the
-  // text blocks of the same message the edit was in; Codex narrates in a
-  // separate agentMessage just before it applies the patch, so the nearest
-  // preceding message is the same sentence.
+  // Codex narrates in a separate agentMessage just before it applies a patch,
+  // so the sentence beside a hunk is the nearest preceding message.
   let said = '';
 
   for (const event of Array.isArray(events) ? events : []) {
@@ -617,13 +374,7 @@ export function changeFromCodexTurn(events, { roots = [], since = 0 } = {}) {
   return into.done();
 }
 
-/**
- * Where the file IS once the change has landed.
- *
- * A rename is filed under the path it moved to, which is the rule
- * main/git-change.mjs already states for git's own renames. A change she
- * opens has to lead to a file that exists.
- */
+/** Where the file is after the change. A rename is filed under its new path, as in main/git-change.mjs. */
 function destinationOf(change) {
   const to = typeof change?.kind?.move_path === 'string' ? change.kind.move_path.trim() : '';
   const from = String(change?.path ?? '').trim();
@@ -631,23 +382,16 @@ function destinationOf(change) {
 }
 
 /**
- * One file change as hunks of rows.
- *
- * THE BRANCH IS ON THE STRING, NOT ON THE KIND, and that is the measurement
- * from the top of this file: an `update` arrived as "@@ -1 +1 @@\n-...\n+...",
- * an `add` in the SAME event arrived as "hello\n". A delete did not occur in
- * that run at all, so guessing which shape it uses would be exactly the kind of
- * unverified mapping this repo refuses; asking the string instead answers for
- * every kind, including ones this CLI has not shipped yet.
+ * One file change as hunks of rows. It checks whether the string is a unified
+ * diff rather than trusting the kind, because an add arrives as raw content and
+ * the shape of a delete has not been observed.
  */
 function hunksFor(change) {
   const diff = String(change?.diff ?? '');
   if (!diff) return [];
   if (diff.startsWith('@@')) {
-    // The two header lines `filesFromPatch` opens a file on. A placeholder
-    // name rather than the real path, because that reader strips `a/` and `b/`
-    // prefixes and trims, and a real path with a space in it would come back
-    // wrong; the path is already known here and is never read back out of this.
+    // `filesFromPatch` needs a file header. A placeholder name is used because
+    // that reader trims names, and the real path is never read back from it.
     return filesFromPatch(`--- a/f\n+++ b/f\n${diff}`)[0]?.hunks ?? [];
   }
   const mark = change?.kind?.type === 'delete' ? '-' : '+';
@@ -662,7 +406,7 @@ function splitLines(text) {
   return out;
 }
 
-/** One line of what the agent said, the same shape code-change.mjs keeps. */
+/** The last non-empty line of what the agent said, as code-change.mjs keeps it. */
 function proseFrom(text) {
   const said = String(text ?? '').trim();
   if (!said) return '';
@@ -671,18 +415,10 @@ function proseFrom(text) {
 }
 
 /**
- * Each root, and also what the filesystem really calls it.
- *
- * Measured in main/code-change.mjs on 2026-08-26 and it bites harder here: the
- * app knew a checkout as `/tmp/proof/widget-repo` and an edit against
- * `/private/tmp/proof/widget-repo/math.js` matched no root and was dropped, so
- * a run that really did change her code finished with an artifact that did not
- * mention it. Codex reports the RESOLVED spelling for every path it touches, so
- * for this engine that is the ordinary case rather than the corner one.
- *
- * Resolved off the deepest ancestor that still exists rather than off the root
- * itself, because this runs after the work is over and CLAUDE.md's process
- * etiquette asks a session to remove its worktree as the last thing it does.
+ * Each root as given and as its real path. Codex reports resolved paths, such
+ * as /private/tmp for /tmp on macOS, which would otherwise match no root. The
+ * real path is taken from the deepest ancestor that still exists, because the
+ * worktree may already be removed when this runs.
  */
 function rootSpellings(roots) {
   const out = new Set();
@@ -706,11 +442,7 @@ function rootSpellings(roots) {
   return [...out];
 }
 
-/**
- * The tally, and the two rules that decide whether a file belongs in her
- * artifact at all. The same collector code-change.mjs keeps private, over
- * absolute paths that arrived in an event instead of in a transcript.
- */
+/** The same tally as the private collector in code-change.mjs, over absolute paths from events. */
 function collector({ roots = [] } = {}) {
   const files = new Map();
   const totals = { plus: 0, minus: 0, editCount: 0, withProse: 0, startedAt: 0, endedAt: 0 };
@@ -721,8 +453,8 @@ function collector({ roots = [] } = {}) {
       abs = String(abs ?? '').trim();
       if (!abs || NOT_CODE.test(abs)) return;
       const rel = shortPath(abs, spellings);
-      // Inside one of this run's own roots it is the product, wherever it
-      // sits. Outside all of them AND under scratch, it is nobody's.
+      // A path inside a root always counts, even under /tmp. Scratch outside
+      // every root is dropped.
       if (rel === null && SCRATCH.test(abs)) return;
       if (!rows.length) return;
       const p = rows.filter((r) => r[0] === '+').length;

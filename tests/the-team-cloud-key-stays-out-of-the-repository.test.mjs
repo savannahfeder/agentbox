@@ -31,6 +31,13 @@ describe('the team cloud config', () => {
     expect(ignored('cloud/team.config.json')).toBe(true);
   });
 
+  // Agentbox Cloud's sign-in settings carry the same address and key
+  // (main/cloud/account.mjs), so they stay out too (w-6633e825a7).
+  it('the cloud sign-in settings that carry the same key are never tracked either', () => {
+    expect(git('ls-files', 'cloud/cloud.public.json').trim()).toBe('');
+    expect(ignored('cloud/cloud.public.json')).toBe(true);
+  });
+
   it('ignores only that file: the database migrations and the example still go in', () => {
     expect(ignored('cloud/team.config.example.json')).toBe(false);
     expect(ignored('cloud/supabase/config.toml')).toBe(false);

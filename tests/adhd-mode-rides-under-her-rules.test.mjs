@@ -57,7 +57,7 @@ describe('ADHD mode rides under her rules only while it is on', () => {
 
   it('goes into the system prompt directly after the message rules', () => {
     const src = read('main/supervisor.mjs');
-    expect(src).toContain('[standing, project, messages, adhd]');
+    expect(src).toContain('[standing, project, teammate, messages, adhd]');
   });
 
   it('ships a default that is the brief file, so Reset puts it back', () => {

@@ -46,7 +46,7 @@ describe('an imported Codex conversation', () => {
 
   it('says where it came from rather than that an agent opened it', () => {
     const said = threadEvents(imported).map((e) => e.said);
-    expect(said).toContain('Brought in from Codex');
+    expect(said).toContain('Started in Codex');
     expect(said).not.toContain('An agent opened this');
   });
 
@@ -82,5 +82,29 @@ describe('any other row', () => {
     const openings = threadEvents(lines).filter((e) => e.field === 'body');
     expect(openings[0].said).toBe('An agent opened this');
     expect(openings[0].words).toBe('The footer has three fonts.');
+  });
+});
+
+// A FRESH IMPORT SENT NOTHING BACK. The yes also wrote a founder "open" over a
+// row that was already open, and the thread drew it as "You sent it back" under
+// Codex's answer: both power testers (w-62228098e6) asked what they had sent.
+// The yes now reopens only a row that was not open, one turned down before.
+describe('a Codex conversation brought in by the store', () => {
+  it('says nothing was sent back when it was brought in fresh', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const { Store } = await import('../main/store.mjs');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zero-codex-history-'));
+    const accountRoot = path.join(root, 'accounts', 'test-account');
+    fs.mkdirSync(accountRoot, { recursive: true });
+    const store = await new Store({ storeRoot: root, accountId: 'test-account', accountRoot, products: [] }).init();
+    const { slug } = store.createProduct({ name: 'Orders Api', repoPath: path.join(root, 'orders') });
+    store.importCodexThreads(slug, [{ id: 'abc', source: 'codex', folder: path.join(root, 'orders'), title: 'Kitchen summary', prompt: PROMPT, last: 'Want it at 6am or 7am?', waiting: true }]);
+    const { readLinesFrom } = await import('../main/store/work-items.mjs');
+    const lines = readLinesFrom(store.productDir(slug)).lines.map((l) => (typeof l === 'string' ? JSON.parse(l) : l));
+    const said = threadEvents(lines).map((e) => e.said);
+    expect(said).not.toContain('You sent it back');
+    expect(store.listItems().find((i) => i.labels.includes('codex:abc')).status).toBe('open');
   });
 });

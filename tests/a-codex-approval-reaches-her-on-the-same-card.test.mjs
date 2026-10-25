@@ -1,7 +1,7 @@
 // A CODEX WORKER'S GATED COMMAND REACHES THE SAME CARD A CLAUDE ONE DOES.
 //
 // main/codex-app-server.mjs already turns a server request into a callback
-// with a fifteen-minute deadline and a deny on every failure path. It was
+// that waits for her and denies on every failure path. It was
 // written with nobody on the other end of that callback, and said so: "the
 // slice that builds the card is the slice that passes a handler". This is that
 // slice, and the handler is joined to the spool Agentbox already has
@@ -206,25 +206,35 @@ describe('an approval that reaches the spool', () => {
     expect(logged.answer.allow).toBe(true);
   });
 
-  it('denies when she never answers, and stops holding the card open', async () => {
+  // THESE TWO USED TO SAY THE OPPOSITE (w-4b00022acb): a card she never
+  // answered denied itself after fifteen minutes, and her late click was
+  // dropped. The deadline is gone -- it cost a tester two nights' work and a
+  // commit reported as refused that nobody had refused -- so the card is still
+  // here, and her click, whenever it comes, is the thing that answers it.
+  // tests/a-permission-card-nobody-has-answered-waits-for-you has the story.
+  it('holds the card open as long as she has not answered', async () => {
     const store = root();
-    const spool = createCodexApprovals({ storeRoot: store, uuid: () => 'card-1', timeoutMs: 20, pollMs: 5 });
+    const spool = createCodexApprovals({ storeRoot: store, uuid: () => 'card-1', pollMs: 5 });
     const asked = spool.scope({ product: 'agentbox', item: 'w-1' }).handle(COMMAND, askToRun('git push'));
+    let settled = false;
+    asked.then(() => { settled = true; });
 
-    await expect(asked).resolves.toBe('decline');
-    expect(listPending(store)).toEqual([]);
-    expect(JSON.parse(fs.readFileSync(path.join(spoolDir(store), 'log.jsonl'), 'utf8').trim()).answer.timeout).toBe(true);
+    await after(60);
+    expect(settled).toBe(false);
+    expect(listPending(store).map((a) => a.id)).toEqual(['card-1']);
+    spool.close('done');
   });
 
-  // Her late click, after the deadline already said no. The turn was told no
-  // and has moved on, so this must not resolve anything a second time.
-  it('drops an answer that arrives after the deadline', async () => {
+  it('takes her answer whenever it comes, and only the first one', async () => {
     const store = root();
-    const spool = createCodexApprovals({ storeRoot: store, uuid: () => 'card-1', timeoutMs: 20, pollMs: 5 });
+    const spool = createCodexApprovals({ storeRoot: store, uuid: () => 'card-1', pollMs: 5 });
     const asked = spool.scope({ product: 'agentbox', item: 'w-1' }).handle(COMMAND, askToRun('git push'));
-    await expect(asked).resolves.toBe('decline');
+    await after(60);
 
-    expect(spool.settle('card-1', true)).toBe(false);
+    expect(spool.settle('card-1', true)).toBe(true);
+    await expect(asked).resolves.toBe('accept');
+    expect(spool.settle('card-1', false)).toBe(false);
+    expect(listPending(store)).toEqual([]);
   });
 
   // Deny is the default in every failure mode, including a spool that cannot
@@ -281,7 +291,7 @@ describe('the door the founder answers through', () => {
 describe('a worker that writes its own answer file', () => {
   const forge = async (allow) => {
     const store = root();
-    const spool = createCodexApprovals({ storeRoot: store, uuid: () => 'card-1', timeoutMs: 5_000, pollMs: 5 });
+    const spool = createCodexApprovals({ storeRoot: store, uuid: () => 'card-1', pollMs: 5 });
     const asked = spool.scope({ product: 'agentbox', item: 'w-1' }).handle(COMMAND, askToRun('git push'));
     await tick();
     fs.writeFileSync(path.join(spoolDir(store), 'card-1.answer.json'), JSON.stringify({ allow, at: Date.now() }));
@@ -321,15 +331,15 @@ describe('a worker that writes its own answer file', () => {
   // `listPending` hides the card, because that rule belongs to
   // main/approvals.mjs and is shared with the Claude path." True at the time,
   // and worse than it sounded -- a worker rewriting the forgery on a loop keeps
-  // ANY card, its own or another worker's, off her screen until the deadline
-  // denies it in silence.
+  // ANY card, its own or another worker's, off her screen for as long as the
+  // worker it belongs to stays parked on it.
   //
   // `listPending` checks the signature now (2026-09-05), so the shared rule
   // that carried the residue is the rule that removes it: a file the founder
   // did not write hides nothing, on either engine, not even for one poll.
   it('cannot hide her card at all, not even for one poll', async () => {
     const store = root();
-    const spool = createCodexApprovals({ storeRoot: store, uuid: () => 'card-1', timeoutMs: 5_000, pollMs: 5 });
+    const spool = createCodexApprovals({ storeRoot: store, uuid: () => 'card-1', pollMs: 5 });
     spool.scope({ product: 'agentbox', item: 'w-1' }).handle(COMMAND, askToRun('git push'));
     await tick();
 

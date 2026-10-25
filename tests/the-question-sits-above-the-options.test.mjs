@@ -64,12 +64,18 @@ describe('the question sits above the options', () => {
     expect(out.endsWith('.')).toBe(true);
   });
 
-  it('says nothing at all when the field has no sentence in it, and the old label stands in', () => {
+  it('says nothing at all when the field has no sentence in it, and a standing sentence takes its place', () => {
     expect(askLine({ body: OFFER })).toBe('');
     // The strip's markup lives in its own component since w-560647d4db, when it
     // moved off the reply card and onto the turn that offered it.
     const focus = readFileSync(new URL('../renderer/src/components/OptionsOffer.tsx', import.meta.url), 'utf8');
-    expect(focus).toMatch(/\{ask \|\| 'Their options · pick or write your own'\}/);
+    expect(focus).toMatch(/\{ask \|\| 'Pick one, or write your own answer'\}/);
+    // The heading is drawn in capitals, where "THEIR" named nobody on the
+    // screen and the middot joined a noun to an instruction. Read without the
+    // comments, which say so where the old line stood.
+    expect(focus.replace(/\{\/\*[\s\S]*?\*\/\}/g, '')).not.toContain('Their options');
+    const phone = readFileSync(new URL('../mobile/src/ui/ThreadParts.tsx', import.meta.url), 'utf8');
+    expect(phone).toContain("{ask || 'Pick one, or write your own answer'}");
   });
 
   it('is drawn as a sentence rather than in the label\'s small caps', () => {

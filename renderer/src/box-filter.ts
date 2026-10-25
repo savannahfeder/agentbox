@@ -13,6 +13,7 @@
 // rows. `tests/a-box-can-be-filtered-by-project-priority-or-agent.test.mjs`.
 
 import { engineLabel } from '../../shared/engines.mjs';
+import { shownPriority } from '../../shared/rank.mjs';
 import { PRIORITIES, priorityIdOf, type PriorityId } from './priority';
 import { isTroubleRow } from './trouble-row';
 import type { WorkItem } from './types';
@@ -48,18 +49,21 @@ export function harnessOf(item: Pick<WorkItem, 'labels'> & { engine?: string | n
   return 'claude';
 }
 
-type Row = Pick<WorkItem, 'product' | 'priority' | 'labels'> & { engine?: string | null };
+type Row = Pick<WorkItem, 'product' | 'priority' | 'labels'> & { engine?: string | null; wrote?: WorkItem['wrote'] };
 
-function matchesPart(item: Row, f: BoxFilter, part: FilterPart): boolean {
+// THE LEVEL IT RUNS AT, which is the level the row shows (shared/rank.mjs
+// shownPriority). `direct` names the conversation projects, whose level is the
+// message sorter's and is read as it is.
+function matchesPart(item: Row, f: BoxFilter, part: FilterPart, direct?: ReadonlySet<string>): boolean {
   if (part === 'project') return !f.project || item.product === f.project;
-  if (part === 'priority') return !f.priority || priorityIdOf(item.priority) === f.priority;
+  if (part === 'priority') return !f.priority || priorityIdOf(shownPriority(item, !!direct?.has(item.product))) === f.priority;
   return !f.harness || harnessOf(item) === f.harness;
 }
 
 const PARTS: FilterPart[] = ['project', 'priority', 'harness'];
 
-export function matchesBoxFilter(item: Row, f: BoxFilter, except?: FilterPart): boolean {
-  return PARTS.every((part) => part === except || matchesPart(item, f, part));
+export function matchesBoxFilter(item: Row, f: BoxFilter, except?: FilterPart, direct?: ReadonlySet<string>): boolean {
+  return PARTS.every((part) => part === except || matchesPart(item, f, part, direct));
 }
 
 export function isFiltering(f: BoxFilter): boolean {
@@ -73,9 +77,9 @@ export function isFiltering(f: BoxFilter): boolean {
  * advance after finishing a task (./advance) both read it, and when the advance
  * read the whole inbox instead it opened tasks the filter hid (w-27759abd33).
  */
-export function filterBox<T extends Row & { id?: string }>(rows: T[], f: BoxFilter): T[] {
+export function filterBox<T extends Row & { id?: string }>(rows: T[], f: BoxFilter, direct?: ReadonlySet<string>): T[] {
   if (!isFiltering(f)) return rows;
-  return rows.filter((i) => isTroubleRow(i) || isUpdateRow(i) || matchesBoxFilter(i, f));
+  return rows.filter((i) => isTroubleRow(i) || isUpdateRow(i) || matchesBoxFilter(i, f, undefined, direct));
 }
 
 /** Picking the value that is already on takes it off; anything else replaces it. */
@@ -122,10 +126,10 @@ const UP_FRONT = 5;
  * part that is on and ignores its own: with High picked, Urgent still says how
  * many urgent rows there are, rather than a row of zeroes.
  */
-export function filterMenu(rows: Row[], f: BoxFilter, products: Product[]): FilterMenu {
+export function filterMenu(rows: Row[], f: BoxFilter, products: Product[], direct?: ReadonlySet<string>): FilterMenu {
   const count = <K extends string>(part: FilterPart, key: (r: Row) => K) => {
     const m = new Map<K, number>();
-    for (const r of rows) if (matchesBoxFilter(r, f, part)) m.set(key(r), (m.get(key(r)) ?? 0) + 1);
+    for (const r of rows) if (matchesBoxFilter(r, f, part, direct)) m.set(key(r), (m.get(key(r)) ?? 0) + 1);
     return m;
   };
 
@@ -143,7 +147,7 @@ export function filterMenu(rows: Row[], f: BoxFilter, products: Product[]): Filt
     moreProjects = ranked.filter((p) => !projects.includes(p));
   }
 
-  const byLevel = count('priority', (r) => priorityIdOf(r.priority));
+  const byLevel = count('priority', (r) => priorityIdOf(shownPriority(r, !!direct?.has(r.product))));
   const priorities = PRIORITIES.map((p) => ({ value: p.id, label: p.label, count: byLevel.get(p.id) ?? 0, on: f.priority === p.id }));
 
   const byHarness = count('harness', harnessOf);

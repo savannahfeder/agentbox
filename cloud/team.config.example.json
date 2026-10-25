@@ -1,4 +1,8 @@
 {
   "url": "https://your-project-ref.example",
-  "anonKey": "your-project-anon-key"
+  "anonKey": "your-project-anon-key",
+  "phoneSite": "https://phone.your-site.example",
+  "contact": "privacy@your-site.example",
+  "operator": "Your Company Inc.",
+  "governingLaw": "the State of Delaware, United States"
 }

@@ -228,7 +228,7 @@ describe('the connection card', () => {
   // so the card has to be shown reading it.
   it('takes the trouble and says it in place of the connected line', () => {
     expect(block).toContain('trouble');
-    expect(block).toMatch(/const say = trouble/);
+    expect(block).toMatch(/const say = state === 'trouble' \? trouble/);
   });
 
   /*

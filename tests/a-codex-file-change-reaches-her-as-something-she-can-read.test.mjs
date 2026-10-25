@@ -239,7 +239,7 @@ describe('an approval joined to the change it is about', () => {
 describe('what one worker remembers of its own changes', () => {
   const store = () => {
     let n = 0;
-    return createCodexApprovals({ storeRoot: root(), uuid: () => `card-${n += 1}`, timeoutMs: 60_000, pollMs: 60_000 });
+    return createCodexApprovals({ storeRoot: root(), uuid: () => `card-${n += 1}`, pollMs: 60_000 });
   };
 
   it('turns the refusal into a card once the item has gone past', async () => {
@@ -259,7 +259,7 @@ describe('what one worker remembers of its own changes', () => {
 
   it('puts the paths and the change in the spool, where her screen reads them', async () => {
     const storeRoot = root();
-    const cards = createCodexApprovals({ storeRoot, uuid: () => 'card-1', now: () => 1234, timeoutMs: 60_000, pollMs: 60_000 });
+    const cards = createCodexApprovals({ storeRoot, uuid: () => 'card-1', now: () => 1234, pollMs: 60_000 });
     const scope = cards.scope({ product: 'agentbox', item: 'w-1' });
     scope.remember(...started('call_A', [add(`${REPO}/notes.txt`, 'hello\n')]));
     scope.handle(...patchAsk('call_A'));

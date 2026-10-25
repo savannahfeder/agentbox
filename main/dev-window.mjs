@@ -8,7 +8,7 @@
 // The change that hurts is one to App.tsx that adds, removes or moves a
 // hook, which is what a branch switch does to it. React Fast Refresh keeps a
 // component's state only while its hooks match, so App is rebuilt from nothing:
-// `snap` is null again, App.tsx draws `<div className="boot">the app</div>`, and
+// `snap` is null again, App.tsx draws its boot screen (`<Booting />`), and
 // every child of App is thrown away and remade. The window drops back to the
 // loading page, and an open artifact closes and reopens. The
 // page never navigates, which is why nothing in the dev server's log looked bad

@@ -12,3 +12,10 @@ export function feedbackPayload(p?: {
   files?: { name: string; type: string; data: string }[];
   app?: { version?: string; os?: string };
 }): { text: string; files: { name: string; type: string; data: string }[]; app: { version: string; os: string } };
+
+export function sendFeedback(p: {
+  url: string | null | undefined;
+  payload: { text: string; files: { name: string; type: string; data: string }[]; app?: { version: string; os: string } };
+  fetchImpl?: (url: string, init: RequestInit) => Promise<{ ok: boolean }>;
+  timeoutMs?: number;
+}): Promise<{ ok: boolean; error?: string }>;

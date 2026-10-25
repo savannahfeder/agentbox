@@ -142,7 +142,13 @@ describe('her own hand lifts what time alone would lift', () => {
     expect(sup._hasSlotFor('claude')).toBe(true);
   });
 
-  it('a signed-out login stays out: retrying it cannot help, however often she asks', () => {
+  // WITH THE OTHER LOGIN AT ITS LIMIT THERE IS NOWHERE FOR THE WORK TO GO, so
+  // both get a try. This used to hold the signed-out login back on the grounds
+  // that the capped one was working, which w-4338a63da6 showed it is not: her
+  // hand lifts a sign-in and never a limit. A login she may just have signed
+  // into is the better of two bad tries, and the capped one is only lifted
+  // here because nothing else on the Mac can run at all.
+  it('a signed-out login gets its try when the only other login is capped', () => {
     const two = new Supervisor(
       { home: ONE_ACCOUNT_HOME, storeRoot: root, maxConcurrentSessions: 3, authProfiles: ['default', '/second'] },
       { listItems: () => [], listProducts: () => [] },
@@ -152,7 +158,26 @@ describe('her own hand lifts what time alone would lift', () => {
     two.noteExitForBackoff(deadOnArrival(HER_LIMIT, 'default'));
     two.liftBrakeForHer();
     expect(two._profileResting('default')).toBe(false);
-    expect(two._profileResting('/second')).toBe(true);
+    expect(two._profileResting('/second')).toBe(false);
+    two.stop?.();
+  });
+
+  // A SECOND LOGIN NO LONGER HOLDS THE CAPPED ONE DOWN (w-dac993a554). It did
+  // while work rotated across a person's subscriptions, because then the other
+  // login really was where the next spawn would go. Work runs on one account
+  // now: the capped account is still the account, so her hand buys one try on
+  // it, and the one try is the guard against a reset hour read wrong.
+  it('lifts a capped login for her whether or not a second one is signed in', () => {
+    const two = new Supervisor(
+      { home: ONE_ACCOUNT_HOME, storeRoot: root, maxConcurrentSessions: 3, authProfiles: ['default', '/second'] },
+      { listItems: () => [], listProducts: () => [] },
+      '/nonexistent-app',
+    );
+    two.noteExitForBackoff(deadOnArrival(HER_LIMIT, 'default'));
+    expect(two._profileResting('default')).toBe(true);
+    two.liftBrakeForHer();
+    expect(two._profileResting('default')).toBe(false);
+    expect(two._pickProfile('claude')).toBe('default');
     two.stop?.();
   });
 

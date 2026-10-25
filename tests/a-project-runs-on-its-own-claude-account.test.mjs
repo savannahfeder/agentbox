@@ -85,13 +85,14 @@ describe('which account a project is tied to', () => {
   });
 
   // THE LEAK IN 1, AS A LIST OF ENVIRONMENTS. A tied project's small-model call
-  // is offered ONE account; an untied one is still offered all three.
-  it('offers the small-model call the pinned account alone, and every account for an untied project', () => {
+  // is offered the account it is tied to; every other project is offered the
+  // one account in use, which used to be all three (w-dac993a554).
+  it('offers the small-model call one account: the tie, or the one in use', () => {
     const sup = makeSupervisor(pins());
     expect(sup._smallModelEnvs('claude', 'acme').map((e) => e.CLAUDE_CONFIG_DIR)).toEqual([work]);
     expect(sup._smallModelEnvs('claude', 'home').map((e) => e.CLAUDE_CONFIG_DIR)).toEqual([undefined]);
-    expect(sup._smallModelEnvs('claude', 'loose').map((e) => e.CLAUDE_CONFIG_DIR)).toEqual([undefined, work, side]);
-    expect(sup._smallModelEnvs('claude', null).map((e) => e.CLAUDE_CONFIG_DIR)).toEqual([undefined, work, side]);
+    expect(sup._smallModelEnvs('claude', 'loose').map((e) => e.CLAUDE_CONFIG_DIR)).toEqual([undefined]);
+    expect(sup._smallModelEnvs('claude', null).map((e) => e.CLAUDE_CONFIG_DIR)).toEqual([undefined]);
   });
 
   // 2 AND 3 IN ONE LINE OF THE SUPERVISOR, so they are one case here.
@@ -102,7 +103,7 @@ describe('which account a project is tied to', () => {
       const sup = makeSupervisor({ projectAccounts: { acme: gone() } });
       expect(sup._projectProfile('acme')).toBe(null);
       expect(sup._profileFitsProject(side, 'acme')).toBe(true);
-      expect(sup._smallModelEnvs('claude', 'acme').map((e) => e.CLAUDE_CONFIG_DIR)).toEqual([undefined, work, side]);
+      expect(sup._smallModelEnvs('claude', 'acme').map((e) => e.CLAUDE_CONFIG_DIR)).toEqual([undefined]);
     });
 
     // DOWN TO ONE LOGIN, which is the case the hidden picker made unfixable:
@@ -253,12 +254,15 @@ describe('where a spawn goes', () => {
     expect(seen.length).toBe(1);
   });
 
+  // Counted straight off `_loadOnProfile`, which is what the share is read
+  // from: through `go` the engine's own cap gets there first, since one
+  // account's share and the machine's number are the same number now
+  // (w-dac993a554).
   it('does not count another account\'s sessions against the pinned one', () => {
     const sup = makeSupervisor({ ...pins(), agentsAuto: false, maxConcurrentSessions: 1 });
-    const seen = spawning(sup);
     sup.sessions.set('w-0', { itemId: 'w-0', product: 'loose', profile: side, engine: 'claude' });
-    go(sup, { id: 'w-1', product: 'acme' }, {});
-    expect(seen.length).toBe(1);
+    expect(sup._loadOnProfile(work)).toBe(0);
+    expect(sup._loadOnProfile(side)).toBe(1);
   });
 
   // A ROW STILL HAVING ITS FOLDER BUILT HAS NO SESSION YET, and in a tied
@@ -277,10 +281,8 @@ describe('where a spawn goes', () => {
   // for a session that may never land there.
   it('does not count a row being prepared in an untied project', () => {
     const sup = makeSupervisor({ ...pins(), agentsAuto: false, maxConcurrentSessions: 1 });
-    const seen = spawning(sup);
     sup._preparing.set('w-0', { item: { id: 'w-0', product: 'loose' }, opts: {}, engine: 'claude' });
-    go(sup, { id: 'w-1', product: 'acme' }, {});
-    expect(seen.length).toBe(1);
+    expect(sup._loadOnProfile(work)).toBe(0);
   });
 
   it('starts an untied project as it always did, with nothing tied anywhere', () => {

@@ -67,7 +67,30 @@ export class RelayRoom {
   constructor(ctx) {
     this.ctx = ctx;
     this.room = new Room();
-    for (const ws of ctx.getWebSockets('mac')) this.room.connectMac(ws);
+    // The computer's "ping" is answered here by the platform, without waking
+    // the room, so a link that has died is found out (main/relay-client.mjs).
+    if (typeof WebSocketRequestResponsePair === 'function') {
+      ctx.setWebSocketAutoResponse?.(new WebSocketRequestResponsePair('ping', 'pong'));
+    }
+    // Woken with more than one socket from the computer (an old one the
+    // platform has not yet seen close), the newest is the live one. Taken in
+    // the order they joined, so the last to take the room is the newest and
+    // the older are let go, rather than whichever the platform lists last.
+    for (const ws of [...ctx.getWebSockets('mac')].sort((a, b) => joined(a) - joined(b))) this.room.connectMac(ws);
+  }
+
+  /**
+   * A room left with no socket takes the newest the computer still has open.
+   * Without this, a room whose socket closed said "not connected" to every
+   * phone while another of the computer's sockets sat open and unused, because
+   * a computer that is not asked anything sends nothing to be noticed by.
+   */
+  adopt(except = null) {
+    if (this.room.mac) return;
+    const CLOSING = 2;
+    const open = this.ctx.getWebSockets('mac').filter((ws) => ws !== except && !(ws.readyState >= CLOSING));
+    const newest = open.sort((a, b) => joined(b) - joined(a))[0];
+    if (newest) this.room.connectMac(newest);
   }
 
   async fetch(request) {
@@ -78,6 +101,7 @@ export class RelayRoom {
       if (!(await macMayJoin(name, url.searchParams.get('proof') ?? ''))) return new Response('Not this room.', { status: 403 });
       const [client, server] = Object.values(new WebSocketPair());
       this.ctx.acceptWebSocket(server, ['mac']);
+      server.serializeAttachment?.({ at: Date.now() });
       this.room.connectMac(server);
       return new Response(null, { status: 101, webSocket: client });
     }
@@ -86,20 +110,28 @@ export class RelayRoom {
       if (size > MAX_REQUEST) return new Response('Too large.', { status: 413 });
       const body = new Uint8Array(await request.arrayBuffer());
       if (body.length > MAX_REQUEST) return new Response('Too large.', { status: 413 });
+      this.adopt();
       return this.room.fromPhone(body, request.signal);
     }
     return new Response('Not found', { status: 404 });
   }
 
   webSocketMessage(ws, message) {
-    // Only a socket that proved itself in fetch() takes the room; a message
-    // from one already let go is dropped.
+    // Every socket here proved itself in fetch(), so an answer is passed on
+    // whichever of them it came back on. Dropping answers from a socket that
+    // was not the room's current one left phones waiting the full 30 s for an
+    // answer the computer had already sent ("did not answer in time"); an
+    // answer names its request by a random id, so it cannot reach the wrong one.
     if (!this.room.mac) this.room.connectMac(ws);
-    else if (this.room.mac !== ws) return;
     this.room.fromMac(typeof message === 'string' ? new TextEncoder().encode(message) : message);
   }
 
-  webSocketClose(ws) { this.room.macGone(ws); }
+  webSocketClose(ws) { this.room.macGone(ws); this.adopt(ws); }
 
-  webSocketError(ws) { this.room.macGone(ws); }
+  webSocketError(ws) { this.room.macGone(ws); this.adopt(ws); }
+}
+
+/** When a computer's socket joined, stamped as it was accepted. */
+function joined(ws) {
+  try { return ws.deserializeAttachment?.()?.at ?? 0; } catch { return 0; }
 }

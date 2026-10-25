@@ -83,14 +83,21 @@ describe('the card', () => {
   it('waits for the whole Mac to be read before it draws a line or a count', () => {
     expect(card).toContain('const read = !!found && !!others && threads !== null;');
     expect(card).toContain('{!read && <div className="ia-empty">{CARD.reading}</div>}');
-    expect(card).toContain('{read && some && (\n          <div className="ia-scroll ia-lines">');
+    // The recent list, which the name field replaces while it has a word in
+    // it (w-6418318cd5). Both lists are `ia-lines`; only one is drawn at once.
+    expect(card).toContain('{read && some && !searching && (\n          <div className="ia-scroll ia-lines">');
   });
   it('has one shape of the list and no switch between looks', () => {
     expect(card).not.toMatch(/setLook\b|ia-only|ia-door/);
   });
 
   it('adds what is ticked with one press, the button saying how many', () => {
-    expect(card).toContain('{LIST.add(picked.length)}');
-    expect(card).toContain('onClick={() => bring(picked)}');
+    // `onScreen` is `picked` unless a name is typed, when it is what you
+    // ticked among the matches (w-6418318cd5). Either way it is exactly the
+    // rows drawn under the button: a count of rows nobody can see is the one
+    // thing this button has never been allowed to say.
+    expect(card).toContain('{LIST.add(onScreen.length)}');
+    expect(card).toContain('onClick={() => bring(onScreen)}');
+    expect(card).toContain('searching ? hits.filter((h) => keptPaths.has(h.path)).map((h) => h.path) : picked');
   });
 });

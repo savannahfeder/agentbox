@@ -105,12 +105,12 @@ describe('C means the same thing on both screens', () => {
     const handler = bounds();
     const focusBranch = handler.slice(handler.indexOf('if (focused) {'), handler.indexOf('switch (e.key) {'));
     expect(focusBranch, 'the focus-mode branch was not found where it was').toContain("e.key === 'j'");
-    expect(focusBranch).toMatch(/e\.key === 'c' \|\| e\.key === 'C'/);
+    expect(focusBranch).toMatch(/e\.key === 'n' \|\| e\.key === 'N'/);
     expect(focusBranch).toContain("setModal('compose')");
   });
 
   it('still opens it from the list', () => {
-    expect(bounds()).toMatch(/case 'c': case 'C':/);
+    expect(bounds()).toMatch(/case 'n': case 'N':/);
   });
 
   it('is the key the new task button promises', () => {

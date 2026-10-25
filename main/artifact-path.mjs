@@ -66,28 +66,55 @@ export function artifactRoots(prod) {
 // now resolves by exact path or not at all.
 const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'sessions', 'runs', 'pending-writes', 'checkpoints']);
 
+// How long one walk of a tree answers for it. A thread asks for every name it
+// mentions the moment it opens, so the walk has to outlive that burst; a
+// picture that lands later is found by the next look, which comes after this.
+export const HUNT_FRESH_MS = 5000;
+const walks = new Map();
+
+// Every file name in one tree, read without holding the main process.
+async function walkNames(tree, fs) {
+  const names = new Map();
+  const walk = async (dir, depth) => {
+    if (depth > 6) return;
+    let entries;
+    try { entries = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return; }
+    const below = [];
+    for (const e of entries) {
+      if (e.name.startsWith('.')) continue;
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) { if (!SKIP.has(e.name)) below.push(walk(full, depth + 1)); }
+      else if (names.has(e.name)) names.get(e.name).push(full);
+      else names.set(e.name, [full]);
+    }
+    await Promise.all(below);
+  };
+  await walk(tree, 0);
+  return names;
+}
+
+function namesIn(tree, fs, now) {
+  const kept = walks.get(tree);
+  if (kept && kept.fs === fs && now - kept.at < HUNT_FRESH_MS) return kept.names;
+  const names = walkNames(tree, fs);
+  walks.set(tree, { at: now, fs, names });
+  if (walks.size > 32) walks.delete(walks.keys().next().value);
+  return names;
+}
+
 // Hunt the file down by NAME inside one product's trees, newest match wins.
 // Workers write links relative to whatever directory they were standing in, so
 // a fixed root list will always miss some of them, and every miss cost her a
 // 10-minute detour (2026-08-05). Bounded: six levels, own product only.
-function huntByName(base, roots, fs) {
+async function huntByName(base, trees, fs, now) {
   let best = null;
-  const walk = (dir, depth) => {
-    if (depth > 6) return;
-    let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      if (e.name.startsWith('.')) continue;
-      const full = path.join(dir, e.name);
-      if (e.isDirectory()) { if (!SKIP.has(e.name)) walk(full, depth + 1); }
-      else if (e.name === base) {
-        let m = 0;
-        try { m = fs.statSync(full).mtimeMs; } catch {}
-        if (!best || m > best.m) best = { full, m };
-      }
+  for (const tree of trees) {
+    for (const full of (await namesIn(tree, fs, now)).get(base) ?? []) {
+      let m;
+      try { m = (await fs.promises.stat(full)).mtimeMs; } catch { continue; }
+      if (!best || m > best.m) best = { full, m };
     }
-  };
-  for (const root of roots) walk(root, 0);
+  }
   return best?.full ?? null;
 }
 
@@ -104,7 +131,7 @@ export function notFoundMessage(raw, own, product) {
 //
 // `products` is the whole list only so the card's own product can be found in
 // it. Nothing in here reads another entry.
-export function resolveArtifact({ src, product, products = [], accountRoot, storeRoot, fs = fsDefault }) {
+export async function resolveArtifact({ src, product, products = [], accountRoot, storeRoot, fs = fsDefault, now = Date.now() }) {
   if (typeof src !== 'string' || !src) return { ok: false, error: 'No file was named.' };
   const raw = decodeURIComponent(src.replace(/^file:\/\//, '')).replace(/^\.\//, '');
   const own = products.find((x) => x.slug === product) ?? null;
@@ -144,10 +171,12 @@ export function resolveArtifact({ src, product, products = [], accountRoot, stor
 
   // The hunt takes the two TREES, not the root list: designs/ and attachments/
   // sit inside the docs dir already, and walking them twice finds nothing new.
+  // A run's change record is never hunted for: `runs` is skipped, so the walk
+  // could not find it, and the open thread asks for it on every refresh.
   const base = path.basename(raw);
   const trees = own ? [own.dir, own.repoPath].filter(Boolean) : [];
-  if (base && trees.length) {
-    const found = huntByName(base, trees, fs);
+  if (base && trees.length && raw.split('/')[0] !== 'runs') {
+    const found = await huntByName(base, trees, fs, now);
     if (found) return { ok: true, path: found };
   }
 

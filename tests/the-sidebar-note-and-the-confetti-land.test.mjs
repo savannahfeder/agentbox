@@ -99,7 +99,7 @@ describe('the last card asks one thing and the celebration is in her own project
   });
 
   it('drops the confetti in her own project instead, and takes it down itself', () => {
-    const finished = walk.slice(walk.indexOf('function Finished('), walk.indexOf('LANDING IN HER OWN PROJECT'));
+    const finished = walk.slice(walk.indexOf('function Finished('), walk.indexOf('export const LANDED_MS'));
     expect(finished).not.toContain('fr-burst');
     const landed = walk.slice(walk.indexOf('export function Landed('));
     expect(landed.slice(0, 3000)).toContain('fr-burst');
@@ -113,6 +113,15 @@ describe('the last card asks one thing and the celebration is in her own project
     // filed itself, into as many inboxes as it had to make. Either is a reason
     // for the confetti to say agents.
     expect(fin).toMatch(/setLanding\(\{ agents: \(filed \?\? chosen\.length\) > 0 \}\)/);
+  });
+
+  it('draws its words over the falling pieces, never under them', () => {
+    // Reported from the QA box, 2026-10-23: "the end-of-tutorial text overlaps
+    // the confetti". `.fr-burst` carries a z-index and is drawn first; these
+    // words carried none, so inside `.fr-landed`'s own stacking context forty
+    // pieces were painted across a 34px headline.
+    const depth = (sel) => Number((css.slice(css.indexOf(sel), css.indexOf('}', css.indexOf(sel))).match(/z-index: (\d+)/) ?? [])[1]);
+    expect(depth('.fr-landed-say {')).toBeGreaterThan(depth('.fr-burst {'));
   });
 
   it('does not stand in the way of the first thing she does in it', () => {

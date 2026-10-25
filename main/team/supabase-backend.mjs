@@ -4,6 +4,7 @@
 // actually keeps people apart; nothing here is trusted to.
 import { asPulled } from '../../shared/team-rules.mjs';
 import { cleanStatus } from '../../shared/team-status.mjs';
+import { roomsSupabase } from './rooms-supabase.mjs';
 
 const PAGE = 500;
 const PUSH_BATCH = 200;
@@ -19,8 +20,26 @@ function must({ data, error }, what) {
   return data;
 }
 
+const COMMAND_COLUMNS = 'id,owner,device,project,item,kind,payload,created_at,claimed_at,taken_at,outcome';
+// Who claimed (`cloud:<run>`, 20261026000000_phone_carries_on_in_the_cloud.sql),
+// asked for only once the database has the column, so a computer that runs
+// before the migration is applied still reads its phone.
+const CLOUD_COLUMNS = `${COMMAND_COLUMNS},claimed_by`;
+const noCloudColumn = (error) => /claimed_by|column .*cloud|cloud.* column/i.test(String(error?.message ?? ''));
+const commandOut = (r) => ({ id: r.id, owner: r.owner, device: r.device, project: r.project, item: r.item, kind: r.kind, payload: r.payload ?? {}, createdAt: r.created_at, claimedAt: r.claimed_at ?? null, claimedBy: r.claimed_by ?? null, takenAt: r.taken_at ?? null, outcome: r.outcome ?? null });
+
 export function supabaseBackend(client) {
   let personId = null;
+  // Whether the database has the cloud's columns yet; the first refusal says not.
+  let cloudColumns = true;
+  const commandsWith = async (query, base = COMMAND_COLUMNS) => {
+    if (cloudColumns) {
+      const out = await query(`${base},claimed_by`);
+      if (!out.error || !noCloudColumn(out.error)) return out;
+      cloudColumns = false;
+    }
+    return query(base);
+  };
   async function myId() {
     if (personId) return personId;
     const { data, error } = await client.auth.getUser();
@@ -238,13 +257,155 @@ export function supabaseBackend(client) {
       return (rows?.length ?? 0) > 0;
     },
 
+    // HER OWN ROWS FOR HER PHONE (20261014000200_phone_inbox.sql). The owner
+    // column defaults to her, and row level security keeps every row hers.
+    // Every row names the computer it belongs to (`device`).
+    // Each write names who it is for, so a write begun before a sign-out
+    // that lands after somebody else signed in is refused by the database
+    // (`owner = auth.uid()`) rather than written into their account.
+    async putPhoneProject({ owner, device, project, name, cloud }) {
+      await myId();
+      const row = { ...(owner ? { owner } : {}), device, project, name, updated_at: new Date().toISOString() };
+      const put = (r) => client.from('phone_projects').upsert(r, { onConflict: 'owner,device,project' });
+      let out = cloud === undefined || !cloudColumns ? await put(row) : await put({ ...row, cloud: !!cloud });
+      if (out.error && cloud !== undefined && cloudColumns && noCloudColumn(out.error)) { cloudColumns = false; out = await put(row); }
+      must(out, 'putting a project on your phone');
+    },
+    async dropPhoneProject(device, project, owner) {
+      const me = await myId();
+      // Its threads go with it (the database cascades).
+      must(await client.from('phone_projects').delete().eq('owner', owner ?? me).eq('device', device).eq('project', project), 'taking a project off your phone');
+    },
+    async putPhoneThreads(device, project, rows, owner) {
+      await myId();
+      const at = new Date().toISOString();
+      for (let i = 0; i < rows.length; i += 50) {
+        const batch = rows.slice(i, i + 50).map((r) => ({ ...(owner ? { owner } : {}), device, project, item: r.item, snapshot: r.snapshot, updated_at: at }));
+        must(await client.from('phone_threads').upsert(batch, { onConflict: 'owner,device,project,item' }), 'sending threads to your phone');
+      }
+    },
+    // Her files for the phone, in her own folder of a private bucket
+    // (20261017000000_phone_files.sql). Named by what is in them, so one
+    // already there is the same file and is left as it is.
+    async putPhoneFile({ owner, device, name, data, type }) {
+      const me = await myId();
+      const { error } = await client.storage.from('phone-files').upload(`${owner ?? me}/${device}/${name}`, data, { contentType: type ?? 'application/octet-stream', upsert: false });
+      if (error && !/exists|duplicate/i.test(`${error.message} ${error.statusCode ?? ''}`) && String(error.statusCode) !== '409') throw new Error(`sending a file to your phone: ${error.message}`);
+    },
+    // A picture her phone put in this computer's folder for a reply; null when it is not there.
+    async getPhoneFile({ owner, device, name }) {
+      const me = await myId();
+      const { data, error } = await client.storage.from('phone-files').download(`${owner ?? me}/${device}/${name}`);
+      if (error) {
+        if (/not.?found/i.test(`${error.message} ${error.error ?? ''}`) || [400, 404].includes(Number(error.statusCode ?? error.status))) return null;
+        throw new Error(`taking a picture from your phone: ${error.message}`);
+      }
+      return Buffer.from(await data.arrayBuffer());
+    },
+    async dropPhoneFiles({ owner, device, names }) {
+      const me = await myId();
+      for (let i = 0; i < names.length; i += 100) {
+        const { error } = await client.storage.from('phone-files').remove(names.slice(i, i + 100).map((n) => `${owner ?? me}/${device}/${n}`));
+        if (error) throw new Error(`clearing old files from your phone: ${error.message}`);
+      }
+    },
+    async dropPhoneThreads(device, project, items, owner) {
+      const me = await myId();
+      for (let i = 0; i < items.length; i += 100) {
+        must(await client.from('phone_threads').delete().eq('owner', owner ?? me).eq('device', device).eq('project', project).in('item', items.slice(i, i + 100)), 'taking threads off your phone');
+      }
+    },
+    // What her phone reads and sends.
+    async phoneProjects() {
+      const me = await myId();
+      const rows = must(await client.from('phone_projects').select('owner,device,project,name').order('name'), 'reading the projects on your phone');
+      return (rows ?? []).filter((r) => r.owner === me);
+    },
+    async phoneThreads() {
+      const me = await myId();
+      const rows = must(await client.from('phone_threads').select('owner,device,project,item,snapshot,updated_at').order('updated_at', { ascending: false }).limit(1000), 'reading the threads on your phone');
+      return (rows ?? []).filter((r) => r.owner === me).map((r) => ({ owner: r.owner, device: r.device, project: r.project, item: r.item, snapshot: r.snapshot, updatedAt: Date.parse(r.updated_at) }));
+    },
+    // One row per computer (20261023000000_phone_settings.sql).
+    async putPhoneSettings({ owner, device, name, settings }) {
+      await myId();
+      must(await client.from('phone_settings').upsert({ ...(owner ? { owner } : {}), device, name, settings, updated_at: new Date().toISOString() }, { onConflict: 'owner,device' }), 'sending your settings to your phone');
+    },
+    async phoneSettings() {
+      const me = await myId();
+      const rows = must(await client.from('phone_settings').select('owner,device,name,settings,updated_at').order('updated_at', { ascending: false }), 'reading your computer\'s settings');
+      return (rows ?? []).filter((r) => r.owner === me).map((r) => ({ owner: r.owner, device: r.device, name: r.name, settings: r.settings, updatedAt: Date.parse(r.updated_at) }));
+    },
+    // The phones her alerts go to (20261025000000_push_devices.sql). The phone writes its own row; this is for tests.
+    async putPushDevice({ token, platform, appVersion = null }) {
+      await myId();
+      must(await client.from('push_devices').upsert({ token, platform, app_version: appVersion, updated_at: new Date().toISOString() }, { onConflict: 'owner,token' }), 'turning on alerts');
+    },
+    async pushDevices(owner) {
+      const me = await myId();
+      const rows = must(await client.from('push_devices').select('owner,token,platform,app_version,updated_at').eq('owner', owner ?? me), 'reading the phones to alert');
+      return (rows ?? []).map((r) => ({ owner: r.owner, token: r.token, platform: r.platform, appVersion: r.app_version ?? null, updatedAt: Date.parse(r.updated_at) }));
+    },
+    async dropPushDevice(token, owner) {
+      const me = await myId();
+      must(await client.from('push_devices').delete().eq('owner', owner ?? me).eq('token', token), 'forgetting a phone');
+    },
+    async addPhoneCommand({ device, project = null, item = null, kind, payload = {} }) {
+      await myId();
+      const row = must(await client.from('phone_commands').insert({ device, project, item, kind, payload }).select(COMMAND_COLUMNS).single(), 'sending that to your computer');
+      return commandOut(row);
+    },
+    async phoneCommands() {
+      await myId();
+      const rows = must(await client.from('phone_commands').select(COMMAND_COLUMNS).order('created_at', { ascending: true }).limit(500), 'reading what your phone sent');
+      return (rows ?? []).map(commandOut);
+    },
+    // This computer's, every one still waiting, oldest first, a page at a time.
+    async waitingPhoneCommands(device) {
+      await myId();
+      const out = [];
+      for (let from = 0; ; from += 200) {
+        const rows = must(await commandsWith((cols) => client.from('phone_commands').select(cols).eq('device', device).is('taken_at', null).order('created_at', { ascending: true }).range(from, from + 199)), 'reading what your phone sent');
+        out.push(...(rows ?? []).map(commandOut));
+        if (!rows || rows.length < 200) return out;
+      }
+    },
+    // This computer's commands the cloud claimed since `since`, taken or not,
+    // so a computer waking up joins the runs it started (Supervisor#adoptCloudRun).
+    async cloudPhoneCommands(device, since) {
+      await myId();
+      if (!cloudColumns) return [];
+      const out = await client.from('phone_commands').select(CLOUD_COLUMNS).eq('device', device).not('claimed_by', 'is', null).gte('created_at', since).order('created_at', { ascending: true }).limit(200);
+      if (out.error && noCloudColumn(out.error)) { cloudColumns = false; return []; }
+      return (must(out, 'reading what the cloud took from your phone') ?? []).map(commandOut);
+    },
+    // THE COMPUTER CLAIMS ONE BEFORE IT DOES IT; the phone takes one back only
+    // while nobody has (renderer/src/cloud-bridge.ts). The database lets one win.
+    async claimPhoneCommand(id, owner) {
+      const me = await myId();
+      const who = owner ?? me;
+      const won = must(await client.from('phone_commands').update({ claimed_at: new Date().toISOString() }).eq('id', id).eq('owner', who).is('taken_at', null).is('claimed_at', null).select('id'), 'starting what your phone sent');
+      if (won?.length) return 'claimed';
+      const row = must(await commandsWith((cols) => client.from('phone_commands').select(cols).eq('id', id).eq('owner', who).maybeSingle(), 'taken_at,claimed_at'), 'reading what your phone sent');
+      // The cloud's claim is the cloud's run: never done here as if it were ours.
+      if (row?.claimed_by) return 'cloud';
+      return row && !row.taken_at && row.claimed_at ? 'ours' : 'gone';
+    },
+    async markPhoneCommand(id, outcome, owner) {
+      const me = await myId();
+      must(await client.from('phone_commands').update({ taken_at: new Date().toISOString(), outcome }).eq('id', id).eq('owner', owner ?? me).is('taken_at', null), 'marking what your phone sent as done');
+    },
+
     subscribe(onChange) {
       const channel = client.channel(`team-${Math.random().toString(36).slice(2)}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'phone_commands' }, () => onChange())
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'lines' }, () => onChange())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'thread_cards' }, () => onChange())
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'people' }, () => onChange())
         .subscribe();
       return () => { client.removeChannel(channel); };
     },
+
+    ...roomsSupabase(client, myId, must),
   };
 }

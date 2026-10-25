@@ -119,6 +119,6 @@ describe('3. the way out is on the tutorial, and the harness looks at it', () =>
     const inset = Number((rule.match(/left: (\d+)px/) || [])[1]);
     expect(reserve / 2).toBeGreaterThan(inset);
     // And the app never opens narrower than this, so the cap is always in force.
-    expect(read('main/main.mjs')).toMatch(/minWidth: 980/);
+    expect(read('main/main.mjs')).toMatch(/minWidth: 720/);
   });
 });

@@ -84,7 +84,7 @@ describe('the walk ends by saying it is over', () => {
     });
     // Scoped to `Finished` itself, because both of these are still in this
     // file: they are what `Landed` draws over her own inbox a moment later.
-    const finished = card.slice(card.indexOf('function Finished('), card.indexOf('LANDING IN HER OWN PROJECT'));
+    const finished = card.slice(card.indexOf('function Finished('), card.indexOf('export const LANDED_MS'));
     expect(finished).not.toContain('COPY.finishHead');
     expect(finished).not.toContain('fr-burst');
     // To the function's own end, not a fixed width: 900 characters stopped

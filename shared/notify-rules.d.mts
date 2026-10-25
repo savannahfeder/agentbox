@@ -25,3 +25,7 @@ export function shouldSpeak(state?: {
 export function banner(
   waiting: ReadonlyArray<{ id?: string; title?: unknown; kind?: string } | null | undefined> | null | undefined,
 ): { title: string; body: string; open: string | null } | null;
+
+export function phoneBanner(
+  waiting: ReadonlyArray<{ id?: string; title?: unknown; thread?: unknown; kind?: string } | null | undefined> | null | undefined,
+): { title: string; body: string; open: string | null } | null;

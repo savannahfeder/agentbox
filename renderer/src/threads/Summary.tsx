@@ -29,8 +29,12 @@ import { summaryFits, useRoomyToggle } from '../room';
 import { VISIBILITY_WORD, chosenNames, whoSees, type Seen } from './summary-rules';
 import { findPeople, teammates } from './composer-rules';
 import { shownToPeople } from '../../../shared/thread-cards.mjs';
+import { shownPriority } from '../../../shared/rank.mjs';
+import { isDirect } from './page-rules';
 import { rowTitle } from '../list-rules';
-import { SharedMark } from './Pages';
+import { inStep, RunningMark, SharedMark } from './Pages';
+import { FleetContext } from '../fleet';
+import { factsFor, statusCell, type StatusCell } from '../status-word';
 import { TicketText } from '../components/TicketReference';
 import { repeatTag } from '../components/List';
 import { joinMessage } from '../message-split';
@@ -40,6 +44,24 @@ import './summary.css';
 
 function Glyph({ kind }: { kind: StateGlyph }) {
   return <span className={`ts-st ts-st-${kind}`} aria-hidden="true" />;
+}
+
+/**
+ * THE MARK BESIDE WHAT IS HAPPENING (w-ec2b04d449). The same shapes the row's
+ * Status column wears, so the panel and the list cannot say a thread is two
+ * things at once: it turns while an agent is on it, rings in the accent while
+ * nothing can start it, and rings faintly while it waits its turn.
+ */
+function StatusGlyph({ status }: { status: StatusCell }) {
+  if (status.live && status.cloud) return <RunningMark cloud />;
+  return <span className={`ts-st ts-st-${status.mark}${status.live ? ' live' : ''}`} aria-hidden="true" ref={status.live ? inStep : undefined} />;
+}
+
+/** What is happening on this thread, for the panel and the byline both. */
+function useStatus(item: WorkItem): StatusCell {
+  const fleet = useContext(FleetContext);
+  const state = threadState(item);
+  return statusCell(item, { ...factsFor(fleet, item.id), state, inProgress: state === 'running' });
 }
 
 // THE MARKS A CHANGEABLE FIELD SHOWS UNDER THE POINTER: a caret on a field
@@ -107,6 +129,8 @@ export function useSummaryShortcut(onToggle: () => void, enabled = true) {
       if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      // An open emoji picker takes letters for its search (team/ChatActions.tsx).
+      if (document.querySelector('.chat-emoji, .chat-emoji-all')) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       if (!e.repeat) onToggle();
@@ -126,9 +150,12 @@ export function useSummaryShortcut(onToggle: () => void, enabled = true) {
  * where it was handed it, in the line's own uppercase mono.
  */
 export function ThreadStateMark({ item }: { item: WorkItem }) {
-  const team = useContext(TeamContext);
-  const state = threadState(item);
-  return <span className="ts-lead"><Glyph kind={stateGlyph(state, waitsOnYou(item, team?.me ?? null))} />{stateWordOf(item, state)}</span>;
+  // AND IT SAYS "WORKING" AGAIN WHILE ONE IS (w-ec2b04d449). The word here was
+  // the thread's state, which reads "Waiting" over a conversation saying
+  // "Editing tokens.css"; it is what is happening now, in the same words the
+  // row and the panel use.
+  const status = useStatus(item);
+  return <span className="ts-lead"><StatusGlyph status={status} />{status.word}</span>;
 }
 
 /* -------------------------------------------------------------------- rail */
@@ -148,7 +175,7 @@ export function ThreadStateMark({ item }: { item: WorkItem }) {
 export function SummaryRail({ item, team, onOpen }: { item: WorkItem; team: TeamView | null; onOpen: () => void }) {
   const me = team?.me ?? null;
   const state = threadState(item);
-  const prio = priorityIdOf(item.priority);
+  const prio = priorityIdOf(shownPriority(item, isDirect(team?.products.get(item.product))));
   const byId = team?.byId ?? new Map<string, Person>();
   const owner = ownerName(item, me, byId);
   const ownerPerson = owner === 'You' ? (me ? byId.get(me) ?? null : null) : byId.get(item.createdBy ?? '') ?? null;
@@ -217,10 +244,15 @@ export interface RepeatHandle {
   onEnd: () => void;
 }
 
-export function SummaryPanel({ item, team, onFinish, onClose, repeat = null }: {
+export function SummaryPanel({ item, team, onFinish, onClose, repeat = null, peopleAsk = 0, onAsked }: {
   item: WorkItem;
   team: TeamView | null;
   repeat?: RepeatHandle | null;
+  /** When ⌘K's Share with Chosen People… was pressed; a new moment opens the
+   *  Visible to menu on its list of people. */
+  peopleAsk?: number;
+  /** Called once it has, so a panel drawn again later does not open it again. */
+  onAsked?: () => void;
   /** FOLD IT BACK TO THE RAIL, from the icon at the top of the summary (w-a3482b8c2c). */
   onClose?: () => void;
   /**
@@ -298,10 +330,19 @@ export function SummaryPanel({ item, team, onFinish, onClose, repeat = null }: {
     return () => { document.removeEventListener('pointerdown', away); window.removeEventListener('keydown', esc, true); };
   }, [menu]);
   useEffect(() => { setMenu(null); }, [item.product, item.id]);
+  // After the line above, so a panel that mounts for the ask keeps it open.
+  useEffect(() => {
+    if (!peopleAsk) return;
+    if (team) { setMenu('visibility'); setPickPeople(true); }
+    onAsked?.();
+  }, [peopleAsk]);
   const holdMenu = (which: Menu) => (el: HTMLElement | null) => { if (menu === which) menuRef.current = el; };
 
   const state = threadState(item);
-  const prio: PriorityId = priorityIdOf(valueOf<number>('priority'));
+  const status = useStatus(item);
+  // A level just picked shows at once; otherwise the level it runs at.
+  const prio: PriorityId = priorityIdOf(pending.priority ? valueOf<number>('priority')
+    : shownPriority(item, isDirect(team?.products.get(item.product))));
   // A thread from before you joined is yours until you share it, whatever it
   // says on disk (summary-rules.ts `whoSees`, the Team page's own rule).
   const visibility = whoSees({
@@ -465,7 +506,7 @@ export function SummaryPanel({ item, team, onFinish, onClose, repeat = null }: {
           title="Click to rename"
           onClick={rename.begin}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); rename.begin(); } }}
-        >{rename.shown}<Pen /></h2>
+        ><span className="ts-title-text">{rename.shown}<Pen /></span></h2>
       )}
       {/* A LINE WITH NO WORDS IS NOT DRAWN AT ALL (w-54e9c7243f): no heading
           over a dim "Not written yet". The one being typed in stays, so
@@ -555,8 +596,8 @@ export function SummaryPanel({ item, team, onFinish, onClose, repeat = null }: {
             to close a thread with its own rules. */}
         {onFinish && statusChoices(state).length ? (
           <span className="ts-value ts-menu-anchor" ref={holdMenu('status')}>
-            <button type="button" className="ts-prop-btn" aria-haspopup="listbox" aria-expanded={menu === 'status'} title="Change the status" onClick={() => setMenu(menu === 'status' ? null : 'status')}>
-              <Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{stateWordOf(item, state)}<Caret />
+            <button type="button" className="ts-prop-btn" aria-haspopup="listbox" aria-expanded={menu === 'status'} title={status.title ?? 'Change the status'} onClick={() => setMenu(menu === 'status' ? null : 'status')}>
+              <StatusGlyph status={status} />{status.word}<Caret />
             </button>
             {menu === 'status' && (
               <span className="prio-menu ts-menu" role="listbox" aria-label="Status">
@@ -577,7 +618,7 @@ export function SummaryPanel({ item, team, onFinish, onClose, repeat = null }: {
             )}
           </span>
         ) : (
-          <span className="ts-value"><Glyph kind={stateGlyph(state, waitsOnYou(item, me))} />{stateWordOf(item, state)}</span>
+          <span className="ts-value" title={status.title}><StatusGlyph status={status} />{status.word}</span>
         )}
         <span className="ts-label">Priority</span>
         <span className="ts-value ts-menu-anchor" ref={holdMenu('priority')}>
@@ -755,13 +796,18 @@ export function useRename(name: string, onRename: ((name: string) => Promise<boo
  * The name keeps whole words up to 59 letters (crumb-rules.ts) and the whole
  * of it is one hover away.
  */
-export function ThreadCrumb({ from, name, onBack, onRename, threadKey = '' }: {
+export function ThreadCrumb({ from, name, onBack, onRename, threadKey = '', renameAsk = 0, onAsked }: {
   from: string; name: string; onBack: () => void;
   onRename?: (name: string) => Promise<boolean>; threadKey?: string;
+  /** When ⌘K's Rename Thread… was pressed; a new moment opens the name box. */
+  renameAsk?: number;
+  /** Called once it has, so a crumb drawn again later does not open it again. */
+  onAsked?: () => void;
 }) {
   const r = useRename(name, onRename, threadKey);
   const box = useRef<HTMLInputElement>(null);
   useEffect(() => { if (r.editing) box.current?.select(); }, [r.editing]);
+  useEffect(() => { if (renameAsk) { r.begin(); onAsked?.(); } }, [renameAsk]);
   return (
     <div className="thread-crumb">
       <button type="button" className="back-esc thread-crumb-back" data-hint="back" onClick={onBack} aria-label={`Back to ${from} (esc)`}>

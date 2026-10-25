@@ -159,8 +159,10 @@ export function installMenu({ onApproval, onReload, onZoom } = {}) {
     {
       label: 'Agents',
       submenu: [
-        { label: 'Allow Pending Approval', accelerator: 'Command+Y', click: () => onApproval?.(true) },
-        { label: 'Deny Pending Approval', accelerator: 'Command+N', click: () => onApproval?.(false) },
+        // CommandOrControl like every other accelerator here: Command alone
+        // left the approval card's hint naming two dead keys on Linux.
+        { label: 'Allow Pending Approval', accelerator: 'CommandOrControl+Y', click: () => onApproval?.(true) },
+        { label: 'Deny Pending Approval', accelerator: 'CommandOrControl+N', click: () => onApproval?.(false) },
       ],
     },
     {

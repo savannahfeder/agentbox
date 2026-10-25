@@ -1,24 +1,28 @@
 /* THE THREADS A THREAD MADE (./ThreadsMade.tsx, w-2e8aa16f0f). A bordered list,
    square, one 1px line between rows; the title in the reading face and the state
    in the app's mono capitals, quieter once it is done. */
-.made { margin: 22px 0 6px; }
+.made { margin: 22px 0 6px; --made-ease: cubic-bezier(.2, .7, .2, 1); }
 /* INSIDE THE CONVERSATION it is part of the turn above it rather than a section
    under the whole thread (w-2e13752a85), so it sits close to the words that
    came back with it and the thread's own 22px column sets the gap below. */
 .thread-block .made { margin: 12px 0 0; }
-.made-label { margin-bottom: 8px; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.made-label { display: flex; align-items: center; margin-bottom: 8px; padding-right: 11px; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 .made-list { border: 1px solid var(--line); border-radius: var(--radius); }
-/* WHILE A TASK IN IT WAITS FOR A YES (./ThreadsMade.tsx, w-d2744c6daa): the
-   outer border in the accent and the label in white. Only the border: the
-   label went orange in one drawing and read as "a bit too much", and white is
-   what was kept. The rows' own lines stay grey. */
-.made-waiting .made-list { border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
-.made-waiting .made-label { color: var(--text); }
-/* The row holds the two presses. Its right-hand padding is all that stands
-   between the state word (or the press that replaces it) and the list's edge,
-   so every row ends in the same place whichever of the two it carries. 10px
-   rather than the 14 it opened with: "should be closer to the right side". */
-.made-row { display: flex; align-items: center; min-height: 40px; padding-right: 10px; }
+
+/* NOTHING SNAPS (w-fcb5fdc2e5): "Everything immediately shades, which is not
+   the best UX. You typically want those little transitions." Every colour a
+   cursor changes here fades. */
+.made-row, .made-open, .made-title, .made-state, .made-acts button {
+  transition: background-color .18s var(--made-ease), color .18s var(--made-ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .made-row, .made-open, .made-title, .made-state, .made-acts button { transition: none; }
+}
+
+/* The row. Its right-hand padding is all that stands between the state word
+   and the list's edge. 10px rather than the 14 it opened with: "should be
+   closer to the right side". */
+.made-row { position: relative; display: flex; align-items: center; min-height: 40px; padding-right: 10px; }
 .made-row + .made-row { border-top: 1px solid var(--line); }
 .made-row:hover { background: var(--wash); }
 .made-open {
@@ -31,43 +35,40 @@
 .made-state { flex: none; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
 .made-state.done, .made-state.scheduled { color: var(--text-faint); }
 
-/* THE PRESS THAT STARTS A FILED THREAD (w-9cf2b43110), standing where that
-   row's state word would be and set in the same mono capitals, so the right-
-   hand column reads as one column and not as a word with a widget after it.
-   Square, because the app's own controls are: "a button that matches our own
-   app's style (sharp borders, caps text etc.)".
+/* A DOT IS WHAT A PROPOSAL LOOKS LIKE (./ThreadsMade.tsx). The one mark of a
+   row waiting on you, and with NEW THREAD the only accent in the list. */
+.made-dot { flex: none; width: 6px; height: 6px; margin-right: -4px; border-radius: 50%; background: var(--accent); }
 
-   IN THE ACCENT, chosen off four drawings: the only thing in this list you can
-   press is the only coloured thing in it. Bordered rather than filled, because
-   three proposals would otherwise be three solid blocks shouting over the
-   titles they belong to, and the loudest thing here should stay the thread's
-   name. It fills in under the cursor.
+/* WHAT IS ALREADY UNDER WAY GOES GREY while proposals wait: "gray it out to
+   show that it's not meant to get your attention." It comes back to full
+   strength under the cursor, since it can still be opened. */
+.made-quiet .made-title, .made-quiet .made-state { color: var(--text-faint); }
+.made-quiet:hover .made-title { color: var(--text-dim); }
 
-   TIGHT, AND HUNG 2px PAST THE WORDS: "feel as tho there's too much padding on
-   the approve button". The inside came down from 9px to 7, and the border sits
-   a touch outside the column the state words end at, because a box whose edge
-   lines up exactly with a column of text reads as standing further out than
-   the text does. Its letters stay inside that column; only its edge hangs. */
-.made-approve {
-  flex: none; margin-right: -2px; padding: 4px 9px;
-  appearance: none; cursor: pointer; border-radius: 0;
-  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  background: none; color: var(--accent);
-  font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+/* ITS ANSWERS, ALWAYS THERE, where a state word would stand. Shown only under
+   the cursor, the proposal you were not pointing at looked broken: "it should
+   always show those options even if you're not hovering over it." Words in the
+   app's mono capitals, no boxes: NEW THREAD in the accent, DO HERE and DISMISS
+   in grey, each washed in under the cursor. In the row's flow, so a long
+   title ends in an ellipsis before them rather than running underneath. */
+.made-acts { flex: none; display: flex; gap: 2px; margin-left: 12px; margin-right: -2px; }
+.made-acts button {
+  flex: none; height: 26px; padding: 0 9px;
+  appearance: none; cursor: pointer; border: 0; border-radius: var(--radius); background: none;
+  font: 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
 }
-.made-approve:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.made-approve:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+.made-acts button:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 1px; }
+.made-approve { color: var(--accent); }
+.made-approve:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.made-here { color: var(--text-dim); }
+.made-dismiss { color: var(--text-faint); }
+.made-here:hover, .made-dismiss:hover { background: var(--wash-strong); color: var(--text); }
 
-/* AND DO IN THIS THREAD (w-554834e749), the grey press beside it: the same
-   size and the same capitals, so the two read as a pair of answers, with the
-   accent left to the one that starts something new. Picked from eight
-   drawings over three rounds. There is no No any more ("ignoring it is
-   basically rejecting it"). */
-.made-here {
-  flex: none; margin-right: 8px; padding: 4px 9px;
-  appearance: none; cursor: pointer; border-radius: 0;
-  border: 1px solid var(--line); background: none; color: var(--text-dim);
-  font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase;
-}
-.made-here:hover { border-color: var(--text-faint); color: var(--text); }
-.made-here:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
+/* START ALL AND DISMISS ALL on the count line (./ThreadsMade.tsx), ending where
+   the rows' answers end: the label's 11px is the rows' 10px plus the list's
+   border. Pulled into the line's own height so the list does not move down
+   when they appear. */
+.made-all { margin: -6px -2px -6px auto; }
+.made-all-start { color: var(--text-dim); }
+.made-all-dismiss { color: var(--text-faint); }
+.made-all-start:hover, .made-all-dismiss:hover { background: var(--wash-strong); color: var(--text); }

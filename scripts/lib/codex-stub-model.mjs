@@ -71,9 +71,19 @@ export function createStubModel({ respond } = {}) {
     let body = '';
     req.on('data', (chunk) => { body += chunk; });
     req.on('end', async () => {
+      // ONLY A TURN IS A TURN. Signed in with ChatGPT, Codex also asks this
+      // address for its model list, its plugins and its account (measured on
+      // codex-cli 0.160.0, 2026-10-15: eleven GETs before the first turn). A
+      // 404 is what it gets from a server that has none of those, and it goes
+      // on without them; answered as a turn, each one was logged as a task.
+      if (req.method !== 'POST' || !/\/responses(\?|$)/.test(req.url)) {
+        res.writeHead(404, { 'content-type': 'application/json' });
+        res.end('{}');
+        return;
+      }
       let parsed = null;
       try { parsed = JSON.parse(body); } catch { parsed = null; }
-      const turn = { at: Date.now(), url: req.url, body: parsed };
+      const turn = { at: Date.now(), url: req.url, body: parsed, auth: codexAuthOf(req.headers) };
       requests.push(turn);
       let items = [];
       try {
@@ -115,11 +125,153 @@ export function createStubModel({ respond } = {}) {
 
   return {
     requests,
-    listen: () => new Promise((resolve) => {
-      server.listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${server.address().port}/v1`));
+    server,
+    listen: (port = 0) => new Promise((resolve) => {
+      server.listen(port, '127.0.0.1', () => resolve(`http://127.0.0.1:${server.address().port}/v1`));
     }),
-    close: () => new Promise((resolve) => server.close(() => resolve())),
+    close: () => new Promise((resolve) => { server.closeAllConnections?.(); server.close(() => resolve()); }),
   };
+}
+
+/** The key the stand-in's own provider signs with. Not a key: it opens nothing anywhere. */
+export const STUB_CODEX_KEY = 'not-a-real-key-the-stub-does-not-check-it';
+
+/**
+ * HOW CODEX SIGNED A REQUEST, without the secret. Measured on codex-cli 0.160.0
+ * (2026-10-15) with a provider that has `requires_openai_auth = true`: a
+ * ChatGPT login sends its access token, which is a JWT, and an API-key login
+ * sends the key itself, `sk-...`, as a bearer. The first bills a ChatGPT plan,
+ * the second is metered per call to whoever owns the key.
+ */
+export function codexAuthOf(headers = {}) {
+  const bearer = String(headers.authorization ?? '').match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  if (!bearer) return 'none';
+  if (bearer === STUB_CODEX_KEY) return 'stub';
+  if (/^sk-/.test(bearer)) return 'api-key';
+  if (/^[\w-]+\.[\w-]+\.[\w-]*$/.test(bearer)) return 'chatgpt';
+  return 'bearer';
+}
+
+/**
+ * THE STAND-IN, LAYERED INTO A PERSON'S OWN config.toml.
+ *
+ * `stubCodexHome` below replaces the whole file, which is right for a bare
+ * home and wrong for a person's: their profile, their MCP servers and their
+ * instructions are the thing a setup is testing. So this adds only what moves
+ * the model and keeps everything else of theirs, and it signs with THEIR login:
+ * `requires_openai_auth = true` makes Codex sign the stand-in's requests with
+ * whatever auth.json holds, exactly as it would sign OpenAI's, so a check can
+ * read off the request whether a ChatGPT plan or an API key would have paid.
+ *
+ * `chatgpt_base_url` keeps the ChatGPT side (plugins, account, analytics) on
+ * loopback too. Measured: without it a ChatGPT login sent its token to
+ * chatgpt.com eleven times before the first turn.
+ *
+ * TOML has no repeated keys and a key below a table belongs to that table, so
+ * the two top-level lines go first, a key the person set themselves is left as
+ * theirs (their own `model_provider` is then what their workers use, which is
+ * itself worth knowing), and the provider's table goes last.
+ */
+export function layeredCodexConfig(own = '', { url }) {
+  const text = String(own ?? '');
+  const firstTable = text.search(/^\s*\[/m);
+  const top = firstTable < 0 ? text : text.slice(0, firstTable);
+  const sets = (key) => new RegExp(`^\\s*${key}\\s*=`, 'm').test(top);
+  const origin = String(url).replace(/\/v1\/?$/, '');
+  return [
+    '# The verify stand-in model (scripts/lib/codex-stub-model.mjs). Everything below the next blank line is the person\'s own.',
+    ...(sets('model_provider') ? [] : ['model_provider = "verify"']),
+    ...(sets('chatgpt_base_url') ? [] : [`chatgpt_base_url = "${origin}/backend-api/"`]),
+    '',
+    text.trimEnd(),
+    '',
+    '[model_providers.verify]',
+    'name = "verify stand-in"',
+    `base_url = "${origin}/v1"`,
+    'wire_api = "responses"',
+    'requires_openai_auth = true',
+    '',
+  ].join('\n');
+}
+
+/** Every text the model was sent in one request: instructions, and each message's text. */
+export function requestText(request) {
+  const out = [String(request?.instructions ?? '')];
+  for (const entry of request?.input ?? []) {
+    if (entry?.type !== 'message') continue;
+    for (const part of entry.content ?? []) if (typeof part?.text === 'string') out.push(part.text);
+  }
+  return out.join('\n');
+}
+
+/** The model's own earlier answers in this request, oldest first: a resumed thread sends them back. */
+export function assistantTextsOf(request) {
+  const out = [];
+  for (const entry of request?.input ?? []) {
+    if (entry?.type !== 'message' || entry.role !== 'assistant') continue;
+    for (const part of entry.content ?? []) if (typeof part?.text === 'string') out.push(part.text);
+  }
+  return out;
+}
+
+/**
+ * What a model asked "reply with exactly the word X" says, and what it
+ * remembers: the same rules as the Claude stand-in's `defaultAnswer`, so the
+ * drives written for one read the other unchanged. Null when the task asked
+ * for no word, and the caller says its own line.
+ */
+export function wordAnswer(request) {
+  const said = promptOf(request);
+  const tok = [...said.matchAll(/\[\[tok:([^\]]+)\]\]/g)].map((m) => m[1]).pop();
+  const mark = tok ? ` [${tok}]` : '';
+  const users = (request?.input ?? []).filter((e) => e?.type === 'message' && e.role === 'user')
+    .map((e) => (e.content ?? []).map((p) => p?.text ?? '').join('\n'));
+  if (/which word did you just reply with/i.test(users.at(-1) ?? '')) {
+    const before = assistantTextsOf(request).join('\n').match(/\b([A-Z]{3,})\b/)?.[1]
+      ?? users.slice(0, -1).join('\n').match(/reply with exactly the word ([A-Za-z]+)/i)?.[1];
+    return before ?? 'I do not know.';
+  }
+  const word = [...said.matchAll(/reply with exactly the word ([A-Za-z]+)/gi)].map((m) => m[1]).pop();
+  return word ? `${word}${mark}` : null;
+}
+
+/**
+ * The tools Codex offered, by the name a call has to use. MCP tools arrive
+ * inside a `namespace` entry (`mcp__agentbox`), whose own tools are named
+ * relative to it, so both shapes are flattened to one list of
+ * `{ name, namespace, full }`. A tool with no name (`tool_search`,
+ * `web_search`) is listed by its type.
+ */
+export function offeredTools(request) {
+  return flatTools(request?.tools ?? []);
+}
+function flatTools(list) {
+  const out = [];
+  for (const t of list) {
+    if (t?.type === 'namespace' && Array.isArray(t.tools)) {
+      for (const s of t.tools) if (s?.name) out.push({ name: s.name, namespace: t.name, full: `${t.name}__${s.name}` });
+    } else if (t?.name || t?.type) out.push({ name: t.name ?? t.type, namespace: null, full: t.name ?? t.type });
+  }
+  return out;
+}
+
+/**
+ * THE TOOLS CODEX HANDED OVER ONLY WHEN ASKED. Measured on codex-cli 0.160.0
+ * (2026-10-15): MCP tools are not in a request's `tools` at all. They sit
+ * behind a client-side `tool_search` (`{ type: 'tool_search', execution:
+ * 'client' }`), whose description names each server ("agentbox"); a model
+ * that answers with a `tool_search_call` gets them back in the next request
+ * as a `tool_search_output` carrying `{ type: 'namespace', name:
+ * 'mcp__agentbox', tools: [...] }`, and calls one as a `function_call` with
+ * `name` and `namespace`. This is every tool found that way in one request.
+ */
+export function searchedTools(request) {
+  return flatTools((request?.input ?? []).filter((e) => e?.type === 'tool_search_output').flatMap((e) => e.tools ?? []));
+}
+
+/** The model asks Codex for the tools that match `query` (see `searchedTools`). */
+export function toolSearchItem(query, { callId = `ts_${Math.random().toString(36).slice(2, 10)}` } = {}) {
+  return { type: 'tool_search_call', call_id: callId, execution: 'client', arguments: { query } };
 }
 
 /**
@@ -214,7 +366,7 @@ export function stubCodexHome(dir, { url, model = 'stub-model' } = {}) {
   // `process.env` (scrubbed of ANTHROPIC_*, CLAUDE_*, OPENAI_* and CODEX_*), so
   // setting it here is what carries it through. The value is never sent
   // anywhere real: the provider it authenticates is the loopback stub.
-  process.env.ASTRAL_STUB_KEY = 'not-a-real-key-the-stub-does-not-check-it';
+  process.env.ASTRAL_STUB_KEY = STUB_CODEX_KEY;
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'config.toml'), [
     `model = "${model}"`,

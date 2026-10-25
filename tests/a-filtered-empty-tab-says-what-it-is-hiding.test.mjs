@@ -48,8 +48,7 @@ describe('what a filtered empty tab says', () => {
     // threads with none, so its empty line names the tab rather than a clock.
     expect(filteredEmptyWords('snoozed', 3).head).toBe('Nothing in your filter is in Later');
     expect(filteredEmptyWords('done', 11).head).toBe('Nothing in your filter is closed');
-    expect(filteredEmptyWords('all', 26).head).toBe('No threads match your filter');
-    for (const tab of ['inbox', 'progress', 'snoozed', 'done', 'all']) {
+    for (const tab of ['inbox', 'progress', 'snoozed', 'done']) {
       expect(filteredEmptyWords(tab, 9).head).not.toBe('Nothing needs you');
     }
   });
@@ -106,7 +105,7 @@ describe('the component that draws it', () => {
 describe('the tab numbers', () => {
   it('count what the filters show, so the number matches the list under it', () => {
     const counts = app.slice(app.indexOf('counts={{'), app.indexOf('counts={{') + 600);
-    for (const tab of ['inbox', 'progress', 'snoozed', 'done', 'allRows']) {
+    for (const tab of ['inbox', 'progress', 'snoozed', 'done']) {
       expect(counts).toContain(`shownCount(${tab})`);
     }
   });

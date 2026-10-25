@@ -15,9 +15,17 @@
 // drive that throws or is killed leaves no orphan behind.
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
-import { guard, sweep } from '../../../../scripts/lib/chrome-guard.mjs';
+import { createRequire } from 'node:module';
+import { guard, sweep, processes } from '../../../../scripts/lib/chrome-guard.mjs';
 
-export const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const MAC_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+/** Google Chrome on a Mac; elsewhere `VERIFY_CHROME`, or the Chromium Playwright installed (the Linux cloud has it). */
+export function findChrome(platform = process.platform, env = process.env, playwright = () => createRequire(import.meta.url)('playwright')) {
+  if (platform === 'darwin') return MAC_CHROME;
+  if (env.VERIFY_CHROME) return env.VERIFY_CHROME;
+  try { return playwright().chromium.executablePath(); } catch { return MAC_CHROME; }
+}
+export const CHROME = findChrome();
 
 const KEYS = {
   Enter: { code: 'Enter', keyCode: 13 },
@@ -25,8 +33,33 @@ const KEYS = {
   Tab: { code: 'Tab', keyCode: 9 },
   ArrowDown: { code: 'ArrowDown', keyCode: 40 },
   ArrowUp: { code: 'ArrowUp', keyCode: 38 },
+  ' ': { code: 'Space', keyCode: 32 },
 };
 const MODIFIERS = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
+
+/** The editing command a Mac keyboard sends with a shortcut: a key event alone selects or undoes nothing. */
+export function editingCommands(key, mods = []) {
+  const held = [...mods].sort().join('+');
+  const k = key.toLowerCase();
+  if (held === 'meta' && k === 'a') return ['selectAll'];
+  if (held === 'meta' && k === 'z') return ['undo'];
+  if (held === 'meta+shift' && k === 'z') return ['redo'];
+  return [];
+}
+
+/** The Chrome processes, helpers too, started on exactly this profile. */
+export function holdersOf(profile, list = processes, chrome = CHROME) {
+  const bundle = chrome.includes('.app/') ? `${chrome.split('.app/')[0]}.app/` : chrome;
+  const flag = new RegExp(`--user-data-dir=${profile.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=\\s|$)`);
+  return list().filter((p) => p.command.startsWith(bundle) && flag.test(p.command)).map((p) => p.pid);
+}
+
+/** Stop any Chrome still on this profile: one that will not answer keeps its lock, and every Chrome after it exits. */
+export function freeProfile(profile) {
+  const pids = holdersOf(profile);
+  for (const pid of pids) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
+  return pids.length;
+}
 
 /**
  * Start a headless Chrome on a throwaway profile and wait for its devtools
@@ -34,17 +67,26 @@ const MODIFIERS = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
  * browser, which lives across many short commands); then its profile should sit
  * inside the instance folder, so `live.mjs down` finds and stops it.
  */
-export async function launchChrome({ width = 1440, height = 900, profile, detached = false } = {}) {
-  if (!fs.existsSync(CHROME)) throw new Error(`No Google Chrome at ${CHROME}. The live drive needs it.`);
-  const chrome = spawn(CHROME, [
+export async function launchChrome({ width = 1440, height = 900, profile, detached = false, bin = CHROME, waitMs = 20_000 } = {}) {
+  if (!fs.existsSync(bin)) throw new Error(`No Google Chrome at ${bin}. The live drive needs it.`);
+  const chrome = spawn(bin, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
     '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
     `--window-size=${width},${height}`, 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'], detached });
   const wsUrl = await new Promise((resolve, reject) => {
     let buf = '';
-    const timer = setTimeout(() => reject(new Error('chrome never printed a devtools url')), 20_000);
+    // A Chrome given up on still holds the profile's lock, and every later
+    // Chrome on that profile hands off to it and exits: it goes too.
+    const timer = setTimeout(() => {
+      chrome.kill('SIGKILL');
+      reject(new Error(`chrome never printed a devtools url in ${Math.round(waitMs / 1000)} s, so it was stopped`));
+    }, waitMs);
     chrome.stderr.on('data', (d) => { buf += d; const m = buf.match(/ws:\/\/\S+/); if (m) { clearTimeout(timer); resolve(m[0]); } });
+    chrome.on('exit', (code) => {
+      clearTimeout(timer);
+      reject(new Error(`chrome exited before printing a devtools url (code ${code}); another Chrome may hold ${profile}`));
+    });
   });
   if (detached) { chrome.stderr.destroy(); chrome.unref(); }
   return { chrome, wsUrl };
@@ -66,7 +108,13 @@ export async function openTab(url, { width = 1440, height = 900 } = {}) {
  */
 export async function connect(wsUrl, { width = 1440, height = 900, targetId: existing = null } = {}) {
   const ws = new WebSocket(wsUrl);
-  await new Promise((r) => { ws.onopen = r; });
+  // A Chrome that has gone never opens the socket; without a deadline Node
+  // exits with "unsettled top-level await" and nothing says why.
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Chrome did not answer at ${wsUrl}`)), 10_000);
+    ws.onopen = () => { clearTimeout(timer); resolve(); };
+    ws.onerror = () => { clearTimeout(timer); reject(new Error(`Chrome is not there any more (${wsUrl})`)); };
+  });
   let nextId = 1;
   const pending = new Map();
   const events = [];
@@ -122,7 +170,8 @@ export async function connect(wsUrl, { width = 1440, height = 900, targetId: exi
       ? { key, code: named.code, windowsVirtualKeyCode: named.keyCode }
       : { key, code: `Key${key.toUpperCase()}`, windowsVirtualKeyCode: key.toUpperCase().charCodeAt(0) };
     const text = !named && !mods.length ? key : key === 'Enter' && !mods.length ? '\r' : undefined;
-    await call('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', modifiers, ...base, ...(text ? { text } : {}) });
+    const commands = editingCommands(key, mods);
+    await call('Input.dispatchKeyEvent', { type: text ? 'keyDown' : 'rawKeyDown', modifiers, ...base, ...(text ? { text } : {}), ...(commands.length ? { commands } : {}) });
     await call('Input.dispatchKeyEvent', { type: 'keyUp', modifiers, ...base });
   };
   /** Text into whatever has focus, the way a paste or an IME lands it. */

@@ -1,11 +1,11 @@
-// THE ONE LINE SAYING IT FOUND AN ACCOUNT ALREADY ON THIS MAC.
+// THE ONE LINE SAYING IT FOUND AN ACCOUNT ALREADY ON THIS COMPUTER.
 //
 // From a session with a new user, 2026-10-07, in her words: a new user came in,
 // started running an agent, and was "like, 'Oh my God, where are the tokens
 // coming from? I didn't even connect my account.'"
 //
 // He was right that nothing said. The app finds whichever coding agent is
-// already signed in on the Mac and runs every worker on that subscription
+// already signed in on the computer and runs every worker on that subscription
 // (main/claude-plan.mjs, main/codex-account.mjs), and the walk is SILENT about
 // it by design: `needsPlan` in renderer/src/plan-setup.ts skips the plan
 // question entirely when one tool is found and signed in, which is the right
@@ -43,13 +43,16 @@ export function runsOnName(engine) {
 }
 
 /**
- * THE ONE LINE DURING THE WALK, on the Mac where there was nothing to ask.
+ * THE ONE LINE DURING THE WALK, on the computer where there was nothing to ask.
  *
  *  It replaces silence, not a question: somebody with no coding agent set up
  *  still gets the plan question and the setup card, and never sees this.
+ *
+ *  It says computer rather than Mac: Agentbox runs on Linux too, and one
+ *  sentence beats a branch, since "this computer" is true on a Mac as well.
  */
-export function foundOnThisMac({ engine = null } = {}) {
+export function foundOnThisComputer({ engine = null } = {}) {
   const name = runsOnName(engine);
   if (!name) return null;
-  return `Your agents will run on the ${name} account already signed in on this Mac.`;
+  return `Your agents will run on the ${name} account already signed in on this computer.`;
 }

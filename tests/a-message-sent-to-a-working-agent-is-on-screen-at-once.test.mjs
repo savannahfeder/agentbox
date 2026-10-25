@@ -64,7 +64,9 @@ describe('a message sent to a working agent', () => {
     // (w-f37a34def6), where a step can be cut.
     // The head's facts are one helper since w-2e8aa16f0f (`headFacts`), which
     // a chat's head calls as well, so the line is matched without its indent.
-    expect(src).toMatch(/e\.pending\n\s+\? <span className="msg-when msg-sending">\{e\.held \? 'Sending… press Z to undo' : cutting \? 'Sending now…' : onSendNow \? 'Waiting for its current step' : 'Sending…'\}<\/span>/);
+    // (And on the phone with the computer closed, that it waits for the
+    // computer, or why the computer turned it down: renderer/src/cloud-bridge.ts.)
+    expect(src).toMatch(/e\.pending\n\s+\? <span className=\{`msg-when msg-sending\$\{e\.refused \? ' msg-refused' : ''\}`\}>\{e\.refused \? `Not sent: \$\{e\.refused\}` : e\.held \? 'Sending… press Z to undo' : onCloudPhone\(\) \? \(e\.cloud \? `Working in \$\{Name\} Cloud` : 'Waiting for your computer'\) : cutting \? 'Sending now…' : onSendNow \? 'Waiting for its current step' : 'Sending…'\}<\/span>/);
   });
 
   it('keeps three of them apart, in the order she sent them', () => {

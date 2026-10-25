@@ -69,19 +69,15 @@ export function placeScore(order, slug, direct) {
 /**
  * The number an item carries into that score.
  *
- * An AGENT'S tag counts for nothing. Agents used to set this themselves, on a
- * rule in the worker brief that told them 7 meant blocking; of the 442 items
- * agents filed, 127 came in at 7 or higher, which is not an order, it is
- * noise. She asked for the ordering to be the app's job, the rule is out of
- * the brief, and this is the half that also covers the items already sitting
- * in the store carrying an agent's 8.
- *
- * Everything else counts, and the test for "hers" is deliberately wide: her
- * compose box writes the number as 'system' rather than 'founder' (the split
- * in store.composeItem is words-versus-lifecycle, not authority), and a repeat
- * rule's number arrives the same way. Reading only 'founder' here would have
- * thrown away the Urgent tag on the very row she complained about
- * (tests/urgent-does-not-wait-behind-medium.test.mjs).
+ * A LEVEL COUNTS WHOEVER SET IT (w-5ac9c9006d, 2026-10-16). An agent's tag
+ * used to count for nothing, because agents once tagged 127 of 442 rows at 7
+ * or higher on an old brief rule. That made every level an agent wrote a lie
+ * on screen, and her answer was to stop discarding them: "If agent-determined
+ * priorities are ignored, then it seems like the whole prioritization system
+ * is ignored. If an agent sets something and I'm like, 'Oh that's the wrong
+ * priority,' I'll fix it. We should also always treat priorities as the
+ * source of truth, regardless of where they came from." Her fix is a new
+ * level, and the fold keeps hers over an agent's.
  *
  * Nought means untagged, not bottom. It is the seed the fold starts an item
  * at and the default her compose sends when she picks no number, and her own
@@ -93,9 +89,27 @@ export const DEFAULT_PRIORITY = 5;
 
 export function itemPriority(item) {
   if (!item) return DEFAULT_PRIORITY;
-  if (item.wrote?.priority?.source === 'agent') return DEFAULT_PRIORITY;
   const n = item.priority;
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_PRIORITY;
+}
+
+/**
+ * THE LEVEL A THREAD SHOWS IS THE LEVEL IT RUNS AT (w-5ac9c9006d, 2026-10-15).
+ *
+ * Every screen drew the raw stored number while the fleet ran `itemPriority`,
+ * so a thread an agent filed untagged read Low and ran as Medium, and an
+ * agent's own 8 read High and ran as Medium. In Progress then showed three
+ * "Low" threads running while a "High" and a "Medium" waited. An agent's level
+ * now counts (above); an untagged row reads Medium here as it runs.
+ *
+ * A CONVERSATION keeps the number it carries: its level is the message
+ * sorter's (main/message-priority.mjs), written as an agent on purpose, and a
+ * conversation never spawns, so there is no running order for it to disagree
+ * with. `conversation` is the caller's to say, since only it knows the product.
+ */
+export function shownPriority(item, conversation = false) {
+  if (conversation) return item?.priority ?? null;
+  return itemPriority(item);
 }
 
 /**
@@ -110,12 +124,11 @@ export function itemPriority(item) {
 export const URGENT_PRIORITY = 9;
 
 /**
- * Is this HER urgent row?
+ * Is this row Urgent?
  *
- * itemPriority already throws away an agent's number, so this cannot be
- * reached by a worker tagging its own proposal a nine. That matters more here
- * than anywhere else in this file: everything downstream of this predicate
- * takes a running session away from something else.
+ * Whoever set it, since 2026-10-16 (itemPriority). Everything downstream of
+ * this predicate takes a running session away from something else, so an
+ * agent's nine interrupts like hers; a wrong one is hers to lower.
  */
 export function isUrgent(item) {
   return itemPriority(item) >= URGENT_PRIORITY;

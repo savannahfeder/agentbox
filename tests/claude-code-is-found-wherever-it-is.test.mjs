@@ -207,19 +207,24 @@ describe('what the settings screen is told', () => {
   // that is read again after every switch she flips does not pay for it each
   // time. Everything else is a stat call and is never cached, which is what
   // makes "install it, then open this screen again" true.
+  // After it, in the background (tests/finding-a-coding-agent-never-holds-the-window).
   it('asks the shell once inside its window, and again after it', () => {
     forgetClaudeBin();
-    let asks = 0;
+    const asks = { now: 0, later: 0 };
     const t0 = 1_000_000;
-    const bare = { home: HOME, exists: () => false, shellLookup: () => { asks += 1; return null; } };
+    const bare = {
+      home: HOME, exists: () => false,
+      shellLookup: () => { asks.now += 1; return null; },
+      shellLookupLater: () => { asks.later += 1; return null; },
+    };
 
     resolveClaudeBin(null, { ...bare, now: t0 });
     resolveClaudeBin(null, { ...bare, now: t0 + 1_000 });
     resolveClaudeBin(null, { ...bare, now: t0 + 29_999 });
-    expect(asks).toBe(1);
+    expect(asks).toEqual({ now: 1, later: 0 });
 
     resolveClaudeBin(null, { ...bare, now: t0 + 30_001 });
-    expect(asks).toBe(2);
+    expect(asks).toEqual({ now: 1, later: 1 });
     forgetClaudeBin();
   });
 });

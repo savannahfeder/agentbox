@@ -50,7 +50,7 @@ describe('the name and its three lines read as one block', () => {
   // CHANGED 2026-10-05 (w-54e9c7243f): the lines are Context and Done now.
   it('puts the name directly above Context, with nothing between', () => {
     // The pencil inside the name is the rename (w-ab3d51dc7d).
-    expect(html).toMatch(/<h2 class="ts-title"[^>]*>Acme renewal terms<svg class="ts-pen"[^]*?<\/svg><\/h2><div class="ts-sec"><div class="ts-h">Context<\/div>/);
+    expect(html).toMatch(/<h2 class="ts-title"[^>]*><span class="ts-title-text">Acme renewal terms<svg class="ts-pen"[^]*?<\/svg><\/span><\/h2><div class="ts-sec"><div class="ts-h">Context<\/div>/);
   });
   it('keeps context then done in that order under the name', () => {
     expect(text(draw(item({ solution: 'Terms sent.' })))).toMatch(/Acme renewal terms Context Acme’s contract ends on the 14th\. Done Terms are drafted\. Status/);

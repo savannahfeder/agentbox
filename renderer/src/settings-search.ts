@@ -11,8 +11,8 @@
 // second word narrows rather than widens.
 
 export type SettingsPageId =
-  | 'general' | 'appearance' | 'shortcuts' | 'phone'
-  | 'claude' | 'codex' | 'running' | 'instructions'
+  | 'general' | 'appearance' | 'shortcuts' | 'phone' | 'alpha' | 'rooms'
+  | 'claude' | 'codex' | 'running' | 'cloud' | 'instructions'
   | 'projects' | 'team';
 
 /** The menu, in the order it is drawn, under the three headings it is drawn
@@ -22,12 +22,15 @@ export const SETTINGS_PAGES: Array<{ id: SettingsPageId; label: string; group: '
   { id: 'appearance', label: 'Appearance', group: 'Personal' },
   { id: 'shortcuts', label: 'Shortcuts', group: 'Personal' },
   { id: 'phone', label: 'Phone', group: 'Personal' },
+  { id: 'alpha', label: 'Alpha features', group: 'Personal' },
   { id: 'claude', label: 'Claude Code', group: 'Agents' },
   { id: 'codex', label: 'Codex', group: 'Agents' },
   { id: 'running', label: 'Running', group: 'Agents' },
+  { id: 'cloud', label: 'Cloud', group: 'Agents' },
   { id: 'instructions', label: 'Instructions', group: 'Agents' },
   { id: 'projects', label: 'Projects', group: 'Workspace' },
   { id: 'team', label: 'Team', group: 'Workspace' },
+  { id: 'rooms', label: 'Rooms', group: 'Workspace' },
 ];
 
 const pageLabel = (id: SettingsPageId) => SETTINGS_PAGES.find((p) => p.id === id)?.label ?? id;
@@ -55,20 +58,30 @@ const ENTRIES: Entry[] = [
   { page: 'shortcuts', label: 'Keyboard shortcuts', words: 'keys hotkeys keybindings' },
   { page: 'phone', label: 'Use it on your phone', anchor: 'phone', words: 'phone mobile qr code scan remote tailscale wifi home screen app' },
   { page: 'phone', label: 'Connected devices', anchor: 'phone-devices', words: 'devices phones connected who reset key' },
+  { page: 'alpha', label: 'Rooms', anchor: 'alpha', words: 'alpha beta early try team teammates friends multiplayer people chat' },
+  { page: 'rooms', label: 'Show my full name', anchor: 'rooms-name', words: 'name last surname initial' },
+  { page: 'rooms', label: 'What you are working on', anchor: 'rooms-card', words: 'card thread private wall' },
+  { page: 'rooms', label: 'Your activity on your page', anchor: 'rooms-card', words: 'activity board inbox profile page hide' },
+  { page: 'rooms', label: 'Go invisible', anchor: 'rooms-invisible', words: 'hide hidden away offline ghost' },
   { page: 'claude', label: 'Usage', anchor: 'usage', words: 'claude code limits plan left remaining quota' },
-  { page: 'claude', label: 'Signed in', anchor: 'accounts', words: 'claude code account accounts login subscription add email' },
+  { page: 'claude', label: 'Signed in', anchor: 'usage', words: 'claude code account accounts login subscription add email this computer local' },
+  { page: 'claude', label: 'Cloud accounts', anchor: 'cloud-accounts', words: 'claude code cloud remote accounts limit' },
   { page: 'claude', label: 'Permission mode', anchor: 'permissions', words: 'claude code permissions bypass ask allow plan accept edits' },
   { page: 'codex', label: 'Usage', anchor: 'usage', words: 'codex limits plan left remaining quota' },
-  { page: 'codex', label: 'Signed in', anchor: 'accounts', words: 'codex account accounts login subscription add email' },
+  { page: 'codex', label: 'Signed in', anchor: 'usage', words: 'codex account accounts login subscription add email this computer local' },
+  { page: 'codex', label: 'Cloud accounts', anchor: 'cloud-accounts', words: 'codex cloud remote accounts limit' },
   { page: 'codex', label: 'Permission mode', anchor: 'permissions', words: 'codex permissions sandbox read only full access' },
   // The Memory group folded into the Agents card (w-e5225b62ba), so these three
   // land on `at-once` together. An anchor naming a group that no longer exists
   // is a search result that scrolls nowhere.
+  { page: 'cloud', label: 'Cloud plans', anchor: 'cloud-plans', words: 'agentbox cloud plan plans pro plus max slots upgrade price pay subscription' },
+  { page: 'cloud', label: 'Billing', anchor: 'cloud-billing', words: 'stripe payment invoices card cancel subscription' },
   { page: 'running', label: 'How many run at once', anchor: 'at-once', words: 'agents concurrent parallel sessions limit queue capacity automatic' },
   { page: 'running', label: 'Hold heavy work when memory is short', anchor: 'at-once', words: 'ram tests builds slow memory' },
   { page: 'running', label: 'Stop programs agents leave behind', anchor: 'at-once', words: 'leftovers left running finished dev servers background jobs processes cleanup kill ram memory' },
   { page: 'running', label: 'Something felt slow', anchor: 'at-once', words: 'slow fewer agents throttle struggling' },
   { page: 'running', label: 'Agents you started yourself', anchor: 'outside', words: 'terminal outside sessions inbox your own' },
+  { page: 'running', label: 'Bring in new chats', anchor: 'outside', words: 'import chats conversations automatic' },
   { page: 'instructions', label: 'Instructions for every agent', words: 'rules prompt claude.md how agents write to you' },
   { page: 'projects', label: 'Projects', words: 'order priority archive new project' },
   { page: 'team', label: 'Team', words: 'invite people members teammates' },

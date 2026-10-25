@@ -26,17 +26,39 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
 
-// A checkout has scripts/linux-launcher.mjs next to this file. The published
-// package does not, so an npm install of that package, including npx, leaves
-// the launcher alone. A missing file is the ordinary case, not an error.
-const launcherPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'linux-launcher.mjs');
-if (fs.existsSync(launcherPath)) {
+// A checkout has scripts/linux-launcher.mjs and scripts/link-own-bin.mjs next
+// to this file. The published package carries neither, so an npm install of
+// that package, including npx, leaves both alone. A missing file is the
+// ordinary case here, not an error.
+const here = path.dirname(fileURLToPath(import.meta.url));
+
+async function fromCheckout(file) {
+  const at = path.join(here, file);
+  if (!fs.existsSync(at)) return null;
   try {
-    const { installLinuxLauncher } = await import(pathToFileURL(launcherPath).href);
-    installLinuxLauncher({ env: process.env });
+    return await import(pathToFileURL(at).href);
   } catch {
     // Nothing here is worth stopping an install for.
+    return null;
   }
+}
+
+const launcher = await fromCheckout('linux-launcher.mjs');
+if (launcher) {
+  const { changed, why } = launcher.installLinuxLauncher({ env: process.env });
+  if (changed) console.log('agentbox: this checkout is in the app launcher.');
+  // A launcher that did not happen says so. Before this, a fresh clone whose
+  // Electron binary was not downloaded yet got no launcher and no word about
+  // it, and `which agentbox` answered nothing.
+  else if (why) console.log(`agentbox: no app launcher was written: ${why}.`);
+}
+
+// And the checkout's own command, so `npx agentbox-app` from here starts the
+// browser rather than looking for `agentbox` on PATH.
+const own = await fromCheckout('link-own-bin.mjs');
+if (own) {
+  const { why } = own.linkOwnBin();
+  if (why) console.log(`agentbox: \`npx agentbox-app\` will not work from this checkout: ${why}.`);
 }
 
 function prebuildsDir() {
@@ -67,7 +89,7 @@ try {
     fs.chmodSync(helper, 0o755);
     fixed += 1;
   }
-  if (fixed) console.log(`agentbox: made ${fixed} node-pty spawn-helper binary${fixed === 1 ? '' : 'ies'} executable, so the terminal works.`);
+  if (fixed) console.log(`agentbox: made ${fixed} node-pty spawn-helper binar${fixed === 1 ? 'y' : 'ies'} executable, so the terminal works.`);
 } catch {
   // Nothing here is worth stopping an install for.
 }

@@ -16,9 +16,11 @@
 // such records across its most recent sessions, the newest written within
 // the minute.
 //
-// THE PUSH STILL WINS. A live notification is this second's truth and a log is
-// the last thing anybody wrote down, so main/codex-usage.mjs reads this only when
-// it has nothing of its own. Nothing about the existing path changes.
+// A LIVE PUSH STILL WINS, AND A QUIET ONE NO LONGER DOES (w-7b7182ef61). A
+// notification that arrived a moment ago is this second's truth and nothing on
+// disk can be newer, so main/codex-usage.mjs does not open a file while one is
+// fresh. Past that the two are compared and the newer is read, because an hours
+// old push was being drawn over a newer line in this log.
 //
 // IT IS THE SAME ACCOUNT OR IT IS NOT READ. One CODEX_HOME is one login, and the
 // log lives inside the home, so a reading taken from `~/.codex/sessions` is a

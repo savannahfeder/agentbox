@@ -73,6 +73,32 @@ describe('the repeating-task rules are only pasted onto a repeat run', () => {
   });
 });
 
+// A teammate's run (w-4bd7b5548b) closed with a long report left open in the
+// inbox until its brief said how a teammate finishes: post to the team chat,
+// then done and clean. Only a teammate:<id> label earns that section.
+const TEAMMATE_RULES = 'If this item is one run of a teammate';
+
+describe('the teammate rules are only pasted onto a teammate run', () => {
+  it('a one-off task and a repeat run are not told how a teammate finishes', () => {
+    const s = makeSupervisor();
+    for (const labels of [[], ['founder', 'repeat:r1'], ['founder', 'teammates']]) {
+      const brief = s.buildBrief(item({ labels }), product(), { continuation: false });
+      expect(brief).not.toContain(TEAMMATE_RULES);
+      expect(brief).not.toContain('teammate-rules:start');
+    }
+  });
+
+  it('a teammate run gets them whole, with the chat and the clean finish', () => {
+    const s = makeSupervisor();
+    const brief = s.buildBrief(item({ labels: ['founder', 'teammate:t-abcdef1234', 'hop:0'] }), product(), { continuation: false });
+    expect(brief).toContain(TEAMMATE_RULES);
+    expect(brief).toContain('team_post');
+    expect(brief).toContain('"clean"');
+    expect(brief).not.toContain('teammate-rules:start');
+    expect(brief).not.toContain('teammate-rules:end');
+  });
+});
+
 describe('what she cut is gone from the file we ship', () => {
   const template = () => fs.readFileSync(path.join(REPO, 'briefs', 'worker.md'), 'utf8');
 
@@ -182,7 +208,7 @@ describe('the four she asked about', () => {
     const t = template();
     const bullet = t.slice(t.indexOf('- EVERYTHING YOU FILE IS A PROPOSAL'));
     const text = bullet.slice(0, bullet.indexOf('\n- '));
-    expect(text).toContain('nothing you create runs until');
+    expect(text).toContain('nothing you file runs until');
     expect(text.split('.').filter((x) => x.trim()).length).toBe(1);
   });
 

@@ -96,6 +96,9 @@ export function createItem(product, fields = {}, { source = 'agent', from = [] }
   const p = resolveProduct(product);
   const sources = [...from, fields.parent].filter(Boolean).map((id) => { try { return locate(id).item; } catch { return null; } });
   const kept = fields.visibility ? {} : privacyFrom(sources);
+  // A row filed under a thread runs as that thread does, or it falls to the default engine.
+  const parent = fields.parent ? sources.at(-1) : null;
+  for (const f of ['engine', 'model', 'effort']) if (fields[f] == null && parent?.[f]) kept[f] = parent[f];
   const item = createWorkItem(p.dir, saidPlainly({ ...fields, ...kept }, source), { source });
   return { ...item, product: p.id, productName: p.name };
 }
@@ -171,9 +174,21 @@ export function privacyFrom(items) {
   return people.length ? { visibility: 'people', visibleTo: people } : { visibility: 'private' };
 }
 
+// A teammate's run is known by these labels, and labels are written whole, so
+// a run that closes with ["clean"] would stop being its teammate's run.
+const RUN_LABELS = ['teammate:', 'hop:', 'from:'];
+function keepRunLabels(had, patch) {
+  if (!Array.isArray(patch.labels)) return patch;
+  const before = had?.labels ?? [];
+  if (!before.some((l) => String(l).startsWith('teammate:'))) return patch;
+  const kept = before.filter((l) => l === 'founder' || RUN_LABELS.some((p) => String(l).startsWith(p)));
+  const missing = kept.filter((l) => !patch.labels.includes(l));
+  return missing.length ? { ...patch, labels: [...patch.labels, ...missing] } : patch;
+}
+
 export function updateItem(id, patch, { product = null, epoch = null, source = 'agent' } = {}) {
-  const { project } = locate(id, { product });
-  const item = updateWorkItem(project.dir, id, saidPlainly(patch, source), { epoch, source });
+  const { project, item: had } = locate(id, { product });
+  const item = updateWorkItem(project.dir, id, saidPlainly(keepRunLabels(had, patch), source), { epoch, source });
   return { ...item, product: project.id, productName: project.name };
 }
 
@@ -208,7 +223,7 @@ const plainly = (s) => String(s ?? '')
 
 export function herRow(item) {
   const labels = item?.labels ?? [];
-  return labels.includes('founder') && !labels.some((l) => String(l).startsWith('repeat:'));
+  return labels.includes('founder') && !labels.some((l) => String(l).startsWith('repeat:') || String(l).startsWith('teammate:'));
 }
 
 export function saidToClose(item, words) {

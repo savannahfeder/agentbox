@@ -39,60 +39,60 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
 describe('the pictures in a folder a message names', () => {
-  it('lists the folder on her screenshot, newest first, so round three leads', () => {
+  it('lists the folder on her screenshot, newest first, so round three leads', async () => {
     touch('designs/w-a3/b-open.png', 300);
     touch('designs/w-a3/r2-rail.png', 120);
     touch('designs/w-a3/r3-built-closed.png', 5);
-    const r = folderPictures({ src: 'designs/w-a3/', product: 'agentbox-team', products: [prod], accountRoot: root });
+    const r = await folderPictures({ src: 'designs/w-a3/', product: 'agentbox-team', products: [prod], accountRoot: root });
     expect(r.ok).toBe(true);
     expect(r.pictures.map((p) => path.basename(p))).toEqual(['r3-built-closed.png', 'r2-rail.png', 'b-open.png']);
     expect(r.total).toBe(3);
   });
 
-  it('accepts the folder written out in full', () => {
+  it('accepts the folder written out in full', async () => {
     touch('designs/w-a3/one.png', 1);
-    const r = folderPictures({ src: `${dir}/designs/w-a3/`, product: 'agentbox-team', products: [prod], accountRoot: root });
+    const r = await folderPictures({ src: `${dir}/designs/w-a3/`, product: 'agentbox-team', products: [prod], accountRoot: root });
     expect(r.pictures).toHaveLength(1);
   });
 
-  it('leaves out what is not a picture, a page or a note beside them', () => {
+  it('leaves out what is not a picture, a page or a note beside them', async () => {
     touch('designs/w-a3/one.png', 1);
     touch('designs/w-a3/page.html', 1);
     touch('designs/w-a3/notes.md', 1);
-    const r = folderPictures({ src: 'designs/w-a3/', product: 'agentbox-team', products: [prod], accountRoot: root });
+    const r = await folderPictures({ src: 'designs/w-a3/', product: 'agentbox-team', products: [prod], accountRoot: root });
     expect(r.pictures.map((p) => path.basename(p))).toEqual(['one.png']);
   });
 
-  it('does not go into folders inside the folder', () => {
+  it('does not go into folders inside the folder', async () => {
     touch('designs/w-a3/one.png', 1);
     touch('designs/w-a3/old/two.png', 1);
-    const r = folderPictures({ src: 'designs/w-a3/', product: 'agentbox-team', products: [prod], accountRoot: root });
+    const r = await folderPictures({ src: 'designs/w-a3/', product: 'agentbox-team', products: [prod], accountRoot: root });
     expect(r.total).toBe(1);
   });
 
-  it('hands back at most `limit` pictures but counts all of them', () => {
+  it('hands back at most `limit` pictures but counts all of them', async () => {
     for (let i = 0; i < 9; i++) touch(`designs/w-a3/p${i}.png`, i);
-    const r = folderPictures({ src: 'designs/w-a3/', product: 'agentbox-team', products: [prod], accountRoot: root, limit: 4 });
+    const r = await folderPictures({ src: 'designs/w-a3/', product: 'agentbox-team', products: [prod], accountRoot: root, limit: 4 });
     expect(r.pictures).toHaveLength(4);
     expect(r.total).toBe(9);
   });
 
-  it('refuses a folder outside her project, even one full of pictures', () => {
+  it('refuses a folder outside her project, even one full of pictures', async () => {
     const outside = path.join(root, 'elsewhere');
     fs.mkdirSync(outside);
     fs.writeFileSync(path.join(outside, 'secret.png'), 'x');
-    const r = folderPictures({ src: outside, product: 'agentbox-team', products: [prod], accountRoot: path.join(root, 'nope') });
+    const r = await folderPictures({ src: outside, product: 'agentbox-team', products: [prod], accountRoot: path.join(root, 'nope') });
     expect(r.ok).toBe(false);
   });
 
-  it('says so when the folder is not there', () => {
-    const r = folderPictures({ src: 'designs/w-gone/', product: 'agentbox-team', products: [prod], accountRoot: root });
+  it('says so when the folder is not there', async () => {
+    const r = await folderPictures({ src: 'designs/w-gone/', product: 'agentbox-team', products: [prod], accountRoot: root });
     expect(r.ok).toBe(false);
   });
 
-  it('refuses a file, which is not a folder to look into', () => {
+  it('refuses a file, which is not a folder to look into', async () => {
     touch('designs/w-a3/one.png', 1);
-    const r = folderPictures({ src: 'designs/w-a3/one.png', product: 'agentbox-team', products: [prod], accountRoot: root });
+    const r = await folderPictures({ src: 'designs/w-a3/one.png', product: 'agentbox-team', products: [prod], accountRoot: root });
     expect(r.ok).toBe(false);
   });
 });

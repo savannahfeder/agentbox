@@ -35,21 +35,22 @@ const cols = (d = display) => boardColumns({ items, products, display: d, now: N
 const ids = (rows) => rows.map((r) => r.id);
 
 describe('the board', () => {
-  it('sorts each column by priority, Urgent first', () => {
+  // In progress runs newest sent first since w-21b638d821.
+  it('sorts each column by priority, Urgent first, and In progress newest sent first', () => {
     const c = cols();
     expect(c.map((x) => x.state)).toEqual(['waiting', 'running', 'scheduled', 'done']);
     expect(c[0].rows.map((e) => e.item.id)).toEqual(['w-urgent', 'w-high', 'w-low']);
-    expect(c[1].rows.map((e) => e.item.id)).toEqual(['r-urgent', 'r-med']);
+    expect(c[1].rows.map((e) => e.item.id)).toEqual(['r-med', 'r-urgent']);
   });
 
   it('is walked down each column, then on to the next, exactly as drawn', () => {
-    expect(ids(boardWalk(cols()))).toEqual(['w-urgent', 'w-high', 'w-low', 'r-urgent', 'r-med', 's-high']);
+    expect(ids(boardWalk(cols()))).toEqual(['w-urgent', 'w-high', 'w-low', 'r-med', 'r-urgent', 's-high']);
   });
 
   it('lets J carry on past the end of a column instead of stopping', () => {
     const walk = ids(boardWalk(cols()));
     const at = walk.indexOf('w-low');
-    expect(walk[at + 1]).toBe('r-urgent');
+    expect(walk[at + 1]).toBe('r-med');
   });
 
   it('still walks by Updated when that is what the menu says', () => {

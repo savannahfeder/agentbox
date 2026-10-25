@@ -14,10 +14,19 @@
 // So it turns twice, 1856ms a turn, WHEN SOMETHING CHANGES, and settles still.
 // Motion in this corner always means news; the rest of the time there is none.
 // Her pick of three, 2026-10-13: "I agree with: 1. It turns, then it settles."
-import React from 'react';
+//
+// AND IT IS ONE DRAWING ON A WHOLE-DEVICE-PIXEL PITCH. It was nine boxes in a
+// grid, each snapped on its own, and twice the fix was whole POINTS for the dot
+// and the gap. A point on a Mac in a scaled mode is 1.5 device pixels, so that
+// never held there: the gaps rounded apart and the mark came out crooked, six
+// times. Now it is one svg whose pitch is a whole number of DEVICE pixels, so
+// every dot stands the same distance from a pixel boundary as every other and
+// all nine are rasterised the same, wherever the mark's own corner lands.
+import React, { useEffect, useState } from 'react';
+import { latticeGrid } from '../../../shared/corner-tag.mjs';
 
-// Which step of the orbit each dot takes; null is the centre, which never
-// joins in because it is never dim.
+// Which step of the orbit each dot takes, in reading order; null is the
+// centre, which never joins in because it is never dim.
 const ORBIT = [0, 1, 2, 7, null, 3, 6, 5, 4];
 
 /** One turn of the orbit. The app's 1488ms, a quarter slower, because the
@@ -50,17 +59,51 @@ export function markMoves(before: Says | null, after: Says): Move {
  * `beat` changes with every move so the element is replaced and its animation
  * starts again from the top; nothing here runs a timer.
  */
-export function Lattice({ lit, move, beat }: { lit: boolean; move: Move; beat: number }) {
+export function Lattice({ box, lit, move, beat }: { box: number; lit: boolean; move: Move; beat: number }) {
   const how = `${lit ? ' is-waiting' : ''}${move === 'stir' && !lit ? ' is-turning' : ''}${move === 'pop' ? ' is-popping' : ''}`;
+  const grid = latticeGrid(box, useScreenPixels());
+  const dots = grid.dots;
   return (
-    <span key={beat} className={`ct-lat${how}`} aria-hidden="true">
+    <svg
+      key={beat}
+      className={`ct-lat${how}`}
+      viewBox={`0 0 ${grid.side} ${grid.side}`}
+      style={{ width: `${grid.size}px`, height: `${grid.size}px` }}
+      aria-hidden="true"
+    >
       {ORBIT.map((step, i) => (
-        <i
+        <circle
           key={i}
+          cx={dots[i].cx}
+          cy={dots[i].cy}
+          r={grid.dot / 2}
           className={step === null ? 'ct-heart' : undefined}
           style={step === null ? undefined : ({ '--p': step, '--r': i } as React.CSSProperties)}
         />
       ))}
-    </span>
+    </svg>
   );
+}
+
+/**
+ * How many device pixels this screen draws to the point, now. It changes when
+ * the tag is dragged onto another monitor, and the mark has to be built again
+ * from the new number, so the pitch stays whole there too.
+ */
+function useScreenPixels() {
+  const [dpr, setDpr] = useState(() => (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1));
+  useEffect(() => {
+    let stop = () => {};
+    const watch = () => {
+      const now = window.devicePixelRatio || 1;
+      setDpr(now);
+      const m = window.matchMedia(`(resolution: ${now}dppx)`);
+      const again = () => { stop(); watch(); };
+      m.addEventListener('change', again);
+      stop = () => m.removeEventListener('change', again);
+    };
+    watch();
+    return () => stop();
+  }, []);
+  return dpr;
 }

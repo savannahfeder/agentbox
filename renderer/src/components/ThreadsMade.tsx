@@ -7,31 +7,49 @@
 // agent files is a proposal waiting on you, and answering it used to mean
 // leaving this thread, finding that one's own row and acting there, once per
 // thread: "it ends up in my inbox with no clear next step." The next step is
-// now in the row that names it, and there are two of them.
+// now in the row that names it.
 //
-// DO IN THIS THREAD, or START NEW THREAD (w-554834e749). Approve was the only
-// real answer, and it always meant a new thread: "I want to be able to do more
-// than just reject or offer subthreads... have the agent not make that a
-// different thread and just do it in our thread." Each press says in full what
-// it does, because the bare word was the confusing part ("make sure it's extra
-// clear"). Chosen off three rounds of drawings: the new thread is the press in
-// the accent, as an outline rather than a solid block ("the orange backgrounds
-// are a little bit too bright"), and this thread is the grey one beside it.
+// THE QUIET LIST (w-fcb5fdc2e5), chosen off four looks. The list it replaces
+// stood two boxed presses on every waiting row inside an orange border, and it
+// read as "the really abrupt orange button might be kind of overwhelming...
+// kind of hard to process." Now:
 //
-// THERE IS NO NO. It was drawn under the cursor, and "No basically means
-// reject, so it's a different functionality"; "ignoring it is basically
-// rejecting it". A proposal you leave alone never runs. One you want gone is
-// closed from its own row like any other thread.
+//   A DOT IS WHAT A PROPOSAL LOOKS LIKE. The small accent dot before a title is
+//   the one mark that says it waits on you, and every proposal carries it. There
+//   is no NEEDS YOU word beside it: drawn in orange next to the orange press it
+//   made two orange words in one list, "and we can't have two pieces of text in
+//   orange. Otherwise it gets very confusing."
 //
-// ONE ROW AT A TIME. There is no press that answers the lot, and that is the
-// decision rather than an omission: three proposals are three decisions, and
-// this app has already been burned once by a key that approved on her behalf
-// (the E-key history in App.tsx's `resolve`). What each row carries is its own.
+//   ITS ANSWERS ARE ALWAYS BESIDE IT, where the state word would stand. They
+//   were drawn under the cursor only, and the proposal you were not pointing
+//   at looked broken: "it should always show those options even if you're not
+//   hovering over it."
 //
-// THE ROW IS A DIV, NOT A BUTTON, which it was until the press arrived: no
-// browser accepts a button inside a button. The press to open is its own
-// control filling the row, so the row looks identical and the presses can
-// never be mistaken for each other.
+//   DISMISS, DO HERE, NEW THREAD, with the main one at the right-hand edge:
+//   "don't you think New Thread should logically be on the right?" Answers
+//   hung off a row's right edge end on the one most people pick, it stands in
+//   one column down the list, and the throwaway one is furthest from it. NEW
+//   THREAD is in the accent, the only orange word the list shows.
+//
+//   DISMISS IS BACK. "I sometimes will just want to reject something." It used
+//   to be left out on the grounds that ignoring a proposal is rejecting it;
+//   asked for again, it is the close a proposal's own row makes, with its undo.
+//
+//   WHAT IS ALREADY UNDER WAY GOES GREY while proposals wait: "Once something is
+//   already processed, I think we maybe gray it out to show that it's not meant
+//   to get your attention. It's not a proposal."
+//
+//   AND NOTHING SNAPS. "Everything immediately shades... You typically want
+//   those little transitions." Every hover fades (threads-made.css).
+//
+// AND THE COUNT LINE ANSWERS FOR THE LOT (w-fe64f35bdd). DISMISS ALL and START
+// ALL stand over the rows' answers, grey so NEW THREAD stays the one orange
+// word, and only where two or more proposals wait. They are presses naming the
+// count, never a key: a key once approved on someone's behalf (App.tsx `resolve`).
+//
+// THE ROW IS A DIV, NOT A BUTTON: no browser accepts a button inside a button.
+// The press to open is its own control filling the row, so the row looks
+// identical and the presses can never be mistaken for each other.
 import type { ThreadStateWord } from '../types';
 import { stateWord } from '../threads-made';
 import './threads-made.css';
@@ -44,10 +62,16 @@ export interface MadeRow {
   approve?: boolean;
 }
 
-export const START_NEW = 'Start new thread';
-export const DO_HERE = 'Do in this thread';
+export const START_NEW = 'New thread';
+export const DO_HERE = 'Do here';
+export const DISMISS = 'Dismiss';
+export const START_ALL = 'Start all';
+export const DISMISS_ALL = 'Dismiss all';
 
-export function ThreadsMade({ rows, onOpen, onApprove, onHere, label }: {
+/** "2 proposals waiting on you". */
+export const waitingWords = (n: number): string => `${n} proposal${n === 1 ? '' : 's'} waiting on you`;
+
+export function ThreadsMade({ rows, onOpen, onApprove, onHere, onDismiss, onStartAll, onDismissAll, label }: {
   rows: MadeRow[];
   onOpen: (id: string) => void;
   /** Start it as its own thread: the approval that has always been here. */
@@ -57,61 +81,61 @@ export function ThreadsMade({ rows, onOpen, onApprove, onHere, label }: {
    * filed it and closes it (`doItHereWrites`, ../threads-made.ts).
    */
   onHere?: (id: string) => void;
+  /** Drop it: it closes and never runs. */
+  onDismiss?: (id: string) => void;
+  /** Start every proposal in this list, by id, in the order drawn. */
+  onStartAll?: (ids: string[]) => void;
+  /** Drop every proposal in this list. */
+  onDismissAll?: (ids: string[]) => void;
   label?: string;
 }) {
   if (!rows.length) return null;
-  // WHILE ANY OF THEM WAITS FOR A YES, THE LIST SAYS SO (w-d2744c6daa): "I
-  // often miss these filed tasks... they're not very visible and it's really
-  // easy to skip them." One had waited 22 hours under a closed thread. Chosen
-  // off seven rounds of drawings: the list's outer border goes orange, the
-  // label reads "Still waiting on you" in white, and the waiting rows come
-  // first. Only a row this list can actually answer counts, so a list drawn
-  // without the press, or one holding a review, stays quiet.
+  // Only a row this list can actually answer counts, so a list drawn without
+  // the press, or one holding a review, stays quiet. The waiting rows come
+  // first (w-d2744c6daa).
   const canPress = (r: MadeRow) => !!onApprove && !!r.approve;
-  const waiting = rows.some(canPress);
-  const shown = waiting ? [...rows.filter(canPress), ...rows.filter((r) => !canPress(r))] : rows;
-  // THE PRESSES STAND WHERE THE STATE WORD WOULD (2026-10-05). A row waiting
-  // on you carries them where it would have said NEEDS YOU, so nothing is held
-  // in reserve on the other rows and every row ends at the same right-hand edge.
+  const asks = rows.filter(canPress);
+  const waiting = asks.length > 0;
+  const shown = waiting ? [...asks, ...rows.filter((r) => !canPress(r))] : rows;
+  const heading = waiting ? waitingWords(asks.length) : label;
+  const ids = asks.map((r) => r.id);
+  const all = asks.length > 1 && !!onStartAll;
   return (
     <div className={waiting ? 'made made-waiting' : 'made'}>
-      {(waiting || label) && <div className="made-label">{waiting ? 'Still waiting on you' : label}</div>}
+      {heading && (
+        <div className="made-label">
+          <span>{heading}</span>
+          {all && (
+            <div className="made-acts made-all">
+              {onDismissAll && <button type="button" className="made-all-dismiss" aria-label={`${DISMISS_ALL} ${asks.length}`} title={`${DISMISS_ALL} ${asks.length}: none of them will run`} onClick={() => onDismissAll(ids)}>{DISMISS_ALL}</button>}
+              <button type="button" className="made-all-start" aria-label={`${START_ALL} ${asks.length} as new threads`} title={`${START_ALL} ${asks.length} as new threads`} onClick={() => onStartAll!(ids)}>{START_ALL}</button>
+            </div>
+          )}
+        </div>
+      )}
       <div className="made-list">
         {shown.map((r) => {
           const press = canPress(r);
+          const cls = press ? 'made-row made-ask' : waiting ? 'made-row made-quiet' : 'made-row';
           return (
-            <div className="made-row" key={r.id}>
+            <div className={cls} key={r.id}>
               {/* The word stays INSIDE the press that opens the thread, so on
                   every row that carries no answer the whole width of the row
                   is still the way in. */}
               <button type="button" className="made-open" onClick={() => onOpen(r.id)}>
+                {press && <span className="made-dot" />}
                 <span className="made-title">{r.title}</span>
                 {!press && <span className={`made-state ${r.state ?? ''}`}>{stateWord(r.state)}</span>}
               </button>
               {/* NAMED WITH THE THREAD EACH ONE IS ABOUT. Several rows each say
                   the same words, so the bare words tell a screen reader, and a
                   hovering cursor, nothing about which proposal it is. */}
-              {press && onHere && (
-                <button
-                  type="button"
-                  className="made-here"
-                  aria-label={`${DO_HERE}: ${r.title}`}
-                  title={`${DO_HERE}: ${r.title}`}
-                  onClick={() => onHere(r.id)}
-                >
-                  {DO_HERE}
-                </button>
-              )}
               {press && (
-                <button
-                  type="button"
-                  className="made-approve"
-                  aria-label={`${START_NEW}: ${r.title}`}
-                  title={`${START_NEW}: ${r.title}`}
-                  onClick={() => onApprove!(r.id)}
-                >
-                  {START_NEW}
-                </button>
+                <div className="made-acts">
+                  {onDismiss && <button type="button" className="made-dismiss" aria-label={`${DISMISS}: ${r.title}`} title={`${DISMISS}: it will not run`} onClick={() => onDismiss(r.id)}>{DISMISS}</button>}
+                  {onHere && <button type="button" className="made-here" aria-label={`Do in this thread: ${r.title}`} title={`Do in this thread: ${r.title}`} onClick={() => onHere(r.id)}>{DO_HERE}</button>}
+                  <button type="button" className="made-approve" aria-label={`Start new thread: ${r.title}`} title={`Start new thread: ${r.title}`} onClick={() => onApprove!(r.id)}>{START_NEW}</button>
+                </div>
               )}
             </div>
           );

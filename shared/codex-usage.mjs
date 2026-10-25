@@ -125,6 +125,7 @@ export function windowSpan(minutes) {
  */
 export function codexLimits(snapshot) {
   const out = [];
+  const refused = reachedWindow(snapshot);
   for (const key of WINDOWS) {
     const window = snapshot?.[key];
     if (!plain(window)) continue;
@@ -133,11 +134,18 @@ export function codexLimits(snapshot) {
     const minutes = field(window, 'windowDurationMins', 'window_minutes');
     const [span, name] = windowSpan(minutes) ?? FALLBACK[key];
     const resets = field(window, 'resetsAt', 'resets_at');
+    const reached = refused === key;
     out.push({
       span,
       qualifier: null,
       name,
-      percent: Math.max(0, Math.min(100, Math.round(percent))),
+      percent: drawnPercent(percent),
+      // WHETHER THIS WINDOW IS ACTUALLY FINISHED, which a percentage cannot say
+      // (w-36c51443df). Only the provider knows: a window can be refused below
+      // a hundred by a spend control or a per-account limit, and one sitting at
+      // a hundred may still be serving. So this is read off the payload and
+      // never derived from `percent`.
+      reached,
       resetsText: null,
       resetsOn: null,
       resetsAt: resets === null ? null : resets * 1000,
@@ -148,6 +156,78 @@ export function codexLimits(snapshot) {
 }
 
 /**
+ * WHICH WINDOW THE PROVIDER SAYS IS SPENT, or null when it says nothing.
+ *
+ * `rateLimitReachedType` NAMES a window (`primary` / `secondary`), measured on a
+ * live push 2026-10-09, so it belongs on that window's own line rather than on
+ * the reading as a whole. A name for a window that is not in the payload is
+ * ignored rather than guessed at: marking a line we were not told about is how
+ * a confident wrong number gets drawn.
+ */
+function reachedWindow(snapshot) {
+  const named = snapshot?.rateLimitReachedType ?? snapshot?.rate_limit_reached_type;
+  return WINDOWS.includes(named) ? named : null;
+}
+
+/**
+ * THE FIGURE TO DRAW, WHICH MAY NOT MANUFACTURE A HUNDRED (w-36c51443df).
+ *
+ * `Math.round` drew 99.6% as "100%", so the one number on the screen that
+ * should have meant "stop" meant "nearly". A reading nobody can act on is worse
+ * than a blunter one, so anything short of the whole window draws at most 99
+ * and 100 means a hundred.
+ *
+ * AND `reached` IS DELIBERATELY NOT AN INPUT HERE. The first draft of this fix
+ * forced 100 whenever the provider refused the window, which is the same sin
+ * one field along: a window capped at 12% by a spend control really is at 12%,
+ * and writing 100 over it would be inventing usage that was never reported.
+ * `percent` says how much has been spent; `reached` says whether it is refused.
+ * Two facts, two fields, and the panel reads "stop" off the second one.
+ *
+ * The clamp stays exactly as it was: a provider that over- or under-reports
+ * must not put an impossible number on her screen.
+ */
+function drawnPercent(percent) {
+  const inRange = Math.max(0, Math.min(100, percent));
+  if (inRange >= 100) return 100;
+  return Math.min(99, Math.round(inRange));
+}
+
+/**
+ * THE FACTS ABOUT THE ACCOUNT RATHER THAN ABOUT ONE WINDOW (w-36c51443df).
+ *
+ * The push carries ten fields and `codexLimits` read two of them. These four
+ * are the rest of what a person would want to know, and the campaign that found
+ * this could not answer any of them from the screen:
+ *
+ *   plan                which subscription is paying. Measured: "prolite".
+ *   credits             whether there is anything behind the window when it
+ *                       goes. Measured: `{hasCredits:false, balance:"0"}`, so
+ *                       nothing -- and "100% used" reads very differently with
+ *                       and without that.
+ *   spendControlReached a cap she or her organisation set, not the plan's.
+ *   reached             which window the provider refused, for any surface
+ *                       drawing the reading whole rather than line by line.
+ *
+ * NULLS RATHER THAN GUESSES, for the reason main/codex-usage.mjs gives about
+ * percentages: a plan nobody has reported is not a plan of none, and a reading
+ * that invents one is worse than a panel that stays quiet.
+ */
+export function codexPlan(snapshot) {
+  const credits = plain(snapshot?.credits) ? snapshot.credits : null;
+  const bool = (value) => (typeof value === 'boolean' ? value : null);
+  return {
+    plan: typeof snapshot?.planType === 'string' && snapshot.planType
+      ? snapshot.planType
+      : (typeof snapshot?.plan_type === 'string' && snapshot.plan_type ? snapshot.plan_type : null),
+    credits: credits ? (bool(credits.hasCredits) ?? bool(credits.has_credits)) : null,
+    unlimitedCredits: credits ? bool(credits.unlimited) : null,
+    spendControlReached: bool(snapshot?.spendControlReached ?? snapshot?.spend_control_reached),
+    reached: reachedWindow(snapshot),
+  };
+}
+
+/**
  * FOLD A ROLLING UPDATE INTO WHAT WE ALREADY HAD, WHICH IS THE PROTOCOL'S OWN
  * INSTRUCTION AND NOT A KINDNESS.
  *
@@ -155,7 +235,7 @@ export function codexLimits(snapshot) {
  * carrying only the five hour window would take the week away, and one carrying
  * neither would take both -- and this repo already puts exactly that on the wire
  * (`{ rateLimits: {} }`, in
- * tests/one-codex-process-carries-many-threads-and-a-card-nobody-answers-denies.test.mjs).
+ * tests/one-codex-process-carries-many-threads-and-a-card-nobody-answers-waits.test.mjs).
  * The failure would look like the corner going quiet for no reason, which is the
  * complaint this whole surface started from.
  *
@@ -168,12 +248,38 @@ export function codexLimits(snapshot) {
  * Only the two windows are carried. Nothing else in the payload is drawn, and a
  * merge that kept fields nobody reads would be inviting somebody to read them.
  */
+/**
+ * THE ACCOUNT-LEVEL FIELDS A FOLD ALSO HAS TO KEEP (w-36c51443df).
+ *
+ * The rule above was "only the two windows, because a merge that kept fields
+ * nobody reads would be inviting somebody to read them". That was right while
+ * nothing read them, and it is exactly why a cap was unreadable. `codexPlan`
+ * reads these now, so they have to survive a fold for the same reason the
+ * windows do: a push carrying only a window would otherwise drop a
+ * `rateLimitReachedType` that arrived a beat earlier, and the corner would fall
+ * back from "spent" to a percentage for no reason -- which is the failure this
+ * function exists to prevent, one field along.
+ *
+ * Still nothing beyond what is drawn. `limitId`, `limitName`, `normalModelSlug`
+ * and `individualLimit` stay out, because nothing reads them.
+ */
+const CARRIED = ['planType', 'credits', 'spendControlReached', 'rateLimitReachedType'];
+
 export function mergeRateLimits(previous, update) {
   const out = {};
   for (const key of WINDOWS) {
     if (plain(update?.[key])) out[key] = update[key];
     else if (plain(previous?.[key])) out[key] = previous[key];
     else out[key] = null;
+  }
+  // `undefined` AND `null` BOTH MEAN "THIS PUSH SAID NOTHING", so either keeps
+  // what was already known -- the measured push carried explicit nulls for
+  // `spendControlReached` and `rateLimitReachedType` while they were fine, and
+  // treating those as news would forget a cap on the very next beat. A push
+  // genuinely lifting one carries `false`, which is a value and does replace.
+  for (const key of CARRIED) {
+    const said = update?.[key];
+    out[key] = said === undefined || said === null ? (previous?.[key] ?? null) : said;
   }
   return out;
 }

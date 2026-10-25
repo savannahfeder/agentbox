@@ -1,4 +1,5 @@
 import { harnessFor } from './harnesses.mjs';
+import { teammateIdOf } from '../shared/teammates.mjs';
 // THE NAME ON THE ROW, WRITTEN RATHER THAN TAKEN FROM THE FIRST SENTENCE.
 //
 // A dictated message keeps its first line as its title, verbatim and forever
@@ -63,49 +64,16 @@ export const NAME_MAX = 64;
 const LIVE = new Set(['open', 'claimed', 'blocked']);
 
 /**
- * PURE. Is this title already a name somebody wrote?
- *
- * The one question that decides whether this module speaks at all, and it is
- * answered off the words alone because that is all there is: nothing on a row
- * records whether its title was typed or derived.
- *
- * Three marks, and together they separate the two shapes `splitMessage` makes
- * (renderer/src/message-split.ts). A first line of 120 characters or less is
- * kept VERBATIM and is the name its person wrote. A longer one is clipped into
- * a title by the app, and every clip it can produce is either a whole sentence
- * of at least 25 characters or a hard cut ending in an ellipsis.
- *
- *   as short as a name we would write   NAME_MAX, so a title already that tight
- *                                       has nothing for us to improve,
- *   as few words as a name has          the same eight `cleanName` allows,
- *   not ending as a sentence does       '.', '!', '?' and '…' are how a clipped
- *                                       title ends and not how a name does.
- *
- * It errs towards leaving the words alone, which is the right way to be wrong:
- * the cost is a short typed sentence keeping its own first line, and the cost
- * the other way is somebody losing the thread they named.
- */
-export function isWrittenName(title) {
-  const t = String(title ?? '').trim();
-  if (!t) return false;
-  if (t.length > NAME_MAX) return false;
-  if (t.split(/\s+/).length > 8) return false;
-  return !/[.!?…]$/.test(t);
-}
-
-/**
  * PURE. Does this row want naming?
  *
- * Four ways to say no, and the last two are the fix for a tester losing their
- * own threads on 2026-10-01: "Add comment to cart.js" became "Improve cart.js
- * header comment" and then "Update cart file comment" inside two minutes.
+ * Three ways to say no:
  *
  *   - it is done, so nobody is scanning for it,
  *   - it has nothing to name from, which is a row with no words on it yet,
- *   - ITS PERSON ALREADY NAMED IT. A short clear title is the name they will
- *     look for, and on a team it is the name they will point someone else at.
- *     Improving it is not an improvement.
  *   - IT HAS BEEN NAMED. Once, when the thread was made, and then never again.
+ *
+ * A short typed title is named too: a list where some rows are typed lines and
+ * the rest are names reads as two styles. The prompt keeps such a line's words.
  *
  * That last line used to read `wroteAt < contentTouchedAt(item)`, so the name
  * followed where the thread stood: an agent writes a note and a result on every
@@ -122,8 +90,8 @@ export function isWrittenName(title) {
  */
 export function wantsName(item) {
   if (!item || !LIVE.has(item.status)) return false;
+  if (teammateIdOf(item)) return false;
   if (!String(item.title ?? '').trim() && !String(item.body ?? '').trim()) return false;
-  if (isWrittenName(item.title)) return false;
   return !String(item.label ?? '').trim();
 }
 
@@ -139,12 +107,15 @@ export function namePrompt(item) {
     'Here is a work thread: the message that opened it, and the latest thing',
     'written on it. Write a short name for the thread AS IT STANDS NOW: 3 to 7',
     'words, sentence case, no quotes, no trailing punctuation, naming the thing',
-    'being worked on rather than restating the sentence. Reply with the name and',
-    'nothing else.',
+    'being worked on rather than restating the sentence. If the opening line is',
+    'already a short name, keep its words and only fix the case. Reply with the',
+    'name and nothing else.',
     '',
     '--- opened with ---',
     cut(item?.title, 300),
-    cut(item?.body, 1200),
+    // A teammate's run is titled with its own part of a message that may have
+    // woken several (shared/teammates.mjs `runTitle`); the whole would mix them.
+    (item?.labels ?? []).some((l) => String(l).startsWith('teammate:')) ? '' : cut(item?.body, 1200),
     '--- latest ---',
     latest || '(nothing written yet)',
     '---',

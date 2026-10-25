@@ -147,6 +147,20 @@ describe('the message the naming call gets', () => {
     expect(prompt).toContain('AS IT STANDS NOW');
   });
 
+  // One message to two teammates opens both their runs, each titled with its
+  // own part (w-4bd7b5548b). Named from the whole message, Iris's run came
+  // back "Calendar article and email deliverability", half of it Ada's job.
+  it('names a teammate\'s run from its own title, not the whole message that woke several', () => {
+    const run = {
+      title: 'Go ahead with the connecting a calendar article',
+      body: '@Iris go ahead with the connecting a calendar article. @Ada why do our sign up emails land in spam?',
+      labels: ['founder', 'teammate:t-iris000001', 'hop:0'],
+    };
+    expect(namePrompt(run)).toContain('connecting a calendar article');
+    expect(namePrompt(run)).not.toContain('spam');
+    expect(namePrompt({ ...run, labels: ['founder'] })).toContain('spam');
+  });
+
   it('says so plainly when nothing has been written yet', () => {
     expect(namePrompt({ title: 'A brand new row' })).toContain('(nothing written yet)');
   });

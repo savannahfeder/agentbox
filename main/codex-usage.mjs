@@ -62,7 +62,37 @@
 // level down.
 
 import { codexLimits, mergeRateLimits } from '../shared/codex-usage.mjs';
+import { limitsStillRunning } from '../shared/usage.mjs';
 import { loggedCodexLimits } from './codex-usage-file.mjs';
+
+const LOG_EVERY_MS = 30_000;
+
+/**
+ * HOW LONG A PUSH IS THIS SECOND'S TRUTH (w-7b7182ef61).
+ *
+ * "The push still wins" holds while pushes are arriving, which is every few
+ * seconds during a turn; nothing on disk can be newer than one of those, so the
+ * busy case never opens a file. A push from four hours ago is just the oldest
+ * thing anybody knows, so past this it is compared against the log instead.
+ */
+const PUSH_FRESH_MS = 60_000;
+
+/**
+ * Every Codex login's own reading, for the Settings page: each out of the
+ * session logs under its own home, and the one in use from `current`, which
+ * the push keeps newer while it works. A login that has never run here gets
+ * no limits rather than zeroes, and a window that has reset since is dropped,
+ * because a login not in use can go days without a new reading.
+ */
+export function codexAccountReadings({ profiles, homeOf, current = null, currentHome = null, now = Date.now(), readLog = loggedCodexLimits }) {
+  return profiles.map((profile) => {
+    const home = homeOf(profile);
+    const live = !!current?.limits?.length && home === currentHome;
+    const reading = live ? current : readLog(home, { now });
+    const limits = limitsStillRunning(live ? current.limits : codexLimits(reading?.snapshot), now);
+    return limits.length ? { profile, limits, at: reading.at } : { profile };
+  });
+}
 
 export class CodexUsage {
   /**
@@ -94,23 +124,42 @@ export class CodexUsage {
   read() {
     if (this._takenUnder !== null && this._takenUnder !== this._home()) this._forget();
     const limits = codexLimits(this._snapshot);
-    if (limits.length) return { limits, at: this._at };
-    // NOTHING HAS PUSHED, SO ASK WHAT CODEX ALREADY WROTE DOWN. This is the
-    // whole of: the push only ever arrives for work the app itself ran, and a
-    // person who runs Codex in its own app would see the panel stay empty
+    const pushed = limits.length ? { limits, at: this._at } : null;
+    if (pushed && this._now() - pushed.at < PUSH_FRESH_MS) return pushed;
+    // NOTHING HAS PUSHED LATELY, SO ASK WHAT CODEX ALREADY WROTE DOWN. This is
+    // the whole of: the push only ever arrives for work the app itself ran, and
+    // a person who runs Codex in its own app would see the panel stay empty
     // while their weekly limit was full. main/codex-usage-file.mjs is a read of a file
     // under this same CODEX_HOME. It starts no process and sends nothing
     // anywhere, so neither rule above is bent.
-    return this._logged();
+    const logged = this._logged();
+    if (!pushed) return logged;
+    return logged && logged.at > pushed.at ? logged : pushed;
+  }
+
+  /**
+   * `read()` with the log cache dropped, for a person who pressed Refresh:
+   *  inside `LOG_EVERY_MS` a press would otherwise change nothing. It asks
+   *  nobody anything, so both rules at the top of this file still hold. */
+  refreshNow() {
+    this._loggedRead = null;
+    return this.read();
   }
 
   /**
    * The last figure in Codex's own session log under this home, shaped exactly
    *  like a pushed one. Null on a Mac where Codex has never run. */
   _logged() {
-    const reading = this._readLog(this._home(), { now: this._now() });
+    // Asked on every request the window makes; the log is walked at most
+    // every half minute.
+    const home = this._home();
+    const now = this._now();
+    if (this._loggedRead && this._loggedRead.home === home && now - this._loggedRead.at < LOG_EVERY_MS) return this._loggedRead.value;
+    const reading = this._readLog(home, { now });
     const limits = codexLimits(reading?.snapshot);
-    return limits.length ? { limits, at: reading.at } : null;
+    const value = limits.length ? { limits, at: reading.at } : null;
+    this._loggedRead = { home, at: now, value };
+    return value;
   }
 
   /**

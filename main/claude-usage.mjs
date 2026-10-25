@@ -1,40 +1,13 @@
-// RUNNING `/usage`, WHICH TAKES TWENTY-FIVE SECONDS AND MUST NEVER BE WAITED ON.
-//
-// The pure half is shared/claude-usage.mjs: the text in, the limits out, the
-// words the pill prints. This is the half that shells out, and everything about
-// its shape comes from one measurement.
-//
-// TIMED TWICE ON HER MAC, 2026-08-31: 23.2s and 28.0s for `claude -p '/usage'`.
-// The percentage did not move between the two, which is the other half of the
-// answer: this is not a number that changes second to second, so nothing is lost
-// by reading it every few minutes and everything is lost by reading it on a
-// timer the window waits for.
-//
-// SO IT IS A CACHE WITH A BACKGROUND REFRESH. Only the explicit Settings
-// refresh waits for a result; snapshots always return immediately:
-//
-//   - `read` answers instantly, always, from the last measurement or with null.
-//     It never blocks and never throws.
-//   - A refresh is kicked off when the cached figure is older than STALE_MS,
-//     and only ever one at a time.
-//   - The window is told when a new one lands, the same way everything else in
-//     this app tells it: a push.
-//
-// WHY NOT A SESSION. Agentbox spawns real workers through the supervisor and could
-// have asked one of them. It must not: a worker is a unit of her work, it lands
-// in her inbox and burns a slot in the fleet, and this is a status reading. It
-// gets its own short-lived child process with no store, no brief and no row.
-//
-// WHAT IS NOT SENT ANYWHERE. The output carries her usage figures and nothing
-// else leaves this machine because of it; `main/analytics.mjs` is the only file
-// that sends, and none of its eight counts is fed from here.
+// Cached provider usage, read through Claude Code without starting a model turn.
+// Snapshots never wait; only an explicit refresh waits for the CLI's answer.
 
-import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readUsage } from '../shared/claude-usage.mjs';
+import { readUsageReport } from '../shared/claude-usage.mjs';
 import { localZone, USAGE_UNREADABLE } from '../shared/usage.mjs';
+import { runClaudeUsage } from './claude-usage-process.mjs';
+import { NO_METERED_KEY } from './harnesses/claude.mjs';
 
 // WHERE THE READING RUNS, AND WHY IT IS NOT "WHEREVER THE APP IS". An app
 // opened from Finder has `/` as its working directory, and this used to spawn
@@ -62,9 +35,7 @@ export function usageCwd() {
 // than the number itself is reported to.
 export const STALE_MS = 5 * 60_000;
 
-// Long enough for the slowest run measured plus most of the same again. Past
-// this the reading is not late, it is not coming.
-const TIMEOUT_MS = 90_000;
+const TIMEOUT_MS = 30_000;
 
 // After a failure, how long before it is worth trying again. A machine that is
 // signed out, rate limited, or has no Claude Code at all would otherwise be
@@ -87,7 +58,7 @@ export class ClaudeUsage {
    * the account's name ('default' or its CLAUDE_CONFIG_DIR) and `env` is the
    * environment to run it in. Supervisor.usageAccount is the real one.
    */
-  constructor({ bin, onChange = () => {}, run = execFile, now = () => Date.now(), where = usageCwd, account = () => ({ profile: 'default' }) } = {}) {
+  constructor({ bin, onChange = () => {}, run = runClaudeUsage, now = () => Date.now(), where = usageCwd, account = () => ({ profile: 'default' }) } = {}) {
     this._bin = bin;
     this._selectedProfile = null;
     this._generation = 0;
@@ -164,7 +135,7 @@ export class ClaudeUsage {
     const profile = this._syncProfile();
     const generation = this._generation;
     const bin = (() => { try { return this._bin(); } catch { return null; } })();
-    const failure = () => ({ ok: false, error: USAGE_UNREADABLE });
+    const failure = (error = USAGE_UNREADABLE) => ({ ok: false, error });
     if (!bin) { this._missed(); return Promise.resolve(failure()); }
     this._busy = true;
     this._pendingGeneration = generation;
@@ -178,8 +149,13 @@ export class ClaudeUsage {
       this._syncProfile();
       if (generation !== this._generation) { resolve(failure()); this._onChange(); return; }
       // Failed or unreadable output cannot acquire a fresh checked time.
-      const limits = err ? [] : readUsage(stdout, this._now(), localZone());
-      if (!limits.length) { this._missed(); resolve(failure()); return; }
+      const limits = err ? [] : readUsageReport(stdout, this._now());
+      if (!limits.length) {
+        this._missed();
+        const unsupported = /get_usage.*(?:not supported|unknown)|unknown.*get_usage/i.test(err?.message ?? '');
+        resolve(failure(unsupported ? 'Update Claude Code to read usage for this account.' : USAGE_UNREADABLE));
+        return;
+      }
       this._last = { limits, at: this._now(), zone: localZone(), profile };
       resolve({ ok: true, reading: this.peek() });
       // Even unchanged percentages now have a newly checked time to draw.
@@ -192,7 +168,9 @@ export class ClaudeUsage {
     if (profile !== 'default') env.CLAUDE_CONFIG_DIR = profile;
     try { this._run(
       bin,
-      ['-p', '/usage', '--output-format', 'text'],
+      ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
+        '--no-session-persistence', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--tools', '',
+        '--settings', JSON.stringify({ ...NO_METERED_KEY, disableAllHooks: true })],
       // `cwd` is the whole fix for the permission panels; see usageCwd above.
       { cwd: this._where(), env, timeout: TIMEOUT_MS, maxBuffer: 4 * 1024 * 1024, encoding: 'utf8' },
       finish,

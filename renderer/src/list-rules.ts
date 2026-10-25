@@ -1,51 +1,20 @@
-// PURE. What belongs in the inbox, and what a click on a message means.
-//
-// The select state was drawn into the unread-dot slot with no hit area of its
-// own, so every click on it was a click on the row, and the row opens the
-// message. Multi-select was therefore only reachable through modifiers, which
-// made it limited.
-//
-// The box is now its own control, and this is the whole grammar in one place so
-// the row and the box can never disagree about what a click was for:
-//
-//   the BOX   selects. Never opens, whatever else is held. Shift extends the
-//             selection from the last row touched, the way it does on the row.
-//   the ROW   opens, unless a modifier says otherwise: shift extends a range,
-//             cmd (or ctrl) picks one out.
+// Pure rules for what each list shows, and what a click on a row or its select
+// box means.
 import { isCleanRun } from '../../shared/repeats.mjs';
+import { teammateIdOf } from '../../shared/teammates.mjs';
 import { answerSettled } from '../../shared/answers.mjs';
-import { firstRealLine, previewText } from './format';
+import { saysARunGotNowhere } from '../../shared/spawn-trouble.mjs';
+import { notShippedLine } from '../../shared/not-shipped.mjs';
+import { firstRealLine, previewText, searchText } from './format';
 import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
 
 /**
- * WRITTEN DOWN AND DELIBERATELY NOT BEGUN (w-afb66e6661): "Add it to Later" on
- * the new thread card. The authority is `notStarted` in shared/work-items.mjs,
- * which is what stops a worker pulling it; this is the window's typed copy of
- * the same one-line fact, kept here because every list in the window already
- * reads its rules from this file.
+ * A thread put in Later and not begun. The window's copy of `notStarted` in
+ * shared/work-items.mjs, which is what stops a worker pulling it.
  */
 export const notStarted = (i: Pick<InboxItem, 'start'> | null | undefined): boolean => i?.start === 'later';
 
-/* ------------------------------- the inbox ------------------------------- */
-// What has a claim on her attention right now. Pulled out of App.tsx so it can
-// be stated once and tested, because it was wrong in a way nobody could see:
-// every list it produced looked plausible, and what was missing from it had no
-// symptom except the work appearing never to have happened.
-//
-// THE ANSWER TO A QUESTION THE USER ASKED IS DELIVERED, NOT FILED. An item she
-// composed spends its life in In Progress (queued, then running) and then a
-// worker writes the result and marks it done, which used to mean straight past
-// her into the archive. The same question could be asked and answered several
-// times over without the answer ever being seen, so the user's own tasks looked
-// like the ones nothing ever happened to (2026-08-06).
-//
-// The distinction the ledger has always carried and this rule now reads: an
-// agent's `done` on her ask is news; her own `done` is the archive.
-//
-// deliveredThrough is the moment this rule started applying. Answers finished
-// before it stay in Done, where she has been finding them; without it, turning
-// this on would have dropped a year of settled work into an empty inbox.
 export interface InboxItem {
   status: string;
   kind?: string;
@@ -69,48 +38,62 @@ export interface InboxItem {
 const hers = (i: InboxItem) => (i.labels ?? []).includes('founder');
 const liveAnswer = (i: InboxItem) => (i.answer && i.answer !== '(withdrawn)' ? i.answer : undefined);
 
-/* ------------------- answered, and handed back to the user ------------------- */
-// A FINISHED ANSWER ON HER OWN OPEN ROW IS NEWS, AND HAD NOWHERE TO GO.
+/* ------------------- the one thing nothing may take away ------------------ */
+/**
+ * A ROW THAT IS STILL ASKING YOU SOMETHING (w-fe48447cab).
+ *
+ * `live` and `shipping` take a row out of Needs you because something is
+ * happening to it. Both were written as unconditional early returns, for rows
+ * where nothing was being asked of anybody. The cost was that an agent asking
+ * you a question and then carrying on working removed its own question from
+ * the person it was asking: the row read "working" in In progress and the
+ * options card addressed to you was in no list you read.
+ *
+ * That is a decision this codebase has already made once, about a different
+ * field. `parkedByAgent` gates WORKERS and never the inbox for exactly this
+ * reason, and `isProposal` refuses to hide a question or a review for it too.
+ * This is the same rule reaching the last two places that did not have it.
+ *
+ * Their ranking for this part of the app, 2026-10-09: "If we have false
+ * negatives, we lose tasks, which is a really big problem... false negatives
+ * are worse than false positives." A question shown next to a working agent
+ * costs a glance; a question hidden behind one costs the task.
+ *
+ * It is deliberately NARROW. Only the two kinds an agent addresses TO you, only
+ * while they are unanswered, and never once finished — those go to the archive
+ * rule, which is its own question. A withdrawn approval is not an answer
+ * (`liveAnswer`), and everything else on a row with a session on it is
+ * unchanged: both incidents above keep their exact behaviour.
+ *
+ * The row stays in In progress as well, because a session really is on it. That
+ * is not the "one row, two tabs" fault this file warns about: a claimed
+ * question is in both lists today, and these two vetoes were the only case
+ * where attaching a session to one changed that.
+ */
+export function stillAsksYou(i: InboxItem): boolean {
+  if (i.kind !== 'question' && i.kind !== 'review') return false;
+  if (i.status === 'done') return false;
+  return !liveAnswer(i);
+}
+
+// The user's own open row, carrying a result a worker wrote after her last
+// word, with no reply from her yet. It goes to the inbox and leaves In
+// progress, but stays open so her reply still lands on the thread. A claimed
+// row is excluded because a worker is on it now.
 //
-// A worker once wrote a whole answer into an open row about an hour after the
-// ask. It could not be seen until a session finally closed the row 27.5 hours
-// later, and TWELVE sessions claimed the row in between: the queue kept handing
-// it out because from outside it looked like unfinished work, and each one read
-// it, saw the answer was already there, correctly wrote nothing, and exited.
-//
-// The inbox showed a worker's result only once the row was done or blocked, or
-// once she had already replied (answerSettled above), so her own open row
-// carrying an answer was in neither list she reads. That left two bad moves:
-// close it, which reaches her but ends a conversation she may be mid-way
-// through, or leave it open, which keeps the thread and hides the answer. Every
-// session on that row but the last chose the second, correctly by the rules it
-// was given.
-//
-// So this is the third state, and it reads what the ledger already records: HER
-// OWN OPEN ROW, CARRYING A RESULT A WORKER WROTE AFTER HER LAST WORD, WITH NO
-// REPLY FROM HER YET. It goes to the inbox and it leaves In progress, because
-// nothing more is going to happen on it until she speaks. It does not close the
-// row: the thread stays alive and her reply still lands on it.
-//
-// Claimed is not here for the same reason it is not in answerSettled: a worker
-// is on the row right now and In progress is honest about that. Done and
-// blocked route on their own branches below and always could.
-//
-// Measured against a real store, replayed line by line: only a handful of rows
-// have ever sat in this state for more than a minute, but they sat there for
-// many hours between them, and the condition moves about one row at a time
-// into the inbox.
-//
-// Only a RESULT counts as the worker's word, unlike agentSpokeSince: on a row
-// the user wrote, the fold makes her outrank an agent on title and body, so a
-// session's rewrite of those is accepted and then silently ignored. The result
-// is the only place a worker can speak on her row, which is exactly why the
-// answer had nowhere to go.
+// Only `result` counts as the worker's word: on a row the user wrote, the fold
+// lets her outrank an agent on title and body, so an agent's rewrite of those
+// is ignored.
 const HER_WORDS = ['title', 'body', 'answer'];
 
 function herLastWord(i: InboxItem): number {
   let last = 0;
   for (const field of HER_WORDS) {
+    // Taking a word back is not saying one. A withdrawal is written to
+    // `answer` in her own hand, so counted here it outranked the very result
+    // it was undoing and the thread stopped being news.
+    // tests/undoing-a-pick-that-went-out-puts-the-thread-back-in-needs-you
+    if (field === 'answer' && i.answer === '(withdrawn)') continue;
     const w = i.wrote?.[field];
     if (w?.source === 'founder') last = Math.max(last, w.ts ?? 0);
   }
@@ -119,186 +102,128 @@ function herLastWord(i: InboxItem): number {
 
 export function answeredHerAsk(i: InboxItem): boolean {
   if (i.status !== 'open' || !hers(i) || liveAnswer(i)) return false;
-  if (!i.result) return false;   // a row with nothing written on it is not an answer
+  if (!i.result) return false;
   const r = i.wrote?.result;
   return !!r && r.source === 'agent' && (r.ts ?? 0) > herLastWord(i);
 }
 
-/* --------------------------- whose schedule is it ------------------------- */
-// WHO deferred a row decides what the deferral MEANS, and until 2026-08-11 one
-// field said both things at once: no worker starts on this yet, and this is
-// not the user's business yet. Those are the same only when the user is the
-// one who set it.
-//
-// Agents found the field and used it as the brake it also is. They were right
-// to want one: a row with no answer and nothing new to do respawns a worker
-// every tick forever, and one row ran four sessions in twenty-seven
-// minutes, the last spawning forty-two seconds after the previous one exited.
-// With no other lever, two workers wrote a future runAt to stop themselves.
-//
-// The cost was invisible and much worse than the loop. Deferring also took the
-// row out of her inbox, so an agent could remove its own question from the
-// person it was asking.
-//
-// So a deferral an agent wrote gates WORKERS ONLY. It still stops the respawn
-// (isDue in shared/work-items.mjs is unchanged and is what
-// the supervisor gates on), and it no longer touches what she sees. Her own
-// deferrals are unchanged: those hide the row, because that is what she meant.
-//
-// An agent parking a row is also a positive reason to SHOW it. The agent has
-// just declared it is not coming back for hours; whatever happens to the row
-// next is hers to decide, so the honest place for it is the inbox.
-//
-// The fold already records who set each field and already makes the founder
-// outrank an agent per field (`wrote`, `beats`, shared/work-items.mjs), so
-// there is nothing new to store: this only reads what is written down.
+// The app has stopped carrying this row's reply. Its own word that a run got
+// nowhere, written after a reply, is written only once it gives up, and nothing
+// starts the row again until somebody writes, so it is in Needs you and not In
+// progress, whoever filed it.
+export function gaveUpOnTheAnswer(i: InboxItem): boolean {
+  if (i.status !== 'open' || !liveAnswer(i) || answerSettled(i)) return false;
+  const r = i.wrote?.result;
+  if (!r || r.source !== 'agent' || (r.ts ?? 0) <= (i.wrote?.answer?.ts ?? 0)) return false;
+  return saysARunGotNowhere(i.result);
+}
+
+// Who deferred a row decides what the deferral means. A future runAt an agent
+// wrote stops workers respawning (`isDue` in shared/work-items.mjs) but does
+// not hide the row, or an agent could take its own question away from the
+// person it asked. An agent parking a row is a reason to show it, because what
+// happens next is the user's call.
 export function parkedByAgent(i: InboxItem, now = Date.now()): boolean {
   if (i.status === 'done') return false;
   return (i.runAt ?? 0) > now && i.wrote?.runAt?.source !== 'founder';
 }
 
-// The moment SHE put this away until, which is what hides a row from the inbox
-// and what puts it in Scheduled. Both lists read this one function, because
-// one row in two tabs, with the wrong tab believed, is the failure this
-// codebase has already had once (2026-08-07).
+// The moment the user put this row away until. The inbox and Scheduled both
+// read this one function, so a row cannot show in both tabs.
 //
-// `legacySnooze` is the old localStorage map, still honoured on read for one
-// release and never written. It is hers by definition, so it counts.
+// `legacySnooze` is the old localStorage map, still honoured on read and never
+// written. Only the user could set it, so it counts.
 export function hiddenUntil(i: InboxItem, legacySnooze = 0): number {
   const mine = i.wrote?.runAt?.source === 'founder' ? i.runAt ?? 0 : 0;
   const reminder = i.wrote?.snoozedUntil?.source === 'founder' ? i.snoozedUntil ?? 0 : 0;
   return Math.max(mine, reminder, legacySnooze);
 }
 
-// `hiddenUntil` is HER deferral only: the caller passes the founder-set runAt
-// maxed with the old localStorage snooze the view still honours on read. It is
-// deliberately not the same number as the `deferredUntil` that gates In
-// progress, which is any deferral by anyone, because nothing runs on a row an
-// agent parked either.
+// The only copy of the inbox membership rule. Do not duplicate it: call this.
 //
-// `live` is whether a session is on this row right now (the supervisor's
-// running list). Nothing else here can see that, and the status cannot stand
-// in for it: a worker writes blocked or done, or leaves its answer, and then
-// keeps running while it writes its last message.
-//
-// `shipping` is whether the app's ship queue still owes this row a ship (the
-// supervisor's `shipping` list), which nothing here can see either.
-//
-// `waitingOn` is the threads this one waits on that can still finish
-// (`waitsThatCanEnd` below), which only the window can see.
+// `deliveredThrough`: answers finished before this moment stay in Done, so
+// turning the rule on did not pour old settled work into the inbox.
+// `hiddenUntil`: the user's own deferral only (see `hiddenUntil` above). It is
+// not the `deferredUntil` that gates In progress, which counts a deferral by
+// anyone, because nothing runs on a row an agent parked either.
+// `live`: a session is on this row now (the supervisor's running list). Status
+// cannot stand in for it, because a worker writes blocked or done and keeps
+// running while it writes its last message.
+// `shipping`: the app's ship queue still owes this row a ship.
+// `waitingOn`: the threads this one waits on that can still finish
+// (`waitsThatCanEnd`).
+// `stopped`: the supervisor will not start it again on its own
+// (`supervisor.stalled`), so a person has to, and Needs you is the list they
+// read.
 export function belongsInInbox(
   i: InboxItem,
-  { deliveredThrough = 0, hiddenUntil = 0, now = Date.now(), live = false, shipping = false, waitingOn = [] as readonly string[] } = {},
+  { deliveredThrough = 0, hiddenUntil = 0, now = Date.now(), live = false, shipping = false, asking = false, waitingOn = [] as readonly string[], stopped = false } = {},
 ): boolean {
-  // ADDED TO LATER AND NOT STARTED (w-afb66e6661). It is written down on
-  // purpose and waits for a person rather than a clock, so it is in Later and
-  // nowhere else. Not a deferral: there is no moment to come back at.
+  // In Later and not begun: it waits for a person, not a clock, so it is in
+  // Later and nowhere else.
   if (notStarted(i)) return false;
-  // AN AGENT IS STILL WORKING ON IT (w-bc976fd247). A row that set itself
-  // blocked sat in Needs you wearing the turning mark until its session
-  // exited. It is In progress until then (`belongsInProgress`), and the
-  // branches below decide the moment it is not.
-  if (live) return false;
-  // THE APP IS STILL TO SHIP IT (w-0c1ba766eb). "It's waiting on us so it
-  // only needs our review when it's finished": a row marked to ship reached
-  // Needs you as finished work while the next move was the app's, and its only
-  // option was "Close this task". It comes back the moment the queue has dealt
-  // with it, shipped or handed back to its agent.
-  if (shipping) return false;
+  // Its agent is stopped on a permission request, so it answers before the
+  // status, the schedule and the waits do: each of those is a reason the thread
+  // would be elsewhere, and none is a reason the question has gone away.
+  if (asking) return true;
+  // A session is still on it, so it is In progress until it exits. Unless it is
+  // still asking you something (w-fe48447cab): the one thing a session may not
+  // do is take away the question it is asking (`stillAsksYou`).
+  if (live && !stillAsksYou(i)) return false;
+  // The ship queue owes it a ship. It comes back once the queue ships it or
+  // hands it back to its agent. Same exception: a ship in flight is not an
+  // answer to a question either.
+  if (shipping && !stillAsksYou(i)) return false;
   if (hiddenUntil > now) return false;    // she put it away herself
-  // One run of a repeating task that a worker EXPLICITLY marked clean. This is
-  // the only place in the app where finishing hides something, so it is keyed on a
-  // marker somebody had to set rather than on what the row is: an unmarked run,
-  // one that failed, one carrying a result, and one that died saying nothing
-  // all stay exactly as loud as they were. Required to hide, never to show,
-  // because ancestry is not proof that a run was quiet.
+  if (stopped) return true;
+  // A repeating-task run hides only when a worker explicitly marked it clean.
+  // The marker is required to hide and never to show, because a run that died
+  // saying nothing is news.
   if (isCleanRun(i)) return false;
-  // WAITING ON ANOTHER THREAD (w-5244c90c33). "Something that's waiting should
-  // be logically in the backlog and then it should automatically resume
-  // without the user needing to know otherwise." So it is in Later, and the
-  // supervisor puts a worker back on it when the last thread it names finishes
-  // (`resumeFinishedWaits`). Only a wait that can end counts: see
-  // `waitsThatCanEnd`, which is why a loop of waits stays here.
+  // Waiting on another thread: it sits in Later, and the supervisor resumes it
+  // when the last thread it names finishes (`resumeFinishedWaits`). Only a wait
+  // that can end counts (`waitsThatCanEnd`), so a loop of waits stays here.
   if (waitsInLater(i, waitingOn)) return false;
   if (parkedByAgent(i, now)) return true; // an agent stopped: what happens next is hers
-  // THE AGENT HAS FINISHED ACTING ON HER ANSWER AND THE THREAD IS STILL ALIVE.
-  // The same event as an agent's `done` on her ask, and the same news: the
-  // difference is only that this row is one a worker is right to leave open
-  // (the standing thread a whole workstream reports from). Without this the
-  // finished work had nowhere to go: the branches below hand an open answered
-  // row back to the agent, so eleven finished reports sat in In progress
-  // reading "stopped" while she waited to be told (2026-08-12). Claimed is
-  // excluded because a worker is on it again, and In progress is telling her.
+  // The agent finished acting on her answer and left the thread open, as a
+  // standing workstream thread does. That is news. The branches below would
+  // hand an open answered row back to the agent, so this must come first.
+  // Claimed is excluded because a worker is on it again.
   if (i.status !== 'done' && i.status !== 'claimed' && answerSettled(i)) return true;
-  // THE WORKER HAS ANSWERED HER AND LEFT THE THREAD OPEN. The same news as the
-  // branch above, one step earlier in the conversation: there she had spoken and
-  // a session finished acting on it, here she has not spoken yet and a session
-  // has finished answering the ask the user wrote. Both end with a written answer on
-  // a live row and nothing coming, which is the one thing this list is for.
-  // Without it the answer waited 27.5 hours (answeredHerAsk, above).
+  // The worker answered her ask and left the thread open (`answeredHerAsk`).
   if (answeredHerAsk(i)) return true;
+  if (gaveUpOnTheAnswer(i)) return true;
   if (i.status === 'done') {
-    // A thread she has SPOKEN ON is hers too, whoever filed it. Keying this on
-    // the 'founder' label alone covered only the asks she composed, and the row
-    // that proved the gap was agent-filed: a one-word status question went onto
-    // the live thread for a whole workstream, a worker answered that question and closed
-    // the row in the same append (which is also the ordinary loop, so the close
-    // itself cannot be refused), and it went to the archive under a one-word
-    // question with the workstream inside it. An agent ending a conversation she
-    // is in the middle of is news she has not received, not filing.
+    // An agent's `done` on a thread the user wrote or spoke on is news; her own
+    // `done` is the archive. A thread she spoke on is hers whoever filed it.
     if (!hers(i) && !liveAnswer(i)) return false;            // agent work she never touched is filed
     if (i.wrote?.status?.source === 'founder') return false; // she archived it herself
     return (i.wrote?.status?.ts ?? i.updatedAt ?? 0) > deliveredThrough;
   }
-  // A STOPPED ROW IS IN THE INBOX, WHATEVER KIND IT IS. The last line of this
-  // function used to say so, and the two branches below it answered first for a
-  // question or a review carrying an answer — which is exactly what an approved
-  // item waiting for its worker is. So that shape fell out of BOTH lists once
-  // stopped: hidden here as "the agent's again" while no agent was on it, and
-  // out of In progress because it was neither open nor claimed. Nothing showed
-  // it anywhere. The stop now promises her inbox on the button, so the promise
-  // has to hold for every row the button appears on, and In progress agrees:
-  // `belongsInProgress` returns false for blocked.
+  // A stopped row is in the inbox whatever its kind. This must come before the
+  // question and review branches: `belongsInProgress` returns false for
+  // blocked, so a stopped row with an answer would otherwise show nowhere.
   if (i.status === 'blocked') return true;
   if (i.kind === 'question') return !liveAnswer(i); // answered questions are the agent's again
   if (i.kind === 'review') return !liveAnswer(i);   // an answered review is being enacted
-  // A PROPOSAL IS NOT A ROW HERE (w-9cf2b43110): it waits in Later and the
-  // thread that filed it shows it, with the press. See `isProposal` below.
+  // A proposal waits in Later, and the thread that filed it shows it
+  // (`isProposal`).
   if (isProposal(i)) return false;
-  // Human-in-the-loop: agent-filed work the thread mask cannot carry — one
-  // filed under no thread at all — is a PROPOSAL awaiting your approval; it
-  // sits here, not in a queue, until you say run it.
+  // Agent-filed work under no thread is a proposal awaiting approval. It sits
+  // here until the user says run it.
   if (i.status === 'open' && !hers(i)) return !liveAnswer(i);
   return false; // blocked is handled above; everything else here is the agent's
 }
 
-/* ------------------------- what an agent proposes ------------------------ */
 /**
- * A THREAD AN AGENT FILED UNDER ANOTHER, WAITING ON A YES (w-9cf2b43110).
+ * An open thread an agent filed under another thread, waiting on a yes. It
+ * sits in Later and the parent thread shows it (ThreadsMade), so the inbox
+ * holds only what needs the user.
  *
- * "I shouldn't have to see those. They're often a little confusing, and
- * there's lots of technical terminology. It's basically agents talking to each
- * other... my expectation is that I am the human in the loop in the inbox and
- * I only see things that need me."
- *
- * One of these used to be its own row in Needs you. It is now in Later, which
- * is already the app's word for written down and deliberately not begun, and
- * the thread that proposed it carries it with the press (ThreadsMade).
- *
- * FOUR KINDS ARE NOT PROPOSALS, and each for its own reason:
- *
- *   a question or a review, which an agent addresses TO you: its options are
- *   only legible on the row, so hiding it would hide the ask itself;
- *
- *   one you wrote (`founder`), which needs nobody's approval;
- *
- *   one already answered, claimed, finished or blocked, which is no longer
- *   waiting on anything from you. A WITHDRAWN approval is not an answer;
- *
- *   and ONE FILED UNDER NO THREAD AT ALL, which is the line that keeps this
- *   safe. Nothing may be hidden with nowhere to be reached from — the same
- *   rule `threadMasked` keeps above — so a proposal with no carrier stays
- *   exactly where it was.
+ * Not proposals: a question or review, whose options only show on its own
+ * row; one the user wrote; one that is answered (a withdrawn answer does not
+ * count) or not open; and one filed under no thread, because nothing may be
+ * hidden with nowhere to reach it from.
  */
 export function isProposal(i: InboxItem): boolean {
   if (i.status !== 'open' || hers(i) || liveAnswer(i)) return false;
@@ -306,35 +231,23 @@ export function isProposal(i: InboxItem): boolean {
   return Boolean(i.parent);
 }
 
-/* ------------------- the threads a thread is waiting on ------------------ */
 /**
- * WHICH THREADS THIS ONE WAITS ON THAT CAN STILL FINISH (w-5244c90c33).
- *
- * A waiting thread sits in Later and resumes by itself when the last thread it
- * names finishes (`resumeFinishedWaits` in main/supervisor.mjs). It FAILS OPEN,
- * because hiding a thread is the dangerous direction, and every wait it drops
- * leaves the thread wherever the rules above put it:
- *
- *   a blocker that is DONE, or one this window CANNOT SEE (another project,
- *   archived, past the 8 MB read), is not a wait;
- *
- *   a thread naming ITSELF is not a wait;
- *
- *   a LOOP of threads that only wait on each other is not a wait either.
- *   Nothing there will ever finish, so nothing would ever resume it, and in
- *   Later it would be lost (3a6cd1d found exactly this). A blocker counts when
- *   it is not itself waiting, or when one of its own waits counts.
- */
-/**
- * WAITING IN LATER, ONE RULE for the inbox, the rail and Later itself, and the
- * same three conditions the supervisor resumes on: parked (blocked), behind a
- * wait that can end, and not stopped by you. A row you stopped is never
- * resumed, so it is never hidden here either; it stays in your inbox.
+ * One rule for the inbox, the rail and Later, matching what the supervisor
+ * resumes on: blocked, behind a wait that can end, and not stopped by the
+ * user. A row the user stopped is never resumed, so it is never hidden here.
  */
 export function waitsInLater(i: InboxItem, waitingOn: readonly string[]): boolean {
   return waitingOn.length > 0 && i.status === 'blocked' && i.wrote?.status?.source !== 'founder';
 }
 
+/**
+ * The threads this one waits on that can still finish. It fails open, because
+ * hiding a thread is the dangerous direction. Not a wait: a blocker that is
+ * done, one this window cannot see (another project, archived, past the 8 MB
+ * read), the thread itself, and a loop of threads that only wait on each
+ * other, since nothing would ever resume them. A blocker counts when it is not
+ * itself waiting, or when one of its own waits counts.
+ */
 export function waitsThatCanEnd<T extends Pick<InboxItem, 'status' | 'blockedBy'> & { id: string }>(
   i: T,
   byId: ReadonlyMap<string, T>,
@@ -351,30 +264,24 @@ export function waitsThatCanEnd<T extends Pick<InboxItem, 'status' | 'blockedBy'
 }
 
 /**
- * HOW LONG LATER MAY KEEP ONE QUIETLY. "Sometimes the tab later is not meant
- * to be looked at, so I think things that go there are really easy to lose."
- * So the quiet has a deadline, and their range for it was "24 - 72 hours,
- * somewhere there. A week is likely no longer relevant/forgotten. Even 3 days
- * is ancient tbh" — the short end of their own range.
+ * How long Later holds a proposal quietly before its thread comes back,
+ * because Later is easy to forget. The owner asked for "24 - 72 hours"; this
+ * is the short end.
  */
 export const PROPOSAL_PATIENCE = 24 * 3_600_000;
 
 /**
- * The threads that proposed something a day ago and have heard nothing.
+ * The threads whose proposals have waited longer than PROPOSAL_PATIENCE. The
+ * thread comes back, never the proposal: it already shows every proposal
+ * under it, in words a person wrote.
  *
- * THE THREAD COMES BACK, NEVER THE PROPOSAL. The thread is the half written in
- * words a person wrote, and it already draws every proposal under it with its
- * press, so one row brings back all of them and brings back none of the
- * agent-to-agent text that started this.
+ * A proposal whose parent is not in `items` is skipped. A thread the user
+ * closed stays closed, without answering its proposals; reopening it turns
+ * the reminder back on.
  *
- * It names a thread it can see in `items`: a proposal whose parent is not
- * there has nothing to come back, which is why `isProposal` refuses to hide
- * one in the first place.
- *
- * A thread YOU closed stays closed. The reminder used to bypass the inbox's
- * archive rule, returning one Done thread after eight closes (2026-10-07).
- * An agent finishing is still news; your closure settles the reminder without
- * answering or deleting its proposals. Reopening deliberately enables it again.
+ * While a reply is on its way to an agent, or an agent is on the thread, the
+ * reminder waits: Needs you wins over In progress, so it made the reply look
+ * swallowed. Once the agent has answered, the thread comes back.
  */
 export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?: string }>(
   items: readonly T[],
@@ -388,155 +295,126 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
     const parent = i.parent ? byId.get(i.parent) : undefined;
     if (!parent) continue;
     if (parent.status === 'done' && parent.wrote?.status?.source === 'founder') continue;
+    if (parent.status === 'claimed' || (liveAnswer(parent) && !answerSettled(parent))) continue;
     owed.add(parent.id);
   }
   return owed;
 }
 
-/* ----------------------------- in progress ------------------------------ */
-// What is actually being worked on, which is a PROMISE: a worker is on this row
-// or is about to be. So the one thing it may never contain is a row whose
-// moment has not arrived, and the supervisor's two spawn passes both gate on
-// exactly that (`isDue`, main/supervisor.mjs). This list did not, so an item
-// deferred for an hour still showed here. One row, two tabs, and the wrong tab
-// believed.
+// In progress promises that a worker is on this row or about to be, so it
+// never holds a row whose moment has not arrived. The supervisor's spawn
+// passes gate on the same thing (`isDue`, main/supervisor.mjs).
 //
 // `deferredUntil` is the caller's dueAt: the ledger's runAt, maxed with the old
 // localStorage snooze the view still honours on read.
-//
-// Answering used to leave a schedule standing, so that approving something on
-// Friday could still run it Monday at 6am. That is now what the picker is for:
-// a reply cancels the schedule (`replyClearsSchedule` below), because the
-// silence it bought was indistinguishable from being ignored.
 export function belongsInProgress(
   i: InboxItem,
-  { deferredUntil = 0, now = Date.now(), live = false, shipping = false } = {},
+  { deferredUntil = 0, now = Date.now(), live = false, shipping = false, stopped = false } = {},
 ): boolean {
-  // Nothing is coming on a thread nobody has started: In progress promises a
-  // worker, and this one is waiting for you to say go (w-afb66e6661).
+  // A thread in Later waits for the user to say go, so no worker is coming.
   if (notStarted(i)) return false;
-  // A session on it is the promise kept, whatever the status says yet: an
-  // agent that has written blocked, done or a moment to wake at is still
-  // working until it exits (w-bc976fd247, and `live` above belongsInInbox).
+  // A live session keeps the promise whatever the status says, until it exits.
   if (live) return true;
-  // And so is the app's ship queue, which owes this row a ship (w-0c1ba766eb).
+  // So does the ship queue still owing this row a ship.
   if (shipping) return true;
   if (deferredUntil > now) return false;
+  // Nothing will start it, so it is in Needs you (`belongsInInbox`).
+  if (stopped) return false;
   if (i.status === 'claimed') return true;
-  // The promise this list makes has been kept: a session acted on her answer
-  // and finished. Nothing is coming, so the row is not in progress, and the
-  // inbox rule above is now showing it to her. Both lists read the one fact,
-  // because "one row, two tabs" is the failure this file has already had.
+  // A session acted on her answer and finished, so nothing is coming and the
+  // inbox shows it instead. Both lists read the same fact.
   if (answerSettled(i)) return false;
-  // And the same for her own ask that has been answered: the answer is written,
-  // she has not replied, and the inbox rule above is now showing it to her. In
-  // progress promises a worker is coming; on this row the next move is hers.
+  // Her ask is answered and she has not replied, so the next move is hers and
+  // the inbox shows it.
   if (answeredHerAsk(i)) return false;
+  if (gaveUpOnTheAnswer(i)) return false;
   if (i.status === 'open' && liveAnswer(i)) return true; // answered/approved, spawn pending
   // Her own work, waiting its turn. Agent-filed work is a proposal and stays in
   // the inbox until she answers it, which is the branch above.
   return i.status === 'open' && i.kind !== 'question' && i.kind !== 'review' && hers(i);
 }
 
-// WHAT IS IN PROGRESS CAN BE STOPPED. One rule, deliberately the same rule as
-// the list above
+/**
+ * OF THE IN PROGRESS TAB, WHAT IS ACTUALLY MOVING (w-712fc99e8d).
+ *
+ * The empty inbox says whether work is moving without you, and it was handed
+ * the length of the tab. The tab holds a thread waiting its turn as well as
+ * one being worked on, so with the fleet set to two agents a tester read "8
+ * threads are running" over four that had not started.
+ *
+ * Running is a session on the thread, a ship the app still owes it, or one of
+ * your own terminal sessions that took your reply. Queued is the supervisor's
+ * own list of what the next tick will start, so a thread stuck at a sign-in
+ * or a usage limit is counted as neither: it is in the tab, and nothing is
+ * happening to it.
+ */
+export function workMoving(
+  rows: readonly { id: string; agent?: unknown }[],
+  { live, shipping, queued }: {
+    live: ReadonlySet<string>; shipping: ReadonlySet<string>; queued: ReadonlySet<string>;
+  },
+): { running: number; queued: number } {
+  let running = 0;
+  let waiting = 0;
+  for (const row of rows) {
+    if (row.agent || live.has(row.id) || shipping.has(row.id)) running += 1;
+    else if (queued.has(row.id)) waiting += 1;
+  }
+  return { running, queued: waiting };
+}
+
+// Everything In progress can be stopped, so this is the list's own rule rather
+// than a check for a live session. Most tasks wait minutes in the queue before
+// a worker claims them, and those must be stoppable too.
 //
-// Both surfaces for stopping already existed, and both gated on a LIVE
-// SESSION instead (`supervisor.running`), which is a much narrower thing than
-// the tab they appear under. In progress holds three kinds of row and only the
-// third was stoppable:
-//
-//   1. her own task, queued, no worker yet   <- the common case
-//   2. answered/approved, spawn pending
-//   3. claimed, a worker running right now   <- the only one with a stop
-//
-// Measured on a real store: the median wait between composing a task and a
-// worker claiming it was 474 seconds, and very few were claimed inside 15
-// seconds. So for essentially every task there is a window of minutes where
-// the row says In progress, nothing is running, and neither ⌘K nor the footer
-// offered any way to stop it. On the row that reported this, that window was
-// 3 minutes 5 seconds.
-//
-// Gating on the tab rather than on a session also removes a contradiction
-// that was visible on screen: with no worker running, the one agent command ⌘K DID
-// offer on a queued row was "Resume This Agent".
-//
-// The deferral argument is the caller's dueAt, exactly as the list passes it: a
-// row whose moment has not arrived is in Scheduled, not here, and it already
-// has its own way back ("Back to Inbox"). Stopping is for what is under way.
+// `deferredUntil` is the caller's dueAt, as the list passes it. A deferred row
+// is in Scheduled, which has its own way back.
 export function stoppable(
   i: InboxItem,
-  { deferredUntil = 0, now = Date.now(), live = false } = {},
+  { deferredUntil = 0, now = Date.now(), live = false, stopped = false } = {},
 ): boolean {
-  return belongsInProgress(i, { deferredUntil, now, live });
+  return belongsInProgress(i, { deferredUntil, now, live, stopped });
 }
 
-/* --------------------- ACTIVE AGENTS, IN THE SIDEBAR --------------------- */
-// WHAT THE RAIL COUNTS AS ACTIVE, and it is a definition over the lists rather
-// than over processes.
+// What the sidebar rail counts as active: the union of In progress, Scheduled
+// and the inbox, with no rule of its own, so there is never a fourth answer to
+// what is live.
 //
-// That reading was picked over only the ones working, knowing what it costs:
-// it is largely the inbox repeated down the side of the screen, often more than
-// twice as many rows. So the rule is the union of three lists (in progress,
-// scheduled, inbox) and nothing of its own, because a fourth definition of what is live is
-// a fourth answer to one question.
-//
-// THIS DOES NOT REPLACE `onTheRail` IN shared/agents.mjs. That one still rules
-// the SESSIONS beside these rows, which are her own terminals and have no work
-// item to be counted by; the app’s own workers reach the panel as the rows they
-// were spawned for, which is what they already are in her inbox.
+// `onTheRail` in shared/agents.mjs still rules the user's own terminal
+// sessions beside these rows, which have no work item.
 export function belongsOnTheRail(
   i: InboxItem,
-  { deliveredThrough = 0, hiddenUntil = 0, deferredUntil = 0, now = Date.now(), live = false, shipping = false, waitingOn = [] as readonly string[] } = {},
+  { deliveredThrough = 0, hiddenUntil = 0, deferredUntil = 0, now = Date.now(), live = false, shipping = false, waitingOn = [] as readonly string[], stopped = false } = {},
 ): boolean {
-  if (belongsInProgress(i, { deferredUntil, now, live, shipping })) return true;
+  if (belongsInProgress(i, { deferredUntil, now, live, shipping, stopped })) return true;
   if (hiddenUntil > now && i.status !== 'done') return true;  // the user's own, put off: Scheduled
   if (waitsInLater(i, waitingOn)) return true; // waiting in Later, coming back by itself
-  return belongsInInbox(i, { deliveredThrough, hiddenUntil, now });
+  return belongsInInbox(i, { deliveredThrough, hiddenUntil, now, stopped });
 }
 
-// What a reply does to the thread's state, which is the difference between the
-// user's words reaching a worker and sitting in the ledger forever. The supervisor
-// only carries an answer while the item is OPEN, so replying to anything parked
-// has to hand it back. Claimed is the exception: a worker is on it and reads
-// her reply when it exits, and reopening would spawn a second one.
+// The supervisor only carries an answer while the item is open, so a reply on
+// a blocked or done row reopens it, or the reply never reaches a worker. A
+// claimed row is left alone: its worker reads the reply when it exits, and
+// reopening would spawn a second one.
 export function statusForReply(status: string): 'open' | undefined {
   return status === 'blocked' || status === 'done' ? 'open' : undefined;
 }
 
-// AND WHAT UNDOING THAT REPLY HAS TO WRITE. Withdrawing kills the session, and
-// killing one parks the row blocked (ipc `zero:stop-session`), so the undo owns
-// the status whether or not the reply itself changed it. It used to restore one
-// only when `statusForReply` had returned something, which is never true of an
-// already-open row: her reply on an open row was withdrawn, the kill left it
-// blocked, and nothing put `open` back. A blocked row carries no answer to
-// anyone, so the next send was written to the ledger and no session ever
-// claimed it (2026-08-17). The option button's undo always wrote 'open' and
-// never had this, which is why the same withdraw worked from there.
-//
-// So the withdraw is one write, and it puts the thread back exactly where the
-// reply found it, always.
+// Withdrawing a reply kills the session, and a kill parks the row blocked (ipc
+// `zero:stop-session`). So the undo always writes back the status the reply
+// found, even when the reply did not change it. Otherwise a withdrawn reply on
+// an open row leaves it blocked, and no session claims the next send.
 export function withdrawReply(statusWhenReplied: string): { answer: string; status: string } {
   return { answer: '(withdrawn)', status: statusWhenReplied };
 }
 
-// A REPLY IS A CLAIM ON NOW. the row stayed in Scheduled, and the supervisor
-// skips an answered row that is not yet due (supervisor.mjs, the continuation
-// pass), so the reply sat unread until the moment came around.
-//
-// So replying clears the schedule, whoever set it. It costs the approve-Friday-run-Monday case, which is now made by answering and
-// then pressing S, and the undo on the reply puts the old moment back.
+// A reply clears the schedule, whoever set it, because the supervisor's
+// continuation pass skips an answered row that is not yet due, so the reply
+// would sit unread until then. The undo on the reply puts the old moment back.
 export function replyClearsSchedule(i: InboxItem, now = Date.now()): boolean {
   return Math.max(i.runAt ?? 0, i.snoozedUntil ?? 0) > now;
 }
 
-/* --------------- a thread spawned from another is just a thread ----------- */
-// There used to be a rule here that hid a thread while any thread spawned from
-// it was still in a list, so a conversation read as one row. It hid an urgent
-// thread with a fresh answer on it behind one the user had put off for three
-// days (w-2eb0e716dd). Every thread now shows by its own rules above.
-
-/* ------------------------------- the click ------------------------------- */
 export type ClickTarget = 'row' | 'box';
 export type ClickIntent = 'open' | 'toggle' | 'range';
 
@@ -549,63 +427,24 @@ export function clickIntent(
   return mods.meta || mods.ctrl ? 'toggle' : 'open';
 }
 
-/* ------------------------------ the summary ------------------------------ */
-// THE ROW HAS TO BE ENOUGH TO DECIDE ON.
-//
-// Which text that is, is the only judgment here, and it is the same one the
-// row has always made: on anything FINISHED the result is the news, because the
-// body is the ask she already knows she made; on anything still open the body
-// is all there is. It is keyed on the item's own status as well as the view,
-// because her own directives are often one line with no body at all, and
-// keying it on the Done tab alone left those rows with nothing to say.
-//
-// Everything about how GOOD that text is lives in briefs/founder.md, not here.
-// This function's whole job is picking which field, and it is out of the
-// component so that choice can be pinned by a test rather than read off a
-// screenshot. The markdown stripping is previewText's, not a second copy of it.
-// A ROW THAT IS NOT FINISHED SHOWED THE USER'S OWN WORDS BACK, NEVER THE
-// ANSWER. The rule used to be "result only when done", and `blocked` is not
-// done, so a worker that answered and marked the row blocked handed back a row
-// reading exactly as it had before. Measured over 72 hours of real ledgers:
-// dozens of returns to the inbox that way, every one of them word for word
-// identical, and several rows sitting in the inbox at that moment carrying a
-// finished answer the list would not print (one of them blank).
-//
-// So the question is not what the STATUS is, it is which text is NEWER. A
-// result written after the body is the last thing anyone said on this row, and
-// that is the news whether the row is blocked, open again on her reply, or
-// done. `wrote` already records when each field was written and by whom, so
-// this reads what is there rather than storing anything.
-//
-// The done case stays keyed on status as well, because a row can be finished
-// with a result whose timestamp the fold never recorded (older ledgers), and
-// dropping it would take news off rows that have been showing it correctly.
+// The line a row prints under its title: whichever of body and result was
+// written last, so a blocked row with an answer shows the answer. A finished
+// row shows its result even when the fold never recorded the result's
+// timestamp (older ledgers). This only picks the field: how good the text is
+// lives in briefs/founder.md, and markdown stripping is previewText's.
 export function rowSummary(
-  i: { id?: string; body?: string; result?: string; answer?: string; status?: string; title?: string; wrote?: Record<string, { ts: number; by?: string } | undefined> },
+  i: { id?: string; body?: string; result?: string; answer?: string; note?: string; status?: string; title?: string; wrote?: Record<string, { ts: number; by?: string } | undefined> },
   view: string,
 ): string {
-  // THE ROW THAT SAYS HER TASKS ARE NOT RUNNING SAYS ITS FIRST LINE AND STOPS.
-  // Its body is a short message, not a card: one line of causes, then a
-  // paragraph per cause naming the tasks. Run through the rule below, the row
-  // ran the first line into the start of the second paragraph, because the
-  // causes line ends on a count rather than on a full stop and the clip keeps
-  // going until it finds one.
+  // The trouble row prints only its first line: it ends on a count, not a full
+  // stop, so the clip below would run on into the next paragraph.
   if (i.id === TROUBLE_ID) return clipToSentence((i.body ?? '').split('\n')[0].trim());
-  // A TEAMMATE'S REPLY IS THE NEWS (the team version). Theo answering the
-  // question Maya sent him hands the row back to her, and the line under its
-  // title has to be what he said, not her own question read back to her. Only
-  // a reply by somebody other than whoever wrote the ask counts, so on one Mac,
-  // where no line carries a writer, nothing changes.
-  // THE NEWEST THING SAID IS THE NEWS, WHOEVER SAID IT (w-560647d4db). This
-  // used to require a DIFFERENT writer — a teammate's reply over your ask —
-  // which is the common case and not the only one. In a conversation between
-  // two people the same person routinely writes both: a teammate starts it and
-  // the same teammate sends the latest message, so the test failed and the row
-  // printed their oldest message, days old and already read. A row cannot print
-  // "what was said last" and then make an exception for who said it.
-  //
-  // `by` is still what gates this, and it still leaves the single-person app
-  // exactly as it was: with nobody signed in no line carries a writer at all.
+  // Over the agent's last word, which was written first and says it ships.
+  const unshipped = notShippedLine(i);
+  if (unshipped) return clipToSentence(unshipped);
+  // In the team version the newest answer is the news, whoever wrote it. Only
+  // an answer that carries a writer (`by`) counts, and with nobody signed in no
+  // line carries one, so the single-person app is unchanged.
   const said = i.wrote?.answer;
   if (i.answer && said?.by
     && said.ts >= Math.max(i.wrote?.body?.ts ?? 0, i.wrote?.result?.ts ?? 0)) {
@@ -617,36 +456,25 @@ export function rowSummary(
   return clipToSentence(previewText(showResult ? i.result! : bodyAfterTitle(i)));
 }
 
-/* ---------------------------- what a row is called ------------------------ */
-// THE NAME ON THE ROW: the written label when there is one, and her own title
-// when there is not.
+// The name on the row: the written label when there is one, otherwise the
+// title. `label` is its own field because the fold refuses a rewrite of the
+// title on a row the user wrote (shared/work-items.mjs). It is written once,
+// when the thread is made (main/row-label.mjs), because Claude Code names its
+// terminal tab but never saves that name to a transcript.
 //
-// TWO THINGS THIS IS NOT. It is not a rewrite of her title: the fold refuses one
-// on a row the user wrote, which is exactly why `label` is a field beside it rather
-// than a better title (shared/work-items.mjs). And it is not extracted from
-// Claude Code, because there is nothing there to extract: Claude Code generates
-// a name for the terminal tab and never saves it, and ZERO of thousands of
-// recent transcript files carry a `summary` row (main/agent-sessions.mjs found
-// the same thing on a smaller sample). It is written by whoever is on the row, which is the one party that
-// knows where the thread has got to.
-//
-// AND IT IS WRITTEN ONCE, when the thread is made and from where the thread
-// stood then, never again (main/row-label.mjs). A row whose person wrote a
-// short clear title of their own is not named at all: that title is what they
-// will look for and what they will point a teammate at.
-//
-// THE NEWEST NAME A PERSON WROTE BEATS THE ONE WE WROTE. A title stamped later
-// than the label is a rename, and the label cannot be erased through the ledger
-// (an empty field is dropped, shared/work-items.mjs), so the choice is made
-// here instead. Without this a rename would be accepted and then invisible.
-//
-// A LABEL OF WHITESPACE IS NOT A LABEL, so it falls through to the title rather
-// than emptying the row: this list may never draw a nameless line.
+// A title the user wrote after the label is a rename and wins, because the
+// ledger drops empty fields and so cannot erase a label. A whitespace label
+// falls through to the title, so no row is drawn without a name.
 export function rowTitle(i: {
   title?: string;
   label?: string;
+  labels?: string[];
+  result?: string;
   wrote?: { title?: { ts: number; source?: string }; label?: { ts: number } };
 }): string {
+  // A teammate's thread reads as its message to you, and before it has said
+  // anything, as its own title, never a name guessed from its opening line.
+  if (teammateIdOf(i)) return (i.result ?? '').split('\n').map((l) => searchText(l).trim()).find(Boolean) || (i.title ?? '');
   const label = (i.label ?? '').trim();
   if (!label) return i.title ?? '';
   const theirs = i.wrote?.title;
@@ -655,39 +483,24 @@ export function rowTitle(i: {
   return (renamed && (i.title ?? '').trim()) || label;
 }
 
-// THE SCHEDULE BOX CALLS A THREAD WHAT THE LIST CALLS IT. It printed the raw
-// title, which on a thread started from a message is the whole first sentence
-// she typed, under the row she had just pressed showing its name
+// The schedule box names a thread the way the list does, not by its raw title
 // (tests/the-schedule-box-names-the-thread-not-the-prompt.test.mjs).
 export function scheduleSubtitle(i: Parameters<typeof rowTitle>[0], count = 1): string {
   return count > 1 ? `${count} items` : rowTitle(i);
 }
 
-// THE ROW MUST NOT SAY THE SAME SENTENCE TWICE. On a message written as one
-// paragraph the title is now a label CUT FROM the body (message-split.ts), so
-// printing the body under it opened both lines with the same words. The summary
-// takes what comes after the label instead, which is the sentence the title
-// could not hold. When the label is not a prefix of the body, nothing here
-// changes: that is every row an agent filed, where the two were always written
-// separately.
+// On a message written as one paragraph the title is cut from the body
+// (message-split.ts), so the summary starts after it rather than repeating it.
+// When the title is not a prefix of the body, the body is used whole.
 function bodyAfterTitle(i: { body?: string; title?: string }): string {
   const body = i.body ?? '';
   const label = (i.title ?? '').replace(/…$/, '').trim();
   return label && body.startsWith(label) ? body.slice(label.length).trim() : body;
 }
 
-// A ROW ENDS ON A FULL STOP, NOT MID-WORD. Cutting at a character count left
-// rows trailing off mid-sentence on a dangling preposition, which is worse than
-// saying less: she reads it as the row trailing off rather than as
-// there being more. So the summary keeps whole sentences up to the budget, and
-// falls back to a hard clip with an ellipsis only when the first sentence is
-// itself longer than the budget.
-//
-// Every row is now the same height, whatever its author wrote.
-//
-// It is still a backstop rather than the design: briefs/worker.md asks agents
-// for an opening that fits, and a row that needs clipping is a row whose
-// author spent it on background instead.
+// The summary keeps whole sentences up to the budget, and clips mid-sentence
+// with an ellipsis only when the first sentence is longer than the budget. It
+// is a backstop: briefs/worker.md asks agents for an opening that fits.
 export const SUMMARY_BUDGET = 112;
 
 export function clipToSentence(text: string, budget = SUMMARY_BUDGET): string {
@@ -699,119 +512,64 @@ export function clipToSentence(text: string, budget = SUMMARY_BUDGET): string {
   return `${text.slice(0, space > 40 ? space : budget).trimEnd()}…`;
 }
 
-/* ------------------------- the order a list reads in ---------------------- */
-
-// WHAT MATTERS MOST, TOP FIRST. Every list that claims to be in an order sorts
-// through this, so the inbox, In progress and the fleet cannot disagree about
-// which row comes next.
-//
-// It is here rather than inline in App.tsx because In progress did not have it
-// and nothing noticed.
-//
-// `score` is the one in shared/rank.mjs, passed in rather than imported so this
-// stays a pure rule over rows and testable without a supervisor snapshot.
-// Recency is the TIE-BREAK now and nothing more.
+// Every ordered list sorts through this, so the inbox, In progress and the
+// fleet agree on which row comes next. `score` is the one in shared/rank.mjs,
+// passed in so this stays pure. Recency only breaks ties.
 export function byRunningOrder<T extends { updatedAt: number }>(score: (i: T) => number) {
   return (a: T, b: T) => score(b) - score(a) || b.updatedAt - a.updatedAt;
 }
 
-// THE HEADING URGENT ROWS LIFT UNDER. Picked out of five treatments
-// (w-bba20a03f5): urgent items are lifted to the top under their own label.
-// The four not picked are in decisions.md and are not switchable anywhere.
-//
-// WHICH ROWS IT COVERS IS `isUrgent` IN shared/rank.mjs AND NOTHING ELSE. There
-// were two answers to "is this urgent" in the renderer before this: the row drew
-// its mark off `(priority ?? 5) >= 9` inline, and `interrupt.ts` asked
-// shared/rank.mjs. They differ, and the difference is not cosmetic. The shared
-// one throws away a number an AGENT wrote (`wrote.priority.source === 'agent'`),
-// which is the rule set on w-b09b0c24cb after more than a quarter of agent-filed
-// rows came in at 7 or higher; the inline one threw away any row with a live
-// session on it, which silently unmarks the user's own urgent row the moment a worker
-// picks it up. With a heading over these rows the two cannot be allowed to
-// disagree, because the heading would then sit over rows that do not all wear
-// the mark. Everything urgent in this app now reads the same predicate.
+// The heading urgent rows are lifted under. Which rows count is `isUrgent` in
+// shared/rank.mjs and nothing else, so the heading never sits over a row that
+// does not wear the urgent mark.
 export const URGENT_HEADING = 'Urgent';
 
-// THE HEADING THAT ENDS THE URGENT BLOCK (w-ad426c52ae). With one urgent row
-// over nineteen ordinary ones, a single Urgent heading made them all look
-// urgent. With nothing under the block but hairlines, the one heading read as
-// a title over the whole inbox. So the rows
-// after the urgent block get this label and Urgent visibly stops where its rows
-// do. With nothing urgent, neither heading draws and the inbox is the
-// headingless list picked on w-abfe371152.
+// Ends the urgent block, so a single Urgent heading does not read as a title
+// over the whole inbox. With nothing urgent, neither heading draws.
 export const REST_HEADING = 'Everything else';
 
-/* ------------------------ the keys a row actually has -------------------- */
-// WHAT THE ROW UNDER THE POINTER SAYS ITS KEYS ARE. The look picked out of
-// four: the row you point at swaps its product name and its time for the keys,
-// in that exact space, so nothing new appears and nothing moves.
+// The keys the row under the pointer shows in place of its product name and
+// time. Each pair must match App.tsx's key switch, because a hint naming a key
+// the handler lacks is worse than none. The words are the ones the ⌘K rows use
+// for the same actions.
 //
-// IT IS A PURE FUNCTION OF THE VIEW, and it is here rather than in the
-// component for one reason: a hint that prints a key the handler does not have
-// is worse than no hint at all, so the two have to be readable side by side.
-// Every pair below is read off App.tsx's own key switch:
-//
-//   Enter  opens whatever is current, in every view
-//   R      replies, INBOX ONLY (`view === 'inbox'` in the switch)
-//   E      closes in the inbox, and in Scheduled it wakes instead, which is
-//          why the word changes rather than the key
-//   L      the reminder picker, inbox and Scheduled. It was S until
-//          2026-10-01, when S became the summary everywhere in the app.
-//
-// The words are the app's own, taken off the ⌘K rows for the same actions, so
-// the hint teaches the vocabulary the rest of the app uses.
-//
-// NOTHING IS DRAWN IN BATCH MODE. With rows ticked, E is batchDone over the
-// ticks and R drops out entirely, so a per-row hint would name the wrong
-// target. The ticked selection is its own mode and says so in ⌘K.
+// Nothing is drawn in batch mode: with rows ticked, E acts on the ticks and R
+// does nothing, so a per-row hint would name the wrong target.
 export type RowKey = { key: string; word: string };
+
+/**
+ * Where R on a row opens its reply box: the tabs L works on. The app moves to
+ * In progress after a send, and an R that did nothing there left the words
+ * typed next to run as shortcuts.
+ */
+export function replyKeyWorksIn(view: string): boolean {
+  return view === 'inbox' || view === 'progress' || view === 'snoozed';
+}
 
 export function rowKeys(view: string, batch = false): RowKey[] {
   if (batch) return [];
-  // THE SECOND WORD IS THE ROUND'S (w-581dbc6cc4). It said "Close" while the
-  // sidebar said Closed and the key meant done, and "closed" was not the right
-  // word. One pair now feeds the
-  // button, this hint, the palette and the tab.
-  // AND THE INBOX CARRIES LATER AS WELL (2026-10-01). L really does schedule a
-  // row in the inbox, and the walk's snooze beat asks for it on an inbox row,
-  // so without this line that beat drew a card naming a key and no chip on the
-  // row to click. It was never S here: S means the summary now, in every place
-  // in the app that says a key.
+  // The E word is DONE.short, the same word the button, the palette and the tab
+  // use. L schedules in the inbox too, and the walk's snooze beat asks for it on
+  // an inbox row.
   if (view === 'inbox') return [{ key: 'R', word: 'Reply' }, { key: 'E', word: DONE.short }, { key: 'L', word: 'Later' }];
   if (view === 'snoozed') return [{ key: 'E', word: 'Back to inbox' }, { key: 'L', word: 'Later' }];
   return [{ key: '⏎', word: 'Open' }];
 }
 
-/* ------------ AND WHAT IS LEFT OF THEM WHILE THE WALK IS ON --------------- */
-/* * A KEY DRAWN ON A ROW IN THE WALK HAS TO DO SOMETHING, which is the rule the setup screens
- have kept since 2026-08-21 and the rows never did.
-
-   THE ROWS BROKE IT AND IT IS PHOTOGRAPHED (w-7fd38422b5, 2026-08-27). While a
-   beat is up, the walk swallows every key except that beat's own, and offers
-   even that one only on the rows the beat is about. The row hint knew none of
-   this: it is a property of the VIEW, so any row under the pointer printed
-   "R Reply · E Close" whatever the walk would do with them. On the clearing
-   beat that is one true promise and three dead ones, and the dead ones sat on
-   the row an agent is stopped on, which is the row her pointer was on.
-
-   So while the walk is coaching, a row may print the beat's own key and no
-   other, and only if the beat is about that row. Everything else prints
-   nothing, which is the truth: nothing else happens.
-
-   THE WALK IS THE ONLY CALLER THAT NARROWS THIS. With `walk` null every row
-   says exactly what it said before, which is every row in the app on every day
-   nobody is being onboarded.
-
- AND A BEAT WITH NO KEY IS NOT THE SAME AS NO WALK, which is the one thing easy to get wrong
- here. Its row may not print "E Close" either, because closing the row the walk is waiting
- on is exactly the move that ends the beat by accident. So a null KEY inside a live walk
- means no row says anything, and the absent WALK is a separate case.
-*/
+/**
+ * The row keys left while the onboarding walk is on. The walk swallows every
+ * key except the current beat's, and only on the rows that beat is about, so a
+ * row prints that key or nothing. With `walk` null every row prints its usual
+ * keys.
+ *
+ * A beat with a null key is not the same as no walk: no row prints anything,
+ * because closing the row the walk waits on would end the beat by accident.
+ */
 export function walkRowKeys(
   all: RowKey[],
   /**
-   * The beat on screen: the key it asks for, which may be null, and the rows
-   *  that key is right for. Null for "no walk is on". */
+   * The beat on screen: the key it asks for (may be null) and the rows that
+   * key is for. Null when no walk is on. */
   walk: { key: string | null; rows: string[] } | null,
   id: string,
 ): RowKey[] {

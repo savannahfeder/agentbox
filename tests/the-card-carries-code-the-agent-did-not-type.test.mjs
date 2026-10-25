@@ -176,7 +176,8 @@ describe('the card carries code the agent did not type into a tool', () => {
     const at = src.indexOf('const settleExit = (code, signal, how) => {');
     expect(src.indexOf('snapshotRepo(cwd)')).toBeLessThan(at);
     const exitHandler = src.slice(at);
-    expect(exitHandler).toContain('changeFromRepo(session.repoBefore)');
-    expect(exitHandler).toMatch(/repos,/);
+    // Read back on the git thread (main/run-change.mjs).
+    expect(exitHandler).toContain('repoBefore: session.repoBefore');
+    expect(fs.readFileSync(path.join(ROOT, 'main', 'run-change.mjs'), 'utf8')).toContain('changeFromRepo(repoBefore)');
   });
 });

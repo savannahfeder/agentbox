@@ -61,10 +61,14 @@ describe('the three seconds in which it is still hers', () => {
 
   it('flushes first, so a second message inside the window sends the first', () => {
     const branch = liveBranch();
-    const flush = branch.indexOf('await flushPending();');
+    const flush = branch.indexOf('flushPending()');
     const arm = branch.indexOf('pendingRef.current = {');
     expect(flush).toBeGreaterThan(-1);
     expect(arm).toBeGreaterThan(flush);
+    // Without waiting for it (tests/e-never-waits-for-the-app.test.mjs); the
+    // hand-over goes after it instead.
+    expect(branch).not.toContain('await flushPending();');
+    expect(branch).toMatch(/run: handOverAfter/);
   });
 
   it('raises no toast, because the message on the screen is the one that says it', () => {

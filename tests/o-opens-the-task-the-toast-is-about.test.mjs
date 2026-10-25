@@ -52,14 +52,14 @@ describe('the window handler answers O', () => {
   const before = app.slice(HANDLER, FOCUSED);
 
   it('above the split between an open task and the list, so it works in both', () => {
-    expect(before).toContain('const goesTo = opensTheToast(e.key, toast);');
+    expect(before).toContain('const goesTo = opensTheToast(e.key, toast, focused ? { product: focused.product, id: focused.id } : null);');
     expect(before).toContain('if (goesTo) { e.preventDefault(); openToastRow(goesTo); return; }');
   });
 
   it('after the typing and modal guard, so an O typed in a box stays an O', () => {
     const guard = before.indexOf('if (modal || inInput) {');
     expect(guard).toBeGreaterThan(-1);
-    expect(before.indexOf('opensTheToast(e.key, toast)')).toBeGreaterThan(guard);
+    expect(before.indexOf('opensTheToast(e.key, toast,')).toBeGreaterThan(guard);
   });
 
   it('the click and the key open the row the same way', () => {

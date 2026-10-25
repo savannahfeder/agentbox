@@ -33,6 +33,8 @@
   --bg-raised: #f1f3f6;
   --bg-selected: #eaeef7;
   --bg-hover: #f6f7fa;
+  /* Highlighted text: a see-through wash the ground shows through, like Slack's. */
+  --select: rgba(46, 125, 230, 0.2);
   /* WHAT A DROPDOWN FLOATS ON. Every menu in the app reads this one token, so
      they move together; it is the window's own ground here, which is what each
      of them painted itself before the token existed. A look may override it,
@@ -227,7 +229,7 @@
   /* Ember's mono on every theme (w-3fc39983be): Ember's type on the small
      right-side details while the original font stays everywhere else. The body stays Avenir Next; only what reads var(--mono)
      takes Geist Mono. Its @font-face sits with Ember's block below. */
-  --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, monospace;
+  --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, 'DejaVu Sans Mono', monospace;
   /* Before this there were TEN different corner sizes on one opened task at the
      same time (13, 9, 8, 7, 6, 4, 20, two two-corner shapes and 50%), measured
      in the running app, not counted off the file. Now there is one number and a
@@ -392,6 +394,7 @@
   --pop: var(--bg);
   --bg-selected: #3a4049;
   --bg-hover: #33363c;
+  --select: rgba(110, 165, 255, 0.3);
   --film-strong: rgba(255, 255, 255, 0.10);
   --find-match: color-mix(in srgb, var(--accent) 22%, transparent);
   --find-current: var(--accent);
@@ -493,7 +496,12 @@
   --work-fill: rgba(41, 47, 58, 0.55);
   --work-chip: rgba(255, 255, 255, 0.07);
   --work-blur: blur(18px) saturate(1.15);
-  --accent: #7aabff;
+  /* THE ONE ORANGE, HERE TOO (w-abed8ae491). Two modes, light and dark, both
+     with orange accents. This block is the dark set UNDER the launch film's
+     look rather than a look of its own, and it still carried the blue the app
+     wore before that, so anything painting dark without the picture got it.
+     tests/every-theme-wears-the-one-orange.test.mjs reads every declaration. */
+  --accent: #ee6018;
   /* THE READING SURFACE IN THE SETUP PICTURE, and the only place in the app
      that paints paper rather than a theme surface. The values are the landing
      page's own (~/dd-landing/index.html), because the article Agentbox offers you
@@ -508,11 +516,11 @@
   --read-kicker: #3A55A4;
   --read-ground: #0F1013;
 
-  --select-bar: #7aabff;
+  --select-bar: var(--accent);
   --on-solid: #24262a;
-  --chip-ask: #d8b44a;
+  --chip-ask: var(--accent);
   --state-stopped: #e08a6c;
-  --underline: rgba(149, 188, 255, 0.68);
+  --underline: rgba(238, 96, 24, 0.6);
   --chip-review: #7bc98e;
   /* Lifted from #d97a6c, which measured 4.32:1 on the new card and was 5.88:1
      on the old one: a lighter ground takes contrast off every ink. This value
@@ -746,9 +754,9 @@
      the new-task card reading as one more row rather than a card on top. */
   --scrim: rgba(0, 0, 0, 0.72);
   --radius: 0px;
-  --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, monospace;
+  --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, 'DejaVu Sans Mono', monospace;
 }
-:root[data-skin="ember-grid"] body { font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, sans-serif; }
+:root[data-skin="ember-grid"] body { font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, 'DejaVu Sans', sans-serif; }
 .look-swatch.ember-grid { background: radial-gradient(ellipse 70% 60% at 72% 28%, rgba(238, 96, 24, 0.14), rgba(238, 96, 24, 0) 70%), #1a1817; }
 .look-swatch.ember-grid::after { background: rgba(40, 38, 37, 0.96); border: 1px solid #464443; border-bottom: none; }
 
@@ -768,6 +776,8 @@
   border-radius: var(--radius);
   padding: 2px 8px;
 }
+/* One a finder can ask again is pressed to look now, and looks the same. */
+button.missing-artifact { background: none; cursor: pointer; }
 
 html, body, #root { height: 100%; }
 
@@ -797,8 +807,12 @@ body {
   /* EMBER GRID'S TYPE IN BOTH THEMES (w-9e434e8671): the launch film's Geist,
      with Ember's own fallbacks, so Light and Dark set every word the same. It
      was Avenir Next outside Ember Grid. The weights and spacing Ember set on
-     titles, tabs and rows apply to both too (foot of workspace-navigation.css). */
-  font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, sans-serif;
+     titles, tabs and rows apply to both too (foot of workspace-navigation.css).
+     DejaVu Sans is last before the generic because Geist carries no ✓, ✕ or ⌘
+     and the two names in front of it are macOS only, so on Linux those marks
+     fell through to whatever fontconfig picked and could be drawn as a box
+     (F-43, tests/a-mark-the-app-draws-has-a-font-on-every-machine). */
+  font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, 'DejaVu Sans', sans-serif;
   font-size: 15.5px;
   background: var(--bg);
   color: var(--text);
@@ -807,14 +821,33 @@ body {
   user-select: none;
 }
 
+/* The words keep their own colour; only the wash behind them is set. */
+::selection { background: var(--select); }
+
 .boot {
   height: 100%;
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: 18px;
   font-size: 28px;
   font-weight: 200;
   letter-spacing: 0.3em;
   color: var(--text-faint);
+}
+
+/* The one sentence the boot screen says when nothing comes back. It stands
+   where the wordmark stood, in reading type rather than in the wordmark's
+   tracking. */
+.boot-stuck p {
+  margin: 0;
+  max-width: 560px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 1.6;
+  color: var(--text-dim);
 }
 
 /* --read-w is the width of the sheet an opened task is set on: the reading
@@ -1022,6 +1055,16 @@ body {
    rather than floating in the middle of the window, because the thing it is
    explaining is still on screen above it. Right-aligned to the bar's own end,
    so it never crosses the window edge.
+
+   OPENED BY A HOVER IT TAKES NO POINTER (w-7b7182ef61). In the sidebar it opens
+   upwards over Feedback and Settings, and a panel that appeared because the
+   pointer passed over the row may not stand in the way of where that pointer
+   was going. There is nothing in it to press.
+
+   PINNED IT DOES TAKE THE PRESS, AND CLOSES ON IT. The press stops here rather
+   than reaching a control it is covering: the update card's Restart sits under
+   this corner, and installing an update nobody could see is worse than spending
+   a click.
 */
 .usage-panel {
   position: absolute; top: calc(100% + 6px); right: -8px; z-index: 40;
@@ -1030,8 +1073,9 @@ body {
   /* --shadow-lg is what every other thing that opens over this app wears, and
      it is the token pair rather than a colour, so light answers it too. */
   border-radius: 5px; box-shadow: var(--shadow-lg);
-  cursor: default;
+  cursor: default; pointer-events: none;
 }
+.usage-panel.is-pinned { pointer-events: auto; }
 .usage-panel h3 {
   margin: 0 0 11px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--agent-ink);
@@ -1073,6 +1117,14 @@ body {
   font-size: 18px;
   line-height: 1;
   font-weight: 400;
+}
+/* The same button on a keyboard with no ⌘, where the key is a word. Four
+   letters at 18px overrun a 34px button, so the word is set at the size the
+   app's other key words take. */
+.cmd-glyph.cmd-word {
+  font-size: 11px;
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
 }
 
 /* P2, the tab head). Smaller than a corner button because it is standing among
@@ -1968,9 +2020,18 @@ body {
 .diagram svg { max-width: 100%; height: auto; }
 /* The library's drop shadow reads as a glow on a dark surface. */
 .diagram svg * { filter: none !important; }
-.diagram-pending { min-height: 120px; }
+.diagram-pending { min-height: 240px; }
 .markdown blockquote { border-left: 3px solid var(--line); padding-left: 12px; color: var(--text-dim); margin: 8px 0; }
 .markdown strong { font-weight: 650; }
+/* A TABLE IS A GRID. With no rule here an agent's table came out in the
+   browser's defaults: no lines, centred headers, cells floating mid-row. A
+   table wider than the message scrolls sideways rather than crushing its
+   columns; a block table still lays its cells out as a table. */
+.markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 14px 0; font-size: 14px; line-height: 1.45; }
+.markdown th, .markdown td { border: 1px solid var(--line); padding: 7px 11px; text-align: left; vertical-align: top; }
+/* Half the raised grey: the full one pulled the eye to the header first. */
+.markdown th { background: color-mix(in srgb, var(--bg-raised) 50%, transparent); font-weight: 650; }
+.markdown td:first-child { font-weight: 600; }
 .inline-image { max-width: 100%; border-radius: 0; border: 1px solid var(--line); margin: 8px 0; }
 
 
@@ -1981,6 +2042,45 @@ body {
 .inline-image-open:hover .inline-image { border-color: var(--text-faint); }
 .inline-image-open:focus-visible .inline-image { outline: 1px solid var(--text-faint); outline-offset: 2px; }
 
+/* A PICTURE HOLDS ITS PLACE WHILE IT LOADS, as a shimmering box, then fades
+   in, in every window. Without it a picture with no bytes yet is a 2 x 2 dot
+   and the words under it jump when it lands. The state is set by phone-files.ts
+   watchPicture, which main.tsx starts; the names say phone because it was
+   built for the phone first. The half-drawn picture and the broken mark are
+   kept out of sight while the box shows.
+
+   The button around a loading picture is as wide as the column, because a
+   button shrinks to what is in it and the box would be 4:3 of nothing.
+   `auto 4 / 3` takes the picture's own shape the moment its first bytes give
+   it. Four :root outweigh the phone's own picture rules in phone.css. */
+:root:root:root:root .inline-image-open:has(> .inline-image[data-phone-img="loading"]) { width: 100%; }
+:root:root:root:root .inline-image[data-phone-img="loading"],
+:root:root:root:root .doc-picture[data-phone-img="loading"] {
+  display: block; width: 100%; max-width: 100%; height: auto; aspect-ratio: auto 4 / 3;
+  color: transparent; object-position: -99999px 0;
+  background: linear-gradient(100deg, transparent 30%, var(--wash) 50%, transparent 70%) 0 0 / 200% 100%, var(--bg-raised);
+  animation: phone-shimmer 1.3s linear infinite;
+}
+:root:root:root:root .attach-row img[data-phone-img="loading"] {
+  color: transparent; object-position: -99999px 0;
+  background: linear-gradient(100deg, transparent 30%, var(--wash) 50%, transparent 70%) 0 0 / 200% 100%, var(--bg-raised);
+  animation: phone-shimmer 1.3s linear infinite;
+}
+:root:root:root:root .inline-image[data-phone-img="ready"],
+:root:root:root:root .doc-picture[data-phone-img="ready"],
+:root:root:root:root .attach-row img[data-phone-img="ready"] { animation: phone-fade-in .25s ease-out; }
+@keyframes phone-shimmer { from { background-position: 100% 0, 0 0; } to { background-position: -100% 0, 0 0; } }
+@keyframes phone-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* ANYTHING ELSE A MESSAGE DRAWS LATE wears the same shimmer at the size it
+   will have, so the words under it hold still
+   (tests/whatever-a-message-draws-late-holds-its-place). */
+.arriving, .message-file-face.arriving, .folder-preview-shot.arriving {
+  background: linear-gradient(100deg, transparent 30%, var(--wash) 50%, transparent 70%) 0 0 / 200% 100%, var(--bg-raised);
+  animation: phone-shimmer 1.3s linear infinite;
+}
+.inline-image.arriving { display: block; width: 100%; aspect-ratio: 4 / 3; }
+
 /* A sound or a film a worker named: its name, then the player, one per line
    even when five were written on one line (ArtifactMedia in Focus.tsx). */
 .inline-media { display: block; margin: 8px 0; }
@@ -1989,9 +2089,13 @@ body {
   display: inline-block; border: 0; background: transparent; text-align: left;
   margin: 0 -3px 6px;
 }
+/* Where the player kept on the shelf is put (../player-shelf.ts). */
+.inline-media-player { display: block; }
 .inline-media audio { display: block; width: min(420px, 100%); height: 36px; }
 .inline-media-missing .inline-media-name.mention { display: inline; margin: 0 -3px; }
-.inline-media video { display: block; max-width: 100%; max-height: 360px; border: 1px solid var(--line); }
+/* The column's width at a fixed height from the first frame: before its size is
+   known a film is the browser's 300 x 150, and it resized once it was. */
+.inline-media video { display: block; width: 100%; height: 360px; object-fit: contain; background: var(--bg-raised); border: 1px solid var(--line); }
 
 /* A folder a worker named on its own line: its name, then its newest pictures,
    three across (FolderPreview in Focus.tsx). Spans, because it sits in a <p>. */
@@ -2022,6 +2126,7 @@ body {
   display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top;
   border: 1px solid var(--line); background: var(--bg-raised);
 }
+.folder-preview-shot.arriving { aspect-ratio: 16 / 10; border: 1px solid var(--line); cursor: default; }
 .folder-preview-shot:hover img { border-color: var(--text-faint); }
 .folder-preview-shot:focus-visible img { outline: 1px solid var(--text-faint); outline-offset: 2px; }
 .folder-preview-label {
@@ -2033,29 +2138,6 @@ body {
   cursor: pointer; font: inherit; font-size: 0.86em; color: var(--text-dim);
 }
 .folder-preview-more:hover { color: var(--text); }
-
-/* The originating message: quiet quoted context above the agent's ask. */
-.origin {
-  margin: 4px 0 22px;
-  padding: 10px 14px;
-  background: var(--bg-raised);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.origin-label {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em;
-  color: var(--text-faint); margin-bottom: 4px; font-weight: 600;
-}
-.origin-title { font-weight: 550; font-size: 14px; }
-/* `.origin-body`, `.origin-answer` and `.origin-on` lived here and are gone
-   with the block that used them. They drew the user's own last answer at full strength
-   with the parent shrunk to a footnote underneath. This box has one shape now,
-   a label and a title, and both are ruled above.
-*/
-.origin-label { display: flex; align-items: baseline; }
-.origin-open { margin-left: auto; opacity: 0; transition: opacity 0.12s; text-transform: none; letter-spacing: 0; font-weight: 500; }
-.origin:hover .origin-open { opacity: 1; }
-.origin:hover { background: var(--bg-hover, var(--bg-raised)); }
 
 /* Blocked items name their blocker, clickably. */
 .blocked-by {
@@ -2089,6 +2171,14 @@ body {
   font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em;
   color: var(--text-faint); margin-bottom: 7px; font-weight: 600;
 }
+/* What wrote it, after the label's own word: quieter than the label, because
+   the label says what this block IS and this says where it came from. */
+.appendix-ran { font-weight: 400; opacity: 0.72; }
+.appendix-unshipped::before {
+  content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); margin-right: 7px; vertical-align: 1px;
+}
+.appendix-ran::before { content: ' · '; }
 
 /* THE ATTACHMENT CHIPS ARE GONE, w-38d7d32c88, 2026-09-23. Rectangular tags
    for files were confusing, took up space and were unnecessary. The whole block went with the row in Focus.tsx, chip, page mark, name and
@@ -3486,6 +3576,10 @@ img.app-mark { opacity: 1; border-radius: 0; }
 
 .modal-title { padding: 14px 18px 2px; font-weight: 600; }
 .modal-subtitle { padding: 0 18px 10px; color: var(--text-dim); font-size: 13px; }
+/* A sentence the box has to carry (SchedulePicker's `note`). Quieter than the
+   title and louder than the subtitle, because it is the one thing in the box
+   that was not asked for. */
+.modal-note { padding: 0 18px 12px; color: var(--text-faint); font-size: 13px; line-height: 1.45; }
 .modal-hint { padding: 10px 18px 12px; color: var(--text-faint); font-size: 12px; display: flex; align-items: center; gap: 10px; }
 
 /* The user's rules and the writing rules, in the NEW-TASK CARD. NOTHING HERE
@@ -3816,20 +3910,40 @@ img.app-mark { opacity: 1; border-radius: 0; }
   border-bottom: 1px solid var(--line);
   color: var(--text);
   font-family: inherit;
-  font-size: 15px;
+  font-size: 16px;
   padding: 14px 18px;
 }
 .hidden-input { opacity: 0; height: 0; padding: 0; border: none; position: absolute; }
 
 .palette-list { max-height: 320px; overflow-y: auto; padding: 6px 0; }
+/* ONE LINE, WHATEVER IS PUT IN IT (w-6418318cd5, 2026-10-16). This was a bare
+   flex with two spans in it and nothing stopping either from wrapping, so one
+   long label stacked the row onto four lines in a list where every other row
+   is one: "There is so much text that it's overflowing on both lines." The
+   copy that did it is shorter now, but shorter copy is not a rule — the next
+   long one would do it again. So neither half wraps, and whichever cannot fit
+   is cut with an ellipsis, which somebody can see, rather than wrapped, which
+   is what this looked like. */
 .palette-item {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
   padding: 8px 18px;
   cursor: pointer;
   font-size: 14px;
 }
-.palette-item.selected { background: var(--bg-selected); }
+/* `min-width: 0` on both: without it a flex child refuses to shrink below the
+   width of its own text and overflows the panel instead of truncating, which
+   is the usual way this fix is written and fails. */
+.palette-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.palette-item.selected { background: var(--wash); box-shadow: inset 2px 0 0 var(--accent); }
 /* Nothing matched. It sits on the first row's own line — same padding, same
    size — so the eye does not move to read it, and it is faint because it is a
    statement, not something to press..
@@ -3839,7 +3953,16 @@ img.app-mark { opacity: 1; border-radius: 0; }
   font-size: 14px;
   color: var(--text-faint);
 }
-.palette-hint { color: var(--text-faint); font-size: 12.5px; }
+.palette-hint {
+  color: var(--text-faint);
+  font-size: 12.5px;
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
 .palette-key {
   min-width: 22px;
   height: 20px;
@@ -3889,6 +4012,7 @@ img.app-mark { opacity: 1; border-radius: 0; }
   border-bottom: 1px solid var(--line);
 }
 .artifact-embed-bar a { color: var(--accent); text-decoration: none; }
+.artifact-embed-arriving { display: block; height: 480px; }
 .artifact-embed iframe {
   display: block;
   width: 100%;
@@ -4109,6 +4233,21 @@ img.app-mark { opacity: 1; border-radius: 0; }
 */
 .app.composing .toast { bottom: auto; top: 74px; }
 
+/* AND OUT OF THE APPROVAL CARD'S WAY. The card is in that corner too and the
+   toast is drawn above it, so a toast lay across Allow and Deny at the moment
+   somebody is reaching for one. SIDEWAYS AND NOT UP, unlike the composer's: the
+   card's width is fixed (`.approvals`, 440px at right 22) and only its height
+   grows with the command it quotes, so beside it is a place that is always
+   clear -- and the top of the window is where New thread is, which the composer
+   covers up with its own card and this would not. 22 + 440 + 18 of air. */
+.app.asking .toast { right: 480px; }
+
+/* Unless there is no room beside it, and then up, where there is always room:
+   480 and 360 of toast need 840 to the right of the sidebar. */
+@media (max-width: 920px) {
+  .app.asking .toast { right: 30px; bottom: auto; top: 74px; }
+}
+
 /* THE ONE THAT OPENS THE TASK IT IS ABOUT: the whole card is the target, so
    it is a `<button>`, and only the pointer and the focus ring are added. */
 .toast-goes { cursor: pointer; }
@@ -4166,6 +4305,56 @@ img.app-mark { opacity: 1; border-radius: 0; }
   animation: toast-drain linear forwards;
 }
 @keyframes toast-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* WHERE A REPLY WENT, above the reply box of the thread it moved her to
+   (./components/SentLine). The box's own width and hairline, square, one
+   small dot of accent, and the toast's keycaps. The toast grey and the close
+   are what say it will go; no shadow, because lifting it off the page made it
+   the loudest thing on screen. */
+.sent-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 9px 9px 9px 14px;
+  background: var(--pop);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-dim);
+}
+.sent-line-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.sent-line-said { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sent-line-title { color: var(--text); }
+.sent-line-keys { flex: none; display: inline-flex; align-items: center; gap: 14px; }
+.sent-line-key { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; font: inherit; color: var(--text-faint); cursor: pointer; }
+.sent-line-key kbd {
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-faint);
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  padding: 0 4px;
+  line-height: 15px;
+}
+.sent-line-key:hover { color: var(--text); }
+.sent-line-key:hover kbd { border-color: var(--text-faint); color: var(--text); }
+.sent-line-close { flex: none; position: relative; width: 24px; height: 24px; margin: -2px 0 -2px 2px; display: grid; place-items: center; padding: 0; border: 0; background: none; color: var(--text-faint); cursor: pointer; }
+.sent-line:hover .sent-line-close { color: var(--text-dim); }
+.sent-line .sent-line-close:hover { color: var(--text); }
+.sent-line-ring { position: absolute; left: 50%; top: 50%; margin: -10px 0 0 -10px; transform: rotate(-90deg); fill: none; stroke-width: 1.5; }
+.sent-line-ring-track { stroke: var(--line); }
+/* 51.84 is the ring's length, 2π × 8.25. */
+.sent-line-ring-left {
+  stroke: var(--text-faint);
+  stroke-dasharray: 51.84;
+  animation: sent-line-ring linear forwards;
+}
+.sent-line:hover .sent-line-ring-left { animation-play-state: paused; }
+@keyframes sent-line-ring { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 51.84; } }
+.sent-line-x { fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; }
 /* A message with no task: its sentence is the whole card. */
 .toast-plain { width: auto; max-width: 360px; display: flex; gap: 12px; padding: 11px 16px; }
 .toast-plain .toast-line { font-size: 13.5px; color: var(--text); white-space: normal; }
@@ -4684,16 +4873,6 @@ img.app-mark { opacity: 1; border-radius: 0; }
    The label is the only thing separating it from a closed row's outcome. */
 .appendix-foot { margin-top: 28px; }
 
-/* An agent parent never answered: its title and nothing else. The body is
-   the message below, restated. */
-.origin-oneline .origin-title {
-  color: var(--text-dim);
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* The drawer, same material and the same upward opening as the priority one:
    both tags sit at the bottom of both composers, where a menu dropping down
    would be off screen. */
@@ -4861,13 +5040,10 @@ img.app-mark { opacity: 1; border-radius: 0; }
   line-height: 1.55; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* NO HORIZONTAL PADDING, DELIBERATELY. A 24px gutter was tried here as a floor
-   for the narrow window and measured out inert: the nav is a fixed 236px, so
-   the pane is always the window minus 237, and the window's own minWidth of 980
-   (main/main.mjs) already leaves 744px for a 620px column. The gutter changed
-   the left gap at 980 from 62px to 62px. A rule that does nothing is worse than
-   no rule, because the next reader believes its comment. */
-.set-pane { flex: 1; min-width: 0; overflow-y: auto; background: var(--bg); position: relative; }
+/* The gutter only bites under a 920 window: the nav is a fixed 236px and the
+   column 620, and the window goes down to 720 (main/main.mjs), where the pane
+   is 483 and the words would otherwise touch the nav. */
+.set-pane { flex: 1; min-width: 0; overflow-y: auto; background: var(--bg); position: relative; padding: 0 32px; }
 /* The screen is the ground here and nothing inside it paints a second one, or
    the photograph would show in the nav column and stop at the pane's edge. */
 :root[data-skin] .set-pane { background: transparent; }
@@ -5906,6 +6082,21 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   background-size: cover, cover, cover;
   background-blend-mode: normal, multiply, normal;
 }
+/* The walk is the one place that wears a focus ring. The app draws none
+   anywhere (see `*:focus` above): its grammar is J, K and Tab for the tabs, and
+   the browser's ring answers a traversal it does not use. Setup is not that app
+   yet. It is a form, Tab is the only way round it without a mouse, and nothing
+   on screen said where you were. One rule for every screen the walk draws, so a
+   screen that gains a button gains the ring with it. */
+.fr-screen :is(button, [role="option"], input, textarea, a):focus-visible,
+.fr-stay-scrim button:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+/* A row in the folder card is full width, so its ring goes just inside the row
+   rather than over the rows either side of it. */
+.fr-screen .fr-folder:focus-visible { outline-offset: -2px; }
+
 .fr-brand {
   position: fixed; left: 64px; top: 44px; z-index: 302;
   display: flex; align-items: center; gap: 11px;
@@ -6399,12 +6590,22 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   font-size: 13px; color: var(--text-faint);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.fr-folder-via { font-size: 12px; color: var(--text-faint); white-space: nowrap; }
+/* The folder screen leaves this column empty and the found screen says what is
+   true of the row in it, so it is a row of its own: the tick sits on the
+   word's middle rather than on its baseline. An empty one is still empty. */
+.fr-folder-via {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--text-faint); white-space: nowrap;
+}
+.fr-folder.lit .fr-folder-via { color: var(--text-dim); }
 .fr-folder-key { display: flex; justify-content: flex-end; }
 .fr-folder-other { margin-top: 4px; }
 .fr-folder-other .fr-folder-name { grid-column: 2 / 5; color: var(--text-dim); }
 .fr-folder-other.lit .fr-folder-name { color: var(--text); }
-.fr-folders-label + .fr-folder-other, .fr-folder + .fr-folder-other { box-shadow: inset 0 1px 0 var(--line); border-radius: 0 0 var(--radius) var(--radius); }
+/* One rule under the plans, however many ways out sit below it: a hairline
+   between two rows of the same group separates nothing. */
+.fr-folders-label + .fr-folder-other, .fr-folder:not(.fr-folder-other) + .fr-folder-other { box-shadow: inset 0 1px 0 var(--line); border-radius: 0 0 var(--radius) var(--radius); }
+.fr-folder-other + .fr-folder-other { margin-top: 0; }
 /* --- WHICH PLAN, AND SETTING IT UP (w-9f6975906c, picked 2026-10-05) -------
    The plan rows are folder rows with a letter where the folder glyph sits. The
    setup card is three steps on the same glass; the step underway is lit the way
@@ -6439,11 +6640,20 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   text-decoration: underline dotted var(--line-strong); text-underline-offset: 3px;
 }
 .ps-link:hover { color: var(--text-dim); }
+/* What is happening, in sentences rather than the tool's own stdout. The link
+   is the one part of it still worth monospace. */
 .ps-log {
   width: 620px; max-width: calc(100vw - 96px); max-height: 220px; overflow: hidden; margin: 14px 0 0;
-  padding: 12px 14px; font: 12px/1.55 var(--mono); color: var(--text-dim); white-space: pre-wrap;
+  padding: 12px 14px; font-size: 13px; line-height: 1.6; color: var(--text-dim); text-align: left;
   background: var(--film-strong); border: 1px solid var(--line); border-radius: var(--radius);
 }
+.ps-log p { margin: 0; }
+.ps-log p + p { margin-top: 5px; }
+.ps-log-link {
+  display: block; margin-top: 9px; font: 12px/1.5 var(--mono); color: var(--text-faint);
+  word-break: break-all; text-decoration: none;
+}
+.ps-log-link:hover { color: var(--text-dim); text-decoration: underline; }
 /* The fallback bar on the inbox, the only setup surface outside the walk. */
 .ps-bar {
   display: flex; align-items: center; gap: 14px; padding: 12px 18px;
@@ -6460,6 +6670,81 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 .ps-bar button:hover { background: var(--bg-hover); color: var(--text); }
 /* The same setup card over the inbox, when the bar is pressed. */
 .ps-over { position: fixed; inset: 0; z-index: 60; }
+/* THE CLOUD'S SETUP (components/CloudSetup.tsx): the setup card above, with
+   the one thing a step asks for inside its row. Claude's code is pasted into a
+   field shaped like the name card's; Codex's is shown large enough to type
+   from across the room. */
+.cs-accounts { padding: 6px; }
+/* Every row of the card, accounts and adding alike, on the same three
+   columns: the mark, the name, and everything else on the row's right edge,
+   in one group, so a word, a button and a chevron all end on one line. No
+   column is held for the remove button: it takes the quiet word's place while
+   the row is pointed at (2026-10-15: "too much white space on the right ...
+   these don't feel properly lined up"). */
+.cs-row {
+  display: grid; grid-template-columns: 24px 1fr auto; column-gap: 14px; align-items: center;
+  width: 100%; min-height: 48px; padding: 0 14px; box-sizing: border-box;
+  border: 0; border-radius: var(--radius); background: none; text-align: left;
+  font: inherit; color: var(--text); transition: background .6s ease;
+}
+.cs-row + .cs-row { box-shadow: inset 0 1px 0 var(--line); }
+/* Paying first: Settings' three plan cards, side by side, on the setup screen. */
+.cs-plans { width: 760px; max-width: calc(100vw - 96px); }
+.cs-plans .cloud-plans { margin-top: 8px; }
+.cs-pay-err { margin: 14px 0 0; font-size: 13px; color: var(--text); }
+.cs-row.fresh { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.cs-row-mark { display: flex; align-items: center; justify-content: center; color: var(--text); }
+.cs-row-name { font-size: 14.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-row-eng { font-size: 12.5px; color: var(--text-faint); }
+.cs-row-go { display: flex; justify-content: center; color: var(--text-faint); margin-inline-end: -3.5px; }
+/* The chevron and the × are drawn inside boxes with room round them; these
+   pull what is drawn onto the same right edge as the words beside them. */
+.cs-row-end { display: inline-flex; align-items: center; justify-content: flex-end; gap: 10px; justify-self: end; min-height: 26px; }
+.cs-row.broken .cs-row-name { color: var(--text-dim); }
+/* AN ACCOUNT BEING ADDED IN THE BACKGROUND, and why one was not (2026-10-15). */
+.cs-row-adding { display: inline-flex; align-items: center; gap: 7px; }
+.cs-row-why { display: block; font-size: 12.5px; color: var(--code-minus); white-space: normal; padding: 2px 0 8px; }
+.cs-row:has(.cs-row-why) { padding-top: 8px; }
+button.cs-row { cursor: pointer; }
+button.cs-row:hover { background: var(--wash-strong, var(--wash)); box-shadow: none; }
+button.cs-row:hover + .cs-row { box-shadow: none; }
+button.cs-row:hover .cs-row-go { color: var(--text); }
+.cs-add .cs-row-mark { color: var(--text-faint); }
+.cs-add .cs-row-name { color: var(--text-dim); }
+.cs-add:hover .cs-row-mark { color: var(--accent); }
+.cs-add:hover .cs-row-name { color: var(--text); }
+.cs-remove { display: none; place-items: center; width: 24px; height: 24px; padding: 0; margin-inline-end: -8px; border: 0; background: none; color: var(--text-faint); font-size: 16px; line-height: 1; cursor: pointer; border-radius: 5px; }
+.cs-row:hover .cs-remove, .cs-remove:focus-visible { display: inline-grid; }
+.cs-row:hover .cs-row-swap { display: none; }
+.cs-remove:hover { color: var(--text); background: var(--wash); }
+.cs-quiet { font: inherit; font-size: 12.5px; color: var(--text-dim); background: none; border: 1px solid var(--line-strong); border-radius: var(--tag-radius); padding: 4px 10px; cursor: pointer; }
+.cs-quiet:hover { color: var(--text); border-color: var(--text-faint); }
+.cs-again { border-color: var(--accent); color: var(--text); }
+.cs-signin-mark { display: flex; margin-bottom: 16px; }
+.cs-choose-head { margin-top: 6px; padding: 12px 12px 6px; box-shadow: inset 0 1px 0 var(--line-strong); font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.cs-choose-head + .cs-row { box-shadow: none; }
+.cs-paste-card { position: relative; padding: 8px; }
+.cs-paste-card input {
+  display: block; width: 100%; box-sizing: border-box; padding: 12px 120px 12px 14px;
+  font: 15px/1.4 var(--mono); color: var(--text); background: none; border: 0;
+}
+.cs-paste-card input:focus { outline: none; }
+.cs-paste-card .fr-submit { top: 50%; bottom: auto; right: 14px; transform: translateY(-50%); display: inline-flex; align-items: center; gap: 8px; }
+.cs-code { display: flex; align-items: center; gap: 16px; }
+.cs-code code {
+  padding: 14px 24px; font: 500 30px/1.2 var(--mono); letter-spacing: .14em; color: var(--text);
+  background: var(--skin-solid); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+}
+.fr-lede.cs-trouble { color: var(--text); }
+.cs-busy {
+  display: inline-block; width: 12px; height: 12px; margin-right: 10px; vertical-align: -1px;
+  border: 1.6px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%;
+  animation: cs-spin .8s linear infinite;
+}
+@keyframes cs-spin { to { transform: rotate(360deg); } }
+.ps-acts .cs-go { display: inline-flex; align-items: center; gap: 10px; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.ps-acts .cs-go:hover { background: color-mix(in srgb, var(--accent) 24%, transparent); }
+
 .fr-card.fr-name-card { border-radius: var(--radius); }
 .fr-name-card .fr-name { margin: 17px 18px; padding-right: 130px; font-size: 17px; }
 .fr-name-card .fr-submit { bottom: 50%; transform: translateY(50%); display: inline-flex; align-items: center; gap: 8px; }
@@ -6623,9 +6908,12 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 /* IN THE STRIP UNDER THE SIDEBAR SINCE 2026-10-06. It was 38 tall from 14 up,
    which reached into the sidebar, and once the sidebar's foot was tightened to
    end at Settings the word sat on top of Settings. The strip under the sidebar
-   is 22 tall and holds nothing else. */
+   is 22 tall and holds nothing else.
+   AND OFF THE WINDOW'S EDGE SINCE 2026-10-24, where at bottom 0 it sat with
+   its descenders 4px off the bottom. 10 is the walk's own FLOOR, what
+   everything else it draws is held off an edge by (./onboarding.ts). */
 .fr-out {
-  position: fixed; left: 16px; bottom: 0px; height: 22px; z-index: 302;
+  position: fixed; left: 16px; bottom: 10px; height: 22px; z-index: 302;
   display: inline-flex; align-items: center;
   border: 0; background: none; padding: 0 6px;
   font: inherit; font-size: 12px; color: var(--text);
@@ -7032,7 +7320,9 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   --line-strong: rgba(255, 255, 255, 0.19);
   --bg-raised: #373a41;
   --wash: rgba(255, 255, 255, 0.065);
-  --accent: #7aabff;
+  /* A link in an html file is the window's orange, not a blue of its own: the
+     file is in the same window as the markdown beside it (w-abed8ae491). */
+  --accent: #ee6018;
   --doc-page: var(--doc-page-held);
   --doc-wash: rgba(255, 255, 255, 0.07);
 }
@@ -7118,6 +7408,85 @@ a.set-ghost { text-decoration: none; display: inline-block; }
    page brings its own black, 0 on markdown) and it is a stated cost of a card
    with a header, not a bug to chase. */
 .doc-view { flex: 1; width: 100%; min-height: 0; border: 0; background: transparent; }
+/* `display: flex` is Electron's requirement for a `<webview>` to fill its
+   box; without it the tag lays out inline and the page draws a few pixels
+   tall. The ground is white because a page off the web expects a white
+   canvas, so a site that paints no background of its own would otherwise
+   show the window's charcoal through the gap. */
+.doc-website-view { display: flex; background: #fff; }
+
+/* A PAGE BEING BROWSED: THE BAR OVER IT (BrowserChrome.tsx).
+
+   One bar for a site on the web and for a local app, because they are the
+   same thing to read. The page is flush: a browsed page gives up the card's
+   air and its corner and runs to the pane's own edge, which is both the
+   space back and the fix for a white page reading as a sticker coming off a
+   rounded dark card.
+
+   Picked out of three built in the real app and photographed; the other two
+   were a tab carrying the page's name and a 26px line with no stepping
+   controls. */
+.doc-pane.doc-browsing .doc-card {
+  margin: 0; border: 0; border-radius: 0;
+  background: var(--doc-page);
+}
+.doc-pane.doc-browsing .preview-frame { background: #fff; }
+
+.web-bar {
+  display: flex; align-items: center; gap: 8px;
+  flex: 0 0 auto; min-width: 0;
+  padding: 0 8px 0 10px;
+  height: 38px;
+  background: var(--doc-page);
+  border-bottom: 1px solid var(--line);
+}
+.web-bar-nav { display: flex; align-items: center; gap: 1px; flex: 0 0 auto; }
+.web-bar-marks { display: flex; align-items: center; gap: 1px; flex: 0 0 auto; margin-left: auto; }
+.web-bar-step {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0;
+  border: 0; border-radius: var(--radius); background: none;
+  color: var(--text-faint); cursor: pointer;
+}
+.web-bar-step:hover:not(:disabled) { background: var(--doc-wash); color: var(--text); }
+.web-bar-step:disabled { opacity: 0.32; cursor: default; }
+.web-bar-step svg { display: block; }
+
+/* The host in the reading ink and the rest dimmed, so the eye lands on where
+   you are rather than on the query string. */
+.web-bar-address {
+  display: flex; align-items: center; gap: 6px;
+  flex: 1 1 auto; min-width: 0;
+  height: 26px; padding: 0 10px;
+  border-radius: var(--radius);
+  background: var(--wash);
+  font-size: 12.5px; white-space: nowrap;
+}
+.web-bar-address { position: relative; cursor: text; }
+.web-bar-mark { display: inline-flex; flex: 0 0 auto; color: var(--text-faint); }
+.web-bar-host { color: var(--text-dim); flex: 0 0 auto; }
+.web-bar-rest { color: var(--text-faint); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The field holds the whole address and is invisible until it has the
+   keyboard; the drawn host and rest lie over it until then. */
+.web-bar-input {
+  flex: 1 1 auto; min-width: 0; height: 100%;
+  padding: 0; border: 0; outline: none; background: none;
+  font: inherit; color: transparent; caret-color: transparent;
+  user-select: text; -webkit-user-select: text;
+}
+.web-bar-shown {
+  position: absolute; inset: 0 10px 0 29px;
+  display: flex; align-items: center; min-width: 0;
+  pointer-events: none;
+}
+.web-bar-address[data-editing="yes"] .web-bar-input { color: var(--text); caret-color: auto; }
+.web-bar-address[data-editing="yes"] .web-bar-shown { visibility: hidden; }
+.web-bar-address[data-editing="yes"] { box-shadow: inset 0 0 0 1px var(--line-strong); }
+/* Loading lights the field's edge: every browser's answer, and it costs no
+   room. */
+.web-bar[data-loading="yes"] .web-bar-address { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.web-bar-refused { flex: 0 0 auto; color: var(--text-faint); font-size: 11.5px; }
+
 .doc-missing { flex: 1; padding: 40px; color: var(--text-faint); font-size: 13.5px; }
 
 /* A PICTURE OPEN IN THE PANE. It keeps the card picked on 08-21, the way a
@@ -7420,8 +7789,12 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 .fr-landed {
   position: fixed; inset: 0; z-index: 302; pointer-events: none;
 }
+/* OVER THE BURST, NOT UNDER IT. `.fr-burst` carries a z-index and is drawn
+   first; these words carried none, so forty falling pieces were painted across
+   a 34px headline. */
 .fr-landed-say {
   position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%);
+  z-index: 303;
   width: min(560px, calc(100vw - 96px));
   text-align: center;
   animation: fr-landed-say 14s ease forwards;
@@ -7857,6 +8230,40 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .modal.ia-card.ia-one { width: 720px; }
 .ia-one .ia-line { margin: 0 0 14px; }
 .ia-lines { max-height: min(56vh, 520px); border-top: 1px solid var(--line); }
+/* FINDING AN OLDER ONE BY NAME (w-6418318cd5). A field the width of the card
+   and a line under it, above the list, because it changes what the list is.
+   It is not a boxed search bar with a magnifier in it: the card has one filled
+   thing on it and that is the button. */
+/* THE GAP ABOVE IT IS ITS OWN (w-6418318cd5, 2026-10-16): "spacing here is
+   wack". It had a 2px top margin and leaned on the subtitle above it for the
+   rest, which works until the subtitle is not there. Measured in the built
+   renderer, the same card was 36.9px above the field at rest and 2px mid
+   search, so the field sat against a 21px headline. */
+.ia-find { margin: 0 0 18px; }
+/* Only when the headline is the thing directly above: searching, where the
+   subtitle is not drawn, and the Mac with nothing on it. With `.ia-top`'s own
+   2px that is 16px, which is the gap the subtitle used to stand in. */
+.ia-top + .ia-find { margin-top: 14px; }
+.ia-find-box {
+  width: 100%; font: inherit; font-size: 14.5px; line-height: 1.35;
+  padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--wash); color: var(--text);
+}
+.ia-find-box::placeholder { color: var(--text-faint); }
+.ia-find-box:focus { outline: none; border-color: var(--accent); background: none; }
+/* One line under the field and never two: what it is for, or what it found,
+   with the way back at the far end of it. */
+/* NO INSET: it was the only thing on the card off the spine, starting at 33px
+   from the edge where the headline, the field and the list all start at 31,
+   and ending 2px short on the right. */
+.ia-find-under { display: flex; align-items: baseline; gap: 12px; margin: 10px 0 0; }
+.ia-find-hint { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-faint); }
+.ia-find-clear {
+  flex: none; font: inherit; font-size: 12.5px; background: none; border: none; padding: 0;
+  cursor: pointer; color: var(--text-faint); text-decoration: underline; text-underline-offset: 3px;
+}
+.ia-find-clear:hover { color: var(--text-dim); }
+.ia-find-reach { color: var(--text-faint); }
 .ia-agent.ia-line-row {
   display: flex; align-items: center; gap: 12px; width: 100%;
   padding: 11px 2px; border-bottom: 1px solid var(--line); --tick-line: 14px;
@@ -7867,6 +8274,14 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;
 }
 .ia-line-meta { flex: none; font-size: 12px; color: var(--text-faint); white-space: nowrap; }
+/* Setup's last screen: a waiting chat carries its question on a second line. */
+.ia-line-row.has-ask { align-items: flex-start; }
+.ia-ask {
+  display: block; margin-top: 3px; font-size: 13px; line-height: 1.45; color: var(--text-faint);
+  white-space: normal; overflow-wrap: anywhere;
+}
+.ia-done-note { margin: 14px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--text-faint); }
+.ia-keep { margin-top: 14px; border-top: 1px solid var(--line); }
 .ia-foot.ia-foot-one { justify-content: flex-start; gap: 10px; padding-top: 18px; }
 /* As drawn: the press is the one filled thing on the card, on the left, and a
    kept line wears the same fill in its tick. */
@@ -8737,3 +9152,95 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 /* THE PHONE WHOSE KEY WAS RESET (renderer/src/browser-bridge.ts). */
 #phone-locked-out { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 32px; background: var(--surface); color: var(--text); font: 16px/1.45 system-ui, sans-serif; text-align: center; }
 #phone-locked-out p { margin-top: 8px; opacity: .8; }
+/* Her Mac turned a reply from the phone down (renderer/src/cloud-bridge.ts). */
+.msg-sending.msg-refused { color: var(--code-minus); }
+
+/* A picture opened from a thread (components/PictureView.tsx), full screen over the app.
+   It is a dark room in every theme, like the reader: the picture is what is lit, so the
+   ink is --read-paper rather than --text, which turns nearly black on the light theme.
+   no-drag: the corner buttons lie over the window's drag strips, which swallow a press
+   whatever is painted on them. It wins because the view is the last thing on the page. */
+.picture-view { position: fixed; inset: 0; z-index: 9400; outline: none; overflow: hidden;
+  background: var(--read-ground); color: var(--read-paper); animation: pv-in .22s ease-out;
+  -webkit-app-region: no-drag; }
+@keyframes pv-in { from { opacity: 0; } }
+.pv-stage { position: absolute; inset: 86px 104px 116px; z-index: 1; display: flex; align-items: center; justify-content: center; }
+.pv-img { display: block; flex: none; cursor: zoom-in; user-select: none; border-radius: var(--radius); will-change: transform;
+  transition: transform .2s cubic-bezier(.2, .8, .2, 1); animation: pv-pic-in .32s cubic-bezier(.2, .8, .2, 1); }
+@keyframes pv-pic-in { from { opacity: 0; scale: .97; } }
+.pv-img.pv-zoomed { cursor: grab; transition: none; }
+.pv-img.pv-zoomed:active { cursor: grabbing; }
+/* The last picture held while the next one is read; dimmed only if that takes a moment. */
+.pv-img.pv-waiting { opacity: .45; transition: transform .2s cubic-bezier(.2, .8, .2, 1), opacity .2s ease .25s; }
+.pv-missing { margin: 0; font-size: 13px; color: color-mix(in srgb, var(--read-paper) 62%, transparent); }
+
+/* The controls fade once the pointer rests, leaving only the picture. */
+.pv-chrome { z-index: 2; transition: opacity .35s ease, background .15s, color .15s; }
+.pv-idle { cursor: none; }
+.pv-idle .pv-chrome { opacity: 0; pointer-events: none; }
+
+.pv-top { position: absolute; top: 16px; left: 16px; right: 16px; height: 46px; display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; }
+.pv-title { display: flex; align-items: center; gap: 12px; min-width: 0; height: 46px; padding: 0 18px; }
+.pv-name { font-size: 13px; letter-spacing: .01em; color: color-mix(in srgb, var(--read-paper) 86%, transparent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pv-count { font: 500 11px/1 var(--mono); letter-spacing: .12em; white-space: nowrap; color: color-mix(in srgb, var(--read-paper) 42%, transparent); }
+.pv-tools { display: flex; align-items: center; gap: 2px; flex: none; }
+.pv-icon { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; background: none; cursor: pointer;
+  border-radius: var(--radius); color: color-mix(in srgb, var(--read-paper) 62%, transparent); transition: color .15s, background .15s; }
+.pv-icon svg { width: 20px; height: 20px; }
+.pv-icon:hover { color: var(--read-paper); background: color-mix(in srgb, var(--read-paper) 9%, transparent); }
+.pv-rule { width: 1px; height: 18px; margin: 0 6px; background: color-mix(in srgb, var(--read-paper) 14%, transparent); }
+
+.pv-strip { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 8px;
+  max-width: calc(100% - 64px); overflow-x: auto; }
+.pv-thumb { flex: none; width: 72px; height: 45px; padding: 0; border: 0; border-radius: var(--radius); overflow: hidden; cursor: pointer;
+  background: color-mix(in srgb, var(--read-paper) 6%, transparent); opacity: .38;
+  outline: 1px solid transparent; outline-offset: 3px; transition: opacity .2s, outline-color .2s; }
+.pv-thumb:hover { opacity: .75; }
+.pv-thumb.is-on { opacity: 1; outline-color: color-mix(in srgb, var(--read-paper) 85%, transparent); }
+.pv-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* The picture's own colours, blurred, light the room; the controls are frosted glass over it. */
+.pv-glow { position: absolute; left: -12%; top: -12%; width: 124%; height: 124%; object-fit: cover; pointer-events: none;
+  filter: blur(80px) saturate(1.8) brightness(.95); opacity: .7; animation: pv-in .6s ease-out; }
+.picture-view::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(closest-side, transparent 55%, color-mix(in srgb, var(--read-ground) 70%, transparent)); }
+.pv-title, .pv-tools, .pv-strip {
+  background: color-mix(in srgb, var(--read-ground) 34%, transparent); backdrop-filter: blur(28px) saturate(1.6);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--read-paper) 8%, transparent); border-radius: var(--radius); }
+.pv-tools { padding: 4px; }
+.pv-img { box-shadow: 0 0 0 1px color-mix(in srgb, var(--read-paper) 8%, transparent), var(--shadow-lg); }
+
+/* The step arrows: a thin chevron, and the edge of the window is the button. It stops short of
+   the bar above and the strip below, or it lies over the close button and the thumbnails. */
+.pv-step { position: absolute; top: 78px; bottom: 96px; width: 104px; display: grid; place-items: center; padding: 0; border: 0; cursor: pointer;
+  background: none; color: color-mix(in srgb, var(--read-paper) 40%, transparent); }
+.pv-step svg { width: 30px; height: 30px; }
+.pv-step:hover:not(:disabled) { color: var(--read-paper); }
+.pv-step:disabled { color: color-mix(in srgb, var(--read-paper) 14%, transparent); cursor: default; }
+.pv-prev { left: 0; }
+.pv-next { right: 0; }
+.pv-prev:hover:not(:disabled) { background: linear-gradient(to right, color-mix(in srgb, var(--read-ground) 45%, transparent), transparent); }
+.pv-next:hover:not(:disabled) { background: linear-gradient(to left, color-mix(in srgb, var(--read-ground) 45%, transparent), transparent); }
+
+/* SETTINGS › CLOUD: the plans as cards (the founder's design of 2026-10-13,
+   cloud-slots/20). Your plan is outlined in the accent; the others carry the
+   button that changes to them. */
+.set-group.cloud-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 36px; }
+.cloud-plan { display: flex; flex-direction: column; align-items: flex-start; padding: 18px 18px 18px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: color-mix(in srgb, var(--text) 3%, transparent); min-height: 196px; }
+.cloud-plan.mine { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.cloud-plan.waiting { border-color: color-mix(in srgb, var(--accent) 60%, var(--line-strong)); }
+.cloud-plan-head { display: flex; justify-content: space-between; width: 100%; font: 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint); }
+.cloud-plan-mine { color: var(--accent); }
+.cloud-plan-price { margin-top: 12px; font-size: 28px; letter-spacing: -0.02em; color: var(--text); }
+.cloud-plan-price span { font-size: 13px; letter-spacing: 0; color: var(--text-faint); }
+.cloud-plan-slots { margin-top: 18px; font-size: 17px; color: var(--text); }
+.cloud-plan-where { margin-top: 2px; font-size: 13px; color: var(--text-faint); }
+.cloud-plan-hours { margin: 2px 0 18px; font-size: 13px; color: var(--text-faint); }
+.cloud-plan-go { margin-top: auto; }
+.cloud-plan-use { margin-top: auto; width: 100%; font-size: 12.5px; color: var(--text-dim); }
+.cloud-plan-bar { display: block; height: 2px; margin-top: 8px; background: var(--line); }
+.cloud-plan-bar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
+.cloud-counts { margin: 0; padding: 4px 0 0 18px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.55; color: var(--text-dim); user-select: text; -webkit-user-select: text; }
+.cloud-plans-say { margin: 14px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-faint); user-select: text; -webkit-user-select: text; }

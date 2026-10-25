@@ -297,8 +297,8 @@ it('IPC import yes with odd supervisor still finds a default-home rollout', () =
 it('the import card, the import "yes" and the Codex watch all take their folders from appSessionFolders', () => {
   // The card's read goes through readImportableThreads, which builds its own
   // folders with appSessionFolders; the import "yes" calls it directly.
-  expect(ipcText).toMatch(/const readAllThreads = \(\) => readImportableThreads\(\{ config, supervisor \}\)/);
+  expect(ipcText).toMatch(/const readAllThreads = \(\) => readImportableThreads\(\{ config, supervisor, readCodex: readCodexThreadsOffThread \}\)/);
   expect(ipcText.match(/appSessionFolders\(\{ config, supervisor \}\)/g)).toHaveLength(1);
   expect(fs.readFileSync(new URL('../main/importable-threads.mjs', import.meta.url), 'utf8')).toMatch(/appSessionFolders\(\{ config, supervisor, env, home[,\s}]/);
-  expect(mainText).toMatch(/readThreads: \(opts\) => readCodexThreads\(\{ \.\.\.opts, codexDirs: appSessionFolders\(\{ config, supervisor \}\)\.codexDirs \}\)/);
+  expect(mainText).toMatch(/readThreads: \(opts\) => readCodexThreadsOffThread\(\{ \.\.\.opts, codexDirs: appSessionFolders\(\{ config, supervisor \}\)\.codexDirs \}\)/);
 });

@@ -75,10 +75,11 @@ describe('the gap the list opens', () => {
   });
 
   it('opens on the two beats that ring one row out of a stack, and no others', () => {
-    // These are exactly the beats `UNDER` was invented for. If a third one is
-    // ever added to UNDER, this fails and whoever adds it has to say which
-    // behaviour they meant.
-    expect(Object.keys(UNDER).sort()).toEqual(['clear', 'snooze']);
+    // UNDER now carries four beats and the gap only ever opens on two of them.
+    // The two added on 2026-10-24 ring the TAB STRIP, not a row: the card goes
+    // under the list for them, and moving the rows for a card that is below
+    // all of them would open a gap nothing stands in.
+    expect(Object.keys(UNDER).sort()).toEqual(['clear', 'snooze', 'tabs', 'where']);
     expect(src).toContain("makesRoom={(run.step === 'clear' || (run.step === 'snooze' && !picking))");
   });
 
@@ -181,10 +182,12 @@ describe('the ⌘K beat', () => {
     // are no neighbouring buttons left to stand off.
     const src = wiring('renderer/src/components/Onboarding.tsx');
     // The tab tour stands beside its ring except in the team layout, where a
-    // card beside one tab sat on the tabs after it (2026-10-01). And the look
-    // around's tabs card stands beside the same strip (2026-10-06): under it,
-    // it printed over the first three thread titles.
-    expect(src).toContain("beside={(run.step === 'where' && !teamStrip) || run.step === 'tabs' || (run.step === 'command' && !!palette) || run.step === 'answer'}");
+    // card beside one tab sat on the tabs after it (2026-10-01).
+    // AND THE TWO BEATS THAT RING THE STRIP ITSELF STAND NOWHERE BESIDE IT
+    // (2026-10-24). Beside a 54px strip a card 147 to 173 tall is centred on
+    // it, so it covered the strip it names, the column headers under it and
+    // the first row of the list. Both take `UNDER` instead.
+    expect(src).toContain("beside={(run.step === 'where' && !teamStrip) || (run.step === 'command' && !!palette) || run.step === 'answer'}");
     expect(src).not.toContain('.focus-actions button');
     expect(src).toContain('const all = [...document.querySelectorAll(sel)];');
   });
@@ -243,7 +246,10 @@ describe('the tab strip', () => {
     // And the team strip's own tab before both, found by its place (`teamTab`).
     expect(src).toContain('[...(teamTab(goingTo) ? [teamTab(goingTo) as string] : []), `.workspace-navigation [data-tab="${goingTo}"]`, `.tabs .tab[data-tab="${goingTo}"]`, ...ANCHOR.where ?? []]');
     expect(src).toContain("const goingTo = run.step === 'where' ? nextTab(tabs, view) : null;");
-    // And the card stands off the sidebar's right edge on that beat.
-    expect(src).toContain("besideOf={run.step === 'tabs' ? '.th-bar .tm-tabs, .workspace-navigation, .tabs' : run.step === 'where' ? '.workspace-navigation, .tabs' : undefined}");
+    // And the card stands off the sidebar's right edge on the old layout's
+    // tour, which rings sidebar rows. The tab-strip beats are under the list.
+    expect(src).toContain("besideOf={run.step === 'where' ? '.workspace-navigation, .tabs' : undefined}");
+    expect(UNDER.tabs).toBe('.list-pane .row:last-of-type');
+    expect(UNDER.where).toBe('.list-pane .row:last-of-type');
   });
 });

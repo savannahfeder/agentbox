@@ -26,9 +26,11 @@
 //      leftovers and no record at all is recorded as ended when this app, whose
 //      store it is in, has no session for it; the clock starts then, never
 //      back-dated.
-//   4. ITS PROGRAMS STOP `idleMs` (2 h) AFTER THE RUN ENDED, or `tightIdleMs`
-//      (10 min) while memory is tight or critical, and never sooner than that
-//      long after the switch went on.
+//   4. ITS PROGRAMS STOP `closeGraceMs` (2 min) AFTER THE TASK IS CLOSED, so a
+//      Z that reopens it keeps them. While memory is tight or critical, also
+//      `tightIdleMs` (10 min) after the run ended, one task per look, the one
+//      whose run ended longest ago first. Never sooner than that long after
+//      the switch went on.
 //   5. NOTHING PROTECTED IS EVER STOPPED: AGENTBOX_KEEP=1 in its environment,
 //      an executable inside an installed app or the system (Docker Desktop and
 //      its VM, a browser an agent opened), an executable that cannot be read,
@@ -49,10 +51,10 @@
 // (main/supervisor.mjs) and everything it starts inherits it; all 40 leftovers
 // that morning carried it, Docker's backend included. The id is read only from
 // the ENVIRONMENT, which is the part of `ps -E` after the arguments `ps` prints
-// without it, and only when both looks agree it is the same process; a tag in a
-// command's own words counts for nothing. A program that renames itself
-// (next-server) hides its environment, so a process under a tagged one belongs
-// to the same task. Codex threads share one app-server and their commands carry
+// without it, and only when both looks agree it is the same process;
+// /proc/<pid>/environ on Linux. A tag in a command's own words counts for
+// nothing. A program that renames itself (next-server) hides its environment
+// from `ps`, so a process under a tagged one belongs to the same task. Codex threads share one app-server and their commands carry
 // no task id yet, so a Codex task's leftovers are not found: coverage is
 // incomplete and the switch says so.
 
@@ -151,8 +153,69 @@ export function applyExecutables(procs, lsofText) {
   return procs;
 }
 
-/** Every process on the Mac, tagged with its task where it can be. About 100 ms. */
-export async function listProcesses() {
+/** /proc counts in USER_HZ, which the kernel fixes at 100 whatever its own tick is. */
+const USER_HZ = 100;
+
+/** When this computer booted, which /proc/<pid>/stat counts a start time from. */
+function bootSeconds(root) {
+  const stat = fs.readFileSync(path.join(root, 'stat'), 'utf8').match(/^btime (\d+)$/m);
+  if (stat) return +stat[1];
+  const up = Number(String(fs.readFileSync(path.join(root, 'uptime'), 'utf8')).split(/\s+/)[0]);
+  return Math.floor(Date.now() / 1000 - up);
+}
+
+/**
+ * The same record the Mac's three `ps` listings give, read from /proc, because
+ * `-E` is BSD's and Linux's procps refuses it (w-bd1806285e).
+ *
+ * `exe` is the real executable even for a program that renamed itself, so
+ * nothing here needs lsof. A process that ends mid-read is left out; one
+ * belonging to somebody else keeps an empty executable and no environment,
+ * which is what leaves it protected.
+ */
+export function readLinuxProcesses({ root = '/proc', hz = USER_HZ, btime = null } = {}) {
+  const boot = btime ?? bootSeconds(root);
+  const out = [];
+  for (const name of fs.readdirSync(root)) {
+    if (!/^\d+$/.test(name)) continue;
+    const dir = path.join(root, name);
+    let stat;
+    try { stat = fs.readFileSync(path.join(dir, 'stat'), 'utf8'); } catch { continue; }
+    const close = stat.lastIndexOf(')');
+    if (close < 0) continue;
+    const comm = stat.slice(stat.indexOf('(') + 1, close);
+    // The fields after the command, which is the only one that can hold spaces
+    // and brackets: state, the parent, and on to the start time.
+    const rest = stat.slice(close + 2).split(' ');
+    const read = (f) => { try { return fs.readFileSync(path.join(dir, f), 'utf8'); } catch { return null; } };
+    const words = (text) => String(text ?? '').split('\0').filter(Boolean);
+    const env = new Map(words(read('environ')).map((s) => {
+      const eq = s.indexOf('=');
+      return eq < 0 ? [s, ''] : [s.slice(0, eq), s.slice(eq + 1)];
+    }));
+    const argv = words(read('cmdline')).join(' ');
+    const rss = (read('status') ?? '').match(/^VmRSS:\s+(\d+) kB$/m);
+    let exe = '';
+    try { exe = fs.readlinkSync(path.join(dir, 'exe')).replace(/ \(deleted\)$/, ''); } catch {}
+    const item = env.get('ZERO_ITEM');
+    out.push({
+      pid: +name,
+      ppid: +rest[1],
+      mb: rss ? +rss[1] / 1024 : 0,
+      start: boot + Math.floor(+rest[19] / hz),
+      exe,
+      cmd: (argv || `[${comm}]`).slice(0, 300),
+      item: /^w-[0-9a-f]+$/.test(item ?? '') ? item : null,
+      product: env.get('ZERO_PRODUCT')?.split(/\s/)[0] || null,
+      keep: env.get('AGENTBOX_KEEP') === '1',
+    });
+  }
+  return out;
+}
+
+/** Every process, tagged with its task where it can be: `ps` on a Mac (about 100 ms), /proc on Linux. */
+export async function listProcesses(platform = process.platform) {
+  if (platform !== 'darwin') return readLinuxProcesses();
   const [base, argv, full] = await Promise.all([
     ps(['-axo', 'pid=,ppid=,rss=,lstart=,comm=']),
     ps(['-ww', '-axo', 'pid=,lstart=,command=']),
@@ -170,7 +233,7 @@ export async function listProcesses() {
   return procs;
 }
 
-async function readMacPressureWord() {
+export async function readMacPressureWord() {
   const out = await new Promise((resolve) => {
     execFile('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level', 'kern.memorystatus_level'], { timeout: 5_000 },
       (err, stdout) => resolve(err ? '' : stdout));
@@ -215,7 +278,9 @@ export class LeftoverCleaner {
     enabledSince = Date.now(),
     live = () => false,
     owns = () => false,
-    idleMs = 2 * 60 * 60_000,
+    // When the task was closed, or null while it is open.
+    closedAt = () => null,
+    closeGraceMs = 2 * 60_000,
     tightIdleMs = 10 * 60_000,
     confirmMs = 60_000,
     settleMs = 30_000,
@@ -225,8 +290,9 @@ export class LeftoverCleaner {
     enabled = true,
     log = () => {},
   } = {}) {
-    Object.assign(this, { list, kill, clock, readPressure, file, enabledSince, live, owns, idleMs, tightIdleMs, confirmMs, settleMs, home, enabled, log });
+    Object.assign(this, { list, kill, clock, readPressure, file, enabledSince, live, owns, closedAt, closeGraceMs, tightIdleMs, confirmMs, settleMs, home, enabled, log });
     this.firstSeen = new Map();
+    this.withPrograms = new Set();
     this.lastStatus = { leftovers: [], survivors: [], stopped: null, pressure: 'normal' };
     const saved = this._load();
     this.runs = saved.runs;
@@ -274,6 +340,9 @@ export class LeftoverCleaner {
 
   status() { return this.lastStatus; }
 
+  /** Whether the last look found programs of this task's that could be stopped. */
+  hasPrograms(item) { return this.withPrograms.has(item); }
+
   /** Stop signalling from this moment, even in a look already under way. */
   disable() { this.enabled = false; }
 
@@ -308,6 +377,7 @@ export class LeftoverCleaner {
       return this.lastStatus;
     }
     const view = this._view(procs, now);
+    this.withPrograms = new Set([...view.tasks.values()].filter((t) => t.procs.length).map((t) => t.item));
     this._reconcileRuns(view, now);
     this._trackStopping(view, now);
     const due = this._due(view, now, pressure);
@@ -407,29 +477,51 @@ export class LeftoverCleaner {
     }
   }
 
-  _stopsAt(item, pressure) {
+  /** When this task's programs stop, or null while nothing says they should. */
+  _stopsAt(item, product, pressure) {
     const run = this.runs[item];
     if (!run || run.state !== 'ended') return null;
     const from = Math.max(run.endedAt, this.enabledSince);
-    return from + (pressure === 'normal' ? this.idleMs : this.tightIdleMs);
+    let closed = null;
+    try { closed = this.closedAt(item, product); } catch { closed = null; }
+    const times = [];
+    if (Number.isFinite(closed)) times.push(Math.max(from, closed) + this.closeGraceMs);
+    if (pressure !== 'normal') times.push(from + this.tightIdleMs);
+    return times.length ? Math.min(...times) : null;
   }
 
-  /** Programs whose time has come and that have been seen long enough. */
+  /**
+   * Programs whose time has come and that have been seen long enough: every
+   * closed task's, and while memory is short, one more task's, the one whose
+   * run ended longest ago.
+   */
   _due(view, now, pressure) {
     const due = [];
     if (!this.enabled) return due;
+    let short = null;
     for (const t of view.tasks.values()) {
       if (this._alive(t)) continue;
-      const at = this._stopsAt(t.item, pressure);
+      const closed = this._stopsAt(t.item, t.product, 'normal');
+      if (closed !== null && now >= closed) { due.push(...this._ready(t, now)); continue; }
+      const at = pressure === 'normal' ? null : this._stopsAt(t.item, t.product, pressure);
       if (at === null || now < at) continue;
-      for (const p of t.procs) {
-        const id = idOf(p);
-        if (this.stopping[id]) continue;
-        if (now - (this.firstSeen.get(id) ?? now) < this.confirmMs) continue;
-        due.push({ item: t.item, id, pid: p.pid });
-      }
+      const ready = this._ready(t, now);
+      const ended = this.runs[t.item].endedAt;
+      if (ready.length && (!short || ended < short.ended)) short = { ended, ready };
     }
+    if (short) due.push(...short.ready);
     return due;
+  }
+
+  _ready(t, now) {
+    const out = [];
+    for (const p of t.procs) {
+      const id = idOf(p);
+      if (this.stopping[id]) continue;
+      if (now - (this.firstSeen.get(id) ?? now) < this.confirmMs) continue;
+      out.push({ item: t.item, id, pid: p.pid });
+    }
+    return out;
   }
 
   /** One fresh look, every rule again, then SIGTERM to what still passes. */
@@ -448,8 +540,8 @@ export class LeftoverCleaner {
       const t = view.tasks.get(d.item);
       if (!t || !t.procs.includes(p)) continue; // protected now, or no longer this task's
       if (this._alive(t)) continue;
-      const at = this._stopsAt(d.item, pressure);
-      if (at === null || now < at) continue; // a run started meanwhile
+      const at = this._stopsAt(d.item, t.product, pressure);
+      if (at === null || now < at) continue; // a run started, or the task reopened, meanwhile
       // Switched off while this look was under way: nothing more is signalled.
       if (!this.enabled) break;
       try { this.kill(p.pid, 'SIGTERM'); } catch { continue; }
@@ -477,7 +569,7 @@ export class LeftoverCleaner {
         kept: t.guarded.length,
         mb: all.reduce((n, p) => n + (p.mb ?? 0), 0),
         oldest: Math.min(...all.map((p) => p.start * 1000)),
-        stopsAt: t.procs.length ? this._stopsAt(t.item, pressure) : null,
+        stopsAt: t.procs.length ? this._stopsAt(t.item, t.product, pressure) : null,
       });
     }
     return out.sort((a, b) => a.oldest - b.oldest);

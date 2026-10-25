@@ -48,7 +48,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { answer, listPending, spoolDir, REQUEST_TTL_MS } from '../main/approvals.mjs';
-import { APPROVAL_TIMEOUT_MS } from '../main/codex-app-server.mjs';
 import { NAME } from '../shared/product-name.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -155,10 +154,9 @@ describe('a request nobody is waiting on any more', () => {
     expect(fs.existsSync(path.join(dir, 'forged.request.json'))).toBe(false);
   });
 
-  it('is not reaped while a worker could still be waiting on it', () => {
+  it('is not reaped up to the moment the window closes', () => {
     // The boundary that matters most, because getting it wrong takes a real
-    // card off her screen while a worker is parked on it. Both engines wait
-    // fifteen minutes, so nothing may go before that.
+    // card off her screen while a worker is parked on it.
     const { root, dir } = spool();
     const t0 = 1_700_000_000_000;
     request(dir, 'live', t0);
@@ -168,14 +166,20 @@ describe('a request nobody is waiting on any more', () => {
     expect(fs.existsSync(path.join(dir, 'live.request.json'))).toBe(true);
   });
 
-  it('waits out the whole of both engines\' deadlines before it does', () => {
-    // The one number this file leans on, checked rather than trusted: the TTL
-    // is a second copy of "fifteen minutes" and it must never be the shorter
-    // one. main/approval-prompt-server.mjs holds the Claude side's copy.
-    const server = fs.readFileSync(path.join(here, '..', 'main', 'approval-prompt-server.mjs'), 'utf8');
-    expect(REQUEST_TTL_MS).toBeGreaterThan(APPROVAL_TIMEOUT_MS);
-    expect(server).toMatch(/TIMEOUT_MS = 15 \* 60_000/);
-    expect(REQUEST_TTL_MS).toBeGreaterThan(15 * 60_000);
+  // AND THE WINDOW IS NOT A DEADLINE ON HER (w-4b00022acb). It used to be read
+  // as one: both engines gave up at fifteen minutes and this was the minute
+  // after, so a card never outlived it. Neither gives up now, so the rule is
+  // turned around -- whoever is waiting keeps its own request in the spool, and
+  // this reaps only what nobody is holding up. That half is driven in
+  // tests/a-permission-card-nobody-has-answered-waits-for-you; this is the
+  // clock that must not come back.
+  it('is not a deadline either engine shadows', () => {
+    const codex = fs.readFileSync(path.join(here, '..', 'main', 'codex-approvals.mjs'), 'utf8');
+    const claude = fs.readFileSync(path.join(here, '..', 'main', 'approval-prompt-core.mjs'), 'utf8');
+
+    expect(codex).not.toMatch(/setTimeout\(\(\) => entry\.decide/);
+    expect(claude).not.toMatch(/TIMEOUT_MS = 15 \* 60_000/);
+    expect(claude).toMatch(/while \(!closed\)/);
   });
 
   it('takes a stray answer file with it, and leaves the live cards alone', () => {

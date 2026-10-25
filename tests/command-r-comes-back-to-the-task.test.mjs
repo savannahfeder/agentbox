@@ -9,9 +9,9 @@
 // itself, and the tests read it the way a reload does, including the ways a
 // note written by another build can be wrong. The second describe reads App.tsx
 // itself, for the three wirings that make the note mean anything and that a
-// later edit could quietly undo: that the restore is gated on a real ⌘R rather
-// than on any load, that the boot screen waits for it instead of flashing the
-// inbox, and that the write is held until the read has happened.
+// later edit could quietly undo: that the restore is gated on a page coming
+// back rather than on any load, that the boot screen waits for it instead of
+// flashing the inbox, and that the write is held until the read has happened.
 
 import { describe, it, expect } from 'vitest';
 import { NAME } from '../shared/product-name.mjs';
@@ -129,19 +129,22 @@ describe('the boot screen only waits when there is somewhere to go', () => {
 
 describe('the app is wired to it', () => {
   it('restores on a reload and never on a fresh launch', () => {
-    // `bootInfo.reloaded` is true only after the ⌘R it was added for. Restoring
-    // on every load would reopen a task from days ago in place of the inbox the
-    // app is designed to open on.
+    // `bootInfo.reloaded` is true only after the ⌘R it was added for, and the
+    // heartbeat beside it covers the restart and the crash that flag cannot see
+    // (tests/a-restart-puts-you-back-where-you-were). Restoring on EVERY load
+    // would reopen a task from days ago in place of the inbox the app is
+    // designed to open on, which is what `comingBack` still refuses.
     expect(app).toMatch(/setReloaded\(!!info\?\.reloaded\)/);
-    expect(app).toMatch(/reloaded !== true/);
+    expect(app).toMatch(/const comingBack = reloaded === true \|\| cameBack\.current;/);
+    expect(app).toMatch(/if \(restored \|\| reloaded === null \|\| !comingBack \|\| !snap\) return;/);
   });
 
   it('holds the boot screen until she is back, so the inbox never flashes', () => {
-    expect(app).toMatch(/if \(restoring\) return <div className="boot">\{NAME\}<\/div>;\n\s*if \(!snap\) return <div className="boot">/);
+    expect(app).toMatch(/if \(restoring\) return <Booting \/>;\n\s*if \(!snap\) return <Booting \/>;/);
   });
 
   it('does not overwrite the note with the blank page that is about to read it', () => {
-    expect(app).toMatch(/if \(reloaded === null \|\| \(reloaded && !restored\)\) return;/);
+    expect(app).toMatch(/if \(reloaded === null \|\| \(comingBack && !restored\)\) return;/);
   });
 
   it('is told about the chord by the main process, and told only once', () => {

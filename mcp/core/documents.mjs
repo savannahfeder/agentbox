@@ -12,7 +12,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { readIndex, readCreationContent, saveCreation, setCreationStatus, CREATION_STATUSES } from '../../main/store/project.mjs';
 import { runForProject } from '../../main/store/queues.mjs';
-import { assertInside, deniesGitOrEnvPath } from '../../main/store/paths.mjs';
+import { assertInside, deniesGitOrEnvPath, deniesMachineryPath } from '../../main/store/paths.mjs';
 import { AGENT_CREATION_KINDS, SCHEMA_VERSION } from '../../shared/contracts.mjs';
 import { libraryFolderOf } from '../../shared/library-folder.mjs';
 import { resolveProduct } from './account.mjs';
@@ -142,6 +142,7 @@ export function readDocument(ref, { id = null, path: relPath = null } = {}) {
     // are what make an agent-supplied path safe to open at all.
     if (id) throw new Error(`no document with id ${id} in ${project.name}`);
     if (deniesGitOrEnvPath(relPath)) throw new Error(`refusing to read a .git/.env path: ${relPath}`);
+    if (deniesMachineryPath(relPath)) throw new Error(`refusing to read a reserved store path: ${relPath}`);
     let content;
     try {
       content = fs.readFileSync(assertInside(project.dir, relPath), 'utf8');
@@ -181,6 +182,7 @@ export async function writeDocument(ref, { id = null, path: relPath = null, titl
     const nextPath = relPath ?? existing?.path;
     if (!nextPath) throw new Error('a new document needs a path, e.g. "reports/first-run.md" or "personas/marcus.md"');
     if (deniesGitOrEnvPath(nextPath)) throw new Error(`refusing to write a .git/.env path: ${nextPath}`);
+    if (deniesMachineryPath(nextPath)) throw new Error(`refusing to write a reserved store path: ${nextPath}`);
 
     // THE PATH ALREADY SAYS WHAT THIS IS, so a caller that did not name a kind
     // gets the one its extension implies rather than a blanket 'markdown'. Two

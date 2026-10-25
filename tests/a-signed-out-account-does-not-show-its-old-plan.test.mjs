@@ -1,11 +1,12 @@
 // Reported 2026-10-07: two account rows showed "Raven Enterprise", including
 // one headed "Not signed in". The saved tier was printed ahead of sign-in
-// status. Render the real account rows to check both sides of that boundary;
+// status. Render the real account tiles to check both sides of that boundary;
 // the internal Enterprise tier must also read as a plain plan name.
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { AccountRows } from '../renderer/src/components/Settings.tsx';
+import { PlaceTiles, accountTile } from '../renderer/src/components/Settings.tsx';
+import { accountsOnce } from '../renderer/src/accounts-once.ts';
 import { planLabel, readPlan } from '../main/claude-plan.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -16,8 +17,8 @@ const account = (over = {}) => ({
   profile: 'default', email: null, signedIn: false, chosen: false,
   plan: 'Enterprise', trouble: null, dir: null, ...over,
 });
-const draw = (accounts) => renderToStaticMarkup(React.createElement(AccountRows, {
-  agent: { engine: 'claude', accounts }, onChoose: () => {}, onAdd: () => {},
+const draw = (accounts) => renderToStaticMarkup(React.createElement(PlaceTiles, {
+  accounts: accountsOnce({ here: accounts }).map((a) => accountTile(a, { many: accounts.length > 1, now: 0, onUse: () => {} })),
 }));
 
 describe('a plan belongs to a signed-in account', () => {
@@ -41,9 +42,9 @@ describe('a plan belongs to a signed-in account', () => {
     expect(html).toContain('Finish signing in to use it');
   });
 
-  it('still says signed in when that account has no plan reading', () => {
+  it('does not ask a signed-in account with no plan reading to sign in', () => {
     const html = draw([account({ email: 'you@example.com', signedIn: true, plan: null })]);
-    expect(html).toContain('>Signed in<');
+    expect(html).toContain('you@example.com');
     expect(html).not.toContain('Finish signing in');
   });
 

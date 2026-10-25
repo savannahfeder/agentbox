@@ -234,6 +234,51 @@ export function spanLeft(ms) {
   return `${hours}h ${minutes % 60}m`;
 }
 
+/**
+ * HOW LONG A WINDOW GOES ON BEING DRAWN AFTER ITS RESET, so a countdown
+ *  crossing zero does not flicker out of the panel a minute before the next
+ *  reading lands. Inside it "any moment" is what it says: the reset is here.
+ */
+const JUST_RESET_MS = 2 * 60_000;
+
+/**
+ * THE WINDOWS A READING CAN STILL ANSWER FOR (w-7b7182ef61).
+ *
+ * A window whose reset has gone past is over, and the one running in its place
+ * has never been read. shared/codex-usage.mjs already holds the rule for that:
+ * absence of data and a real zero are different facts and must never look the
+ * same. So it is DROPPED rather than relabelled -- no wording makes a
+ * percentage about a window nobody is in worth reading -- and the corner falls
+ * back to whatever the reading can still answer for (`headlineLimit`).
+ *
+ * A RESET WE COULD NOT PLACE ON A CLOCK KEEPS ITS ROW. `resetsAt` is null
+ * whenever Claude Code printed its stamp in a timezone we could not honestly
+ * convert, and a limit we cannot time is not a limit we may call finished.
+ */
+export function limitsStillRunning(limits, now = Date.now()) {
+  return (limits ?? []).filter((l) => !Number.isFinite(l?.resetsAt) || l.resetsAt + JUST_RESET_MS > now);
+}
+
+/**
+ * A reset to the nearest minute. Claude Code gives one a moment before the
+ * minute (11:59:59.6) and the cloud's header the minute itself, and both name
+ * the same reset.
+ */
+export const toMinute = (at) => Math.round(at / 60_000) * 60_000;
+
+/**
+ * THE DAY A RESET FALLS ON, in this machine's calendar: null today, "Thu" this
+ * week, and "Tue Oct 27" six or more days out, where a weekday alone would
+ * read as today.
+ */
+export function resetDay(at, now = Date.now()) {
+  const d = new Date(toMinute(at));
+  if (d.toDateString() === new Date(now).toDateString()) return null;
+  const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
+  if (at - now < 6 * 86_400_000) return weekday;
+  return `${weekday} ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+}
+
 /* -------------------------------- the panel ------------------------------- */
 
 /**
@@ -281,7 +326,7 @@ export function spanLeft(ms) {
  */
 export function limitRows(limits, now = Date.now()) {
   const here = localZone();
-  return (limits ?? []).map((l) => ({
+  return limitsStillRunning(limits, now).map((l) => ({
     // Stable across redraws, and it has to carry the qualifier: Claude Code's
     // two week rows are otherwise the same string.
     key: `${l.span}:${l.qualifier ?? ''}`,
@@ -316,8 +361,9 @@ function whenItStartsOver(l, now, here) {
  * 2026-09-01.
  */
 export function usageSentence(limits, now = Date.now(), engineWord = null) {
-  if (!limits?.length) return null;
-  const said = limits.map((l) => {
+  const live = limitsStillRunning(limits, now);
+  if (!live.length) return null;
+  const said = live.map((l) => {
     const when = l.resetsAt ? `, ${untilReset(l.resetsAt - now)}` : l.resetsText ? `, resets ${l.resetsText}` : '';
     return `${l.name}: ${l.percent}% used${when}.`;
   }).join(' ');

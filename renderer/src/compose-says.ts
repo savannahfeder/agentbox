@@ -123,12 +123,47 @@ export function noProjectYet(
  * THE UNDO IS SAID OUT LOUD, unchanged, because a way back she cannot see is
  * one she will not take.
  */
-export function sentLine(p: { to: string; when?: string | null; held?: boolean }): string {
+export function sentLine(p: {
+  to: string; when?: string | null; held?: boolean;
+  /** How many threads a pasted list went out as, when it was split. */
+  threads?: number;
+  /** The new row's entry in `supervisor.atLimit`: every login of its tool is out of usage. */
+  limit?: { tool: string; until: number } | null; now?: number;
+}): string {
+  // A split says how many went: it is a thing you did on purpose, and the fact
+  // you want back is that three rows exist. One thread counts nothing.
+  if ((p.threads ?? 1) > 1 && !p.held && !p.when) return `Started ${p.threads} threads in ${p.to} · Z to undo`;
   // "Started in", because "Sent to Office admin" read as a message to a person.
   // And "Added to Later" for the one answer on the Send later menu with no
   // moment in it (w-afb66e6661): it did not start, so saying it did is a lie,
   // and it is not scheduled either.
   if (p.held) return `Added to Later in ${p.to} · Z to undo`;
+  if (p.limit && !p.when) {
+    const now = p.now ?? Date.now();
+    const at = p.limit.until > now
+      ? new Date(p.limit.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase()
+      : null;
+    // Short, because the card holds about thirty characters on this line and
+    // the reason is the half that must survive; its title names the task.
+    return `${at ? `${p.limit.tool} is out until ${at}` : `${p.limit.tool} is out of usage`} · Z to undo`;
+  }
   const where = p.when ? `Scheduled in ${p.to}` : `Started in ${p.to}`;
   return `${p.when ? `${where} · ${p.when}` : where} · Z to undo`;
+}
+
+/**
+ * What the toast says between Send and the computer's answer (w-461fbd8d2d).
+ *
+ * The card closes the moment Send is pressed, so for one round trip, which on
+ * a phone's relay is about half a second, this is the only sign the press
+ * landed. It names the same place `sentLine` will, in the same verb, so the
+ * toast that replaces it reads as the same sentence finishing. No Z yet:
+ * nothing has been written for Z to take back.
+ */
+export function sendingLine(p: { kind: 'task' | 'repeat' | 'message'; to: string; held?: boolean; scheduled?: boolean; threads?: number }): string {
+  if (p.kind === 'message') return p.to ? `Sending to ${p.to}…` : 'Sending…';
+  if (p.held) return `Adding to Later in ${p.to}…`;
+  if (p.scheduled || p.kind === 'repeat') return `Scheduling in ${p.to}…`;
+  if ((p.threads ?? 1) > 1) return `Starting ${p.threads} threads in ${p.to}…`;
+  return `Starting in ${p.to}…`;
 }

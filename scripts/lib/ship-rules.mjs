@@ -39,3 +39,35 @@ export function notReadyToShip({ isPrimaryWorktree, dirty, onMain, hasCommits })
   }
   return null;
 }
+
+/**
+ * WHY THIS CHECKOUT SHOULD NOT BE RELEASED, as sentences, or an empty list.
+ *
+ * Added 2026-10-13, after half a day was lost to it. The app folder follows the
+ * public main on its own, except it had fallen nine commits behind; two
+ * releases were built in it, each a quarter of an hour of signing and
+ * notarising, and each came out as the version already on the website carrying
+ * that morning's code. The build said nothing: it notarises the wrong commit as
+ * happily as the right one.
+ *
+ * Both questions are cheap and both are asked before a file is written. A null
+ * means the answer could not be found — no network, no tags — and a build that
+ * cannot ask is not a build of the wrong commit, so it goes ahead.
+ */
+export function whyNotToRelease({ behind = null, version = null, released = null } = {}) {
+  const said = [];
+  if (Number.isFinite(behind) && behind > 0) {
+    said.push(
+      `This checkout is ${behind} commit${behind === 1 ? '' : 's'} behind origin/main, `
+      + 'so it would build code that is not what shipped. '
+      + 'Catch it up first: git fetch origin && git merge --ff-only refs/remotes/origin/main',
+    );
+  }
+  if (version && Array.isArray(released) && released.includes(`v${version}`)) {
+    said.push(
+      `Version ${version} is already released as v${version}, so this build could not be published. `
+      + 'Bump the version in package.json first: npm version <next> --no-git-tag-version',
+    );
+  }
+  return said;
+}

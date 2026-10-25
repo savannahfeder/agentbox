@@ -60,14 +60,17 @@ describe('the plan question takes one more answer', () => {
     expect(mine).toBeTruthy();
     expect(mine.plan).toBeUndefined();
     expect(mine.name).toBe(COPY.haveOne);
-    expect(rows.filter((r) => r.other).map((r) => r.key)).toEqual(['mine']);
+    // Two rows under the rule since w-8656bdd97d: showing us where one is, and
+    // not doing any of this now. Neither is a plan, which is what the rule
+    // separates them for.
+    expect(rows.filter((r) => r.other).map((r) => r.key)).toEqual(['mine', 'skip']);
   });
 
   // THE COMPUTER IS ASKED BY THE SCREEN, NOT BY A ROW, since 2026-10-09: the
   // look runs on arrival, so by the time anybody reads these rows it has
   // already happened. tests/the-plan-question-looks-while-it-asks holds that.
   it('asks the computer itself, and only then asks the person', () => {
-    expect(planRows().map((r) => r.key)).toEqual(['claude', 'codex', 'both', 'mine']);
+    expect(planRows().map((r) => r.key)).toEqual(['claude', 'codex', 'both', 'mine', 'skip']);
   });
 
   // THE CASE THAT MUST NOT MATCH, and it cost a round: a row in the separated

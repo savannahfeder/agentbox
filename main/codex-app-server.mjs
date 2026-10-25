@@ -1,284 +1,222 @@
-// The transport to `codex app-server`: one child process, many work items, and
-// an approval that always gets an answer or takes the connection down trying.
+// The transport to `codex app-server`: one child process for many work items.
+// It speaks newline-delimited JSON-RPC 2.0 over stdio, and when a turn needs an
+// approval the server sends us a request with an id that we must answer.
 //
-// THIS IS THE PART THAT WAS NEVER SOLVED.The removed build drove `codex exec`,
-// a one-shot run over a single JSON stream, and `codex exec` has no channel
-// back to the caller. A Claude Code worker that wants something outside its
-// grants raises a card through main/approval-prompt-server.mjs and waits in
-// place; a Codex worker could not raise anything, so it either ran ungated or
-// it stopped. That was the blocker, and `git show 258d71d^:main/codex.mjs` is
-// worth reading for what else was tried, but ITS EVENT PARSING IS OBSOLETE and
-// none of it is carried over here.
+// main/supervisor.mjs spawns the process and holds the client,
+// main/codex-session.mjs wraps one thread of it per work item, and
+// main/codex-approvals.mjs is the `onApproval` handler. This file does
+// transport and routing only. The transport is injected so the tests run
+// without `codex` installed.
 //
-// `codex app-server` is the fix, verified by running it rather than by reading
-// about it. It speaks newline-delimited JSON-RPC 2.0 over the child's stdio,
-// and when a turn wants to run a gated command the SERVER sends US a request,
-// with an id, that we must answer. That is the missing channel, and it is the
-// same shape the approvals spool already has: a question, a wait, an answer.
+// Deny is the default in every failure mode, and silence is not a refusal:
+// - A card waits for the person it is addressed to and is never denied on a
+//   clock; main/codex-approvals.mjs holds the whole argument. It is settled by
+//   their answer, by the worker that raised it stopping, or by the app closing,
+//   and a late answer is dropped, because one request id cannot be answered
+//   twice.
+// - A write that fails, at once or in its callback, is a broken connection.
+//   Every waiter is settled and the child is killed.
+// - A stdout line that will not parse may have been an approval request, so it
+//   is fatal. Tracing goes to stderr, and blank lines are skipped.
 //
-// AND IT MOVES THE FAILURE SOMEWHERE NEW, WHICH IS WHAT THIS FILE IS ABOUT. A
-// request with an id that nobody ever answers is not an error. It is a worker
-// parked forever, with no exit code, no message and nothing on the row. CLAUDE.md
-// already has that incident under another name -- "A WORKER THAT DID NOT FINISH
-// DELIVERED NOTHING, HOWEVER LONG IT TOOK" -- three items stranded for two, two
-// and six hours. So the posture here is copied from
-// main/approval-prompt-server.mjs and not re-argued:
-//
-//   DENY IS THE DEFAULT IN EVERY FAILURE MODE, AND SILENCE IS NOT A REFUSAL.
-//
-// That sentence has three consequences, and each one cost a draft of this file.
-//
-// A CARD SHE NEVER ANSWERS DENIES ITSELF, AFTER FIFTEEN MINUTES. The first
-// draft waited forever, on the theory that the caller owns the timeout policy.
-// It does not: main/approval-prompt-server.mjs is the same channel for the same
-// founder and it has `TIMEOUT_MS = 15 * 60_000` and denies on expiry. Waiting
-// forever is not neutrality, it is a worker parked for the rest of the session
-// because she went to lunch. The deadline is injectable so that tests do not
-// sleep, and a late answer arriving after it has already denied is DROPPED --
-// the turn was told no and has moved on, and a second answer to one request id
-// is a protocol violation on top of an approval nobody is waiting for.
-//
-// A REFUSAL THAT CANNOT BE WRITTEN IS SILENCE. So a write that throws, a write
-// that fails afterwards in its callback, and an error raised on the pipe itself
-// are all treated as a broken connection: settle everything, tell every thread,
-// take the child down. There is no way to answer a request over a dead pipe,
-// and a supervisor can see a dead worker. It cannot see a hung one.
-//
-// A FRAME WE CANNOT READ MIGHT HAVE BEEN A CARD. stdout is the protocol here --
-// the child's tracing goes to stderr, measured, and the live run read zero
-// unreadable lines. A line on stdout that will not parse is therefore not noise
-// to step over: it is a frame whose id has just been lost, and if it was an
-// approval request then the turn that raised it waits forever. Nothing can tell
-// whether it was, which is exactly why tolerating it is unsafe. Unreadable or
-// unbounded input is fatal, loudly. Blank lines are framing rather than content
-// and are the one thing here that may be skipped.
-//
-// ------------------------------------------------------------------------
-// WHAT WAS MEASURED, ON THIS MAC, 2026-09-04, codex-cli 0.148.0. Some of this
-// contradicts what was written down before; where it does, the machine wins.
-//
-// THE THREAD ID IS AT `result.thread.id`. Off a live `thread/start` response:
-// `result.thread.id` was "01a068f1-be4d-7701-98e3-16137d16dcdf" and
-// `result.threadId` was `undefined`. The obvious guess fails silently -- every
-// thread ends up filed under the id `undefined`, which is one shared bucket --
-// so it is asserted rather than trusted.
-//
-// SERVER REQUEST IDS START AT 0 AND ARE A SEPARATE NUMBER SPACE FROM OURS. In
-// the captured session the first approval carried `id: 0` while our own
-// `initialize` carried `id: 1`. A classifier written `if (msg.id)` drops the
-// first approval of every session, because 0 is falsy. Everything below tests
-// `!== undefined`, and the two spaces never share a map.
-//
-// A REFUSAL IS ACCEPTED EVEN WHEN THE SERVER DID NOT OFFER IT. The live
-// approval arrived with `availableDecisions: ["accept",
-// {acceptWithExecpolicyAmendment: ...}, "cancel"]` -- no "decline" in the list.
-// Answering `{decision: 'decline'}` anyway worked: the item completed with
-// `status: "declined"`, `serverRequest/resolved` fired, and the turn COMPLETED
-// 4.0 seconds later. `availableDecisions` is a hint about which buttons a UI
-// should draw, not a whitelist the answer is validated against. That is the
-// measurement that makes an unconditional refusal safe, and without it the
-// deny-by-default rule above would have been a guess.
-//
-// A JSON-RPC ERROR FRAME REFUSES TOO, MEASURED ON ONE METHOD. The same
-// `item/commandExecution/requestApproval` answered with `{error: {code: -32001,
-// message}}` left the item at `status: "failed"` and the turn still COMPLETED,
-// 5.5 seconds later. BE PRECISE ABOUT THE SCOPE OF THAT: it was measured for
-// command approval and for nothing else, so using it as the refusal for other
-// server requests is a REASONED EXTENSION rather than a measured fact. It is
-// the best one available -- a well-formed error is the only answer that is
-// valid for a result shape nobody has measured -- but the next slice to lean on
-// it for a specific method should measure that method.
-//
-// NO HEAD-OF-LINE BLOCKING. Proven separately: an approval on thread A that is
-// deliberately never answered does not stop thread B from raising its own
-// approval, having it answered, and completing its turn. That is what makes one
-// process for the whole fleet safe, and it is a promise this file has to keep --
-// hence the read loop below never awaits anything.
-//
-// `ephemeral: false` IS THE DEFAULT AND HAS TO BE. `thread/resume` fails with
-// "no rollout found for thread id" on an ephemeral thread, so a thread started
-// ephemerally cannot carry a continuation. the app's whole reply path is
-// continuations, so the default is the one that can come back.
-//
-// TWO THINGS THE WRITTEN BRIEF HAD WRONG, both from the CLI's own
-// `codex app-server generate-json-schema` dump:
-//
-//   `abort` IS NOT A v2 APPROVAL DECISION. CommandExecutionApprovalDecision and
-//   FileChangeApprovalDecision are accept / acceptForSession / decline / cancel,
-//   plus two amendment OBJECTS (`acceptWithExecpolicyAmendment` and
-//   `applyNetworkPolicyAmendment`, command approvals only). `abort` belongs to
-//   the LEGACY `ReviewDecision` used by `execCommandApproval` and
-//   `applyPatchApproval`. Sending it to a v2 approval is a malformed answer, so
-//   it is treated as junk here.
-//
-//   `item/permissions/requestApproval` TAKES NO `decision` AT ALL. Its response
-//   is PermissionsRequestApprovalResponse: `{ permissions, scope?,
-//   strictAutoReview? }`, a granted profile rather than a word.
-//
-// AND THERE ARE TEN SERVER-TO-CLIENT REQUEST METHODS IN THE STABLE SCHEMA, NOT
-// THREE. Beyond the three approvals: item/tool/requestUserInput, item/tool/call,
-// mcpServer/elicitation/request, account/chatgptAuthTokens/refresh,
-// attestation/generate, and the legacy applyPatchApproval and
-// execCommandApproval, both of which are still in the stable dump. The
-// experimental schema adds more (currentTime/read), so "ten" is a fact about
-// the stable dump on 0.148.0 and not a ceiling. Every one of them hangs
-// whatever raised it if it is left open, so ANY server request this file does
-// not know how to answer gets the error frame. That is the honest answer and
-// not a placeholder: refusing `account/chatgptAuthTokens/refresh` may well cost
-// a long-lived process its token refresh, and the slice that wants that
-// capability is the slice that gets to measure the shape and answer it
-// properly. A refusal is a bug somebody can see; silence is not.
-//
-// ------------------------------------------------------------------------
-// SCOPE. Transport and routing, nothing else. Nothing here turns an event into
-// Agentbox's work lines or its trace, nothing here touches the approvals spool,
-// and nothing here decides which engine a row runs on.
-//
-// IT IS NO LONGER INERT, AND THIS HEADER SAID IT WAS FOR A WHOLE SLICE AFTER IT
-// HAD STOPPED BEING ONE. Three files depend on it now: main/supervisor.mjs spawns the
-// process and holds the client, main/codex-session.mjs is the per-work-item
-// facade over one thread of it, and main/codex-approvals.mjs is the handler on
-// the other end of `onApproval` that this file was written around. The three
-// sentences above still hold; the fourth was a fact about a Tuesday.
-//
-// The transport is injected so this whole file can be tested without `codex`
-// being installed. That is not tidiness. Four tests in this suite already fail
-// on any machine whose clock or installs differ from hers, and a transport test
-// that shelled out to the real binary would be the fifth.
+// Protocol facts, measured on codex-cli 0.148.0:
+// - The thread id is at `result.thread.id`; `result.threadId` is undefined.
+// - Server request ids start at 0 and are a separate number space from ours,
+//   so ids are tested with `!== undefined`.
+// - `decline` is accepted even when `availableDecisions` does not list it,
+//   which is what makes an unconditional refusal safe.
+// - An error frame also refuses a command approval. That was measured for that
+//   method only; other server requests get it because it is the one answer
+//   valid for any result shape.
+// - An open approval on one thread does not block the others, as long as the
+//   read loop never awaits.
+// - `thread/resume` fails on an ephemeral thread, so `ephemeral` defaults to
+//   false.
+// - `abort` is a word of the legacy `ReviewDecision`, not a v2 approval
+//   decision.
+// - `item/permissions/requestApproval` takes a granted profile, not a decision.
+// - Any server request not in APPROVAL_SHAPE gets the error frame, because one
+//   left open hangs whatever raised it.
 
 import { StringDecoder } from 'node:string_decoder';
 import { NAME, Name, nameSlug } from '../shared/product-name.mjs';
 
 /**
- * How this client names itself to the server. It comes back on `initialize` as
- * part of `userAgent` -- measured live as "astral/0.148.0 (Mac OS 15.6.1;
- * arm64) (astral; 1.0.0)", which is the app's name of the day rather than a
- * constant -- and it is what appears in Codex's own session records, so it says
- * this app rather than the name of whatever spike wrote it. READ, NEVER TYPED:
- * that measured line is why, it is a record written months ago under a name the
- * app no longer has.
+ * How this client names itself to the server. It appears in `userAgent` and in
+ * Codex's own session records, so it comes from shared/product-name.mjs rather
+ * than being typed here.
  */
 export const CLIENT_INFO = Object.freeze({ name: nameSlug, title: NAME, version: '1.0.0' });
 
 /**
- * The four SCALAR answers this callback supports, read off the CLI's schema
- * dump rather than remembered.
- *
- * Not the whole v2 vocabulary: command approvals also accept two structured
- * amendment objects, which widen the execpolicy or pin a network rule for
- * future commands. Those are standing policy changes rather than an answer to
- * the question that was asked, they cannot be expressed as a word, and nothing
- * in Agentbox can produce one yet -- so a handler returning one is refused. That
- * is conservative in the safe direction, and it is a deliberate omission rather
- * than an oversight.
- *
- * `abort` is NOT here and reads like it should be. It is a legacy word.
+ * The scalar answers a v2 approval takes, from the CLI's schema dump. Command
+ * approvals also take two amendment objects, which are standing policy changes
+ * rather than an answer, so a handler returning one is refused. `abort` is a
+ * legacy word and is not here.
  */
 export const APPROVAL_DECISIONS = Object.freeze(['accept', 'acceptForSession', 'decline', 'cancel']);
 
 /**
- * The three words an MCP elicitation takes, which is a SHORTER list than the
- * one above and not a subset by accident: `McpServerElicitationRequestResponse`
- * has no `acceptForSession`, so an approval that lasts a session cannot be
- * expressed here at all. Read off the CLI's schema dump 2026-09-22.
+ * The actions an MCP elicitation takes. `McpServerElicitationRequestResponse`
+ * has no `acceptForSession`.
  */
 export const ELICITATION_ACTIONS = Object.freeze(['accept', 'decline', 'cancel']);
 
 /**
- * The refusal. `decline` and not `cancel`, deliberately: measured, `decline`
- * leaves the item `declined` and lets the agent carry on and try something
- * else, while `cancel` also interrupts the whole turn. A failure to reach the
- * founder should cost the command, not the work item.
+ * The refusal. `decline` lets the agent carry on and try something else, while
+ * `cancel` also interrupts the whole turn.
  */
 export const REFUSAL_DECISION = 'decline';
 
-/** Her deadline, matching main/approval-prompt-server.mjs exactly. */
-export const APPROVAL_TIMEOUT_MS = 15 * 60_000;
-
 /**
- * How long ONE FRAME may be before the connection is called corrupt. Generous,
- * because `turn/diff/updated` carries a git-format diff of the whole turn and a
- * big refactor is a big diff; bounded, because an unterminated line is
- * otherwise a memory leak that ends in a dead app.
- *
- * IT APPLIES TO A TERMINATED LINE AS WELL AS TO A RUNAWAY ONE, and it did not.
- * The check ran on the residual buffer AFTER every newline-delimited frame had
- * been taken out of it, so it could only ever see a line with no end. A single
- * complete ten-megabyte line -- which is precisely what an enormous
- * `turn/diff/updated` is -- went straight past the bound to `JSON.parse` and on
- * to the handlers. Both halves are checked now: `read` refuses an oversized
- * line before it parses it, and the residual check still catches the one that
- * never terminates.
+ * The longest frame allowed before the connection is called corrupt. Large,
+ * because `turn/diff/updated` carries the whole turn's diff. Bounded, because
+ * an unterminated line would otherwise grow until the app dies. `read` checks
+ * each complete line, and the data handler checks the unterminated rest.
  */
 export const MAX_FRAME_LENGTH = 16 * 1024 * 1024;
 
 /**
- * HOW LONG AN ORDINARY REQUEST MAY GO UNANSWERED.
- *
- * The approval had a deadline from the first draft of this file, for the reason
- * written at the top: a request with an id that nobody answers is a worker
- * parked forever with no exit code and nothing on the row. EVERY REQUEST HAS
- * THAT SHAPE, and the ones that get a worker as far as raising an approval --
- * `initialize`, `config/read`, `thread/start`, `thread/resume`, `turn/start` --
- * had nothing to settle them at all. A live app-server that accepts the bytes
- * and never answers holds a work item and a fleet slot for the rest of the
- * session; the pipe is not broken, so nothing else here fires either.
- *
- * Two minutes, which is far above anything measured (a handshake and a
- * `config/read` answer in milliseconds, and `turn/start` resolves when the turn
- * is ACCEPTED rather than when it finishes) and far below a founder noticing a
- * row is stuck. The turn itself is not on this clock; only the request that
- * starts it is.
- *
- * ONE REQUEST GOES, NOT THE CONNECTION. A rejection frees the row and the slot,
- * which is the whole failure being closed, and the worker's own chain turns it
- * into a run that says why on stderr. Taking the shared process down over one
- * slow answer would charge every other thread for it.
+ * How long an ordinary request may go unanswered. A live server that accepts a
+ * request and never answers would otherwise hold a work item forever, since the
+ * pipe is not broken. `turn/start` resolves when the turn is accepted, so the
+ * turn itself is not on this clock. A timeout rejects that one request and
+ * leaves the connection up for the other threads.
  */
 export const REQUEST_TIMEOUT_MS = 2 * 60_000;
 
 /**
- * The server requests we know how to answer, and in which of the three shapes.
+ * The server requests we answer, and the shape each answer takes.
  *
- * `mcpServer/elicitation/request` IS AN APPROVAL AND NOT ONLY A FORM, which is
- * the correction this table carries. It is how Codex asks whether an MCP TOOL
- * CALL may run. Measured on this Mac 2026-09-22 against codex-cli 0.153.4, a
- * thread started exactly as `workerThreadParams` starts one, with one stdio MCP
- * server on it and the model asked to call its single tool:
- *
- *   item/started  mcpToolCall server=probe tool=ping status=inProgress
- *   REQUEST       mcpServer/elicitation/request
- *                 { serverName: "probe", mode: "form",
- *                   message: 'Allow the probe MCP server to run tool "ping"?',
- *                   _meta: { codex_approval_kind: "mcp_tool_call",
- *                            persist: ["session","always"],
- *                            tool_description: "...", tool_params: {} } }
- *
- * The method was not on this table, so it took the error frame below, and the
- * measured consequence was the whole integration rather than one lost call:
- *
- *   answered with the error frame  -> item/completed mcpToolCall status=failed,
- *                                     error "user rejected MCP tool call"
- *   answered `{action:"accept"}`   -> the tool ran and returned its result
- *
- * EVERY STORE TOOL A CODEX WORKER HAS IS AN MCP TOOL CALL, so the first row is
- * a worker that cannot claim, checkpoint or finish anything, and the only words
- * anybody sees are that sentence: a rejection nobody made, over a card that was
- * never drawn. `McpServerElicitationRequestResponse` is `{ action: "accept" |
- * "decline" | "cancel", content?, _meta? }`, which is a third answer shape, and
- * its vocabulary happens to be three of the words the decision shape speaks.
+ * `mcpServer/elicitation/request` is how Codex asks whether an MCP tool call
+ * may run (`_meta.codex_approval_kind: "mcp_tool_call"`), and every store tool
+ * is one. Refused with the error frame, the call fails as "user rejected MCP
+ * tool call", so it must reach the handler. Its answer is `{ action }`.
  */
 const APPROVAL_SHAPE = new Map([
   ['item/commandExecution/requestApproval', 'decision'],
   ['item/fileChange/requestApproval', 'decision'],
   ['item/permissions/requestApproval', 'grant'],
   ['mcpServer/elicitation/request', 'elicitation'],
+  // THE SAME TWO APPROVALS UNDER THEIR v1 NAMES (w-36c51443df). These are the
+  // older spellings of the first two rows, and they used to fall through to a
+  // protocol error -- so a Codex speaking v1 on any path would have had every
+  // command refused rather than carded. Their answer is `{ decision:
+  // ReviewDecision }` and that vocabulary is NOT the v2 one, which is why they
+  // get a shape of their own rather than sharing `decision`. See
+  // LEGACY_DECISIONS.
+  ['execCommandApproval', 'legacy'],
+  ['applyPatchApproval', 'legacy'],
+]);
+
+/**
+ * THE v1 WORD FOR EACH OF OUR FOUR, read off `ExecCommandApprovalResponse.json`
+ * in the 0.160.0 schema dump, 2026-10-09.
+ *
+ * `ReviewDecision` is `approved` | `approved_for_session` |
+ * `approved_mcp_policy_amendment` | `timed_out` | `abort` as bare words, plus
+ * `{denied:{rejection}}` and two amendment objects. NOTE THAT `decline` IS NOT
+ * IN IT: forwarding our own v2 word would have been refused by the server, and
+ * the refusal is an OBJECT here rather than a word, which is exactly the kind of
+ * difference that a shared mapping hides. The amendments are left out for the
+ * reason APPROVAL_DECISIONS gives: they are standing policy changes rather than
+ * an answer to the question asked, and nothing here can produce one.
+ */
+export const LEGACY_DECISIONS = Object.freeze({
+  accept: 'approved',
+  acceptForSession: 'approved_for_session',
+  cancel: 'abort',
+  // The one place a refusal gets to say why, so it says why.
+  decline: { denied: { rejection: `${Name} did not approve this. Carry on with what you are already allowed to do and leave the rest for her to look at.` } },
+});
+
+/**
+ * EVERY REQUEST THE SERVER MAY SEND A CLIENT, so the list lives somewhere a
+ * reader can check it against the schema rather than inferring it from which
+ * branch happens to catch what.
+ *
+ * Read off every `method` const in `ServerRequest.json`, codex-cli 0.160.0,
+ * 2026-10-09. Six raise a card (APPROVAL_SHAPE above) and four cannot be served
+ * at all (CANNOT_SERVE below). A method in neither list is NEW, and `onUnknownRequest`
+ * exists so that it is news rather than a silence.
+ */
+export const SERVER_REQUESTS = Object.freeze([
+  'account/chatgptAuthTokens/refresh',
+  'applyPatchApproval',
+  'attestation/generate',
+  'execCommandApproval',
+  'item/commandExecution/requestApproval',
+  'item/fileChange/requestApproval',
+  'item/permissions/requestApproval',
+  'item/tool/call',
+  'item/tool/requestUserInput',
+  'mcpServer/elicitation/request',
+]);
+
+/**
+ * THE FOUR THAT ARE REFUSED ON PURPOSE, each with the reason in its own words.
+ *
+ * They used to share one anonymous error with the approvals, which is how
+ * nobody noticed they existed. All four ask the CLIENT to do something rather
+ * than asking a person to decide something, and there is no answer here to
+ * invent for any of them.
+ */
+const CANNOT_SERVE = new Map([
+  ['item/tool/call', `it asks this app to run a tool of its own, and ${Name} offers the model no such tool`],
+  ['account/chatgptAuthTokens/refresh', `it asks this app to mint a fresh ChatGPT login token, which ${Name} does not hold and must not forge`],
+  ['attestation/generate', `it asks this app to sign an attestation, which ${Name} cannot produce`],
+  // THE ONE THAT IS A QUESTION FOR A PERSON, and the one worth coming back to.
+  // Its answer is a map of question id to typed answers
+  // (`ToolRequestUserInputResponse`), Agentbox has no form to put on screen, and a
+  // question may be flagged `isSecret` -- so an invented answer would be worse
+  // than a no. Pointing the model at its reply is the road that does reach her.
+  ['item/tool/requestUserInput', `it asks a question that needs a typed answer and ${Name} has no way to put that question on screen; ask it in your reply instead, where she will read it`],
 ]);
 
 const REFUSAL_ERROR = Object.freeze({
   code: -32001,
   message: `${Name} did not approve this request. Continue with what you are already allowed to do, and leave the rest for the founder to look at.`,
 });
+
+/** A refusal that names what was asked, so it is one somebody can act on. */
+const cannotServe = (method, why) => Object.freeze({
+  code: -32001,
+  message: `${Name} cannot answer ${method}: ${why}.`,
+});
+
+const UNKNOWN_REQUEST = `${Name} does not recognise this request, so it is refused rather than guessed at`;
+
+// Refuse in the method's own vocabulary where it has one. A declined
+// elicitation leaves the turn running; the error frame is a protocol failure.
+const refusal = (shape) => {
+  if (shape === 'decision') return { result: { decision: REFUSAL_DECISION } };
+  if (shape === 'elicitation') return { result: { action: REFUSAL_DECISION } };
+  // v1 SAYS NO WITH AN OBJECT, NOT A WORD. `decline` is not in its
+  // vocabulary at all, so a timed-out or unowned legacy card answered in our
+  // own word would be a protocol error on a question the server is waiting on.
+  if (shape === 'legacy') return { result: { decision: LEGACY_DECISIONS.decline } };
+  return { error: { ...REFUSAL_ERROR } };
+};
+
+/** This client's yes to `method`, without the JSON-RPC envelope, or null for a request a yes does not answer. */
+export function yesTo(method) {
+  const shape = APPROVAL_SHAPE.get(method);
+  if (shape === 'decision') return { result: { decision: 'accept' } };
+  if (shape === 'elicitation') return { result: { action: 'accept' } };
+  return null;
+}
+
+/**
+ * The no this client sends `method` when nobody can be asked, without the
+ * JSON-RPC envelope: for the cloud server driving a Codex run with the
+ * computer shut (cloud/gateway/phone.mjs), so it refuses in these words.
+ */
+export function refusalTo(method) {
+  const cannot = CANNOT_SERVE.get(method);
+  if (cannot) return { error: cannotServe(method, cannot) };
+  const shape = APPROVAL_SHAPE.get(method);
+  return shape ? refusal(shape) : { error: cannotServe(method, UNKNOWN_REQUEST) };
+}
 
 const plain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const only = (keys, allowed) => keys.every((k) => allowed.includes(k));
@@ -288,22 +226,22 @@ const only = (keys, allowed) => keys.every((k) => allowed.includes(k));
  *
  * Give it either a `transport` (anything child-process-shaped: `stdin.write`,
  * `stdin.end`, `stdout.on('data')`, an optional `stderr`, `on('exit')`,
- * `on('error')`, `kill`) or a `spawn` function that returns one. Production
- * passes a real child; the tests pass a notepad.
+ * `on('error')`, `kill`) or a `spawn` function that returns one.
  *
- * `onNotification` catches every line that belongs to no watched thread: a
- * thread we have not been told about yet, and the notifications that carry no
- * thread at all. There are eighteen of those in the 0.148.0 stable schema --
- * account, config, process, filesystem and remote-control news, among them
- * `account/rateLimits/updated` and `remoteControl/status/changed` -- so this is
- * an ordinary channel rather than an error path.
+ * `onNotification` gets every line for no watched thread, including the many
+ * account and config notifications that carry no thread at all.
  */
 export function createCodexAppServer({
   transport = null,
   spawn = null,
   clientInfo = CLIENT_INFO,
   onNotification = null,
-  approvalTimeoutMs = APPROVAL_TIMEOUT_MS,
+  // A SERVER REQUEST THIS FILE HAS NEVER HEARD OF (w-36c51443df). Six known
+  // methods once shared one anonymous refusal, so a NEW one would have been
+  // indistinguishable from them and from nothing at all. Handed up rather than
+  // logged here, because what to do with it -- a line on the row, a report --
+  // belongs to the caller.
+  onUnknownRequest = null,
   requestTimeoutMs = REQUEST_TIMEOUT_MS,
   maxFrameLength = MAX_FRAME_LENGTH,
   stderrLimit = 64 * 1024,
@@ -313,7 +251,7 @@ export function createCodexAppServer({
 
   const pending = new Map();    // OUR request id -> { resolve, reject, method, onResult }
   const threads = new Map();    // thread id -> handlers
-  const openCards = new Map();  // THEIR request id -> the deadline timer
+  const openCards = new Set();  // THEIR request ids, each waiting on a person
   const decoder = new StringDecoder('utf8');
   let nextId = 1;
   let buffer = '';
@@ -321,20 +259,13 @@ export function createCodexAppServer({
   let gone = null;              // null while live; the closing reason once not
   let drained = false;          // stdout has ended, so the diagnostics are complete
   let finished = false;
-
-  /* ------------------------------- writing -------------------------------- */
+  let resumeLeavesTurns = true; // false once this Codex refuses `excludeTurns`
 
   /**
-   * Put one message on the wire, or take the connection down.
-   *
-   * Three ways a real pipe fails and all three end here: it throws where it
-   * stands, it accepts the bytes and reports the failure in the write callback,
-   * or it raises `error` later. The callback is the one that is easy to miss
-   * and the one that matters most, because a refusal that was "written" and
-   * never arrived is indistinguishable from an approval.
-   *
-   * A `false` return is NOT a failure: that is ordinary backpressure and the
-   * bytes are still queued. Only the callback and the throw are failures.
+   * Put one message on the wire, or take the connection down. A pipe can fail
+   * by throwing or in the write callback (or later with `error`). The callback
+   * matters most: a refusal that never arrived looks the same as no answer. A
+   * `false` return is only backpressure, not a failure.
    */
   function write(msg) {
     if (gone) return false;
@@ -358,8 +289,7 @@ export function createCodexAppServer({
     if (gone) return Promise.reject(new Error(`${method}: codex app-server is no longer running (${gone.reason})`));
     const id = nextId++;
     return new Promise((resolve, reject) => {
-      // The deadline is armed BEFORE the write, so a request that is accepted
-      // and then never answered cannot outlive it. See REQUEST_TIMEOUT_MS.
+      // Armed before the write. See REQUEST_TIMEOUT_MS.
       const timer = setTimeout(() => {
         if (!pending.delete(id)) return;
         reject(new Error(`${method}: codex app-server accepted this request and never answered it (${Math.round(requestTimeoutMs / 1000)}s)`));
@@ -376,11 +306,7 @@ export function createCodexAppServer({
 
   const notify = (method) => write({ jsonrpc: '2.0', method });
 
-  /* ------------------------------- reading -------------------------------- */
-
-  // The decoder rather than `chunk.toString`: a chunk boundary can fall in the
-  // middle of a UTF-8 sequence, and agent messages stream through here one
-  // delta at a time in whatever language the repo is written in.
+  // A StringDecoder, because a chunk can end in the middle of a UTF-8 sequence.
   child.stdout.on('data', (chunk) => {
     if (gone) return;
     buffer += typeof chunk === 'string' ? chunk : decoder.write(chunk);
@@ -395,13 +321,8 @@ export function createCodexAppServer({
     }
   });
 
-  // The child writes tracing here, and the last line of it is usually the
-  // reason something failed -- that is where "Rejected" showed up in the
-  // measurements above. Worth keeping for a cause report, and NEVER worth
-  // parsing: nothing on this pipe is protocol, however badly formed it looks,
-  // so garbage here must not cost the founder a fleet. Only the tail is kept,
-  // because a long run's tracing is unbounded and the useful part is always at
-  // the end.
+  // The child's tracing. Its last lines usually say why something failed, so
+  // the tail is kept for cause reports. It is not protocol and is never parsed.
   child.stderr?.on('data', (chunk) => {
     stderrText += typeof chunk === 'string' ? chunk : chunk.toString();
     if (stderrText.length > stderrLimit) stderrText = stderrText.slice(-stderrLimit);
@@ -415,9 +336,7 @@ export function createCodexAppServer({
   for (const event of ['end', 'close']) child.stdout.on?.(event, () => { drained = true; if (gone) finish(); });
 
   function read(line) {
-    // THE BOUND APPLIES TO A LINE THAT ENDED, TOO. The residual check below the
-    // split can only ever see a frame with no newline in it, so a single
-    // complete frame of any size walked past it into `JSON.parse`. See
+    // The data handler's check only sees an unterminated line. See
     // MAX_FRAME_LENGTH.
     if (line.length > maxFrameLength) {
       return fail('protocol', { note: `a frame of ${line.length} characters passed the ${maxFrameLength} this connection allows` });
@@ -435,8 +354,7 @@ export function createCodexAppServer({
       return fail('protocol', { note: 'a line on stdout could not be read as a message, and it may have been an approval request' });
     }
 
-    // Three kinds, and the test is `!== undefined` in both places because the
-    // server's ids start at zero.
+    // `!== undefined`, because the server's ids start at zero.
     if (msg.id !== undefined && msg.method !== undefined) return serverRequest(msg);
     if (msg.id !== undefined) return response(msg);
     if (typeof msg.method === 'string') return notification(msg);
@@ -452,11 +370,9 @@ export function createCodexAppServer({
       waiting.reject(new Error(`codex app-server refused ${waiting.method}: ${msg.error.message ?? JSON.stringify(msg.error)}`));
       return;
     }
-    // Synchronously, INSIDE the read loop, before the next line of this chunk
-    // is looked at. A promise resolves on a microtask and the rest of the chunk
-    // is read on this one, so registering the thread's handlers off the
-    // resolved promise would miss any notification the server packed in behind
-    // the response -- which for `thread/start` is the thread's own first event.
+    // `onResult` runs before the next line is read. Registering a thread off
+    // the resolved promise would miss notifications sent right behind the
+    // response, such as the thread's first event.
     try { waiting.onResult?.(msg.result); } catch { /* the caller's bookkeeping, not ours */ }
     waiting.resolve(msg.result);
   }
@@ -468,94 +384,60 @@ export function createCodexAppServer({
     else call(() => onNotification?.(msg.method, msg.params));
   }
 
-  /* ------------------------------- approvals ------------------------------ */
-
   /**
-   * Answer a server request. NEVER awaits: the handler's promise is left to
-   * settle on its own, because the founder may take fifteen minutes and every
-   * other thread on this process reads through the same loop.
+   * Answer a server request. Never awaits the handler, because one card waits
+   * for a person and every thread reads through this loop.
    */
   function serverRequest(msg) {
-    // A SECOND REQUEST ON AN ID THAT IS STILL OPEN IS NOT A SECOND CARD.
-    //
-    // `openCards` is keyed by the server's request id, so a duplicate used to
-    // overwrite the entry without clearing the timer it replaced. The first
-    // card's deadline then went on running and denied the SECOND card at its
-    // own hour, and the first card's real answer -- her click -- landed on a map
-    // entry that had already been swapped and was dropped.
-    //
-    // There is no way to answer two open requests that share one id: whichever
-    // we write, the server matches it to one of them and the other hangs. That
-    // is the same unresolvable input as an unreadable frame, so it gets the same
-    // answer this file gives every one of those. Loud, and with `finish` denying
-    // every card that was open, so nothing is left waiting on a decision it can
-    // never receive.
+    // Two open requests on one id cannot both be answered, so treat it like an
+    // unreadable frame and end the connection.
     if (openCards.has(msg.id)) {
       return fail('protocol', { note: `codex app-server raised a second request on id ${msg.id} while the first was still open, and one answer cannot settle two` });
     }
+    // THREE ROADS NOW, AND A REQUEST TAKES ONE OF THEM BY DECISION (w-36c51443df).
+    //
+    // There used to be two: a card, or one anonymous error for everything else.
+    // Six of the ten requests the schema allows took the second, with nothing
+    // anywhere naming which -- so the only way to learn that
+    // `account/chatgptAuthTokens/refresh` was being refused was to read the
+    // schema by hand. Now a refusal says what it refused, and a method in
+    // neither table is REPORTED, because a new one arriving in silence is how
+    // this lasted.
+    const cannot = CANNOT_SERVE.get(msg.method);
+    if (cannot) return write({ jsonrpc: '2.0', id: msg.id, error: cannotServe(msg.method, cannot) });
+
     const shape = APPROVAL_SHAPE.get(msg.method);
-    if (!shape) return write({ jsonrpc: '2.0', id: msg.id, error: { ...REFUSAL_ERROR } });
+    if (!shape) {
+      call(() => onUnknownRequest?.(msg.method, msg.params));
+      return write({ jsonrpc: '2.0', id: msg.id, error: cannotServe(msg.method, UNKNOWN_REQUEST) });
+    }
 
     const id = threadOf(msg.params);
     const handler = id === null ? null : threads.get(id)?.onApproval;
-    // A refusal that is already certain does not wait out the clock: there is
-    // nobody to ask, so the turn hears no now rather than in fifteen minutes.
+    // Nobody to ask, so refuse now rather than at the deadline.
     if (typeof handler !== 'function') return write({ jsonrpc: '2.0', id: msg.id, ...refusal(shape) });
 
-    openCard(msg.id, shape);
+    openCards.add(msg.id);
     Promise.resolve()
       .then(() => handler(msg.method, msg.params))
       .then((answered) => answerCard(msg.id, translate(shape, answered) ?? refusal(shape)))
       .catch(() => answerCard(msg.id, refusal(shape)));
   }
 
-  /** Start her deadline. Expiry denies, once, and closes the card. */
-  function openCard(id, shape) {
-    const timer = setTimeout(() => {
-      if (openCards.delete(id)) write({ jsonrpc: '2.0', id, ...refusal(shape) });
-    }, approvalTimeoutMs);
-    timer?.unref?.();
-    openCards.set(id, timer);
-  }
-
   /**
-   * The one answer this card will ever get.
-   *
-   * A card the deadline has already denied is CLOSED, so her late click lands
-   * here and is dropped rather than approving something the turn stopped
-   * waiting for twenty minutes ago. Same for a card whose connection died.
+   * The only answer a card gets. A card on a dead connection is already closed,
+   * so a late answer is dropped.
    */
   function answerCard(id, body) {
-    if (!openCards.has(id)) return;
-    clearTimeout(openCards.get(id));
-    openCards.delete(id);
+    if (!openCards.delete(id)) return;
     write({ jsonrpc: '2.0', id, ...body });
   }
 
-  // A REFUSAL IS SAID IN THE VOCABULARY THE METHOD TAKES, which for an
-  // elicitation is `decline` rather than an error frame. Both reach the model
-  // as a no; the difference is that a declined elicitation leaves the tool call
-  // declined and the turn running, while the error frame is a protocol failure
-  // on a request the server expected an answer to.
-  const refusal = (shape) => {
-    if (shape === 'decision') return { result: { decision: REFUSAL_DECISION } };
-    if (shape === 'elicitation') return { result: { action: REFUSAL_DECISION } };
-    return { error: { ...REFUSAL_ERROR } };
-  };
-
   /**
-   * The handler's answer, in the shape the method actually takes, or null if it
-   * is not one this protocol version can express. Null is the whole
-   * deny-by-default rule: everything unrecognised lands there.
-   *
-   * The elicitation's three actions are `accept`, `decline` and `cancel`, read
-   * off `McpServerElicitationRequestResponse` in the CLI's own schema dump on
-   * 2026-09-22. `acceptForSession` is NOT among them, so a handler that answers
-   * a tool call with the word a command approval uses is refused rather than
-   * quietly turned into a yes. `content` is omitted: the accept this app sends
-   * answers a permission question whose `requestedSchema` has no properties,
-   * and a form that really does ask for typed input is not something Agentbox can
-   * fill in for her.
+   * The handler's answer in the shape the method takes, or null, which means
+   * refuse. An elicitation has no `acceptForSession`, so that word is refused
+   * rather than turned into a yes. `content` is never sent, because Agentbox
+   * only answers elicitations that ask for no input.
    */
   function translate(shape, answered) {
     if (shape === 'decision') {
@@ -564,27 +446,24 @@ export function createCodexAppServer({
     if (shape === 'elicitation') {
       return ELICITATION_ACTIONS.includes(answered) ? { result: { action: answered } } : null;
     }
+    if (shape === 'legacy') {
+      // Our word in, Codex's older word out. A word that is not one of our four
+      // answers null, which lands on the deny-by-default rule exactly as it
+      // does for every other shape.
+      const said = Object.hasOwn(LEGACY_DECISIONS, answered) ? LEGACY_DECISIONS[answered] : null;
+      return said ? { result: { decision: said } } : null;
+    }
     const grant = grantFrom(answered);
     return grant ? { result: grant } : null;
   }
 
   /**
-   * A permissions grant, CHECKED FIELD BY FIELD AND THEN BUILT FRESH.
-   *
-   * This is the one server request whose answer is a document rather than a
-   * word, and the document widens a sandbox. Forwarding the caller's object
-   * would mean checking one value and sending another: a `toJSON`, or a getter,
-   * runs again inside JSON.stringify, and what reaches Codex is whatever it
-   * returns the second time. So nothing the handler returned reaches the wire
-   * by reference, every value is read exactly once, and an unknown key anywhere
-   * -- on the object, in the profile, or in either area -- is a refusal rather
-   * than something to pass along. Inherited properties do not count, so a grant
-   * on a prototype is not a grant.
-   *
-   * The `entries` form of the filesystem profile is deliberately NOT accepted.
-   * Its shape has three nested variants, none of them measured, and a grant
-   * this file cannot check is a grant it has no business sending. The slice
-   * that needs it measures it.
+   * A permissions grant, checked field by field and built fresh. This answer
+   * widens a sandbox, so nothing the handler returned is sent by reference: a
+   * getter or `toJSON` could give JSON.stringify a different value from the one
+   * checked. Any unknown key is a refusal, and inherited properties do not
+   * count. The `entries` form of the filesystem profile is refused because its
+   * shape is unmeasured.
    */
   function grantFrom(answered) {
     if (!plain(answered)) return null;
@@ -626,8 +505,7 @@ export function createCodexAppServer({
     }
 
     const grant = { permissions };
-    // `turn` when nobody said, because it is the narrower of the two and a
-    // grant that outlives the question it answered is not that answer.
+    // Default to `turn`, the narrower scope.
     if (top.includes('scope')) {
       if (answered.scope !== 'turn' && answered.scope !== 'session') return null;
       grant.scope = answered.scope;
@@ -641,9 +519,8 @@ export function createCodexAppServer({
     return grant;
   }
 
-  // Almost every line carries `params.threadId`. `thread/started` is the
-  // exception and keeps it at `params.thread.id`, which is the thread's own
-  // first event and therefore the worst one to lose.
+  // Most lines carry `params.threadId`, but `thread/started` has
+  // `params.thread.id`.
   function threadOf(params) {
     if (!plain(params)) return null;
     if (typeof params.threadId === 'string') return params.threadId;
@@ -651,17 +528,14 @@ export function createCodexAppServer({
     return null;
   }
 
-  // A listener that throws must not take the read loop with it: one thread's
-  // bad handler would otherwise stop every other thread on this process.
+  // A listener that throws must not stop the read loop for every other thread.
   function call(fn) {
     try { fn(); } catch { /* the caller's problem, and not worth the fleet */ }
   }
 
-  /* ------------------------------ the ending ------------------------------ */
-
   /** Why this connection ended, in a sentence that names something actionable. */
-  function cause() {
-    const tail = stderrText.trim().split('\n').slice(-3).join(' ').trim();
+  function cause({ withTail = true } = {}) {
+    const tail = withTail ? stderrText.trim().split('\n').slice(-3).join(' ').trim() : '';
     const said = tail ? `: ${tail}` : '';
     if (!gone) return `the connection to codex app-server failed on write${said}`;
     switch (gone.reason) {
@@ -674,14 +548,9 @@ export function createCodexAppServer({
   }
 
   /**
-   * The connection is over, whatever ended it.
-   *
-   * Marked SYNCHRONOUSLY, so that from this instant no further request is
-   * accepted and no late approval can be written. Finished once stdout has
-   * drained, so the tracing tail that explains it is complete rather than
-   * whatever happened to have arrived by the moment `exit` fired -- exit
-   * routinely beats the last of the pipe, and "exited with code 1" on its own
-   * is not a cause anybody can act on.
+   * The connection is over. It is marked at once, so no further request or late
+   * approval is written, and finished once stdout drains, because `exit` often
+   * arrives before the last of the tracing that explains it.
    */
   function fail(reason, detail = {}) {
     if (gone) return;
@@ -698,21 +567,17 @@ export function createCodexAppServer({
   }
 
   /**
-   * Everything that was waiting finds out, once, and nothing stays registered.
-   *
-   * A promise nobody settles is exactly how a work item strands, so an
-   * in-flight request rejects rather than staying pending, and every watched
-   * thread is told rather than left listening to a dead pipe. Deadlines are
-   * cancelled and registrations dropped: a card that can never be answered and
-   * a thread that can never be spoken to are only holding this client alive.
+   * Settles everything once. Pending requests reject, watched threads get
+   * `onClosed`, and every timer and registration is dropped, so no work item is
+   * left waiting and nothing keeps the client alive.
    */
   function finish() {
     if (finished) return;
     finished = true;
     gone.stderr = stderrText;
+    gone.why = cause({ withTail: false });
     const why = cause();
 
-    for (const timer of openCards.values()) clearTimeout(timer);
     openCards.clear();
 
     for (const [id, waiting] of pending) {
@@ -725,8 +590,6 @@ export function createCodexAppServer({
     for (const handlers of listening) call(() => handlers.onClosed?.(gone));
   }
 
-  /* -------------------------------- the API ------------------------------- */
-
   const watch = (threadId, handlers = {}) => { threads.set(threadId, handlers); return threadId; };
 
   return {
@@ -734,15 +597,10 @@ export function createCodexAppServer({
     request: (method, params) => send(method, params),
 
     /**
-     * The whole handshake, not half of it: the request, and then `initialized`
-     * once the server has answered.
-     *
-     * `initialized` is the only client notification in the 0.148.0 schema and
-     * the documented lifecycle puts it before any other operation. 0.148
-     * tolerates its absence, which is why the first draft never noticed it was
-     * missing; a later one need not. It is sent from the response hook, so it
-     * can never overtake the response, and it is never sent at all if the
-     * server refused the handshake.
+     * The handshake: `initialize`, then the `initialized` notification once the
+     * server answers. The protocol wants it before any other call, though 0.148
+     * does not enforce that. Sent from the response hook, so it cannot overtake
+     * the response and is not sent if the server refuses.
      */
     initialize: () => send('initialize', { clientInfo }, () => notify('initialized')),
 
@@ -760,27 +618,36 @@ export function createCodexAppServer({
     ).then((result) => ({ threadId: result?.thread?.id ?? null, thread: result?.thread ?? null, result })),
 
     /**
-     * Continue a thread we already know the id of, so the watch goes on first
-     * and no event of the resumed thread can arrive unowned.
+     * Continue a known thread. The watch goes on before the request, so no
+     * event of the resumed thread arrives unowned, and comes off if the server
+     * refuses the resume.
      *
-     * A resume the server REFUSES never became a thread, so the watch is rolled
-     * back. Left installed, it would hand every later line carrying that id to
-     * a listener for a session that does not exist.
+     * Without `excludeTurns` the answer carries every turn in one frame, and a
+     * long thread passes `maxFrameLength`, which ends this connection for every
+     * thread on it. Codex before 0.155 refuses the field without the
+     * experimental API, so that Codex is asked again in full.
      */
     resumeThread: (params = {}, handlers = {}) => {
       const id = typeof params.threadId === 'string' ? params.threadId : null;
       if (id) watch(id, handlers);
-      return send('thread/resume', params).catch((err) => {
-        if (id && threads.get(id) === handlers) threads.delete(id);
-        throw err;
-      });
+      const lean = resumeLeavesTurns;
+      return send('thread/resume', lean ? { ...params, excludeTurns: true } : params)
+        .catch((err) => {
+          if (!lean || !/excludeTurns/.test(err?.message ?? '')) throw err;
+          resumeLeavesTurns = false;
+          return send('thread/resume', params);
+        })
+        .catch((err) => {
+          if (id && threads.get(id) === handlers) threads.delete(id);
+          throw err;
+        });
     },
 
     startTurn: (threadId, params = {}) => send('turn/start', { threadId, ...params }),
 
     /** Both ids: a turn is not identified by either one alone. */
     interruptTurn: (threadId, turnId) => send('turn/interrupt', { threadId, turnId }),
-    steerTurn: (threadId, expectedTurnId, text) => send('turn/steer', {threadId, expectedTurnId, input:[{type:'text',text}]}),
+    steerTurn: (threadId, expectedTurnId, text, pictures = []) => send('turn/steer', {threadId, expectedTurnId, input:[{type:'text',text}, ...pictures.map((p) => ({type:'localImage', path:p}))]}),
 
     watch,
     unwatch: (threadId) => threads.delete(threadId),

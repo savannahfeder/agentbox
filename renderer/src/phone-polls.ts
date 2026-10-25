@@ -15,6 +15,25 @@ export const PHONE_PUSH_MS = 2_000;
 export const pollEvery = (ms: number, phone: boolean) => (phone ? Math.max(ms, PHONE_POLL_MS) : ms);
 
 /**
+ * A read never asked again on top of itself. A call while one is out asks
+ * once more after it, however many calls came, so the newest state still
+ * arrives (tests/a-phone-never-piles-up-requests-on-its-computer).
+ */
+export function oneAtATime(read: () => Promise<unknown>) {
+  let out = false;
+  let again = false;
+  const run = (): void => {
+    out = true;
+    again = false;
+    read().catch(() => {}).finally(() => {
+      out = false;
+      if (again) run();
+    });
+  };
+  return () => { if (out) again = true; else run(); };
+}
+
+/**
  * `fn` at most once every `ms`: the first call at once, and the latest of any
  * that came in between once the time is up, so the last change is never missed.
  */

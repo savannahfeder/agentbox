@@ -50,11 +50,13 @@ describe('the panel opens with the thread’s name', () => {
   // properties sit at its foot, Priority second. It was properties first.
   // The heading carries a pencil since it renames the thread (w-ab3d51dc7d),
   // so these read the name up to that pencil.
-  const named = (html) => html.match(/<h2 class="ts-title"[^>]*>([^<]*)<svg class="ts-pen"/)?.[1];
+  // The name is inside .ts-title-text since w-c9da359466: the clamp moved
+  // off the click target so its padding could not leak a fourth line.
+  const named = (html) => html.match(/<span class="ts-title-text">([^<]*)<svg class="ts-pen"/)?.[1];
   it('says the name the row shows, the label, first and over the three lines', () => {
     const html = draw(item());
     expect(named(html)).toBe('Acme renewal terms');
-    expect(html).toMatch(/<\/svg><\/h2><div class="ts-sec">/);
+    expect(html).toMatch(/<\/svg><\/span><\/h2><div class="ts-sec">/);
     expect(text(html)).toMatch(/^Acme renewal terms Context .* Status In progress Priority \w+ Owner You Project Northwind/);
   });
   it('falls back to the title on a thread with no label', () => {

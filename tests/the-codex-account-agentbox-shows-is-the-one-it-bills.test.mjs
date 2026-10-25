@@ -221,14 +221,15 @@ describe('a second Codex login', () => {
     expect(appServerSpawns()).toHaveLength(1);
   });
 
-  // AND THE CAP NOW MEANS SOMETHING. It reads the same list, so a login that is
-  // real widens it and a machine with one login is exactly as it was.
-  it('widens the Codex cap because it widens what actually runs', () => {
+  // AND THE CAP IS THE SAME CAP (w-dac993a554). A second login used to widen
+  // it, because work rotated across both and both really were running; one
+  // account runs the work now, so adding a login adds no agents.
+  it('leaves the Codex cap where it was when a second login is added', () => {
     const second = mkdtempSync(join(tmpdir(), 'second-codex-'));
     dirs.push(second);
     const one = build().sup;
     const two = build({ codexProfiles: ['default', second] }).sup;
-    expect(two._capacityFor('codex')).toBe(one._capacityFor('codex') * 2);
+    expect(two._capacityFor('codex')).toBe(one._capacityFor('codex'));
   });
 
   // A blank or missing list is the one login she has, unchanged.

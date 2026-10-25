@@ -92,7 +92,7 @@ const spoken = (src) => src
    so the checks about a row's wording read this and the checks about where the
    cards SIT still read the pane. */
 const cardSource = spoken(settings.slice(
-  settings.indexOf('type CardAccount = {'),
+  settings.indexOf('type CardAccount ='),
   settings.indexOf('const Group = ({'),
 ));
 
@@ -148,10 +148,11 @@ describe('the account rows never tell anybody to get a second subscription', () 
   /* * THE HEADING NEVER CHANGES SHAPE WITH THE COUNT.
   */
   it('heads the list with one phrase that works at any number', () => {
-    // The page is titled with the agent's name, and the rows are headed
-    // "Signed in", neither of which can grow a plural whatever the count is.
+    // The page is titled with the agent's name, and the tiles are headed
+    // "Signed in" on either agent's page, which cannot grow a plural whatever
+    // the count is.
     expect(said).toMatch(/title=\{agent\.name\}/);
-    expect(said).toMatch(/label="Signed in"/);
+    expect(said).toMatch(/name="Signed in"/);
     expect(said).not.toMatch(/label="Accounts"/);
     expect(said).not.toMatch(/Claude accounts/);
   });
@@ -160,7 +161,8 @@ describe('the account rows never tell anybody to get a second subscription', () 
      config directory, and it was the row's heading.
   */
   it('heads each row with the email rather than the config folder', () => {
-    expect(cardSource).toMatch(/const label = a\.email \?\? 'Not signed in'/);
+    const once = fs.readFileSync(path.join(root, 'renderer/src/accounts-once.ts'), 'utf8');
+    expect(once).toMatch(/name: h\?\.email \?\? .*'Not signed in'/);
     expect(said).not.toMatch(/label=\{a\.label\}/);
   });
 
@@ -172,18 +174,17 @@ describe('the account rows never tell anybody to get a second subscription', () 
 
   it('still lets a signed-out account say so and be signed back in', () => {
     expect(cardSource).toMatch(/trouble: a\.trouble\?\.note \?\? null/);
-    expect(cardSource).toMatch(/CopyCmd cmd=\{`CLAUDE_CONFIG_DIR=\$\{a\.dir\} claude`\}/);
-    // And it is the ONLY thing that speaks under a row, so a healthy account
-    // carries no sentence at all. A troubled one is also not a thing to pick:
-    // it leaves the clickable row and becomes something to fix.
-    expect(cardSource).toMatch(/if \(a\.trouble\) \{/);
-    expect(cardSource).toMatch(/<Row key=\{a\.profile\} label=\{label\} desc=\{a\.trouble\}>/);
+    expect(cardSource).toMatch(/cmd: trouble && h\?\.dir \? `CLAUDE_CONFIG_DIR=\$\{h\.dir\} claude`/);
+    // A troubled tile says what is wrong in place of its meters, with the
+    // command that fixes it.
+    expect(cardSource).toMatch(/\{a\.trouble \? \(/);
+    expect(cardSource).toMatch(/<div className="acct-tile-trouble">\{a\.trouble\}<\/div>/);
   });
 
   it('still raises the two-folders-one-subscription line above the list', () => {
     // Above the rows rather than inside one of them, because it is a fact
     // about the pair, and only on Claude Code's page, whose pair it is.
-    expect(said).toMatch(/warn=\{engine === 'claude' \? w\.accountsNote : null\}/);
+    expect(said).toMatch(/<Place[\s\S]{0,900}warn=\{engine === 'claude' \? w\.accountsNote : null\}/);
   });
 
   /*
@@ -193,7 +194,8 @@ describe('the account rows never tell anybody to get a second subscription', () 
      the opposite, and the difference is the changed rule above. */
   it('offers the same Add account row on either agent', () => {
     expect(cardSource).not.toMatch(/\{agent\.engine === 'codex' && \(/);
-    expect(cardSource).toMatch(/<Row label="Add account">\s*<button type="button" className="set-ghost" onClick=\{\(\) => onAdd\(agent\)\}>Add<\/button>/);
+    expect(cardSource).toMatch(/className="acct-tile acct-tile-add" onClick=\{onAdd\}>Add account<\/button>/);
+    expect(spoken(accountsPane)).toMatch(/<Place[\s\S]{0,900}onAdd=\{\(\) => void addAccount\(agent\)\}/);
     // And it still says nothing about what a second one would add, which is the
     // line that did not move.
     expect(cardSource).not.toMatch(/adds capacity/);
@@ -243,10 +245,10 @@ describe('where the account rows live', () => {
   // SINCE THE REDRAW (w-ccadd13c46): each agent's own page, which the menu
   // names by the agent, so the place to look is the word she is looking for.
   it('is the coding agent\'s own page', () => {
-    expect(spoken(accountsPane)).toMatch(/<AccountRows/);
+    expect(spoken(accountsPane)).toMatch(/name="Signed in"/);
     expect(cardSource).toMatch(/w\.accounts \?\? \[\]\)\.map/);
     const general = settings.slice(settings.indexOf("pane === 'general' && ("), settings.indexOf("pane === 'claude' && enginePage"));
-    expect(general).not.toContain('<AccountRows');
+    expect(general).not.toContain('name="Signed in"');
   });
 
   // The reading order of General: is Claude Code here, who is it signed in as,
@@ -266,14 +268,16 @@ describe('where the account rows live', () => {
   // The claim that survives is the first half of it: the agents lead the page.
   // The agent's page reads in the order a person asks: how much is left, who
   // it is signed in as, then what it may do.
-  it('reads usage, then who is signed in, then permissions', () => {
+  // Since 2026-10-16 the usage of the account in use sits under its own row,
+  // and since 2026-10-21 every account is one tile, wherever it is signed in.
+  it('reads who is signed in with how much is left, then permissions', () => {
     const said = spoken(accountsPane);
-    const usage = said.indexOf('label="Usage"');
-    const who = said.indexOf('label="Signed in"');
+    const who = said.indexOf('name="Signed in"');
+    const usage = said.indexOf('accounts={tiles}');
     const perms = said.indexOf('label="Permissions"');
-    expect(usage).toBeGreaterThan(-1);
-    expect(who).toBeGreaterThan(usage);
-    expect(perms).toBeGreaterThan(who);
+    expect(who).toBeGreaterThan(-1);
+    expect(usage).toBeGreaterThan(who);
+    expect(perms).toBeGreaterThan(usage);
     expect(said).not.toContain('<Updates');
   });
 });

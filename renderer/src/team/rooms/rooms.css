@@ -1,0 +1,553 @@
+/* ROOMS (alpha, w-3d0fa23ffb), as approved in round 23. Only the app's own
+   tokens, and the app's own line in both looks: the stronger Light line of
+   round 22 answered a screen's contrast fault, not the design. */
+:root { --rm-line: var(--line); }
+
+.rm-pic { display: block; flex: none; object-fit: cover; border: 1px solid var(--line-strong); box-sizing: border-box; background: var(--bg-selected); }
+.rm-ini { text-align: center; font-family: var(--mono); letter-spacing: .04em; background: var(--film-strong); color: var(--text-dim); }
+.rm-quiet { margin-left: 9px; flex: none; font: 12px var(--mono); color: var(--text-faint); }
+.rm-label { font: 11px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+.rm-label b { font-weight: 400; color: var(--text-dim); margin-left: 6px; }
+.rm-btn { height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); background: var(--control-face); box-shadow: var(--control-shadow); color: var(--text); font: inherit; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; box-sizing: border-box; cursor: default; }
+.rm-btn svg { color: var(--text-dim); }
+.rm-btn:hover { background: var(--wash-strong); }
+.rm-btn.go { border-color: var(--text-faint); }
+.rm-btn:disabled { color: var(--text-faint); }
+.rm-ag { font: 10.5px/14px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }
+.rm-ag b { font-weight: 400; color: var(--text-dim); }
+.rm-ag .live-mark { width: 13px; height: 13px; gap: 1.5px; color: var(--text); }
+.rm-priv { color: var(--text-faint); }
+.rm-nm { display: flex; align-items: baseline; min-width: 0; color: var(--text); }
+.rm-nm > .n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-pop { background: var(--pop); border: 1px solid var(--line-strong); box-shadow: var(--shadow-lg); }
+
+/* Messages and Rooms sit under Threads, one gap below it. */
+.workspace-tabs.rm-msgnav { margin-top: 3px; }
+
+.rm-sep { width: 1px; height: 14px; background: var(--line-strong); flex: none; align-self: center; }
+
+/* the Rooms page, in the threads table's rows and type */
+.rm-rooms { flex: 1; min-height: 0; overflow-y: auto; }
+.th-grid.rm-rgrid { grid-template-columns: 200px 150px 170px minmax(0, 1fr) 96px; }
+.rm-rnm { display: flex; align-items: center; gap: 9px; }
+.rm-rnm svg { color: var(--text-faint); flex: none; }
+.rm-rnm.muted { color: var(--text-dim); }
+.rm-rpp { display: flex; align-items: center; gap: 10px; }
+.rm-rpp .fs { display: flex; }
+.rm-rpp .fs .rm-pic + .rm-pic { margin-left: -3px; outline: 2px solid var(--skin-solid, var(--surface)); }
+.rm-rpp .n { font: 11.5px var(--mono); color: var(--text-dim); }
+.th-cell-title.rm-rlast { color: var(--text-dim); }
+.rm-rdots { padding: 0 6px; }
+.rm-rdots svg { width: 15px; height: 15px; }
+.th-table .row.menu .rm-rdots { opacity: 1; pointer-events: auto; }
+.th-table .row.menu .th-when { visibility: hidden; }
+.rm-rfind { color: var(--text-faint); font-size: 14px; }
+.rm-rfind:hover { color: var(--text); }
+
+/* the page */
+.list-pane.rm-open { display: flex; flex-direction: column; overflow: hidden; }
+/* Search finds threads, so it steps out while a room is open. */
+.list-pane.rm-open .th-bar .th-search { display: none; }
+.rm-split { flex: 1; min-height: 0; display: flex; }
+.rm-main { flex: 1; min-width: 0; padding: 12px 24px 24px var(--text-x, 32px); overflow-y: auto; position: relative; }
+/* A page with no chat beside it ends where the top bar's button does. */
+.rm-main.wide { padding-right: 20px; }
+/* Every line is drawn once: overlapping translucent hairlines double. */
+.rm-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.rm-grid > .rm-card:nth-child(-n+4) { border-top: 1px solid var(--rm-line); }
+.rm-grid > .rm-card:nth-child(4n+1) { border-left: 1px solid var(--rm-line); }
+.rm-card { position: relative; height: 180px; box-sizing: border-box; border-right: 1px solid var(--rm-line); border-bottom: 1px solid var(--rm-line); padding: 18px 12px 14px; display: flex; flex-direction: column; align-items: center; text-align: center; background: none; font: inherit; color: inherit; cursor: default; min-width: 0; }
+.rm-card .rm-nm { margin-top: 12px; font-size: 13.5px; justify-content: center; max-width: 100%; }
+.rm-card .rm-on { margin-top: 6px; font-size: 12.5px; line-height: 17px; color: var(--text-dim); max-width: 100%; }
+.rm-card .rm-ag { margin-top: auto; }
+.rm-card:hover { background: var(--wash); }
+.rm-card.sel { background: var(--wash); box-shadow: inset 0 0 0 1px var(--text-faint); }
+.rm-check { position: absolute; left: 10px; top: 10px; width: 16px; height: 16px; background: var(--text); color: var(--bg); display: flex; align-items: center; justify-content: center; }
+.rm-notice { display: flex; align-items: center; gap: 10px; min-height: 36px; margin: 0 0 10px; padding: 0 6px 0 12px; border: 1px solid var(--rm-line); background: var(--wash); font-size: 13px; color: var(--text); }
+.rm-notice svg { color: var(--text-dim); flex: none; }
+.rm-notice .rm-btn { margin-left: auto; height: 24px; font-size: 12.5px; padding: 0 10px; }
+.rm-empty { margin-top: 28px; max-width: 560px; display: flex; flex-direction: column; gap: 12px; }
+.rm-empty .t { font-size: 15px; color: var(--text); }
+.rm-empty .s { font-size: 13px; color: var(--text-faint); margin-top: -6px; }
+.rm-selbar { position: sticky; bottom: 0; margin: 16px auto 0; width: max-content; z-index: 6; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 12px; font-size: 13px; color: var(--text); white-space: nowrap; }
+.rm-selbar .faces { display: flex; }
+.rm-selbar .x { color: var(--text-faint); display: flex; background: none; border: 0; padding: 4px; }
+/* The room as a board (RoomBoard.tsx): a face beside the name over the title.
+   Its columns, three or four with Later, fit beside the chat from a 1440
+   window up; below that it scrolls sideways rather than squeezing. The right
+   gap is the board's own, so it is still there at the end of a scroll. */
+.rm-main.board { overflow: auto; padding-right: 0; }
+.rm-main.board > .rm-notice { margin-right: 24px; }
+.rm-main.board > .rm-empty { margin: 4px 24px 24px 0; }
+.rm-board { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(170px, 1fr)); gap: 0 18px; padding-right: 24px; width: fit-content; min-width: 100%; box-sizing: border-box; align-items: start; }
+.rm-board .th-col-h { height: 32px; }
+.rm-board .th-col-h .live-mark { width: 12px; height: 12px; gap: 1.5px; margin-right: 9px; color: var(--text); }
+.rm-brow { display: flex; align-items: flex-start; gap: 10px; width: 100%; min-width: 0; padding: 10px 0; border: 0; border-top: 1px solid var(--line); background: none; font: inherit; text-align: left; color: var(--text-dim); cursor: pointer; }
+.rm-brow:last-child { border-bottom: 1px solid var(--line); }
+/* Centred on the name and the title's one line. */
+.rm-brow > .tm-av { width: 24px; height: 24px; line-height: 22px; font-size: 8.5px; margin-top: 5px; }
+.rm-brow .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.rm-brow .who { font-size: 12px; line-height: 16px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-brow .t { font-size: 13.5px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-brow.running { color: var(--text); }
+.rm-brow.done { color: var(--text-faint); }
+.rm-brow:hover .t { color: var(--text); }
+.rm-bnone { padding: 9px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--text-faint); }
+.th-pop.rm-viewpop { width: max-content; max-width: 470px; }
+.rm-viewpop .opts > button .th-st { margin-right: 0; top: 0; }
+.rm-viewnote { font-size: 12px; color: var(--text-faint); }
+
+/* the chat */
+/* The max keeps BOARD_LEAST (room-rules) for the board when the window narrows. */
+.rm-chat { width: var(--rm-chat-w, 41%); min-width: 300px; max-width: min(720px, calc(100% - 620px)); flex: none; border-left: 1px solid var(--rm-line); display: flex; flex-direction: column; min-height: 0; position: relative; }
+.rm-chat-grip { position: absolute; left: -4px; top: 0; bottom: 0; width: 7px; z-index: 6; cursor: col-resize; }
+.rm-chat-grip::after { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 1px; background: transparent; transition: background .12s; }
+.rm-chat-grip:hover::after, .rm-chat.dragging .rm-chat-grip::after { background: var(--accent); }
+.rm-chat.dragging, .rm-chat.dragging * { user-select: none; }
+.rm-chat-head { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 14px; height: 40px; flex: none; border-bottom: 1px solid var(--rm-line); }
+.rm-switch { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; margin-left: -8px; font: inherit; font-size: 13.5px; color: var(--text); background: none; border: 0; min-width: 0; }
+.rm-switch > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-switch:hover, .rm-switch.open { background: var(--wash-strong); }
+.rm-switch svg { color: var(--text-faint); flex: none; }
+.rm-unread { width: 6px; height: 6px; background: var(--accent); flex: none; }
+.rm-chat-head .ic { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: var(--text-dim); background: none; border: 0; flex: none; }
+.rm-chat-head .rm-switch + .ic { margin-left: auto; }
+.rm-chat-head .ic:hover, .rm-chat-head .ic.on { background: var(--wash-strong); color: var(--text); }
+.rm-chat-list { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 20px 4px; display: flex; flex-direction: column; }
+.rm-chat-list.more-above { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 36px); mask-image: linear-gradient(to bottom, transparent 0, #000 36px); }
+.rm-cm { padding: 8px 0 6px; }
+.rm-cm .h { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text); line-height: 18px; }
+.rm-cm .h em { font: normal 10.5px var(--mono); color: var(--text-faint); }
+.rm-cm .tx { font-size: 13.5px; line-height: 20px; color: var(--text); margin-top: 3px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rm-cm .tx b { font-weight: 400; background: var(--wash-strong); padding: 0 3px; }
+.rm-cm.cont { padding-top: 0; }
+.rm-cm.cont .tx { margin-top: 0; }
+.rm-cm .rep { display: flex; align-items: center; gap: 3px; margin-top: 5px; font: 10px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); background: none; border: 0; padding: 0; }
+.rm-cm .rep:hover { color: var(--text-dim); }
+.rm-cm .act { display: none; margin-left: auto; font: 10px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); background: none; border: 0; padding: 0; }
+.rm-cm:hover .act { display: inline; }
+.rm-cm.root { padding-bottom: 12px; border-bottom: 1px solid var(--rm-line); margin-bottom: 4px; }
+.rm-day { margin: 6px 0 4px; }
+.rm-compose { margin: 8px 20px 20px; flex: none; border: 1px solid var(--line-strong); background: var(--control-face); display: flex; flex-direction: column; }
+/* THE DIRECT CHAT'S BOX: the words, what is attached, then the bar and Send. */
+.rm-compose-input { min-height: 40px; max-height: 200px; overflow-y: auto; padding: 10px 12px 4px; box-sizing: border-box; color: var(--text); font-size: 13.5px; line-height: 20px; }
+.rm-compose .attach-row { padding: 2px 12px 8px; }
+.rm-compose .attach-thumb img { height: 48px; max-width: 120px; }
+.rm-compose-bar { display: flex; align-items: center; gap: 10px; padding: 4px 8px 6px 8px; }
+.rm-compose-bar .fmt-bar { margin-right: auto; min-width: 0; }
+.rm-compose-bar .dock-send { padding: 4px 12px; }
+.rm-compose-bar .dock-send:disabled { color: var(--text-faint); background: none; border-color: var(--line-strong); cursor: default; }
+.rm-chat .rm-compose-bar .fmt-mark, .rm-chat .rm-compose-bar .fmt-gap { display: none; }
+
+/* What a direct chat's message wears, worn by a room's too. */
+.rm-cm { position: relative; }
+.rm-cm:hover > .chat-acts { opacity: 1; pointer-events: auto; }
+/* The body is `user-select: none`, so the name, time and words opt back in. The
+   face does not, or its initials would ride along in every copy. */
+.rm-cm .h, .rm-cm .tx { user-select: text; -webkit-user-select: text; }
+.rm-cm .rm-pic { user-select: none; -webkit-user-select: none; }
+.rm-cm .tx p { margin: 0; white-space: pre-line; }
+.rm-cm .tx p + p { margin-top: 8px; }
+.rm-cm .tx a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.rm-cm .tx code { font-family: var(--mono); font-size: .88em; background: var(--wash-strong); padding: 1px 4px; }
+.rm-cm .tx .rm-at { font-weight: 400; background: var(--wash-strong); padding: 0 3px; }
+.rm-cm .tx .rm-at.me { box-shadow: inset 0 -2px 0 var(--accent); }
+.rm-cm .tx .inline-image { display: block; max-width: min(100%, 360px); max-height: 240px; margin-top: 6px; }
+.rm-cm .tx .inline-image.arriving { width: min(100%, 360px); height: 160px; background: var(--wash); }
+.rm-cm .rm-file { display: inline-block; margin-top: 4px; padding: 3px 8px; border: 1px solid var(--line); font-size: 12.5px; color: var(--text-dim); }
+.rm-cm .chat-chips { margin-top: 6px; }
+.rm-cm .rm-edited, .rm-cm .h .rm-edited { font: normal 10.5px var(--mono); color: var(--text-faint); }
+.rm-cm .rm-gone { color: var(--text-faint); font-style: italic; }
+.rm-cm .chat-edit { margin-top: 4px; }
+
+/* THE NEW LINE: where you had read to, a hairline in the accent with its word. */
+.rm-new { display: flex; align-items: center; gap: 10px; margin: 8px 0 2px; font: 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.rm-new::before { content: ''; flex: 1; height: 1px; background: var(--accent); opacity: .5; }
+/* What went wrong, in the text's own colour, with the accent kept to a dot. */
+.rm-chat-err { display: flex; align-items: center; gap: 8px; margin: 0 20px 2px; font-size: 12.5px; color: var(--text-dim); }
+.rm-chat-err::before { content: ''; flex: none; width: 6px; height: 6px; background: var(--accent); }
+.rm-full .rm-chat-err { margin: 0 28px 2px; max-width: 704px; }
+.rm-retry {
+  flex: none; height: 22px; padding: 0 8px; appearance: none; border: 1px solid var(--line-strong); border-radius: 0; cursor: pointer;
+  background: none; color: var(--text); font: inherit; font-size: 12px;
+}
+.rm-retry:hover { border-color: var(--text-faint); }
+.rm-picker { position: absolute; left: 20px; right: 20px; bottom: 112px; z-index: 30; padding: 4px; display: flex; flex-direction: column; gap: 1px; }
+
+/* menus */
+.rm-menu { position: fixed; z-index: 60; min-width: 250px; padding: 4px; display: flex; flex-direction: column; gap: 1px; }
+.rm-menu .row { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 9px; font: inherit; font-size: 13px; color: var(--text-dim); white-space: nowrap; background: none; border: 0; text-align: left; width: 100%; box-sizing: border-box; }
+.rm-menu .row:hover, .rm-menu .row.on { background: var(--wash-strong); color: var(--text); }
+.rm-menu .row svg { color: var(--text-faint); flex: none; }
+.rm-menu .row .k { margin-left: auto; font: 11px var(--mono); color: var(--text-faint); }
+.rm-menu .row .sub { color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.rm-menu .row .rm-unread { margin-left: auto; }
+.rm-menu .rule { height: 1px; background: var(--rm-line); margin: 3px 5px; }
+.rm-menu .head { padding: 8px 9px 6px; }
+.rm-menu.members .row { height: 36px; }
+.rm-menu.members { max-height: 420px; overflow-y: auto; }
+
+/* hover card */
+.rm-hc { position: fixed; z-index: 50; width: 300px; box-sizing: border-box; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.rm-hc .hd { display: flex; gap: 12px; align-items: center; }
+.rm-hc .hd .w { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rm-hc .hd .rm-nm { font-size: 14.5px; }
+.rm-hc .hd .rl { font-size: 12.5px; color: var(--text-faint); }
+.rm-hc .bio { font-size: 13px; line-height: 19px; color: var(--text-dim); margin-top: -4px; }
+.rm-hc .nums { display: flex; border-top: 1px solid var(--rm-line); border-bottom: 1px solid var(--rm-line); }
+.rm-hc .nums > div { flex: 1; padding: 10px 0; display: flex; flex-direction: column; gap: 3px; }
+.rm-hc .nums > div + div { padding-left: 14px; border-left: 1px solid var(--rm-line); }
+.rm-hc .nums b { font: 300 17px/20px var(--mono); color: var(--text); font-variant-numeric: tabular-nums; }
+.rm-hc .nums button.lnk { font: 300 17px/20px var(--mono); color: var(--text); background: none; border: 0; padding: 0; text-align: left; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--text-faint); }
+.rm-hc .nums span { white-space: nowrap; font: 9.5px/12px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); }
+.rm-hc .acts { display: flex; gap: 8px; }
+.rm-hc .acts .rm-btn { flex: 1; justify-content: center; }
+
+/* ranks */
+.rm-rhead { display: flex; align-items: center; gap: 18px; height: 32px; margin-bottom: 6px; }
+.rm-rhead .bk { display: inline-flex; align-items: center; gap: 4px; color: var(--text-dim); font: inherit; font-size: 13px; background: none; border: 0; padding: 0; }
+.rm-ranks .hd, .rm-rrow { display: grid; grid-template-columns: 34px 28px minmax(0, 1fr) minmax(120px, 260px) 60px; column-gap: 14px; align-items: center; }
+.rm-ranks .hd { padding: 4px 12px 10px; border-bottom: 1px solid var(--rm-line); }
+.rm-rrow { height: 45px; padding: 0 12px; border-bottom: 1px solid var(--rm-line); }
+.rm-rrow .r { font: 12px var(--mono); color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.rm-rrow .rm-nm { font-size: 13.5px; }
+.rm-rrow .bar { height: 4px; background: var(--rm-line); position: relative; }
+.rm-rrow .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--text-dim); }
+.rm-rrow .v { font: 12.5px var(--mono); color: var(--text-dim); text-align: right; font-variant-numeric: tabular-nums; }
+.rm-rrow.me { background: var(--wash); }
+
+/* their page */
+.rm-prof { padding-bottom: 32px; }
+.rm-ph { padding: 14px 0 0; }
+.rm-ph .top { display: flex; align-items: center; gap: 20px; }
+.rm-ph .who { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.rm-ph .rm-nm { font-size: 26px; letter-spacing: -.03em; }
+.rm-ph .rl { font-size: 13.5px; color: var(--text-dim); }
+.rm-ph .st { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-faint); }
+.rm-ph .acts { margin-left: auto; align-self: flex-start; display: flex; gap: 8px; }
+.rm-stats { display: flex; margin-top: 30px; }
+.rm-stats > div { display: flex; flex-direction: column; gap: 9px; padding: 0 36px; border-left: 1px solid var(--rm-line); }
+.rm-stats > div:first-child { padding-left: 0; border-left: 0; }
+.rm-stats b, .rm-stats .lnk { font: 300 30px/32px var(--mono); color: var(--text); display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.rm-stats .lnk { background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; text-decoration-color: var(--text-faint); }
+.rm-stats b svg { color: var(--text-faint); }
+.rm-prule { margin: 34px -20px 0 calc(-1 * var(--text-x, 32px)); border-bottom: 1px solid var(--rm-line); }
+.rm-pgrid { display: grid; grid-template-columns: minmax(0, 1fr) 240px; column-gap: 56px; padding: 28px 0 0; }
+.rm-chartbox { position: relative; min-width: 0; }
+.rm-chartbox svg { display: block; overflow: visible; }
+.rm-chartbox .grid { stroke: var(--rm-line); }
+.rm-chartbox text { fill: var(--text-faint); font-family: var(--mono); font-size: 10.5px; }
+.rm-chartbox .ln { stroke: var(--text-dim); }
+.rm-chartbox .ar { fill: var(--wash); }
+.rm-chartbox .pt { fill: var(--text); stroke: var(--bg); }
+.rm-chartbox .guide { stroke: var(--line-strong); stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.rm-chartbox .tip { position: absolute; pointer-events: none; white-space: nowrap; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--text); transform: translate(14px, -50%); }
+.rm-chartbox .tip.left { transform: translate(calc(-100% - 14px), -50%); }
+.rm-chartbox .tip span { font: 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+.rm-pcol .blk { padding: 0 0 22px; margin-bottom: 22px; border-bottom: 1px solid var(--rm-line); display: flex; flex-direction: column; gap: 11px; }
+.rm-pcol .blk:last-child { border-bottom: 0; }
+.rm-pcol .line { font-size: 13.5px; color: var(--text); display: flex; gap: 9px; align-items: center; }
+.rm-pcol .line svg { color: var(--text-faint); }
+.rm-prof button.line { background: none; border: 0; padding: 0; font: inherit; font-size: 13.5px; color: var(--text); text-align: left; cursor: default; display: flex; gap: 9px; align-items: center; }
+.rm-prof button.line svg { color: var(--text-faint); }
+.rm-prof button.line:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--text-faint); }
+.rm-ptotal { display: flex; flex-direction: column; gap: 9px; margin-bottom: 22px; }
+.rm-ptotal b { font: 300 30px/32px var(--mono); color: var(--text); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+
+/* the bio */
+.rm-bio { font-size: 13.5px; line-height: 20px; color: var(--text-dim); max-width: 620px; }
+.rm-bio-edit, .rm-bio-add { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; color: var(--text-faint); cursor: default; text-align: left; }
+.rm-bio-edit { margin-left: 10px; opacity: 0; }
+.rm-bio:hover .rm-bio-edit, .rm-bio-edit:focus-visible { opacity: 1; }
+.rm-bio-edit:hover, .rm-bio-add:hover { color: var(--text-dim); text-decoration: underline; text-underline-offset: 3px; }
+.rm-ph .who:has(.rm-bio-form) { flex: 1; }
+.rm-bio-form { position: relative; width: min(620px, 100%); margin-left: -11px; }
+.rm-bio-form textarea { display: block; box-sizing: border-box; width: 100%; field-sizing: content; min-height: 32px; resize: none; border: 1px solid var(--line-strong); background: var(--control-face); padding: 5px 10px; font: inherit; font-size: 13.5px; line-height: 20px; color: var(--text); outline: none; }
+.rm-bio-form textarea::placeholder { color: var(--text-faint); }
+.rm-bio-form .k { position: absolute; left: calc(100% + 12px); bottom: 8px; white-space: nowrap; font: 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+
+/* dialogs, inside the app's own .modal */
+.modal.rm-dlg { width: 540px; }
+.rm-dlg .sec { padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; }
+.rm-dlg .sec + .sec { border-top: 1px solid var(--rm-line); }
+.rm-dlg .t { display: flex; align-items: center; font-size: 18px; letter-spacing: -.02em; color: var(--text); }
+.rm-dlg .x { margin-left: auto; color: var(--text-faint); background: none; border: 0; padding: 2px; display: flex; align-self: flex-start; }
+.rm-dlg .room { display: flex; align-items: center; gap: 12px; }
+.rm-dlg .ttl { display: inline-flex; align-items: center; gap: 4px; font-size: 20px; letter-spacing: -.02em; color: var(--text); }
+.rm-dlg .ttl svg { color: var(--text-faint); width: 20px; height: 20px; }
+.rm-dlg .who { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-dim); }
+.rm-faces { display: flex; }
+.rm-faces .rm-pic { margin-right: -5px; outline: 2px solid var(--bg-raised); }
+.rm-field { display: flex; gap: 8px; }
+.rm-input { flex: 1; height: 36px; box-sizing: border-box; border: 1px solid var(--line-strong); background: var(--control-face); padding: 0 11px; display: flex; align-items: center; gap: 9px; font: inherit; font-size: 13.5px; color: var(--text); min-width: 0; outline: none; }
+.rm-input::placeholder { color: var(--text-faint); }
+.rm-input svg { color: var(--text-faint); flex: none; }
+.rm-input .v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-field .rm-btn { height: 36px; }
+.rm-pend .row2 { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-dim); height: 26px; }
+.rm-pend .row2 em { margin-left: auto; font: normal 10.5px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); }
+.rm-err { font-size: 12.5px; color: var(--danger, var(--accent)); }
+.rm-opt { display: flex; gap: 12px; padding: 10px 12px; border: 1px solid var(--rm-line); align-items: flex-start; background: none; font: inherit; text-align: left; color: inherit; }
+.rm-opt.on { border-color: var(--text-faint); background: var(--wash); }
+.rm-opt:disabled { opacity: .5; }
+.rm-opt .bx { width: 14px; height: 14px; border: 1px solid var(--line-strong); flex: none; margin-top: 2px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+.rm-opt.on .bx { border-color: var(--text); }
+.rm-opt.on .bx::after { content: ''; width: 6px; height: 6px; background: var(--text); }
+.rm-opt b { font-weight: 400; font-size: 13.5px; color: var(--text); display: block; }
+.rm-opt span { font-size: 12.5px; color: var(--text-faint); }
+.rm-acts { display: flex; justify-content: flex-end; gap: 8px; }
+.rm-from { font-size: 13px; color: var(--text-dim); display: flex; align-items: center; gap: 8px; }
+.rm-big { display: inline-flex; align-items: center; gap: 6px; font-size: 26px; letter-spacing: -.03em; color: var(--text); }
+.rm-big svg { width: 24px; height: 24px; color: var(--text-faint); }
+.rm-joinfaces { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.rm-joinfaces .rm-pic { width: 100% !important; height: auto !important; aspect-ratio: 1; }
+.rm-live { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-dim); }
+.rm-live .live-mark { width: 13px; height: 13px; gap: 1.5px; color: var(--text); }
+.rm-note { font-size: 12.5px; line-height: 18px; color: var(--text-faint); }
+
+/* invisible */
+.th-me-btn small.th-me-invis { display: flex; align-items: center; gap: 5px; }
+.th-me-wrap { position: relative; }
+.th-me-wrap .rm-ipop { position: absolute; left: 0; bottom: calc(100% + 6px); }
+.rm-ipop { position: fixed; width: 340px; box-sizing: border-box; z-index: 60; padding: 16px 16px 8px; display: flex; flex-direction: column; }
+.rm-ipop .t { display: flex; align-items: center; gap: 9px; font-size: 15px; color: var(--text); }
+.rm-ipop .t svg { color: var(--text-dim); }
+.rm-ipop ul { list-style: none; margin: 12px 0 10px; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.rm-ipop li { display: flex; gap: 10px; font-size: 13px; line-height: 18px; color: var(--text-dim); }
+.rm-ipop li svg { color: var(--text-faint); flex: none; margin-top: 1px; }
+.rm-ipop .rule { height: 1px; background: var(--rm-line); margin: 2px -16px 6px; }
+.rm-ipop .when { display: flex; align-items: center; height: 32px; margin: 0 -8px; padding: 0 8px; font: inherit; font-size: 13px; color: var(--text-dim); background: none; border: 0; text-align: left; }
+.rm-ipop .when:hover { background: var(--wash-strong); color: var(--text); }
+
+/* find rooms */
+.rm-find { display: flex; flex-direction: column; margin-top: -12px; }
+.rm-find .bar { display: flex; align-items: center; gap: 22px; height: 52px; }
+.rm-backt { display: inline-flex; align-items: center; gap: 8px; color: var(--text-dim); background: none; border: 0; padding: 0; font: inherit; letter-spacing: inherit; cursor: pointer; -webkit-app-region: no-drag; }
+.rm-backt:hover { color: var(--text); }
+.rm-search { margin-left: auto; width: 280px; height: 32px; box-sizing: border-box; border: 1px solid var(--line-strong); background: var(--control-face); display: flex; align-items: center; gap: 9px; padding: 0 10px; }
+.rm-search input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--text); font: inherit; font-size: 13px; }
+.rm-search svg { color: var(--text-faint); }
+.rm-froom { display: grid; grid-template-columns: minmax(0, 1fr) 230px 110px 92px; column-gap: 24px; align-items: center; min-height: 74px; padding: 0 0 0 8px; border-bottom: 1px solid var(--rm-line); }
+.rm-froom.head { min-height: 38px; }
+.rm-froom .rm-nm { font-size: 15px; display: flex; align-items: center; gap: 7px; }
+.rm-froom .rm-nm svg { color: var(--text-faint); width: 14px; height: 14px; }
+.rm-froom .here { display: flex; align-items: center; }
+.rm-froom .here .rm-pic { margin-right: -4px; outline: 2px solid var(--surface); }
+.rm-froom .here em { font: normal 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); margin-left: 14px; }
+.rm-froom .v { font: 12.5px var(--mono); color: var(--text-dim); text-align: right; }
+.rm-froom .j { display: flex; justify-content: flex-end; }
+.rm-froom .joined { font: 11px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); background: none; border: 0; padding: 0; cursor: pointer; }
+.rm-froom .joined:hover { color: var(--text-dim); }
+
+/* settings */
+.rm-prev { display: flex; gap: 28px; align-items: flex-start; }
+.rm-prev .pv { display: flex; flex-direction: column; gap: 10px; width: 220px; flex: none; margin-top: -26px; }
+.rm-prev .rm-card { width: 220px; border: 1px solid var(--rm-line); }
+
+/* a mention in Needs you */
+.rm-mention { cursor: default; }
+/* The threads below sit in their own group box, where `.row + .row` cannot see the mention above them. */
+.th-table .rm-mention + div > .row:first-child::after { content: ''; position: absolute; left: var(--gutter); right: var(--row-r); top: 0; height: 1px; background: var(--line); opacity: var(--row-line); }
+.rm-where { display: inline-flex; align-items: center; gap: 5px; }
+
+/* the messages page */
+.rm-msgs { flex: 1; min-height: 0; display: flex; }
+.list-pane.pinned .rm-msgs { height: 100%; }
+.rm-list { width: 340px; flex: none; border-right: 1px solid var(--rm-line); display: flex; flex-direction: column; min-height: 0; }
+.rm-list .hd { display: flex; align-items: center; padding: 14px 16px 10px var(--text-x, 32px); }
+.rm-list .rm-search { margin-left: 0; width: 100%; }
+.rm-convs { flex: 1; min-height: 0; overflow-y: auto; }
+.rm-convs-empty { padding: 14px 16px 0 var(--text-x, 32px); font-size: 13px; color: var(--text-faint); }
+.rm-conv { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; column-gap: 12px; align-items: center; padding: 10px 16px 10px var(--text-x, 32px); width: 100%; background: none; border: 0; text-align: left; font: inherit; color: inherit; }
+.rm-conv:hover { background: var(--wash); }
+.rm-conv.on { background: var(--wash-strong); }
+.rm-conv .fc { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); position: relative; box-sizing: border-box; }
+.rm-conv .fc.two .rm-pic { position: absolute; }
+.rm-conv .fc.two .rm-pic:first-child { left: 0; top: 0; }
+.rm-conv .fc.two .rm-pic:last-child { right: 0; bottom: 0; outline: 2px solid var(--surface); }
+.rm-conv .fc.room { border: 1px solid var(--line-strong); }
+.rm-conv .t { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rm-conv .t .nm { display: flex; align-items: center; gap: 7px; min-width: 0; height: 18px; }
+.rm-conv .t b { min-width: 0; font-weight: 400; font-size: 14px; line-height: 18px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-conv .t .ls { font-size: 12.5px; line-height: 16px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A long name gives way before the pin does. */
+.rm-conv-pin { display: flex; flex: none; color: var(--text-faint); }
+/* The time on the name's line and the unread dot on the second, flush right.
+   The rows match .t's two lines. */
+.rm-conv .m { align-self: stretch; display: grid; grid-template-rows: 18px 16px; row-gap: 2px; justify-items: end; align-items: center; font: 10.5px var(--mono); color: var(--text-faint); }
+/* UNREAD READS BRIGHTER: the name and its last line, beside the dot. */
+.rm-conv.unread .t .ls { color: var(--text-dim); }
+.rm-conv.muted .t b { color: var(--text-dim); }
+/* The row's ⋯ waits over the time until you point at the row. */
+.rm-conv-wrap { position: relative; }
+.rm-conv-more {
+  position: absolute; right: 16px; top: 9px; width: 24px; height: 20px; padding: 0; display: grid; place-items: center;
+  appearance: none; border: 1px solid var(--line-strong); border-radius: 0; cursor: pointer;
+  background: var(--skin-solid, var(--surface)); color: var(--text-dim); visibility: hidden;
+}
+.rm-conv-more svg { width: 13px; height: 13px; }
+.rm-conv-wrap:hover .rm-conv-more, .rm-conv-wrap.menu .rm-conv-more, .rm-conv-more:focus-visible { visibility: visible; }
+/* The time steps aside for it; the unread dot stays. */
+.rm-conv-wrap:hover .rm-conv .m, .rm-conv-wrap.menu .rm-conv .m { color: transparent; }
+.rm-conv-more:hover { color: var(--text); }
+.rm-open { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+.rm-full { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.rm-full > .hd { height: 52px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 28px; border-bottom: 1px solid var(--rm-line); font-size: 15px; color: var(--text); }
+.rm-full > .hd .ic { margin-left: auto; display: flex; gap: 8px; }
+.rm-full .rm-chat-list { padding: 10px 28px 4px; max-width: 760px; width: 100%; box-sizing: border-box; }
+.rm-full .rm-cm .h { font-size: 14px; }
+.rm-full .rm-cm .tx { font-size: 14.5px; line-height: 22px; }
+.rm-full .rm-compose { margin: 8px 28px 24px; max-width: 704px; }
+.rm-full .rm-picker { left: 28px; right: auto; width: 320px; }
+
+/* GROUPS: under the Groups tab, the row of every group, the chat filling the page, the people down the right. */
+.gr-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.gr-body { flex: 1; min-height: 0; display: flex; }
+.gr-chat { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.gr-chat .rm-full .rm-chat-list { max-width: none; padding-left: var(--text-x, 32px); padding-right: 32px; }
+.gr-chat .rm-full .rm-compose { max-width: none; margin-left: var(--text-x, 32px); margin-right: 32px; }
+.gr-chat .rm-full .rm-chat-err { margin-left: var(--text-x, 32px); }
+.gr-notice { flex: none; margin: 16px 32px 0 var(--text-x, 32px); }
+.gr-notice .t { flex: 1; min-width: 0; }
+.gr-notice .rm-btn { margin-left: 0; }
+.rm-full.hang .rm-cm { padding-left: 44px; }
+.rm-full.hang .rm-cm .h { gap: 8px; }
+.rm-full.hang .rm-cm .h > .rm-pic:first-child { position: absolute; left: 0; top: 9px; }
+
+/* A named group wears a #; a chat, the faces in it (GroupMark). */
+.gr-faces { display: flex; flex: none; }
+.gr-faces > .rm-pic + .rm-pic { margin-left: -6px; outline: 2px solid var(--skin-solid, var(--surface)); }
+.gr-tile { display: inline-flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box; border: 1px solid var(--line-strong); color: var(--text-dim); }
+.gr-two { position: relative; flex: none; display: inline-block; }
+.gr-two > .rm-pic { position: absolute; }
+.gr-two > .rm-pic:first-child { left: 0; top: 0; }
+.gr-two > .rm-pic:last-child { right: 0; bottom: 0; z-index: 1; outline: 2px solid var(--pop, var(--surface)); }
+
+/* Who is in the group: face, name and level, what they are on, their agents. */
+.gr-side { width: clamp(240px, 36%, 368px); flex: none; min-height: 0; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; padding: 16px 24px 24px; border-left: 1px solid var(--rm-line); }
+.gr-ph { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-height: 20px; margin-bottom: 8px; }
+.gr-pt { font-size: 13.5px; color: var(--text); }
+.gr-pn { font-size: 12.5px; color: var(--text-faint); white-space: nowrap; }
+.gr-prow { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 12px; align-items: center; width: calc(100% + 48px); box-sizing: border-box; margin: 0 -24px; padding: 10px 24px; border: 0; background: none; font: inherit; text-align: left; color: inherit; cursor: default; }
+.gr-prow:hover { background: var(--wash); }
+.gr-pw { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gr-l1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 13.5px; line-height: 18px; color: var(--text); }
+.gr-lv { flex: none; font: 11.5px var(--mono); color: var(--text-faint); }
+.gr-l2 { font-size: 12.5px; line-height: 17px; color: var(--text-dim); }
+.gr-l2.idle { color: var(--text-faint); }
+.gr-ag { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--text-dim); white-space: nowrap; }
+.gr-ag .live-mark { width: 11px; height: 11px; gap: 1px; color: var(--text); }
+.gr-pmore { margin-top: 8px; font-size: 12.5px; color: var(--text-faint); }
+
+/* The group's options, in the top bar beside New thread. */
+.gr-opts { position: relative; display: inline-flex; }
+.gr-optmenu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 230px; padding: 4px; display: flex; flex-direction: column; gap: 1px; }
+.gr-optmenu .row { display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box; height: 32px; padding: 0 9px; border: 0; background: none; font: inherit; font-size: 13px; text-align: left; color: var(--text-dim); white-space: nowrap; cursor: default; }
+.gr-optmenu .row:hover { background: var(--wash-strong); color: var(--text); }
+.gr-optmenu .row svg { flex: none; color: var(--text-faint); }
+.gr-optmenu .row .k { margin-left: auto; font: 11px var(--mono); color: var(--text-faint); }
+.gr-optmenu .rule { height: 1px; margin: 3px 5px; background: var(--rm-line); }
+
+.gr-none { padding: 48px var(--text-x, 32px); }
+.gr-none-acts { display: flex; gap: 8px; margin-top: 16px; }
+
+/* A group's chat a size up from a thread's list (w-dcaa2c122e, round 11). */
+.gr-page .rm-full .rm-cm .h { font-size: 15px; }
+.gr-page .rm-full .rm-cm .tx { font-size: 16px; line-height: 25px; }
+.gr-page .rm-full.hang .rm-cm .h > .rm-pic:first-child { top: 10px; }
+.gr-page .rm-compose-input { font-size: 15px; line-height: 22px; }
+.gr-page .gr-pt, .gr-page .gr-l1 { font-size: 14.5px; line-height: 19px; }
+.gr-page .gr-l2 { font-size: 13.5px; line-height: 18px; }
+.gr-page .gr-pn, .gr-page .gr-ag { font-size: 13px; }
+
+/* 44 points from the frame to the words, on every page beside the narrow sidebar (round 13). */
+.gt-inset .list, .gt-inset .list-pane { --gutter: 20px; --text-x: 44px; --row-r: 32px; }
+.gt-inset.workspace-layout > .topbar { padding-left: 44px; padding-right: 28px; }
+.gt-inset .th-table .row.unread::before { left: 25px; }
+
+/* A thread's summary on the left, where the sidebar was, read first (round 15). */
+.gt-sumleft .focus-pane[data-summary="open"] > .focus-scroll,
+.gt-sumleft .focus-pane[data-summary="open"] > .focus-dock,
+.gt-sumleft .focus-pane[data-summary="open"] > .keep-line,
+.gt-sumleft .focus-pane[data-summary="open"] > .task-terminal { margin-right: 0; margin-left: var(--ts-panel-w); }
+.gt-sumleft .ts-panel { right: auto; left: 0; border-left: 0; border-right: 1px solid var(--line); }
+.gt-sumleft.gt-inset .ts-panel { padding-left: 44px; }
+.gt-sumleft .focus-pane { --ts-panel-w: 368px; }
+/* Folded with S, it leaves its strip on the same side it was open on. */
+.gt-sumleft .focus-pane[data-summary="rail"] > .focus-scroll,
+.gt-sumleft .focus-pane[data-summary="rail"] > .focus-dock,
+.gt-sumleft .focus-pane[data-summary="rail"] > .keep-line,
+.gt-sumleft .focus-pane[data-summary="rail"] > .task-terminal,
+.gt-sumleft .focus-pane[data-summary="over"] > .focus-scroll,
+.gt-sumleft .focus-pane[data-summary="over"] > .focus-dock,
+.gt-sumleft .focus-pane[data-summary="over"] > .keep-line,
+.gt-sumleft .focus-pane[data-summary="over"] > .task-terminal { margin-right: 0; margin-left: var(--ts-rail-w); }
+.gt-sumleft .ts-rail { right: auto; left: 0; border-left: 0; border-right: 1px solid var(--line); }
+.gt-sumleft .ts-rail-ic svg, .gt-sumleft .ts-close svg { transform: scaleX(-1); }
+/* A thread's trail, its arrow on the 44-point edge the summary, a document's
+   conversation and its reply box all start on, and its corner where the Inbox's is. */
+.workspace-layout.gt-inset.workspace-task > .topbar { padding-left: 36px; }
+.workspace-layout.gt-inset[data-artifact-layout="beside"] .focus { padding-left: 44px; }
+.workspace-layout.gt-inset[data-artifact-layout="beside"] .focus-dock { padding-left: 44px; }
+.workspace-layout.gt-inset.workspace-task > .topbar > .topbar-right { right: 28px; }
+
+/* WITH GROUPS ON THE SIDEBAR STAYS NARROW (GroupsSidebar.tsx). Pointed at, it
+   opens to the full sidebar and moves the page over until the pointer leaves,
+   will sit. The four things that read the width are eased, not the width
+   itself: every element inherits it, so easing it restyled the whole page
+   each frame. Settings' own list does not slide. */
+.app.workspace-layout.gt-rail, .gt-rail.workspace-layout::before, .gt-rail > .panel-marks, .gt-rail .workspace-navigation.gt-rail-nav {
+  transition-property: padding-left, left, width; transition-duration: .2s; transition-timing-function: cubic-bezier(.4, 0, .2, 1); }
+.app.workspace-layout.gt-rail.gt-rail-open, .gt-rail-open.workspace-layout::before, .gt-rail-open > .panel-marks, .gt-rail-open .workspace-navigation.gt-rail-nav {
+  transition-duration: .24s; transition-timing-function: cubic-bezier(.22, .61, .36, 1); }
+.app.workspace-layout.gt-rail.workspace-settings, .gt-rail.workspace-settings::before, .gt-rail.workspace-settings > .panel-marks { transition: none; }
+.gt-rail-nav button, .gt-rail-nav .th-team { overflow: hidden; }
+.gt-rail-nav button > span:not(.tm-av), .gt-rail-nav .th-team-name, .gt-rail-nav.workspace-navigation .workspace-running { display: block; white-space: nowrap; opacity: 1; transition: opacity .14s .08s; }
+.workspace-collapsed .gt-rail-nav.workspace-navigation button > span:not(.tm-av), .workspace-collapsed .gt-rail-nav .th-team-name, .workspace-collapsed .gt-rail-nav.workspace-navigation .workspace-running { display: block; opacity: 0; transition: opacity .06s; }
+.gt-rail-nav .workspace-tab.has-count { position: relative; }
+.gt-rail-nav.workspace-navigation .workspace-tab.has-count::after { content: ''; position: absolute; top: 8px; left: 25px; right: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: 0; transition: opacity .1s; }
+.workspace-collapsed .gt-rail-nav.workspace-navigation .workspace-tab.has-count::after { opacity: 1; }
+/* Your face keeps one size and one place, narrow or wide. */
+.gt-rail-nav.workspace-navigation .th-me { padding-left: 4px; gap: 7px; }
+.gt-rail-nav.workspace-navigation .th-me .th-me-btn { width: calc(100% + 4px); margin-left: -4px; padding: 0 8px; gap: 9px; }
+.gt-rail-nav.workspace-navigation .th-me .tm-av { width: 22px; height: 22px; line-height: 20px; font-size: 9px; }
+@media (prefers-reduced-motion: reduce) {
+  .app.workspace-layout.gt-rail, .gt-rail.workspace-layout::before, .gt-rail > .panel-marks, .gt-rail .workspace-navigation.gt-rail-nav, .gt-rail-nav button > span:not(.tm-av), .gt-rail-nav .th-team-name, .gt-rail-nav .workspace-running, .gt-rail-nav .workspace-tab.has-count::after { transition: none !important; }
+}
+.gt-rail-groups { margin-top: 3px; }
+.gt-hh { display: inline-flex; color: var(--text-faint); }
+
+/* THE GROUPS PAGE (GroupsColumn.tsx): every group down its left, 20 points
+   in, the open one's chat beside them on the 44-point edge. Its top bar is cut
+   on the column's line, Groups over the list and the group's name over its chat. */
+.gc-list { width: 300px; flex: none; min-height: 0; overflow-y: auto; padding: 8px 0 12px; border-right: 1px solid var(--rm-line); }
+.gc-row { display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 12px; align-items: center; width: 100%; padding: 9px 16px 9px 20px; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: default; }
+.gc-row:hover { background: var(--wash); }
+.gc-row.on { background: var(--wash-strong); }
+.gc-w { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gc-1, .gc-2 { display: flex; gap: 8px; min-width: 0; }
+.gc-1 > .rm-one, .gc-2 > .rm-one { flex: 1; min-width: 0; }
+.gc-1 { align-items: baseline; font-size: 14px; line-height: 19px; color: var(--text); }
+:root .gc-row.unread .gc-1 > .rm-one { font-weight: 530; }
+.gc-t { flex: none; font-size: 12px; color: var(--text-faint); }
+.gc-2 { align-items: center; font-size: 13px; line-height: 17px; color: var(--text-faint); }
+.gc-row.unread .gc-2 { color: var(--text-dim); }
+/* Something new: a dot at the end of the line under the time, not in a gutter of its own. */
+.gc-dot { flex: none; width: 6px; height: 6px; background: var(--accent); }
+.gc-head { flex: 1; min-width: 0; align-self: stretch; display: flex; margin-left: -44px; }
+.gc-head-col { width: 300px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 16px 0 20px; border-right: 1px solid var(--rm-line); }
+.gc-col-title { flex: 1; min-width: 0; color: var(--text-dim); }
+.gc-find { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border: 1px solid var(--line); background: none; font: inherit; font-size: 12px; color: var(--text-faint); cursor: default; }
+.gc-find kbd { font: 11px var(--mono); }
+.gc-find:hover { background: var(--wash); color: var(--text); }
+/* Clear of New thread and the group's options at the bar's right end. */
+.gc-head-group { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 0 250px 0 44px; }
+.modal.palette.gc-finder { width: 600px; max-width: calc(100vw - 80px); }
+/* Nine whole rows before it scrolls, fewer in a short window so the box stays on screen. */
+.gc-flist.palette-list { max-height: min(calc(9 * 60px + 12px), 55vh); }
+.palette-item.gc-frow { justify-content: flex-start; align-items: center; gap: 12px; height: 60px; padding: 0 18px; }
+.gc-fw { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gc-f1 { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; line-height: 19px; color: var(--text); }
+.gc-f2 { font-size: 12.5px; line-height: 17px; color: var(--text-faint); }
+.gc-fm { flex: none; font-size: 12px; color: var(--text-faint); }

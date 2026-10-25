@@ -33,26 +33,30 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const app = fs.readFileSync(path.join(here, '..', 'renderer', 'src', 'App.tsx'), 'utf8');
 
 const row = { id: 'w-1', product: 'p', title: 'The row she closed' };
+// She closed the row from inside a task, so the close moved her to the next
+// one and the row she wants back is behind it. A Z from a LIST opens nothing,
+// which is tests/a-z-in-a-list-puts-the-row-back-without-opening-it.
+const ON_A_TASK = { onATask: true };
 
 describe('what a Z past the grace window puts in front of her', () => {
   it('opens the row a reopen brought back', () => {
-    expect(shownAfterUndo(null, row)).toEqual({ open: row, compose: false });
+    expect(shownAfterUndo(null, row, ON_A_TASK)).toEqual({ open: row, compose: false });
   });
 
   it('still opens the thread a withdrawn reply belongs to, words and all', () => {
     const thread = { id: 'w-2' };
-    expect(shownAfterUndo({ item: thread }, row)).toEqual({ open: thread, compose: false });
+    expect(shownAfterUndo({ item: thread }, row, ON_A_TASK)).toEqual({ open: thread, compose: false });
   });
 
   it('still reopens the new task card for a withdrawn new task, and opens no row', () => {
-    expect(shownAfterUndo({ compose: true }, undefined)).toEqual({ open: null, compose: true });
+    expect(shownAfterUndo({ compose: true }, undefined, ON_A_TASK)).toEqual({ open: null, compose: true });
   });
 
   // The case that must not match: undoing a schedule change or putting the
   // update row back names no row, and must not pull her off what she is on.
   it('opens nothing when the undo named no row', () => {
-    expect(shownAfterUndo(null, undefined)).toEqual({ open: null, compose: false });
-    expect(shownAfterUndo(undefined, undefined)).toEqual({ open: null, compose: false });
+    expect(shownAfterUndo(null, undefined, ON_A_TASK)).toEqual({ open: null, compose: false });
+    expect(shownAfterUndo(undefined, undefined, ON_A_TASK)).toEqual({ open: null, compose: false });
   });
 });
 
@@ -69,7 +73,7 @@ describe('the app uses that rule on every row it puts back', () => {
   it('opens what the rule says after a late Z, and drops a pending advance', () => {
     const from = app.indexOf('const { take: last, rest, instant } = nextUndo(undoStack, now);');
     const late = app.slice(from, app.indexOf('/* ------------------------------- keyboard', from));
-    expect(late).toContain('shownAfterUndo(restored, last.brings)');
+    expect(late).toContain('shownAfterUndo(restored, last.brings, { onATask: !!focused })');
     expect(late).toContain('advanceRef.current = null;');
     expect(late).toContain('setFocused(shown.open); markSeen(shown.open);');
     // and the advance is dropped BEFORE the undo runs, not after the row opens

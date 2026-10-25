@@ -7,14 +7,20 @@
 //
 //   npm run ship
 //
-// Fetch, merge what moved, run the tests for what changed, push. If the push is
-// rejected because somebody pushed while the tests were running, do all of it
-// again rather than leaving the branch half-shipped. Three attempts, then it
-// stops and says so.
+// Fetch, merge what moved, push. If the push is rejected because somebody
+// pushed while the tests were running, do all of it again rather than leaving
+// the branch half-shipped. Three attempts, then it stops and says so.
 //
-// IT NEVER SKIPS THE HOOK. The pre-push hook is where the whole suite and the
+// IT NEVER SKIPS THE HOOK. The pre-push hook is where the tests and the
 // public-repository check live, and they are the point. This script is the
 // order of operations, not a replacement for the gates.
+//
+// AND IT DOES NOT RUN THE TESTS ITSELF (w-9e4d3f3cc1, 2026-10-19). It used to
+// run them here and then push, and the push runs the hook, which ran the same
+// set again: every ship paid for its gate twice, 12 minutes of it on a core
+// file. The hook's run is the one that was kept, because a push cannot get
+// around it and because it already runs a red file again on its own before
+// refusing, which this one never did.
 //
 // IT NEVER REACHES INTO ANOTHER CHECKOUT. The folder the app runs from follows
 // the public main by fast-forward, on its own; a script writing into it is the
@@ -23,7 +29,6 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { racedWithAnotherPush, notReadyToShip } from './lib/ship-rules.mjs';
-import { testsThatRead } from './lib/tests-that-read.mjs';
 
 // THE FOLDER IT SHIPS IS THE ONE IT RUNS IN. `npm run ship` runs in the
 // package root, so a person or agent in a worktree ships that worktree as
@@ -53,12 +58,6 @@ const why = notReadyToShip({
 });
 if (why) stop(why);
 
-/** Everything this branch changes, for `vitest related`. */
-function changedFiles() {
-  const out = git('diff', '--name-only', `${PUBLIC}/main...HEAD`);
-  return out ? out.split('\n').filter((f) => f && !f.startsWith('docs/')) : [];
-}
-
 function mergeWhatMoved() {
   if (git('rev-list', '--count', `HEAD..${PUBLIC}/main`) === '0') return;
   say(`${PUBLIC}/main has moved. Merging it in.`);
@@ -70,28 +69,14 @@ function mergeWhatMoved() {
   }
 }
 
-function runTests() {
-  const files = changedFiles();
-  if (!files.length) return;
-  say(`running the tests for ${files.length} changed file(s). The hook runs the rest on push.`);
-  // `related` runs the tests that import these; a test that reads one as
-  // text is invisible to it (scripts/lib/tests-that-read.mjs), so those are
-  // named too, and a test file named to related runs itself.
-  const readers = testsThatRead(files, root);
-  const out = spawnSync('npx', ['vitest', 'related', '--run', ...files, ...readers], {
-    cwd: root,
-    encoding: 'utf8',
-    stdio: 'inherit',
-    env: { ...process.env, VITEST_MAX_FORKS: process.env.VITEST_MAX_FORKS ?? '2', VITEST_MIN_FORKS: process.env.VITEST_MIN_FORKS ?? '1' },
-  });
-  if (out.status !== 0) stop('those tests are red, so nothing was pushed.');
-}
-
 for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
   mergeWhatMoved();
-  runTests();
-  say(`pushing to ${PUBLIC} main (attempt ${attempt} of ${ATTEMPTS}). The hook runs the suite and the public check now.`);
-  const pushed = spawnSync('git', ['push', PUBLIC, 'HEAD:main'], { cwd: root, encoding: 'utf8' });
+  say(`pushing to ${PUBLIC} main (attempt ${attempt} of ${ATTEMPTS}). The hook runs the tests and the public check now.`);
+  // ROOM FOR THE WHOLE TEST RUN TO COME BACK THROUGH HERE. The only test run a
+  // ship has is the hook's, inside this push, so this buffer now carries every
+  // failure anybody will read: node's default is a megabyte, and a truncated
+  // one returns no status at all and would be read as a refusal with no reason.
+  const pushed = spawnSync('git', ['push', PUBLIC, 'HEAD:main'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   process.stdout.write(pushed.stdout ?? '');
   process.stderr.write(pushed.stderr ?? '');
   if (pushed.status === 0) {

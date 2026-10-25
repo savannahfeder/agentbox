@@ -22,7 +22,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rowKeys } from '../renderer/src/list-rules';
+import { rowKeys, replyKeyWorksIn } from '../renderer/src/list-rules';
 import { HINTS, capsFor } from '../renderer/src/hint-plate';
 import { DONE } from '../renderer/src/done-word';
 
@@ -42,6 +42,8 @@ const pages = read('renderer/src/threads/Pages.tsx');
 // The thread's Summary button, which printed its S on its face until
 // w-5984544441 and says it in a plate now.
 const summary = read('renderer/src/threads/Summary.tsx');
+// The up and down arrows on a thread in Needs you (w-65bcefb857).
+const queue = read('renderer/src/components/OneThingAtATime.tsx');
 
 // The list's own key switch, which is the only place the row keys are run.
 // Everything above it belongs to modals, chords and full-screen reading.
@@ -70,11 +72,14 @@ describe('the row prints the keys it really has', () => {
     ]);
   });
 
-  it('never offers reply outside the inbox, because R is inbox-only', () => {
-    expect(listSwitch).toMatch(/case 'r': case 'R':.*view === 'inbox'/);
-    for (const view of ['snoozed', 'progress', 'done']) {
-      expect(rowKeys(view).some((k) => k.key === 'R')).toBe(false);
+  // R works in In progress and Later too since w-4465054f04; the rows there
+  // need not print it, but no row may print it where it does nothing.
+  it('never offers reply on a row where R does nothing', () => {
+    expect(listSwitch).toMatch(/case 'r': case 'R':.*replyKeyWorksIn\(view\)/);
+    for (const view of ['inbox', 'snoozed', 'progress', 'done']) {
+      if (rowKeys(view).some((k) => k.key === 'R')) expect(replyKeyWorksIn(view)).toBe(true);
     }
+    expect(rowKeys('done').some((k) => k.key === 'R')).toBe(false);
   });
 
   it('changes E’s word in Scheduled, where it wakes instead of closing', () => {
@@ -109,7 +114,7 @@ describe('the row prints the keys it really has', () => {
   // `view === 'inbox' || view === 'snoozed'`, so both of those print it and the
   // other two print nothing.
   it('prints L only where the reminder picker opens, and never S', () => {
-    expect(listSwitch).toMatch(/case 'l': case 'L':[\s\S]{0,400}view === 'inbox' \|\| view === 'snoozed'/);
+    expect(listSwitch).toMatch(/case 'l': case 'L':[\s\S]{0,600}view === 'inbox' \|\| view === 'snoozed' \|\| view === 'progress'/);
     const views = ['inbox', 'snoozed', 'progress', 'done'];
     expect(views.filter((v) => rowKeys(v).some((k) => k.key === 'L'))).toEqual(['inbox', 'snoozed']);
     expect(views.filter((v) => rowKeys(v).some((k) => k.key === 'S'))).toEqual([]);
@@ -122,8 +127,8 @@ describe('the hint is drawn on the row the keys act on', () => {
     expect(app).toMatch(/const pointed: WorkItem \| undefined =/);
     expect(app).toMatch(/case 'Enter': if \(!multiSel\.size && pointed\)/);
     expect(app).toMatch(/else if \(pointed && view === 'inbox'\) markDone\(pointed\)/);
-    expect(app).toMatch(/case 'r': case 'R': if \(!multiSel\.size && pointed && view === 'inbox'\)/);
-    expect(app).toMatch(/else if \(pointed && \(view === 'inbox' \|\| view === 'snoozed'\)\) openSnooze\(pointed\)/);
+    expect(app).toMatch(/case 'r': case 'R': if \(!multiSel\.size && pointed && replyKeyWorksIn\(view\)\)/);
+    expect(app).toMatch(/else if \(pointed && \(view === 'inbox' \|\| view === 'snoozed' \|\| view === 'progress'\)\) openSnooze\(pointed\)/);
   });
 
   it('lets a ticked selection outrank the pointer', () => {
@@ -205,7 +210,7 @@ describe('Tab walks the tabs the Inbox draws', () => {
 describe('only a component that does not already show its key carries a hint', () => {
   it('wears a data-hint for every id the list knows, and knows every id worn', () => {
     const worn = new Set();
-    for (const file of [app, list, nav1, terminal, focus, pages, summary]) {
+    for (const file of [app, list, nav1, terminal, focus, pages, summary, queue]) {
       // The row writes its own as a spread, because it is only worn in the
       // inbox and only off an ordinary row.
       for (const m of file.matchAll(/data-hint(?:="|': ')([a-z-]+)/g)) worn.add(m[1]);

@@ -94,7 +94,7 @@ export function DiagramBlock({ source, fallback }: { source: string; fallback: R
     <div className="code-wrap diagram-wrap">
       {svg
         ? <div className="diagram" role="img" aria-label="Chart" dangerouslySetInnerHTML={{ __html: svg }} />
-        : <div className="diagram diagram-pending" />}
+        : <div className="diagram diagram-pending arriving" />}
       <button
         className={`code-copy ${copied ? 'copied' : ''}`}
         onClick={() => {

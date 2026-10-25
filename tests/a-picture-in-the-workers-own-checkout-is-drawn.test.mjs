@@ -59,25 +59,25 @@ describe('what a click on it opens', () => {
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
   const open = (src) => resolveArtifact({ src, product: 'agentbox-team', products, accountRoot: path.join(root, 'store') });
 
-  it('finds the picture in the checkout its path names, as on her screenshot', () => {
+  it('finds the picture in the checkout its path names, as on her screenshot', async () => {
     const file = put('.claude/worktrees/w-1b574413db/designs/w-1b574413db/a1-page-empty.png');
-    expect(open('designs/w-1b574413db/a1-page-empty.png')).toEqual({ ok: true, path: file });
+    expect(await open('designs/w-1b574413db/a1-page-empty.png')).toEqual({ ok: true, path: file });
   });
 
-  it('still prefers the same path in the project folder when it is there', () => {
+  it('still prefers the same path in the project folder when it is there', async () => {
     put('.claude/worktrees/w-1b/designs/w-1b/a.png');
     const own = path.join(dir, 'designs', 'w-1b', 'a.png');
     fs.mkdirSync(path.dirname(own), { recursive: true });
     fs.writeFileSync(own, 'x');
-    expect(open('designs/w-1b/a.png').path).toBe(own);
+    expect((await open('designs/w-1b/a.png')).path).toBe(own);
   });
 
-  it('does NOT reach into another task\'s checkout for a path that names no task', () => {
+  it('does NOT reach into another task\'s checkout for a path that names no task', async () => {
     put('.claude/worktrees/w-1b/shots/a.png');
-    expect(open('shots/a.png').ok).toBe(false);
+    expect((await open('shots/a.png')).ok).toBe(false);
   });
 
-  it('does NOT invent a checkout that is not there', () => {
-    expect(open('designs/w-0000000000/a.png').ok).toBe(false);
+  it('does NOT invent a checkout that is not there', async () => {
+    expect((await open('designs/w-0000000000/a.png')).ok).toBe(false);
   });
 });

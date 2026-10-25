@@ -89,7 +89,6 @@ describe('the screen uses them on a phone only', () => {
     ['components/Focus.tsx', /setInterval\(read, pollEvery\(4000, onPhone\(\)\)\)/],
     ['components/Live.tsx', /setInterval\(read, pollEvery\(8000, onPhone\(\)\)\)/],
     ['components/ItemThread.tsx', /setInterval\(read, pollEvery\(REFRESH_MS, onPhone\(\)\)\)/],
-    ['components/Settings.tsx', /pollEvery\(15_000, onPhone\(\)\)/],
   ])('%s asks at the phone pace', (file, pattern) => {
     expect(src(file)).toMatch(pattern);
   });

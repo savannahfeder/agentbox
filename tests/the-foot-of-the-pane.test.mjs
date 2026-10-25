@@ -111,7 +111,9 @@ describe('the shortcuts are off the screen and the verbs are not', () => {
     // The palette label follows the round's word now (w-581dbc6cc4), so this
     // checks the row still exists rather than what it is called.
     expect(app).toContain("id: 'done'");
-    expect(app).toContain('DONE.verb} Task');
+    // "Mark done", the words the thread's own menu uses (threads/ThreadMenu),
+    // since the palette's rows were put in one casing (2026-10-24).
+    expect(app).toContain('`Mark ${DONE.verb.toLowerCase()}`');
     expect(app).toContain("id: 'snooze', label: 'Later'");
     expect(app).toContain('onResolve={() => markDone(focused)}');
   });
@@ -202,7 +204,7 @@ describe('the Done mark she picked', () => {
     const rules = fs.readFileSync(path.join(root, 'renderer', 'src', 'list-rules.ts'), 'utf8');
     expect(word).toContain("export const DONE = { verb: 'Done', short: 'Done', noun: 'Done' };");
     expect(rules).toContain("{ key: 'E', word: DONE.short }");
-    expect(app).toContain('DONE.verb} Task');
+    expect(app).toContain('`Mark ${DONE.verb.toLowerCase()}`');
     // approved 2026-10-01 (w-e731ca9376): the Done place left the sidebar and
     // the heading over every list reads Inbox, so the two readers that were
     // there (the sidebar tab and the page title) are gone. The Done tab is now
@@ -300,7 +302,9 @@ describe('the Done row says its key the way its plate did', () => {
   it('prints E on its row and wears no plate', () => {
     expect(focus).not.toContain('data-hint="done"');
     expect(plate).not.toContain("done: [{ key: 'E', what: 'Mark done' }],");
-    expect(menu).toContain('<kbd>{row.key}</kbd>');
+    // `chord` draws the key in this keyboard's own glyphs (shared/key-caps.mjs);
+    // the row still prints its key beside its words, which is what this guards.
+    expect(menu).toContain('<kbd>{chord(row.key)}</kbd>');
   });
 
   it('describes E exactly as the row plate describes it', () => {

@@ -8,3 +8,7 @@
 export function strandedTitle(count: number): string;
 /** The line in a thread where a run stopped, in our words; `raw` is the tool's own refusal. */
 export function runStoppedLine(raw: string): string;
+/** True when `text` is the app's own word that a run got nowhere. */
+export function saysARunGotNowhere(text: string | null | undefined): boolean;
+/** What one account's tile says when it cannot run; `dir` is its config folder, for the sign-in command. */
+export function accountSentence(cause: string, dir?: string | null): string;

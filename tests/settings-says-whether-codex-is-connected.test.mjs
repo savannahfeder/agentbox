@@ -132,8 +132,8 @@ describe('the card is the one Claude Code already uses', () => {
     expect(block).toContain('function Connection(');
     // And exactly one of them: a second three-state card is a second set of
     // words for one fact, which is what this file exists to prevent.
-    expect(block.match(/const label = found \?/g)).toHaveLength(1);
-    expect(block).toContain('const label = found ? copy.connected : certain ? copy.missing : copy.unsure;');
+    expect(block.match(/const label = /g)).toHaveLength(1);
+    expect(block).toContain('const label = copy[state];');
   });
 
   it('binds each engine to its own words and its own search', () => {
@@ -146,8 +146,9 @@ describe('the card is the one Claude Code already uses', () => {
   // The three states are the SAME three, drawn the same way, so nobody has to
   // learn a second reading of a dot.
   it('spends the live dot on found alone for both of them', () => {
-    expect(block).toContain("<span className={`set-dot ${found ? 'live' : ''}`} />");
-    expect(block).toContain("{found ? 'connected' : certain ? 'not found' : 'not sure'}");
+    // Found and working: a found engine main says is failing is not lit.
+    expect(block).toContain("<span className={`set-dot ${state === 'connected' ? 'live' : ''}`} />");
+    expect(block).toContain("{ connected: 'connected', trouble: 'not working', missing: 'not found', unsure: 'not sure' }");
   });
 });
 
@@ -329,7 +330,7 @@ describe('the card is drawn on every Mac', () => {
     expect(open.engineChoiceOpened()).toBe(true);
     expect(shut.engineChoices()).toHaveLength(1);
     expect(open.engineChoices()).toHaveLength(1);
-    expect(read('main/settings.mjs')).toContain('...codexState(config)');
+    expect(read('main/settings.mjs')).toContain('...codexState(config, {}, { search })');
   });
 
   // The renderer reads main's fields rather than deriving its own.
@@ -381,7 +382,8 @@ describe('the card is drawn on every Mac', () => {
   */
   it('says which Codex account this Mac is signed into', () => {
     expect(settings).toContain('(w.codex?.accounts ?? []).map');
-    expect(settings).toContain("const label = a.email ?? 'Not signed in'");
+    // A tile per login, named by its email, the way Claude Code's are.
+    expect(settings).toContain('codexAccountsOnce({ here: agent.accounts');
     // It is still not a second Accounts PAGE, which is the thing she turned down.
     expect(settings).not.toMatch(/\['accounts', 'Accounts'\]/);
   });

@@ -42,7 +42,16 @@ export declare function sessionLimit(limits: UsageLimit[] | null | undefined): U
 export declare function headlineLimit(limits: UsageLimit[] | null | undefined): UsageLimit | null;
 export declare const ANY_MOMENT: string;
 export declare function spanLeft(ms: number): string;
+export declare const toMinute: (at: number) => number;
+export declare function resetDay(at: number, now?: number): string | null;
 export declare function untilReset(ms: number): string;
+
+/** The windows a reading can still answer for: one whose reset has gone past
+ *  measures a window nobody is in any more. */
+export declare function limitsStillRunning(
+  limits: UsageLimit[] | null | undefined,
+  now?: number,
+): UsageLimit[];
 
 export declare function limitRows(
   limits: UsageLimit[] | null | undefined,

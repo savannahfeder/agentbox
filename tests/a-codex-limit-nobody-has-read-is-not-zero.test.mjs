@@ -172,7 +172,7 @@ describe('a rolling update merges rather than replaces', () => {
   });
 
   it('keeps both when the update mentions neither, which this repo already sends', () => {
-    // tests/one-codex-process-carries-many-threads-and-a-card-nobody-answers-denies.test.mjs
+    // tests/one-codex-process-carries-many-threads-and-a-card-nobody-answers-waits.test.mjs
     // puts `{ rateLimits: {} }` on the wire. It must cost her nothing.
     expect(codexLimits(mergeRateLimits(HERS, {})).map((l) => l.percent)).toEqual([33, 63]);
     expect(codexLimits(mergeRateLimits(HERS, null)).map((l) => l.percent)).toEqual([33, 63]);

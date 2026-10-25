@@ -16,9 +16,32 @@
 export type TypedPart = { text: string } | { embed: string };
 
 const PICTURE = /^!\[[^\]\n]*\]\([^)\s]+\)$/;
-const ATTACHED_FILE = /^\[[^\]\n]*\]\(attachments\/[^)\s]+\)$/;
+const ATTACHED_FILE = /^\[[^\]\n]*\]\((?:attachments\/[^)\s]+|phone-files\/[0-9a-f]{64}\.[a-z0-9]{1,8})\)$/;
 
 const isEmbed = (line: string) => PICTURE.test(line.trim()) || ATTACHED_FILE.test(line.trim());
+
+// A thread picked with # is the other thing the app writes into a person's
+// words, `[Its name](w-…)` (thread-mentions.ts), and it is drawn as the thread.
+const THREAD_LINK = /\[((?:\\.|[^\]\\\n])*)\]\((w-[a-f0-9]{10})\)/g;
+const unescaped = (words: string) => words.replace(/\\([[\]\\])/g, '$1');
+
+export type TypedPiece = { text: string } | { thread: string; text: string };
+
+export function threadPieces(text: string): TypedPiece[] {
+  const out: TypedPiece[] = [];
+  let at = 0;
+  for (const m of text.matchAll(THREAD_LINK)) {
+    if (m.index! > at) out.push({ text: text.slice(at, m.index) });
+    out.push({ thread: m[2], text: unescaped(m[1]) });
+    at = m.index! + m[0].length;
+  }
+  if (!out.length) return [{ text }];
+  if (at < text.length) out.push({ text: text.slice(at) });
+  return out;
+}
+
+/** The words with each thread link down to the thread's name. */
+export const threadWords = (text: string) => text.replace(THREAD_LINK, (_, words: string) => unescaped(words));
 
 export function typedParts(text: string): TypedPart[] {
   const parts: TypedPart[] = [];

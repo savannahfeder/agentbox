@@ -205,7 +205,7 @@ describe('her own answer, on a Codex card', () => {
     const { root, dir } = planted('unused');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const cards = createCodexApprovals({ storeRoot: root, uuid: () => 'card-1', timeoutMs: 60_000, pollMs: 5 });
+      const cards = createCodexApprovals({ storeRoot: root, uuid: () => 'card-1', pollMs: 5 });
       const asked = cards.scope({ product: 'agentbox', item: 'w-1' }).handle(...commandAsk('git push'));
 
       // Exactly main/ipc.mjs's order, in one breath: the card is drawn, then
@@ -228,11 +228,11 @@ describe('her own answer, on a Codex card', () => {
     // `readdir` shows the entry, so `listPending` counts the card decided and
     // hides it, while `existsSync` resolves the link, finds nothing, and
     // reports there is nothing to sweep. The card would have stayed hidden for
-    // the whole fifteen minutes.
+    // as long as the worker stayed parked on it.
     const { root, dir } = planted('unused');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const cards = createCodexApprovals({ storeRoot: root, uuid: () => 'card-1', timeoutMs: 60_000, pollMs: 5 });
+      const cards = createCodexApprovals({ storeRoot: root, uuid: () => 'card-1', pollMs: 5 });
       const asked = cards.scope({ product: 'agentbox', item: 'w-1' }).handle(...commandAsk('git push'));
       fs.symlinkSync(path.join(root, 'nowhere.md'), path.join(dir, 'card-1.answer.json'));
       await settled();
@@ -253,7 +253,7 @@ describe('her own answer, on a Codex card', () => {
     const { root, dir } = planted('unused');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const cards = createCodexApprovals({ storeRoot: root, uuid: () => 'card-1', timeoutMs: 60_000, pollMs: 5 });
+      const cards = createCodexApprovals({ storeRoot: root, uuid: () => 'card-1', pollMs: 5 });
       const asked = cards.scope({ product: 'agentbox', item: 'w-1' }).handle(...commandAsk('git push'));
       fs.mkdirSync(path.join(dir, 'card-1.answer.json'));
       await settled();

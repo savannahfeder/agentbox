@@ -29,7 +29,10 @@ describe("Ember's accents", () => {
   // w-9e434e8671: Light wears Ember Grid's type too, so the body is Geist in
   // both themes and Light carries Ember's five weight and spacing rules.
   it('set the body in Geist in both themes, with Ember Grid’s fallbacks', () => {
-    expect(styles).toContain("font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, sans-serif;");
+    // DejaVu Sans joined the end of the stack for the marks Geist has no glyph
+    // for (tests/a-mark-the-app-draws-has-a-font-on-every-machine). Nothing in
+    // front of it moved, so a Mac still sets every word in Geist.
+    expect(styles).toContain("font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, 'DejaVu Sans', sans-serif;");
     expect(styles).not.toContain("font-family: 'Avenir Next', 'Source Sans 3 Variable'");
     for (const rule of [
       ':root:root .set-title { font-weight: 400; letter-spacing: -0.035em; }',

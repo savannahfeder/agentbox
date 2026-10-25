@@ -28,6 +28,11 @@ export function writePicked(picked: string[], store: Pick<Storage, 'setItem'> | 
   try { store?.setItem(KEY, JSON.stringify(picked)); } catch { /* private mode */ }
 }
 
+/** Whose threads the Inbox can show. With Rooms on, other people's work is seen in a room, so the Inbox is yours alone. */
+export function inboxEveryone<T extends { id: string }>(everyone: T[], me: string | null, roomsOn: boolean): T[] {
+  return roomsOn ? everyone.filter((p) => p.id === me) : everyone;
+}
+
 /** Only people still on the team, and never nobody: you, when nothing is left. */
 export function normalizePicked(picked: string[] | null, me: string | null, known: string[]): string[] {
   const kept = (picked ?? []).filter((id) => known.includes(id));
@@ -92,14 +97,12 @@ export function peopleWorthADot(everyone: Person[], picked: string[], me: string
   return !(shown.length === 1 && shown[0].id === me);
 }
 
-type Tab = 'inbox' | 'progress' | 'snoozed' | 'done' | 'all';
+type Tab = 'inbox' | 'progress' | 'snoozed' | 'done';
 const TAB_STATE: Record<Tab, (s: ThreadCard['state']) => boolean> = {
   inbox: (s) => s === 'waiting',
   progress: (s) => s === 'running',
   snoozed: (s) => s === 'scheduled',
   done: (s) => s === 'done',
-  // Everything, finished threads included (w-fda2165ec6).
-  all: () => true,
 };
 
 const startOfDay = (now: number) => { const t = new Date(now); t.setHours(0, 0, 0, 0); return t.getTime(); };
@@ -140,14 +143,12 @@ export type MixedRow = { item: WorkItem; card?: undefined } | { card: ThreadCard
  * finished, newest first; a card says only when it last changed, so that
  * stands in for it.
  */
-// ON ALL (`tab`, w-fda2165ec6) the same order as your rows: open ahead of
-// finished, and a finished card by when it last changed.
-export function mergeRows(mine: WorkItem[], theirs: ThreadCard[], sort: Display['sort'] | 'done', rank: { order: string[]; products: Product[] } = { order: [], products: [] }, tab?: string): MixedRow[] {
+export function mergeRows(mine: WorkItem[], theirs: ThreadCard[], sort: Display['sort'] | 'done', rank: { order: string[]; products: Product[] } = { order: [], products: [] }): MixedRow[] {
   const slugOf = new Map(rank.products.map((p) => [p.name, p.slug]));
   const ranked = (c: ThreadCard): Ranked => ({ priority: c.priority, updatedAt: c.updatedAt, product: slugOf.get(c.project ?? '') ?? null, status: c.state === 'done' ? 'done' : undefined });
   const by = sort === 'done'
     ? order({ sort: 'updated' }, 'done')
-    : order({ sort }, tab, rank.order, conversationSlugs(rank.products));
+    : order({ sort }, undefined, rank.order, conversationSlugs(rank.products));
   const cards = theirs.slice().sort((a, b) => by(ranked(a), ranked(b)));
   const ahead = (c: ThreadCard, i: WorkItem) => by(ranked(c), i) < 0;
   const out: MixedRow[] = [];

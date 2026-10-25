@@ -42,10 +42,13 @@ export function previewLine<T>(
 }
 
 export function SchedulePicker<T>({
-  title, subtitle, placeholder, hintWhenRefused, options, parse, previewOf, onChoose, onClose,
+  title, subtitle, note, placeholder, hintWhenRefused, options, parse, previewOf, onChoose, onClose,
 }: {
   title: string;
   subtitle?: string;
+  /** A sentence this box has to carry rather than swallow the key for: see
+   *  `openSnooze` in App.tsx and ../stopped-agent.ts. */
+  note?: string;
   placeholder: string;
   hintWhenRefused: string;
   options: Array<PickerOption<T>>;
@@ -80,6 +83,7 @@ export function SchedulePicker<T>({
       <div className="modal snooze" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">{title}</div>
         {subtitle && <div className="modal-subtitle">{subtitle}</div>}
+        {note && <div className="modal-note">{note}</div>}
         <div className="snooze-input-row">
           <input
             ref={ref}

@@ -27,8 +27,10 @@ const runs = (files, opts) => Object.fromEntries(Object.entries(layersFor(files,
 // Since 2026-10-12 (the owner's answer on w-4401acca50): every deploy that
 // changes what a person runs also runs real Claude Code and Codex, the
 // installed app, and an agent trying to break it.
-const APP_CHANGE = { live: true, real: true, installed: true, breaker: true };
-const NO_APP_CHANGE = { live: false, real: false, installed: false, breaker: false };
+// Since 2026-10-15, also the real Claude Code on other people's setups
+// (tests/a-real-claude-code-runs-on-other-peoples-setups-without-a-bill.test.mjs).
+const APP_CHANGE = { live: true, setups: true, real: true, installed: true, breaker: true };
+const NO_APP_CHANGE = { live: false, setups: false, real: false, installed: false, breaker: false };
 
 describe('which layers a branch gets', () => {
   it('a change to how Codex is found runs the machine check and every app layer', () => {
@@ -46,7 +48,7 @@ describe('which layers a branch gets', () => {
   });
 
   it('--quick keeps the stand-in drives and drops the slow, billed layers', () => {
-    expect(runs(['main/supervisor.mjs'], { quick: true })).toEqual({ 'this-machine': true, machines: false, live: true, real: false, installed: false, breaker: false });
+    expect(runs(['main/supervisor.mjs'], { quick: true })).toEqual({ 'this-machine': true, machines: false, live: true, setups: false, real: false, installed: false, breaker: false });
   });
 
   it('each slow layer can be dropped on its own, and says why it was', () => {
@@ -58,6 +60,8 @@ describe('which layers a branch gets', () => {
 
   it('a change to the stand-in worker or the skill re-proves the drive', () => {
     expect(runs(['scripts/lib/stub-claude-worker.mjs']).live).toBe(true);
+    // The stand-in imports it; a power test's world changes what every stand-in does.
+    expect(runs(['scripts/lib/stand-in-world.mjs']).live).toBe(true);
     expect(runs(['.claude/skills/verify-agentbox/scripts/drives.mjs']).live).toBe(true);
     expect(runs(['.claude/skills/verify-agentbox/scripts/machines.mjs']).machines).toBe(true);
   });

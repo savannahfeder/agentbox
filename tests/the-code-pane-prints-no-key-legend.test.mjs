@@ -113,6 +113,11 @@ describe('the unsaved mark still carries the one key it needs to', () => {
   it('says Press ⌘S where she can only see it with something unsaved', () => {
     // The word Unsaved is drawn only while that file is dirty, and the key
     // rides its label rather than a strip that shows the whole time.
-    expect(drawn).toContain('<span className="code-file-unsaved" title="Not saved yet. Press ⌘S.">Unsaved</span>');
+    const mark = drawn.match(/<span className="code-file-unsaved"[^>]*>Unsaved<\/span>/);
+    expect(mark, 'no Unsaved mark on the file').toBeTruthy();
+    expect(mark[0]).toContain('Not saved yet. Press ');
+    // And the key it names is this keyboard's, so where there is no ⌘ it reads
+    // Ctrl+S rather than a key the keyboard has not got (4dabd8f7).
+    expect(mark[0]).toContain("chord('⌘S')");
   });
 });

@@ -24,7 +24,9 @@
 /* A message that carries on a run sits close under it, and its time waits in
    the face column until the pointer is on it. */
 .thread-block.is-chat-cont { margin-top: -12px; }
-.chat-gt { display: block; font: 10px/25px var(--mono); color: var(--text-faint); text-align: right; visibility: hidden; }
+/* Wider than the face column, so it grows leftward out of it rather than into the words. */
+.chat-gutter { position: relative; }
+.chat-gt { position: absolute; right: 0; top: 2px; white-space: nowrap; font: 10px/25px var(--mono); color: var(--text-faint); text-align: right; visibility: hidden; }
 .chat-msg:hover .chat-gt { visibility: visible; }
 
 /* WHAT YOU DID STANDS IN THE TEXT COLUMN, NOT THE FACE COLUMN (w-2b0cd0f741).
@@ -41,6 +43,12 @@
    drew the browser's own grooved 2px line at full strength. */
 .chat-msg .msg-body hr { border: 0; border-top: 1px solid var(--line); opacity: .5; margin: 16px 0; }
 
+/* A NEW LINE A PERSON TYPED IS A NEW LINE (w-0d55a2b160). Markdown joins two
+   lines one newline apart into one; `pre-line` keeps the break and still
+   folds runs of spaces the way a paragraph does. Only on a paragraph, so a
+   list keeps its own spacing. */
+.msg-body.chat-lines p { white-space: pre-line; }
+
 .chat-folded { max-height: 340px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 62%, transparent); mask-image: linear-gradient(#000 62%, transparent); }
 .chat-more {
   justify-self: start; appearance: none; background: none; border: 0; padding: 0; margin-top: 6px;
@@ -49,6 +57,25 @@
 }
 .chat-more:hover { color: var(--text); text-decoration-color: var(--text-faint); }
 .chat-more:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
+
+/* A PICTURE IN A CHAT IS A PREVIEW, at Slack's size (w-286ad4e81c): held
+   inside 360 by 240 at its own shape, and a click opens it large over the
+   chat. At the column's width a Retina screenshot drew at twice its size.
+   Pictures sent together share one paragraph (attachments.ts), which becomes
+   their row, as in Slack. The row carries the spacing, so a picture is a block
+   with no text line's gap under it, and the row drops .chat-lines' pre-line,
+   which kept the line break between two pictures as a gap. The box a picture
+   holds while it loads is the same size, so nothing under it jumps. */
+.chat-msg .msg-body p:has(> .inline-image-open),
+.chat-msg .msg-body p:has(> .inline-image) { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin: 16px 0; white-space: normal; }
+.chat-msg .msg-body > p:has(> .inline-image-open, > .inline-image):first-child { margin-top: 0; }
+.chat-msg .msg-body > p:has(> .inline-image-open, > .inline-image):last-child { margin-bottom: 0; }
+.chat-msg .inline-image { display: block; margin: 0; max-width: min(100%, 360px); max-height: 240px; }
+/* The button sizes itself from the picture's height cap alone, so it is held to the same width. */
+.chat-msg .inline-image-open { max-width: min(100%, 360px); }
+.chat-msg .inline-image.arriving { width: min(100%, 360px); max-height: 240px; }
+:root:root:root:root .chat-msg .inline-image-open:has(> .inline-image[data-phone-img="loading"]) { width: min(100%, 360px); }
+:root:root:root:root .chat-msg .inline-image[data-phone-img="loading"] { max-height: 240px; }
 
 /* ---------------------- reactions, and the bar on pointing ----------------
    Drawing A, with round one's note on it: no colour and no rounded corners. So
@@ -96,6 +123,68 @@
 .chat-act:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
 .chat-act svg { width: 14px; height: 14px; flex: none; }
 .chat-act-word { white-space: nowrap; }
+/* Your three most recent emoji, one press each, before the bar's words. */
+.chat-quick {
+  width: 28px; height: 26px; padding: 0;
+  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer;
+  font-size: 14px; line-height: 1;
+}
+.chat-quick:hover { background: var(--wash); }
+.chat-quick:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
+.chat-quick + .chat-act { border-left: 1px solid var(--line); }
+.chat-act-more svg { width: 14px; height: 14px; }
+
+/* THE MORE MENU, placed against the window like the whole emoji list. */
+.chat-menu {
+  position: fixed; z-index: 85; box-sizing: border-box; padding: 4px 0;
+  border: 1px solid var(--line-strong); border-radius: 0;
+  background: var(--skin-solid, var(--surface)); box-shadow: 0 8px 28px #0006;
+}
+.chat-menu-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; height: 30px; padding: 0 12px;
+  appearance: none; background: none; border: 0; border-radius: 0; cursor: pointer; text-align: left;
+  font: inherit; font-size: 13px; color: var(--text-dim);
+}
+.chat-menu-row.on { background: var(--wash); color: var(--text); }
+.chat-menu-row kbd { font: 10.5px var(--mono); color: var(--text-faint); background: none; border: 0; }
+.chat-menu-row.danger.on { color: var(--text); }
+.chat-menu-rule { height: 1px; margin: 4px 0; background: var(--line); }
+
+/* Deleting asks once, in a small square card over the window. */
+.chat-confirm-back { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: #0006; }
+.chat-confirm {
+  width: 340px; padding: 18px 18px 14px; box-sizing: border-box;
+  border: 1px solid var(--line-strong); border-radius: 0;
+  background: var(--skin-solid, var(--surface)); box-shadow: 0 12px 40px #0008;
+}
+.chat-confirm-title { font-size: 15px; color: var(--text); }
+.chat-confirm-body { margin-top: 6px; font-size: 13px; color: var(--text-dim); line-height: 1.45; }
+.chat-confirm-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.chat-confirm-no, .chat-confirm-yes {
+  height: 28px; padding: 0 14px; appearance: none; border-radius: 0; cursor: pointer; font: inherit; font-size: 13px;
+  border: 1px solid var(--line-strong); background: none; color: var(--text-dim);
+}
+.chat-confirm-yes { color: var(--text); background: var(--wash-strong); }
+.chat-confirm-no:hover, .chat-confirm-yes:hover { color: var(--text); border-color: var(--text-faint); }
+
+/* EDITING A MESSAGE IN PLACE: the words in a box where they were. */
+.chat-edit { grid-column: 2; margin-top: 2px; border: 1px solid var(--line-strong); background: var(--wash); }
+.chat-edit-box {
+  display: block; width: 100%; box-sizing: border-box; padding: 9px 12px; resize: none; overflow-y: auto;
+  border: 0; outline: none; background: none; color: var(--text); font: inherit; font-size: 14.5px; line-height: 1.45;
+}
+.chat-edit-foot { display: flex; align-items: center; gap: 6px; padding: 0 8px 8px 12px; }
+.chat-edit-hint { flex: 1; font: 10.5px var(--mono); letter-spacing: .02em; color: var(--text-faint); }
+.chat-edit-cancel, .chat-edit-save {
+  height: 24px; padding: 0 10px; appearance: none; border: 1px solid var(--line-strong); border-radius: 0; cursor: pointer;
+  background: none; color: var(--text-dim); font: inherit; font-size: 12px;
+}
+.chat-edit-save { color: var(--text); background: var(--wash-strong); }
+.chat-edit-cancel:hover, .chat-edit-save:hover { color: var(--text); border-color: var(--text-faint); }
+
+/* EDITED, AFTER THE TIME, and a deleted message that is kept for its replies. */
+.msg-edited { font: 11px var(--mono); letter-spacing: .03em; color: var(--text-faint); }
+.msg-deleted { color: var(--text-faint); font-style: italic; }
 
 /* The emoji plate hangs off the bar and opens UPWARD, for the same reason the
    reply box's menu does: the newest message is at the foot of the window and
@@ -187,7 +276,55 @@
 .fmt-i { font-style: italic; font-family: var(--serif, inherit); }
 .fmt-s { text-decoration: line-through; }
 .fmt-gap { width: 13px; }
+.fmt-aa.on { color: var(--text); background: var(--wash); }
+.fmt-aa .fmt-letter { font-size: 12px; letter-spacing: .02em; }
+
+/* RECORDING A VOICE NOTE: the bar becomes the recording, on the same line. */
+.fmt-recording { gap: 8px; }
+.voice-rec-dot { flex: none; width: 6px; height: 6px; background: var(--accent); animation: voice-rec 1.2s steps(2, jump-none) infinite; }
+@keyframes voice-rec { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .voice-rec-dot { animation: none; } }
+.voice-rec-time { flex: none; font: 11px var(--mono); letter-spacing: .03em; color: var(--text-dim); white-space: nowrap; }
+.voice-meter { display: flex; align-items: center; gap: 2px; height: 18px; flex: none; }
+.voice-meter span { width: 2px; min-height: 2px; background: var(--text-dim); }
+.fmt-done { color: var(--text); border: 1px solid var(--line-strong); }
+.fmt-btn.fmt-discard-ask { width: auto; padding: 0 7px; color: var(--text); border: 1px solid var(--line-strong); }
+.fmt-discard-word { font-size: 12px; white-space: nowrap; }
+.fmt-done:disabled { color: var(--text-faint); cursor: default; }
 .fmt-emoji-wrap { position: relative; display: inline-flex; }
+/* The address a link button asks for, on a line of its own above the bar. */
+.fmt-bar { position: relative; }
+.fmt-link-ask {
+  position: absolute; bottom: calc(100% + 6px); left: 0; width: 280px; z-index: 60;
+  padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: 0; outline: none;
+  background: var(--pop); color: var(--text); font: inherit; font-size: 13px; box-shadow: var(--shadow-lg);
+}
+.fmt-link-ask::placeholder { color: var(--text-faint); }
+
+/* ---------------- the chat's reply box, as an editor (w-0d55a2b160) --------
+   ./RichReply.tsx. At rest it is the text field it replaced: the same padding,
+   size, line height and floor, which the box's own class still carries. Inside
+   it, bold is bold and a list is a list, drawn as quietly as the sent message
+   draws them. */
+.rich-reply { cursor: text; }
+.rich-reply .ProseMirror { outline: none; white-space: pre-wrap; overflow-wrap: break-word; }
+.rich-reply .ProseMirror p { margin: 0; }
+.rich-reply .ProseMirror strong { font-weight: 600; }
+.rich-reply .ProseMirror ul, .rich-reply .ProseMirror ol { margin: 2px 0; padding-left: 22px; }
+.rich-reply .ProseMirror li p { margin: 0; }
+.rich-reply .ProseMirror blockquote { margin: 2px 0; padding-left: 12px; border-left: 2px solid var(--line-strong); color: var(--text-dim); }
+.rich-reply .ProseMirror code { font-family: var(--mono); font-size: .88em; background: var(--wash-strong); padding: 1px 4px; }
+.rich-reply .ProseMirror pre { margin: 4px 0; padding: 8px 10px; background: var(--wash); font-family: var(--mono); font-size: .88em; white-space: pre-wrap; }
+.rich-reply .ProseMirror pre code { background: none; padding: 0; font-size: inherit; }
+.rich-reply .ProseMirror a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.rich-reply .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--text-faint);
+}
+/* The thread panel's box, at the size its text field was. */
+.chat-thread-input {
+  width: 100%; box-sizing: border-box; min-height: 82px; max-height: 240px; overflow-y: auto;
+  padding: 12px 16px 6px; font-size: 14.5px; line-height: 1.45; color: var(--text);
+}
 
 /* AGENTS IN A CONVERSATION (w-7b9cb8636a, ./ChatAgents.tsx). */
 
@@ -324,11 +461,15 @@ body.chat-thread-dragging * { cursor: col-resize !important; }
   display: flex; flex-direction: column; gap: 20px; padding: 24px 28px 20px;
 }
 .chat-thread-body .chat-day { margin: 2px 0 -2px; }
+/* The panel is drawn outside the reading pane, which is the one place that
+   undoes the body's `user-select: none`, so its words opt back in here. */
+.chat-thread-body .msg-head, .chat-thread-body .msg-body { user-select: text; -webkit-user-select: text; }
 
 /* The reply box, on the same line as the chat's and in the same plate. */
 .chat-thread-foot { flex: none; padding: 0 28px 24px; }
+/* Relative so the @ and # menus rise off it, as they do off the chat's box. */
 .chat-thread-box {
-  display: flex; flex-direction: column;
+  position: relative; display: flex; flex-direction: column;
   background: var(--wash); border: 1px solid var(--line); border-radius: 0;
   transition: border-color .18s, background .18s;
 }
@@ -356,8 +497,14 @@ body.chat-thread-dragging * { cursor: col-resize !important; }
 .chat-thread-bar .dock-send:disabled { color: var(--text-faint); background: none; border-color: var(--line-strong); cursor: default; }
 .chat-thread-bar .dock-send:disabled:hover { background: none; }
 /* A PANEL DRAGGED NARROW keeps what puts something INTO the message (@, the
-   paperclip, the emoji) and lets the marks go, rather than pushing Send off
-   the edge. The marks are the buttons before the bar's gap. */
+   paperclip, the microphone, the emoji) and lets the marks go, rather than
+   pushing Send off the edge. The marks are the buttons after the bar's gap. */
 @container (max-width: 400px) {
-  .chat-thread-bar .fmt-btn:has(~ .fmt-gap), .chat-thread-bar .fmt-gap { display: none; }
+  .chat-thread-bar .fmt-mark, .chat-thread-bar .fmt-gap { display: none; }
+}
+/* And the bar over a message keeps every button but drops the words of Hand
+   to an agent, which would otherwise cover the name beside it. */
+.chat-thread-panel { container: thread-panel / inline-size; }
+@container thread-panel (max-width: 400px) {
+  .chat-thread-panel .chat-act-word { display: none; }
 }

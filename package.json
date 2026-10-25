@@ -1,7 +1,7 @@
 {
   "name": "agentbox-app",
   "productName": "Agentbox",
-  "version": "0.1.13",
+  "version": "0.1.16",
   "description": "An inbox for managing dozens of Claude Code and Codex agents.",
   "author": "Savannah Feder",
   "repository": {
@@ -31,6 +31,7 @@
   "files": [
     "bin/",
     "main/**/*.mjs",
+    "main/native/*/build/*.node",
     "shared/**/*.mjs",
     "shared/**/*.mts",
     "shared/**/*.json",
@@ -43,6 +44,7 @@
     "scripts/before-publish.mjs",
     "scripts/after-install.mjs",
     "scripts/approval-server.sh",
+    "scripts/cloud-shim.pl",
     "scripts/memory-gate-hook.sh",
     "worker-permissions.json",
     "LICENSE",
@@ -50,7 +52,7 @@
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "node scripts/prepare-terminal.mjs && node scripts/read-claude-commands.mjs && node scripts/read-claude-models.mjs && vite build renderer",
+    "build": "node scripts/build-liquid-glass.mjs && node scripts/prepare-terminal.mjs && node scripts/read-claude-commands.mjs && node scripts/read-claude-models.mjs && vite build renderer",
     "start": "npm run build && node scripts/brand-electron.mjs && electron .",
     "test": "vitest run",
     "read:claude": "node scripts/read-claude-commands.mjs --snapshot && node scripts/read-claude-models.mjs --snapshot",
@@ -68,6 +70,8 @@
     "relay:build": "node relay/build.mjs",
     "relay:dev": "node relay/build.mjs && cd relay && npm ci --no-audit --no-fund && npx wrangler dev --port 8787",
     "relay:deploy": "node relay/deploy.mjs",
+    "phone:build": "vite build renderer --logLevel warn && node scripts/build-phone-site.mjs",
+    "phone:deploy": "npm run phone:build && node scripts/deploy-phone-site.mjs",
     "prepare": "node scripts/install-hooks.mjs",
     "serve": "node bin/agentbox.mjs",
     "prepack": "npm run build",
@@ -109,6 +113,9 @@
     "vitest": "^2.0.5"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-agentcore": "^3.1150.0",
+    "@aws-sdk/client-s3": "^3.1150.0",
+    "@aws-sdk/s3-request-presigner": "^3.1150.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@supabase/supabase-js": "^2.117.2",
     "electron-updater": "^6.8.9",
@@ -117,6 +124,11 @@
     "qrcode": "^1.5.4",
     "web-push": "^3.6.7",
     "zod": "^4.4.3"
+  },
+  "allowScripts": {
+    "node-pty": true,
+    "esbuild": true,
+    "electron-winstaller": false
   },
   "build": {
     "appId": "ac.astral.app",
@@ -136,6 +148,7 @@
       "!briefs/writing-rules.md",
       "worker-permissions.json",
       "scripts/approval-server.sh",
+      "scripts/cloud-shim.pl",
       "scripts/memory-gate-hook.sh",
       "renderer/dist/**/*",
       "package.json"
@@ -143,8 +156,10 @@
     "asarUnpack": [
       "worker-permissions.json",
       "scripts/approval-server.sh",
+      "scripts/cloud-shim.pl",
       "scripts/memory-gate-hook.sh",
-      "node_modules/node-pty/**"
+      "node_modules/node-pty/**",
+      "main/native/**/*.node"
     ],
     "mac": {
       "extendInfo": {
@@ -152,11 +167,12 @@
         "NSDocumentsFolderUsageDescription": "Agentbox needs this to let your agents work in a project you keep in Documents.",
         "NSDownloadsFolderUsageDescription": "Agentbox needs this to let your agents work in a project you keep in Downloads.",
         "NSRemovableVolumesUsageDescription": "Agentbox needs this to let your agents work in a project you keep on an external disk.",
-        "NSAppleEventsUsageDescription": "Agentbox needs this when an agent you started asks another app to do something."
+        "NSAppleEventsUsageDescription": "Agentbox needs this when an agent you started asks another app to do something.",
+        "NSMicrophoneUsageDescription": "Agentbox needs this to record a voice note when you press the microphone button."
       },
       "category": "public.app-category.productivity",
       "icon": "build/icon.icns",
-      "x64ArchFiles": "Contents/Resources/app.asar.unpacked/node_modules/node-pty/prebuilds/darwin-*/*",
+      "x64ArchFiles": "Contents/Resources/app.asar.unpacked/{node_modules/node-pty/prebuilds/darwin-*/*,main/native/**/*.node}",
       "target": [
         {
           "target": "dmg",

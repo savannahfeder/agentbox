@@ -93,9 +93,11 @@ describe('the crumb itself', () => {
   });
 });
 
-describe('the thread view wears the crumb when it has a summary', () => {
-  it('portals the crumb into the bar for a thread with a summary, and the full band otherwise', () => {
-    expect(focus).toMatch(/summaryOffered && crumbFrom\s*\?\s*<ThreadCrumb/);
+// Since 2026-10-24 every thread opened from a list wears it, summary or not
+// (tests/every-opened-thread-wears-the-trail-header).
+describe('the thread view wears the crumb', () => {
+  it('portals the crumb into the bar for a thread opened from a list, and the full band otherwise', () => {
+    expect(focus).toMatch(/const barContent = crumbFrom\s*\?\s*<><ThreadCrumb/);
     expect(focus).toMatch(/createPortal\(barContent, headerTarget\)/);
     expect(focus).toMatch(/:\s*<>\{backButton\}\{bandLine\}<\/>/);
   });

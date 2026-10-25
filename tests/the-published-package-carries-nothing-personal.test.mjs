@@ -48,6 +48,7 @@ function plant(rel, body) {
 
 beforeAll(() => {
   plant('main/a-stray-binary', '\x7fELF not really, but not source either\n');
+  plant('main/a-stray-addon.node', 'not the glass\n');
   plant('scripts/lib/somebody-scratch-file.mjs', '// left behind by a design run\n');
   // The file is normally absent from a fresh checkout, and a test that only
   // passes because the file is missing is not a test. So put one there.
@@ -86,13 +87,15 @@ describe('the tarball npm would publish', () => {
   it('carries source out of main, and not whatever else is lying in it', () => {
     expect(fs.existsSync(path.join(repoRoot, 'main', 'a-stray-binary'))).toBe(true);
     expect(has((p) => p === 'main/a-stray-binary')).toBe(false);
-    // Every main/ file that does ship is source.
+    expect(has((p) => p === 'main/a-stray-addon.node')).toBe(false);
+    // Every main/ file that does ship is source, or the tray's glass that
+    // `npm pack` compiles from main/native (scripts/build-liquid-glass.mjs).
     for (const f of manifest.files.filter((f) => f.path.startsWith('main/'))) {
-      expect(f.path).toMatch(/\.mjs$/);
+      expect(f.path).toMatch(/\.mjs$|^main\/native\/[\w-]+\/build\/[\w-]+\.node$/);
     }
   });
 
-  it('carries the two scripts the app runs, and not the harness beside them', () => {
+  it('carries the scripts the app runs, and not the harness beside them', () => {
     // scripts/lib/ is where the screenshot and design harnesses live, nothing
     // at run time imports any of it, and it is where scratch files land.
     expect(fs.existsSync(path.join(repoRoot, 'scripts', 'lib', 'somebody-scratch-file.mjs'))).toBe(true);
@@ -102,6 +105,8 @@ describe('the tarball npm would publish', () => {
       'scripts/after-install.mjs',
       'scripts/approval-server.sh',
       'scripts/before-publish.mjs',
+      // A cloud run's stand-in: perl runs it as a file.
+      'scripts/cloud-shim.pl',
       // The memory check every worker's shell commands ask (w-3958c3753d):
       // Claude Code runs it as a file, so it ships like the approval server.
       'scripts/memory-gate-hook.sh',

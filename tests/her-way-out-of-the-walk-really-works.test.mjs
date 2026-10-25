@@ -108,7 +108,7 @@ describe('1. the press reaches the page: nothing draggable covers Skip', () => {
     const pill = cssCode.slice(cssCode.indexOf('.fr-band-pill {'), cssCode.indexOf('.fr-band-dot'));
     const capsule = Number(pill.match(/max-width: min\(\d+px, calc\(100vw - (\d+)px\)\)/)[1]);
     expect(reserve).toBeLessThanOrEqual(capsule / 2);
-    expect(read('main/main.mjs')).toMatch(/minWidth: 980/);
+    expect(read('main/main.mjs')).toMatch(/minWidth: 720/);
   });
 
   it('the strip really draws the lane, inside itself and before the capsule', () => {

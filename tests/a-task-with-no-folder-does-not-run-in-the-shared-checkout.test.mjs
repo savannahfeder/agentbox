@@ -112,15 +112,20 @@ describe('a row that cannot have its own folder', () => {
   });
 
   // THE NULL RESULT, which is a different route to the same place: a repoPath
-  // that exists and is not a repository makes `restoreTaskFolder` answer null
+  // that exists and is not a repository made `restoreTaskFolder` answer null
   // rather than throw, and `made?.path ?? base` turned that into the checkout.
-  it('is never handed a folder that is not a repository', () => {
+  // Since 2026-10-14 such a folder is made a repository first (tests/a-project-
+  // folder-that-is-not-a-repository-still-runs-its-first-task), so the row gets
+  // a folder of its own, and still never the checkout itself.
+  it('is never handed the checkout of a folder that was not a repository', () => {
     const notARepo = fs.mkdtempSync(path.join(os.tmpdir(), 'not-a-repo-'));
     made.push(notARepo);
     const { sup, product, dir: store } = supervisorOver(notARepo);
     made.push(store);
 
-    expect(() => sup.workFolderFor({ id: 'w-notarepo', product: 'agentbox' }, product)).toThrow();
+    const got = sup.workFolderFor({ id: 'w-notarepo', product: 'agentbox' }, product);
+    expect(got).not.toBe(notARepo);
+    expect(got).toBe(taskFolderPath(notARepo, 'w-notarepo'));
   });
 
   // THE CASE THAT MUST NOT MATCH. A project with no repository never promised

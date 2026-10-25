@@ -161,7 +161,7 @@ describe('the reading it does have comes from the push alone', () => {
   // AND "NO READING YET" NEVER BECOMES A ZERO, which is the dashboard law and
   // the thing losing the read could quietly have broken. This repo really does
   // put `{ rateLimits: {} }` on that channel
-  // (tests/one-codex-process-carries-many-threads-and-a-card-nobody-answers-denies.test.mjs).
+  // (tests/one-codex-process-carries-many-threads-and-a-card-nobody-answers-waits.test.mjs).
   it('is still nothing after a push that carried no window, never a pair of zeroes', () => {
     const usage = new CodexUsage({ home: () => '/h' });
     usage.saw('account/rateLimits/updated', { rateLimits: {} });

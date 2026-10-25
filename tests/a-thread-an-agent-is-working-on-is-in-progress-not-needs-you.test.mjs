@@ -102,7 +102,11 @@ describe('the window hands the running sessions to both lists', () => {
     // belongsInInbox and so could not honour `live` there.
     // The app's ship queue may sit between them: a row it still owes a ship
     // is out of Needs you for the same reason (w-0c1ba766eb).
-    expect(app).toMatch(/const inboxCandidates = [\s\S]{0,600}if \(liveIds\.has\(i\.id\)\) return false;\s*(\/\/[^\n]*\n\s*)*(if \(shippingIds\.has\(i\.id\)\) return false;\s*)?if \(owedAnAnswer/);
+    // Both lines now carry the one exception the rule carries, and the regex
+    // was widened to allow it rather than relaxed: a row still asking you
+    // something is never hidden by either (`stillAsksYou`, w-fe48447cab). The
+    // behaviour this file is about is every assertion above, all unchanged.
+    expect(app).toMatch(/const inboxCandidates = [\s\S]{0,1200}if \(liveIds\.has\(i\.id\) && !stillAsksYou\(i\)( && ![^)]+\(i\))*\) return false;\s*(\/\/[^\n]*\n\s*)*(if \(shippingIds\.has\(i\.id\) && !stillAsksYou\(i\)( && ![^)]+\(i\))*\) return false;\s*)?if \(owedAnAnswer/);
     expect(app).toMatch(/belongsInProgress\(i, \{[^}]*live: liveIds\.has\(i\.id\)/);
     expect(app).toMatch(/belongsOnTheRail\(i, \{[^}]*live: liveIds\.has\(i\.id\)/);
   });

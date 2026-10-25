@@ -69,7 +69,7 @@ describe('a Z whose undo fails', () => {
   const undo = app.slice(app.indexOf('const undo = useCallback('), app.indexOf('/* ------------------------------- keyboard'));
 
   it('catches the failure rather than letting it end the press in silence', () => {
-    expect(undo).toMatch(/try \{\s*\n\s*await last\.run\(\);\s*\n\s*\} catch \(err\) \{/);
+    expect(undo).toMatch(/try \{\s*\n\s*(outcome = )?await last\.run\(\);\s*\n\s*\} catch \(err\) \{/);
   });
 
   it('puts the entry back on the pile, so the next Z does not reach past it', () => {

@@ -32,7 +32,7 @@ const EM_DASH = '—';
 const ROOTS = ['renderer/src', 'main', 'shared'];
 const EXTS = new Set(['.ts', '.tsx', '.mjs', '.js']);
 
-// THE THREE THAT STAY, EACH A DECISION AND NOT AN OVERSIGHT. Matched on the
+// THE ONES THAT STAY, EACH A DECISION AND NOT AN OVERSIGHT. Matched on the
 // fragment rather than a line number, so the allowance cannot drift onto some
 // other line as the file moves underneath it.
 const ALLOWED = [
@@ -55,9 +55,9 @@ const ALLOWED = [
     fragment: 'recovery',
     why: 'A console.log to the terminal. She never sees it.',
   },
-  // THE TWO STRIPPERS. Both are regex literals rather than anything anybody
-  // reads, and both exist to TAKE the character out. A guard that made them
-  // give up their dash would be a guard that switched the strippers off.
+  // THE STRIPPERS. Every one is a regex literal rather than anything anybody
+  // reads, and every one exists to TAKE the character out. A guard that made
+  // them give up their dash would be a guard that switched the strippers off.
   {
     file: 'shared/claude-commands.mjs',
     fragment: 'menuDescription',
@@ -69,6 +69,13 @@ const ALLOWED = [
     fragment: '.replace(',
     why: 'The same removal on the dashboard side. The dash in it is the pattern, '
       + 'not a word.',
+  },
+  {
+    file: 'shared/teammates.mjs',
+    fragment: 'const rest = words.slice',
+    why: "partFor, which trims the punctuation between a teammate's @name and "
+      + 'what was asked of it, so the run title starts on the words. '
+      + 'A dash is one of the marks it removes.',
   },
   {
     file: 'renderer/src/search.ts',
@@ -178,7 +185,7 @@ describe('no em dash in anything the app says', () => {
     expect(saidOutLoud(prose)).toEqual([]);
   });
 
-  it('names a reason for each of the three it allows', () => {
+  it('names a reason for each one it allows', () => {
     for (const a of ALLOWED) {
       expect(fs.existsSync(path.join(root, a.file))).toBe(true);
       expect(fs.readFileSync(path.join(root, a.file), 'utf8')).toContain(a.fragment);

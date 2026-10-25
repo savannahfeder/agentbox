@@ -19,27 +19,56 @@ import { cardsFor } from '../../shared/thread-cards.mjs';
 import fs from 'node:fs';
 import { saveAttachments, attachmentMarkdown } from '../save-attachments.mjs';
 import { hasLapsed, statusEnds } from '../../shared/team-status.mjs';
+import QRCode from 'qrcode';
+import { createPhoneInbox } from '../phone-inbox.mjs';
+import { SNAPSHOT_LIMITS, phoneProjectsOf, phoneEligible } from '../../shared/phone-snapshot.mjs';
+import { createRooms } from './rooms.mjs';
 
 // `signingIn` is { url } while a Google sign-in waits on the browser, so the
 // page can offer that link again rather than a button that does nothing.
-const EMPTY = { configured: false, started: false, signedIn: false, signingIn: null, me: null, team: null, invites: [], sent: [], people: [], cards: [], lastSyncAt: null, error: null };
+const EMPTY = { configured: false, canSignIn: false, started: false, settling: false, signedIn: false, signingIn: null, me: null, team: null, invites: [], sent: [], people: [], cards: [], lastSyncAt: null, error: null };
+
+// With Alpha features › Multiplayer off the window gets the sign-in the phone
+// needs and no team, so it draws the single-person app.
+export function teamForWindow(state, multiplayer) {
+  if (multiplayer || !state) return state;
+  const { rooms, ...rest } = state;
+  return { ...rest, configured: false, team: null, invites: [], sent: [], people: [], cards: [] };
+}
 
 export function createTeamService({
   session, store, disk, accountRoot, stateFile, onChange = () => {}, log = () => {}, intervalMs = 5000, startRetryMs = 1500,
   // The clock, so a test can move past the moment a status runs out.
   now = Date.now,
+  // HER PHONE WITH THE MAC SHUT (docs/cloud/PHONE-PLAN.md, step 1): which
+  // projects she put on it (slugs), how a command from it is done, and where
+  // this Mac remembers what it sent. Needs no team, only a sign-in.
+  phone = null,
+  // ROOMS (alpha, docs/team/ROOMS-PLAN.md): { enabled, device, presenceFacts, prefsFile }.
+  rooms: roomsSetup = null,
 }) {
-  let state = { ...EMPTY, configured: !!session?.configured };
+  // The phone site's address, only an https one, and its code for Settings.
+  const site = typeof phone?.site === 'string' && /^https:\/\/[^\s/]+(\/[^\s]*)?$/.test(phone.site) ? phone.site : null;
+  let siteQr = null;
+  // `settling` holds the window's boot screen until the team is known, so it
+  // never draws the single-person app first and then redraws with the team.
+  // `canSignIn` survives teamForWindow, so a build with Multiplayer off still asks.
+  let state = { ...EMPTY, configured: !!session?.configured, canSignIn: !!session?.configured, settling: !!session?.configured, phoneSite: site, phoneSiteQr: null };
   let backend = null;
   let sync = null;
   let timer = null;
   let unsubscribe = null;
   let pending = null;
+  let phoneInbox = null;
   // The sync cursors and which team this Mac is in, in one file.
   let local = null;
   const kept = () => (local ??= fileSyncState(stateFile, fs));
 
   const set = (patch) => { state = { ...state, ...patch }; onChange(); };
+  const rooms = roomsSetup ? createRooms({
+    backend: () => backend, me: () => state.me, team: () => state, now, log, onChange, ...roomsSetup,
+  }) : null;
+  if (site) QRCode.toString(site, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }).then((qr) => { siteQr = qr; set({ phoneSiteQr: qr }); }).catch(() => {});
 
   function products() {
     try { return store.listProducts(); } catch { return []; }
@@ -140,10 +169,69 @@ export function createTeamService({
         set({ error: String(err?.message ?? err) });
         return null;
       } finally {
+        // On its own, so a team sync that failed does not hold up her phone,
+        // nor her phone the team.
+        await phoneOnce();
+        await rooms?.tick().catch((err) => log(`rooms: ${err.message}`));
         pending = null;
       }
     });
     return pending;
+  }
+
+  async function phoneOnce() {
+    // Not before the app's handlers exist: a command taken then would be
+    // marked refused for no reason of hers.
+    if (!phoneInbox || phone.ready?.() === false) return;
+    try {
+      await phoneInbox.syncOnce();
+      if (state.phoneError) set({ phoneError: null });
+    } catch (err) {
+      set({ phoneError: String(err?.message ?? err) });
+    }
+  }
+
+  function makePhoneInbox() {
+    if (!phone) return null;
+    const productOf = (slug) => products().find((p) => p.slug === slug) ?? null;
+    // WHO IT SENDS AS, fixed now, and whether that is still who is signed in
+    // (Codex's second review, finding 1).
+    const owner = state.me?.id;
+    const signedInAs = backend;
+    if (!owner) return null;
+    let inbox = null;
+    inbox = createPhoneInbox({
+      backend,
+      owner,
+      alive: () => phoneInbox === inbox && backend === signedInAs && state.me?.id === owner,
+      device: phone.device?.() ?? null,
+      projects: () => {
+        const on = new Set(phoneProjectsOf(phone.projects(), owner, phoneEligible(products())));
+        return products().filter((p) => on.has(p.slug)).map((p) => ({ slug: p.slug, name: p.name || p.slug, dir: p.dir || null, repoPath: p.repoPath || null }));
+      },
+      listItems: (slug) => { const p = productOf(slug); try { return p ? disk.readWorkItems(p.dir) : []; } catch { return []; } },
+      historyOf: (slug, id, { all = false } = {}) => { try { return store.readHistory(slug, id, { max: all ? Number.MAX_SAFE_INTEGER : SNAPSHOT_LIMITS.lines * 4 }); } catch { return []; } },
+      apply: phone.apply,
+      liveOf: (slug, id) => phone.live?.(slug, id) ?? null,
+      approvalsOf: () => phone.approvals?.() ?? [],
+      readSettings: phone.readSettings ?? null,
+      version: phone.version ?? '',
+      idleMs: phone.idleMs ?? null,
+      // The lid shut: projects whose threads carry on in the cloud, and runs it started (shared/cloud-kit.mjs).
+      carrying: phone.carrying ?? null,
+      kitsFor: phone.kitsFor ?? null,
+      adopt: phone.adopt ?? null,
+      cloudReplies: phone.cloudReplies ?? null,
+      runHome: phone.runHome ?? null,
+      newThreadKits: phone.newThreadKits ?? null,
+      adoptNew: phone.adoptNew ?? null,
+      // One file per person: what this Mac sent up for one account is not
+      // what the next one to sign in here has.
+      stateFile: phone.stateFile.replace(/(\.json)?$/, `.${owner}.json`),
+      now,
+      log,
+    });
+    return inbox;
   }
 
   function stopLoop() {
@@ -166,6 +254,8 @@ export function createTeamService({
     // no team cloud. So the single-person app opened on no projects at all.
     // Everybody gets one at boot now (main/main.mjs), signed in or not.
     await refreshTeam();
+    if (state.settling) set({ settling: false });
+    phoneInbox = makePhoneInbox();
     sync = createTeamSync({
       backend,
       disk,
@@ -186,7 +276,10 @@ export function createTeamService({
   }
 
   return {
-    state: () => state,
+    state: () => (rooms ? { ...state, rooms: rooms.state() } : state),
+    rooms,
+    /** What the desktop's banner was told arrived, for her phone's alerts (main/phone-alerts.mjs). */
+    phoneArrivals: (list, needsYou) => phoneInbox?.arrivals(list, needsYou),
 
     // THREE TRIES AT START, because one dropped request left the app signed
     // out until it was restarted (measured 2026-10-01 on a loaded Mac: the
@@ -201,10 +294,10 @@ export function createTeamService({
         try {
           const b = await session.restore();
           if (b) await signedIn(b);
-          set({ started: true });
+          set({ started: true, settling: false });
           return state;
         } catch (err) {
-          set({ error: String(err?.message ?? err) });
+          set({ error: String(err?.message ?? err), settling: false });
           if (attempt < 2) await new Promise((r) => setTimeout(r, startRetryMs * (attempt + 1)));
         }
       }
@@ -253,13 +346,16 @@ export function createTeamService({
 
     async signOut() {
       stopLoop();
+      // While still signed in, so this Mac can say it has gone.
+      await rooms?.stop().catch(() => {});
       await session.signOut?.();
       disk.setLineAuthor(null);
       delete process.env.AGENTBOX_PERSON_ID;
       backend = null;
       sync = null;
+      phoneInbox = null;
       // Signed out is a known answer, so the window shows the sign-in page at once.
-      state = { ...EMPTY, configured: !!session?.configured, started: true };
+      state = { ...EMPTY, configured: !!session?.configured, started: true, phoneSite: site, phoneSiteQr: siteQr };
       onChange();
       return state;
     },

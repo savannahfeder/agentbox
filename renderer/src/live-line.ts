@@ -22,15 +22,17 @@
 // In progress with no session, no place in the queue and no schedule is a row
 // nothing is going to touch until something changes, and the honest word for it
 // is that nothing is running. It happens: a worker took the row twice and gave
-// nothing back, so the tick is resting it (`restingUntil`), or another Agentbox
-// holds the claim. Saying "queued" there would be the lie this whole vocabulary
+// nothing back, so the tick is resting it (`restingUntil`). A live claim this
+// window did not take is not that: an agent is on it, just not one of ours
+// (`elsewhere`). Saying "queued" there would be the lie this whole vocabulary
 // was invented to stop telling (`queued` in supervisor.mjs, and the founder's
 // own report on of a row reading "queued" under a sentence saying it was
 // reading).
 
 import { spanLabel } from './notes';
 import { Name } from '../../shared/product-name.mjs';
-import type { RunningSession, WorkItem } from './types';
+import { resetDay } from '../../shared/usage.mjs';
+import type { RunningSession, WhyNotCloud, WorkItem } from './types';
 
 // THE FIFTH STATE, AND IT IS THE ONE SOMEBODY OUTSIDE THIS BUILDING ASKED FOR.
 //
@@ -51,7 +53,9 @@ import type { RunningSession, WorkItem } from './types';
 // would be worse than the silence it replaces.
 // `next` is a queued task she pushed with Run now (w-87ff499077): still
 // waiting, but first in line, and the word changing is how the press shows.
-export type LiveState = 'working' | 'shipping' | 'next' | 'queued' | 'signin' | 'limit' | 'paused' | 'silent' | 'idle';
+// `asking` is a worker stopped on a permission request: a live session, and
+// not working, because nothing moves until you answer it.
+export type LiveState = 'asking' | 'working' | 'elsewhere' | 'shipping' | 'next' | 'queued' | 'signin' | 'limit' | 'paused' | 'silent' | 'idle';
 
 export interface LiveLine {
   state: LiveState;
@@ -64,6 +68,8 @@ export interface LiveFacts {
   session?: RunningSession | null;
   /** `supervisor.queued`: the ids a tick will spawn as soon as a slot frees. */
   queued?: string[];
+  /** On `supervisor.remoteHeld`: our own session, open between Remote Control turns. */
+  remoteHeld?: boolean;
   /**
    * `supervisor.signInNeeded`: rows nothing can start because the tool they run
    *  on is signed out, each with that tool's name ("Claude Code", "Codex"). */
@@ -75,6 +81,9 @@ export interface LiveFacts {
   atLimit?: Record<string, { tool: string; until: number }>;
   /** The id is on `supervisor.shipping`: the app's ship queue still owes it a ship. */
   shipping?: boolean;
+  /** An approval in the spool names this thread, so its agent has stopped on a
+   *  question only you can answer (`snapshot.approvals`). */
+  asking?: boolean;
   /** `supervisor.runNow`: the queued ids she pushed with Run now. */
   runNow?: string[];
   /** `supervisor.stalled`: a worker died on it. The stalled bar owns this. */
@@ -87,6 +96,8 @@ export interface LiveFacts {
   silent?: { runs: number; endedAt: number } | null;
   /** Spawning is off, globally or for this product. */
   paused?: boolean;
+  /** `supervisor.whyNotCloud[id]`: why it runs locally or waits, with the cloud on Everything. */
+  whyNotCloud?: WhyNotCloud | null;
   /** How many workers are up, and how many may be. Both measured, both real. */
   running?: number;
   capacity?: number;
@@ -140,7 +151,15 @@ export function shortWord(state: LiveState, helpers = 0): string {
   if (state === 'working' && helpers > 0) {
     return helpers === 1 ? '1 Subagent Working' : `${helpers} Subagents Working`;
   }
+  // NOT THE TAB'S OWN WORDS: this read "Needs you" under a tab called Needs
+  // you, and said nothing the tab had not. Not "Blocked" either, which already
+  // means a thread waiting on another thread (`byline.ts`, "Blocked by" in the
+  // summary). "Asking" is what the agent is doing, in the present tense the
+  // rest of these words are in; the hover carries the whole sentence.
+  if (state === 'asking') return 'Asking';
   if (state === 'working') return 'Working';
+  // The same word as a run of ours; the mark beside it says where.
+  if (state === 'elsewhere') return 'Working';
   if (state === 'shipping') return 'Shipping';
   if (state === 'next') return 'Up next';
   if (state === 'queued') return 'Queued';
@@ -219,6 +238,17 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   // Finished is finished. The result at the foot of the conversation is the
   // news, and a mark under it about agents would be an appendix to an ending.
   if (item.status === 'done') return null;
+
+  // ABOVE THE SESSION, which is what made the row read wrong: a worker waiting
+  // on an approval is a live session in every list the supervisor keeps, so
+  // "Working" won. Above `stalled` and `scheduled` too — a card with Allow and
+  // Deny on it outranks any news about the run behind it.
+  if (facts.asking) {
+    return {
+      state: 'asking',
+      line: 'The agent stopped to ask your permission. Nothing happens on this thread until you answer.',
+    };
+  }
 
   if (session) {
     const elapsed = Math.max(0, now - session.startedAt);
@@ -299,6 +329,18 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
     };
   }
 
+  // A LIVE CLAIM THAT NO SESSION OF OURS HOLDS. Below shipping, where any claim
+  // left is a leftover; above everything about this app's own agents (signed
+  // out, at a limit, paused), none of which stops an agent somewhere else. A run
+  // killed outright leaves its claim for up to a lease (LEASE_MS), so the
+  // sentence does not promise the agent is busy this second.
+  if (item.status === 'claimed' && item.claim && !item.claimExpired && !facts.remoteHeld) {
+    return {
+      state: 'elsewhere',
+      line: 'An agent is working on this outside this window, in a terminal or on another computer, so its steps do not show here.',
+    };
+  }
+
   // SIGNED OUT IS NOT QUEUED (2026-10-04). "An agent starts on it as soon as
   // one is free" could sit on screen for half an hour while no agent could
   // start at all, because the Claude Code login had run out. The row says what is
@@ -321,9 +363,10 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
     const at = limit.until > now
       ? new Date(limit.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase()
       : null;
+    const day = at ? resetDay(limit.until, now) : null;
     return {
       state: 'limit',
-      line: `${limit.tool} is at its usage limit, so this starts on its own when it resets${at ? ` at ${at}` : ''}.`,
+      line: `${limit.tool} is at its usage limit, so this starts on its own when it resets${day ? ` on ${day}` : ''}${at ? ` at ${at}` : ''}.`,
     };
   }
 

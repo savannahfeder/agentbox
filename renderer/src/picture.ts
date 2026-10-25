@@ -17,9 +17,17 @@ import { IMG_SCHEME } from '../../shared/schemes.mjs';
 
 const SCHEME = `${IMG_SCHEME}://file`;
 
+// THE PHONE WITH THE MAC SHUT has no app to answer the scheme, and Safari
+// refuses an address on it before anything can point it elsewhere, so there
+// every file it has a link for is drawn from that link (cloud-files.ts).
+let linkFor: ((file: string) => string | null) | null = null;
+export function setPictureLinks(fn: ((file: string) => string | null) | null) { linkFor = fn; }
+
 /** The url for a picture at an absolute path on this Mac. */
 export function pictureUrl(file: string): string {
   if (!file || !file.startsWith('/')) return file;
+  const link = linkFor?.(file);
+  if (link) return link;
   // Segment by segment: encodeURIComponent would eat the separators, and
   // encodeURI would leave '#' and '?' in a filename to be read as url syntax.
   const parts = file.split('/').filter(Boolean).map(encodeURIComponent);

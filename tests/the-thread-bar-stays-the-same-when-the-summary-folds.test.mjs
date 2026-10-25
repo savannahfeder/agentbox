@@ -10,30 +10,26 @@
 // day: "Let's not change the bar at the top here based on whether the summary
 // is expanded or condensed."
 //
-// So the crumb follows whether the thread HAS a summary (summaryOffered), not
-// whether it is open. A thread that has none (an agent's, a conversation, an
-// opened design) never had the crumb and keeps the full bar.
+// So the crumb followed whether the thread HAS a summary (summaryOffered), not
+// whether it is open, and a thread with none (an agent's, a conversation, an
+// opened design) kept the full bar. Since 2026-10-24 those wear the crumb too:
+// "when you click into an inbox item, the header should be this one ... I
+// believe you're using an old header from before, which is no longer active"
+// (tests/every-opened-thread-wears-the-trail-header).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 
 const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
 const barRule = focus.match(/const barContent = ([^;]*);/)?.[1] ?? '';
 
-describe('the thread bar does not depend on the summary being open', () => {
-  it('draws the crumb whenever the thread has a summary, open or folded', () => {
-    expect(barRule).toMatch(/^summaryOffered && crumbFrom\s*\?\s*<ThreadCrumb/);
+describe('the thread bar does not depend on the summary', () => {
+  it('draws the crumb whenever the app names where the thread was opened from', () => {
+    expect(barRule).toMatch(/^crumbFrom\s*\?\s*<><ThreadCrumb/);
   });
-  it('never asks whether the summary is open', () => {
-    expect(barRule).not.toMatch(/summaryShown|summaryOpen/);
+  it('never asks whether the summary is open, or whether there is one', () => {
+    expect(barRule).not.toMatch(/summaryShown|summaryOpen|summaryOffered/);
   });
-  it('keeps the full bar for a thread with no summary at all', () => {
+  it('keeps the full bar only when the app gives no tab to name', () => {
     expect(barRule).toMatch(/:\s*<>\{backButton\}\{bandLine\}<\/>$/);
-    // Agents, conversations, things made and an opened design have no summary,
-    // and so no crumb.
-    expect(focus).toMatch(/const summarised = !agent && !made && !direct;/);
-    expect(focus).toMatch(/const summaryOffered = summarised && !openDoc;/);
-  });
-  it('keeps the full bar when the app gives no tab to name', () => {
-    expect(barRule).toMatch(/&& crumbFrom/);
   });
 });

@@ -6,15 +6,17 @@ import { createContext } from 'react';
 import type { Person, Product, TeamState, WorkItem } from '../types';
 import { isShared } from '../../../shared/team-rules.mjs';
 import { visibilityOf } from '../../../shared/thread-cards.mjs';
-import { dueWords, firstName, sentFrom } from './company';
+import { dueWords, firstName, personOf, sentFrom } from './company';
 import './team.css';
 
-export { dueWords, firstName };
+export { dueWords, firstName, personOf };
 
 export interface TeamView {
   state: TeamState;
   me: string | null;
   byId: Map<string, Person>;
+  /** People known only from my rooms, to name and draw, never to pick (company.ts personOf). */
+  alsoById?: Map<string, Person>;
   products: Map<string, Product>;
 }
 

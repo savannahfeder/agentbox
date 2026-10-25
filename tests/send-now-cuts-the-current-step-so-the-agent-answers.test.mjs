@@ -28,11 +28,14 @@ function fake() {
   return c;
 }
 const say = (c, event) => c.stdout.emit('data', JSON.stringify(event) + '\n');
+// A session inside a turn, which is the only place there is a step to cut
+// (an idle one is send-now-never-cuts-the-turn-already-answering-her).
+const working = () => { const c = fake(); attachClaudeInput(c); say(c, { type: 'system', subtype: 'init' }); return c; };
 const ackControl = (c) => { const f = c.frames.find((x) => x.type === 'control_request'); say(c, { type: 'control_response', response: { subtype: 'success', request_id: f.request_id, response: {} } }); };
 
 describe('the session input', () => {
   it('cuts the current step when a message is waiting', async () => {
-    const c = fake(); attachClaudeInput(c);
+    const c = working();
     c.steer('show me what you have');
     const p = c.interrupt();
     expect(c.frames.at(-1)).toMatchObject({ type: 'control_request', request: { subtype: 'interrupt' } });
@@ -41,13 +44,13 @@ describe('the session input', () => {
   });
 
   it('does nothing when no message is waiting, so it cannot end the run', async () => {
-    const c = fake(); attachClaudeInput(c);
+    const c = working();
     await expect(c.interrupt()).resolves.toEqual({ interrupted: false });
     expect(c.frames.some((f) => f.type === 'control_request')).toBe(false);
   });
 
   it('does nothing once the agent has already taken the message', async () => {
-    const c = fake(); attachClaudeInput(c);
+    const c = working();
     const p = c.steer('x');
     say(c, { type: 'user', uuid: c.frames[0].uuid });
     await p;
@@ -55,7 +58,7 @@ describe('the session input', () => {
   });
 
   it('the cut step ends in an error result, and the input stays open for her message', async () => {
-    const c = fake(); attachClaudeInput(c);
+    const c = working();
     const sent = c.steer('show me');
     c.interrupt(); ackControl(c);
     say(c, { type: 'result', subtype: 'error_during_execution', is_error: true });
@@ -73,7 +76,7 @@ function supervisorWith(child, extra = {}) {
 
 describe('sending a reply now', () => {
   it('puts her words in line first, then cuts the step', async () => {
-    const c = fake(); attachClaudeInput(c);
+    const c = working();
     const s = supervisorWith(c);
     const done = submitReply(s, { product: 'p', id: 'w', answer: 'stop and show me', now: true }, () => ({ answer: 'stop and show me' }));
     await new Promise((r) => setTimeout(r, 0));
@@ -84,7 +87,7 @@ describe('sending a reply now', () => {
   });
 
   it('an ordinary reply waits its turn and cuts nothing', async () => {
-    const c = fake(); attachClaudeInput(c);
+    const c = working();
     const s = supervisorWith(c);
     const done = submitReply(s, { product: 'p', id: 'w', answer: 'when you can' }, () => ({ answer: 'when you can' }));
     await new Promise((r) => setTimeout(r, 0));
@@ -98,7 +101,7 @@ describe('the Send now on a message already waiting', () => {
   const sup = (sessions) => Object.assign(Object.create(Supervisor.prototype), { sessions });
 
   it('cuts the step of the running session it was sent to', async () => {
-    const c = fake(); attachClaudeInput(c);
+    const c = working();
     c.steer('waiting');
     const run = sup(new Map([['w', { product: 'p', child: c }]])).sendNow('p', 'w');
     ackControl(c);
@@ -110,7 +113,7 @@ describe('the Send now on a message already waiting', () => {
   });
 
   it('never reaches a row of the same id in another project', async () => {
-    const c = fake(); attachClaudeInput(c);
+    const c = working();
     c.steer('waiting');
     await expect(sup(new Map([['w', { product: 'other', child: c }]])).sendNow('p', 'w')).resolves.toEqual({ ok: false, interrupted: false });
     expect(c.frames.some((f) => f.type === 'control_request')).toBe(false);

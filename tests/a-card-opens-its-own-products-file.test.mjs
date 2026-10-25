@@ -40,69 +40,69 @@ const find = (s, src, product = 'agentbox') =>
   resolveArtifact({ src, product, products: s.products, accountRoot: s.accountRoot, storeRoot: s.root });
 
 describe('a card never opens another product\'s file', () => {
-  it('does not fall through to the product that happens to have the file', () => {
+  it('does not fall through to the product that happens to have the file', async () => {
     const s = store();
-    const out = find(s, 'reports/week-32.md');
+    const out = await find(s,'reports/week-32.md');
     expect(out.ok).toBe(false);
     expect(out.path).toBeUndefined();
   });
 
-  it('does not fall through by name either, which is how nine of eleven chips missed', () => {
+  it('does not fall through by name either, which is how nine of eleven chips missed', async () => {
     const s = store();
     // The by-name hunt is the last resort and the widest net. It walks our
     // trees only, so a file that exists ONLY under the app stays unfound.
-    const out = find(s, 'main/ipc.mjs');
+    const out = await find(s,'main/ipc.mjs');
     expect(out.ok).toBe(false);
   });
 
-  it('still finds our own file, under any root a worker might have used', () => {
+  it('still finds our own file, under any root a worker might have used', async () => {
     const s = store();
     fs.writeFileSync(path.join(s.ours, 'designs', 'round-3.html'), 'ours');
     fs.writeFileSync(path.join(s.ours, 'attachments', 'shot.png'), 'ours');
-    expect(find(s, 'designs/round-3.html').path).toBe(path.join(s.ours, 'designs', 'round-3.html'));
-    expect(find(s, 'round-3.html').path).toBe(path.join(s.ours, 'designs', 'round-3.html'));
-    expect(find(s, 'shot.png').path).toBe(path.join(s.ours, 'attachments', 'shot.png'));
+    expect((await find(s, 'designs/round-3.html')).path).toBe(path.join(s.ours, 'designs', 'round-3.html'));
+    expect((await find(s, 'round-3.html')).path).toBe(path.join(s.ours, 'designs', 'round-3.html'));
+    expect((await find(s, 'shot.png')).path).toBe(path.join(s.ours, 'attachments', 'shot.png'));
   });
 
-  it('keeps the account-root retry, inside our own product', () => {
+  it('keeps the account-root retry, inside our own product', async () => {
     const s = store();
     fs.writeFileSync(path.join(s.ours, 'notes.md'), 'ours');
     // A worker wrote the account root straight onto the file, no product slug.
-    expect(find(s, path.join(s.accountRoot, 'notes.md')).path).toBe(path.join(s.ours, 'notes.md'));
+    expect((await find(s, path.join(s.accountRoot, 'notes.md'))).path).toBe(path.join(s.ours, 'notes.md'));
   });
 
-  it('does not use the account-root retry to reach another product', () => {
+  it('does not use the account-root retry to reach another product', async () => {
     const s = store();
-    expect(find(s, path.join(s.accountRoot, 'reports', 'week-32.md')).ok).toBe(false);
+    expect((await find(s, path.join(s.accountRoot, 'reports', 'week-32.md'))).ok).toBe(false);
   });
 
-  it('opens an absolute path exactly as written, because that is not a guess', () => {
+  it('opens an absolute path exactly as written, because that is not a guess', async () => {
     const s = store();
     const said = path.join(s.theirs, 'reports', 'week-32.md');
     // Said in full. Refusing this would break every link into the app's own
     // repo, which is not a product at all.
-    expect(find(s, said).path).toBe(said);
+    expect((await find(s, said)).path).toBe(said);
   });
 });
 
 describe('when it cannot find one, it says so', () => {
-  it('hands back a sentence naming the file and the product', () => {
+  it('hands back a sentence naming the file and the product', async () => {
     const s = store();
-    const out = find(s, 'reports/week-32.md');
+    const out = await find(s,'reports/week-32.md');
     expect(out.error).toBe(`reports/week-32.md is not in ${NAME}. Nothing was opened.`);
   });
 
-  it('says the project is not set up when the card belongs to no known product', () => {
+  it('says the project is not set up when the card belongs to no known product', async () => {
     const s = store();
-    const out = find(s, 'reports/week-32.md', 'kestrel');
+    const out = await find(s,'reports/week-32.md', 'kestrel');
     expect(out.ok).toBe(false);
     expect(out.error).toContain(`not set up in ${NAME}`);
   });
 
-  it('never returns a bare code or an empty error', () => {
+  it('never returns a bare code or an empty error', async () => {
     const s = store();
     for (const src of ['reports/week-32.md', 'main/ipc.mjs', '/nowhere/at/all.md']) {
-      const out = find(s, src);
+      const out = await find(s,src);
       expect(out.ok).toBe(false);
       expect(out.error.length).toBeGreaterThan(20);
       expect(out.error.endsWith('.')).toBe(true);
@@ -117,7 +117,7 @@ describe('the roots a relative path is tried against', () => {
   // this root it resolved to nothing of hers and the by-name hunt handed back
   // another card's record instead. Last in the list on purpose: a file of hers
   // always wins over one of ours.
-  it('is the docs dir, designs, attachments, the repo and our home, and nothing outside the product', () => {
+  it('is the docs dir, designs, attachments, the repo and our home, and nothing outside the product', async () => {
     const s = store();
     expect(artifactRoots(s.products[0])).toEqual([
       s.ours, path.join(s.ours, 'designs'), path.join(s.ours, 'attachments'), machineryDir(s.ours),
@@ -127,7 +127,7 @@ describe('the roots a relative path is tried against', () => {
 
   // The measured symptom, pinned so it cannot come back: two cards, each with
   // its own run record in the home, and each asking for its own.
-  it('opens this card own change record and never another card one', () => {
+  it('opens this card own change record and never another card one', async () => {
     const s = store();
     const mine = machineryPath(s.ours, 'runs/w-86377d7fea/the-change-it-made.change');
     const theirs = machineryPath(s.ours, 'runs/w-71210efd70/the-change-it-made.change');
@@ -136,7 +136,7 @@ describe('the roots a relative path is tried against', () => {
       fs.writeFileSync(f, text);
     }
 
-    const got = find(s, 'runs/w-86377d7fea/the-change-it-made.change');
+    const got = await find(s,'runs/w-86377d7fea/the-change-it-made.change');
 
     expect(got.ok).toBe(true);
     expect(got.path).toBe(mine);
@@ -145,12 +145,12 @@ describe('the roots a relative path is tried against', () => {
 
   // AND WHEN IT IS NOT THERE, IT SAYS SO RATHER THAN GUESSING. Every card's
   // record has the identical basename, so the hunt would always find one.
-  it('says nothing rather than hand back a stranger change record', () => {
+  it('says nothing rather than hand back a stranger change record', async () => {
     const s = store();
     const other = machineryPath(s.ours, 'runs/w-9352d560c7/the-change-it-made.change');
     fs.mkdirSync(path.dirname(other), { recursive: true });
     fs.writeFileSync(other, '{"item":"w-9352d560c7"}');
 
-    expect(find(s, 'runs/w-5413d258b4/the-change-it-made.change').ok).toBe(false);
+    expect((await find(s, 'runs/w-5413d258b4/the-change-it-made.change')).ok).toBe(false);
   });
 });

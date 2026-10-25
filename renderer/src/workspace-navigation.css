@@ -16,6 +16,8 @@
 .workspace-tabs { display: flex; flex-direction: column; gap: 3px; }
 .workspace-navigation .workspace-tab { width: 100%; text-align: left; }
 .workspace-navigation .workspace-tab.active { background: var(--wash); color: var(--text); font-weight: 500; }
+/* Light: a lifted fill and a hairline rather than a grey block (w-22da913d00). */
+:root[data-theme="light"]:not([data-skin]) .workspace-navigation .workspace-tab.active { background: rgba(255, 255, 255, .75); box-shadow: inset 0 0 0 1px var(--line); }
 .workspace-navigation button:hover { background: var(--wash); color: var(--text); }
 .workspace-navigation button:focus-visible { outline: 2px solid var(--underline); outline-offset: 2px; }
 .workspace-footer { margin-top: auto; display: flex; align-items: center; gap: 4px; }
@@ -150,14 +152,6 @@
 .workspace-bottom .workspace-footer { margin-top: 0; border-top: 1px solid var(--line); padding-top: 12px; }
 .workspace-usage:empty { display: none; }
 .workspace-usage .usage-box { width: 100%; }
-.workspace-navigation .usage-pill { display: grid; grid-template-columns: 1fr auto; width: 100%; height: auto; min-height: 50px; padding: 10px; gap: 8px; text-align: left; border-top: 1px solid var(--line); border-radius: 0; }
-.usage-sidebar-label { font-size: 11px; }
-.usage-sidebar-percent { font-size: 10px; font-variant-numeric: tabular-nums; }
-.workspace-usage .usage-pill > .usage-meter { grid-column: 1 / -1; width: 100%; height: 3px; }
-.workspace-usage .usage-panel { top: auto; bottom: calc(100% + 8px); left: 0; right: auto; }
-.workspace-collapsed .workspace-usage .usage-pill { display: flex; min-height: 36px; padding: 10px; }
-.workspace-collapsed .workspace-usage .usage-pill > .usage-meter { display: block; }
-@media(max-width:700px) { .workspace-usage .usage-pill { display: flex; min-height: 36px; padding: 10px; } .workspace-usage .usage-pill > .usage-meter { display: block !important; } }
 
 /* Blur only the backdrop image. Content and controls remain sharp. Overscan
    prevents transparent edges when the background blur is increased. */
@@ -195,10 +189,23 @@
 }
 .settings-embedded .set-pane { flex: 1; min-height: 0; background: transparent; border-radius: var(--radius); }
 .workspace-utilities button[aria-current="page"] { background: var(--wash); color: var(--text); }
-.workspace-navigation .usage-pill { display: flex; align-items: center; justify-content: space-between; min-height: 28px; padding: 4px 10px; border: 0; gap: 8px; color: var(--text-faint); }
-.workspace-usage { padding: 8px 0; }
-.usage-sidebar-percent { margin-left: auto; opacity: .65; }
-.workspace-collapsed .workspace-usage { display: none; }
+/* THE READING IS A ROW LIKE FEEDBACK AND SETTINGS (w-dcaa2c122e), picked from
+   five drawn in the app: the gauge in their icon column, the agent's name on
+   their labels' edge, the percent where Inbox shows its count, at their size.
+   It sits 2 under Settings, as they sit to each other, and narrow it keeps
+   its gauge as they keep theirs. */
+.workspace-navigation .workspace-usage { padding: 0 0 12px; margin-top: -10px; }
+.workspace-navigation .workspace-usage .usage-pill { display: flex; align-items: center; gap: 11px; width: 100%; height: 36px; min-height: 36px; padding: 0 10px; border: 0; border-radius: var(--radius); font-size: 13px; text-align: left; color: var(--text-faint); }
+.workspace-navigation .workspace-usage .usage-pill:hover { background: var(--wash); color: var(--text); }
+.workspace-navigation .usage-row-num { margin-left: auto; font-variant-numeric: tabular-nums; }
+.workspace-navigation .usage-pill.is-close .usage-row-num { color: var(--text); }
+/* Its limits open above it as wide as the sidebar, the way your account menu opens from your row. */
+.workspace-navigation .workspace-usage .usage-panel { top: auto; bottom: calc(100% + 8px); left: 0; right: 0; width: auto; border-radius: 0; }
+.workspace-navigation .usage-panel .usage-meter, .workspace-navigation .usage-panel .usage-meter > i { border-radius: 0; }
+/* Using more than one agent, its limits list each under a hairline, the one used last tagged. */
+.usage-panel .usage-other { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.usage-panel h3 small { margin-left: 8px; font-size: 10.5px; font-weight: 500; color: var(--text-faint); }
+.usage-panel .usage-read { margin-top: 8px; font-size: 11.5px; color: var(--agent-ink); }
 @media(max-width:700px) { .workspace-usage { display: none; } }
 /* THE INSTRUCTIONS PAGE IS ONE PAGE (w-4cbcd888ae, 2026-10-01). Picked from
    three drawn in the real app: a heading that says who the page is for and
@@ -223,7 +230,8 @@
 .instr-scope-menu hr { border:0; border-top:1px solid var(--line); margin:5px 4px; }
 /* A single readable column for shared and project instructions. */
 .instr-body { width:100%; }
-.instr-card { border:1px solid var(--line); border-radius:var(--radius); background:var(--film-strong); }
+/* Rounded like the settings card (settings.css .set-plate), so the two sit together. */
+.instr-card { border:1px solid var(--line); border-radius:10px; background:var(--film-strong); }
 .instr-part { padding:16px 26px 22px; scroll-margin-top:16px; }
 .instr-part + .instr-part { border-top:1px solid var(--line); }
 .instr-part-head { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:30px; }
@@ -304,9 +312,6 @@
 .instr-part-tools .set-sw { flex:none; }
 /* The app's own task brief, behind a line she has to open (w-3dc46f3a67). It is
    quieter than the two boxes above it because it is ours and not hers. */
-.instruction-advanced { margin-top:40px; border-top:1px solid var(--line); padding-top:20px; }
-.instruction-advanced-toggle { font:inherit; font-size:12px; color:var(--text-faint); border:0; background:transparent; padding:0; cursor:pointer; }
-.instruction-advanced-toggle:hover { color:var(--text-dim); }
 
 :root .workspace-layout > .settings-embedded { background: transparent; }
 
@@ -806,6 +811,16 @@
 .workspace-layout:is([data-design-toolbar="floating"],[data-design-toolbar="corner"],[data-design-toolbar="edge"])[data-artifact-layout="beside"] .doc-html .doc-card:focus-within > .doc-head {
  opacity:1; pointer-events:auto; transform:translateY(0);
 }
+/* A browsed page has a browser bar rather than the document header the block
+   above floats, and it is flush to the pane's edge rather than inset. The two
+   rules that put the inset there are written through the whole path, so these
+   have to be as well or they lose the cascade by one class. */
+.workspace-layout[data-artifact-layout="beside"] .doc-browsing .doc-view { border:0; border-radius:0; }
+.workspace-layout[data-artifact-layout="beside"] > .body > .artifact-host > .doc-pane.doc-browsing .doc-card,
+.workspace-layout[data-artifact-layout="focus"] .doc-pane.doc-browsing .doc-card {
+ margin:0; border:0; border-radius:0;
+}
+
 @media (hover:none) {
  .workspace-layout[data-design-toolbar][data-artifact-layout="beside"] .doc-html .doc-head { opacity:1; pointer-events:auto; transform:none; }
 }
@@ -982,29 +997,37 @@ body {
 /* ═══ EMBER GRID, the launch film's look (w-b3e123a0af) ═══. The colours are in
    the theme's token block in styles.css; these are the film's shapes, each
    scoped to the theme so nothing already approved moves. The card is
-   edged with one hairline and the film's four corner marks instead of the
-   white top light the glass themes wear. The chrome (search, section label,
-   times) is Geist Mono in capitals, the count is the one orange, and titles are
-   the film's 400 weight rather than the app's 500. The floating cards (new
-   task, ⌘K and every other modal) wear the same marks over their own fill and
-   a firmer edge, and page headings drop from 600 to the film's 400. */
-:root[data-skin="ember-grid"] .workspace-layout::before,
-:root[data-skin="ember-grid"] .modal {
-  --grid-ticks:
-    linear-gradient(var(--skin-tick), var(--skin-tick)) left 8px top 8px / 12px 1px no-repeat,
-    linear-gradient(var(--skin-tick), var(--skin-tick)) left 8px top 8px / 1px 12px no-repeat,
-    linear-gradient(var(--skin-tick), var(--skin-tick)) right 8px top 8px / 12px 1px no-repeat,
-    linear-gradient(var(--skin-tick), var(--skin-tick)) right 8px top 8px / 1px 12px no-repeat,
-    linear-gradient(var(--skin-tick), var(--skin-tick)) left 8px bottom 8px / 12px 1px no-repeat,
-    linear-gradient(var(--skin-tick), var(--skin-tick)) left 8px bottom 8px / 1px 12px no-repeat,
-    linear-gradient(var(--skin-tick), var(--skin-tick)) right 8px bottom 8px / 12px 1px no-repeat,
-    linear-gradient(var(--skin-tick), var(--skin-tick)) right 8px bottom 8px / 1px 12px no-repeat;
-}
+   edged with one hairline instead of the white top light the glass themes
+   wear, and the film's four corner marks stand 7px outside it (w-22da913d00:
+   they read better outside than 8px inside). The chrome (search, section
+   label, times) is Geist Mono in capitals, the count is the one orange, and
+   titles are the film's 400 weight rather than the app's 500. Page headings
+   drop from 600 to the film's 400. */
 :root[data-skin="ember-grid"] .workspace-layout::before {
   box-shadow: inset 0 0 0 1px var(--skin-pane-line), var(--shadow-card);
-  background: var(--grid-ticks), var(--skin-pane);
+  background: var(--skin-pane);
 }
-:root[data-skin="ember-grid"] .modal { background: var(--grid-ticks), var(--bg-raised); border-color: var(--line-strong); }
+/* The marks need their own element: a card cannot paint outside itself, and
+   `.workspace-layout::after` is the window's drag strip. */
+.panel-marks { display: none; }
+:root[data-skin="ember-grid"] .panel-marks {
+  display: block; position: absolute; top: 40px; bottom: 22px; left: var(--workspace-left); right: 22px; pointer-events: none;
+}
+:root[data-window="flat"][data-skin="ember-grid"] .panel-marks { top: 22px; }
+:root[data-skin="ember-grid"] .panel-marks::after {
+  content: ''; position: absolute; inset: -7px;
+  background:
+    linear-gradient(var(--skin-tick), var(--skin-tick)) left top / 10px 1px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) left top / 1px 10px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) right top / 10px 1px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) right top / 1px 10px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) left bottom / 10px 1px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) left bottom / 1px 10px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) right bottom / 10px 1px no-repeat,
+    linear-gradient(var(--skin-tick), var(--skin-tick)) right bottom / 1px 10px no-repeat;
+}
+:root[data-skin="ember-grid"] .modal { background: var(--bg-raised); border-color: var(--line-strong); }
+:root[data-skin="ember-grid"] .modal.palette { background: rgba(38, 36, 34, .97); border-color: rgba(255, 255, 255, .08); }
 :root[data-skin="ember-grid"] .set-title { font-weight: 400; letter-spacing: -0.035em; }
 
 /* INBOX ZERO, the film's "0 terminals opened" card, made more visually
@@ -1030,8 +1053,9 @@ body {
 :root[data-skin="ember-grid"] .idle-zero-say { color: var(--text-dim); }
 :root[data-skin="ember-grid"] .idle-zero-col .idle-field { margin-top: 36px; }
 :root[data-skin="ember-grid"] .workspace-navigation .workspace-search { background: transparent; }
+/* A faint fill and a hairline: the solid selected grey was too much (w-22da913d00). */
 :root[data-skin="ember-grid"] .workspace-navigation .workspace-tab.active {
-  background: var(--bg-selected); box-shadow: inset 0 0 0 1px var(--line); font-weight: 400;
+  background: rgba(40, 38, 37, .7); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07); font-weight: 400;
 }
 :root[data-skin="ember-grid"] .workspace-running { color: var(--accent); }
 
@@ -1067,3 +1091,4 @@ body {
 :root:root .workspace-navigation .workspace-tab.active { font-weight: 400; }
 :root:root .workspace-title { font-weight: 400; letter-spacing: -.03em; }
 :root:root .row .subject { font-weight: 400; letter-spacing: -.01em; }
+

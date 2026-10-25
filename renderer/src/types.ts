@@ -14,6 +14,8 @@ export interface WorkItem {
   // PINNED TO THE TOP OF THE LIST (w-20323283e6). Kept by the supervisor, on
   // this Mac, like the place; absent on every row nobody has pinned.
   pinned?: boolean;
+  /** Kept on this Mac whatever the cloud is set to (Supervisor#setThreadOnMac). */
+  onMac?: boolean;
   // WHAT PEOPLE PUT ON EACH MESSAGE IN A CONVERSATION (w-560647d4db): by the
   // message's line uid, then by emoji, then the people on it. Folded out of the
   // presses the ledger holds (shared/work-items.mjs); absent on every row
@@ -26,6 +28,8 @@ export interface WorkItem {
   talk?: {
     chat: { by: string; ts: number; text: string }[];
     threads: Record<string, { by: string; text: string; replies: { by: string; ts: number; text: string }[] }>;
+    /** Per person, when they last marked it done; what came before is settled for them. */
+    settled?: Record<string, number>;
   };
   status: 'open' | 'claimed' | 'done' | 'blocked';
   title: string;
@@ -113,6 +117,9 @@ export interface Product {
   name: string;
   oneLiner: string;
   repoPath: string | null;
+  /** When it was made (epoch ms), or null on one made before that was written
+   *  down. It places an unplaced project under the ones already here. */
+  createdAt?: number | null;
   // THE MARK SHE PICKED FOR THIS PROJECT, already a url this window can draw.
   // Null on a project that has never been given one, and that is what makes
   // `ProductMark` draw its burst instead. Resolved by `listProducts` against the
@@ -172,6 +179,8 @@ export interface TeamCallResult {
   error?: string;
   /** A new account that waits on the link in its confirmation email. */
   confirm?: boolean;
+  /** The row a call wrote into, when it wrote one: a message's conversation. */
+  made?: { product: string; id: string };
 }
 
 export type ThreadStateWord = 'waiting' | 'running' | 'scheduled' | 'done';
@@ -205,8 +214,16 @@ export interface TeamInvite {
 
 export interface TeamState {
   configured: boolean;
+  /** The phone site's address, for the phone with the Mac shut, once there is one. */
+  phoneSite?: string | null;
+  /** That address as a QR code (svg), drawn on Settings › Phone. It carries no key. */
+  phoneSiteQr?: string | null;
   /** The first look for a saved sign-in is over (false while it is still being found). */
   started?: boolean;
+  /** This build has an account to sign in to, whether or not Multiplayer is on. */
+  canSignIn?: boolean;
+  /** The saved sign-in and its team are still being restored; the boot screen waits on it. */
+  settling?: boolean;
   /** When this person began sharing on this Mac: threads started before it stay theirs unless shared by hand. */
   since?: number | null;
   /** The invites this team has out that nobody has taken up yet. */
@@ -223,6 +240,184 @@ export interface TeamState {
   cards: ThreadCard[];
   lastSyncAt: number | null;
   error: string | null;
+  /** Rooms (alpha), while switched on in Alpha features (main/team/rooms.mjs). */
+  rooms?: RoomsState | null;
+}
+
+/** One person's card on a room's wall (shared/room-cards.mjs wallCards). */
+export interface RoomCard {
+  id: string;
+  me: boolean;
+  name: string;
+  avatarUrl: string | null;
+  headline: string | null;
+  bio: string | null;
+  /** Null when they hid it. */
+  agents: number | null;
+  level: number | null;
+  hoursTotal: number;
+  hoursWeek: number;
+  hoursToday: number;
+  streak: number;
+  /** Agent hours per month, oldest first, for their chart. */
+  byMonth: { month: string; hours: number }[];
+  /** On my team, so their shared threads reach me. */
+  teammate: boolean;
+  /** They let teammates see their activity on their page. */
+  showActivity: boolean;
+  /** What is waiting, running and done today, off their presence, when they show it to everyone in their rooms; else null. */
+  activity?: RoomActivity[] | null;
+  /** In the room without a card: they have not turned Rooms on. */
+  away?: boolean;
+  status: string | null;
+  workingOn: string | null;
+  workingPrivate: boolean;
+}
+
+export interface RoomActivity {
+  title: string;
+  project: string | null;
+  state: 'waiting' | 'running' | 'done';
+  at: number;
+}
+
+export interface RoomMessage {
+  id: string;
+  roomId: string;
+  by: string | null;
+  body: string;
+  inReplyTo: string | null;
+  mentions: string[];
+  at: number;
+  /** When its author last edited it. */
+  editedAt?: number | null;
+  /** Taken back by its author; the body is empty. */
+  deleted?: boolean;
+  /** emoji -> the people on it, oldest first. */
+  reactions?: Record<string, string[]>;
+}
+
+export interface Room {
+  id: string;
+  name: string;
+  kind: 'room' | 'group';
+  teamId: string | null;
+  listed: boolean;
+  /** Joined only by an email invite: no link works for it. */
+  inviteOnly: boolean;
+  role: 'owner' | 'member';
+  members: number;
+  createdAt: number;
+  pinned: boolean;
+  muted: boolean;
+  unread: number;
+  /** Where I have read to, ms; 0 when I never have. */
+  readAt?: number;
+  /** I marked it unread, and have not read it since. */
+  markedUnread?: boolean;
+  lastAt: number;
+  agents: number;
+  wall: RoomCard[];
+  /** Everyone in the room by name, invisible or not on Rooms yet; null on a cloud that cannot say, where the wall names them. */
+  people?: { id: string; name: string; avatarUrl: string | null }[] | null;
+}
+
+export interface RoomProfile {
+  person_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  headline: string | null;
+  bio: string | null;
+  show_working: 'none' | 'team' | 'everyone';
+  show_agents: boolean;
+  show_level: boolean;
+  show_status: boolean;
+  show_activity?: boolean;
+  invisible_until: string | null;
+  status_text: string | null;
+  status_until: string | null;
+}
+
+export interface RoomMention {
+  id: string;
+  messageId: string;
+  roomId: string;
+  roomName: string;
+  by: string | null;
+  byName: string;
+  body: string;
+  at: number;
+}
+
+export interface RoomsState {
+  on: boolean;
+  ready: boolean;
+  rooms: Room[];
+  messages: Record<string, RoomMessage[]>;
+  me: RoomProfile | null;
+  /** Each person's place on the whole app by agent hours, for me and people I share a room with. */
+  ranks: Record<string, number>;
+  invites: { roomId: string; roomName: string; invitedBy: string | null; invitedByName: string | null }[];
+  mentions: RoomMention[];
+  error: string | null;
+}
+
+// TEAMMATES (main/teammates.mjs): agents with a standing job, and the one team
+// chat they and you write to.
+export interface TeammateMemory { id: string; text: string; from: string | null; at: number; by?: string | null }
+export interface TeammateWorks { every: 'day' | 'weekday' | 'week'; at: string; on?: number }
+export interface TeammateRef { id: string; product: string; title: string }
+export interface Teammate {
+  id: string; name: string; letter: string; role: string | null; job: string | null; goal: string | null;
+  counted: string | null; asksFirst: string | null; works: TeammateWorks | null; worksLabel: string | null;
+  product: string; engine: string | null; model: string | null; effort: string | null; limit: number;
+  paused: boolean; status: 'draft' | 'active'; memory: TeammateMemory[]; createdAt: number; starter?: string | null;
+  /** Its run is waiting for you to allow or deny a command (drawn from `approvals`, not the store). */
+  asking?: boolean;
+  /** It asked you something in the team chat and has not heard back (chat-lines `asksYou`). */
+  question?: boolean;
+  /** Work for it was held after too many hand-offs without you (chat-lines `heldFor`). */
+  held?: boolean;
+  waiting: TeammateRef[]; now: string | null; running: { id: string; product: string } | null;
+  queued: number; next?: TeammateRef[]; done: TeammateRef[]; runsThisWeek: number;
+  /** What it does on its own, each with when, in words ("After a ship", "9am and 3pm"). */
+  duties?: TeammateDuty[];
+  /** The playbooks it reads, by id (TeammatesView.playbooks). */
+  playbooks?: string[];
+}
+export interface TeammateDuty { id: string; what: string; when: string; lastRan?: number | null }
+/** What the person has taught their teammates about one kind of work, shared by every teammate that reads it. */
+export interface Playbook {
+  id: string; title: string; readers: string[]; updatedAt: number;
+  lessons: { id: string; text: string; ts: number; by?: string; from?: { product: string; id: string; title: string } | null }[];
+}
+export interface TeamChatLine {
+  id: string; kind: 'msg' | 'pass' | 'act'; from: string; to?: string[] | string; text?: string;
+  title?: string; details?: string; verb?: string; ref?: string; options?: string[]; ts: number;
+  /** Said for you by one of your threads, when you asked it to. */
+  via?: string; viaProduct?: string;
+  /** On an `act`: `learned` (kept something about you), `updated` (changed its own instructions),
+   *  `lesson` (added to the playbook `ref`), and the older run and pause verbs. */
+}
+export interface TeamRunLine {
+  id: string; kind: 'run'; teammate: string; item: string; product: string; title: string;
+  verb: 'picked' | 'passed' | 'queued' | 'sent' | 'answered' | 'finished'; by?: string; byName?: string; waiting?: boolean; answered?: boolean;
+  /** Your words, on an `answered` line. */
+  text?: string; ts: number;
+}
+export interface TeammatesView { list: Teammate[]; chat: TeamChatLine[]; runs: TeamRunLine[]; error?: string; playbooks?: Playbook[];
+  /** Something the loop that wakes teammates could not do lately, in words. */
+  trouble?: string }
+export type TeammatesResult<T = unknown> = { ok: true; value: T } | { ok: false; error: string };
+
+export type RoomsResult<T = unknown> ={ ok: true; value: T; rooms: RoomsState } | { ok: false; error: string; rooms?: RoomsState };
+
+/** Why a thread is not in the cloud: running locally, or waiting for the cloud or for this computer.
+ *  `why` is one of main/supervisor.mjs `_whyLocal`'s or `_whyWaitingForCloud`'s answers. */
+export interface WhyNotCloud {
+  at: 'mac' | 'wait-cloud' | 'wait-mac';
+  why: string;
+  detail?: string | number | null;
 }
 
 export interface RunningSession {
@@ -252,6 +447,9 @@ export interface RunningSession {
   // (main/supervisor.mjs). Absent whenever there are none, which is every
   // ordinary run, so the mark at the foot of a task keeps its one word.
   helpers?: number;
+  /** 'cloud' while this run is in a cloud sandbox (docs/cloud/PLAN.md);
+   *  absent for a run on this Mac. */
+  where?: 'cloud';
 }
 
 /**
@@ -321,6 +519,20 @@ export interface UsageLimit {
   zone: string | null;
 }
 
+/** The Agentbox Cloud plan this Mac is signed in to, as the cloud server counts it. */
+export interface CloudPlan {
+  signedIn: boolean;
+  plan?: 'none' | 'pro' | 'plus' | 'max';
+  unlimited?: boolean;
+  /** Agents at once; null when unlimited. */
+  agents?: number | null;
+  hoursPerMonth?: number;
+  running?: number;
+  usedSeconds?: number;
+  error?: string;
+  message?: string;
+}
+
 /**
  * What was left of ONE coding agent's limit at `at`. Null on the snapshot until
  *  the first reading lands -- which for Claude Code costs twenty-five seconds,
@@ -339,6 +551,14 @@ export interface Usage {
   profile?: string;
 }
 
+/** One Claude login's own reading, or why it has none (main/account-usage.mjs). */
+export interface AccountUsageReading {
+  profile: string;
+  limits?: UsageLimit[];
+  at?: number;
+  error?: string | null;
+}
+
 export interface SupervisorStatus {
   paused: boolean;
   running: RunningSession[];
@@ -349,6 +569,10 @@ export interface SupervisorStatus {
   // Items a tick will spawn as soon as a slot frees: waiting their turn, not
   // forgotten. The row says "queued" so the two are never confused.
   queued?: string[];
+  // Sessions this app holds open between Remote Control turns, which `running` leaves out.
+  remoteHeld?: string[];
+  // With the cloud on Everything, why a thread runs locally or waits (Supervisor#status).
+  whyNotCloud?: Record<string, WhyNotCloud>;
   // Rows nothing can start because their tool is signed out, id -> the tool's
   // name. Said instead of "queued", which would promise an agent that cannot come.
   signInNeeded?: Record<string, string>;
@@ -376,7 +600,7 @@ export interface SupervisorStatus {
   capacity: number;
   // Which Claude accounts are in trouble and what kind. Always current, because
   // the only thing that reads it is a page she chose to open.
-  accountTrouble?: Record<string, { cause: TroubleCause; since: number }>;
+  accountTrouble?: Record<string, { cause: TroubleCause; since: number; at?: number }>;
   // THE ONE LINE ABOVE THE LIST, and null unless it is really true and has been
   // for twenty unbroken minutes. Two facts can fill it: tasks nothing has been
   // able to run on (design option four), or nothing being able to start anywhere at
@@ -420,7 +644,16 @@ export interface SupervisorStatus {
 // shared/spawn-trouble.mjs): its owner renews it, no admin is involved.
 // 'model-not-on-plan' is a Codex login whose plan lacks the model the task asks
 // for; the fix is another model or another login, not this login.
-export type TroubleCause = 'signed-out' | 'org-blocked' | 'subscription-ended' | 'at-limit' | 'workspace' | 'interrupted' | 'model-not-on-plan' | 'unknown';
+// 'level-not-offered' is a thinking level the task's model does not offer.
+// 'too-old' is a Claude Code older than the worker's command line (2.1.71), and
+// 'network' a proxy or company certificate the workers never had; both wait on
+// her, and neither is fixed by trying again. 'api-key' is a Codex signed in
+// with an API key, which is refused rather than billed; 'codex-config' is a
+// config.toml Codex cannot read. 'open-elsewhere' is a Codex conversation
+// another Codex window is writing to. 'no-plan' is the same refusal as
+// 'signed-out' on a login nobody ever signed into, which is what a person who
+// skipped setup meets: the remedy is setting a plan up, not signing back in.
+export type TroubleCause = 'signed-out' | 'no-plan' | 'org-blocked' | 'subscription-ended' | 'at-limit' | 'workspace' | 'interrupted' | 'model-not-on-plan' | 'level-not-offered' | 'too-old' | 'network' | 'api-key' | 'codex-config' | 'open-elsewhere' | 'unknown';
 
 // A worker frozen mid-action, waiting on the user's allow/deny.
 export interface Approval {
@@ -490,6 +723,9 @@ export interface AgentTurn {
   at: number;
   who: 'you' | 'it';
   text: string;
+  /** What wrote it, off the ledger (thread-history.ts, `ran`). The thread
+   *  signs the message with it instead of "The agent". */
+  ran?: { engine?: string; model?: string };
   // Which person wrote it, on a shared project (the team version). A message
   // from a teammate is drawn with their face and name instead of "You".
   by?: string;
@@ -501,6 +737,10 @@ export interface AgentTurn {
   // A REPLY IN A THREAD: the uid of the message it answers (w-920461cbe6).
   // In a chat, `itemThread` lifts these out of the stream into `replies`.
   inReplyTo?: string;
+  /** When its author last edited it (shared/message-edits.mjs). */
+  edited?: number;
+  /** Deleted by its author, drawn only because replies hang off it. */
+  deleted?: boolean;
   // A CONTINUATION OF THE BLOCK ABOVE, not a new message. Shape B puts the
   // work between the messages, so a reply that stopped for a tool is drawn as
   // two blocks with the thing it ran between them. They are still one reply:
@@ -529,6 +769,11 @@ export interface AgentTurn {
   // and after it `steer` has put the user's words on the session's stdin and no undo
   // can reach them. So the message says which of the two it is in.
   held?: boolean;
+  // AND, ON THE PHONE WITH THE MAC SHUT, WHY HER MAC DID NOT TAKE IT
+  // (renderer/src/cloud-bridge.ts). Absent on every other message.
+  refused?: string;
+  // Or that Agentbox Cloud took it with the computer shut (shared/cloud-kit.mjs).
+  cloud?: boolean;
   // THE ROW THE WORDS WERE SAID ON, when they came from somewhere other than here.
   //
   // The ask usually lives on the PARENT row, and the pane used to quote it in a
@@ -642,9 +887,17 @@ export interface UpdateState {
 export interface Snapshot {
   products: Product[];
   items: WorkItem[];
+  // ON THE PHONE WITH THE MAC SHUT ONLY (renderer/src/cloud-bridge.ts): her
+  // replies from the phone her Mac has not taken yet, or turned down.
+  phoneWaiting?: { product: string; id: string; at: number; text: string; refused?: string; cloud?: true }[];
+  // On the hosted phone: a line saying what it shows may be out of date (cloud-bridge.ts phoneStatusLine).
+  phoneStatus?: string | null;
   // The team (main/team/index.mjs). Null or absent on a build with no team
   // cloud, which is the single-person app.
   team?: TeamState | null;
+  teammates?: TeammatesView | null;
+  /** Which alpha features are switched on (Settings, Alpha features). */
+  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean };
   agents?: AgentSession[];
   approvals?: Approval[];
   supervisor: SupervisorStatus;
@@ -652,6 +905,9 @@ export interface Snapshot {
   // and is not running. ⌘R will not pick it up, only a restart will, and the
   // renderer says so. Null when the running app IS the app on disk.
   restartNeeded?: { files: string[]; since: number } | null;
+  /** Where threads run and this month's cloud use, for the cloud button
+   *  (renderer/src/cloud-menu.ts). Absent from an older main process. */
+  cloud?: import('./cloud-menu').CloudStatus | null;
   /**
    * What was left of her rate limit at the last reading, or null before the
    * first one lands. It rides the snapshot for the same reason `restartNeeded`
@@ -687,7 +943,7 @@ export interface Snapshot {
    * WHETHER THIS MAC WAS ALREADY SIGNED INTO A CODING AGENT, AND WHICH
    *  (w-e217e577e5, 2026-10-07), for the one line the walk says about it.
    *  Answered whole by `Supervisor#runsOnAccount`, for the reason `engines` is:
-   *  which account the fleet spends is `_narrowToChosen`'s rule, pinned to that
+   *  which account the fleet spends is `_theOneAccount`'s rule, pinned to that
    *  file. Null, or absent on an older payload, on a Mac where nothing readable
    *  is signed in, and then nothing is said. The words are shared/runs-on.mjs.
    *
@@ -716,7 +972,7 @@ export interface Snapshot {
 }
 
 // FOUR, not five.
-export type View = 'inbox' | 'snoozed' | 'progress' | 'done' | 'all';
+export type View = 'inbox' | 'snoozed' | 'progress' | 'done';
 
 // How many of her own Claude Code sessions the inbox takes. 'all' so she can go
 // through them once and close them, 'waiting' for only the ones stopped on a
@@ -801,14 +1057,17 @@ export interface ProjectSettings {
   /** Her mark for this project as a drawable url, or null for the burst. */
   logo: string | null;
   autonomous: boolean;
+  /** Its threads go to her account online for her phone with the Mac shut. */
+  onPhone?: boolean;
   permission: PermissionMode | 'workspace';
   permissionArgs: string[] | null;
   /** This project's own Codex mode, or 'workspace' when it has no opinion. */
   codexMode: CodexModeId | 'workspace';
   /**
-   * The one Claude account this project's agents run on, or 'any' when it runs
-   * on whichever has room. Never a login that has since been signed out: the
-   * supervisor answers 'any' for a tie it can no longer honour.
+   * The one Claude account this project's agents run on, or 'any' when it has
+   * no tie of its own and runs on the account in use. Never a login that has
+   * since been signed out: the supervisor answers 'any' for a tie it can no
+   * longer honour.
    */
   account?: string;
   // The user's rules for this project, as they sit on disk. Empty means the file does
@@ -818,6 +1077,8 @@ export interface ProjectSettings {
 }
 
 export interface WorkspaceSettings {
+  /** Every project on her phone, unless she turned it off (shared/phone-snapshot.mjs). */
+  phoneAll?: boolean;
   agentsRunning: boolean;
   sessionsAtOnce: number;
   /**
@@ -891,6 +1152,8 @@ export interface WorkspaceSettings {
    *  See main/codex-models.mjs. */
   codexModels?: Array<{ id: string; label: string; levels?: string[]; defaultLevel?: string | null }>;
   codexModelDefault?: string | null;
+  /** Set when every Codex login offered is on ChatGPT's free plan; `endedAt` is when the latest paid plan ended. */
+  codexFreePlan?: { endedAt: number | null } | null;
   /**
    * What CLAUDE CODE calls its models on THIS Mac, read off the installed
    * binary rather than off the table committed when Agentbox was built, so a
@@ -941,6 +1204,9 @@ export interface WorkspaceSettings {
   } | null;
   permission: PermissionMode;
   permissionArgs: string[];
+  /** The mode cloud runs start in, or 'same' for this computer's. */
+  cloudPermission?: PermissionMode | 'same' | null;
+  cloudCodexMode?: CodexModeId | 'same';
   /** What a Codex worker may do across the workspace. Never 'workspace' here. */
   codexMode: CodexModeId;
   // One switch over everything that leaves the machine, on at install
@@ -951,6 +1217,10 @@ export interface WorkspaceSettings {
   // Whether the ADHD mode rules ride under "How agents write to you". Off
   // unless she turned it on (w-5737fe67cf).
   adhdMode?: boolean;
+  // New Claude Code and Codex chats come in on their own (w-62228098e6).
+  importNew?: boolean;
+  // Settings, Alpha features (w-3d0fa23ffb).
+  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean };
   // The corner tag over other apps (w-dafae58a23). On unless she turned it off.
   cornerTag?: boolean;
   outsideAgents: AgentMode;
@@ -1061,7 +1331,8 @@ declare global {
   interface Window {
     zero?: {
       snapshot(): Promise<Snapshot>;
-      refreshUsage?(): Promise<{ ok: boolean; reading?: Usage; error?: string }>;
+      refreshUsage?(p?: { engine?: 'claude' | 'codex' }): Promise<{ ok: boolean; reading?: Usage; error?: string }>;
+      accountUsage?(p: { refresh?: boolean; engine?: 'claude' | 'codex' }): Promise<{ readings: AccountUsageReading[] }>;
       // Whether a screen reader is running, which is what decides xterm's
       // accessibility tree. Optional: a preload from before this channel
       // existed has no such function, and `api.assistiveTech` reads that as no.
@@ -1082,11 +1353,12 @@ declare global {
       compact(p: { product: string; id: string }): Promise<{state: string; at: number}>;
       remoteControl(p: {product: string; id: string; action?: string}): Promise<{state: string; at: number; text?: string; url?: string; mayBeActive?: boolean} | null>;
       compactionStatus(p: {product: string; id: string}): Promise<{state: string; at: number} | null>;
-      answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string }): Promise<WorkItem>;
+      answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean }): Promise<WorkItem>;
       sendNow(p: { product: string; id: string }): Promise<{ ok: boolean; interrupted: boolean }>;
       setProductOrder(p: { order: string[] }): Promise<unknown>;
       setThreadPlaces(p: { places: Record<string, number | null> }): Promise<unknown>;
       setThreadPins?(p: { pins: Record<string, true | null> }): Promise<unknown>;
+      setThreadOnMac?(p: { onMac: Record<string, true | null> }): Promise<unknown>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
       compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
       // Feedback to the Agentbox team (main/feedback.mjs). Optional: an older
@@ -1111,8 +1383,15 @@ declare global {
       teamSync(): Promise<TeamCallResult>;
       teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;
       teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult>;
+      teamEdit(p: { product: string; id: string; on: string; text?: string; gone?: boolean }): Promise<TeamCallResult>;
+      micAccess?(): Promise<'granted' | 'settings'>;
       teamMessage(p: { to: string | string[]; body: string; priority?: number; files?: TeamMessageFile[] }): Promise<TeamCallResult>;
+      rooms?(p: { op: string; args?: unknown[] }): Promise<RoomsResult>;
+      teammates?(p: { op: string; args?: unknown }): Promise<TeammatesResult>;
       threadEdit(p: { product: string; id: string; patch: ThreadEditPatch }): Promise<{ ok: boolean; error?: string }>;
+      /** Move a thread to another project (shared/move-thread.mjs). Answers
+       *  with the row it became there, or with the reason in words. */
+      moveItem(p: { product: string; id: string; to: string }): Promise<{ ok: boolean; error?: string; item?: WorkItem; from?: string; to?: string }>;
       schedule(p: { product: string; id: string; runAt: number }): Promise<WorkItem>;
       snooze(p: { product: string; id: string; snoozedUntil: number }): Promise<WorkItem>;
       repeats(): Promise<RepeatRule[]>;
@@ -1173,7 +1452,8 @@ declare global {
       pathForFile(file: File): string | null;
       /** Pasted bytes to disk, so the draft carries a path. */
       // Bytes for a paste, a path for a drag. One or the other, never neither.
-      stageAttachment(p: { name: string; dataBase64?: string; srcPath?: string }): Promise<{ path: string }>;
+      // `name` comes back when a TIFF or HEIC was turned into a PNG or JPEG.
+      stageAttachment(p: { name: string; dataBase64?: string; srcPath?: string }): Promise<{ path: string; name?: string }>;
       onChanged(fn: () => void): () => void;
       approve?(p: { id: string; allow: boolean; note?: string }): Promise<{ ok: boolean }>;
       // Fired for the button AND for the Cmd+Y/Cmd+N chord that main catches
@@ -1191,6 +1471,8 @@ declare global {
       // 'sharp' (main/screen-detail.mjs). It rides here rather than being
       // pushed because the answer is needed on the first paint.
       bootInfo?(): Promise<{ reloaded: boolean; builtAt: number; recovered?: string | null; screenDetail?: string }>;
+      onJoinRoom?(fn: () => void): () => void;
+      takeJoin?(): Promise<string | null>;
       // Keeping Agentbox current (main/updater.mjs). Look again now, and restart
       // onto the version that already downloaded itself.
       updateCheck(): Promise<UpdateState>;
@@ -1212,8 +1494,12 @@ declare global {
         title: string;
         product?: string | null;
         productName?: string | null;
+        // An approval's thread, by its list name, which heads the phone's alert.
+        thread?: string | null;
+        // An approval's thread id, which the phone's alert opens.
+        item?: string | null;
         kind: string;
-      }>): Promise<void>;
+      }>, needsYou?: Array<{ id: string; product: string }>): Promise<void>;
       // She clicked the banner: open this row.
       onOpenItem?(fn: (p: { id: string }) => void): () => void;
     };

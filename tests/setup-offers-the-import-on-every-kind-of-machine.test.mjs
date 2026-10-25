@@ -66,7 +66,7 @@ function codexSession(codexDir, { id = 'x1', originator = 'codex_cli_rs', when =
 /** What setup's last card decides, given the app as a brand new user has it. */
 async function setupCard({ env = {}, shellEnv = {}, config = {}, supervisor = { _codexProfiles: () => ['default'], _codexProfileHome: () => path.join(home, '.codex') } } = {}) {
   const { finishCard } = await import('../renderer/src/onboarding.ts');
-  const threads = markImported(readImportableThreads({ config, supervisor, env, shellEnv, home, now: NOW }), []);
+  const threads = markImported(await readImportableThreads({ config, supervisor, env, shellEnv, home, now: NOW }), []);
   return { threads, card: finishCard({ missing: false }, { read: true, some: false }, threads) };
 }
 

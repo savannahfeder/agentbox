@@ -60,7 +60,7 @@ describe('on a phone, feedback', () => {
   it('is on the phone\'s own Settings page, wired to the same card the desktop opens', () => {
     const settings = read('renderer/src/components/Settings.tsx');
     expect(settings).toMatch(/<Group id="phone-feedback" label="Feedback">/);
-    expect(settings).toMatch(/<PhonePage onFeedback=\{onFeedback\} \/>/);
+    expect(settings).toMatch(/<PhonePage onFeedback=\{onFeedback\} /);
     expect(read('renderer/src/App.tsx')).toMatch(/<Settings[\s\S]{0,200}onFeedback=\{\(\) => setFeedbackOpen\(true\)\}/);
   });
   it('and its card says nothing of pasting, dropping or keys a phone does not have', () => {

@@ -11,7 +11,7 @@ import { keepActivityKeyLocal, LIVE_STEPS_SHOWN, previousActivity, stepsSinceLas
 import { LiveMark } from './LiveMark';
 import { api } from '../api';
 import { onPhone } from '../phone-screen';
-import { pollEvery } from '../phone-polls';
+import { pollEvery, oneAtATime } from '../phone-polls';
 import { runNodes } from '../item-thread';
 import type { AgentWork } from '../types';
 import type { WorkItem } from '../types';
@@ -34,14 +34,15 @@ export function Live({ item, facts }: { item: WorkItem; facts: LiveFacts }) {
     setHistoryError(false);
     if (!expanded || !facts.session) return;
     let active = true;
-    const read = () => api.sessionTrace({ product: item.product, id: item.id })
+    // One at a time: a trace slower than the pushes must not pile up (../phone-polls).
+    const read = oneAtATime(() => api.sessionTrace({ product: item.product, id: item.id })
       .then(result => {
         if (!active) return;
         // Only the run that is up, and only since it last said something.
         const newest = (result?.sessions ?? []).at(-1);
         setHistory(newest ? stepsSinceLastSaid(runNodes(newest)).filter((node): node is AgentWork => node.kind === 'work') : []);
         setHistoryError(false);
-      }).catch(() => { if (active) setHistoryError(true); });
+      }).catch(() => { if (active) setHistoryError(true); }));
     read();
     const off = api.onChanged(read);
     const timer = setInterval(read, pollEvery(8000, onPhone()));
@@ -93,7 +94,8 @@ export function Live({ item, facts }: { item: WorkItem; facts: LiveFacts }) {
   return (
     <div className="live-activity">
       <div className={`live-brief live-${live.state}`}>
-        <LiveMark still={!working} />
+        {/* An agent outside this window is working too; only its steps are not ours to show. */}
+        <LiveMark still={!working && live.state !== 'elsewhere'} />
         {working ? (
           <button type="button" className="live-disclosure" onKeyDown={keepActivityKeyLocal} aria-expanded={expanded}
             aria-controls={detailId} onClick={() => setExpanded(value => !value)}>

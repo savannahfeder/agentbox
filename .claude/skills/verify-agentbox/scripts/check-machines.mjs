@@ -21,13 +21,14 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { SHAPES, build, CLAUDE_VERSION, CODEX_VERSION } from './machines.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
-const { recoverShellPath, readShellDataDirs } = await import(path.join(repo, 'main/shell-path.mjs'));
+const { recoverShellPath, readShellSettings, launchAdditions } = await import(path.join(repo, 'main/shell-path.mjs'));
 const { findClaudeBin, askShell } = await import(path.join(repo, 'main/claude-bin.mjs'));
+const { shellRunner } = await import(path.join(repo, 'main/engine-bin.mjs'));
 const { findCodexBin } = await import(path.join(repo, 'main/codex-bin.mjs'));
 const { harnessFor } = await import(path.join(repo, 'main/harnesses.mjs'));
 
@@ -40,10 +41,8 @@ const wanted = args.filter((a) => !a.startsWith('--'));
 
 const FINDERS = { claude: findClaudeBin, codex: findCodexBin };
 
-/** main/claude-bin.mjs's defaultRun, with the fake machine's environment instead of ours. */
-const asTheMachine = (env) => (shell, shellArgs, timeout = 4000) => execFileSync(shell, shellArgs, {
-  encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout, env,
-});
+/** The app's own probe runner (main/engine-bin.mjs), with the fake machine's environment instead of ours. */
+const asTheMachine = (env) => shellRunner(env);
 const VERSIONS = { claude: CLAUDE_VERSION, codex: CODEX_VERSION };
 
 /** One shape, start to finish. Returns facts and the list of what did not hold. */
@@ -52,11 +51,16 @@ export async function checkShape(shape) {
   const facts = { shape: shape.name, why: shape.why };
   const wrong = [];
   try {
-    const boot = await recoverShellPath({ env: m.launchEnv, platform: 'darwin' });
-    const bootEnv = { ...m.launchEnv, PATH: boot.path };
+    const boot = await recoverShellPath({ env: m.launchEnv, platform: m.platform });
     facts.bootPath = { error: boot.error, entries: boot.path.split(':').map(m.tilde) };
-    const dirs = await readShellDataDirs({ env: m.launchEnv, platform: 'darwin' });
-    facts.shellDirs = Object.fromEntries(Object.entries(dirs).map(([k, v]) => [k, m.tilde(v)]));
+    for (const folder of shape.expect.bootPath ?? []) {
+      if (!facts.bootPath.entries.includes(folder)) wrong.push(`the app's PATH does not hold ${folder}${boot.error ? ` (${boot.error.split('\n')[0]})` : ''}`);
+    }
+    // What learnShellDataDirs reads and puts into the app's environment: the
+    // two folders, and the proxy, certificate and language settings.
+    const settings = await readShellSettings({ env: m.launchEnv, platform: m.platform });
+    const bootEnv = { ...m.launchEnv, ...launchAdditions(settings, m.launchEnv, m.platform), PATH: boot.path };
+    facts.shellDirs = Object.fromEntries(Object.entries(settings.dirs).map(([k, v]) => [k, m.tilde(v)]));
     for (const [k, v] of Object.entries(shape.expect.shellDirs ?? {})) {
       if (facts.shellDirs[k] !== v) wrong.push(`${k} from the shell: expected ${v}, got ${facts.shellDirs[k] ?? 'nothing'}`);
     }
@@ -89,6 +93,11 @@ export async function checkShape(shape) {
         if (want.runs && !fact.runs) wrong.push(`${engine}: found but a worker cannot start it: ${fact.started}`);
         const leaked = (shape.expect.scrubbed?.[engine] ?? []).filter((k) => k in env);
         if (leaked.length) wrong.push(`${engine}: a worker would be handed ${leaked.join(', ')}`);
+        for (const [k, v] of Object.entries(shape.expect.workerEnv ?? {})) {
+          const got = env[k] === undefined ? undefined : m.tilde(env[k]);
+          const held = v instanceof RegExp ? v.test(got ?? '') : got === v;
+          if (!held) wrong.push(`${engine}: a worker's ${k} should be ${v}, got ${got ?? 'nothing'}`);
+        }
       }
       facts[engine] = fact;
     }

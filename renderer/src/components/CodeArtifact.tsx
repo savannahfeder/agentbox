@@ -1,24 +1,11 @@
-// THE CHANGE THE AGENT MADE, AS AN ARTIFACT IN THE PANE.
-//
-// So this is not a screen and not a window. It is a third kind of file for the
-// pane that already opens markdown and html, and everything around it — the
-// crumb, the way out, the two marks, the divider, the split she dragged — is
-// the pane's and is not touched here.
-//
-// WHAT IS IN IT AND WHY, measured against Cursor, the Codex app and the Claude
-// Code desktop app on 2026-08-23 (reports/how-developers-read-agent-code.html).
-// All three give the same six things: a list of the changed files beside the
-// change, coloured counts, syntax colour, folding a file shut, a keystroke to
-// move, and a way out to the developer's own editor. None of the three shows
-// two columns side by side, none puts the change in the conversation as the
-// main surface, and none takes commands at the diff. The rule for v1 is that
-// we do not go past what those three do, so this has the six and stops.
-//
-// A chain of folders with one child each folds into one row (`treeRows`), so
-// the tree of a real eleven-file change is fifteen rows two levels deep rather
-// than a nesting exercise.
+// The change an agent made, drawn as a file in the document pane beside
+// markdown and html. Everything around it (crumb, way out, divider, split)
+// belongs to the pane. The scope matches what Cursor, the Codex app and the
+// Claude Code desktop app offer, and goes no further: no side-by-side columns
+// and no commands at the diff.
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
+import { chord } from '../this-keyboard';
 import {
   BATCH_ROWS, changeSummary, filesInTreeOrder, fillNext, foldsFor, firstBatch, hiddenLines, hunkView, hunkViewAt, linesSkipped, marked, rowSlices, sliceGuessPx, stepInTree, toggled, tokenize, tookLabel, treeRows, visibleRows, wordChanges,
   type Change, type ChangedFile, type Hunk,
@@ -27,15 +14,11 @@ import { copiedText, linesToCopy } from '../code-copy';
 import { applySplices, savedLine, unsavedIn, type Row as EditRow } from '../code-edit';
 import { caretStep, codeScroll, editsAcrossLines, extendHead, extendsSelection, fileOnScreen, inputChangesText, nextChange, type Head } from '../code-keys';
 
-/*
- * ------------------------- the caret, in the DOM ---------------------------
-   A line is a span full of little coloured spans, so "the caret is at column
-   nine" is not a thing the DOM says out loud: it says which text node and how
-   far into it. These two turn one into the other and back, and they are the
-   only DOM the arrow keys touch. The RULES are in code-keys.ts, where they can
-   be tested; this is the plumbing under them. ------------------------------ */
+// A line is a span of coloured spans, so the DOM gives the caret as a text node
+// and an offset, not a column. The helpers below convert between the two. The
+// rules for the arrow keys are in code-keys.ts, where they can be tested.
 
-/** Every line of the change she is allowed to type into, in the order drawn. */
+/** Every editable line of the change, in the order drawn. */
 function editableLines(): HTMLElement[] {
   return [...document.querySelectorAll<HTMLElement>('.code-body .code-line')]
     .filter((el) => el.isContentEditable);
@@ -77,17 +60,13 @@ function placeCaret(el: HTMLElement, col: number) {
   const sel = window.getSelection();
   sel?.removeAllRanges();
   sel?.addRange(range);
-  // The line she has just landed on has to be ON the screen. `nearest` is the
-  // whole of it: it moves the column only when the line is off the edge, so
-  // walking down the middle of a screenful does not jump.
+  // `nearest` scrolls only when the line is off the edge, so walking down the
+  // middle of a screenful does not jump.
   el.scrollIntoView({ block: 'nearest' });
 }
 
-/*
- * ----------- WHAT THE USER TYPED AND HAS NOT SAVED, KEPT -------------------
-   One map per change, outside every component, so closing the pane does not
-   throw her typing away (round four; the story is on `edits` below). It is
-   per running app and never touches disk. ---------------------------------- */
+// Unsaved edits, one map per change, held outside every component so closing
+// the pane keeps them. They last as long as the app runs and never touch disk.
 const KEPT = new Map<string, Map<string, Map<number, Map<number, string>>>>();
 
 /** The unsaved edits for one change, made if this is the first time. */
@@ -106,17 +85,10 @@ function allLines(): HTMLElement[] {
 }
 
 /**
- * How many lines of the change the selection is standing on right now.
- *
- * Two or more is the case an edit cannot serve: the browser's delete and its
- * insert both stop at the end of the contentEditable they are in, so they would
- * take the first line of the block and leave the rest (code-keys.ts,
- * editsAcrossLines, has the measurement and why refusing is the answer).
- *
- * It counts every line the range touches, INCLUDING the removed ones, because
- * the question here is what she has under her hands, not what a copy would
- * hand back. linesToCopy drops the red lines for the clipboard's sake; a
- * selection that reaches across one is still a selection across lines.
+ * How many drawn lines the selection touches, removed lines included. Two or
+ * more is a selection an edit cannot serve, because the browser's delete and
+ * insert stop at the end of one contentEditable (see `editsAcrossLines` in
+ * code-keys.ts).
  */
 function selectedLineCount(): number {
   const sel = window.getSelection();
@@ -134,12 +106,11 @@ function offsetIn(el: HTMLElement, node: Node, offset: number): number {
   return r.toString().length;
 }
 
-/** The five colours, drawn as classes so the stylesheet owns every value. An
- * uncoloured token is bare text: one element fewer per word, on a pane that
- * held 386,310 of them on the biggest real change. */
+/** The syntax colours, drawn as classes so the stylesheet owns every value. An
+ * uncoloured token is bare text, one element fewer per word on a big change. */
 function Code({ line, span }: { line: string; span?: [number, number] | null }) {
-  // The words that changed against the paired line are wrapped once more, over
-  // their colour (`wordChanges` in code-artifact.ts).
+  // Words that changed against the paired line get one more wrapper over their
+  // colour (`wordChanges` in code-artifact.ts).
   const toks = useMemo(() => marked(tokenize(line), span ?? null), [line, span?.[0], span?.[1]]);
   return (
     <>{toks.map((t, i) => (t.hl
@@ -157,25 +128,17 @@ function Counts({ plus, minus }: { plus: number; minus: number }) {
   );
 }
 
-// ONE LINE, AND IT IS THE ONE THING ON THIS SCREEN SHE CAN TYPE INTO.
-//
-// MEMOISED, AND THAT IS LOAD BEARING RATHER THAN AN OPTIMISATION. A line she is
-// typing in is a contentEditable, so its text lives in the DOM and not in
-// React's idea of it. If a re-render higher up reconciled these children, React
-// would put the ORIGINAL line back and her keystrokes would vanish. Identical
-// props mean React skips the subtree entirely, so the only thing that ever
-// rewrites this DOM is her.
-//
-// A REMOVED LINE IS NOT EDITABLE, and that is not a restriction so much as an
-// honest one: it is not in the file any more, so there is nowhere on disk her
-// words could go.
+// One line of the change. The memo is needed for correctness, not speed: an
+// edited line is a contentEditable whose text lives in the DOM, and if React
+// reconciled its children it would put the original line back over the
+// keystrokes. A removed line is not editable because it has no place on disk.
 const CodeLine = memo(function CodeLine({ mark, line, span, num, editable, onEdit, onDone }: {
   mark: string;
   line: string;
   // The changed words against its paired line, or null.
   span?: [number, number] | null;
-  // What line this was in the file, or null where the change came out of the
-  // conversation and nobody knows. Null draws an empty gutter, not a guess.
+  // The line number in the file, or null when the change came from the
+  // conversation and the number is unknown. Null draws an empty gutter.
   num: number | null;
   editable: boolean;
   onEdit: (text: string) => void;
@@ -183,13 +146,10 @@ const CodeLine = memo(function CodeLine({ mark, line, span, num, editable, onEdi
 }) {
   return (
     <div className={`code-row${mark === '+' ? ' cr-plus' : mark === '-' ? ' cr-minus' : ''}${editable ? ' cr-live' : ''}`}>
-      {/* THE NUMBER LIVES OUTSIDE `.code-line`, and that is load bearing rather
-          than tidiness. Everything that reads the change reads the text of
-          `.code-line`: the clipboard (code-copy.ts), a save finding its place
-          in the file (code-edit.ts), and the arrow keys counting columns. A
-          number inside it would be pasted into her source and counted as
-          columns she never typed. Outside it, it is invisible to all three,
-          exactly as `.code-mark` already is. */}
+      {/* The number stays outside `.code-line`, like `.code-mark`. The
+          clipboard (code-copy.ts), a save (code-edit.ts) and the arrow keys all
+          read the text of `.code-line`, and a number inside it would be pasted
+          and counted as columns. */}
       <span className="code-num" aria-hidden="true">{num ?? ''}</span>
       <span className="code-mark" aria-hidden="true">{mark === '=' ? '' : mark === '+' ? '+' : '−'}</span>
       <span
@@ -199,24 +159,18 @@ const CodeLine = memo(function CodeLine({ mark, line, span, num, editable, onEdi
         spellCheck={false}
         onInput={editable ? (e) => onEdit(e.currentTarget.textContent ?? '') : undefined}
         onBlur={editable ? onDone : undefined}
-        // A ROW IS ONE LINE OF THE FILE AND STAYS ONE LINE. Enter inside a
-        // contentEditable would put a second line inside a row, and the row
-        // would then read back as those two lines run together — visible, but
-        // not what she meant by pressing Enter. Adding a line to the file is a
-        // different feature; refusing the key is the honest half of it. ESCAPE
-        // STEPS OUT OF THE LINE, not out of the file. A line is a
-        // contentEditable, so while the caret is in one the app's own guard
-        // refuses every single-letter key AND escape with it — measured dead
-        // 2026-08-24. Blurring hands the keyboard back, saves the line on the
-        // way past (onBlur is onDone), and the next escape is the ordinary one
-        // that closes the change.
+        // A row is one line of the file, so Enter is refused: inside a
+        // contentEditable it would put a second line in the row. Escape blurs
+        // the line, which saves it (onBlur is onDone) and hands the keyboard
+        // back, because the app's own key guard ignores keys typed into a
+        // contentEditable. The next Escape closes the change.
         onKeyDown={editable ? (e) => {
           if (e.key === 'Enter') e.preventDefault();
           if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); e.currentTarget.blur(); }
         } : undefined}
         onPaste={editable ? (e) => {
-          // Same reason, from the other end: paste arrives as plain text with
-          // its newlines flattened, rather than as html carrying a paragraph.
+          // For the same reason, paste arrives as plain text with its newlines
+          // flattened.
           e.preventDefault();
           const flat = e.clipboardData.getData('text/plain').replace(/[\r\n]+/g, ' ');
           document.execCommand('insertText', false, flat);
@@ -228,37 +182,29 @@ const CodeLine = memo(function CodeLine({ mark, line, span, num, editable, onEdi
   );
 }, (a, b) => a.mark === b.mark && a.line === b.line && a.num === b.num && a.editable === b.editable
   && a.span?.[0] === b.span?.[0] && a.span?.[1] === b.span?.[1]);
-// The two callbacks are deliberately NOT compared. They are fresh closures on
-// every parent render and comparing them would defeat the memo entirely, which
-// is the bug this component exists to avoid. What they close over — the row's
-// index and the parent's handler — is stable for the life of one row.
+// The two callbacks are left out of the comparison on purpose. They are fresh
+// closures on every parent render, and what they close over (the row's index
+// and the parent's handler) is stable for the life of one row.
 
 function HunkRows({ hunk, editable, pending, onEdit, onDone }: {
   hunk: Hunk;
   editable: boolean;
-  // What the user typed into this hunk and has not saved, by row. Null when nothing
-  // is waiting, which is the ordinary case.
+  // Unsaved text in this hunk, by row. Usually null.
   pending?: Map<number, string> | null;
   // (row index inside the hunk, the line as it now reads)
   onEdit: (at: number, text: string) => void;
   onDone: () => void;
 }) {
-  // BOTH OF THESE WALK EVERY ROW OF THE HUNK, and they used to do it again on
-  // every render of the pane. The rows of a hunk do not move while she reads,
-  // so the walk is held rather than repeated.
   const { rows } = useMemo(() => hunkView(hunk.rows), [hunk.rows]);
   const at = useMemo(() => hunkViewAt(hunk.rows), [hunk.rows]);
   const words = useMemo(() => wordChanges(hunk.rows), [hunk.rows]);
   const draw = (mark: string, text: string, i: number) => {
-    // THE USER'S WORDS WIN OVER THE FILE'S. A line typed in and not saved is
-    // drawn as she left it, so closing the change and opening it again shows
-    // her own text rather than quietly putting the original back.
+    // Unsaved text wins over the file's, so reopening the change shows it.
     const line = (mark === '-' ? undefined : pending?.get(at[i])) ?? text;
-    // A line she has typed into is no longer the line the span was found in.
+    // An edited line is no longer the line the span was found in.
     const span = line === text ? words[at[i]] : null;
-    // A REMOVED LINE IS NUMBERED IN THE OLD FILE, everything else in the new
-    // one, which is what every diff tool does and the only reading that is
-    // true: a red line has no line in the file as it now stands.
+    // A removed line is numbered in the old file, everything else in the new
+    // one, as in every diff tool.
     const pair = hunk.nums?.[at[i]];
     const num = (mark === '-' ? pair?.[0] : pair?.[1]) ?? null;
     return (
@@ -274,10 +220,9 @@ function HunkRows({ hunk, editable, pending, onEdit, onDone }: {
       />
     );
   };
-  // THE HEIGHT A SLICE STANDS AT WHILE THE BROWSER IS SKIPPING IT. The
-  // stylesheet turns on `content-visibility: auto` per slice, not per hunk, so
-  // an 800-row hunk is laid out a slice at a time as she reaches it
-  // (`rowSlices` in code-artifact.ts has the measurement).
+  // The stylesheet sets `content-visibility: auto` per slice, so a long hunk is
+  // laid out a slice at a time; the guess is a skipped slice's height
+  // (`rowSlices` in code-artifact.ts).
   const slices = useMemo(() => rowSlices(rows.length), [rows.length]);
   return (
     <div className="code-hunk">
@@ -290,43 +235,28 @@ function HunkRows({ hunk, editable, pending, onEdit, onDone }: {
   );
 }
 
-// ONE FILE'S WORTH OF CHANGE, AND IT IS SEALED OFF FROM THE REST OF THE PANE.
-//
-// The re-rendering half of that is real and this is where it was. Scrolling
-// moves `at`, the file she is standing on, several times on the way down a long
-// change. `at` lives in state, so every one of those moves re-rendered
-// CodeArtifact, and the change was built inline inside it: seventeen sections,
-// every hunk in each, every row in every hunk. CodeLine's memo saved the DOM
-// but not the work above it — 2,562 elements were still described, keyed and
-// compared to decide that not one of them had changed.
-//
-// Measured on a real 2,562-row change with the processor turned down six
-// times, this subtree was the largest named cost in a scroll after the layout
-// reads below it (HunkRows, draw and CodeLine together, in the sampling
-// profiler). Sealing it behind a memo means walking the files costs the
-// seventeen headers and nothing else.
-//
-// EVERY PROP HERE IS STABLE ON PURPOSE, which is the whole of why the memo
-// works: `file` comes out of a useMemo, `pending` is a map held in a ref,
-// and both handlers are useCallbacks with no dependencies. A fresh closure in
-// any one of them would defeat this exactly the way it would defeat CodeLine.
 type Gap = { from: number; lines: string[] };
 
+// One file's hunks, behind a memo so that scrolling, which moves `at` and
+// re-renders CodeArtifact, does not rebuild every row. Every prop is stable on
+// purpose: `file` comes from a useMemo, `pending` from a ref, and the handlers
+// are useCallbacks with no dependencies. A fresh closure in any of them breaks
+// the memo.
+
 const FileHunks = memo(function FileHunks({ file, pending, onEdit, onDone, readFile, onNotice, gaps }: {
-  // The gaps opened in this file, held by the pane so folding the file and
-  // opening it again does not close them. The same Map for the life of the pane.
+  // Gaps opened in this file, held by the pane so folding the file does not
+  // close them. The same Map for the life of the pane.
   gaps: Map<number, Gap>;
   file: ChangedFile;
-  // What the user typed into this file and has not saved, by hunk. Null is ordinary.
+  // Unsaved text in this file, by hunk. Usually null.
   pending?: Map<number, Map<number, string>> | null;
   onEdit: (file: string, hunk: number, row: number, text: string) => void;
   onDone: () => void;
-  // The file as it is on disk now, for opening a gap. Stable, like the rest.
+  // Reads the file as it is on disk now, to open a gap.
   readFile: (path: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
   onNotice: (text: string) => void;
 }) {
-  // THE GAPS SHE HAS OPENED, by the index of the hunk below each one: the
-  // lines read off the disk and the number the first of them has.
+  // Opened gaps, by the index of the hunk below each one.
   const [opened, setOpened] = useState<Map<number, Gap>>(() => new Map(gaps));
   const openGap = async (i: number) => {
     const read = await readFile(file.path);
@@ -340,10 +270,9 @@ const FileHunks = memo(function FileHunks({ file, pending, onEdit, onDone, readF
     <>
       {file.hunks.map((hunk, i) => (
         <div className="code-hunk-block" key={i}>
-          {/* WHERE THE FILE JUMPS, AND PRESSING IT OPENS THE LINES IN BETWEEN
-             (2026-10-04). It draws only between hunks and only when git gave us
-             the numbers to count with; opened, the lines take its place, read
-             only, because they are not part of what the agent changed. */}
+          {/* The skipped lines between two hunks, drawn only when git gave line
+             numbers. Opened lines are read only, because the agent did not
+             change them. */}
           {i > 0 && opened.has(i) ? (
             <div className="code-gap-lines">
               {opened.get(i)!.lines.map((text, k) => (
@@ -358,11 +287,9 @@ const FileHunks = memo(function FileHunks({ file, pending, onEdit, onDone, readF
           <HunkRows
             hunk={hunk}
             editable
-            // ONLY WHAT WAS KEPT FROM AN EARLIER OPENING IS DRAWN. A line
-            // she is typing in right now is a contentEditable holding its
-            // own text, and handing it back its own keystrokes is how
-            // React puts the caret at the front of the word (CodeLine
-            // says why it is memoised at all).
+            // Only text kept from an earlier opening. Handing a live
+            // contentEditable its own keystrokes moves the caret to the front
+            // of the word.
             pending={pending?.get(i) ?? null}
             onEdit={(row, text) => onEdit(file.path, i, row, text)}
             onDone={onDone}
@@ -375,20 +302,15 @@ const FileHunks = memo(function FileHunks({ file, pending, onEdit, onDone, readF
 
 export function CodeArtifact({ product, src, change, startAt = null, startAtFrom = 0, onFileAt, onNotice }: {
   product: string;
-  // The change artifact's own path, which is what a save asks main to look one
-  // of its files up inside.
+  // The change artifact's own path, which a save hands main to find the file.
   src: string;
   change: Change;
-  // THE FILE IT OPENS STANDING ON, when something pointed at one. That is a
-  // chip on a work line in the conversation: she presses the file the agent
-  // said it edited and the code opens at that file rather than at the top of
-  // a change of eighteen. Null opens at the top, which is every other way in.
+  // The file to open at, set by a file chip in the conversation. Null opens at
+  // the top.
   startAt?: string | null;
-  // When that pointing happened, so pressing the same chip twice lands twice.
+  // When the chip was pressed, so pressing the same chip twice lands twice.
   startAtFrom?: number;
-  // THE FILE SHE IS STANDING ON, HANDED BACK UP TO THE PANE.The mark that
-  // does it lives in the pane's own header, one level above this, so the
-  // only thing this has to say is which file it would open.
+  // The current file, for the mark in the pane's header that opens it.
   onFileAt: (path: string | null) => void;
   onNotice: (text: string) => void;
 }) {
@@ -402,45 +324,37 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   const heads = useRef(new Map<string, HTMLDivElement | null>());
   const treeRef = useRef<HTMLDivElement | null>(null);
   const treeRowRefs = useRef(new Map<string, HTMLButtonElement | null>());
-  // Which of the two things moved the tree: her scrolling, or her walking. The
-  // scroll-to-the-top effect below reads it and stands down for the first.
+  // Whether the tree last moved because of a scroll or a key. The
+  // scroll-to-the-top effect below stands down for a scroll.
   const fromScroll = useRef(false);
-  // THE FILE SHE ASKED TO BE TAKEN TO, while the column is still settling under
-  // the jump. Non-null means a move she asked for is in flight, and the scroll
-  // handler leaves `at` alone until it lands, or her own scroll cancels it.
-  // Without this the pane repoints itself mid-jump and she arrives somewhere
-  // she did not ask for.
+  // The file a jump is heading to while the column settles. While it is set,
+  // the scroll handler leaves `at` alone until the jump lands or the user
+  // scrolls.
   const holding = useRef<string | null>(null);
-  // THE SELECTION SHE IS MAKING WITH THE KEYBOARD, as two points in the list of
-  // drawn lines. It has to be carried rather than read back off the DOM,
-  // because the moment a selection leaves the line it started in the editing
-  // host is blurred and the browser no longer has a caret to grow from.
+  // A keyboard selection, as two points in the drawn lines. It is carried here
+  // because once a selection leaves its starting line the editing host blurs
+  // and the browser has no caret to grow from.
   const keySel = useRef<{ anchor: Head; head: Head } | null>(null);
-  // Where her last plain click landed, which is what a shifted click extends
-  // FROM. The browser keeps this itself inside one editing host and loses it
-  // between two, which is why a shift-click across lines took only one.
+  // Where the last plain click landed, for a shift-click to extend from. The
+  // browser keeps this inside one editing host and loses it between two.
   const clickAnchor = useRef<{ line: HTMLElement; col: number } | null>(null);
 
-  // WHERE SHE STANDS IS A FILE OF THE WHOLE CHANGE, NOT A ROW OF THE TREE.
-  // It was a position in the visible tree, so folding a folder made the same
-  // position name another file and the code jumped there: 2,739 to 20,787,
-  // measured 2026-10-04. `files` never changes when the tree folds.
+  // `at` indexes `files`, not the visible tree, so folding a folder never
+  // changes which file it names.
   const current = files[Math.min(at, Math.max(0, files.length - 1))];
-  // A press on a file always jumps, the one she is on included, which bare
-  // `at` cannot say when it does not change.
+  // Bumped on every press so a press on the current file still jumps.
   const [jump, setJump] = useState(0);
   const seenJump = useRef(0);
-  // THE FILES SHE HAS FOLDED SHUT FROM THEIR HEADER, which is how a reviewer
-  // says "done with this one" (2026-10-04,
-  // tests/a-file-folds-shut-from-its-header.test.mjs). Folding the file she is
-  // inside keeps her place: its header stays where it was, at the top.
+  // Files folded shut from their header
+  // (tests/a-file-folds-shut-from-its-header.test.mjs). Folding the file in
+  // view keeps its header where it was.
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set(foldsFor(product, src)));
   const foldFile = (path: string, block: HTMLElement | null) => {
     const body = bodyRef.current;
     const above = body && block ? block.getBoundingClientRect().top - body.getBoundingClientRect().top : 0;
-    // A FILE OPENING AGAIN IS DRAWN FROM WHAT SHE HAS TYPED NOW, not from the
-    // snapshot taken when the pane opened, or the line she edited shows its
-    // old words while ⌘S would save the new ones.
+    // A file opening again is drawn from the current edits, not the snapshot
+    // taken when the pane opened, or it would show old words that ⌘S would not
+    // save.
     if (folded.has(path)) {
       const now = edits.current.get(path);
       seeded.current.set(path, new Map([...(now ?? new Map())].map(([h, m]) => [h, new Map(m)])));
@@ -462,13 +376,10 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
     setJump((n) => n + 1);
   };
 
-  // HOW MANY FILES HAVE THEIR CODE DRAWN. A big change opens on its first
-  // screenful and the rest is drawn in the idle moments straight after, so
-  // opening the largest real change no longer freezes the window for every
-  // row of it (`firstBatch` in code-artifact.ts has the numbers). Every file's
-  // header is drawn from the start, so the tree, the jumps and the sticky
-  // names work while the rest arrives. An ordinary change is drawn whole in
-  // the first frame and none of this runs.
+  // Which files have their code drawn. A big change opens on its first
+  // screenful and draws the rest in idle moments (`firstBatch` in
+  // code-artifact.ts). Every file's header is drawn from the start, so the
+  // tree, the jumps and the sticky names work meanwhile.
   const [drawn, setDrawn] = useState<ReadonlySet<number>>(() => {
     const at0 = Math.max(0, files.findIndex((f) => f.path === startAt));
     return new Set(Array.from({ length: firstBatch(files, 0) }, (_, i) => i).concat(at0));
@@ -476,10 +387,9 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   const hereIndex = at;
   useEffect(() => {
     if (drawn.size >= files.length) return;
-    // NEAREST TO HER FIRST. The file she is on is urgent; anything else waits
-    // for a moment her hand is still, because a batch forced in mid-scroll is a
-    // dropped frame. Drawing everything above a far file in one go is what
-    // stalled a fast scroll for 754ms, measured, so it is never done.
+    // Nearest first. The current file is urgent; the rest waits for idle,
+    // because a batch forced in mid-scroll drops a frame. Never draw
+    // everything above a far file in one go: that stalls a fast scroll.
     const plan = fillNext(files, drawn, Math.max(0, hereIndex), BATCH_ROWS);
     const urgent = plan.includes(Math.max(0, hereIndex));
     const next = () => setDrawn((was) => new Set([...was, ...plan]));
@@ -492,36 +402,14 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
     return () => clearTimeout(t);
   }, [drawn, files, hereIndex]);
 
-  /* * ------------------------- typing into the change -------------------------
-
-     Her keystrokes live in a REF and not in state, on purpose. A line is a
-     contentEditable and its text is already in the DOM; putting it in state as
-     well would re-render the very element she has a cursor in. The ref is read
-     once, when she saves.
-
-     `dirtyAt` is the only thing state has to know: something is unsaved. It
-     moves on blur rather than on every keystroke, so no re-render ever lands
-     mid-word. -------------------------------------------------------------
-  */
-  // AND THEY OUTLIVE THE PANE BEING CLOSED, which is round four's fix.
-  //
-  // MEASURED 2026-08-27 on the real pane: typing a word into a line, pressing
-  // escape twice to come out of the change, and opening the same change again
-  // showed the ORIGINAL line. The typed words were gone and nothing had said so — no
-  // warning on the way out, no mark, no notice. The ref below lives inside the
-  // component, so closing the pane unmounted it and took her typing with it.
-  //
-  // So the ref is seeded from, and written through to, a map that lives outside
-  // the component, keyed by which change it is. It is deliberately NOT written
-  // to disk: an edit kept across a restart would be measured against a file
-  // that has moved on, and applySplices would refuse it with a reason she could
-  // no longer place. It lasts as long as the app is running, which is as long
-  // as she can remember typing it.
+  // Keystrokes live in a ref, not in state, because the text is already in the
+  // contentEditable and a re-render would rewrite the line under the caret. The
+  // ref is the change's map in KEPT, so it outlives the pane. It is never
+  // written to disk: after a restart the file may have moved on, and
+  // applySplices would refuse the edit.
   const edits = useRef(keepFor(product, src));
-  // A SNAPSHOT OF WHAT WAS ALREADY WAITING WHEN THIS PANE OPENED, which is the
-  // only thing the rows are drawn from. `edits` itself changes under her hands
-  // as she types; reading that while she types would rewrite the line she has a
-  // caret in, which is the one thing CodeLine's memo exists to prevent.
+  // What was waiting when the pane opened. Rows are drawn from this, never from
+  // `edits` as it changes, for the reason above.
   const seeded = useRef(new Map([...edits.current].map(([f, byHunk]) => [f, new Map([...byHunk].map(([h, m]) => [h, new Map(m)]))])));
   const [dirtyAt, setDirtyAt] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -533,25 +421,20 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
     byHunk.set(row, text);
     byFile.set(hunk, byHunk);
     edits.current.set(file, byFile);
-    // ON THE FIRST CHARACTER, NOT ON BLUR.Half of why is that the mark
-    // used to wait until she clicked out of the line, so the whole time
-    // she was typing the screen said nothing had changed. This moves the
-    // stamp only when the SET of unsaved files changes, so it is one
-    // re-render per file and never one per keystroke, and the lines
-    // themselves are memoised past it anyway (CodeLine) so her cursor is
-    // not touched.
+    // The unsaved mark shows on the first character. The stamp moves only when
+    // the set of unsaved files changes, so it is one re-render per file, not
+    // per keystroke.
     if (unsavedIn(edits.current).length !== was) setDirtyAt((n) => n + 1);
   }, []);
 
   const settle = useCallback(() => setDirtyAt((n) => n + 1), []);
 
-  // Stable, so FileHunks' memo holds: the parent's onNotice is a fresh closure
-  // on every render, so it is read through a ref.
+  // Read through a ref so FileHunks gets a stable callback; the parent's
+  // onNotice is a fresh closure on every render.
   const noticeRef = useRef(onNotice);
   noticeRef.current = onNotice;
   const notice = useCallback((text: string) => noticeRef.current(text), []);
   const readFile = useCallback((path: string) => api.codeFile({ product, src, path }), [product, src]);
-  // One Map of opened gaps per file, the same one every render.
   const gapStore = useRef(new Map<string, Map<number, Gap>>());
   const gapsFor = (path: string) => {
     let m = gapStore.current.get(path);
@@ -562,10 +445,9 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   const dirtyFiles = () => unsavedIn(edits.current);
 
   /**
-   * WHAT ⌘S DOES. Every file the user typed in, one at a time, and it says what
-   * happened to each. Nothing is written unless her lines can be found in the
-   * file exactly as the change left them, which is decided in code-edit.ts and
-   * not here.
+   * ⌘S. Saves every file with edits, one at a time, and reports each. A file is
+   * written only if its lines are found exactly as the change left them, which
+   * code-edit.ts decides.
    */
   const saveAll = useCallback(async () => {
     const targets = dirtyFiles();
@@ -594,9 +476,8 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
           product, src: src, path: filePath, text: spliced.text, mtime: read.mtime ?? 0,
         });
         if (!wrote.ok) { onNotice(wrote.error ?? `${filePath} could not be saved.`); continue; }
-        // Only now is her version the truth, so the rows the pane was drawn
-        // from move with it and a second ⌘S is not a second write of the same
-        // thing onto lines that no longer match.
+        // The drawn rows take the saved text, so a second ⌘S does not try to
+        // write onto lines that no longer match.
         for (const [hunk, m] of byHunk.entries()) {
           const rows = file.hunks[hunk]?.rows;
           if (!rows) continue;
@@ -612,21 +493,12 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
     if (done.length) onNotice(done.join(' '));
   }, [files, product, change, saving, onNotice]);
 
-  // THE KEYS THIS PANE ANSWERS, and it is a short list on purpose. J and K used
-  // to walk the files from anywhere and no longer do anything at all
-  // (code-keys.ts says why they are still swallowed).
-  //
-  // AND THE ARROWS, WHICH WERE DEAD.Measured before this handler existed:
-  // ArrowUp, ArrowDown, ArrowRight, PageUp and PageDown did nothing anywhere in
-  // this pane. What an arrow MEANS is decided in code-keys.ts and the three
-  // answers are there; this only asks where her keyboard is and does what it is
-  // told.
+  // The keys this pane answers. What each key means is decided in code-keys.ts;
+  // this only asks where the focus is and acts on the answer.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // ⌘S FIRST, AND BEFORE THE GUARD BELOW, because the whole point of it is
-      // that she is standing in a line she has been typing in. Every other
-      // keystroke here stays out of a field, which is why J does not walk the
-      // files while she is writing the letter j into one.
+      // ⌘S comes before the field guard below, because it is pressed from
+      // inside a line being edited.
       if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
         (e.target as HTMLElement)?.blur?.();
@@ -636,18 +508,10 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       const el = e.target as HTMLElement | null;
       const tag = String(el?.tagName ?? '').toUpperCase();
 
-      // ── SELECTING WITH THE KEYBOARD, WHICH ALSO HAS TO CROSS THE LINES ────
-      // MEASURED 2026-08-27 (round four): shift and two downs from the end of a
-      // line reached ZERO lines of the change, and shift with up reached the
-      // one line she was already in, so a block could not be taken out of a
-      // change without a mouse at all. Same wall as rounds one to three: a line
-      // is its own editing host and a native shifted arrow has nothing outside
-      // it to extend into. So the head of the selection is carried here and
-      // applied with setBaseAndExtent, which is the one call that does cross a
-      // host — it is what round three's drag already uses.
-      //
-      // A PLAIN KEY OR A FRESH PRESS OF THE MOUSE ENDS IT, below, so nothing
-      // she does next is measured against a selection she thought was gone.
+      // Shifted arrows. Each line is its own editing host, so a native shifted
+      // arrow cannot extend past it. The head is carried in `keySel` and applied
+      // with setBaseAndExtent, which can cross hosts. A plain key or a fresh
+      // mouse press ends the selection.
       if (e.shiftKey && !e.metaKey && !e.altKey && !e.ctrlKey && extendsSelection(e.key)) {
         const lines = allLines();
         const live = keySel.current;
@@ -662,10 +526,8 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
           if (to) {
             e.preventDefault();
             keySel.current = { anchor, head: to };
-            // ONCE IT LEAVES THE LINE, HAND THE KEYBOARD BACK. The line she
-            // started in is an editing host and still has focus, so a keystroke
-            // would land inside it while six lines are selected. Round three
-            // does exactly this the moment a drag crosses out of a line.
+            // Once the selection leaves its line, blur that line, or the next
+            // keystroke would land inside it while many lines are selected.
             if (to.line !== anchor.line) (document.activeElement as HTMLElement | null)?.blur?.();
             const a = pointAt(lines[anchor.line], anchor.col);
             const b = pointAt(lines[to.line], to.col);
@@ -675,31 +537,18 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
           }
         }
       }
-      // ── AN EDIT ACROSS LINES IS REFUSED, NOT HALF DONE ───────────────────
-      // MEASURED 2026-08-27 (round five): four lines selected, one Backspace,
-      // and one of the four changed. The other three sat there looking
-      // selected and untouched, and the change drew the same 833 lines after
-      // as before, so nothing said the press had only reached a quarter of
-      // what she was pointing at. code-keys.ts says why the answer is to
-      // refuse rather than to implement it: these are diff rows, and joining
-      // the first line of a block to the last has no meaning across a removed
-      // line or a hunk boundary.
-      //
-      // THE SELECTION IS LEFT STANDING so ⌘C still takes the block, which is
-      // what round four built the selection for in the first place.
+      // An edit across lines is refused rather than half done; code-keys.ts
+      // says why. The selection is left standing so ⌘C still copies it.
       if (selectedLineCount() > 1
         && editsAcrossLines(e.key, { meta: e.metaKey, ctrl: e.ctrlKey, alt: e.altKey })) {
         e.preventDefault();
         return;
       }
 
-      // Anything else means the selection she was making is finished with.
       if (!e.shiftKey) keySel.current = null;
 
-      // ── HER CARET, CROSSING OUT OF A ONE-LINE DOCUMENT ────────────────────
-      // A line of the change is its own contentEditable, so down from the
-      // caret is genuinely nowhere and the browser is right to do nothing.
-      // Only this component knows the next line is the next sibling.
+      // Moving the caret between lines. Each line is its own contentEditable,
+      // so the browser has nowhere to move it.
       const line = el?.closest?.('.code-line') as HTMLElement | null;
       if (line && el?.isContentEditable) {
         const text = line.textContent ?? '';
@@ -708,13 +557,11 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
         const lines = editableLines();
         const here = lines.indexOf(line);
         const next = lines[here + step.move];
-        // At the very first or very last editable line there is nowhere to go,
-        // and the honest thing is to leave the caret where it is rather than
-        // wrap her round to the other end of the change.
+        // At the first or last editable line the caret stays put; it does not
+        // wrap.
         if (here < 0 || !next) { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); return; }
         e.preventDefault();
-        // Her keystrokes in the line she is leaving are already in the ref;
-        // settle stamps the unsaved mark the way a blur would.
+        // Stamp the unsaved mark the way a blur would.
         settle();
         placeCaret(next, step.col === Infinity ? (next.textContent ?? '').length : step.col);
         return;
@@ -723,10 +570,9 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return;
       if (e.ctrlKey || e.altKey) return;
 
-      // ── ] AND [: THE NEXT CHANGE AND THE ONE BEFORE ──────────────────────
-      // Each change lands just under the file's sticky name. A file not drawn
-      // yet counts as one change, so ] never skips past it; a folded file has
-      // none, because folding it is how she said she was done with it.
+      // ] and [ step to the next and previous change, landing just under the
+      // file's sticky name. A file not drawn yet counts as one change, so ]
+      // never skips it; a folded file has none.
       if ((e.key === ']' || e.key === '[') && !e.metaKey) {
         const body = bodyRef.current;
         if (body) {
@@ -743,10 +589,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
         return;
       }
 
-      // ── THE FILE TREE, WHEN HER KEYBOARD IS ON IT ─────────────────────────
-      // She clicked a file, so the arrows walk the files the way they walk any
-      // other sidebar. That is the whole of it now: J and K used to do the same
-      // thing from anywhere in the pane and were taken off it.
+      // With focus in the file tree, the arrows walk the files.
       const onTree = !!el?.closest?.('.code-tree');
       if (onTree && !e.metaKey) {
         const to = stepInTree(e.key, current?.path ?? null, fileRows.map((r) => (r as { path: string }).path), files.map((f) => f.path));
@@ -757,9 +600,8 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
         }
       }
 
-      // ── OTHERWISE THE ARROWS SCROLL THE CODE ──────────────────────────────
-      // `.code-body` is a plain div, so nothing ever focuses it and the browser
-      // had no scroller to hand the arrows to. This gives it one.
+      // Otherwise the arrows scroll the code. `.code-body` is a plain div that
+      // never takes focus, so the browser would not scroll it.
       const body = bodyRef.current;
       if (body) {
         const row = body.querySelector('.code-row');
@@ -773,38 +615,11 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       }
 
       if (e.metaKey) return;
-      // J AND K ARE GONE FROM HERE, and nothing takes their place.
-      //
-      // They are still owned by the change (CHANGE_OWNS in code-keys.ts) so the
-      // app below stands down for them, and code-keys.ts says why: the app's J
-      // means "next task", so handing the key back would turn a stray press
-      // into the change closing and another card coming up — round two's fault
-      // wearing the costume of a removal. Owned and inert is the honest end of
-      // a feature that was removed.
-      //
-      // Two meanings on one key is the fault renderer/src/keys.ts was written
-      // about, and this one cost the user the meaning used all day.
-      //
-      // MEASURED 2026-08-24, with a change open and her keyboard on the
-      // message: E opened the file and the card was NOT archived. Not merely
-      // both-at-once — the archive never ran at all. Both handlers are window
-      // listeners; this one fired first, and the app's own never fired for E,
-      // though it fired for every other letter in the same state a moment
-      // earlier. So the card silently stayed in her inbox.
-      //
-      // NOTHING IS LOST BY DELETING IT. The pane already draws the control that
-      // does this, on the file this line would have opened: openOutside in
-      // DocPane.tsx, on the icon settled on 2026-08-23, pointed at the same
-      // `fileAt` this component reports up. The key was a second door onto a
-      // door she already has.
+      // J and K do nothing here on purpose. CHANGE_OWNS in code-keys.ts still
+      // claims them, so the app's own J does not fire under an open change.
     };
-    // THE SAME REFUSAL, ONE LAYER DOWN, because a keystroke is not the only
-    // way text arrives. A paste, a drop and the dictation she uses all reach
-    // the line through beforeinput without a key ever being pressed, and each
-    // of them would land in the first line of the block and leave the rest.
-    // Two listeners rather than one rule in two shapes: keydown is where the
-    // key can still be refused before the browser acts on it, and this is the
-    // net under everything that never was a key.
+    // The same refusal for text that arrives without a key: paste, drop and
+    // dictation all come through beforeinput.
     const onInput = (e: Event) => {
       const type = (e as InputEvent).inputType ?? '';
       if (!inputChangesText(type)) return;
@@ -818,27 +633,17 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
     };
   }, [fileRows, files, current?.path, at, saveAll, settle]);
 
-  /*
-   * ------------- SELECTING SOME OF THE CHANGE, AND COPYING IT ---------------
-     Two faults, one gesture, both measured on the real pane 2026-08-27 and both
-     in code-copy.ts in full. Dragging down seven lines selected ONE, because a
-     browser will not let a mouse selection leave the editing host it started in
-     and every line here is its own. And what did reach the clipboard carried the
-     diff's gutter: a bare "+" on a line of its own between every pair of code
-     lines, which `user-select: none` does not stop.
-
-     So the drag is taken over the moment it leaves the line it started in, and
-     the copy is built rather than left to the browser. Both are narrow on
-     purpose. Inside one line nothing here runs at all: an ordinary drag, a
-     double click on a word and a click into the middle of a line are the
-     browser's, they were already right, and they stay its business. ------- */
+  // Selecting across lines and copying. The browser will not let a mouse
+  // selection leave the editing host it started in, and every line is its own
+  // host. Its copy would also carry the diff's gutter, which `user-select: none`
+  // does not stop. So a drag is taken over once it leaves its starting line, and
+  // the copy is built here (code-copy.ts). Inside one line the browser handles
+  // everything.
   useEffect(() => {
     const body = bodyRef.current;
     if (!body) return;
-    // `line` is the line the press landed IN, and is null when it landed in the
-    // margin beside one. That difference is the whole of when to take over:
-    // from inside a line, only once the drag crosses out of it; from the
-    // margin, at once, because there was never a line to stay in.
+    // `line` is null when the press landed in the margin. From inside a line the
+    // drag is taken over once it crosses out; from the margin, at once.
     let anchor: { node: Node; offset: number; line: HTMLElement | null } | null = null;
     let took = false;
 
@@ -850,19 +655,13 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
     const onDown = (e: MouseEvent) => {
       anchor = null;
       took = false;
-      // A second or third click is the browser selecting a word or a line, and
-      // it does that correctly. Only a fresh press starts a drag we might take.
+      // A double or triple click is the browser selecting a word or a line.
       if (e.button !== 0 || e.detail > 1) return;
       const el = e.target as HTMLElement | null;
       const line = el?.closest?.('.code-line') as HTMLElement | null;
 
-      // ── SHIFT AND CLICK, WHICH IS THE OTHER WAY A HAND TAKES A BLOCK ──────
-      // Measured 2026-08-27 (round four): clicking line one and shift-clicking
-      // line seven selected ONE line. Round three took over the DRAG and left
-      // this alone, and it fails for the same reason — the browser will not
-      // grow a selection out of the editing host its anchor sits in. Extending
-      // from the click before it is the whole fix, and it is the same
-      // setBaseAndExtent the drag and the keyboard use.
+      // Shift-click across lines, extended from the previous click for the same
+      // reason as the drag.
       if (e.shiftKey && clickAnchor.current && line) {
         const r = caretAt(e.clientX, e.clientY);
         const from = clickAnchor.current;
@@ -879,20 +678,16 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       if (line) {
         const r = caretAt(e.clientX, e.clientY);
         if (r) anchor = { node: r.startContainer, offset: r.startOffset, line };
-        // Remembered for a shifted click, and for nothing else. It is where
-        // this press landed, in characters, so it survives the blur that a
-        // crossing selection does to the line.
+        // Kept in characters for a later shift-click, so it survives the blur a
+        // crossing selection causes.
         clickAnchor.current = { line, col: r ? offsetIn(line, r.startContainer, r.startOffset) : 0 };
         keySel.current = null;
         return;
       }
       clickAnchor.current = null;
       keySel.current = null;
-      // PRESSED IN THE MARGIN, on the `+` or `−` beside a line. That is not a
-      // miss: it is where a hand goes to take a whole block, and it selected
-      // one line too (measured on the real pane, 2026-08-27, before and after
-      // the drag was taken over for the text). Grabbing the margin means the
-      // whole of that line, so the drag starts at its front.
+      // A press in the margin, on the `+` or `−`, means the whole line, so the
+      // drag starts at its front.
       const row = el?.closest?.('.code-row') as HTMLElement | null;
       const first = row?.querySelector('.code-line') as HTMLElement | null;
       if (first) {
@@ -908,9 +703,8 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       const r = caretAt(e.clientX, e.clientY);
       const sel = window.getSelection();
       if (!r || !sel) return;
-      // THE FIRST TIME IT CROSSES OUT OF THE LINE, hand the keyboard back. The
-      // line she started in is an editing host and it still has focus, so a
-      // keystroke would land inside it while seven lines are selected.
+      // On the first crossing, blur the starting line, or a keystroke would land
+      // inside it while many lines are selected.
       if (!took) { took = true; (document.activeElement as HTMLElement | null)?.blur?.(); }
       sel.setBaseAndExtent(anchor.node, anchor.offset, r.startContainer, r.startOffset);
       e.preventDefault();
@@ -922,9 +716,8 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
       const range = sel.getRangeAt(0);
-      // ONE ROW IS THE BROWSER'S. It has no gutter in it and no header, so
-      // there is nothing here to improve and every reason not to interfere.
-      // The count is of every row touched, removed ones too: see linesToCopy.
+      // A copy inside one row is left to the browser. Every row touched is
+      // counted, removed ones too (see linesToCopy).
       const touched = allLines().filter((el) => range.intersectsNode(el));
       const plan = linesToCopy(touched.map((el) => !!el.closest('.code-row')?.classList.contains('cr-minus')));
       if (!plan) return;
@@ -934,8 +727,8 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       const texts = lines.map((el) => el.textContent ?? '');
       let from = first.contains(range.startContainer) ? offsetIn(first, range.startContainer, range.startOffset) : 0;
       let to = last.contains(range.endContainer) ? offsetIn(last, range.endContainer, range.endOffset) : texts[texts.length - 1].length;
-      // A range that stops exactly at the head of a line still counts that line
-      // as touched, and pasting a blank line she did not select is a small lie.
+      // A range that ends at the very start of a line, or starts at the very end
+      // of one, still touches it; that line was not selected.
       if (texts.length > 1 && to === 0) { texts.pop(); to = texts[texts.length - 1].length; }
       if (texts.length > 1 && from >= texts[0].length) { texts.shift(); from = 0; }
       e.clipboardData?.setData('text/plain', copiedText(texts, from, to));
@@ -956,60 +749,32 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
 
   useEffect(() => { onFileAt(current?.path ?? null); }, [current?.path]);
 
-  // WHERE IT OPENS, WHEN SHE ARRIVED BY PRESSING A FILE. The tree is built
-  // before this runs, so the file she named is found in the same list J and K
-  // walk and simply becomes the one she is standing on; the scroll below then
-  // brings it to the top the way it does for any other move. A file that is not
-  // in the change leaves her at the top, which is where the change opens
-  // anyway — but nothing should ever send one, because the chip is only drawn
-  // when the change holds the file (fileInChange, shared/work-lines.mjs).
+  // Opening at a file named by a chip. The chip is drawn only when the change
+  // holds the file (fileInChange, shared/work-lines.mjs).
   useEffect(() => {
     if (startAt) goTo(startAt);
   }, [startAt, startAtFrom, files]);
 
-  // The file she walked to comes to the top of the running column — UNLESS the
-  // tree only moved because she scrolled there herself, in which case pulling
-  // the column to the head of that file would yank the screen out from under
-  // her hand. `fromScroll` is which of the two happened.
+  // A file the user walked to comes to the top of the column, unless the tree
+  // moved because the user scrolled there, when pulling the column would yank
+  // the screen.
   useEffect(() => {
     if (!current) return;
-    // A JUMP SHE ASKED FOR IS KNOWN BY ITS OWN COUNTER. `fromScroll` is set
-    // inside a scroll's state update, and one queued in the same render as a
-    // jump flipped it back on after goTo cleared it, so Home marked the first
-    // file and left the code where it was (2026-10-04, twice in two).
+    // A jump is known by its own counter, because a scroll's state update
+    // queued in the same render can set `fromScroll` again after goTo cleared
+    // it.
     const asked = jump !== seenJump.current;
     seenJump.current = jump;
     const cameFromScroll = fromScroll.current && !asked;
     fromScroll.current = false;
     if (!cameFromScroll) {
-      // NOTHING OUTSIDE THE RUNNING COLUMN MOVES. This was `scrollIntoView`,
-      // which walks EVERY scrollable ancestor it can find and scrolls each one,
-      // so walking the files was also dragging the card behind the pane up and
-      // down. Setting one scrollTop moves one thing.
-      //
-      // The measurement is taken off the file's BLOCK and not its header,
-      // because the header is `position: sticky`: once the column has scrolled
-      // at all, the header's own rectangle is pinned to the top of the pane and
-      // reads as already-where-it-should-be, so the distance comes out zero.
-      //
-      // AND IT KEEPS PUTTING IT THERE UNTIL THE COLUMN STOPS MOVING, which is
-      // the fix of 2026-09-20.
-      //
-      // REPRODUCED before it was touched, on a real seventeen-file change:
-      // clicking main.mjs left the tree correctly marking main.mjs while
-      // working-from-your-phone.html was the file actually at the top of the
-      // screen. One jump in four landed on the wrong file.
-      //
-      // The cause is `content-visibility: auto` on every hunk. A hunk nobody has
-      // looked at stands at a guessed height, so the distance measured here is
-      // measured against a column that is about to change length: the scroll
-      // lands, the browser then draws what it just brought near the window, the
-      // real heights replace the guesses, and everything below slides. One
-      // setScrollTop cannot survive that, and nothing was re-asserting it.
-      //
-      // So it asks again on each of the next frames until the file's block has
-      // sat at the top for three in a row, and gives up after twenty so a column
-      // that genuinely cannot settle does not spin.
+      // Set one scrollTop rather than call scrollIntoView, which scrolls every
+      // scrollable ancestor and dragged the card behind the pane. Measure the
+      // file's block, not its header: the header is `position: sticky`, so its
+      // rectangle reads as already at the top. Hunks use `content-visibility:
+      // auto`, so real heights replace guessed ones after the scroll lands and
+      // the file slides. Re-assert each frame until the block has sat at the
+      // top for three frames, giving up after twenty.
       const body = bodyRef.current;
       const want = current.path;
       if (body && heads.current.get(want)) {
@@ -1032,12 +797,8 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
         requestAnimationFrame(put);
       }
     }
-    // AND THE ROW SHE IS STANDING ON STAYS ON SCREEN IN THE TREE. Eighteen files
-    // and their folders are taller than the tree, so from about the eighth file
-    // down the only mark saying where she was had scrolled out of sight, and
-    // walking read as the code moving for no reason. This runs whether she got
-    // there by key or by scrolling, because the question it answers — where am
-    // I — is the same one either way.
+    // Keep the current row visible in the tree, whether the user got there by
+    // key or by scrolling.
     const tree = treeRef.current;
     const row = treeRowRefs.current.get(current.path);
     if (tree && row) {
@@ -1048,28 +809,10 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
     }
   }, [current?.path, jump]);
 
-  // THE TREE FOLLOWS HER EYE, and before this it simply did not. Measured on
-  // the real pane: scrolled 12,240px down into renderer/src/fixtures.ts, the
-  // tree still highlighted the FIRST file of the change. That is not only a
-  // wrong highlight.
-  //
-  // AND IT NO LONGER MEASURES THE WHOLE CHANGE ONCE A FRAME TO DO IT. This
-  // asked every file header in the change where it was, on every animation
-  // frame of every scroll: eighteen getBoundingClientRect calls a frame, each
-  // one a forced layout on a column of 33,539 elements. In the sampling
-  // profiler on a real 2,562-row change, `getBoundingClientRect` was the
-  // single largest named cost of a scroll.
-  //
-  // Where a file starts only changes when the column changes SHAPE, which is
-  // not something scrolling does. So it is measured once and held, and taken
-  // again only when the column's own length moves under it; the scroll handler
-  // below says why that is the whole of the staleness.
-  //
-  // THE MEASUREMENT IS TAKEN OFF THE BLOCK AND NOT THE HEADER, for the reason
-  // the effect above already gives: the header is `position: sticky`, so once
-  // its file is crossing the top of the pane its own rectangle reads as pinned
-  // there rather than where the file begins. Off the block the number is the
-  // same whatever the scroll position, which is what makes it safe to hold.
+  // Where each file's block starts, so the tree can follow the scroll. Measured
+  // once and held, because a getBoundingClientRect per file per frame forces
+  // layout on every scroll. Taken off the block, not the sticky header, so the
+  // number does not depend on the scroll position.
   const offsets = useRef<number[]>([]);
   const measureFiles = useCallback(() => {
     const body = bodyRef.current;
@@ -1090,20 +833,11 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       if (frame) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
-        // THE ONE CASE THE HELD NUMBERS GO STALE, and it is a real one rather
-        // than a defensive one: a hunk the browser was skipping stands at a
-        // guessed height until it is drawn, so files below it move. Every such
-        // correction changes the length of the column, so asking the column how
-        // long it is catches all of them. It is one read rather than eighteen,
-        // and it is a number the browser has already worked out to be able to
-        // scroll at all. A ResizeObserver was tried here first and cost more
-        // layout than it saved, because each of its callbacks forces its own.
+        // The held offsets go stale only when a skipped hunk is drawn at its
+        // real height, and that always changes the column's length. A
+        // ResizeObserver cost more layout than it saved.
         if (body.scrollHeight !== tall) { tall = body.scrollHeight; measureFiles(); }
-        // A JUMP SHE ASKED FOR IS NOT A SCROLL SHE MADE. While the effect above
-        // is still putting a chosen file at the top, every frame of that lands
-        // here as a scroll event, and repointing `at` off it is what took her to
-        // a file she had not picked. The jump says where she is; this stands
-        // down until it lands.
+        // While a jump is landing, its own scroll events must not repoint `at`.
         if (holding.current) return;
         const n = fileOnScreen(offsets.current, body.scrollTop);
         setAt((was) => {
@@ -1113,15 +847,10 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
         });
       });
     };
-    // HER OWN HAND CANCELS THE JUMP AT ONCE, so she is never held anywhere. A
-    // wheel, a trackpad, a drag on the bar or an arrow key all mean she has
-    // taken over, and the file she was being carried to stops mattering
-    // mid-flight rather than fighting her for the next few frames.
+    // Any wheel, touch, press or key from the user cancels a jump at once.
     const release = () => { holding.current = null; };
-    // NOT THE KEY THAT ASKED FOR THE JUMP. That key reaches this listener too,
-    // and when it ran after the pane's own it cancelled the jump it had just
-    // started: End on the tree marked the last file while the code stayed at
-    // the top (2026-10-04). A key the pane acted on is marked handled.
+    // Except the key that started the jump, which reaches this listener too.
+    // A key the pane acted on is marked handled.
     const releaseKey = (e: KeyboardEvent) => { if (!e.defaultPrevented) holding.current = null; };
     body.addEventListener('scroll', onScroll, { passive: true });
     body.addEventListener('wheel', release, { passive: true });
@@ -1139,26 +868,14 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   }, [files, measureFiles]);
 
   const took = tookLabel(change);
-  // Recomputed off the ref every time the dirty stamp moves, which is on blur
-  // and after a save. A dot beside a file is the whole of the unsaved state:
-  // these rows carry no controls by design and this is not one.
   const unsaved = useMemo(() => new Set(dirtyFiles()), [dirtyAt, saving]);
 
   return (
     <div className="code-artifact">
-      {/* THE FILE PICKER, WHICH STANDS IN FOR THE TREE WHEN THE PANE IS NARROW.
-          w-481e93b9eb: the chevron sat in the wrong place, and the cause is that
-          the chevron was not ours. The select
-          was left at `appearance: auto`, so Chromium drew its own arrow to its own
-          metrics: a heavy filled glyph, jammed about 9px from the border and
-          sitting a couple of points below the middle, while every other chevron in
-          this app is the 13px, 1.5 stroke one `.code-caret` draws in the file tree.
-
-          So the box is ours now and the mark inside it is the SAME path the tree
-          uses, laid on the one number the control already has: the picker is inset
-          12px from the code column on both sides, so the chevron is inset 12px from
-          the picker. It is `aria-hidden` and takes no pointer, because the select
-          underneath it is still the whole control. */}
+      {/* The file picker stands in for the tree when the pane is narrow. The
+          chevron is drawn here, not by Chromium, so it matches the tree's; the
+          select underneath is still the whole control
+          (tests/the-file-picker-draws-its-own-chevron.test.mjs). */}
       <div className="code-file-pick">
         <select className="code-file-picker" aria-label="File to review" value={current?.path ?? files[0]?.path ?? ''} onChange={e => goTo(e.target.value)}>{files.map(file => <option key={file.path} value={file.path}>{file.path}{unsaved.has(file.path) ? ' · Unsaved' : ''}</option>)}</select>
         <svg className="code-pick-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
@@ -1178,11 +895,8 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
               onClick={() => {
                 const next = new Set(shut);
                 if (next.has(row.key)) next.delete(row.key); else next.add(row.key);
-                // FOLDING MOVES NOTHING BUT THE TREE. `at` indexes every file of
-                // the change, which folding does not touch, so she stays on the
-                // file she was reading whether the folder is hers or not. It
-                // used to index the drawn rows, and folding her own folder
-                // threw the code from 2,739 to 20,787 (2026-10-04).
+                // Folding moves only the tree, because `at` indexes `files`
+                // (tests/folding-the-tree-never-moves-the-code.test.mjs).
                 setShut(next);
               }}
             >
@@ -1198,31 +912,17 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
               className={`code-node code-file${current?.path === row.path ? ' is-at' : ''}${folded.has(row.path) ? ' is-folded' : ''}`}
               style={{ paddingLeft: 12 + row.depth * 13 }}
               title={row.path}
-              // Pressing a file is her ASKING to be taken there, so the column
-              // does move to it — the opposite of the scroll case above.
               onClick={() => goTo(row.path)}
             >
               <span className="code-node-name">{row.label}</span>
               {unsaved.has(row.path)
-                ? <span className="code-unsaved" title="Not saved yet. Press ⌘S.">•</span>
+                ? <span className="code-unsaved" title={`Not saved yet. Press ${chord('⌘S')}.`}>•</span>
                 : <Counts plus={row.plus} minus={row.minus} />}
             </button>
           )))}
         </div>
-        {/* THE KEYS THEMSELVES ARE A SHORTER LIST NOW. The text came off,
-            and then the keys it advertised, because J and K should not walk
-            between files and the pane only needs to work at a basic level, so
-            what is left is the arrows, ⌘S and esc — nothing that has to be
-            read off a strip to be found. What was here was four lines of
-            chrome on the surface
-            she opens to read code, and one of them was a lie: E was unbound
-            on 2026-08-24 (w-671391746a, it was stealing archive) and the
-            legend went on advertising it for two days.
-
-            NOTHING REPLACES IT. Do not put these back as a hover, a menu or a
-            "?" — the strip is not the discoverability problem. Getting INTO
-            this pane is, and that is the open question on w-c1d09f0638.
-         */}
+        {/* No key legend, here or as a hover, menu or "?"
+            (tests/the-code-pane-prints-no-key-legend.test.mjs). */}
       </div>
 
       <div className="code-body" ref={bodyRef}>
@@ -1238,20 +938,13 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
               <span className="code-file-name">{file.path.split('/').pop()}</span>
               <span className="code-file-where">{file.path.split('/').slice(0, -1).join('/')}</span>
               <Counts plus={file.plus} minus={file.minus} />
-              {/* It carries the word and not only a dot, because a dot alone goes
-                 unnoticed. It is drawn only while that file has something unsaved, so
-                 the approved row is unchanged the rest of the time.
-               */}
+              {/* The word, not only a dot, because a dot alone goes unnoticed. */}
               {unsaved.has(file.path) && (
-                <span className="code-file-unsaved" title="Not saved yet. Press ⌘S.">Unsaved</span>
+                <span className="code-file-unsaved" title={`Not saved yet. Press ${chord('⌘S')}.`}>Unsaved</span>
               )}
-              {/* NOTHING ELSE ON THIS ROW. Both of the things that were here were
-                 removed on purpose.
-               */}
+              {/* Nothing else goes on this row. */}
             </div>
-            {/* THE AGENT'S OWN SENTENCE IS NOT DRAWN OVER THE CHANGE, on purpose.
-               Do not put it back.
-             */}
+            {/* The agent's own sentence is not drawn over the change. */}
             {!folded.has(file.path) && (drawn.has(fileIndex) ? (
               <FileHunks
                 file={file}

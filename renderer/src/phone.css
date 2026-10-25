@@ -1,6 +1,6 @@
 /* THE PHONE LAYOUT. A phone reaches the inbox through the phone
    door (main/phone-link.mjs) and draws the same screens in a quarter of the
-   width. The desktop window cannot get this narrow (its minimum is 980), so
+   width. The desktop window cannot get this narrow (its minimum is 720), so
    nothing here ever reaches it.
 
    The shape: the frame goes edge to edge, everything you press sits in the top
@@ -204,8 +204,21 @@
   :root:root:root .th-table .row .has-act .th-when { visibility: visible; }
   :root:root:root .row .subject { text-decoration: none; }
 
-  /* The board has four columns; a phone shows them one under another. */
-  :root:root:root .th-board { grid-template-columns: minmax(0, 1fr); padding: 8px 12px 24px; width: auto; }
+  /* THE BOARD SWIPES SIDEWAYS, A COLUMN AT A TIME. Stacked one under another,
+     a 41-card first column buried the other three ("just shows one row and
+     can't scroll to the side to see more", 2026-10-13). Each column is a bit
+     narrower than the screen so the next one shows at the edge, a swipe snaps
+     to a column, and each column scrolls on its own. Its heading scrolls with
+     it and paints nothing: a sticky heading needed a fill, which drew a dark
+     band over the page's warm background ("this weird black background on
+     Needs You and In Progress"). */
+  :root:root:root .list-pane:has(> .th-board-wrap) { overflow: hidden; }
+  :root:root:root .th-board-wrap { height: 100%; min-height: 0; }
+  :root:root:root .th-board { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 86%; gap: 12px; align-items: stretch; height: 100%; width: auto; min-width: 0; padding: 0 12px; scroll-padding: 0 12px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
+  :root:root:root .th-board::-webkit-scrollbar { display: none; }
+  :root:root:root .th-col { overflow-y: auto; min-height: 0; scroll-snap-align: start; overscroll-behavior-y: contain; padding-bottom: calc(88px + var(--phone-foot)); scrollbar-width: none; }
+  :root:root:root .th-col::-webkit-scrollbar { display: none; }
+  :root:root:root .th-col-h { padding-top: 8px; }
 
   /* An open task: the words take the width, the right-hand rail goes. */
   :root:root:root .focus-pane { --ts-rail-w: 0px; --ts-panel-w: 0px; --read-w: 100%; }
@@ -239,7 +252,7 @@
   /* Its top bar is a back arrow and the thread's name in the reading type,
      not the desktop's "NEEDS YOU / NAME" crumb in capitals. */
   :root:root:root .thread-crumb-from, :root:root:root .thread-crumb-sep { display: none; }
-  :root:root:root .thread-crumb, :root:root:root .thread-crumb * { font-family: 'Geist', 'Avenir Next', -apple-system, sans-serif; text-transform: none; letter-spacing: 0; font-size: 15px; }
+  :root:root:root .thread-crumb, :root:root:root .thread-crumb * { font-family: 'Geist', 'Avenir Next', -apple-system, 'DejaVu Sans', sans-serif; text-transform: none; letter-spacing: 0; font-size: 15px; }
   :root:root:root .thread-crumb-name { color: var(--text); }
 
   /* A PAGE OPENED FROM A THREAD KEEPS A BAR ON A PHONE: a back arrow and the
@@ -297,30 +310,8 @@
      tap (phone-screen.ts installPictureZoom). Left to the page, a pinch did
      nothing and a drag scrolled ("I can't zoom in on them", 2026-10-12). */
   :root:root:root .doc-picture { touch-action: none; transform-origin: center center; transition: transform .05s linear; }
-  /* A PICTURE HOLDS ITS PLACE WHILE IT LOADS, as a soft shimmering box of a
-     picture's shape, and then fades in whole. Through the relay it arrives a
-     piece at a time, and it drew top-down, grew from nothing and pushed the
-     words under it ("as images load in mobile they look rather weird",
-     2026-10-12). The half-drawn picture and the broken mark are kept out of
-     sight (object-position and color) while the box shows; the state is set
-     by phone-files.ts watchPicture. */
-  :root:root:root .inline-image[data-phone-img="loading"],
-  :root:root:root .doc-picture[data-phone-img="loading"] {
-    display: block; width: 100%; max-width: 100%; height: auto; aspect-ratio: 4 / 3;
-    color: transparent; object-position: -99999px 0;
-    background: linear-gradient(100deg, rgba(255, 255, 255, .035) 30%, rgba(255, 255, 255, .09) 50%, rgba(255, 255, 255, .035) 70%) 0 0 / 200% 100%, var(--bg-raised, rgba(255, 255, 255, .03));
-    animation: phone-shimmer 1.3s linear infinite;
-  }
-  :root:root:root .attach-row img[data-phone-img="loading"] {
-    color: transparent; object-position: -99999px 0;
-    background: linear-gradient(100deg, rgba(255, 255, 255, .035) 30%, rgba(255, 255, 255, .09) 50%, rgba(255, 255, 255, .035) 70%) 0 0 / 200% 100%, var(--bg-raised, rgba(255, 255, 255, .03));
-    animation: phone-shimmer 1.3s linear infinite;
-  }
-  :root:root:root .inline-image[data-phone-img="ready"],
-  :root:root:root .doc-picture[data-phone-img="ready"],
-  :root:root:root .attach-row img[data-phone-img="ready"] { animation: phone-fade-in .25s ease-out; }
-  @keyframes phone-shimmer { from { background-position: 100% 0, 0 0; } to { background-position: -100% 0, 0 0; } }
-  @keyframes phone-fade-in { from { opacity: 0; } to { opacity: 1; } }
+  /* A picture's box while it loads is at the foot of this file, outside this
+     block, because the phone link in a computer's browser is wider than this. */
   /* The reply box's attach button, an icon like the box's others. */
   :root:root:root .compose-attach {
     flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; margin: 0 4px 0 -6px;
@@ -330,8 +321,34 @@
   /* The hint plates teach keys a phone does not have. */
   :root:root:root .hint-plate, :root:root:root .row-keys, :root:root:root .dock-card kbd { display: none !important; }
 
-  /* The toast sits above the bottom bar, across the width. */
-  :root:root:root .toast { left: 12px; right: 12px; width: auto; bottom: calc(var(--phone-tabs, 0px) + var(--phone-foot) + 12px); }
+  /* THE TOAST IS ONE SLIM LINE UNDER THE TOP BAR (2026-10-13). At the foot it
+     sat on the reply box and the tabs, the two things a phone is pressed on
+     most, and at two lines with drawn keys it was "rather large" for a phone
+     with no keyboard. Up here it covers only the first line of what is under
+     the bar. One line: where it went, then Undo as a word. The task's title
+     and the O key go; tapping the line still opens the task. */
+  :root:root:root .toast {
+    left: 12px; right: 12px; width: auto; max-width: none;
+    top: calc(env(safe-area-inset-top, 0px) + var(--phone-top, 56px) + 8px); bottom: auto;
+    display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 0 6px 0 14px;
+  }
+  :root:root:root .toast .toast-title { display: none; }
+  :root:root:root .toast .toast-line { flex: 1; min-width: 0; font-size: 13.5px; color: var(--text); }
+  :root:root:root .toast .toast-keys { gap: 0; }
+  :root:root:root .toast .toast-key:not(.toast-undo) { display: none; }
+  :root:root:root .toast .toast-key kbd { display: none; }
+  :root:root:root .toast .toast-undo { height: 40px; padding: 0 10px; }
+  :root:root:root .toast .toast-undo .toast-key-word { font-size: 13.5px; color: var(--accent); }
+  :root:root:root .toast .toast-clock { left: 14px; right: 14px; }
+  :root:root:root .app.composing .toast { top: calc(env(safe-area-inset-top, 0px) + var(--phone-top, 56px) + 8px); }
+
+  /* WHERE A REPLY WENT stands in the reply box's own flow, right above the
+     input, rather than over the page under the top bar. Back and Undo are
+     words to tap: a phone has no O or Z. */
+  :root:root:root .sent-line { margin: 0 0 8px; padding: 0 4px 0 14px; min-height: 40px; font-size: 13.5px; }
+  :root:root:root .sent-line kbd { display: none; }
+  :root:root:root .sent-line-key { height: 40px; padding: 0 10px; color: var(--text-dim); }
+  :root:root:root .sent-line-close { width: 40px; height: 40px; margin: 0; }
 
   /* The setup bar: its sentence over its buttons, not squeezed beside them. */
   :root:root:root .ps-bar { flex-wrap: wrap; gap: 10px; padding: 12px 16px; }
@@ -373,7 +390,7 @@
   :root:root:root .settings-screen .set-nav-ico { display: none; }
   :root:root:root .settings-screen .set-nav-item { flex: none; width: auto; white-space: nowrap; margin: 0; padding: 0 12px; height: 36px; }
   :root:root:root .settings-screen .set-nav-item + .set-nav-item { margin-top: 0; }
-  :root:root:root .settings-screen .set-pane { flex: 1; min-height: 0; }
+  :root:root:root .settings-screen .set-pane { flex: 1; min-height: 0; padding: 0; }
   :root:root:root .settings-screen .set-inner:not(.instructions-page) { padding: 20px 16px 120px; max-width: none; }
   :root:root:root .settings-screen .set-phone-qr { flex-direction: column; align-items: flex-start; }
 
@@ -537,3 +554,6 @@
   :root:root:root #phone-alerts-ask button { font: inherit; height: 36px; padding: 0 14px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--wash-strong); color: var(--text); }
   :root:root:root #phone-alerts-ask button.quiet { background: none; color: var(--text-dim); }
 }
+
+/* A picture's placeholder while it loads is in styles.css: every window has it. */
+

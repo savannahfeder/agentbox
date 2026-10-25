@@ -69,8 +69,12 @@ describe('where the offer is drawn', () => {
     expect(focus.indexOf('<ThreadsMade')).toBeLessThan(focus.indexOf('{offerInPane && ('));
   });
 
+  // The strip answers to the offer alone. What makes an offer has since grown
+  // a second half (../renderer/src/ship-offer.ts), so this pins the thing that
+  // was wrong rather than the words that were right at the time.
   it('no longer waits on the reply box being open', () => {
-    expect(focus).toMatch(/const stripShown = showOptions;/);
+    expect(focus).toMatch(/const stripShown = showOptions(\s*\|\|\s*\w+)?;/);
+    expect(focus).not.toMatch(/const stripShown = [^;]*replyOpen/);
     expect(focus).not.toMatch(/const stripShown = showOptions && \(artifactView/);
   });
 

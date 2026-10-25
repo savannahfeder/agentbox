@@ -10,6 +10,7 @@ import type { UsageLimit } from './usage.d.mts';
 
 export declare function resetAt(text: string, now?: number, zoneNow?: string | null): number | null;
 export declare function readUsage(text: string | null | undefined, now?: number, zoneNow?: string | null): UsageLimit[];
+export declare function readUsageReport(value: unknown, now?: number): UsageLimit[];
 export declare function pillText(
   limits: UsageLimit[] | null | undefined,
   now?: number,

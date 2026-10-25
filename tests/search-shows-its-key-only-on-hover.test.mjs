@@ -33,8 +33,10 @@ describe('the Search button prints no key', () => {
   it('and no bare "/" after its word either', () => {
     expect(searchButton()).not.toMatch(/<\/span>\s*\/\s*$/);
   });
-  it('still says Search, so it is only the key that went', () => {
-    expect(searchButton()).toMatch(/<span>Search<\/span>/);
+  // The word went too, on 2026-10-14 (w-3c51d02de5): the button is the
+  // magnifier alone and says "Search threads" to a screen reader instead.
+  it('is still named, so it is only the key that went', () => {
+    expect(searchButton()).toMatch(/aria-label="Search threads"/);
   });
   it('and the style for the keycap went with it', () => {
     expect(css).not.toMatch(/\.th-search kbd/);

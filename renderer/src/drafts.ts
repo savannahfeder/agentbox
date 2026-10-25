@@ -67,6 +67,58 @@ export function clearDraft(item: ItemRef, store?: DraftStore): void {
   const s = backing(store);
   s.removeItem(draftKey(item));
   s.removeItem(draftImagesKey(item));
+  s.removeItem(draftPickKey(item));
+}
+
+/* ------------------------------- the pick -------------------------------- */
+
+// THE MODEL AND THE LEVEL ARE PART OF THE UNSENT MESSAGE TOO, and they were
+// the third thing the box lost by closing, after the words and the images.
+// Same fix as those: they live beside the words rather than in the composer's
+// own state, which dies with the box, and under their own key, so nothing she
+// can type into the box can be read as a pick.
+//
+// ABSENT MEANS UNTOUCHED, which is not a pick of nothing: the box then opens on
+// the thread's own model and the send writes nothing at all.
+
+/** A model and a level as the reply box holds them. `null` is the engine's own. */
+export interface DraftPick {
+  model: string | null;
+  effort: string | null;
+  /** The coding agent, when her pick moved the thread to the other one
+   *  (w-e1a42f6b21). Kept with the model so a fold loses neither. */
+  engine?: string | null;
+}
+
+export function draftPickKey(item: ItemRef): string {
+  return `zero.draftpick.${item.product}:${item.id}`;
+}
+
+/** Her pick, or null when she has not opened the drawer on this thread. */
+export function readDraftPick(item: ItemRef, store?: DraftStore): DraftPick | null {
+  let raw: string | null = null;
+  try { raw = backing(store).getItem(draftPickKey(item)); } catch { return null; }
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const word = (v: unknown) => (typeof v === 'string' && v ? v : null);
+    // The agent only when there is one: a pick that never crossed carries no
+    // engine at all, which is what every reader of this already expects.
+    const engine = word(parsed.engine);
+    return { model: word(parsed.model), effort: word(parsed.effort), ...(engine ? { engine } : {}) };
+  } catch {
+    return null;
+  }
+}
+
+/** Keep her pick, or take it off the box with null. */
+export function saveDraftPick(item: ItemRef, pick: DraftPick | null, store?: DraftStore): void {
+  const s = backing(store);
+  try {
+    if (!pick) s.removeItem(draftPickKey(item));
+    else s.setItem(draftPickKey(item), JSON.stringify({ model: pick.model ?? null, effort: pick.effort ?? null, ...(pick.engine ? { engine: pick.engine } : {}) }));
+  } catch { /* a refused store is not a reason to lose the send */ }
 }
 
 /* ------------------------------ the images ------------------------------- */
@@ -87,7 +139,7 @@ export function readDraftAttachments(item: ItemRef, store?: DraftStore): DraftAt
     // image, which reads as the app having damaged her paste.
     return parsed
       .filter((a) => a && typeof a === 'object' && typeof a.name === 'string' && (a.dataBase64 || a.srcPath))
-      .map((a) => ({ name: a.name, dataBase64: a.dataBase64, srcPath: a.srcPath, image: !!a.image }));
+      .map((a) => ({ name: a.name, dataBase64: a.dataBase64, srcPath: a.srcPath, image: !!a.image, ...(typeof a.draftId === 'string' ? { draftId: a.draftId } : {}) }));
   } catch {
     return [];
   }
@@ -254,6 +306,8 @@ export interface DraftAttachment {
   dataBase64?: string;
   srcPath?: string;
   image: boolean;
+  /** A voice note's id in the store of unsent notes, so it is never put back twice. */
+  draftId?: string;
 }
 
 export interface ComposeDraft {
@@ -265,6 +319,8 @@ export interface ComposeDraft {
   when: { runAt: number; repeat: unknown };
   /** Images that did not fit, so the card can say so instead of coming back short. */
   dropped: number;
+  /** When Send was pressed on these words, while that send has not landed. */
+  sendingAt?: number;
 }
 
 export const COMPOSE_DRAFT_KEY = 'zero.draft.compose';
@@ -309,7 +365,29 @@ export function readComposeDraft(store?: DraftStore): ComposeDraft {
     priority: typeof d.priority === 'string' ? d.priority : null,
     when: { runAt: typeof when.runAt === 'number' ? when.runAt : 0, repeat: when.repeat ?? null },
     dropped: typeof d.dropped === 'number' && d.dropped > 0 ? d.dropped : 0,
+    ...(typeof d.sendingAt === 'number' ? { sendingAt: d.sendingAt } : {}),
   };
+}
+
+/** As long as an ordinary send takes; past it the app says it is not answering. */
+export const COMPOSE_SENDING_GRACE_MS = 6_000;
+
+/** Stamp the written copy as being sent, and return it. */
+export function markComposeDraftSending(store?: DraftStore, now = Date.now()): ComposeDraft {
+  const d = readComposeDraft(store);
+  if (composeDraftIsEmpty(d)) return d;
+  return saveComposeDraft({ ...d, sendingAt: now }, store);
+}
+
+/**
+ * What a NEW card opens with. Words whose send is still in flight are not a
+ * draft yet, or N straight after Send opens on the task just sent; once the
+ * send has hung past the grace they come back, as a frozen app needs.
+ */
+export function openingComposeDraft(store?: DraftStore, now = Date.now()): ComposeDraft {
+  const d = readComposeDraft(store);
+  if (d.sendingAt && now - d.sendingAt < COMPOSE_SENDING_GRACE_MS) return { ...EMPTY_COMPOSE_DRAFT };
+  return d;
 }
 
 /** Nothing typed, nothing pasted and nothing set is not a draft. */
@@ -364,6 +442,26 @@ export function clearComposeDraft(store?: DraftStore): void {
 }
 
 /**
+ * The card's words go when the send LANDS, not when Send is pressed.
+ *
+ * They used to be taken at the press (w-461fbd8d2d), because the card closes
+ * before the computer answers. That leaves the only copy inside a call that
+ * has not returned, which is nowhere at all for as long as the app takes to
+ * answer, and the app can stop answering.
+ *
+ * So the copy outlives the press, and this drops it once something has come
+ * back, unless the box holds something else by then. Same rule as
+ * `restoreComposeDraft` below: a card opened and typed into in the meantime is
+ * never emptied by an older send landing.
+ */
+export function dropComposeDraft(sent: ComposeDraft, store?: DraftStore): void {
+  const now = readComposeDraft(store);
+  if (now.text !== sent.text) return;
+  if (now.attachments.length !== sent.attachments.length) return;
+  clearComposeDraft(store);
+}
+
+/**
  * Undo of a NEW TASK: the whole card goes back, exactly as she sent it.
  *
  * Both halves of this were broken. Sending was the one action in the app that put
@@ -388,7 +486,13 @@ export function clearComposeDraft(store?: DraftStore): void {
  */
 export function restoreComposeDraft(draft: ComposeDraft, store?: DraftStore): boolean {
   if (!draft || composeDraftIsEmpty(draft)) return false;
-  if (!composeDraftIsEmpty(readComposeDraft(store))) return false;
-  saveComposeDraft(draft, store);
+  const now = readComposeDraft(store);
+  // A send that failed still holds its stamped copy: it comes back as a draft.
+  if (now.sendingAt && now.text === draft.text) {
+    saveComposeDraft({ ...now, sendingAt: undefined }, store);
+    return true;
+  }
+  if (!composeDraftIsEmpty(now)) return false;
+  saveComposeDraft({ ...draft, sendingAt: undefined }, store);
   return true;
 }

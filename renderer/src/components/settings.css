@@ -25,7 +25,7 @@
 .set-search {
   display: flex; align-items: center; gap: 8px; height: 32px; margin-top: 8px; padding: 0 10px;
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--wash);
-  color: var(--text-faint); cursor: text;
+  color: var(--text-faint); cursor: text; -webkit-app-region: no-drag;
 }
 .set-search:focus-within { border-color: var(--line-strong); }
 .set-search svg { width: 15px; height: 15px; flex: none; }
@@ -98,28 +98,46 @@
 .set-picker-bare { gap: 0; }
 .set-row-ctl .set-picker-menu { left: auto; right: 0; }
 
-/* A usage window: the bar, then how much of it is spent. */
-.set-usage { display: inline-flex; align-items: center; gap: 12px; }
-.set-usage .usage-meter.wide { width: 140px; }
-.set-usage-pct { min-width: 64px; text-align: right; font-size: 12.5px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
-
-/* THE ACCOUNT IN USE CANNOT BE MISSED. One cue was missable and she proved it,
-   so the live row says it four ways at once: a brighter film across the whole
-   row, the address in full white, a rule down its left edge, and the words
-   In use beside the address.
-   THE RULE IS THE APP'S SELECTION BAR, `--select-bar`, the orange a selected
-   inbox row wears, and the row carrying it is SQUARE AND INSET: it stops 8px
-   short of the card's sides and 6px short of its top and bottom, so the bar
-   never meets the card's rounded corner. The first drawing ran it to the edge,
-   where the corner bent it (her picture, 2026-10-05). */
-.settings-screen[data-pane] .set-plate > .set-acct-row.on {
-  margin: 6px -10px; padding: 12px 10px 12px 8px; border-radius: 0;
-  background: var(--film-strong); border-left: 2px solid var(--select-bar);
+/* SESSION, WEEK AND FABLE, the same meters on every account, each ending with
+   when it resets. One grid for all the rows, so the bars and the times line up.
+   A full one turns its time to the accent. */
+.acct-meters { display: grid; grid-template-columns: 56px 1fr auto auto; align-items: center; gap: 10px; margin-top: 16px; font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.acct-meter { display: contents; }
+.acct-meter-word { color: var(--text-faint); }
+.acct-meter .usage-meter { width: auto; }
+.acct-meter-pct { text-align: right; }
+.acct-meter-when { padding-left: 4px; color: var(--text-faint); text-align: right; white-space: nowrap; }
+.acct-meter.full .acct-meter-when { color: var(--accent); }
+.acct-tile-cmd { margin-top: 10px; }
+.acct-meters-none { margin-top: 16px; font-size: 12px; color: var(--text-faint); }
+.acct-place-act { display: inline-flex; align-items: center; gap: 12px; }
+.acct-checked { font-size: 12px; font-weight: 400; color: var(--text-faint); }
+.acct-reading-time { margin-top: 12px; font-size: 12px; color: var(--text-faint); }
+/* Switching is a button: as grey text on the state line it read as a status.
+   Filled, because nothing else on a tile is; held to the address's row. */
+.settings-screen[data-pane] .acct-switch {
+  flex: none; display: inline-flex; align-items: center; height: 24px; margin: -2px 0 -2px auto; padding: 0 10px;
+  border: 0; border-radius: var(--tag-radius); background: var(--line); color: var(--text); font: inherit; font-size: 12.5px; line-height: 1; white-space: nowrap; cursor: pointer;
 }
-.settings-screen[data-pane] .set-plate > .set-acct-row.on .set-row-label { color: var(--text); }
-/* An inset row carries its own edges, so the hairlines either side of it go. */
-.settings-screen[data-pane] .set-plate > .set-acct-row.on + .set-row,
-.settings-screen[data-pane] .set-plate > .set-row + .set-acct-row.on { border-top-color: transparent; }
+.settings-screen[data-pane] .acct-switch:hover { background: var(--line-strong); }
+/* TILES: an account each, two to a line, every one the same shape here and in
+   the cloud. The one in use is lifted by its fill and its IN USE, not by a
+   different edge, so the tiles line up. */
+.acct-place-line { margin: -4px 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--text-dim); }
+.acct-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.acct-tile { padding: 16px 18px 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--wash); text-align: left; }
+.acct-tile.on { background: var(--film-strong); border-color: var(--line-strong); }
+.acct-tile-head { display: flex; align-items: center; gap: 12px; min-height: 20px; }
+.acct-tile-name { min-width: 0; font-size: 13.5px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct-tile-head .set-badge { flex: none; margin-left: -2px; }
+.acct-tile-about { display: flex; align-items: center; gap: 12px; height: 20px; margin-top: 7px; font-size: 12px; color: var(--text-faint); }
+.acct-tile-about > span:not(.acct-place) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A place is a status in IN USE's label voice. No box: boxed, it read as a button not yet pressed. */
+.acct-place { flex: none; display: inline-flex; align-items: center; gap: 5px; color: var(--text-dim); font-family: var(--mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+.acct-tile-about .acct-cloud-act { flex: none; font-size: 12px; }
+.acct-tile-trouble { margin-top: 16px; font-size: 12px; line-height: 1.5; color: var(--text-dim); }
+.acct-tile-add { grid-column: 1 / -1; padding: 11px 16px; border-style: dashed; background: none; color: var(--text-faint); font: inherit; font-size: 13px; text-align: center; cursor: pointer; }
+.acct-tile-add:hover { color: var(--text); }
 /* IN USE is said in the app's label voice, the small mono capitals the
    new-task card's TO and MODEL wear, in the accent. */
 .set-badge {
@@ -127,6 +145,7 @@
   font-family: var(--mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--accent);
 }
+.set-badge.set-badge-off { color: var(--text-faint); }
 
 /* ------------------------------- controls ---------------------------------
    THE CONTROLS ARE THE NEW-TASK CARD'S (2026-10-05). The ones this screen had
@@ -223,3 +242,13 @@
 .set-phone-qr { display: flex; gap: 18px; align-items: center; }
 .set-phone-qr img { width: 168px; height: 168px; flex: none; background: #fff; border-radius: 10px; padding: 8px; }
 .set-phone-qr code { font-size: 11px; opacity: .7; word-break: break-all; }
+
+/* WHICH PROJECTS GO TO HER PHONE (Settings › Phone): the dropdown's own rows,
+   a line of small print under the two choices and a tick beside each project. */
+.set-phone-menu { min-width: 260px; max-height: 360px; overflow-y: auto; }
+.set-phone-row { display: flex; align-items: center; gap: 9px; white-space: normal; }
+.set-phone-row-text { display: flex; flex-direction: column; gap: 1px; }
+.set-phone-row-text small { font-size: 11.5px; font-weight: 400; color: var(--text-faint); }
+.set-phone-rule { height: 1px; background: var(--line); margin: 4px 6px; }
+.set-phone-tick { border-radius: 3px; }
+.set-phone-tick.on { background: var(--accent); border-color: var(--accent); color: var(--find-current-ink, #fff); }

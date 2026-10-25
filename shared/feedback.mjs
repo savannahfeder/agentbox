@@ -5,6 +5,7 @@
 //
 // Words, files, or both, and never nothing. The size limit keeps one request
 // well inside what the mail provider takes as attachments.
+import { Name } from './product-name.mjs';
 
 export const FEEDBACK_LIMITS = Object.freeze({
   text: 20_000,
@@ -41,4 +42,28 @@ export function feedbackPayload({ text = '', files = [], app = {} } = {}) {
     files: (files ?? []).map(({ name, type, data }) => ({ name: String(name ?? 'file'), type: String(type || 'application/octet-stream'), data: String(data ?? '') })),
     app: { version: String(app.version ?? ''), os: String(app.os ?? '') },
   };
+}
+
+// Answers { ok: true } or { ok: false, error } with the error as a sentence.
+// It never throws, so the card always has something to say. The Mac sends
+// through it (main/feedback.mjs) and so does the phone website (cloud-bridge.ts).
+export async function sendFeedback({ url, payload, fetchImpl = globalThis.fetch, timeoutMs = 60_000 }) {
+  if (!url) return { ok: false, error: `Feedback is not set up in this copy of ${Name}.` };
+  // Checked again here, off the bytes that would actually travel, since the
+  // card is not the last word on what leaves the device.
+  const sized = (payload?.files ?? []).map((f) => ({ size: Math.floor((String(f?.data ?? '').length * 3) / 4) }));
+  const check = checkFeedback({ text: payload?.text, files: sized });
+  if (!check.ok) return { ok: false, error: check.reason };
+  try {
+    const res = await fetchImpl(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (res?.ok) return { ok: true };
+    return { ok: false, error: 'It did not send. Try again in a moment.' };
+  } catch {
+    return { ok: false, error: 'It did not send. Check your connection and try again.' };
+  }
 }

@@ -1,0 +1,21 @@
+{
+  "//": "Expo's tsconfig.base, written out: the root test run reads this file without mobile/node_modules installed.",
+  "compilerOptions": {
+    "allowJs": true,
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "module": "preserve",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "customConditions": ["react-native"],
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "target": "ESNext",
+    "types": ["node"],
+    "strict": true
+  },
+  "include": ["src", "app.config.ts", "expo-env.d.ts"],
+  "exclude": ["node_modules", "metro.config.js", "android", "ios"]
+}

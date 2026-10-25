@@ -191,8 +191,10 @@ describe('a Mac with no agent files is offered nothing at all', () => {
     expect(card).toMatch(/read && !some \? \(alreadyIn > 0 \? CARD\.headAllIn : CARD\.headNone\) : LIST\.head/);
     // The line over the list is not said over an empty card, because there is
     // nothing under it and it would be the same contradiction in a smaller
-    // typeface.
-    expect(card).toMatch(/read && some && <p className="ia-line">/);
+    // typeface. And not over a search either (w-6418318cd5): "From the last 10
+    // days" over a list of matches from July is the same sentence being wrong
+    // in the other direction.
+    expect(card).toMatch(/read && some && !searching && <p className="ia-line">/);
     // And the key the walk teaches still does something on it.
     expect(card).toMatch(/if \(walk && !some\) \{ walk\.onSkip\(\); return; \}/);
   });
@@ -260,7 +262,7 @@ describe('the coaching card promises no dead key either', () => {
     // (hers: "it's actually R to reply"). The app answers R in an open thread.
     const said = [...new Set([...keys, ...tourKeys])];
     expect(said.sort()).toEqual(['1', 'N', 'E', 'L', 'B', 'R', '↵', '⌘K', '⌘↵', '⇥'].sort());
-    expect(app).toContain("else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setOpenDoc(null); setModal('reply'); }");
+    expect(app).toContain("else if (e.key === \'r\' || e.key === \'R\') { e.preventDefault(); setModal(\'reply\'); if (modal === \'reply\') focusTheReplyBox(); }");
   });
 
   it('B flips the inbox to the board, which is what the board beat says', () => {
@@ -312,11 +314,18 @@ describe('the coaching card promises no dead key either', () => {
     // (shared/first-run-practice.mjs) and a digit on a focused row picks AND
     // sends. If this ever became select-then-Enter the card would be promising
     // one key for a two-key move.
-    expect(app).toMatch(/\/\^\[1-9\]\$\/\.test\(e\.key\)\) pickOption\(focused, Number\(e\.key\)\)/);
+    // IT MAY BE HELD AND IT MAY NOT BECOME TWO KEYS. The branch holds the key
+    // for 800ms after the app itself puts a new thread in front of you
+    // (renderer/src/pick-settles.ts, F-31), which the walk never does: it opens
+    // its own row. Anywhere else the press still picks AND sends.
+    expect(app).toMatch(/\/\^\[1-9\]\$\/\.test\(e\.key\)\) \{[\s\S]{0,400}pickOption\(focused, Number\(e\.key\)\);/);
+    expect(app).not.toMatch(/\/\^\[1-9\]\$\/\.test\(e\.key\)\) \{[\s\S]{0,400}setOptionSel\(/);
   });
 
-  it('C opens the compose card, which is what beat four says it does', () => {
-    expect(app).toMatch(/case 'c': case 'C':[\s\S]{0,80}setModal\('compose'\)/);
+  // N, which beat four says. C was its twin until it turned to the cloud
+  // (tests/the-cloud-is-on-or-off-with-one-key).
+  it('N opens the compose card, which is what beat four says it does', () => {
+    expect(app).toMatch(/case 'n': case 'N':[\s\S]{0,80}setModal\('compose'\)/);
   });
 
   it('↵ opens the row under the cursor, which is what beat six says', () => {
@@ -329,10 +338,13 @@ describe('the coaching card promises no dead key either', () => {
 
   it('still handles plain Enter on the welcome, which draws it', () => {
     expect(walk).toContain("if (run.step !== 'welcome') return;");
-    // Enter goes through `begin`, which asks the plan on a Mac with nothing set
-    // up (w-9f6975906c) and otherwise starts the walk, so it always moves.
+    // Enter goes through `begin`, which always moves. It used to branch here,
+    // to the plan question on a computer with nothing set up (w-9f6975906c)
+    // and past it on every other one; since w-e217e577e5 both go to the same
+    // step, which asks the question or says what it found. The claim this
+    // makes is the one that matters either way: the press leads somewhere.
     expect(walk).toMatch(/e\.key === 'Enter'[\s\S]{0,60}begin\(\)/);
-    expect(walk).toMatch(/const begin = async \(\) => \{[\s\S]{0,120}onStep\('plan'\)[\s\S]{0,40}else onEvent\(\{ t: 'start' \}\)/);
+    expect(walk).toMatch(/const begin = async \(\) => \{[\s\S]{0,200}onStep\('plan'\)/);
   });
 });
 

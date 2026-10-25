@@ -31,7 +31,9 @@ let appDir;
 
 const layPlan = (at, tier) => {
   fs.mkdirSync(path.dirname(at), { recursive: true });
-  fs.writeFileSync(at, JSON.stringify({ oauthAccount: { organizationRateLimitTier: tier } }));
+  // A real sign-in always carries an email and an account id; a folder
+  // without them is not counted as an account.
+  fs.writeFileSync(at, JSON.stringify({ oauthAccount: { emailAddress: 'you@example.com', accountUuid: `uuid-${at}`, organizationRateLimitTier: tier } }));
 };
 
 const layConfig = (over) => fs.writeFileSync(path.join(appDir, 'zero.config.json'), JSON.stringify(over));

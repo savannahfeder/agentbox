@@ -59,7 +59,10 @@ console.log('stub: ' + a.join(' '));
  *   shell     the login shell ($SHELL)
  *   rc        { '.zshrc': '...' } profile files written into the fake home
  *   launch    extra variables in the launch environment
- *   expect    { claude: { found, from?, certain? , runs? }, codex: {...}, scrubbed?: [names] }
+ *   platform  'darwin' unless it says 'linux' (a launcher entry, not the Dock)
+ *   expect    { claude: { found, from?, certain? , runs? }, codex: {...}, scrubbed?: [names],
+ *               bootPath?: [folders the app's PATH must hold],
+ *               workerEnv?: { NAME: value every found engine's worker must be handed } }
  *   known     a product gap already understood. The shape still runs and prints
  *             KNOWN instead of FAIL, so the run stays usable as a gate while
  *             the gap waits on its own fix. Take it off when the fix lands.
@@ -186,6 +189,86 @@ export const SHAPES = [
     expect: { claude: { found: false, certain: false }, codex: { found: false, certain: false } },
   },
   {
+    name: 'slow-zshrc-homebrew-in-zprofile',
+    why: 'A .zshrc slower than the app will wait, with Homebrew on PATH from .zprofile as its installer says. The app must still find what .zprofile gives and hand it to workers.',
+    files: [{ at: '~/brew/bin/claude', kind: 'native', engine: 'claude' }],
+    rc: { '.zprofile': 'export PATH="$HOME/brew/bin:$PATH"\n', '.zshrc': 'sleep 8\n' },
+    expect: { claude: { found: true, from: 'shell', runs: true }, codex: { found: false, certain: false }, bootPath: ['~/brew/bin'] },
+  },
+  {
+    name: 'tmux-autostart-in-zshrc',
+    why: '`[ -z "$TMUX" ] && exec tmux` in .zshrc. With no terminal tmux exits 1 before the app\'s question runs, which read as "not installed" and lost the whole PATH.',
+    files: [
+      { at: '~/brew/bin/tmux', kind: 'text', text: '#!/bin/sh\necho "open terminal failed: not a terminal" >&2\nexit 1\n' },
+      { at: '~/brew/bin/claude', kind: 'native', engine: 'claude' },
+    ],
+    rc: { '.zprofile': 'export PATH="$HOME/brew/bin:$PATH"\n', '.zshrc': '[ -z "$TMUX" ] && exec tmux\n' },
+    expect: { claude: { found: true, from: 'shell', runs: true }, codex: { found: false, certain: false }, bootPath: ['~/brew/bin'] },
+  },
+  {
+    name: 'tmux-autostart-tool-only-in-zshrc',
+    why: 'The same tmux line, and Claude Code on PATH only through .zshrc. No shell the app can ask gets that far, so it must not be called missing.',
+    files: [
+      { at: '~/brew/bin/tmux', kind: 'text', text: '#!/bin/sh\necho "open terminal failed: not a terminal" >&2\nexit 1\n' },
+      { at: '~/tools/bin/claude', kind: 'native', engine: 'claude' },
+    ],
+    rc: { '.zprofile': 'export PATH="$HOME/brew/bin:$PATH"\n', '.zshrc': 'export PATH="$HOME/tools/bin:$PATH"\n[ -z "$TMUX" ] && exec tmux\n' },
+    expect: { claude: { found: false, certain: false }, codex: { found: false, certain: false } },
+  },
+  {
+    name: 'exec-fish-in-zshrc',
+    why: '`exec fish` at the end of .zshrc, fish reading its commands from a closed stdin and exiting 0 having printed nothing.',
+    files: [
+      { at: '~/brew/bin/fish', kind: 'text', text: '#!/bin/sh\ncat >/dev/null\nexit 0\n' },
+      { at: '~/brew/bin/claude', kind: 'native', engine: 'claude' },
+    ],
+    rc: { '.zprofile': 'export PATH="$HOME/brew/bin:$PATH"\n', '.zshrc': 'exec fish\n' },
+    expect: { claude: { found: true, from: 'shell', runs: true }, codex: { found: false, certain: false }, bootPath: ['~/brew/bin'] },
+  },
+  {
+    name: 'company-proxy-in-zshrc',
+    why: 'HTTPS_PROXY and the company certificate exported in .zshrc, where Claude Code\'s own error says to put them. A Dock launch never sees them, and without them every request fails.',
+    files: [
+      { at: '~/.local/bin/claude', kind: 'native', engine: 'claude' },
+      { at: '~/.local/bin/codex', kind: 'native', engine: 'codex' },
+      { at: '~/certs/corp.pem', kind: 'text', text: 'not a real certificate\n' },
+    ],
+    rc: { '.zshrc': 'export HTTPS_PROXY=http://proxy.corp.test:3128\nexport NO_PROXY=localhost,127.0.0.1\nexport NODE_EXTRA_CA_CERTS="$HOME/certs/corp.pem"\n' },
+    expect: {
+      claude: { found: true, runs: true }, codex: { found: true, runs: true },
+      workerEnv: { HTTPS_PROXY: 'http://proxy.corp.test:3128', NO_PROXY: 'localhost,127.0.0.1', NODE_EXTRA_CA_CERTS: '~/certs/corp.pem' },
+    },
+  },
+  {
+    name: 'dock-launch-has-no-language',
+    why: 'launchd hands a Dock app no LANG (read off a real Dock-launched Electron app). Without one, Ruby reads files as US-ASCII and sed counts bytes, unlike the person\'s own Terminal.',
+    files: [
+      { at: '~/.local/bin/claude', kind: 'native', engine: 'claude' },
+      { at: '~/.local/bin/codex', kind: 'native', engine: 'codex' },
+    ],
+    // Which UTF-8 depends on this Mac's /etc/zprofile, which the fake root does
+    // not replace: macOS 26 sets C.UTF-8 there, and the app's own fallback is
+    // en_US.UTF-8. Either is what the person needs.
+    expect: { claude: { found: true, runs: true }, codex: { found: true, runs: true }, workerEnv: { LANG: /\.UTF-8$/ } },
+  },
+  {
+    name: 'linux-launcher-nvm-in-bashrc',
+    why: 'Linux, started from the launcher entry. The desktop session read ~/.profile without -i, so the nvm lines in ~/.bashrc (below Ubuntu\'s interactive guard) never reached it.',
+    platform: 'linux',
+    shell: '/bin/bash',
+    launch: { PATH: '/usr/local/bin:/usr/bin:/bin' },
+    files: [
+      { at: '~/.local/bin/claude', kind: 'native', engine: 'claude' },
+      { at: '~/.nvm/versions/node/v22.14.0/bin/node', kind: 'node' },
+      { at: '~/.nvm/versions/node/v22.14.0/bin/codex', kind: 'npm', engine: 'codex' },
+    ],
+    rc: {
+      '.profile': 'if [ -n "$BASH_VERSION" ]; then\n  [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"\nfi\n',
+      '.bashrc': 'case $- in\n  *i*) ;;\n  *) return;;\nesac\nexport NVM_DIR="$HOME/.nvm"\nexport PATH="$NVM_DIR/versions/node/v22.14.0/bin:$PATH"\n',
+    },
+    expect: { claude: { found: true, runs: true }, codex: { found: true, from: 'shell', runs: true }, bootPath: ['~/.nvm/versions/node/v22.14.0/bin'] },
+  },
+  {
     name: 'claude-only-inside-the-desktop-app',
     why: 'Claude Code only as the copy the Claude desktop app keeps for itself.',
     files: [{ at: '~/Library/Application Support/Claude/claude-code/2.1.999/claude.app/Contents/MacOS/claude', kind: 'native', engine: 'claude' }],
@@ -270,7 +353,9 @@ export function build(shape, { root = fs.mkdtempSync(path.join(os.tmpdir(), 'age
   const realPath = (value) => String(value ?? '').split(':').filter(Boolean).map(toReal).join(':');
 
   // The environment a Dock launch hands the app: launchd's, and nothing from
-  // the terminal this check happens to run in.
+  // the terminal this check happens to run in. NO LANG: it used to say
+  // en_US.UTF-8 here, and a real Dock-launched Electron app has none (read off
+  // one with `ps eww`, 2026-10-15), so every shape was hiding that.
   const launchEnv = {
     HOME: home,
     CFFIXED_USER_HOME: home,
@@ -279,8 +364,7 @@ export function build(shape, { root = fs.mkdtempSync(path.join(os.tmpdir(), 'age
     SHELL: shape.shell ?? '/bin/zsh',
     PATH: DOCK_PATH,
     TMPDIR: os.tmpdir(),
-    LANG: 'en_US.UTF-8',
     ...(shape.launch ?? {}),
   };
-  return { shape, root, home, sys, toReal, realPath, virtual, launchEnv, tilde: (p) => (p && inHome(p) ? `~/${path.relative(home, p)}` : p) };
+  return { shape, root, home, sys, toReal, realPath, virtual, launchEnv, platform: shape.platform ?? 'darwin', tilde: (p) => (p && inHome(p) ? `~/${path.relative(home, p)}` : p) };
 }

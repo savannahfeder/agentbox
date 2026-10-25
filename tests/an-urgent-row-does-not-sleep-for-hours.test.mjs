@@ -124,15 +124,15 @@ describe('the rest an urgent row earns', () => {
     expect(sup.restingUntil(items[0]) - Date.now()).toBe(15 * MIN);
   });
 
-  // An agent may not reach this. itemPriority already throws away a worker's
-  // own number, and this is the one place it matters most: a worker could
-  // otherwise tag its own row a nine and buy itself a session every quarter
-  // hour forever.
-  it('cannot be reached by a worker tagging its own row urgent', () => {
+  // A LEVEL COUNTS WHOEVER SET IT (w-5ac9c9006d, 2026-10-16), so an agent's
+  // nine is Urgent here too. What stops it buying a session every quarter hour
+  // forever is the empty-runs rule below, which holds for any Urgent row, and
+  // her lowering it, which the fold keeps over the agent's.
+  it('is reached by an agent tagging a row urgent, like any Urgent row', () => {
     const items = [row('w-agent', 9, { wrote: { priority: { ts: NOW, source: 'agent' } } })];
     const sup = makeSupervisor(items);
     for (let i = 0; i < 3; i += 1) sup.noteFreshRun(items[0]);
-    expect(sup.restingUntil(items[0]) - Date.now()).toBe(4 * HOUR);
+    expect(sup.restingUntil(items[0]) - Date.now()).toBe(15 * MIN);
   });
 });
 

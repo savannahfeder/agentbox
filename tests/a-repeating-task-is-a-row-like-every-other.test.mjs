@@ -20,6 +20,7 @@ import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { List, repeatTag, nextRunWords } from '../renderer/src/components/List.tsx';
+import { FleetContext } from '../renderer/src/fleet.ts';
 globalThis.React = React;
 
 const at = (y, m, d, h, min = 0) => new Date(y, m - 1, d, h, min, 0, 0).getTime();
@@ -38,11 +39,16 @@ const later = (over = {}) => ({
   createdAt: at(2026, 10, 1, 9), updatedAt: at(2026, 10, 2, 9), runAt: at(2026, 10, 9, 9), ...over,
 });
 
-const draw = (props) => renderToStaticMarkup(React.createElement(List, {
-  items: [later()], view: 'snoozed', selected: -1, seen: new Set(), running: [], multiSel: new Set(),
-  repeats: [rule()], allItems: [], onSelect() {}, onOpen() {}, onToggle() {}, onRange() {},
-  table: true, products: [], ...props,
-}));
+// The fleet the window would be holding: a rule's row reads its last run's
+// status out of it, the same way every other row does (w-ec2b04d449).
+const draw = ({ fleet = {}, ...props } = {}) => renderToStaticMarkup(
+  React.createElement(FleetContext.Provider, { value: fleet },
+    React.createElement(List, {
+      items: [later()], view: 'snoozed', selected: -1, seen: new Set(), running: [], multiSel: new Set(),
+      repeats: [rule()], allItems: [], onSelect() {}, onOpen() {}, onToggle() {}, onRange() {},
+      table: true, products: [], ...props,
+    })));
+const working = (run) => ({ queued: [], sessions: new Map([[run.id, { itemId: run.id, product: run.product, startedAt: NOW - 60_000, tail: [] }]]) });
 const ruleRow = (html) => html.slice(html.indexOf('data-repeat-id'), html.indexOf('data-item-id'));
 
 describe('in the table, a repeating task is one row in the columns', () => {
@@ -79,7 +85,8 @@ describe('in the table, a repeating task is one row in the columns', () => {
 
   it('wears the live mark while one of its runs is going, like any running thread', () => {
     const run = later({ id: 'r-abc1234567-20261004', status: 'claimed', runAt: undefined });
-    expect(ruleRow(draw({ repeats: [rule({ lastOccurrence: run.id })], allItems: [run] }))).toMatch(/th-st s-running live/);
+    const row = ruleRow(draw({ repeats: [rule({ lastOccurrence: run.id })], allItems: [run], fleet: working(run) }));
+    expect(row).toMatch(/th-st s-running live/);
     expect(ruleRow(draw())).not.toMatch(/th-st/);
   });
 
@@ -122,11 +129,14 @@ describe('the faint words after the title say the rule’s own schedule', () => 
     expect(row).toMatch(/th-repeat[\s\S]*Check for new video skills/);
     expect(row).not.toMatch(/th-tag/);
   });
-  it('a running rule shows the live mark in the repeat mark’s place, not both', () => {
+  // The two marks stopped fighting over one place when the running one moved
+  // into the Status column (w-ec2b04d449): the title keeps the rule's own
+  // mark, and what is happening is said a column over.
+  it('a running rule keeps its repeat mark and says Working in the status cell', () => {
     const run = later({ id: 'r-abc1234567-20261004', status: 'claimed', runAt: undefined });
-    const row = ruleRow(draw({ repeats: [rule({ lastOccurrence: run.id })], allItems: [run] }));
-    expect(row).toMatch(/th-st s-running live/);
-    expect(row).not.toMatch(/th-repeat/);
+    const row = ruleRow(draw({ repeats: [rule({ lastOccurrence: run.id })], allItems: [run], fleet: working(run) }));
+    expect(row).toMatch(/th-repeat[\s\S]*Check for new video skills/);
+    expect(row).toMatch(/th-cell-state[\s\S]*Working/);
   });
   it('and the deferred thread beneath it wears no repeat mark', () => {
     const html = draw();

@@ -245,7 +245,7 @@ describe('the clear band around the glass', () => {
     r.call('corner-tag:ready', { part: 'tag' });
     const w = r.win();
     w.setIgnoreMouseEvents = (ignore, opts) => ignores.push({ ignore, opts });
-    r.call('corner-tag:size', { part: 'tag', width: 140, height: 51, frame: 10 });
+    r.call('corner-tag:size', { part: 'tag', width: 140, height: 51, glass: { x: 10, y: 10, width: 120, height: 31 } });
     return { r, ignores, w };
   };
 
@@ -301,7 +301,7 @@ describe('a drag with the clear band in place', () => {
     // window: the glass plus the band on every side
     const draw = () => {
       const glass = Math.round(28 * r.scaleSent());
-      r.call('corner-tag:size', { part: 'tag', width: Math.round(glass * 3.9) + 2 * BAND, height: glass + 2 * BAND, frame: BAND });
+      r.call('corner-tag:size', { part: 'tag', width: Math.round(glass * 3.9) + 2 * BAND, height: glass + 2 * BAND, glass: { x: BAND, y: BAND, width: Math.round(glass * 3.9), height: glass } });
       return glass;
     };
     draw();

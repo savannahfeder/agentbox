@@ -105,34 +105,33 @@ describe('the press, drawn in the list', () => {
   const draw = (props) => renderToStaticMarkup(React.createElement(ThreadsMade, { rows, onOpen: () => {}, ...props }));
   const html = draw({ onApprove: () => {}, onReject: () => {}, onHere: () => {} });
 
-  // THE DRAWING SHE PICKED (2026-10-13, "this one wins", the sixth of eight
-  // over three rounds): two presses, each saying in full what it does, "Do in
-  // this thread" in grey and then "Start new thread" in an orange outline at
-  // the edge. No No.
+  // THE QUIET LIST (w-fcb5fdc2e5) replaced the two boxed presses: NEW THREAD,
+  // DO HERE, DISMISS as words under the cursor, the first in the accent. The
+  // accessible name still says what DO HERE does in full.
   it('is one press per waiting thread and none on the rest', () => {
     expect(html.match(/class="made-here"/g)).toHaveLength(1);
-    expect(html).toContain('>Do in this thread<');
+    expect(html).toContain('>Do here<');
   });
 
   it('names the thread it would fold in', () => {
     expect(html).toContain('aria-label="Do in this thread: Say why Send is off"');
   });
 
-  it('comes first, with Start new thread after it at the edge', () => {
+  it('comes first, with New thread after it at the edge', () => {
     expect(html.match(/class="made-approve"/g)).toHaveLength(1);
     expect(html.indexOf('made-here')).toBeLessThan(html.indexOf('made-approve'));
   });
 
-  it('is the grey one, and the accent stays on Start new thread', () => {
+  it('is the grey one, and the accent stays on New thread', () => {
     const css = read('renderer/src/components/threads-made.css');
     const here = css.match(/\.made-here \{[^}]*\}/)[0];
     const start = css.match(/\.made-approve \{[^}]*\}/)[0];
     expect(here).not.toContain('--accent');
-    expect(here).toMatch(/border: 1px solid var\(--line\)/);
+    expect(here).toMatch(/color: var\(--text-dim\)/);
     expect(start).toMatch(/color: var\(--accent\)/);
-    // An outline, not a solid block: "the orange backgrounds are a little bit
-    // too bright".
-    expect(start).toMatch(/background: none/);
+    // Words, not a solid block: "the orange backgrounds are a little bit too
+    // bright".
+    expect(css).toMatch(/\.made-acts button \{[^}]*background: none/);
   });
 
   it('draws none where it is not wired, which is every other list', () => {

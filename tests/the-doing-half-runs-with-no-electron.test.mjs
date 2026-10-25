@@ -102,6 +102,22 @@ describe('the doing half, booted with no Electron', () => {
     expect(res.status).toBe(403);
   });
 
+  // THE TOKEN IS THE KEY, AND THE NAME ON THE DOOR IS NOT (asked 2026-10-23,
+  // answered 2026-10-24). A page whose own hostname resolves to this machine
+  // can reach this port — any page can, which is why there is a token at all —
+  // and it still gets nothing without one. The usual extra guard, refusing a
+  // Host that is not localhost, cannot go in: main/phone-link.mjs serves this
+  // same handler to a phone through a relay or over Tailscale, where the Host
+  // is neither. So this pins both halves rather than leaving it to a comment.
+  it('asks for the token whatever name the request arrives under', async () => {
+    const strange = { host: 'agents.example.com' };
+    expect((await post(`${base}/api/zero:snapshot`, null, strange)).status).toBe(403);
+    expect((await post(`${base}/api/zero:snapshot`, token, strange)).status).toBe(200);
+    // The stream and the file key are the other two doors that reach the store.
+    expect((await get(`${base}/events`, strange)).status).toBe(403);
+    expect((await get(`${base}/file-key`, strange)).status).toBe(403);
+  });
+
   it('says which channel it could not find', async () => {
     const res = await post(`${base}/api/zero:not-a-channel`, token);
     expect(res.status).toBe(404);
@@ -162,9 +178,21 @@ describe('the stand-ins for the three Electron things', () => {
   });
 });
 
-function post(url, token) {
+function get(url, extra = {}) {
   return new Promise((resolve, reject) => {
-    const headers = { 'content-type': 'application/json' };
+    const req = http.request(url, { method: 'GET', headers: extra }, (res) => {
+      let body = '';
+      res.on('data', (c) => { body += c; });
+      res.on('end', () => resolve({ status: res.statusCode, body }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+function post(url, token, extra = {}) {
+  return new Promise((resolve, reject) => {
+    const headers = { 'content-type': 'application/json', ...extra };
     if (token) headers['x-agentbox-token'] = token;
     const req = http.request(url, { method: 'POST', headers }, (res) => {
       let body = '';

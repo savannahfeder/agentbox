@@ -17,6 +17,7 @@ import {
 } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortShown, type EffortChoice } from '../effort';
 import { useKeepInWindow } from '../keep-in-window';
+import { modelDrawerKey } from '../model-drawer-keys';
 import {useAgentUpdates} from './AgentUpdates';
 
 // THE EFFORT LIVES IN HERE TOO.The levels sit under a hairline at the foot of
@@ -94,7 +95,22 @@ export function ModelPicker({ value, onChange, title, onOpenChange, engine = nul
   const pick = (id: string) => { onChange(id === fallback ? null : id); setOpen(false); };
 
   return (
-    <span className="compose-word-wrap" ref={wrap}>
+    <span
+      className="compose-word-wrap model-pick"
+      ref={wrap}
+      /* ESCAPE FROM ANYWHERE IN THE DRAWER, which is what the effort strip
+         needed: clicking a level moves focus onto that button, and the handler
+         on the word below never heard the key. It rides on the wrapper rather
+         than on each button so there is one of it, and `../model-drawer-keys`
+         says which keys are the drawer's and which belong to the button the
+         press landed on. */
+      onKeyDown={(e) => {
+        if (modelDrawerKey(e, { open, from: 'inside' }) !== 'close') return;
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+      }}
+    >
       {open && (
         <span className="prio-menu model-menu" role="listbox" aria-label="Model">
           {showUpdate&&<span className="model-update-row"><span>{updateEngine==='codex'?'Codex':'Claude Code'}</span><button type="button" title={`Update ${updateEngine==='codex'?'Codex':'Claude Code'} in the app terminal`} onClick={()=>{setOpen(false);start(updateEngine);}}>{update.state==='running'?'Updating…':'Update now'}</button></span>}
@@ -148,17 +164,14 @@ export function ModelPicker({ value, onChange, title, onOpenChange, engine = nul
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={(e) => {
-          if (!open) {
-            if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              setOpen(true);
-            }
-            return;
-          }
-          if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); }
-          if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => (c + 1) % rows.length); }
-          if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => (c - 1 + rows.length) % rows.length); }
-          if (e.key === 'Enter') { e.preventDefault(); if (rows[cursor]) pick(rows[cursor].id); }
+          const move = modelDrawerKey(e, { open, from: 'word' });
+          if (!move) return;
+          e.preventDefault();
+          if (move === 'open') setOpen(true);
+          if (move === 'close') { e.stopPropagation(); setOpen(false); }
+          if (move === 'down') setCursor((c) => (c + 1) % rows.length);
+          if (move === 'up') setCursor((c) => (c - 1 + rows.length) % rows.length);
+          if (move === 'pick' && rows[cursor]) pick(rows[cursor].id);
         }}
       >{engineModelLabel(engine, value, { codexModels, codexDefault })}</button>
     </span>

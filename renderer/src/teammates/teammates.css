@@ -1,0 +1,237 @@
+/* TEAMMATES (w-4bd7b5548b), as approved in round 5: each teammate a dashed
+   letter, the agent mark, under Groups; its page the team chat seen through it
+   with what it is on beside it. Only the app's own tokens. */
+
+.tq { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box; font-style: normal;
+  width: 18px; height: 18px; border: 1px dashed var(--line-strong); color: var(--text-dim); font: 400 9.5px/1 var(--mono); }
+.tq-hd { width: 20px; height: 20px; font-size: 10px; }
+.tq-pic { width: 32px; height: 32px; font-size: 12px; }
+.tq-big { width: 40px; height: 40px; font-size: 14px; }
+.tq-wt { position: absolute; top: -4px; right: -4px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.tq-hash { color: var(--text-faint); }
+.tq-dots { display: inline-block; width: 12px; height: 9px; flex: none;
+  background-image: radial-gradient(circle, var(--text-faint) 1px, transparent 1.2px); background-size: 4px 4.5px; }
+
+.tq-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.tq-title > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tq-title .tq-role { color: var(--text-faint); font-size: 15px; letter-spacing: 0; }
+
+/* The pages */
+.tq-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.tq-page.tq-one { flex-direction: row; }
+.tq-chat { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.tq-lines { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 32px 8px 32px; display: flex; flex-direction: column; }
+.tq-lines .rm-day { margin: 10px 0 4px; }
+.tq-empty { margin: 24px 0; font-size: 14.5px; color: var(--text-faint); }
+.tq-error { margin: 6px 32px 0 32px; font-size: 13px; color: var(--accent); }
+
+.rm-cm.tq-m { position: relative; padding: 10px 0 4px 52px; }
+.rm-cm.tq-m.tq-cont { padding-top: 2px; }
+.rm-cm.tq-m .h { font-size: 15px; gap: 8px; }
+.rm-cm.tq-m .h > .tq, .rm-cm.tq-m .h > .rm-pic { position: absolute; left: 0; top: 10px; }
+.rm-cm.tq-m .h > .rm-pic { width: 32px; height: 32px; line-height: 30px; font-size: 10px; }
+.rm-cm.tq-m .tx { font-size: 16px; line-height: 25px; }
+.rm-cm.tq-m .tx p { white-space: pre-wrap; }
+/* A pasted brief's headings are words in a message, not page titles. */
+.rm-cm.tq-m .tx :is(h1, h2, h3, h4) { font-size: 16px; line-height: 25px; font-weight: 500; margin: 0; }
+.rm-cm.tq-m .tx ul, .rm-cm.tq-m .tx ol { margin: 4px 0; padding-left: 22px; white-space: normal; }
+.tq-to { color: var(--text-faint); font-size: 13.5px; }
+
+.tq-act { display: flex; align-items: center; gap: 8px; padding: 6px 0 6px 52px; font-size: 14.5px; line-height: 20px; color: var(--text); }
+.tq-act > svg, .tq-act > .tq-dots { color: var(--text-faint); width: 13px; flex: none; }
+.tq-act > span { min-width: 0; }
+.tq-act .v { color: var(--text-faint); }
+.tq-act em { font: normal 400 10.5px/1 var(--mono); color: var(--text-faint); margin-left: 2px; flex: none; }
+.tq-act.tq-note { color: var(--text-dim); }
+.tq-st { font: 400 10.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); margin-left: 4px; flex: none; }
+.tq-st.need { color: var(--text); display: inline-flex; align-items: center; gap: 7px; }
+.tq-st.need::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.tq-link { font: inherit; color: var(--text); background: none; border: 0; padding: 0; text-align: left; cursor: default; }
+.tq-link:hover { text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.tq-key { font: 400 10.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); margin-left: 6px; background: none; border: 0; padding: 0;
+  text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; flex: none; }
+.tq-key:hover { color: var(--text); }
+
+.tq-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.tq-chip { height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); background: none; font: inherit; font-size: 13.5px; color: var(--text); display: inline-flex; align-items: center; cursor: default; }
+.tq-chip:hover { background: var(--wash-strong); }
+
+.rm-compose.tq-compose { margin: 8px 32px 24px 32px; }
+.tq-input { min-height: 40px; max-height: 200px; resize: none; padding: 11px 13px 4px; box-sizing: border-box; border: 0; outline: 0; background: none; font: inherit; color: var(--text); font-size: 15px; line-height: 22px; }
+.tq-input::placeholder { color: var(--text-faint); }
+.tq-compose .rm-compose-bar { justify-content: space-between; }
+.tq-compose .dock-send kbd { font: 400 10.5px/1 var(--mono); color: var(--text-faint); margin-left: 6px; }
+
+/* The panel beside a teammate's chat */
+.gr-side.tq-side { padding: 18px 24px 24px; }
+/* The Log has no faces, so its lines start at its title. */
+.tq-log .tq-act { padding-left: 0; }
+.tq-sec { margin-bottom: 26px; }
+.tq-sh { display: flex; align-items: baseline; justify-content: space-between; font-size: 14.5px; color: var(--text); margin-bottom: 8px; }
+.tq-sh b { font-weight: 400; font-size: 13px; color: var(--text-faint); }
+.tq-edit { font: 400 10.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); background: none; border: 0; padding: 0; cursor: default; }
+.tq-edit:hover { color: var(--text); }
+.tq-sv { font-size: 14px; line-height: 20px; color: var(--text); }
+.tq-sv.dim, .tq-side .dim { color: var(--text-dim); }
+.tq-li { display: flex; align-items: center; gap: 12px; width: 100%; padding: 6px 0; font: inherit; font-size: 14px; line-height: 20px; color: var(--text-dim); background: none; border: 0; text-align: left; cursor: default; }
+button.tq-li:hover { color: var(--text); }
+.tq-li svg { color: var(--text-faint); flex: none; }
+.tq-li.need { color: var(--text); }
+.tq-li.need::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin: 0 2px; flex: none; }
+.tq-li.now { color: var(--text); }
+.tq-li.dim { color: var(--text-faint); }
+
+.tq-about .tq-cardhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.tq-about .tq-cardhead .n { font-size: 15px; color: var(--text); }
+.tq-f { display: block; padding: 11px 0; border-top: 1px solid var(--line); }
+.tq-f .l { display: block; font-size: 12.5px; color: var(--text-faint); margin-bottom: 5px; }
+.tq-f .s { display: block; font-size: 12.5px; color: var(--text-faint); margin-top: 5px; }
+.tq-f ul { list-style: none; padding: 0; margin: 0; }
+.tq-f li { display: flex; align-items: flex-start; gap: 8px; padding: 4px 0; font-size: 14px; line-height: 20px; color: var(--text); }
+.tq-in { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--line); background: var(--control-face); font: inherit; font-size: 14px; line-height: 20px; color: var(--text); outline: 0; resize: vertical; }
+.tq-in:focus { border-color: var(--text-faint); }
+select.tq-in { height: 32px; padding: 0 6px; }
+.tq-row2 { display: flex; gap: 8px; }
+.tq-row2 .tq-time { width: 128px; flex: none; }
+.tq-num { width: 90px; }
+.tq-x { margin-left: auto; width: 20px; height: 20px; flex: none; background: none; border: 0; color: var(--text-faint); font-size: 15px; line-height: 1; cursor: default; }
+.tq-x:hover { color: var(--text); }
+.tq-foot { padding-top: 16px; border-top: 1px solid var(--line); }
+.tq-quiet { height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); background: none; font: inherit; font-size: 13.5px; color: var(--text-dim); cursor: default; }
+.tq-quiet:hover { color: var(--text); background: var(--wash); }
+
+/* An inbox row a teammate sent you, led by its mark */
+.tq-from { display: inline-flex; align-items: center; gap: 7px; flex: none; color: var(--text-dim); }
+.list-pane.tq-open { display: flex; flex-direction: column; overflow: hidden; }
+.rm-cm.tq-m .h > .tq-you { display: inline-flex; align-items: center; justify-content: center; }
+/* Sat on the line's baseline, an inline-flex box takes the mark's small letter
+   as its baseline and drops the name below the title. */
+.tq-from { margin-right: 10px; vertical-align: top; height: 20px; }
+.tq-from b { font-weight: 400; color: var(--text-dim); }
+.tq-heads { display: inline-flex; gap: 16px; }
+/* With Groups on the page's text edge is 44 points in (rooms.css .gt-inset). */
+.gt-inset .tq-lines { padding-left: 44px; }
+.gt-inset .rm-compose.tq-compose { margin-left: 44px; }
+.gt-inset .tq-error { margin-left: 44px; }
+.tq-to.tq-link { color: var(--text-faint); font-size: 13.5px; }
+.tq-to.tq-link:hover { color: var(--text-dim); }
+.tq-chip:disabled { cursor: default; }
+.tq-chip:disabled:hover { background: none; }
+.tq-chip.on { background: var(--wash-strong); border-color: var(--text-faint); }
+.tq-chip.dim { color: var(--text-faint); border-color: var(--line); }
+.tq-where-chips { margin-top: 2px; }
+.tq-works { margin-top: 6px; font-size: 13px; }
+.tq-works.tq-link { display: block; color: var(--text-dim); font-size: 13px; }
+.tq-works.tq-link:hover { color: var(--text); }
+/* One line each: the thread behind it holds the rest. */
+.tq-act > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+span.tq-link { cursor: default; }
+span.tq-link:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
+
+/* A teammate at work: the foot of its chat says the step it is on. */
+.tq-live { color: var(--text-dim); }
+.tq-live.on { color: var(--text); }
+.tq-live .tq-when { margin-left: 10px; color: var(--text-faint); }
+.tq-dots.tq-moving { animation: tq-pulse 1.4s ease-in-out infinite; }
+@keyframes tq-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .tq-dots.tq-moving { animation: none; } }
+.tq-step { padding-top: 0; padding-left: 25px; }
+.tq-folded { max-height: 11.5em; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent); mask-image: linear-gradient(to bottom, #000 70%, transparent); }
+.tq-more { margin: 6px 0 0; display: inline-block; }
+
+/* CHATS: your AI teammates, people and groups in one list. Softer than the
+   inbox, as the chat is, with the sections folding. */
+.cx-list { padding: 10px 10px 16px; display: flex; flex-direction: column; gap: 1px; background: var(--bg); }
+.cx-search { display: flex; align-items: center; gap: 8px; height: 32px; margin: 0 2px 6px; padding: 0 10px; border-radius: 6px; background: var(--wash); color: var(--text-faint); }
+.cx-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; font-size: 13.5px; color: var(--text); }
+.cx-search input::placeholder { color: var(--text-faint); }
+.cx-sec { display: flex; flex-direction: column; gap: 1px; margin-top: 8px; }
+.cx-head { display: flex; align-items: center; height: 30px; padding: 0 4px 0 2px; }
+.cx-fold { flex: 1; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 6px; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 500; color: var(--text-dim); text-align: left; cursor: default; }
+.cx-fold svg { color: var(--text-faint); flex: none; }
+.cx-fold em { font-style: normal; font-weight: 400; color: var(--text-faint); }
+.cx-plus { width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 6px; background: none; color: var(--text-faint); cursor: default; }
+.cx-plus:hover { background: var(--wash-strong); color: var(--text); }
+.cx-row { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 14px; color: var(--text); text-align: left; cursor: default; }
+.cx-row:hover { background: var(--wash); }
+.cx-row.on { background: var(--bg-selected); }
+.cx-row .tq, .cx-row .gr-tile, .cx-row img, .cx-row .gr-two { flex: none; }
+.cx-row .tq-sm { width: 20px; height: 20px; }
+.cx-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cx-add .cx-n { color: var(--text-dim); }
+.cx-need { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+
+/* A teammate's pages sit in the Groups page's frame. */
+.tq-chats .gr-chat { min-width: 0; }
+.tq-chat .tq-lines { padding-left: var(--text-x, 32px); }
+.tq-saved { color: var(--text-faint); }
+.tq-saved > svg { color: var(--text-dim); }
+.tq-menu { min-width: 200px; }
+
+/* About: its description in its own words, the facts beside it, square. */
+.tq-doc { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; }
+.tq-doc-in { max-width: 720px; padding: 28px 40px 28px var(--text-x, 40px); }
+.tq-doc-id { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+.tq-doc-id b { display: block; font-weight: 500; font-size: 20px; letter-spacing: -.01em; color: var(--text); }
+.tq-doc-id small { display: block; font-size: 13.5px; color: var(--text-faint); margin-top: 2px; }
+.tq-doc-note { font-size: 14px; color: var(--text-dim); margin: -8px 0 18px; }
+.tq-desc { font-size: 15px; line-height: 25px; color: var(--text); }
+.tq-desc h1, .tq-desc h2, .tq-desc h3, .tq-desc h4, .tq-desc h5 { margin: 20px 0 6px; font-size: 13px; font-weight: 600; color: var(--text-dim); }
+.tq-desc p { margin: 0 0 10px; }
+.tq-desc ul, .tq-desc ol { margin: 0 0 10px; padding-left: 20px; }
+.tq-desc .dim { color: var(--text-faint); }
+.tq-doc .rm-compose.tq-compose { margin: 22px 0 0; }
+.tq-doc .tq-error { margin-left: 0; }
+.gr-side.tq-details { padding: 22px 24px; background: var(--bg); }
+.tq-details dl { display: grid; grid-template-columns: 86px minmax(0, 1fr); column-gap: 14px; row-gap: 16px; margin: 0; font-size: 13.5px; line-height: 20px; }
+.tq-details dt { color: var(--text-faint); }
+.tq-details dd { margin: 0; min-width: 0; color: var(--text); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.tq-details dd.tq-chips, .tq-details dd .tq-chips { flex-direction: row; margin-top: 0; }
+.tq-details .tq-chip { height: 26px; padding: 0 9px; font-size: 13px; }
+.tq-details .s { font-size: 12px; color: var(--text-faint); }
+.tq-details .dim { color: var(--text-faint); }
+.tq-duty small { display: block; font-size: 12.5px; color: var(--text-faint); }
+.tq-book { display: inline-flex; align-items: center; gap: 7px; border: 0; padding: 0; background: none; font: inherit; color: var(--text); text-align: left; cursor: default; }
+.tq-book svg { color: var(--text-faint); flex: none; }
+.tq-book:hover span { text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.tq-knows { display: flex; gap: 6px; width: 100%; }
+.tq-details > .tq-st { margin: 16px 0 0; }
+
+/* A playbook, with its table on square corners like the rest of the app. */
+.tq-crumb { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-faint); margin-bottom: 14px; }
+.tq-crumb .tq-link { color: var(--text-dim); }
+.tq-h { margin: 0; font-weight: 500; font-size: 22px; letter-spacing: -.01em; color: var(--text); }
+.tq-sub { font-size: 13.5px; color: var(--text-faint); margin: 6px 0 20px; }
+.tq-lessons { margin: 0 0 24px; padding-left: 20px; font-size: 15px; line-height: 25px; color: var(--text); }
+.tq-from-table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: 0; font-size: 13.5px; }
+.tq-from-table th { text-align: left; font-weight: 500; font-size: 13px; color: var(--text-dim); padding: 11px 16px; border-bottom: 1px solid var(--line); }
+.tq-from-table td { padding: 10px 16px; border-top: 1px solid var(--line); color: var(--text); vertical-align: top; }
+.tq-from-table td:last-child { text-align: right; color: var(--text-faint); white-space: nowrap; }
+.tq-from-table td:last-child .tq-link { color: var(--text-dim); }
+
+.tq-log-day { font: 400 10.5px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); margin: 14px 0 6px; }
+.tq-log-day:first-of-type { margin-top: 2px; }
+
+/* The Chats page as drawn in round 6 (designs/w-4bd7b5548b/round-6): softer
+   than the inbox, only here, so a group's own chat keeps its look. */
+.cx-row img, .cx-row .rm-pic { border-radius: 50%; }
+.cx-row .tq { border-radius: 6px; }
+.tq-chats .tq-chat .rm-day { display: flex; align-items: center; gap: 12px; margin: 18px 0 14px; }
+.tq-chats .tq-chat .rm-day::before, .tq-chats .tq-chat .rm-day::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.tq-chats .tq-chat .rm-day .rm-label { font: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--text-faint); }
+.tq-chats .tq-chat .rm-cm.tq-m .h > span { font-weight: 600; }
+.tq-chats .tq-chat .rm-cm.tq-m .h em { font-family: inherit; font-size: 12px; letter-spacing: 0; font-style: normal; color: var(--text-faint); }
+.tq-chats .tq-chat .rm-cm.tq-m .h .rm-pic { width: 36px; height: 36px; border-radius: 6px; }
+.tq-chats .tq-chat .rm-cm.tq-m .h .tq-pic { width: 36px; height: 36px; border-radius: 6px; }
+.tq-chats .tq-chip { border-radius: 6px; }
+.tq-chats .tq-doc-id .tq, .tq-chats .tq-title .tq { border-radius: 6px; }
+.tq-card { margin-top: 10px; max-width: 520px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 14px 16px; background: var(--surface); }
+.tq-card .q { font-size: 14px; font-weight: 500; color: var(--text); }
+.tq-card .btns { display: flex; gap: 8px; margin-top: 12px; }
+.tq-card .def { display: flex; align-items: center; gap: 7px; margin-top: 10px; font-size: 12.5px; color: var(--text-faint); }
+.tq-btn { height: 30px; padding: 0 12px; border-radius: 5px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); font: inherit; font-size: 13.5px; cursor: default; }
+.tq-btn.pri { background: var(--text); color: var(--surface); border-color: var(--text); }
+.tq-btn.pri:hover { opacity: .9; }
+.tq-dot-need { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
+.tq-pick { position: relative; }
+.tq-pick .prio-menu { top: calc(100% + 6px); bottom: auto; left: -9px; }

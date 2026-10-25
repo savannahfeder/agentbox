@@ -15,8 +15,10 @@ describe('the toast can carry a way in', () => {
   it('holds the row by id rather than a closure over the list', () => {
     // A closure made at send time would hold the list from BEFORE the row
     // existed. The lookup happens at click time instead.
-    expect(app).toContain("const [toast, setToast] = useState<{ text: string; goes?: { product: string; id: string } } | null>(null);");
-    expect(app).toContain('const showToast = useCallback((text: string, goes?: { product: string; id: string }) => {');
+    // ToastGoes is that same { product, id }, plus `repeat` for a repeating
+    // task's rule since w-5513afd09a.
+    expect(app).toContain("const [toast, setToast] = useState<{ text: string; goes?: ToastGoes } | null>(null);");
+    expect(app).toContain('const showToast = useCallback((text: string, goes?: ToastGoes) => {');
   });
 
   it('is handed the row a new task was filed as', () => {
@@ -27,8 +29,11 @@ describe('the toast can carry a way in', () => {
 
   it('opens that row, marks it seen and clears itself', () => {
     // One path for the click and for O since w-f0bfe32859: openToastRow.
-    expect(app).toMatch(/setToast\(null\);\s*if \(!row\) return;/);
-    expect(app).toMatch(/setFocused\(row\);\s*markSeen\(row\);/);
+    // Since w-5513afd09a the toast clears first, ahead of the repeating-task
+    // branch, so both kinds of destination take it down.
+    const body = app.slice(app.indexOf('const openToastRow = useCallback('), app.indexOf('/* ------------------------------- keyboard'));
+    expect(body).toMatch(/useCallback\(\(to: ToastGoes\) => \{\s*setToast\(null\);/);
+    expect(body).toMatch(/if \(!row\) return;\s*setSearch\(null\);\s*setFocused\(row\);\s*markSeen\(row\);/);
   });
 
   it('outlives noticing it, which 2.5 seconds did not', () => {
@@ -41,12 +46,15 @@ describe('the toast can carry a way in', () => {
   it('stays a plain announcement when there is nowhere to go', () => {
     // Nothing that is only telling her something grows a pointer or a ring.
     // Since w-f0bfe32859 it is drawn in parts, and still a div.
-    expect(app).toContain(': <div key={toastShown.current} className="toast toast-plain">{face}</div>;');
+    // On a thread's page it also sits in the bar (w-65bcefb857), still a div.
+    expect(app).toContain(': <div key={toastShown.current} className={`toast toast-plain${toastInBar ? \' toast-in-bar\' : \'\'}`}>{face}</div>;');
   });
 
   it('says out loud that it is pressable', () => {
     // Since w-f0bfe32859 the words are a keycap, O, which also works.
-    expect(app).toContain('{toast.goes && <span className="toast-key"><kbd>O</kbd><span className="toast-key-word">Open</span></span>}');
+    // Drawn when it would go somewhere other than the thread already open
+    // (toastOpens, w-5513afd09a).
+    expect(app).toContain('{opens && <span className="toast-key"><kbd>O</kbd><span className="toast-key-word">Open</span></span>}');
     expect(css).toContain('.toast-goes {');
     expect(css).toMatch(/\.toast-goes \{[^}]*cursor: pointer;/s);
     expect(css).toMatch(/\.toast-goes:focus-visible \{[^}]*outline:/s);
@@ -67,7 +75,9 @@ describe('the toast after an answer carries the same way in', () => {
     // Followed, since w-c78d1e1607, by what the thread says if a Z takes it back.
     // Then, since 2026-10-13, how long it is held: a phone's reply is not.
     expect(app).toMatch(/goes\?: \{ product: string; id: string \},[\s\S]{0,300}?undid\?: UndidSpec\[\],[\s\S]{0,300}?holdMs: number = UNDO_GRACE_MS,\s*\) => \{/);
-    expect(app).toContain('showToast(`${toast} · press Z to undo`, stay ? undefined : goes);');
+    // Even when `stay` keeps her on the row (w-5513afd09a): the cap is held
+    // back while that row is open, not by dropping the destination.
+    expect(app).toContain('showToast(`${toast} · press Z to undo`, goes && { ...goes, sent: true });');
   });
 
   it('a typed reply hands it the row it answered', () => {
@@ -88,7 +98,9 @@ describe('the toast after an answer carries the same way in', () => {
   });
 
   it('a picked option hands it the row it picked on', () => {
-    expect(app).toContain('`Option ${option.n} → ${item.productName}`, undefined, undefined, { product: item.product, id: item.id }');
+    // The fourth argument is whether she stays on the thread, since 2026-10-13
+    // (tests/a-reply-keeps-you-on-the-thread-unless-you-are-clearing-your-inbox).
+    expect(app).toContain('`Option ${option.n} sent → ${item.productName}`, takeBack, !movesOn(item), { product: item.product, id: item.id }');
   });
 
   // The fourth argument here is `stay`, for the same reason it is on the
@@ -101,6 +113,6 @@ describe('the toast after an answer carries the same way in', () => {
     // and there is nothing to go and watch, so those toasts stay plain.
     // The fifth argument, the way in, stays undefined; the last is only what
     // the thread says if a Z takes the close back (w-c78d1e1607).
-    expect(app).toContain('}, `Closed: ${clipToSentence(item.title, TOAST_TITLE)}`, undefined, stay, undefined, undid);');
+    expect(app).toContain('}, `${DONE.verb}: ${clipToSentence(item.title, TOAST_TITLE)}`, undefined, stay, undefined, undid);');
   });
 });

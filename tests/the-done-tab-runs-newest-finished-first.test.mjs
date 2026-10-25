@@ -69,11 +69,13 @@ describe('the clock is when it was finished', () => {
   });
 });
 
-describe('every other tab keeps the sort you chose', () => {
+describe('Needs you and Later keep the sort you chose', () => {
   const rows = [done('urgent-old', 9, 2 * DAY), done('low-new', 1, HOUR)];
   // Not All since 2026-10-07: it holds finished threads now and reads them
   // the way Done does (tests/the-all-tab-holds-finished-threads-too.test.mjs).
-  for (const tab of ['inbox', 'progress', 'snoozed', undefined]) {
+  // Not In progress since w-21b638d821: it runs newest sent first
+  // (tests/in-progress-runs-newest-sent-first.test.mjs).
+  for (const tab of ['inbox', 'snoozed', undefined]) {
     it(`${tab ?? 'no tab'} under Priority is still Urgent first`, () => {
       expect(ids(sorted(rows, byPriority, tab))).toEqual(['urgent-old', 'low-new']);
     });
@@ -111,14 +113,17 @@ describe('the board’s Done column', () => {
 
 describe('what the page says', () => {
   it('the time column is headed Done on the Done tab', () => expect(timeHeading('done')).toBe('Done'));
-  it('and Updated everywhere else', () => {
-    for (const tab of ['inbox', 'progress', 'snoozed', 'all']) expect(timeHeading(tab)).toBe('Updated');
+  it('and Sent everywhere else', () => {
+    // Later is headed Back since w-c9da359466: a page of threads coming back
+    // has no use for how long ago each was touched. Sent since w-21b638d821.
+    for (const tab of ['inbox', 'progress', 'all']) expect(timeHeading(tab)).toBe('Sent');
+    expect(timeHeading('snoozed')).toBe('Back');
   });
   it('the app hands the tab to the sorter, for your rows and for the merge', () => {
     const app = src('App.tsx');
     // Your project order rides after the tab since w-e263a8a0fb.
     expect(app).toMatch(/sortedByDisplay\([^;]*inboxDisplay, view[,)]/);
-    expect(app).toMatch(/mergeRows\(displayedBox, theirRows, view === 'done' \? 'done' : inboxDisplay\.sort[,)]/);
+    expect(app).toMatch(/mergeRows\(displayedBox, theirRows, view === 'done' \? 'done' : view === 'progress' \? 'updated' : inboxDisplay\.sort[,)]/);
   });
   it('the Display menu says Done keeps its own order while you are on it', () => {
     expect(src('threads', 'Pages.tsx')).toMatch(/Done runs newest first/);

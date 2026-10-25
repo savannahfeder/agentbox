@@ -9,7 +9,7 @@
 // the claim Supabase sets, and try every door from both sides.
 //
 // No Docker and no network: the Mac this runs on has other work on it.
-import { it, expect, beforeAll, describe } from 'vitest';
+import { it, expect, beforeAll, afterAll, describe } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -82,6 +82,7 @@ beforeAll(async () => {
   await as(MAYA, `insert into public.team_invites (team_id, email, invited_by) values ($1, 'THEO@northwind.test', $2)`, [team.id, MAYA]);
   await as(THEO, `select public.accept_invite($1)`, [team.id]);
 }, 60_000);
+afterAll(() => db.close());
 
 describe('people', () => {
   it('turns a sign-in into a person named from their Google profile', async () => {

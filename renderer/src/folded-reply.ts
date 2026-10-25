@@ -11,6 +11,8 @@
 // So the pill carries her own sentence when there is one, and the invitation
 // only when there is genuinely nothing under it.
 
+import { voiceNoteOf } from './team/voice-note';
+
 export interface FoldedAttachment {
   name: string;
   image?: boolean;
@@ -58,7 +60,7 @@ function clip(line: string, budget: number): string {
 function filesSaid(attachments: FoldedAttachment[]): string {
   const kept = (attachments ?? []).filter((a) => a && a.name);
   if (!kept.length) return '';
-  const noun = kept.every((a) => a.image) ? 'image' : 'file';
+  const noun = kept.every((a) => a.image) ? 'image' : kept.every((a) => voiceNoteOf(a.name)) ? 'voice note' : 'file';
   return `${kept.length} ${noun}${kept.length === 1 ? '' : 's'}`;
 }
 

@@ -12,23 +12,15 @@
 // was not: one hand-written line saying `"source":"founder"` granted its own
 // next run bypassPermissions. Proved on a scratch ledger, 2026-08-24.
 //
-// So the grant is not on the ledger any more. It lives here, in the app's own
-// home, written by main and by nothing else. The MCP server has no code that
-// reaches this file and no tool that names it.
+// So the grant is not on the ledger any more. It lives in her own folder (the
+// desktop's user data folder), written by main and by nothing else.
 //
-// WHAT THIS DOES AND WHAT IT DOES NOT DO, said plainly.
-//
-//   It does NOT make forging impossible. Anything that can run commands can
-//   write any file this user owns, and `~/.astral` is no exception. Claude Code
-//   has the identical property: its settings file is as writable as anything
-//   else in your home, and it relies on the sandbox and the prompt rather than
-//   on the folder.
-//
-//   What it changes is the COST. Before: one more line appended to a file the
-//   worker was appending to anyway, in a format it writes every few seconds,
-//   in its own working directory. After: a deliberate reach into the app's own
-//   storage, in a file nothing briefs it about and no tool it holds mentions.
-//   That is a real difference and it is the whole claim. It is not a wall.
+// NEVER UNDER THE STORE ROOT. The app makes its own home the store root, and
+// every Claude worker is granted that folder, so a file edit there needs no
+// card. Outside the granted folders a write meets the same card or auto-mode
+// check as any other reach into her home. That is the whole claim and it is
+// not a wall: anything that can run commands can write any file this user owns
+// (tests/a-worker-cannot-set-its-own-permission-mode).
 //
 // GRANTING IS THE FOUNDER'S, SPENDING ONE IS THE MACHINERY'S, AGENTS GET
 // NEITHER. That rule survives the move intact, and it is now structural rather
@@ -36,12 +28,72 @@
 // there is no `source` to check and no line for anyone else to forge.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { appHome } from './store/home.mjs';
+import crypto from 'node:crypto';
+import { nameSlug } from '../shared/product-name.mjs';
 import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
 import { CODEX_MODE_ORDER } from '../shared/codex-modes.mjs';
 
 const FILE = 'answer-modes.json';
+
+// Set once at start by `keepAnswerModesIn`. Until then nothing is read or kept:
+// a process that never said where must not fall back to the store root.
+let where = null;
+let saidNowhere = false;
+
+const inside = (file, dir) => {
+  const f = path.resolve(file);
+  const d = path.resolve(dir);
+  return f === d || f.startsWith(d + path.sep);
+};
+
+function configHome(home, env) {
+  const given = typeof env?.XDG_CONFIG_HOME === 'string' ? env.XDG_CONFIG_HOME.trim() : '';
+  return given && path.isAbsolute(given) ? given : path.join(home, '.config');
+}
+
+/**
+ * Where the app keeps these, said once at start (main/main.mjs, main/serve.mjs).
+ *
+ * In `userDir`, unless that is inside the store root, as the headless copy's
+ * is: then in a per-store folder under the config home, the way the team
+ * sign-in moves (main/team/session.mjs). If that is inside the store root too,
+ * nowhere: every thread runs on its project's mode, which is the safe side.
+ * Returns the file, or null.
+ */
+export function keepAnswerModesIn({ userDir, storeRoot, home = os.homedir(), env = process.env }) {
+  let target = userDir ? path.join(userDir, FILE) : null;
+  if (target && storeRoot && inside(target, storeRoot)) {
+    const tag = crypto.createHash('sha256').update(path.resolve(storeRoot)).digest('hex').slice(0, 16);
+    target = path.join(configHome(home, env), nameSlug, 'grants', tag, FILE);
+  }
+  if (!target || (storeRoot && inside(target, storeRoot))) {
+    console.warn(`zero: nowhere outside the store root (${storeRoot}) to keep what a reply may do, so every thread runs on its project's mode`);
+    target = null;
+  }
+  where = target;
+  if (storeRoot) carryFromTheStore(path.join(storeRoot, FILE));
+  return where;
+}
+
+export const answerModesFile = () => where;
+
+// AN OLDER VERSION KEPT THIS IN THE STORE ROOT. Its file is carried across the
+// first time and removed every time. The new file is created even when there is
+// nothing to carry, because that is what makes the carry happen once: without
+// it, a file a worker wrote into the store later would be carried at the next
+// start.
+function carryFromTheStore(old) {
+  let found = null;
+  try { found = fs.lstatSync(old); } catch { /* nothing there */ }
+  if (where && !fs.existsSync(where)) {
+    writeAll(where, sweep(found?.isFile() ? readAll(old) : {}, Date.now()));
+  }
+  if (found) {
+    try { fs.rmSync(old, { force: true }); } catch (err) { console.warn(`zero: could not remove ${old}: ${err.message}`); }
+  }
+}
 
 // HOW LONG A MODE LIVES, NOW THAT IT BELONGS TO A THREAD AND NOT TO ONE SEND.
 //
@@ -61,21 +113,35 @@ const FILE = 'answer-modes.json';
 // the file does not grow without limit. Swept on every write.
 const KEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
-const file = (home = appHome()) => path.join(home, FILE);
+const fileFor = (home) => (home === undefined ? where : path.join(home, FILE));
 
-function readAll(home) {
+// Never through a link, and never anything but a regular file, so a link left
+// in place of one cannot point the read at a file somebody else writes.
+const READ_FLAGS = fs.constants.O_RDONLY | fs.constants.O_NONBLOCK | (fs.constants.O_NOFOLLOW ?? 0);
+
+function readAll(target) {
+  if (!target) return {};
+  let fd = null;
   try {
-    const raw = JSON.parse(fs.readFileSync(file(home), 'utf8'));
+    fd = fs.openSync(target, READ_FLAGS);
+    if (!fs.fstatSync(fd).isFile()) return {};
+    const raw = JSON.parse(fs.readFileSync(fd, 'utf8'));
     return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   } catch {
     return {};
+  } finally {
+    if (fd !== null) { try { fs.closeSync(fd); } catch { /* already closed */ } }
   }
 }
 
 // tmp + rename, so a reader never sees half a file and a crash mid-write leaves
 // the previous one intact.
-function writeAll(home, all) {
-  const target = file(home);
+function writeAll(target, all) {
+  if (!target) {
+    if (!saidNowhere) console.warn('zero: a mode was picked with nowhere to keep it, so the thread runs on its project\'s mode');
+    saidNowhere = true;
+    return;
+  }
   fs.mkdirSync(path.dirname(target), { recursive: true });
   const tmp = `${target}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, `${JSON.stringify(all, null, 2)}\n`);
@@ -123,8 +189,8 @@ function sweep(all, now) {
  */
 const ALLOWED_MODES = [...CLAUDE_PERMISSION_MODES, ...CODEX_MODE_ORDER];
 
-export function answerMode(slug, id, { home = appHome(), now = Date.now() } = {}) {
-  const entry = readAll(home)[keyOf(slug, id)];
+export function answerMode(slug, id, { home, now = Date.now() } = {}) {
+  const entry = readAll(fileFor(home))[keyOf(slug, id)];
   if (!entry || typeof entry !== 'object') return undefined;
   if (Number.isFinite(entry.at) && now - entry.at > KEEP_MS) return undefined;
   if (entry.mode === null) return null;
@@ -132,9 +198,9 @@ export function answerMode(slug, id, { home = appHome(), now = Date.now() } = {}
 }
 
 /** Every row that currently carries one, as `{ "<slug>/<id>": mode }`. */
-export function answerModes({ home = appHome(), now = Date.now() } = {}) {
+export function answerModes({ home, now = Date.now() } = {}) {
   const out = {};
-  for (const [key, entry] of Object.entries(readAll(home))) {
+  for (const [key, entry] of Object.entries(readAll(fileFor(home)))) {
     if (!entry || typeof entry !== 'object') continue;
     if (Number.isFinite(entry.at) && now - entry.at > KEEP_MS) continue;
     if (entry.mode === null) { out[key] = null; continue; }
@@ -150,12 +216,12 @@ export function answerModes({ home = appHome(), now = Date.now() } = {}) {
  * A mode that is not one of the six is refused outright rather than stored,
  * which is what the ledger's own check used to do.
  */
-export function setAnswerMode(slug, id, mode, { home = appHome(), now = Date.now() } = {}) {
+export function setAnswerMode(slug, id, mode, { home, now = Date.now() } = {}) {
   if (mode !== null && !ALLOWED_MODES.includes(mode)) return answerMode(slug, id, { home, now });
-  const all = sweep(readAll(home), now);
+  const all = sweep(readAll(fileFor(home)), now);
   all[keyOf(slug, id)] = { mode, at: now };
-  writeAll(home, all);
-  return mode;
+  writeAll(fileFor(home), all);
+  return fileFor(home) ? mode : undefined;
 }
 
 /**
@@ -170,14 +236,14 @@ export function setAnswerMode(slug, id, mode, { home = appHome(), now = Date.now
  * the worst this call can do is keep a grant she already made alive one more
  * month.
  */
-export function touchAnswerMode(slug, id, used, { home = appHome(), now = Date.now() } = {}) {
-  const all = sweep(readAll(home), now);
+export function touchAnswerMode(slug, id, used, { home, now = Date.now() } = {}) {
+  const all = sweep(readAll(fileFor(home)), now);
   const key = keyOf(slug, id);
   const entry = all[key];
   if (!entry || typeof entry !== 'object') return undefined;
   if (used !== undefined && entry.mode !== used) return entry.mode;
   all[key] = { mode: entry.mode, at: now };
-  writeAll(home, all);
+  writeAll(fileFor(home), all);
   return entry.mode;
 }
 
@@ -193,14 +259,14 @@ export function touchAnswerMode(slug, id, used, { home = appHome(), now = Date.n
  * NOW, for the same reason as above. Clearing is not "less": it means back to
  * the project's setting, which can be the wider one.
  */
-export function clearAnswerMode(slug, id, spent, { home = appHome(), now = Date.now() } = {}) {
-  const all = sweep(readAll(home), now);
+export function clearAnswerMode(slug, id, spent, { home, now = Date.now() } = {}) {
+  const all = sweep(readAll(fileFor(home)), now);
   const key = keyOf(slug, id);
   const current = all[key]?.mode;
   if (spent !== undefined && current !== spent) return current === undefined ? undefined : current;
   all[key] = { mode: null, at: now };
-  writeAll(home, all);
+  writeAll(fileFor(home), all);
   return null;
 }
 
-export const _internals = { file, KEEP_MS };
+export const _internals = { file: fileFor, KEEP_MS, useFile: (f) => { where = f ?? null; } };

@@ -63,6 +63,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { envName, readEnv } from '../shared/product-name.mjs';
 import { liveDownload, RELEASE_REPO, DOWNLOAD_ASSET } from './lib/live-download.mjs';
+import { whyNotToRelease } from './lib/ship-rules.mjs';
+import { cloudAccountConfig } from '../main/cloud/config.mjs';
+import { loadCloudConfig } from '../main/team/session.mjs';
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const noSign = process.argv.includes('--no-sign');
@@ -70,6 +73,33 @@ const noSign = process.argv.includes('--no-sign');
 function die(lines) {
   console.error(`\n${lines.join('\n')}\n`);
   process.exit(1);
+}
+
+// IS THIS THE COMMIT THAT SHIPPED, AND IS THIS VERSION STILL FREE (2026-10-13).
+// Half a day went on two releases built in a folder nine commits behind main:
+// each took a quarter of an hour to sign and notarise, and each came out as the
+// version already on the website carrying that morning's code. The build said
+// nothing, because it notarises a stale commit as happily as a fresh one. Both
+// questions below are asked before anything is built, and a question that
+// cannot be answered — no network, no tags — is not an answer of no.
+function commitsBehindMain() {
+  try {
+    execFileSync('git', ['fetch', 'origin', '--quiet'], { cwd: repo, stdio: 'ignore', timeout: 20_000 });
+    const out = execFileSync('git', ['rev-list', '--count', 'HEAD..refs/remotes/origin/main'], { cwd: repo, encoding: 'utf8' });
+    const n = Number(out.trim());
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function releasedTags() {
+  try {
+    const out = execFileSync('git', ['ls-remote', '--tags', `https://github.com/${RELEASE_REPO}.git`], { cwd: repo, encoding: 'utf8', timeout: 20_000 });
+    return out.split('\n').flatMap((line) => line.match(/refs\/tags\/(v[\d.]+)$/)?.[1] ?? []);
+  } catch {
+    return null;
+  }
 }
 
 // The one Developer ID certificate on this machine, and the team it belongs to.
@@ -132,6 +162,16 @@ function feedbackAddress() {
 
 const feedbackUrl = feedbackAddress();
 
+// WHERE AGENTBOX CLOUD IS (main/cloud/config.mjs): the server's address and
+// the database's public address and key, all public. Read from cloud/ or
+// ~/.agentbox/cloud.public.json. Putting that file there is the act that
+// opens the cloud to everyone who downloads this build, so do it only once
+// the server takes real money (scripts/stripe-setup.mjs --live).
+const cloud = cloudAccountConfig(repo);
+// AND THE CLOUD SETTINGS › PHONE SIGNS IN TO (main/team/session.mjs
+// loadCloudConfig): its address, public key and phone site, also public.
+const teamCloud = loadCloudConfig(repo, { packaged: false, env: {} });
+
 
 if (!noSign) {
   // A SIGNED RELEASE IS THE ONE STRANGERS DOWNLOAD, so a missing key stops it
@@ -166,6 +206,22 @@ if (!noSign) {
       'To build without signing or notarising, run: npm run pack',
     ]);
   }
+  // Before a minute of signing is spent: the right commit, and a free version.
+  const refusals = whyNotToRelease({
+    behind: commitsBehindMain(),
+    version: JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version,
+    released: releasedTags(),
+  });
+  if (refusals.length) {
+    die([
+      refusals.length === 1 ? 'This build would be thrown away.' : 'This build would be thrown away, twice over.',
+      '',
+      ...refusals.flatMap((line) => [line, '']),
+      `The folder this ran in is ${repo}.`,
+      'To build it anyway, run: npm run pack',
+    ]);
+  }
+
   if (!identity) {
     die([
       'No Developer ID Application certificate in this Mac’s keychain, so nothing can be signed.',
@@ -219,6 +275,18 @@ if (feedbackUrl) {
   console.log('→ baking the feedback address into the build');
 } else {
   console.log(`→ no feedback address (${envName('FEEDBACK_URL')} or "feedbackUrl" in zero.config.json), so the Feedback card sends to the one in main/feedback.mjs`);
+}
+if (cloud) {
+  for (const k of ['gateway', 'supabaseUrl', 'anonKey']) args.push(`-c.extraMetadata.bakedCloud.${k}=${cloud[k]}`);
+  console.log(`→ baking Agentbox Cloud into the build (${cloud.gateway}): everyone who downloads it can sign up and pay`);
+} else {
+  console.log('→ no cloud.public.json, so this build does not offer Agentbox Cloud');
+}
+if (teamCloud) {
+  for (const k of ['url', 'anonKey', 'phoneSite']) if (teamCloud[k]) args.push(`-c.extraMetadata.bakedTeam.${k}=${teamCloud[k]}`);
+  console.log(`→ baking the team cloud into the build (${teamCloud.url}): Settings › Phone can sign in, and Multiplayer is in Alpha features`);
+} else {
+  console.log('→ no team.config.json, so this build cannot sign in for the phone');
 }
 if (noSign) {
   console.log('→ packaging, unsigned');

@@ -1,54 +1,8 @@
-// PURE. WHAT A TOOL CALL SAYS ON SCREEN.
-//
-// WHAT MESSY ACTUALLY WAS, measured over seven live imported sessions, off the
-// drawn screen and not off the source:
-//
-//   535 work lines in 162 runs 328 of them (61%) ran past the end of their box
-//   and were cut by the ellipsis, so they could not be read at all 368 of them
-//   (69%) were over sixty characters the six worst showed 2% to 4% of
-//   themselves; every one of those was `cd /Users/you/Desktop/dev/... &&
-//   python3 - <<'PY' ...` 18 distinct raw tool names were printed as verbs, the
-//   worst being `mcp__plugin_paper-desktop_paper__write_html`, 31 times in one
-//   thread the longest unbroken run was 20 lines, and that happened three times
-//
-// So there are three separate defects wearing one word, and this file is the
-// three answers.
-//
-// ONE. THE INTERESTING PART OF A COMMAND IS NEVER AT THE FRONT. Every one of
-// the six worst lines was a real command hiding behind a `cd` into an absolute
-// path, or an `export PATH=` prelude, or both. Truncating from the right, which
-// is what an ellipsis does, therefore threw away the only part that mattered and
-// kept the part every line shares. `plainCommand` drops the prelude instead, so
-// the line STARTS at the thing that ran.
-//
-// TWO. A PATH IS SHOWN FROM THE END. `/Users/you/Desktop/dev/zero/
-// renderer/src/components/Tweaks.tsx` is 63 characters of which the last 11 are
-// the answer. Under the session's own folder it becomes
-// `renderer/src/components/Tweaks.tsx`; deeper than that it keeps the last
-// three segments behind a leading ellipsis. Nothing is invented and nothing is
-// silently dropped: the whole string is one press away on the line itself.
-//
-// THREE. A RUN AGGREGATES. Consecutive tool calls fold into one line that says
-// how many and what kind. The threshold is three and it is measured, not
-// chosen: the run-length histogram is
-// {1:38, 2:42, 3:36, 4:18, 5:6, 6:6, 7:8, 8:2, 11:2, 13:1, 20:3}. Folding at
-// two takes the screen down 70% and folding at three takes it down 62%, so the
-// last eight points cost the 42 pairs, and a pair read as two short clean
-// lines says more than "2 things it ran" does. Three is where a wall starts.
-//
-// NOTHING HERE HIDES A FAILURE. A folded run says on its own line that
-// something in it failed, in the same words and the same colour a single line
-// would, because a fold she has to open to find bad news in is worse than the
-// wall it replaced.
+// Pure. Turns a tool call into the line a thread shows for it. The full string
+// is always one press away on the line, so shortening here never loses it.
 
-/* ------------------------------ WHAT IT DID ------------------------------- */
-// PLAIN WORDS AND NOT OUR TOOL NAMES. The design law forbids jargon in UI copy,
-// so "Bash" and "Glob" are ours, not the reader's.
-//
-// `changed` RATHER THAN `edited` (2026-10-01). A tester who is not a programmer
-// reads "edited" as a document being revised; the thing that happened is that a
-// file in the code is now different, and the line next to it already offers the
-// file as a chip into the change. One word for one event.
+// Plain words, not tool names. Edit is "changed" because a reader who is not a
+// programmer takes "edited" to mean a document was revised.
 const VERBS = {
   Bash: 'ran',
   Read: 'read',
@@ -65,8 +19,6 @@ const VERBS = {
   ListAgents: 'listed the other sessions',
   SendMessage: 'messaged',
   ToolSearch: 'looked up a tool',
-  // Measured in her own threads on 2026-08-20 and printed raw until now:
-  // `skill` 3 times and `askuserquestion` twice, both as bare lowercase names.
   Skill: 'used a skill',
   AskUserQuestion: 'asked a question',
   BashOutput: 'checked on a command',
@@ -74,48 +26,32 @@ const VERBS = {
   ExitPlanMode: 'finished planning',
 };
 
-// THE PREFIX STRIP WAS BROKEN AND HER LONGEST THREAD IS WHERE IT SHOWED. The
-// old pattern was `^mcp__[^_]+__`, which needs the server's name to hold no
-// underscore. `mcp__plugin_paper-desktop_paper__write_html` went through
-// untouched and she read that string 31 times in one afternoon. An MCP name is
-// `mcp__<server>__<tool>` and a server may contain anything, so the tool is
-// what follows the LAST double underscore.
+// An MCP tool name is `mcp__<server>__<tool>` and the server name may itself
+// hold underscores (`mcp__plugin_paper-desktop_paper__write_html`), so the tool
+// is what follows the last double underscore.
 export function workVerb(name) {
   const n = String(name ?? '').trim();
   if (!n) return 'did something';
   if (VERBS[n]) return VERBS[n];
   const mcp = n.startsWith('mcp__') ? n.slice(n.lastIndexOf('__') + 2) : n;
-  // Underscores are how a machine spells a space. She reads the result, so it
-  // gets the space: `list_work_items` is jargon and `list work items` is a
-  // name, which is all this line has ever claimed to be.
   return mcp.replace(/_+/g, ' ').trim().toLowerCase() || 'did something';
 }
 
-/* ------------------------------ A PATH, SHORT ----------------------------- */
-// From the END, because that is where the answer is. Three segments is the
-// budget: measured over her 535 lines, three segments holds the whole of every
-// path that sits inside a repo and the meaningful tail of every scratch path.
+// A path is shortened from the end, where the file name is. Three segments
+// hold the whole of most paths inside a repo.
 const PATH_SEGMENTS = 3;
 
-// `home` IS THE MACHINE'S, AND IT HAS NO DEFAULT. It used to default to
-// `/Users/you`, which meant every path this shortened was shortened correctly
-// on exactly one Mac in the world. Agentbox is downloaded now: on anybody
-// else's, `~/notes.md` came out as `/Users/leon/notes.md`, which is the
-// prefix-only line this whole file exists to stop. Nothing is guessed when
-// nobody says whose Mac it is; the path is shown whole, which is worse than a
-// tilde and is at least true.
+// `home` has no default on purpose: with none given, a path is shown whole
+// rather than shortened against a guess at whose machine this is.
 export function shortPath(raw, cwd = '', home = '') {
   const s = String(raw ?? '').trim();
   if (!s) return '';
   if (!s.startsWith('/') && !s.startsWith('~')) return s;
 
   let p = s;
-  // `/private/tmp` and `/tmp` are the same folder on a Mac and she has never
-  // typed either. Saying `/private` first is the filesystem talking.
+  // On macOS `/tmp` is a link to `/private/tmp`; show the one people type.
   p = p.replace(/^\/private\/tmp\//, '/tmp/');
 
-  // Inside the folder this session is running in, a path is what she would
-  // type: relative, with nothing above it.
   const base = String(cwd ?? '').replace(/^\/private\/tmp\//, '/tmp/').replace(/\/+$/, '');
   if (base && (p === base || p.startsWith(`${base}/`))) {
     const rel = p === base ? '' : p.slice(base.length + 1);
@@ -128,13 +64,11 @@ export function shortPath(raw, cwd = '', home = '') {
   return trimSegments(p);
 }
 
-// Keep the last few segments and say, with an ellipsis, that there were more.
-// The leading `…/` is the whole of the honesty here: a bare `components/
-// Tweaks.tsx` would read as a path from the root of something.
+// The leading `…/` says segments were dropped. Without it `components/Tweaks.tsx`
+// would read as a path from the root of something.
 function trimSegments(p) {
-  // The lead is kept whole when nothing is trimmed, because `/x/store.mjs` and
-  // `x/store.mjs` are two different files and dropping the slash would be this
-  // function quietly saying the wrong one.
+  // The lead is kept when nothing is trimmed, because `/x/store.mjs` and
+  // `x/store.mjs` are different files.
   const lead = p.startsWith('~/') ? '~/' : p.startsWith('/') ? '/' : '';
   const body = p.slice(lead.length);
   const parts = body.split('/').filter(Boolean);
@@ -142,22 +76,9 @@ function trimSegments(p) {
   return `…/${parts.slice(-PATH_SEGMENTS).join('/')}`;
 }
 
-/* --------------------------- A COMMAND, PLAIN ----------------------------- */
-// THE PRELUDE COMES OFF THE FRONT. Every shape below was counted in her own
-// sessions on 2026-08-20; none of it is hypothetical.
-//
-//   `cd /Users/you/Desktop/dev/zero && …`         the commonest by far
-//   `export PATH="$HOME/.nvm/versions/node/…" ; …`     29 times in one thread
-//   `SP=/private/tmp/claude-501/-Users-…/… ; …`        a bare assignment
-// `source ~/.zshrc && …`
-//
-// Each is scaffolding that says nothing about what the agent was doing, and
-// each is long enough on its own to fill the line. They come off one at a time
-// until what is left is a command.
-//
-// WHAT IT NEVER DOES IS INVENT. If stripping leaves nothing, the original
-// stands: an agent that genuinely only ran `cd somewhere` did that, and a line
-// reading empty would be this function lying about it.
+// The interesting part of a command is never at the front, and an ellipsis cuts
+// from the right. So these preludes come off the front, one at a time, until
+// what is left is the command that ran. If nothing is left, the original stands.
 const PRELUDE = [
   // cd <path> && |; | \n
   /^cd\s+(?:"[^"]*"|'[^']*'|[^\s;&|]+)\s*(?:&&|;|\n)\s*/,
@@ -168,33 +89,25 @@ const PRELUDE = [
   // source|. <file> && |; | \n
   /^(?:source|\.)\s+(?:"[^"]*"|'[^']*'|[^\s;&|]+)\s*(?:&&|;|\n)\s*/,
   // echo "=== a banner ===" && |; | \n
-  //
-  // ONLY A BANNER, and the `===` or `---` is what makes it one. An agent
-  // labelling its own terminal output is talking to itself, and four of the 31
-  // worst lines left on her screen after the preludes came off were exactly
-  // this. A plain `echo something` is a real command and is left alone, because
-  // it may be the whole of what ran.
+  // Only a banner, marked by `===` or `---`. A plain `echo` may be the whole of
+  // what ran, so it stays.
   /^echo\s+(?:"[^"]*(?:===|---)[^"]*"|'[^']*(?:===|---)[^']*')\s*(?:&&|;|\n)\s*/,
 ];
 
-// A heredoc is a whole script pretending to be an argument. The longest in her
-// sessions was 84 lines of python inside one `ran`. Everything from the marker
-// onward becomes an ellipsis, so the line says which program was fed a script
-// without printing the script.
+// Everything from a heredoc marker onward becomes an ellipsis, so the line
+// names the program that was fed a script without printing the script.
 const HEREDOC = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1([\s\S]*)$/;
 
-// EXCEPT WHEN THE PROGRAM IS THE WHOLE OF WHAT IS LEFT. Drawn over her own
-// thread on 2026-08-20 the first cut put three `python3 - …` lines in a row
-// inside one fold, which distinguishes nothing. In every one of those the file
-// being worked on was named on the script's FIRST line, so when the command in
-// front of the marker is this short the first line comes with it.
+// When the command before the marker is this short (`python3 -`), the script's
+// first line comes with it. That line usually names the file, and without it a
+// row of `python3 - …` lines cannot be told apart.
 const HEREDOC_HEAD = 12;
 
 function firstScriptLine(body, marker) {
   for (const line of String(body ?? '').split('\n')) {
     const t = line.trim();
-    // The marker itself closes the heredoc and is not a line of the script.
-    // Matched exactly, because a one-word line of script looks just like one.
+    // The closing marker is not a line of the script. It is matched exactly,
+    // because a one-word line of script looks just like one.
     if (!t || t === marker) continue;
     if (t.startsWith('#') || t.startsWith('//')) continue;
     return t;
@@ -207,8 +120,7 @@ export function plainCommand(raw) {
   if (!s) return '';
   const whole = s;
 
-  // Peel the scaffolding, repeatedly: `cd x && export Y=z && npm test` is all
-  // three of these in a row.
+  // Repeated, because `cd x && export Y=z && npm test` has two preludes.
   for (let i = 0; i < 6; i += 1) {
     const before = s;
     for (const re of PRELUDE) s = s.replace(re, '');
@@ -224,35 +136,18 @@ export function plainCommand(raw) {
   return s || whole.replace(/\s+/g, ' ').trim();
 }
 
-/* --------------------- THE STORE'S OWN BOOKKEEPING ------------------------ */
-// NOT WORK, AND NOT SHOWN AT ALL.
-//
-// Testers who are not programmers read the top of every thread as noise, and
-// the top of every thread is this: a tool lookup, a claim, and later an update
-// to the item. MEASURED over 3,344 real session traces from 2026-09-20 to
-// 2026-10-01: 55,500 tool lines, of which 2,462 are the store's own records
-// (claim 1,212, update 999, release 138, the lists 113) and 498 are a tool
-// lookup. Three per cent of the lines and the first two lines of nearly every
-// thread.
-//
-// NOTHING OF THE WORK IS HIDDEN BY THIS. Reading a document, writing one,
-// filing a question and looking at a page are what the session was asked to do;
-// taking the item and writing its status back are how it tells the app it is
-// running. The second kind is what comes off the screen.
-//
-// The server is named after the product (`mcp__agentbox__`, `mcp__daydream__`),
-// so the prefix is never one fixed string and the tool is what follows the last
-// double underscore, the same reading `workVerb` makes.
+// The store's own bookkeeping is not shown. Claiming an item, writing its
+// status back and listing what is there are how a session tells the app it is
+// running. Reading or writing a document is the work, and stays on screen.
 const BOOKKEEPING = new Set([
   'claim_work_item', 'release_work_item', 'update_work_item',
   'list_work_items', 'list_documents', 'list_products', 'list_skills',
   'list_chats', 'get_product',
 ]);
 
-// The name arrives three ways and all three are the same tool: the full
-// `mcp__<server>__<tool>` a Claude transcript writes, the bare tool Codex
-// reports beside its server, and `ToolSearch`, which is the harness loading a
-// schema and is nobody's work.
+// A Claude transcript writes `mcp__<server>__<tool>`, with the server named
+// after the product, and Codex reports the bare tool. `ToolSearch` is Claude
+// Code loading a tool's schema.
 export function isBookkeeping(name) {
   const n = String(name ?? '').trim();
   if (!n) return false;
@@ -260,34 +155,17 @@ export function isBookkeeping(name) {
   return BOOKKEEPING.has(n.startsWith('mcp__') ? n.slice(n.lastIndexOf('__') + 2) : n);
 }
 
-/* ------------------------- A COMMAND, IN PLAIN WORDS ---------------------- */
-// "Running cat README.md; echo ---; cat package.json" is what a tester was
-// shown. What happened was that it read two files.
-//
-// MEASURED over the same 3,344 traces: 32,349 Bash lines, 361 distinct leading
-// programs, and the eleven commonest cover 80% of them (grep 5,325, git 3,998,
-// sed 3,894, npx 2,471, python3 2,435, cat 2,074, ls 1,814, a shell -c 1,464,
-// arch 947, a for loop 894, node 689). 55% of the lines are compound (`a && b;
-// c`) and 48% hold a pipe, so the thing on the screen is a shell one-liner and
-// not a sentence.
-//
-// THE RULE IS THAT A GUESS IS WORSE THAN A COMMAND. Every segment has to be
-// recognised and they all have to agree on one verb; one unknown part, or two
-// different verbs, and this returns null and the line stays the command it
-// always was. A wrong verb on her screen cannot be checked against anything,
-// and the raw command at least is true. The exact string is one press away
-// either way (`full` on the work line).
-//
-// `doing` IS THE SAME EVENT WHILE IT IS STILL HAPPENING, because the live line
-// under a running row reads "Reading README.md" and the thread above it reads
-// "Read README.md". One table, so the two can never drift.
+// A shell command in words: `cat README.md; echo ---; cat package.json` reads
+// "read README.md and package.json". A wrong verb is worse than the raw
+// command, so every segment must be recognised and all must agree on one verb,
+// or the line stays the command. `doing` is the same verb for the live line
+// under a running row, in the same table so the two cannot drift.
 
 // Scaffolding between the real steps of a line. A banner, a `cd`, a wait.
 const NOISE = new Set(['echo', 'cd', 'pwd', 'true', 'false', ':', 'sleep', 'clear', 'date', 'printf', 'set']);
 
-// `2>&1` and `2>/dev/null` say nothing about what ran and are on a third of
-// these lines. Any OTHER redirect writes or reads a file we have not accounted
-// for, so it gives up rather than guess.
+// `2>&1` and `2>/dev/null` say nothing about what ran. Any other redirect reads
+// or writes a file this does not account for, so it gives up rather than guess.
 const QUIET_REDIRECT = /^[0-9]*>>?&?(?:[0-9]+|\/dev\/null)$/;
 
 const FAMILIES = [
@@ -306,8 +184,8 @@ const FAMILIES = [
 const BY_HEAD = new Map();
 for (const family of FAMILIES) for (const head of family.heads) BY_HEAD.set(head, family);
 
-// A `git` subcommand is the verb; the ones not listed keep their command,
-// because "checked the code" over `git merge-base` says less than the line did.
+// Subcommands not listed keep their command, because a vague verb over
+// `git merge-base` says less than the command does.
 const GIT = {
   status: { verb: 'checked what changed', doing: 'Checking what changed' },
   diff: { verb: 'checked what changed', doing: 'Checking what changed' },
@@ -341,9 +219,8 @@ function unquote(token) {
   return t;
 }
 
-// Split on separators that are OUTSIDE quotes. A `;` inside a sed script or a
-// grep pattern is not a new command, and splitting on it is how a reader of
-// shell lines invents steps that never ran.
+// Splits only outside quotes: a `;` inside a sed script or a grep pattern is
+// not a new command.
 function splitOutside(text, separators) {
   const out = [];
   let buffer = '';
@@ -379,8 +256,7 @@ function argumentsOf(words, skip = []) {
     const token = unquote(raw);
     if (!quoted) {
       if (QUIET_REDIRECT.test(token)) continue;
-      // Anything else involving a file handle, a subshell or a glob of
-      // commands is a shape nobody taught this.
+      // Any other redirect, a subshell or backticks is a shape this cannot read.
       if (/[<>`]/.test(token) || token.includes('$(')) return null;
     }
     if (isFlag(token)) {
@@ -400,7 +276,7 @@ function stageWords(stage, cwd, home) {
   const head = unquote(words[0]);
   const rest = words.slice(1);
   if (NOISE.has(head)) {
-    // `echo something > a file` writes a file, and this is not the reader of it.
+    // `echo something > a file` writes a file, so it is not noise.
     const args = argumentsOf(rest);
     return args === null ? null : 'noise';
   }
@@ -423,9 +299,8 @@ function stageWords(stage, cwd, home) {
   if (SCRIPTS.has(head) || /\.(?:sh|mjs|js|py)$/.test(head)) {
     const args = argumentsOf(rest);
     if (args === null) return null;
-    // `python3 - <<'PY'` is a script with no name, and `plainCommand` already
-    // puts its first line after the ellipsis. That line is what a developer
-    // reads to tell one of 2,793 of these from another, so it is kept.
+    // `python3 - <<'PY'` has no file name. `plainCommand` put the script's
+    // first line after the ellipsis, and that line tells these apart.
     if (stage.includes('…')) {
       const first = stage.slice(stage.lastIndexOf('…') + 1).trim();
       return { ...SCRIPT, names: first ? [first] : [] };
@@ -447,8 +322,8 @@ const URL_LIKE = /^(?:https?:\/\/|www\.|localhost|127\.0\.0\.1)/;
 
 function namesFor(family, args, cwd, home) {
   if (family.take === 'first') return args.slice(0, 1);
-  // A fetch names the page, which is not always the first argument: `curl -s -o
-  // /dev/null -w '%{http_code}' <url>` had three before it.
+  // The URL is not always the first argument, as in
+  // `curl -s -o /dev/null -w '%{http_code}' <url>`.
   if (family.take === 'url') {
     const url = args.find((a) => URL_LIKE.test(a));
     return url ? [url] : args.slice(0, 1);
@@ -462,10 +337,8 @@ function namesFor(family, args, cwd, home) {
   return files;
 }
 
-// WHAT THE SUBCOMMAND NAMED, because a developer reads these lines for the
-// file, the branch or the message, and a verb on its own tells them less than
-// the command did. Measured over the same traces: `git add`, `git commit`,
-// `git push` and `git merge` are 563 lines that said nothing but their verb.
+// Keeps what the subcommand named (the file, the branch or the message),
+// because a bare verb tells a developer less than the command did.
 function gitWords(rest, cwd, home) {
   const words = [...rest];
   // `git -C <path> <subcommand>`: the folder is not the verb.
@@ -484,8 +357,7 @@ const NOT_A_REF = new Set(['origin', 'upstream', '.', '--', 'HEAD']);
 
 function gitNames(sub, rest, cwd, home) {
   if (sub === 'commit') {
-    // The message, which is the one thing a commit line is read for. It is
-    // absent when the message came in on stdin (`git commit -F -`).
+    // The message is absent when it came in on stdin (`git commit -F -`).
     const at = rest.findIndex((w) => unquote(w) === '-m' || unquote(w) === '--message');
     const message = at >= 0 ? unquote(rest[at + 1] ?? '') : '';
     return message ? [message] : [];
@@ -497,9 +369,8 @@ function gitNames(sub, rest, cwd, home) {
     return refs.length ? [refs[refs.length - 1]] : [];
   }
   const files = args.filter(looksLikeAFile).map((a) => shortPath(a, cwd, home));
-  // A HISTORY COMMAND OFTEN NAMES SOMETHING THAT IS NOT A PATH, and it is the
-  // point of the line: `git log --grep w-4ac1af8c99` is a search for one
-  // thread. The value a flag carried survives when no file does.
+  // A history command often names something that is not a path, like
+  // `git log --grep <word>`, so the first argument is kept when no file is.
   if (files.length) return files;
   return args.length ? [args[0]] : [];
 }
@@ -512,15 +383,14 @@ function sedWords(rest, cwd, home) {
   if (args === null) return null;
   const flags = rest.map(unquote).filter(isFlag);
   const inPlace = flags.some((f) => f.startsWith('-i'));
-  // THE FILE IS THE LAST ARGUMENT, AND A SED SCRIPT IS NOT IT. A trace line is
-  // cut at 200 characters, so the file is sometimes not on it at all and the
-  // script (`s#a#b#`) is the last thing that looks like a path.
+  // The file is the last argument that is not a sed script. A trace line is cut
+  // at 200 characters, so the file may be missing and the script (`s#a#b#`)
+  // is then the last thing that looks like a path.
   const file = [...args].reverse().find((a) => looksLikeAFile(a) && !SED_SCRIPT.test(a));
   if (inPlace) {
     return file ? { verb: 'changed', doing: 'Changing', names: [shortPath(file, cwd, home)] } : null;
   }
-  // `sed -n 1,200p <file>` is how an agent reads part of a file; 3,529 of the
-  // 3,894 sed lines measured were exactly that, against 325 that edited.
+  // `sed -n 1,200p <file>` is how an agent reads part of a file.
   if (!flags.some((f) => f === '-n' || f === '-e' || f === '-E')) return null;
   return file ? { verb: 'read', doing: 'Reading', names: [shortPath(file, cwd, home)] } : null;
 }
@@ -546,15 +416,15 @@ function runnerWords(rest, cwd, home) {
 
 // A trace line is cut at 200 characters, so the last test file on a long
 // `vitest run a b c` often arrives without its extension. Anything that looks
-// like a path counts, which is how 586 lines that named nothing got their name.
+// like a path counts.
 function testWords(rest) {
   const args = rest.map(unquote).filter((w) => !isFlag(w) && w !== 'run');
   const files = args.filter((w) => TEST_FILE.test(w) || w.includes('/'));
   return { ...TESTS, names: files.map(lastSegment) };
 }
 
-// Up to three names, then the count. Her standing objection to a cap is one
-// that rounds off in silence, so the count says what it counted.
+// Up to three names, then a count that says what it counted, so the cap is
+// never silent.
 function joinNames(names, many = 'files') {
   const list = [...new Set(names.filter(Boolean))];
   if (!list.length) return '';
@@ -566,10 +436,8 @@ function joinNames(names, many = 'files') {
 /**
  * What a shell command did, in words, or null to leave it as the command.
  *
- * `cwd` and `home` are the folder the session ran in and the Mac's home, the
- * same two arguments `shortPath` takes and for the same reason: a path is only
- * shortenable against the folder it sits under, and nothing is guessed when
- * nobody says.
+ * `cwd` and `home` are the session's folder and the machine's home, passed on
+ * to `shortPath`.
  */
 export function commandWork(raw, cwd = '', home = '') {
   const command = plainCommand(raw);
@@ -594,10 +462,8 @@ export function commandWork(raw, cwd = '', home = '') {
   return { verb: said.verb, doing: said.doing, subject: joinNames(names, first.many) };
 }
 
-/* ------------------------------- THE SUBJECT ------------------------------ */
-// WHICH ONE THIS WAS, in as few characters as the truth allows. `cwd` is the
-// folder the session is running in, which is what makes a path relative; it is
-// optional so that nothing that calls this without one gets worse than before.
+// What the call acted on, as short as it can be without being wrong. With a
+// `cwd`, paths under it are shown relative to it.
 export function workSubject(input, cwd = '', home = '') {
   const i = input ?? {};
   if (i.command != null && String(i.command).trim()) {
@@ -609,9 +475,7 @@ export function workSubject(input, cwd = '', home = '') {
   return String(raw).replace(/\s+/g, ' ').trim();
 }
 
-// THE WHOLE OF IT, for the line she opened. Nothing this file shortens is
-// lost: the full string goes back on the screen above the output, and this is
-// the function that says whether there is anything to put there.
+// The whole string, shown above the output when a line is opened.
 export function fullSubject(input) {
   const i = input ?? {};
   const raw = i.command ?? i.file_path ?? i.path ?? i.notebook_path
@@ -619,10 +483,8 @@ export function fullSubject(input) {
   return String(raw).replace(/\s+$/, '');
 }
 
-/* -------------------------------- THE RUN --------------------------------- */
-// AGGREGATE, HER WORD. Three or more consecutive tool calls fold into one line.
-// Two do not, because two clean lines say more than a fold does and 42 of her
-// 162 runs are exactly two.
+// Three or more consecutive tool calls fold into one line. Two stay as two
+// lines, which say more than a fold does.
 export const RUN_MIN = 3;
 
 export function groupWork(events, { min = RUN_MIN } = {}) {
@@ -635,8 +497,8 @@ export function groupWork(events, { min = RUN_MIN } = {}) {
     run = [];
   };
   for (const e of events ?? []) {
-    // SOMETHING SHE DID IS NOT THE AGENT'S WORK and never folds into it: three
-    // snoozes are three lines, not one "You put it off" (w-49b4e45403).
+    // What the person did is not the agent's work and never folds into it:
+    // three snoozes are three lines.
     if (e && e.kind === 'work' && !e.yours && !e.standalone) { run.push(e); continue; }
     flush();
     out.push(e);
@@ -645,22 +507,15 @@ export function groupWork(events, { min = RUN_MIN } = {}) {
   return out;
 }
 
-// WHAT THE FOLDED LINE SAYS. It says the number first, because the number is
-// the thing a fold owes her: her standing objection to every cap in this
-// codebase is a total that was rounded off without saying so.
+// The folded line says the total first, then up to three verbs with their
+// counts and one count for the rest:
 //
-//   one verb, and one we have a plain word for   `20 things it ran`
-//   one verb we do not                           `31 things it did · write html 31`
-//   several                                      `24 things it did · ran 18 · read 4 · edited 2`
+//   one verb with a plain word   `20 things it ran`
+//   one verb without             `31 things it did · write html 31`
+//   several                      `24 things it did · ran 18 · read 4 · changed 2`
 //
-// Three verbs is the tally's budget; past that the rest is one more count, so
-// the line never grows past what fits.
-//
-// A COUNT OF ONE IS NOT PRINTED. Drawn over her own threads on 2026-08-20 the
-// first cut read `8 things it did · ran 5 · read 2 · asked a question 1`, and
-// that trailing 1 reads as part of the name rather than as a number. A bare
-// verb already says once.
-const PLAIN = new Set(['ran', 'read', 'wrote', 'edited', 'looked for', 'searched for', 'fetched', 'messaged']);
+// A count of one is not printed, because a trailing 1 reads as part of the name.
+const PLAIN = new Set(['ran', 'read', 'wrote', 'changed', 'looked for', 'searched for', 'fetched', 'messaged']);
 const TALLY_VERBS = 3;
 
 export function runSummary(items) {
@@ -679,22 +534,17 @@ export function runSummary(items) {
   return `${list.length} things it did · ${shown.join(' · ')}`;
 }
 
-// THE BAD NEWS IS NEVER BEHIND THE FOLD. Said in plain words on the closed line,
-// in the one colour this surface uses.
+// A failure inside a fold is said on the closed line, so nobody has to open it
+// to find bad news.
 export function runFailures(items) {
   const bad = (items ?? []).filter((e) => e && e.failed).length;
   if (!bad) return '';
   return `${bad} failed`;
 }
 
-/* --------------------------- THE FILE IT CHANGED -------------------------- */
-// A WORK LINE THAT SAYS IT CHANGED A FILE HANDS THE FILE OVER, so the thread
-// can make it a chip.
-//
-// The same four tools main/code-change.mjs reads, and they have to stay the
-// same four: one list saying which calls become a diff and another saying which
-// lines become a chip is two lists that drift, and the symptom of the drift is
-// a chip that opens onto a file the change does not hold.
+// The tools whose file the thread shows as a chip into the change. These must
+// be the same tools main/code-change.mjs reads, or a chip opens onto a file the
+// change does not hold.
 export const CHANGES_A_FILE = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
 
 /**
@@ -711,15 +561,13 @@ export function changedFile(name, input) {
 /**
  * Which entry of a change a path on a work line is, or null.
  *
- * A transcript records the ABSOLUTE path it wrote; a change records the path
- * relative to one of the run's roots when it sits under one, and the absolute
- * path when it does not (main/code-change.mjs). So the two shapes have to meet,
- * and matching on the tail is what makes them: the change's key is either the
- * whole string or a suffix of it at a segment boundary.
+ * A transcript records the absolute path it wrote. A change records the path
+ * relative to one of the run's roots when it sits under one, and absolute when
+ * not (main/code-change.mjs). So a key matches when it is the whole path or a
+ * suffix of it at a segment boundary.
  *
- * The LONGEST match wins. `src/a.ts` and `renderer/src/a.ts` are different
- * files and both are suffixes of the second one's absolute path; taking the
- * first match would open whichever the change happened to list first.
+ * The longest match wins: `src/a.ts` and `renderer/src/a.ts` are both suffixes
+ * of the second one's absolute path.
  */
 export function fileInChange(paths, raw) {
   const p = String(raw ?? '').trim().replace(/^\/private\/tmp\//, '/tmp/');

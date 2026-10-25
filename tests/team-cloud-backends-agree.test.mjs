@@ -174,6 +174,59 @@ for (const [where, makeWorld, enabled] of worlds) {
       await expect(w.theo.putCards(team.id, [{ ...card, people: [] }])).rejects.toThrow();
     });
 
+    // HER THREADS ON HER PHONE (20261014000200_phone_inbox.sql): her own
+    // rows, read by nobody else, not even a teammate, and a command marked
+    // once only by her.
+    it('keeps the phone rows to their owner, teammate or not', async () => {
+      const project = `phone-${shared.slice(0, 8)}`;
+      const device = 'a1b2c3d4e5f6';
+      await w.maya.putPhoneProject({ device, project, name: 'Website' });
+      await w.maya.putPhoneThreads(device, project, [{ item: 'w-1', snapshot: { v: 3, item: { id: 'w-1', title: 'Hi' }, history: [] } }]);
+      expect((await w.maya.phoneThreads()).filter((t) => t.project === project).map((t) => [t.device, t.item, t.snapshot.item.title])).toEqual([[device, 'w-1', 'Hi']]);
+      expect(await w.theo.phoneThreads()).toEqual([]);
+      expect(await w.jun.phoneProjects()).toEqual([]);
+
+      const cmd = await w.maya.addPhoneCommand({ device, project, item: 'w-1', kind: 'reply', payload: { text: 'yes' } });
+      expect(await w.theo.waitingPhoneCommands(device)).toEqual([]);
+      expect(await w.maya.waitingPhoneCommands('0f0e0d0c0b0a')).toEqual([]);
+      await w.theo.markPhoneCommand(cmd.id, 'done');
+      expect((await w.maya.waitingPhoneCommands(device)).map((c) => c.id)).toEqual([cmd.id]);
+      await w.maya.markPhoneCommand(cmd.id, 'done');
+      await w.maya.markPhoneCommand(cmd.id, 'refused: late');
+      expect((await w.maya.phoneCommands()).find((c) => c.id === cmd.id)?.outcome).toBe('done');
+      expect(await w.maya.waitingPhoneCommands(device)).toEqual([]);
+
+      await w.maya.dropPhoneProject(device, project);
+      expect((await w.maya.phoneThreads()).filter((t) => t.project === project)).toEqual([]);
+    });
+
+    // HER COMPUTER'S SETTINGS FOR HER PHONE (20261023000000_phone_settings.sql).
+    it('keeps a computer\'s settings to their owner, and a setting command to no project', async () => {
+      const device = 'a1b2c3d4e5f6';
+      await w.maya.putPhoneSettings({ device, name: 'Studio Mac', settings: { v: 1, workspace: { adhdMode: true } } });
+      await w.maya.putPhoneSettings({ device, name: 'Studio Mac', settings: { v: 1, workspace: { adhdMode: false } } });
+      expect((await w.maya.phoneSettings()).map((s) => [s.device, s.name, s.settings.workspace.adhdMode])).toEqual([[device, 'Studio Mac', false]]);
+      expect(await w.theo.phoneSettings()).toEqual([]);
+      await expect(w.theo.putPhoneSettings({ owner: w.maya.personId, device, name: 'x', settings: {} })).rejects.toThrow();
+      const cmd = await w.maya.addPhoneCommand({ device, kind: 'setting', payload: { scope: 'workspace', key: 'adhdMode', value: true } });
+      expect([cmd.project, cmd.item]).toEqual([null, null]);
+      await expect(w.maya.addPhoneCommand({ device, project: 'alpha', kind: 'setting', payload: {} })).rejects.toThrow();
+      await w.maya.markPhoneCommand(cmd.id, 'done');
+    });
+
+    // THE PHONES HER ALERTS GO TO (20261025000000_push_devices.sql).
+    it('keeps the phones her alerts go to to their owner', async () => {
+      const token = `ExponentPushToken[${shared.replace(/-/g, '').slice(0, 22)}]`;
+      await w.maya.putPushDevice({ token, platform: 'ios', appVersion: '1.0.0' });
+      await w.maya.putPushDevice({ token, platform: 'ios', appVersion: '1.0.1' });
+      expect((await w.maya.pushDevices()).filter((d) => d.token === token).map((d) => d.appVersion)).toEqual(['1.0.1']);
+      expect(await w.theo.pushDevices()).toEqual([]);
+      await w.theo.dropPushDevice(token);
+      expect((await w.maya.pushDevices()).map((d) => d.token)).toContain(token);
+      await w.maya.dropPushDevice(token);
+      expect((await w.maya.pushDevices()).map((d) => d.token)).not.toContain(token);
+    });
+
     // A STATUS LINE YOU WRITE YOURSELF (w-0b54ee983f).
     it('carries a status line to the team and clears it again', async () => {
       const until = Date.now() + 2 * 86_400_000;

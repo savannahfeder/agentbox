@@ -51,7 +51,10 @@ describe('the reply box in a thread', () => {
 
   it('takes a pasted picture and a dropped one', () => {
     const src = code(read('renderer/src/team/ThreadPanel.tsx'));
-    expect(src).toMatch(/onPaste=\{async \(e\) => \{\s*const pasted = await fromPaste\(e\)/);
+    // The box is the chat's editor since w-0d55a2b160, which hands a pasted
+    // or dropped file to `onFiles` rather than putting it in the text.
+    expect(src).toMatch(/onFiles=\{async \(files\) => \{\s*const got = await collectFiles\(files\)/);
+    expect(code(read('renderer/src/team/RichReply.tsx'))).toMatch(/if \(files\.length\) \{ live\.current\.onFiles\?\.\(files\); return true; \}/);
     expect(src).toMatch(/onDrop=\{async \(e\) => \{[\s\S]*?collectFiles\(e\.dataTransfer\.files\)/);
   });
 
@@ -60,7 +63,8 @@ describe('the reply box in a thread', () => {
   // carries the link to it after the words.
   it('saves the picture into the conversation and links it from the reply', () => {
     const src = code(read('renderer/src/team/ThreadPanel.tsx'));
-    expect(src).toMatch(/\[words, await persistAttachments\(product, files\)\]\.filter\(Boolean\)\.join\('\\n\\n'\)/);
+    expect(src).toMatch(/linked = await persistAttachments\(product, files\);/);
+    expect(src).toMatch(/\[words, linked\]\.filter\(Boolean\)\.join\('\\n\\n'\)/);
     expect(code(read('renderer/src/components/ItemThread.tsx'))).toMatch(/<ThreadPanel\s+product=\{item\.product\}/);
   });
 
@@ -68,8 +72,9 @@ describe('the reply box in a thread', () => {
   // empty box is still not.
   it('sends a picture with no words, and never an empty reply', () => {
     const src = code(read('renderer/src/team/ThreadPanel.tsx'));
-    expect(src).toMatch(/if \(!words && !attachments\.length\) return;/);
-    expect(src).toMatch(/const ready = !!draft\.trim\(\) \|\| attachments\.length > 0;/);
+    // `files` is the box's attachments plus a note finished by this Send.
+    expect(src).toMatch(/if \(!words && !files\.length\) return;/);
+    expect(src).toMatch(/const ready = !!draft\.trim\(\) \|\| attachments\.length > 0 \|\| recording;/);
     expect(panel()).toMatch(/<button type="button" class="dock-send" disabled="" title="Send · ↵">Send <kbd>↵<\/kbd><\/button>/);
   });
 });
@@ -83,22 +88,23 @@ describe('the thread reply box is laid out like the chat\'s own', () => {
   const css = read('renderer/src/team/chat.css');
 
   it('has room for three lines, growing as you write', () => {
-    expect(html).toMatch(/<textarea rows="3"/);
-    expect(css).toMatch(/\.chat-thread-box textarea \{[^}]*min-height: 82px; max-height: 240px;/);
+    // An editor since w-0d55a2b160, at the size the text field was.
+    expect(html).toContain('class="chat-thread-input rich-reply"');
+    expect(css).toMatch(/\.chat-thread-input \{[^}]*min-height: 82px; max-height: 240px;/);
   });
 
   it('ends in a footer: the chat\'s formatting bar on the left, Send last, in the corner', () => {
     const bar = html.slice(html.indexOf('class="chat-thread-bar"'));
     expect(bar.indexOf('class="fmt-bar"')).toBeGreaterThan(-1);
     expect(bar.indexOf('class="dock-send"')).toBeGreaterThan(bar.indexOf('aria-label="Add an emoji"'));
-    expect(html.indexOf('class="chat-thread-bar"')).toBeGreaterThan(html.indexOf('<textarea'));
+    expect(html.indexOf('class="chat-thread-bar"')).toBeGreaterThan(html.indexOf('class="chat-thread-input'));
     expect(html.lastIndexOf('</button>')).toBe(html.indexOf('Send <kbd>↵</kbd></button>') + 'Send <kbd>↵</kbd>'.length);
   });
 
   // THE CASE THAT MUST NOT HAPPEN: a panel dragged narrow pushing Send off the
   // edge. The marks go; @, the paperclip and the emoji stay.
   it('lets the formatting marks go before Send when the panel is narrow', () => {
-    expect(css).toMatch(/@container \(max-width: 400px\) \{\s*\.chat-thread-bar \.fmt-btn:has\(~ \.fmt-gap\), \.chat-thread-bar \.fmt-gap \{ display: none; \}/);
+    expect(css).toMatch(/@container \(max-width: 400px\) \{\s*\.chat-thread-bar \.fmt-mark, \.chat-thread-bar \.fmt-gap \{ display: none; \}/);
   });
 });
 
@@ -134,11 +140,13 @@ describe('a new message to a person', () => {
 
   it('sends the files it holds with the words', () => {
     expect(src).toMatch(/attachments\.map\(\(\{ name, dataBase64, srcPath \}\) => \(\{ name, dataBase64, srcPath \}\)\)/);
-    expect(src).toMatch(/person \? !!text\.trim\(\) \|\| attachments\.length > 0/);
+    // Addressed to a person AND sent as a message: a task to a person is
+    // held to the task's bar instead (w-c34591721f).
+    expect(src).toMatch(/asMessage \? !!text\.trim\(\) \|\| attachments\.length > 0/);
   });
 
   it('has an attach button beside Send', () => {
-    const from = src.indexOf('{person ? (');
+    const from = src.indexOf("{person && sendAs === 'message' ? (");
     const bar = src.slice(from, src.indexOf('\n        ) : (', from));
     expect(bar).toMatch(/aria-label="Attach files"/);
   });

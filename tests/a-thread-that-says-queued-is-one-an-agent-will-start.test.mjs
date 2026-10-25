@@ -146,14 +146,77 @@ describe('a Codex account still being added', () => {
     expect([1, 2, 3, 4].map(() => sup._pickProfile('codex'))).toEqual(['default', 'default', 'default', 'default']);
   });
 
-  it('takes its turn once its sign-in lands', () => {
+  // AND IT TAKES NO TURN WHEN ITS SIGN-IN LANDS (w-dac993a554): work runs on
+  // one account, so a login just added is somewhere to switch to rather than a
+  // second share of the threads. Picked, it is the account.
+  it('is somewhere to switch to once its sign-in lands, not a second share', () => {
     const { halfAdded, signedIn } = twoAccounts({ secondSignedIn: true });
-    const sup = build({ extra: { codexHome: signedIn, codexProfiles: ['default', halfAdded] } });
-    expect(new Set([1, 2].map(() => sup._pickProfile('codex')))).toEqual(new Set(['default', halfAdded]));
+    const extra = { codexHome: signedIn, codexProfiles: ['default', halfAdded] };
+    const sup = build({ extra });
+    expect([1, 2].map(() => sup._pickProfile('codex'))).toEqual(['default', 'default']);
+    const picked = build({ extra: { ...extra, activeAccount: { codex: halfAdded } } });
+    expect(picked._pickProfile('codex')).toBe(halfAdded);
   });
 
   it('is still tried when no account has a sign-in, so a signed-out Mac says so', () => {
     const sup = build({ extra: { codexHome: temp('codex-empty-'), codexProfiles: ['default'] } });
     expect(sup._pickProfile('codex')).toBe('default');
+  });
+});
+
+// A FIFTH PATH, FOUND BY THE POWER TEST (run 1 issue 4, run 2 issue 41,
+// w-712fc99e8d): search tagged a finished thread QUEUED while its own preview
+// read "Done: Write the on-call runbook". The tick walks past a row already
+// holding an agent's result nobody has replied to (`awaitingHer` in `isFresh`,
+// which is what stops the same answer being written three times); the queued
+// list was a second copy of those rules and did not know it. Both now read the
+// one pair of predicates.
+describe('a thread already holding an answer for you', () => {
+  const answered = (extra = {}) => row({
+    wrote: { result: { ts: 50, source: 'agent' } }, updatedAt: 50, ...extra,
+  });
+
+  it('is not queued, because nothing is going to start on it', async () => {
+    const sup = build({ items: [answered()] });
+    expect(sup.status().queued).toEqual([]);
+    await sup.tick();
+    expect(codexSpawns()).toHaveLength(0);
+  });
+
+  it('is queued again once you have written back', async () => {
+    const sup = build({ items: [answered({ wrote: { result: { ts: 50, source: 'agent' }, body: { ts: 60, source: 'founder' } } })] });
+    expect(sup.status().queued).toEqual(['w-task']);
+    await sup.tick();
+    expect(codexSpawns()).toHaveLength(1);
+  });
+
+  it('and a thread with no result on it is queued, as it always was', async () => {
+    const sup = build({ items: [row()] });
+    expect(sup.status().queued).toEqual(['w-task']);
+    await sup.tick();
+    expect(codexSpawns()).toHaveLength(1);
+  });
+
+  it('is not queued either when only a note has been written, since that is no answer', () => {
+    const sup = build({ items: [row({ wrote: { note: { ts: 50, source: 'agent' } } })] });
+    expect(sup.status().queued).toEqual(['w-task']);
+  });
+});
+
+describe('the queued list and the tick', () => {
+  it('ask the same two questions, so neither can drift from the other', async () => {
+    const items = [
+      row({ id: 'w-fresh' }),
+      row({ id: 'w-answered', wrote: { result: { ts: 50, source: 'agent' } } }),
+      row({ id: 'w-reply', answer: 'go on', wrote: { answer: { ts: 60, source: 'founder' } } }),
+      row({ id: 'w-withdrawn', answer: '(withdrawn)' }),
+      row({ id: 'w-proposal', labels: [] }),
+      row({ id: 'w-question', kind: 'question' }),
+    ];
+    const sup = build({ items, extra: { maxConcurrentSessions: 6 } });
+    const queued = sup.status().queued;
+    await sup.tick();
+    expect(new Set(sup.sessions.keys())).toEqual(new Set(queued));
+    expect(new Set(queued)).toEqual(new Set(['w-fresh', 'w-reply']));
   });
 });

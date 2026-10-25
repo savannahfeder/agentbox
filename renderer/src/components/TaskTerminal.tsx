@@ -1,12 +1,14 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {api} from '../api';
+import {MAC} from '../this-keyboard';
 import {commandRunning,whenACommandFinishes} from '../../../shared/terminal-state.mjs';
 import {linksAtRow} from '../../../shared/terminal-links.mjs';
 import {guardInvalidRange} from '../../../shared/xterm-invalid-range.mjs';
 import {inputQueue} from '../../../shared/terminal-input.mjs';
 import {optionWordKey} from '../../../shared/terminal-keys.mjs';
 import {dragSize,readSavedSize,SIZE_KEY} from '../../../shared/terminal-size.mjs';
+import {terminalKeys} from '../../../shared/terminal-focus.mjs';
 import {CrossIcon} from './CrossIcon';
 import '@xterm/xterm/css/xterm.css';
 import './task-terminal.css';
@@ -35,6 +37,7 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
   const saved=views.get(key);
   const [open,setOpen]=useState(saved?.open??startOpen);
   const [placement,setPlacement]=useState<'bottom'|'side'>(saved?.placement??'bottom');
+  const [keys]=useState(()=>terminalKeys({startOpen,wasOpen:saved?.open}));
   const [error,setError]=useState('');const [cwd,setCwd]=useState('');
   const [exited,setExited]=useState(false);const [processName,setProcessName]=useState('Shell');
   const [revision,setRevision]=useState(0);const host=useRef<HTMLDivElement>(null);
@@ -77,7 +80,9 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
     return ()=>{window.removeEventListener('task-terminal-open',show);window.removeEventListener('task-terminal-toggle',flip);};
   },[]);
   useEffect(()=>{
-    if(!open||!host.current)return;
+    if(!open){keys.hidden();return;}
+    if(!host.current)return;
+    const takeKeys=keys.takesKeys(revision);
     let cancelled=false,timer:ReturnType<typeof setTimeout>|undefined;
     let dispose=()=>{};
     setError('');setExited(false);
@@ -125,7 +130,7 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
         const input=inputQueue(data=>api.terminal({product,id,action:'write',data}),{onError:report});
         const subscription=terminal.onData(data=>input.push(data));
         // Option+Left/Right jump a word, as in Mac Terminal (shared/terminal-keys.mjs).
-        const mac=/Mac/.test(navigator.platform);
+        const mac=MAC;
         terminal.attachCustomKeyEventHandler(event=>{const sequence=optionWordKey(event,mac);if(sequence===undefined)return true;if(sequence)input.push(sequence);event.preventDefault();return false;});
         dispose=()=>{if(ready)screenCache.set(key,{token,screen:serializer.serialize({scrollback:1000}),offset,cols:terminal.cols,rows:terminal.rows});observer.disconnect();subscription.dispose();terminal.dispose();};
         const consume=async(state:any)=>{if(cancelled)return;setCwd(state.cwd);setProcessName(state.process);setExited(state.exited);watch(state.process,state.exited);if(state.truncated){terminal.reset();terminal.writeln('[Earlier terminal output omitted]');}await new Promise<void>(resolve=>terminal.write(state.data,resolve));offset=state.offset;};
@@ -133,7 +138,7 @@ export function TaskTerminal({product,id,headerTarget,startOpen=false,commandSes
         if(cancelled)return;
         token=initial.token;const cached=screenCache.get(key);
         if(cached?.token===token){terminal.resize(cached.cols,cached.rows);await new Promise<void>(resolve=>terminal.write(cached.screen,resolve));initial=await api.terminal({product,id,action:'read',offset:cached.offset});}
-        await consume(initial);ready=true;resize();terminal.focus();
+        await consume(initial);ready=true;resize();if(takeKeys)terminal.focus();
         // EACH READ WAITS IN MAIN for the shell's next output and comes back the
         // moment there is some, so an echo is on screen as soon as the shell
         // prints it (main/task-terminals.mjs, `read`). A main that cannot wait

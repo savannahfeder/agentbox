@@ -172,17 +172,17 @@ describe('what an urgent row may not take', () => {
     expect(killed).toEqual([]);
   });
 
-  // An agent cannot promote its own proposal into something that takes a
-  // running session away from her work. itemPriority already discards an
-  // agent's number; this is that rule reaching all the way through.
-  it('ignores a nine an agent wrote on its own item', async () => {
+  // A LEVEL COUNTS WHOEVER SET IT (w-5ac9c9006d, 2026-10-16): "always treat
+  // priorities as the source of truth, regardless of where they came from."
+  // An agent's nine interrupts like hers; a wrong one is hers to lower.
+  it('takes a slot for a nine an agent wrote, like any Urgent row', async () => {
     build([
       hers('w-medium', 5),
       hers('w-agent-nine', 9, { labels: ['founder'], wrote: { priority: { ts: NOW, source: 'agent' } } }),
     ], 1);
     running('w-medium');
     await sup.tick();
-    expect(killed).toEqual([]);
+    expect(killed).toEqual(['w-medium']);
   });
 
   // A session whose id has not reached us yet cannot be resumed, so killing it

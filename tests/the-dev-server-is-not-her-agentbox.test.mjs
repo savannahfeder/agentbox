@@ -125,7 +125,8 @@ describe('the screen she was describing', () => {
   it('is what App draws with no snapshot, which is why a rebuilt App shows it', () => {
     // If this line moves, the diagnosis in main/dev-window.mjs stops being true
     // and starts lying to whoever reads it next.
-    expect(read('renderer/src/App.tsx')).toMatch(/if \(!snap\) return <div className="boot">\{NAME\}<\/div>;/);
+    expect(read('renderer/src/App.tsx')).toMatch(/if \(!snap\) return <Booting \/>;/);
+    expect(read('renderer/src/App.tsx')).toMatch(/<div className="boot"><span>\{NAME\}<\/span><\/div>/);
   });
 });
 

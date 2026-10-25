@@ -60,7 +60,7 @@ describe('one list tab, and it is lit wherever her threads are listed', () => {
   // approved 2026-10-01 (w-e731ca9376): In progress, Scheduled and Done are
   // tabs on the Inbox page now, so standing on any of them is standing in the
   // Inbox, and the one tab the sidebar has for them stays lit.
-  it.each(['inbox', 'progress', 'snoozed', 'done', 'all'])('lights Inbox on the %s list', (view) => {
+  it.each(['inbox', 'progress', 'snoozed', 'done'])('lights Inbox on the %s list', (view) => {
     const html = draw({ view });
     expect(inboxTab(html)).toContain('workspace-tab active');
     expect(inboxTab(html)).toContain('aria-current="page"');

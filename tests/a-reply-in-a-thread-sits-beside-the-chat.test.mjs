@@ -237,7 +237,10 @@ describe('the panel', () => {
   });
 
   it('has a reply box of its own', () => {
-    expect(html).toContain('placeholder="Reply in thread…"');
+    // The chat's editor since w-0d55a2b160, which draws its words, and so its
+    // placeholder, only once it is in a window.
+    expect(html).toContain('class="chat-thread-input rich-reply"');
+    expect(fs.readFileSync(new URL('../renderer/src/team/ThreadPanel.tsx', import.meta.url), 'utf8')).toContain('placeholder="Reply in thread…"');
   });
 
   it('can be dragged wider or narrower from its left edge', () => {

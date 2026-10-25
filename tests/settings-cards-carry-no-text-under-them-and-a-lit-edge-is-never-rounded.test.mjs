@@ -72,22 +72,11 @@ describe('the corners', () => {
     expect(rule('.set-plate:not(.set-keys)')).toContain('border-radius: 10px;');
   });
 
-  it('keeps the account in use square, inset clear of the card\'s corners', () => {
-    const on = rule('.set-plate > .set-acct-row.on');
-    expect(on).toContain('border-radius: 0;');
-    expect(on).toMatch(/margin: 6px -10px;/);
-    // The card's sides are 18px in, so the row stops 8px short of them.
-    expect(rule('.set-plate:not(.set-keys)')).toContain('padding: 0 18px;');
-  });
-
-  it('wears the app\'s selection bar there, not a rule of its own', () => {
-    expect(rule('.set-plate > .set-acct-row.on')).toContain('border-left: 2px solid var(--select-bar);');
-  });
-
+  // The account-in-use row that wore one went with the Codex account list
+  // (2026-10-25); both agents draw tiles now. The rule stays for the next edge.
   it('rounds nothing that wears a highlighted edge', () => {
     // Every rule that draws a coloured edge on one side draws no curve.
     const blocks = css.split('}').filter((b) => /border-left:\s*\d+px solid var\(--(select-bar|accent)\)/.test(b));
-    expect(blocks.length).toBeGreaterThan(0);
     for (const b of blocks) expect(b).toMatch(/border-radius: 0;/);
   });
 });

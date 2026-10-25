@@ -120,7 +120,7 @@ describe('1. the tutorial offers itself when somebody makes a new project', () =
   it('writes the bit on BOTH buttons, so turning it down is an answer too', () => {
     // An offer that only remembers being accepted comes back on the next
     // project, which is the nagging she refuses.
-    const started = app.slice(app.indexOf('const startTutorial = useCallback'), app.indexOf('}, []);', app.indexOf('const startTutorial = useCallback')));
+    const started = app.slice(app.indexOf('const startTutorial = useCallback'), app.indexOf('\n  }, [', app.indexOf('const startTutorial = useCallback')));
     expect(started).toContain('rememberOffered(localStorage)');
     const declined = app.slice(app.indexOf('<TutorialOffer'), app.indexOf('<TutorialOffer') + 1400);
     expect(declined).toContain('onNot={');
@@ -133,8 +133,10 @@ describe('1. the tutorial offers itself when somebody makes a new project', () =
     // somebody who skipped has seen none of the practice, and the next project
     // they make is exactly the moment they might want it after all.
     expect(app).toContain('if (practised) rememberOffered(localStorage);');
-    expect(app).toContain('onDone={(chosen) => finishRun(chosen, { practised: true })}');
-    expect(app).toContain('finishRun([], { filed: added, practised: true });');
+    // Skipping the tutorial reaches the import card too since w-62228098e6, so
+    // the card asks whether the practice round was made.
+    expect(app).toContain('onDone={(chosen) => { const practised = !!runRef.current?.practice; finishRun(chosen, { practised, celebrate: practised }); }}');
+    expect(app).toContain('finishRun([], { filed: added, practised, celebrate: practised });');
     expect(app).toContain("onLeave={() => finishRun([], { celebrate: false })}");
     const out = app.slice(app.indexOf('<WayOut'), app.indexOf('<WayOut') + 400);
     expect(out).not.toContain('practised');
@@ -191,7 +193,9 @@ describe('1. the tutorial offers itself when somebody makes a new project', () =
     // the call. AND THE WORD IS TUTORIAL SINCE 2026-08-28.
     expect(COPY.offerLater).toContain('⌘K');
     expect(COPY.offerLater.toLowerCase()).toContain('tutorial');
-    expect(app).toContain('showToast(WALK_COPY.offerLater)');
+    // `sayKeys` draws that ⌘K as the key this keyboard really has, so the
+    // sentence says Ctrl+K on Linux (shared/key-caps.mjs).
+    expect(app).toContain('showToast(sayKeys(WALK_COPY.offerLater))');
   });
 });
 
@@ -298,7 +302,7 @@ describe('2. the two of them are two things, and a stranger can tell them apart'
     // `walkAgain` calls `restartFirstRun` because that walk really is the first
     // run and has to believe it. The tutorial does not: the person is set up and
     // stays set up.
-    const fn = app.slice(app.indexOf('const startTutorial = useCallback'), app.indexOf('}, []);', app.indexOf('const startTutorial = useCallback')));
+    const fn = app.slice(app.indexOf('const startTutorial = useCallback'), app.indexOf('\n  }, [', app.indexOf('const startTutorial = useCallback')));
     expect(fn).not.toContain('restartFirstRun');
     expect(fn).toContain('setRun(tutorialRun(product))');
     // And it touches neither the store nor the main process.
@@ -333,7 +337,7 @@ describe('2. the two of them are two things, and a stranger can tell them apart'
   it('puts the ⌘K beat back to nobody-has-opened-it before either walk starts', () => {
     for (const name of ['walkAgain', 'startTutorial']) {
       const from = app.indexOf(`const ${name} = useCallback`);
-      const fn = app.slice(from, app.indexOf('}, []);', from));
+      const fn = app.slice(from, app.indexOf('\n  }, [', from));
       expect(fn, name).toContain('sawPalette.current = false;');
     }
   });

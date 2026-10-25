@@ -58,7 +58,8 @@ describe('on the list', () => {
 
   it('still reads the other filters on a message, like any thread of yours', () => {
     expect(keeps(message(), display({ projects: ['team-app'], priorities: ['urgent'] }), NOW, null, DIRECT)).toBe(false);
-    expect(keeps(message({ updatedAt: NOW - 30 * 86_400_000 }), display({ projects: ['team-app'], updated: 'week' }), NOW, null, DIRECT)).toBe(false);
+    const monthAgo = NOW - 30 * 86_400_000;
+    expect(keeps(message({ createdAt: monthAgo, updatedAt: monthAgo, wrote: { body: { ts: monthAgo, source: 'founder', by: RILEY } } }), display({ projects: ['team-app'], updated: 'week' }), NOW, null, DIRECT)).toBe(false);
   });
 
   it('does not let a project through because its slug merely looks like a conversation', () => {

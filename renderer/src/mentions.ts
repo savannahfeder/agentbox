@@ -4,7 +4,7 @@
 // says what kind of thing it is, the name says which, and the full path waits
 // in the hover title rather than sitting orange in the sentence.
 import { sourceReference } from './source-reference.mjs';
-import { isMediaPath } from './remark-artifact-paths';
+import { isMediaPath } from './artifact-paths';
 
 export type MentionKind = 'thread' | 'folder' | 'page' | 'doc' | 'image' | 'code' | 'media' | 'link' | 'file';
 

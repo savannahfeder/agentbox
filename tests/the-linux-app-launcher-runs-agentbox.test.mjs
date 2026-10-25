@@ -4,6 +4,11 @@
 // Exec=<command>, and this session's PATH includes ~/.local/bin. The entry
 // has to run that command. `npm start` is not what installs it. The published
 // browser package must not install it either.
+//
+// The command itself runs Electron's own cli rather than the binary in
+// node_modules, since 2026-10-24: that binary is downloaded on the first run,
+// so asking for it at install time wrote no launcher at all
+// (tests/a-fresh-clone-on-linux-gets-an-app-launcher).
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -17,7 +22,14 @@ const repo = path.join(path.dirname(new URL(import.meta.url).pathname), '..');
 
 let home;
 let appDir;
-let electron;
+let electronCli;
+
+// The node the install was run with is named in the script, with PATH as the
+// fallback. One place, so every expectation below reads the same shape.
+const node = '/usr/bin/node-of-the-install';
+function script(cli, dir) {
+  return `#!/bin/sh\n# Electron downloads its binary on the first run, so this goes through its own cli.\nnode='${node}'\n[ -x "$node" ] || node=node\nexec "$node" '${cli}' '${dir}' "$@"\n`;
+}
 
 function desktopFields(text) {
   const fields = {};
@@ -39,8 +51,9 @@ function commandPath(dir) {
 beforeEach(() => {
   home = fs.mkdtempSync(path.join(os.tmpdir(), 'linux-launcher-home-'));
   appDir = fs.mkdtempSync(path.join(os.tmpdir(), 'linux-launcher-app-'));
-  electron = path.join(appDir, 'electron');
-  fs.writeFileSync(electron, '');
+  electronCli = path.join(appDir, 'node_modules', 'electron', 'cli.js');
+  fs.mkdirSync(path.dirname(electronCli), { recursive: true });
+  fs.writeFileSync(electronCli, '');
   fs.mkdirSync(path.join(appDir, 'docs', 'readme'), { recursive: true });
   fs.writeFileSync(path.join(appDir, 'docs', 'readme', 'icon.svg'), '<svg/>');
 });
@@ -52,10 +65,10 @@ afterEach(() => {
 
 describe('the linux app launcher runs agentbox', () => {
   it('writes a command on ~/.local/bin and a desktop entry that runs it', () => {
-    const result = installLinuxLauncher({ appDir, home, platform: 'linux', env: {}, electron });
+    const result = installLinuxLauncher({ appDir, home, platform: 'linux', env: {}, electronCli, node });
     const file = entryPath(path.join(home, '.local', 'share'));
     const command = commandPath(home);
-    expect(result).toEqual({ changed: true, file, command });
+    expect(result).toEqual({ changed: true, file, command, why: null });
     const text = fs.readFileSync(file, 'utf8');
     expect(text.startsWith('[Desktop Entry]\n')).toBe(true);
     expect(text.endsWith('\n')).toBe(true);
@@ -67,7 +80,7 @@ describe('the linux app launcher runs agentbox', () => {
     expect(fields.Exec).toBe(nameSlug);
     expect(fields.TryExec).toBe(nameSlug);
     expect(fields.Path).toBeUndefined();
-    expect(fields.Exec).not.toContain(electron);
+    expect(fields.Exec).not.toContain(electronCli);
     expect(fields.Exec).not.toContain(appDir);
     expect(fields.Icon).toBe(path.join(appDir, 'docs', 'readme', 'icon.svg'));
     expect(fields.Terminal).toBe('false');
@@ -75,7 +88,7 @@ describe('the linux app launcher runs agentbox', () => {
     expect(fields.StartupWMClass).toBe(nameSlug);
     expect(fields.Categories).toBe('Development;');
     expect(fs.statSync(command).mode & 0o111).not.toBe(0);
-    expect(fs.readFileSync(command, 'utf8')).toBe(`#!/bin/sh\nexec '${electron}' '${appDir}' "$@"\n`);
+    expect(fs.readFileSync(command, 'utf8')).toBe(script(electronCli, appDir));
     const store = defaultStoreRoot({ home, platform: 'linux', env: {} });
     expect(file.startsWith(store + path.sep)).toBe(false);
     expect(command.startsWith(store + path.sep)).toBe(false);
@@ -85,7 +98,7 @@ describe('the linux app launcher runs agentbox', () => {
     const xdg = fs.mkdtempSync(path.join(os.tmpdir(), 'linux-launcher-xdg-'));
     try {
       const absolute = installLinuxLauncher({
-        appDir, home, platform: 'linux', env: { XDG_DATA_HOME: xdg }, electron,
+        appDir, home, platform: 'linux', env: { XDG_DATA_HOME: xdg }, electronCli, node,
       });
       expect(absolute.file).toBe(entryPath(xdg));
       expect(absolute.command).toBe(commandPath(home));
@@ -95,7 +108,7 @@ describe('the linux app launcher runs agentbox', () => {
         const fresh = fs.mkdtempSync(path.join(os.tmpdir(), 'linux-launcher-home-'));
         try {
           const result = installLinuxLauncher({
-            appDir, home: fresh, platform: 'linux', env: { XDG_DATA_HOME: given }, electron,
+            appDir, home: fresh, platform: 'linux', env: { XDG_DATA_HOME: given }, electronCli, node,
           });
           expect(result.file).toBe(entryPath(path.join(fresh, '.local', 'share')));
           expect(result.command).toBe(commandPath(fresh));
@@ -110,16 +123,16 @@ describe('the linux app launcher runs agentbox', () => {
 
   it('quotes a checkout path that contains a space or a quote', () => {
     const spaced = fs.mkdtempSync(path.join(os.tmpdir(), 'linux launcher '));
-    const bin = path.join(spaced, 'electron bin');
+    const cli = path.join(spaced, 'electron cli.js');
     const quoted = path.join(spaced, "o'brien");
     fs.mkdirSync(quoted, { recursive: true });
-    fs.writeFileSync(bin, '');
+    fs.writeFileSync(cli, '');
     try {
       const result = installLinuxLauncher({
-        appDir: quoted, home, platform: 'linux', env: {}, electron: bin,
+        appDir: quoted, home, platform: 'linux', env: {}, electronCli: cli, node,
       });
-      const script = fs.readFileSync(result.command, 'utf8');
-      expect(script).toBe(`#!/bin/sh\nexec '${bin}' '${quoted.replaceAll("'", `'\\''`)}' "$@"\n`);
+      expect(fs.readFileSync(result.command, 'utf8'))
+        .toBe(script(cli, quoted.replaceAll("'", `'\\''`)));
       expect(desktopFields(fs.readFileSync(result.file, 'utf8')).Exec).toBe(nameSlug);
     } finally {
       fs.rmSync(spaced, { recursive: true, force: true });
@@ -128,29 +141,29 @@ describe('the linux app launcher runs agentbox', () => {
 
   it('omits Icon when the checkout has no icon file', () => {
     fs.rmSync(path.join(appDir, 'docs', 'readme', 'icon.svg'));
-    const result = installLinuxLauncher({ appDir, home, platform: 'linux', env: {}, electron });
+    const result = installLinuxLauncher({ appDir, home, platform: 'linux', env: {}, electronCli, node });
     const fields = desktopFields(fs.readFileSync(result.file, 'utf8'));
     expect(fields.Icon).toBeUndefined();
     expect(fs.readFileSync(result.file, 'utf8')).not.toMatch(/^Icon=/m);
   });
 
   it('leaves both files alone when a second run would write the same command', () => {
-    const first = installLinuxLauncher({ appDir, home, platform: 'linux', env: {}, electron });
+    const first = installLinuxLauncher({ appDir, home, platform: 'linux', env: {}, electronCli, node });
     const desktopBefore = fs.statSync(first.file);
     const commandBefore = fs.statSync(first.command);
-    const second = installLinuxLauncher({ appDir, home, platform: 'linux', env: {}, electron });
-    expect(second).toEqual({ changed: false, file: first.file, command: first.command });
+    const second = installLinuxLauncher({ appDir, home, platform: 'linux', env: {}, electronCli, node });
+    expect(second).toEqual({ changed: false, file: first.file, command: first.command, why: null });
     expect(fs.statSync(first.file).mtimeMs).toBe(desktopBefore.mtimeMs);
     expect(fs.statSync(first.command).mtimeMs).toBe(commandBefore.mtimeMs);
   });
 
-  it('rewrites the command when the electron binary moves, and the entry still runs its name', () => {
-    installLinuxLauncher({ appDir, home, platform: 'linux', env: {}, electron });
-    const moved = path.join(appDir, 'electron-moved');
+  it('rewrites the command when Electron moves, and the entry still runs its name', () => {
+    installLinuxLauncher({ appDir, home, platform: 'linux', env: {}, electronCli, node });
+    const moved = path.join(appDir, 'node_modules', 'electron', 'cli-moved.js');
     fs.writeFileSync(moved, '');
-    const result = installLinuxLauncher({ appDir, home, platform: 'linux', env: {}, electron: moved });
+    const result = installLinuxLauncher({ appDir, home, platform: 'linux', env: {}, electronCli: moved, node });
     expect(result.changed).toBe(true);
-    expect(fs.readFileSync(result.command, 'utf8')).toBe(`#!/bin/sh\nexec '${moved}' '${appDir}' "$@"\n`);
+    expect(fs.readFileSync(result.command, 'utf8')).toBe(script(moved, appDir));
     expect(desktopFields(fs.readFileSync(result.file, 'utf8')).Exec).toBe(nameSlug);
   });
 
@@ -159,7 +172,7 @@ describe('the linux app launcher runs agentbox', () => {
     const previous = process.env.XDG_DATA_HOME;
     process.env.XDG_DATA_HOME = xdg;
     try {
-      const result = installLinuxLauncher({ appDir, home, platform: 'linux', electron });
+      const result = installLinuxLauncher({ appDir, home, platform: 'linux', electronCli, node });
       expect(result.file).toBe(entryPath(path.join(home, '.local', 'share')));
       expect(fs.existsSync(entryPath(xdg))).toBe(false);
     } finally {
@@ -176,9 +189,10 @@ describe('what the launcher install must never do', () => {
     try {
       for (const platform of ['darwin', 'win32']) {
         const result = installLinuxLauncher({
-          appDir, home, platform, env: { XDG_DATA_HOME: xdg }, electron,
+          appDir, home, platform, env: { XDG_DATA_HOME: xdg }, electronCli, node,
         });
-        expect(result).toEqual({ changed: false, file: null, command: null });
+        // No `why`: a Mac is not a machine that should have had a launcher.
+        expect(result).toEqual({ changed: false, file: null, command: null, why: null });
       }
       expect(fs.existsSync(entryPath(xdg))).toBe(false);
       expect(fs.existsSync(commandPath(home))).toBe(false);
@@ -187,22 +201,27 @@ describe('what the launcher install must never do', () => {
     }
   });
 
-  it('writes nothing when the electron binary is missing, and a failure does not throw', () => {
+  it('writes nothing when there is no Electron at all, and says so rather than failing', () => {
     const missing = installLinuxLauncher({
-      appDir, home, platform: 'linux', env: {}, electron: path.join(appDir, 'no-electron'),
+      appDir, home, platform: 'linux', env: {}, electronCli: path.join(appDir, 'no-electron', 'cli.js'), node,
     });
-    expect(missing).toEqual({ changed: false, file: null, command: null });
+    expect(missing.changed).toBe(false);
+    expect(missing.command).toBe(null);
+    expect(missing.why).toMatch(/Electron package is not installed/);
     expect(fs.existsSync(entryPath(path.join(home, '.local', 'share')))).toBe(false);
     expect(fs.existsSync(commandPath(home))).toBe(false);
 
     const blocker = path.join(home, 'not-a-directory');
     fs.writeFileSync(blocker, 'x');
     expect(() => installLinuxLauncher({
-      appDir, home: path.join(blocker, 'home'), platform: 'linux', env: {}, electron,
+      appDir, home: path.join(blocker, 'home'), platform: 'linux', env: {}, electronCli, node,
     })).not.toThrow();
-    expect(installLinuxLauncher({
-      appDir, home: path.join(blocker, 'home'), platform: 'linux', env: {}, electron,
-    })).toEqual({ changed: false, file: null, command: null });
+    const blocked = installLinuxLauncher({
+      appDir, home: path.join(blocker, 'home'), platform: 'linux', env: {}, electronCli, node,
+    });
+    expect(blocked.changed).toBe(false);
+    expect(blocked.command).toBe(null);
+    expect(blocked.why).toMatch(/failed/);
   });
 
   it('is installed with the checkout, and never by npm start or the browser package', () => {
@@ -220,7 +239,9 @@ describe('what the launcher install must never do', () => {
     expect(bin).not.toMatch(/linux-launcher/);
     expect(dev).not.toMatch(/linux-launcher/);
     expect(after).toMatch(/linux-launcher\.mjs/);
-    expect(after).toMatch(/existsSync\(launcherPath\)/);
+    // The published package carries neither this file nor link-own-bin.mjs, so
+    // the postinstall has to look before it loads one.
+    expect(after).toMatch(/if \(!fs\.existsSync\(at\)\) return null/);
     expect(main).toMatch(/installLinuxLauncher\(\{[^}]*env:\s*process\.env/);
     expect(main).toMatch(/!app\.isPackaged/);
     const readme = fs.readFileSync(path.join(repo, 'README.md'), 'utf8');

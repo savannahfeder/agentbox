@@ -26,6 +26,9 @@ set -u
 git_dir=$(git rev-parse --absolute-git-dir 2>/dev/null) || exit 0
 common_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || exit 0
 [ "$git_dir" = "$common_dir" ] || exit 0
+# A cloud run lays a thread's folder down as a repository of its own, at the
+# path it has on the Mac; that is a task folder, not her checkout.
+case "$(git rev-parse --show-toplevel 2>/dev/null)" in */.claude/worktrees/*) exit 0 ;; esac
 
 echo >&2
 echo "  ================================================================" >&2

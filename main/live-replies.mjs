@@ -15,9 +15,11 @@ import { TURN_CLOSED } from './claude-input.mjs';
 // is the result, so without this it has every reason to save the answer for an
 // ending the person is not waiting through.
 //
-// Their words go LAST, as in `replyBrief`: the newest thing they said is the
-// newest thing in its context, and nothing of ours is written after it.
-export function liveReplyBrief(answer) {
+// Their words go LAST: the newest thing they said is the newest thing in its
+// context, and nothing of ours is written after it. `files` is the supervisor's
+// `attachmentBlock` for this reply: the pictures in it by absolute path, which
+// is also what a cloud run reads to send them up (main/cloud/run.mjs).
+export function liveReplyBrief(answer, files = '') {
   return [
     'This arrived in your thread just now, while you work, and they are watching',
     'for a reply. Do what it asks. If it asks you anything, or says it did not',
@@ -25,6 +27,7 @@ export function liveReplyBrief(answer) {
     'you go back to what you were doing: the sentences you write while you work',
     'are what they read, so an answer saved for the end reads as no answer at all.',
     'Then carry on.',
+    ...(files ? [files] : []),
     '',
     'What they said:',
     '',
@@ -49,7 +52,10 @@ export function submitReply(supervisor, payload, commit) {
     // A held Remote Control conversation is sitting idle rather than working,
     // and the slash commands it takes stop being commands once prose is wrapped
     // round them. Both reach it exactly as typed.
-    const taken = session.child.steer(session.remoteIdle ? answer : liveReplyBrief(answer));
+    const files = session.remoteIdle ? null : supervisor.replyFiles?.(product, answer, session.engine, id);
+    const taken = session.remoteIdle
+      ? session.child.steer(answer)
+      : session.child.steer(liveReplyBrief(answer, files?.block), files?.pictures ?? []);
     // SENT NOW: her words go in line first, then the step is cut, in the same
     // tick, so the cut turn's result can never close the input ahead of them.
     // A cut that fails leaves the message waiting its turn, which is still sent.

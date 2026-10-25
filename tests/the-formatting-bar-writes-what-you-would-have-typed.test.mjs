@@ -108,7 +108,7 @@ describe('the bar is wired to the reply box', () => {
   const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
 
   it('is drawn on the composer, taking the box and the attach handler', () => {
-    expect(focus).toMatch(/<FormatBar box=\{ref\} onChange=\{changeText\} onAttach=\{pickFiles\} \/>/);
+    expect(focus).toMatch(/<FormatBar box=\{ref\} onChange=\{changeText\} onAttach=\{pickFiles\}[^>]*\/>/);
   });
 
   it('is drawn only when the reply goes to people, never to an agent', () => {

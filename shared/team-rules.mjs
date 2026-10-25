@@ -71,11 +71,16 @@ export function lastSpeaker(item) {
  * first, with how many replies are new, who wrote them, what the thread is
  * about and its newest words. Null for a row with no record of who spoke where
  * (one from before threads), which then reads by `lastSpeaker` as it always did.
+ *
+ * Marking the chat done settles everything said before it, for you
+ * (`talk.settled`, w-8a14927b21), so your own message reopening it brings
+ * nothing old back.
  */
 export function whatWaits(item, me) {
   const talk = item?.talk;
   if (!talk || !me) return null;
-  const since = (list) => { let n = 0; for (let k = list.length - 1; k >= 0 && list[k].by !== me; k -= 1) n += 1; return n; };
+  const settled = talk.settled?.[me] ?? 0;
+  const since = (list) => { let n = 0; for (let k = list.length - 1; k >= 0 && list[k].by !== me && list[k].ts > settled; k -= 1) n += 1; return n; };
   const threads = [];
   for (const [uid, t] of Object.entries(talk.threads ?? {})) {
     const replies = t.replies ?? [];
@@ -158,7 +163,9 @@ const A_TEAMMATE_MAY_SET = ['problem', 'progress', 'solution', 'blockedBy', 'blo
 // only a conversation draws a thread, and the mark rides beside an `answer`
 // this list already lets through. Without it a teammate's thread reply would
 // land in the middle of your chat instead of in the thread.
-const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'people', 'status', 'react', 'inReplyTo'];
+// AND AN EDIT OR DELETION OF A MESSAGE, which the fold reads only from that
+// message's own author (shared/message-edits.mjs).
+const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'people', 'status', 'react', 'inReplyTo', 'edit'];
 // AND THE LEVEL THE SENDER PICKED, ON THE OPENING LINE ALONE (w-7ba439c883).
 // A message now carries how urgent its sender thought it was, and that number
 // decides where it sits in the inbox it lands in, so it has to survive the

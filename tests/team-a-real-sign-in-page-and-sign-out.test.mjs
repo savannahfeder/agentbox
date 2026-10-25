@@ -71,17 +71,19 @@ describe('the doors and the page', () => {
     expect(read('preload.cjs')).toContain("teamSignInEmail: (payload) => ipcRenderer.invoke('zero:team-sign-in-email', payload)");
   });
 
-  it('stands over the whole app while a team build has nobody signed in', () => {
+  it('stands over the whole app while a build that can sign in has nobody signed in', () => {
     const app = read('renderer/src/App.tsx');
-    expect(app).toContain("snap.team.started === true && !snap.team.signedIn");
-    expect(app).toContain('<SignInPage signedOut={signedOutHere}');
+    expect(read('renderer/src/sign-in-ask.ts')).toContain("page: held && team!.started === true");
+    expect(app).toContain('const signInGate = signInAsked.page;');
+    expect(app).toContain('<SignInPage onSkip={onCloudPhone() ? undefined : skipSignIn} signedOut={signedOutHere}');
     expect(app).toMatch(/if \(signInGateRef\.current\) return;/);
   });
 
   it('offers Google first, then email and password, and a way to make an account', () => {
     const page = read('renderer/src/team/SignInPage.tsx');
     expect(page.indexOf('Continue with Google')).toBeLessThan(page.indexOf('type="password"'));
-    expect(page).toContain('Create an account');
+    expect(page).toContain('role="tab"');
+    expect(page).toContain('>Create account</button>');
     expect(page).toContain('You are signed out');
     expect(page).not.toMatch(/—/);
   });

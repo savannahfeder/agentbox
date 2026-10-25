@@ -371,7 +371,7 @@ describe('a request rewritten under the id she is reading', () => {
 
 describe('a codex card rewritten in the shared spool', () => {
   const raise = (root) => {
-    const cards = createCodexApprovals({ storeRoot: root, timeoutMs: 60_000, pollMs: 60_000 });
+    const cards = createCodexApprovals({ storeRoot: root, pollMs: 60_000 });
     const worker = cards.scope({ product: 'agentbox', item: 'w-1' });
     const decided = worker.handle('item/commandExecution/requestApproval', { command: 'rm -rf ~/Zero' });
     const id = cards.pending()[0];

@@ -10,6 +10,11 @@
 // you" in white, and the waiting rows come first. The Approve buttons keep the
 // accent they already had. No keyboard letter: tried and dropped. Once nothing
 // waits, the list goes back to its quiet grey self.
+//
+// THE ORANGE MOVED TO A DOT (w-fcb5fdc2e5). The border and the boxed presses
+// together read as "kind of overwhelming... kind of hard to process". The
+// orange is now one dot on each waiting row, the label counts them ("2
+// proposals waiting on you"), and the waiting rows still come first.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
@@ -26,12 +31,13 @@ const waiting = (id, title) => ({ id, title, state: 'scheduled', approve: true }
 describe('while a task waits for a yes', () => {
   const html = draw([running('w-1', 'Add the counts'), waiting('w-2', 'Find out why'), waiting('w-3', 'Make a chart')]);
 
-  it('marks the whole list as waiting, which is what turns its border orange', () => {
+  it('marks the whole list as waiting, which is what a close scrolls to', () => {
     expect(html).toContain('class="made made-waiting"');
+    expect(html.match(/class="made-dot"/g)).toHaveLength(2);
   });
 
-  it('says so in the label', () => {
-    expect(html).toContain('>Still waiting on you<');
+  it('says so in the label, counting them', () => {
+    expect(html).toContain('>2 proposals waiting on you<');
     expect(html).not.toContain('>Filed from this thread<');
   });
 
@@ -42,7 +48,7 @@ describe('while a task waits for a yes', () => {
 
   it('draws no keyboard letter inside the press', () => {
     expect(html).not.toContain('made-a"');
-    expect(html.match(/>Start new thread</g)).toHaveLength(2);
+    expect(html.match(/>New thread</g)).toHaveLength(2);
   });
 });
 
@@ -66,16 +72,16 @@ describe('when nothing waits', () => {
   });
 });
 
-describe('the orange is the border and the words are white', () => {
+describe('the orange is the dot, not the border or the label', () => {
   const css = read('renderer/src/components/threads-made.css');
 
-  it('turns the list border orange', () => {
-    expect(css).toMatch(/\.made-waiting \.made-list \{[^}]*border-color:[^}]*var\(--accent\)/);
+  it('paints the dot in the accent', () => {
+    expect(css).toMatch(/\.made-dot \{[^}]*background: var\(--accent\)/);
   });
 
-  it('turns the label white, not orange', () => {
-    const rule = css.match(/\.made-waiting \.made-label \{[^}]*\}/)[0];
-    expect(rule).toMatch(/color: var\(--text\)/);
-    expect(rule).not.toMatch(/accent/);
+  it('leaves the border and the label grey', () => {
+    expect(css).not.toMatch(/\.made-waiting \.made-list \{[^}]*accent/);
+    expect(css).toMatch(/\.made-label \{[^}]*color: var\(--text-faint\)/);
+    expect(css).not.toMatch(/\.made-waiting \.made-label \{[^}]*accent/);
   });
 });

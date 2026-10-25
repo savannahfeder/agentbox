@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GATE_CAP } from '../scripts/lib/tests-the-push-runs.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOOK = path.join(root, 'scripts/hooks/pre-push');
@@ -99,10 +100,14 @@ function runHook(dir, stdin, env = {}, args = []) {
   const hook = path.join(dir, 'pre-push');
   fs.copyFileSync(HOOK, hook);
   fs.chmodSync(hook, 0o755);
-  // The hook reads the red files out of the json report with this helper, so
-  // the throwaway repo needs it too.
-  fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+  // The hook reads the red files out of the json report with this helper, and
+  // asks the other two what the push can afford to wait for, so the throwaway
+  // repo needs all three.
+  fs.mkdirSync(path.join(dir, 'scripts/lib'), { recursive: true });
   fs.copyFileSync(path.join(root, 'scripts/red-test-files.mjs'), path.join(dir, 'scripts/red-test-files.mjs'));
+  for (const lib of ['tests-the-push-runs.mjs', 'tests-that-read.mjs']) {
+    fs.copyFileSync(path.join(root, 'scripts/lib', lib), path.join(dir, 'scripts/lib', lib));
+  }
   const r = spawnSync(hook, args, { cwd: dir, input: stdin, encoding: 'utf8', env: { ...process.env, AGENTBOX_PUSH_FULL_SUITE: '', ...env } });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }
@@ -334,6 +339,27 @@ describe('a push tests what it changed', () => {
     runHook(dir, `refs/heads/main ${head} refs/heads/main ${base}\n`, { AGENTBOX_PUSH_FULL_SUITE: '1' });
     expect(calls()[0]).not.toContain('related');
   });
+
+  // AND IT STOPS SHORT OF WHAT A SHIP CANNOT WAIT FOR (w-9e4d3f3cc1,
+  // 2026-10-19). `related` on a core file here reaches most of the suite: 216
+  // of 1,207 test files name main/supervisor.mjs, and running them cost 12
+  // minutes on a busy Mac. Over the cap the hook runs the files that are most
+  // about the change and says who runs the rest
+  // (scripts/lib/tests-the-push-runs.mjs).
+  it('stops at the cap when most of the suite names what the push changes', () => {
+    const { dir, calls, base } = repoWithBase('capped');
+    const many = {};
+    for (let i = 0; i < GATE_CAP + 5; i += 1) many[`tests/sweep-${i}.test.mjs`] = "read('a.mjs');\n";
+    const head = commit(dir, { ...many, 'main/a.mjs': 'export const a = 6;\n' });
+    const { code, out } = runHook(dir, `refs/heads/main ${head} refs/heads/main ${base}\n`);
+    expect(code).toBe(0);
+    const asked = calls()[0].trim().split(/\s+/);
+    expect(asked[0]).toBe('run');
+    expect(asked).not.toContain('related');
+    expect(asked.filter((a) => a.endsWith('.test.mjs'))).toHaveLength(GATE_CAP);
+    expect(out).toMatch(/more than a ship can wait for/);
+    expect(out).toContain('GitHub runs');
+  });
 });
 
 describe('the hook is switched on without anyone remembering to', () => {
@@ -359,10 +385,14 @@ describe('the hook is switched on without anyone remembering to', () => {
   const hooksPath = (dir) =>
     spawnSync('git', ['config', '--get', 'core.hooksPath'], { cwd: dir, encoding: 'utf8' }).stdout.trim();
 
-  it('points git at the versioned hooks directory', () => {
+  // Absolute, because git resolves a relative hooksPath against whichever
+  // working tree runs it, and a task folder's own scripts/hooks is a worker's.
+  const versioned = (dir) => path.join(fs.realpathSync(dir), 'scripts/hooks');
+
+  it('points git at the versioned hooks directory, by its absolute path', () => {
     const dir = checkout('install');
     expect(install(dir).status).toBe(0);
-    expect(hooksPath(dir)).toBe('scripts/hooks');
+    expect(hooksPath(dir)).toBe(versioned(dir));
   });
 
   it('says so and changes nothing when it is already on', () => {
@@ -371,7 +401,25 @@ describe('the hook is switched on without anyone remembering to', () => {
     const second = install(dir);
     expect(second.status).toBe(0);
     expect(second.stdout).toContain('already on');
-    expect(hooksPath(dir)).toBe('scripts/hooks');
+    expect(hooksPath(dir)).toBe(versioned(dir));
+  });
+
+  it('turns the old relative scripts/hooks into the absolute path', () => {
+    const dir = checkout('relative');
+    execFileSync('git', ['config', 'core.hooksPath', 'scripts/hooks'], { cwd: dir });
+    expect(install(dir).status).toBe(0);
+    expect(hooksPath(dir)).toBe(versioned(dir));
+  });
+
+  it('points a linked worktree at the primary checkout, not its own copy', () => {
+    const dir = checkout('primary');
+    fs.writeFileSync(path.join(dir, 'f'), 'f');
+    execFileSync('git', ['add', '-A'], { cwd: dir });
+    execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base'], { cwd: dir });
+    const linked = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'zero-linked-')), 'task');
+    execFileSync('git', ['worktree', 'add', '-q', linked], { cwd: dir });
+    expect(install(linked).status).toBe(0);
+    expect(hooksPath(dir)).toBe(versioned(dir));
   });
 
   it('leaves a hooks path somebody else chose alone', () => {

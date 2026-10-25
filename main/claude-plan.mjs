@@ -96,8 +96,28 @@ export function isMaxTier(raw) {
  *  Claude Code has not fetched a profile for yet: all of them come back
  *  `known: false`, which every caller here treats as "leave everything exactly
  *  as it was". */
+const planCache = new Map();
+
 export function readPlan(profile, { home = os.homedir(), file = null } = {}) {
   const at = file ?? planFile(profile, home);
+  // Keyed on the file's mtime AND its size, as accountIdentity is keyed on the
+  // mtime alone: the cloud tiles ask on every snapshot.
+  //
+  // THE SIZE IS THERE BECAUSE AN MTIME CAN STAND STILL (w-dac993a554). Two
+  // writes inside one tick of the filesystem's clock carry the same mtime, and
+  // the cache then served the first one's plan for ever. A subscription
+  // renewed in that window read as ended until the file was written again, so
+  // `Supervisor#_forgetRenewedSubscriptions` never let the account back in.
+  let stat = null;
+  try { stat = fs.statSync(at); } catch { /* read below says none */ }
+  const hit = planCache.get(at);
+  if (stat && hit?.mtime === stat.mtimeMs && hit?.size === stat.size) return hit.plan;
+  const plan = readPlanNow(at);
+  if (stat) planCache.set(at, { mtime: stat.mtimeMs, size: stat.size, plan });
+  return plan;
+}
+
+function readPlanNow(at) {
   const none = { known: false, max: false, label: null, tier: null, from: null, file: at };
   let account = null;
   try {
@@ -126,6 +146,34 @@ export function readPlan(profile, { home = os.homedir(), file = null } = {}) {
     return { known: true, ended: true, max: false, label: 'Subscription ended', tier, from, file: at };
   }
   return { known: true, ended: false, max: isMaxTier(tier), label: planLabel(tier), tier, from, file: at };
+}
+
+/**
+ * WHICH ACCOUNT AND PLAN ONE LOGIN IS ON, as a string that changes only when
+ *  one of them does: an upgrade, extra usage switched on, a renewal, or a
+ *  /login as somebody else. Claude Code rewrites this file all day for other
+ *  reasons, so only these fields count (named as Claude Code 2.1.305 writes
+ *  them). Null when the file names no account or cannot be read.
+ */
+const PLAN_FIELDS = ['accountUuid', 'organizationUuid', 'organizationType', 'organizationRateLimitTier',
+  'userRateLimitTier', 'seatTier', 'billingType', 'hasExtraUsageEnabled', 'planDisplayName', 'subscriptionCreatedAt'];
+const stampCache = new Map();
+
+export function planStamp(profile, { home = os.homedir(), file = null } = {}) {
+  const at = file ?? planFile(profile, home);
+  let mtime;
+  try { mtime = fs.statSync(at).mtimeMs; } catch { return null; }
+  const hit = stampCache.get(at);
+  if (hit?.mtime === mtime) return hit.stamp;
+  let stamp = null;
+  try {
+    const account = JSON.parse(fs.readFileSync(at, 'utf8'))?.oauthAccount;
+    if (account?.accountUuid) {
+      stamp = JSON.stringify(PLAN_FIELDS.map((k) => (k === 'hasExtraUsageEnabled' ? account[k] === true : account[k] ?? null)));
+    }
+  } catch { /* half written: the next write has a new mtime and is read again */ }
+  stampCache.set(at, { mtime, stamp });
+  return stamp;
 }
 
 /**

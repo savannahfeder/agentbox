@@ -156,10 +156,26 @@ describe('⌘K', () => {
     const html = renderToStaticMarkup(createElement(Palette, new Proxy({
       products: [], supervisorPaused: false, look: 'dark', order: [],
     }, { get: (t, k) => (k in t ? t[k] : noop), has: () => true })));
-    return [...html.matchAll(/<div class="palette-item[^"]*"><span>([^<]*)<\/span>/g)].map((m) => m[1]);
+    // The label span carries a class since 2026-10-16, when the row was taught
+    // not to wrap onto a second line.
+    return [...html.matchAll(/<div class="palette-item[^"]*"><span class="palette-label">([^<]*)<\/span>/g)].map((m) => m[1]);
+  };
+  /** A row's label and its hint together, which is where the two tools are named. */
+  const rowText = (label) => {
+    const html = renderToStaticMarkup(createElement(Palette, new Proxy({
+      products: [], supervisorPaused: false, look: 'dark', order: [],
+    }, { get: (t, k) => (k in t ? t[k] : noop), has: () => true })));
+    const at = html.indexOf(`>${label}<`);
+    return html.slice(at, at + 400);
   };
   it('has one import line, and it names Codex as well as Claude Code', () => {
     const imports = labels().filter((l) => /^Import/.test(l));
-    expect(imports).toEqual(['Import agents from Claude Code or Codex']);
+    // SHORTER SINCE 2026-10-16: it was the longest label in the palette and
+    // wrapped, so which tools it reads moved into the hint beside it. Both are
+    // still named on the row, which is what this test is about.
+    expect(imports).toEqual(['Import chats and agents']);
+    const text = rowText('Import chats and agents');
+    expect(text).toMatch(/Claude Code/);
+    expect(text).toMatch(/Codex/);
   });
 });

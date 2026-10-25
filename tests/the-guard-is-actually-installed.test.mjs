@@ -41,11 +41,16 @@ const git = (...args) =>
   execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
 describe('the checkout guard is installed, not merely written', () => {
-  it('git is pointed at our hooks directory', () => {
-    // Without this, every file below is inert no matter how correct it is.
+  it('git is pointed at our hooks directory, by its absolute path', () => {
+    // Without this, every file below is inert no matter how correct it is. The
+    // path is absolute and off the COMMON dir: a relative 'scripts/hooks' is
+    // resolved against whatever working tree runs git, so a task folder's own,
+    // worker-edited hooks would run as the app.
+    const common = git('rev-parse', '--path-format=absolute', '--git-common-dir');
+    const expected = path.resolve(common, '..', 'scripts/hooks');
     let configured = '';
     try { configured = git('config', 'core.hooksPath'); } catch { configured = ''; }
-    expect(configured, 'core.hooksPath is unset, so none of the hooks run').toBe('scripts/hooks');
+    expect(configured, 'core.hooksPath is not the absolute path to our hooks, so they may not run').toBe(expected);
   });
 
   it('every hook the guard needs is on disk', () => {

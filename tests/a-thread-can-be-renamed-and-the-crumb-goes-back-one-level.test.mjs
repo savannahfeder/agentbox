@@ -205,6 +205,6 @@ describe('the summary’s name renames the thread', () => {
     title: MESSAGE, label: 'Acme renewal terms', priority: 7, epoch: 0, claim: null, createdAt: 0, updatedAt: 0 };
   it('is a control saying so, under the same name the row shows', () => {
     const html = renderToStaticMarkup(React.createElement(SummaryPanel, { item, items: [item], team: null }));
-    expect(html).toMatch(/<h2 class="ts-title"[^>]*role="button"[^>]*aria-label="Rename this thread"[^>]*>Acme renewal terms/);
+    expect(html).toMatch(/<h2 class="ts-title"[^>]*role="button"[^>]*aria-label="Rename this thread"[^>]*><span class="ts-title-text">Acme renewal terms/);
   });
 });

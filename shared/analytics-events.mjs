@@ -34,6 +34,18 @@ export const EVENTS = {
   task_written: 'A task was written',
   run_started: 'An agent started work',
   run_finished: 'An agent stopped work',
+  // WHAT HAPPENS IN THE MINUTES AFTER SETUP (2026-10-16). Most installs on
+  // 0.1.13 went quiet within minutes of finishing setup, and nothing said
+  // whether they quit, put the corner tag away, or what the import brought in
+  // (tests/what-people-do-after-setup-is-counted.test.mjs).
+  app_quit: `${Name} was quit`,
+  tag_hidden: 'The corner tag was hidden',
+  tag_turned_off: 'The corner tag was turned off',
+  import_offered: 'Setup offered agents to import',
+  import_taken: 'Setup imported agents',
+  // Sent as the switch goes off and never again, so an install that opted out
+  // is not read as one that stopped using the app.
+  counts_turned_off: 'Counts were turned off',
 };
 
 export const EVENT_NAMES = Object.keys(EVENTS);

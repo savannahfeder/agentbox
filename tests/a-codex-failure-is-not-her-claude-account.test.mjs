@@ -75,11 +75,14 @@ describe('a codex session runs on a codex home, never a claude one', () => {
   // subscriptions, which is what roughly doubles throughput. A fix that
   // pinned everything to 'default' would pass the test above and cost half
   // the fleet.
-  it('still round-robins claude code across both subscriptions', () => {
+  // ONE ACCOUNT, NOT BOTH (w-dac993a554): this read "still round-robins claude
+  // code across both subscriptions" until the app stopped spreading one
+  // person's work over their plans.
+  it('sends every claude spawn to the one claude account', () => {
     const s = bare({ authProfiles: ['default', '/Users/her/.claude-second'] });
     const picked = new Set();
     for (let i = 0; i < 10; i += 1) picked.add(s._pickProfile('claude'));
-    expect(picked).toEqual(new Set(['default', '/Users/her/.claude-second']));
+    expect(picked).toEqual(new Set(['default']));
   });
 
   // The default, so a caller that names no engine is answered about the engine
@@ -93,34 +96,29 @@ describe('a codex session runs on a codex home, never a claude one', () => {
   // change to the method.
   // Both signed in: a login still being added is skipped until its sign-in
   // lands (tests/a-thread-that-says-queued-is-one-an-agent-will-start).
-  it('would use a second codex login if one were configured', () => {
+  it('uses the second codex login when that is the one picked', () => {
     const first = mkdtempSync(join(tmpdir(), 'codex-first-'));
     const second = mkdtempSync(join(tmpdir(), 'codex-second-'));
     writeFileSync(join(first, 'auth.json'), '{}');
     writeFileSync(join(second, 'auth.json'), '{}');
-    const s = bare({ codexHome: first, codexProfiles: ['default', second] });
+    const s = bare({ codexHome: first, codexProfiles: ['default', second], activeAccount: { codex: second } });
     const picked = new Set();
     for (let i = 0; i < 10; i += 1) picked.add(s._pickProfile('codex'));
-    expect(picked).toEqual(new Set(['default', second]));
+    expect(picked).toEqual(new Set([second]));
     rmSync(first, { recursive: true, force: true });
     rmSync(second, { recursive: true, force: true });
   });
 
-  // A quarantined Codex login leaves the Codex rotation, exactly as a
-  // quarantined Claude one leaves Claude's, and the OTHER engine's rotation is
-  // untouched by it.
-  it('keeps a resting codex login out of the codex rotation only', () => {
+  // A quarantined Codex login stops the Codex fleet and says nothing about
+  // Claude Code's, which goes on running on its own account.
+  it('empties the codex pool while its login rests, and only the codex one', () => {
     const s = bare({
       authProfiles: ['default', '/Users/her/.claude-second'],
       codexProfiles: ['default', '/Users/her/.codex-second'],
     });
     s._profileCooldown['codex:default'] = Date.now() + 60_000;
-    const codex = new Set();
-    for (let i = 0; i < 10; i += 1) codex.add(s._pickProfile('codex'));
-    expect(codex).toEqual(new Set(['/Users/her/.codex-second']));
-    const claude = new Set();
-    for (let i = 0; i < 10; i += 1) claude.add(s._pickProfile('claude'));
-    expect(claude).toEqual(new Set(['default', '/Users/her/.claude-second']));
+    expect(s._liveProfilesFor('codex')).toEqual([]);
+    expect(s._liveProfilesFor('claude')).toEqual(['default']);
   });
 });
 

@@ -10,7 +10,7 @@
 // So the heading is the ask now. It comes off the SAME field the options came
 // off (`optionsFrom`), which is the field the pane is leading with, so the
 // question and its answers can never come from two different rounds.
-import { optionsFrom } from './format';
+import { optionsFrom, stripOptionsSection } from './format';
 import { clipToSentence } from './list-rules';
 
 // Two lines of the strip's heading, near enough. Wider than the inbox row's 112
@@ -84,6 +84,12 @@ export function askFull(item: AskFields): string {
 
 export function askLine(item: AskFields): string {
   return clipToSentence(askFull(item), ASK_BUDGET);
+}
+
+/** The options' heading: the ask, except over an answer that is nothing but that one line, which it would only repeat. */
+export function askHeading(item: AskFields): string {
+  const prose = stripOptionsSection(item[optionsFrom(item)] ?? '').split('\n').filter((l) => l.trim() && !/^#{1,4}\s/.test(l.trim()));
+  return prose.length <= 1 ? '' : askLine(item);
 }
 
 /**

@@ -24,7 +24,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { linkArtifactPaths, isMediaPath, productPath } from '../renderer/src/remark-artifact-paths.ts';
+import { CODE_PATH, linkArtifactPaths, isMediaPath, productPath } from '../renderer/src/remark-artifact-paths.ts';
 import os from 'node:os';
 import { servable, byteRange, mediaResponse, mediaType } from '../main/img-scheme.mjs';
 
@@ -155,10 +155,11 @@ describe('the pane draws a player for audio and video', () => {
   });
 
   it('asks for the file on the app scheme, never file://, which her window cannot load', () => {
-    const media = focus.slice(focus.indexOf('export function ArtifactMedia'), focus.indexOf('function ArtifactLink'));
+    // The players are made on the shelf just above it, so a film keeps playing
+    // while the thread moves (tests/a-film-keeps-playing-while-the-thread-moves).
+    const media = focus.slice(focus.indexOf('const players = playerShelf'), focus.indexOf('function ArtifactLink'));
     expect(media).toContain('pictureUrl(');
-    expect(media).toContain('<audio');
-    expect(media).toContain('<video');
+    expect(media).toContain("createElement(film ? 'video' : 'audio')");
     expect(media).not.toContain('file://');
   });
 
@@ -174,9 +175,10 @@ describe('the pane draws a player for audio and video', () => {
   });
 
   it('links a code span that is nothing but an audio or video path, too', () => {
-    const pathRe = focus.match(/const PATH_RE = (\/.*\/i);/)[1];
-    expect(pathRe).toContain('mp3');
-    expect(pathRe).toContain('mp4');
+    expect(focus).toContain('const PATH_RE = CODE_PATH;');
+    expect(CODE_PATH.test('voices/lily.mp3')).toBe(true);
+    expect(CODE_PATH.test('designs/cut.mp4')).toBe(true);
+    expect(CODE_PATH.test('npm run ship')).toBe(false);
   });
 });
 

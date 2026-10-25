@@ -27,6 +27,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { landingRow, nudge, placeBefore, priorityList } from '../project-priority';
+import { chord } from '../this-keyboard';
 import { ProductMark } from './ProductMark';
 import { shortPath } from './Settings';
 import { archiveLabel, archivedLine, keepShown, selectionLine, togglePick } from '../project-archive';
@@ -35,18 +36,25 @@ import './projects-page.css';
 
 const DRAG_THRESHOLD_PX = 4;
 
+/** The one path worth a row: its code, or the store folder when it has none. */
+export const where = (p: { repo?: string | null; dir?: string | null }) => p.repo || p.dir || '';
+
 interface Row {
   slug: string;
   name: string;
   logo?: string | null;
   dir: string;
+  /** Where its code is, when it has a folder of its own. */
+  repo: string | null;
 }
 
-export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archived = [], onUnarchive, onArchive, who }: {
+export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archived = [], onUnarchive, onArchive, who, home = null }: {
   /** Every project, already in the running order (App's `rankedProducts`). */
   ranked: Product[];
   /** What Settings knows about each project: its folder, what is running, its mode. */
   details: ProjectSettings[];
+  /** This computer's home folder, so a path under it reads as `~`. */
+  home?: string | null;
   /** Writes the order. Absent means the list is shown in order but cannot be moved. */
   onSetOrder?: (slugs: string[]) => void | Promise<void>;
   onOpen: (slug: string) => void;
@@ -124,13 +132,13 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
     for (const p of ordered) {
       const d = info.get(p.slug);
       seen.add(p.slug);
-      out.push({ slug: p.slug, name: d?.name ?? p.name, logo: d?.logo ?? p.logo, dir: d?.dir ?? p.dir });
+      out.push({ slug: p.slug, name: d?.name ?? p.name, logo: d?.logo ?? p.logo, dir: d?.dir ?? p.dir, repo: d?.repoPath ?? p.repoPath ?? null });
     }
     for (const d of details) {
       // In the order but left off on purpose (a conversation, the practice
       // project) stays off; only one the order has never heard of is added.
       if (seen.has(d.slug) || bySlug.has(d.slug)) continue;
-      out.push({ slug: d.slug, name: d.name, logo: d.logo, dir: d.dir ?? '' });
+      out.push({ slug: d.slug, name: d.name, logo: d.logo, dir: d.dir ?? '', repo: d.repoPath ?? null });
     }
     return out;
   }, [full.join('\n'), ranked, details, archived]);
@@ -143,7 +151,8 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
   const shown = needle
     ? rows.filter((p) => p.name.toLowerCase().includes(needle)
       || p.slug.toLowerCase().includes(needle)
-      || (p.dir ?? '').toLowerCase().includes(needle))
+      || (p.dir ?? '').toLowerCase().includes(needle)
+      || (p.repo ?? '').toLowerCase().includes(needle))
     : rows;
   const shownSlugs = shown.map((r) => r.slug);
   // A tick on a row the search has hidden, or that left the list, is dropped,
@@ -318,8 +327,11 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
                   <ProductMark src={p.logo} name={p.name} slug={p.slug} size={18} />
                   <span className="pp-text">
                     <span className="pp-name">{p.name}</span>
-                    {/* THE FOLDER, which tells two projects of the same name apart. */}
-                    {p.dir && <span className="pp-where">{shortPath(p.dir)}</span>}
+                    {/* WHERE ITS CODE IS, and the store folder only where it has
+                        none: the store folder is the same long account path on
+                        every row. The title carries it whole, because the row
+                        cuts it off at the right. */}
+                    {where(p) && <span className="pp-where" title={where(p)}>{shortPath(where(p), home)}</span>}
                   </span>
                   {/* WHO SEES ITS THREADS (design 1B, w-b989839656), only on a
                       team, where the question exists. */}
@@ -329,11 +341,11 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
                       <button type="button" className="pp-top" disabled={rank === 0}
                         onClick={() => commit(p.slug, placeBefore(full, p.slug, allSlugs[0]))}>To top</button>
                       <button type="button" className="pp-arrow" disabled={i === 0} aria-label={`Move ${p.name} up`}
-                        title="Move up (⌥↑)" onClick={() => commit(p.slug, nudge(full, shownSlugs, p.slug, -1))}>
+                        title={`Move up (${chord('⌥↑')})`} onClick={() => commit(p.slug, nudge(full, shownSlugs, p.slug, -1))}>
                         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 9.5 8 6l3.5 3.5" /></svg>
                       </button>
                       <button type="button" className="pp-arrow" disabled={i === shown.length - 1} aria-label={`Move ${p.name} down`}
-                        title="Move down (⌥↓)" onClick={() => commit(p.slug, nudge(full, shownSlugs, p.slug, 1))}>
+                        title={`Move down (${chord('⌥↓')})`} onClick={() => commit(p.slug, nudge(full, shownSlugs, p.slug, 1))}>
                         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 6.5 8 10l3.5-3.5" /></svg>
                       </button>
                     </span>
@@ -364,7 +376,7 @@ export function ProjectsPage({ ranked, details, onSetOrder, onOpen, onNew, archi
                 <li key={p.slug} className="pp-archived-row">
                   <span className="pp-text">
                     <span className="pp-name">{p.name}</span>
-                    {p.dir && <span className="pp-where">{shortPath(p.dir)}</span>}
+                    {p.dir && <span className="pp-where" title={p.dir}>{shortPath(p.dir, home)}</span>}
                   </span>
                   {onUnarchive && (
                     <button type="button" className="set-ghost" onClick={() => onUnarchive(p.slug)}>Bring back</button>

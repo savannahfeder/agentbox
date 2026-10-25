@@ -20,7 +20,9 @@ const said = (status, error) => new Response(JSON.stringify({ error }), { status
 export const MAC_AWAY = 'Your computer is not connected. Open Agentbox on it and keep it awake, then try again.';
 
 export class Room {
-  constructor({ firstFrameMs = 30_000, maxPending = 64 } = {}) {
+  // 256 unanswered at once: 64 was reached by one phone on a busy computer
+  // (2026-10-13), and a request waiting costs the room one entry in a map.
+  constructor({ firstFrameMs = 30_000, maxPending = 256 } = {}) {
     this.mac = null;
     this.pending = new Map();
     this.firstFrameMs = firstFrameMs;

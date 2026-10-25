@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   DAY_NAMES, foldRepeats, isOwed, isRepeatRule, occurrenceId, periodKey, repeatLabel,
+  standingInstruction,
 } from '../shared/repeats.mjs';
 import { machineryPath } from './store/home.mjs';
 import { NAME } from '../shared/product-name.mjs';
@@ -59,6 +60,11 @@ export const OCCURRENCE_PROTOCOL = [
   'If you are unsure which of the two this is, it is the second one. This is the',
   `only place in ${NAME} where finishing quietly hides something, so the marker is`,
   'required to hide, never to show.',
+  '',
+  'IF THEY TELL YOU HOW THIS TASK SHOULD GO FROM NOW ON, CHANGE IT YOURSELF with',
+  'the store tool set_repeating_task. Editing this run or writing a memory note',
+  'reaches no later run: this body is a copy, and every run gets a new task',
+  'folder. Never ask them to go and edit the task by hand.',
   '',
   'HER INSTRUCTION FOLLOWS.',
 ].join('\n');
@@ -212,7 +218,7 @@ export class Repeats {
 
       const { created } = workItemsDisk.createWorkItemIfAbsent(productDir, id, {
         title: `${rule.title} · ${dayStamp(key)}`,
-        body: `${OCCURRENCE_PROTOCOL.replace('<REPEAT_LABEL>', repeatLabel(ruleId))}\n\n${rule.body ?? rule.title}`,
+        body: `${OCCURRENCE_PROTOCOL.replace('<REPEAT_LABEL>', repeatLabel(ruleId))}\n\n${standingInstruction(rule)}`,
         kind: 'directive',
         priority: rule.priority ?? 5,
         labels: ['founder', repeatLabel(ruleId)],

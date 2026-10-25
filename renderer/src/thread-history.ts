@@ -85,11 +85,26 @@ export interface ThreadEvent {
   // What was actually written, in full. The component shows the beginning and
   // opens the rest in place; nothing here decides how much is shown.
   words?: string;
+  /** When its author last edited the words (item-thread.ts, `withEdits`). */
+  edited?: number;
+  /** Deleted by its author, kept only because replies hang off it. */
+  deleted?: boolean;
   // AN ACTION OF HERS THAT ANSWERED THE AGENT, though it is not a message: a
   // picked option. The conversation treats it as her reply for what comes
   // after it, so the agent's result stays above it instead of being lifted
   // under it.
   answers?: true;
+  /**
+   * WHAT THIS ANSWER RAN ON, folded off the ledger rather than recorded anew:
+   * the row's agent and model are written BEFORE the reply that starts a run
+   * (main/store.mjs, `answerItem`), so what the row said at this point in the
+   * file is what the run that wrote this was spawned with. Absent where the
+   * row named neither, because this line never guesses.
+   *
+   * A result and a checkpoint carry it and the opening ask does not: a row an
+   * agent filed was written by a run on ANOTHER row.
+   */
+  ran?: { engine?: string; model?: string };
 }
 
 // '(withdrawn)' is the tombstone an undone send leaves behind, not words.
@@ -124,6 +139,12 @@ export function snoozeWords(runAt: number, from: number): string {
 // App.tsx), one line. A typed reply that merely starts the same way and goes on
 // to say more is still a message of hers, so the match is the whole answer.
 const PICK = /^Option (\d+): ([^\n]+)$/;
+
+/** A pick's line in the thread, or null when the answer is a typed reply. */
+export function pickedLine(answer: string): { said: string; words: string } | null {
+  const picked = PICK.exec(answer);
+  return picked ? { said: `You picked option ${picked[1]}`, words: picked[2].replace(/\s*\(recommended\)\s*$/i, '').trim() } : null;
+}
 
 // HOW LONG AFTER YOUR REPLY A LIFTED SNOOZE STILL BELONGS TO IT. The app
 // writes the two one after the other, milliseconds apart; a minute leaves room
@@ -192,6 +213,13 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
   // The short written name, folded forward like `title`. Read once at the end:
   // see `withTitleSaid`.
   let label: string | null = null;
+  // The agent and model the row is on, folded the same way (`ran` above).
+  // Both are cleared by writing '', which is how the ledger says "none".
+  let ranEngine: string | undefined;
+  let ranModel: string | undefined;
+  const ranNow = (): { engine?: string; model?: string } | undefined => (
+    ranEngine || ranModel ? { ...(ranEngine ? { engine: ranEngine } : {}), ...(ranModel ? { model: ranModel } : {}) } : undefined
+  );
   // WHO SAID EACH EVENT, for a teammate's line (the team version). Every event
   // a line produced is tagged with its writer when the next line begins, and
   // once more after the last, which leaves the loop below exactly as it was.
@@ -226,6 +254,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     markReply = typeof reply === 'string' && reply ? reply : undefined;
     const patch = line.patch ?? null;
     if (has(patch, 'label')) label = String(patch!.label ?? '');
+    if (has(patch, 'engine')) ranEngine = String(patch!.engine ?? '') || undefined;
+    if (has(patch, 'model')) ranModel = String(patch!.model ?? '') || undefined;
     const mine = line.source === 'founder';
     const who: ThreadEvent['who'] = mine ? 'you' : 'agent';
     const at = line.ts;
@@ -272,9 +302,12 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
       if (words(patch!.body)) opened = true;
       // Their words with no title: the ask branch below opens the thread.
       if (theirs && words(next!.patch?.body)) continue;
+      // A chat the import brought in from Claude Code was yours, not an agent's,
+      // and its row is dated when the chat started there.
+      const broughtIn = Array.isArray(patch!.labels) && patch!.labels.includes('thread-import');
       events.push({
         at, who,
-        said: mine ? 'You opened this' : 'An agent opened this',
+        said: mine ? 'You opened this' : broughtIn ? 'Started in Claude Code' : 'An agent opened this',
         ...(words(patch!.body) ? { words: words(patch!.body)!, message: true as const, field: 'body' as const } : {}),
       });
       continue;
@@ -293,9 +326,10 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
       && patch.labels.some((l) => typeof l === 'string' && l.startsWith('codex:')) && yourBody) {
       const i = events.findIndex((e) => e.field === 'body');
       if (i >= 0 && events[i].who === 'agent') events[i] = { ...events[i], who: 'you', said: 'You opened this', words: yourBody };
-      // And the wordless birth line above it says where the row came from.
+      // And the wordless birth line above it says where the row came from,
+      // dated when the chat started there (store.importCodexThreads).
       const birth = events.findIndex((e) => e.said === 'An agent opened this' && !e.field);
-      if (birth >= 0) events[birth] = { ...events[birth], said: 'Brought in from Codex' };
+      if (birth >= 0) events[birth] = { ...events[birth], said: 'Started in Codex' };
     }
 
     // The ask, on whichever line it arrived. See `opened` above: on her own
@@ -346,13 +380,9 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
       // be drawn as her message reading "Option 1: …". It is a quiet line of
       // hers now, the option's own words beside it, and `answers` tells the
       // conversation it still answered the agent (item-thread.ts).
-      const picked = said ? PICK.exec(said) : null;
+      const picked = said ? pickedLine(said) : null;
       if (picked) {
-        events.push({
-          at, who: 'you', said: `You picked option ${picked[1]}`,
-          words: picked[2].replace(/\s*\(recommended\)\s*$/i, '').trim(),
-          field: 'answer', answers: true,
-        });
+        events.push({ at, who: 'you', ...picked, field: 'answer', answers: true });
         continue;
       }
       events.push(said
@@ -362,12 +392,12 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
     }
 
     if (words(patch.result)) {
-      events.push({ at, who: 'agent', said: 'It came back to you', words: words(patch.result)!, message: true, field: 'result' });
+      events.push({ at, who: 'agent', said: 'It came back to you', words: words(patch.result)!, message: true, field: 'result', ...(ranNow() ? { ran: ranNow() } : {}) });
       continue;
     }
 
     if (words(patch.note)) {
-      events.push({ at, who: 'agent', said: 'It checked in', words: words(patch.note)!, message: true, field: 'note' });
+      events.push({ at, who: 'agent', said: 'It checked in', words: words(patch.note)!, message: true, field: 'note', ...(ranNow() ? { ran: ranNow() } : {}) });
       continue;
     }
 
@@ -447,7 +477,25 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
   }
   tagWriter();
 
-  return withTitleSaid(events, title, label);
+  return withTitleSaid(theAskComesFirst(events), title, label);
+}
+
+// NOTHING HAPPENED ON A THREAD BEFORE YOU ASKED FOR IT.
+//
+// The one exception to "nothing is re-sorted", and it is narrow on purpose: a
+// single event moves, to the top, and the rest keep the ledger's order.
+//
+// A thread you compose is two lines, the stamp that makes the row and then
+// your words (store.composeItem), and a worker can claim the row between them
+// and write before your words land. A tester's brand new thread opened on "Now
+// looking at how the open thread handles keys" with her own message under it
+// (power-test-2, issue 21). The clock is right and the reading is wrong: she
+// typed before any of it existed.
+function theAskComesFirst(events: ThreadEvent[]): ThreadEvent[] {
+  const bodied = events.findIndex((e) => e.field === 'body');
+  const i = bodied >= 0 ? bodied : events.findIndex((e) => /opened this$/.test(e.said));
+  if (i <= 0) return events;
+  return [events[i], ...events.slice(0, i), ...events.slice(i + 1)];
 }
 
 // WHEN THE HEADER SHOWS THE SHORT NAME, THE TITLE IS SAID IN THE OPENING.
@@ -463,12 +511,19 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
 function withTitleSaid(events: ThreadEvent[], title: string | null, label: string | null): ThreadEvent[] {
   const named = (label ?? '').trim();
   const said = (title ?? '').trim();
-  if (!named || !said || named === said) return events;
+  if (!said) return events;
   // Her rows open twice, the system's stamp and then her own line; the one
   // carrying the body is the opening she reads.
   const bodied = events.findIndex((e) => e.field === 'body');
   const i = bodied >= 0 ? bodied : events.findIndex((e) => /opened this$/.test(e.said));
   if (i < 0) return events;
+  // AND A THREAD TYPED AS ONE LINE HAS NOTHING ELSE TO SAY (w-326fb83c0e). It
+  // is saved as a title with no body, so until the app writes the row a short
+  // name — fifteen seconds to a minute — the rule above left the opening
+  // wordless and what you asked for was in the header and nowhere else. Your
+  // own opening only: a thread an agent filed keeps its own words.
+  const wordless = !events[i].words && events[i].who === 'you';
+  if (!wordless && (!named || named === said)) return events;
   const squash = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
   const head = squash(said.replace(/…$/, '')).slice(0, 40);
   const body = events[i].words ?? '';

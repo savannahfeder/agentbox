@@ -12,6 +12,8 @@
 // hint. The levels are still in ⌘K by NAME, which is how people find them
 // anyway. DO NOT PUT THE CHORD BACK without a product decision.
 
+import { shownPriority } from '../../shared/rank.mjs';
+
 /** Display order, top to bottom. */
 export const PRIORITIES = [
   { id: 'urgent', label: 'Urgent', value: 9 },
@@ -60,9 +62,13 @@ export interface PriorityCommand {
  * anyway would be a plain lie about the other rows, and this is a control that
  * decides which answers ride the session cap.
  */
-export function priorityCommands(targets: { priority?: number | null }[]): PriorityCommand[] {
+export function priorityCommands(
+  targets: { priority?: number | null; product?: string; wrote?: Record<string, { source?: string } | undefined> }[],
+  direct?: ReadonlySet<string>,
+): PriorityCommand[] {
   if (!targets.length) return [];
-  const levels = new Set(targets.map((t) => priorityIdOf(t.priority)));
+  // The level each row runs at, which is the level it shows (shared/rank.mjs).
+  const levels = new Set(targets.map((t) => priorityIdOf(shownPriority(t, !!direct?.has(t.product ?? '')))));
   const shared = levels.size === 1 ? [...levels][0] : null;
   const many = targets.length > 1 ? ` (${targets.length} selected)` : '';
   return PRIORITIES.map((p) => ({

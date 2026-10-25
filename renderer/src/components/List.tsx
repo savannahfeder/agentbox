@@ -5,7 +5,7 @@
 
 import { useContext, useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { Product, RepeatRule, RunningSession, ThreadCard, View, WorkItem } from '../types';
-import { ago, dayLabel, previewText, stamp } from '../format';
+import { ago, dayAndTime, dayLabel, previewText, stamp } from '../format';
 import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitle, walkRowKeys } from '../list-rules';
 import { isUrgentRow } from '../interrupt';
 // THE SAME PREDICATE THE PANE USES, not a second copy of the rule. The row and
@@ -20,7 +20,9 @@ import { splitHits } from '../search';
 import type { ThreadSearchDetails } from '../threads/search';
 import { clockLabel, isCleanRun, nextRunAt } from '../../../shared/repeats.mjs';
 import { Face, TeamRowEnd, type TeamView } from '../team/people';
-import { RepeatMark, RowCells, TableHead, ThreadCells, WaitingContext } from '../threads/Pages';
+import { CloudOfferRow, RepeatMark, RowCells, TableHead, ThreadCells, WaitingContext } from '../threads/Pages';
+import { FleetContext } from '../fleet';
+import { cardStatus, factsFor, statusCell } from '../status-word';
 import { toApproveWords } from '../threads-made';
 import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
@@ -139,7 +141,9 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, running, engineChoice, engines, stalled, queued, signInNeeded, atLimit, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, unread, running, engineChoice, engines, stalled, queued, signInNeeded, atLimit, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder, lead = null }: {
+  /** Rows drawn above the list's own, under its head: a mention in a room (team/rooms/MentionRows.tsx). */
+  lead?: ReactNode;
   items: WorkItem[];
   view: View;
   // WHICH VIEW'S KEYS THE ROW HINT PRINTS, which is not always the view this
@@ -153,6 +157,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   hoveredId?: string | null;
   selected: number;
   seen: Set<string>;
+  /** An agent wrote since you last opened it (renderer/src/unread.ts). */
+  unread?: (item: WorkItem) => boolean;
   running: RunningSession[];
   /**
    * WHETHER THIS MAC HAS TWO CODING AGENTS TO TELL APART. False on almost every
@@ -252,6 +258,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   onReorder?: (id: string, beforeId: string | null, drawn: string[]) => void;
 }) {
   const waiting = useContext(WaitingContext);
+  const fleet = useContext(FleetContext);
   const drag = useRowDrag(table ? onReorder : undefined);
   // The hover does not move while a row is carried: each row crossed would
   // redraw the whole app under the drag (w-6e5b532a95).
@@ -287,7 +294,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   //
   // `emptyText` survives because search is the one case that is NOT an empty
   // page: something was typed and the app has to say what it matched.
-  if (items.length === 0 && rules.length === 0 && !mixed?.length) {
+  if (items.length === 0 && rules.length === 0 && !mixed?.length && !lead) {
     return emptyText ? <div className="empty">{emptyText}</div> : null;
   }
 
@@ -297,9 +304,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   // localStorage deferral, still read so nothing already deferred pops back.
   const deferredUntil = (item: WorkItem) => Math.max(item.runAt ?? 0, item.snoozedUntil ?? 0, snoozes?.[item.id] ?? 0);
   const wakeTs = (item: WorkItem) => deferredUntil(item) || item.updatedAt;
-  const wake = (ts: number) => new Date(ts).toLocaleString(undefined, {
-    weekday: 'short', hour: 'numeric', minute: '2-digit',
-  });
+  const wake = (ts: number) => dayAndTime(ts);
 
   // THE ROW SAYING NOTHING IS RUNNING WEARS NO DAY LABEL. It is about right now
   // and it is drawn first; a "Today" over it would be the list filing a fact
@@ -373,6 +378,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
   return (
     <div className={`list${table ? ' th-table' : ''}`} ref={drag.listRef}>
       {table && <TableHead person={withPerson} tab={view} />}
+      {lead}
       {/* Repeating tasks sit above the deferred rows, in the tab that already
           holds work with a moment attached. They are RULES, not items, so they
           arrive on their own list and no inbox rule has an opinion about them. */}
@@ -387,12 +393,15 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
       {table && rules.map((rule) => {
         const pool = allItems ?? items;
         const last = rule.lastOccurrence ? pool.find((i) => i.id === rule.lastOccurrence) ?? null : null;
+        // A repeating rule's own state is its last run's: the mark turns only
+        // where an agent really is on that one (w-ec2b04d449).
         const live = !!last && (last.status === 'open' || last.status === 'claimed');
         return (
           <div key={rule.id} data-repeat-id={rule.id} className="row" title={repeatRow(rule, last).last}
             onClick={() => onOpenRepeat?.(rule)}>
             <span className="mark" aria-hidden="true" />
-            <RowCells live={live} lead={<RepeatMark />} title={rule.title} aside={repeatTag(rule)} where={rule.productName}
+            <RowCells status={last ? statusCell(last, { ...factsFor(fleet, last.id), inProgress: live, now: Date.now() }) : undefined}
+              lead={<RepeatMark />} title={rule.title} aside={repeatTag(rule)} where={rule.productName}
               person={withPerson ? personCell?.(team?.me ?? null) : undefined}
               priority={rule.priority ?? 5} updatedAt={rule.updatedAt ?? rule.createdAt}
               when={nextRunWords(rule)} now={Date.now()} />
@@ -444,7 +453,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
               return (
                 <div key={key} className={`row th-their-row${selectedCard === key ? ' selected' : ''}`} onClick={() => onOpenCard?.(c)}>
                   <span className="mark" aria-hidden="true" />
-                  <RowCells title={c.title ?? 'Private thread'} where={c.project ?? ''} person={personCell?.(c.personId)}
+                  <RowCells status={cardStatus(c.state)} title={c.title ?? 'Private thread'} where={c.project ?? ''} person={personCell?.(c.personId)}
                     priority={c.priority} updatedAt={c.updatedAt} now={Date.now()} />
                 </div>
               );
@@ -480,7 +489,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
                 {...(view === 'inbox' && !isImportRow(item)
                   ? { 'data-hint': 'row', 'data-hint-text': '.subject' }
                   : {})}
-                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}`}
+                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}${view === 'inbox' && unread?.(item) ? ' unread' : ''}`}
                 /*
                  * ON MOUSE MOVE, NOT ON MOUSE ENTER. A pointer parked over the
                    list while she walks it with J and K would otherwise claim
@@ -787,6 +796,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, running,
           })}
         </div>
       ))}
+      {table && view === 'progress' && !ranked && <CloudOfferRow />}
       {onEnd && <ListFoot onEnd={onEnd} />}
     </div>
   );

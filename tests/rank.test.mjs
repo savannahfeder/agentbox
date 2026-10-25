@@ -209,17 +209,19 @@ describe('hiding a product from the picker', () => {
 });
 
 
-// The number on an item is hers alone. Agents used to set it off a rule in
-// the worker brief; that rule is gone and so is its effect, including on the
-// items already in the store carrying an agent's 8.
+// A level counts whoever set it (w-5ac9c9006d, 2026-10-16). It used to be hers
+// alone, and every level an agent wrote was then a lie on screen: "We should
+// also always treat priorities as the source of truth, regardless of where
+// they came from."
 describe('whose priority counts', () => {
   const agentTagged = (n) => ({ priority: n, wrote: { priority: { ts: 1, source: 'agent' } } });
   const composed = (n) => ({ priority: n, wrote: { priority: { ts: 1, source: 'system' } } });
   const answeredWith = (n) => ({ priority: n, wrote: { priority: { ts: 1, source: 'founder' } } });
 
-  it("an agent's own number does not move it", () => {
-    expect(itemPriority(agentTagged(9))).toBe(DEFAULT_PRIORITY);
-    expect(itemPriority(agentTagged(2))).toBe(DEFAULT_PRIORITY);
+  it("an agent's own number is taken exactly too", () => {
+    expect(itemPriority(agentTagged(9))).toBe(9);
+    expect(itemPriority(agentTagged(2))).toBe(2);
+    expect(itemPriority(agentTagged(0))).toBe(DEFAULT_PRIORITY);
   });
 
   // Her compose box stamps the number as 'system' and her reply stamps it as
@@ -245,11 +247,11 @@ describe('whose priority counts', () => {
     expect(hot).toBeGreaterThan(cold);
   });
 
-  it("an agent's 9 no longer beats an untagged row in the same product", () => {
+  it("an agent's 9 beats an untagged row in the same product", () => {
     const order = ['first'];
     const loud = productRankScore(order, 'first') + itemPriority(agentTagged(9));
     const quiet = productRankScore(order, 'first') + itemPriority({});
-    expect(loud).toBe(quiet);
+    expect(loud).toBeGreaterThan(quiet);
   });
 
   it('a whole product she ranks higher still outranks any tag at all', () => {

@@ -204,13 +204,18 @@ describe('two sessions never end up on one row', () => {
   });
 
   // THE CASE THAT MUST NOT MATCH: a finished folder and nobody preparing one.
-  // That spawn runs now, and making it wait would be a row that never answers.
-  it('does not make a spawn wait when the folder is finished', () => {
+  // That spawn goes ahead: made ready off the main thread (git runs over even a
+  // finished folder), then started, never left waiting for nothing.
+  it('starts the spawn when the folder is finished', async () => {
     const { sup, product, dir: store } = supervisorOver(dir, [{ id: 'w-ready', product: 'agentbox', status: 'open' }]);
     stores.push(store);
-    ensureTaskFolder(dir, 'w-ready');
+    const there = ensureTaskFolder(dir, 'w-ready').path;
+    const spawns = [];
+    sup.spawnWorker = (item, opts) => spawns.push({ cwd: sup.workFolderFor(item, product), opts });
 
-    expect(sup._folderFirst({ id: 'w-ready', product: 'agentbox' }, product, 'claude', {})).toBe(false);
+    sup._folderFirst({ id: 'w-ready', product: 'agentbox' }, product, 'claude', {});
+    for (let i = 0; i < 200 && !spawns.length; i += 1) await new Promise((r) => setTimeout(r, 25));
+    expect(spawns.map((s) => s.cwd)).toEqual([there]);
   });
 
   // The other end of the same race: the folder is finished and the spawn that

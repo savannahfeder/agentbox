@@ -17,6 +17,10 @@ import { listProducts, getProduct, createProduct, updateProduct } from './core/p
 import { listDocuments, readDocument, writeDocument } from './core/documents.mjs';
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mjs';
 import { listWorkItems, updateItem, createClaimRegistry } from './core/work.mjs';
+import { readStandingInstruction, setStandingInstruction } from './core/repeats.mjs';
+import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook } from './core/teammates.mjs';
+import { readTeammates, teamDir } from '../main/store/teammates-files.mjs';
+import { legacyRoot } from '../main/store/project.mjs';
 import { listProductChats, readProductChat } from './core/chat.mjs';
 import { lookAtPage } from './core/page.mjs';
 import { WORK_ITEM_STATUSES } from '../shared/work-items.mjs';
@@ -33,6 +37,8 @@ import { Name, possessive } from '../shared/product-name.mjs';
 const CAPABILITIES = [
   'products', 'documents (read and write, any path in the product)',
   'personas and transcripts (they are documents)', 'skills', 'work items', 'past chats (read only)',
+  'the standing instruction behind a repeating task, on a thread that is one of its runs',
+  'the team chat and passing work to a teammate, from any thread; remembering and setting up, on a thread that is a teammate\'s run',
   'looking at a page running on this machine (look_at_page, local addresses only)',
 ];
 const MISSING = [
@@ -50,9 +56,12 @@ const guard = (fn) => async (args) => {
   try { return await fn(args ?? {}); } catch (err) { return { ...text(`error: ${err?.message ?? err}`), isError: true }; }
 };
 
-export function buildTools({ holder } = {}) {
+// `ownItem` is the row this server's session was started for, if any.
+export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null } = {}) {
   const account = resolveAccount();
   const claims = createClaimRegistry({ holder: holder ?? `mcp-${process.pid}` });
+  const hasTeam = teammatesExist(String(process.env.STORE_ACCOUNT_ID ?? '').trim() || account.accountId);
+  const capabilities = hasTeam ? CAPABILITIES : CAPABILITIES.filter((c) => !c.includes('teammate'));
 
   const tools = [
     /* ------------------------------- products ------------------------------ */
@@ -138,7 +147,7 @@ export function buildTools({ holder } = {}) {
       name: 'fetch_skill',
       description: 'One skill in full, with a short header explaining which of its tools exist here and which are your own job. These were written for the agent inside the app, so the method applies exactly and some tool names do not.',
       schema: { name: z.string() },
-      run: ({ name }) => json(fetchSkill(name, { capabilities: CAPABILITIES, missing: MISSING })),
+      run: ({ name }) => json(fetchSkill(name, { capabilities, missing: MISSING })),
     },
     {
       name: 'fetch_reference',
@@ -177,7 +186,7 @@ export function buildTools({ holder } = {}) {
     },
     {
       name: 'claim_work_item',
-      description: 'Take exclusive ownership of a work item before starting it. Pass an id for a specific one, or a filter to pull the next available item (highest priority, then oldest) from any product. Returns claimed false with the current holder if someone else has it, which is an ordinary outcome: ask for the next one instead. The claim is kept alive automatically for as long as this session runs and is released if it dies, so there is nothing to renew and nothing to clean up. If an earlier session on this row lost its claim mid-write, that write comes back with the claim, in `pending`: it never reached the row or the founder, so read it and carry what is still true into your own note or result.',
+      description: 'Take exclusive ownership of a work item before starting it. Pass an id for a specific one, or a filter to pull the next available item (highest priority, then oldest) from any product. With neither, a session started for a work item claims that item. Returns claimed false with the current holder if someone else has it, which is an ordinary outcome: ask for the next one instead. The claim is kept alive automatically for as long as this session runs and is released if it dies, so there is nothing to renew and nothing to clean up. If an earlier session on this row lost its claim mid-write, that write comes back with the claim, in `pending`: it never reached the row or the founder, so read it and carry what is still true into your own note or result.',
       schema: {
         product: z.string().optional(),
         id: z.string().optional(),
@@ -187,7 +196,11 @@ export function buildTools({ holder } = {}) {
           product: z.string().optional(),
         }).optional(),
       },
-      run: async ({ product, id, filter }) => json(await claims.claim({ product, id, filter: filter ?? (id ? null : {}) })),
+      // A bare call from a session started for a row means that row, not the oldest open one anywhere.
+      run: async ({ product, id, filter }) => {
+        if (!id && !filter && ownItem) return json(await claims.claim({ id: ownItem }));
+        return json(await claims.claim({ product, id, filter: filter ?? (id ? null : {}) }));
+      },
     },
     {
       name: 'update_work_item',
@@ -203,7 +216,7 @@ export function buildTools({ holder } = {}) {
         closeBecause: z.string().optional().describe('only with status done on a row the founder wrote: their own words, quoted exactly from the row, asking you to close it'),
         deferBecause: z.string().optional().describe('only with runAt on a row the founder wrote: their own words, quoted exactly from the row, asking for it to be put off or to be reminded later. Without them the row stays in their inbox'),
         problem: z.string().optional().describe(`the summary's CONTEXT: a few plain sentences, ${CONTEXT_WORDS} words at most, that bring the thread back to someone who has forgotten it: what was asked, what was found, the facts needed to decide`),
-        progress: z.string().optional().describe(`the summary's DONE list: the steps taken so far, one per line, oldest first and newest last, ${DONE_STEPS} lines at most of ${DONE_STEP_WORDS} words each. Send the whole list each time; it replaces the last one`),
+        progress: z.string().optional().describe(`the summary's DONE list: the steps taken so far, one per line, oldest first and newest last, ${DONE_STEPS} lines at most of ${DONE_STEP_WORDS} words each. Send the whole list each time; it replaces the last one. Every line is a step that FINISHED: one you are about to take goes on after it happens, never before`),
         solution: z.string().optional().describe(`no longer shown; leave it out (older threads may still carry one, ${SUMMARY_WORDS} words at most)`),
         blockedBy: z.array(z.string()).optional().describe('ids of threads this one waits on'),
         blocks: z.array(z.string()).optional().describe('ids of threads that wait on this one'),
@@ -215,6 +228,98 @@ export function buildTools({ holder } = {}) {
       description: 'Hand an item back unfinished so another session can take it. Worth doing when you find it is not what you thought, or belongs to work you are not equipped for; otherwise it stays held until this session ends.',
       schema: { id: z.string() },
       run: ({ id }) => json(claims.release(id)),
+    },
+
+    /* --------------------------- repeating tasks --------------------------- */
+    // The rule itself, for the session standing on one of its runs. A run that
+    // edits its own body edits a copy, and a memory note is kept per task
+    // folder while every run gets a new one, so neither reaches tomorrow.
+    {
+      name: 'read_repeating_task',
+      description: 'The standing instruction behind this run, if this thread is one run of a repeating task: the words every run after this one is briefed with, plus the schedule and when it next runs. Read it before changing it; set_repeating_task replaces the whole instruction.',
+      schema: {},
+      run: () => json(readStandingInstruction()),
+    },
+    {
+      name: 'set_repeating_task',
+      description: 'Change the standing instruction behind this run, so the next run and every one after it is briefed with the new words. This is what to use when the person tells you, on a run, how the task should go from now on ("if there is nothing new, don\'t bother me") — they should not have to go and edit it themselves, and a memory note will not do it, because every run gets a new task folder. Send the WHOLE instruction, not the part you are adding: read_repeating_task first, then send it back with their change in it. Only the words are yours: the hour, the day and which coding agent runs it stay on their own screen, and it only works on a thread that is a run of a repeating task.',
+      schema: {
+        instruction: z.string().describe('the whole standing instruction, as the person would have typed it'),
+      },
+      run: ({ instruction }) => json(setStandingInstruction({ instruction })),
+    },
+
+    /* ------------------------------- teammates ------------------------------ */
+    // On a teammate's run, the teammate speaks; on any other thread, the person
+    // does, because they asked. Which comes from the run, never an argument.
+    {
+      name: 'team_post',
+      description: 'Say something in the team chat: as the teammate this run belongs to, or, on any other thread, for the person when they ask you to tell a teammate something. The person and every teammate read it, so say "you" to the person, never "the person". Naming a teammate in `to` or with @Name in the text wakes them to read it, so name someone only when they need to act. Keep it short and plain. Add up to four short `options` when asking the person something they can answer in a tap.',
+      schema: {
+        text: z.string().describe('what to say, one to three sentences'),
+        to: z.array(z.string()).optional().describe('names of teammates who need to act on it'),
+        options: z.array(z.string()).optional().describe('short answers the person can tap, when asking them a question'),
+      },
+      run: ({ text: words, to, options }) => json(teamPost({ text: words, to, options })),
+    },
+    {
+      name: 'team_pass',
+      description: 'Hand a piece of work to a teammate whose job it is. They get it as a run of their own, with your title and details as its brief, and it shows in the team chat. On a thread that is not a teammate\'s run, use it when the person asks you to give something to one of their teammates (call team_roster first to see who is on the team). Put everything they need in the details: steps, files, links, what done looks like.',
+      schema: {
+        to: z.string().describe('the teammate\'s name'),
+        title: z.string().describe('the work, in a short line'),
+        details: z.string().describe('everything they need to do it'),
+        project: z.string().optional().describe('the project the work is in, when it is not the teammate\'s own (from another thread it defaults to that thread\'s)'),
+      },
+      run: ({ to, title, details, project }) => json(teamPass({ to, title, details, project })),
+    },
+    {
+      name: 'team_remember',
+      description: 'Keep a standing preference the person stated ("from now on", "always", "never", "I prefer"), so every later run of yours is briefed with it. A few words in their terms. The person sees it in the team chat and can undo it.',
+      schema: { text: z.string().describe('the preference, in a few words') },
+      run: ({ text: words }) => json(teamRemember({ text: words })),
+    },
+    {
+      name: 'team_playbook',
+      description: 'Keep a lesson about how the person likes a kind of work done ("open videos on the product, never a logo") in the playbook of that title ("How you like videos made"), made if new, with the thread you are on as where it came from. Every teammate that reads the playbook is briefed with it. Leave out lesson to start reading a playbook another teammate wrote.',
+      schema: {
+        playbook: z.string().describe('its title, like "How you write posts"'),
+        lesson: z.string().optional().describe('the lesson, one sentence in their terms'),
+      },
+      run: ({ playbook, lesson }) => json(teamPlaybook({ playbook, lesson })),
+    },
+    {
+      name: 'team_setup',
+      description: 'Set or change who you are as a teammate: your name (your role, like Marketing lead), role, job (as long as it needs, in plain words to yourself), goal, how the goal is counted, what you ask the person first, what you do on your own (duties: a list, each { what, every: day|weekday|week, at: ["09:00", "15:00"], on: 0-6 for weekly } or { what, after: "ship", most: runs a week }, with tell: when to bring the person in; the list you send replaces the old one), and which coding agent runs you when the person said (runsOn: claude or codex). A new teammate calls it to set itself up, and with ready true when it is set.',
+      schema: {
+        name: z.string().optional(),
+        role: z.string().optional(),
+        job: z.string().optional(),
+        goal: z.string().optional(),
+        counted: z.string().optional(),
+        asksFirst: z.string().optional(),
+        duties: z.array(z.object({
+          what: z.string(),
+          every: z.enum(['day', 'weekday', 'week']).optional(),
+          at: z.union([z.string(), z.array(z.string())]).optional(),
+          on: z.number().int().optional(),
+          after: z.enum(['ship']).optional(),
+          most: z.number().int().optional(),
+          tell: z.string().optional(),
+        })).optional(),
+        every: z.enum(['day', 'weekday', 'week', 'never']).optional(),
+        at: z.string().optional(),
+        on: z.number().int().optional(),
+        runsOn: z.enum(['claude', 'codex']).optional(),
+        ready: z.boolean().optional(),
+      },
+      run: (args) => json(teamSetup(args)),
+    },
+    {
+      name: 'team_roster',
+      description: 'The person\'s teammates (agents with standing jobs) with their role and job, and the last twenty things said in the team chat. Works on any thread.',
+      schema: {},
+      run: () => json(teamRoster()),
     },
 
     /* -------------------------------- chats -------------------------------- */
@@ -256,9 +361,15 @@ export function buildTools({ holder } = {}) {
     },
   ];
 
+  // Teammates are an alpha feature: their tools are offered once there is a
+  // teammate to talk to, which is never while the feature is off.
   return {
     account,
     claims,
-    tools: tools.map((t) => ({ ...t, run: guard(t.run) })),
+    tools: tools.filter((t) => hasTeam || !t.name.startsWith('team_')).map((t) => ({ ...t, run: guard(t.run) })),
   };
+}
+
+function teammatesExist(accountId) {
+  try { return readTeammates(teamDir(legacyRoot(), accountId)).length > 0; } catch { return false; }
 }

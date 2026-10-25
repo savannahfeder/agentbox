@@ -74,12 +74,14 @@ describe('the chips under a message', () => {
 describe('the bar that appears when you point at a message', () => {
   const html = draw(HERS, acting);
 
-  it('offers react, reply and handing it to an agent', () => {
+  it('offers react, reply, handing it to an agent and the more menu, after three quick reactions', () => {
     expect(html).toContain('class="chat-acts"');
-    expect(html.match(/class="chat-act[ "]/g)).toHaveLength(3);
+    expect(html.match(/class="chat-act[ "]/g)).toHaveLength(4);
+    expect(html.match(/class="chat-quick"/g)).toHaveLength(3);
     expect(html).toContain('aria-label="React"');
     expect(html).toContain('aria-label="Reply"');
     expect(html).toContain('aria-label="Hand to an agent"');
+    expect(html).toContain('aria-label="More"');
   });
 
   it('says "Hand to an agent" in words, not only as a glyph', () => {

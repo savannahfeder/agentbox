@@ -23,7 +23,7 @@ const system:Section = {id:'system',label:'System prompt',description:`${Name}â€
 const fixtureText = new Map<string,string>();
 const preview = () => new URLSearchParams(location.search).has('fixtures') || !window.zero;
 // What every section's writing surface needs, whichever file is under it.
-type Writing = {text:string|null;status:string;edit:(v:string)=>void;restore?:{section:Section;defaultText:string;pick:(v:string,label:string)=>void};undo?:{label:string}|null;undoRestore?:()=>void};
+export type Writing = {text:string|null;status:string;edit:(v:string)=>void;restore?:{section:Section;defaultText:string;pick:(v:string,label:string)=>void};undo?:{label:string}|null;undoRestore?:()=>void};
 // Reading, saving and restoring one of the app's instruction files.
 function useInstruction(section: Section): Writing {
  const [text,setText]=useState<string|null>(null);
@@ -174,14 +174,14 @@ function useAdhdMode() {
    blocks, because a file of instructions is a document and was being shown as
    a form field. An empty section has nothing to read, so it opens as the
    writing surface with the caret in it. */
-function Part({id,label,writing,description,head,hidden}:{id:string;label?:string;writing:Writing;description?:string;head?:React.ReactNode;hidden?:boolean}) {
+export function Part({id,label,writing,description,head,hidden,find}:{id:string;label?:string;writing:Writing;description?:string;head?:React.ReactNode;hidden?:boolean;find?:string}) {
  const {text,status,edit,restore,undo,undoRestore}=writing;
  const [writingNow,setWriting]=useState(false);
  const decided=useRef(false);
  useEffect(()=>{if(text!==null&&!decided.current){decided.current=true;setWriting(startsWriting(text));}},[text]);
  const box=useRef<HTMLTextAreaElement>(null);
  useEffect(()=>{if(writingNow&&text!==null) box.current?.focus({preventScroll:true});},[writingNow]);
- return <section className="instr-part" id={`instr-${id}`}>
+ return <section className="instr-part" id={`instr-${id}`} data-find={find}>
   <div className="instr-part-head">
    {label && <h2>{label}</h2>}
    <div className="instr-part-tools">
@@ -234,14 +234,13 @@ function ScopeSwitch({scope,projects,onScope}:{scope:Scope;projects:ProjectSetti
 }
 /* One document for all the user's rules, followed by the optional ADHD mode.
    The heading switches projects. Sections already visible need no sidebar.
-   The app's task brief remains behind Advanced. */
+   The app's task brief is its own card under them, shown, not folded away. */
 export function InstructionSettings({projects=[],scope:asked=EVERY,onScope,onSaved=()=>{}}:{projects?:ProjectSettings[];scope?:Scope;onScope?:(s:Scope)=>void;onSaved?:()=>void}){
  const [own,setOwn]=useState<Scope>(asked);
  useEffect(()=>setOwn(asked),[asked]);
  const scope=resolveScope(own,projects);
  const pick=(s:Scope)=>{setOwn(s);onScope?.(s);};
  const project=projects.find(p=>p.slug===scope);
- const [showAdvanced,setShowAdvanced]=useState(false);
  return <div className="set-inner instructions-page">
   <ScopeSwitch scope={scope} projects={projects} onScope={pick}/>
   <div className="instr-body">
@@ -251,10 +250,7 @@ export function InstructionSettings({projects=[],scope:asked=EVERY,onScope,onSav
       ? <><SharedPart section={rules}/><AdhdPart/></>
       : project && <ProjectPart project={project} onSaved={onSaved}/>}
     </div>
-    {scope===EVERY && <div className="instruction-advanced">
-     <button className="instruction-advanced-toggle" aria-expanded={showAdvanced} onClick={()=>setShowAdvanced(v=>!v)}>{showAdvanced?'Hide advanced':'Advanced'}</button>
-     {showAdvanced && <div className="instr-card instr-card-ours"><SharedPart section={system}/></div>}
-    </div>}
+    {scope===EVERY && <div className="instr-card instr-card-ours"><SharedPart section={system}/></div>}
    </div>
   </div>
  </div>;

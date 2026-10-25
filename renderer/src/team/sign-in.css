@@ -35,3 +35,20 @@
 .si-switch { margin: 20px 0 0; font-size: 13px; color: var(--text-faint); }
 .si-switch button { background: none; border: 0; padding: 0; font: inherit; color: var(--text); cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
 .si-switch button:hover { text-decoration-color: var(--text-dim); }
+/* Sign in and Create account, drawn like the inbox's own tabs. */
+.si-tabs { display: flex; gap: 22px; margin: 0 0 22px; border-bottom: 1px solid var(--line); }
+.si-tabs button { margin: 0 0 -1px; padding: 0 0 10px; border: 0; border-bottom: 1px solid transparent; background: none; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); cursor: pointer; }
+.si-tabs button:hover { color: var(--text-dim); }
+.si-tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
+.si-center { text-align: center; }
+/* The cloud's Create account only. Courts read this line for its size and
+   for links that stand out from it, so it is not the faintest text here. */
+.si-terms { margin: 14px 0 0; font-size: 12.5px; line-height: 19px; color: var(--text-dim); text-align: center; }
+.si-terms a, .si-lede a { color: var(--text); text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; }
+.si-back { -webkit-app-region: no-drag; }
+.si-skip-corner { position: absolute; top: 18px; right: 22px; padding: 4px 6px; border: 0; background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; -webkit-app-region: no-drag; }
+.si-skip-corner:hover { color: var(--text); }
+/* On a phone the card is the screen's width, padding included, and never
+   wider (the phone with the Mac shut signs in here, renderer/src/cloud-bridge.ts). */
+:root[data-door="phone"] .si-page { grid-template-columns: minmax(0, 1fr); }
+:root[data-door="phone"] .si-card { width: auto; box-sizing: border-box; padding: 30px 22px 22px; }

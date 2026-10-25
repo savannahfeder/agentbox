@@ -58,7 +58,6 @@
 //   npm run fresh -- --clean        delete them all
 
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -66,72 +65,13 @@ import { fileURLToPath } from 'node:url';
 // the app can do this to itself from ⌘K since 2026-08-23 and two copies of a
 // rule about CFFIXED_USER_HOME is exactly how one of them goes quietly wrong.
 import { HOMES, existingHomes, makeHome, prepareHome, freshEnv } from '../shared/fresh-user-home.mjs';
+// AND THE OTHER HALF IS WHICH APP TO OPEN (scripts/fresh-user-target.mjs). On
+// Linux there is no bundle to find, so this command used to stop there.
+import { freshUserTarget } from './fresh-user-target.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(__dirname, '..');
 const args = new Set(process.argv.slice(2));
-
-// NEWEST WINS, not first found, and that is deliberate. On 2026-08-20 the
-// signed build in release/ was packed at 15:08 and main moved at 15:20, so a
-// fresh-user run against it showed a screen twelve minutes out of date: it
-// still carried the nothing-here page she had already killed. A test that
-// quietly runs yesterday's app is worse than no test, so the freshest bundle
-// wins and its age is printed either way. ASTRAL_APP=/path/to/Astral.app
-// overrides, for when the older one is the point (checking a signed build).
-// The binary inside a bundle is named after the bundle, so a side build packed
-// by scripts/pack-side.mjs has "the app Rest" in there and not "the app". Read it
-// rather than assumed: without this, ASTRAL_APP pointed at a side build answers
-// "no packaged the app found", which is a confusing thing to be told about a
-// folder you are looking straight at.
-function binIn(app) {
-  const dir = path.join(app, 'Contents', 'MacOS');
-  try {
-    const named = fs.readdirSync(dir).find((f) => f.startsWith('Agentbox'));
-    return named ? path.join(dir, named) : null;
-  } catch {
-    return null;
-  }
-}
-
-function findApp() {
-  if (process.env.ASTRAL_APP) {
-    const app = process.env.ASTRAL_APP;
-    const bin = binIn(app);
-    return bin ? { app, bin, at: builtAt(app) } : null;
-  }
-  const candidates = [
-    '/Applications/Astral.app',
-    path.join(os.homedir(), 'Applications', 'Astral.app'),
-    // electron-builder names this folder after the arch it was asked for, so
-    // the build target moving from arm64 to universal moved it. Both are
-    // listed because a build packed before that change is still a perfectly
-    // good app to open, and the sort below picks the newer one.
-    path.join(repo, 'release', 'mac-universal', 'Astral.app'),
-    path.join(repo, 'release', 'mac-arm64', 'Astral.app'),
-    path.join(repo, 'release', 'mac', 'Astral.app'),
-    // Where a session leaves an unsigned build packed straight off main, when
-    // the signed one beside it has fallen behind. `npm run release` never
-    // writes here, so nothing it produces is ever overwritten by a rebuild.
-    path.join(repo, 'release', 'from-main', 'Astral.app'),
-  ];
-  const found = candidates
-    .map((app) => ({ app, bin: path.join(app, 'Contents', 'MacOS', 'Agentbox') }))
-    .filter((c) => fs.existsSync(c.bin))
-    .map((c) => ({ ...c, at: builtAt(c.app) }))
-    .sort((a, b) => b.at - a.at);
-  return found[0] ?? null;
-}
-
-// When the bundle was packed. The asar is the whole app including the renderer,
-// so its mtime is the honest answer; the .app directory's own mtime moves for
-// reasons that are not a rebuild.
-function builtAt(app) {
-  try {
-    return fs.statSync(path.join(app, 'Contents', 'Resources', 'app.asar')).mtimeMs;
-  } catch {
-    return 0;
-  }
-}
 
 const existing = existingHomes;
 
@@ -148,10 +88,9 @@ if (args.has('--clean')) {
   process.exit(0);
 }
 
-const found = findApp();
-if (!found) {
-  console.error('No packaged Agentbox found. Build one with `npm run pack`, or install the dmg.');
-  console.error('Looked in /Applications, ~/Applications and release/.');
+const found = freshUserTarget({ repo });
+if (found.kind === 'none') {
+  console.error(`Nothing to open as a new user: ${found.why}`);
   process.exit(1);
 }
 
@@ -173,7 +112,7 @@ if (args.has('--keep')) {
 // app could not already write.
 const { claudeBin, keychain } = prepareHome(home, { withAgents: args.has('--with-agents') });
 
-const child = spawn(found.bin, [], {
+const child = spawn(found.bin, found.args, {
   detached: true,
   stdio: 'ignore',
   env: freshEnv(home),
@@ -181,12 +120,15 @@ const child = spawn(found.bin, [], {
 child.unref();
 
 const mins = Math.round((Date.now() - found.at) / 60000);
-const age = found.at ? `built ${mins < 60 ? `${mins} min` : `${Math.round(mins / 60)} hr`} ago` : 'build time unknown';
+const age = found.kind === 'checkout'
+  ? 'run from source'
+  : (found.at ? `built ${mins < 60 ? `${mins} min` : `${Math.round(mins / 60)} hr`} ago` : 'build time unknown');
 console.log(`Opening ${found.app} as a brand new user, ${age}.`);
 console.log(`Its whole world is ${home} — settings, config and store.`);
 console.log(`Your own Agentbox keeps running and nothing of yours was read or changed.`);
+if (found.needsBuild) console.log('Note: the screen has not been built here, so run `npm run build` and open it again.');
 if (!claudeBin) console.log('Note: Claude Code is not at ~/.local/bin/claude, so agents will not run.');
-if (!keychain) console.log('Note: no ~/Library/Keychains, so Claude Code will say it is not logged in.');
+if (!keychain && process.platform === 'darwin') console.log('Note: no ~/Library/Keychains, so Claude Code will say it is not logged in.');
 // The hint has to name the command she actually typed. Run through npm it is
 // `npm run fresh -- --clean`; run as a file it is the file. Printing the wrong
 // one is a line that does not work when pasted.

@@ -178,8 +178,19 @@ const programOf = (key) => key.split(' ')[0];
 const measured = (list) => (list ?? []).filter((o) => o !== '?');
 
 /**
+ * Light, however it was learned: `l` measured on its own, `c` only as part of
+ * a chain. Read the same everywhere, so `c` changes no verdict; it is there to
+ * be counted. Pinned by
+ * tests/the-record-says-whether-it-learned-light-from-a-chain.test.mjs.
+ */
+const isLight = (o) => o === 'l' || o === 'c';
+
+/**
  * The learned record. Each key and each program keeps its last ten
- * observations as letters: l light, m in between, h heavy, ? not measured.
+ * observations as letters: l light, c light but learned only inside a chain,
+ * m in between, h heavy, ? not measured. A build that predates `c` drops it on
+ * load, which costs those runs as evidence and holds a little more than it
+ * needs to; it cannot call anything light that is not.
  * Both maps are kept in least-recently-seen-first order so the oldest falls off
  * first when either passes `maxKeys`.
  */
@@ -221,6 +232,15 @@ export class CommandHistory {
     if (keys.length > 1 || opaque) {
       this._push(this.keys, chainKey(keys, opaque), obs);
       if (obs !== 'l') return true;
+      // And only as a chain: the early return above means these records only
+      // ever hear about the chains that came out light, so they drift light.
+      // `c` marks that weaker evidence so it can be counted. It is read as `l`
+      // everywhere, so nothing is classified differently yet.
+      for (const key of keys) {
+        this._push(this.keys, key, 'c');
+        this._push(this.programs, programOf(key), 'c');
+      }
+      return true;
     }
     for (const key of keys) {
       this._push(this.keys, key, obs);
@@ -238,11 +258,17 @@ export class CommandHistory {
       if (v === 'heavy' || verdict === 'heavy') verdict = 'heavy';
       else if (v === 'unknown') verdict = 'unknown';
     };
-    if (keys.length > 1 || opaque) {
-      const chain = this.keys.get(chainKey(keys, opaque));
-      if (chain?.slice(-5).includes('h')) return 'heavy';
-      if (opaque) worse('unknown');
-    }
+    // A command's own record outranks the records of its parts: it is the only
+    // reading that covered everything the command starts, and the parts drift
+    // light (see `record`). The key is coarser than the command, so an old
+    // heavy run also holds back cheap variants that share it; that is the
+    // price. A middling run only keeps the command out of the light lane, where
+    // `lightLane` of them would start together, and `_holdsSlot` hands the slot
+    // back once a run measures small.
+    const own = measured(this.keys.get(keys.length > 1 || opaque ? chainKey(keys, opaque) : keys[0]));
+    if (own.includes('h')) return 'heavy';
+    if (own.includes('m')) worse('unknown');
+    if (opaque) worse('unknown');
     for (const key of keys) worse(this._classifyKey(key));
     return verdict;
   }
@@ -251,10 +277,10 @@ export class CommandHistory {
     const own = this.keys.get(key);
     const recent = measured(own?.slice(-5));
     if (recent.includes('h')) return 'heavy';
-    if (recent.length >= 2 && recent.every((o) => o === 'l')) return 'light';
-    if (recent.some((o) => o !== 'l')) return 'unknown';
+    if (recent.length >= 2 && recent.every(isLight)) return 'light';
+    if (recent.some((o) => !isLight(o))) return 'unknown';
     const prog = measured(this.programs.get(programOf(key))?.slice(-10));
-    if (prog.length >= 5 && prog.every((o) => o === 'l')) return 'light';
+    if (prog.length >= 5 && prog.every(isLight)) return 'light';
     return 'unknown';
   }
 
@@ -278,7 +304,7 @@ export class CommandHistory {
       if (!Array.isArray(entries)) return;
       for (const e of entries) {
         if (Array.isArray(e) && typeof e[0] === 'string' && Array.isArray(e[1])) {
-          map.set(e[0], e[1].filter((o) => ['l', 'm', 'h', '?'].includes(o)).slice(-10));
+          map.set(e[0], e[1].filter((o) => ['l', 'c', 'm', 'h', '?'].includes(o)).slice(-10));
         }
       }
     };

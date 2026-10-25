@@ -36,8 +36,9 @@ const refused = (cwd, ...args) => {
 
 // A repo shaped like hers: hooks come out of the working tree, the way
 // core.hooksPath=scripts/hooks does in this one.
-const makeRepo = () => {
-  const dir = fs.mkdtempSync(path.join(root, 'repo-'));
+const makeRepo = (at = null) => {
+  const dir = at ?? fs.mkdtempSync(path.join(root, 'repo-'));
+  fs.mkdirSync(dir, { recursive: true });
   git(dir, 'init', '-q', '-b', 'main', '.');
   git(dir, 'config', 'user.email', 'test@example.com');
   git(dir, 'config', 'user.name', 'test');
@@ -148,5 +149,34 @@ describe('nothing commits in the checkout her app runs from', () => {
     fs.appendFileSync(path.join(repo, 'f.txt'), 'deliberate\n');
     git(repo, 'add', '-A');
     expect(refused(repo, 'commit', '--no-verify', '-qm', 'deliberate')).toBe(false);
+  });
+});
+
+
+// A THREAD'S FOLDER IN THE CLOUD IS NOT HER CHECKOUT (2026-10-16). A cloud run
+// lays a thread's folder down as a repository of its own at the path it has on
+// the Mac, `.claude/worktrees/<id>`, not as a linked worktree. The first
+// `npm install` there switched these guards on, and they read it as the
+// checkout her app runs from: measured that day in a cloud run, every commit
+// was refused ("THIS IS THE CHECKOUT HER APP RUNS FROM") and a branch checkout
+// would have been put back on main. "Almost everything broke."
+describe('a thread\'s folder laid down as a repository of its own', () => {
+  const taskFolder = () => path.join(root, 'Users', 'someone', 'dev', 'app', '.claude', 'worktrees', 'w-1234abcd');
+
+  it('commits on its branch', () => {
+    const repo = makeRepo(taskFolder());
+    git(repo, 'checkout', '-q', '-b', 'agentbox/w-1234abcd');
+    expect(branchOf(repo)).toBe('agentbox/w-1234abcd');
+    fs.writeFileSync(path.join(repo, 'f.txt'), 'second\n');
+    git(repo, 'commit', '-qam', 'second');
+    expect(git(repo, 'log', '-1', '--format=%s')).toBe('second');
+  });
+
+  it('while a checkout anywhere else is still guarded', () => {
+    const repo = makeRepo(path.join(root, 'Users', 'someone', 'dev', 'app'));
+    expect(refused(repo, 'commit', '--allow-empty', '-qm', 'nope')).toBe(true);
+    // A folder merely NAMED like one, not inside .claude/worktrees, is guarded too.
+    const named = makeRepo(path.join(root, 'w-1234abcd'));
+    expect(refused(named, 'commit', '--allow-empty', '-qm', 'nope')).toBe(true);
   });
 });

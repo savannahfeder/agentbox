@@ -84,9 +84,9 @@ const copy = (key) => unquote(block.match(new RegExp(key + ": (?:'([^']*)'|`([^`
 
 describe('the three states, and only three', () => {
   it('says connected only when Claude Code was actually found', () => {
-    expect(block).toContain('const label = found ? copy.connected : certain ? copy.missing : copy.unsure;');
+    expect(block).toContain("if (found) return trouble ? 'trouble' : 'connected';");
     // One expression, for every engine drawn through this card.
-    expect(block.match(/const label = found \?/g)).toHaveLength(1);
+    expect(block.match(/const label = /g)).toHaveLength(1);
     expect(copy('connected')).toBe('Claude Code is connected');
   });
 
@@ -98,10 +98,10 @@ describe('the three states, and only three', () => {
   });
 
   it('spends the live dot on found alone, so unsure is never drawn as a yes', () => {
-    expect(block).toContain("<span className={`set-dot ${found ? 'live' : ''}`} />");
-    // The word beside the dot is the same three-way answer, so neither has to
-    // be learned from the other.
-    expect(block).toContain("{found ? 'connected' : certain ? 'not found' : 'not sure'}");
+    expect(block).toContain("<span className={`set-dot ${state === 'connected' ? 'live' : ''}`} />");
+    // The word beside the dot is the same answer, so neither has to be learned
+    // from the other.
+    expect(block).toContain("{ connected: 'connected', trouble: 'not working', missing: 'not found', unsure: 'not sure' }");
   });
 
   it('offers the install link only when it is sure there is nothing here', () => {
@@ -209,7 +209,7 @@ describe('where it lives', () => {
     expect(read('renderer/src/settings-search.ts')).toContain("{ id: 'claude', label: 'Claude Code', group: 'Agents' }");
     const page = settings.slice(settings.indexOf('const enginePage = (engine'), settings.indexOf('<div className="set-nav">'));
     expect(page).toContain('(!agent.found || agent.trouble || agent.chosen)\n          && (engine === \'codex\' ? <CodexCli {...status} /> : <ClaudeCode {...status} />)');
-    expect(page.indexOf('<ClaudeCode')).toBeLessThan(page.indexOf('label="Usage"'));
+    expect(page.indexOf('<ClaudeCode')).toBeLessThan(page.indexOf('name="Signed in"'));
     // And the card still reads main's answer rather than deriving a second one.
     expect(settings).toContain('found: !!w.claudeFound');
     expect(settings).toContain('certain: w.claudeCertain !== false');

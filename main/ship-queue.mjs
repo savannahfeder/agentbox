@@ -22,10 +22,12 @@
 // cannot change the code that ships it. With no `ship.json`, nothing here does
 // anything at all.
 
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Name } from '../shared/product-name.mjs';
+import { SHIP_FAILED } from '../shared/not-shipped.mjs';
+import { conflictBrief, earlyConflictNote } from './ship-conflict-brief.mjs';
 
 export const SHIP_LABEL = 'ship';
 const SHIP_MS = 20 * 60 * 1000;
@@ -83,11 +85,16 @@ export const withoutShipLabel = (item) => labelsOf(item).filter((l) => l !== SHI
  * marking, and with a task folder to ship from. THE WINDOW READS THIS TOO
  * (w-0c1ba766eb): a row on this list is waiting on the app, not on a person,
  * so it is In progress and not Needs you until the queue has dealt with it.
+ *
+ * A CLOSED ROW STILL SHIPS, because a close is not a cancel. The window
+ * leaves closed rows out (`waitingIds`), so one stays in Done while it ships.
  */
+export const owedAShip = (item, handled = {}) => wantsShipping(item) && !(markedAt(item) <= (handled[keyOf(item)] ?? -1));
+
 export function waitingToShip(items, products, settings, { folderFor, handled = {} }) {
   const bySlug = new Map(products.map((p) => [p.slug, p]));
   return items
-    .filter((i) => wantsShipping(i) && i.status !== 'done' && !(markedAt(i) <= (handled[keyOf(i)] ?? -1)))
+    .filter((i) => owedAShip(i, handled))
     .map((item) => {
       const product = bySlug.get(item.product);
       const script = product ? shipScriptFor(product, settings) : null;
@@ -98,12 +105,24 @@ export function waitingToShip(items, products, settings, { folderFor, handled = 
 }
 
 /**
- * The next task to ship, oldest ask first, or null: one the queue owes, with
- * no session on it (an agent still working may yet commit).
+ * The next task to ship, the most important first, or null.
+ *
+ * A session the row's own agent is still finishing holds its ship: its commits
+ * may not all be in. A session that started AFTER the label does not, because
+ * that is a reply, and a reply to a thread already waiting used to hold it for
+ * as long as the new session ran (2026-10-19). `liveSince` answering null
+ * means nobody can say when the live work started — a cloud run whose folder
+ * has not come home — and that waits, as it always did.
+ *
+ * Priority before age, the way `shared/work-items.mjs` orders the queue a
+ * puller sees: a thread the person is waiting on queued behind every older one.
  */
-export function nextToShip(items, products, settings, { isLive = () => false, folderFor, handled = {} }) {
-  const ready = waitingToShip(items, products, settings, { folderFor, handled }).filter(({ item }) => !isLive(item));
-  ready.sort((a, b) => markedAt(a.item) - markedAt(b.item));
+export function nextToShip(items, products, settings, {
+  isLive = () => false, liveSince = () => null, folderFor, handled = {},
+}) {
+  const ready = waitingToShip(items, products, settings, { folderFor, handled })
+    .filter(({ item }) => !isLive(item) || liveSince(item) > markedAt(item));
+  ready.sort((a, b) => (b.item.priority ?? 0) - (a.item.priority ?? 0) || markedAt(a.item) - markedAt(b.item));
   return ready[0] ?? null;
 }
 
@@ -185,7 +204,7 @@ function diagnosis({ why, failed }) {
 }
 
 /** What the agent is told when its branch did not ship. */
-export function failureReply(output) {
+export function failureReply(output, { brief = null } = {}) {
   const tail = String(output ?? '').trim().slice(-KEEP);
   const { died, ...rest } = whyItDidNotShip(output);
   return [
@@ -202,6 +221,7 @@ export function failureReply(output) {
       'a worker that was starved or timed out is likelier than a bug in your change.',
       'Run the tests for your change again before you go looking for one.',
     ] : []),
+    ...(brief ? ['', brief] : []),
     '',
     'Fix what the script says below in your task folder, commit, then add the label',
     `\`${SHIP_LABEL}\` to this row again and end your turn. Do not push or touch any`,
@@ -217,16 +237,35 @@ export function failureReply(output) {
 export function failureNote(output) {
   const { died, last, ...rest } = whyItDidNotShip(output);
   const said = died ? `${DIED}. It last said: ${last ?? 'nothing at all'}` : diagnosis(rest);
-  return `It did not ship, and it went back to its agent: ${said.slice(0, 300)}`;
+  return `${SHIP_FAILED}${said.slice(0, 300)}`;
 }
 
-export function runScript(script, cwd, { timeout = SHIP_MS, env = process.env } = {}) {
+/**
+ * The base checkout's hooks, read off the task folder's shared git dir. The
+ * ship runs with cwd = the task folder, whose core.hooksPath may be the
+ * relative 'scripts/hooks' resolving to the branch's own, worker-edited copy.
+ * Pinning the base copy here is what keeps the gate the branch cannot change.
+ */
+function baseHooksPath(cwd) {
+  return new Promise((resolve) => {
+    execFile('git', ['-C', cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', timeout: 10_000 }, (err, stdout) => {
+      const common = err ? '' : String(stdout).trim();
+      resolve(common ? path.resolve(common, '..', 'scripts', 'hooks') : null);
+    });
+  });
+}
+
+export async function runScript(script, cwd, { timeout = SHIP_MS, env = process.env } = {}) {
   const node = env.npm_node_execpath && fs.existsSync(env.npm_node_execpath) ? env.npm_node_execpath : 'node';
+  const hooks = await baseHooksPath(cwd);
+  const baseGate = hooks
+    ? { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.hooksPath', GIT_CONFIG_VALUE_0: hooks }
+    : {};
   return new Promise((resolve) => {
     let out = '';
     let child;
     try {
-      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0' }, stdio: ['ignore', 'pipe', 'pipe'] });
+      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (e) {
       resolve({ code: 1, out: String(e?.message ?? e) });
       return;
@@ -245,23 +284,26 @@ export function runScript(script, cwd, { timeout = SHIP_MS, env = process.env } 
  * supervisor's own tick and returns at once; the run happens beside it.
  */
 export class ShipQueue {
-  constructor({ store, userDir, folderFor, isLive, handBack = () => {}, run = runScript, afterShip = () => {}, log = console }) {
-    Object.assign(this, { store, userDir, folderFor, isLive, handBack, run, afterShip, log });
+  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, log = console }) {
+    Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, log });
     this.busy = null;
+    this.earlyConflicts = new Map();
   }
 
   tick(items, products) {
     if (this.busy) return null;
     const settings = readShipSettings(this.userDir);
     if (!Object.keys(settings).length) return null;
-    const next = nextToShip(items, products, settings, { isLive: this.isLive, folderFor: this.folderFor, handled: readHandled(this.userDir) });
+    const next = nextToShip(items, products, settings, {
+      isLive: this.isLive, liveSince: this.liveSince, folderFor: this.folderFor, handled: readHandled(this.userDir),
+    });
     if (!next) return null;
     // Marked handled only once the run has ENDED, pass or fail. Marked before
     // it, a run cut off by an app restart was never tried again
     // (w-f37a34def6, 2026-10-04). Within one app, `busy` already stops a
     // second start; across a restart, trying again is the point.
     const done = () => writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(next.item)]: markedAt(next.item) });
-    this.busy = this.ship(next).then(done, done).finally(() => { this.busy = null; });
+    this.busy = this.ship(next, products, items).then(done, done).finally(() => { this.busy = null; });
     return this.busy;
   }
 
@@ -270,24 +312,78 @@ export class ShipQueue {
     const settings = readShipSettings(this.userDir);
     if (!Object.keys(settings).length) return [];
     return waitingToShip(items, products, settings, { folderFor: this.folderFor, handled: readHandled(this.userDir) })
+      .filter(({ item }) => item.status !== 'done')
       .map(({ item }) => item.id);
   }
 
-  async ship({ item, product, script, cwd }) {
+  /** Whether this row's folder must stay for a ship still to come. */
+  owes(item, products) {
+    const settings = readShipSettings(this.userDir);
+    if (!Object.keys(settings).length) return false;
+    return waitingToShip([item], products, settings, { folderFor: this.folderFor, handled: readHandled(this.userDir) }).length > 0;
+  }
+
+  // A thread id from a merge on main, read from this project or another one on
+  // the same checkout.
+  _readThread(id, product, products) {
+    const slugs = [product.slug, ...(products ?? []).filter((p) => p.slug !== product.slug && p.repoPath && p.repoPath === product.repoPath).map((p) => p.slug)];
+    for (const slug of slugs) {
+      const found = this.store.readItem?.(slug, id);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  // After a ship lands, every other open branch of a project that ships is
+  // checked against the new main with `git merge-tree`, which reads commits and
+  // touches no task folder. A conflict waits here for that thread's next run.
+  async _findNewConflicts(shipped, items, products) {
+    const settings = readShipSettings(this.userDir);
+    const bySlug = new Map((products ?? []).map((p) => [p.slug, p]));
+    for (const other of items ?? []) {
+      const product = bySlug.get(other.product);
+      if (other.id === shipped.id || other.status === 'done' || !product || !settings[product.slug]) continue;
+      const cwd = this.folderFor(other, product);
+      if (!cwd || !fs.existsSync(cwd)) continue;
+      try {
+        const note = await earlyConflictNote({ cwd, readThread: (id) => this._readThread(id, product, products) });
+        if (note) this.earlyConflicts.set(keyOf(other), note); else this.earlyConflicts.delete(keyOf(other));
+      } catch (e) { this.log.warn?.(`zero: could not check ${other.id} against main:`, e.message); }
+    }
+  }
+
+  /** What main's last ship means for this thread's branch, once, or null. */
+  takeEarlyConflict(item) {
+    const note = this.earlyConflicts.get(keyOf(item)) ?? null;
+    this.earlyConflicts.delete(keyOf(item));
+    return note;
+  }
+
+  async ship({ item, product, script, cwd }, products = [], items = []) {
     this.log.info?.(`zero: shipping ${item.id} from ${cwd}`);
     const { code, out } = await this.run(script, cwd);
     try {
       // Already on main: there is nothing to fix, so nobody is woken.
       const already = /There is nothing to ship/.test(out);
       if (code === 0 || already) {
-        this.store.shipped(product.slug, item.id, { sha: shippedSha(out), labels: withoutShipLabel(item) });
-        this.afterShip();
+        const sha = shippedSha(out);
+        this.store.shipped(product.slug, item.id, { sha, labels: withoutShipLabel(item) });
+        // THE COMMIT TRAVELS WITH THE NEWS. What follows a ship wants to know
+        // which commit went out: main/main-went-red.mjs waits for that
+        // commit's test run on GitHub, because nothing else is still running
+        // five minutes after the agent ended.
+        this.afterShip({ item, product, sha });
+        await this._findNewConflicts(item, items, products);
       } else {
         this.store.shipFailed(product.slug, item.id, { note: failureNote(out), labels: withoutShipLabel(item) });
+        let brief = null;
+        try {
+          brief = await conflictBrief({ cwd, output: out, readThread: (id) => this._readThread(id, product, products) });
+        } catch (e) { this.log.warn?.(`zero: could not brief the conflict on ${item.id}:`, e.message); }
         // Straight back to the session that wrote the change. Not through the
         // reply on the row: that field is hers, and the app's words written
         // there would be drawn as hers and could not replace hers anyway.
-        this.handBack(item, failureReply(out));
+        this.handBack(item, failureReply(out, { brief }));
       }
     } catch (e) {
       this.log.warn?.(`zero: could not record the ship of ${item.id}:`, e.message);

@@ -17,6 +17,14 @@
 // starting, and the phone skips it. A phone from before this asks nothing and
 // gets exactly what it got before, so the relay and the Mac can update in
 // either order.
+//
+// This test then went red on main itself (2026-10-17), on a macOS runner
+// taking 10.6 minutes where it usually takes 8. Nothing was wrong with the
+// relay: the clock below was the real one scaled down 100x, which left the
+// slack at 200 ms, and a stall that long before the Mac saw the request was
+// enough. Measured by stalling the Mac's socket by a known amount: red at
+// 200 ms for the reply and 300 ms for the quick answer, against 1200 ms for
+// both once the clock below was widened.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
 import { createHandler, newToken } from '../main/serve.mjs';
@@ -48,11 +56,14 @@ function socketTo(room) {
   };
 }
 
-// The room gives up on a silent Mac after 300 ms here (30 s on Cloudflare),
-// the agent takes the reply after 900 ms, and the Mac says it is still working
-// every 100 ms (10 s for real).
-const FIRST_FRAME_MS = 300;
-const AGENT_TAKES_MS = 900;
+// The room gives up on a silent Mac after 1200 ms here (30 s on Cloudflare),
+// the agent takes the reply after 2000 ms, and the Mac says it is still
+// working every 120 ms (10 s for real). Wider than an even scaling down, to
+// keep about a second of slack rather than 200 ms.
+const FIRST_FRAME_MS = 1200;
+const AGENT_TAKES_MS = 2000;
+const STILL_WORKING_MS = 120;
+const SLOWLY = 15_000;
 
 let server, key, room, client, ctx, taken;
 
@@ -67,9 +78,11 @@ beforeAll(async () => {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const port = server.address().port;
   room = new Room({ firstFrameMs: FIRST_FRAME_MS });
-  client = createRelayClient({ relayUrl: 'https://relay.test', key: () => key, port: () => port, WebSocketImpl: socketTo(room), waitMs: 100, log: { warn() {}, info() {} } });
+  client = createRelayClient({ relayUrl: 'https://relay.test', key: () => key, port: () => port, WebSocketImpl: socketTo(room), waitMs: STILL_WORKING_MS, log: { warn() {}, info() {} } });
   client.start();
-  await until(() => client.state().connected);
+  // A Mac that never joined turns every case below into the room's 503, which
+  // reads like the bug this test is about. Fail here instead.
+  expect(await until(() => client.state().connected)).toBe(true);
   ctx = { room: (await relayIds(key)).room, keys: await relayKeys(key) };
 });
 afterAll(() => { client?.stop(); server?.close(); });
@@ -85,7 +98,7 @@ describe('a reply the agent takes after the relay would have given up', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
     expect(taken).toContain('please also fix the header');
-  });
+  }, SLOWLY);
 
   it('and a quick answer is unchanged: no waiting frame gets in front of it', async () => {
     const res = await tunnelFetch(new Request('https://relay.test/api/zero:snapshot', {
@@ -100,5 +113,5 @@ describe('a phone from before this', () => {
   it('asks for no waiting frames, so it gets what it always got: the room gives up at its limit', async () => {
     const res = await reply('an old phone', { wait: false });
     expect(res.status).toBe(504);
-  });
+  }, SLOWLY);
 });

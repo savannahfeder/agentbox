@@ -1,29 +1,18 @@
 import { walkFiles } from './code-keys';
 
-// PURE. What a change the agent made is, as a thing the pane can open.
-//
-// So a change is a THIRD KIND OF ARTIFACT, beside the markdown file and the
-// html page the pane already opens, and it has a path like they do. The
-// arithmetic and the naming live here, out of the component, so they can be
-// tested without a window.
+// Pure helpers for a change opened in the pane, kept out of the component so
+// they can be tested without a window.
 
 /** One line of a change. `=` is context, `+` added, `-` removed. */
 export type Row = ['=' | '+' | '-', string];
 
 /**
- * WHAT LINE EACH ROW WAS, in the old file and in the new one —.
+ * A row's line number in the old file and in the new one, null on the side the
+ * row does not exist in. `main/git-change.mjs` fills it from the `@@` header.
  *
- * One pair per row, parallel to `rows`, null on the side a row does not exist
- * in: a removed line has no number in the new file, an added one none in the
- * old. `main/git-change.mjs` fills it off the `@@` header.
- *
- * IT IS OPTIONAL AND OFTEN ABSENT, and the pane has to keep drawing without it.
- * Only git knows these. A change read out of the CONVERSATION instead (a
- * product with no repository, or the drawings a run writes into the docs
- * folder, which is not a checkout) diffs one edit's own before against its
- * after, so its indexes are offsets inside a fragment and not file lines at
- * all. Inventing numbers from those would put a confident wrong number beside
- * every line, which is worse than an empty gutter.
+ * Often absent. A change read from the conversation instead of git diffs one
+ * edit's before against its after, so its offsets are inside a fragment, not
+ * file lines. An empty gutter is better than a wrong number on every line.
  */
 export type RowNums = [number | null, number | null];
 
@@ -56,32 +45,18 @@ export type Change = {
   editCount?: number;
 };
 
-/**
- * The kind of file this is. Kept beside `docKind` rather than inside it so the
- * pane's two settled kinds are not disturbed by a third.
- *
- * A change is written by the run as a file in the product's own folders, so it
- * gets a breadcrumb the same way every other artifact does and needs no new
- * idea of where an artifact lives.
- */
 export function isChangePath(path: string | undefined | null): boolean {
   if (!path) return false;
   return /\.change$/i.test(String(path).split(/[?#]/)[0]);
 }
 
 /**
- * Where one item's change is, product-relative.
- *
- * The same string main/code-change.mjs writes it to (`changePath` there), and
- * the two have to stay the same string: this is what a chip in the chat asks
- * the pane to open, and a chip that opens nothing is the one thing the
- * attachment row on the card has refused to draw since 2026-08-19.
+ * Where one item's change is, product-relative. It has to match `changePath` in
+ * main/code-change.mjs, which writes the file this opens.
  */
 export function changePathFor(itemId: string): string {
   return `runs/${itemId}/the-change-it-made.change`;
 }
-
-/* -------------------------------- the tree -------------------------------- */
 
 export type TreeRow =
   | { kind: 'folder'; label: string; depth: number; key: string; plus: number; minus: number; files: number }
@@ -94,17 +69,9 @@ function emptyNode(name: string): Node {
 }
 
 /**
- * The changed files as folders, the way they sit in the repository.
- *
- * A CHAIN OF FOLDERS WITH ONE CHILD EACH IS ONE ROW, not two. `renderer/src`
- * holds four files and a components folder, so it is a folder; `renderer` holds
- * only `src`, so it never gets a line of its own. Measured on the real change
- * this was drawn against (48 edits, 11 files): the naive tree is 15 rows
- * nesting three folders deep, this one is 14 rows nesting two, and the two it
- * drops are the two that say nothing.
- *
- * Folders come before files at every level and both are alphabetical, which is
- * what a file browser does and what a new user already reads all day.
+ * The changed files as a folder tree. A chain of folders with one child each is
+ * one row (`renderer/src`, not `renderer` then `src`). Folders come before
+ * files at every level, each sorted by name, as in a file browser.
  */
 export function treeRows(files: ChangedFile[]): TreeRow[] {
   const root = emptyNode('');
@@ -127,7 +94,6 @@ export function treeRows(files: ChangedFile[]): TreeRow[] {
     const folders = kids.filter((k) => !k.file).sort((a, b) => a.name.localeCompare(b.name));
     const leaves = kids.filter((k) => k.file).sort((a, b) => a.name.localeCompare(b.name));
     for (const folder of folders) {
-      // Fold a chain with a single folder child into one label.
       let label = folder.name;
       let cur = folder;
       while (cur.children.size === 1) {
@@ -169,7 +135,7 @@ function filesUnder(node: Node): ChangedFile[] {
   return [...node.children.values()].flatMap(filesUnder);
 }
 
-/** The rows a shut folder hides, so folding one is one line of work. */
+/** The tree rows left once the contents of every shut folder are hidden. */
 export function visibleRows(rows: TreeRow[], shut: ReadonlySet<string>): TreeRow[] {
   const out: TreeRow[] = [];
   let hidingAt: number | null = null;
@@ -182,9 +148,7 @@ export function visibleRows(rows: TreeRow[], shut: ReadonlySet<string>): TreeRow
   return out;
 }
 
-/* ------------------------------- the counts ------------------------------- */
-
-/** "11 files", "1 file". Never a bare number with no noun on it. */
+/** "11 files", "1 file". */
 export function fileCount(n: number): string {
   return n === 1 ? '1 file' : `${n} files`;
 }
@@ -195,7 +159,7 @@ export function changeSummary(change: Change): string {
   return `${fileCount(files)} +${change.plus ?? 0} −${change.minus ?? 0}`;
 }
 
-/** How long the run took, in the words she uses. Empty when it is not known. */
+/** How long the run took, in words. Empty when it is not known. */
 export function tookLabel(change: Change): string {
   const from = change.startedAt ?? 0;
   const to = change.endedAt ?? 0;
@@ -208,24 +172,9 @@ export function tookLabel(change: Change): string {
   return hours === 1 ? '1 hour' : `${hours} hours`;
 }
 
-/* ----------------------------- the five colours ---------------------------- */
-//
-// AGENTBOX HAS NO CODE COLOURS AT ALL and this is the smallest set that reads as
-// syntax rather than as a highlighter: a comment, a string, a keyword, a number
-// and a name that starts with a capital. Everything else is the window's own
-// ink. Five classes, five tokens in the stylesheet, so all sixteen skins answer
-// them in one place instead of each carrying a theme of its own.
-
-//
-// FIVE WAS TOO FEW, 2026-10-05. With only those, a line like
-// `const [drawn, setDrawn] = useState<ReadonlySet<number>>(() => {` had two of
-// its nine words coloured, and she read the pane as "pretty much all gray":
-// "there are variables being instantiated and functions being run, and yet
-// we're not highlighting those." So three more, the three every editor has: a
-// function being run or defined (`fn`), a name being made (`def`) and a
-// constant in capitals (`con`). A property that is only read keeps its ink, on
-// purpose: colouring every word is a highlighter again.
-
+// Each class is one token in the stylesheet, so every skin colours code in one
+// place. A property that is only read stays uncoloured on purpose, because
+// colouring every word stops reading as syntax.
 export type Tok = { c: '' | 'com' | 'str' | 'kw' | 'num' | 'typ' | 'fn' | 'def' | 'con'; s: string };
 
 const KEYWORDS = new Set([
@@ -336,14 +285,11 @@ export function tokenize(line: string): Tok[] {
   return out;
 }
 
-/* ------------------------ the words that changed -------------------------- */
-//
-// A removed line and the line that replaced it used to be two whole coloured
-// lines, so finding `, ensurePersonalProject` meant comparing them by eye
-// (2026-10-04, tests/the-words-that-changed-are-marked.test.mjs). The span the
-// two do not share, between their common start and common end, is marked.
-
-/** The part of each line the other does not share, or null when there is nothing worth marking. */
+/**
+ * The part of each line the other does not share, between their common start
+ * and common end, or null when there is nothing worth marking
+ * (tests/the-words-that-changed-are-marked.test.mjs).
+ */
 export function changedSpan(a: string, b: string): { minus: [number, number]; plus: [number, number] } | null {
   if (a === b) return null;
   const max = Math.min(a.length, b.length);
@@ -353,8 +299,8 @@ export function changedSpan(a: string, b: string): { minus: [number, number]; pl
   while (s < max - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s += 1;
   const minus: [number, number] = [p, a.length - s];
   const plus: [number, number] = [p, b.length - s];
-  // A WHOLE LINE THAT IS DIFFERENT IS ALREADY SAID BY ITS COLOUR. Marking most
-  // of it again is noise, so past this share nothing is marked.
+  // A line that is mostly different is already shown by its colour, so past
+  // this share nothing is marked.
   const share = Math.max((minus[1] - minus[0]) / Math.max(1, a.length), (plus[1] - plus[0]) / Math.max(1, b.length));
   return share > 0.6 ? null : { minus, plus };
 }
@@ -402,84 +348,39 @@ export function marked(toks: Tok[], span: [number, number] | null): (Tok & { hl?
   return out;
 }
 
-// NOTHING IS FOLDED. EVERY LINE OF A HUNK IS DRAWN.
-//
-// This used to cut any hunk over 34 rows down to a head of 18 and a tail of 6,
-// with an "N more lines" button in the gap.
-//
-// What the fold was costing, measured over the last forty rounds merged onto
-// main (scripts/measure-hunk-fold.mjs): it cut 1,110 of 3,284 hunks, put
-// 147,520 of 206,845 lines behind a button, and 38 of those 40 changes had at
-// least one. 71% of the code a card was carrying was not on the screen, and
-// reading all of it was 1,110 presses.
-//
-// The reason it existed is real and is now simply accepted: a card whose whole
-// new file arrives as one green run is long. Long is preferred over hidden.
+// Every row of a hunk is drawn. A long hunk is preferred over hidden code.
 export function hunkView(rows: Row[]): { rows: Row[]; hidden: number } {
   return { rows, hidden: 0 };
 }
 
 /**
- * Where each drawn row sits in the hunk it came from.
- *
- * Parallel to `hunkView(...).rows`, and now the identity, because nothing is
- * left out. It is kept rather than deleted because a line she types into has
- * to be put back at the right place in the file (renderer/src/code-edit.ts),
- * and that mapping is the one thing between the typed words and the wrong line of
- * somebody's source. It stays named so it stays checked.
+ * Where each drawn row sits in its hunk, parallel to `hunkView(...).rows`. It
+ * is the identity now, but renderer/src/code-edit.ts relies on it to put a
+ * typed line back at the right place in the file.
  */
 export function hunkViewAt(rows: Row[]): number[] {
   return rows.map((_, i) => i);
 }
 
-// HOW TALL A HUNK IS BEFORE ANYBODY HAS LOOKED AT IT.
-//
-// Taking the fold out meant the biggest measured change went from 961 rows on
-// the screen to 2,946, and from 11,016 elements to 32,298. Measured with the
-// processor turned down six times (scripts/measure-the-code-pane-lag.mjs),
-// scrolling it end to end dropped 7 frames past 50ms where the folded one
-// dropped none. A Mac running several agents at once is the real version of a
-// slow processor, so that stutter is felt in real use.
-//
-// THE ANSWER IS NOT TO HIDE CODE AGAIN. `content-visibility: auto` on a hunk
-// lets the browser skip the style, layout and paint of one that is nowhere near
-// the window, while every row stays in the document: the text is still there to
-// be selected, copied, walked with a key and saved. Nothing goes behind a
-// button and nothing is missing; the browser stops drawing what is a thousand
-// lines above her.
-//
-// A skipped hunk still needs a HEIGHT, or the scrollbar would lurch as each one
-// came into view. `.code-row` is 12px of mono at line-height 1.55, so 18.6px,
-// and `.code-hunk` adds 2px of padding top and bottom. That guess is exact for
-// every line that does not wrap, and the `auto` keyword on the CSS property
-// makes the browser keep the REAL height once it has drawn the hunk properly,
-// so a wrapped line corrects itself the first time it is seen and stays
-// corrected.
+// The height of a hunk the browser skips with `content-visibility: auto`, so
+// the scrollbar does not lurch as hunks come into view. `.code-row` is 12px
+// mono at line-height 1.55 (18.6px) and `.code-hunk` adds 2px of padding top
+// and bottom. The `auto` in `contain-intrinsic-size` makes the browser keep the
+// real height once drawn, so a wrapped line corrects itself.
 export const ROW_PX = 18.6;
 export const HUNK_PAD_PX = 4;
 
 /**
- * HOW MANY LINES WERE SKIPPED BETWEEN TWO HUNKS, or null when nobody knows.
- *
- * One reason it is unfamiliar is that hunks run together. The fold came out on
- * 2026-08-27 on her own instruction, and nothing replaced the thing it also
- * carried: a mark saying the code jumps here. So a file with edits at line 40
- * and line 900 drew them as neighbours, and the code read as continuous when it
- * is not. Every diff tool she has used says so, and this is that sentence
- * rather than the fold coming back: nothing to press, nothing hidden, just the
- * count.
- *
- * Null when either side has no numbers, which is every change read out of the
- * conversation rather than off git, and 0 or less when the two hunks genuinely
- * touch. Both draw nothing.
+ * How many lines of the file lie between two hunks, so the pane can mark the
+ * gap instead of drawing them as neighbours. Null when either hunk has no line
+ * numbers (a change read from the conversation) or when the two touch.
  */
 export function linesSkipped(before: Hunk | undefined, after: Hunk | undefined): number | null {
   const last = before?.nums?.[(before.nums?.length ?? 0) - 1];
   const first = after?.nums?.[0];
   if (!last || !first) return null;
-  // The new file's numbering, because that is the file she is looking at. A
-  // hunk that ends on a removed line has no new number on its last row, so the
-  // last row that HAS one is what the gap is measured from.
+  // Measured in the new file's numbering. A hunk can end on a removed line,
+  // which has no new number, so the gap starts from the last row that has one.
   const endsAt = [...(before?.nums ?? [])].reverse().find((p) => p[1] != null)?.[1];
   const startsAt = (after?.nums ?? []).find((p) => p[1] != null)?.[1];
   if (endsAt == null || startsAt == null) return null;
@@ -488,13 +389,10 @@ export function linesSkipped(before: Hunk | undefined, after: Hunk | undefined):
 }
 
 /**
- * THE LINES A GAP BETWEEN TWO HUNKS STOOD FOR, read out of the file as it is
- * on disk now, numbered from `from` (2026-10-04,
- * tests/the-hidden-lines-open-in-place.test.mjs).
- *
- * The disk may have moved on since the change, so the last row before the gap
- * and the first row after it must still read the same at the numbers the
- * change gives them, or nothing is returned but the reason.
+ * The lines a gap between two hunks stood for, read from the file on disk now
+ * and numbered from `from` (tests/the-hidden-lines-open-in-place.test.mjs).
+ * The file may have moved on since the change, so the rows either side of the
+ * gap must still match at their numbers, or only the reason comes back.
  */
 export function hiddenLines(fileText: string, before: Hunk, after: Hunk):
   { ok: true; from: number; lines: string[] } | { ok: false; error: string } {
@@ -521,14 +419,10 @@ export function hunkGuessPx(rows: number): number {
   return Math.round(rows * ROW_PX + HUNK_PAD_PX);
 }
 
-// THE BROWSER SKIPS OFF-SCREEN CODE IN SLICES, NOT WHOLE HUNKS (2026-10-04).
-//
-// A hunk can be a whole new file: the largest real change had hunks of 808,
-// 608 and 440 rows. With `content-visibility` on the hunk, scrolling one pixel
-// into one made the browser style and lay out every row of it in a single
-// frame, and sixty wheel ticks dropped 21 frames past 50ms. A slice of at most
-// this many rows is about two screenfuls, so the work arrives a little at a
-// time as she scrolls. tests/a-big-change-scrolls-without-stalling.test.mjs.
+// The browser skips off-screen code in slices of at most this many rows, about
+// two screenfuls, rather than whole hunks. A hunk can be a whole new file, and
+// scrolling into one would make the browser lay out every row of it in one
+// frame. Pinned by tests/a-big-change-scrolls-without-stalling.test.mjs.
 export const SLICE_ROWS = 48;
 
 /** [from, to) row ranges cutting `n` rows into slices of at most SLICE_ROWS. */
@@ -543,13 +437,9 @@ export function sliceGuessPx(rows: number): number {
   return Math.round(rows * ROW_PX);
 }
 
-// HOW MANY FILES ARE DRAWN IN THE FIRST FRAME. The rest follow in idle moments
-// straight after, so a 28,000-row change opens on a screenful instead of
-// freezing the window for every row of it (4.7s at a quarter speed, measured).
-// The median real change is 76 rows and is under the budget, so it is drawn
-// whole at once exactly as before. A batch is small enough to fit the gap
-// between two frames (400 rows cost about 40ms at half speed and dropped
-// frames under a scrolling hand; 150 do not), so filling in is not felt.
+// Rows drawn in the first frame, so a huge change opens on a screenful instead
+// of freezing the window. The rest fill in at idle moments, BATCH_ROWS at a
+// time, which is small enough to fit between two frames while scrolling.
 export const FIRST_ROWS = 2400;
 export const BATCH_ROWS = 150;
 
@@ -585,21 +475,15 @@ export function firstBatch(files: ChangedFile[], atLeast: number, budget = FIRST
   return n;
 }
 
-/**
- * The files in the order the tree puts them, so J and K walk the list she is
- * looking at. Reading order in the running column and reading order in the tree
- * being two different orders is the one thing that makes a keystroke feel
- * broken.
- */
+/** The files in the tree's order, so the column reads in the same order as the tree. */
 export function filesInTreeOrder(files: ChangedFile[]): ChangedFile[] {
   const order = new Map(treeRows(files).filter((r) => r.kind === 'file').map((r, i) => [(r as { path: string }).path, i]));
   return [...files].sort((a, b) => (order.get(a.path) ?? 0) - (order.get(b.path) ?? 0));
 }
 
-// THE FILES SHE HAS FOLDED IN EACH CHANGE, for as long as the app runs, so
-// closing the pane does not throw away which ones she was done with (2026-10-04).
-// Not on disk, for the reason the unsaved edits are not: a change she reopens
-// tomorrow is a different reading.
+// The files folded in each change, kept while the app runs so closing the pane
+// does not lose them. Not saved to disk: a change reopened tomorrow is a fresh
+// reading.
 const FOLDS = new Map<string, Set<string>>();
 
 /** The live set of folded file paths for one change; the same set every time. */
@@ -618,21 +502,18 @@ export function toggled(set: ReadonlySet<string>, path: string): Set<string> {
 }
 
 /**
- * WHERE AN ARROW ON THE TREE GOES, as a path, or null for nowhere.
- *
- * `shown` is the files the tree draws (folding hides some), `all` every file in
- * the change in the same order. She may be standing in a file the tree is not
- * showing, because folding never moves her (since 2026-10-04,
- * tests/folding-the-tree-never-moves-the-code.test.mjs); then down is the next
- * file shown after hers and up the one before, rather than the top.
+ * Where an arrow on the tree goes, as a path, or null for nowhere. `shown` is
+ * the files the tree draws, `all` every file in the same order. Folding never
+ * moves her (tests/folding-the-tree-never-moves-the-code.test.mjs), so she may
+ * be in a file the tree hides; then down is the next shown file after hers and
+ * up the one before.
  */
 export function stepInTree(key: string, path: string | null, shown: string[], all: string[]): string | null {
   if (!shown.length) return null;
   if (key !== 'ArrowDown' && key !== 'ArrowUp' && key !== 'Home' && key !== 'End') return null;
   const here = path ? shown.indexOf(path) : -1;
   if (here >= 0 || key === 'Home' || key === 'End') {
-    // The ordinary walk is walkFiles' (code-keys.ts); it stops at the ends,
-    // which here reads as nowhere to go.
+    // walkFiles stops at the ends, which here means nowhere to go.
     const to = walkFiles(key, Math.max(0, here), shown.length);
     return to == null || (to === here) ? null : shown[to];
   }
@@ -645,15 +526,7 @@ export function stepInTree(key: string, path: string | null, shown: string[], al
   return pick ?? null;
 }
 
-/**
- * The agent's sentence over a change, trimmed to one line's worth.
- *
- * MEASURED ON HER MAC, 2026-08-23: 4,442 file-writing tool calls across the
- * sixty largest conversations, 99.7% have the agent's own prose earlier in the
- * same conversation, median 19 seconds before the change, median 91 characters.
- * So the sentence is nearly always there and nearly always short; this only
- * guards the tail.
- */
+/** The agent's sentence over a change, cut at a word to one line's worth. */
 export function saidLine(said: string | undefined | null, limit = 150): string {
   const clean = String(said ?? '').replace(/\s+/g, ' ').trim();
   if (clean.length <= limit) return clean;

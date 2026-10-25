@@ -203,7 +203,10 @@ describe('2. a key is drawn with its name when the glyph says nothing', () => {
     const cap = drawn.slice(drawn.indexOf('export function Cap('), drawn.indexOf('/** THE CARD ITSELF'));
     expect(cap).toContain('<kbd className={className}>');
     expect(cap).toContain('className="fr-cap-word"');
-    expect(cap).toContain('keyName(cap)');
+    // The name is asked of the cap AS DRAWN, not of the glyph it came from
+    // (4dabd8f7): where there is no ⇥ key the cap is already the word Tab,
+    // and naming that one would put Tab inside Tab.
+    expect(cap).toMatch(/const shown = chord\(cap\);[\s\S]{0,80}keyName\(shown\)/);
     // The card and the walk's own Next buttons both go through it, so no bare
     // <kbd> holding a glyph is left anywhere in the walk.
     expect(drawn).not.toContain('<kbd>↵</kbd>');

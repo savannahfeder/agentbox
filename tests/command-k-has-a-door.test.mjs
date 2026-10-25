@@ -17,11 +17,18 @@
 //
 //   THE ⌘ MARK CARRIES NO LABEL. `Commands` beside it was option A and she
 //   turned it down.
+//
+// THE MARK IS NOT ALWAYS A ⌘ (4dabd8f7, 2026-10-24). On a keyboard with no
+// command key it reads the word for the key instead, and this file pinned the
+// Mac character as a string, so both of its assertions on the mark went red on
+// main the moment that landed. They read shared/key-caps.mjs now: what is
+// pinned is the shape, and which character stands in it is the table's answer.
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { chordOf } from '../shared/key-caps.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -34,6 +41,7 @@ const tabNav = (() => {
   const start = app.indexOf('<nav\n          className="tabs"');
   return app.slice(start, app.indexOf('</nav>', start));
 })();
+const cmdMark = corner.match(/<span className=[^>]*\bcmd-glyph\b[^>]*aria-hidden="true">(.*?)<\/span>/);
 
 describe('the corner is the three marks she named, in her order', () => {
   it('puts the plus on the LEFT of the ⌘ mark, which is the one edit she asked for', () => {
@@ -77,7 +85,10 @@ describe('the corner is the three marks she named, in her order', () => {
 describe('the door to ⌘K', () => {
   it('is a bare glyph and not the word she turned down', () => {
     const btn = corner.slice(corner.indexOf('aria-label="Commands"') - 400, corner.indexOf('aria-label="Commands"') + 500);
-    expect(btn).toContain('<span className="cmd-glyph" aria-hidden="true">⌘</span>');
+    expect(cmdMark, 'no cmd-glyph span in the corner').toBeTruthy();
+    // Both characters come from the table, so a ⌘ written in by hand fails
+    // here: on Linux it draws a key the keyboard does not have.
+    expect(cmdMark[1]).toBe(`{MAC ? '${chordOf('⌘', true)}' : '${chordOf('⌘', false)}'}`);
     // Option A was a control reading `Commands` with ⌘K printed beside it in
     // the app's own keycap, 121 points wide. She picked the glyph over it.
     expect(btn).not.toMatch(/<kbd>/);
@@ -92,7 +103,7 @@ describe('the door to ⌘K', () => {
   it('is a bare ⌘ mark that says ⌘K when she points at it', () => {
     // The button itself never grows a label: "A bare ⌘ in the corner family, no
     // label, no keycap, no border."
-    expect(corner).toMatch(/aria-label="Commands"[\s\S]{0,300}<span className="cmd-glyph" aria-hidden="true">⌘<\/span>/);
+    expect(corner).toMatch(/aria-label="Commands"[\s\S]{0,300}<span className=[^>]*\bcmd-glyph\b/);
     // AND IT CARRIES A HINT AGAIN SINCE 2026-09-24. It was left out on the rule
     // that a component already showing its key gets no plate, and she reported
     // the result: "When I hover over certain buttons, like the ones shown in
@@ -106,6 +117,15 @@ describe('the door to ⌘K', () => {
     expect(rule, 'no .cmd-glyph rule').toBeTruthy();
     expect(rule[0]).toContain('font-size: 18px');
     expect(rule[0]).toContain('font-weight: 400');
+  });
+
+  it("draws the word, where there is no ⌘ key, at a word's size", () => {
+    // 18px is a character's size; four letters set in it are a shout, and the
+    // corner family is 18px glyphs either side of this one.
+    const rule = css.match(/\.cmd-glyph\.cmd-word \{[^}]*\}/s);
+    expect(rule, 'no .cmd-glyph.cmd-word rule').toBeTruthy();
+    expect(rule[0]).toContain('font-size: 11px');
+    expect(rule[0]).toContain('font-family: var(--mono)');
   });
 });
 
@@ -171,8 +191,10 @@ describe('the header on the sidebar layout', () => {
     expect(right).not.toContain('aria-label="Commands"');
   });
 
+  // Search is drawn here only on the board since w-3c51d02de5 (2026-10-14);
+  // on the list it is at the end of the tabs row. Where it is drawn, it is first.
   it('puts Search first, then New thread, then Display', () => {
-    const search = right.indexOf('data-hint="search"');
+    const search = right.indexOf('<SearchButton');
     const compose = right.indexOf('data-hint="new-task"');
     // The filters button's label carries whose threads are on the page since
     // 538593f, so it is an expression now, not the plain attribute this read.

@@ -5,12 +5,7 @@
 // other half, which is what happens on the card and after the press, and it was
 // hers to decide.
 //
-// Three things below are the ones a later session would undo without noticing.
-//
-//   IT DOES NOT RESUME. She was offered resuming and picked this instead, so the
-//   row says out loud that replying starts a fresh session. A later round that
-//   quietly wires the transcript in would be answering a question she already
-//   answered the other way.
+// Two things below are the ones a later session would undo without noticing.
 //
 // A THREAD LANDS WHERE ITS FOLDER LANDS.A conversation had in
 // ~/Desktop/dev/zero belongs to the project pointing at that folder and to no
@@ -27,7 +22,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from '../main/store.mjs';
-import { NAME, Name } from '../shared/product-name.mjs';
+import { Name } from '../shared/product-name.mjs';
 import {
   THREAD_LABEL, startedIn, threadImportRow, threadLabel, threadsNeedingRows, whenWords,
 } from '../shared/agent-import.mjs';
@@ -219,19 +214,21 @@ describe('the card counts both kinds or it counts neither', () => {
 });
 
 describe('what the imported row says to her', () => {
-  const row = threadImportRow(hers[0], { projectName: NAME, now: NOW });
+  const row = threadImportRow(hers[0]);
 
-  it('is called what she called it, and asks one thing in bold on line one', () => {
+  // It opened on a note of ours, "Say what you want done next in this
+  // thread", until setup's last screen started offering chats by the question
+  // they ended on (w-62228098e6). The row is now the chat itself.
+  it('is called what the chat is called, and opens on her own first message', () => {
     expect(row.title).toBe('this is a test');
-    const first = row.body.split('\n')[0];
-    expect(first).toBe('**Say what you want done next in this thread.**');
-    // The inbox row clips its first sentence at 112 characters (SUMMARY_BUDGET,
-    // renderer/src/list-rules.ts), so the whole point has to land inside it.
-    expect(first.length).toBeLessThan(112);
+    expect(row.body).toBe('this is a test');
+    const said = threadImportRow({ ...hers[0], firstSaid: 'this is a test, check the login', lastSaid: 'Checked. Ship it?' });
+    expect(said.body).toBe('this is a test, check the login');
+    expect(said.result).toBe('Checked. Ship it?');
+    expect(said.body).not.toContain('Say what you want done next');
   });
 
-  it('says where and when she had it, in the words a person uses about this week', () => {
-    expect(row.body).toContain('You started this in a terminal today in ~/Desktop/dev/zero.');
+  it('says when she had it in the words a person uses about this week', () => {
     expect(whenWords(NOW - 26 * 3600e3, NOW)).toBe('yesterday');
     expect(whenWords(NOW - 4 * 24 * 3600e3, NOW)).toBe('on Monday');
     // Past the window the finder covers it says nothing rather than guessing.
@@ -240,11 +237,6 @@ describe('what the imported row says to her', () => {
     expect(startedIn('desktop')).toBe('in the Claude Code desktop app');
   });
 
-  it('says it does not carry the conversation on, because she chose that', () => {
-    expect(row.body).toContain('replying starts a fresh session rather than carrying the old one on');
-    expect(row.body).toContain(`${Name} has not read the conversation`);
-    expect(row.body).toContain(`${NAME} runs it here in ${NAME}`);
-  });
 
   it('waits for her rather than starting on its own', () => {
     // A question is what the supervisor never spawns fresh work on (`isFresh`,
@@ -318,7 +310,7 @@ describe('the store files them, and the second press does not move it', () => {
       'tried to open zero here but it failed.',
     ]);
     const test = items.find((i) => i.title === 'this is a test');
-    expect(test.body).toContain('**Say what you want done next in this thread.**');
+    expect(test.body).toBe('this is a test');
     expect(test.kind).toBe('question');
     expect(test.labels).toContain('thread:t1');
     // The newest thread on the card is the newest row in the inbox.
@@ -345,14 +337,14 @@ describe('the wiring the card needs is really there', () => {
     // One ticked list since w-db6f5e331e: threads are lines among the rest.
     expect(logic).toContain('for (const t of d.threads ?? [])');
     expect(card).toContain('{lines.map(lineRow)}');
-    expect(card).toContain('api.importThreads({ product: slug, threads: load.ids })');
+    expect(card).toContain("api.importThreads({ product: slug, threads: load.ids, land: 'sorted' })");
     expect(api).toContain("zero.agentThreads()");
     expect(api).toContain("zero.importThreads(p)");
     expect(preload).toContain("ipcRenderer.invoke('zero:agent-threads')");
     expect(preload).toContain("ipcRenderer.invoke('zero:import-threads'");
     expect(ipc).toContain("ipcMain.handle('zero:agent-threads'");
     expect(ipc).toContain("ipcMain.handle('zero:import-threads'");
-    expect(ipc).toContain('store.importThreadRows(product, chosen)');
+    expect(ipc).toContain('store.importThreadRows(product, chosen, how)');
   });
 
   it('never counts a section by its agents alone', () => {
@@ -363,14 +355,19 @@ describe('the wiring the card needs is really there', () => {
     expect(logic.slice(logic.indexOf('export function picksOf'))).toContain('.items.map((a) => a.path)');
     expect(logic).not.toMatch(/d\.items\.some\(/);
     // The one count on the card now is the button's, and it counts every
-    // ticked line, threads and agent files alike (w-db6f5e331e).
-    expect(card).toContain('{LIST.add(picked.length)}');
+    // ticked line, threads and agent files alike (w-db6f5e331e). Since
+    // w-6418318cd5 that list is `onScreen`, which is `picked` unless a name is
+    // typed into the field, when it is what you ticked among the matches: one
+    // reader either way, and always the rows actually drawn under the button.
+    expect(card).toContain('{LIST.add(onScreen.length)}');
+    expect(card).toContain('? hits.filter((h) => keptPaths.has(h.path)).map((h) => h.path) : picked');
   });
 
   it('takes the thread objects off main rather than off the screen', () => {
     // The renderer sends ids. A row that names a conversation should name one
     // the main process read, not one a card has been holding since this morning.
-    expect(ipc).toContain('const chosen = lastThreads.filter((t) => want.has(String(t?.id ?? \'\')));');
+    // And it reads the end of any it holds without one (w-62228098e6).
+    expect(ipc).toContain('const chosen = readChatEnds(lastThreads.filter((t) => want.has(String(t?.id ?? \'\'))));');
     expect(card).not.toMatch(/importThreads\(\{ product: slug, threads: \[\{/);
   });
 });

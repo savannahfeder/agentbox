@@ -18,7 +18,7 @@
 //
 // THE POSTURE DOES NOT CHANGE. A frame we cannot read might have been an
 // approval request, so it is still fatal and still loud -- see
-// tests/one-codex-process-carries-many-threads-and-a-card-nobody-answers-denies
+// tests/one-codex-process-carries-many-threads-and-a-card-nobody-answers-waits
 // for that half. What changes is who pays: a transport fault is a fact about
 // the connection, not about the item, and CLAUDE.md already settles that shape
 // for the other engine.

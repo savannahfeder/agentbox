@@ -5,7 +5,7 @@ import {glanceFile,type Glance} from '../file-glance';
 import {ArtifactThumbnail} from './ArtifactThumbnail';
 import './message-files.css';
 
-const KIND_LABEL={html:'Design',image:'Picture',markdown:'Document',code:'Code'} as const;
+const KIND_LABEL={html:'Design',image:'Picture',markdown:'Document',code:'Code',website:'Website'} as const;
 
 /** EVERY FILE A MESSAGE NAMES, AS SMALL FRAMED TILES SIDE BY SIDE
  * (w-9ed13d72b3). These replaced a 200px card per file that printed the raw
@@ -24,16 +24,21 @@ export function MessageFiles({product,paths,revision,openDoc,onOpen}:{product:st
 /** A file nothing can read gets no tile; the message still names it.
  * The tile opens the file beside the task, as the card it replaced did. */
 function MessageFile({product,path,revision,open,onOpen}:{product:string;path:string;revision:number;open:boolean;onOpen:()=>void}) {
-  const [glance,setGlance]=useState<Glance|null>(null);
+  // undefined until the first read answers. A refresh keeps the tile it had
+  // until the new read lands, rather than taking it away and back.
+  const [glance,setGlance]=useState<Glance|null|undefined>(undefined);
   useEffect(()=>{
     let live=true;
-    setGlance(null);
     glanceFile(api,product,path).then(g=>{if(live)setGlance(g);});
     return ()=>{live=false;};
   },[product,path,revision]);
-  if (!glance) return null;
   const name=path.split('/').pop() ?? path;
   const kind=docKind(path);
+  if (glance===undefined) return <span className="message-file" aria-hidden="true">
+    <span className="message-file-face arriving"/>
+    <span className="message-file-foot"><span className="message-file-name">{name}</span><span className="message-file-kind">{kind ? KIND_LABEL[kind] : 'File'}</span></span>
+  </span>;
+  if (!glance) return null;
   const picture=kind==='html' || kind==='image';
   return <button type="button" className="message-file" aria-pressed={open} title={`Open ${name}`} onClick={onOpen}>
     <span className="message-file-face">

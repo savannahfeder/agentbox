@@ -118,22 +118,30 @@ describe('her one login signed out, and she has signed back in', () => {
   });
 });
 
-describe('where another login is working, the signed-out one stays out', () => {
-  it('a healthy second login keeps the work moving on its own', () => {
+// HER HAND LIFTS EVERY BENCH, ON EVERY LOGIN (w-dac993a554).
+//
+// This describe used to be "where another login is working, the signed-out one
+// stays out": a login somebody could mend was held benched while another of
+// their subscriptions was free, because the work would have gone there. Work
+// runs on one account now, so there is no other login to hold anything back
+// for, and what her hand buys is one try wherever the bench was.
+describe('her hand lifts a bench whatever else is signed in', () => {
+  it('lifts the second login that is signed out', () => {
     const sup = supervisor(['default', '/second']);
     sup.noteExitForBackoff(deadOnArrival(SIGNED_OUT, '/second'));
-    sup.liftBrakeForHer();
     expect(sup._profileResting('/second')).toBe(true);
+    sup.liftBrakeForHer();
+    expect(sup._profileResting('/second')).toBe(false);
     expect(sup._profileResting('default')).toBe(false);
   });
 
-  it('a second login merely at its limit counts as working, because her hand lifts that too', () => {
+  it('lifts both when one is signed out and the other is at its limit', () => {
     const sup = supervisor(['default', '/second']);
     sup.noteExitForBackoff(deadOnArrival(SIGNED_OUT, '/second'));
     for (let i = 0; i < 3; i++) sup.noteExitForBackoff(deadOnArrival(AT_LIMIT, 'default'));
     sup.liftBrakeForHer();
     expect(sup._profileResting('default')).toBe(false);
-    expect(sup._profileResting('/second')).toBe(true);
+    expect(sup._profileResting('/second')).toBe(false);
   });
 
   it('nothing she did: a signed-out login stays parked', () => {
@@ -155,10 +163,15 @@ describe('the same rule for a Codex login', () => {
     expect(sup._profileResting('codex:default')).toBe(false);
   });
 
-  it('a second working Codex login keeps the signed-out one out', () => {
+  // A SECOND LOGIN CHANGES NOTHING HERE (w-dac993a554). It used to keep the
+  // signed-out login benched, because the work would have gone to the other
+  // one; work runs on one account now, so her hand buys the same one try it
+  // buys on a computer with a single login.
+  it('lifts the signed-out Codex login with a second login signed in too', () => {
     const sup = supervisor(['default'], { codexProfiles: ['default', '/codex-2'] });
     sup.noteExitForBackoff(deadOnArrival(SIGNED_OUT, 'default', 'codex'));
-    sup.liftBrakeForHer();
     expect(sup._profileResting('codex:default')).toBe(true);
+    sup.liftBrakeForHer();
+    expect(sup._profileResting('codex:default')).toBe(false);
   });
 });

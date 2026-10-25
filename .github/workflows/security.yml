@@ -1,0 +1,63 @@
+# SECURITY CHECKS ON EVERY SHIP, AND ONCE A WEEK.
+#
+# Shipping is a push to main (`npm run ship`), so that push is the deploy moment
+# this runs on. Pull requests run it too, so a fork's change is scanned before
+# anyone merges it. The Monday run catches what changes without a push: a new
+# Semgrep rule, or a new advisory against a package the app already ships.
+#
+# semgrep: static rules for JavaScript, TypeScript and committed secrets, over
+#   the code that ships (not tests). A finding fails the run. A false positive
+#   someone has read is silenced with a `nosemgrep` comment on that line, never
+#   by dropping the rule for everyone.
+# audit: npm's advisory database over the packages the app ships. It fails on
+#   critical only, because on 2026-10-24 it already reported four high and two
+#   moderate advisories, all with fixes. Raise it to high once those are upgraded.
+#
+# The deep agent-driven audit (Cloudflare's security-audit skill, or Anthropic's
+# /claude-security) is not here: it costs agent time and needs a person to read
+# what it finds. Run it monthly or before a release.
+#
+# Same rules as tests.yml: a read-only token, no secrets, never pull_request_target.
+
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install semgrep==1.182.1
+      - run: >-
+          semgrep scan --error --metrics off
+          --config p/javascript --config p/typescript --config p/secrets
+          --exclude tests --exclude node_modules --exclude dist
+          main shared mcp cloud relay bin scripts renderer/src mobile/src preload.cjs
+
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm audit --omit=dev --audit-level=critical

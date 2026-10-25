@@ -190,7 +190,9 @@ describe('the sentence reads back as the thing it says', () => {
       .toBe(`Claude Code would not start in this project's folder, so nothing has been done here. ${Name} keeps trying, and it will keep failing the same way until this is fixed.`);
     expect(deadRunSentence({ engineWord: 'Claude Code', cause: 'interrupted' }))
       .toBe(`Claude Code was cut off in the middle, so nothing has been done on this task. ${Name} runs it again on its own.`);
+    // The second half changed on 2026-10-19
+    // (tests/a-failure-we-cannot-name-points-at-the-agent-not-the-app).
     expect(deadRunSentence({ engineWord: 'The agent' }))
-      .toBe(`The agent stopped before it did anything, so this task has not been started. ${Name} keeps trying, and it will keep failing the same way until this is fixed.`);
+      .toBe(`The agent stopped before it did anything, so this task has not been started. ${Name} tries again on its own.`);
   });
 });

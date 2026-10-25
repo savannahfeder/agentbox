@@ -28,7 +28,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  ANCHOR, BEAT, COACHED, START, STEPS, advance, beatRows, coach, finishCard, readFirstRun,
+  ANCHOR, BEAT, COACHED, FLOOR, START, STEPS, advance, beatRows, coach, finishCard, readFirstRun,
   replyAnswered, replyWritten, skipStep, walkMayOpen, walkRows,
 } from '../renderer/src/onboarding.ts';
 import { PRACTICE_ANSWER, PRACTICE_REPLY, PRACTICE_REPLY_ANSWER, PRACTICE_SLUG } from '../shared/first-run-practice.mjs';
@@ -93,7 +93,11 @@ describe('3. a look around before the first thread', () => {
       expect(say.lead.split(/[.!?]\s/).length, step).toBeLessThanOrEqual(2);
     }
     expect(coach('tour', 0).quiet).toContain('inbox');
-    expect(loud(coach('tabs', 0))).toMatch(/Needs you[\s\S]*In progress/);
+    // IN THE ORDER THE STRIP DRAWS THEM, quiet line first (2026-10-24). The
+    // card named Later and Done above Needs you, which is the tab the person
+    // is standing on.
+    expect(coach('tabs', 0).quiet).toMatch(/Needs you[\s\S]*In progress/);
+    expect(loud(coach('tabs', 0))).toMatch(/Later[\s\S]*Done/);
     // THE CASE THAT MUST NOT MATCH: no other card grows a Next.
     for (const step of COACHED.filter((s) => s !== 'tour' && s !== 'tabs')) {
       expect(coach(step, 0)?.next, step).toBeUndefined();
@@ -353,12 +357,17 @@ describe('4e. with the reply box open, the card asks to send it, not for R', () 
     expect(card).toMatch(/el\.closest\('\.focus-dock'\)/);
   });
 
-  it('keeps the corner Skip in the strip under the sidebar, clear of Settings', () => {
+  it('keeps the corner Skip in the strip under the sidebar, clear of Settings and of the edge', () => {
     // Measured in the built app at 1440x900: Skip 878 to 900, Settings 838 to
     // 874. It was 38 tall from 14 up and sat on Settings.
+    // AND OFF THE WINDOW'S OWN EDGE SINCE 2026-10-24. At bottom 0 the word sat
+    // on the bottom edge with its descenders 4px off it, reported from the QA
+    // box; FLOOR is what everything else the walk draws is held off an edge by,
+    // and Settings above it still clears the word by 8.
     const css = read('renderer/src/styles.css');
     const rule = css.slice(css.indexOf('.fr-out {'), css.indexOf('}', css.indexOf('.fr-out {')));
-    expect(rule).toMatch(/bottom: 0px; height: 22px;/);
+    expect(rule).toMatch(/bottom: 10px; height: 22px;/);
+    expect(FLOOR).toBe(10);
   });
 });
 
@@ -407,7 +416,8 @@ describe('6. the board and the tab tour end where they should', () => {
     expect(loud(coach('where', 0, { view: 'progress', tabs: ['inbox', 'progress', 'snoozed', 'done', 'all'] }))).toBe('Press ⇥ or click another tab to go on.');
     // Still the payoff on that stop: the agent she answered, working.
     expect(coach('where', 0, { view: 'progress' }).quiet).toBe('The agent you answered is here, working without you.');
-    // And the look around is where Later and Done are said now.
-    expect(coach('tabs', 0).quiet).toMatch(/Later[\s\S]*Done/);
+    // And the look around is where Later and Done are said now, on its loud
+    // line, under the quiet one naming the two tabs before them.
+    expect(loud(coach('tabs', 0))).toMatch(/Later[\s\S]*Done/);
   });
 });

@@ -3,6 +3,7 @@
 // The look of the pane is settled and lives in styles.css and DocPane.tsx. This
 // file is the arithmetic and the naming, kept out of the component so it can be
 // tested without a window.
+import { isWebsiteAddress } from '../../shared/websites.mjs';
 
 /**
  * The kinds of file the pane draws, and nothing else.
@@ -12,8 +13,16 @@
  * already are, so it opens here the same way and needs no second idea of what
  * an artifact is.
  *
- * `image` IS THE FOURTH AND IT REVERSES THE RULE BELOW.*/
-export type DocKind = 'html' | 'markdown' | 'code' | 'image';
+ * `image` IS THE FOURTH AND IT REVERSES THE RULE BELOW.
+ *
+ * `website` IS THE FIFTH AND IT IS NOT A FILE AT ALL. An ordinary http or
+ * https link in a thread used to leave the app for the browser; it now draws
+ * in the pane where the file would have been, in a browser of its own
+ * (WebsitePane.tsx), with one mark that hands it to the browser you use.
+ * shared/websites.mjs decides which addresses those are, and a local app is
+ * NOT one of them: it already has its own way through here.
+ */
+export type DocKind = 'html' | 'markdown' | 'code' | 'image' | 'website';
 
 /**
  * What the pane would do with this path, or null when it should be handed to
@@ -28,6 +37,10 @@ export type DocKind = 'html' | 'markdown' | 'code' | 'image';
  */
 export function docKind(path: string | undefined | null): DocKind | null {
   if (!path) return null;
+  // THE ADDRESS IS ASKED BEFORE THE EXTENSION. https://example.com/report.html
+  // ends in one the pane knows, and looking for that file in the product's
+  // folders finds nothing: it is a page on the web, and the web is the kind.
+  if (isWebsiteAddress(path)) return 'website';
   const clean = String(path).split(/[?#]/)[0];
   if (/\.html?$/i.test(clean)) return 'html';
   if (/\.(md|markdown)$/i.test(clean)) return 'markdown';
@@ -218,11 +231,17 @@ export const DOC_FRAME_CLASS = 'doc-view';
  * the whole test, and it is what keeps the forwarded key from being answered
  * twice: main only forwards from a frame, and this refuses anything that
  * arrives while the app's own page has the keyboard.
+ *
+ * A WEBVIEW COUNTS TOO, because a page off the web is drawn in one
+ * (WebsitePane.tsx) and the question is the same question. Asking for an
+ * IFRAME by name cost a press: escape from inside a website moved the
+ * keyboard back and left the pane open.
  */
 export function focusIsInTheFile(
   active: { tagName?: string; classList?: { contains(c: string): boolean } } | null | undefined,
 ): boolean {
   if (!active) return false;
-  if (String(active.tagName ?? '').toUpperCase() !== 'IFRAME') return false;
+  const tag = String(active.tagName ?? '').toUpperCase();
+  if (tag !== 'IFRAME' && tag !== 'WEBVIEW') return false;
   return !!active.classList?.contains(DOC_FRAME_CLASS);
 }

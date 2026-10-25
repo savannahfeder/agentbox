@@ -21,6 +21,9 @@ import readline from 'node:readline';
 
 const home = process.env.CODEX_HOME || '.';
 const log = (line) => { try { fs.appendFileSync(path.join(home, 'fake.log'), `${line}\n`); } catch {} };
+// The app's one-line naming call (`codex exec`) is not an app-server, so it is
+// not counted as one.
+if (process.argv[2] === 'exec') { log('exec'); process.exit(1); }
 let auth = '';
 try { auth = fs.readFileSync(path.join(home, 'auth.json'), 'utf8'); } catch {}
 const signedIn = auth.includes('"signed-in"');
@@ -44,10 +47,21 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       return reply({ config: { mcp_servers: {} } });
     case 'thread/start': {
       const id = `th-${++n}`;
+      // Opt in with `$CODEX_HOME/keeps-rollouts`: the file a reply needs to find to resume.
+      if (fs.existsSync(path.join(home, 'keeps-rollouts'))) {
+        const day = path.join(home, 'sessions', '2026', '10', '20');
+        fs.mkdirSync(day, { recursive: true });
+        fs.writeFileSync(path.join(day, `rollout-2026-10-20T00-00-00-${id}.jsonl`), '{}\n');
+      }
       reply({ thread: { id } });
       return send({ method: 'thread/started', params: { threadId: id, thread: { id } } });
     }
     case 'thread/resume':
+      // Another Codex window holding the conversation, in codex-cli 0.163.0's words.
+      if (fs.existsSync(path.join(home, 'writer-held'))) {
+        log('resume refused');
+        return send({ id: msg.id, error: { code: -32600, message: `thread ${msg.params?.threadId} already has an active writer` } });
+      }
       return reply({ thread: { id: msg.params?.threadId } });
     case 'turn/start': {
       const threadId = msg.params?.threadId;

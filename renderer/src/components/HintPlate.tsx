@@ -18,7 +18,7 @@ export function HintPlate({ lines, comp, align, text }: {
   lines: HintLine[];
   /** The live box of the component this belongs to, in window coordinates. */
   comp: DOMRect;
-  align?: 'left' | 'right';
+  align?: 'left' | 'right' | 'center';
   /**
    * The box of the WORDS inside that component, when it has any. The plate
    *  lines its first cap up with the first letter of them; see `placeHint`. */

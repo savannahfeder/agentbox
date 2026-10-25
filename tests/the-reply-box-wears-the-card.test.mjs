@@ -47,7 +47,11 @@ describe('the reply footer is the card\'s footer', () => {
   });
 
   it('sends with the app\'s own button, keycap inside it', () => {
-    expect(dock).toMatch(/className="dock-send"[\s\S]{0,160}Send <kbd>⌘↵<\/kbd>/);
+    // The keycap is `SEND`, which is the chord in this keyboard's own keys
+    // (4dabd8f7): the Mac chord written in here drew ⌘↵ on a Linux keyboard
+    // that has neither key.
+    expect(dock).toMatch(/className="dock-send"[\s\S]{0,240}Send <kbd>\{SEND\}<\/kbd>/);
+    expect(focus).toMatch(/import \{ SEND \} from '\.\.\/this-keyboard'/);
   });
 
   it('opens its menus UPWARD, because this footer sits at the bottom', () => {

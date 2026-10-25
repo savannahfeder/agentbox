@@ -13,7 +13,7 @@
 // This module is the part with no React in it, so the walk can be tested
 // without a window.
 
-import { PRACTICE_BACKDROP, PRACTICE_NAME, PRACTICE_TASK } from '../../shared/first-run-practice.mjs';
+import { PRACTICE_NAME, PRACTICE_TASK } from '../../shared/first-run-practice.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { DONE } from './done-word';
 // The walk's own question card, and the one answer this file shares with it:
@@ -333,6 +333,9 @@ export type Event =
  *  the project, `sent` when the task really exists. */
 export function advance(s: FirstRun, e: Event): FirstRun {
   switch (e.t) {
+    // The welcome's own Return went through here until w-e217e577e5, when the
+    // plan step stopped being a step only some computers walk: it is between
+    // these two now, and moves itself on with `stepTo`.
     case 'start':
       return s.step === 'welcome' ? { ...s, step: 'folder' } : s;
     case 'folder':
@@ -613,13 +616,13 @@ export function walkRows<T extends { id: string }>(rows: T[], run: FirstRun | nu
   // examples have been shown, hiding them while she writes her first thread
   // would be an inbox emptying itself for no reason. So from `look` to
   // `unblock` the list holds the four examples, her own thread, and the
-  // practice team's running and scheduled work (never its waiting rows, which
-  // are for the board). Codex, consulted on the round: "Preserve those
+  // practice team's other work. Codex, consulted on the round: "Preserve those
   // examples afterward; don't make the inbox mysteriously empty when creation
   // begins."
+  // The backdrop is no longer sifted by state here (2026-10-24): nothing in it
+  // needs you, so there is no half to leave out (shared/first-run-practice.mjs).
   if (WITH_EXAMPLES.includes(run.step)) {
-    const backdrop = (run.backdrop ?? []).filter((_, i) => PRACTICE_BACKDROP[i]?.state !== 'needs');
-    const keep = new Set([...(run.examples ?? []), run.item, ...backdrop].filter(Boolean) as string[]);
+    const keep = new Set([...(run.examples ?? []), run.item, ...(run.backdrop ?? [])].filter(Boolean) as string[]);
     return rows.filter((r) => keep.has(r.id));
   }
   // AND THE TOUR SEES HER OWN TASK TOO. Beat fifteen walks Inbox, In progress
@@ -649,16 +652,13 @@ export function walkRows<T extends { id: string }>(rows: T[], run: FirstRun | nu
   // (w-58c8f466e7). By here every staged row has been closed, put off or
   // answered, so the board opened with nothing waiting on you and the tabs
   // held one row each: "there's no value if we go into the board view and
-  // there's nothing on the page." The tour leaves out the rows that need you,
-  // because its first card says the inbox is now empty.
+  // there's nothing on the page."
   //
   // AND THE ⌘K BEAT KEEPS THE BOARD'S SET. Pressing B ends the board beat, so
   // the screen the board card promised used to empty itself one frame after
   // it appeared, under the very next card.
   if (run.step === 'where' || run.step === 'board' || run.step === 'command') {
-    const backdrop = (run.backdrop ?? [])
-      .filter((_, i) => run.step !== 'where' || PRACTICE_BACKDROP[i]?.state !== 'needs');
-    const keep = new Set([...(run.examples ?? []), run.item, ...backdrop].filter(Boolean) as string[]);
+    const keep = new Set([...(run.examples ?? []), run.item, ...(run.backdrop ?? [])].filter(Boolean) as string[]);
     return rows.filter((r) => keep.has(r.id));
   }
   return rows.filter((r) => r.id === run.item);
@@ -1577,11 +1577,11 @@ export function nextTab(tabs: readonly string[] | undefined, view: string | unde
  *  carry no `data-tab`, so the tab tour finds one by its place in the strip.
  *  Without this the tour rang the sidebar, which in that layout holds only
  *  Inbox and Team (2026-10-01). */
-export const TEAM_TABS: readonly string[] = ['inbox', 'progress', 'snoozed', 'done', 'all'];
+export const TEAM_TABS: readonly string[] = ['inbox', 'progress', 'snoozed', 'done'];
 
 /** And the words on those tabs, the same ones Pages.tsx draws. */
 export const TEAM_TAB_NAMES: Readonly<Record<string, string>> = {
-  inbox: 'Needs you', progress: 'In progress', snoozed: 'Later', done: DONE.short, all: 'All',
+  inbox: 'Needs you', progress: 'In progress', snoozed: 'Later', done: DONE.short,
 };
 
 export function teamTab(view: string | null | undefined): string | null {
@@ -1653,9 +1653,13 @@ export function coach(
     // the tab tour after inbox zero went down to one press, so this is where
     // Later and Done are said. "In progress is agents at work" read as broken
     // grammar to a persona tester and is gone.
+    // AND THEY ARE NAMED IN THE ORDER THE STRIP DRAWS THEM (2026-10-24). The
+    // card reads quiet line first, loud line second, and the quiet line opened
+    // on Later and Done: it explained the far end of the strip before the tab
+    // the person was standing on.
     case 'tabs':
-      return say('Later is what you put off, and Done is what you finished.',
-        'Needs you is what waits on you. In progress is what agents are doing.', '↵', '', { next: true });
+      return say('Needs you is what waits on you. In progress is what agents are doing.',
+        'Later is what you put off, and Done is what you finished.', '↵', '', { next: true });
     case 'make':
       // "Thread", not task, the word since w-ec62ab6b38 (2026-09-28).
       // AND IT NAMES THE BUTTON AS WELL AS THE KEY (2026-10-01). Somebody who
@@ -2638,6 +2642,11 @@ export const UNDER: Partial<Record<Step, string>> = {
   // Two rows are still in the list on beat fourteen and the ring is on the
   // first of them, so the card goes under both for the same reason.
   snooze: '.list-pane .row:last-of-type',
+  // AND THE TWO BEATS THAT RING THE TAB STRIP, the same fault one control
+  // higher up: the strip is 54 tall and the card 147 to 173, so beside a tab
+  // it covered the strip it names, the column headers and the first row.
+  tabs: '.list-pane .row:last-of-type',
+  where: '.list-pane .row:last-of-type',
 };
 
 // ---------------------------------------------------------------------------
@@ -2983,6 +2992,22 @@ export function restartFirstRun(store: Store): void {
   try { store.removeItem(DONE_KEY); store.removeItem(KEY); } catch { /* as above */ }
 }
 
+type WalkProject = { slug: string; name: string; repoPath: string | null; practice?: boolean };
+
+/**
+ * The projects setup's last screen files into: the one the walk made first,
+ *  then every other one, so a chat in a folder that already has a project
+ *  lands there instead of the store being asked for that project again. Never
+ *  the practice project, which `finishRun` archives a moment later. The app's
+ *  list is a poll behind when the card first draws, so the walk's project is
+ *  built from the walk until the list has it. */
+export function walkProjects<P extends WalkProject>(products: P[], run: Pick<FirstRun, 'product' | 'name' | 'folder'>): WalkProject[] {
+  const others = products.filter((p) => !p.practice && p.slug !== run.product);
+  if (!run.product) return others;
+  const mine = products.find((p) => p.slug === run.product) ?? { slug: run.product, name: run.name, repoPath: run.folder };
+  return [mine, ...others];
+}
+
 /**
  * `?firstrun=1` opens the walk at the beginning; `?firstrun=answer` opens it at
  *  one named step. Anything else is not a step and is refused, because a typo
@@ -3032,6 +3057,34 @@ export const IN_PRACTICE: Step[] = [
 /** Whether the practice band is on the screen right now. */
 export function practising(run: { step: Step; practice: string | null } | null): boolean {
   return !!run && !!run.practice && IN_PRACTICE.includes(run.step);
+}
+
+/**
+ * Whether the walk is drawing a screen over the whole window. The setup
+ *  screens, the hand-off and the finish card are `.fr-screen`: fixed, opaque,
+ *  covering everything. The practice round rings a real app somebody is using,
+ *  and `landed` draws nothing.
+ *
+ *  Asked by the keys rather than by the drawing: a key that opens something
+ *  over the app opens it UNDER one of these screens, where nobody sees it. */
+export function walkCoversTheApp(run: { step: Step } | null | undefined): boolean {
+  if (!run) return false;
+  return run.step !== 'landed' && !IN_PRACTICE.includes(run.step);
+}
+
+/**
+ * Which control on the screen Tab moves to, as an index into the screen's own
+ *  controls: the one after where focus is, wrapping, and the first one when
+ *  focus is not on the screen at all.
+ *
+ *  A walk screen holds its focus the way any dialog does. Stopping the app's
+ *  tab rotation was only half of it: the screens are fixed over an app still in
+ *  the document, so the browser's Tab walked into the sidebar behind them and
+ *  the focus ring was drawn where nobody could see it. */
+export function tabStop(count: number, at: number, shift = false): number {
+  if (count <= 0) return -1;
+  if (at < 0) return shift ? count - 1 : 0;
+  return (at + (shift ? -1 : 1) + count) % count;
 }
 
 export function forcedStep(param: string | null): Step | null {

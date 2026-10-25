@@ -120,8 +120,16 @@ describe('on a phone, the inboxes along the bottom', () => {
   });
 
   it('and everything that floats above them uses the same inset', () => {
-    for (const piece of ['.topbar .th-new', '.toast', '.approvals', '#phone-alerts-ask']) {
+    for (const piece of ['.topbar .th-new', '.approvals', '#phone-alerts-ask']) {
       expect(last(piece, 'bottom')).toMatch(/var\(--phone-foot\)/);
     }
+  });
+
+  // The toast left the foot on 2026-10-13: it sat on the reply box and the
+  // tabs ("keeps blocking real components I want to touch"). It hangs under
+  // the top bar instead.
+  it('and the toast hangs under the top bar, clear of all of them', () => {
+    expect(last('.toast', 'top')).toMatch(/var\(--phone-top, 56px\)/);
+    expect(last('.toast', 'bottom')).toBe('auto');
   });
 });

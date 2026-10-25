@@ -43,6 +43,7 @@ function prose(text) {
   return text
     .replace(/```[\s\S]*?```/g, '')
     .replace(/`[^`\n]*`/g, '')
+    .replace(/<code>[\s\S]*?<\/code>/g, '')
     .replace(/https?:\/\/\S+/g, '')
     .replace(/^\s{4,}.*$/gm, '');
 }
@@ -70,6 +71,21 @@ describe('finding the title', () => {
 
   it('takes the first heading, not a later one', () => {
     expect(firstHeading(`<h1 align="center">${Name}</h1>\n\n## Get it`)).toBe(Name);
+  });
+});
+
+// The centred pitch is an html paragraph, where a markdown backtick does not
+// render, so a command written there has to be <code>npx agentbox-app</code>.
+// That is an inline code span, which the rule above has always put out of
+// scope; prose() only knew the backtick spelling of one.
+describe('what counts as prose', () => {
+  it('drops an html code span, not just a backtick one', () => {
+    expect(prose(`Run <code>npx ${NAME}-app</code> to start it.`)).not.toContain(NAME);
+    expect(prose(`Run \`npx ${NAME}-app\` to start it.`)).not.toContain(NAME);
+  });
+
+  it('keeps the name when it is really prose', () => {
+    expect(prose(`${Name} runs on your own plan.`)).toContain(Name);
   });
 });
 

@@ -166,7 +166,8 @@ describe('it says which list the row is on, in the tab\'s own word', () => {
 describe('the header leaves the animation at the conversation foot', () => {
   it('uses plain status text in the header and keeps the lattice below', () => {
     expect(bylineDrawn).not.toMatch(/LiveMark|is-shimmering/);
-    expect(live).toMatch(/<LiveMark still=\{!working\} \/>/);
+    // It also moves for an agent working outside this window (w-ae746145fc).
+    expect(live).toMatch(/<LiveMark still=\{!working( && live\.state !== 'elsewhere')?\} \/>/);
     expect(focus).toMatch(/<Live item=\{item\}/);
     expect(focus).toMatch(/<Byline\b/);
   });

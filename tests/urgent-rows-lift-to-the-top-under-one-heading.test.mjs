@@ -56,13 +56,13 @@ describe('what counts as urgent', () => {
     expect(isUrgentRow(claimed)).toBe(true);
   });
 
-  // The other half of the same rule, and the one that must not be lost:
-  // an agent writing itself a nine buys nothing. Over a quarter of agent-filed
-  // rows came in at 7 or higher before agents lost the number (w-b09b0c24cb).
-  it('ignores a number an agent wrote for itself', () => {
+  // A LEVEL COUNTS WHOEVER SET IT (w-5ac9c9006d, 2026-10-16), so an agent's
+  // nine lifts under the heading like hers. A row nobody tagged does not.
+  it('lifts a nine an agent wrote, and not a row nobody tagged', () => {
     const agentTagged = row('d', 9, { wrote: { priority: { source: 'agent' } } });
-    expect(itemPriority(agentTagged)).toBeLessThan(9);
-    expect(isUrgentRow(agentTagged)).toBe(false);
+    expect(itemPriority(agentTagged)).toBe(9);
+    expect(isUrgentRow(agentTagged)).toBe(true);
+    expect(isUrgentRow(row('e', 0, { wrote: {} }))).toBe(false);
   });
 });
 
