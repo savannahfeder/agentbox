@@ -489,16 +489,29 @@ export type Keyboard = 'a field' | 'the card' | 'nothing' | 'away';
  * The cost is Enter and Space opening a menu from a focused trigger. The arrow
  * keys do that (`triggerKeys` in ./ThreadComposer.tsx) and ⌘↵ is printed on
  * Send, so nothing on the card is out of the keyboard's reach.
+ *
+ * `inline` is the box drawn on the empty inbox. It does not own the screen, so
+ * a key pressed with nothing focused is the inbox's (J, K, E), not a letter.
  */
 export function keyOnTheNewThreadCard(
-  { key, meta, ctrl, alt, menuOpen, on }: {
-    key: string; meta?: boolean; ctrl?: boolean; alt?: boolean; menuOpen: boolean; on: Keyboard;
+  { key, meta, ctrl, alt, menuOpen, on, inline = false }: {
+    key: string; meta?: boolean; ctrl?: boolean; alt?: boolean; menuOpen: boolean; on: Keyboard; inline?: boolean;
   },
 ): 'the message' | 'leave it' {
   if (meta || ctrl || alt) return 'leave it';
   if (key.length !== 1 && key !== 'Enter') return 'leave it';
   if (menuOpen || on === 'a field' || on === 'away') return 'leave it';
+  if (inline && on === 'nothing') return 'leave it';
   return 'the message';
+}
+
+/**
+ * Whether the box on the empty inbox moves into the New thread dialog. A
+ * thread landing in Needs you takes the page away; if you were in the box, or
+ * left words in it, the dialog opens on what it held, over the list.
+ */
+export function writingMovesToTheDialog({ waiting, onScreen, writing }: { waiting: number; onScreen: boolean; writing: boolean }): boolean {
+  return waiting > 0 && onScreen && writing;
 }
 
 /**

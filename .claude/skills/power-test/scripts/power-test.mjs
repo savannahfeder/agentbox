@@ -71,6 +71,7 @@ const real = flag('real') || cloud;
 const cloudAccounts = opt('cloud-accounts');
 if (cloudAccounts && !cloud) stop('--cloud-accounts narrows the cloud\'s accounts: add --cloud.');
 const focus = opt('focus');
+const alpha = opt('alpha');
 const model = opt('model');
 const inherit = opt('tester-login') === 'inherit';
 const external = opt('testers') === 'external';
@@ -187,7 +188,7 @@ for (const person of people) {
   fs.mkdirSync(dir, { recursive: true });
   const shape = real ? [] : ['--logins', String(person.logins), ...(person.codex ? [] : ['--no-codex'])];
   say(`${person.name}: starting a copy of the app shaped like their setup`);
-  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []));
+  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(alpha ? ['--alpha', alpha] : []));
   fs.writeFileSync(path.join(dir, 'up.log'), up.out);
   const stateFile = path.join(instanceDir(name), 'instance.json');
   const state = readJson(stateFile);

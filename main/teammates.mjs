@@ -5,7 +5,7 @@ import {
   planWakes, teammateLabel, FROM_LABEL_PREFIX, HOP_LABEL_PREFIX, hopOf, teammateIdOf, YOU, mentionsIn,
   letterFor, statusOf, runLines, STARTERS, CHAT_TAIL, isWorks, DEFAULT_LIMIT, MAX_HOPS,
   offerFrom, offerAnswer, threadsDigest, OFFER_LABEL, OFFER_MAKE, OFFER_NOT_NOW, TEAMMATE_EFFORT, GREETING, starterAsks,
-  dutyWhen, dutyOf, DUTY_LABEL_PREFIX,
+  dutyWhen, dutyOf, DUTY_LABEL_PREFIX, CHAT_LABEL, yesFirst,
 } from '../shared/teammates.mjs';
 import { isShippedNote } from '../shared/shipped-note.mjs';
 import { ruleLabel, periodKey } from '../shared/repeats.mjs';
@@ -192,13 +192,13 @@ export class Teammates {
 
   // Your words in the team chat. On a teammate's page they go to that
   // teammate; in the team chat to whoever they name with @.
-  post({ text, to = [], options } = {}, now = Date.now()) {
+  post({ text, to = [], options, fresh = false } = {}, now = Date.now()) {
     const words = String(text ?? '').trim();
     if (!words) throw new Error('Nothing to send.');
     const team = this.list(now);
     const ids = new Set([...(Array.isArray(to) ? to : [to]).filter(Boolean), ...mentionsIn(words, team)]);
     const known = [...ids].filter((x) => team.some((t) => t.id === x));
-    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(options ? { options } : {}) }, now);
+    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}) }, now);
   }
 
   // Your go-ahead for work held after too many hand-offs: the same work again,
@@ -286,6 +286,7 @@ export class Teammates {
           const labels = ['founder', teammateLabel(t.id), `${HOP_LABEL_PREFIX}${hop}`];
           if (a.trigger.kind === 'pass' && a.trigger.from && a.trigger.from !== YOU) labels.push(`${FROM_LABEL_PREFIX}${a.trigger.from}`);
           if (a.trigger.kind === 'duty') labels.push(`${DUTY_LABEL_PREFIX}${a.trigger.duty}`);
+          if (a.trigger.kind === 'message' && a.trigger.from === YOU && !a.trigger.via) labels.push(CHAT_LABEL);
           await lock.withProjectLock(dir, async () => {
             const opening = this.openingFor(t, a.trigger, team);
             const made = workItemsDisk.createWorkItemIfAbsent(dir, a.id, {
@@ -349,8 +350,11 @@ export class Teammates {
           : `Someone to take on asks like these, which I keep making:\n${asks}${read}`;
         this.describe({ text, product: row.product, threads }, now);
       }
-      // Clean, so the answered offer leaves Needs you rather than waiting to be read.
+      // Clean, so the answered offer leaves Needs you rather than waiting to be
+      // read, and titled for what happened, so it no longer reads as an offer.
+      const like = String(row.title ?? '').match(/“(.+)”/)?.[1];
       workItemsDisk.updateWorkItem(dir, row.id, {
+        ...(like ? { title: tap.kind === 'make' ? `Made a teammate for things like “${like}”` : `No teammate for things like “${like}”` } : {}),
         status: 'done',
         labels: [...(row.labels ?? []), 'clean'],
         note: tap.kind === 'make' ? 'A new teammate is setting itself up in the team chat.' : 'Not now. This one will not be offered again.',
@@ -363,7 +367,7 @@ export class Teammates {
     if (!dir) return null;
     const body = offer.said;
     const result = [
-      '**Make a teammate for these?**', '', `${offer.said} Like these:`, '', ...offer.titles.map((t) => `- ${t}`), '',
+      '**Make a teammate for these?**', '', `${offer.said} Like these:`, '', ...offer.asked.map(({ title, n }) => `- ${title}${n > 1 ? ` (${n} times)` : ''}`), '',
       'A teammate would take this kind of work on. It does it on its own, on a schedule if you like, and comes to you only when it needs you. It reads these threads first, with everything you said in them, then asks you only what they leave open.',
       '', '## Options', `1. ${OFFER_MAKE} (recommended)`, `2. ${OFFER_NOT_NOW}`,
     ].join('\n');
@@ -384,7 +388,7 @@ export class Teammates {
   _threadsBehind(row, listed, items, chat) {
     const kept = chat.messages.find((m) => m.kind === 'act' && m.verb === 'offered' && m.text === row.title && m.threads?.length);
     if (kept) return kept.threads;
-    const titles = new Set(listed.map((l) => l.slice(2).trim().toLowerCase()));
+    const titles = new Set(listed.map((l) => l.slice(2).replace(/ \(\d+ times\)$/, '').trim().toLowerCase()));
     return items.filter((i) => (i.labels ?? []).includes('founder') && !teammateIdOf(i) && titles.has(String(i.label || i.title).trim().toLowerCase()))
       .slice(0, 12).map((i) => ({ product: i.product, id: i.id, title: String(i.label || i.title).trim() }));
   }
@@ -523,7 +527,8 @@ export class Teammates {
       '',
       t.job ? `Your job: ${t.job}` : null,
       t.goal ? `Your goal: ${t.goal}${t.counted ? ` (counted as: ${t.counted})` : ''}` : null,
-      t.asksFirst ? `Ask the person first: ${t.asksFirst}` : null,
+      yesFirst(t.asksFirst) ? `Ask the person first: ${yesFirst(t.asksFirst)}`
+        : t.asksFirst ? "What needs the person's yes first is not set: what you saved there is a question. Ask it with team_post, with options, and save their answer as a statement with team_setup asksFirst." : null,
       t.duties?.length ? null : isWorks(t.works) ? `You wake on your own ${ruleLabel(t.works)}.` : 'You wake when someone writes to you or passes you work.',
       '',
       ...(t.duties?.length ? ['## What you do on your own', ...t.duties.map((d) => `- ${d.what} (${dutyWhen(d).toLowerCase()})${d.tell ? `. Bring the person in only when ${d.tell}` : ''}`), 'You also wake when someone writes to you or passes you work.', ''] : []),
@@ -545,7 +550,7 @@ export class Teammates {
         'You are a new teammate, still being set up. The opening message is what the person asked for, and anything they have answered since is in the team chat above. Set yourself up, then stop:',
         digest ? '0. First read every thread under "The threads you come from" above for how the person wants this work done: what they asked for, what they corrected, what they liked and turned down, and what they decided. Keep each lasting lesson about how this kind of work is done with team_playbook (a short title like "How you write posts"), and anything about the person themselves with team_remember, one per call, in their words. Write your job, goal and what needs their yes from what the threads show, not from guesses, and in step 2 ask only what the threads leave open.' : null,
         'Your job, goal, when you wake and what you ask first, above, are guesses to confirm, not settled.',
-        '1. Your name is your role: two or three words that say what you do, like Marketing lead or Support lead, that no teammate has. Set name and role to it. If you already have a name other than New teammate, keep that name. Draft your job in plain words to yourself, as long as it needs, your goal, how you count it, what you ask the person first, your duties (what you do on your own and when), and if they said which agent should run you, runsOn. Save the draft with team_setup, without ready.',
+        '1. Your name is your role: two or three words that say what you do, like Marketing lead or Support lead, that no teammate has. Set name and role to it. If you already have a name other than New teammate, keep that name. Draft your job in plain words to yourself, as long as it needs, your goal, how you count it, what you ask the person first, your duties (what you do on your own and when; each time you wake on your own is a duty, and your job promises no time your duties do not hold), and if they said which agent should run you, runsOn. Save the draft with team_setup, without ready.',
         '2. Always ask before you start, even when the opening seems clear: the person does not want a teammate that guesses. Ask what you would otherwise assume, at least when you should work on your own and what you should do first, and anything else you guessed, such as what needs their yes. One team_post per question, at most four, each with two to four short answers in `options`, your best guess first. Then finish this run quietly. Their answers wake you again with the chat in your brief.',
         '3. When they have answered, save what they said with team_setup and ready true, post one or two sentences saying what you will do first, and finish quietly. team_setup refuses ready until they have written to you.',
         'If the opening is a piece of work rather than a description of a teammate, it is also your first job: set yourself up for work like it, and once team_setup has ready true, do it in this run and finish as any run does.',

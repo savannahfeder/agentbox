@@ -256,7 +256,7 @@ describe('setting Stripe up (scripts/stripe-setup.mjs)', () => {
   it('the billing page switches between exactly the plans sold, and cancels at the period\'s end', () => {
     const sold = [{ product: 'prod_a', price: 'price_a' }, { product: 'prod_b', price: 'price_b' }];
     const s = portalSettings(sold).features;
-    expect(s.subscription_update.products).toEqual([{ product: 'prod_a', prices: ['price_a'] }, { product: 'prod_b', prices: ['price_b'] }]);
+    expect(s.subscription_update.products).toEqual([{ product: 'prod_a', prices: ['price_a'], adjustable_quantity: { enabled: false } }, { product: 'prod_b', prices: ['price_b'], adjustable_quantity: { enabled: false } }]);
     expect(s.subscription_cancel).toEqual({ enabled: true, mode: 'at_period_end' });
   });
 

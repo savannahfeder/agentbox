@@ -5,9 +5,8 @@
 // (threads/composer-rules.ts `projectSwatch`), so a project looks like itself
 // on every screen.
 //
-// It used to draw a sunburst here, which was also the Agentbox logo, so every
-// project without a picture wore the app's mark. That is gone for good; the
-// Agentbox mark is AppMark.tsx and only ever means Agentbox.
+// A project never wears the Agentbox mark: that is AppMark.tsx and only ever
+// means Agentbox.
 
 import { projectSwatch } from '../threads/composer-rules';
 

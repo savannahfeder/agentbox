@@ -33,6 +33,10 @@ const SPOKEN_FILES = [
   'renderer/src/components/RemoteControl.tsx',
   'renderer/src/components/Palette.tsx',
   'renderer/src/api.ts',
+  // The cloud's offer to take the threads that are waiting. On the Linux QA
+  // box it read "This Mac is running all it can" at the moment it asked for
+  // money (2026-10-25).
+  'renderer/src/cloud-upgrade.ts',
   'shared/project-folder-check.mjs',
   'shared/spawn-trouble.mjs',
   'shared/agent-import.mjs',

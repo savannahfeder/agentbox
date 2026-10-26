@@ -357,6 +357,8 @@ export const DRIVES = {
         barName: (() => { const n = document.querySelector('.thread-crumb-name'); return !!n && getComputedStyle(n).display !== 'none'; })(),
         summary: !!document.querySelector('.one-sum'),
         answer: !!document.querySelector('.one-answer'),
+        // A thread with one or two earlier messages is drawn whole, its ask in it (ItemThread, drawnWhole).
+        whole: !!document.querySelector('.focus-body .thread') && !document.querySelector('.one-earlier'),
         earlier: document.querySelector('.one-earlier')?.textContent ?? null,
       }))()`);
       try {
@@ -384,7 +386,7 @@ export const DRIVES = {
 
         const order = await tab.evaluate(`[...document.querySelectorAll('.list-pane .row:not(.th-head)')].map((r) => r.textContent)`);
         await tab.press('Enter');
-        const opened = await tab.until(`!!(document.querySelector('.app.one-at-a-time') && document.querySelector('.one-answer'))`, { why: 'Enter to open the pointed row', ms: 10_000 }).catch(() => false);
+        const opened = await tab.until(`!!(document.querySelector('.app.one-at-a-time .one-sum') && (document.querySelector('.one-answer') || document.querySelector('.focus-body .thread')))`, { why: 'Enter to open the pointed row', ms: 10_000 }).catch(() => false);
         claim(opened, 'Enter on a row opens it on the one-at-a-time page');
         const first = await page();
         // Enter opens the pointed row, which need not be the top one.
@@ -392,7 +394,7 @@ export const DRIVES = {
         claim(at >= 0 && first.pos === `${at + 1} of 4`, 'the corner says where you are', first.pos ?? 'no position');
         claim(!first.barName, 'the bar keeps only the way back; the name is said once, on the page');
         claim(!!first.title && titles.some((t) => t.startsWith(first.title.replace(/…$/, '').slice(0, 20))), 'the page names the thread above its Context', first.title ?? '');
-        claim(first.summary && first.answer, 'the summary on top and the newest answer under it');
+        claim(first.summary && (first.answer || first.whole), 'the summary on top, then the newest answer, or the whole of a short thread', first.whole ? 'drawn whole' : 'the answer');
         claim(first.choices === 3 && !first.heading, 'the three choices at the foot, without a heading', `${first.choices} choices`);
         claim(!first.panel, 'no summary panel beside the page');
         await capture('first');
@@ -431,9 +433,15 @@ export const DRIVES = {
         const back = await page();
         claim(back.on && back.name === before.name, 'the up arrow walks back', back.pos ?? '');
 
-        await tab.evaluate(`document.querySelector('.one-earlier')?.click()`);
-        const opened2 = await tab.until(`!!(document.querySelector('.one-earlier')?.textContent?.startsWith('Hide') && document.querySelector('.focus-body .thread'))`, { why: 'the earlier messages to open', ms: 8000 }).catch(() => false);
-        claim(opened2, 'the earlier messages open in place', before.earlier ?? '');
+        // These threads are short, so they are drawn whole, the ask in them; a longer one folds.
+        if (before.earlier) {
+          await tab.evaluate(`document.querySelector('.one-earlier')?.click()`);
+          const opened2 = await tab.until(`!!(document.querySelector('.one-earlier')?.textContent?.startsWith('Hide') && document.querySelector('.focus-body .thread'))`, { why: 'the earlier messages to open', ms: 8000 }).catch(() => false);
+          claim(opened2, 'the earlier messages open in place', before.earlier);
+        } else {
+          const ask = await tab.evaluate(`document.querySelector('.focus-body .thread')?.textContent ?? ''`);
+          claim(!!before.name && ask.includes(before.name.replace(/…$/, '').slice(0, 20)), 'a short thread is drawn whole, with your ask in it', before.name ?? '');
+        }
         await capture('earlier');
 
         await tab.press('Escape');

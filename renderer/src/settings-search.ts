@@ -15,9 +15,9 @@ export type SettingsPageId =
   | 'claude' | 'codex' | 'running' | 'cloud' | 'instructions'
   | 'projects' | 'team';
 
-/** The menu, in the order it is drawn, under the three headings it is drawn
+/** The menu, in the order it is drawn, under the headings it is drawn
  *  under. Team is left out by the screen on a build with no team cloud. */
-export const SETTINGS_PAGES: Array<{ id: SettingsPageId; label: string; group: 'Personal' | 'Agents' | 'Workspace' }> = [
+export const SETTINGS_PAGES: Array<{ id: SettingsPageId; label: string; group: 'Personal' | 'Agents' | 'Workspace' | 'Billing' }> = [
   { id: 'general', label: 'General', group: 'Personal' },
   { id: 'appearance', label: 'Appearance', group: 'Personal' },
   { id: 'shortcuts', label: 'Shortcuts', group: 'Personal' },
@@ -26,11 +26,12 @@ export const SETTINGS_PAGES: Array<{ id: SettingsPageId; label: string; group: '
   { id: 'claude', label: 'Claude Code', group: 'Agents' },
   { id: 'codex', label: 'Codex', group: 'Agents' },
   { id: 'running', label: 'Running', group: 'Agents' },
-  { id: 'cloud', label: 'Cloud', group: 'Agents' },
   { id: 'instructions', label: 'Instructions', group: 'Agents' },
   { id: 'projects', label: 'Projects', group: 'Workspace' },
   { id: 'team', label: 'Team', group: 'Workspace' },
   { id: 'rooms', label: 'Rooms', group: 'Workspace' },
+  // Last, where people look for what they pay for; the founder's capital B.
+  { id: 'cloud', label: 'Plan and Billing', group: 'Billing' },
 ];
 
 const pageLabel = (id: SettingsPageId) => SETTINGS_PAGES.find((p) => p.id === id)?.label ?? id;
@@ -74,8 +75,9 @@ const ENTRIES: Entry[] = [
   // The Memory group folded into the Agents card (w-e5225b62ba), so these three
   // land on `at-once` together. An anchor naming a group that no longer exists
   // is a search result that scrolls nowhere.
-  { page: 'cloud', label: 'Cloud plans', anchor: 'cloud-plans', words: 'agentbox cloud plan plans pro plus max slots upgrade price pay subscription' },
-  { page: 'cloud', label: 'Billing', anchor: 'cloud-billing', words: 'stripe payment invoices card cancel subscription' },
+  { page: 'cloud', label: 'Your plan', anchor: 'cloud-billing', words: 'agentbox cloud billing stripe payment invoices invoice receipts card cancel subscription manage plan account' },
+  { page: 'cloud', label: 'This month', anchor: 'cloud-use', words: 'cloud usage hours agents running used left' },
+  { page: 'cloud', label: 'Change plan', anchor: 'cloud-plans', words: 'agentbox cloud plan plans pro plus max slots upgrade downgrade switch price pay subscription' },
   { page: 'running', label: 'How many run at once', anchor: 'at-once', words: 'agents concurrent parallel sessions limit queue capacity automatic' },
   { page: 'running', label: 'Hold heavy work when memory is short', anchor: 'at-once', words: 'ram tests builds slow memory' },
   { page: 'running', label: 'Stop programs agents leave behind', anchor: 'at-once', words: 'leftovers left running finished dev servers background jobs processes cleanup kill ram memory' },

@@ -161,6 +161,30 @@ export function afterCheck(readiness: Array<Pick<EngineSetupState, 'engine' | 'f
   return readiness.some((r) => r.found) ? { t: 'found' } : { t: 'nothing' };
 }
 
+/* ---------------- AND THE COMPUTER CHANGES WHILE YOU LOOK ----------------- */
+/* The arrival look was the only one, so a login that appeared a minute later
+   was found by reloading the page and by nothing else (F-71).
+
+   WHAT IS WORTH LOOKING AGAIN FOR is everything up to a plan that is signed
+   in. A tool on the disk signed out is the state that changes next; a plan
+   signed in is the end of the question, and no later look could add to it. */
+
+/** Whether another look at the computer could still change this screen. */
+export function worthLookingAgain(
+  readiness: Array<Pick<EngineSetupState, 'found' | 'signedIn'>> | null | undefined,
+): boolean {
+  return needsPlan(readiness ?? []);
+}
+
+/** How often the plan screen looks again while it is up. */
+export const LOOK_AGAIN_MS = 5_000;
+/**
+ * And how long it keeps that clock. NOTHING RETRIES FOR EVER (CLAUDE.md), and
+ *  each look spawns both tools to ask them. After this the screen still looks
+ *  on coming back to the window, which is the move somebody signing in
+ *  somewhere else makes. */
+export const LOOK_AGAIN_FOR_MS = 3 * 60_000;
+
 /* ------------------------- WHAT THE QUESTION OFFERS ----------------------- */
 /**
  * A ROW ON A QUESTION CARD: a mark, a name, a sentence, and whether it belongs
@@ -277,9 +301,14 @@ export function foundHead(ready: Engine[]): string {
 export function foundLede(ready: Engine[]): string | null {
   if (!ready.length) return null;
   const names = ready.map(planName);
-  return ready.length > 1
-    ? `Your agents will run on your own ${names.join(' and ')} plans.`
-    : `Your agents will run on your own ${names[0]} plan.`;
+  if (ready.length > 1) return `Your agents will run on your own ${names.join(' and ')} plans.`;
+  // AND THE OTHER ROW IS ANSWERED TOO (w-04e8d6d6e6). The screen says it
+  // found one plan and then draws the other one under it offering to set it
+  // up, with nothing saying whether that one was looked for. A tester with
+  // ChatGPT signed in read the Claude row as something still to do.
+  const other = (['claude', 'codex'] as Engine[]).find((e) => !ready.includes(e));
+  const sentence = `Your agents will run on your own ${names[0]} plan.`;
+  return other ? `${sentence} You do not need ${planName(other)} as well.` : sentence;
 }
 
 /**

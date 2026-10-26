@@ -15,8 +15,14 @@
 // indicator to the input field showing that it's condensed and can be
 // expanded, rather than having a whole single option there?" The number keys
 // pick any choice either way, and one picked out with the arrow keys brings
-// the box back. The fold stays from thread to thread, since it is how
-// somebody likes to read.
+// the box back.
+//
+// IT FOLDS ONE THREAD'S CHOICES, NOT EVERY THREAD'S. It first stayed from
+// thread to thread, and the founder read the next threads as "not asking us
+// for next steps... I didn't even realize that for a lot of these it's been
+// condensed. When I condensed it for one of these, I didn't expect them all to
+// be condensed." Now a fold holds for that thread's current choices; another
+// thread, or the same thread's next round of choices, opens unfolded.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ChoicesFold, ChoicesShow } from '../renderer/src/components/OneThingAtATime.tsx';
+import { foldKey, foldedKeys, toggleFold } from '../renderer/src/one-thing-at-a-time.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
@@ -59,9 +66,40 @@ describe('folded', () => {
   it('which brings the box back without opening the reply', () => {
     expect(read('renderer/src/components/OneThingAtATime.tsx')).toMatch(/onClick=\{\(e\) => \{ e\.stopPropagation\(\); onShow\(\); \}\}/);
   });
-  it('and the fold stays from thread to thread', () => {
-    expect(focus).toMatch(/localStorage\.getItem\(CHOICES_FOLDED\) === '1'/);
-    expect(focus).toMatch(/localStorage\.setItem\(CHOICES_FOLDED, now \? '1' : '0'\)/);
+});
+
+describe('which choices a fold holds', () => {
+  const thread = (id, ts) => ({ product: 'p', id, wrote: { result: { ts } }, result: '## Options\n1. A\n2. B' });
+  it('this thread\'s choices, kept when you come back to it', () => {
+    const folded = toggleFold([], foldKey(thread('w-1', 5)));
+    expect(folded.includes(foldKey(thread('w-1', 5)))).toBe(true);
+  });
+  it('not another thread\'s', () => {
+    const folded = toggleFold([], foldKey(thread('w-1', 5)));
+    expect(folded.includes(foldKey(thread('w-2', 5)))).toBe(false);
+  });
+  it('not the same thread\'s next round of choices', () => {
+    const folded = toggleFold([], foldKey(thread('w-1', 5)));
+    expect(folded.includes(foldKey(thread('w-1', 9)))).toBe(false);
+  });
+  it('and the arrow on the sign unfolds it again', () => {
+    const k = foldKey(thread('w-1', 5));
+    expect(toggleFold(toggleFold([], k), k)).toEqual([]);
+  });
+  it('reads the old fold-everything setting as nothing folded', () => {
+    expect(foldedKeys('1')).toEqual([]);
+    expect(foldedKeys(null)).toEqual([]);
+    expect(foldedKeys('["p:w-1:5"]')).toEqual(['p:w-1:5']);
+  });
+  it('and keeps no more than the last hundred', () => {
+    let list = [];
+    for (let i = 0; i < 150; i++) list = toggleFold(list, `p:w-${i}:1`);
+    expect(list.length).toBe(100);
+    expect(list.at(-1)).toBe('p:w-149:1');
+  });
+  it('the page asks it, keyed by the thread on screen', () => {
+    expect(focus).toMatch(/const choicesFolded = foldedChoices\.includes\(foldKey\(item\)\);/);
+    expect(focus).toMatch(/localStorage\.getItem\(CHOICES_FOLDED\)/);
   });
 });
 

@@ -12,6 +12,7 @@ export const OFFER_LABEL: 'teammate-offer';
 export const OFFER_MAKE: string;
 export const OFFER_NOT_NOW: string;
 export const MAX_HOPS: number;
+export function yesFirst(asksFirst: string | null | undefined): string | null;
 export const TEAMMATE_EFFORT: 'high';
 export const GREETING: string;
 export function starterAsks(team?: Array<{ starter?: string | null; name: string }>): Array<{ starter: string; ask: string; name: string; role: string }>;

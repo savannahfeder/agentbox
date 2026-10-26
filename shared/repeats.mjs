@@ -15,6 +15,16 @@ const KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const CLEAN_LABEL = 'clean';
 export const REPEAT_LABEL_PREFIX = 'repeat:';
 
+// A run's body is the app's rules for the agent (main/repeats.mjs), then the
+// person's instruction after INSTRUCTION_MARK. Screens show the instruction.
+export const PROTOCOL_OPENS = 'THIS IS ONE RUN OF A REPEATING TASK.';
+export const INSTRUCTION_MARK = 'HER INSTRUCTION FOLLOWS.';
+export function instructionOf(body) {
+  const text = String(body ?? '');
+  const at = text.indexOf(`\n${INSTRUCTION_MARK}\n`);
+  return text.startsWith(PROTOCOL_OPENS) && at >= 0 ? text.slice(at + INSTRUCTION_MARK.length + 2).trim() : text;
+}
+
 export function repeatLabel(ruleId) {
   return `${REPEAT_LABEL_PREFIX}${ruleId}`;
 }

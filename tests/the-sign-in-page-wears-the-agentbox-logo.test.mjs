@@ -18,10 +18,18 @@ describe('the sign-in page wears the Agentbox logo', () => {
     ['signing in', {}],
     ['after signing out', { signedOut: true }],
     ['waiting on the browser', { waitingUrl: 'https://example.test/auth' }],
-  ])('shows the app icon above the heading when %s', (_, props) => {
+  ])('shows the logo above the heading when %s', (_, props) => {
     const head = top(draw(props));
-    expect(head).toMatch(/<img[^>]*class="product-mark app-mark"/);
-    expect(head).toContain('agentbox-icon');
+    expect(head).toMatch(/<svg[^>]*class="product-mark app-mark"/);
+    expect(head.match(/<circle/g)).toHaveLength(9);
+  });
+
+  // The logo is the dots; the dark tile around them is the Mac app icon, and
+  // drawn here it hid the logo (2026-10-25).
+  it('draws the logo itself, not the app icon', () => {
+    const head = top(draw());
+    expect(head).not.toContain('agentbox-icon');
+    expect(head).not.toMatch(/<img[^>]*app-mark/);
   });
 
   it('never draws the letter placeholder', () => {
@@ -33,6 +41,6 @@ describe('the sign-in page wears the Agentbox logo', () => {
   });
 
   it('keeps the logo out of what a screen reader says, since the heading names the app', () => {
-    expect(top(draw())).toMatch(/<img[^>]*aria-hidden="true"/);
+    expect(top(draw())).toMatch(/<svg[^>]*aria-hidden="true"/);
   });
 });

@@ -145,12 +145,13 @@ describe('the ⌘K beat', () => {
       .not.toBe(coach('command', 0, {}).quiet);
   });
 
-  it('rings the palette, and the palette before the key that opens it', () => {
+  it('rings the palette', () => {
     // AND THE PALETTE, NOT THE LIST INSIDE IT. `.palette-list` scrolls, so the
     // run of its children is the height of everything in it rather than the
     // height of what is on show: the ring came out 630 by 1449 in a 986 tall
-    // window and ran off the bottom of the screen. Photographed once.
-    expect(ANCHOR.command).toEqual(['.modal.palette', 'button[aria-label="Commands"]']);
+    // window and ran off the bottom of the screen. Photographed once. The ⌘
+    // button after it went with the layout without the sidebar (w-a1ed0e8b25).
+    expect(ANCHOR.command).toEqual(['.modal.palette']);
     expect(ANCHOR.command[0]).not.toContain('palette-list');
   });
 
@@ -162,7 +163,11 @@ describe('the ⌘K beat', () => {
     // `besideLeft` takes the bar to clear as an argument since 2026-08-28, so
     // the beat that teaches how a task ends can stand off its own buttons. The
     // palette branch is unchanged and this still fails if it is taken away.
-    expect(src).toContain('left: besideRing ? Math.round(geo.ring.x + geo.ring.w + 26) : besideLeft(geo, besideOf),');
+    // Since 2026-10-26 the same expression is read once, as `asideAt`, because
+    // whether there is room for the card is asked of it as well
+    // (tests/a-coaching-card-is-never-a-strip-at-the-window-edge).
+    expect(src).toContain('const asideAt = besideRing ? Math.round(geo.ring.x + geo.ring.w + 26) : besideLeft(geo, besideOf);');
+    expect(src).toContain('left: asideAt,');
   });
 
   // AND SINCE 2026-10-06 THE BEAT THAT ENDS A THREAD STANDS TO THE RIGHT OF
@@ -220,11 +225,13 @@ describe('the ⌘K beat', () => {
 describe('the tab strip', () => {
   const app = read('renderer/src/App.tsx');
 
-  it('names the Scheduled tab the way the other three are named', () => {
-    expect(app).toContain('data-tab="snoozed"');
-    for (const tab of ['inbox', 'progress', 'done', 'snoozed']) {
-      expect(app, `${tab} tab`).toContain(`data-tab="${tab}"`);
-    }
+  // The four named tabs were the old strip's, drawn only without the sidebar,
+  // and went with it (w-a1ed0e8b25). The sidebar's row is named; the Inbox's
+  // own tabs carry no name and `teamTab` finds them by their place.
+  it('names the sidebar row, and finds the Inbox tabs by place', () => {
+    expect(read('renderer/src/components/WorkspaceNavigation.tsx')).toContain('data-tab="inbox"');
+    expect(app).not.toMatch(/data-tab="(progress|snoozed|done)"/);
+    expect(read('renderer/src/components/Onboarding.tsx')).toContain('teamTab(goingTo)');
   });
 
   it('leaves the whole strip as the floor and never as the target', () => {
@@ -242,9 +249,9 @@ describe('the tab strip', () => {
     // behind it moved into ../onboarding so the card's own sentences could be
     // drawn off the same answer as the ring. Same ring, and the name it gave
     // up is now the shared function's.
-    // The sidebar's own row is rung first, the old strip's tab after it.
-    // And the team strip's own tab before both, found by its place (`teamTab`).
-    expect(src).toContain('[...(teamTab(goingTo) ? [teamTab(goingTo) as string] : []), `.workspace-navigation [data-tab="${goingTo}"]`, `.tabs .tab[data-tab="${goingTo}"]`, ...ANCHOR.where ?? []]');
+    // The team strip's own tab first, found by its place (`teamTab`), then the
+    // sidebar's own row. The old strip's tab went with that layout.
+    expect(src).toContain('[...(teamTab(goingTo) ? [teamTab(goingTo) as string] : []), `.workspace-navigation [data-tab="${goingTo}"]`, ...ANCHOR.where ?? []]');
     expect(src).toContain("const goingTo = run.step === 'where' ? nextTab(tabs, view) : null;");
     // And the card stands off the sidebar's right edge on the old layout's
     // tour, which rings sidebar rows. The tab-strip beats are under the list.

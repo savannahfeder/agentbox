@@ -425,8 +425,8 @@ describe('every dial actually reaches the window', () => {
 // 2026-08-23: "Lake is the default theme during onboarding."
 //
 // AND WHAT IT SEEDS IS GOUACHE VALLEY. That sentence was about a look being PUT
-// ON her running window, which is the PIN, and the pin is still held to it:
-// `idleSkin` paints nothing where nothing was picked.
+// ON her running window, which is the PIN. The inbox zero page that wore that
+// pin went with the layout without the sidebar (w-a1ed0e8b25).
 //
 // The write itself has never moved, because leaving both keys empty is the whole
 // of that tester's bug.

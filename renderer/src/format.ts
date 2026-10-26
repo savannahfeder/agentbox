@@ -301,7 +301,7 @@ export function parseRepeat(raw: string): RepeatParse {
     // "every day at half past nine" is a recurrence this cannot keep and must
     // say so. Without "at", the rest is the task itself and the hour defaults,
     // the way every day-shaped answer in parseWhen already does.
-    const at = rest.match(/^at\s+(.+)$/);
+    const at = rest.match(/^(?:(?:only|just)\s+)?at\s+(.+)$/);
     return at ? shapeOf(opener[0], at[1]) : shapeOf(opener[0], '');
   }
 

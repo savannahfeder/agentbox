@@ -32,7 +32,8 @@ describe('the thread\'s name', () => {
   it('heads the page, read before the Context', () => {
     const html = draw({ title: 'Agent stopped check if pushed', context: 'You asked which test used 4 GB.', you: null });
     expect(html).toMatch(/^<div class="one-sum"><h2 class="one-title">Agent stopped check if pushed<\/h2>/);
-    expect(visible(html)).toMatch(/^Agent stopped check if pushed Context You asked/);
+    // With no "Context" label since round seventeen.
+    expect(visible(html)).toMatch(/^Agent stopped check if pushed You asked/);
   });
   it('and is left out when there is none', () => {
     expect(draw({ title: '', context: 'c', you: null })).not.toContain('one-title');

@@ -165,13 +165,11 @@ describe('the foot of the sidebar', () => {
   // line is the only place the address appears. The row the app actually
   // draws passes onAccount, and its second line is what you are up to
   // instead: see your-own-row-says-what-you-are-up-to-not-your-email.
-  it('shows the signed-in person, name and email, and the toggle sits at the top instead', () => {
+  it('shows the signed-in person, name and email', () => {
     const html = draw({ team: onATeam });
     const row = html.slice(html.indexOf('class="th-me"'));
     expect(row).toContain('Ada Lovelace');
     expect(row).toContain('<small>ada@example.test</small>');
-    expect(row).not.toContain('workspace-toggle');
-    expect(html.slice(0, html.indexOf('workspace-tabs'))).toContain('workspace-toggle');
   });
 
   it('offers to sign in instead when the team cloud is set up and nobody is signed in', () => {
@@ -195,14 +193,16 @@ describe('the top of the sidebar', () => {
     expect(top).toContain('>Northwind</span>');
   });
 
-  // With no team the corner names the app, so it wears the app's icon (the
-  // launch film's "On the grid" logo) rather than a letter (w-a514b58055).
-  it('falls back to the app name and the app icon when there is no team', () => {
+  // With no team the corner names the app, so it wears the app's logo rather
+  // than a letter (w-a514b58055): the dots, not the Mac icon's tile, which hid
+  // them at 20px (w-1587f83559).
+  it('falls back to the app name and the app logo when there is no team', () => {
     const html = draw();
     const top = html.slice(0, html.indexOf('workspace-tabs'));
     expect(top).toContain(`>${Name}</span>`);
     expect(top).toContain('th-mark-app');
-    expect(top).toMatch(/<img[^>]*class="product-mark app-mark"/);
+    expect(top).toMatch(/<svg[^>]*class="product-mark app-mark"/);
+    expect(top).not.toContain('agentbox-icon');
     expect(top).not.toContain(`>${Name.slice(0, 1).toUpperCase()}</span>`);
   });
 });
@@ -214,26 +214,22 @@ describe('every control keeps its name in either width', () => {
       onFeedback: noop, onInstructions: noop, onSettings: noop, inboxCount: 2,
     });
     const buttons = html.match(/<button[^>]*>/g);
-    // Inbox, Feedback, Instructions, Settings, the toggle and your own row
-    // (it opens your account). Team left with w-05ff3d1438, Team members
-    // with w-8415594d19, and Invite people with w-1b574413db.
+    // Inbox, Feedback, Instructions, Settings and your own row (it opens your
+    // account). Team left with w-05ff3d1438, Team members with w-8415594d19,
+    // Invite people with w-1b574413db, and the collapse toggle with the open
+    // sidebar (w-a1ed0e8b25).
     //
     // Your own row is one button in either width: face, name and email,
     // opening your account menu (w-a09476712f). The status line that was a
     // seventh button under your name lives in that menu now.
-    expect(buttons).toHaveLength(6);
+    expect(buttons).toHaveLength(5);
     for (const b of buttons) expect(b).toMatch(/aria-label="[^"]+"/);
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
   });
 
-  it.each([
-    [false, 'Collapse sidebar'],
-    [true, 'Expand sidebar'],
-  ])('labels the toggle for what it will do when collapsed=%s', (collapsed, label) => {
-    const toggle = buttonWith(draw({ collapsed }), 'workspace-toggle');
-    expect(toggle).toContain(`aria-label="${label}"`);
-    expect(toggle).toContain(`title="${label}"`);
-    expect(toggle).toContain('data-hint="sidebar"');
+  it.each([false, true])('has no toggle to open or shut it when collapsed=%s', (collapsed) => {
+    expect(buttonWith(draw({ collapsed }), 'workspace-toggle')).toBe('');
+    expect(draw({ collapsed })).not.toMatch(/Collapse sidebar|Expand sidebar|data-hint="sidebar"/);
   });
 
   // The tab is named Threads since w-05ff3d1438; its internal name is still inbox.

@@ -9,8 +9,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { cloudConfigPath, readCloudConfig, readCloudKey, writeCloudKey, cloudKeyPath, cloudAccountConfig, forgetCloudKey } from './config.mjs';
-import { withDeadline, plainAuthError } from '../team/session.mjs';
-import { signInWithGoogle, cancelGoogleSignIn } from '../team/sign-in.mjs';
+import { withDeadline } from '../team/session.mjs';
+import { plainAuthError } from '../team/auth-words.mjs';
+import { signInWithGoogle, cancelGoogleSignIn, sendPasswordReset, waitForTheConfirmationLink } from '../team/sign-in.mjs';
 import { Name } from '../../shared/product-name.mjs';
 
 const CALL_MS = 30_000;
@@ -35,8 +36,14 @@ export async function currentCloudTerms(config) {
  * token of a fresh sign-in, held in memory only: the cloud key is what this
  * Mac keeps, so nothing asks the keychain.
  */
-export function cloudAccountSession({ config, openExternal, log = () => {}, createClient = null }) {
+export function cloudAccountSession({ config, openExternal, log = () => {}, createClient = null, confirmWaitMs = null }) {
   let lastUrl = null;
+  // A reset is one client from the email to the new password: the client that
+  // asked for the link holds the other half of the code the link carries.
+  let resetting = null;
+  // A new account is the same, from the sign-up to its confirmation link.
+  let confirming = null;
+  const returnUrl = () => config.signInReturn || RETURN_URL;
   const client = async () => {
     const make = createClient || (await import('@supabase/supabase-js')).createClient;
     const mem = new Map();
@@ -52,7 +59,7 @@ export function cloudAccountSession({ config, openExternal, log = () => {}, crea
   return {
     async google() {
       const c = await client();
-      await signInWithGoogle({ client: c, openExternal, returnUrl: config.signInReturn || RETURN_URL, log, onUrl: (u) => { lastUrl = u; } });
+      await signInWithGoogle({ client: c, openExternal, returnUrl: returnUrl(), log, onUrl: (u) => { lastUrl = u; } });
       return tokenOf((await c.auth.getSession()).data);
     },
     async email(email, password) {
@@ -63,14 +70,60 @@ export function cloudAccountSession({ config, openExternal, log = () => {}, crea
     // With confirmation on, a new account has no session until its email's
     // link is followed: null, and the page says to check the inbox.
     async signUp({ name, email, password }) {
-      const { data, error } = await (await client()).auth.signUp({
-        email: String(email ?? '').trim(), password: String(password ?? ''),
-        options: { data: { full_name: String(name ?? '').trim() || undefined } },
+      const c = await client();
+      const at = String(email ?? '').trim();
+      const { data, error } = await c.auth.signUp({
+        email: at, password: String(password ?? ''),
+        options: {
+          data: { full_name: String(name ?? '').trim() || undefined },
+          // Named, or the link goes to the database's own site_url, which is
+          // this Mac with no path on it, where nothing is listening.
+          emailRedirectTo: returnUrl(),
+        },
       });
       if (error) throw new Error(plainAuthError(error.message));
-      return data?.session?.access_token ?? null;
+      if (data?.session?.access_token) { confirming = null; return data.session.access_token; }
+      confirming = { client: c, email: at };
+      return null;
     },
-    cancel: () => cancelGoogleSignIn(),
+
+    /** Another copy of the link, for one that never arrived or went astray. */
+    async resend() {
+      if (!confirming) throw new Error('Create the account again to get a new link.');
+      const { error } = await confirming.client.auth.resend({
+        type: 'signup', email: confirming.email, options: { emailRedirectTo: returnUrl() },
+      });
+      if (error) throw new Error(plainAuthError(error.message));
+    },
+
+    /** The access token of a sign-up whose link the browser brings back here. */
+    async confirmation() {
+      if (!confirming) return null;
+      const c = confirming.client;
+      await waitForTheConfirmationLink({ client: c, returnUrl: returnUrl(), log, ...(confirmWaitMs ? { timeoutMs: confirmWaitMs } : {}) });
+      confirming = null;
+      return tokenOf((await c.auth.getSession()).data);
+    },
+    // The reset email's link comes back to the address a Google sign-in comes
+    // back to, so the database had to be told of no new one.
+    async startReset(email) {
+      const c = await client();
+      const { opened } = await sendPasswordReset({ client: c, email, returnUrl: returnUrl(), log });
+      resetting = { client: c, opened };
+    },
+    async waitForReset() {
+      if (!resetting) throw new Error('Ask for the reset email again.');
+      await resetting.opened;
+    },
+    async newPassword(password) {
+      if (!resetting) throw new Error('Ask for the reset email again.');
+      const { error } = await resetting.client.auth.updateUser({ password: String(password ?? '') });
+      if (error) throw new Error(plainAuthError(error.message));
+      const token = tokenOf((await resetting.client.auth.getSession()).data);
+      resetting = null;
+      return token;
+    },
+    cancel: () => { resetting = null; confirming = null; return cancelGoogleSignIn(); },
     reopen: () => (lastUrl ? openExternal(lastUrl) : null),
   };
 }
@@ -82,15 +135,30 @@ export function cloudAccountSession({ config, openExternal, log = () => {}, crea
  * that same sign-in once they do.
  */
 export async function cloudSignIn({ config, session, method, email, password, name, acceptTerms = false, env = process.env, home = os.homedir() }) {
+  // A reset is three presses, and only the last one has an account to open:
+  // send the email, wait for its link, then take the new password.
+  if (method === 'reset' || method === 'reset-wait') {
+    try {
+      if (method === 'reset') { await session.startReset(email); return { ok: true, sent: true }; }
+      await session.waitForReset();
+      return { ok: true, opened: true };
+    } catch (err) {
+      return { ok: false, error: err?.message || String(err), ...(err?.cancelled ? { cancelled: true } : {}) };
+    }
+  }
   let token;
   let agreeing = acceptTerms;
   try {
     if (method === 'google') token = await session.google();
+    else if (method === 'new-password') token = await session.newPassword(password);
     else if (method === 'email') token = await session.email(email, password);
     else if (method === 'sign-up') {
       agreeing = true;
       token = await session.signUp({ name, email, password });
       if (!token) return { ok: true, confirm: true };
+    } else if (method === 'resend') {
+      await session.resend();
+      return { ok: true, confirm: true, sent: true };
     } else if (method === 'agree') {
       token = session.held;
       agreeing = true;
@@ -105,6 +173,19 @@ export async function cloudSignIn({ config, session, method, email, password, na
   if (out.ok) { session.held = null; return out; }
   if (out.error === 'terms' && !agreeing) return { ok: false, needsTerms: true, terms: out.terms ?? null };
   return { ok: false, error: out.message || out.error };
+}
+
+/**
+ * A new account's page says to check the inbox, and this waits behind it for
+ * the link to come back, then finishes the same sign-in, with nothing else to
+ * press. Creating the account is what agrees to the terms, as on the page.
+ */
+export async function waitForEmailConfirmation({ config, session, env = process.env, home = os.homedir() }) {
+  let token;
+  try { token = await session.confirmation(); } catch (err) { return { ok: false, error: err?.message || String(err), ...(err?.cancelled ? { cancelled: true } : {}) }; }
+  if (!token) return { ok: false, error: 'nothing-waiting' };
+  const out = await signInToCloud({ config, acceptedTerms: await currentCloudTerms(config), googleSignIn: async () => token, env, home });
+  return out.ok ? out : { ok: false, error: out.message || out.error };
 }
 
 // `googleSignIn` gives the access token of whichever sign-in the page made.

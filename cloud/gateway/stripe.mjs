@@ -79,14 +79,31 @@ export function stripeClient({ key, webhookSecret, managedPayments = false, fetc
         success_url: successUrl,
         cancel_url: cancelUrl,
         allow_promotion_codes: true,
+        // Adaptive Pricing, on by itself under Managed Payments, otherwise
+        // converts the dollars the plan screen offers into a currency read
+        // from the browser, and a promotion code is then redeemed against the
+        // converted total.
+        adaptive_pricing: { enabled: false },
         ...(managedPayments ? { managed_payments: { enabled: true } } : {}),
       });
       return { id: session.id, url: session.url };
     },
     session: (id) => call('GET', `/v1/checkout/sessions/${encodeURIComponent(id)}`),
     expire: (id) => call('POST', `/v1/checkout/sessions/${encodeURIComponent(id)}/expire`),
-    async billing({ customer, returnUrl }) {
-      return (await call('POST', '/v1/billing_portal/sessions', { customer, return_url: returnUrl })).url;
+    // `switchTo`: open at Stripe's page confirming that change, with its proration shown.
+    async billing({ customer, returnUrl, switchTo = null }) {
+      let flow = {};
+      if (switchTo) {
+        const sub = await call('GET', `/v1/subscriptions/${encodeURIComponent(switchTo.subscription)}`);
+        const item = sub.items?.data?.[0]?.id;
+        if (!item) throw new Error(`Stripe's subscription ${switchTo.subscription} has no item to change`);
+        flow = { flow_data: {
+          type: 'subscription_update_confirm',
+          subscription_update_confirm: { subscription: sub.id, items: [{ id: item, price: await priceOf(switchTo.plan), quantity: 1 }] },
+          after_completion: { type: 'redirect', redirect: { return_url: returnUrl } },
+        } };
+      }
+      return (await call('POST', '/v1/billing_portal/sessions', { customer, return_url: returnUrl, ...flow })).url;
     },
     subscription: (id) => call('GET', `/v1/subscriptions/${encodeURIComponent(id)}`),
     signed: (raw, header, nowMs) => stripeSigned(raw, header, webhookSecret, nowMs),

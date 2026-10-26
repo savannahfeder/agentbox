@@ -17,12 +17,14 @@ import { createRoot } from 'react-dom/client';
 import { GRIPS, Grip, HIDE_CHOICES, cardLines, cardScale, inPoints, tagSays } from '../../../shared/corner-tag.mjs';
 import { NAME } from '../../../shared/product-name.mjs';
 import { Lattice, Move, markMoves } from './lattice';
+import { MoveButton, PlacePicker } from './place';
 import './corner-tag.css';
 
 type Ready = { id: string; title: string; says: string; since?: number; open?: string | null };
 // ready: what is new since you last left the app; before: how many were
 // already waiting then; glass: the Mac draws the glass, so this page draws none.
-type State = { ready: Ready[]; before?: number; working: number; now: number; open?: boolean; scale?: number; glass?: boolean };
+// corner: the one the tray rests in.
+type State = { ready: Ready[]; before?: number; working: number; now: number; open?: boolean; scale?: number; glass?: boolean; corner?: Grip };
 type Part = 'tag' | 'card';
 type Tone = 'light' | 'dark';
 
@@ -46,6 +48,7 @@ type Bridge = {
   dismiss: (id: string) => Promise<unknown>;
   hide: (choice: string) => Promise<unknown>;
   resize: (by: number) => Promise<unknown>;
+  place: (corner: Grip) => Promise<unknown>;
   settings: () => Promise<unknown>;
   menu: () => Promise<unknown>;
 };
@@ -55,8 +58,9 @@ const params = new URLSearchParams(location.search);
 const part: Part = params.get('part') === 'card' ? 'card' : 'tag';
 
 // For pictures and for working on the page without the app: ?demo=ready or
-// ?demo=working, with -open to show the list; ?s= draws it at a screen's scale.
-function demoState(): { state: State; open: boolean } | null {
+// ?demo=working, with -open to show the list; ?s= draws it at a screen's scale;
+// &place=1 opens the list on its four corners.
+function demoState(): { state: State; open: boolean; placing: boolean } | null {
   const demo = params.get('demo');
   if (!demo) return null;
   const now = Date.now();
@@ -67,7 +71,10 @@ function demoState(): { state: State; open: boolean } | null {
   })) : [];
   const scale = Number(params.get('s') ?? 1.1);
   const before = Number(params.get('before') ?? 0);
-  return { state: { ready, before, working: demo.startsWith('ready') ? 20 - n : 20, now, scale }, open: demo.endsWith('-open') };
+  return {
+    state: { ready, before, working: demo.startsWith('ready') ? 20 - n : 20, now, scale, corner: 'br' },
+    open: demo.endsWith('-open'), placing: params.get('place') === '1',
+  };
 }
 const demo = demoState();
 document.documentElement.classList.toggle('ct-demo', !!demo);
@@ -274,8 +281,18 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
 }
 
 /* --------------------------------- the list -------------------------------- */
-function CardBody({ state }: { state: State }) {
+function CardBody({ state, placing, setPlacing }: { state: State; placing: boolean; setPlacing: (on: boolean) => void }) {
   const { lines, more } = cardLines(state.ready, state.now);
+  if (placing) {
+    const says = tagSays({ ready: state.ready.length });
+    const tray = (
+      <span className="ct-tag ct-chip">
+        <Lattice box={10 * cardScale(state.scale ?? 1)} lit={says?.kind === 'ready'} move="none" beat={0} />
+        {says && <span className="ct-count">{says.text}</span>}
+      </span>
+    );
+    return <PlacePicker here={state.corner} tray={tray} onPick={(c) => bridge?.place(c)} onBack={() => setPlacing(false)} />;
+  }
   return (
     <>
       {/* Her pick of five (w-93b3a1a796): the tray counts only these, so the
@@ -327,6 +344,7 @@ function CardBody({ state }: { state: State }) {
             </button>
           </span>
         </span>
+        <MoveButton here={state.corner} onOpen={() => setPlacing(true)} />
         <span className="ct-sep" />
         <button className="ct-off" onClick={() => bridge?.settings()}>Turn off…</button>
       </div>
@@ -336,12 +354,18 @@ function CardBody({ state }: { state: State }) {
 
 function Card({ state }: { state: State }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [placing, setPlacing] = useState(!!demo?.placing);
   useReportSize(ref, 'card', null);
+  useEffect(() => bridge?.onOpen((o) => { if (!o) setPlacing(false); }), []);
+  // Escape steps back from the corners to the list, and shuts the list.
   useEffect(() => {
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') bridge?.toggle(); };
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (placing) setPlacing(false); else bridge?.toggle();
+    };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, []);
+  }, [placing]);
   return (
     <div
       ref={ref}
@@ -350,7 +374,7 @@ function Card({ state }: { state: State }) {
       onPointerEnter={() => bridge?.hover('card', true)}
       onPointerLeave={() => bridge?.hover('card', false)}
     >
-      <CardBody state={state} />
+      <CardBody state={state} placing={placing} setPlacing={setPlacing} />
     </div>
   );
 }

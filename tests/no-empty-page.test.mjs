@@ -63,52 +63,30 @@ describe('a view with nothing in it draws nothing', () => {
   });
 });
 
-describe('the inbox zero page stays up under an overlay', () => {
-  it('does not take a modal into account when deciding the inbox is empty', () => {
-    const line = app.match(/const inboxEmpty = .*/)?.[0];
-    expect(line, 'App.tsx no longer computes inboxEmpty').toBeTruthy();
-    // The regression, exactly: `!modal` back in this condition is her bug back.
-    expect(line).not.toMatch(/modal/);
-    expect(line).toMatch(/view === 'inbox'/);
-    expect(line).toMatch(/inbox\.length === 0/);
+// THE WHOLE-PAGE INBOX ZERO WENT WITH THE LAYOUT WITHOUT A SIDEBAR
+// (w-a1ed0e8b25). The sidebar layout keeps the Inbox's tabs on screen with
+// nothing in them and draws its zero under them (threads/Pages.tsx,
+// InboxClear), so nothing swaps the page out, under a modal or otherwise.
+describe('an empty inbox keeps its page', () => {
+  it('has no whole-page zero to swap in', () => {
+    expect(app).not.toMatch(/const inboxEmpty = /);
+    expect(app).not.toContain('<IdlePage');
+    expect(fs.existsSync(path.join(root, 'renderer/src/components/IdlePage.tsx'))).toBe(false);
   });
 
-  it('draws the idle page, not the list, whenever the inbox is empty', () => {
-    expect(app).toMatch(/\{inboxEmpty \? \(/);
+  it('draws its zero under the tabs, in the list\'s place', () => {
+    expect(app).toMatch(/\(emptyView && !theirRows\.length[\s\S]{0,1400}<InboxClear/);
   });
 
-  // The page has one rule. This guards against a second, modal-gated
-  // condition being reintroduced without a reader.
-  it('leaves nothing gated on the modal any more', () => {
+  it('leaves nothing gated on the modal', () => {
     expect(app).not.toMatch(/const inboxZero = /);
     expect(app).not.toMatch(/gameShowingRef/);
   });
-});
 
-describe('an empty view draws no card either', () => {
-  it('marks the pane bare when there is nothing in it and no search', () => {
-    const line = app.match(/const bareView = [\s\S]*?;\n/)?.[0];
-    expect(line, 'App.tsx no longer computes bareView').toBeTruthy();
-    expect(line).toMatch(/search === null/);
-    expect(line).toMatch(/list\.length === 0/);
-    expect(app).toMatch(/bareView \? ' bare' : ''/);
-  });
-
-  it('takes the fill and the shadow off that pane in a plain theme', () => {
-    const rule = css.match(/\n\.list-pane\.bare \{[^}]*\}/)?.[0];
-    expect(rule, 'styles.css no longer has the bare pane rule').toBeTruthy();
-    expect(rule).toMatch(/background: none;/);
-    expect(rule).toMatch(/box-shadow: none;/);
-  });
-
-  // The skinned pane adds a wash, a hairline and a blur, and it outranks a bare
-  // class, so its twin is written out beside it. A blurred nothing is still a
-  // rectangle you can see the edges of.
-  it('takes the wash, the hairline and the blur off it under a picture', () => {
-    const rule = css.match(/:root\[data-skin\] \.list-pane\.bare \{[^}]*\}/)?.[0];
-    expect(rule, 'styles.css no longer has the skinned bare pane rule').toBeTruthy();
-    expect(rule).toMatch(/background: none;/);
-    expect(rule).toMatch(/border: 0;/);
-    expect(rule).toMatch(/backdrop-filter: none;/);
+  // The sidebar layout's pane never draws a card (workspace-navigation.css), so
+  // an empty one has no card to take away.
+  it('draws no card under an empty view', () => {
+    expect(read('renderer/src/workspace-navigation.css')).toContain(':root .workspace-layout > .body > .list-pane { background: none; border: 0; box-shadow: none; backdrop-filter: none;');
+    expect(css).not.toMatch(/\.list-pane\.bare/);
   });
 });

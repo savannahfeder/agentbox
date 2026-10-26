@@ -13,25 +13,24 @@
 // Measured before the change: `.th-board` was `repeat(4, minmax(0, 1fr))`,
 // which has no floor, and nothing in the app read the window's width at all;
 // the only fold was a CSS rule at 700px that hid the sidebar's words.
+//
+// THE SIDEBAR HALF WENT ON 2026-10-26 (w-a1ed0e8b25): the sidebar is always
+// narrow now, so there is nothing of it to fold, and only the summary folds.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { SIDEBAR_FOLDS_BELOW, SUMMARY_NEEDS, sidebarFits, summaryFits, shownWithRoom, nextWithRoom } from '../renderer/src/room.ts';
+import * as room from '../renderer/src/room.ts';
 
+const { SUMMARY_NEEDS, summaryFits, shownWithRoom, nextWithRoom } = room;
 const read = (p) => fs.readFileSync(new URL(`../renderer/src/${p}`, import.meta.url), 'utf8');
 
-describe('the sidebar folds first', () => {
-  it('folds below its width and not at or above it', () => {
-    expect(sidebarFits(SIDEBAR_FOLDS_BELOW - 1)).toBe(false);
-    expect(sidebarFits(SIDEBAR_FOLDS_BELOW)).toBe(true);
-    expect(sidebarFits(1440)).toBe(true);
-  });
-  it('folds in the window from the report, about 970 points wide', () => {
-    expect(sidebarFits(971)).toBe(false);
+describe('the sidebar has nothing to fold', () => {
+  it('keeps no window width for it', () => {
+    expect(room.sidebarFits).toBeUndefined();
+    expect(room.SIDEBAR_FOLDS_BELOW).toBeUndefined();
   });
 });
 
-describe('the summary folds only when the folded sidebar was not enough', () => {
-  // The summary asks the thread's own pane, so a sidebar you held open counts.
+describe('the summary folds when the thread pane has no room for it', () => {
   it('stays open beside a pane wide enough for it and a readable conversation', () => {
     expect(summaryFits(SUMMARY_NEEDS)).toBe(true);
     expect(summaryFits(SUMMARY_NEEDS - 1)).toBe(false);
@@ -39,14 +38,7 @@ describe('the summary folds only when the folded sidebar was not enough', () => 
   it('leaves at least 520 points of conversation when it is open', () => {
     expect(SUMMARY_NEEDS - 352).toBeGreaterThanOrEqual(520);
   });
-  // The order matters: widening the window must never open the sidebar and
-  // close the summary in the same step. At the width the sidebar comes back,
-  // the pane it leaves (window less the open sidebar's 246 and the frame's 22)
-  // still has room for the summary.
-  it('is never closed by the sidebar coming back', () => {
-    expect(summaryFits(SIDEBAR_FOLDS_BELOW - 246 - 22 - 2)).toBe(true);
-  });
-  it('is closed in the window from the report once the sidebar has folded', () => {
+  it('is closed in the window from the report, beside the narrow sidebar', () => {
     // 971 less the folded sidebar's 82 and the frame's 22.
     expect(summaryFits(971 - 82 - 22)).toBe(false);
   });
@@ -81,9 +73,8 @@ describe('the app is wired to it', () => {
   const app = read('App.tsx');
   const focus = read('components/Focus.tsx');
   const summary = read('threads/Summary.tsx');
-  it('folds the sidebar by the window width, through the one toggle', () => {
-    expect(app).toMatch(/sidebarFits\(/);
-    expect(app).toMatch(/useRoomyToggle\(/);
+  it('no longer folds the sidebar by the window width', () => {
+    expect(app).not.toMatch(/sidebarFits\(|useWindowWidth\(/);
   });
   it('folds the summary by the thread pane width', () => {
     expect(summary).toMatch(/summaryFits\(/);

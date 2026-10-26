@@ -1,28 +1,17 @@
 // WHAT FOLDS WHEN THE WINDOW IS NARROW (w-df42206cea, 2026-10-05).
 //
-// In a window about 970 points wide the sidebar (246) and the summary (352)
-// left a thread's conversation about 360 points. Asked for: the summary closed
-// by default when there is no room, "but you can reopen it", and "maybe better
-// to close left sidebar first". So the sidebar folds to its strip of icons
-// first, everywhere, and the summary folds only when the thread's pane is still
-// too narrow for it after that.
+// The summary closes by default when a thread's pane has no room for it, "but
+// you can reopen it". The sidebar is always narrow, so it has nothing to fold.
 //
 // A FOLD THE APP MADE IS NOT A CHOICE, so it is never remembered: widen the
 // window and what you had comes back. A click while there is no room is
 // honoured at once and is for now only, until the window crosses the line
 // again. A click with room is your choice and is remembered, as before.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
-/** The window width below which the sidebar folds. Chosen so that at this
- *  width, with the sidebar open, a thread's pane still has room for the summary
- *  (1180 less the sidebar's 246 and the frame's 22 is 912, over SUMMARY_NEEDS):
- *  widening the window never opens the sidebar and closes the summary at once. */
-export const SIDEBAR_FOLDS_BELOW = 1180;
-
-/** The summary's widest panel (368, in the Groups layout) and 520 of conversation beside it. */
+/** The summary's widest panel (368) and 520 of conversation beside it. */
 export const SUMMARY_NEEDS = 368 + 520;
 
-export const sidebarFits = (windowWidth: number) => windowWidth >= SIDEBAR_FOLDS_BELOW;
 export const summaryFits = (paneWidth: number) => paneWidth >= SUMMARY_NEEDS;
 
 /** Where the summary is drawn: beside the conversation, over it when opened
@@ -67,15 +56,4 @@ export function useRoomyToggle(fits: boolean, choice: boolean, setChoice: (v: bo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [choice, fits, override, setChoice]);
   return [shown, toggle];
-}
-
-/** The window's inner width, kept current. */
-export function useWindowWidth(): number {
-  const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 1440 : window.innerWidth));
-  useEffect(() => {
-    const on = () => setWidth(window.innerWidth);
-    window.addEventListener('resize', on);
-    return () => window.removeEventListener('resize', on);
-  }, []);
-  return width;
 }

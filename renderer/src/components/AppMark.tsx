@@ -1,25 +1,30 @@
 // THE AGENTBOX MARK: the app's own logo, wherever the app names itself.
 //
-// It is the "On the grid" icon made for the launch film and picked as the full
-// icon, tile and all, over the bare mark (2026-09-26). The same file is the
-// README's icon and the source of the app icon (scripts/make-icon.mjs).
-//
-// It used to be a drawn sunburst that lived inside ProductMark as the default
-// for any project without a picture, which put the app's logo beside every
-// unnamed project. Projects now wear their colour (ProductMark.tsx); this is
-// only ever Agentbox.
+// Nine dots with the top right one lit (picked 2026-10-25). Here it is the dots
+// alone; the dark tile around them belongs to the Mac app icon
+// (renderer/src/assets/agentbox-icon.svg), and drawn in the app it shrank the
+// logo to half its box and sank it into a dark sidebar. The unlit dots take the
+// text colour so they read in every theme. This is only ever Agentbox; projects
+// wear their colour (ProductMark.tsx).
 
-import icon from '../assets/agentbox-icon.svg?url';
+const LIT = '#ee6018';
+const AT = [21, 50, 79];
 
 export function AppMark({ size = 24, title }: { size?: number; title?: string }) {
   return (
-    <img
+    <svg
       className="product-mark app-mark"
-      src={icon}
+      viewBox="10 10 80 80"
       width={size} height={size}
-      alt={title ?? ''}
+      // Inline, because a panel's rule for its own icons would otherwise size it.
+      style={{ width: size, height: size }}
+      role={title ? 'img' : undefined}
+      aria-label={title}
       aria-hidden={title ? undefined : true}
-      draggable={false}
-    />
+    >
+      {AT.map((cy) => AT.map((cx) => (cx === 79 && cy === 21
+        ? <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="10.5" fill={LIT} />
+        : <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="10.5" fill="currentColor" fillOpacity="0.38" />)))}
+    </svg>
   );
 }

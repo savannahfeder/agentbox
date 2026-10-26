@@ -57,10 +57,14 @@ describe('3. a coaching card is two lines, everywhere in the walk', () => {
       // `next` is a yes or no, the look around's button (2026-10-06): it holds
       // no words, so there is still nowhere to put a third line.
       // `alt` is a second key letter and `anyKey` a yes or no (2026-10-06):
-      // neither holds a sentence.
+      // neither holds a sentence. `intoTheBox` is a yes or no too (2026-10-26):
+      // it says a letter typed at the ring opens the box, and says it in no
+      // words at all.
       const fields = ['key', 'lead', 'quiet', 'tail', ...(card.caps ? ['caps'] : []), ...(card.next ? ['next'] : []),
-        ...(card.alt ? ['alt'] : []), ...(card.anyKey ? ['anyKey'] : [])].sort();
+        ...(card.alt ? ['alt'] : []), ...(card.anyKey ? ['anyKey'] : []),
+        ...(card.intoTheBox ? ['intoTheBox'] : [])].sort();
       if (card.alt) expect(card.alt, name).toMatch(/^[A-Z]$/);
+      if ('intoTheBox' in card) expect(card.intoTheBox, name).toBe(true);
       expect(Object.keys(card).sort(), `${name} has a field to hide one in`).toEqual(fields);
       if ('next' in card) expect(card.next, name).toBe(true);
     }
@@ -81,7 +85,7 @@ describe('3. a coaching card is two lines, everywhere in the walk', () => {
     const end = logic.indexOf('THE WORDS OF THE WALK');
     expect(end).toBeGreaterThan(0);
     const helper = logic.slice(logic.indexOf('const say = ('), end);
-    expect(helper).toContain('extra: { caps?: number; next?: boolean; alt?: string; anyKey?: boolean } = {}');
+    expect(helper).toContain('extra: { caps?: number; next?: boolean; alt?: string; anyKey?: boolean; intoTheBox?: boolean } = {}');
     expect(helper).not.toContain('why');
   });
 

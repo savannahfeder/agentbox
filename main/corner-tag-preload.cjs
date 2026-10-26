@@ -49,6 +49,8 @@ contextBridge.exposeInMainWorld('cornerTag', {
   // One notch bigger or smaller, from the list's own foot, so she can see the
   // tag change while she decides.
   resize: (by) => ipcRenderer.invoke('corner-tag:resize', { by }),
+  // 'tl', 'tr', 'bl' or 'br', picked from the list's Place.
+  place: (corner) => ipcRenderer.invoke('corner-tag:place', corner),
   settings: () => ipcRenderer.invoke('corner-tag:settings'),
   menu: () => ipcRenderer.invoke('corner-tag:menu'),
 });

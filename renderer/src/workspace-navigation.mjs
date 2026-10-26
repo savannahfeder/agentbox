@@ -1,13 +1,3 @@
-// THE SIDEBAR IS ALWAYS DRAWN, THE WALK INCLUDED. The walk used to hide the
-// sidebar and drew the old top tab strip instead, so
-// the tutorial taught a layout nobody saw again once it ended. Since
-// w-ec62ab6b38 (2026-09-28) the tutorial runs in the same window people use
-// afterwards, and its tab tour rings the sidebar's own rows. The setup screens
-// before it are full-window and cover the sidebar anyway.
-export function workspaceNavigationShown({ inFullScreen = false, walking = false } = {}) {
-  return true;
-}
-
 // THE LAST TAB'S NAME IS PART OF THE ROUND ON FINISHING (w-581dbc6cc4). The
 // page title must match whatever the sidebar calls it, and "Closed" was not the
 // best word. So the word comes from `done-word.ts`, where the button, the row
@@ -45,8 +35,7 @@ export function workspaceDestinations({ scheduledCount = 0, view = 'inbox', done
 
 // WHAT THE TOP STRIP CARRIES WHILE A SEARCH IS OPEN.
 //
-// In the workspace layout the strip is where an opened task's title and byline
-// are drawn: App.tsx renders `.workspace-task-header` there and Focus.tsx
+// The strip is where an opened task's title and byline are drawn: App.tsx renders `.workspace-task-header` there and Focus.tsx
 // teleports its band into it (`headerTarget`). The search field was tested
 // BEFORE that host, so opening a result took the host off the screen. The band
 // then fell back to drawing inside the pane while the strip kept its 88 point
@@ -59,9 +48,9 @@ export function workspaceDestinations({ scheduledCount = 0, view = 'inbox', done
 // query is untouched, so escape out of the task puts her back on her results
 // with what the user typed still in the box. On the list itself, where the strip has
 // nothing else to carry, nothing changes at all.
-export function searchFieldInStrip({ searching = false, workspaceNavigation = false, focused = false, settingsOpen = false } = {}) {
+export function searchFieldInStrip({ searching = false, focused = false, settingsOpen = false } = {}) {
   if (!searching) return false;
-  return !(workspaceNavigation && focused && !settingsOpen);
+  return !(focused && !settingsOpen);
 }
 
 // THERE IS NO SECTION KEY ANY MORE (w-914b16eab6, 2026-10-02). ⌘1 to ⌘4 went

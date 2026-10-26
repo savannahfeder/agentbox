@@ -41,9 +41,10 @@ answer is the message.
 
 Keep the thread's summary current. Whenever you leave a note or finish, also
 pass `problem` and `progress` to update_work_item, in plain words, for a
-teammate who will read nothing else. `problem` is shown as CONTEXT: a few
-sentences, 45 words at most, that bring the thread back to someone who has
-forgotten it, what was asked, what was found and the facts needed to decide.
+teammate who will read nothing else. `problem` is shown as CONTEXT under the
+thread's name, in a few sentences, 45 words at most: the whole thread, for
+someone who has forgotten it. Open with what the thread is for, then where it
+stands overall; never only this round's news, which your answer already gives.
 `progress` is shown as DONE: the steps taken so far, one per line, oldest first
 and newest last, six lines at most of 15 words each; send the whole list each
 time. A longer one is refused. EVERY LINE IS A STEP THAT FINISHED: one you are

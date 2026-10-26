@@ -300,7 +300,7 @@ describe('what the person is told', () => {
   it('names the plan, its agents and hours, and what is used', async () => {
     const { start, me } = setup();
     await start(1);
-    expect(await me()).toEqual({ plan: 'test', unlimited: false, agents: SET.test.agents, hoursPerMonth: SET.test.hoursPerMonth, running: 1, usedSeconds: 0, month: '2026-10', terms: { accepted: TERMS_VERSION, current: TERMS_VERSION } });
+    expect(await me()).toEqual({ plan: 'test', unlimited: false, agents: SET.test.agents, hoursPerMonth: SET.test.hoursPerMonth, running: 1, usedSeconds: 0, month: '2026-10', billing: 'given', terms: { accepted: TERMS_VERSION, current: TERMS_VERSION } });
   });
 });
 

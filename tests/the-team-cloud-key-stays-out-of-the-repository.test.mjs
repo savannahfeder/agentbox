@@ -31,9 +31,11 @@ describe('the team cloud config', () => {
     expect(ignored('cloud/team.config.json')).toBe(true);
   });
 
-  // Agentbox Cloud's sign-in settings carry the same address and key
-  // (main/cloud/account.mjs), so they stay out too (w-6633e825a7).
-  it('the cloud sign-in settings that carry the same key are never tracked either', () => {
+  // The file that points a copy at another Agentbox Cloud stays on its machine.
+  // The real cloud's public address and key ship in shared/cloud-address.mjs
+  // (2026-10-26), as they already did inside every download; holding them does
+  // not make a copy the team version.
+  it('the file that points a copy at another cloud is never tracked either', () => {
     expect(git('ls-files', 'cloud/cloud.public.json').trim()).toBe('');
     expect(ignored('cloud/cloud.public.json')).toBe(true);
   });

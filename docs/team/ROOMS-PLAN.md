@@ -491,7 +491,10 @@ Rooms and Messages were two places for one idea. They are one, called Groups:
 - The group's options are one button in the top bar: Everyone's threads (the
   board), Invite people, Members, Mute, Leave, New group, Find groups to join.
 - Any group, from anywhere (a mention, Message on someone's page, a join),
-  opens in the Groups tab. A direct record opens in its own view over it.
+  opens in the Groups tab. A direct record opens on the same page as a group
+  (2026-10-26, w-d28f0c6ba8): the Chats list, its chat, and People down the
+  right. Its own thread page, with the "Needs you / name" bar, read as a
+  different app for some people and not others.
 - The Rooms page and the Messages page are no longer drawn; their components
   are still in the tree.
 

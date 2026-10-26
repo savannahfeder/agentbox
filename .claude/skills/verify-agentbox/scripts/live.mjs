@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // A REAL AGENTBOX, UNDER /tmp, THAT A VERIFYING AGENT CAN DRIVE AND THROW AWAY.
 //
-//   node .claude/skills/verify-agentbox/scripts/live.mjs up [--real-claude]
+//   node .claude/skills/verify-agentbox/scripts/live.mjs up [--real-claude] [--alpha teammates,rooms]
 //        [--projects "Payments API,Web app"], and on stand-ins [--logins 1-4] [--no-codex]
 //   ... up --real --cloud: every thread to this Mac's cloud, through a relay of the copy's own
 //   VERIFY_INSTANCE=<name> before any verb: a second copy from the same checkout
@@ -150,6 +150,8 @@ export function copyConfig(state, had = {}) {
     engineChoice: '2026-01-01T00:00:00.000Z',
     maxConcurrentSessions: 2,
     ...(state.teamFile ? { alphaRooms: true } : {}),
+    // `up --alpha teammates,rooms`: features still in testing are off for a new person.
+    ...Object.fromEntries((state.alpha ?? []).map((f) => [`alpha${f[0].toUpperCase()}${f.slice(1)}`, true])),
     ...(state.cloud && !('cloudRuns' in had) ? { cloudRuns: 'all', cloudWhenOn: 'all' } : {}),
   };
 }
@@ -520,7 +522,8 @@ async function up(args) {
     if (missing.length) stop(`no cloud account here is ${missing.join(' or ')}; the cloud menu's Manage lists the ones that are.`);
     cloudAccounts = keys.join(',');
   }
-  const prepared = { ...(await prepare(real, setupName, shape)), teamFile, ...(cloud ? { cloud: true, cloudTmp: cloudTmpFor(INSTANCE), cloudAccounts } : {}) };
+  const alpha = value('alpha');
+  const prepared = { ...(await prepare(real, setupName, shape)), teamFile, ...(alpha ? { alpha: alpha.split(',').map((f) => f.trim()).filter(Boolean) } : {}), ...(cloud ? { cloud: true, cloudTmp: cloudTmpFor(INSTANCE), cloudAccounts } : {}) };
   const next = await start(installed ? { ...prepared, installed: true } : prepared);
   say(installed ? `up: the installed app, pid ${next.pid}, window on debugging port ${next.cdpPort}` : `up: ${next.url}`);
   say(setupName

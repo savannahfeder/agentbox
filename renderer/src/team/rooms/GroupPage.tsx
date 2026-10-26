@@ -25,7 +25,7 @@ export function peopleShown(room: Pick<Room, 'members' | 'wall'>): { cards: Room
 // Where their thread is kept from you, the line they wrote about themselves.
 const onWords = (c: RoomCard) => c.away ? 'Not on Groups yet' : c.agents ? c.workingOn ?? c.bio ?? 'Private thread' : c.status ?? 'Not running';
 
-export function PeoplePanel({ room, onPerson }: { room: Room; onPerson: (id: string) => void }) {
+export function PeoplePanel({ room, onPerson }: { room: Pick<Room, 'members' | 'wall'>; onPerson: (id: string) => void }) {
   const { cards, working, more } = peopleShown(room);
   return <aside className="gr-side">
     <div className="gr-ph"><span className="gr-pt">People</span><span className="gr-pn">{working} of {room.members} working</span></div>

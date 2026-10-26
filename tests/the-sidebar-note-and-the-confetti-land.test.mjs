@@ -130,8 +130,11 @@ describe('the last card asks one thing and the celebration is in her own project
     // still falling. That is the whole difference from the card it came off.
     const rule = css.slice(css.indexOf('\n.fr-landed {'), css.indexOf('}', css.indexOf('\n.fr-landed {')));
     expect(rule).toContain('pointer-events: none');
-    expect(walk).toMatch(/const t = setTimeout\(onGone, LANDED_MS\);/);
-    expect(walk).toMatch(/const on = \(\) => onGone\(\);/);
+    // Through a ref since 2026-10-26, which is what makes the clock and the
+    // listener survive a redraw at all
+    // (tests/the-finished-tutorial-words-take-themselves-down).
+    expect(walk).toMatch(/const t = setTimeout\(\(\) => gone\.current\(\), LANDED_MS\);/);
+    expect(walk).toMatch(/const on = \(\) => gone\.current\(\);/);
   });
 
   it('says the line that is true of the inbox behind it', () => {

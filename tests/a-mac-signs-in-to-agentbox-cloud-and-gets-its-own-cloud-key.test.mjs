@@ -15,6 +15,7 @@ import { createGateway, gatewayServer, memoryObjects } from '../cloud/gateway/ga
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 import { cloudAccountConfig, currentCloudTerms, signInToCloud, signOutOfCloud } from '../main/cloud/account.mjs';
 import { cloudConfigPath, cloudKeyPath, readCloudConfig, readCloudKey } from '../main/cloud/config.mjs';
+import { CLOUD_ADDRESS } from '../shared/cloud-address.mjs';
 
 const P = '66666666-6666-4666-8666-666666666666';
 let home; let server; let gateway; const env = {};
@@ -43,10 +44,10 @@ const config = () => ({ gateway, supabaseUrl: 'https://db.example', anonKey: 'pu
 const googleSignIn = async () => 'google-session';
 
 describe('where the Mac finds Agentbox Cloud', () => {
-  it('is read from the app\'s own folder first, then this Mac, and half a setting is none', () => {
+  it('is read from the app\'s own folder first, then this Mac, then the one that ships, and half a setting is passed over', () => {
     const app = fs.mkdtempSync(path.join(os.tmpdir(), 'cloudapp-'));
     try {
-      expect(cloudAccountConfig(app, { home })).toBe(null);
+      expect(cloudAccountConfig(app, { home })).toEqual(CLOUD_ADDRESS);
       fs.mkdirSync(path.join(home, '.agentbox'), { recursive: true });
       fs.writeFileSync(path.join(home, '.agentbox', 'cloud.public.json'), JSON.stringify({ gateway: 'https://home', supabaseUrl: 'https://db', anonKey: 'k' }));
       expect(cloudAccountConfig(app, { home })?.gateway).toBe('https://home');
@@ -60,19 +61,19 @@ describe('where the Mac finds Agentbox Cloud', () => {
 
   // A downloaded app has no cloud/ folder: scripts/release.mjs bakes the
   // setting into the packaged package.json, as it does the analytics key.
-  it('a release build carries it in its own package.json, and half a setting there is none', () => {
+  it('a release build carries it in its own package.json, and half a setting there is passed over', () => {
     const app = fs.mkdtempSync(path.join(os.tmpdir(), 'cloudapp-'));
     try {
       fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({ name: 'agentbox-app', bakedCloud: { gateway: 'https://baked', supabaseUrl: 'https://db', anonKey: 'k' } }));
       expect(cloudAccountConfig(app, { home })?.gateway).toBe('https://baked');
       fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({ name: 'agentbox-app', bakedCloud: { gateway: 'https://baked' } }));
-      expect(cloudAccountConfig(app, { home })).toBe(null);
+      expect(cloudAccountConfig(app, { home })).toEqual(CLOUD_ADDRESS);
       fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({ name: 'agentbox-app' }));
-      expect(cloudAccountConfig(app, { home })).toBe(null);
+      expect(cloudAccountConfig(app, { home })).toEqual(CLOUD_ADDRESS);
     } finally { fs.rmSync(app, { recursive: true, force: true }); }
   });
 
-  it('the release bakes exactly the three public settings it found, and nothing when it found none', () => {
+  it('the release bakes exactly the three public settings it found', () => {
     const release = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'scripts', 'release.mjs'), 'utf8');
     expect(release).toMatch(/const cloud = cloudAccountConfig\(repo\);/);
     expect(release).toMatch(/if \(cloud\) \{\n\s+for \(const k of \['gateway', 'supabaseUrl', 'anonKey'\]\) args\.push\(`-c\.extraMetadata\.bakedCloud\.\$\{k\}=\$\{cloud\[k\]\}`\);/);

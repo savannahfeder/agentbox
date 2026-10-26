@@ -14,7 +14,7 @@ it('moves the existing band instead of copying its metadata',()=>{
  // the summary is open, and otherwise the band itself, moved, never copied.
  expect(read('components/Focus.tsx')).toMatch(/headerTarget \? createPortal\(barContent, headerTarget\) : bandLine/);
  expect(read('components/Focus.tsx')).toMatch(/:\s*<>\{backButton\}\{bandLine\}<\/>;/);
- expect(read('App.tsx')).toContain('headerTarget={workspaceNavigation ? taskHeader : null}');
+ expect(read('App.tsx')).toContain('headerTarget={taskHeader}');
 });
 it('keeps inline previews out of keyboard focus, leaving document controls available',()=>{
  expect(read('components/Focus.tsx')).toContain('tabIndex={-1}');

@@ -111,18 +111,17 @@ describe('signing and notarisation', () => {
     }
   });
 
-  // The logo is the "On the grid" icon from the launch film, one file that the
-  // app icon, the in-app mark and the README all draw. This is the test that
-  // stops them drifting: a second copy of the logo anywhere fails it. It
-  // replaced a test that pinned the old sunburst's geometry, which the founder
-  // retired (w-a514b58055).
-  it('draws the icon, the mark in the app and the README from one logo file', () => {
+  // The app icon is one file that the Mac icon and the README both draw; this
+  // stops them drifting. The logo inside the app is the dots without the
+  // icon's tile (AppMark.tsx), checked against the icon in
+  // the-logo-is-nine-dots-with-the-top-right-one-lit. It replaced a test that
+  // pinned the old sunburst's geometry, which the founder retired (w-a514b58055).
+  it('draws the app icon and the README from one file', () => {
     const svg = path.join(repo, 'renderer/src/assets/agentbox-icon.svg');
     const icon = fs.readFileSync(path.join(repo, 'scripts/make-icon.mjs'), 'utf8');
     const mark = fs.readFileSync(path.join(repo, 'renderer/src/components/AppMark.tsx'), 'utf8');
 
     expect(icon).toContain("'renderer', 'src', 'assets', 'agentbox-icon.svg'");
-    expect(mark).toContain("'../assets/agentbox-icon.svg?url'");
     expect(fs.readFileSync(svg).equals(fs.readFileSync(path.join(repo, 'docs/readme/icon.svg')))).toBe(true);
     // And the sunburst is drawn nowhere any more.
     expect(icon).not.toMatch(/RAYS/);

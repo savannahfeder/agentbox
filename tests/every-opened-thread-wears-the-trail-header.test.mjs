@@ -20,7 +20,8 @@ const rooms = read('../renderer/src/team/rooms/rooms.css');
 
 describe('the bar over an opened thread', () => {
   it('is the trail whenever the thread was opened from a list, summary or not, document or not', () => {
-    expect(focus).toMatch(/const barContent = crumbFrom\s*\? <><ThreadCrumb /);
+    // A person's chat drawn inside Chats wears the Chats bar instead (a-persons-chat-opened-from-chats-keeps-the-chats-list).
+    expect(focus).toMatch(/const barContent = inChats\s*\?[^;]*?: crumbFrom\s*\? <><ThreadCrumb /);
     expect(focus).not.toContain('summaryOffered && crumbFrom');
   });
   it('is the old band only where nothing says where it was opened from', () => {

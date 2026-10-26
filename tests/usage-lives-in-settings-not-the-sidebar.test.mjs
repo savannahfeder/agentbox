@@ -33,8 +33,9 @@ it('hands the sidebar its usage reading and keeps shortcuts accessible',()=>{
  const app=fs.readFileSync(new URL('../renderer/src/App.tsx',import.meta.url),'utf8');
  const at=/<WorkspaceNavigation[\s>]/.exec(app);
  expect(at).not.toBeNull();
- const nav=app.slice(at.index,app.indexOf('{inFullScreen && !workspaceNavigation ?',at.index));
+ const nav=app.slice(at.index,app.indexOf('{/* THE REACH',at.index));
  expect(nav.length).toBeGreaterThan(100);
+ expect(nav).not.toContain('<header');
  expect(nav).toContain('usage=');
  expect(app).toContain("setSettingsPane('shortcuts')");
 });

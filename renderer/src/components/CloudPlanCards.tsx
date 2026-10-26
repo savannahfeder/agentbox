@@ -1,4 +1,4 @@
-// The cloud's plans as cards side by side: Settings › Cloud and the setup
+// The cloud's plans as cards side by side: Settings › Plan and Billing and the setup
 // screen's first step draw the same three, so a plan looks the same wherever
 // it is chosen.
 import { planCards, usageLine, usedPercent, type PaidPlan } from '../cloud-upgrade';

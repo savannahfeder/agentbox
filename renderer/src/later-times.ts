@@ -14,6 +14,8 @@ export function laterPresets(now = Date.now()): LaterPreset[] {
   const monday = new Date(now);
   monday.setDate(monday.getDate() + ((( 1 - monday.getDay()) + 7) % 7 || 7));
   monday.setHours(8, 0, 0, 0);
+  // On a Sunday the coming Monday is tomorrow, already offered.
+  if (monday.getTime() === tomorrow.getTime()) monday.setDate(monday.getDate() + 7);
   list.push({ label: 'Next week', ts: monday.getTime() });
   return list;
 }

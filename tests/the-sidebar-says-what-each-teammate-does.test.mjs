@@ -27,11 +27,12 @@ describe('a teammate\'s role', () => {
   // list shows each one by its name alone, and the old sidebar rows that put
   // a role after a person's name are gone (round 6).
   it('is the name each teammate goes by in the Chats list', () => {
-    expect(read('ChatsColumn.tsx')).toMatch(/<TeammateMark t=\{t\} \/><span className="cx-n">\{t\.name\}<\/span>/);
+    expect(read('ChatsColumn.tsx')).toMatch(/<TeammateMark t=\{t\} \/><span className="cx-n">\{rowName\(t\)\}<\/span>/);
   });
 
-  it('is drawn with a capital at the top of its page, when it is not already its name', () => {
-    const page = read('TeammatesPage.tsx');
-    expect(page).toMatch(/\{!book && t\.role && <span className="tq-role">\{roleLabel\(t\.role\)\}<\/span>\}/);
+  it('is drawn with a capital at the top of its page, when it is not already its name', async () => {
+    const { titleAside } = await import('../renderer/src/teammates/chat-lines.ts');
+    expect(titleAside('chat', 'video producer')).toBe('Video producer');
+    expect(read('TeammatesPage.tsx')).toMatch(/<span className="tq-role">\{titleAside\(shown\.kind, t\.role, t\)\}<\/span>/);
   });
 });

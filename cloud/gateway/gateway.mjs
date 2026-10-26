@@ -219,6 +219,8 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const plan = planOf(rec);
     return {
       plan: plans[rec.plan] ? rec.plan : 'none', unlimited: !!plan.unlimited, agents: plan.unlimited ? null : plan.agents, hoursPerMonth: plan.hoursPerMonth, running: live(rec, 'run').length, usedSeconds: rec.used[month(t)] || 0, month: month(t),
+      // A plan set by hand has no subscription behind it, so nothing to change or cancel on Stripe.
+      billing: PAYING.has(rec.stripe?.status) ? 'stripe' : plan.agents ? 'given' : null,
       terms: { accepted: rec.terms?.version ?? null, current: termsVersion },
     };
   }
@@ -443,8 +445,16 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const base = hostOf(headers);
     const toBilling = async (customer) => ({ url: await stripe.billing({ customer, returnUrl: `${base}/v1/paid?billing=1` }), where: 'billing' });
     const rec = await recOf(person);
-    // A change of plan is made on the billing page.
-    if (PAYING.has(rec.stripe?.status)) return toBilling(rec.stripe.customer);
+    // A change of plan is confirmed on the billing page, opened at that change.
+    if (PAYING.has(rec.stripe?.status)) {
+      if (rec.plan === plan || !rec.stripe.subscription) return toBilling(rec.stripe.customer);
+      try {
+        return { url: await stripe.billing({ customer: rec.stripe.customer, returnUrl: `${base}/v1/paid?plan=${plan}`, switchTo: { subscription: rec.stripe.subscription, plan } }), where: 'billing' };
+      } catch (err) {
+        log(`switching ${person} to ${plan} on Stripe's page failed, so the billing page opens instead: ${err.message}`);
+        return toBilling(rec.stripe.customer);
+      }
+    }
     // Open, paid or gone: what a checkout this server opened is now.
     const settle = async (open, keep) => {
       if (!open?.id) return null;

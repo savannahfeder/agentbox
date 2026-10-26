@@ -49,13 +49,6 @@ const queue = read('renderer/src/components/OneThingAtATime.tsx');
 // Everything above it belongs to modals, chords and full-screen reading.
 const listSwitch = app.slice(app.indexOf('      switch (e.key) {'));
 
-// The tab row as it is actually written, so a test about what stands IN it
-// cannot be satisfied by something 800 points away in the corner.
-const tabNav = () => {
-  const start = app.indexOf('<nav\n          className="tabs"');
-  return app.slice(start, app.indexOf('</nav>', start));
-};
-
 describe('the row prints the keys it really has', () => {
   // AND LATER IS ON AN INBOX ROW TOO SINCE 2026-10-01. These words are only
   // ever drawn while the tutorial is on (`walkRowKeys` narrows them to the
@@ -238,8 +231,8 @@ describe('only a component that does not already show its key carries a hint', (
     // read too widely and swallowed three BUTTONS, which then showed no
     // shortcut at all on hover.
     const near = (file, anchor) => file.slice(Math.max(0, file.indexOf(anchor) - 320), file.indexOf(anchor) + 320);
-    expect(near(app, 'className="icon-btn tab-search"')).toContain('data-hint="search"');
-    expect(near(app, 'aria-label="Commands"')).toContain('data-hint="commands"');
+    expect(near(pages, 'className="th-search"')).toContain('data-hint="search"');
+    expect(near(pages, 'className="th-new"')).toContain('data-hint="new-task"');
     // What has NOT changed: the four excluded by name still say nothing.
     expect(app + list + focus).not.toMatch(/data-hint="(tick|reply|options|send)"/);
   });
@@ -279,21 +272,11 @@ describe('the plate says the key and what it does, in one fragment', () => {
   });
 });
 
-// THE MAC'S OWN LABEL. The app draws the key itself, so the system label
-// saying it too would be the same fact twice, a second apart, in two hands.
-describe('the Mac’s label names the button and nothing more', () => {
-  it('leaves the Mac’s label naming the button and nothing more', () => {
-    // The key is drawn in the app now, so the system label saying it too would
-    // be the same fact twice, a second apart, in two different hands.
-    expect(app).toContain('title="Search threads"');
-    // w-ec62ab6b38 (2026-09-28): the plus is titled New thread now, not New task.
-    expect(app).toContain('title="New thread"');
-    expect(app).not.toMatch(/title=\{keyHints \? 'Search threads \(\/\)'/);
-    expect(app).not.toMatch(/title=\{keyHints \? 'New (task|thread) \(C\)'/);
-  });
-
-  it('says nothing on the cog, which has no key to say', () => {
-    const cog = app.slice(app.indexOf('title="Settings"') - 200, app.indexOf('title="Settings"') + 200);
+// THE MAC'S OWN LABEL on the corner of the layout without the sidebar named
+// the button and nothing more. That corner went with the layout (w-a1ed0e8b25).
+describe('Settings has no key to say', () => {
+  it('says nothing on the sidebar’s Settings row', () => {
+    const cog = nav1.slice(nav1.indexOf('aria-label="Settings"') - 200, nav1.indexOf('aria-label="Settings"') + 200);
     expect(cog).toContain('title="Settings"');
     expect(cog).not.toContain('data-hint');
   });

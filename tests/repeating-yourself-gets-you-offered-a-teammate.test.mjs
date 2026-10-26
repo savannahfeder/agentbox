@@ -112,6 +112,9 @@ describe('the offer in the store', () => {
     await team.tick({ items: store.listItems(), now });
     const closed = store.listItems().find((i) => i.id === offers[0].id);
     expect(closed.status).toBe('done');
+    // Done, it says what happened: still asking "Want a teammate...?" in Done
+    // today, it read as offered again (power test of 2026-10-25).
+    expect(closed.title).toMatch(/^Made a teammate for things like “.+”$/);
     // And out of Needs you: the second power test found it there, done and counted.
     const { isCleanRun } = await import('../shared/repeats.mjs');
     expect(isCleanRun(closed)).toBe(true);
@@ -122,5 +125,18 @@ describe('the offer in the store', () => {
     // And never offered again.
     await team.tick({ items: store.listItems(), now: now + 3 * 86_400_000 });
     expect(store.listItems().filter((i) => (i.labels ?? []).includes(OFFER_LABEL))).toHaveLength(1);
+  });
+});
+
+// The offer lists each ask with how many times it was asked ("(9 times)"),
+// and the threads behind it are found by those titles when the offer's own
+// record of them is gone.
+describe('the threads behind an answered offer, found by title', () => {
+  it('match an ask listed with its count', async () => {
+    const { Teammates } = await import('../main/teammates.mjs');
+    const team = Object.create(Teammates.prototype);
+    const items = [{ id: 'w-1', product: 'site', title: 'Write the changelog', labels: ['founder'] }];
+    const found = team._threadsBehind({ title: 'x' }, ['- Write the changelog (3 times)'], items, { messages: [] });
+    expect(found.map((t) => t.id)).toEqual(['w-1']);
   });
 });

@@ -16,6 +16,13 @@
 //   it now counts what the filters show. The number she is missing is not lost:
 //   the whole of it is in the sentence, in the one place she is already
 //   looking, and the Display menu's foot still reads "Showing 4 of 7".
+//
+// 2026-10-26: that second half turned main red while the app was right. The
+// check looked for the words `shownCount(progress)`, and In progress had been
+// given its own list, `progressTab`, so that a thread in Needs you is not
+// counted twice; the page and the number moved onto it together. The promise is
+// that the two agree, not what the list is called, so the check now reads the
+// list each tab draws out of `wholeBox` and compares.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -91,7 +98,7 @@ describe('the component that draws it', () => {
   it('is what an emptied tab draws, above the unfiltered empty states', () => {
     // The order matters: the filtered test is read FIRST, so a filter can
     // never fall through to "Nothing needs you".
-    const branch = app.slice(app.indexOf('{workspaceNavigation && emptyView'), app.indexOf('{workspaceNavigation && emptyView') + 1400);
+    const branch = app.slice(app.indexOf('(emptyView && !theirRows.length'), app.indexOf('(emptyView && !theirRows.length') + 1400);
     expect(branch).toContain('<FilteredEmpty');
     expect(branch.indexOf('<FilteredEmpty')).toBeLessThan(branch.indexOf('<InboxClear'));
     expect(branch).toContain('hiddenNow');
@@ -103,10 +110,22 @@ describe('the component that draws it', () => {
 });
 
 describe('the tab numbers', () => {
+  // The list a tab draws is named once, in `wholeBox`, and read from there
+  // rather than written down again, so a tab put on a new list stays checked
+  // instead of going red.
+  const boxForTab = (tab) => {
+    const whole = app.slice(app.indexOf('const wholeBox'), app.indexOf('const shownBox'));
+    // `done` is the last arm of the chain and so is not named in it.
+    const arm = tab === 'done' ? /:\s*(\w+);/.exec(whole) : new RegExp(`view === '${tab}' \\? (\\w+)`).exec(whole);
+    return arm?.[1];
+  };
+
   it('count what the filters show, so the number matches the list under it', () => {
     const counts = app.slice(app.indexOf('counts={{'), app.indexOf('counts={{') + 600);
     for (const tab of ['inbox', 'progress', 'snoozed', 'done']) {
-      expect(counts).toContain(`shownCount(${tab})`);
+      const box = boxForTab(tab);
+      expect(box).toBeTruthy();
+      expect(counts).toContain(`${tab}: (mineShown ? shownCount(${box})`);
     }
   });
 

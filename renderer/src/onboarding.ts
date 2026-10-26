@@ -309,6 +309,19 @@ export function setupStepCount(run: { step: Step; tutorial?: boolean } | null): 
   return BEAT[run.step] ?? null;
 }
 
+/**
+ * WHICH ROW THE MOUSE MAY LIGHT. A row lights under the pointer, and the
+ *  pointer does not have to move for that: a card drawn under a mouse standing
+ *  still fires mouseenter on whatever row lands beneath it. The plan card and
+ *  the folder card put a row in the same place, so arriving on the folder
+ *  screen lit "I do not have one, skip for now", Return hint and all, under a
+ *  mouse nobody had touched since the last press. `moved` is whether the
+ *  pointer has moved since this screen was drawn; until it has, the lit row is
+ *  whatever the keyboard made it, which on arrival is none. */
+export function hoverLit(lit: number, row: number, moved: boolean): number {
+  return moved ? row : lit;
+}
+
 export type Event =
   | { t: 'start' }
   | { t: 'folder'; path: string }
@@ -1513,6 +1526,11 @@ export interface Coach {
    * commands like making a new project in tutorial. it should just respond with
    * any key to moving to the next step". Only the ⌘K list's half has it. */
   anyKey?: boolean;
+  /**
+   * THE RING IS ROUND A BOX WITH NO CARET IN IT, so a letter typed here is the
+   * start of a reply rather than a shortcut (`typedAtTheBox`). Only the beat
+   * that asks for one has it. */
+  intoTheBox?: boolean;
   /* * AND THERE IS NO `why` ANY MORE, WHICH IS THE TWO-LINE BUDGET (w-9a6ea066d6,
      2026-08-28). Four beats carried a third sentence under a hairline rule saying why the
      beat mattered.
@@ -1528,7 +1546,7 @@ export interface Coach {
 
 const say = (
   quiet: string, lead: string, key: string | null = null, tail = '',
-  extra: { caps?: number; next?: boolean; alt?: string; anyKey?: boolean } = {},
+  extra: { caps?: number; next?: boolean; alt?: string; anyKey?: boolean; intoTheBox?: boolean } = {},
 ): Coach => ({ quiet, lead, key, tail, ...extra });
 
 /**
@@ -1639,6 +1657,8 @@ export function coach(
     replies?: number;
     /** Whether the reply box is open, for the answer beat's second half. */
     replying?: boolean;
+    /** Whether the words in that box are theirs, typed at the ring. */
+    wrote?: boolean;
   } = {},
 ): Coach | null {
   switch (step) {
@@ -1764,12 +1784,20 @@ export function coach(
         // just adds R to the input field rather than actually moving to the
         // next step." Now the card says what the open box is waiting for.
         : ctx.replying
-        ? say('Your reply is written for you.', 'Press ', '⌘↵', ' or click Send to ask for it.')
+        // AND IT ONLY CLAIMS THE REPLY WHEN THE REPLY IS OURS (F-70). A box
+        // opened by typing has their own words in it, so the quiet line goes
+        // back to the one the beat opened with rather than telling somebody
+        // looking at their own sentence that it was written for them.
+        ? say(ctx.wrote ? 'Your agent finished, and offers to make it shorter.' : 'Your reply is written for you.',
+          'Press ', '⌘↵', ' or click Send to ask for it.')
         // R IS THE APP'S REPLY KEY, AND IT IS THE CAP (2026-10-06), hers: "it's
         // actually R to reply". E rides as the beat's second key, so pressing
         // it is still taken, and the box writes the reply in for her when it
         // opens (App.tsx, PRACTICE_REPLY).
-        : say('Your agent finished, and offers to make it shorter.', 'Press ', 'R', ' or click the reply box to ask for that, or E to mark it done.', { alt: 'E' });
+        // AND TYPING AT THE BOX OPENS IT (2026-10-26, F-70). The box glows and
+        // the card points at it, so somebody types; the box has no caret, so
+        // the letters went to the list instead. `intoTheBox` is that rule.
+        : say('Your agent finished, and offers to make it shorter.', 'Press ', 'R', ' or click the reply box to ask for that, or E to mark it done.', { alt: 'E', intoTheBox: true });
     // THE THREE ARE EXAMPLES AND THE CARD HAS TO SAY SO.
     //
     // The old line was 'Three of these are waiting on you.' over 'Clear them.
@@ -2390,6 +2418,38 @@ export function swallowPress(
   return keyToken(e) !== NEVER_SWALLOWED;
 }
 
+/* ----------------- AND A LETTER TYPED AT A GLOWING BOX --------------------- */
+/* A ring round a reply box invites typing, and the box has no caret in it
+   until something opens it, so the letters went to the list as keys: an "e"
+   marked the thread done and an "l" snoozed the next row (F-70).
+
+   SWALLOWING THEM IS NOT AN ANSWER EITHER — a glow that invites typing and
+   then eats it is a dead screen. The letter opens the box, which is what R
+   does, and the card's next sentence is already written for an open box. The
+   letter itself is not typed into it: the box opens with the reply already
+   written (App.tsx, PRACTICE_REPLY).
+
+   THE TWO KEYS THE CARD NAMES ARE NOT TOUCHED. R opens the box already, and E
+   marks the thread done, which the card offers out loud. */
+
+/**
+ * Whether this press is somebody typing at a box the ring is round rather than
+ *  pressing a key at the walk. Pure, like `swallowPress` beside it. */
+export function typedAtTheBox(
+  say: Pick<Coach, 'key' | 'alt' | 'intoTheBox'>,
+  e: { key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean },
+  target: EventTarget | null,
+): boolean {
+  if (!say.intoTheBox) return false;
+  // A caret already somewhere takes its own keys, the rule every other press
+  // in this file keeps.
+  if (!pressCounts(target)) return false;
+  const token = keyToken(e);
+  if (token === null) return false;
+  if (token === say.key || (!!say.alt && token === say.alt)) return false;
+  return /^[A-Z0-9]$/.test(token);
+}
+
 /* -------------- AND A CLICK ON WHAT THE BEAT IS NOT ABOUT ------------------ */
 /* * A TESTER WANDERED, AND WAS NOT LOST.
 
@@ -2614,10 +2674,9 @@ export const ANCHOR: Partial<Record<Step, string[]>> = {
   // ring follows the press from the button to the menu without the beat having
   // to know which half it is on.
   board: ['.th-pop', '.th-right .th-disp'],
-  // THE PALETTE FIRST, THEN THE KEY THAT OPENS IT. Same order-of-preference
-  // shape as `snooze` and `unblock` above: the thing that is only on the screen
-  // part of the time wins while it is there. Before this the only anchor was
-  // the ⌘ button in the corner, which sits OUTSIDE the palette, so the walk
+  // THE PALETTE. The ⌘ button that stood in the corner after it went with the
+  // layout without the sidebar (w-a1ed0e8b25). Before the palette was here the
+  // only anchor was that button, which sits OUTSIDE the palette, so the walk
   // went silent the moment the palette opened and the beat that teaches ⌘K had
   // no words on the one screen it is for. See `command` in `coach` for the
   // photograph.
@@ -2628,7 +2687,7 @@ export const ANCHOR: Partial<Record<Step, string[]>> = {
   // children is the height of everything in it rather than the height of what
   // is on show. The modal's own children are the field and the list box, both
   // of which end where the screen ends.
-  command: ['.modal.palette', 'button[aria-label="Commands"]'],
+  command: ['.modal.palette'],
 };
 
 /**
@@ -2810,6 +2869,23 @@ export const NEAR_RIGHT = 220;
  * Room one line of the sentence needs: the flip test at the bottom edge uses
  *  it, and so does the probe that keeps the sentence off other people's text. */
 export const LINE_H = 22;
+/**
+ * THE NARROWEST A CARD BESIDE ITS RING MAY BE, and the air it keeps at the
+ *  window's edge. A card placed beside a ring is given a left and no right, so
+ *  what it really gets is whatever is left of the window. Beside the reply box,
+ *  which is as wide as its pane, that was 74px in the shot a tester sent on
+ *  2026-10-25, and the card came out a 100px strip of two-word lines. Under
+ *  this much room it goes back above or below its ring, where there is a whole
+ *  pane to be read in. */
+export const BESIDE_MIN = 200;
+export const BESIDE_MARGIN = 24;
+
+/**
+ * Whether a card starting at `left` has room to be read beside its ring.
+ *  Pure, like `ring`, so the one number that decides it is tested. */
+export function fitsBeside(left: number, view: { w: number }): boolean {
+  return view.w - left - BESIDE_MARGIN >= BESIDE_MIN;
+}
 
 /**
  * Draw the ring and place the sentence. Pure, so the geometry is tested rather

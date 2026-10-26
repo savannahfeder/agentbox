@@ -48,13 +48,14 @@ describe('the menu', () => {
     expect(top).toContain('aria-label="Search settings"');
   });
 
-  it('is headed Personal, Agents and Workspace', () => {
-    expect(settings).toContain("(['Personal', 'Agents', 'Workspace'] as const)");
+  // Billing joined last on 2026-10-25 (w-893c5fe268).
+  it('is headed Personal, Agents, Workspace and Billing', () => {
+    expect(settings).toContain("(['Personal', 'Agents', 'Workspace', 'Billing'] as const)");
   });
 
   it('shows the search results in place of the menu while there are words in the box', () => {
     const nav = settings.slice(settings.indexOf('<div className="set-nav-scroll">'), settings.indexOf('<div className="set-pane"'));
-    expect(nav.indexOf('{query.trim() ? (')).toBeLessThan(nav.indexOf("(['Personal', 'Agents', 'Workspace']"));
+    expect(nav.indexOf('{query.trim() ? (')).toBeLessThan(nav.indexOf("(['Personal', 'Agents', 'Workspace', 'Billing']"));
   });
 
   it('empties the search on Escape before it leaves Settings', () => {

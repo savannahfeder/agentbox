@@ -2,15 +2,11 @@
 //
 //   npm run icon              rasterise the Agentbox icon and install it as build/icon.icns
 //
-// THE ICON IS renderer/src/assets/agentbox-icon.svg, the "On the grid" icon made
-// for the launch film and picked as the full icon, tile and all (2026-09-26).
-// It is the same file AppMark draws in the app and the README shows, so the
-// three cannot drift. It is already a finished macOS icon: a 1024 canvas, the
-// art inset to Apple's 824, the corner a real superellipse, its own contact
-// shadow. So this script only rasterises it; it draws nothing of its own.
-//
-// It replaced the drawn sunburst this script used to generate, which was the
-// app's mark until the founder retired it.
+// THE ICON IS renderer/src/assets/agentbox-icon.svg, the same file AppMark draws
+// in the app and the README shows, so the three cannot drift. It is already a
+// finished macOS icon: a 1024 canvas, the art inset to Apple's 824, the corner
+// a real superellipse, its own contact shadow. So this script only rasterises
+// it; it draws nothing of its own.
 //
 // WHY THIS IS A SCRIPT AND NOT A PNG SOMEBODY EXPORTED. A macOS icon is one
 // drawing at ten sizes, and the .icns has to be rebuilt whenever the drawing
@@ -20,6 +16,11 @@
 // protocol was broken on this machine as of 2026-08-20 (it never opened a page
 // target). Electron is already a dependency, it is the same renderer the app
 // itself draws with, and `capturePage` needs none of that.
+//
+// `npm run icon` passes --force-color-profile=srgb. Without it the capture
+// carries the display's colour profile and the logo's orange #ee6018 comes out
+// #df6b23. It has to be on the command line: set from inside the script it
+// lands too late and changes nothing.
 
 import { app, BrowserWindow } from 'electron';
 import fs from 'node:fs';

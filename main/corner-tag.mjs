@@ -37,7 +37,7 @@
 // is, so it hands over what is ready and how many are working on
 // `zero:corner-tag`; shared/corner-tag.mjs puts it newest first.
 
-import { cardPlacement, cornerPlace, heightFromDrag, EDGE_SLACK, hiddenUntil, keepCorner, newSince, notDismissed, readyNow, restingSpot, spotFor, tagScaleOn, tagShows, tagZoom, zoomFor, zoomStep, GRIPS, HIDE_CHOICES } from '../shared/corner-tag.mjs';
+import { cardPlacement, cornerPlace, heightFromDrag, EDGE_SLACK, MARGIN, hiddenUntil, keepCorner, newSince, notDismissed, readyNow, restingSpot, spotFor, tagScaleOn, tagShows, tagZoom, zoomFor, zoomStep, GRIPS, HIDE_CHOICES } from '../shared/corner-tag.mjs';
 
 // How long the pointer may be off both the tag and its list before the list
 // shuts: long enough to cross the gap between them, short enough to feel like
@@ -66,7 +66,7 @@ const HIDE_LABELS = { '5m': 'Hide for 5 minutes', '30m': 'Hide for 30 minutes', 
 const CHANNELS = [
   'zero:corner-tag', 'corner-tag:ready', 'corner-tag:size', 'corner-tag:hover', 'corner-tag:toggle',
   'corner-tag:press', 'corner-tag:release', 'corner-tag:go', 'corner-tag:hide', 'corner-tag:settings', 'corner-tag:menu',
-  'corner-tag:clickable', 'corner-tag:resize', 'corner-tag:dismiss',
+  'corner-tag:clickable', 'corner-tag:resize', 'corner-tag:dismiss', 'corner-tag:place',
 ];
 
 export function createCornerTag({
@@ -161,7 +161,9 @@ export function createCornerTag({
   const scaleNow = () => tagScaleOn((tag ? areaOf(tag) : areas()[0] ?? { width: 0 }).width, zoom);
   const sendState = () => {
     const shown = fresh();
-    const s = { ready: shown, before: Math.max(0, ready.length - shown.length), working, now: now(), open, scale: scaleNow(), glass: !!glass };
+    // corner: the one it rests in, so the list's Place can say "Here now".
+    const corner = tag ? cornerPlace(tag, framed(areaOf(tag))).corner : 'br';
+    const s = { ready: shown, before: Math.max(0, ready.length - shown.length), working, now: now(), open, scale: scaleNow(), glass: !!glass, corner };
     send('tag', 'corner-tag:state', s);
     send('card', 'corner-tag:state', s);
   };
@@ -322,6 +324,8 @@ export function createCornerTag({
     hovered.card = false;
     if (alive('card') && wins.card.isVisible()) wins.card.hide();
     send('tag', 'corner-tag:open', false);
+    // The list goes back to its threads, so it never reopens on the corners.
+    send('card', 'corner-tag:open', false);
   }
 
   const showCard = () => {
@@ -723,6 +727,19 @@ export function createCornerTag({
   ipcMain.handle('corner-tag:resize', (_e, p) => {
     const by = Number(p?.by) < 0 ? -1 : 1;
     setZoom(zoomStep(zoom, by));
+    return null;
+  });
+
+  // A corner picked from the list's Place: the usual gap in, on the screen
+  // it is on now, remembered the way a drag is. The list shuts because it
+  // was left behind in the old corner.
+  ipcMain.handle('corner-tag:place', (_e, corner) => {
+    if (!GRIPS.includes(corner) || !tag || press) return null;
+    place = { corner, dx: MARGIN, dy: MARGIN };
+    placeTag();
+    saveConfig(config, { cornerTagSpot: { x: Math.round(tag.x), y: Math.round(tag.y) }, cornerTagPlace: place });
+    closeCard();
+    sendState();
     return null;
   });
 

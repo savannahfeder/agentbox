@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   DAY_NAMES, foldRepeats, isOwed, isRepeatRule, occurrenceId, periodKey, repeatLabel,
-  standingInstruction,
+  standingInstruction, PROTOCOL_OPENS, INSTRUCTION_MARK,
 } from '../shared/repeats.mjs';
 import { machineryPath } from './store/home.mjs';
 import { NAME } from '../shared/product-name.mjs';
@@ -42,8 +42,8 @@ const MISSES_BEFORE_ALERT = 3;
 // last can be truncated away entirely, and a worker that never saw it cannot
 // know that a quiet finish has to be marked.
 export const OCCURRENCE_PROTOCOL = [
-  'THIS IS ONE RUN OF A REPEATING TASK. It runs again tomorrow whatever happens',
-  'here, so this run does not have to carry the future.',
+  `${PROTOCOL_OPENS} It runs again at its next time whatever`,
+  'happens here, so this run does not have to carry the future.',
   '',
   'FINISH ONE OF TWO WAYS.',
   '',
@@ -66,7 +66,7 @@ export const OCCURRENCE_PROTOCOL = [
   'reaches no later run: this body is a copy, and every run gets a new task',
   'folder. Never ask them to go and edit the task by hand.',
   '',
-  'HER INSTRUCTION FOLLOWS.',
+  INSTRUCTION_MARK,
 ].join('\n');
 
 export class Repeats {

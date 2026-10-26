@@ -4,7 +4,6 @@ import type { TeamState, View } from '../types';
 import { Face } from '../team/people';
 import { Name } from '../../../shared/product-name.mjs';
 import { SidebarIcon } from './SidebarIcon';
-import { SidebarToggleIcon } from './SidebarToggleIcon';
 import { AppMark } from './AppMark';
 import { SidebarMove, SidebarUpdate } from './SidebarUpdate';
 import { changeLines, closedHere, readMoveClosed, readUpdateClosed, writeMoveClosed, writeUpdateClosed } from '../update-row';
@@ -41,14 +40,14 @@ import type { Invisible } from '../team/rooms/GoInvisible';
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, onSignIn, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove, invisible = null, inboxLabel = 'Threads', rail = false, onHover, groups = null, onGroupsPage = false, teammates = null, onTeammatesPage = false }: {
-  /** Each teammate's row under Groups (renderer/src/teammates), and whether one of their pages is up. */
-  teammates?: ReactNode; onTeammatesPage?: boolean;
+export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, onAccount, onSignIn, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove, invisible = null, inboxLabel = 'Threads', rail = false, onHover, groups = null, onGroupsPage = false, onTeammatesPage = false }: {
+  /** Whether one of the teammates' pages is up, which unlights Threads. */
+  onTeammatesPage?: boolean;
   /** The first row's name: Threads, or Inbox while its page holds groups too. */
   inboxLabel?: string;
-  /** With Groups on (w-dcaa2c122e): narrow, wide only while pointed at, with no way to pin it open. */
+  /** Narrow, and wide only while pointed at, with no way to pin it open (w-dcaa2c122e). False on a phone. */
   rail?: boolean; onHover?: (on: boolean) => void;
-  /** Groups' rows under Inbox, and whether a group is the page, which unlights Inbox. */
+  /** The row under the first one, Groups or Chats, and whether a group is the page, which unlights it. */
   groups?: ReactNode; onGroupsPage?: boolean;
   // ROOMS (alpha): going invisible from your account menu.
   invisible?: Invisible | null;
@@ -77,7 +76,8 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   team?: TeamState | null; onInvite?: () => void; onAccount?: () => void; onSignIn?: () => void; onFeedback?: () => void;
   // The last row of your account menu.
   onSignOut?: () => void;
-  view: View; collapsed: boolean; onToggle: () => void; onView: (view: View) => void; onSearch: () => void; onCompose: () => void;
+  // `collapsed` is true while the sidebar is narrow, which is always on a phone.
+  view: View; collapsed: boolean; onView: (view: View) => void; onSearch: () => void; onCompose: () => void;
 }) {
   // The Team page is a page like Settings: while it is up no list tab is lit.
   const page = pageIn ?? (teamPage ? 'team' : null);
@@ -118,7 +118,7 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
   // it wears the Agentbox icon rather than a letter A.
   const mark = team?.team?.name
     ? <span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span>
-    : <span className="th-mark th-mark-app" aria-hidden="true"><AppMark size={20} /></span>;
+    : <span className="th-mark th-mark-app" aria-hidden="true"><AppMark size={12} /></span>;
   // THE BOTTOM-LEFT CORNER, AND IT IS NULL WHEN THERE IS NOBODY TO PUT IN IT.
   //
   // YOUR OWN ROW IS ONE BUTTON, face, name and email, and it opens your account
@@ -144,20 +144,8 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
       ? <button type="button" className="th-me-signin" aria-label="Sign in to your team" onClick={onTeam}>Sign in to your team</button>
       : null;
   return <aside className={`workspace-navigation${rail ? ' gt-rail-nav' : ''}`} aria-label="Workspace" {...hover}>
-    {/* THE TOGGLE SITS BESIDE THE TEAM'S NAME, at the top, where sidebars keep
-        it (2026-10-01). Collapsed, the mark itself is the way back
-        open, and shows the sidebar icon under the pointer. */}
     <div className="th-team" title={collapsed ? undefined : teamName}>
-      {rail ? <>{mark}<span className="th-team-name">{teamName}</span></> : collapsed ? (
-        <button type="button" className="workspace-toggle th-mark-btn" data-hint="sidebar" aria-label="Expand sidebar" title="Expand sidebar" onClick={onToggle}>
-          {mark}
-          <span className="th-mark-open" aria-hidden="true"><SidebarToggleIcon collapsed /></span>
-        </button>
-      ) : <>
-        {mark}
-        <span className="th-team-name">{teamName}</span>
-        <button type="button" className="workspace-toggle th-toggle" data-hint="sidebar" data-hint-align="right" aria-label="Collapse sidebar" title="Collapse sidebar" onClick={onToggle}><SidebarToggleIcon collapsed={false} /></button>
-      </>}
+      {mark}<span className="th-team-name">{teamName}</span>
     </div>
     <nav className="workspace-tabs" aria-label="Threads">
       <button data-tab="inbox" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label={inboxLabel} aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `${inboxLabel} · ${waitingDescription}` : collapsed ? inboxLabel : undefined} onClick={() => onView('inbox')}><SidebarIcon view="inbox" /><span>{inboxLabel}</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
@@ -167,7 +155,6 @@ export function WorkspaceNavigation({ view, collapsed, onToggle, onView, onSearc
           it. `onTeam` is still the sign-in link at the foot. */}
     </nav>
     {groups}
-    {teammates}
     <div className="workspace-bottom">
       {/* The card sits above the foot list; with the sidebar shut it is a
           row inside it (SidebarUpdate.tsx). */}

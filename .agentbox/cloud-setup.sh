@@ -9,5 +9,7 @@ command -v xvfb-run >/dev/null 2>&1 || {
   sudo apt-get update -qq
   sudo apt-get install -y -qq xvfb xauth libgtk-3-0 libnss3 libasound2
 }
-# ffmpeg and Inter: the launch-film work cuts video, mixes sound and draws mockup text on cloud runs.
-command -v ffmpeg >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-inter; }
+# ffmpeg: design rounds film a flow drawn over the real app, and the launch-film work cuts video and mixes sound.
+command -v ffmpeg >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
+# Inter: the launch-film work draws mockup text in it.
+fc-list 2>/dev/null | grep -qi "Inter" || { sudo apt-get update -qq && sudo apt-get install -y -qq fonts-inter; }

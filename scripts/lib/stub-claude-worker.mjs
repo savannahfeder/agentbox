@@ -118,15 +118,29 @@ if (streamInput) {
   while (!firstUserLine && !stdinEnded && Date.now() < until) await wait(20);
 }
 
+function mcpServers() {
+  const at = argv.indexOf('--mcp-config');
+  if (at < 0) return {};
+  const raw = argv[at + 1] ?? '';
+  try { return JSON.parse(raw.trim().startsWith('{') ? raw : fs.readFileSync(raw, 'utf8')).mcpServers ?? {}; } catch { return {}; }
+}
+
 /** The approvals server Agentbox wrote into this worker's --mcp-config, spoken to
  *  exactly the way Claude Code speaks to it: MCP over the child's stdio. */
 async function askTheFounder({ tool_name: toolName, input }) {
-  const at = argv.indexOf('--mcp-config');
-  if (at < 0) throw new Error('no --mcp-config was passed, so there is no approvals channel to use');
-  const config = JSON.parse(fs.readFileSync(argv[at + 1], 'utf8'));
-  const server = config.mcpServers?.['zero-approvals'];
+  if (argv.indexOf('--mcp-config') < 0) throw new Error('no --mcp-config was passed, so there is no approvals channel to use');
+  const server = mcpServers()['zero-approvals'];
   if (!server) throw new Error('the mcp config Agentbox wrote has no zero-approvals server in it');
+  const session = mcpSession(server);
+  const answer = await session.call('approval_prompt', { tool_name: toolName, input });
+  session.close();
+  // The server answers with the decision as JSON text inside the MCP result,
+  // which is the shape Claude Code's --permission-prompt-tool contract expects.
+  const text = answer?.result?.content?.[0]?.text ?? '{}';
+  try { return JSON.parse(text); } catch { return { behavior: 'deny', message: `unreadable answer: ${text}` }; }
+}
 
+function mcpSession(server) {
   const child = spawn(server.command, server.args ?? [], {
     env: { ...process.env, ...(server.env ?? {}) },
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -150,16 +164,49 @@ async function askTheFounder({ tool_name: toolName, input }) {
   const call = (method, params) => new Promise((resolve) => {
     const id = nextId++;
     waiting.set(id, resolve);
+    setTimeout(() => { if (waiting.delete(id)) resolve({ error: { message: `${method} had no answer in 20 s` } }); }, 20_000).unref();
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
   });
 
-  await call('initialize', { protocolVersion: '2024-11-05', clientInfo: { name: 'agentbox-proof-stub', version: '1.0.0' }, capabilities: {} });
-  const answer = await call('tools/call', { name: 'approval_prompt', arguments: { tool_name: toolName, input } });
-  try { child.kill(); } catch { /* done with it */ }
-  // The server answers with the decision as JSON text inside the MCP result,
-  // which is the shape Claude Code's --permission-prompt-tool contract expects.
-  const text = answer?.result?.content?.[0]?.text ?? '{}';
-  try { return JSON.parse(text); } catch { return { behavior: 'deny', message: `unreadable answer: ${text}` }; }
+  const ready = call('initialize', { protocolVersion: '2024-11-05', clientInfo: { name: 'agentbox-proof-stub', version: '1.0.0' }, capabilities: {} });
+  return {
+    call: async (name, args) => { await ready; return call('tools/call', { name, arguments: args }); },
+    close: () => { try { child.kill(); } catch { /* done with it */ } },
+  };
+}
+
+// A TEAMMATE'S RUN, PLAYED, through the store server a real run is given:
+// it asks its setup question, sets itself up once answered, and otherwise
+// answers in the chat. Without it no teammate on stand-ins ever finished setup.
+const ROLES = [[/\b(ci|tests?|flaky|bugs?|qa|quality)\b/i, 'Quality lead'], [/\b(api|backend|endpoints?|server|deploys?|infra)\b/i, 'Engineering lead'],
+  [/\b(investors?|fundrais\w*|raise)\b/i, 'Fundraiser'], [/\b(support|customers?|tickets?)\b/i, 'Support lead'], [/\b(summar\w*|changelog|digest|shipped)\b/i, 'Release notes lead'],
+  [/\b(marketing|posts?|tweets?|videos?|launch)\b/i, 'Marketing lead'], [/\b(growth|signups?|metrics?)\b/i, 'Growth lead']];
+async function actAsTeammate(brief, prompt, answer) {
+  const server = Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && s?.env?.STORE_ACCOUNT_ID)?.[1];
+  if (!server) return;
+  const session = mcpSession(server);
+  const text = (r) => r?.result?.content?.[0]?.text ?? '';
+  const failed = (r) => !!(r?.error || r?.result?.isError);
+  try {
+    if (brief.includes('You are a new teammate, still being set up.')) {
+      let you = null;
+      try { you = JSON.parse(text(await session.call('team_roster', {}))).you; } catch { /* named from the ask */ }
+      const name = you && you !== 'New teammate' ? you : ROLES.find(([re]) => re.test(prompt.split('\n').filter((l) => !/^(#|Title:)/.test(l)).join('\n')))?.[1] ?? 'Operations lead';
+      const fields = {
+        role: name, job: `Looks after ${name.toLowerCase().replace(/ lead$/, '')} for you, and brings you what needs a decision.`,
+        goal: 'Nothing in its area waits on you without a reason', asksFirst: 'Anything that goes out in public or costs money',
+        duties: [{ what: 'Look over what changed today', every: 'weekday', at: ['10:00'] }],
+      };
+      let named = await session.call('team_setup', { ...fields, name });
+      if (failed(named) && /taken/.test(text(named))) named = await session.call('team_setup', { ...fields, name: `${name} 2` });
+      const go = await session.call('team_setup', { ready: true });
+      if (failed(go)) await session.call('team_post', { text: 'Before I start: should I bring you everything I find, or only what needs a decision?', options: ['Everything', 'Only decisions'] });
+      return;
+    }
+    await session.call('team_post', { text: answer });
+  } finally {
+    session.close();
+  }
 }
 
 let said = plan.say ?? 'the stub worker ran';
@@ -236,6 +283,8 @@ if (slow > 0) {
 }
 
 try {
+  const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
+  if (brief.includes('team_post') && process.env.ZERO_ITEM) await actAsTeammate(brief, promptText, said);
   if (plan.approval) {
     const decision = await askTheFounder(plan.approval);
     say({ type: 'assistant', message: { content: [{ type: 'text', text: `the founder said: ${decision.behavior}` }] } });

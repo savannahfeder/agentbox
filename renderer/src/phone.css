@@ -419,6 +419,9 @@
   /* The name used to be drawn here, on the backdrop, where a tap on it
      closed the page. */
   :root:root:root .tc-veil::after { content: none; }
+  /* The empty inbox's New thread box is the desktop's. The phone has its pen
+     button, and the rules below would turn the box into a sheet in mid-page. */
+  :root:root:root .th-start .th-clear-compose { display: none; }
   /* It stops where the keyboard starts (--kb), so the attach row and the end
      of the message are never under it. */
   :root:root:root .tc-veil > .tc-card {

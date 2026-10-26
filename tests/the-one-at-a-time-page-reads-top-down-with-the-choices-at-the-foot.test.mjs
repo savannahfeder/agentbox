@@ -26,9 +26,11 @@ const noop = () => {};
 describe('the summary on top', () => {
   const draw = (p) => renderToStaticMarkup(h(QueueSummary, { onToggle: noop, open: false, ...p }));
 
-  it('is the Context, its label running into its text', () => {
+  it('is the Context, under a row with the earlier messages and no label', () => {
+    // The label ran into the text until round seventeen
+    // (tests/the-context-sits-under-its-label-small-and-set-off).
     const html = draw({ context: 'Funding deadlines in the next 3 weeks.', earlier: 1 });
-    expect(visible(html)).toMatch(/^Context Funding deadlines in the next 3 weeks\. Show 1 earlier message$/);
+    expect(visible(html)).toMatch(/^Show 1 earlier message Funding deadlines in the next 3 weeks\.$/);
   });
   it('opens the earlier messages from one line, counted', () => {
     expect(visible(draw({ context: 'c', you: null, earlier: 8 }))).toContain('Show 8 earlier messages');
@@ -42,13 +44,12 @@ describe('the summary on top', () => {
   it('draws only what it has', () => {
     expect(visible(draw({ context: null, earlier: 0 }))).toBe('');
   });
-  it('keeps a label on one line when the text beside it is one long link', () => {
+  it('breaks a long link rather than running off the line', () => {
     // Drawn on a real thread whose last message, then shown beside the
     // Context, was a bare x.com link: the link could not break, so "3:46AM"
     // fell to a line of its own under "You, Yesterday".
     const css = read('renderer/src/one-thing-at-a-time.css');
     expect(css).toMatch(/\.one-col \{[^}]*overflow-wrap: anywhere/);
-    expect(css).toMatch(/\.one-lab \{[^}]*white-space: nowrap/);
   });
   it('says nothing with a colon or a dash', () => {
     const words = visible(draw({ context: 'c', earlier: 3 }));
@@ -129,7 +130,7 @@ describe('where the app wires it', () => {
     expect(app).toMatch(/const queueSpot = spotIn\(shownInbox, focused\);/);
   });
   it('the thread page takes the queue, and wears no summary panel in it', () => {
-    expect(app).toMatch(/queue=\{queueSpot \?/);
+    expect(app).toMatch(/queue=\{queueSpot && !inChats \?/);
     expect(focus).toMatch(/const summaryOffered = [^\n]*!page/);
   });
   it('the choices go to the foot, apart from the reply box, without their heading', () => {

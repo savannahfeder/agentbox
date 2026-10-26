@@ -268,11 +268,11 @@ describe('the corner marks do not land on the code figures', () => {
 // corner on a task is the task's.
 describe('the corner carries the task on a task and the app on a list', () => {
   it('draws neither the plus nor the palette mark while a task is open', () => {
-    expect(app).toContain('const taskOpen = workspaceNavigation && !!focused && !settingsOpen;');
-    expect(app).toMatch(/\{!taskOpen && !workspaceNavigation && <button[\s\S]{0,200}aria-label="New thread"/);
-    expect(app).toMatch(/\{!taskOpen && !workspaceNavigation && <button[\s\S]{0,200}aria-label="Commands"/);
+    const corner = app.slice(app.indexOf('<div className="topbar-right">'), app.indexOf('</header>'));
+    expect(corner).not.toContain('aria-label="New thread"');
+    expect(corner).not.toContain('aria-label="Commands"');
     // Search and New thread in the header go the same way on a task.
-    expect(app).toMatch(/\{workspaceNavigation && !focused && !settingsOpen && [^\n]*\(\s*<HeaderActions/);
+    expect(app).toMatch(/\{!focused && !settingsOpen && [^\n]*\(\s*<HeaderActions/);
   });
 
   it('costs neither verb a route she already has', () => {

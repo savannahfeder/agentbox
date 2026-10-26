@@ -77,10 +77,11 @@ describe('whether the cloud is offered on this Mac', () => {
     expect(supervisor(app).cloudStatus()).toMatchObject({ setUp: false, offered: true });
   });
 
-  it('a Mac without them is not, and nor is one already set up on its own AWS', () => {
+  // tests/every-copy-of-the-app-offers-agentbox-cloud
+  it('a Mac without them is offered the cloud every copy ships with, and one already set up on its own AWS is not', () => {
     const app = path.join(tmp, 'app');
     fs.mkdirSync(app, { recursive: true });
-    expect(supervisor(app).cloudStatus()).toMatchObject({ setUp: false, offered: false });
+    expect(supervisor(app).cloudStatus()).toMatchObject({ setUp: false, offered: true });
     offerIn(app);
     fs.mkdirSync(path.join(tmp, '.agentbox'), { recursive: true });
     fs.writeFileSync(cloudConfigPath({}, tmp), JSON.stringify({ region: 'us-east-1', bucket: 'b', runtimeArn: 'arn:x' }));

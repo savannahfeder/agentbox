@@ -105,9 +105,11 @@ describe('the walk rings the control the keyboard is on', () => {
   it('keeps the folder list’s own highlight under the keyboard', () => {
     // The rows light one at a time with the arrows and with the pointer. Focus
     // lights the same row, so Tab and the arrows cannot disagree about which
-    // row Return will take.
-    expect(walk).toMatch(/onFocus=\{\(\) => setLit\(i\)\}/);
-    expect(walk).toMatch(/onFocus=\{\(\) => setLit\(recent\?\.length \?\? 0\)\}/);
-    expect(walk).toMatch(/onFocus=\{\(\) => setLit\(\(recent\?\.length \?\? 0\) \+ 1\)\}/);
+    // row Return will take. Since 2026-10-26 both go through `light`, which
+    // also records WHICH of the two lit it
+    // (tests/a-card-drawn-under-a-still-mouse-lights-no-row).
+    expect(walk).toMatch(/onFocus=\{\(\) => light\(i, 'key'\)\}/);
+    expect(walk).toMatch(/onFocus=\{\(\) => light\(recent\?\.length \?\? 0, 'key'\)\}/);
+    expect(walk).toMatch(/onFocus=\{\(\) => light\(\(recent\?\.length \?\? 0\) \+ 1, 'key'\)\}/);
   });
 });

@@ -134,6 +134,9 @@ function dutiesFrom(list, me, now) {
 export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at, on, duties, runsOn, ready } = {}, ctx = {}) {
   const { dir, me, team, item } = teammateContext(ctx);
   const now = ctx.now ?? Date.now();
+  if (typeof asksFirst === 'string' && /\?\s*$/.test(asksFirst)) {
+    throw new Error('asksFirst is what needs the person\'s yes before you do it, said as a statement ("Anything that goes out in public"). Ask a question with team_post instead.');
+  }
   const patch = {};
   if (typeof name === 'string' && name.trim()) {
     const clean = name.trim().replace(/\s+/g, ' ').slice(0, 40);

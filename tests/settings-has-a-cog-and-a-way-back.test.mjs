@@ -17,7 +17,9 @@ it('draws the hairline sliders rather than radial spokes',()=>{
 // components to see shortcuts." The page is still in Settings and in ⌘K.
 it('offers a back control, no sidebar shortcuts row and no instructions link',()=>{
  const app=fs.readFileSync(new URL('../renderer/src/App.tsx',import.meta.url),'utf8');
- const nav=app.slice(app.indexOf('<WorkspaceNavigation '),app.indexOf('{inFullScreen && !workspaceNavigation ?',app.indexOf('<WorkspaceNavigation ')));
+ const start=app.indexOf('<WorkspaceNavigation\n');
+ const nav=app.slice(start,app.indexOf('{/* THE REACH',start));
+ expect(nav).toContain('onSettings=');
  expect(nav).not.toContain('onShortcuts=');expect(nav).not.toContain('onInstructions=');
  expect(app).toContain('aria-label="Back to previous page"');
 });

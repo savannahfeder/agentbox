@@ -163,10 +163,9 @@ function feedbackAddress() {
 const feedbackUrl = feedbackAddress();
 
 // WHERE AGENTBOX CLOUD IS (main/cloud/config.mjs): the server's address and
-// the database's public address and key, all public. Read from cloud/ or
-// ~/.agentbox/cloud.public.json. Putting that file there is the act that
-// opens the cloud to everyone who downloads this build, so do it only once
-// the server takes real money (scripts/stripe-setup.mjs --live).
+// the database's public address and key, all public. A cloud.public.json in
+// cloud/ or ~/.agentbox points this build at another cloud; without one it is
+// the cloud every copy ships with (shared/cloud-address.mjs).
 const cloud = cloudAccountConfig(repo);
 // AND THE CLOUD SETTINGS › PHONE SIGNS IN TO (main/team/session.mjs
 // loadCloudConfig): its address, public key and phone site, also public.
@@ -279,8 +278,6 @@ if (feedbackUrl) {
 if (cloud) {
   for (const k of ['gateway', 'supabaseUrl', 'anonKey']) args.push(`-c.extraMetadata.bakedCloud.${k}=${cloud[k]}`);
   console.log(`→ baking Agentbox Cloud into the build (${cloud.gateway}): everyone who downloads it can sign up and pay`);
-} else {
-  console.log('→ no cloud.public.json, so this build does not offer Agentbox Cloud');
 }
 if (teamCloud) {
   for (const k of ['url', 'anonKey', 'phoneSite']) if (teamCloud[k]) args.push(`-c.extraMetadata.bakedTeam.${k}=${teamCloud[k]}`);

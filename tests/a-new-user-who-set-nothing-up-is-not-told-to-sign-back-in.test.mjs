@@ -56,7 +56,7 @@ describe('the plan screen says what it found', () => {
   // one that shipped for it (w-e217e577e5).
   it('still says it found something the moment one plan is signed in', () => {
     expect(foundHead(readyEngines(CODEX_READY))).toBe(COPY.foundHead);
-    expect(foundLede(readyEngines(CODEX_READY))).toBe('Your agents will run on your own ChatGPT plan.');
+    expect(foundLede(readyEngines(CODEX_READY))).toBe('Your agents will run on your own ChatGPT plan. You do not need Claude as well.');
   });
 
   it('names no tool and no tier in the heading for a signed-out computer', () => {

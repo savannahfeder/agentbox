@@ -163,7 +163,7 @@ describe('the rest of round 23, checked screen by screen on 2026-10-21', () => {
   it('a full page has its own title and no state tabs', () => {
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(app).toMatch(/roomShown && roomsUi\.heading \? roomsUi\.heading\.title : <h1 className="workspace-title">Threads<\/h1>/);
-    expect(app).toMatch(/\{workspaceNavigation && search === null && !\(roomShown && roomsUi\.heading\) && \(\s*<StateTabs/);
+    expect(app).toMatch(/\{search === null && !\(roomShown && roomsUi\.heading\) && \(\s*<StateTabs/);
     expect(app).toMatch(/roomShown && roomsUi\.heading\?\.right !== undefined \? roomsUi\.heading\.right : \(?\s*<HeaderActions/);
   });
 });

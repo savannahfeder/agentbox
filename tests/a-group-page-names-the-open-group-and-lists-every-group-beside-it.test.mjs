@@ -49,7 +49,9 @@ describe('the bar over a group', () => {
   it('is cut on the column’s own line', () => {
     expect(rule('.gc-list')).toContain('width: 300px;');
     expect(rule('.gc-head-col')).toContain('width: 300px;');
-    expect(rule('.gc-head')).toContain('margin-left: -44px;');
+    // By each layout's own top bar padding (the-chats-header-lines-up-with-its-list-in-both-layouts).
+    expect(rule('.gc-head')).toContain('margin-left: -32px;');
+    expect(rule('.gt-inset .gc-head')).toContain('margin-left: -44px;');
   });
 });
 

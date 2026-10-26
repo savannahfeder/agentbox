@@ -97,7 +97,7 @@ describe('the crumb itself', () => {
 // (tests/every-opened-thread-wears-the-trail-header).
 describe('the thread view wears the crumb', () => {
   it('portals the crumb into the bar for a thread opened from a list, and the full band otherwise', () => {
-    expect(focus).toMatch(/const barContent = crumbFrom\s*\?\s*<><ThreadCrumb/);
+    expect(focus).toMatch(/const barContent = inChats\s*\?[^;]*?: crumbFrom\s*\?\s*<><ThreadCrumb/);
     expect(focus).toMatch(/createPortal\(barContent, headerTarget\)/);
     expect(focus).toMatch(/:\s*<>\{backButton\}\{bandLine\}<\/>/);
   });

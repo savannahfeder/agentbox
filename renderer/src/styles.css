@@ -262,10 +262,8 @@
   --skin-tint: none;
   --skin-pane: var(--surface);
   --skin-pane-line: transparent;
-  /* The corner marks and the rays behind inbox zero, which only Ember Grid
-     draws (workspace-navigation.css). */
+  /* The corner marks, which only Ember Grid draws (workspace-navigation.css). */
   --skin-tick: transparent;
-  --skin-rays: none;
   --skin-blur: 0px;
   /* The opaque writing surface. With no skin on there is no photograph to
      average, so it falls back to the card the app already had. */
@@ -567,10 +565,8 @@
   --skin-tint: none;
   --skin-pane: var(--surface);
   --skin-pane-line: transparent;
-  /* The corner marks and the rays behind inbox zero, which only Ember Grid
-     draws (workspace-navigation.css). */
+  /* The corner marks, which only Ember Grid draws (workspace-navigation.css). */
   --skin-tick: transparent;
-  --skin-rays: none;
   --skin-blur: 0px;
   /* The opaque writing surface. With no skin on there is no photograph to
      average, so it falls back to the card the app already had. */
@@ -714,10 +710,6 @@
   --skin-dim: 0;
   /* The film's L-shaped corner marks, 12px long, 8px in from each corner. */
   --skin-tick: #5c5855;
-  /* Inbox zero's backdrop, from the film's "0 terminals opened" card: the
-     brand's 24 rays in the one orange, fading in past the figure and out
-     toward the edge, over a faint orange glow. */
-  --skin-rays: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-500 -500 1000 1000'><defs><radialGradient id='f' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='490'><stop offset='0.26' stop-color='%23EE6018' stop-opacity='0'/><stop offset='0.34' stop-color='%23EE6018' stop-opacity='0.26'/><stop offset='1' stop-color='%23EE6018' stop-opacity='0'/></radialGradient><radialGradient id='g' gradientUnits='userSpaceOnUse' cx='0' cy='0' r='380'><stop offset='0' stop-color='%23EE6018' stop-opacity='0.10'/><stop offset='1' stop-color='%23EE6018' stop-opacity='0'/></radialGradient></defs><circle r='380' fill='url(%23g)'/><g stroke='url(%23f)' stroke-width='1.3' stroke-linecap='round'><line x1='0.0' y1='-125.0' x2='0.0' y2='-480.0'/><line x1='32.4' y1='-120.7' x2='124.2' y2='-463.6'/><line x1='62.5' y1='-108.3' x2='240.0' y2='-415.7'/><line x1='88.4' y1='-88.4' x2='339.4' y2='-339.4'/><line x1='108.3' y1='-62.5' x2='415.7' y2='-240.0'/><line x1='120.7' y1='-32.4' x2='463.6' y2='-124.2'/><line x1='125.0' y1='-0.0' x2='480.0' y2='-0.0'/><line x1='120.7' y1='32.4' x2='463.6' y2='124.2'/><line x1='108.3' y1='62.5' x2='415.7' y2='240.0'/><line x1='88.4' y1='88.4' x2='339.4' y2='339.4'/><line x1='62.5' y1='108.3' x2='240.0' y2='415.7'/><line x1='32.4' y1='120.7' x2='124.2' y2='463.6'/><line x1='0.0' y1='125.0' x2='0.0' y2='480.0'/><line x1='-32.4' y1='120.7' x2='-124.2' y2='463.6'/><line x1='-62.5' y1='108.3' x2='-240.0' y2='415.7'/><line x1='-88.4' y1='88.4' x2='-339.4' y2='339.4'/><line x1='-108.3' y1='62.5' x2='-415.7' y2='240.0'/><line x1='-120.7' y1='32.4' x2='-463.6' y2='124.2'/><line x1='-125.0' y1='0.0' x2='-480.0' y2='0.0'/><line x1='-120.7' y1='-32.4' x2='-463.6' y2='-124.2'/><line x1='-108.3' y1='-62.5' x2='-415.7' y2='-240.0'/><line x1='-88.4' y1='-88.4' x2='-339.4' y2='-339.4'/><line x1='-62.5' y1='-108.3' x2='-240.0' y2='-415.7'/><line x1='-32.4' y1='-120.7' x2='-124.2' y2='-463.6'/></g></svg>");
   --bg: #1a1817;
   --surface: #282625;
   --bg-raised: #2f2d2c;
@@ -1233,18 +1225,6 @@ body {
   color: var(--text-faint);
   text-align: center;
   font-size: 14px;
-}
-
-/* A VIEW WITH NOTHING IN IT.The words came out of List.tsx, and this takes the
-   card out from under them, because an empty card the size of the window is the
-   same page with the sentence painted out and it reads as a list that failed to
-   load. What is left is the ground the window already has, which is what the
-   inbox zero page has always shown. Its twin for a window wearing a picture is
-   down in the skin block, beside the rule it has to outrank.
-*/
-.list-pane.bare {
-  background: none;
-  box-shadow: none;
 }
 
 /* ONE LEFT EDGE FOR EVERY WORD. The group label, the title and the summary all
@@ -3245,11 +3225,12 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .product-mark.product-swatch { display: inline-grid; place-items: center; opacity: 1; }
 .product-swatch i { display: block; border-radius: var(--radius); }
 .rail .product-mark.product-swatch { opacity: 1; }
-/* The Agentbox icon is a finished picture, colours and all: never dimmed. */
-img.app-mark { opacity: 1; border-radius: 0; }
-/* The sidebar corner with no team: the icon is its own tile, so no plate under it. */
-.th-mark.th-mark-app { background: none; }
-.th-mark.th-mark-app img { display: block; }
+/* The Agentbox logo carries its own dim and lit dots: never dimmed again. */
+.product-mark.app-mark, .rail .product-mark.app-mark { opacity: 1; border-radius: 0; }
+/* The sidebar corner with no team: the logo stands on the sidebar itself, not
+   on the orange plate a team's initial sits on, in the text colour. */
+.th-mark.th-mark-app { background: none; color: var(--text); }
+.th-mark.th-mark-app svg { display: block; }
 /* In the panel it is dimmer than anywhere else it appears, because here it is
    the only mark on the screen and a full-strength logo in an empty corner is a
    spot of ink the eye goes to first. */
@@ -3977,6 +3958,31 @@ img.app-mark { opacity: 1; border-radius: 0; }
   color: var(--text-dim);
 }
 .palette-confirm { padding: 18px; font-size: 14px; line-height: 1.55; position: relative; }
+
+/* ⌘K in the website's look (w-391bc4efbe): magnifier and Esc on the input, a
+   mark per row, the keys in a footer. Scoped to `.palette-k` because the Later
+   box and Find a group reuse the rows above, and the selected row stays the
+   shared one. */
+.palette-k .palette-query { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 16px 0 18px; border-bottom: 1px solid var(--line); }
+.palette-k .palette-query svg { width: 18px; height: 18px; flex: none; color: var(--text-faint); }
+.palette-k .palette-input { flex: 1; min-width: 0; width: auto; border: none; padding: 0; font-size: 17px; caret-color: var(--accent); }
+.palette-k .palette-input::placeholder { color: var(--agent-ink); }
+.palette-k .palette-esc {
+  flex: none; padding: 4px 6px; cursor: pointer; background: none;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  font: 500 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint);
+}
+.palette-k .palette-esc:hover { color: var(--text); }
+.palette-k .palette-item { justify-content: flex-start; align-items: center; gap: 12px; height: 38px; padding: 0 18px; font-size: 14.5px; color: var(--text-dim); }
+.palette-k .palette-item.selected { color: var(--text); }
+.palette-k .palette-glyph { flex: none; width: 18px; text-align: center; font: 400 13px/1 var(--mono); color: var(--agent-ink); }
+.palette-k .palette-item.selected .palette-glyph { color: var(--accent); }
+.palette-k .palette-hint, .palette-k .palette-key { margin-left: auto; }
+.palette-k .palette-foot {
+  display: flex; gap: 18px; padding: 10px 18px; border-top: 1px solid var(--line);
+  font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--agent-ink);
+}
+.palette-k .palette-foot b { font-weight: 500; color: var(--text-faint); }
 
 .snooze-input-row { position: relative; display: flex; align-items: center; }
 .snooze-input { flex: 1; }
@@ -5551,18 +5557,6 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   border: 1px solid var(--skin-pane-line);
   -webkit-backdrop-filter: blur(var(--skin-blur));
   backdrop-filter: blur(var(--skin-blur));
-}
-
-/* AND NO CARD AT ALL WHEN THE VIEW IS EMPTY. Written out here rather than
-   folded into the plain rule above the list, because the wash, the hairline and
-   the blur are three things the skin adds and all three have to go or the card
-   is still on the picture in outline.
-*/
-:root[data-skin] .list-pane.bare {
-  background: none;
-  border: 0;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
 }
 
 /* AN OPENED TASK, which is the whole window rather than a card (`.app.flat`).

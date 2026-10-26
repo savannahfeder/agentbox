@@ -119,6 +119,16 @@ export function dutyStart(d, now = Date.now()) {
 }
 
 export const DUTY_LABEL_PREFIX = 'duty:';
+
+// What needs the person's yes first, as a rule. A question saved there is not
+// one (setup refuses it now; older teammates may still carry one).
+export function yesFirst(asksFirst) {
+  const rule = String(asksFirst ?? '').trim();
+  return rule && !rule.endsWith('?') ? rule : null;
+}
+// A run your own words in a teammate's chat woke. You are in that chat
+// waiting for its answer, so it is next for a free agent.
+export const CHAT_LABEL = 'from-chat';
 export const dutyOf = (item) => (item?.labels ?? []).find((l) => typeof l === 'string' && l.startsWith(DUTY_LABEL_PREFIX))?.slice(DUTY_LABEL_PREFIX.length) ?? null;
 
 function cleanText(v, max = 2000) {
@@ -412,7 +422,8 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
         actions.push({ type: 'hops', teammate: tid, msg: m.id, from: m.from });
         continue;
       }
-      if (fromYou && m.kind === 'msg') {
+      // A new thread to a teammate is new work, never an answer to its last question.
+      if (fromYou && m.kind === 'msg' && !m.fresh) {
         const runs = runsOf(tid, items);
         const waiting = runs.filter(waitingOnYou).sort((a, b) => (b.wrote?.result?.ts ?? 0) - (a.wrote?.result?.ts ?? 0))[0];
         // A running run hears your words only if your words started it;
@@ -510,7 +521,8 @@ export function runLines(items, teammates = []) {
     const r = item.wrote?.result;
     if (r && r.source === 'agent' && !(item.labels ?? []).includes('clean')) {
       const answered = (item.wrote?.answer?.ts ?? 0) > r.ts;
-      out.push({ ...base, id: `${item.id}:sent`, kind: 'run', verb: 'sent', waiting: waitingOnYou(item), answered, ts: r.ts });
+      const said = String(item.result ?? '').split('\n').map((l) => l.replace(/\*\*|__|`|^#+\s*/g, '').trim()).find(Boolean) ?? '';
+      out.push({ ...base, id: `${item.id}:sent`, kind: 'run', verb: 'sent', said: clip(said, 200), waiting: waitingOnYou(item), answered, ts: r.ts });
     }
     if (item.status === 'done') {
       out.push({ ...base, id: `${item.id}:done`, kind: 'run', verb: 'finished', ts: item.wrote?.status?.ts ?? item.updatedAt ?? 0 });
@@ -666,6 +678,16 @@ function yourAsks(items, now) {
  * alike enough to be one job, under a key no offer has used. One open offer at
  * a time, and one a day at most.
  */
+function askedOnce(group) {
+  const seen = new Map();
+  for (const i of group) {
+    const title = String(i.label || i.title).trim();
+    const had = seen.get(title.toLowerCase());
+    if (had) had.n += 1; else seen.set(title.toLowerCase(), { title, n: 1 });
+  }
+  return [...seen.values()];
+}
+
 export function offerFrom({ items = [], offered = new Set(), now = Date.now() } = {}) {
   const open = (items ?? []).filter((i) => (i.labels ?? []).includes(OFFER_LABEL));
   if (open.some((i) => i.status !== 'done' || now - (i.createdAt ?? 0) < 24 * 60 * 60 * 1000)) return null;
@@ -686,6 +708,7 @@ export function offerFrom({ items = [], offered = new Set(), now = Date.now() } 
       key, product, count: group.length,
       // The same words asked again are one line, not five.
       titles: [...new Map(group.map((i) => [String(i.label || i.title).trim().toLowerCase(), String(i.label || i.title).trim()])).values()].slice(0, 5),
+      asked: askedOnce(group).slice(0, 5),
       threads: group.slice(0, OFFER_THREADS).map((i) => ({ product: i.product, id: i.id, title: String(i.label || i.title).trim() })),
       title: `Want a teammate for things like “${clip(lead.label || lead.title, 60)}”?`,
       said: `You've asked for this ${group.length} times this month.`,

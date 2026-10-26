@@ -66,7 +66,7 @@ describe('the key', () => {
 
   it('N alone starts a thread', () => {
     const app = read('../renderer/src/App.tsx');
-    expect(app).toMatch(/case 'n': case 'N': e\.preventDefault\(\); setModal\('compose'\); break;/);
+    expect(app).toMatch(/case 'n': case 'N': e\.preventDefault\(\); startThread\(\); break;/);
     expect(app).not.toMatch(/e\.key === 'c' \|\| e\.key === 'C' \|\| e\.key === 'n'/);
   });
 });

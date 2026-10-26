@@ -187,6 +187,13 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# AGENTBOX: the default said Supabase Auth and never said Agentbox, which reads
+# as phishing. The hosted project keeps its own copy of this template, under
+# Authentication › Emails › Confirm signup; this file is what it should say.
+[auth.email.template.confirm]
+subject = "Confirm your email for Agentbox"
+content_path = "./templates/confirm.html"
+
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
 enable_signup = false

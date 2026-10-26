@@ -54,11 +54,22 @@ const NOTHING = [r('claude', false, false), r('codex', false, false)];
 describe('what it says it found', () => {
   it('names the plan that will be spent, not the tool that spends it', () => {
     expect(COPY.foundHead).toBe('Found on this computer.');
-    expect(foundLede(readyEngines(CLAUDE_READY))).toBe('Your agents will run on your own Claude plan.');
-    expect(foundLede(readyEngines(CODEX_READY))).toBe('Your agents will run on your own ChatGPT plan.');
+    expect(foundLede(readyEngines(CLAUDE_READY))).toMatch(/^Your agents will run on your own Claude plan\./);
+    expect(foundLede(readyEngines(CODEX_READY))).toMatch(/^Your agents will run on your own ChatGPT plan\./);
     expect(`${COPY.foundHead} ${foundLede(readyEngines(CLAUDE_READY))}`).not.toMatch(/Claude Code|Codex|CLI|terminal/i);
   });
 
+  // AND IT ANSWERS THE OTHER ROW, which is the one nobody asked for. A tester
+  // with ChatGPT signed in read "Found on this computer." over a Claude row
+  // offering "Set up" and could not tell whether Claude had been looked for or
+  // was still something they had to do (2026-10-25, Linux).
+  it('says the plan they do not need as well, when there is one', () => {
+    expect(foundLede(readyEngines(CODEX_READY))).toBe('Your agents will run on your own ChatGPT plan. You do not need Claude as well.');
+    expect(foundLede(readyEngines(CLAUDE_READY))).toBe('Your agents will run on your own Claude plan. You do not need ChatGPT as well.');
+  });
+
+  // AND WITH BOTH SIGNED IN THERE IS NO SECOND SENTENCE: there is no row left
+  // to answer, and a line saying so would be a line about nothing.
   it('says both when both are signed in, since either one may run the work', () => {
     expect(foundLede(readyEngines(BOTH_READY))).toBe('Your agents will run on your own Claude and ChatGPT plans.');
   });

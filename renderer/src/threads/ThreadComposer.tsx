@@ -31,7 +31,7 @@
 
 import { PriorityIcon } from '../components/Priority';
 import { SEND } from '../this-keyboard';
-import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { PRACTICE_TASK } from '../../../shared/first-run-practice.mjs';
 import type { Product, WorkItem } from '../types';
 import type { Engine } from '../../../shared/engines.mjs';
@@ -93,9 +93,28 @@ export interface ThreadSent {
 
 type MenuKey = 'to' | 'model' | 'sendAs' | 'dueOn' | 'project' | 'priority' | 'visibility' | 'later';
 
+/** What a card opens on. Project, model and priority need no field: the card
+ *  reads them from what was last picked and from the saved draft. */
+export interface ComposeStart {
+  to?: string;
+  also?: string[];
+  body?: string;
+  mate?: string | null;
+  sendAs?: SendAs;
+  due?: string | null;
+  visibility?: Visibility | null;
+  chosen?: string[] | null;
+  /** Where the caret was, as [start, end]. */
+  caret?: [number, number];
+}
+
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate,
+  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver,
 }: {
+  /** On the page: whether the keyboard is in the box or words are left in it. */
+  onWriting?: (writing: boolean) => void;
+  /** On the page: filled with a reading of the box, for the dialog to open on. */
+  handOver?: MutableRefObject<(() => ComposeStart) | null>;
   /** Your teammates, offered in To beside the agents, and Someone new. */
   agentMates?: readonly { id: string; name: string; letter: string; role: string | null }[];
   /** Hands the words to a teammate ('new' makes one from them); an error to show, or null once it is theirs. */
@@ -110,7 +129,7 @@ export function ThreadComposer({
   /** The project on screen, which the card opens on ahead of the one last used. */
   defaultProduct?: string | null;
   /** Who it is to (a teammate's id) and words to start from, for a card opened from somewhere. */
-  initial?: { to?: string; also?: string[]; body?: string } | null;
+  initial?: ComposeStart | null;
   /**
    * THE TUTORIAL'S OWN EXAMPLE TASK, and nothing else ever sets this.
    *
@@ -164,6 +183,9 @@ export function ThreadComposer({
   onSending?: (p: { kind: ThreadSent['kind']; product?: string; to?: string; toMany?: string[]; runAt?: number; start?: 'later'; threads?: number }) => void;
   /** A send handed over with `onSending` that did not stand. The words are back in the draft. */
   onFailed?: (reason: string, p: { to?: string; also?: string[] }) => void;
+  /** Drawn open on the empty inbox rather than as a dialog: no veil, To and
+   *  Model as chips in the bar, and the keyboard is only its own once you are in it. */
+  inline?: boolean;
 }) {
   const team = useContext(TeamContext);
   const others = useMemo(() => (team ? teammates(team.state.people, team.me) : []), [team]);
@@ -172,7 +194,7 @@ export function ThreadComposer({
   const [to, setTo] = useState<string>(() => (initial?.to && others.some((p) => p.id === initial.to) ? initial.to : 'agent'));
   const person = to === 'agent' ? null : others.find((p) => p.id === to) ?? null;
   // A teammate in To, or 'new' for Someone new: it takes the words in the team chat.
-  const [mate, setMate] = useState<string | null>(null);
+  const [mate, setMate] = useState<string | null>(() => initial?.mate ?? null);
   const mateRow = mate && mate !== 'new' ? agentMates?.find((t) => t.id === mate) ?? null : null;
   // A teammate who leaves the team while the card is open takes the To with them.
   useEffect(() => { if (to !== 'agent' && !person) setTo('agent'); }, [to, person]);
@@ -196,8 +218,8 @@ export function ThreadComposer({
   // SEND AS: a task or a message (w-c34591721f, approved 2026-10-17). A card
   // addressed to a person starts as a message, which is what it has always
   // made; a task is the thing you now say out loud.
-  const [sendAs, setSendAs] = useState<SendAs>('message');
-  const [due, setDue] = useState<string | null>(null);
+  const [sendAs, setSendAs] = useState<SendAs>(() => initial?.sendAs ?? 'message');
+  const [due, setDue] = useState<string | null>(() => initial?.due ?? null);
   // An agent has no Send As, so going back to one puts both away rather than
   // leaving a day on a card that cannot carry it.
   useEffect(() => { if (!person) { setSendAs('message'); setDue(null); } }, [person]);
@@ -245,9 +267,9 @@ export function ThreadComposer({
   // same picker the To field uses, and the pick stands only while somebody is
   // on the list; with nobody on it the thread is sent Private, because that is
   // who can see it (composer-rules.ts `sharingFields`).
-  const [picked, setPicked] = useState<Visibility | null>(null);
+  const [picked, setPicked] = useState<Visibility | null>(() => initial?.visibility ?? null);
   const visibility: Visibility = picked ?? startingVisibility(product);
-  const [chosenPicked, setChosen] = useState<string[] | null>(null);
+  const [chosenPicked, setChosen] = useState<string[] | null>(() => initial?.chosen ?? null);
   const chosen = chosenPicked ?? (picked ? [] : startingChosen(product));
   const [visPage, setVisPage] = useState<'rows' | 'people'>('rows');
   const pickVisibility = (v: Visibility) => { setPicked(v); };
@@ -402,11 +424,20 @@ export function ThreadComposer({
   // land after the key behind it has already been dispatched, and that key goes
   // nowhere. It is how "Task" arrived in the box as "ask" (w-abed8ae491).
   useLayoutEffect(() => {
+    if (inline) return;
     const t = textRef.current;
     if (!t) return;
     t.focus();
-    t.setSelectionRange(t.value.length, t.value.length);
+    const [from, to] = initial?.caret ?? [t.value.length, t.value.length];
+    t.setSelectionRange(from, to);
   }, []);
+  // On the page the box is one line until the words need more.
+  useLayoutEffect(() => {
+    const t = textRef.current;
+    if (!inline || !t) return;
+    t.style.height = 'auto';
+    t.style.height = `${Math.min(t.scrollHeight, 240)}px`;
+  }, [inline, text]);
 
   /* ----------------------------- the keyboard ----------------------------- */
   // Every character belongs to the message, wherever the keyboard is sitting;
@@ -445,7 +476,7 @@ export function ThreadComposer({
         : at.tagName === 'TEXTAREA' || at.tagName === 'INPUT' || at.isContentEditable ? 'a field'
           : card.current?.contains(at) ? 'the card' : 'away';
       const means = keyOnTheNewThreadCard({
-        key: e.key, meta: e.metaKey, ctrl: e.ctrlKey, alt: e.altKey, menuOpen: !!menuUp.current, on: where,
+        key: e.key, meta: e.metaKey, ctrl: e.ctrlKey, alt: e.altKey, menuOpen: !!menuUp.current, on: where, inline,
       });
       if (means !== 'the message') return;
       // Before the button under it hears it: Space and Enter on a focused
@@ -491,6 +522,11 @@ export function ThreadComposer({
   const listed = person || attachments.length || scripted || named.encode(typed.trim()) !== typed.trim() || mate
     ? [] : listedTasks(typed);
 
+  // The dialog closes on Send; the box on the page stays, so it empties. The
+  // send goes on with the words it already took, and a failed one reopens them
+  // in the dialog (`onFailed`).
+  const emptyForTheNext = () => { setText(''); setAttachments([]); setSending(false); };
+
   const sendTask = async (when: { runAt?: number; start?: 'later'; repeat?: { every: 'day' | 'weekday' | 'week'; on?: number; at: string }; asList?: boolean } = {}) => {
     // A teammate takes the words in the team chat rather than as a thread.
     if (mate) { void sendToTeammate(); return; }
@@ -510,6 +546,7 @@ export function ThreadComposer({
     const taken = markComposeDraftSending();
     try { localStorage.setItem(LAST_PRODUCT_KEY, product.slug); } catch { /* the send still stands */ }
     onSending?.({ kind: when.repeat ? 'repeat' : 'task', product: product.slug, ...(when.runAt ? { runAt: when.runAt } : {}), ...(when.start ? { start: when.start } : {}), ...(parts.length > 1 ? { threads: parts.length } : {}) });
+    if (inline) emptyForTheNext();
     try {
       const attached = await persistAttachments(product.slug, attachments);
       const body = [message.body, attached].filter(Boolean).join('\n\n');
@@ -594,6 +631,7 @@ export function ThreadComposer({
     const taken = markComposeDraftSending();
     const toMany = extra.length ? [person.id, ...also] : undefined;
     onSending?.({ kind: 'message', to: person.id, ...(toMany ? { toMany } : {}) });
+    if (inline) emptyForTheNext();
     const failed = (said: string) => {
       restoreComposeDraft(taken);
       if (onFailed) { onFailed(said, { to: person.id, ...(also.length ? { also } : {}) }); return; }
@@ -638,10 +676,11 @@ export function ThreadComposer({
     if (!mate || !words || sending || !onToTeammate) return;
     setSending(true);
     setError(null);
+    const taken = markComposeDraftSending();
     const err = await onToTeammate(mate, words, product?.slug ?? null);
     setSending(false);
-    if (err) setError(err);
-    else { setText(''); onClose(); }
+    if (err) { restoreComposeDraft(taken); setError(err); }
+    else { dropComposeDraft(taken); setText(''); onClose(); }
   };
   const send = () => (person && sendAs === 'message' ? sendMessage() : sendTask());
   // ⌘↵ SENDS WHEREVER THE CURSOR IS while the card is open (w-9f6975906c).
@@ -652,6 +691,9 @@ export function ThreadComposer({
   const sendRef = useRef(send);
   sendRef.current = send;
   useEffect(() => {
+    // On the page the card's own onKeyDown hears ⌘↵ inside it, and outside it
+    // the key is not the card's.
+    if (inline) return;
     const on = (e: KeyboardEvent) => {
       if (e.defaultPrevented || !(e.metaKey || e.ctrlKey) || e.key !== 'Enter') return;
       e.preventDefault();
@@ -970,84 +1012,109 @@ export function ThreadComposer({
   );
 
   /* ------------------------------- card --------------------------------- */
-  return (
-    <div className="modal-backdrop tc-veil" onClick={onClose}>
+  // Each head field is a labelled row on the dialog and a chip at the front of
+  // the bar on the page.
+  const trigger = (key: MenuKey) => `${inline ? 'tc-chip' : 'tc-word'} ${open === key ? 'open' : ''}`;
+  const fields: { label: string; node: ReactNode }[] = [
+    { label: 'To', node: (
+      <span className="tc-anchor" ref={anchor('to')}>
+        <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'}
+          onClick={() => toggle('to')} onKeyDown={triggerKeys('to')}>
+          {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : inline ? null : <AgentFace />}
+          <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : agentWordFor(engineRows, pick.engine)}</span>
+        </button>
+        {extra.map((p) => (
+          <span key={p.id} className="tc-also">
+            <Face person={p} />{p.name}
+            <button type="button" aria-label={`Remove ${p.name}`} title={`Remove ${p.name}`} onClick={() => setAlso((was) => was.filter((x) => x !== p.id))}>×</button>
+          </span>
+        ))}
+        {person && others.length > group.length && (
+          <button type="button" className="tc-add" aria-label="Add someone" title="Add someone"
+            onClick={() => { setAdding(true); setQuery(''); if (open !== 'to') toggle('to'); }}>+</button>
+        )}
+        {open === 'to' && toMenu}
+      </span>
+    ) },
+    ...(rows.includes('sendAs') ? [{ label: 'Send As', node: (
+      <span className="tc-anchor" ref={anchor('sendAs')}>
+        <button type="button" data-trigger className={trigger('sendAs')} aria-haspopup="listbox" aria-expanded={open === 'sendAs'}
+          onClick={() => toggle('sendAs')} onKeyDown={triggerKeys('sendAs')}>
+          <span className="tc-word-text">{sendAs === 'task' ? 'Task' : 'Message'}</span>
+        </button>
+        {open === 'sendAs' && sendAsMenu}
+      </span>
+    ) }] : []),
+    ...(rows.includes('dueOn') ? [{ label: 'Due On', node: (
+      <span className="tc-anchor" ref={anchor('dueOn')}>
+        <button type="button" data-trigger className={trigger('dueOn')} aria-haspopup="listbox" aria-expanded={open === 'dueOn'}
+          onClick={() => toggle('dueOn')} onKeyDown={triggerKeys('dueOn')}>
+          {/* A day nobody set is drawn in the faint ink a placeholder
+              uses: it is an answer, but a quiet one. */}
+          <span className={`tc-word-text${due ? '' : ' tc-unset'}`}>{dueWords(due)}</span>
+        </button>
+        {open === 'dueOn' && dueOnMenu}
+      </span>
+    ) }] : []),
+    ...(rows.includes('model') ? [{ label: 'Model', node: (
+      <span className="tc-anchor" ref={anchor('model')}>
+        <button type="button" data-trigger className={trigger('model')} aria-haspopup="listbox" aria-expanded={open === 'model'}
+          onClick={() => toggle('model')} onKeyDown={triggerKeys('model')}>
+          <span className="tc-word-text">{labelOf(pick)}</span>
+        </button>
+        {open === 'model' && modelMenu}
+      </span>
+    ) }] : []),
+  ];
+  const headChips = inline ? fields.map((f) => <Fragment key={f.label}>{f.node}</Fragment>) : null;
+
+  // Read after the move lands: focus going from one control to the next blurs
+  // the first, and a window losing focus to another app leaves activeElement
+  // where it was.
+  const [inBox, setInBox] = useState(false);
+  const writingNow = () => { setTimeout(() => setInBox(!!card.current?.contains(document.activeElement)), 0); };
+  const hasWords = !!text.trim() || attachments.length > 0;
+  useEffect(() => { if (inline) onWriting?.(inBox || hasWords); }, [inline, inBox, hasWords]);
+  useEffect(() => () => onWriting?.(false), []);
+  if (handOver && inline) {
+    handOver.current = () => {
+      const t = textRef.current;
+      return {
+        to, also, body: text, mate, sendAs, due, visibility: picked, chosen: chosenPicked,
+        ...(t && document.activeElement === t ? { caret: [t.selectionStart, t.selectionEnd] as [number, number] } : {}),
+      };
+    };
+  }
+
+  const box = (
       <div
         ref={card}
-        className="tc-card"
-        role="dialog"
+        className={`tc-card${inline ? ' tc-inline' : ''}`}
+        role={inline ? 'group' : 'dialog'}
         aria-label="New thread"
+        onFocus={inline ? writingNow : undefined}
+        onBlur={inline ? writingNow : undefined}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); void send(); return; }
           if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
-            if (open) close('trigger'); else onClose();
+            // On the page Escape steps out of the box and keeps the words.
+            if (open) close('trigger'); else if (inline) (document.activeElement as HTMLElement | null)?.blur(); else onClose();
           }
         }}
       >
-        <div className="tc-head">
-          <div className="tc-field">
-            <span className="tc-label">To</span>
-            <span className="tc-anchor" ref={anchor('to')}>
-              <button type="button" data-trigger className={`tc-word ${open === 'to' ? 'open' : ''}`} aria-haspopup="listbox" aria-expanded={open === 'to'}
-                onClick={() => toggle('to')} onKeyDown={triggerKeys('to')}>
-                {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : <AgentFace />}
-                <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : agentWordFor(engineRows, pick.engine)}</span>
-              </button>
-              {extra.map((p) => (
-                <span key={p.id} className="tc-also">
-                  <Face person={p} />{p.name}
-                  <button type="button" aria-label={`Remove ${p.name}`} title={`Remove ${p.name}`} onClick={() => setAlso((was) => was.filter((x) => x !== p.id))}>×</button>
-                </span>
-              ))}
-              {person && others.length > group.length && (
-                <button type="button" className="tc-add" aria-label="Add someone" title="Add someone"
-                  onClick={() => { setAdding(true); setQuery(''); if (open !== 'to') toggle('to'); }}>+</button>
-              )}
-              {open === 'to' && toMenu}
-            </span>
+        {!inline && (
+          <div className="tc-head">
+            {fields.map((f) => (
+              <div key={f.label} className="tc-field">
+                <span className="tc-label">{f.label}</span>
+                {f.node}
+              </div>
+            ))}
           </div>
-          {rows.includes('sendAs') && (
-            <div className="tc-field">
-              <span className="tc-label">Send As</span>
-              <span className="tc-anchor" ref={anchor('sendAs')}>
-                <button type="button" data-trigger className={`tc-word ${open === 'sendAs' ? 'open' : ''}`} aria-haspopup="listbox" aria-expanded={open === 'sendAs'}
-                  onClick={() => toggle('sendAs')} onKeyDown={triggerKeys('sendAs')}>
-                  <span className="tc-word-text">{sendAs === 'task' ? 'Task' : 'Message'}</span>
-                </button>
-                {open === 'sendAs' && sendAsMenu}
-              </span>
-            </div>
-          )}
-          {rows.includes('dueOn') && (
-            <div className="tc-field">
-              <span className="tc-label">Due On</span>
-              <span className="tc-anchor" ref={anchor('dueOn')}>
-                <button type="button" data-trigger className={`tc-word ${open === 'dueOn' ? 'open' : ''}`} aria-haspopup="listbox" aria-expanded={open === 'dueOn'}
-                  onClick={() => toggle('dueOn')} onKeyDown={triggerKeys('dueOn')}>
-                  {/* A day nobody set is drawn in the faint ink a placeholder
-                      uses: it is an answer, but a quiet one. */}
-                  <span className={`tc-word-text${due ? '' : ' tc-unset'}`}>{dueWords(due)}</span>
-                </button>
-                {open === 'dueOn' && dueOnMenu}
-              </span>
-            </div>
-          )}
-          {rows.includes('model') && (
-            <div className="tc-field">
-              <span className="tc-label">Model</span>
-              <span className="tc-anchor" ref={anchor('model')}>
-                <button type="button" data-trigger className={`tc-word ${open === 'model' ? 'open' : ''}`} aria-haspopup="listbox" aria-expanded={open === 'model'}
-                  onClick={() => toggle('model')} onKeyDown={triggerKeys('model')}>
-                  <span className="tc-word-text">{labelOf(pick)}</span>
-                </button>
-                {open === 'model' && modelMenu}
-              </span>
-            </div>
-          )}
-        </div>
+        )}
 
         {convo && onOpenConversation && (
           <div className="tc-note tc-continues">
@@ -1059,6 +1126,7 @@ export function ThreadComposer({
         <textarea
           ref={textRef}
           className={`tc-text ${named.over}`}
+          rows={inline ? 1 : undefined}
           value={text}
           onChange={(e) => { setText(e.target.value); named.track(e.target); }}
           onSelect={(e) => named.track(e.currentTarget)}
@@ -1101,6 +1169,7 @@ export function ThreadComposer({
 
         {person && sendAs === 'message' ? (
           <div className="tc-bar">
+            {headChips}
             {/* HOW URGENT IT IS, AND NOTHING ELSE (w-7ba439c883, approved
                 2026-10-05). The corner used to carry "Goes to Maya's inbox.",
                 which was put there because a bare corner reads as a control
@@ -1121,6 +1190,7 @@ export function ThreadComposer({
           </div>
         ) : mate ? (
           <div className="tc-bar">
+            {headChips}
             {mate === 'new' && (
               <span className="tc-anchor" ref={anchor('project')}>
                 <button type="button" data-trigger className={`tc-chip ${open === 'project' ? 'open' : ''}`} title={product?.name ?? 'Which project'}
@@ -1139,6 +1209,7 @@ export function ThreadComposer({
           </div>
         ) : (
           <div className="tc-bar">
+            {headChips}
             <span className="tc-anchor" ref={anchor('project')}>
               <button type="button" data-trigger className={`tc-chip ${open === 'project' ? 'open' : ''}`} title={product?.name ?? 'Which project'}
                 aria-haspopup="listbox" aria-expanded={open === 'project'} onClick={() => toggle('project')} onKeyDown={triggerKeys('project')}>
@@ -1187,8 +1258,9 @@ export function ThreadComposer({
           </div>
         )}
       </div>
-    </div>
   );
+  if (inline) return box;
+  return <div className="modal-backdrop tc-veil" onClick={onClose}>{box}</div>;
 }
 
 /* ------------------------------- glyphs --------------------------------- */

@@ -7,7 +7,7 @@
 // one module both read is the follow-up that retires this file.
 
 import {
-  belongsInInbox, belongsInProgress, hiddenUntil, isProposal, notStarted, rowTitle, stillAsksYou, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd,
+  belongsInInbox, belongsInProgress, hiddenUntil, inProgressTab, isProposal, notStarted, rowTitle, stillAsksYou, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd,
 } from '../../../renderer/src/list-rules';
 import { boardColumns, DEFAULT_DISPLAY, keeps, sentAt, sorted, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { searchThreads } from '../../../renderer/src/threads/search';
@@ -64,10 +64,10 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
     return belongsInInbox(i, { deliveredThrough: DELIVERED_THROUGH, hiddenUntil: hiddenAt(i), now, waitingOn: waitingOn(i) });
   });
   const needsYou = new Set(inbox.map((i) => i.id));
-  const progress = items.filter((i) => {
+  const progress = inProgressTab(items.filter((i) => {
     if (hiddenAt(i) > now && !live.has(i.id)) return false;
     return belongsInProgress(i, { deferredUntil: i.runAt ?? 0, now, live: live.has(i.id) });
-  });
+  }), inbox);
   const snoozed = items.filter((i) => (notStarted(i) || isProposal(i) || hiddenAt(i) > now || (waitsInLater(i, waitingOn(i)) && !live.has(i.id)))
     && (i.status !== 'done' || i.wrote?.status?.source !== 'founder'));
   const done = items.filter((i) => !needsYou.has(i.id) && !live.has(i.id) && i.status === 'done');

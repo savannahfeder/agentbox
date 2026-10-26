@@ -20,20 +20,13 @@ it('draws no file name over a full screen document, and takes back the height it
  expect(css).toContain('.workspace-artifact-header .doc-crumb { font-size:14px; }');
 });
 
-it('collapses the sidebar on the way in and puts it back on the way out',()=>{
+// THE SIDEBAR IS ALWAYS NARROW (w-a1ed0e8b25), so full screen has nothing to
+// fold on the way in and nothing to put back on the way out, and no sidebar
+// preference is written down for a quit to reopen with.
+it('leaves the narrow sidebar as it is, and stores no sidebar preference',()=>{
  const app=read('App.tsx');
- expect(app).toContain('const panelBeforeFullScreen = useRef<boolean | null>(null);');
- // It watches the mode she picked, not the laid-out view, so a narrow window
- // cannot collapse her sidebar on its own.
- expect(app).toContain("if (!!openDoc && artifactMode === 'focus') {");
- expect(app).toContain('}, [openDoc, artifactMode]);');
- expect(app).toContain('panelBeforeFullScreen.current = true;');
- expect(app).toContain('setPanelUp(back);');
-});
-
-it('never writes an automatic collapse down as her preference',()=>{
- const app=read('App.tsx');
- const persist=app.slice(app.indexOf('const [panelUp, setPanelUp]'),app.indexOf('const togglePanel'));
- expect(persist).toContain('if (panelBeforeFullScreen.current !== null) return;');
- expect(persist).toContain("localStorage.setItem('powerup.sidebar.collapsed', String(!panelUp));");
+ expect(app).not.toContain('panelBeforeFullScreen');
+ expect(app).not.toContain('powerup.sidebar.collapsed');
+ // Full screen is still the mode she picked, not the laid-out view.
+ expect(app).toContain("const fullScreenDoc = !!openDoc && artifactMode === 'focus';");
 });

@@ -42,7 +42,7 @@ import type { TraceSession } from '../notes';
 import type { AgentTurn, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
-import { appWrote, earlierCount, earlierThan, newestAnswer, standsAt } from '../one-thing-at-a-time';
+import { appWrote, drawnWhole, earlierCount, earlierThan, newestAnswer, standsAt } from '../one-thing-at-a-time';
 import { rowTitle } from '../list-rules';
 import { askMarkUnread, say } from '../team/chat-events';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
@@ -375,14 +375,17 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   const byApp = !!queue && appWrote(outcome, item.wrote);
   const newest = queue ? newestAnswer(events, byApp ? null : outcome) : null;
   // Answered since (a reply or a pick the agent is working on): drawn from that answer down.
-  const from = queue && newest && !earlierOpen ? standsAt(events, newest) : -1;
+  const stands = queue && newest && !earlierOpen ? standsAt(events, newest) : -1;
+  const behind = stands >= 0 ? earlierThan(events, stands) : newest ? earlierCount(events, byApp ? null : outcome) : 0;
+  const short = !earlierOpen && drawnWhole(behind);
+  const from = short ? -1 : stands;
   const queueHead = queue && (
     <QueueSummary
       key={`${item.product}:${item.id}`}
       title={rowTitle(item)}
       context={queue.context}
-      earlier={from >= 0 ? earlierThan(events, from) : newest ? earlierCount(events, byApp ? null : outcome) : 0}
-      steps={!!newest && (events.some((e) => e.kind === 'work') || after.length > 0)}
+      earlier={short ? 0 : behind}
+      steps={!short && !!newest && (events.some((e) => e.kind === 'work') || after.length > 0)}
       open={earlierOpen}
       onToggle={() => { setEarlierOpen((open) => !open); setWhole(true); }}
     />
@@ -393,11 +396,11 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
       {after.map((act, i) => <ActLine key={`${act.at}-${i}`} act={act} />)}
     </div>
   );
-  if (queue && newest && !earlierOpen && from < 0) {
+  if (queue && newest && !earlierOpen && !short && from < 0) {
     return (
       <>
         {queueHead}
-        <QueueAnswer text={clean(newest.text)} md={md} />
+        <QueueAnswer text={clean(newest.text)} md={md} name={rowTitle(item)} />
         {byApp && outcome && <p className="one-app-note">{clean(outcome.text)}</p>}
         {afterList}
         {madeList(made.atFoot)}

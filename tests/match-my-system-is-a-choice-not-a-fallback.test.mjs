@@ -124,7 +124,7 @@ describe('the window is told a colour, never the pick', () => {
     // Following it once at boot and never again is a promise half kept.
     const app = read('renderer/src/App.tsx');
     expect(app).toMatch(/onMachineTheme\(setMachine\)/);
-    expect(app).toMatch(/\[idlePinned, firstRunPinned, theme, skin, machine\]/);
+    expect(app).toMatch(/\[firstRunPinned, theme, skin, machine\]/);
   });
 
   it('tells the stylesheet which way the Mac points, for the tile', () => {

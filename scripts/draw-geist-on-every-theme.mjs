@@ -28,7 +28,7 @@ const LOOKS = [
 // of its type treatment on the other themes. So this is the
 // TYPE half of every Ember rule in workspace-navigation.css, unscoped: the face,
 // the mono capitals on the chrome, the 400 weights. The colour half (the
-// orange, the corner marks, the rays, the transparent search) stays Ember's.
+// orange, the corner marks, the transparent search) stays Ember's.
 const GEIST = `
   body { font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, sans-serif !important; }
   :root { --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, monospace !important; }

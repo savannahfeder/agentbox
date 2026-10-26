@@ -136,8 +136,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'DejaVu Sa
 /* ---- the tag ----
    The mark and how many are new, nothing else (w-93b3a1a796, her pick of
    "just the dots"): the words moved into the list. The small corners are the
-   ones she approved (2026-10-08), not the Mac's capsule. */
+   ones she approved (2026-10-08), not the Mac's capsule.
+
+   THE HAND IS THE ONLY THING THAT SAYS IT MOVES. Nothing is drawn on the tag
+   to say so, by choice, so the pointer carries it the way the resize arrow
+   carries the corners. It stays on the glass: the window is wider, and a hand
+   over the clear band would promise a drag to another app's window. */
 .ct-tag {
+  cursor: grab;
   height: calc(28px * var(--ct-s)); padding: 0 calc(10px * var(--ct-s));
   border-radius: calc(6px * var(--ct-s)); box-sizing: border-box;
   display: flex; align-items: center; gap: calc(7px * var(--ct-s));
@@ -225,7 +231,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'DejaVu Sa
   position: absolute; left: 0; top: 0;
   background: var(--ct-tint-hover);
   border-radius: calc(8px * var(--ct-cs)); padding: calc(9px * var(--ct-cs)) calc(8px * var(--ct-cs)) calc(8px * var(--ct-cs));
-  box-sizing: border-box; width: max-content; max-width: calc(440px * var(--ct-cs)); min-width: calc(240px * var(--ct-cs));
+  /* As wide as its foot needs, with Size and Move to side by side in it. */
+  box-sizing: border-box; width: max-content; max-width: calc(496px * var(--ct-cs)); min-width: calc(240px * var(--ct-cs));
 }
 .ct-line {
   all: unset; box-sizing: border-box; display: flex; align-items: center; gap: calc(9px * var(--ct-cs)); width: 100%;
@@ -295,4 +302,45 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'DejaVu Sa
 .ct-foot .ct-steps svg {
   width: calc(9px * var(--ct-cs)); height: calc(9px * var(--ct-cs)); display: block;
   fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linecap: round;
+}
+
+/* ---- moving the tray, from the foot of its own list (w-6da6d4ad24) ----
+   "Move to" and a small screen, the corner the tray is in lit, are one
+   button. Pressing it turns the list into the screen, where each corner is
+   its own button, big enough to hit. */
+.ct-foot .ct-move { display: inline-flex; align-items: center; gap: calc(6px * var(--ct-cs)); margin-left: calc(4px * var(--ct-cs)); }
+.ct-mini-screen { display: block; flex: none; width: calc(21px * var(--ct-cs)); height: calc(15px * var(--ct-cs)); }
+.ct-mini-frame { fill: none; stroke: currentColor; stroke-opacity: 0.3; stroke-width: 1.2; }
+.ct-mini-corner { fill: var(--ct-faint); }
+.ct-mini-corner.is-here { fill: var(--ct-lat); }
+.ct-corner { display: block; flex: none; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+
+.ct-place-head { display: flex; align-items: center; justify-content: space-between; }
+.ct-place-head button {
+  all: unset; cursor: pointer; color: var(--ct-dim);
+  padding: calc(1px * var(--ct-cs)) calc(6px * var(--ct-cs)); border-radius: calc(5px * var(--ct-cs));
+}
+.ct-place-head button:hover { background: var(--ct-press); color: var(--ct-ink); }
+.ct-screen {
+  display: grid; grid-template-columns: 1fr 1fr; row-gap: calc(28px * var(--ct-cs)); column-gap: calc(8px * var(--ct-cs));
+  min-width: calc(300px * var(--ct-cs)); margin: calc(5px * var(--ct-cs)) calc(2px * var(--ct-cs)) 0;
+  padding: calc(6px * var(--ct-cs)); border: 1px solid var(--ct-rule); border-radius: calc(7px * var(--ct-cs));
+}
+.ct-spot {
+  all: unset; box-sizing: border-box; display: flex; align-items: center; gap: calc(7px * var(--ct-cs));
+  height: calc(40px * var(--ct-cs)); padding: 0 calc(12px * var(--ct-cs)); border-radius: calc(5px * var(--ct-cs));
+  font-size: calc(12.5px * var(--ct-cs)); color: var(--ct-dim);
+}
+/* The mark, or the tray, on the side of the screen it stands for. */
+.ct-spot-tr, .ct-spot-br { flex-direction: row-reverse; }
+button.ct-spot { cursor: pointer; }
+button.ct-spot:hover { background: var(--ct-press); color: var(--ct-ink); }
+.ct-spot .ct-corner { width: calc(12px * var(--ct-cs)); height: calc(12px * var(--ct-cs)); }
+.ct-spot.is-here { color: var(--ct-faint); }
+/* The tray, small, where it is now. Drawn in the list's own ink rather than
+   as glass, so it reads the same where the Mac draws the glass. */
+.ct-tag.ct-chip {
+  cursor: default; pointer-events: none; height: calc(24px * var(--ct-cs));
+  padding: 0 calc(8px * var(--ct-cs)); gap: calc(6px * var(--ct-cs)); font-size: calc(12px * var(--ct-cs));
+  border: 1px solid var(--ct-rule); background: var(--ct-press);
 }

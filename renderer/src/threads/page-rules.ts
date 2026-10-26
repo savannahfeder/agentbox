@@ -8,7 +8,7 @@
 import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mjs';
 import type { Seen } from './summary-rules';
 import { hiddenUntil } from '../list-rules';
-import type { Product, ThreadCard, ThreadStateWord, WorkItem } from '../types';
+import type { Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { priorityIdOf, priorityValueOf, type PriorityId } from '../priority';
 import { dayAndTime, firstRealLine } from '../format';
 import { threadState } from '../../../shared/thread-cards.mjs';
@@ -848,4 +848,13 @@ export function conversationWith(personIds: string | string[], { products, items
   if (!record) return null;
   return items.filter((i) => i.product === record.slug && !i.agent)
     .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0] ?? null;
+}
+
+/** The tab that holds a thread in this state, for opening it from elsewhere. */
+export function tabOfState(state: ThreadStateWord | null): View | null {
+  if (state === 'waiting') return 'inbox';
+  if (state === 'running') return 'progress';
+  if (state === 'scheduled') return 'snoozed';
+  if (state === 'done') return 'done';
+  return null;
 }

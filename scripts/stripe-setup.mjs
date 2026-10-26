@@ -50,7 +50,7 @@ export const portalSettings = (sold) => ({
     invoice_history: { enabled: true },
     payment_method_update: { enabled: true },
     subscription_cancel: { enabled: true, mode: 'at_period_end' },
-    subscription_update: { enabled: true, default_allowed_updates: ['price'], proration_behavior: 'create_prorations', products: sold.map((s) => ({ product: s.product, prices: [s.price] })) },
+    subscription_update: { enabled: true, default_allowed_updates: ['price'], proration_behavior: 'create_prorations', products: sold.map((s) => ({ product: s.product, prices: [s.price], adjustable_quantity: { enabled: false } })) },
   },
 });
 

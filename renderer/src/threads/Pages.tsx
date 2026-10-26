@@ -150,7 +150,7 @@ function CloudOfferCard() {
   const { offer, onGo } = at;
   return <div className="th-card th-offer-card">
     <div className="t">{offer.say.replace(/\.$/, '')}</div>
-    <div className="m"><CloudIcon /><span className="p">{offer.waiting.replace(/ (is|are) waiting\.$/, ' waiting').replace(/threads? /, '')}</span>
+    <div className="m"><span className="th-offer-count"><CloudIcon /><span className="p">{offer.waiting.replace(/ (is|are) waiting\.$/, ' waiting').replace(/threads? /, '')}</span></span>
       {offer.go && <button type="button" className="th-offer-card-go" onClick={() => onGo(offer.go!)}>{offer.go.act === 'pay' ? offer.go.label.replace(/ · .*/, '') : 'Start in the cloud'}<span aria-hidden="true">→</span></button>}</div>
   </div>;
 }
@@ -463,36 +463,14 @@ function PeopleLine({ everyone, picked, me, onPick }: PeoplePick) {
 }
 
 /* ------------------------------------------------------------ an empty tab */
-/** AN EMPTY INBOX, DRAWN AGAIN FROM THE QUESTION IT ANSWERS (2026-10-01),
- *  from first principles. When nothing needs you,
- *  the page has three things to say: that you are clear, whether work is
- *  moving without you, and how to start the next thing. It sits where the
- *  first row would, under the tabs, left aligned with the titles, so the page
- *  does not jump when a thread lands. The tabs stay: an empty Needs you is
- *  still the Inbox, and Running is one click away. */
-export function InboxClear({ running, queued = 0, scheduled, onView, onCompose, team = false }: {
-  running: number; scheduled: number; onView: (v: TabView) => void; onCompose: () => void;
-  /** Waiting its turn: in the tab, and no agent on it yet (`workMoving`, w-712fc99e8d). */
-  queued?: number;
-  /** Signed into a team: only then does the quiet line offer a teammate (w-db6f5e331e). */
-  team?: boolean;
-}) {
-  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-  return <div className="th-clear">
+/** THE EMPTY INBOX IS WHERE THE NEXT THREAD STARTS (w-4e9f957f97). The
+ *  heading, and under it the New thread box drawn open on the page: App.tsx
+ *  puts the one composer into `slot`. What is in progress has its own tab and
+ *  is not counted here. */
+export function InboxClear({ slot }: { slot: (el: HTMLDivElement | null) => void }) {
+  return <div className="th-clear th-start">
     <h2>Nothing needs you</h2>
-    <p>
-      {running > 0
-        ? <><button type="button" className="th-clear-link" onClick={() => onView('progress')}>{plural(running, 'thread is running', 'threads are running')}</button>. Each one lands here when it needs you.</>
-        : queued > 0
-          ? <><button type="button" className="th-clear-link" onClick={() => onView('progress')}>{plural(queued, 'thread is queued', 'threads are queued')}</button>. An agent starts on {queued === 1 ? 'it' : 'each'} as soon as one is free.</>
-          : scheduled > 0
-            ? <><button type="button" className="th-clear-link" onClick={() => onView('snoozed')}>{plural(scheduled, 'thread is scheduled', 'threads are scheduled')}</button>. Nothing else is open.</>
-            : team ? 'Start a thread and an agent picks it up, or message a teammate.' : 'Start a thread and an agent picks it up.'}
-    </p>
-    <div className="th-clear-acts">
-      <button type="button" className="th-new" onClick={onCompose}><PenIcon />New thread</button>
-      <span className="th-clear-key">or press <kbd>N</kbd></span>
-    </div>
+    <div className="th-clear-compose" ref={slot} />
   </div>;
 }
 
@@ -992,7 +970,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
             }
             if (e.item) onOpenItem(e.item); else if (e.card) onOpenCard?.(e.card);
           }}>
-          <div className="t">{e.message
+          <div className="t">{e.item && <TeammateLead item={e.item} />}{e.message
             ? <MessageTitle people={e.message.people} fromMe={e.message.fromMe} text={e.title ?? ''} mark={pin} />
             : <TitleThenMark title={e.title ?? ''} mark={marks} />}
           </div>

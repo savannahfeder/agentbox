@@ -40,6 +40,9 @@ if (args.includes('--help') || args.includes('-h')) {
     npx agentbox-app --no-open       start it and print the url instead
 
   Everything stays on this machine. Nothing is uploaded and nothing is hosted.
+
+  The desktop app is the other way to run it, built from the repository:
+  https://github.com/savannahfeder/agentbox#install
 `);
   process.exit(0);
 }
@@ -103,7 +106,10 @@ const server = createServer({
 const wanted = Number(flag('port', 0)) || 0;
 server.listen(wanted, '127.0.0.1', () => {
   const url = `http://127.0.0.1:${server.address().port}/?token=${token}`;
-  console.log(`\n  agentbox is running.\n\n  ${url}\n\n  Store: ${dataDir}\n  Stop it with control-C.\n`);
+  // WHICH OF THE TWO THIS IS. There is a desktop app as well, and somebody who
+  // ran this line expecting that one has to be told here: the README is not
+  // what they are looking at.
+  console.log(`\n  agentbox is running in your browser.\n\n  ${url}\n\n  Store: ${dataDir}\n  The desktop app is built from the repository: https://github.com/savannahfeder/agentbox#install\n  Stop it with control-C.\n`);
   if (!args.includes('--no-open')) open(url);
 });
 

@@ -27,7 +27,7 @@ import fs from 'node:fs';
 import { Worker } from 'node:worker_threads';
 import os from 'node:os';
 import path from 'node:path';
-import { RECENT_DAYS, isScratchFolder, shortFolder, threadTitle } from './agent-sessions.mjs';
+import { RECENT_DAYS, isScratchFolder, isTaskFolder, shortFolder, threadTitle } from './agent-sessions.mjs';
 import { codexDataDirs } from './agent-homes.mjs';
 import { WAS_SLUGS, nameSlug } from '../shared/product-name.mjs';
 import { howTheChatEnded } from '../shared/agent-import.mjs';
@@ -35,6 +35,8 @@ import { howTheChatEnded } from '../shared/agent-import.mjs';
 export const CODEX_RECENT_DAYS = RECENT_DAYS;
 /** The originator Codex records for a run this app started (CLIENT_INFO.name), now and before. */
 const OUR_ORIGINATORS = new Set([nameSlug, ...WAS_SLUGS]);
+/** `codex exec` and Codex as an MCP server: one-shot runs a program starts. */
+const SOURCES_NOT_TYPED = new Set(['exec', 'mcp']);
 /** How many day folders the walk opens at most, whatever `days` says. */
 const MAX_DAY_FOLDERS = 40;
 /**
@@ -223,6 +225,9 @@ function readRolloutAfresh(file) {
         // every run a person's; its originator is the clientInfo name we hand
         // Codex, under this name or one the app had before.
         threadSource: OUR_ORIGINATORS.has(String(p.originator ?? '').toLowerCase()) ? 'agentbox'
+          // A program's run, like Claude Code's `-p`: Codex 0.163.0 still
+          // writes `thread_source: "user"` on it.
+          : SOURCES_NOT_TYPED.has(p.source) ? 'program'
           : typeof p.thread_source === 'string' ? p.thread_source : (typeof p.source === 'string' ? 'user' : 'other'),
         startedAt: Number.isFinite(startedAt) ? startedAt : 0,
       };
@@ -303,7 +308,7 @@ export function readCodexThreads({ home = os.homedir(), codexDir = null, codexDi
     }
   }
   const byId = new Map();
-  const skipped = { notHers: 0, scratch: 0, old: 0, empty: 0, unreadable: 0, copy: 0 };
+  const skipped = { notHers: 0, scratch: 0, ours: 0, old: 0, empty: 0, unreadable: 0, copy: 0 };
   for (const dir of dirs) readOneCodexHome(dir, { home, days, now, cutoff, index, byId, skipped });
   const out = [...byId.values()].map(({ fileTime, ...t }) => t);
   out.sort((a, b) => b.when - a.when);
@@ -316,6 +321,7 @@ function readOneCodexHome(codexDir, { home, days, now, cutoff, index, byId, skip
     if (!r) { skipped.unreadable += 1; continue; }
     if (r.threadSource !== 'user') { skipped.notHers += 1; continue; }
     if (!r.cwd || isScratchFolder(r.cwd, home)) { skipped.scratch += 1; continue; }
+    if (isTaskFolder(r.cwd)) { skipped.ours += 1; continue; }
     const named = index.get(r.id);
     const when = Math.max(named?.updatedAt ?? 0, r.mtime, r.startedAt);
     if (when < cutoff) { skipped.old += 1; continue; }

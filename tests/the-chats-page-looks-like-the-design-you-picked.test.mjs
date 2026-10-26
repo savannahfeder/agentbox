@@ -32,13 +32,12 @@ describe('a teammate\'s chat', () => {
     expect(rule('.tq-chats .tq-chat .rm-cm.tq-m .h .tq-pic')).toMatch(/border-radius: 6px/);
   });
 
-  it('shows what it sent you as a card with a button to open it', () => {
+  it('shows what it sent you in its own block after its name', () => {
     const chat = page.slice(page.indexOf('function ChatColumn('), page.indexOf('\nfunction ', page.indexOf('function ChatColumn(') + 10));
-    expect(chat).toMatch(/e\.verb === 'sent'[\s\S]{0,200}<SentCard /);
+    // Since 2026-10-26 the card is the thread's own inbox row
+    // (a-thread-a-teammate-sent-you-looks-like-its-row-in-your-inbox).
+    expect(chat).toMatch(/e\.verb === 'sent'[\s\S]{0,300}<SentCard /);
     expect(page).toMatch(/function SentCard\(/);
-    expect(page).toMatch(/className="tq-card"/);
-    expect(page).toMatch(/className="tq-btn pri"[^>]*>Open it</);
-    expect(rule('.tq-card')).toMatch(/border-radius: 6px/);
   });
 
   it('lets you tap an answer on soft-cornered buttons', () => {
@@ -46,15 +45,15 @@ describe('a teammate\'s chat', () => {
   });
 });
 
-describe('the Chats list and About', () => {
+describe('the Chats list and a teammate\'s details', () => {
   it('sits on the page\'s own background, with round faces for people', () => {
     expect(rule('.cx-list')).toMatch(/background: var\(--bg\)/);
     expect(css).toMatch(/\.cx-row img[^{]*\{[^}]*border-radius: 50%/);
   });
 
   it('picks where it works from a short menu, not a row of buttons', () => {
-    const about = page.slice(page.indexOf('function About('), page.indexOf('\nfunction ', page.indexOf('function About(') + 10));
-    expect(about).toMatch(/<dt>Works in<\/dt>\s*<dd>\{real\.length > 1\s*\? <PickOne /);
+    const details = page.slice(page.indexOf('function Details('), page.indexOf('\nfunction ', page.indexOf('function Details(') + 10));
+    expect(details).toMatch(/<dt>Works in<\/dt>\s*<dd>\{real\.length > 1\s*\? <PickOne /);
     expect(page).toMatch(/function PickOne\(/);
   });
 

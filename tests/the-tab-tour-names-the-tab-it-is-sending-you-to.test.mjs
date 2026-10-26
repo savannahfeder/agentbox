@@ -140,8 +140,11 @@ describe('4. one copy of where the press goes, used by the ring and the words', 
     const view = read('renderer/src/components/Onboarding.tsx');
     expect(view).toContain('nextTab(tabs, view)');
     expect(view).not.toContain("tabs ?? ['inbox', 'progress', 'done']");
-    // And the ring is drawn off that same answer.
-    expect(view).toContain('.tabs .tab[data-tab="${goingTo}"]');
+    // And the ring is drawn off that same answer: the Inbox's own tab by its
+    // place, then the sidebar's row (the old strip's tab went with that
+    // layout, w-a1ed0e8b25).
+    expect(view).toContain('teamTab(goingTo)');
+    expect(view).toContain('.workspace-navigation [data-tab="${goingTo}"]');
   });
 
   it('hands the strip to the card as well as to the ring', () => {

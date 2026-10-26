@@ -25,9 +25,11 @@ describe('To in New thread', () => {
     expect(app).toMatch(/agentMates=\{teammatesUi\.live \? snap\.teammates\?\.list\.filter\(\(t\) => t\.status === 'active'\) : undefined\}/);
   });
 
-  it('posts to a teammate, describes Someone new in the project picked, and opens where it went', () => {
-    expect(app).toMatch(/to === 'new' \? 'describe' : 'post', to === 'new' \? \{ text, \.\.\.\(product \? \{ product \} : \{\}\) \} : \{ text, to: \[to\] \}/);
-    expect(app).toMatch(/teammatesUi\.go\(to === 'new' \? r\.value\?\.teammate\?\.id \?\? 'team' : to\)/);
+  // A send to a teammate leaves you where you were, as any send does; only
+  // someone new opens, since it asks you its first questions (last power test).
+  it('posts to a teammate, describes Someone new in the project picked, and opens only someone new', () => {
+    expect(app).toMatch(/to === 'new' \? 'describe' : 'post', to === 'new' \? \{ text, \.\.\.\(product \? \{ product \} : \{\}\) \} : \{ text, to: \[to\], fresh: true \}/);
+    expect(app).toMatch(/if \(to === 'new'\) teammatesUi\.go\(r\.value\?\.teammate\?\.id \?\? 'team'\);/);
   });
 
   it('Make a teammate opens the new teammate from where the store puts it', () => {

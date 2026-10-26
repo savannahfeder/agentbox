@@ -80,8 +80,9 @@ describe('the ten beats, in her order', () => {
     // no sentence anywhere in the window and nothing saying how to get out, on
     // the one beat that exists to teach ⌘K. The order is the same one `snooze`
     // and `unblock` already use: the thing that is only on the screen part of
-    // the time wins while it is there.
-    expect(ANCHOR.command).toEqual(['.modal.palette', 'button[aria-label="Commands"]']);
+    // the time wins while it is there. The button itself went with the layout
+    // without the sidebar (w-a1ed0e8b25), so the palette is all that is left.
+    expect(ANCHOR.command).toEqual(['.modal.palette']);
   });
 
   it('ends on the finish card, which is where her agents are asked about', () => {

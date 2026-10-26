@@ -301,3 +301,21 @@
    an empty field — most tasks never carry a day — so it is drawn in the ink a
    placeholder uses: present, readable, and not asking for anything. */
 .tc-word-text.tc-unset { color: var(--text-faint); }
+
+/* ------------------------- on the empty inbox ---------------------------- */
+/* The same card drawn open on the page (w-4e9f957f97, approved as round 3,
+   option 4): no surface of its own, the words large over one rule, and the
+   head's fields as chips in the bar. Its menus drop below the chips, since
+   rising would cover the words; fitMenu still flips one that has no room. */
+.tc-card.tc-inline { width: 720px; max-width: 100%; background: none; border: 0; box-shadow: none; }
+.tc-inline .tc-text {
+  height: auto; overflow-y: auto; padding: 0 0 14px;
+  font-size: 22px; line-height: 30px;
+  border-bottom: 1px solid var(--line-strong); transition: border-color 0.14s;
+}
+.tc-inline .tc-text:focus { border-bottom-color: var(--text-faint); }
+.tc-inline .tc-bar { flex-wrap: wrap; border-top: 0; padding: 14px 0 0; }
+.tc-inline .tc-note, .tc-inline .attach-row { padding: 12px 0 0; }
+.tc-inline .tc-word-text { text-decoration: none; }
+.tc-inline .tc-menu { top: calc(100% + 8px); bottom: auto; left: 0; }
+.tc-inline .tc-menu.tc-right { left: auto; right: 0; }

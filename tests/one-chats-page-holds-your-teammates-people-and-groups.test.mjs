@@ -132,7 +132,7 @@ describe('a teammate\'s page', () => {
   });
 
   it('says in its header that it is an AI teammate, unless it has a role to show', () => {
-    expect(page).toMatch(/\{!book && !t\.role && <span className="tq-role">AI teammate<\/span>\}/);
+    expect(page).toMatch(/\{!book && <span className="tq-role">\{titleAside\(shown\.kind, t\.role, t\)\}<\/span>\}/);
   });
 
   it('describes it in words beside a square list of facts', () => {

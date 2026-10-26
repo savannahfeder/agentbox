@@ -71,15 +71,12 @@ describe('the walk', () => {
   });
 });
 
+// The empty inbox has no sentence of its own since w-4e9f957f97: it is the
+// heading over the New thread box, whose To menu is where a teammate is offered.
 describe('the empty inbox', () => {
-  const draw = (t) => text(renderToStaticMarkup(React.createElement(InboxClear, {
-    running: 0, scheduled: 0, onView: () => {}, onCompose: () => {}, team: t,
-  })));
-  it('names no teammate when there is no team', () => {
-    expect(draw(false)).not.toMatch(TEAM_WORDS);
-    expect(draw(false)).toMatch(/agent picks it up/);
-  });
-  it('still offers a teammate on a team', () => {
-    expect(draw(true)).toMatch(/teammate/);
+  const draw = () => text(renderToStaticMarkup(React.createElement(InboxClear, { slot: () => {} })));
+  it('names no teammate', () => {
+    expect(draw()).not.toMatch(TEAM_WORDS);
+    expect(draw()).toMatch(/Nothing needs you/);
   });
 });

@@ -49,6 +49,7 @@ node $P --who startup-engineer,founder --hours 2 --focus "replies after switchin
 | `--who` | names from `people/`, `random:N` or `all` | `random:2` |
 | `--hours` / `--minutes` | how long | 1 hour |
 | `--focus` | what the team shipped and wants leaned on, in a sentence | none |
+| `--alpha` | alpha features on in every copy, e.g. `teammates` or `teammates,rooms` | off, as for anyone new |
 | `--real` | the Claude Code and Codex this computer has, on their plans | stand-ins |
 | `--chaos` | `none`, `light`, `normal`, `heavy` | `normal` |
 | `--round-minutes` | one tester session before it is restarted with its diary | 20 |

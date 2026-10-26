@@ -59,8 +59,10 @@ describe('the sidebar, pointed at', () => {
   it('stands still for anyone who asks for less motion', () => {
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.app\.workspace-layout\.gt-rail, \.gt-rail\.workspace-layout::before, \.gt-rail > \.panel-marks, \.gt-rail \.workspace-navigation\.gt-rail-nav,[^{]*\{ transition: none !important; \}/);
   });
-  it('leaves the ordinary sidebar alone: with Groups off its words still hide when folded', () => {
-    expect(nav).toContain('.workspace-collapsed .workspace-navigation button > span, .workspace-collapsed .workspace-search kbd { display: none; }');
+  // There is no other sidebar since w-a1ed0e8b25; the phone's, which is not a
+  // rail, still hides its words.
+  it('hides the words of a sidebar that is not the rail', () => {
+    expect(nav).toContain('.workspace-collapsed .workspace-navigation button > span { display: none; }');
   });
 });
 

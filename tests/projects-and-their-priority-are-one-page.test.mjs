@@ -126,7 +126,7 @@ describe('the mark beside a project', () => {
   it('the sidebar corner shows the Agentbox icon when there is no team, and the team initial when there is', () => {
     const nav = read('renderer/src/components/WorkspaceNavigation.tsx');
     expect(nav).toMatch(/team\?\.team\?\.name\s*\?\s*<span className="th-mark"/);
-    expect(nav).toMatch(/<AppMark size=\{20\} \/>/);
+    expect(nav).toMatch(/<AppMark size=\{\d+\} \/>/);
   });
 
   it('the first-run screens show the Agentbox mark, not a project mark', () => {

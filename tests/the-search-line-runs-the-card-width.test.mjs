@@ -163,12 +163,13 @@ describe('the corner steps off the strip while she is searching', () => {
     expect(searchNav).toMatch(/^\{searchFieldInStrip\(\{ searching: search !== null/);
   });
 
-  it('brings all three back, so nothing is deleted from the app', () => {
+  it('brings the corner back, so nothing is deleted from the app', () => {
+    // The corner holds the header's own actions (New thread and Display) since
+    // the plus, the ⌘ mark and the cog went with the layout without the
+    // sidebar (w-a1ed0e8b25).
     const corner = app.slice(app.indexOf('className="topbar-right"'), app.indexOf('</header>'));
-    // w-ec62ab6b38 (2026-09-28): the plus is labelled New thread now, not New task.
-    expect(corner).toMatch(/aria-label="New thread"/);
-    expect(corner).toMatch(/aria-label="Commands"/);
-    expect(corner).toMatch(/aria-label="Settings"/);
+    expect(corner).toContain('<HeaderActions');
+    expect(corner).toContain("onCompose={() => setModal('compose')}");
   });
 
   it('did not instead stop the line short of them, which was option five', () => {

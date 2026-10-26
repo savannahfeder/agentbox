@@ -9,10 +9,10 @@ import { TeamContext } from '../team/people';
 import {
   ALSO, ANCHOR, BOUNDS, BREATHE_AFTER_MS, COACHED, COPY, FLOOR, FLOOR_OF, TEAM_TAB_NAMES, TEXT_MAX, TEXT_MIN, teamTab,
   HELD_EVENTS, LINE_H, NOT_THE_APP, SLAB_OF, TEXT_GAP, UNDER,
-  anyAgents, clearOf, finishCard, forgetAgentsWhileLookingAgain, gateRows,
-  forgetFoldersWhileLookingAgain, keepSecondRead, keyName, keyToken, padFor,
+  anyAgents, clearOf, finishCard, fitsBeside, forgetAgentsWhileLookingAgain, gateRows,
+  forgetFoldersWhileLookingAgain, hoverLit, keepSecondRead, keyName, keyToken, padFor,
   practising, pressAtWrongRow, pressCounts, readAgentsAgain, roomFor, strayClick,
-  swallowPress, walkProjects, wrongPress,
+  swallowPress, typedAtTheBox, walkProjects, wrongPress,
   coach, nextStep, nextTab, recentFolders, ring, runOf, shortPath, stepBack,
   type AgentFile, type Coach, type FirstRun, type Rect, type RecentFolder, type Step,
 } from '../onboarding';
@@ -198,11 +198,14 @@ export function Cap({ cap, className }: { cap: string; className?: string }) {
 /**
  * The coaching card. The quiet line says where you are and the loud line says
  * the one key to press. */
-function Card({ say, beat, pointed, knock = 0, onNext, onSkip }: {
+function Card({ say, beat, pointed, knock = 0, onNext, onSkip, onType }: {
   say: Coach;
   /** Next on the look-around cards. ↵ does the same and never reaches the app,
    * where it would open the selected row. */
   onNext?: () => void;
+  /** Somebody typed at the box the ring is round, so open it on that letter
+   * (`typedAtTheBox`). */
+  onType?: (letter: string) => void;
   /** The quiet way past this one card, drawn on every coaching card. */
   onSkip?: () => void;
   /** Stray clicks answered on this beat, from `Ringed`. Added to the same
@@ -225,6 +228,10 @@ function Card({ say, beat, pointed, knock = 0, onNext, onSkip }: {
   aim.current = { beat: beat ?? [], pointed: pointed ?? null };
   const next = useRef(onNext);
   next.current = onNext;
+  // A ref for the same reason `next` is one: the app writes it inline, so it is
+  // a new function on every render.
+  const intoTheBox = useRef(onType);
+  intoTheBox.current = onType;
   // On an any-key card, any key or a click in the palette moves on, and the
   // event is stopped so no command runs by accident. This is registered before
   // the field rule below because on the ⌘K beat the cursor is in the palette's
@@ -290,6 +297,16 @@ function Card({ say, beat, pointed, knock = 0, onNext, onSkip }: {
         return;
       }
       if (!wrongPress(say.key, e)) return;
+      // A letter at a box the ring is round is a reply being typed, not a
+      // wrong key: it opens the box, and the cap does not pulse at somebody
+      // doing what the glow asks for.
+      if (typedAtTheBox(say, e, e.target)) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        intoTheBox.current?.(e.key);
+        return;
+      }
       // A beat's second key, like E beside R, is not a wrong press.
       if (say.alt && keyToken(e) === say.alt) return;
       setWrong((n) => n + 1);
@@ -481,11 +498,13 @@ function adriftAt(): { x: number; y: number; w: number } {
 
 function Ringed({
   selector, boundsSel, underSel, makesRoom, say, beside, besideRing, besideOf, beat, pointed,
-  hold, also, onNext, onSkip,
+  hold, also, onNext, onSkip, onType,
 }: {
   selector: string[]; boundsSel?: string; underSel?: string; say: Coach;
   /** The look around's Next. See `Card`. */
   onNext?: () => void;
+  /** Typing at the box the ring is round. See `Card`. */
+  onType?: (letter: string) => void;
   /** The quiet "Skip this step". See `Card`. */
   onSkip?: () => void;
   /** Set on beats that ring one row out of a stack. It overrides `underSel`,
@@ -631,7 +650,7 @@ function Ringed({
           className="fr-tether fr-adrift"
           style={{ left: adrift.x, top: adrift.y, maxWidth: adrift.w }}
           role="status"
-        ><Card say={say} beat={beat} pointed={pointed} knock={knock} onNext={onNext} onSkip={onSkip} /></p>
+        ><Card say={say} beat={beat} pointed={pointed} knock={knock} onNext={onNext} onSkip={onSkip} onType={onType} /></p>
       </>
     );
   }
@@ -639,6 +658,11 @@ function Ringed({
   // A stray click deepens the veil, swells the ring once and pulses the cap,
   // with no words. `knock` keys the veil and the halo so each click replays it.
   const knocked = knock ? ' fr-knock' : '';
+  // Where a card beside its ring would start, and whether there is enough
+  // window left of it to read one. With none, the card takes its ordinary
+  // place above or below the ring instead (`fitsBeside`).
+  const asideAt = besideRing ? Math.round(geo.ring.x + geo.ring.w + 26) : besideLeft(geo, besideOf);
+  const aside = !!beside && fitsBeside(asideAt, { w: window.innerWidth });
   return (
     <>
       <Veil key={knock} box={geo.ring} knocked={knocked} />
@@ -653,7 +677,7 @@ function Ringed({
           x={pad} y={pad} width={geo.ring.w} height={geo.ring.h} rx={geo.ring.r}
         />
       </svg>
-      {beside ? (
+      {aside ? (
         // Vertically centred on the ring. The half-height shift is in the
         // class's transform, because the drop and the lift use that transform
         // too.
@@ -664,15 +688,15 @@ function Ringed({
             // Clear of the whole tab strip, so the card covers no tab and stays
             // put while the ring moves. With `besideRing` (the palette) it
             // stands off the ring instead, because there is no strip to clear.
-            left: besideRing ? Math.round(geo.ring.x + geo.ring.w + 26) : besideLeft(geo, besideOf),
+            left: asideAt,
             top: geo.ring.y + geo.ring.h / 2,
             maxWidth: besideRing
-              ? Math.max(240, window.innerWidth - (geo.ring.x + geo.ring.w + 26) - 40)
+              ? Math.max(240, window.innerWidth - asideAt - 40)
               // No wider than an ordinary card, so it stays off the header.
-              : Math.max(240, Math.min(TEXT_MAX + 60, window.innerWidth - besideLeft(geo, besideOf) - 200)),
+              : Math.max(240, Math.min(TEXT_MAX + 60, window.innerWidth - asideAt - 200)),
           }}
           role="status"
-        ><Card say={say} beat={beat} pointed={pointed} knock={knock} onNext={onNext} onSkip={onSkip} /></p>
+        ><Card say={say} beat={beat} pointed={pointed} knock={knock} onNext={onNext} onSkip={onSkip} onType={onType} /></p>
       ) : (
         <p
           ref={cardRef}
@@ -681,7 +705,7 @@ function Ringed({
             ? { left: geo.text.x, top: geo.text.y, maxWidth: geo.text.w }
             : { right: geo.text.right, top: geo.text.y, maxWidth: geo.text.w }}
           role="status"
-        ><Card say={say} beat={beat} pointed={pointed} knock={knock} onNext={onNext} onSkip={onSkip} /></p>
+        ><Card say={say} beat={beat} pointed={pointed} knock={knock} onNext={onNext} onSkip={onSkip} onType={onType} /></p>
       )}
     </>
   );
@@ -838,11 +862,17 @@ export function Landed({ agents, onGone }: {
     })),
   );
   const team = useContext(TeamContext);
+  // THE WAY OUT IS A REF. The app writes `onGone` inline, so it is a new
+  // function on every render; as a dependency it dropped the listeners and
+  // started the fourteen seconds again each time, and an app that redraws at
+  // all never reached the end of them.
+  const gone = useRef(onGone);
+  gone.current = onGone;
   useEffect(() => {
-    const t = setTimeout(onGone, LANDED_MS);
+    const t = setTimeout(() => gone.current(), LANDED_MS);
     // Any key or press takes it down and still reaches the app, so the event is
     // neither stopped nor prevented.
-    const on = () => onGone();
+    const on = () => gone.current();
     const armed = setTimeout(() => window.addEventListener('keydown', on), 0);
     const armedClick = setTimeout(() => window.addEventListener('pointerdown', on), 0);
     return () => {
@@ -850,7 +880,7 @@ export function Landed({ agents, onGone }: {
       window.removeEventListener('keydown', on);
       window.removeEventListener('pointerdown', on);
     };
-  }, [onGone]);
+  }, []);
   return (
     <div className="fr-landed" aria-live="polite">
       <div className="fr-burst" aria-hidden="true">
@@ -1052,7 +1082,7 @@ function Slab({ head, line, piece, onNext }: {
   }, [onNext]);
   return (
     <div className="fr-screen fr-screen-intro">
-      <div className="fr-brand"><AppMark size={22} />{NAME}</div>
+      <div className="fr-brand"><AppMark size={13} />{NAME}</div>
       <IntroPiece kind={piece} />
       <div className="fr-corner">
         <div>
@@ -1084,7 +1114,7 @@ function Statement({ head, line, go, onNext, skip, onSkip }: {
   }, [onNext]);
   return (
     <div className="fr-screen">
-      <div className="fr-brand"><AppMark size={22} />{NAME}</div>
+      <div className="fr-brand"><AppMark size={13} />{NAME}</div>
       <div className="fr-stack">
         <div className="fr-finish" role="status">
           <h1 className="fr-finish-head">{head}</h1>
@@ -1101,7 +1131,11 @@ export function Onboarding({
   run, claude, home, opened, waiting, later, picking, palette, board, replying, view, tabs, products = [],
   beat, pointed, runsOn = null,
   onEvent, onStep, onSkipToApp, onPractice, onDone, onFiled, onProjectMade, onRecheck, onLeave, onShut, onSkipStep,
+  onType,
 }: {
+  /** Open the reply box on a letter typed at it, which is where that letter
+   * goes (`typedAtTheBox`). */
+  onType?: (letter: string) => void;
   /** Skip the tutorial from its hand-off page, into her own project. */
   onLeave?: () => void;
   /** Shut whatever is open over the app; the ⌘K beat's any-key press. */
@@ -1184,6 +1218,18 @@ export function Onboarding({
   // Nothing is lit until the person picks, so the Return that left the welcome
   // cannot choose a folder. Arrow down lights the first.
   const [lit, setLit] = useState(-1);
+  // Whether the mouse has moved since this screen was drawn. See `hoverLit`:
+  // a row under a mouse standing still is not a row anybody chose.
+  const stirred = useRef(false);
+  // And whether it is the mouse that lit the row, which decides what Return
+  // may do with the row that skips the folder.
+  const [byMouse, setByMouse] = useState(false);
+  /** Light a row: `how` is the mouse, or the keyboard, which owns Return. */
+  const light = (row: number, how: 'mouse' | 'key') => {
+    if (how === 'mouse' && !stirred.current) return;
+    setLit((l) => (how === 'mouse' ? hoverLit(l, row, stirred.current) : row));
+    setByMouse(how === 'mouse');
+  };
   const wantsRecent = run.step === 'welcome' || run.step === 'folder';
   useEffect(() => {
     if (!wantsRecent || recent) return;
@@ -1232,6 +1278,10 @@ export function Onboarding({
   // Whether focus is in the reply box. The app's `replying` can move on while
   // the box stays focused, and then a "Press R" card would type an r into it.
   const [inReply, setInReply] = useState(false);
+  // Whether the box was opened by typing at it, so the words in it are theirs
+  // and the card does not call them ours.
+  const [wrote, setWrote] = useState(false);
+  useEffect(() => { setWrote(false); }, [run.step]);
   useEffect(() => {
     const read = () => {
       const el = document.activeElement as Element | null;
@@ -1314,6 +1364,19 @@ export function Onboarding({
     return () => window.removeEventListener('keydown', on);
   }, [run.step, onEvent]);
 
+  // Every screen starts still, and the first real movement of the mouse ends
+  // that. `mousemove` fires only when the pointer moves, where `mouseenter`
+  // fires on a card drawn under one that has not.
+  useEffect(() => {
+    stirred.current = false;
+    setByMouse(false);
+    const on = () => { stirred.current = true; };
+    // In the capture phase, so the first movement has already counted by the
+    // time the row under the pointer asks to be lit.
+    window.addEventListener('mousemove', on, { capture: true });
+    return () => window.removeEventListener('mousemove', on, { capture: true });
+  }, [run.step]);
+
   // The folder list's keys: arrows move the highlight through the recent
   // folders, "Choose another folder" and the no-folder row, and Return takes
   // it. Armed on the next tick so the Return that arrived here does not leave.
@@ -1321,9 +1384,13 @@ export function Onboarding({
   useEffect(() => {
     if (run.step !== 'folder' || recent === null) return;
     const on = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowDown') { e.preventDefault(); setLit((i) => Math.min(rows + 1, i + 1)); }
-      if (e.key === 'ArrowUp') { e.preventDefault(); setLit((i) => Math.max(0, i - 1)); }
-      if (e.key === 'Enter' && lit > rows) { e.preventDefault(); skipFolder(); return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); setByMouse(false); setLit((i) => Math.min(rows + 1, i + 1)); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setByMouse(false); setLit((i) => Math.max(0, i - 1)); }
+      // SKIPPING IS THE KEYBOARD'S ALONE. A hand left on the mouse over this
+      // row is not somebody saying they have no folder, and the rest of the
+      // product wants one. The cap is not drawn on a row the mouse lit either,
+      // so Return promises nothing here that it will not do.
+      if (e.key === 'Enter' && lit > rows) { e.preventDefault(); if (!byMouse) skipFolder(); return; }
       if (e.key === 'Enter' && lit < 0) { e.preventDefault(); return; }
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -1409,7 +1476,7 @@ export function Onboarding({
       && !!document.querySelector('.th-bar .tm-tabs');
     const say = coach(run.step, run.sentAt ? now - run.sentAt : 0, {
       opened, view, picking, palette, board, replying: !!replying || inReply, left: beat?.length, tabs, replies: run.replies,
-      tabNames: teamStrip ? TEAM_TAB_NAMES : undefined, team: !!team,
+      tabNames: teamStrip ? TEAM_TAB_NAMES : undefined, team: !!team, wrote,
     });
     if (!say) return null;
     // Ring the walk's own rows by id where it knows them, falling back to
@@ -1433,7 +1500,7 @@ export function Onboarding({
           : goingTo
             // The team strip has no data-tab, so `teamTab` finds the tab by
             // its place in the strip.
-            ? [...(teamTab(goingTo) ? [teamTab(goingTo) as string] : []), `.workspace-navigation [data-tab="${goingTo}"]`, `.tabs .tab[data-tab="${goingTo}"]`, ...ANCHOR.where ?? []]
+            ? [...(teamTab(goingTo) ? [teamTab(goingTo) as string] : []), `.workspace-navigation [data-tab="${goingTo}"]`, ...ANCHOR.where ?? []]
             : ANCHOR[run.step];
 
     if (!sel || !sel.length) return null;
@@ -1468,6 +1535,7 @@ export function Onboarding({
         // On the ⌘K beat any press shuts the palette, which ends the beat.
         onNext={say.next ? () => go(run.step) : say.anyKey ? onShut : undefined}
         onSkip={onSkipStep}
+        onType={(letter) => { setWrote(true); onType?.(letter); }}
       />
     );
   }
@@ -1523,7 +1591,7 @@ export function Onboarding({
   return (
     <div className={backWord ? 'fr-screen has-back' : 'fr-screen'}>
       {backWord}
-      <div className="fr-brand"><AppMark size={22} />{NAME}</div>
+      <div className="fr-brand"><AppMark size={13} />{NAME}</div>
 
       {run.step === 'welcome' && (
         <div className="fr-corner">
@@ -1578,10 +1646,11 @@ export function Onboarding({
                 role="option"
                 aria-selected={lit === i}
                 className={`fr-folder${lit === i ? ' lit' : ''}${run.folder === f.folder ? ' on' : ''}`}
-                onMouseEnter={() => setLit(i)}
+                onMouseEnter={() => light(i, 'mouse')}
+                onMouseMove={() => light(i, 'mouse')}
                 // Tab lights the row it lands on, so the arrows and the
                 // keyboard never disagree about which row Return takes.
-                onFocus={() => setLit(i)}
+                onFocus={() => light(i, 'key')}
                 onClick={() => takeFolder(f.folder)}
               >
                 <span className="fr-fold"><FolderGlyph /></span>
@@ -1597,8 +1666,9 @@ export function Onboarding({
               role="option"
               aria-selected={lit === (recent?.length ?? 0)}
               className={`fr-folder fr-folder-other${lit === (recent?.length ?? 0) ? ' lit' : ''}`}
-              onMouseEnter={() => setLit(recent?.length ?? 0)}
-              onFocus={() => setLit(recent?.length ?? 0)}
+              onMouseEnter={() => light(recent?.length ?? 0, 'mouse')}
+              onMouseMove={() => light(recent?.length ?? 0, 'mouse')}
+              onFocus={() => light(recent?.length ?? 0, 'key')}
               onClick={pickFolder}
             >
               <span className="fr-fold"><PlusGlyph /></span>
@@ -1610,13 +1680,14 @@ export function Onboarding({
               role="option"
               aria-selected={lit === (recent?.length ?? 0) + 1}
               className={`fr-folder fr-folder-other fr-folder-none${lit === (recent?.length ?? 0) + 1 ? ' lit' : ''}`}
-              onMouseEnter={() => setLit((recent?.length ?? 0) + 1)}
-              onFocus={() => setLit((recent?.length ?? 0) + 1)}
+              onMouseEnter={() => light((recent?.length ?? 0) + 1, 'mouse')}
+              onMouseMove={() => light((recent?.length ?? 0) + 1, 'mouse')}
+              onFocus={() => light((recent?.length ?? 0) + 1, 'key')}
               onClick={skipFolder}
             >
               <span className="fr-fold"><SkipGlyph /></span>
               <span className="fr-folder-name">{COPY.folderNone}</span>
-              <span className="fr-folder-key">{lit === (recent?.length ?? 0) + 1 && <Cap cap="↵" />}</span>
+              <span className="fr-folder-key">{lit === (recent?.length ?? 0) + 1 && !byMouse && <Cap cap="↵" />}</span>
             </button>
           </div>
           {/* One note under the card: a refusal, else what this Mac is

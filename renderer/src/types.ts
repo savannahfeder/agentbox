@@ -396,6 +396,8 @@ export interface TeamChatLine {
   title?: string; details?: string; verb?: string; ref?: string; options?: string[]; ts: number;
   /** Said for you by one of your threads, when you asked it to. */
   via?: string; viaProduct?: string;
+  /** The words that set a new teammate up; from a suggestion, with the threads it was made from. */
+  setup?: boolean; threads?: { product: string; id: string; title: string }[];
   /** On an `act`: `learned` (kept something about you), `updated` (changed its own instructions),
    *  `lesson` (added to the playbook `ref`), and the older run and pause verbs. */
 }
@@ -404,6 +406,8 @@ export interface TeamRunLine {
   verb: 'picked' | 'passed' | 'queued' | 'sent' | 'answered' | 'finished'; by?: string; byName?: string; waiting?: boolean; answered?: boolean;
   /** Your words, on an `answered` line. */
   text?: string; ts: number;
+  /** The first thing it said, on a `sent` line. */
+  said?: string;
 }
 export interface TeammatesView { list: Teammate[]; chat: TeamChatLine[]; runs: TeamRunLine[]; error?: string; playbooks?: Playbook[];
   /** Something the loop that wakes teammates could not do lately, in words. */
@@ -529,6 +533,8 @@ export interface CloudPlan {
   hoursPerMonth?: number;
   running?: number;
   usedSeconds?: number;
+  /** Who bills the plan: Stripe, or nobody because it was set by hand. Absent from older servers. */
+  billing?: 'stripe' | 'given' | null;
   error?: string;
   message?: string;
 }

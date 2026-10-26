@@ -47,3 +47,7 @@ export function foldRepeats(
   lines: Array<{ id: string; ts: number; patch: Record<string, unknown> } | null>,
   now?: number,
 ): Map<string, RepeatRule>;
+export const PROTOCOL_OPENS: string;
+export const INSTRUCTION_MARK: string;
+/** A repeating run's body without the agent's rules in front of it; any other body whole. */
+export function instructionOf(body: string | null | undefined): string;

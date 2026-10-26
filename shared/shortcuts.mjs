@@ -207,8 +207,6 @@ export const SHORTCUTS = [
       { keys: ['⌘C'], what: 'Turn the cloud on or off, when no text is selected.' },
       // '/' above the focused branch → openSearch
       { keys: ['/'], what: 'Search your threads.' },
-      // '\\' above the focused branch → togglePanel
-      { keys: ['\\'], what: 'Show or hide the left sidebar.' },
       // main/main.mjs before-input-event: ⌘Y / ⌘N answer the oldest approval.
       // Its own card prints "⌘Y / ⌘N" beside Allow and Deny, so the words here
       // are the card's words. It lives under this heading rather than under an

@@ -118,6 +118,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     throw new Error('registerIpc needs host: { ipcMain, app, dialog }');
   }
   const { ipcMain, app, dialog } = host;
+  // A browser copy hands in its own; outside Electron, the `electron` package has no shell.
+  const shellNow = async () => host.shell ?? (await import('electron')).shell;
   // Coalesced: the supervisor fires onChange per worker stream line, which is
   // every second or two per running session. Each push makes the renderer
   // refetch the whole snapshot, so unthrottled pushes had the UI visibly
@@ -870,7 +872,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       else if (op === 'start') value = mates.start(a.id);
       else if (op === 'update') value = mates.update(a.id, { ...a.patch, ...(a.patch && 'engine' in a.patch ? { engine: supervisor.engineOffered(a.patch.engine) ?? null } : {}) });
       else if (op === 'remove') value = mates.remove(a.id);
-      else if (op === 'post') value = mates.post({ text: a.text, to: a.to });
+      else if (op === 'post') value = mates.post({ text: a.text, to: a.to, fresh: a.fresh === true });
       else if (op === 'goAhead') value = mates.goAhead(a.id, a.ref);
       else if (op === 'remember') value = mates.remember(a.id, a.text, { from: 'you' });
       else if (op === 'forget') value = mates.forget(a.id, a.memory);
@@ -1154,7 +1156,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // reached this handler at all: the whole pair was dropped four times over on
   // the way from her card (main/repeats.mjs says where).
   ipcMain.handle('zero:compose-repeat', (_e, { product, title, body, priority, rule, engine, model }) => {
-    return store.composeRepeat(product, {
+    const made = store.composeRepeat(product, {
       title,
       body,
       priority,
@@ -1162,6 +1164,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       engine: supervisor.engineOffered(engine),
       model: supervisor.modelOffered(engine, model),
     });
+    // A new rule is owed at once, so its first run starts now, not on the next tick.
+    supervisor.wake();
+    return made;
   });
 
   // THE ONE HANDLER THAT TAKES A FREE-FORM PATCH, so it is the one that has to
@@ -1747,10 +1752,25 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const config = cloudAccountConfig(supervisor.appDir, { home });
     if (!config) return null;
     if (!cloudAccount || cloudAccount.config !== JSON.stringify(config)) {
-      const { shell } = await import('electron');
+      const shell = await shellNow();
       cloudAccount = { config: JSON.stringify(config), value: config, session: cloudAccountSession({ config, openExternal: (u) => shell.openExternal(u), log: (l) => console.log(`cloud account: ${l}`) }) };
     }
     return cloudAccount;
+  };
+  // A new account's link comes back to this Mac's own listener while the page
+  // says to check the inbox, and the sign-in finishes here, so the page moves
+  // on by itself. Behind the handler, which it would hold for a quarter hour.
+  let confirming = null;
+  const waitForTheLink = async (acct) => {
+    if (confirming) return;
+    const { waitForEmailConfirmation } = await import('./cloud/account.mjs');
+    confirming = waitForEmailConfirmation({ config: acct.value, session: acct.session, home: supervisor.config.home || os.homedir() })
+      .then((out) => {
+        if (!out.ok) { console.log(`cloud account: the confirmation link did not finish: ${out.error}`); return; }
+        try { if (window?.isMinimized?.()) window.restore(); window?.show?.(); } catch { /* no window to raise */ }
+        push();
+      })
+      .finally(() => { confirming = null; });
   };
   ipcMain.handle('zero:cloud-account-sign-in', async (_e, { method, email, password, name, acceptTerms } = {}) => {
     const acct = await cloudAccountSessionNow();
@@ -1758,6 +1778,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     const { cloudSignIn } = await import('./cloud/account.mjs');
     const out = await cloudSignIn({ config: acct.value, session: acct.session, method, email, password, name, acceptTerms: acceptTerms === true, home: supervisor.config.home || os.homedir() });
     if (method === 'google') { try { if (window?.isMinimized?.()) window.restore(); window?.show?.(); } catch { /* no window to raise */ } }
+    if (out.ok && out.confirm) void waitForTheLink(acct);
     push();
     return out;
   });
@@ -1774,7 +1795,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   const cloudCall = async (name, args = {}) => {
     try {
       const account = await import('./cloud/account.mjs');
-      const { shell } = await import('electron');
+      const shell = await shellNow();
       return await account[name]({ ...args, openExternal: (u) => shell.openExternal(u), home: supervisor.config.home || os.homedir() });
     } catch (err) {
       return { ok: false, error: 'unreachable', message: `The cloud did not answer: ${err?.message || err}` };
@@ -2035,7 +2056,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // 2026-08-19). When it finds nothing it now hands back a sentence she can
   // read, and the renderer shows it.
   ipcMain.handle('zero:open-artifact', async (_e, { product, src, mode }) => {
-    const { shell } = await import('electron');
+    const shell = await shellNow();
     if (typeof src !== 'string' || !src) return { ok: false, error: 'no path' };
     if (/^https?:/.test(src)) { if (mode !== 'resolve') shell.openExternal(src); return { ok: true, opened: src } }
     const found = await resolveArtifact({

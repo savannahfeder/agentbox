@@ -43,11 +43,14 @@ describe('the narrow sidebar itself', () => {
       view: 'inbox', collapsed: true, inboxLabel: 'Inbox', onToggle() {}, onView() {}, onSearch() {}, onCompose() {}, onSettings() {}, onUpdate() {}, ...props,
     }));
   };
+  // Nor does the phone's, which is not a rail: the open sidebar and its
+  // toggle went for everyone (w-a1ed0e8b25).
   it('has no way to pin it open', () => {
-    const html = draw({ rail: true });
-    expect(html).not.toContain('Expand sidebar');
-    expect(html).not.toContain('Collapse sidebar');
-    expect(draw({ rail: false })).toContain('Expand sidebar');
+    for (const rail of [true, false]) {
+      const html = draw({ rail });
+      expect(html).not.toContain('Expand sidebar');
+      expect(html).not.toContain('Collapse sidebar');
+    }
   });
   it('unlights Inbox while a group, or a conversation, is the page', () => {
     expect(draw({ rail: true, onGroupsPage: true })).not.toMatch(/data-tab="inbox" class="workspace-tab active/);
@@ -66,17 +69,18 @@ describe('in the app', () => {
     expect(app).not.toContain('<AccountFace');
     expect(app).not.toContain('<TopNotices');
   });
+  // Since w-a1ed0e8b25 it is narrow on every desktop, Groups or not
+  // (tests/the-narrow-sidebar-is-the-only-sidebar).
   it('with Groups on, on a desktop, the sidebar is narrow and wide only while pointed at', () => {
-    expect(app).toContain('const narrowSidebar = roomsUi.live && workspaceNavigation && !onPhone();');
-    expect(app).toContain('const sideFolded = narrowSidebar ? !railOpen : workspaceCollapsed;');
-    expect(app).toContain('{workspaceNavigation && <WorkspaceNavigation');
+    expect(app).toContain('const narrowSidebar = !onPhone();');
+    expect(app).toContain('const sideFolded = !railOpen;');
     expect(app).toMatch(/rail=\{narrowSidebar\} onHover=\{setRailOpen\}/);
     // Narrow, the page starts 44 points past the 38-point strip; wide, it moves over
     // (tests/the-narrow-sidebar-opens-by-moving-the-page-over).
     expect(read('../renderer/src/workspace-navigation.css')).toContain('.app.workspace-collapsed { --workspace-width: 38px; }');
   });
   it('the Inbox is titled over its tabs, and a group has no row of chips', () => {
-    expect(app).toContain('narrowSidebar && !roomShown ? <h1 className="workspace-title">Inbox</h1>');
+    expect(app).toContain('roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1>');
     expect(hook).not.toContain('GroupBar');
   });
   it('a direct message lights Groups, and its trail says it came from there when opened over a group', () => {
@@ -88,7 +92,7 @@ describe('in the app', () => {
 // Kept from the layout before: a thread's own header, and the summary's side.
 describe('a thread', () => {
   it('keeps its own header, with no height forced on it', () => {
-    expect(app).toContain(': focused ? <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : (');
+    expect(app).toContain(': <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (');
     expect(css).not.toMatch(/workspace-task > \.topbar \{[^}]*height/);
   });
   it('folded with S, leaves its summary’s strip on the left, where it was open', () => {

@@ -32,17 +32,12 @@ const rule = (selector) => {
 };
 
 describe('an opened task has no top bar', () => {
-  it('draws the bar only when a task is not open', () => {
-    // `inFullScreen` is the opened-task state; it is the same flag that puts
-    // `flat` on the app. The strip took children while the six shapes of round
-    // three are open (`renderer/src/task-shape.ts`): two of them put words in
-    // it. So this asks for the branch and the class rather than for the exact
-    // self- closing tag it was written against, which is the part that carries
-    // the rule. When she picks a shape and the option set is deleted, the
-    // strip goes back to being empty for four of the six and this still holds.
-    expect(app).toMatch(/\{inFullScreen && !workspaceNavigation \? \(?\s*(?:\/\*[\s\S]*?\*\/\s*)?<div className="topbar-quiet"/);
-    // A bar at all, only when no task is open.
+  it('draws the bar on every screen, since the sidebar is always drawn', () => {
+    // The quiet strip was the layout without the sidebar, which no screen has
+    // any more; an opened task's own header is teleported into the bar.
+    expect(app).not.toContain('className="topbar-quiet"');
     expect(app).toContain('<header className="topbar">');
+    expect(app).toContain('<div className="workspace-task-header" ref={setTaskHeader} />');
   });
 
   it('leaves a strip that can still be grabbed, because the bar was the only one', () => {

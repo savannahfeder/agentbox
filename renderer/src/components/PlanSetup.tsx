@@ -7,11 +7,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import {
-  COPY, afterCheck, afterFound, enginesFor, foundHead, foundLede, foundRows, litRow, planName, planNote,
-  planRows, readLog, readyEngines, setupLede, setupRows,
+  COPY, LOOK_AGAIN_FOR_MS, LOOK_AGAIN_MS, afterCheck, afterFound, enginesFor, foundHead, foundLede,
+  foundRows, litRow, planName, planNote, planRows, readLog, readyEngines, setupLede, setupRows,
+  worthLookingAgain,
   type AskRow, type Engine, type EngineSetupState, type Plan, type StepRow,
 } from '../plan-setup';
 import { Cap } from './Onboarding';
+import { hoverLit } from '../onboarding';
 
 const Mark = ({ letter }: { letter: string }) => <span className="ps-mark" aria-hidden="true">{letter}</span>;
 
@@ -47,6 +49,17 @@ export function AskList({ rows, label, onPick, busy = false, start = 0 }: {
   start?: number;
 }) {
   const [lit, setLit] = useState(start);
+  // Whether the mouse has moved since this card was drawn (`hoverLit`). Without
+  // it the card lights whatever row is drawn under a mouse standing still, and
+  // here that row's Return opens a sign-in page for a plan nobody picked.
+  const stirred = useRef(false);
+  useEffect(() => {
+    const on = () => { stirred.current = true; };
+    // Capture, so the first movement counts before the row under the pointer
+    // asks to be lit.
+    window.addEventListener('mousemove', on, { capture: true });
+    return () => window.removeEventListener('mousemove', on, { capture: true });
+  }, []);
   // A row that leaves the app is its own anchor, so a CLICK on one is the
   // browser's to handle and never reaches here; this is the keyboard's copy of
   // that, and the only place `href` is opened by hand.
@@ -104,7 +117,8 @@ export function AskList({ rows, label, onPick, busy = false, start = 0 }: {
             href={row.href}
             target="_blank"
             rel="noreferrer"
-            onMouseEnter={() => setLit(i)}
+            onMouseEnter={() => setLit((l) => hoverLit(l, i, stirred.current))}
+            onMouseMove={() => setLit((l) => hoverLit(l, i, stirred.current))}
           >{inside}</a>
         ) : (
           <button
@@ -113,7 +127,8 @@ export function AskList({ rows, label, onPick, busy = false, start = 0 }: {
             role="option"
             aria-selected={lit === i}
             className={className}
-            onMouseEnter={() => setLit(i)}
+            onMouseEnter={() => setLit((l) => hoverLit(l, i, stirred.current))}
+            onMouseMove={() => setLit((l) => hoverLit(l, i, stirred.current))}
             onClick={() => choose(i)}
           >{inside}</button>
         );
@@ -238,6 +253,48 @@ export function PlanQuestion({ onPick, onReady, onSkip, look, found = null }: {
     asked.current = true;
     void check();
   }, [check]);
+
+  /*
+   * AND IT LOOKS AGAIN WHILE IT IS UP (F-71). The computer changes under this
+   * screen — somebody signs in to Codex in a terminal next door — and the
+   * arrival look was the only one, so the answer was a page reload.
+   *
+   * QUIET, so nothing flickers: it leaves `looking` and `looked` to the
+   * arrival look and only replaces the reading when one turns up. In a ref for
+   * the same reason `asked` is one: the walk writes `look` inline, so a
+   * dependency on it would restart this clock on every render.
+   */
+  const readingsNow = useRef(readings);
+  readingsNow.current = readings;
+  const busyLooking = useRef(false);
+  const open = worthLookingAgain(ready);
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    const again = async () => {
+      if (busyLooking.current) return;
+      busyLooking.current = true;
+      try {
+        const rs = await readingsNow.current(true);
+        if (!live) return;
+        const next = afterCheck(rs);
+        if (next.t === 'ready' || next.t === 'found') setReady(rs);
+      } catch { /* a probe that could not run leaves the screen as it is */ }
+      finally { busyLooking.current = false; }
+    };
+    const clock = setInterval(() => void again(), LOOK_AGAIN_MS);
+    const stop = setTimeout(() => clearInterval(clock), LOOK_AGAIN_FOR_MS);
+    const back = () => { if (document.visibilityState !== 'hidden') void again(); };
+    window.addEventListener('focus', back);
+    document.addEventListener('visibilitychange', back);
+    return () => {
+      live = false;
+      clearInterval(clock);
+      clearTimeout(stop);
+      window.removeEventListener('focus', back);
+      document.removeEventListener('visibilitychange', back);
+    };
+  }, [open]);
 
   /*
    * SHOW IT WHERE ONE IS. The panel opens in the main process and the choice is

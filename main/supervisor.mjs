@@ -62,7 +62,7 @@ import os from 'node:os';
 import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, placedScore, productRankScore } from '../shared/rank.mjs';
 import { keysForAgents } from '../shared/shortcuts.mjs';
 import { isCleanRun, ruleIdOf } from '../shared/repeats.mjs';
-import { teammateIdOf, mentionsIn, teammatesOn, OFFER_LABEL } from '../shared/teammates.mjs';
+import { teammateIdOf, mentionsIn, teammatesOn, OFFER_LABEL, CHAT_LABEL } from '../shared/teammates.mjs';
 import { mayRunHere } from '../shared/team-rules.mjs';
 
 // WHO IS SIGNED IN, handed to the store server a worker talks through. An MCP
@@ -4048,8 +4048,9 @@ export class Supervisor {
     const word = typeof model === 'string' ? model.trim() : '';
     if (!word || engineOf(engine) !== 'codex') return false;
     if (this._modelRefused?.[this._accountKey('codex', profile)]?.includes(word)) return true;
-    const known = codexKnownSlugs({ home: this._codexProfileHome(profile) });
-    return known.size > 0 && !known.has(word);
+    const home = this._codexProfileHome(profile);
+    const known = codexKnownSlugs({ home });
+    return known.size > 0 && !known.has(word) && codexDefaultModel({ home }) !== word;
   }
 
   /**
@@ -6878,6 +6879,7 @@ export class Supervisor {
     // since the session it paused scored below it and held that slot anyway.
     const heldFor = new Set([...this._preempted.values()].map((r) => `${r.forProduct}:${r.forItem}`));
     const holds = (row) => (heldFor.has(`${row.item.product}:${row.item.id}`) ? 1 : 0);
+    const talking = (row) => ((row.item.labels ?? []).includes(CHAT_LABEL) ? 1 : 0);
     queue.sort((a, b) =>
       // A COMMAND GOES TO THE FRONT, ahead of the priority she set on anything
       // else, because it is not competing with them for anything. It takes no
@@ -6894,6 +6896,9 @@ export class Supervisor {
       // tick's one interruption on its engine (`spent` below).
       || (this._runNow.has(b.item.id) ? 1 : 0) - (this._runNow.has(a.item.id) ? 1 : 0)
       || (this._runNow.get(a.item.id)?.at ?? 0) - (this._runNow.get(b.item.id)?.at ?? 0)
+      // Then a teammate you are talking to: you are in its chat waiting for
+      // the answer. It takes the next free slot and interrupts nothing.
+      || talking(b) - talking(a)
       || holds(b) - holds(a)
       || this._score(b.item) - this._score(a.item)
       // The tie-break, and the only thing left of "continuations go first".
@@ -8681,6 +8686,9 @@ export class Supervisor {
     if (!word) return null;
     const known = codexKnownSlugs({ home });
     if (!known.size || known.has(word)) return null;
+    // Her config.toml's model is what Codex runs when none is sent, so it runs
+    // when named too, listed in the cache or not (a provider of her own is not).
+    if (codexDefaultModel({ home }) === word) return null;
     const offered = codexModels({ home }).map((m) => m.id);
     const instead = offered.length ? ` It offers ${offered.join(', ')}.` : '';
     const asked = from === 'workspace'

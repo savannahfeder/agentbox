@@ -102,10 +102,11 @@ export function broadcastingWindow() {
  *  back with a real absolute path. `noDialog` is the flag that tells it to.
  *  See main/folders.mjs.
  */
-export function nodeHost({ onQuit = () => {} } = {}) {
+export function nodeHost({ onQuit = () => {}, openExternal = openInBrowser } = {}) {
   const quitHooks = [];
   return {
     ipcMain: collectingIpcMain(),
+    shell: { openExternal: async (url) => { openExternal(url); } },
     app: {
       isPackaged: false,
       getVersion: () => readVersion(),
@@ -116,6 +117,13 @@ export function nodeHost({ onQuit = () => {} } = {}) {
       showOpenDialog: async () => ({ canceled: true, noDialog: true, filePaths: [] }),
     },
   };
+}
+
+function openInBrowser(url) {
+  const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
+  try {
+    spawn(cmd, [url], { detached: true, stdio: 'ignore', shell: process.platform === 'win32' }).unref();
+  } catch { /* no browser on this machine */ }
 }
 
 function readVersion() {
@@ -161,7 +169,7 @@ export function answerWhatOnlyTheWindowAnswered(ipcMain) {
  *  sends nothing and the other reports that there is nothing to update, which
  *  is the truth for a copy run out of npm.
  */
-export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, userDir = dataDir } = {}) {
+export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, userDir = dataDir, openExternal = openInBrowser } = {}) {
   const config = loadConfig(dataDir);
   // The browser editor uses the same user files as the desktop. Finish the
   // older migrations first so only user content enters the combined file.
@@ -184,7 +192,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   const store = await new Store(config).init();
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   const window = broadcastingWindow();
-  const host = nodeHost();
+  const host = nodeHost({ openExternal });
   // THE TEAM, as on the desktop (main/main.mjs), with no Electron: the session
   // file is plain JSON readable only by this user, kept in this copy's own
   // folder and not in the store (headlessSessionFile), and Google sign-in opens
@@ -195,7 +203,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
     session: supabaseSession({
       cloudConfig,
       sessionFile: headlessSessionFile({ userDir, storeRoot: config.storeRoot }),
-      openExternal: async (url) => { spawn('open', [url], { stdio: 'ignore', detached: true }).unref(); },
+      openExternal: host.shell.openExternal,
     }),
     store,
     disk: workItemsDisk,

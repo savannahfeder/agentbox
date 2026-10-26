@@ -24,7 +24,8 @@ const barRule = focus.match(/const barContent = ([^;]*);/)?.[1] ?? '';
 
 describe('the thread bar does not depend on the summary', () => {
   it('draws the crumb whenever the app names where the thread was opened from', () => {
-    expect(barRule).toMatch(/^crumbFrom\s*\?\s*<><ThreadCrumb/);
+    // Unless it is a person's chat drawn inside Chats, which wears the Chats bar.
+    expect(barRule).toMatch(/^inChats\s*\?[\s\S]*?:\s*crumbFrom\s*\?\s*<><ThreadCrumb/);
   });
   it('never asks whether the summary is open, or whether there is one', () => {
     expect(barRule).not.toMatch(/summaryShown|summaryOpen|summaryOffered/);

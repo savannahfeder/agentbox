@@ -8,7 +8,7 @@
 // see-through pixels with white and rounds the corners itself, so the tile sat
 // inside a white frame. The phone icon is now the tile's own background edge to
 // edge (scripts/make-phone-icon.mjs). Read here pixel by pixel: every edge and
-// corner is solid and dark, and the orange bar is still in the middle.
+// corner is solid and dark, and the logo's orange dot is still in its place.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import zlib from 'node:zlib';
@@ -70,9 +70,16 @@ describe('the phone icon', () => {
     }
   });
 
-  it('still carries the orange bar across its middle', () => {
-    const p = png.at(Math.round(png.width * 0.6), Math.round(png.height * 0.5));
-    expect(p.r).toBeGreaterThan(200);
-    expect(p.b).toBeLessThan(100);
+  // The logo's lit dot sits at 70% across and 30% down once the tile is cut to
+  // its square (2026-10-25, the nine-dot logo replaced the bars).
+  const orange = (p) => p.r > 200 && p.g < 140 && p.b < 100;
+
+  it('carries the orange dot at its top right', () => {
+    expect(orange(png.at(Math.round(png.width * 0.7), Math.round(png.height * 0.3)))).toBe(true);
+  });
+
+  it('keeps the middle and the top left dots unlit', () => {
+    expect(orange(png.at(Math.round(png.width * 0.5), Math.round(png.height * 0.5)))).toBe(false);
+    expect(orange(png.at(Math.round(png.width * 0.3), Math.round(png.height * 0.3)))).toBe(false);
   });
 });

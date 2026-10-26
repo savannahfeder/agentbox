@@ -1,6 +1,5 @@
-// With Groups on, the sidebar stays narrow and opens while pointed at
-// (w-dcaa2c122e). It holds the Groups row and no groups: a group is picked on
-// the Groups page, or found with G.
+// With Groups on, the narrow sidebar (w-dcaa2c122e) holds the Groups row and
+// no groups: a group is picked on the Groups page, or found with G.
 import type { GroupChoice } from './GroupList';
 import { I } from './icons';
 

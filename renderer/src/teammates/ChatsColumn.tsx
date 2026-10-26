@@ -8,7 +8,7 @@ import { GroupMark } from '../team/rooms/GroupList';
 import { groupsInOrder } from '../team/rooms/GroupsSidebar';
 import { I } from '../team/rooms/icons';
 import { TeammateMark } from './TeammatesRail';
-import { FOLD_KEY, foldedSet, toggleFold } from './chat-lines';
+import { FOLD_KEY, foldedSet, rowName, toggleFold } from './chat-lines';
 
 export interface ChatsValue {
   teammates: Teammate[];
@@ -65,7 +65,7 @@ export function ChatsColumn({ current }: { current: string | null }) {
       {mates.map((t) => {
         const on = current === `teammate:${t.id}`;
         return <button type="button" key={t.id} className={`cx-row${on ? ' on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => openMate(t.id)}>
-          <TeammateMark t={t} /><span className="cx-n">{t.name}</span>{waitsOnYou(t) && <i className="cx-need" aria-label="Waiting on you" />}
+          <TeammateMark t={t} /><span className="cx-n">{rowName(t)}</span>{waitsOnYou(t) ? <i className="cx-need" aria-label="Waiting on you" /> : t.paused ? <span className="cx-st">Paused</span> : null}
         </button>;
       })}
       {!c.teammates.length && <button type="button" className={`cx-row cx-add${current === 'new' ? ' on' : ''}`} onClick={c.onNew}><i className="tq tq-sm tq-hash" aria-hidden="true">+</i><span className="cx-n">New teammate</span></button>}
@@ -80,4 +80,10 @@ export function ChatsColumn({ current }: { current: string | null }) {
       <GroupMark g={g} size={20} /><span className="cx-n">{g.name}</span>{g.unread && !on && <i className="cx-need" aria-label="New messages" />}
     </button>;
   }
+}
+
+/** A page drawn inside Chats, with the list on its left. With no `current` the page is drawn as it is. */
+export function ChatsFrame({ current, children }: { current: string | null; children: ReactNode }) {
+  if (!current) return <>{children}</>;
+  return <div className="gr-page tq-chats cx-frame"><div className="gr-body"><ChatsColumn current={current} /><div className="cx-frame-main">{children}</div></div></div>;
 }

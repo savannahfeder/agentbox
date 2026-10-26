@@ -63,6 +63,18 @@ export function isScratchFolder(folder, home = os.homedir()) {
     || /^\/var\/folders(\/|$)/.test(p);
 }
 
+/** An Agentbox task folder (main/task-folders.mjs), or a folder inside one. A
+ *  chat there is part of a thread the inbox already holds, whoever started it.
+ *  Claude Code's desktop app makes worktrees in the same place, named
+ *  `upbeat-matsumoto-588a8d`, so the `w-<hex>` id is what tells them apart. */
+const TASK_FOLDER = /\/\.claude\/worktrees\/w-[0-9a-f]{6,}(\/|$)/i;
+export function isTaskFolder(folder) {
+  return TASK_FOLDER.test(String(folder ?? ''));
+}
+// The same rule on the name Claude Code files a transcript under, where `/.`
+// and `/` both became `-`.
+const TASK_PROJECT_DIR = /--claude-worktrees-w-[0-9a-f]{6,}(-|$)/i;
+
 /** The same rule read off the folder Claude Code filed the transcript in, so
  *  a temp-folder transcript is refused without being opened. Claude Code names
  *  that folder after the working folder with every character that is not a
@@ -206,9 +218,10 @@ function typedTurn(row) {
   return threadTitle(messageText(row)) !== '';
 }
 
-/** Reads a transcript's end for Claude Code's own title (`ai-title`, the last
- *  one wins) and the agent's last reply, every text block of it since the last
- *  thing a person typed. */
+/** Reads a transcript's end for its names, the one given with `/rename`
+ *  (`custom-title`) and the one Claude Code made up (`ai-title`), the last of
+ *  each winning, and the agent's last reply, every text block of it since the
+ *  last thing a person typed. */
 export function readTranscriptTail(file, bytes = TAIL_BYTES) {
   let fd = null;
   try {
@@ -220,21 +233,24 @@ export function readTranscriptTail(file, bytes = TAIL_BYTES) {
     const lines = buf.slice(0, n).toString('utf8').split('\n');
     if (from > 0) lines.shift();
     let aiTitle = '';
+    let customTitle = '';
     let reply = '';
     for (const line of lines) {
       if (!line.trim()) continue;
       let row;
       try { row = JSON.parse(line); } catch { continue; }
       if (row.type === 'ai-title' && row.aiTitle) aiTitle = String(row.aiTitle);
+      // An empty one is a rename cleared.
+      else if (row.type === 'custom-title') customTitle = String(row.customTitle ?? '');
       else if (typedTurn(row)) reply = '';
       else if (row.type === 'assistant') {
         const text = messageText(row).trim();
         if (text) reply = reply ? `${reply}\n\n${text}` : text;
       }
     }
-    return { aiTitle, lastSaid: reply.slice(-SAID_CHARS) };
+    return { aiTitle, customTitle, lastSaid: reply.slice(-SAID_CHARS) };
   } catch {
-    return { aiTitle: '', lastSaid: '' };
+    return { aiTitle: '', customTitle: '', lastSaid: '' };
   } finally {
     if (fd !== null) { try { fs.closeSync(fd); } catch { /* nothing to do */ } }
   }
@@ -243,8 +259,11 @@ export function readTranscriptTail(file, bytes = TAIL_BYTES) {
 /** What a finished read knows about how a chat ended, for its row and the
  *  setup card. */
 function endOf(file) {
-  const { aiTitle, lastSaid } = file ? readTranscriptTail(file) : { aiTitle: '', lastSaid: '' };
-  return { aiTitle, lastSaid, ...howTheChatEnded(lastSaid) };
+  const { aiTitle, customTitle, lastSaid } = file ? readTranscriptTail(file) : { aiTitle: '', customTitle: '', lastSaid: '' };
+  // The name a person gave beats the one Claude Code made up, as in its own
+  // resume list.
+  const name = threadTitle(customTitle) || threadTitle(aiTitle);
+  return { name, lastSaid, ...howTheChatEnded(lastSaid) };
 }
 
 /** The first message a person typed, whole, for an imported row's opening. */
@@ -288,7 +307,7 @@ function messageText(row) {
 /** `skipped` counts why each transcript was left out, so a change to a filter
  *  can be measured. */
 function readTerminalThreads({ home, dirs, cutoff, max, budgetMs = READ_BUDGET_MS, skipIds = new Set() }) {
-  const skipped = { old: 0, scratch: 0, started: 0, subagent: 0, empty: 0, unread: 0, desktopDupe: 0, copy: 0 };
+  const skipped = { old: 0, scratch: 0, ours: 0, started: 0, subagent: 0, empty: 0, unread: 0, desktopDupe: 0, copy: 0 };
   const out = [];
   // Every data folder is pooled and sorted newest first before any file is
   // opened, so `max` and the time budget only ever cut off older sessions.
@@ -302,7 +321,11 @@ function readTerminalThreads({ home, dirs, cutoff, max, budgetMs = READ_BUDGET_M
       try { when = fs.statSync(file).mtimeMs; } catch { continue; }
       if (when < cutoff) { skipped.old += 1; continue; }
       if (isSubagentPath(file.slice(root.length))) { skipped.subagent += 1; continue; }
-      if (isScratchProjectDir(path.relative(root, file).split(path.sep)[0], home)) { skipped.scratch += 1; continue; }
+      const projectDir = path.relative(root, file).split(path.sep)[0];
+      if (isScratchProjectDir(projectDir, home)) { skipped.scratch += 1; continue; }
+      // Before any file is opened, so the workers' transcripts do not spend
+      // the read budget the person's chats need.
+      if (TASK_PROJECT_DIR.test(projectDir)) { skipped.ours += 1; continue; }
       recent.push({ file, when });
     }
   }
@@ -346,6 +369,7 @@ function readTerminalThreads({ home, dirs, cutoff, max, budgetMs = READ_BUDGET_M
     if (cwd || entrypoint) seenIds.add(id);
     if (!startedByHand(entrypoint)) { skipped.started += 1; continue; }
     if (isScratchFolder(cwd, home)) { skipped.scratch += 1; continue; }
+    if (isTaskFolder(cwd)) { skipped.ours += 1; continue; }
     const title = threadTitle(said);
     if (!title) { skipped.empty += 1; continue; }
     out.push({
@@ -382,7 +406,7 @@ function withEnds(threads, desktopFiles) {
     const firstSaid = t.firstSaid ?? firstTyped(readTranscriptHead(file).said);
     return {
       ...t,
-      title: t.source === 'desktop' ? t.title : threadTitle(end.aiTitle) || t.title,
+      title: t.source === 'desktop' ? t.title : end.name || t.title,
       waiting: end.waiting,
       ask: end.ask,
       lastSaid: end.lastSaid,
@@ -423,7 +447,7 @@ export function desktopSessionsDir(home = os.homedir()) {
  *  the last turn, so no transcript is read. Archived sessions are left out. */
 function readDesktopThreads({ home, cutoff, max }) {
   const root = desktopSessionsDir(home);
-  const skipped = { old: 0, scratch: 0, archived: 0, empty: 0 };
+  const skipped = { old: 0, scratch: 0, ours: 0, archived: 0, empty: 0 };
   const out = [];
   // Every id this side owns, recent or not, so the transcript walk skips them.
   const owned = new Set();
@@ -438,6 +462,7 @@ function readDesktopThreads({ home, cutoff, max }) {
     if (rec?.isArchived) { skipped.archived += 1; continue; }
     const folder = String(rec?.originCwd || rec?.cwd || '');
     if (isScratchFolder(folder, home)) { skipped.scratch += 1; continue; }
+    if (isTaskFolder(folder)) { skipped.ours += 1; continue; }
     const title = threadTitle(rec?.title || '');
     if (!title) { skipped.empty += 1; continue; }
     out.push({
@@ -519,7 +544,7 @@ function readOneChat(file, { id, folder, home, when }) {
   const end = endOf(file);
   return {
     id, source: sourceOf(entrypoint), folder: cwd, folderName: path.basename(cwd), short: shortFolder(cwd, home),
-    title: threadTitle(end.aiTitle) || title, when, path: file,
+    title: end.name || title, when, path: file,
     waiting: end.waiting, ask: end.ask, lastSaid: end.lastSaid, firstSaid: firstTyped(said), startedAt: firstAt || when,
   };
 }

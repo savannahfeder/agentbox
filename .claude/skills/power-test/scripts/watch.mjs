@@ -197,6 +197,11 @@ export function keepEvidence(state, out) {
   try { fs.cpSync(state.receipts, path.join(dest, 'receipts'), { recursive: true }); } catch { /* none */ }
 }
 
+/** The copy's agent cap now: a tester may change it in Settings mid-run. */
+export function agentCap(dataDir) {
+  try { return Number(JSON.parse(fs.readFileSync(path.join(dataDir, 'zero.config.json'), 'utf8')).maxConcurrentSessions) || 2; } catch { return 2; }
+}
+
 /**
  * One watcher per copy. `tick()` samples and checks; `finish()` writes
  * machine.json and returns the findings. `quiet(now)` is true while the power
@@ -208,8 +213,6 @@ export function createWatcher({ state, out, seeded = new Set(), afterMs, quiet =
   let logAt = 0;
   let maxAtOnce = 0;
   let overLimit = 0;
-  const config = (() => { try { return JSON.parse(fs.readFileSync(path.join(state.data, 'zero.config.json'), 'utf8')); } catch { return {}; } })();
-  const allowed = Number(config.maxConcurrentSessions) || 2;
   const found = (key, finding, now) => {
     const had = findings.get(key);
     if (had) { had.count++; had.lastAt = now; Object.assign(had, { detail: finding.detail ?? had.detail }); return; }
@@ -242,6 +245,7 @@ export function createWatcher({ state, out, seeded = new Set(), afterMs, quiet =
       }
     } catch { /* no log yet */ }
     const procs = instanceProcesses(st);
+    const allowed = agentCap(st.data);
     memory.push(procs.appKb + procs.childKb);
     overLimit = procs.workers > allowed + 1 ? overLimit + 1 : 0;
     if (overLimit >= 2) found('too-many-agents', { kind: 'too-many-agents', severity: 'wrong', title: `More agents running than the app allows (${allowed})`, detail: `${procs.workers} worker processes at once` }, now);

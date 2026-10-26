@@ -53,7 +53,7 @@ describe('the tabs', () => {
   it('sit under the Inbox’s title, never in the top bar', () => {
     expect(app).not.toContain('tabsInTop');
     expect(app).not.toContain('className="tabs-top"');
-    expect(app).toContain('narrowSidebar && !roomShown ? <h1 className="workspace-title">Inbox</h1>');
+    expect(app).toContain('roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1>');
   });
   it('are not hidden by any rule left from the top bar', () => {
     expect(css).not.toContain('.tabs-top');

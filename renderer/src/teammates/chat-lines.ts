@@ -118,6 +118,13 @@ export function workingLine(
   return { state: 'working', text: session.activity?.at(-1)?.label?.trim() || run, aside: elapsed < 60_000 ? 'just started' : `${spanLabel(elapsed)} in` };
 }
 
+// A run's first line. Its teammate's queue letting it go is not an agent
+// having it: until a session exists it is waiting, as the live line says.
+export function startWord(r: Pick<TeamRunLine, 'teammate' | 'item'>, team: Pick<Teammate, 'id' | 'running'>[], sessions: ReadonlyMap<string, unknown>): string {
+  const mate = team.find((x) => x.id === r.teammate);
+  return mate?.running?.id === r.item && !sessions.has(r.item) ? 'Waiting to start' : 'Picked up';
+}
+
 // The same line in the team chat, said of the teammate by name: a step that
 // starts with a verb in -ing follows "is", and anything else is what it is on.
 export function teamWorkingLine(name: string, line: { state: 'working' | 'waiting'; text: string }): { lead: string; text: string } {
@@ -144,6 +151,40 @@ export function idleLine(t: Pick<Teammate, 'works'>, now = Date.now()): string {
 export function roleLabel(role: string | null | undefined): string {
   const r = (role ?? '').trim();
   return r ? r[0].toUpperCase() + r.slice(1) : '';
+}
+
+/** Beside its name in the bar: About on its About page, then whether it is paused or setting up, then its role. */
+export function titleAside(kind: string, role: string | null | undefined, t: { paused?: boolean; status?: string } = {}): string {
+  if (kind === 'about') return 'About';
+  if (t.paused) return 'Paused';
+  if (t.status === 'draft') return 'Setting up';
+  return roleLabel(role) || 'AI teammate';
+}
+
+/** Its name in the Chats list. A draft has none of its own yet, so it goes by what you asked of it. */
+export function rowName(t: { name: string; status: string; job?: string | null }): string {
+  const ask = (t.job ?? '').split('\n')[0].replace(/\s+/g, ' ').trim();
+  if (t.status !== 'draft' || t.name !== 'New teammate' || !ask) return t.name;
+  const cut = ask.length > 30 ? `${ask.slice(0, 30).replace(/\s+\S*$/, '')}…` : ask;
+  return roleLabel(cut);
+}
+
+/** Its goal and how it is counted, as one sentence however each one ends. */
+export function goalLine(goal: string, counted: string | null | undefined): string {
+  const g = goal.trim();
+  const c = (counted ?? '').trim().replace(/[.\s]+$/, '');
+  return c ? `${g.replace(/[.,;:\s]+$/, '')}, counted as ${c.replace(/^./, (x) => x.toLowerCase())}.` : g;
+}
+
+export function firstSentence(text: string): string {
+  const one = String(text ?? '').replace(/\s+/g, ' ').trim();
+  return one.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? one;
+}
+
+/** The inbox tab every one of these threads sits in, or null when they differ or one is in none. */
+export function sentTab<T extends string>(tabs: (T | null)[]): T | null {
+  const first = tabs[0] ?? null;
+  return first !== null && tabs.every((x) => x === first) ? first : null;
 }
 
 // What it saved, shown in your chat with it as one quiet line.

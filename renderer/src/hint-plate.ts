@@ -87,7 +87,6 @@ export const HINTS: Record<string, HintLine[]> = {
   // N, not C, since w-fb9051e597. C still opens it; only N is advertised.
   // "Thread" is the app's word for a row since w-ec62ab6b38.
   'new-task': [{ key: 'N', what: 'New thread' }],
-  sidebar: [{ key: '\\', what: 'Show or hide the sidebar' }],
   // THE TABS ALONG THE TOP OF THE INBOX (Needs you, In progress, Later, Done,
   // All). Tab walks them, so every tab wears the same plate. It replaced ⌘1 to
   // ⌘4 on the sidebar's sections, 2026-10-02 (w-914b16eab6). NEXT TAB ONLY:
@@ -121,20 +120,10 @@ export const HINTS: Record<string, HintLine[]> = {
   // a thread's top bar wears its own S the way the reply pill wears R, and a
   // component that already shows its key gets no plate. The shortcuts page
   // lists it.
-  // THE CORNER OF THE TOP BAR, AND THESE THREE WERE MISSING AT FIRST: hovering
-  // them showed no shortcut at all.
-  //
-  // THEY WERE LEFT OUT ON A RULE AND THE RULE WAS READ TOO WIDELY. A component
-  // that already shows its key gets no plate, and these
-  // were held to it: the ⌘ mark "is" its key and the search field prints / at
-  // its right end. That is true of the reply pill, where R is printed as a
-  // keycap next to a word, and it is not true here: an icon of a ⌘ is a picture
-  // of a button, not a statement that the chord is ⌘K, and nothing about a
-  // magnifier says what pressing it costs. A button she points at and gets
-  // nothing from is the fault.
-  commands: [{ key: '⌘K', what: 'Everything by name' }],
   // The cloud button (threads/Pages.tsx): ⌘C turns the cloud on or off.
   cloud: [{ key: '⌘C', what: 'Cloud on or off' }],
+  // THE MAGNIFIER GETS A PLATE although the search field prints / at its right
+  // end: nothing about a magnifier says what pressing it costs.
   search: [{ key: '/', what: 'Search your tasks' }],
   // A task she has opened.
   // THE MARK THAT FINISHED IT IS A ROW NOW (w-e731ca9376, 2026-10-01): Mark

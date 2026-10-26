@@ -166,7 +166,7 @@ describe('every line says a key the app really has', () => {
   // top bar printed one letter for two different things. Scheduling is L
   // everywhere now and S belongs to the summary.
   it('runs C, E, L and the terminal chord', () => {
-    expect(app).toMatch(/case 'n': case 'N': e\.preventDefault\(\); setModal\('compose'\);/);
+    expect(app).toMatch(/case 'n': case 'N': e\.preventDefault\(\); startThread\(\);/);
     expect(HINTS['new-task'][0].key).toBe('N');
     expect(HINTS.row.map((l) => l.key)).toEqual(['↵', 'E', 'L']);
     expect(HINTS.terminal[0].key).toBe('⌘J');
@@ -197,34 +197,24 @@ describe('a button with a key never says nothing', () => {
     expect(display[0]).not.toContain('data-hint');
   });
 
-  it('keeps the plus, the command mark and the magnifier their hints in the layout without the sidebar', () => {
-    // w-ec62ab6b38 (2026-09-28): the plus is labelled New thread now; the hint key stays new-task.
-    expect(app).toMatch(/aria-label="New thread"/);
-    expect(app).toMatch(/data-hint="new-task"[\s\S]{0,120}aria-label="New thread"/);
-    expect(app).toMatch(/data-hint="commands"[\s\S]{0,120}aria-label="Commands"/);
-    expect(app).toMatch(/data-hint="search"[\s\S]{0,120}title="Search threads"/);
-  });
-
   it('says the same key for the same thing wherever it is drawn', () => {
-    // New thread and Search are each drawn twice in the code: once in the
-    // header's right end and once in the corner of the layout without the
-    // sidebar. Two hints for one action would be two places to get it wrong,
-    // so both wear the same id.
-    expect((app + pages).match(/data-hint="new-task"/g)).toHaveLength(2);
-    expect((app + pages).match(/data-hint="search"/g)).toHaveLength(2);
+    // New thread and Search are each drawn once, in the header's right end.
+    // The corner of the layout without the sidebar drew them a second time
+    // until that layout was deleted (w-a1ed0e8b25).
+    expect((app + pages).match(/data-hint="new-task"/g)).toHaveLength(1);
+    expect((app + pages).match(/data-hint="search"/g)).toHaveLength(1);
     // approved 2026-10-01 (w-e731ca9376): the sidebar carries neither any more.
     expect(nav).not.toContain('data-hint="new-task"');
     expect(nav).not.toContain('data-hint="search"');
   });
 
-  it('leaves the cog alone, because it has no key at all', () => {
-    const cog = app.slice(app.indexOf('title="Settings"') - 240, app.indexOf('title="Settings"') + 240);
+  it('leaves Settings alone, because it has no key at all', () => {
+    const cog = nav.slice(nav.indexOf('aria-label="Settings"') - 240, nav.indexOf('aria-label="Settings"') + 240);
+    expect(cog).toContain('aria-label="Settings"');
     expect(cog).not.toContain('data-hint');
   });
 
-  it('runs the keys those three claim', () => {
-    expect(HINTS.commands[0].key).toBe('⌘K');
-    expect(app).toMatch(/\(e\.metaKey \|\| e\.ctrlKey\) && e\.key\.toLowerCase\(\) === 'k'/);
+  it('runs the key the magnifier claims', () => {
     expect(HINTS.search[0].key).toBe('/');
     expect(app).toMatch(/if \(e\.key === '\/'\)/);
   });

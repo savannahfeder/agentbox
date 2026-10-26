@@ -10,11 +10,6 @@
 .th-team { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 0 0 9px; margin: 0 0 18px; font-size: 14px; color: var(--text); min-width: 0; }
 .th-team-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .th-mark { width: 20px; height: 20px; flex: none; display: grid; place-items: center; border-radius: var(--radius); background: var(--accent); color: #1a1817; font: 600 11px var(--mono); }
-.workspace-navigation .th-toggle { width: 34px; height: 34px; padding: 0; justify-content: center; margin-left: auto; }
-.workspace-navigation .workspace-toggle.th-mark-btn { width: 38px; height: 34px; padding: 0; margin-left: -9px; justify-content: center; position: relative; }
-.th-mark-open { position: absolute; inset: 0; display: none; place-items: center; color: var(--text); }
-.th-mark-btn:hover .th-mark-open, .th-mark-btn:focus-visible .th-mark-open { display: grid; }
-.th-mark-btn:hover .th-mark, .th-mark-btn:focus-visible .th-mark { visibility: hidden; }
 .th-side-foot { display: flex; flex-direction: column; gap: 2px; }
 
 
@@ -413,11 +408,13 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-clear { padding: 40px var(--row-r, 24px) 40px var(--text-x, 32px); max-width: 560px; }
 .th-clear h2 { margin: 0 0 8px; font-size: 18px; font-weight: 500; letter-spacing: -.01em; color: var(--text); }
 .th-clear p { margin: 0 0 22px; font-size: 14px; line-height: 21px; color: var(--text-dim); }
-.th-clear-link { background: none; border: 0; padding: 0; font: inherit; color: var(--text); cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
-.th-clear-link:hover { text-decoration-color: var(--text-dim); }
 .th-clear-acts { display: flex; align-items: center; gap: 14px; }
-.th-clear-key { font-size: 12.5px; color: var(--text-faint); }
-.th-clear-key kbd { font: 11px var(--mono); color: var(--text-dim); border: 1px solid var(--line); border-radius: var(--radius); padding: 1px 5px; margin-left: 4px; background: none; }
+/* Nothing needs you: the heading over the New thread box, one column in the
+   middle of what is left under the tabs, a little above centre. */
+.list-pane:has(> .th-start) { display: flex; flex-direction: column; }
+.th-clear.th-start { flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: none; padding: 32px var(--row-r, 24px) 12vh var(--text-x, 32px); }
+.th-start > * { width: 720px; max-width: 100%; align-self: center; }
+.th-start h2 { margin: 0 0 28px; font-size: 28px; line-height: 1.15; letter-spacing: -.025em; }
 /* A tab the filters emptied. It reads as the inbox-zero screen next door, not
    as a warning: a small tick, a short heading, the number quiet underneath.
    Her note on the first cut, which put the whole sentence in the heading:
@@ -433,12 +430,6 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 :root[data-shell="tab"] .app.workspace-layout { padding-top: 22px; }
 :root[data-shell="tab"] .workspace-layout::before { top: 22px; }
 :root[data-shell="tab"] .workspace-navigation { top: 32px; }
-/* The collapsed sidebar hides every span inside its buttons; the mark is the
-   one that has to stay. */
-.workspace-collapsed .workspace-navigation .th-mark-btn > .th-mark { display: grid; }
-.workspace-collapsed .workspace-navigation .th-mark-btn > .th-mark-open { display: none; }
-.workspace-collapsed .workspace-navigation .th-mark-btn:hover > .th-mark-open,
-.workspace-collapsed .workspace-navigation .th-mark-btn:focus-visible > .th-mark-open { display: grid; }
 /* The heading row draws no hairline under itself, on both pages. */
 .th-table .row.th-head + .row::after { display: none; }
 
@@ -529,10 +520,12 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-offer-go:hover { background: var(--bg-hover); }
 .th-offer-go svg { width: 14px; height: 14px; }
 .th-card.th-offer-card { cursor: default; background: none; border-style: dashed; }
-.th-offer-card .m { gap: 8px; }
+/* space-between, not an auto margin: a button that wraps onto its own line then starts at the left. */
+.th-offer-card .m { gap: 10px 8px; flex-wrap: wrap; justify-content: space-between; }
+.th-offer-count { display: inline-flex; align-items: center; gap: 8px; }
 .th-offer-card .m .p { flex: none; }
 .th-offer-card .m svg { width: 13px; height: 13px; flex: none; }
-.th-offer-card-go { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; border: 0; padding: 0; background: none; font: inherit; letter-spacing: inherit; text-transform: inherit; color: var(--accent); cursor: pointer; }
+.th-offer-card-go { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; border: 0; padding: 0; background: none; font: inherit; letter-spacing: inherit; text-transform: inherit; color: var(--accent); cursor: pointer; }
 .th-card .m .th-card-wait { margin-left: 8px; text-transform: none; letter-spacing: 0; }
 
 /* WHY A THREAD IS NOT IN THE CLOUD, on hovering its Status (w-de59f3ff12, ../where-why.ts).

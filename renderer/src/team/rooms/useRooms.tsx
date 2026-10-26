@@ -3,7 +3,7 @@
 // App.tsx only places them beside the narrow sidebar (GroupsSidebar.tsx).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../../api';
-import type { Room, RoomMention, RoomsState } from '../../types';
+import type { Person, Room, RoomMention, RoomsState } from '../../types';
 import './rooms.css';
 import { boardPeople, boardPicked, cardName, chatPeople, groupInTab, mentionRows, noticeShown, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab, type MentionRow } from './room-rules';
 import { OpenGroupNotice } from './OpenGroupNotice';
@@ -22,6 +22,7 @@ import { GroupPage, PeoplePanel } from './GroupPage';
 import { GroupMenuButton, groupChoices, type GroupMenuAction } from './GroupList';
 import { SidebarGroups, groupsInOrder } from './GroupsSidebar';
 import { GroupFinder, GroupsColumn, GroupsHead } from './GroupsColumn';
+import { directPeople } from './direct-people';
 
 type Dialog =
   | { kind: 'invite'; roomId: string }
@@ -34,8 +35,10 @@ type Direct = Conversation & { people: string[] };
 /** A named group's name, or the people in a chat. */
 const nameOf = (r: Room) => (r.kind === 'group' ? r.wall.filter((c) => !c.me).map(cardName).join(', ') || r.name : r.name);
 
-export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, directs = [], now, toast, onOpenDirect, onTeamMessage, onLeavePage, renderBoard }: {
+export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team = [], directs = [], now, toast, onOpenDirect, onTeamMessage, onLeavePage, renderBoard }: {
   rooms: RoomsState | null | undefined; on: boolean; meId: string | null; myName: string; fullName?: string; hasTeam: boolean;
+  /** Everyone on your team, for a teammate in a direct record who is not on Groups yet. */
+  team?: Person[];
   /** Teammates' direct records, listed among the groups as chats of their own. */
   directs?: Direct[];
   now: number; toast: (text: string) => void;
@@ -367,5 +370,10 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, dire
     sidebarGroups: (onGroupsPage: boolean, chats?: () => void) => <SidebarGroups onGroupsPage={onGroupsPage} onGroups={chats ?? openTab} label={chats ? 'Chats' : 'Groups'} />,
     /** The group a teammate's card was opened over, for its Back. */
     roomName: open ? nameOf(open) : null,
+    /** Who is in a direct record's chat, listed the way a group lists its people. */
+    chatPeople: (people: string[]) => {
+      const { members, wall, roomOf } = directPeople({ people, rooms: all, team, meId });
+      return <PeoplePanel room={{ members, wall }} onPerson={(id) => { if (!roomOf[id]) return; openRoom(roomOf[id]); setPane(`person:${id}`); }} />;
+    },
   };
 }

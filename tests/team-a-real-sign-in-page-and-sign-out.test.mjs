@@ -81,7 +81,8 @@ describe('the doors and the page', () => {
 
   it('offers Google first, then email and password, and a way to make an account', () => {
     const page = read('renderer/src/team/SignInPage.tsx');
-    expect(page.indexOf('Continue with Google')).toBeLessThan(page.indexOf('type="password"'));
+    // The field became a field with a Show on it in 2026-10-25 (F-63).
+    expect(page.indexOf('Continue with Google')).toBeLessThan(page.indexOf("passwordField(mode === 'sign-up'"));
     expect(page).toContain('role="tab"');
     expect(page).toContain('>Create account</button>');
     expect(page).toContain('You are signed out');

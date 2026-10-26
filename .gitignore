@@ -101,8 +101,8 @@ briefs/founder.md
 # lives only on the machines that run that version; a checkout without it is
 # the single-person app. `cloud/team.config.example.json` shows the shape.
 cloud/team.config.json
-# Agentbox Cloud's sign-in settings carry the same address and key; a release
-# build writes them into the app (main/cloud/account.mjs).
+# Points this copy at another Agentbox Cloud than the one every copy ships
+# with (shared/cloud-address.mjs).
 cloud/cloud.public.json
 
 # WHAT THE BUILD READ OFF THE CLAUDE CODE ON THIS MACHINE.

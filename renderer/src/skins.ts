@@ -265,16 +265,8 @@ export function applyTune(tune: SkinTune, root: { style: { setProperty(k: string
 export const DEFAULT_SKIN: SkinId = 'ember-grid';
 
 /**
- * The picture inbox zero wears: the one that was picked, and none otherwise.
- */
-export function idleSkin(skin: SkinChoice): SkinChoice {
-  return skin;
-}
-
-/**
  * The picture behind the walk's setup screens: one the user picked, or
- * WALK_PICTURE when they have none or are on the default. Kept apart from
- * idleSkin because the rules differ. The caller paints it and stores nothing,
+ * WALK_PICTURE when they have none or are on the default. The caller paints it and stores nothing,
  * so the walk never changes anybody's saved look.
  */
 export function walkSkin(skin: SkinChoice): SkinChoice {

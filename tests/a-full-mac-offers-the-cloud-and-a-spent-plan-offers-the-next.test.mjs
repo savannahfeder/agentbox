@@ -2,13 +2,17 @@
 //
 // The founder designed this flow on 2026-10-13 in the cloud buildout thread
 // (w-1dc7ee2408; designs cloud-native/04 and 05, cloud-pricing/14 and
-// cloud-slots/20): never a pop-up, a last row in the list ("This Mac is
+// cloud-slots/20): never a pop-up, a last row in the list ("This computer is
 // running all it can. 2 threads are waiting." with "Start them in the cloud")
 // and a card on the board, plans as cards on a Cloud page in Settings, and
 // "Move to Plus" when the month's hours are used up. Paying works since
 // w-6633e825a7, but nothing in the app offered it. These are the rules for
 // when the offer shows and what it says; the drawing is in List.tsx and
 // CloudPlans.tsx.
+//
+// The sentence said "This Mac" until 2026-10-26, which is what a Linux box
+// read at the moment it was asked to pay (w-ddd9cc8f34). It names this
+// computer now, and the guard is in tests/the-screens-never-name-a-mac.
 import { describe, it, expect } from 'vitest';
 import { cloudOffer, planCards, usageLine } from '../renderer/src/cloud-upgrade';
 
@@ -18,12 +22,12 @@ const pro = { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPe
 describe('when the Mac is full and threads wait', () => {
   it('someone with no cloud yet is asked to start them in the cloud, which signs in', () => {
     const o = cloudOffer({ cloud: { setUp: false, offered: true, mode: 'full', running: 0 }, plan: null, waiting: 2, macFull: true });
-    expect(o).toEqual({ say: 'This Mac is running all it can.', waiting: '2 threads are waiting.', go: { label: 'Start them in the cloud', act: 'sign-in' } });
+    expect(o).toEqual({ say: 'This computer is running all it can.', waiting: '2 threads are waiting.', go: { label: 'Start them in the cloud', act: 'sign-in' } });
   });
 
   it('signed in with no plan, the same row opens the plans', () => {
     const o = cloudOffer({ cloud: managed(), plan: { signedIn: true, plan: 'none', agents: 0 }, waiting: 1, macFull: true });
-    expect(o).toEqual({ say: 'This Mac is running all it can.', waiting: '1 thread is waiting.', go: { label: 'Start it in the cloud', act: 'plans' } });
+    expect(o).toEqual({ say: 'This computer is running all it can.', waiting: '1 thread is waiting.', go: { label: 'Start it in the cloud', act: 'plans' } });
   });
 
   it('with a plan and the cloud off, the row turns the cloud on', () => {

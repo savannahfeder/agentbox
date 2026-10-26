@@ -20,6 +20,7 @@
 import { readNotes, type Notes, type TraceSession } from './notes';
 import { commandPrompt } from '../../shared/claude-commands.mjs';
 import { DEFAULT_ENGINE } from '../../shared/engines.mjs';
+import { instructionOf } from '../../shared/repeats.mjs';
 
 export interface LedgerLine {
   id: string;
@@ -300,15 +301,20 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null): Threa
       first = false;
       title = String(patch!.title ?? '');
       if (words(patch!.body)) opened = true;
+      // A repeating run opens on the person's own instruction, not the rules
+      // the app gives its agent in front of it.
+      const asked = words(patch!.body);
+      const ruled = !!asked && instructionOf(asked) !== asked;
+      const opening = ruled ? words(instructionOf(asked)) : asked;
       // Their words with no title: the ask branch below opens the thread.
       if (theirs && words(next!.patch?.body)) continue;
       // A chat the import brought in from Claude Code was yours, not an agent's,
       // and its row is dated when the chat started there.
       const broughtIn = Array.isArray(patch!.labels) && patch!.labels.includes('thread-import');
       events.push({
-        at, who,
-        said: mine ? 'You opened this' : broughtIn ? 'Started in Claude Code' : 'An agent opened this',
-        ...(words(patch!.body) ? { words: words(patch!.body)!, message: true as const, field: 'body' as const } : {}),
+        at, who: ruled ? 'you' : who,
+        said: mine || ruled ? 'You opened this' : broughtIn ? 'Started in Claude Code' : 'An agent opened this',
+        ...(opening ? { words: opening, message: true as const, field: 'body' as const } : {}),
       });
       continue;
     }

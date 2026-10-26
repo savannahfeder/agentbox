@@ -102,7 +102,7 @@ export function ModeScreen({ variant, value, onPick }: {
 }) {
   return (
     <div className="fr-screen">
-      <div className="fr-brand"><AppMark size={22} />{NAME}</div>
+      <div className="fr-brand"><AppMark size={13} />{NAME}</div>
 
       {/* A — A CARD OF ITS OWN, ALL FOUR. The strongest thing to show on a
           call, and the most expensive: it is a whole beat, and the beat is

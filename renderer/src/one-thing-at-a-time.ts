@@ -4,6 +4,7 @@
 // kept here so a test can reach them.
 import type { AgentEvent, AgentTurn } from './types';
 import type { ItemOutcome } from './item-thread';
+import { optionsFrom } from './format';
 
 export interface Spot { pos: number; total: number; index: number }
 
@@ -48,6 +49,14 @@ export function earlierCount(events: AgentEvent[], outcome: ItemOutcome | null, 
   return outcome ? messages : Math.max(0, messages - (newestAnswer(events, null) ? 1 : 0));
 }
 
+/** Fewer messages than this behind the fold, and the fold would hide her own ask to save a line or two. */
+const FOLD_FROM = 3;
+
+/** Whether the page draws the whole conversation rather than folding `behind` messages away. None behind is a fold of steps only, which still helps. */
+export function drawnWhole(behind: number): boolean {
+  return behind > 0 && behind < FOLD_FROM;
+}
+
 /**
  * Where the page starts on a thread that has been answered since its newest
  * answer, by a reply or a pick: at that answer, so the question stays in view
@@ -70,4 +79,27 @@ export function splitHeadline(text: string): { headline: string | null; rest: st
   const m = /^\s*\*\*([^*\n]+)\*\*[ \t]*(?:\n|$)/.exec(text);
   if (!m) return { headline: null, rest: text };
   return { headline: m[1].trim(), rest: text.slice(m[0].length).replace(/^\s+/, '') };
+}
+
+/**
+ * Which choices a fold holds: one thread's current round of them. Another
+ * thread, or the same thread's next round, opens unfolded.
+ */
+export function foldKey(item: Parameters<typeof optionsFrom>[0] & Keyed): string {
+  return `${item.product}:${item.id}:${item.wrote?.[optionsFrom(item)]?.ts ?? 0}`;
+}
+
+const FOLDS_KEPT = 100;
+
+/** The folds kept on this machine; the old fold-everything setting reads as none. */
+export function foldedKeys(raw: string | null): string[] {
+  try {
+    const list = JSON.parse(raw ?? '[]');
+    return Array.isArray(list) ? list.filter((k): k is string => typeof k === 'string') : [];
+  } catch { return []; }
+}
+
+/** Folds or unfolds one round of choices, keeping the newest hundred folds. */
+export function toggleFold(list: string[], key: string): string[] {
+  return list.includes(key) ? list.filter((k) => k !== key) : [...list, key].slice(-FOLDS_KEPT);
 }

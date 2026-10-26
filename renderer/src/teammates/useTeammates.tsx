@@ -2,16 +2,19 @@
 // rows, the title, the right end of the top bar and the page. Kept apart from
 // useRooms, whose every field App reads is pinned by its own tests.
 import { useMemo, useState, type ReactNode } from 'react';
-import type { Product, RunningSession, TeammatesView } from '../types';
+import type { Product, RunningSession, TeammatesView, WorkItem } from '../types';
 import { TeammateMenu, TeammatesPage, TeammatesTitle, shownOf, type TeammateModels } from './TeammatesPage';
 import { SidebarGroups } from '../team/rooms/GroupsSidebar';
 import { api } from '../api';
 import { asksYou, heldFor } from './chat-lines';
+import type { TabView } from '../threads/Pages';
 
 /** `new`, a teammate's id, or `log:`, `about:` or `book:` one of its pages; 'team' opens the first chat. */
 export type TeammatesOpen = string | null;
 
-export function useTeammates({ view: stored, asking = [], running = [], products, engines, models, me, mePic = null, onEnter, onOpenThread, onChanged }: {
+export function useTeammates({ items = [], view: stored, asking = [], running = [], products, engines, models, me, mePic = null, onEnter, onOpenThread, tabOf, onOpenList, onChanged }: {
+  /** Every thread the app holds, so what a teammate sent you is drawn as its inbox row. */
+  items?: WorkItem[];
   models?: TeammateModels;
   mePic?: string | null;
   view: TeammatesView | null | undefined;
@@ -25,6 +28,9 @@ export function useTeammates({ view: stored, asking = [], running = [], products
   /** Leave whatever page is up, so this one can be. */
   onEnter: () => void;
   onOpenThread: (product: string, id: string) => void;
+  /** The inbox tab a thread sits in, and a way to open the inbox at one. */
+  tabOf?: (item: WorkItem) => TabView | null;
+  onOpenList?: (view: TabView) => void;
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState<TeammatesOpen>(null);
@@ -52,8 +58,8 @@ export function useTeammates({ view: stored, asking = [], running = [], products
   const shown = shownOpen ? shownOf(shownOpen, team) : null;
   const mate = shown && shown.kind !== 'new' ? team.find((t) => t.id === shown.id) ?? null : null;
   const page: ReactNode = shownOpen && view
-    ? <TeammatesPage view={view} open={shownOpen} products={products} engines={engines} me={me}
-        onOpen={go} onOpenThread={onOpenThread} onChanged={onChanged} sessions={sessions} models={models} mePic={mePic} />
+    ? <TeammatesPage view={view} items={items} open={shownOpen} products={products} engines={engines} me={me}
+        onOpen={go} onOpenThread={onOpenThread} tabOf={tabOf} onOpenList={onOpenList} onChanged={onChanged} sessions={sessions} models={models} mePic={mePic} />
     : null;
   const call = async (op: string, args: Record<string, unknown>) => { const r = await api.teammates(op, args); if (r.ok) onChanged(); return r.ok; };
   return {
@@ -61,6 +67,8 @@ export function useTeammates({ view: stored, asking = [], running = [], products
     open: shownOpen,
     go,
     leave,
+    /** Escape: from About, its Log or a playbook back to its chat; from a chat, out of Chats. */
+    back: () => (shown && (shown.kind === 'about' || shown.kind === 'log' || shown.kind === 'book') ? go(shown.id) : leave()),
     list: team,
     onNew: () => go('new'),
     /** The wide sidebar's one Chats row; with Groups on, the Groups row is it. */

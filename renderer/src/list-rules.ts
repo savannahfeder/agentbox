@@ -1,6 +1,6 @@
 // Pure rules for what each list shows, and what a click on a row or its select
 // box means.
-import { isCleanRun } from '../../shared/repeats.mjs';
+import { instructionOf, isCleanRun } from '../../shared/repeats.mjs';
 import { teammateIdOf } from '../../shared/teammates.mjs';
 import { answerSettled } from '../../shared/answers.mjs';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mjs';
@@ -335,32 +335,19 @@ export function belongsInProgress(
 }
 
 /**
- * OF THE IN PROGRESS TAB, WHAT IS ACTUALLY MOVING (w-712fc99e8d).
+ * THE IN PROGRESS TAB: what `belongsInProgress` holds, less what Needs you is
+ * holding, so a thread is counted in one tab only.
  *
- * The empty inbox says whether work is moving without you, and it was handed
- * the length of the tab. The tab holds a thread waiting its turn as well as
- * one being worked on, so with the fleet set to two agents a tester read "8
- * threads are running" over four that had not started.
- *
- * Running is a session on the thread, a ship the app still owes it, or one of
- * your own terminal sessions that took your reply. Queued is the supervisor's
- * own list of what the next tick will start, so a thread stuck at a sign-in
- * or a usage limit is counted as neither: it is in the tab, and nothing is
- * happening to it.
+ * The two rules overlap on purpose — a row asking you something is in Needs
+ * you whatever is happening to it, and a session really is on it — which is
+ * right for the rules and wrong for the numbers. Needs you wins here, as
+ * `tabState` in App.tsx already had it for the board, and nothing that reads
+ * the rule itself changes: the row is still stoppable, still says In progress,
+ * still has a worker on it.
  */
-export function workMoving(
-  rows: readonly { id: string; agent?: unknown }[],
-  { live, shipping, queued }: {
-    live: ReadonlySet<string>; shipping: ReadonlySet<string>; queued: ReadonlySet<string>;
-  },
-): { running: number; queued: number } {
-  let running = 0;
-  let waiting = 0;
-  for (const row of rows) {
-    if (row.agent || live.has(row.id) || shipping.has(row.id)) running += 1;
-    else if (queued.has(row.id)) waiting += 1;
-  }
-  return { running, queued: waiting };
+export function inProgressTab<T extends { id: string }>(progress: readonly T[], inbox: readonly { id: string }[]): T[] {
+  const needsYou = new Set(inbox.map((i) => i.id));
+  return progress.filter((i) => !needsYou.has(i.id));
 }
 
 // Everything In progress can be stopped, so this is the list's own rule rather
@@ -493,7 +480,7 @@ export function scheduleSubtitle(i: Parameters<typeof rowTitle>[0], count = 1): 
 // (message-split.ts), so the summary starts after it rather than repeating it.
 // When the title is not a prefix of the body, the body is used whole.
 function bodyAfterTitle(i: { body?: string; title?: string }): string {
-  const body = i.body ?? '';
+  const body = instructionOf(i.body ?? '');
   const label = (i.title ?? '').replace(/…$/, '').trim();
   return label && body.startsWith(label) ? body.slice(label.length).trim() : body;
 }

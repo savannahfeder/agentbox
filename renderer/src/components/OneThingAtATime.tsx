@@ -41,6 +41,11 @@ export function QueueSummary({ title, context, earlier, steps = false, open, onT
   return (
     <div className="one-sum">
       {title && <h2 className="one-title">{title}</h2>}
+      {toggle && (
+        <div className="one-head">
+          <button type="button" className="one-earlier" onClick={onToggle}>{toggle}</button>
+        </div>
+      )}
       {context && (
         <div
           ref={cols}
@@ -51,20 +56,22 @@ export function QueueSummary({ title, context, earlier, steps = false, open, onT
           onClick={opens ? flip : undefined}
           onKeyDown={opens ? (e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); flip(); } } : undefined}
         >
-          {/* The label says the line can be skipped; the answer under it is what to read. */}
-          <div className="one-col"><span className="one-lab">Context</span>{context}</div>
+          <div className="one-col">{context}</div>
         </div>
       )}
-      {toggle && <button type="button" className="one-earlier" onClick={onToggle}>{toggle}</button>}
     </div>
   );
 }
 
-export function QueueAnswer({ text, md }: { text: string; md: (text: string) => ReactNode }) {
+const sameLine = (a: string, b: string) => a.replace(/\s+/g, ' ').trim().toLowerCase() === b.replace(/\s+/g, ' ').trim().toLowerCase();
+
+export function QueueAnswer({ text, md, name = '' }: { text: string; md: (text: string) => ReactNode; name?: string }) {
   const { headline, rest } = splitHeadline(text);
+  // A teammate's thread is named after this same line, so it is not said twice.
+  const shown = headline && !sameLine(headline, name) ? headline : null;
   return (
     <div className="outcome one-answer">
-      {headline && <h1 className="one-q">{headline}</h1>}
+      {shown && <h1 className="one-q">{shown}</h1>}
       {rest.trim() && md(rest)}
     </div>
   );

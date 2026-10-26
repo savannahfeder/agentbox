@@ -120,7 +120,7 @@ describe('the card hands over before it waits on anything', () => {
 describe('the app closes the card on the hand-over, not on the answer', () => {
   const app = src('App.tsx');
   const at = app.indexOf('<ThreadComposer');
-  const wiring = app.slice(at, app.indexOf('/>\n      )}', at));
+  const wiring = app.slice(at, app.indexOf("/>, modal === 'compose' ? null : clearSlot)}", at));
 
   it('closes it and says Sending in onSending, except in the tutorial, which waits as before', () => {
     expect(wiring).toMatch(/onSending=\{walkCard \? undefined : /);
