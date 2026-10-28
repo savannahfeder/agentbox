@@ -3791,6 +3791,19 @@ img.product-mark { object-fit: cover; opacity: 1; }
   line-height: 16px; margin-left: 8px;
 }
 .dock-send:hover kbd { color: var(--text-dim); }
+/* Send later's half of Send, the new thread card's split button in this box's material. */
+.dock-send-pair { margin-left: auto; display: inline-flex; align-items: stretch; flex: none; }
+.dock-send-pair > .dock-send { margin-left: 0; }
+.reply-later { position: relative; display: inline-flex; }
+.dock-send-later {
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 8px;
+  font: inherit; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--text-faint);
+  background: var(--wash); border: 1px solid var(--line-strong); border-left: 0; border-radius: 0; cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.dock-send-later.set { padding-left: 10px; color: var(--text-dim); }
+.dock-send-later:hover, .dock-send-later[aria-expanded='true'] { color: var(--text); background: var(--wash-strong); }
+.dock-send-later:focus-visible { outline: 1px solid var(--text); outline-offset: 1px; }
 /* A line only when there is something true to say: the first run of a repeat,
    or words that looked like a schedule and were not understood. Never red;
    this is the footer's own quiet voice. */

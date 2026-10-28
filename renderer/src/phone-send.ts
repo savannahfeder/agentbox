@@ -49,7 +49,8 @@ export function phoneSender({ client, rows, setRows, aliases, changed }: {
     if ((withdrawn.get(`${payload?.product}/${payload?.id}`) ?? 0) > Date.now() - 60_000
       && (channel === REQUEST_CHANNELS.schedule || (channel === REQUEST_CHANNELS.answer && (payload?.answer === '(withdrawn)' || !String(payload?.answer ?? '').trim())))) return { ok: true };
     if (channel === REQUEST_CHANNELS.stopSession && payload?.withdraw) throw new Error('Your computer already has it. Undo it there.');
-    const cmd = commandFor(channel, channel === REQUEST_CHANNELS.answer && scheduled(payload) ? { ...payload, unschedule: true } : payload, aliases());
+    const clears = channel === REQUEST_CHANNELS.answer && scheduled(payload) && !(Number(payload?.runAt) > Date.now());
+    const cmd = commandFor(channel, clears ? { ...payload, unschedule: true } : payload, aliases());
     if (!cmd) throw new Error(NOT_HERE);
     const asked = client.generation();
     const row = await client.insertCommand(cmd);

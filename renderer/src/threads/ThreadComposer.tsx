@@ -65,8 +65,10 @@ import {
   joinNames, placeholderFor, projectsOffered, projectSwatch, recentModels,
   sharingFields, startingProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   dueChoices, dueWords, headRows, keyOnTheNewThreadCard, taskFields,
-  type Harness, type Keyboard, type ModelPick, type SendAs, type Visibility,
+  startingWhen, whenOnDraft, whenToSend, whenWords,
+  type Harness, type Keyboard, type ModelPick, type SendAs, type SendWhen, type Visibility,
 } from './composer-rules';
+import { sameRule } from '../../../shared/repeats.mjs';
 import './thread-composer.css';
 import { TeammateMark } from '../teammates/TeammatesRail';
 
@@ -260,6 +262,11 @@ export function ThreadComposer({
   const prioShown: PriorityId = prio ?? 'medium';
   const pickPrio = (id: PriorityId) => { setPrio(id); };
 
+  /* ---------------------------- send later ------------------------------ */
+  // A row of Send later sets when it goes, and Send sends it, so there is still
+  // room to add a line after picking a time (w-54cdf7c768).
+  const [when, setWhen] = useState<SendWhen>(() => startingWhen(opened.current.when));
+
   /* --------------------------- visibility ------------------------------- */
   // A NEW THREAD STARTS WHERE ITS PROJECT IS, AND WHO SEES IT IS STILL CHOSEN
   // FOR THAT THREAD (w-b989839656, approved 2026-10-05). The project's
@@ -417,13 +424,13 @@ export function ThreadComposer({
   // On every keystroke, every paste, every pick, the same draft the old card
   // kept, so an Escape or a reload never takes her words or her pictures.
   useEffect(() => {
-    const draft = { text, attachments, priority: prio, when: { runAt: 0, repeat: null }, dropped: 0 };
+    const draft = { text, attachments, priority: prio, when: whenOnDraft(when), dropped: 0 };
     // A card opened while the last send is in flight starts empty, and must not
     // wipe the copy that send keeps until it lands (`openingComposeDraft`).
     if (composeDraftIsEmpty(draft) && readComposeDraft().sendingAt) return;
     const stored = saveComposeDraft(draft);
     setDropped(stored.dropped);
-  }, [text, attachments, prio]);
+  }, [text, attachments, prio, when]);
 
   // A LAYOUT EFFECT, SO THE CARD HAS THE KEYBOARD BEFORE THE NEXT KEYSTROKE.
   // N opens the card inside a keydown; a passive effect is scheduled and can
@@ -525,7 +532,7 @@ export function ThreadComposer({
   // The dialog closes on Send; the box on the page stays, so it empties. The
   // send goes on with the words it already took, and a failed one reopens them
   // in the dialog (`onFailed`).
-  const emptyForTheNext = () => { setText(''); setAttachments([]); setSending(false); };
+  const emptyForTheNext = () => { setText(''); setAttachments([]); setWhen(null); setSending(false); };
 
   const sendTask = async (when: { runAt?: number; start?: 'later'; repeat?: { every: 'day' | 'weekday' | 'week'; on?: number; at: string } } = {}) => {
     // A teammate takes the words in the team chat rather than as a thread.
@@ -658,7 +665,7 @@ export function ThreadComposer({
     if (err) { restoreComposeDraft(taken); setError(err); }
     else { dropComposeDraft(taken); setText(''); onClose(); }
   };
-  const send = () => (person && sendAs === 'message' ? sendMessage() : sendTask());
+  const send = () => (person && sendAs === 'message' ? sendMessage() : sendTask(whenToSend(when)));
   const talk = useWebDictation({ text, setText }, () => void send());
   // ⌘↵ SENDS WHEREVER THE CURSOR IS while the card is open (w-9f6975906c).
   // It used to be heard only inside the card, so once a menu or a click had
@@ -926,17 +933,24 @@ export function ThreadComposer({
   const monday = mondayMorning(now);
   const typedAt = momentFromWords(laterText, now);
   const typedRule = readRule(repeatText);
+  const pickWhen = (w: SendWhen) => { setWhen(w); close('text'); };
+  const isAt = (ts: number) => !!when && 'runAt' in when && when.runAt === ts;
   const laterMenu = (
     <div className="tc-menu tc-rise tc-right tc-wide" role="menu" aria-label="Send later" onKeyDown={menuKeys}>
       {laterPage === 'list' ? (<>
         <span className="tc-menu-head">Send later</span>
-        <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => sendTask({ start: 'later' })}>
+        {when && (
+          <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => pickWhen(null)}>
+            <SendNowIcon /><span className="tc-row-label">Send now</span>
+          </button>
+        )}
+        <button type="button" data-item className={`tc-row ${when && 'start' in when ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pickWhen({ start: 'later' })}>
           <ClockIcon /><span className="tc-row-label">Add it to Later</span>
         </button>
-        <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => sendTask({ runAt: tomorrow })}>
+        <button type="button" data-item className={`tc-row ${isAt(tomorrow) ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pickWhen({ runAt: tomorrow })}>
           <ClockIcon /><span className="tc-row-label">Tomorrow morning</span><small>{laterHint(tomorrow)}</small>
         </button>
-        <button type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => sendTask({ runAt: monday })}>
+        <button type="button" data-item className={`tc-row ${isAt(monday) ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pickWhen({ runAt: monday })}>
           <ClockIcon /><span className="tc-row-label">Monday morning</span><small>{laterHint(monday)}</small>
         </button>
         {/* A TIME IN WORDS, where a browser date field used to be: the same
@@ -951,10 +965,10 @@ export function ThreadComposer({
             aria-label="Send at a time you type"
             value={laterText}
             onChange={(e) => setLaterText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && typedAt) { e.preventDefault(); sendTask({ runAt: typedAt.ts }); } }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && typedAt) { e.preventDefault(); pickWhen({ runAt: typedAt.ts }); } }}
           />
           {laterText.trim() && (typedAt
-            ? <button type="button" data-item className="tc-schedule" onClick={() => sendTask({ runAt: typedAt.ts })}>{typedAt.hint}</button>
+            ? <button type="button" data-item className="tc-schedule" onClick={() => pickWhen({ runAt: typedAt.ts })}>{typedAt.hint}</button>
             : <small className="tc-when-no">Not a time yet</small>)}
         </span>
         <span className="tc-sep" />
@@ -968,7 +982,7 @@ export function ThreadComposer({
         <span className="tc-sep" />
         <span className="tc-menu-head">Repeat it</span>
         {repeatPresets(now).filter((r) => r.rule).map((r) => (
-          <button key={r.label} type="button" data-item className="tc-row" onPointerEnter={hover} onClick={() => sendTask({ repeat: r.rule! })}>
+          <button key={r.label} type="button" data-item className={`tc-row ${when && 'repeat' in when && sameRule(when.repeat, r.rule) ? 'on' : ''}`} onPointerEnter={hover} onClick={() => pickWhen({ repeat: r.rule! })}>
             <RepeatIcon /><span className="tc-row-label">{r.label}</span>
           </button>
         ))}
@@ -985,11 +999,11 @@ export function ThreadComposer({
             value={repeatText}
             onChange={(e) => setRepeatText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && typedRule && 'rule' in typedRule) { e.preventDefault(); sendTask({ repeat: typedRule.rule }); }
+              if (e.key === 'Enter' && typedRule && 'rule' in typedRule) { e.preventDefault(); pickWhen({ repeat: typedRule.rule }); }
             }}
           />
           {repeatText.trim() && (typedRule && 'rule' in typedRule
-            ? <button type="button" data-item className="tc-schedule" onClick={() => sendTask({ repeat: typedRule.rule })}>{typedRule.label[0].toUpperCase() + typedRule.label.slice(1)}</button>
+            ? <button type="button" data-item className="tc-schedule" onClick={() => pickWhen({ repeat: typedRule.rule })}>{typedRule.label[0].toUpperCase() + typedRule.label.slice(1)}</button>
             : <small className="tc-when-no">{typedRule ? 'Can’t repeat that' : 'Not a repeat yet'}</small>)}
         </span>
       </>)}
@@ -1231,8 +1245,11 @@ export function ThreadComposer({
               <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={refusal ?? stopper?.reason ?? `Send · ${SEND}`}>
                 Send <kbd>{SEND}</kbd>
               </button>
-              <button type="button" data-trigger className="tc-send-caret" disabled={!canSend} aria-label="Send later"
+              {/* A picked time is said here, on the half that changes it. */}
+              <button type="button" data-trigger className={`tc-send-caret${when ? ' set' : ''}`} disabled={sending}
+                aria-label={when ? `Sends ${whenWords(when)}. Change when` : 'Send later'} title={when ? 'Change when it sends' : 'Send later'}
                 aria-haspopup="menu" aria-expanded={open === 'later'} onClick={() => toggle('later')} onKeyDown={triggerKeys('later')}>
+                {when && <span className="tc-send-when">{whenWords(when)}</span>}
                 <CaretIcon />
               </button>
               {open === 'later' && laterMenu}
@@ -1277,6 +1294,9 @@ const CaretIcon = () => (
 // lines up with the names above it rather than stepping sideways.
 const PlusIcon = () => (
   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+);
+const SendNowIcon = () => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M5 12h13M13 7l5 5-5 5" /></svg>
 );
 const ClockIcon = () => (
   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 8v4.5l3 2" /></svg>

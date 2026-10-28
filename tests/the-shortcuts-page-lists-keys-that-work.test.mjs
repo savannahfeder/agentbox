@@ -147,7 +147,7 @@ const HANDLED = {
     [summary, 'if (!e.repeat) onToggle();'],
     [summary, "window.addEventListener('keydown', onKey, true);"],
   ],
-  'Z': [[focused, "e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }"], [list, "case 'z': case 'Z': undo(); break;"]],
+  'Z': [[focused, "e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }"], [list, "case 'z': case 'Z': e.preventDefault(); undo(); break;"]],
   '⌘A': [
     [chords, "e.key.toLowerCase() === 'a' && !inInput && !modal"],
     // Pressing it again with everything ticked clears the ticks, which the

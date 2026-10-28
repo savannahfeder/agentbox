@@ -45,7 +45,7 @@ import { whatTheFileSentUp } from '../../shared/artifact-keys.mjs';
 import { ALIVE_EVERY_MS, markWindowAlive, type Place, placeIsSomewhere, readPlace, windowWasJustHere, writePlace, writeScroll } from './where-she-was';
 import { Rail } from './components/Rail';
 import { ThreadComposer, type ComposeStart } from './threads/ThreadComposer';
-import { joinNames, writingMovesToTheDialog, projectsOffered, teammates } from './threads/composer-rules';
+import { joinNames, laterHint, writingMovesToTheDialog, projectsOffered, teammates } from './threads/composer-rules';
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mjs';
 import { changePathFor } from './code-artifact';
@@ -4172,7 +4172,7 @@ export default function App() {
   // lives in `leaveResolved` above and still covers every way a row leaves her
   // inbox.
 
-  const answerWith = useCallback(async (item: WorkItem, text: string, priority?: number, sent?: SentDraft, mode?: AnswerMode | null, engine?: string | null, pick?: ReplyPick) => {
+  const answerWith = useCallback(async (item: WorkItem, text: string, priority?: number, sent?: SentDraft, mode?: AnswerMode | null, engine?: string | null, pick?: ReplyPick, runAt?: number) => {
     // AN AGENT ROW IS NOT WORK OF HERS TO CLOSE, DEFER OR RESTART. It stands
     // for a session running outside Agentbox; the only two things that mean
     // anything to it are a reply and being taken to its window.
@@ -4196,6 +4196,10 @@ export default function App() {
     // reads her reply when it exits (deliverMidflightReply). Reopening would
     // put a second worker on the same item.
     const status = statusForReply(item.status);
+    // A REPLY SET FOR LATER (w-54cdf7c768) is written now with the row set for
+    // its time, so nothing hands it to an agent before then.
+    const later = (runAt ?? 0) > Date.now();
+    const keepsTime = later ? runAt : 0;
     // A REPLY THAT DID NOT GET THROUGH COMES BACK TO THE BOX, on every path.
     // NEVER PULL HER BACK. This settles whenever the agent's session does,
     // which can be minutes after she moved on, and it used to switch the
@@ -4204,7 +4208,7 @@ export default function App() {
     // is looking. If she is not, the words wait in this row's box and a toast
     // she can click says where.
     const putBack = (error: unknown) => {
-      restoreFailedDraft(item, sent?.words ?? text, sent?.attachments ?? []);
+      restoreFailedDraft(item, sent?.words ?? text, sent?.attachments ?? [], undefined, keepsTime);
       const here = focusedNow.current?.id === item.id && focusedNow.current?.product === item.product;
       if (here) {
         setModal('reply');
@@ -4244,7 +4248,10 @@ export default function App() {
     // What the promise waits on is the acknowledgement, not the handing over.
     // So the message says "press Z to undo" for exactly as long as that is
     // true and stops saying it the moment it stops being true.
-    const isRunning = snap?.supervisor.running.some((run) => run.itemId === item.id && run.product === item.product);
+    const running = snap?.supervisor.running.some((run) => run.itemId === item.id && run.product === item.product);
+    // A reply for later is not handed to the run, and its Z leaves that run alone.
+    const isRunning = running && !later;
+    const runStays = later && running;
     if (isRunning) {
       setFollowing({ product: item.product, id: item.id });
       setModal(null);
@@ -4418,7 +4425,7 @@ export default function App() {
     setSending((q) => [...q, mine]);
     const restore = (): Restored => {
       setSending((q) => q.filter((s) => s !== mine));
-      return restoreDraft(item, sent?.words ?? text, sent?.attachments ?? []) ? { item } : null;
+      return restoreDraft(item, sent?.words ?? text, sent?.attachments ?? [], undefined, keepsTime) ? { item } : null;
     };
     // A REPLY IS A CLAIM ON NOW, so it cancels a schedule rather than queueing
     // behind it. The rule and the reason are in list-rules; what is here is the
@@ -4456,6 +4463,7 @@ export default function App() {
           // run this reply starts reads the model she just chose rather than the
           // one it was on (main/store.mjs, answerItem).
           ...(pick ?? {}),
+          ...(later ? { runAt } : {}),
         });
       } catch (error) {
         setSending((q) => q.filter((s) => s !== mine));
@@ -4463,7 +4471,7 @@ export default function App() {
         return;
       }
       setTimeout(() => setSending((q) => q.filter((s) => s !== mine)), LANDED_MS);
-      if (wasScheduled) {
+      if (wasScheduled && !later) {
         if (priorRunAt > Date.now()) await api.schedule({ product: item.product, id: item.id, runAt: 0 });
         if (priorSnooze > Date.now()) await api.snooze({ product: item.product, id: item.id, snoozedUntil: 0 });
         // The legacy localStorage snooze hides a row on read all by itself, so
@@ -4472,20 +4480,21 @@ export default function App() {
         setSnoozes((s) => { const next = { ...s }; delete next[item.id]; return next; });
       }
       pushUndo({ label: 'Reply withdrawn, back in your inbox', undoes: 'take back that reply and stop the agent', restore, undid, run: async () => {
-        if (wasScheduled && priorRunAt) await api.schedule({ product: item.product, id: item.id, runAt: priorRunAt });
+        if (later) await api.schedule({ product: item.product, id: item.id, runAt: priorRunAt });
+        else if (wasScheduled && priorRunAt) await api.schedule({ product: item.product, id: item.id, runAt: priorRunAt });
         if (wasScheduled && priorSnooze) await api.snooze({ product: item.product, id: item.id, snoozedUntil: priorSnooze });
         // `withdraw`: on the phone, take back the reply itself if her Mac has not taken it.
-        await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id, withdraw: true });
+        if (!runStays) await (window.zero as any)?.stopSession?.({ product: item.product, id: item.id, withdraw: true });
         // Put the thread back exactly where the reply found it. The rule and
         // what it cost are in list-rules (`withdrawReply`): restoring the
         // status only when the reply had changed one left an already-open row
         // sitting blocked after the kill, where nothing carries an answer.
-        await api.answer({ product: item.product, id: item.id, ...withdrawReply(item.status) });
+        await api.answer({ product: item.product, id: item.id, ...(runStays ? { answer: '(withdrawn)' } : withdrawReply(item.status)) });
         // Taking the command back ends the watch with it, so the next Escape
         // means what it always meant.
         setFollowing(null);
       } });
-    }, talking ? 'Sent' : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id }, undid, holdsReplies(onPhone()) ? UNDO_GRACE_MS : 0);
+    }, talking ? 'Sent' : later ? `Sends ${laterHint(runAt!)} → ${item.productName}` : `Sent → ${item.productName}`, restore, stay, { product: item.product, id: item.id, ...(later ? { at: laterHint(runAt!) } : {}) }, undid, holdsReplies(onPhone()) ? UNDO_GRACE_MS : 0);
   }, [deferCommit, snap?.supervisor.running, snap?.products, showToast, refresh, markSeen, pushUndo, startChatAgents, fire, movesOn]);
   answerWithRef.current = answerWith;
 
@@ -5629,7 +5638,8 @@ export default function App() {
           break;
         // N starts a thread (w-fb9051e597). C does nothing: the cloud is ⌘C.
         case 'n': case 'N': e.preventDefault(); startThread(); break;
-        case 'z': case 'Z': undo(); break;
+        // Held, or a card Z reopens takes the keystroke as a typed z.
+        case 'z': case 'Z': e.preventDefault(); undo(); break;
         // B FLIPS LIST AND BOARD (w-58c8f466e7): "I quite often switch between
         // board and list view". B for board; it shipped as V first and that
         // read as "a weird one". Only where the list or the board is what is
@@ -5862,6 +5872,7 @@ export default function App() {
     <SentLine
       key={toastShown.current}
       title={sentTo ? sentTo.label || sentTo.title : 'the thread you left'}
+      at={toast.goes.at}
       undoes={toastParts(toast.text).undo}
       onBack={() => openToastRow(toast.goes!)}
       onUndo={() => { setToast(null); void undo(); }}
@@ -6699,7 +6710,7 @@ export default function App() {
                   codexModelDefault={codexModelDefault}
                   engines={snap.engines?.choices}
                   items={items}
-                  onReplySend={(text, priority, repeat, sent, mode, pick) => {
+                  onReplySend={(text, priority, repeat, sent, mode, pick, sendAt) => {
                     // THE REPLY GOES WHERE THE ROW ACTUALLY LIVES. On an agent
                     // row there is no ledger to answer; the text is handed to
                     // the running session itself, and the toast says what came
@@ -6710,7 +6721,7 @@ export default function App() {
                     // be the system swallowing something the user wrote, which is the
                     // failure this app cares about most.
                     if (repeat && !teammateIdOf(focused)) applyRepeat(focused, repeat);
-                    answerWith(focused, text, priority, sent, mode, runningEngine, pick);
+                    answerWith(focused, text, priority, sent, mode, runningEngine, pick, sendAt);
                   }}
                   onReplyClose={() => setModal(null)}
                   onStop={() => stopAgent(focused)}

@@ -78,7 +78,8 @@ import { PictureView, picturesFor, type Picture } from './PictureView';
 import { watchScrollGutter } from '../scroll-gutter';
 import { CODE_PATH, artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
 import { api } from '../api';
-import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveDraftAttachments, readDraftPick, saveDraftPick, type SentDraft } from '../drafts';
+import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveDraftAttachments, readDraftPick, saveDraftPick, readDraftWhen, saveDraftWhen, type SentDraft } from '../drafts';
+import { ReplyLater } from './ReplyLater';
 import { effortSaid, pickOnTheRow, pickToSend, replyOpensOn } from '../reply-pick';
 import { withQuote } from '../team/chat-quote';
 import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, threadToOpen } from '../team/chat-threads';
@@ -726,7 +727,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onResolve: () => void;
   onPick: (n: number) => void;
   onReply: () => void;
-  onReplySend: (text: string, priority?: number, repeat?: RepeatRuleValue | null, sent?: SentDraft, mode?: AnswerMode | null, pick?: ReplyPick) => void;
+  onReplySend: (text: string, priority?: number, repeat?: RepeatRuleValue | null, sent?: SentDraft, mode?: AnswerMode | null, pick?: ReplyPick, sendAt?: number) => void;
   onReplyClose: () => void;
   onStop: () => void;
   // Run now, the three-dot menu's row on a waiting task.
@@ -2407,7 +2408,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
    *  and the new-task card cannot show two different lists. */
   codexModels?: ModelChoice[];
   codexModelDefault?: string | null;
-  onSend: (text: string, priority?: number, repeat?: RepeatRuleValue | null, sent?: SentDraft, mode?: AnswerMode | null, pick?: ReplyPick) => void;
+  onSend: (text: string, priority?: number, repeat?: RepeatRuleValue | null, sent?: SentDraft, mode?: AnswerMode | null, pick?: ReplyPick, sendAt?: number) => void;
   onClose: () => void;
   /**
    * HOW A MODE CHANGE IS ANNOUNCED NOW THAT NOTHING SITS IN THE FOOTER.So the
@@ -2445,10 +2446,17 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // back to is the draft she left.
   const [text, setText] = useState(() => readDraft(item));
   const [attachments, setAttachments] = useState<PendingAttachment[]>(() => readDraftAttachments(item));
+  // WHEN IT GOES, 0 for now (w-54cdf7c768). Only a work thread's reply waits:
+  // a message to a person or into a terminal has no row to hold it.
+  const canWait = !item.agent && !talkTo?.length;
+  const [sendAt, setSendAt] = useState(() => readDraftWhen(item));
+  useEffect(() => { setSendAt(readDraftWhen(item)); }, [item.product, item.id]);
+  const pickSendAt = (at: number) => { setSendAt(at); saveDraftWhen(item, at); };
   useEffect(() => {
     const restored = (event: Event) => {
       if ((event as CustomEvent).detail !== draftKey(item)) return;
       setText(readDraft(item));
+      setSendAt(readDraftWhen(item));
       const back = readDraftAttachments(item);
       setAttachments(back);
       // A voice note that went with the undone or refused send comes back
@@ -2751,7 +2759,8 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
     onSend([named.encode(chat.encode(words)), attachedMd].filter(Boolean).join('\n\n'), prio ? priorityValueOf(prio) : undefined, repeat, sent, mode,
       touched
         ? pickToSend({ model, effort }, { engine: engineShown, was: engineNow, engineCount: engineRows.length })
-        : undefined);
+        : undefined,
+      canWait && sendAt > Date.now() ? sendAt : undefined);
   };
   // A note being recorded is a draft: the box stays open round it.
   const hasDraft = !!text.trim() || attachments.length > 0 || recording;
@@ -3358,12 +3367,15 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             things to choose between; a stop INSTEAD of a dead Send is one
             thing that is always the thing she can do. */}
         {stop && !hasDraft ? stop : (
+        <span className="dock-send-pair">
         <button
           className="dock-send"
           onClick={() => send()}
           disabled={!hasDraft || !!chat.block || saving}
           title={chat.block ?? `Send · ${SEND}`}
         >{saving ? 'Sending…' : <>Send <kbd>{SEND}</kbd></>}</button>
+        {canWait && <ReplyLater at={sendAt} onPick={pickSendAt} onClosed={() => ref.current?.focus()} />}
+        </span>
         )}
         </>}
       </div>

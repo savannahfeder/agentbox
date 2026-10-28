@@ -38,13 +38,14 @@ export function liveReplyBrief(answer, files = '') {
 // `from` names the teammate whose words these are: they reach a running
 // session framed as that teammate's, never as the person's or as a command.
 export function submitReply(supervisor, payload, commit) {
-  const { product, id, status, permissionMode, now = false, from = null } = payload;
+  const { product, id, status, permissionMode, now = false, from = null, later = false } = payload;
   const answer = from ? framedTeammate(from, payload.answer) : payload.answer;
   const key = JSON.stringify([product, id]);
   const sends = supervisor._replySends ??= new Map();
   const previous = sends.get(key) ?? Promise.resolve();
   const session = supervisor.sessions?.get(id);
-  const live = session?.product === product && typeof session.child?.steer === 'function'
+  // A reply set for later waits in the ledger for its time, never in a session.
+  const live = !later && session?.product === product && typeof session.child?.steer === 'function'
     && !(from && session.remoteIdle)
     && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)';
   // Observe rejections immediately, including when an earlier reply is still

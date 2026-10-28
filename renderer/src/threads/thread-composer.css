@@ -141,6 +141,8 @@
 .tc-send > .tc-send-main { border-radius: var(--radius) 0 0 var(--radius); }
 .tc-send.solo > .tc-send-main { border-radius: var(--radius); }
 .tc-send > .tc-send-caret { padding: 0 9px; border-left: 1px solid rgba(26, 24, 23, 0.28); border-radius: 0 var(--radius) var(--radius) 0; }
+.tc-send > .tc-send-caret.set { gap: 6px; padding-left: 11px; }
+.tc-send-when { font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .tc-send > button:hover:not(:disabled) { filter: brightness(1.08); }
 .tc-send > button:focus-visible { outline: 1px solid var(--text); outline-offset: 1px; }
 .tc-send > button:disabled { opacity: 0.45; cursor: default; }

@@ -688,7 +688,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // answered at once (supervisor.sendNow).
   ipcMain.handle('zero:send-now', (_e, { product, id }) => supervisor.sendNow(product, id));
 
-  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped }) => {
+  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped, runAt }) => {
     if (isAgentRow(id)) return { ok: false };
     // WORK THAT NEVER REACHED MAIN IS NOT CLOSED UNASKED (shared/not-shipped.mjs).
     // The window asks first and says so with `closeUnshipped`; the phone and
@@ -746,7 +746,13 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // handing them over in one call and writing the model afterwards would be a
     // race the run usually wins, so she would pick a model and watch the old one
     // take the task. `answerItem` writes both, and it writes the model first.
-    const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,now:!!now},()=>store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone }));
+    // A REPLY SET FOR LATER is these words with the row set for its time. The
+    // time goes in first, so no pass ever reads the words on a row that is due.
+    const later = Number(runAt) > Date.now() && status !== 'done';
+    const out = await submitReply(supervisor,{product,id,answer,status,permissionMode,now:!!now,later},()=>{
+      if (later) store.scheduleItem(product, id, runAt);
+      return store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone });
+    });
     // A REPLY ON A ROW A TEAMMATE GAVE YOU HANDS IT BACK TO THEM, so the
     // conversation moves to their inbox instead of sitting in both
     // (shared/team-rules.mjs handedOnByReply). Archiving hands nothing on.

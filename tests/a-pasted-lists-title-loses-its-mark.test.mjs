@@ -73,7 +73,7 @@ describe('what the card does with a list, which is nothing special', () => {
   });
 
   it('sends one row from one Send, whatever was typed', () => {
-    expect(card).toMatch(/const send = \(\) => \(person && sendAs === 'message' \? sendMessage\(\) : sendTask\(\)\);/);
+    expect(card).toMatch(/const send = \(\) => \(person && sendAs === 'message' \? sendMessage\(\) : sendTask\(whenToSend\(when\)\)\);/);
     expect(card.match(/await api\.compose\(/g)).toHaveLength(1);
   });
 
