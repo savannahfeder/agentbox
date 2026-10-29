@@ -79,7 +79,7 @@ function snug(el: HTMLElement): Box {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   for (let n = walk.nextNode(); n; n = walk.nextNode()) {
-    if (!n.textContent?.trim()) continue;
+    if (!n.textContent?.trim() || n.parentElement?.closest('.live-announcement')) continue;
     const range = document.createRange();
     range.selectNodeContents(n);
     for (const r of range.getClientRects()) {

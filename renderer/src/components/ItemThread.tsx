@@ -43,7 +43,7 @@ import type { AgentTurn, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
 import { catchUpDue } from '../../../shared/agent-import.mjs';
-import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, standsAt } from '../one-thing-at-a-time';
+import { appWrote, askLine, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, standsAt } from '../one-thing-at-a-time';
 import { rowTitle } from '../list-rules';
 import { askMarkUnread, say } from '../team/chat-events';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
@@ -380,13 +380,15 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   // Answered since (a reply or a pick the agent is working on): drawn from that answer down.
   const stands = queue && newest && !earlierOpen ? standsAt(events, newest) : -1;
   const behind = stands >= 0 ? earlierThan(events, stands) : newest ? earlierCount(events, byApp ? null : outcome) : 0;
-  const short = !earlierOpen && drawnWhole(behind, broughtIn(item));
+  // While an agent works the page folds to its latest words, with your ask on top.
+  const working = !!session;
+  const short = !earlierOpen && !working && drawnWhole(behind, broughtIn(item));
   const from = short ? -1 : stands;
   const queueHead = queue && (
     <QueueSummary
       key={`${item.product}:${item.id}`}
       title={rowTitle(item)}
-      context={queue.context}
+      context={working && !queue.context ? askLine(item.body ?? item.title ?? '') : queue.context}
       earlier={short ? 0 : behind}
       steps={!short && !!newest && (events.some((e) => e.kind === 'work') || after.length > 0)}
       open={earlierOpen}
@@ -408,6 +410,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
       </>
     );
   }
+  if (queue && working && !newest && !earlierOpen) return <>{queueHead}</>;
   if (queue && newest && !earlierOpen && !short && from < 0) {
     return (
       <>

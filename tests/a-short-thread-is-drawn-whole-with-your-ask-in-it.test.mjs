@@ -55,8 +55,9 @@ describe('how many messages a thread can hide before the fold is worth it', () =
 
 describe('where the page reads it', () => {
   it('both folds, the newest answer alone and the view from the answer she followed up, ask it', () => {
-    // A brought-in chat is the one exception (an-imported-chat-opens-on-the-clean-page).
-    expect(thread).toMatch(/const short = !earlierOpen && drawnWhole\(behind, broughtIn\(item\)\);/);
+    // A brought-in chat (an-imported-chat-opens-on-the-clean-page) and a thread
+    // an agent is working on (a-thread-an-agent-is-working-on-reads-as-one-page) fold.
+    expect(thread).toMatch(/const short = !earlierOpen && !working && drawnWhole\(behind, broughtIn\(item\)\);/);
     expect(thread).toMatch(/const from = short \? -1 : stands;/);
     expect(thread).toMatch(/if \(queue && newest && !earlierOpen && !short && from < 0\)/);
   });

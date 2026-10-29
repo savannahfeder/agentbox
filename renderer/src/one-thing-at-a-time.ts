@@ -58,6 +58,13 @@ export function drawnWhole(behind: number, imported = false): boolean {
   return !imported && behind > 0 && behind < FOLD_FROM;
 }
 
+/** The line under the title while an agent works: the first paragraph of what you asked. */
+export function askLine(ask: string): string | null {
+  const first = ask.trim().split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
+  if (!first) return null;
+  return `You asked: ${/[.!?]$/.test(first) ? first : `${first}.`}`;
+}
+
 /** A thread brought in from a Claude Code or Codex chat. */
 export const broughtIn = (item: { labels?: string[] }): boolean =>
   (item.labels ?? []).some((l) => l === 'thread-import' || l.startsWith('codex:'));
