@@ -66,7 +66,6 @@ function Card({ toast, dismiss, place }: { toast: Said; dismiss: () => void; pla
         style={{
           minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 14, paddingRight: 4,
           backgroundColor: color.pop, borderWidth: 1, borderColor: color.line, overflow: 'hidden',
-          ...(place.pill ? { borderRadius: 20 } : null),
           shadowColor: '#000', shadowOpacity: color.lift, shadowRadius: 35, shadowOffset: { width: 0, height: 24 }, elevation: 16,
         }}>
         {/* Only a toast that names a thread stays on one line; a plain one wraps (`.toast-plain`). */}
