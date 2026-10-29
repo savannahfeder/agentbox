@@ -293,3 +293,32 @@ describe('the practice tutorial does not offer itself on top', () => {
     expect(app).toContain('touring: tourRef.current !== null,');
   });
 });
+
+describe('the command bar', () => {
+  // The founder, 2026-10-29: "make sure that our onboarding flow teaches people
+  // about the Cmd+K menu bar." It is the last tip, once a first thread is closed.
+  it('is pointed out on the list once the first thread is closed', () => {
+    expect(tourStep(after('compose', 'open', 'reply', 'close'), at({ rows: 0 }))).toBe('palette');
+    expect(tourStep(after('open', 'choose', 'close'), at({ view: 'progress', rows: 0 }))).toBe('palette');
+    // Measured in the fresh window: closing the only thread leaves the empty inbox, where the box is drawn on the page.
+    expect(tourStep(noteSent(after('open', 'reply', 'close')), at({ rows: 0, composer: 'inline' }))).toBe('palette');
+  });
+  it('not before, not inside a thread, and not once it has been opened', () => {
+    expect(tourStep(after('compose', 'open'), at({ rows: 0 }))).not.toBe('palette');
+    expect(tourStep(after('compose', 'open', 'reply', 'close'), at({ thread: true }))).toBe(null);
+    expect(tourStep(noteSent(after('open', 'reply', 'close', 'palette')), at({ rows: 0 }))).toBe(null);
+    // Someone who brought chats in and has not sent anything is then shown New thread.
+    expect(tourStep(after('open', 'reply', 'close', 'palette'), at({ rows: 0 }))).toBe('start');
+  });
+  it('counts as learned when the bar opens', async () => {
+    const fs = await import('node:fs');
+    const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+    expect(app).toContain("if (modal === 'palette' && tour && !tour.done.includes('palette')) setTour(finishLesson(tour, 'palette'));");
+  });
+  it('has no glow, since nothing on screen opens it', async () => {
+    // Drawn first on the page title: the glow hugged "Threads" and the card covered the tabs.
+    const fs = await import('node:fs');
+    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+    expect(tour).toContain("{step !== 'palette' && <div key={`glow-${step}`}");
+  });
+});

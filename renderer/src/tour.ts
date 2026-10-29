@@ -3,9 +3,11 @@
 // tests/the-tutorial-walks-you-through-your-first-real-thread.test.mjs holds
 // what each rule is for.
 
-export type TourStep = 'start' | 'folder' | 'pick' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close';
+export type TourStep = 'start' | 'folder' | 'pick' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette';
 /** Each tip shows until it is done or put away, then never again. The New thread box's three steps are one. */
-export type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close';
+export type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette';
+/** Every lesson there is; a tour with all of them done has nothing left to say. */
+export const LESSONS: Lesson[] = ['start', 'compose', 'working', 'open', 'choose', 'reply', 'close', 'palette'];
 
 export interface Tour {
   sent: boolean;
@@ -69,6 +71,8 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
     return null;
   }
   if (s.composer === 'card') return null;
+  // The last tip: once a first thread is closed, the bar that reaches everything else.
+  if (!todo('close') && todo('palette') && (s.view === 'inbox' || s.view === 'progress')) return 'palette';
   if (t.sent && todo('working') && s.view === 'progress' && s.running > 0) return 'working';
   // The first task's answer lands in Needs you while you are still on In progress.
   if (t.sent && todo('open') && s.view !== 'inbox' && s.running === 0 && (s.waiting ?? 0) > 0) return 'answered';

@@ -145,7 +145,7 @@ import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './
 import { FirstRunFlow } from './components/FirstRun';
 import { ideasFor } from './first-run';
 import { Tour } from './components/Tour';
-import { noteSent, readTour, saveTour, showIdeas, startTour, type Tour as TourState } from './tour';
+import { finishLesson, noteSent, readTour, saveTour, showIdeas, startTour, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   finishedCleared, firstRunNeeded, projectsOfTheirOwn, inboxCleared, laterCleared, laterId, laterIndex,
@@ -1024,6 +1024,10 @@ export default function App() {
   const setTour = useCallback((t: TourState) => { saveTour(localStorage, t); setTourState(t); }, []);
   const tourRef = useRef(tour);
   tourRef.current = tour;
+  // The tutorial's last tip is the command bar, learned the moment it opens.
+  useEffect(() => {
+    if (modal === 'palette' && tour && !tour.done.includes('palette')) setTour(finishLesson(tour, 'palette'));
+  }, [modal, tour, setTour]);
   const runRef = useRef<FirstRun | null>(null);
   runRef.current = run;
   // The same, for the Claude Code answer, so `finishRun` can refuse a press

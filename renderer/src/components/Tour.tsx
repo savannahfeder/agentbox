@@ -4,13 +4,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { MAC } from '../this-keyboard';
-import { finishLesson, lessonOf, skipTour, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { Name } from '../../../shared/product-name.mjs';
+import { finishLesson, LESSONS, lessonOf, skipTour, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
 type Side = 'above' | 'below' | 'below-right';
 
-const ON_THE_LIST: TourStep[] = ['start', 'working', 'answered', 'open'];
+const ON_THE_LIST: TourStep[] = ['start', 'working', 'answered', 'open', 'palette'];
 const IN_THE_BOX: TourStep[] = ['folder', 'pick', 'send'];
 const CMD = MAC ? '⌘' : 'Ctrl';
 const GAP = 8;
@@ -31,6 +32,7 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   choose: { words: <>Press <K k="1" /> to choose the recommended option</>, side: 'above' },
   reply: { words: <>Press <K k="R" /> to answer this agent</>, side: 'above' },
   close: { words: <>When it is finished, press <K k="E" /> to close it</>, side: 'below-right' },
+  palette: { words: <>Press <K k={CMD} /><K k="K" /> to find anything {Name} can do</>, side: 'below' },
 };
 
 /** A chat still being written up is not pointed at until it reads as a thread. */
@@ -61,6 +63,8 @@ function targetsOf(step: TourStep): HTMLElement[] {
     case 'choose': return one(document.querySelector('.opt-row')?.parentElement);
     case 'reply': return one(document.querySelector('.dock-pill'));
     case 'close': return one(document.querySelector('.ts-done'));
+    // Nothing on screen opens the command bar, so the card sits alone under the tabs.
+    case 'palette': return one(document.querySelector('.tm-tab')?.parentElement);
   }
 }
 
@@ -134,7 +138,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
   const settling = useRef<{ step: TourStep | null; since: number }>({ step: null, since: 0 });
   const quietAt = useRef<string | null>(null);
   const place = useRef('');
-  const live = !!tour && !tour.skipped && tour.done.length < 7;
+  const live = !!tour && !tour.skipped && LESSONS.some((l) => !tour.done.includes(l));
 
   // WHAT IS ON SCREEN, read a few times a second while there is anything left to say.
   useEffect(() => {
@@ -182,6 +186,11 @@ export function Tour({ tour, view, thread, covered, onChange }: {
     // In the dialog the suggestions sit above the project and Send, so the card goes under the whole box.
     const dialog = step === 'pick' ? document.querySelector('.tc-card:not(.tc-inline)')?.getBoundingClientRect() : null;
     if (dialog) top = dialog.bottom + GAP;
+    if (step === 'palette') {
+      const pane = document.querySelector('.list-pane')?.getBoundingClientRect();
+      left = pane ? pane.left + (pane.width - w) / 2 : (window.innerWidth - w) / 2;
+      top = box.y + box.h + 3 * GAP;
+    }
     left = Math.max(12, Math.min(left, window.innerWidth - w - 12));
     top = Math.max(12, Math.min(top, window.innerHeight - h - 12));
     setCardAt((had) => (had && had.left === left && had.top === top ? had : { left, top }));
@@ -220,7 +229,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
   if (!step || !box || !tour) return null;
   return (
     <>
-      <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />
+      {step !== 'palette' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
       <div key={`card-${step}`} ref={cardRef} className="tour-card" role="status"
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
         <span className="tour-say">{SAY[step].words}</span>
