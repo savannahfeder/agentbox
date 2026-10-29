@@ -55,8 +55,10 @@ describe('it sits at the right end of the tabs row', () => {
     // With a team on, the team's faces sit between the tabs and Search (w-b5f23cff71).
     expect(tabs).toMatch(/<\/div>\s*(\{team\?\.corner\}\s*)?\{onSearch && <SearchButton/);
   });
-  it('the inbox hands the tabs its search', () => {
-    expect(element('StateTabs')).toMatch(/onSearch=\{openSearch\}/);
+  // Only on a phone since w-33611c2122: on a desktop the sidebar's Search row
+  // and ⌘K find threads (the-list-draws-no-magnifier-where-the-sidebar-searches).
+  it('the inbox hands the tabs its search on a phone', () => {
+    expect(element('StateTabs')).toMatch(/onSearch=\{searchInTheList\}/);
   });
   it('is pushed to the far right of the row', () => {
     expect(css).toMatch(/\.th-bar > \.th-search \{[^}]*margin-left: auto/);
@@ -69,7 +71,7 @@ describe('it sits at the right end of the tabs row', () => {
 describe('the header draws it only where there are no tabs', () => {
   it('the header asks for search only on the board', () => {
     // With a team on the board sits under the tabs, which carry search (w-2b3e1a85e5).
-    expect(element('HeaderActions')).toMatch(/onSearch=\{!teamMode && inboxDisplay\.view === 'board' \? openSearch : undefined\}/);
+    expect(element('HeaderActions')).toMatch(/onSearch=\{!teamMode && inboxDisplay\.view === 'board' \? searchInTheList : undefined\}/);
   });
   it('and draws nothing when it is not asked', () => {
     expect(fn('HeaderActions')).toMatch(/\{onSearch && <SearchButton onSearch=\{onSearch\} \/>\}/);

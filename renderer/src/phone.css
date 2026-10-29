@@ -700,3 +700,41 @@
 /* Only a phone-sized screen has the strip Safari takes its top colour from. */
 :root[data-door="phone"] .phone-edge-top { display: none; }
 
+
+/* ⌘K ON A PHONE (w-33611c2122): the screen above the keyboard, the field at
+   the top with Cancel beside it, threads before commands, no keys. */
+:root:root:root[data-door="phone"] .palette-on-phone {
+  position: fixed; top: var(--vvtop, 0px); left: 0; right: 0; bottom: var(--kb, 0px); z-index: 70;
+  display: block; padding: 0; background: var(--bg); backdrop-filter: none;
+}
+:root:root:root[data-door="phone"] .palette-phone {
+  width: 100%; max-width: none; height: 100%; margin: 0; border: 0; border-radius: 0; box-shadow: none;
+  background: var(--bg); backdrop-filter: none; display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+}
+:root:root:root[data-door="phone"] .palette-phone .palette-query { height: 56px; padding: 0 6px 0 16px; gap: 10px; }
+:root:root:root[data-door="phone"] .palette-phone .palette-input { font-size: 17px; }
+:root:root:root[data-door="phone"] .palette-phone .palette-input::placeholder { color: var(--text-faint); }
+:root:root:root[data-door="phone"] .palette-phone .palette-cancel {
+  flex: none; height: 44px; padding: 0 10px; border: 0; background: none; font: inherit; font-size: 16px; color: var(--text-dim); cursor: pointer;
+}
+:root:root:root[data-door="phone"] .palette-phone .palette-list { flex: 1; max-height: none; overflow-y: auto; padding: 4px 0 calc(16px + var(--phone-foot, 8px)); }
+:root:root:root[data-door="phone"] .palette-phone .palette-section { padding: 18px 16px 8px; }
+:root:root:root[data-door="phone"] .palette-phone .palette-section:first-child { padding-top: 12px; }
+:root:root:root[data-door="phone"] .palette-phone .palette-item { height: auto; min-height: 52px; padding: 8px 16px; gap: 14px; font-size: 16px; color: var(--text); }
+:root:root:root[data-door="phone"] .palette-phone .palette-item.selected { background: none; box-shadow: none; }
+:root:root:root[data-door="phone"] .palette-phone .palette-item:active { background: var(--wash); }
+:root:root:root[data-door="phone"] .palette-phone .palette-item.selected .palette-glyph { color: var(--agent-ink); }
+:root:root:root[data-door="phone"] .palette-phone .palette-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+:root:root:root[data-door="phone"] .palette-phone .palette-sub { font: 400 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+:root:root:root[data-door="phone"] .palette-phone .palette-empty { padding: 16px; font-size: 16px; }
+/* Before anything is typed the commands are tiles, two to a row, and a long
+   name wraps rather than being cut: every word of it has to be readable. */
+:root:root:root[data-door="phone"] .palette-phone .palette-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 16px calc(16px + var(--phone-foot, 8px)); align-content: start; }
+:root:root:root[data-door="phone"] .palette-phone .palette-tiles .palette-item {
+  min-width: 0; min-height: 84px; padding: 12px; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 12px;
+  border: 1px solid var(--line); font-size: 15px; line-height: 1.3;
+}
+:root:root:root[data-door="phone"] .palette-phone .palette-tiles .palette-glyph { text-align: left; font-size: 16px; }
+:root:root:root[data-door="phone"] .palette-phone .palette-tiles .palette-text { max-width: 100%; }
+:root:root:root[data-door="phone"] .palette-phone .palette-tiles .palette-label { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; }

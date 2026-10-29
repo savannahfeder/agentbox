@@ -127,6 +127,12 @@
 .has-count .workspace-running { margin-left: auto; min-width: 20px; text-align: right; }
 .workspace-collapsed .workspace-running { display: none; }
 @media(max-width:700px) { .workspace-running { display: none; } }
+/* ⌘K on the Search row, where Threads shows its count. */
+.workspace-keys { margin-left: auto; display: flex; gap: 3px; opacity: 1; transition: opacity .14s .08s; }
+.workspace-keys kbd { font: 600 10.5px var(--mono); color: var(--text-faint); border: 1px solid var(--line-strong); border-radius: 0; padding: 0 4px; line-height: 15px; min-width: 15px; text-align: center; }
+.workspace-navigation button:hover .workspace-keys kbd { color: var(--text); border-color: var(--text-faint); }
+.workspace-collapsed .workspace-keys { opacity: 0; transition: opacity .06s; }
+@media(max-width:700px) { .workspace-keys { display: none; } }
 
 .workspace-bottom { margin-top: auto; padding-top: 24px; }
 .workspace-utilities { display: flex; flex-direction: column; gap: 2px; padding-bottom: 12px; }
