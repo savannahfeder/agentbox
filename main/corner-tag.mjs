@@ -37,7 +37,7 @@
 // is, so it hands over what is ready and how many are working on
 // `zero:corner-tag`; shared/corner-tag.mjs puts it newest first.
 
-import { cardPlacement, cornerPlace, heightFromDrag, EDGE_SLACK, MARGIN, hiddenUntil, keepCorner, newSince, notDismissed, readyNow, restingSpot, spotFor, tagScaleOn, tagShows, tagZoom, zoomFor, zoomStep, GRIPS, HIDE_CHOICES } from '../shared/corner-tag.mjs';
+import { cardPlacement, cornerPlace, heightFromDrag, EDGE_SLACK, MARGIN, hiddenUntil, keepCorner, newSince, notDismissed, readyNow, restingSpot, spotFor, tagScaleOn, tagShows, tagZoom, toneFromLuma, zoomFor, zoomStep, GRIPS, HIDE_CHOICES } from '../shared/corner-tag.mjs';
 
 // How long the pointer may be off both the tag and its list before the list
 // shuts: long enough to cross the gap between them, short enough to feel like
@@ -218,10 +218,13 @@ export function createCornerTag({
   // Where each page draws its glass, and how round, as it last said. The Mac's
   // glass is put exactly there, and the page draws no fill of its own.
   const shape = { tag: null, card: null };
-  // Which way the tag's glass went over what is behind it. Only the tag is
-  // read: glass the list's size follows the Mac's own dark or light setting
-  // rather than the screen, so the list is held to the tag's reading.
+  // Light or dark, from how bright the screen behind the tag is. The glass's
+  // own light-or-dark follows the Mac's setting rather than the screen
+  // (tests/the-tray-goes-light-or-dark-from-how-bright-the-screen-behind-it-is),
+  // so it is only the fallback, and only a brightness reading holds the tag:
+  // a tone read from the tag's appearance would read back its own hold.
   let tone = null;
+  let toneFromScreen = false;
   const toneSent = { tag: null, card: null };
   let toneTimer = null;
   const shareTone = () => {
@@ -234,9 +237,18 @@ export function createCornerTag({
   const readTone = () => {
     if (!glass || !shape.tag || !alive('tag') || !wins.tag.isVisible()) return;
     let read = null;
-    try { read = glass.tone(wins.tag); } catch { /* no reading, keep the last */ }
-    if ((read !== 'light' && read !== 'dark') || read === tone) return;
+    let fromLuma = false;
+    try {
+      read = toneFromLuma(glass.luma?.(wins.tag), tone);
+      fromLuma = read !== null;
+      // Once measured, the tag is held, and its appearance says only that.
+      if (!fromLuma && toneFromScreen) return;
+      read ??= glass.tone(wins.tag);
+    } catch { /* no reading, keep the last */ }
+    if ((read !== 'light' && read !== 'dark') || (read === tone && fromLuma === toneFromScreen)) return;
     tone = read;
+    toneFromScreen = fromLuma;
+    dress('tag');
     dress('card');
     shareTone();
   };
@@ -261,7 +273,7 @@ export function createCornerTag({
     // The tag is clear glass, so a light page shows through it the way a dark
     // one does; the regular glass frosts over light pages. The list keeps the
     // regular glass, because it is read.
-    const opts = part === 'tag' ? { radius: shape.tag.radius, style: 'clear' }
+    const opts = part === 'tag' ? { radius: shape.tag.radius, style: 'clear', ...(toneFromScreen ? { tone } : {}) }
       : tone ? { radius: shape.card.radius, tone } : { radius: shape.card.radius };
     try { glass.set(wins[part], shape[part].rect, opts); } catch { return; }
     if (part === 'tag') { readTone(); watchTones(); }
