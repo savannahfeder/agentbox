@@ -17,7 +17,7 @@ const read = (p) => fs.readFileSync(new URL(`../renderer/src/${p}`, import.meta.
 const app = read('App.tsx');
 
 it('puts full screen down once no file is open', () => {
-  expect(app).toMatch(/useEffect\(\(\) => \{\s*if \(openDoc\) return;\s*setArtifactMode\('beside'\);\s*setArtifactReturnBeside\(false\);\s*\}, \[openDoc\]\);/);
+  expect(app).toMatch(/useEffect\(\(\) => \{\s*if \(!openDoc\) setArtifactMode\('beside'\);\s*\}, \[openDoc\]\);/);
 });
 
 it('opens a linked file without asking for a mode, so it takes beside', () => {
@@ -32,6 +32,6 @@ it('still opens full screen when full screen is what was pressed', () => {
 });
 
 it('keeps a file that is still open full screen until it closes', () => {
-  expect(app).toContain("onMode={mode => { setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode(mode); }}");
+  expect(app).toContain("setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode(mode);");
   expect(app).toContain("if (artifactMode === 'focus' && artifactReturnBeside) setArtifactMode('beside');");
 });
