@@ -4,27 +4,32 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { MAC } from '../this-keyboard';
-import { finishLesson, skipTour, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { finishLesson, lessonOf, skipTour, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
 type Side = 'above' | 'below' | 'below-right';
 
-const LESSONS: TourStep[] = ['working', 'open', 'choose', 'close'];
-const GUIDED: TourStep[] = ['start', 'folder', 'pick', 'send'];
+const ON_THE_LIST: TourStep[] = ['start', 'working', 'answered', 'open'];
+const IN_THE_BOX: TourStep[] = ['folder', 'pick', 'send'];
 const CMD = MAC ? '⌘' : 'Ctrl';
 const GAP = 8;
+/** How long a tip waits for the screen to stop changing, and how long it must be up to count as seen. */
+const SETTLE_MS = 500;
+const SEEN_MS = 1000;
 
 const K = ({ k }: { k: string }) => <span className="tour-k">{k}</span>;
 
 const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
-  start: { words: <>Press <K k="N" /> to give an agent its first task</>, side: 'below-right' },
+  start: { words: <>Press <K k="N" /> to give an agent a new task</>, side: 'below-right' },
   folder: { words: <>Choose the folder this agent will work in</>, side: 'below' },
   pick: { words: <>Press <K k="↓" /> to choose a suggestion, or type your own</>, side: 'below' },
   send: { words: <>Press <K k={CMD} /><K k="↵" /> to send it to an agent</>, side: 'below-right' },
   working: { words: <>An agent is working on this. Press <K k="N" /> to start another thread</>, side: 'below' },
+  answered: { words: <>Your agent has answered. Press <K k="⇧" /><K k="⇥" /> to see it</>, side: 'below' },
   open: { words: <>This agent needs your answer. Press <K k="↵" /> to open it</>, side: 'below-right' },
   choose: { words: <>Press <K k="1" /> to choose the recommended option</>, side: 'above' },
+  reply: { words: <>Press <K k="R" /> to answer this agent</>, side: 'above' },
   close: { words: <>When it is finished, press <K k="E" /> to close it</>, side: 'below-right' },
 };
 
@@ -33,6 +38,8 @@ const firstRow = (running: boolean) => {
   if (running) return rows.find((r) => r.querySelector('.s-running')) ?? null;
   return document.querySelector<HTMLElement>('.list-pane .row.selected[data-item-id]') ?? rows[0] ?? null;
 };
+
+const needsYouTab = () => document.querySelector<HTMLElement>('.tm-tab[data-hint="state-tab"]');
 
 function targetsOf(step: TourStep): HTMLElement[] {
   const card = document.querySelector('.tc-card');
@@ -46,8 +53,10 @@ function targetsOf(step: TourStep): HTMLElement[] {
     case 'pick': return one(card?.querySelector('[data-tour="ideas"]'));
     case 'send': return one(card?.querySelector('.tc-send'));
     case 'working': return one(firstRow(true));
+    case 'answered': return one(needsYouTab());
     case 'open': return one(firstRow(false));
     case 'choose': return one(document.querySelector('.opt-row')?.parentElement);
+    case 'reply': return one(document.querySelector('.dock-pill'));
     case 'close': return one(document.querySelector('.ts-done'));
   }
 }
@@ -75,7 +84,7 @@ function snug(el: HTMLElement): Box {
 
 function boxOf(step: TourStep, els: HTMLElement[]): Box | null {
   if (!els.length) return null;
-  if (step === 'working' || step === 'open') return snug(els[0]);
+  if (step === 'working' || step === 'answered' || step === 'open') return snug(els[0]);
   const rs = els.map((e) => e.getBoundingClientRect()).filter((r) => r.width);
   if (!rs.length) return null;
   const x = Math.min(...rs.map((r) => r.left)), y = Math.min(...rs.map((r) => r.top));
@@ -91,11 +100,16 @@ function readScreen(view: string, thread: boolean, covered: boolean): TourScreen
     view,
     rows: document.querySelectorAll('.list-pane .row[data-item-id]').length,
     running: document.querySelectorAll('.list-pane .row[data-item-id] .s-running').length,
+    waiting: Number(needsYouTab()?.querySelector('b')?.textContent) || 0,
     thread,
+    typing: thread && !!document.activeElement?.closest('.dock-card'),
     options: !!document.querySelector('.opt-row'),
     covered,
   };
 }
+
+/** Where someone is: a tip put away waits until this changes before the next one shows. */
+const placeOf = (s: TourScreen) => `${s.composer}|${s.view}|${s.thread}`;
 
 const same = (a: Box | null, b: Box | null) => (!a || !b ? a === b : a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
 
@@ -112,21 +126,35 @@ export function Tour({ tour, view, thread, covered, onChange }: {
   const [cardAt, setCardAt] = useState<{ left: number; top: number } | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const shown = useRef<TourStep | null>(null);
-  const live = !!tour && !tour.skipped && (tour.guided || tour.done.length < LESSONS.length);
+  const shownAt = useRef(0);
+  const settling = useRef<{ step: TourStep | null; since: number }>({ step: null, since: 0 });
+  const quietAt = useRef<string | null>(null);
+  const place = useRef('');
+  const live = !!tour && !tour.skipped && tour.done.length < 7;
 
   // WHAT IS ON SCREEN, read a few times a second while there is anything left to say.
   useEffect(() => {
     if (!live || !tour) { setStep(null); return undefined; }
     const read = () => {
-      const next = tourStep(tour, readScreen(view, thread, covered));
+      const screen = readScreen(view, thread, covered);
+      if (screen.typing && !tour.done.includes('reply')) { onChange(finishLesson(tour, 'reply')); return; }
+      place.current = placeOf(screen);
+      if (quietAt.current && quietAt.current !== place.current) quietAt.current = null;
+      const wanted = quietAt.current ? null : tourStep(tour, screen);
+      // A screen still arriving (the inbox before its rows land) must not flash a tip.
+      if (wanted !== settling.current.step) settling.current = { step: wanted, since: Date.now() };
+      const next = wanted && Date.now() - settling.current.since < SETTLE_MS ? shown.current : wanted;
       const was = shown.current;
       if (was !== next) {
+        const seenFor = Date.now() - shownAt.current;
         shown.current = next;
-        // Closing the New thread box without sending is a way out.
-        if (was && GUIDED.includes(was) && was !== 'start' && next === 'start') { shown.current = null; onChange(skipTour(tour)); return; }
-        // A tip that was on screen and has gone, because what it pointed at was done, is not shown again.
+        shownAt.current = Date.now();
         setStep(next);
-        if (was && LESSONS.includes(was) && !covered) { onChange(finishLesson(tour, was as Lesson)); return; }
+        // A tip that was read and has gone, because what it pointed at was done, is not shown again.
+        if (was && seenFor >= SEEN_MS && !covered && !quietAt.current && (!next || lessonOf(was) !== lessonOf(next))) {
+          onChange(finishLesson(tour, lessonOf(was)));
+          return;
+        }
       }
       const b = next ? boxOf(next, targetsOf(next)) : null;
       setBox((had) => (same(had, b) ? had : b));
@@ -144,6 +172,9 @@ export function Tour({ tour, view, thread, covered, onChange }: {
     const side = SAY[step].side;
     let left = side === 'below-right' ? box.x + box.w - w : box.x;
     let top = side === 'above' ? box.y - GAP - h : box.y + box.h + GAP;
+    // On the page the suggestions hang under Send: below it the card covers the first, above it your words.
+    const ideas = step === 'send' ? document.querySelector('.tc-card [data-tour="ideas"]')?.getBoundingClientRect() : null;
+    if (ideas && ideas.top >= box.y + box.h) top = ideas.bottom + GAP;
     // In the dialog the suggestions sit above the project and Send, so the card goes under the whole box.
     const dialog = step === 'pick' ? document.querySelector('.tc-card:not(.tc-inline)')?.getBoundingClientRect() : null;
     if (dialog) top = dialog.bottom + GAP;
@@ -152,23 +183,27 @@ export function Tour({ tour, view, thread, covered, onChange }: {
     setCardAt((had) => (had && had.left === left && had.top === top ? had : { left, top }));
   }, [box, step]);
 
-  // THE WAYS OUT. Clicking away from the guided part ends the tutorial; clicking
-  // away from a tip puts that tip away; Escape on the list ends the tutorial.
+  // THE WAYS OUT. A click anywhere but the glow puts this tip away, and the next
+  // one waits until you move somewhere else. Escape on the list, or Skip
+  // tutorial, ends all of it.
   useEffect(() => {
     if (!step || !tour) return undefined;
     const inside = (t: EventTarget | null) => {
       const el = t as Element | null;
       if (!el?.closest) return false;
       if (el.closest('.tour-card')) return true;
-      if (GUIDED.includes(step) && step !== 'start' && el.closest('.tc-card')) return true;
+      if (IN_THE_BOX.includes(step) && el.closest('.tc-card')) return true;
       return targetsOf(step).some((x) => x.contains(el));
     };
     const down = (e: PointerEvent) => {
       if (inside(e.target)) return;
-      onChange(GUIDED.includes(step) ? skipTour(tour) : finishLesson(tour, step as Lesson));
+      quietAt.current = place.current;
+      shown.current = null;
+      setStep(null);
+      onChange(finishLesson(tour, lessonOf(step)));
     };
     const key = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || !['start', 'working', 'open'].includes(step)) return;
+      if (e.key !== 'Escape' || !ON_THE_LIST.includes(step)) return;
       e.preventDefault();
       e.stopPropagation();
       onChange(skipTour(tour));
@@ -181,8 +216,8 @@ export function Tour({ tour, view, thread, covered, onChange }: {
   if (!step || !box || !tour) return null;
   return (
     <>
-      <div className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />
-      <div ref={cardRef} className="tour-card" role="status"
+      <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />
+      <div key={`card-${step}`} ref={cardRef} className="tour-card" role="status"
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
         <span className="tour-say">{SAY[step].words}</span>
         <button type="button" className="tour-skip" onClick={() => onChange(skipTour(tour))}>Skip tutorial</button>

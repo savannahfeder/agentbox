@@ -4,68 +4,85 @@
 // one row and an "Open task" hint, and the founder's words were that people
 // finish it thinking "wtf do I do now?". The old practice walk kept people in
 // it (72% of 115 installs replied during setup) but only 17 replied three times
-// to real agents on day one. So the tutorial now runs on the person's own
-// inbox: a gold glow on one thing and a card saying the key to press, to make,
-// aim and send a first thread, then four tips that each show once, the first
-// time they apply.
+// to real agents on day one. So the tutorial runs on the person's own inbox: a
+// gold glow on one thing and a card saying the key to press.
 //
 // The founder's rules for it, after seeing it drawn:
-//  - "what if they don't want to? Can they just click away?" Clicking away,
-//    closing the New thread box or Skip ends all of it, the later tips too, so
-//    nothing pops up after someone said no. "It's not good if, for the rest of
-//    the time, there's always a glowing button." A later tip goes on any click.
+//  - "what if they don't want to? Can they just click away?" and "It's not good
+//    if, for the rest of the time, there's always a glowing button." Each tip
+//    shows until it is done or clicked away from, then never again; Skip
+//    tutorial and Escape end all of it.
 //  - "after you've gone through one flow, making a new thread probably
-//    shouldn't show those suggestions." The suggestions show only while the
-//    guided part is on and nothing has been sent.
+//    shouldn't show those suggestions." They show only before the first send.
+//
+// Round two, 2026-10-29, after the founder tried it: "the moment I imported it,
+// all I saw was a weird flash of orange light", then no tutorial at all.
+// Measured in a fresh window driven over its DevTools port: the tour started,
+// and one click on the imported chat's row set it to skipped for good, because
+// any click away ended everything. A click now puts one tip away. And "when
+// people import agents, that is how they evaluate our app", so a chat brought
+// in is pointed at before the New thread button.
 import { describe, it, expect } from 'vitest';
 import {
-  startTour, skipTour, noteSent, finishLesson, tourStep, showIdeas, readTour, saveTour, TOUR_KEY,
+  startTour, skipTour, noteSent, finishLesson, lessonOf, tourStep, showIdeas, readTour, saveTour, TOUR_KEY,
 } from '../renderer/src/tour.ts';
 
 const inbox = { composer: 'none', folder: true, text: false, view: 'inbox', rows: 3, running: 0, thread: false, options: false, covered: false };
 const at = (over) => ({ ...inbox, ...over });
+const after = (...ls) => ls.reduce((t, l) => finishLesson(t, l), startTour());
 
-describe('the guided part, for someone who brought chats in', () => {
-  const s = startTour();
-  it('starts on the New thread button', () => {
-    expect(tourStep(s, inbox)).toBe('start');
+describe('someone who brought chats in', () => {
+  it('is pointed at a chat first, because that is how the app is judged', () => {
+    expect(tourStep(startTour(), inbox)).toBe('open');
   });
-  it('goes to the suggestions once the box is open and empty', () => {
-    expect(tourStep(s, at({ composer: 'card' }))).toBe('pick');
+  it('inside it, at the options when there are some', () => {
+    expect(tourStep(startTour(), at({ thread: true, options: true }))).toBe('choose');
   });
-  it('goes to Send once there are words', () => {
-    expect(tourStep(s, at({ composer: 'card', text: true }))).toBe('send');
+  it('or at the reply box when there are none', () => {
+    expect(tourStep(startTour(), at({ thread: true, options: false }))).toBe('reply');
+  });
+  it('then at closing it, once one of those is done', () => {
+    expect(tourStep(after('open', 'choose'), at({ thread: true }))).toBe('close');
+    expect(tourStep(after('open', 'reply'), at({ thread: true }))).toBe('close');
+    expect(tourStep(after('open', 'choose', 'close'), at({ thread: true }))).toBe(null);
+  });
+  it('then back on the list, at New thread', () => {
+    expect(tourStep(after('open'), inbox)).toBe('start');
   });
 });
 
-describe('the guided part, for someone with no chats', () => {
-  const s = startTour();
-  const empty = at({ rows: 0, composer: 'inline' });
-  it('never asks for the New thread button, because the box is already on the page', () => {
-    expect(tourStep(s, empty)).not.toBe('start');
+describe('the New thread box', () => {
+  it('asks for a folder first when the project has none, even with words typed', () => {
+    expect(tourStep(startTour(), at({ composer: 'card', folder: false }))).toBe('folder');
+    expect(tourStep(startTour(), at({ composer: 'card', folder: false, text: true }))).toBe('folder');
   });
-  it('asks for a folder first when the project has none', () => {
-    expect(tourStep(s, { ...empty, folder: false })).toBe('folder');
+  it('then the suggestions, then Send', () => {
+    expect(tourStep(startTour(), at({ composer: 'card' }))).toBe('pick');
+    expect(tourStep(startTour(), at({ composer: 'card', text: true }))).toBe('send');
   });
-  it('asks for a folder before words, even with words typed', () => {
-    expect(tourStep(s, { ...empty, folder: false, text: true })).toBe('folder');
+  it('is the first thing for someone with no chats, on the empty inbox', () => {
+    const empty = at({ rows: 0, composer: 'inline' });
+    expect(tourStep(startTour(), { ...empty, folder: false })).toBe('folder');
+    expect(tourStep(startTour(), empty)).toBe('pick');
   });
-  it('goes to the suggestions once the project has a folder', () => {
-    expect(tourStep(s, empty)).toBe('pick');
+  it('is one tip: put away, its three steps do not come back', () => {
+    expect(lessonOf('folder')).toBe('compose');
+    expect(lessonOf('pick')).toBe('compose');
+    expect(lessonOf('send')).toBe('compose');
+    expect(tourStep(after('compose'), at({ composer: 'card' }))).toBe(null);
   });
 });
 
 describe('getting out of it', () => {
-  it('ends everything, so nothing keeps glowing and nothing else pops up', () => {
+  it('a tip clicked away from is not shown again, and the next one still is', () => {
+    expect(tourStep(after('open'), inbox)).toBe('start');
+    expect(tourStep(after('open', 'start'), inbox)).toBe(null);
+  });
+  it('Skip ends everything', () => {
     const out = skipTour(startTour());
     expect(tourStep(out, inbox)).toBe(null);
     expect(tourStep(out, at({ composer: 'card' }))).toBe(null);
     expect(tourStep(out, at({ thread: true, options: true }))).toBe(null);
-  });
-  it('a later tip clicked away is not shown again, and the next one still is', () => {
-    const s = finishLesson(noteSent(startTour()), 'open');
-    expect(tourStep(s, inbox)).toBe(null);
-    expect(tourStep(s, at({ thread: true, options: true }))).toBe('choose');
   });
   it('shows nothing to someone who never had the tutorial', () => {
     expect(tourStep(null, inbox)).toBe(null);
@@ -77,13 +94,12 @@ describe('getting out of it', () => {
 });
 
 describe('the suggestions', () => {
-  it('show while the guided part is on and nothing has been sent', () => {
+  it('show until the first send', () => {
     expect(showIdeas(startTour())).toBe(true);
-  });
-  it('are gone after the first send', () => {
+    expect(showIdeas(after('open', 'start'))).toBe(true);
     expect(showIdeas(noteSent(startTour()))).toBe(false);
   });
-  it('are gone after clicking away or skipping', () => {
+  it('are gone after Skip', () => {
     expect(showIdeas(skipTour(startTour()))).toBe(false);
   });
   it('never show for someone who never had the tutorial', () => {
@@ -92,32 +108,16 @@ describe('the suggestions', () => {
 });
 
 describe('after the first send', () => {
-  const sent = noteSent(startTour());
-  it('says the agent is working, on In progress', () => {
+  const sent = finishLesson(noteSent(startTour()), 'open');
+  it('says the agent is working, on In progress, once', () => {
     expect(tourStep(sent, at({ view: 'progress', running: 1 }))).toBe('working');
+    expect(tourStep(finishLesson(sent, 'working'), at({ view: 'progress', running: 1 }))).toBe(null);
   });
   it('does not say it on a list with nothing running', () => {
     expect(tourStep(sent, at({ view: 'progress', running: 0, rows: 0 }))).toBe(null);
   });
-  it('says it once', () => {
-    expect(tourStep(finishLesson(sent, 'working'), at({ view: 'progress', running: 1 }))).toBe(null);
-  });
-  it('then points at a thread that needs you, once', () => {
-    const s = finishLesson(sent, 'working');
-    expect(tourStep(s, inbox)).toBe('open');
-    expect(tourStep(finishLesson(s, 'open'), inbox)).toBe(null);
-  });
-  it('then at the options, in a thread that has them', () => {
-    const s = finishLesson(finishLesson(sent, 'working'), 'open');
-    expect(tourStep(s, at({ thread: true, options: true }))).toBe('choose');
-    expect(tourStep(s, at({ thread: true, options: false }))).toBe(null);
-  });
-  it('then at Done, on the next thread opened after the options tip', () => {
-    const s = finishLesson(finishLesson(finishLesson(sent, 'working'), 'open'), 'choose');
-    expect(tourStep(s, at({ thread: true }))).toBe('close');
-    expect(tourStep(finishLesson(s, 'close'), at({ thread: true }))).toBe(null);
-  });
-  it('never puts the guided steps back', () => {
+  it('never puts New thread or the box tips back', () => {
+    expect(tourStep(sent, inbox)).toBe(null);
     expect(tourStep(sent, at({ composer: 'card' }))).toBe(null);
   });
 });
@@ -127,7 +127,7 @@ describe('where it is kept', () => {
   it('reads back what was saved', () => {
     const st = store();
     saveTour(st, finishLesson(noteSent(startTour()), 'working'));
-    expect(readTour(st)).toEqual({ guided: false, sent: true, skipped: false, done: ['working'] });
+    expect(readTour(st)).toEqual({ sent: true, skipped: false, done: ['compose', 'working'] });
   });
   it('reads nothing as no tutorial', () => {
     expect(readTour(store())).toBe(null);
@@ -136,6 +136,16 @@ describe('where it is kept', () => {
     const st = store();
     st.setItem(TOUR_KEY, '{nope');
     expect(readTour(st)).toBe(null);
+  });
+});
+
+describe('a click', () => {
+  it('puts the tip away rather than ending the tutorial', async () => {
+    const fs = await import('node:fs');
+    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+    const down = tour.slice(tour.indexOf('const down = '), tour.indexOf('const key = '));
+    expect(down).toContain('finishLesson(tour, lessonOf(step))');
+    expect(down).not.toContain('skipTour');
   });
 });
 
@@ -175,5 +185,69 @@ describe('the empty inbox during the tutorial', () => {
     const fs = await import('node:fs');
     const box = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
     expect(box).toContain('const ideaRows = ideas?.length && product?.repoPath && !person && !mate ? (');
+  });
+});
+
+describe('a tip on a screen still arriving', () => {
+  // Measured 2026-10-29 in the fresh window: for a moment after setup the inbox
+  // had no rows yet, so the New thread box's tip flashed ("a weird flash of
+  // orange light") and was then counted as seen, before the chat's row landed.
+  it('waits for the screen to settle, and counts as seen only after a second', async () => {
+    const fs = await import('node:fs');
+    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+    expect(tour).toMatch(/const SETTLE_MS = 500;/);
+    expect(tour).toMatch(/const SEEN_MS = 1000;/);
+    expect(tour).toContain('if (was && seenFor >= SEEN_MS && !covered');
+  });
+});
+
+describe('the send tip on the page', () => {
+  // Measured 2026-10-29 in the fresh window: on the empty inbox the suggestions
+  // hang under Send, and the "Press ⌘↵" card drawn below Send covered the one
+  // just picked; moved above Send, it covered the words picked.
+  it('sits under the suggestions when they are under Send', async () => {
+    const fs = await import('node:fs');
+    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+    expect(tour).toContain('if (ideas && ideas.top >= box.y + box.h) top = ideas.bottom + GAP;');
+  });
+});
+
+describe('when the first agent answers', () => {
+  // Measured 2026-10-29 in the fresh window: the first task went to In progress,
+  // the agent answered 26 seconds later, and its row moved to Needs you. The
+  // page left behind read "Nothing is running." with no tip at all.
+  const sent = () => noteSent(startTour());
+  const done = at({ view: 'progress', rows: 0, running: 0, waiting: 1 });
+  it('points at Needs you from the tab you are on', () => {
+    expect(tourStep(sent(), done)).toBe('answered');
+    expect(tourStep(sent(), at({ view: 'later', rows: 0, waiting: 2 }))).toBe('answered');
+  });
+  it('and counts as the lesson about opening an answer', () => {
+    expect(lessonOf('answered')).toBe('open');
+    expect(tourStep(finishLesson(sent(), 'open'), done)).toBe(null);
+  });
+  it('not while an agent there is still working', () => {
+    expect(tourStep(sent(), { ...done, rows: 1, running: 1 })).toBe('working');
+  });
+  it('not when nothing is waiting, nor on Needs you itself', () => {
+    expect(tourStep(sent(), { ...done, waiting: 0 })).toBe(null);
+    expect(tourStep(sent(), at({ view: 'inbox', rows: 1, waiting: 1 }))).toBe('open');
+  });
+});
+
+describe('answering the agent', () => {
+  // Measured 2026-10-29 in the fresh window: R opened the reply box and the tip
+  // went, but the lesson was never counted, so Escape brought "Press R" back.
+  it('shows nothing while you type a reply', () => {
+    expect(tourStep(after('open'), at({ thread: true, typing: true }))).toBe(null);
+    expect(tourStep(after('open', 'reply'), at({ thread: true, typing: true }))).toBe(null);
+  });
+  it('then points at closing it', () => {
+    expect(tourStep(after('open', 'reply'), at({ thread: true }))).toBe('close');
+  });
+  it('counts the reply lesson as done once the reply box has the keyboard', async () => {
+    const fs = await import('node:fs');
+    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+    expect(tour).toContain("if (screen.typing && !tour.done.includes('reply'))");
   });
 });

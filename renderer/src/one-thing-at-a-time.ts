@@ -52,10 +52,15 @@ export function earlierCount(events: AgentEvent[], outcome: ItemOutcome | null, 
 /** Fewer messages than this behind the fold, and the fold would hide her own ask to save a line or two. */
 const FOLD_FROM = 3;
 
-/** Whether the page draws the whole conversation rather than folding `behind` messages away. None behind is a fold of steps only, which still helps. */
-export function drawnWhole(behind: number): boolean {
-  return behind > 0 && behind < FOLD_FROM;
+/** Whether the page draws the whole conversation rather than folding `behind` messages away. None behind is a fold of steps only, which still helps.
+ *  A chat brought in from Claude Code or Codex is always folded: its first look is the agent's answer, not the ask it started from. */
+export function drawnWhole(behind: number, imported = false): boolean {
+  return !imported && behind > 0 && behind < FOLD_FROM;
 }
+
+/** A thread brought in from a Claude Code or Codex chat. */
+export const broughtIn = (item: { labels?: string[] }): boolean =>
+  (item.labels ?? []).some((l) => l === 'thread-import' || l.startsWith('codex:'));
 
 /**
  * Where the page starts on a thread that has been answered since its newest

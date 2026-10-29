@@ -6,8 +6,10 @@
   border: 1px solid rgba(var(--tour-gold), .5);
   background: rgba(var(--tour-gold), .04);
   box-shadow: 0 0 44px 2px rgba(var(--tour-gold), .42);
-  transition: left .18s ease, top .18s ease, width .18s ease, height .18s ease;
+  animation: tour-in .25s ease both;
 }
+.tour-card { animation: tour-in .25s ease both; }
+@keyframes tour-in { from { opacity: 0; } to { opacity: 1; } }
 
 .tour-card {
   position: fixed; z-index: 1001; display: flex; align-items: center; gap: 18px;
@@ -31,4 +33,4 @@
 }
 .tour-skip:hover { color: var(--text-dim); }
 
-@media (prefers-reduced-motion: reduce) { .tour-glow { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .tour-glow, .tour-card { animation: none; } }

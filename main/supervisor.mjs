@@ -104,7 +104,7 @@ import { referencedFiles, isImagePath } from '../shared/referenced-files.mjs';
 import { namedThreadsBlock } from '../shared/named-threads.mjs';
 import { changePath } from './code-change.mjs';
 import { snapshotRepo } from './git-change.mjs';
-import { importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mjs';
+import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mjs';
 import { readTranscriptHead } from './agent-sessions.mjs';
 import { claudeSessionOpen } from './claude-session-open.mjs';
 import { planStamp, readPlan } from './claude-plan.mjs';
@@ -2059,6 +2059,42 @@ export class Supervisor {
     return parts.join('\n');
   }
 
+  /**
+   * THE ONE RUN A CHAT BROUGHT IN FROM CLAUDE CODE IS OWED (`catchUpDue`): the
+   *  same conversation, told to write up where it stands the way every thread
+   *  here reads, and to do nothing else. Its last message becomes the thread's
+   *  answer, so the first look at an imported chat is a question with options
+   *  rather than the raw end of a terminal session.
+   */
+  catchUpBrief(item, product, { folder = '' } = {}) {
+    return [
+      `THIS CONVERSATION HAS JUST BEEN BROUGHT INTO ${NAME}, as the thread ${item.id}.`,
+      'Everything you remember is still true. The person will read this thread in',
+      `${NAME}'s inbox, which shows each thread as a short answer with options rather than as a chat.`,
+      ...(folder ? [`You were working in ${folder}.`] : []),
+      '',
+      'YOUR ONLY JOB IN THIS RUN is to write up where this conversation stands.',
+      'Do no new work: change no files, run no commands that change anything, and send nothing anywhere.',
+      'Leave its status as it is: it stays open, waiting for the person.',
+      '',
+      `1. Call update_work_item on ${item.id} with:`,
+      '   - problem: what this conversation is about and where it stands, in two or three',
+      '     plain sentences, 45 words at most.',
+      '   - progress: the steps already done, one per line, oldest first, six lines at most.',
+      '2. End with your answer as your last message, which becomes what the person sees:',
+      '   - line one in bold: the one thing they need to decide or know, as a plain question',
+      '     when there is something to decide;',
+      '   - then two to four short plain sentences on where it stands;',
+      '   - then, when there is a choice, a section headed "## Options" with numbered next',
+      '     steps, the one you recommend first and marked "(recommended)".',
+      '   No headings other than that, no code blocks, no file paths unless one is the point.',
+      '',
+      '---',
+      '',
+      this.buildBrief(item, product, { continuation: false }),
+    ].join('\n');
+  }
+
   /** The base checkout: what every session used before folders existed. */
   productFolder(product) {
     return product?.repoPath && fs.existsSync(product.repoPath) ? product.repoPath : product?.dir;
@@ -3411,6 +3447,24 @@ export class Supervisor {
   }
 
   sayTheRunDied(item, session, { gaveUp = false } = {}) {
+    // A CATCH-UP THAT DIED LEAVES THE CHAT AS IT WAS BROUGHT IN: a sentence about
+    // a usage limit is the worst first look an imported chat can have. It is
+    // owed again after its rest, three tries in all (NOTHING RETRIES FOR EVER).
+    const tries = this._catchUps?.[item.id];
+    if (tries) {
+      delete this._catchUps[item.id];
+      const labels = (item.labels ?? []).filter((l) => l !== CATCH_UP_LABEL);
+      this.store.routeItem?.(item.product, item.id, { labels: tries < CATCH_UP_TRIES ? [...labels, CATCH_UP_LABEL] : labels, status: 'open' });
+      // Spoken for, so the pass over resting rows does not write the sentence instead.
+      const seen = this._fruitless?.[`${item.product}:${item.id}`];
+      if (seen) seen.saidAt = seen.endedAt ?? Date.now();
+      // Nor its run log, which the thread would draw over the agent's answer.
+      try {
+        const dir = this.store.listProducts?.().find((p) => p.slug === item.product)?.dir;
+        if (dir && session?.startedAt) fs.rmSync(machineryPath(dir, path.join('sessions', item.id, `${session.startedAt}.log`)), { force: true });
+      } catch { /* the chat is still as it was; the log only adds a line */ }
+      return;
+    }
     try {
       // THE STDERR LINES, not simply the last thing in the tail. By the time
       // this runs the exit handler has already appended its own lines, so
@@ -7008,6 +7062,8 @@ export class Supervisor {
    * and deliberately not on `_isContinuation`.
    */
   _isFreshWork(item, now = Date.now(), autonomous = new Set(this.config.autonomousProducts ?? [])) {
+    // A chat just brought in is owed its catch-up, though it is a question with an answer waiting (`catchUpBrief`).
+    if (catchUpDue(item)) return !!this.importedThreadFor(item) && this.restingUntil(item) <= now;
     // A worker can put the 'founder' label on any row through the store MCP
     // (create_work_item/update_work_item take a free labels array), and nothing
     // else here checked who wrote it, so a forged label auto-spawned a run she
@@ -7728,6 +7784,7 @@ export class Supervisor {
     // A FORK IS NOT AN INTERRUPTED SESSION AND MUST NOT BE TOLD IT IS. It is
     // the old conversation under a new id, on a new row, and the one thing it
     // cannot work out for itself is that it has moved.
+    else if (forkFrom?.imported && catchUpDue(item)) prompt = this.catchUpBrief(item, product, { folder: forkFrom.folder });
     else if (forkFrom?.imported) prompt = this.importedBrief(item, product, { continuation, engine, folder: forkFrom.folder, copy: !!forkFrom.open });
     else if (forkFrom) prompt = this.forkBrief(item, { product, from: forkFrom.sourceId });
     else {
@@ -7738,6 +7795,11 @@ export class Supervisor {
     // A BRANCH THE APP COULD NOT SHIP (main/ship-queue.mjs) goes back to the
     // session that wrote it, and that is all it is told: it has everything
     // else already. A fresh session gets its brief first.
+    // Owed once: a catch-up that dies is not tried again, and the row reads as it was brought in.
+    if (catchUpDue(item)) {
+      this.store.routeItem?.(item.product, item.id, { labels: (item.labels ?? []).filter((l) => l !== CATCH_UP_LABEL) });
+      this._catchUps = { ...(this._catchUps ?? {}), [item.id]: ((this._catchUps ?? {})[item.id] ?? 0) + 1 };
+    }
     if (shipFailure) prompt = resumeId || rowChat ? shipFailure : `${prompt}\n\n${shipFailure}`;
     // Another thread's ship left this branch in conflict with main
     // (`_findNewConflicts`), heard now rather than at this thread's own ship.
@@ -10209,6 +10271,7 @@ export class Supervisor {
           if (saidNothingSheCanUse(session)) this.sayTheRunDied(item, session);
         }
       }
+      if (this._catchUps?.[item.id] && !saidNothingSheCanUse(session)) delete this._catchUps[item.id];
       this.onChange?.();
       // Accepted live input is already in the provider conversation. On a
       // failed run release the latest delivery so resuming that same conversation

@@ -42,7 +42,7 @@ import type { TraceSession } from '../notes';
 import type { AgentTurn, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
-import { appWrote, drawnWhole, earlierCount, earlierThan, newestAnswer, standsAt } from '../one-thing-at-a-time';
+import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, standsAt } from '../one-thing-at-a-time';
 import { rowTitle } from '../list-rules';
 import { askMarkUnread, say } from '../team/chat-events';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
@@ -379,7 +379,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   // Answered since (a reply or a pick the agent is working on): drawn from that answer down.
   const stands = queue && newest && !earlierOpen ? standsAt(events, newest) : -1;
   const behind = stands >= 0 ? earlierThan(events, stands) : newest ? earlierCount(events, byApp ? null : outcome) : 0;
-  const short = !earlierOpen && drawnWhole(behind);
+  const short = !earlierOpen && drawnWhole(behind, broughtIn(item));
   const from = short ? -1 : stands;
   const queueHead = queue && (
     <QueueSummary

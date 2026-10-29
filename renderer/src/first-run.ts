@@ -41,7 +41,7 @@ export function listKey(e: KeyLike): ListKey {
 }
 
 
-type ThreadLike = { folder?: string; short?: string; when?: number; imported?: boolean };
+type ThreadLike = { folder?: string; short?: string; when?: number; imported?: boolean; lastSaid?: string; endUnknown?: boolean };
 
 const bare = (folder: string) => folder.replace(/\/+$/, '');
 
@@ -56,10 +56,13 @@ function placed(t: ThreadLike, home: string): boolean {
   return checkProjectFolder(folder, { home }).ok && (!t.short || checkProjectFolder(t.short, { home }).ok);
 }
 
+/** Read to the end and the agent said nothing: brought in, it would open on her own words alone. */
+const unanswered = (t: ThreadLike) => typeof t.lastSaid === 'string' && !t.endUnknown && !t.lastSaid.trim();
+
 /** The newest chats not yet in the inbox, from any folder that can be a project. */
 export function chatChoices<T extends ThreadLike>(threads: T[], { home = '', max = 8 }: { home?: string; max?: number } = {}): T[] {
   return threads
-    .filter((t) => !t.imported && placed(t, home))
+    .filter((t) => !t.imported && placed(t, home) && !unanswered(t))
     .sort((a, b) => (b.when ?? 0) - (a.when ?? 0))
     .slice(0, max);
 }
