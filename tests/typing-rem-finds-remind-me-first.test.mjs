@@ -98,6 +98,7 @@ describe('the wiring', () => {
   });
 
   it('the palette ranks what it filters', () => {
-    expect(read('renderer/src/components/Palette.tsx')).toContain('rankMatches(q, commands.filter');
+    // `offered` is every command, less the Mac-only ones on a phone.
+    expect(read('renderer/src/components/Palette.tsx')).toContain('rankMatches(q, offered.filter');
   });
 });

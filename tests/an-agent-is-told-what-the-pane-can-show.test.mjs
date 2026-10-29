@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import { linkArtifactPaths } from '../renderer/src/remark-artifact-paths.ts';
-import { opensOnItsOwn } from '../renderer/src/message-artifacts.ts';
+import { besideDocument } from '../renderer/src/message-artifacts.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const rules = fs.readFileSync(path.join(root, 'briefs/message-rules.md'), 'utf8');
@@ -42,7 +42,8 @@ describe('the rule tells an agent what the pane can show', () => {
 
   it('says a folder on its own line draws its pictures, and a design page opens beside', () => {
     expect(flat).toMatch(/A folder's path on a line of its own draws its newest six pictures/);
-    expect(flat).toMatch(/An html page in designs\/ opens beside the message by itself/);
+    expect(flat).toMatch(/An html page or a markdown file whose path sits on a line of its own opens beside the message by itself/);
+    expect(flat).toMatch(/Once it is settled, name it inside a sentence and it stays shut/);
   });
 
   it('leaves the arrangement to the agent instead of prescribing a format', () => {
@@ -81,8 +82,9 @@ describe('each claim in it is true of the renderer', () => {
     expect(inline.some((k) => k.type === 'link')).toBe(false);
   });
 
-  it('an html page in designs/ opens on its own, and a report page does not', () => {
-    expect(opensOnItsOwn('designs/w-1/options.html')).toBe(true);
-    expect(opensOnItsOwn('reports/w-1/summary.html')).toBe(false);
+  it('a page or a note on its own line opens beside, and one inside a sentence does not', () => {
+    expect(besideDocument('Three options.\n\ndesigns/w-1/options.html')).toBe('designs/w-1/options.html');
+    expect(besideDocument('drafts/script.md')).toBe('drafts/script.md');
+    expect(besideDocument('Approved, kept in designs/w-1/options.html.')).toBeNull();
   });
 });

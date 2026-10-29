@@ -28,10 +28,10 @@ export interface MessageFiles {
 
 // The thread's reading type (`.focus-body .markdown`): 16px on 25.6px; a
 // document opened on its own reads at 15 on 24 (`.doc-card .markdown`).
-const BODY: TextStyle = { fontSize: 16, lineHeight: 25.6, color: color.text };
-const DOC_BODY: TextStyle = { fontSize: 15, lineHeight: 24, color: color.text };
-// The theme's `--bg-raised`, which a picture's box and a code span sit on.
-const RAISED = '#2f2d2c';
+// The colour is a getter so it is read as the text draws, in the look worn then.
+const BODY: TextStyle = { fontSize: 16, lineHeight: 25.6, get color() { return color.text; } };
+const DOC_BODY: TextStyle = { fontSize: 15, lineHeight: 24, get color() { return color.text; } };
+// A picture's box and a code span sit on the theme's `--bg-raised`, `color.raised`.
 const WEB = /^https?:/i;
 
 interface Drawing { files?: MessageFiles; italics: boolean; body: TextStyle; doc: boolean; pictures: string[]; quiet: boolean }
@@ -75,7 +75,7 @@ function Words({ spans }: { spans: Span[] }) {
           ...(family ? { fontFamily: family } : {}),
           ...(s.italic && !italics ? { fontStyle: 'italic' } : {}),
           ...(s.strike ? { textDecorationLine: 'line-through' } : {}),
-          ...(s.code ? { fontSize: 13, color: color.text, backgroundColor: 'rgba(255, 255, 255, 0.07)' } : {}),
+          ...(s.code ? { fontSize: 13, color: color.text, backgroundColor: color.film } : {}),
         };
         if (s.mention) {
           const { kind, src } = s.mention;
@@ -117,10 +117,10 @@ function Picture({ src, alt }: { src: string; alt: string }) {
     );
   }
   // Holds the picture's place while it is looked for: at its own shape when its computer listed one, else the site's 4:3 box.
-  if (uri === undefined || !size) return <View style={size ? { width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, backgroundColor: RAISED } : { width: '100%', aspectRatio: 4 / 3, backgroundColor: RAISED }} />;
+  if (uri === undefined || !size) return <View style={size ? { width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, backgroundColor: color.raised } : { width: '100%', aspectRatio: 4 / 3, backgroundColor: color.raised }} />;
   const drawn = (
     <Image source={{ uri }} accessibilityLabel={alt} resizeMode="contain" onError={() => setBroken(true)}
-      style={{ width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, borderWidth: 1, borderColor: color.line, backgroundColor: RAISED }} />
+      style={{ width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, borderWidth: 1, borderColor: color.line, backgroundColor: color.raised }} />
   );
   if (/^data:/i.test(src)) return drawn;
   return <Pressable accessibilityRole="imagebutton" accessibilityLabel={alt || src} onPress={() => open(src, files, pictures)}>{drawn}</Pressable>;
@@ -179,7 +179,7 @@ function Shot({ file, all, width }: { file: string; all: string[]; width: number
   const tall = ratio > 0 && ratio < 16 / 10;
   return (
     <Pressable onPress={() => open(file, files, all)} accessibilityRole="imagebutton" accessibilityLabel={base} style={{ width }}>
-      <View style={{ width: '100%', aspectRatio: 16 / 10, borderWidth: 1, borderColor: color.line, backgroundColor: RAISED, overflow: 'hidden' }}>
+      <View style={{ width: '100%', aspectRatio: 16 / 10, borderWidth: 1, borderColor: color.line, backgroundColor: color.raised, overflow: 'hidden' }}>
         {!!uri && (
           <Image source={{ uri }} accessibilityLabel={base} resizeMode="cover"
             onLoad={(e) => { const { width: w = 0, height: h = 0 } = e.nativeEvent?.source ?? {}; if (w && h) setRatio(w / h); }}
@@ -204,7 +204,7 @@ function Media({ src, label }: { src: string; label: string }) {
         <MentionIcon kind="media" tint={color.faint} />{label}
       </Text>
       {link && (film
-        ? <Player link={link} film style={{ width: '100%', height: 360, backgroundColor: RAISED, borderWidth: 1, borderColor: color.line }} />
+        ? <Player link={link} film style={{ width: '100%', height: 360, backgroundColor: color.raised, borderWidth: 1, borderColor: color.line }} />
         : <Player link={link} film={false} style={{ width: '100%', maxWidth: 420, height: 36 }} />)}
     </View>
   );
@@ -292,7 +292,7 @@ function Table({ block }: { block: Extract<Block, { kind: 'table' }> }) {
                     ...(c === columns - 1 ? { borderRightWidth: 1 } : {}),
                     ...(r === all.length - 1 ? { borderBottomWidth: 1 } : {}),
                     // `th`: half the raised grey.
-                    ...(r === 0 ? { backgroundColor: 'rgba(47, 45, 44, 0.5)' } : {}),
+                    ...(r === 0 ? { backgroundColor: color.film } : {}),
                   }}>
                     <T style={cellText(r, c)}><Words spans={row[c] ?? []} /></T>
                   </View>
@@ -307,7 +307,7 @@ function Table({ block }: { block: Extract<Block, { kind: 'table' }> }) {
 }
 
 // `.markdown h2, h3` are the site's small capitals; the others are the browser's own sizes.
-const SMALL_CAPS: TextStyle = { fontSize: 12, lineHeight: 19.2, letterSpacing: 0.84, textTransform: 'uppercase', color: color.faint, fontFamily: font.semibold };
+const SMALL_CAPS: TextStyle = { fontSize: 12, lineHeight: 19.2, letterSpacing: 0.84, textTransform: 'uppercase', get color() { return color.faint; }, fontFamily: font.semibold };
 const HEADING: Record<number, TextStyle> = {
   1: { fontSize: 32, lineHeight: 51.2, fontFamily: font.semibold },
   2: SMALL_CAPS,
@@ -362,7 +362,7 @@ function One({ block: b, tone, depth }: { block: Block; tone?: string; depth: nu
     case 'code':
       return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          style={{ backgroundColor: 'rgba(40, 38, 37, 0.9)', borderWidth: 1, borderColor: color.line }}
+          style={{ backgroundColor: color.raised, borderWidth: 1, borderColor: color.line }}
           contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: 14, flexGrow: 1 }}>
           <T style={{ fontFamily: font.mono, fontSize: 13, lineHeight: 20.8, color: color.text }}>{b.text}</T>
         </ScrollView>

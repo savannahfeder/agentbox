@@ -184,6 +184,8 @@ span.tq-link:focus-visible { outline: 1px solid var(--text-faint); outline-offse
 .tq-desc p { margin: 0 0 10px; }
 .tq-desc ul, .tq-desc ol { margin: 0 0 10px; padding-left: 20px; }
 .tq-desc .dim { color: var(--text-faint); }
+/* Its method's own title repeats the name the bar above already shows. */
+.tq-method > h1:first-child { display: none; }
 .tq-doc .rm-compose.tq-compose { margin: 22px 0 0; }
 .tq-doc .tq-error { margin-left: 0; }
 .gr-side.tq-details { padding: 22px 24px; background: var(--bg); }

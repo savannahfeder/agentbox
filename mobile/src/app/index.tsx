@@ -192,7 +192,7 @@ function Board({ columns, foot }: { columns: ReturnType<typeof phoneBoard>; foot
           {c.rows.length === 0 && <T style={{ fontSize: 13, color: color.faint, paddingVertical: 4, paddingHorizontal: 2 }}>Nothing here.</T>}
           {c.rows.map((e) => (
             <Pressable key={e.key} onPress={() => e.item && open(e.item.product, e.item.id)}
-              style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderColor: color.line, backgroundColor: pressed ? color.picked : 'rgba(255, 255, 255, 0.035)' })}>
+              style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
               <T numberOfLines={3} style={{ fontSize: 14, lineHeight: 20, marginBottom: 14 }}>{e.title}</T>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}

@@ -14,7 +14,7 @@ import { Markdown } from '../../../ui/Markdown';
 import { IconButton, Sheet, SheetHead, SheetRow, SheetSep, T, TopBar, Wall } from '../../../ui/parts';
 import { color, font, size } from '../../../ui/theme';
 
-const label = { fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase' as const, color: color.faint };
+const label = { fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase' as const, get color() { return color.faint; } };
 
 export default function RepeatPage() {
   const c = useCloud();

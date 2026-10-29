@@ -4054,6 +4054,12 @@ img.product-mark { object-fit: cover; opacity: 1; }
   font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--agent-ink);
 }
 .palette-k .palette-foot b { font-weight: 500; color: var(--text-faint); }
+.palette-k .palette-section {
+  padding: 14px 18px 6px; font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--agent-ink);
+}
+.palette-k .palette-section:first-child { padding-top: 8px; }
+/* A long title gives way, never the project's name. */
+.palette-k .palette-thread .palette-hint { flex: none; }
 
 .snooze-input-row { position: relative; display: flex; align-items: center; }
 .snooze-input { flex: 1; }

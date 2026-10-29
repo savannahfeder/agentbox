@@ -74,7 +74,7 @@ describe('who a teammate wakes', () => {
     const acts = plan([p], [gmLane(), vpLane()]);
     expect(acts.filter((a) => a.type === 'run')).toEqual([]);
     expect(acts).toContainEqual({
-      type: 'tell', teammate: gm.id, item: GM_LANE, product: 'kestrel', msg: 'm-2', hop: 1, hold: false,
+      type: 'tell', teammate: gm.id, item: GM_LANE, product: 'kestrel', msg: 'm-2', hop: 1, hold: true,
       text: handOffText(p), from: { teammate: vp.id, name: 'Video producer' },
     });
     expect(acts).toContainEqual({ type: 'seen', msg: 'm-2', teammate: gm.id, run: GM_LANE });
@@ -162,8 +162,8 @@ describe('the evening of 26 October, replayed', () => {
     ['msg', vp, gm, "It uses your three cards and the app's own sentence"], ['msg', vp, gm, 'Hold every post with a bracket in it'],
   ];
 
-  const replay = ({ before = false, careful = false } = {}) => {
-    const team = [gm, careful ? { ...vp, handoffsNeedYes: true } : vp];
+  const replay = ({ before = false, careful = false, eager = false } = {}) => {
+    const team = [gm, careful ? { ...vp, handoffsNeedYes: true } : eager ? { ...vp, handoffsNeedYes: false } : vp];
     const items = [];
     const messages = [];
     const lines = [];
@@ -203,8 +203,15 @@ describe('the evening of 26 October, replayed', () => {
     return { gm: count(gm), vp: count(vp), turns, items };
   };
 
-  it('is one thread each, and only the four hand-offs woke anyone', () => {
+  it('is one thread each, and the Video producer starts nothing a teammate handed it without you', () => {
     const now = replay();
+    expect({ gm: now.gm, vp: now.vp }).toEqual({ gm: 1, vp: 1 });
+    // Its first turn only: the four hand-offs wait for your yes.
+    expect(now.turns).toEqual({ [gm.id]: 1, [vp.id]: 1 });
+  });
+
+  it('told to take hand-offs straight away, only the four hand-offs woke it', () => {
+    const now = replay({ eager: true });
     expect({ gm: now.gm, vp: now.vp }).toEqual({ gm: 1, vp: 1 });
     // Two first turns, then one turn per hand-off: the twelve mentions cost nothing.
     expect(now.turns).toEqual({ [gm.id]: 1, [vp.id]: 5 });
@@ -368,8 +375,10 @@ describe('through the store', () => {
   it('a hand-off lands on the other teammate\'s thread as theirs, and talk lands nowhere', async () => {
     const growth = team.create({ name: 'Growth marketer' });
     const video = team.create({ name: 'Video producer' });
-    const { writeChat } = await import('../main/store/teammates-files.mjs');
+    const { writeChat, writeTeammate } = await import('../main/store/teammates-files.mjs');
     const T = Date.now();
+    // The person told it to take hand-offs straight away.
+    writeTeammate(team.dir(), growth.id, { handoffsNeedYes: false }, T);
     writeChat(team.dir(), { kind: 'pass', from: 'you', to: growth.id, title: 'Run a daily clip', details: '', via: 'w-xaccount', viaProduct: product.id }, T);
     writeChat(team.dir(), { kind: 'pass', from: 'you', to: video.id, title: 'Make the clips', details: '', via: 'w-xaccount', viaProduct: product.id }, T + 1);
     await tick(T + 2);

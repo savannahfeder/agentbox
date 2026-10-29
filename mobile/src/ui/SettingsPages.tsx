@@ -1,25 +1,27 @@
 // The Settings pages, in the desktop's words (renderer/src/components/Settings.tsx).
 // Each is only its plates; app/settings/[page].tsx puts it on a page.
 // A row that belongs to the computer reads its copy and sends a change to it
-// (state/settings.tsx); the account and the alerts belong to this phone.
+// (state/settings.tsx); the account, the alerts and the look belong to this phone.
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useState, type ComponentType } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { CODEX_MODES, CODEX_MODE_ORDER } from '../../../renderer/src/codex-modes';
 import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS } from '../../../renderer/src/modes';
 import { NAME } from '../../../shared/product-name.mjs';
 import { deleteAccount } from '../../../renderer/src/phone-account';
 import { withDeadline } from '../lib/deadline';
+import { PHONE_LOOKS } from '../lib/look';
 import { alertsHere, sendTestAlert } from '../platform/alerts';
 import { useCloud } from '../state/cloud';
+import { useLook } from '../state/look';
 import { useSettings, type SettingsState } from '../state/settings';
 import { Tick } from './icons';
 import { Sheet, SheetHead, SheetRow, SheetSep, T } from './parts';
 import { Aside, Button, Chip, Choice, Group, NavRow, Row, Stepper, Switch } from './SettingsParts';
 import { TeamPage } from './TeamPage';
-import { color } from './theme';
+import { color, DARK, font, LIGHT, type Palette } from './theme';
 
 const MODES = MODE_ORDER.filter((m) => m !== 'custom').map((m) => ({ value: m as string, label: MODE_WORDS[m] }));
 const CODEX = CODEX_MODE_ORDER.map((m) => ({ value: m as string, label: CODEX_MODES[m].label }));
@@ -85,6 +87,49 @@ function General() {
           <Group label="Updates"><Row first label={`${NAME} ${s.settings.version}`} /></Group>
         </>
       ) : <Aside>{NOT_YET}</Aside>}
+    </>
+  );
+}
+
+/** A small drawing of the app in one palette: its wall, a row of words and the orange. */
+function Swatch({ p }: { p: Palette }) {
+  const bar = (w: `${number}%`, c: string) => <View style={{ height: 4, width: w, backgroundColor: c, opacity: 0.85 }} />;
+  return (
+    <View style={{ flex: 1, backgroundColor: p.bg, paddingHorizontal: 9, paddingTop: 12, gap: 7 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+        <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: p.accent }} />
+        {bar('60%', p.text)}
+      </View>
+      {bar('80%', p.faint)}
+      <View style={{ height: 1, backgroundColor: p.line, marginVertical: 2 }} />
+      {bar('70%', p.text)}
+      {bar('50%', p.faint)}
+    </View>
+  );
+}
+
+// A look is the one setting you judge by looking at it, so, as on the
+// desktop's Appearance page, the picture is the control.
+function Appearance() {
+  const { look, pick } = useLook();
+  return (
+    <>
+      <Group label="Theme">
+        <View style={{ flexDirection: 'row', gap: 12, paddingVertical: 18 }}>
+          {PHONE_LOOKS.map((l) => {
+            const on = look === l.id;
+            return (
+              <Pressable key={l.id} onPress={() => pick(l.id)} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={l.name} style={{ flex: 1, gap: 9 }}>
+                <View style={{ height: 96, flexDirection: 'row', overflow: 'hidden', borderWidth: on ? 2 : 1, borderColor: on ? color.accent : color.lineStrong }}>
+                  {l.id === 'match' ? <><Swatch p={LIGHT} /><Swatch p={DARK} /></> : <Swatch p={l.id === 'light' ? LIGHT : DARK} />}
+                </View>
+                <T style={{ fontSize: 13, textAlign: 'center', fontFamily: on ? font.medium : font.regular, color: on ? color.text : color.dim }}>{l.name}</T>
+              </Pressable>
+            );
+          })}
+        </View>
+      </Group>
+      <Aside>{look === 'match' ? 'Follows your phone’s light or dark setting. ' : ''}Only this phone changes. Your computer keeps its own look.</Aside>
     </>
   );
 }
@@ -271,8 +316,14 @@ function Running() {
 function OutsideAgents() {
   const s = useSettings();
   const r = s.reading('workspace', 'outsideAgents', s.settings!.workspace.outsideAgents);
-  return <Row first stack label="Show in your inbox" desc={`Claude Code started in a terminal, not from here. ${AGENT_SENTENCE[r.value as string] ?? ''}`} reading={r}
-    control={<Choice label="Show in your inbox" value={r.value as string} options={AGENT_OPTIONS} onChange={(v) => void s.change({ scope: 'workspace', key: 'outsideAgents', value: v })} />} />;
+  return (
+    <>
+      <Row first stack label="Show in your inbox" desc={`Claude Code started in a terminal, not from here. ${AGENT_SENTENCE[r.value as string] ?? ''}`} reading={r}
+        control={<Choice label="Show in your inbox" value={r.value as string} options={AGENT_OPTIONS} onChange={(v) => void s.change({ scope: 'workspace', key: 'outsideAgents', value: v })} />} />
+      <SettingSwitch label="Bring in new chats" k="importNew" copy={!!s.settings!.workspace.importNew}
+        desc="A new Claude Code or Codex chat in one of your projects comes in after ten quiet minutes. Waiting ones go to Needs you, finished ones to Done." />
+    </>
+  );
 }
 
 function Instructions() {
@@ -294,6 +345,8 @@ function Alpha() {
   return (
     <Group>
       <SettingSwitch first label="Rooms" desc="See the people you work with and their agents, with a chat beside them. Needs a team sign-in." k="alphaRooms" copy={w.alpha.rooms} />
+      <SettingSwitch label="Teammates" desc="Agents with a standing job that work on their own, talk in one team chat and reach you only when they need you." k="alphaTeammates" copy={!!w.alpha.teammates} />
+      <SettingSwitch label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in." k="alphaMultiplayer" copy={!!w.alpha.multiplayer} />
     </Group>
   );
 }
@@ -309,12 +362,13 @@ function Projects() {
   );
 }
 
-export type PageId = 'general' | 'phone' | 'alpha' | 'claude' | 'codex' | 'running' | 'instructions' | 'projects' | 'team';
+export type PageId = 'general' | 'appearance' | 'phone' | 'alpha' | 'claude' | 'codex' | 'running' | 'instructions' | 'projects' | 'team';
 export interface SettingsPageDef { id: PageId; label: string; group: 'Personal' | 'Agents' | 'Workspace'; lede?: string; Body: ComponentType; shown: (s: SettingsState) => boolean }
 
 const hasComputer = (s: SettingsState) => !!s.settings;
 export const SETTINGS_PAGES: SettingsPageDef[] = [
   { id: 'general', label: 'General', group: 'Personal', Body: General, shown: () => true },
+  { id: 'appearance', label: 'Appearance', group: 'Personal', Body: Appearance, shown: () => true },
   { id: 'phone', label: 'Phone', group: 'Personal', lede: 'Read and reply from your phone, even with this computer closed.', Body: Phone, shown: () => true },
   { id: 'alpha', label: 'Alpha features', group: 'Personal', lede: 'Early features you can try before they are finished. They may change or go away.', Body: Alpha, shown: hasComputer },
   { id: 'claude', label: 'Claude Code', group: 'Agents', Body: Claude, shown: hasComputer },

@@ -19,7 +19,7 @@ it('hands skipped words to a visible composer before onboarding unmounts', () =>
 });
 
 it('retains the same hint state when the measured position is unchanged', () => {
-  expect(app).toContain('setLessonAt((previous) => lessonPosition(previous,');
+  expect(app).toContain('const lessonAt = useLessonPlace(');
   const update = lessonPosition;
   const had = { left: 200, top: 100 };
   expect(update(had, { ...had })).toBe(had);
