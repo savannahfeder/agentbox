@@ -83,11 +83,9 @@ html, body, #root { margin: 0; padding: 0; background: transparent; overflow: hi
    the marks the app draws are not in every sans (F-43). Never reached on a Mac. */
 body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'DejaVu Sans', sans-serif; -webkit-font-smoothing: antialiased; user-select: none; cursor: default; color: var(--ct-ink); }
 
-/* THE CLEAR BAND AROUND THE GLASS. The window is the tag plus this, so the
-   resize arrows can sit ON its corners, half over the glass and half outside
-   it, the way a window's own corner handle does. Nothing is drawn in the band:
-   a click there is not the tag's, and main/corner-tag.mjs lets it through to
-   whatever is underneath. */
+/* THE CLEAR BAND AROUND THE GLASS. The window is the tag plus this. Nothing
+   is drawn in the band: a click there is not the tag's, and
+   main/corner-tag.mjs lets it through to whatever is underneath. */
 .ct-frame {
   position: absolute; left: 0; top: 0; display: inline-block;
   padding: calc(10px * var(--ct-s)); box-sizing: content-box;
@@ -139,8 +137,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'DejaVu Sa
    ones she approved (2026-10-08), not the Mac's capsule.
 
    THE HAND IS THE ONLY THING THAT SAYS IT MOVES. Nothing is drawn on the tag
-   to say so, by choice, so the pointer carries it the way the resize arrow
-   carries the corners. It stays on the glass: the window is wider, and a hand
+   to say so, by choice, so the pointer carries it. Its size changes only from
+   the list's Size steps or the right-click menu, never by a drag: a corner
+   that resized caught presses meant to move it. It stays on the glass: the window is wider, and a hand
    over the clear band would promise a drag to another app's window. */
 .ct-tag {
   cursor: grab;
@@ -156,24 +155,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'DejaVu Sa
   border-color: var(--ct-line); border-bottom-color: var(--ct-line-bottom);
 }
 .ct-tag.is-dragging { cursor: grabbing; }
-
-/* THE RESIZE GRIP: the tag's bottom-left corner, drawn only while the pointer
-   is on the tag so nothing is added to the corner of her screen at rest. It is
-   inside the glass, because the window is exactly the glass and padding it is
-   what once let a first click fall through (main/corner-tag.mjs). */
-/* THE CORNERS STILL TAKE A DRAG, AND DRAW NOTHING. A glyph that appears as
-   the pointer crosses a corner reads as a glitch rather than a handle ("you
-   accidentally see something flash... it really kills the vibes"), so the
-   affordance is the pointer itself: the system's resize arrow over a patch
-   big enough to aim at. Discovering that it resizes at all is a question
-   still open; nothing in the corner of her screen answers it by flashing. */
-.ct-grip {
-  position: absolute; width: calc(20px * var(--ct-s)); height: calc(20px * var(--ct-s));
-}
-.ct-grip-tl { left: calc(2.4px * var(--ct-s)); top: calc(2.4px * var(--ct-s)); cursor: nwse-resize; }
-.ct-grip-tr { right: calc(2.4px * var(--ct-s)); top: calc(2.4px * var(--ct-s)); cursor: nesw-resize; }
-.ct-grip-bl { left: calc(2.4px * var(--ct-s)); bottom: calc(2.4px * var(--ct-s)); cursor: nesw-resize; }
-.ct-grip-br { right: calc(2.4px * var(--ct-s)); bottom: calc(2.4px * var(--ct-s)); cursor: nwse-resize; }
 
 /* ---- the nine-dot lattice (renderer/src/corner-tag/lattice.tsx) ----
    ONE DRAWING, NOT NINE BOXES. It was a grid of nine boxes, and twice the fix
