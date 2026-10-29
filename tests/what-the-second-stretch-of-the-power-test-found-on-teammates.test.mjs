@@ -31,7 +31,7 @@ describe('a new thread to a teammate', () => {
 
   it('is sent from the New thread box as fresh, and the store keeps that', () => {
     expect(fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8')).toMatch(/\{ text, to: \[to\], fresh: true \}/);
-    expect(fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8')).toMatch(/mates\.post\(\{ text: a\.text, to: a\.to, fresh: a\.fresh === true \}\)/);
+    expect(fs.readFileSync(new URL('../main/ipc.mjs', import.meta.url), 'utf8')).toMatch(/mates\.post\(\{ text: a\.text, to: a\.to, fresh: a\.fresh === true[,}]/);
   });
 });
 
