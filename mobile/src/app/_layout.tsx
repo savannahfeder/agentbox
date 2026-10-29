@@ -4,11 +4,12 @@ import { GeistMono_400Regular, GeistMono_500Medium } from '@expo-google-fonts/ge
 import * as Notifications from 'expo-notifications';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Platform, View } from 'react-native';
 import { SafeAreaInsetsContext, SafeAreaProvider } from 'react-native-safe-area-context';
 import { CloudProvider } from '../state/cloud';
 import { GroupsProvider } from '../state/groups';
+import { LookProvider, useLook } from '../state/look';
 import { Approvals } from '../ui/Approvals';
 import { color } from '../ui/theme';
 import { Toast } from '../ui/Toast';
@@ -25,7 +26,19 @@ function useAlertsOpenThreads() {
   }, []);
 }
 
+// A new look redraws each screen where it stands: its colours are read while it
+// draws (ui/theme.ts), and the key makes every one of them draw again.
+function Redrawn({ children }: { children: ReactNode }) {
+  return <View key={useLook().worn} style={{ flex: 1 }}>{children}</View>;
+}
+const redrawn = ({ children }: { children: ReactNode }) => <Redrawn>{children}</Redrawn>;
+
 export default function Root() {
+  return <LookProvider><App /></LookProvider>;
+}
+
+function App() {
+  const { worn } = useLook();
   const [loaded, failed] = useFonts({ Geist_400Regular, Geist_500Medium, Geist_600SemiBold, GeistMono_400Regular, GeistMono_500Medium });
   useAlertsOpenThreads();
   // A browser swaps the fonts in when they arrive, and WebKit's never reports back.
@@ -33,8 +46,8 @@ export default function Root() {
   const app = (
     <CloudProvider>
       <GroupsProvider>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg }, animation: 'slide_from_right' }} />
+        <StatusBar style={worn === 'light' ? 'dark' : 'light'} />
+        <Stack screenLayout={redrawn} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg }, animation: 'slide_from_right' }} />
         <Approvals />
         <Toast />
       </GroupsProvider>
