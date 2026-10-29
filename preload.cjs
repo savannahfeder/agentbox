@@ -18,7 +18,7 @@ if (process.platform !== 'darwin') {
 }
 
 // EVERY ASK BEFORE A RELOAD IS ANSWERED, held write or not. main waits for
-// this before it reloads (main/write-before-reload.mjs), so a page with
+// this before it reloads (main/write-before-reload.mts), so a page with
 // nothing held, or one that has not set a handler yet, says so at once rather
 // than making ⌘R sit out the wait.
 let writeHeld = null;
@@ -136,7 +136,7 @@ contextBridge.exposeInMainWorld('zero', {
   cornerTag: (state) => ipcRenderer.invoke('zero:corner-tag', state),
   // Whether this page came up from ⌘R, and which build it is running.
   bootInfo: () => ipcRenderer.invoke('zero:boot-info'),
-  // KEEPING AGENTBOX CURRENT (main/updater.mjs). The state of it rides the
+  // KEEPING AGENTBOX CURRENT (main/updater.mts). The state of it rides the
   // snapshot, so these two are only the verbs: look again now, and restart onto
   // the version that has already downloaded. Nothing here can start a download,
   // because nothing needs to; that happens on its own in the background.
@@ -260,7 +260,7 @@ contextBridge.exposeInMainWorld('zero', {
   moveToCloud: (payload) => ipcRenderer.invoke('zero:move-to-cloud', payload),
   setProductHidden: (payload) => ipcRenderer.invoke('zero:set-product-hidden', payload),
   approve: (payload) => ipcRenderer.invoke('zero:approve', payload),
-  // The phone door (main/phone-link.mjs): { action: 'status' | 'on' | 'off' | 'reset' | 'via', via }.
+  // The phone door (main/phone-link.mts): { action: 'status' | 'on' | 'off' | 'reset' | 'via', via }.
   phoneLink: (payload) => ipcRenderer.invoke('zero:phone-link', payload),
   onPhoneChanged: (fn) => {
     const handler = () => fn();

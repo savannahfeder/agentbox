@@ -172,7 +172,7 @@ export const REQUEST_CHANNELS = {
   moveToCloud: 'zero:move-to-cloud',
   setProductHidden: 'zero:set-product-hidden',
   approve: 'zero:approve',
-  // The phone door's Settings page (main/phone-link.mjs): its state, on, off,
+  // The phone door's Settings page (main/phone-link.mts): its state, on, off,
   // a new key, and which address the QR code carries. The desktop window only.
   phoneLink: 'zero:phone-link',
 };
@@ -209,6 +209,6 @@ export const WRAPPED_ARGS = {
 // this one is absent there rather than wrong. The screen already reads null.
 //
 // `onWriteHeld` is the desktop's ⌘R asking the page to write what the undo
-// window holds before it reloads (main/write-before-reload.mjs). A browser
+// window holds before it reloads (main/write-before-reload.mts). A browser
 // reload asks nobody; the page writes on `pagehide` there instead.
 export const DESKTOP_ONLY = ['pathForFile', 'onWriteHeld'];

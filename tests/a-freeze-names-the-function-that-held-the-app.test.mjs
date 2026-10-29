@@ -21,7 +21,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { freezeFrom, writeFreeze, dayOf } from '../main/freeze-recorder.mjs';
-import { stallWatch } from '../main/stall-watch.mjs';
+import { stallWatch } from '../main/stall-watch.mts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dirs = [];

@@ -2,14 +2,14 @@
 // 2026-10-01).
 //
 // Teammates run the team build from a git checkout (docs/team/PLAN.md), and
-// main/updater.mjs does nothing at all from source: it reports `unsupported`,
+// main/updater.mts does nothing at all from source: it reports `unsupported`,
 // because electron-updater only reads published releases. Measured on this
 // branch before the change: `createUpdater` on an unpackaged app returned
 // phase `unsupported` for every check, so a teammate's copy never learned that
 // main had moved, however many pushes landed. The ask was the opposite: the
 // app notices there is newer code and asks whether to restart onto it.
 //
-// So main/source-updater.mjs fetches the branch's upstream, and when it is
+// So main/source-updater.mts fetches the branch's upstream, and when it is
 // ahead the sidebar offers a restart, as it does for the installed app.
 // Pressing Restart fast-forwards, reinstalls packages only when they changed,
 // rebuilds the screens, and relaunches.
@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createSourceUpdater } from '../main/source-updater.mjs';
+import { createSourceUpdater } from '../main/source-updater.mts';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { announcesUpdate, SAY } from '../renderer/src/update-row.ts';

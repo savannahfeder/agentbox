@@ -94,7 +94,7 @@ export function describe(state) {
     // The one question every screen actually asks. A screen should not have to
     // learn which phase strings mean "there is a button to press".
     ready: phase === 'ready',
-    // A COPY RUN FROM SOURCE (main/source-updater.mjs) says three more things:
+    // A COPY RUN FROM SOURCE (main/source-updater.mts) says three more things:
     // that it is one, what changed (newest first, at most five titles, and how
     // many there are in all), and that the button was pressed and it is
     // rebuilding, which takes long enough that the row has to say so.

@@ -204,7 +204,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetLook(r.to!),
     })),
     // Above the stale-files row, which only concerns a build on this machine.
-    // Shown only once the download has finished (main/updater.mjs).
+    // Shown only once the download has finished (main/updater.mts).
     ...(updateReady ? [{
       id: 'update',
       label: `Restart to update ${NAME}`,

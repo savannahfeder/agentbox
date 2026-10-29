@@ -7,7 +7,7 @@
 // which brings back the Allow box; if that still fails it opens the exact
 // Settings page. Nothing is reset without the press.
 import { describe, expect, it, vi } from 'vitest';
-import { micOwner, getMic, SETTINGS_URL } from '../main/mic.mjs';
+import { micOwner, getMic, SETTINGS_URL } from '../main/mic.mts';
 
 function prefs(status, answer) {
   return { getMediaAccessStatus: vi.fn(() => status), askForMediaAccess: vi.fn(async () => answer) };

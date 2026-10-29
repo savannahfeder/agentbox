@@ -128,7 +128,7 @@ function sources(dir) {
   return fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) => {
     const rel = path.join(dir, e.name);
     if (e.isDirectory()) return sources(rel);
-    return /\.(tsx?|mjs)$/.test(e.name) ? [rel] : [];
+    return /\.(tsx?|mjs|mts)$/.test(e.name) ? [rel] : [];
   });
 }
 

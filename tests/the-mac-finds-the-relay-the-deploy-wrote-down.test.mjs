@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { relayAddress } from '../main/relay-address.mjs';
+import { relayAddress } from '../main/relay-address.mts';
 import { RELAY_URL } from '../shared/relay-address.mjs';
 
 const folder = (json) => {

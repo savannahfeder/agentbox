@@ -17,7 +17,7 @@
 //   buffer until the app dies.
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { createAcpClient, ACP_PROTOCOL_VERSION, rejectionOption } from '../main/acp.mjs';
+import { createAcpClient, ACP_PROTOCOL_VERSION, rejectionOption } from '../main/acp.mts';
 
 // A fake agent: one object per line in, one object per line out.
 function fakeAgent() {

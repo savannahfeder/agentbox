@@ -68,7 +68,7 @@ export class RelayRoom {
     this.ctx = ctx;
     this.room = new Room();
     // The computer's "ping" is answered here by the platform, without waking
-    // the room, so a link that has died is found out (main/relay-client.mjs).
+    // the room, so a link that has died is found out (main/relay-client.mts).
     if (typeof WebSocketRequestResponsePair === 'function') {
       ctx.setWebSocketAutoResponse?.(new WebSocketRequestResponsePair('ping', 'pong'));
     }

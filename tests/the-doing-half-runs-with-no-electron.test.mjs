@@ -106,7 +106,7 @@ describe('the doing half, booted with no Electron', () => {
   // answered 2026-10-24). A page whose own hostname resolves to this machine
   // can reach this port — any page can, which is why there is a token at all —
   // and it still gets nothing without one. The usual extra guard, refusing a
-  // Host that is not localhost, cannot go in: main/phone-link.mjs serves this
+  // Host that is not localhost, cannot go in: main/phone-link.mts serves this
   // same handler to a phone through a relay or over Tailscale, where the Host
   // is neither. So this pins both halves rather than leaving it to a comment.
   it('asks for the token whatever name the request arrives under', async () => {

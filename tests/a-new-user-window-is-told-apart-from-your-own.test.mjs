@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freshEnv, runningAsAFreshUser } from '../shared/fresh-user-home.mjs';
-import { newUserWindow } from '../main/new-user-window.mjs';
+import { newUserWindow } from '../main/new-user-window.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const main = fs.readFileSync(path.join(root, 'main/main.mjs'), 'utf8');
@@ -56,7 +56,7 @@ describe('the window a throwaway copy opens', () => {
   });
 
   it('is what the window is actually built with', () => {
-    expect(main).toContain("import { newUserWindow } from './new-user-window.mjs'");
+    expect(main).toContain("import { newUserWindow } from './new-user-window.mts'");
     expect(main).toMatch(/window = new BrowserWindow\(\{[\s\S]{0,400}\.\.\.newUserWindow\(/);
   });
 

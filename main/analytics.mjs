@@ -2,7 +2,7 @@
 // process, and a list of seven counts it will refuse to grow past.
 //
 // IT IS NOT THE ONLY TRAFFIC ANY MORE, and the header said so until 2026-08-29.
-// `main/updater.mjs` asks github.com a few times a day whether a newer Agentbox
+// `main/updater.mts` asks github.com a few times a day whether a newer Agentbox
 // has been released, which reaches us not at all and is nothing to do with this
 // file. `legal/privacy.html` 5.5 is where that is written down.
 //

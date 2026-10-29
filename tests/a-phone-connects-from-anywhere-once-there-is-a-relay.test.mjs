@@ -1,7 +1,7 @@
 // "ANYWHERE" ON THE PHONE PAGE (2026-10-12). The relay is the setup-free way
 // for a phone to reach this Mac from any network ("it should be as simple as a
 // QR code", "yes go ahead with cloudflare"). This is the Mac's side of the
-// choice, in main/phone-link.mjs:
+// choice, in main/phone-link.mts:
 // - with a relay to use it is the choice a new person starts on, and the
 //   others stay;
 // - the phone server then answers this Mac only, as it does behind Tailscale,
@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { createPhoneLink } from '../main/phone-link.mjs';
+import { createPhoneLink } from '../main/phone-link.mts';
 
 const open = [];
 afterEach(() => { while (open.length) open.pop().close(); });

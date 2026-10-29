@@ -33,7 +33,7 @@ function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, entry.name);
     if (entry.isDirectory()) { if (entry.name !== 'node_modules') out.push(...walk(p)); }
-    else if (/\.(mjs|cjs|js)$/.test(entry.name)) out.push(p);
+    else if (/\.(mjs|mts|cjs|js)$/.test(entry.name) && !entry.name.endsWith('.d.mts')) out.push(p);
   }
   return out;
 }

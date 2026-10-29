@@ -30,7 +30,7 @@ import http from 'node:http';
 import { createHandler, newToken } from '../main/serve.mjs';
 import { relayIds, relayKeys, macMayJoin } from '../shared/relay-crypto.mjs';
 import { Room } from '../relay/room.mjs';
-import { createRelayClient } from '../main/relay-client.mjs';
+import { createRelayClient } from '../main/relay-client.mts';
 import { tunnelFetch } from '../relay/phone/tunnel.mjs';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

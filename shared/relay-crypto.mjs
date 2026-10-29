@@ -1,4 +1,4 @@
-// THE RELAY'S LOCKS (relay/worker.mjs, main/relay-client.mjs, relay/phone/).
+// THE RELAY'S LOCKS (relay/worker.mjs, main/relay-client.mts, relay/phone/).
 //
 // A phone away from home reaches the Mac through a relay we run. Everything
 // that crosses it is sealed on one end and opened on the other with keys made

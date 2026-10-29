@@ -34,7 +34,7 @@ import QRCode from 'qrcode';
 import webpush from 'web-push';
 import { phoneBanner, shouldSpeak } from '../shared/notify-rules.mjs';
 import { createHandler, sameKey } from './serve.mjs';
-import { createRelayClient } from './relay-client.mjs';
+import { createRelayClient } from './relay-client.mts';
 import { Name } from '../shared/product-name.mjs';
 
 export const PHONE_PORT = 41745;
@@ -154,7 +154,7 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
   // `PHONE_PORT` in the app, so a phone paired once comes back to the same
   // address; 0 asks for whatever is free, and then only the socket knows.
   const livePort = () => server?.address()?.port ?? port;
-  // ANYWHERE, THROUGH THE RELAY (main/relay-client.mjs). With a relay to use it
+  // ANYWHERE, THROUGH THE RELAY (main/relay-client.mts). With a relay to use it
   // is where a person starts, because it needs nothing on the phone; a route
   // someone picked stays picked. Before the relay every file said "wifi"
   // whether or not anybody picked it, so only a pick marked as one counts.

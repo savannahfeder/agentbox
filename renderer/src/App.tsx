@@ -1694,7 +1694,7 @@ export default function App() {
   // A RELOAD WRITES WHAT IS HELD BEFORE IT HAPPENS (w-47218417a5). The window
   // above lives only in this page, so ⌘R inside it used to throw the close or
   // answer away and the thread came back to her inbox untouched. main asks
-  // before it reloads and waits for this to finish (main/write-before-reload.mjs).
+  // before it reloads and waits for this to finish (main/write-before-reload.mts).
   // `pagehide` covers the window closing or the app quitting, where nobody
   // asks: the write's first step leaves for main before the page goes.
   // A PHONE PUT AWAY never sends `pagehide`: iOS hides the page, freezes it and
@@ -7324,7 +7324,7 @@ export default function App() {
         staleFiles={snap.restartNeeded?.files ?? []}
         /*
          * A newer Agentbox that has already downloaded itself. The palette is
-           the glance surface for it, not the rail (main/updater.mjs).
+           the glance surface for it, not the rail (main/updater.mts).
 
            `closed` is empty ON PURPOSE and it is the whole of "rejecting an
            update loses nothing": closing the row hides the ROW, and ⌘K goes

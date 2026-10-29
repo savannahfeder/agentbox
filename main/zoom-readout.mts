@@ -1,4 +1,4 @@
-// What the zoom readout says. Kept apart from the menu, like zoom-keys.mjs, so
+// What the zoom readout says. Kept apart from the menu, like zoom-keys.mts, so
 // it imports without Electron and the ladder can be tested for real.
 //
 // So this file computes one number and nothing else. Chromium's zoom factor is

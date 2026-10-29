@@ -159,7 +159,7 @@ export function answerWhatOnlyTheWindowAnswered(ipcMain) {
   // A room invite link only ever opens the desktop app.
   ipcMain.handle('zero:take-join', () => null);
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); return null; });
-  // The phone door belongs to the desktop app (main/phone-link.mjs); a tab is told there is none.
+  // The phone door belongs to the desktop app (main/phone-link.mts); a tab is told there is none.
   ipcMain.handle('zero:phone-link', () => null);
 }
 
@@ -378,7 +378,7 @@ export function createServer(options) {
 }
 
 /**
- * The same door as a bare request handler, so main/phone-link.mjs can put its
+ * The same door as a bare request handler, so main/phone-link.mts can put its
  * own server in front of it. `token` may be a function, read on every request,
  * so a key that is reset stops working at once.
  */
@@ -406,7 +406,7 @@ export function createHandler({ channels, token, listeners = new Set(), dist = p
     // AND THE HOST HEADER IS NOT CHECKED, asked and answered 2026-10-24.
     // Refusing a Host that is not localhost is the usual guard against a page
     // whose own name resolves to this machine, and it cannot go here:
-    // main/phone-link.mjs serves this same handler to a phone through a relay
+    // main/phone-link.mts serves this same handler to a phone through a relay
     // or over Tailscale, where the Host is neither. The token is the key,
     // whatever name the request arrives under
     // (tests/the-doing-half-runs-with-no-electron).

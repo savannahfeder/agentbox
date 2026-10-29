@@ -4,8 +4,8 @@
 // open document is a webview with its own zoom.
 
 import { app, BrowserWindow, Menu, webContents } from 'electron';
-import { zoomTarget } from './zoom-keys.mjs';
-import { zoomPercentFor } from './zoom-readout.mjs';
+import { zoomTarget } from './zoom-keys.mts';
+import { zoomPercentFor } from './zoom-readout.mts';
 
 // Approval hotkeys live in the MENU, not the renderer: a child web contents
 // owns the keyboard whenever one is up, so a renderer listener never hears

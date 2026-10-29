@@ -1,7 +1,7 @@
 // YOUR MAC ALERTS YOUR PHONE WHEN A THREAD NEWLY NEEDS YOU.
 //
 // The phone app could turn alerts on and send itself a test, and nothing ever
-// sent a real one (2026-10-23): the old sender (main/phone-link.mjs) spoke
+// sent a real one (2026-10-23): the old sender (main/phone-link.mts) spoke
 // Web Push to the phone website and is no longer wired to anything. Now the
 // Mac, in its phone pass (main/phone-inbox.mjs), hears the same arrivals the
 // desktop banner hears (main/notify.mjs, from App.tsx's inbox) and sends

@@ -62,7 +62,7 @@ with the Mac shut.
   browser-safe `foldWorkItems` rebuilds rows from them anywhere.
 - **The phone screen**: the app's own renderer with a phone layout
   (renderer/src/phone.css, browser-bridge.ts), served BY the Mac over Wi-Fi,
-  Tailscale or the Cloudflare relay (main/phone-link.mjs, relay/). Dead when
+  Tailscale or the Cloudflare relay (main/phone-link.mts, relay/). Dead when
   the Mac sleeps.
 - **Cloud runs** (docs/cloud/PLAN.md): every run is proxied by a process on the
   Mac, which also serves the agent's store tools and approvals.

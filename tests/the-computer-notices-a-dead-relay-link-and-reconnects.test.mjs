@@ -5,7 +5,7 @@
 // app from my phone, it works fine", and, sending a reply with pictures, "it
 // says your computer did not answer in time so I'm just stuck here".
 //
-// Measured in the code: the computer's socket to the relay (main/relay-client.mjs)
+// Measured in the code: the computer's socket to the relay (main/relay-client.mts)
 // sent nothing while nobody was asking, and had no way to learn that the link
 // had died under it. A laptop that slept, or changed networks, kept a socket it
 // believed open while the relay had dropped it ("not connected"), or the relay
@@ -20,7 +20,7 @@
 // taken for a dead one. And a room woken with two sockets from one computer
 // keeps the newest, not whichever the platform lists last.
 import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from 'vitest';
-import { createRelayClient, PING_MS, PONG_GRACE_MS } from '../main/relay-client.mjs';
+import { createRelayClient, PING_MS, PONG_GRACE_MS } from '../main/relay-client.mts';
 import { buildRelay } from '../relay/build.mjs';
 import { relayIds, FROM_MAC, ID_BYTES } from '../shared/relay-crypto.mjs';
 

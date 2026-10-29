@@ -18,7 +18,7 @@
 // "Script not run"). The one such frame is the small preview under a message,
 // and that one is told not to scroll at all (ArtifactThumbnail.tsx).
 import { DOC_SCHEMES, isScheme } from '../shared/schemes.mjs';
-import { DOCUMENT_HEIGHT_SCRIPT, wantsDocumentHeight } from './frame-document-height.mjs';
+import { DOCUMENT_HEIGHT_SCRIPT, wantsDocumentHeight } from './frame-document-height.mts';
 
 const RULES = (thumb) => `@layer agentbox-scrollbars {
   ::-webkit-scrollbar { width: 10px; height: 10px; }

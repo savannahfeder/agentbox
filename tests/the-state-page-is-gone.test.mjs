@@ -63,7 +63,7 @@ function sourceFiles() {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, e.name);
       if (e.isDirectory()) walk(p);
-      else if (/\.(ts|tsx|mjs|cjs|js|css|md)$/.test(e.name)) out.push(p);
+      else if (/\.(ts|tsx|mjs|mts|cjs|js|css|md)$/.test(e.name)) out.push(p);
     }
   };
   for (const t of TREES) walk(path.join(root, t));

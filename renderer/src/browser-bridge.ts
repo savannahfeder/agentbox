@@ -41,7 +41,7 @@ const KEEPALIVE_MAX = 16_000;
  *  not want it in a screenshot, and it would otherwise ride along into every
  *  link somebody copies out of here.
  */
-// THE PHONE DOOR IS THE OTHER CASE (main/phone-link.mjs). Its address is not
+// THE PHONE DOOR IS THE OTHER CASE (main/phone-link.mts). Its address is not
 // this computer's own, and there the key stays in the address bar on purpose:
 // a phone's home-screen icon is saved from that address, and on a phone the
 // icon gets storage of its own, so a key kept anywhere else is lost to it.

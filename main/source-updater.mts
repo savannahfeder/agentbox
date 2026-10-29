@@ -1,7 +1,7 @@
 // A COPY RUN FROM SOURCE KEEPS ITSELF CURRENT TOO (w-7a39dace23, 2026-10-01).
 //
 // Teammates run the team build from a git checkout (docs/team/PLAN.md), and
-// main/updater.mjs cannot help them: electron-updater reads published releases
+// main/updater.mts cannot help them: electron-updater reads published releases
 // and does nothing at all unpackaged. Their updates are pushes to main, several
 // a day, so this watches the branch instead of a release feed.
 //
@@ -32,7 +32,7 @@
 
 import { execFile, execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
-import { describe } from './updater.mjs';
+import { describe } from './updater.mts';
 import { loginShell } from './shell-path.mjs';
 
 const FIRST_CHECK_MS = 20_000;

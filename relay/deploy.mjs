@@ -6,7 +6,7 @@
 // 3. Signs in to Cloudflare if this computer is not signed in: wrangler opens
 //    the Cloudflare page in the browser, once, for the person running this.
 // 4. Deploys, and writes the address it got to relay/relay.local.json, which
-//    the app in this folder reads (main/relay-address.mjs). Restart the app,
+//    the app in this folder reads (main/relay-address.mts). Restart the app,
 //    and Settings, then Phone, offers "Anywhere".
 import fs from 'node:fs';
 import path from 'node:path';

@@ -22,7 +22,7 @@ import http from 'node:http';
 import { createHandler, newToken } from '../main/serve.mjs';
 import { relayIds, relayKeys, macMayJoin } from '../shared/relay-crypto.mjs';
 import { Room } from '../relay/room.mjs';
-import { createRelayClient, squeezes } from '../main/relay-client.mjs';
+import { createRelayClient, squeezes } from '../main/relay-client.mts';
 import { tunnelFetch } from '../relay/phone/tunnel.mjs';
 import { isScreenFile, mayKeep } from '../relay/phone/kept.mjs';
 
