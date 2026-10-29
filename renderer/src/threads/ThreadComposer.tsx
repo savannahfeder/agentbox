@@ -682,6 +682,8 @@ export function ThreadComposer({
   };
   // ↓ reaches the suggestions when nothing has the keyboard, as on the empty inbox after closing a thread.
   const ideasShown = !!(ideas?.length && (product?.repoPath || projectChosen) && !person && !mate);
+  // The tutorial's first task: My Workspace is not drawn as already picked.
+  const unpicked = !!ideas?.length && !projectChosen && !product?.repoPath;
   const offeredIdeas = product?.repoPath ? ideas ?? [] : ideasFor({ folder: false });
   useEffect(() => {
     if (!ideasShown) return undefined;
@@ -866,6 +868,7 @@ export function ThreadComposer({
         <button key={p.slug} type="button" data-item className={`tc-row ${p.slug === product?.slug ? 'on' : ''}`} onPointerEnter={hover}
           onClick={() => { pickProject(p.slug); setProjectChosen(true); close('text'); }}>
           <Swatch slug={p.slug} /><span className="tc-row-label">{p.name}</span>
+          {!p.repoPath && <span className="tc-row-note">No folder · for work that isn’t code</span>}
         </button>
       ))}
       {/* MAKING A PROJECT IS A THING YOU CAN DO FROM HERE, ALWAYS (approved
@@ -1238,8 +1241,8 @@ export function ThreadComposer({
               <span className="tc-anchor" ref={anchor('project')}>
                 <button type="button" data-trigger className={`tc-chip ${open === 'project' ? 'open' : ''}`} title={product?.name ?? 'Which project'}
                   aria-haspopup="listbox" aria-expanded={open === 'project'} onClick={() => toggle('project')} onKeyDown={triggerKeys('project')}>
-                  {product && <Swatch slug={product.slug} />}
-                  <span className="tc-chip-name">{product?.name ?? 'No project'}</span>
+                  {product && !unpicked && <Swatch slug={product.slug} />}
+                  <span className="tc-chip-name">{unpicked ? 'Choose a folder' : product?.name ?? 'No project'}</span>
                 </button>
                 {open === 'project' && projectMenu}
               </span>
@@ -1256,8 +1259,8 @@ export function ThreadComposer({
             <span className="tc-anchor" ref={anchor('project')} data-tour="project">
               <button type="button" data-trigger className={`tc-chip ${open === 'project' ? 'open' : ''}`} title={product?.name ?? 'Which project'}
                 aria-haspopup="listbox" aria-expanded={open === 'project'} onClick={() => toggle('project')} onKeyDown={triggerKeys('project')}>
-                {product && <Swatch slug={product.slug} />}
-                <span ref={projName} className={`tc-chip-name ${projCut ? 'cut' : ''}`}>{product?.name ?? 'No project'}</span>
+                {product && !unpicked && <Swatch slug={product.slug} />}
+                <span ref={projName} className={`tc-chip-name ${projCut ? 'cut' : ''}`}>{unpicked ? 'Choose a folder' : product?.name ?? 'No project'}</span>
               </button>
               {open === 'project' && projectMenu}
             </span>

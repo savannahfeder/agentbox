@@ -10,8 +10,8 @@
 // The founder's rules for it, after seeing it drawn:
 //  - "what if they don't want to? Can they just click away?" and "It's not good
 //    if, for the rest of the time, there's always a glowing button." Each tip
-//    shows until it is done or clicked away from, then never again; Skip
-//    tutorial and Escape end all of it.
+//    shows until it is done, then never again; Skip tutorial and Escape end
+//    all of it.
 //  - "after you've gone through one flow, making a new thread probably
 //    shouldn't show those suggestions." They show only before the first send.
 //
@@ -74,7 +74,7 @@ describe('the New thread box', () => {
 });
 
 describe('getting out of it', () => {
-  it('a tip clicked away from is not shown again, and the next one still is', () => {
+  it('a tip learned is not shown again, and the next one still is', () => {
     expect(tourStep(after('open'), inbox)).toBe('start');
     expect(tourStep(after('open', 'start'), inbox)).toBe(null);
   });
@@ -140,12 +140,35 @@ describe('where it is kept', () => {
 });
 
 describe('a click', () => {
-  it('puts the tip away rather than ending the tutorial', async () => {
+  // The founder, 2026-10-29, in the fresh window: "It showed the Cmd+K line but
+  // I clicked elsewhere by accident and it disappeared. Clicking should not get
+  // rid of the tutorial." A click elsewhere had put the close tip away and
+  // counted it, so the confetti said the tutorial was over and then the
+  // command bar tip came after it.
+  it('elsewhere does nothing; on the lit thing, it is doing what the tip asks', async () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     const down = tour.slice(tour.indexOf('const down = '), tour.indexOf('const key = '));
+    expect(down).toContain('if (!onTarget(e.target)) return;');
     expect(down).toContain('finishLesson(tour, lessonOf(step))');
-    expect(down).not.toContain('skipTour');
+    expect(tour).not.toContain('quietAt');
+  });
+});
+
+describe('a tip that leaves the screen', () => {
+  const was = at({});
+  it('is learned when the screen it asked for comes', async () => {
+    const { learnedBy } = await import('../renderer/src/tour.ts');
+    expect(learnedBy('open', was, at({ thread: true }))).toBe(true);
+    expect(learnedBy('start', was, at({ composer: 'card' }))).toBe(true);
+    expect(learnedBy('answered', at({ view: 'progress' }), at({ view: 'inbox' }))).toBe(true);
+  });
+  it('and not when something else took its place', async () => {
+    const { learnedBy } = await import('../renderer/src/tour.ts');
+    expect(learnedBy('open', was, at({ view: 'progress' }))).toBe(false);
+    expect(learnedBy('start', was, at({ thread: true }))).toBe(false);
+    expect(learnedBy('palette', was, at({ thread: true }))).toBe(false);
+    expect(learnedBy('close', at({ thread: true }), at({ thread: true, covered: true }))).toBe(false);
   });
 });
 
@@ -197,7 +220,7 @@ describe('a tip on a screen still arriving', () => {
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     expect(tour).toMatch(/const SETTLE_MS = 500;/);
     expect(tour).toMatch(/const SEEN_MS = 1000;/);
-    expect(tour).toContain('if (was && seenFor >= SEEN_MS && !covered');
+    expect(tour).toContain('if (was && seenFor >= SEEN_MS && !covered && learnedBy(was, before.current, screen))');
   });
 });
 
@@ -365,13 +388,16 @@ describe('My Workspace, chosen on purpose', () => {
   });
 });
 
-describe('closing the first thread', () => {
+describe('the end of the tutorial', () => {
   // The founder, 2026-10-29: "it would be nice if, at the end, it did a little
-  // thing. Previously we had confetti explode when it was done."
-  it('bursts the confetti once, as the close is learned', async () => {
+  // thing. Previously we had confetti explode when it was done." Fired on the
+  // close first, it said the tutorial was over with the command bar tip still
+  // to come.
+  it('bursts the confetti once, when the close and the command bar are both learned', async () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
-    expect(tour).toContain("if (!hadClose.current && tour?.done.includes('close') && !tour.skipped) setBurst(Date.now());");
+    expect(tour).toContain("const ended = (t: TourState | null) => !!t && !t.skipped && t.done.includes('close') && t.done.includes('palette');");
+    expect(tour).toContain('if (covered || hadEnded.current === ended(tour)) return;');
     expect(tour).toContain('{burst ? <ConfettiBurst key={burst} /> : null}');
   });
   it('draws the burst the walk once ended on', async () => {
@@ -414,5 +440,63 @@ describe('closing a thread before its tip comes up', () => {
     expect(closesThread({ key: 'E' }, true)).toBe(true);
     expect(closesThread({ key: 'e' }, false)).toBe(false);
     expect(closesThread({ key: 'e', metaKey: true }, true)).toBe(false);
+  });
+});
+
+describe('a thread opened while its agent is still working', () => {
+  // The founder, 2026-10-29: "I was curious about things so I did not hit N,
+  // clicked into the task, and hit R ... I think you need better handling if
+  // the user goes off path." Nothing said the agent was still at it.
+  it('says the answer will come to Needs you', () => {
+    expect(tourStep(noteSent(startTour()), at({ thread: true, busy: true }))).toBe('busy');
+    expect(lessonOf('busy')).toBe('busy');
+  });
+  it('and asks for nothing else on that page while it works', () => {
+    const t = finishLesson(noteSent(startTour()), 'busy');
+    expect(tourStep(t, at({ thread: true, busy: true }))).toBe(null);
+    expect(tourStep(t, at({ thread: true, busy: false }))).toBe('reply');
+  });
+});
+
+describe('a menu open over the tip', () => {
+  // The founder, 2026-10-29, with the project menu open over the suggestions:
+  // "in the event that you open up another component, it should probably have a
+  // higher z-index than the border of this component." The glow sat over it.
+  it('puts the tip aside until it closes, without counting it', async () => {
+    const { learnedBy } = await import('../renderer/src/tour.ts');
+    const box = at({ composer: 'inline', folder: true, ideas: true });
+    expect(tourStep(startTour(), { ...box, menu: true })).toBe(null);
+    expect(tourStep(startTour(), box)).toBe('pick');
+    expect(learnedBy('pick', box, { ...box, menu: true })).toBe(false);
+  });
+  it('but not the folder tip, which is about that menu', () => {
+    expect(tourStep(startTour(), at({ composer: 'inline', folder: false, menu: true }))).toBe('folder');
+  });
+});
+
+describe('the folder chip before a choice', () => {
+  // The founder, 2026-10-29: "it's going to be a bit confusing because a
+  // particular folder is already selected and it's also not obvious what my
+  // workspace is. Most people probably won't know what that is and even I forgot."
+  const read = async () => (await import('node:fs')).readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
+  it('asks for a folder rather than showing My Workspace as picked', async () => {
+    const box = await read();
+    expect(box).toContain('const unpicked = !!ideas?.length && !projectChosen && !product?.repoPath;');
+    expect(box).toContain("{unpicked ? 'Choose a folder' : product?.name ?? 'No project'}");
+  });
+  it('says in the menu what a project with no folder is for', async () => {
+    const box = await read();
+    expect(box).toContain('{!p.repoPath && <span className="tc-row-note">No folder · for work that isn’t code</span>}');
+  });
+});
+
+describe('the command bar tip on a thread', () => {
+  // Measured 2026-10-29: E closed the first thread and the app went straight
+  // on to the next one waiting, so the command bar tip, drawn only on the
+  // list, never came.
+  it('shows on the next thread too, once that thread asks for nothing first', () => {
+    const t = noteSent(after('open', 'choose', 'reply', 'close'));
+    expect(tourStep(t, at({ thread: true, options: true }))).toBe('palette');
+    expect(tourStep(t, at({ thread: true, busy: true }))).toBe('busy');
   });
 });

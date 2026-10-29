@@ -7,7 +7,7 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { closesThread, finishLesson, keyLearns, LESSONS, lessonOf, skipTour, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { closesThread, finishLesson, keyLearns, learnedBy, LESSONS, lessonOf, skipTour, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -35,6 +35,7 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   choose: { words: <>Press <K k="1" /> to choose the recommended option</>, side: 'above' },
   reply: { words: <>Press <K k="R" /> to answer this agent</>, side: 'above' },
   close: { words: <>When it is finished, press <K k="E" /> to close it</>, side: 'below-right' },
+  busy: { words: <>This agent is still working. Its answer will come to Needs you</>, side: 'below' },
   palette: { words: <>Press <K k={CMD} /><K k="K" /> to find anything {Name} can do</>, side: 'below' },
 };
 
@@ -67,8 +68,9 @@ function targetsOf(step: TourStep): HTMLElement[] {
     case 'choose': return one(document.querySelector('.opt-row')?.parentElement);
     case 'reply': return one(document.querySelector('.dock-pill'));
     case 'close': return one(document.querySelector('.ts-done'));
+    case 'busy': return one(document.querySelector('.live-activity .live-brief'));
     // Nothing on screen opens the command bar, so the card sits alone under the tabs.
-    case 'palette': return one(document.querySelector('.tm-tab')?.parentElement);
+    case 'palette': return one(document.querySelector('.tm-tab')?.parentElement ?? document.querySelector('.thread-crumb-from')?.parentElement);
   }
 }
 
@@ -95,7 +97,7 @@ function snug(el: HTMLElement): Box {
 
 function boxOf(step: TourStep, els: HTMLElement[]): Box | null {
   if (!els.length) return null;
-  if (step === 'working' || step === 'answered' || step === 'open') return snug(els[0]);
+  if (step === 'working' || step === 'answered' || step === 'open' || step === 'busy') return snug(els[0]);
   const rs = els.map((e) => e.getBoundingClientRect()).filter((r) => r.width);
   if (!rs.length) return null;
   const x = Math.min(...rs.map((r) => r.left)), y = Math.min(...rs.map((r) => r.top));
@@ -116,13 +118,12 @@ function readScreen(view: string, thread: boolean, covered: boolean): TourScreen
     thread,
     preparing: !!document.querySelector('.list-pane .row[data-catching-up], .one-catching-up'),
     typing: thread && !!document.activeElement?.closest('.dock-card'),
+    busy: thread && !!document.querySelector('.live-word.is-shimmering'),
+    menu: !!document.querySelector('.tc-menu'),
     options: !!document.querySelector('.opt-row'),
     covered,
   };
 }
-
-/** Where someone is: a tip put away waits until this changes before the next one shows. */
-const placeOf = (s: TourScreen) => `${s.composer}|${s.view}|${s.thread}`;
 
 const same = (a: Box | null, b: Box | null) => (!a || !b ? a === b : a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
 
@@ -141,18 +142,21 @@ export function Tour({ tour, view, thread, covered, onChange }: {
   const shown = useRef<TourStep | null>(null);
   const shownAt = useRef(0);
   const settling = useRef<{ step: TourStep | null; since: number }>({ step: null, since: 0 });
-  const quietAt = useRef<string | null>(null);
-  const place = useRef('');
+  const before = useRef<TourScreen | null>(null);
   const countedSteps = useRef(new Set<number>());
   const live = !!tour && !tour.skipped && LESSONS.some((l) => !tour.done.includes(l));
 
-  // THE FIRST THREAD CLOSED: one burst of confetti, the way the old walk ended.
+  // THE END OF THE TUTORIAL: one burst of confetti, the way the old walk ended,
+  // once the first thread is closed and the command bar shown, and only when
+  // nothing is over the window to hide it.
   const [burst, setBurst] = useState(0);
-  const hadClose = useRef(!!tour?.done.includes('close'));
+  const ended = (t: TourState | null) => !!t && !t.skipped && t.done.includes('close') && t.done.includes('palette');
+  const hadEnded = useRef(ended(tour));
   useEffect(() => {
-    if (!hadClose.current && tour?.done.includes('close') && !tour.skipped) setBurst(Date.now());
-    hadClose.current = !!tour?.done.includes('close');
-  }, [tour]);
+    if (covered || hadEnded.current === ended(tour)) return;
+    if (!hadEnded.current) setBurst(Date.now());
+    hadEnded.current = ended(tour);
+  }, [tour, covered]);
   useEffect(() => {
     if (!burst) return undefined;
     const t = setTimeout(() => setBurst(0), 2600);
@@ -165,9 +169,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
     const read = () => {
       const screen = readScreen(view, thread, covered);
       if (screen.typing && !tour.done.includes('reply')) { onChange(finishLesson(tour, 'reply')); return; }
-      place.current = placeOf(screen);
-      if (quietAt.current && quietAt.current !== place.current) quietAt.current = null;
-      const wanted = quietAt.current ? null : tourStep(tour, screen);
+      const wanted = tourStep(tour, screen);
       // A screen still arriving (the inbox before its rows land) must not flash a tip.
       if (wanted !== settling.current.step) settling.current = { step: wanted, since: Date.now() };
       const next = wanted && Date.now() - settling.current.since < SETTLE_MS ? shown.current : wanted;
@@ -183,12 +185,13 @@ export function Tour({ tour, view, thread, covered, onChange }: {
         shown.current = next;
         shownAt.current = Date.now();
         setStep(next);
-        // A tip that was read and has gone, because what it pointed at was done, is not shown again.
-        if (was && seenFor >= SEEN_MS && !covered && !quietAt.current && (!next || lessonOf(was) !== lessonOf(next))) {
+        // A tip read and gone because the screen it asked for came is not shown again.
+        if (was && seenFor >= SEEN_MS && !covered && learnedBy(was, before.current, screen)) {
           onChange(finishLesson(tour, lessonOf(was)));
           return;
         }
       }
+      if (next) before.current = screen;
       const b = next ? boxOf(next, targetsOf(next)) : null;
       setBox((had) => (same(had, b) ? had : b));
     };
@@ -214,7 +217,8 @@ export function Tour({ tour, view, thread, covered, onChange }: {
     if (step === 'palette') {
       const pane = document.querySelector('.list-pane')?.getBoundingClientRect();
       left = pane ? pane.left + (pane.width - w) / 2 : (window.innerWidth - w) / 2;
-      top = box.y + box.h + 3 * GAP;
+      // Under the tabs on a list; on a thread, in the empty middle of its header line.
+      top = document.querySelector('.tm-tab') ? box.y + box.h + 3 * GAP : box.y + (box.h - h) / 2;
     }
     left = Math.max(12, Math.min(left, window.innerWidth - w - 12));
     top = Math.max(12, Math.min(top, window.innerHeight - h - 12));
@@ -226,18 +230,14 @@ export function Tour({ tour, view, thread, covered, onChange }: {
   // tutorial, ends all of it.
   useEffect(() => {
     if (!step || !tour) return undefined;
-    const inside = (t: EventTarget | null) => {
+    const onTarget = (t: EventTarget | null) => {
       const el = t as Element | null;
-      if (!el?.closest) return false;
-      if (el.closest('.tour-card')) return true;
-      if (IN_THE_BOX.includes(step) && el.closest('.tc-card')) return true;
-      return targetsOf(step).some((x) => x.contains(el));
+      return !!el?.closest && targetsOf(step).some((x) => x.contains(el));
     };
+    // Pressing the lit thing is doing what the tip asks; a click anywhere else leaves the tip up.
     const down = (e: PointerEvent) => {
-      if (inside(e.target)) return;
-      quietAt.current = place.current;
-      shown.current = null;
-      setStep(null);
+      if (!onTarget(e.target)) return;
+      if (IN_THE_BOX.includes(step) || step === 'busy' || step === 'palette') return;
       onChange(finishLesson(tour, lessonOf(step)));
     };
     const key = (e: KeyboardEvent) => {

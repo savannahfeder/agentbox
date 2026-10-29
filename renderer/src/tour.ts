@@ -3,9 +3,9 @@
 // tests/the-tutorial-walks-you-through-your-first-real-thread.test.mjs holds
 // what each rule is for.
 
-export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette';
+export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy';
 /** Each tip shows until it is done or put away, then never again. The New thread box's three steps are one. */
-export type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette';
+export type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy';
 /** Every lesson there is; a tour with all of them done has nothing left to say. */
 export const LESSONS: Lesson[] = ['start', 'compose', 'working', 'open', 'choose', 'reply', 'close', 'palette'];
 
@@ -37,6 +37,10 @@ export interface TourScreen {
   waiting?: number;
   /** A thread is open. */
   thread: boolean;
+  /** The open thread's agent is still working on it. */
+  busy?: boolean;
+  /** A menu is open over the page. */
+  menu?: boolean;
   /** The thread's reply box has the keyboard. */
   typing?: boolean;
   /** The open thread offers options. */
@@ -62,6 +66,19 @@ export function keyLearns(step: TourStep, e: { key: string; metaKey?: boolean; c
   return !!KEYS[step]?.test(e.key);
 }
 
+/** Whether the screen that replaced a tip is the one it asked for, so the lesson is learned. */
+export function learnedBy(step: TourStep, before: TourScreen | null, after: TourScreen): boolean {
+  if (after.covered || after.menu || !before) return false;
+  switch (step) {
+    case 'start': return after.composer !== 'none';
+    case 'open': return after.thread;
+    case 'answered': return after.view === 'inbox';
+    case 'working': return after.thread || after.view !== before.view;
+    case 'busy': return !after.thread;
+    default: return false;
+  }
+}
+
 /** E on an open thread closes it, which is the close lesson whatever tip is up. */
 export function closesThread(e: { key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean }, thread: boolean): boolean {
   return thread && !e.metaKey && !e.ctrlKey && !e.altKey && /^e$/i.test(e.key);
@@ -75,15 +92,18 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
   const todo = (l: Lesson) => !t.done.includes(l);
   if (s.composer !== 'none' && !t.sent && todo('compose')) {
     if (!s.folder) return 'folder';
+    if (s.menu) return null;
     if (s.text) return 'send';
     return s.ideas === false ? 'write' : 'pick';
   }
   if (s.preparing) return null;
   if (s.thread) {
     if (s.typing) return null;
+    if (s.busy) return todo('busy') ? 'busy' : null;
     if (s.options && todo('choose')) return 'choose';
     if (!s.options && todo('reply') && todo('choose')) return 'reply';
     if ((!todo('choose') || !todo('reply')) && todo('close')) return 'close';
+    if (!todo('close') && todo('palette') && (t.sent || !todo('start'))) return 'palette';
     return null;
   }
   if (s.composer === 'card') return null;
