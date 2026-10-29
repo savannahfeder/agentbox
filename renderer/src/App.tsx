@@ -149,7 +149,7 @@ import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './
 import { FirstRunFlow } from './components/FirstRun';
 import { ideasFor } from './first-run';
 import { Tour } from './components/Tour';
-import { finishLesson, noteSent, readTour, saveTour, showIdeas, startTour, type Tour as TourState } from './tour';
+import { finishLesson, firstTask, noteSent, readTour, saveTour, showIdeas, startTour, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   finishedCleared, firstRunNeeded, projectsOfTheirOwn, inboxCleared, laterCleared, laterId, laterIndex,
@@ -6168,14 +6168,15 @@ export default function App() {
     const tab = tabOfState(tabState.get(firstThread) ?? null);
     if (!tab) return;
     if (tab === followedTab.current) return;
+    // Inside a thread or a card, it waits for you to come back to the list.
+    if (focused || !(modal === null || modal === 'compose') || !(['inbox', 'progress'] as View[]).includes(view)) return;
     followedTab.current = tab;
-    if (!focused && (modal === null || modal === 'compose') && (['inbox', 'progress'] as View[]).includes(view) && tab !== view) setView(tab);
+    if (tab !== view) setView(tab);
     if (tab === 'inbox') setFirstThread(null);
   }, [firstThread, tabState, focused, modal, view]);
   // And the cursor on it, once its row is drawn there.
   const followAt = firstThread ? list.findIndex((i) => i.id === firstThread) : -1;
   useEffect(() => { if (followAt >= 0) setSelected(followAt); }, [followAt]);
-  useEffect(() => { if (focused) setFirstThread(null); }, [focused]);
   // END OF THE FOLLOWING
 
   const openView = (next: View) => { roomsUi.leave(); teammatesUi.leave(); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); };
@@ -6997,7 +6998,7 @@ export default function App() {
                       // AND NOT UNDER THE LANDING (2026-10-06), which says the
                       // same thing louder: "Nothing needs you" and "You finished
                       // the tutorial" were drawn one on top of the other.
-                      ? run === null && !landing && <InboxClear slot={setClearSlot} first={showIdeas(tour)} />
+                      ? run === null && !landing && <InboxClear slot={setClearSlot} first={firstTask(tour)} />
                       : <EmptyTab view={view} starting={justSent} waiting={needsYouCount.inbox} />
                 ) : <List
                   lead={view === 'inbox' && search === null && roomsUi.mentions.length
@@ -7151,6 +7152,7 @@ export default function App() {
           initial={walkCard ? { body: `${TASK_TITLE}\n\n${TASK_BODY}` } : composeInitial}
           scripted={walkCard ? { labels: [FIRST_RUN_LABEL] } : null}
           ideas={!walkCard && showIdeas(tour) ? FIRST_IDEAS : null}
+          askFolder={firstTask(tour)}
           onOpenConversation={openConversation}
           // "Reorder" beside the project menu's heading: Settings on the
           // Projects page, which is where the order is set. The draft is
@@ -7173,7 +7175,7 @@ export default function App() {
           // keeps the old order: its beat moves on from the card closing.
           onSending={walkCard ? undefined : (how) => {
             // The tutorial's first send, which may be a repeating suggestion whose first run starts now.
-            const first = !!tour && showIdeas(tour);
+            const first = firstTask(tour);
             // Sending the first task is finishing the first run; leaving without one is not.
             if (first) { firstSend.current = true; setTour(noteSent(tour!)); try { window.zero?.track?.('first_run_finished'); } catch {} }
             setModal(null);

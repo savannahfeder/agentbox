@@ -110,10 +110,12 @@ export interface ComposeStart {
 }
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas,
+  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false,
 }: {
   /** First-thread suggestions, offered only while the tutorial is walking someone to their first send. */
   ideas?: Idea[] | null;
+  /** The tutorial's first task: the folder is asked for before the suggestions. */
+  askFolder?: boolean;
   statusLine?: string | null;
   /** On the page: whether the keyboard is in the box or words are left in it. */
   onWriting?: (writing: boolean) => void;
@@ -681,9 +683,9 @@ export function ThreadComposer({
     if (e.key === 'ArrowUp') { e.preventDefault(); if (at === 0) textRef.current?.focus(); else rows[at - 1]?.focus(); }
   };
   // ↓ reaches the suggestions when nothing has the keyboard, as on the empty inbox after closing a thread.
-  const ideasShown = !!(ideas?.length && (product?.repoPath || projectChosen) && !person && !mate);
+  const ideasShown = !!(ideas?.length && (product?.repoPath || projectChosen || !askFolder) && !person && !mate);
   // The tutorial's first task: My Workspace is not drawn as already picked.
-  const unpicked = !!ideas?.length && !projectChosen && !product?.repoPath;
+  const unpicked = askFolder && !!ideas?.length && !projectChosen && !product?.repoPath;
   const offeredIdeas = product?.repoPath ? ideas ?? [] : ideasFor({ folder: false });
   useEffect(() => {
     if (!ideasShown) return undefined;
@@ -1134,7 +1136,7 @@ export function ThreadComposer({
         className={`tc-card${inline ? ' tc-inline' : ''}`}
         role={inline ? 'group' : 'dialog'}
         aria-label="New thread"
-        data-tour-folder={product?.repoPath || projectChosen ? '1' : '0'}
+        data-tour-folder={product?.repoPath || projectChosen || !askFolder ? '1' : '0'}
         data-tour-text={text.trim() ? '1' : '0'}
         onFocus={inline ? writingNow : undefined}
         onBlur={inline ? writingNow : undefined}

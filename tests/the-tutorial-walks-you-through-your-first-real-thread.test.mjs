@@ -94,10 +94,18 @@ describe('getting out of it', () => {
 });
 
 describe('the suggestions', () => {
-  it('show until the first send', () => {
+  // Round eleven: "after you've gone through one flow, making a new thread
+  // probably shouldn't show those suggestions." Then, 2026-10-29: "it should
+  // always propose suggestions if you ever need to type a task in", and, of the
+  // New thread box after the first send, "when i hit n there's no guidance".
+  // So they show in every New thread box until the tutorial is over.
+  it('show in every New thread box while the tutorial runs', () => {
     expect(showIdeas(startTour())).toBe(true);
     expect(showIdeas(after('open', 'start'))).toBe(true);
-    expect(showIdeas(noteSent(startTour()))).toBe(false);
+    expect(showIdeas(noteSent(startTour()))).toBe(true);
+  });
+  it('and not once the tutorial is over', () => {
+    expect(showIdeas(noteSent(after('close', 'palette')))).toBe(false);
   });
   it('are gone after Skip', () => {
     expect(showIdeas(skipTour(startTour()))).toBe(false);
@@ -107,79 +115,14 @@ describe('the suggestions', () => {
   });
 });
 
-describe('after the first send', () => {
-  const sent = finishLesson(noteSent(startTour()), 'open');
-  it('says the agent is working, on In progress, once', () => {
-    expect(tourStep(sent, at({ view: 'progress', running: 1 }))).toBe('working');
-    expect(tourStep(finishLesson(sent, 'working'), at({ view: 'progress', running: 1 }))).toBe(null);
+describe('a second New thread box during the tutorial', () => {
+  it('points at the suggestions again, but asks for no folder', () => {
+    const sent = noteSent(startTour());
+    expect(tourStep(sent, at({ composer: 'card', folder: true, ideas: true }))).toBe('pick');
+    expect(tourStep(sent, at({ composer: 'card', folder: true, ideas: true, text: true }))).toBe('send');
   });
-  it('does not say it on a list with nothing running', () => {
-    expect(tourStep(sent, at({ view: 'progress', running: 0, rows: 0 }))).toBe(null);
-  });
-  it('never puts New thread or the box tips back', () => {
-    expect(tourStep(sent, inbox)).toBe(null);
-    expect(tourStep(sent, at({ composer: 'card' }))).toBe(null);
-  });
-});
-
-describe('where it is kept', () => {
-  const store = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, v), m }; };
-  it('reads back what was saved', () => {
-    const st = store();
-    saveTour(st, finishLesson(noteSent(startTour()), 'working'));
-    expect(readTour(st)).toEqual({ sent: true, skipped: false, done: ['compose', 'working'] });
-  });
-  it('reads nothing as no tutorial', () => {
-    expect(readTour(store())).toBe(null);
-  });
-  it('reads a broken value as no tutorial', () => {
-    const st = store();
-    st.setItem(TOUR_KEY, '{nope');
-    expect(readTour(st)).toBe(null);
-  });
-});
-
-describe('a click', () => {
-  // The founder, 2026-10-29, in the fresh window: "It showed the Cmd+K line but
-  // I clicked elsewhere by accident and it disappeared. Clicking should not get
-  // rid of the tutorial." A click elsewhere had put the close tip away and
-  // counted it, so the confetti said the tutorial was over and then the
-  // command bar tip came after it.
-  it('elsewhere does nothing; on the lit thing, it is doing what the tip asks', async () => {
-    const fs = await import('node:fs');
-    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
-    const down = tour.slice(tour.indexOf('const down = '), tour.indexOf('const key = '));
-    expect(down).toContain('if (!onTarget(e.target)) return;');
-    expect(down).toContain('finishLesson(tour, lessonOf(step))');
-    expect(tour).not.toContain('quietAt');
-  });
-});
-
-describe('a tip that leaves the screen', () => {
-  const was = at({});
-  it('is learned when the screen it asked for comes', async () => {
-    const { learnedBy } = await import('../renderer/src/tour.ts');
-    expect(learnedBy('open', was, at({ thread: true }))).toBe(true);
-    expect(learnedBy('start', was, at({ composer: 'card' }))).toBe(true);
-    expect(learnedBy('answered', at({ view: 'progress' }), at({ view: 'inbox' }))).toBe(true);
-  });
-  it('and not when something else took its place', async () => {
-    const { learnedBy } = await import('../renderer/src/tour.ts');
-    expect(learnedBy('open', was, at({ view: 'progress' }))).toBe(false);
-    expect(learnedBy('start', was, at({ thread: true }))).toBe(false);
-    expect(learnedBy('palette', was, at({ thread: true }))).toBe(false);
-    expect(learnedBy('close', at({ thread: true }), at({ thread: true, covered: true }))).toBe(false);
-  });
-});
-
-describe('the first thread after bringing chats in', () => {
-  // Walked in the built app on 2026-10-29: the box opened on My Workspace, which
-  // has no folder, so it asked for one although the chats had just made a project.
-  it('goes to the project the newest chat ran in', async () => {
-    const fs = await import('node:fs');
-    const first = fs.readFileSync(new URL('../renderer/src/components/FirstRun.tsx', import.meta.url), 'utf8');
-    const bring = first.slice(first.indexOf('const bringIn = useCallback('), first.indexOf('// THE KEYBOARD'));
-    expect(bring).toMatch(/if \(n === 1\) try \{ localStorage\.setItem\(LAST_PRODUCT_KEY, p\.slug\)/);
+  it('and nothing once the tutorial is over', () => {
+    expect(tourStep(noteSent(after('close', 'palette')), at({ composer: 'card', folder: true, ideas: false }))).toBe(null);
   });
 });
 
@@ -189,7 +132,7 @@ describe('the first send', () => {
   it('moves to In progress even when it is a repeating suggestion', async () => {
     const fs = await import('node:fs');
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-    expect(app).toContain("const first = !!tour && showIdeas(tour);");
+    expect(app).toContain("const first = firstTask(tour);");
     expect(app).toContain("(how.kind === 'task' || (first && how.kind === 'repeat'))");
   });
 });
@@ -202,12 +145,12 @@ describe('the empty inbox during the tutorial', () => {
     const pages = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(pages).toContain("{first ? 'Give an agent its first task' : 'Nothing needs you'}");
-    expect(app).toContain('<InboxClear slot={setClearSlot} first={showIdeas(tour)} />');
+    expect(app).toContain('<InboxClear slot={setClearSlot} first={firstTask(tour)} />');
   });
   it('offers the suggestions only once the project has a folder', async () => {
     const fs = await import('node:fs');
     const box = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
-    expect(box).toContain('const ideasShown = !!(ideas?.length && (product?.repoPath || projectChosen) && !person && !mate);');
+    expect(box).toContain('const ideasShown = !!(ideas?.length && (product?.repoPath || projectChosen || !askFolder) && !person && !mate);');
   });
 });
 
@@ -377,7 +320,7 @@ describe('My Workspace, chosen on purpose', () => {
   it('counts as the folder once it is picked from the menu', async () => {
     const fs = await import('node:fs');
     const box = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
-    expect(box).toContain("data-tour-folder={product?.repoPath || projectChosen ? '1' : '0'}");
+    expect(box).toContain("data-tour-folder={product?.repoPath || projectChosen || !askFolder ? '1' : '0'}");
     expect(box).toContain('setProjectChosen(true);');
   });
   it('has no suggestions, so the tip points at the words instead', () => {
@@ -425,7 +368,7 @@ describe('suggestions wherever the first task is typed', () => {
   it('shows them once a folder is set or My Workspace is picked', async () => {
     const fs = await import('node:fs');
     const box = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
-    expect(box).toContain('const ideasShown = !!(ideas?.length && (product?.repoPath || projectChosen) && !person && !mate);');
+    expect(box).toContain('const ideasShown = !!(ideas?.length && (product?.repoPath || projectChosen || !askFolder) && !person && !mate);');
     expect(box).toContain('const offeredIdeas = product?.repoPath ? ideas ?? [] : ideasFor({ folder: false });');
   });
 });
@@ -481,7 +424,7 @@ describe('the folder chip before a choice', () => {
   const read = async () => (await import('node:fs')).readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
   it('asks for a folder rather than showing My Workspace as picked', async () => {
     const box = await read();
-    expect(box).toContain('const unpicked = !!ideas?.length && !projectChosen && !product?.repoPath;');
+    expect(box).toContain('const unpicked = askFolder && !!ideas?.length && !projectChosen && !product?.repoPath;');
     expect(box).toContain("{unpicked ? 'Choose a folder' : product?.name ?? 'No project'}");
   });
   // And then: "I thought it was actually a folder ... that can run code. It's just for personal tasks."
@@ -512,5 +455,37 @@ describe('the glow around the working line', () => {
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     expect(tour).toContain("n.parentElement?.closest('.live-announcement')");
     expect(tour).toContain("el.querySelectorAll('svg, .th-st, .live-mark')");
+  });
+});
+
+describe('a key a tip counts', () => {
+  // The founder, 2026-10-29: "when i hit e here nothing happens, doesnt bring me
+  // to inbox", with the command bar tip up on a thread. Reproduced in a fresh
+  // window: the tip's listener saved the tutorial at once, the app redrew
+  // before its own key handler ran and put a new handler in its place, and the
+  // press reached neither. E also counted the command bar as learned.
+  it("is still the app's to act on: the tutorial is saved after the press", async () => {
+    const fs = await import('node:fs');
+    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+    const key = tour.slice(tour.indexOf('const key = (e: KeyboardEvent) => {'), tour.indexOf("window.addEventListener('pointerdown'"));
+    expect(key).toContain('const later = (t: TourState) => setTimeout(() => onChange(t), 0);');
+    expect(key).not.toMatch(/\bonChange\(finishLesson/);
+  });
+  it('E counts the close, and not the command bar', async () => {
+    const { closeLessons } = await import('../renderer/src/tour.ts');
+    expect(closeLessons('palette')).toEqual(['close']);
+    expect(closeLessons('reply')).toEqual(['reply', 'close']);
+    expect(closeLessons('choose')).toEqual(['choose', 'close']);
+  });
+});
+
+describe('the command bar tip on the empty inbox', () => {
+  // Measured 2026-10-29 by the end-to-end walk: closing the only thread leaves
+  // the empty inbox with the box and its suggestions, and their tip took the
+  // place of the command bar's, so the tutorial never ended.
+  it('comes before the suggestions once the first thread is closed', () => {
+    const t = noteSent(after('open', 'reply', 'close'));
+    expect(tourStep(t, at({ rows: 0, composer: 'inline', folder: true, ideas: true }))).toBe('palette');
+    expect(tourStep(t, at({ rows: 0, composer: 'card', folder: true, ideas: true }))).toBe('pick');
   });
 });

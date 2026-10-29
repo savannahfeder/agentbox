@@ -29,6 +29,14 @@ describe('the inbox after the first task is sent', () => {
     expect(follow).toContain('if (tab === followedTab.current) return;');
   });
 
+  it('keeps following while you look inside it, and moves once you are back on the list', () => {
+    // Measured 2026-10-29 by the end-to-end walk: opening the first thread while
+    // its agent worked stopped the following, and its answer was left unshown.
+    const follow = app.slice(app.indexOf('// THE FIRST THREAD, FOLLOWED'), app.indexOf('// END OF THE FOLLOWING'));
+    expect(follow).toContain("if (focused || !(modal === null || modal === 'compose') || !(['inbox', 'progress'] as View[]).includes(view)) return;");
+    expect(app).not.toContain('useEffect(() => { if (focused) setFirstThread(null); }, [focused]);');
+  });
+
   it("is the tutorial's first thread", () => {
     expect(app).toContain('if (firstSend.current && made?.id) { firstSend.current = false; setFirstThread(made.id); }');
   });

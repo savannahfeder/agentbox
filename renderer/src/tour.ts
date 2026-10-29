@@ -79,18 +79,29 @@ export function learnedBy(step: TourStep, before: TourScreen | null, after: Tour
   }
 }
 
+/** What E on a thread teaches: the close, and the tip it closed over when that tip was about the thread. */
+export function closeLessons(step: TourStep): Lesson[] {
+  const own = lessonOf(step);
+  return own === 'reply' || own === 'choose' || own === 'busy' ? [own, 'close'] : ['close'];
+}
+
 /** E on an open thread closes it, which is the close lesson whatever tip is up. */
 export function closesThread(e: { key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean }, thread: boolean): boolean {
   return thread && !e.metaKey && !e.ctrlKey && !e.altKey && /^e$/i.test(e.key);
 }
 
-/** The first-thread suggestions, until the first send or Skip. */
-export const showIdeas = (t: Tour | null): boolean => !!t && !t.sent && !t.skipped;
+/** The suggestions, in every New thread box until the tutorial is over or skipped. */
+export const showIdeas = (t: Tour | null): boolean => !!t && !t.skipped && !(t.done.includes('close') && t.done.includes('palette'));
+/** Before the first send: the box asks for a folder, and the empty inbox says to give a first task. */
+export const firstTask = (t: Tour | null): boolean => !!t && !t.sent && !t.skipped;
 
 export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
   if (!t || t.skipped || s.covered) return null;
   const todo = (l: Lesson) => !t.done.includes(l);
-  if (s.composer !== 'none' && !t.sent && todo('compose')) {
+  // The command bar is the last tip, so it goes before the suggestions on the empty inbox.
+  if (!todo('close') && todo('palette') && (t.sent || !todo('start')) && s.composer === 'inline' && !s.thread) return 'palette';
+  const firstBox = !t.sent && todo('compose');
+  if (s.composer !== 'none' && (firstBox || s.ideas)) {
     if (!s.folder) return 'folder';
     if (s.menu) return null;
     if (s.text) return 'send';

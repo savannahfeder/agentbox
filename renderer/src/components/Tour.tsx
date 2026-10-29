@@ -7,7 +7,7 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { closesThread, finishLesson, keyLearns, learnedBy, LESSONS, lessonOf, skipTour, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { closeLessons, closesThread, finishLesson, keyLearns, learnedBy, LESSONS, lessonOf, skipTour, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -238,12 +238,14 @@ export function Tour({ tour, view, thread, covered, onChange }: {
     const down = (e: PointerEvent) => {
       if (!onTarget(e.target)) return;
       if (IN_THE_BOX.includes(step) || step === 'busy' || step === 'palette') return;
-      onChange(finishLesson(tour, lessonOf(step)));
+      setTimeout(() => onChange(finishLesson(tour, lessonOf(step))), 0);
     };
     const key = (e: KeyboardEvent) => {
+      // After the press has reached the app: saving now redraws it first, and the press is lost.
+      const later = (t: TourState) => setTimeout(() => onChange(t), 0);
       const typing = (e.target as Element | null)?.closest?.('input, textarea, [contenteditable="true"]');
-      if (!typing && closesThread(e, thread)) { onChange(finishLesson(finishLesson(tour, lessonOf(step)), 'close')); return; }
-      if (!typing && keyLearns(step, e)) { onChange(finishLesson(tour, lessonOf(step))); return; }
+      if (!typing && closesThread(e, thread)) { later(closeLessons(step).reduce(finishLesson, tour)); return; }
+      if (!typing && keyLearns(step, e)) { later(finishLesson(tour, lessonOf(step))); return; }
       if (e.key !== 'Escape' || !ON_THE_LIST.includes(step)) return;
       e.preventDefault();
       e.stopPropagation();
