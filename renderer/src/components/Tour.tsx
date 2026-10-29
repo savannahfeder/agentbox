@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
+import { FIRST_RUN_STEP } from '../first-run';
 import { finishLesson, keyLearns, LESSONS, lessonOf, skipTour, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
@@ -138,6 +139,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
   const settling = useRef<{ step: TourStep | null; since: number }>({ step: null, since: 0 });
   const quietAt = useRef<string | null>(null);
   const place = useRef('');
+  const countedSteps = useRef(new Set<number>());
   const live = !!tour && !tour.skipped && LESSONS.some((l) => !tour.done.includes(l));
 
   // WHAT IS ON SCREEN, read a few times a second while there is anything left to say.
@@ -154,6 +156,12 @@ export function Tour({ tour, view, thread, covered, onChange }: {
       const next = wanted && Date.now() - settling.current.since < SETTLE_MS ? shown.current : wanted;
       const was = shown.current;
       if (was !== next) {
+        // The first run's folder and first task are counted where they now happen.
+        const counted = next === 'folder' ? FIRST_RUN_STEP.where : next === 'pick' || next === 'send' ? FIRST_RUN_STEP.task : null;
+        if (counted && !tour.sent && !countedSteps.current.has(counted)) {
+          countedSteps.current.add(counted);
+          try { window.zero?.track?.('first_run_step', counted); } catch {}
+        }
         const seenFor = Date.now() - shownAt.current;
         shown.current = next;
         shownAt.current = Date.now();

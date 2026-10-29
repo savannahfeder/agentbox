@@ -101,13 +101,12 @@ function runHook(dir, stdin, env = {}, args = []) {
   fs.copyFileSync(HOOK, hook);
   fs.chmodSync(hook, 0o755);
   // The hook reads the red files out of the json report with this helper, and
-  // asks the other two what the push can afford to wait for, so the throwaway
-  // repo needs all three.
-  fs.mkdirSync(path.join(dir, 'scripts/lib'), { recursive: true });
+  // asks scripts/lib what the push can afford to wait for. The whole folder
+  // rather than a list of names: a third lib file was added and the list was
+  // not, and the hook answered as though nothing had changed.
+  fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
   fs.copyFileSync(path.join(root, 'scripts/red-test-files.mjs'), path.join(dir, 'scripts/red-test-files.mjs'));
-  for (const lib of ['tests-the-push-runs.mjs', 'tests-that-read.mjs']) {
-    fs.copyFileSync(path.join(root, 'scripts/lib', lib), path.join(dir, 'scripts/lib', lib));
-  }
+  fs.cpSync(path.join(root, 'scripts/lib'), path.join(dir, 'scripts/lib'), { recursive: true });
   const r = spawnSync(hook, args, { cwd: dir, input: stdin, encoding: 'utf8', env: { ...process.env, AGENTBOX_PUSH_FULL_SUITE: '', ...env } });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }

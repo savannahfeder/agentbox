@@ -42,8 +42,11 @@ it. Three are habits on every change:
 - `blast-radius` when a change touches `main/`, `shared/`, the store or how
   workers start.
 
-`correct` (turn a repeated mistake into a check that fails) and `interrogate`
-(Claude and Codex both review a diff) run when someone asks.
+`correct` (turn a repeated mistake into a check that fails), `interrogate`
+(Claude and Codex both review a diff) and `handoff` (the best Codex model tests
+your change and you fix only what is likely and bad) run when someone asks.
+
+Do not design for rare or future cases nobody asked about.
 
 ## NOTHING RETRIES FOR EVER, NOTHING WAITS FOR EVER, NOTHING FAILS IN SILENCE (2026-10-19)
 
@@ -84,6 +87,13 @@ files naming the change, it runs the ones most about it and GitHub runs the
 whole suite after the push (`scripts/lib/tests-the-push-runs.mjs`). So run
 `npm run test:changed` yourself before you say a branch is ready; the ship is
 not where you find out.
+
+A RED MAIN FIXES ITSELF (2026-10-29). When GitHub's whole-suite run on main
+goes red, the app files a thread that starts on its own, fixes the break or
+reverts the commit, and ships without review (`main/main-went-red.mjs`). After
+two fixes that leave main red, the next one waits in Needs you. While main is
+red, a push is refused only for tests it turned red itself: the ones already
+red on main are left out (`AGENTBOX_RED_ON_MAIN` in the pre-push hook).
 
 Local `main` only ever points at something that is on the public `main`. Moving
 it onto a branch is refused (`scripts/hooks/reference-transaction`), because a

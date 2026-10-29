@@ -56,6 +56,11 @@ const emptyFixtures = params.get('fixtures') === 'empty';
 // "Three agents working." without this.
 // The number is hers to pass; nothing else about the fixture changes.
 const workingFixtures = Math.max(0, Math.min(99, Number(params.get('working') ?? 0) || 0));
+// ?waiting=2 puts two threads in Needs you with nothing running, which is
+// where a first task sits once its agent has finished and asked a question.
+// Without it the In progress tab's empty line, all of F-142, cannot be
+// photographed: the empty fixture has no inbox and the full one is never idle.
+const waitingFixtures = Math.max(0, Math.min(99, Number(params.get('waiting') ?? 0) || 0));
 // ?fixtures=crowded reproduces a real crowded picker: twenty two projects,
 // duplicates and scratch included. That is the only shape where the composer's
 // chips WRAP, and ranking-by-dragging was written against a single row, so it
@@ -351,6 +356,10 @@ export const api = {
   async snapshot(): Promise<Snapshot> {
     if (emptyFixtures) {
       const empty = { ...structuredClone(fixtureSnapshot), items: [], approvals: [], supervisor: { paused: false, running: [], capacity: 3 } };
+      // ?noProjects IS A STORE NOBODY HAS USED, which is the only world the
+      // first run draws in: it opens on a count of projects, and the empty
+      // fixture still carries Kestrel and the rest.
+      if (params.has('noProjects')) empty.products = [];
       // AND THE AGENTS THE BAR COUNTS. Real running entries rather than a number
       // poked in, so the bar counts the same array the app counts everywhere
       // else. The inbox stays empty, which is what keeps the idle page up.
@@ -359,6 +368,16 @@ export const api = {
           itemId: `w-working-${i + 1}`, product: 'kestrel', startedAt: Date.now() - (i + 1) * 60_000,
           tail: ['tool: Read'],
         })) as typeof empty.supervisor.running;
+      }
+      if (waitingFixtures) {
+        const now = Date.now();
+        empty.items = Array.from({ length: waitingFixtures }, (_x, i) => ({
+          id: `w-waiting-${i + 1}`, product: 'kestrel', productName: 'Kestrel',
+          status: 'open', kind: 'task', title: 'README usage section with example call',
+          labels: [], priority: 1, epoch: 1, claim: null,
+          result: 'Which name and email should the commit use?',
+          createdAt: now - (i + 1) * 60_000, updatedAt: now - (i + 1) * 60_000,
+        })) as typeof empty.items;
       }
       // AND THE SECOND CODING AGENT, LAST, OVER WHICHEVER WORLD IS UP. It is
       // applied at all four exits rather than once around them because each
@@ -477,7 +496,7 @@ export const api = {
         base.cloud = { setUp: false, offered: true, mode: 'full', whenOn: 'full', running: 0, month: { runs: 0, agentHours: 0, estimatedCost: 0, costPerAgentHour: 0 }, accounts: [], signIns: [] } as typeof base.cloud;
       } else if (cloud === 'mac' || cloud === 'full' || cloud === 'all') {
         base.cloud = {
-          setUp: true, mode: cloud, whenOn: cloud === 'all' ? 'all' : 'full', running: 3,
+          setUp: true, mode: cloud, whenOn: cloud === 'all' ? 'all' : 'full', running: 3, projects: base.products.map((p) => p.slug),
           month: { runs: 6, agentHours: 2.4, estimatedCost: 0.31, costPerAgentHour: 0.13 },
           accounts: [
             { engine: 'claude', key: 'a1', name: 'me@example.com', ready: true, state: 'ready' },
@@ -503,6 +522,17 @@ export const api = {
           delete (first as { where?: string }).where;
           const kept = base.items.find((i) => i.id === first.itemId);
           if (kept) kept.onMac = true;
+        }
+        // &needs draws the top thread in Needs you handed back for a key only this Mac has.
+        if (params.has('needs')) {
+          const first = base.items.find((i) => /^The first row a new project/.test(i.title));
+          if (first) Object.assign(first, { onMac: true, needsMac: 'your Stripe key' });
+        }
+        // &moving draws the other running threads on this Mac, all of which the cloud could take now.
+        if (params.has('moving') && base.cloud) {
+          const here = base.supervisor.running.filter((r) => (r as { where?: string }).where !== 'cloud').map((r) => r.itemId);
+          base.cloud.movable = here;
+          if (cloud === 'all') base.supervisor.whyNotCloud = Object.fromEntries(here.map((id) => [id, { at: 'mac' as const, why: 'moving' }]));
         }
       }
       // &cloud=managed draws Agentbox Cloud signed in through its server, and
@@ -866,6 +896,17 @@ export const api = {
   async setThreadOnMac(onMac: Record<string, true | null>): Promise<void> {
     if (useFixtures || !window.zero?.setThreadOnMac) return;
     await window.zero.setThreadOnMac({ onMac });
+  },
+
+  /**
+   * Move runs on this Mac to the cloud as it has room; how many will go. One
+   * thread names its project too, which the phone's command needs.
+   */
+  async moveToCloud(ids: string[], product?: string): Promise<number> {
+    if (useFixtures || !window.zero?.moveToCloud) return 0;
+    const out = await window.zero.moveToCloud({ ids, ...(product && ids.length === 1 ? { product, id: ids[0] } : {}) });
+    // The phone leaves a command for the computer, which says nothing back yet.
+    return out?.moving ?? (out?.ok ? ids.length : 0);
   },
 
   async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem | null> {
@@ -1236,6 +1277,13 @@ export const api = {
     if (useFixtures && engineFixtures === 'nowhere') {
       return { engine, phase: 'idle', error: null, log: '', found: false, signedIn: false };
     }
+    // AND THE SAME MACHINE WITH AN INSTALL RUNNING ON IT. The first probe is
+    // `ready`, which has to answer empty or the gate never opens; every action
+    // after it is the press, and it stays where it is so the screen can be
+    // photographed waiting.
+    if (useFixtures && engineFixtures === 'installing') {
+      return { engine, phase: action === 'ready' ? 'idle' : 'installing', error: null, log: '', found: false, signedIn: false };
+    }
     /*
      * AND THE MACHINE MOST PEOPLE ARRIVE ON (w-e217e577e5): Claude signed in
      * already, nothing else here. Every fixture copy answers `assumeReady` for
@@ -1255,14 +1303,17 @@ export const api = {
     if (!zero?.engineSetup) return assumeReady;
     try {
       const r = await zero.engineSetup({ action, engine });
-      if (!r?.ok) return { ...assumeReady, phase: 'failed', found: false, signedIn: false, error: r?.error ?? 'Setup could not start.' };
+      // A PROBE THAT DID NOT RUN IS NOT A COMPUTER WITH NOTHING ON IT. The
+      // setup card reads this as failed and says so; the inbox bar reads
+      // `certain` and stays down.
+      if (!r?.ok) return { ...assumeReady, phase: 'failed', found: false, signedIn: false, certain: false, error: r?.error ?? 'Setup could not start.' };
       return {
         engine, phase: r.phase ?? 'idle', error: r.error ?? null, log: r.log ?? '',
-        found: !!r.found, signedIn: !!r.signedIn,
+        found: !!r.found, signedIn: !!r.signedIn, certain: r.certain !== false,
         bin: r.bin ?? null, already: !!r.already,
       };
     } catch (e) {
-      return { ...assumeReady, phase: 'failed', found: false, signedIn: false, error: String((e as Error)?.message ?? e) };
+      return { ...assumeReady, phase: 'failed', found: false, signedIn: false, certain: false, error: String((e as Error)?.message ?? e) };
     }
   },
 
@@ -1468,6 +1519,8 @@ export const api = {
         const turnedDown = checkProjectFolder('~');
         return { path: null, refused: turnedDown.ok ? undefined : turnedDown.say };
       }
+      // A browser tab's answer, so the picker the app draws can be shot too.
+      if (params.has('drawnPicker')) return { path: null, browse: true };
       return { path: '/Users/you/Desktop/dev/house' };
     }
     const zero = window.zero as any;

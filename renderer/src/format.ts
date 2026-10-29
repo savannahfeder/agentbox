@@ -234,9 +234,15 @@ export function discardsTheChange(option: string): boolean {
   return DISCARDS.test(bareOption(option));
 }
 
+// AND THE APP'S OWN OFFER WHERE GIT CANNOT NAME AN AUTHOR (F-139,
+// ./ship-offer.ts). The name and email are the whole point of the press, so
+// sending it as it stands says nothing; it opens the box with its own words in
+// it, exactly as "Change something first" does.
+const NAMES_NOBODY = /^commit it and ship, as the name and email below$/i;
+
 export function needsYourWords(option: string): boolean {
   const words = bareOption(option);
-  return SAYS_NOTHING.test(words) || /^(?:something|anything) else$/i.test(words);
+  return SAYS_NOTHING.test(words) || NAMES_NOBODY.test(words) || /^(?:something|anything) else$/i.test(words);
 }
 
 // What Enter means in the schedule box, in one place so the key handler and the

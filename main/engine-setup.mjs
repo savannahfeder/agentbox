@@ -189,12 +189,16 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
     /**
      * WHETHER THIS TOOL CAN RUN AN AGENT RIGHT NOW: found, and signed in by its
      *  own account. The walk asks before it asks anything, so a Mac that is
-     *  already set up never sees the plan question. */
+     *  already set up never sees the plan question.
+     *
+     *  `certain` is whether anything was established at all, the same rule
+     *  `signedIn` above keeps for the app's routing: a check that never
+     *  answered says nothing, rather than no. */
     async readiness(engine) {
       const hit = await find(engine);
-      if (!hit?.found) return { engine, found: false, signedIn: false };
-      try { return { engine, found: true, signedIn: await signedIn({ engine, log: '' }, hit.path) }; }
-      catch (error) { return { engine, found: true, signedIn: false, error: error.message }; }
+      if (!hit?.found) return { engine, found: false, signedIn: false, certain: hit?.certain !== false };
+      try { return { engine, found: true, signedIn: await signedIn({ engine, log: '' }, hit.path), certain: true }; }
+      catch (error) { return { engine, found: true, signedIn: false, certain: false, error: error.message }; }
     },
     /** The same question against a path already found, so asking it at
      *  launch does not search the Mac again. */

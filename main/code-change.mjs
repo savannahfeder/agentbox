@@ -299,6 +299,16 @@ export function standsAcross(repoChanges = []) {
 }
 
 /**
+ * Whether a commit could be made in every folder a run worked in. One folder
+ * that cannot name an author is a no, because the offer is one press and it
+ * has to be true of all of them. Null where not one of them could be read.
+ */
+export function knowsYouAcross(repoChanges = []) {
+  const known = repoChanges.map((r) => r?.knowsYou).filter((v) => typeof v === 'boolean');
+  return known.length ? known.every(Boolean) : null;
+}
+
+/**
  * The two readings of one run, put together.
  *
  * WHERE THEY DISAGREE, THE DISK WINS. The conversation only knows what the
@@ -331,6 +341,7 @@ export function mergeChange(fromTranscript, repoChanges = [], { roots = [] } = {
   return {
     ...fromTranscript,
     ...standsAcross(repoChanges),
+    knowsYou: knowsYouAcross(repoChanges),
     // A run whose conversation held no edits still has a clock: the moment its
     // checkout was photographed, and the moment it was read back.
     startedAt: fromTranscript.startedAt ?? spawnedAt,
@@ -400,8 +411,11 @@ export function writeChangeForRun({ transcript, docsDir, itemId, roots = [], sin
  * the offer goes on answering the question the earlier round left: "Ship it
  * (recommended)" over a thread whose change had just been discarded (F-83).
  *
- * Only the two facts are rewritten. The hunks stay as they were, because what
- * a run did is still worth reading after the work it did has gone.
+ * Only the facts the offer reads are rewritten, the identity among them: a
+ * round that answers "what name and email" leaves a folder git can commit in,
+ * and without this the offer would go on asking for one. The hunks stay as
+ * they were, because what a run did is still worth reading after the work it
+ * did has gone.
  *
  * Returns null either way: nothing was saved for THIS run, which is what the
  * caller reports.
@@ -411,9 +425,12 @@ function restand(file, change) {
   let saved;
   try { saved = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
   if (!saved || !Array.isArray(saved.files)) return null;
-  if (saved.committed === change.committed && saved.uncommitted === change.uncommitted) return null;
+  if (saved.committed === change.committed && saved.uncommitted === change.uncommitted
+    && saved.knowsYou === change.knowsYou) return null;
   try {
-    fs.writeFileSync(file, JSON.stringify({ ...saved, committed: change.committed, uncommitted: change.uncommitted }, null, 1));
+    fs.writeFileSync(file, JSON.stringify({
+      ...saved, committed: change.committed, uncommitted: change.uncommitted, knowsYou: change.knowsYou,
+    }, null, 1));
   } catch { /* the offer stays where it was; nothing else depends on this */ }
   return null;
 }

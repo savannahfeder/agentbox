@@ -130,6 +130,11 @@ const SIGNED_OUT = [
 // transient. Before SIGNED_OUT, whose /oauth/ would bench the account for it.
 const LOGIN_BUSY = [/another claude code process is refreshing/i];
 
+// The server turning requests away for a moment, in Claude Code's words:
+// "Server is temporarily limiting requests (not your usage limit)". Before
+// AT_LIMIT, whose /usage limit/ would bench a plan that has room.
+export const SERVER_BUSY = [/not your usage limit/i, /temporarily limiting requests/i];
+
 const AT_LIMIT = [
   /usage limit/i,
   /rate limit/i,
@@ -290,6 +295,7 @@ export function troubleCause(raw) {
   if (LEVEL_NOT_OFFERED.some((re) => re.test(text))) return 'level-not-offered';
   if (OPEN_ELSEWHERE.some((re) => re.test(text))) return 'open-elsewhere';
   if (LOGIN_BUSY.some((re) => re.test(text))) return 'interrupted';
+  if (SERVER_BUSY.some((re) => re.test(text))) return 'interrupted';
   if (SIGNED_OUT.some((re) => re.test(text))) return 'signed-out';
   if (AT_LIMIT.some((re) => re.test(text))) return 'at-limit';
   // BEFORE WORKSPACE, whose /untrusted/ would read a certificate as a folder,

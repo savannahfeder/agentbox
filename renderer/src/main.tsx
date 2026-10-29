@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import {AgentUpdates} from './components/AgentUpdates';
+import { ScreenCrash } from './components/ScreenCrash';
 import '@fontsource-variable/source-sans-3';
 import './styles.css';
 import './workspace-navigation.css';
@@ -14,6 +15,7 @@ import { applySkin, applyTune, normalizeSavedLook, resolveSkin, resolveTune, SKI
 import { applyTaskShape, resolveTaskShape, TASK_SHAPE_KEY } from './task-shape';
 import { installPictureWatch } from './phone-files';
 import { theDoorNeedsItsKey } from './browser-bridge';
+import { comeBackFromABlankScreen, writeHeldBeforeReload } from './after-a-crash';
 
 // A thrown React error takes the screen down without taking the process down,
 // so nothing in the main process ever hears about it. These two lines are the
@@ -26,8 +28,25 @@ import { theDoorNeedsItsKey } from './browser-bridge';
 const sendCrash = (name: string, message: string, stack: string) => {
   try { Promise.resolve(window.zero?.crash?.({ name, message, stack })).catch(() => {}); } catch {}
 };
+// AND IF THAT THROW TOOK THE WHOLE SCREEN WITH IT, bring it back
+// (./after-a-crash says when the boundary does not). Read on the next tick,
+// because React empties the root as it unwinds, not before this listener runs.
+const comeBack = () => setTimeout(() => comeBackFromABlankScreen({
+  root: document.getElementById('root'),
+  now: Date.now(),
+  reload: () => { void writeHeldBeforeReload().then(() => window.location.reload()); },
+  say: (words) => {
+    if (document.getElementById('screen-died')) return;
+    const box = document.createElement('div');
+    box.id = 'screen-died';
+    box.setAttribute('role', 'alert');
+    box.textContent = words;
+    document.body.appendChild(box);
+  },
+}), 0);
 window.addEventListener('error', (e) => {
   sendCrash(e.error?.name ?? 'Error', e.error?.message ?? String(e.message ?? ''), e.error?.stack ?? '');
+  comeBack();
 });
 window.addEventListener('unhandledrejection', (e) => {
   const r: any = (e as PromiseRejectionEvent).reason;
@@ -65,7 +84,7 @@ const boot = () => {
   installPictureWatch();
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <AgentUpdates><App /></AgentUpdates>
+      <ScreenCrash><AgentUpdates><App /></AgentUpdates></ScreenCrash>
     </React.StrictMode>
   );
 };

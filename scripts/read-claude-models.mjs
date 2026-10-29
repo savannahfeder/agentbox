@@ -217,7 +217,7 @@ export function run({ bin = null, out = OUT, local = LOCAL, snapshot = false, lo
     // that quietly ships a stale one, so this says which it is shipping.
     if (!had) throw new Error(`No Claude Code on this machine and no ${shown(out)} to fall back on.`);
     const was = had.match(/READ_FROM = "([^"]+)"/)?.[1] ?? 'an unknown version';
-    log(`read-claude-models: no Claude Code here, keeping the table read from ${was}`);
+    log(`[claude-models] building without Claude Code installed, using the table read from ${was}`);
     return;
   }
   // The refusals in `build` run on every build, as they always did: an alias the

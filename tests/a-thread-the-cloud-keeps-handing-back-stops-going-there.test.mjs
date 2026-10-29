@@ -50,12 +50,14 @@ describe('the second hand-back', () => {
     expect(mayGoToTheCloud(sup)).toBe(false);
   });
 
+  // Since 2026-10-29 the row also carries what the cloud needed, for the
+  // thread's cloud button (the-cloud-button-on-a-thread-says-...).
   it('shows on the row as kept here, which is one press to undo', () => {
     const sup = make(tmp());
     roundTrip(sup);
     expect(sup.withPlaces([{ id: 'w-a' }])).toEqual([{ id: 'w-a' }]);
     roundTrip(sup);
-    expect(sup.withPlaces([{ id: 'w-a' }])).toEqual([{ id: 'w-a', onMac: true }]);
+    expect(sup.withPlaces([{ id: 'w-a' }])).toEqual([{ id: 'w-a', onMac: true, needsMac: 'this project has no repository here' }]);
   });
 
   it('lasts a restart', () => {

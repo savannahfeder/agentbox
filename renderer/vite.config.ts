@@ -16,6 +16,13 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'dist',
+    // Vite's 500 kB warning is about what a browser downloads over the
+    // internet. Nothing here is downloaded: the app window loads these files
+    // off the disk beside it, and a browser tab loads them from 127.0.0.1. So
+    // the warning only ever told a person following the README that their
+    // build had gone wrong (F-144). The limit is set above what the bundle is
+    // so a chunk that really does run away still says so.
+    chunkSizeWarningLimit: 4000,
     rollupOptions: { input: { main: page('index.html'), cornerTag: page('corner-tag.html') } },
   },
 });

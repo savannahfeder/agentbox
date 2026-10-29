@@ -61,7 +61,9 @@ describe('finding Codex', () => {
   it('finds the shell installer path first, before anything a package manager left', () => {
     const installed = `${HOME}/.local/bin/codex`;
     const found = findCodexBin({
-      home: HOME, exists: only(installed, '/opt/homebrew/bin/codex'), shellLookup: noShell,
+      // `env: {}` because this is about the order of the list. /opt/homebrew/bin
+      // is on a Mac's own PATH, which the finder reads before the list.
+      home: HOME, env: {}, exists: only(installed, '/opt/homebrew/bin/codex'), shellLookup: noShell,
     });
     expect(found).toMatchObject({ path: installed, found: true, from: 'disk', certain: true });
   });
@@ -73,7 +75,9 @@ describe('finding Codex', () => {
     ['pnpm on macOS', `${HOME}/Library/pnpm/codex`],
     ["the standalone store, when CODEX_INSTALL_DIR put the link somewhere we do not know", `${HOME}/.codex/packages/standalone/current/bin/codex`],
   ])('finds it after %s', (_how, where) => {
-    const found = findCodexBin({ home: HOME, exists: only(where), shellLookup: noShell });
+    // `env: {}` because this is about the list: /usr/local/bin is also on the
+    // PATH of whatever machine runs the suite, which is a source of its own.
+    const found = findCodexBin({ home: HOME, env: {}, exists: only(where), shellLookup: noShell });
     expect(found).toMatchObject({ path: where, found: true, from: 'disk' });
   });
 
@@ -381,7 +385,7 @@ describe('Claude Code is still asked for exactly as it was', () => {
   it('finds Claude Code in the same places, and still prefers its own installer', () => {
     const installer = `${HOME}/.local/bin/claude`;
     expect(findClaudeBin({
-      home: HOME, exists: only(installer, '/opt/homebrew/bin/claude'), shellLookup: noShell,
+      home: HOME, env: {}, exists: only(installer, '/opt/homebrew/bin/claude'), shellLookup: noShell,
     })).toMatchObject({ path: installer, found: true, from: 'disk' });
     expect(claudeCandidatePaths(HOME)[0]).toBe(installer);
   });

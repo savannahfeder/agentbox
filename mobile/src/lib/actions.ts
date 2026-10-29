@@ -28,6 +28,7 @@ export type Press =
   | { kind: 'new'; product: string; text: string; saved?: Saved[]; choices?: Choices; to?: string; when?: string | null }
   | { kind: 'stop' }
   | { kind: 'run-now' }
+  | { kind: 'move-to-cloud' }
   | { kind: 'send-back' }
   | { kind: 'send-now' }
   | { kind: 'pin'; pinned: boolean }
@@ -150,6 +151,8 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       return { steps: [{ door: 'stopSession', payload: on }], toast: 'Stop sent. Your computer stops the agent when it gets it.' };
     case 'run-now':
       return { steps: [{ door: 'runNow', payload: on }], toast: 'Up next. It starts as soon as an agent is free.' };
+    case 'move-to-cloud':
+      return { steps: [{ door: 'moveToCloud', payload: { ...on, ids: [item.id] } }], toast: 'Moving to the cloud. It keeps working until the cloud has room.' };
     case 'send-back':
       return { steps: [{ door: 'reopen', payload: on }], toast: `Back in the queue → ${to}` };
     case 'send-now':

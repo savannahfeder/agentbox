@@ -75,6 +75,6 @@ describe('the team tools an agent is offered', () => {
     const { writeTeammate, teamDir } = await import('../main/store/teammates-files.mjs');
     const { legacyRoot } = await import('../main/store/project.mjs');
     writeTeammate(teamDir(legacyRoot(), account), 't-fe11c00001', { name: 'Felix', status: 'active' }, Date.now());
-    expect(names().filter((n) => n.startsWith('team_')).sort()).toEqual(['team_pass', 'team_playbook', 'team_post', 'team_remember', 'team_roster', 'team_setup']);
+    expect(names().filter((n) => n.startsWith('team_')).sort()).toEqual(['team_method', 'team_pass', 'team_playbook', 'team_post', 'team_remember', 'team_roster', 'team_setup']);
   });
 });

@@ -986,9 +986,14 @@ export const fixtureSettings = {
 //   ?engines=codex    two agents, workspace moved to Codex. The screen the
 //                     shipped bug was on.
 
-export type FixtureEngineWorld = 'missing' | 'claude' | 'codex' | 'nowhere' | 'chosen' | 'signedout' | 'ready';
+//   ?engines=installing  nothing on the machine and the install you pressed
+//                     still running. No url could draw that, which is how the
+//                     gate shipped asking you to press for the whole of one
+//                     (F-145).
 
-const ENGINE_WORLDS: FixtureEngineWorld[] = ['missing', 'claude', 'codex', 'nowhere', 'chosen', 'signedout', 'ready'];
+export type FixtureEngineWorld = 'missing' | 'claude' | 'codex' | 'nowhere' | 'chosen' | 'signedout' | 'ready' | 'installing';
+
+const ENGINE_WORLDS: FixtureEngineWorld[] = ['missing', 'claude', 'codex', 'nowhere', 'chosen', 'signedout', 'ready', 'installing'];
 
 /**
  * The world one url asks for, or null for the Mac she has. A word nothing
@@ -1198,7 +1203,9 @@ export function fixtureSecondEngine(snap: Snapshot, world: FixtureEngineWorld | 
   // already up (w-ce8c1a9275).
   // `ready` belongs with them: it says what is on the machine, not which agent
   // any row runs on.
-  if (!world || world === 'missing' || world === 'nowhere' || world === 'chosen' || world === 'signedout' || world === 'ready') return snap;
+  // `installing` belongs with them too: it is the gate waiting on a machine
+  // with nothing on it, and there are no rows behind it yet.
+  if (!world || world === 'missing' || world === 'nowhere' || world === 'chosen' || world === 'signedout' || world === 'ready' || world === 'installing') return snap;
   const byItem = OFF_THE_WORKSPACE[world];
   const engineOf = (id: string) => byItem[id] ?? world;
   return {

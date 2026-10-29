@@ -18,6 +18,43 @@ export function teamDir(storeRoot, accountId) {
 export const teammatesFile = (dir) => path.join(dir, 'teammates.jsonl');
 export const chatFile = (dir) => path.join(dir, 'chat.jsonl');
 export const playbooksFile = (dir) => path.join(dir, 'playbooks.jsonl');
+// A teammate's method, which its own runs edit, and the threads it learns
+// from, which the app writes out whole.
+export const methodFile = (dir, id) => path.join(dir, 'methods', `${id}.md`);
+export const sourcesDir = (dir, id) => path.join(dir, 'sources', id);
+
+const VERSIONS_KEPT = 30;
+
+/** Writes the method whole, keeping the text it replaces so a bad change can be undone. */
+export function writeMethod(dir, id, text) {
+  const file = methodFile(dir, id);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  let before = '';
+  try { before = fs.readFileSync(file, 'utf8'); } catch { /* the first one */ }
+  if (before.trim() && before !== text) {
+    const versions = path.join(path.dirname(file), `${id}.versions`);
+    fs.mkdirSync(versions, { recursive: true });
+    fs.writeFileSync(path.join(versions, `${Date.now()}.md`), before);
+    const old = fs.readdirSync(versions).sort();
+    for (const f of old.slice(0, Math.max(0, old.length - VERSIONS_KEPT))) fs.rmSync(path.join(versions, f), { force: true });
+  }
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, text);
+  fs.renameSync(tmp, file);
+  return file;
+}
+
+/** The method's text and when it last changed, or null when it has none. */
+export function readMethod(dir, id) {
+  try {
+    const file = methodFile(dir, id);
+    const st = fs.statSync(file);
+    const text = fs.readFileSync(file, 'utf8');
+    return text.trim() ? { file, text, changedAt: st.mtimeMs } : null;
+  } catch {
+    return null;
+  }
+}
 
 // The screen asks for these on every refresh; a file only read again when it
 // has changed keeps a long chat from costing a parse each time.

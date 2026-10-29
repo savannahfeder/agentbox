@@ -8,11 +8,11 @@
 // w-decf3c5062): the working line ends "on this Mac", and hovering it gives the
 // same reason the list gives. A cloud run's line ends "in the cloud".
 import { describe, it, expect } from 'vitest';
-import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Live } from '../renderer/src/components/Live';
 import { livePlace } from '../renderer/src/live-line';
+import { factsFor } from '../renderer/src/status-word';
 
 globalThis.React = React;
 
@@ -74,11 +74,16 @@ describe('the place, in words', () => {
 });
 
 // The list had the reason all along; the open thread was never handed it.
+//
+// It was pinned here as the literal line App.tsx wrote out by hand. That hand
+// written object was itself the next bug (F-135, w-93ab9b1fcb): it had no
+// `asking` in it either. Both panes now read `factsFor`, so the reason reaching
+// the open thread is a fact about the one builder rather than about a line of
+// JSX, and that is what this asks.
 describe('the open thread', () => {
   it('is handed the same reason the list is', () => {
-    const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-    const start = app.indexOf('live={{');
-    const facts = app.slice(start, app.indexOf('}}', start));
-    expect(facts).toMatch(/whyNotCloud: snap\.supervisor\.whyNotCloud\?\.\[focused\.id\]/);
+    const fleet = { whyNotCloud: { 'w-sleep': NO_ACCOUNT } };
+    expect(factsFor(fleet, 'w-sleep').whyNotCloud).toEqual(NO_ACCOUNT);
+    expect(factsFor(fleet, 'w-other').whyNotCloud).toBe(null);
   });
 });

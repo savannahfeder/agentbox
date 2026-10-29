@@ -235,6 +235,7 @@ export function createTeamService({
       toCarry: phone.toCarry ?? null,
       handedOver: phone.handedOver ?? (() => {}),
       takenBack: phone.takenBack ?? (() => {}),
+      carriedFinished: phone.carriedFinished ?? (() => {}),
       // One file per person: what this Mac sent up for one account is not
       // what the next one to sign in here has.
       stateFile: phone.stateFile.replace(/(\.json)?$/, `.${owner}.json`),

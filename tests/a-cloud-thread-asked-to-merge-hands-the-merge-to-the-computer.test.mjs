@@ -21,8 +21,18 @@ describe('what a cloud run is told about branches', () => {
     // The hand-back paragraph stays last, where the plain note takes it from.
     const handback = CLOUD_NOTE.split('\n\n').at(-1);
     expect(handback).toMatch(/^For a missing installed skill or task file, first use the store tool request_cloud_resource/);
-    expect(handback).toContain('Do not transfer the whole thread solely for a missing skill or task file.');
+    expect(handback).toContain('Do not transfer the whole thread solely for a missing skill or file the request does not name.');
     expect(handback).toContain(`End your turn with one line and nothing else: ${HAND_BACK}`);
+  });
+
+  // w-6771163ced: a launch-video run could not fetch the intro film its request
+  // named, was told to "finish independent work", and built a whole film
+  // around a guessed style and its own music.
+  it('hands back an input the request names that cannot be fetched, rather than building around a guess', () => {
+    const handback = CLOUD_NOTE.split('\n\n').at(-1);
+    expect(handback).toMatch(/a file, folder or skill the request names that request_cloud_resource cannot deliver, stop at once/);
+    expect(handback).toMatch(/any path under the account's documents/);
+    expect(PLAIN_CLOUD_NOTE.split('\n\n').at(-1)).toBe(handback);
   });
 
   // A cloud run asked about the project's branches listed two; the computer

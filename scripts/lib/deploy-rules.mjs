@@ -25,6 +25,21 @@ export function nextVersion(mainVersion, taken = []) {
 }
 
 /**
+ * What a release page says. The version alone used to be all of it, so nothing
+ * anywhere wrote down which commit became which release, and a build made from
+ * that commit reported the older number main still carried (F-138).
+ */
+export function releaseNotes({ version, commit = '', sourceVersion = '' } = {}) {
+  const head = `Agentbox ${version}`;
+  if (!commit) return head;
+  const lines = [head, '', `Built from https://github.com/savannahfeder/agentbox/commit/${commit}`];
+  if (sourceVersion && sourceVersion !== version) {
+    lines.push('', `That commit's package.json still says ${sourceVersion}. The version is picked when the release runs rather than committed, so a copy built from source calls itself ${sourceVersion}. This release is ${version}.`);
+  }
+  return lines.join('\n');
+}
+
+/**
  * Which file names the AWS account the cloud server runs in. cloud.json first,
  * then cloud.own-aws.json, which is where those details went when this Mac's
  * cloud.json became the managed cloud's address (2026-10-25). None means stop:

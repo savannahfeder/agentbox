@@ -31,6 +31,7 @@ type Push = (payload: unknown) => void;
 // tab is already holding. Everything a person READS uses `Name`.
 const TOKEN_HEADER = 'x-agentbox-token';
 const TOKEN_KEY = 'agentbox-token';
+const KEEPALIVE_MAX = 16_000;
 
 /**
  * Is this a tab talking to a local Agentbox, or something else?
@@ -162,10 +163,15 @@ export function installBrowserBridge(): boolean {
     .catch(() => { /* pictures stay blank; everything else still works */ });
 
   const ask = async (channel: string, payload?: unknown) => {
+    const body = JSON.stringify(payload ?? null);
     const res = await fetch(`/api/${encodeURIComponent(channel)}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', [TOKEN_HEADER]: token, 'x-agentbox-device': device },
-      body: JSON.stringify(payload ?? null),
+      body,
+      // A reply written as the page reloads still reaches the computer. Only
+      // replies, and only small ones: the browser refuses every keepalive call
+      // once those in flight pass 64 KB between them.
+      keepalive: channel === REQUEST_CHANNELS.answer && body.length < KEEPALIVE_MAX,
     });
     if (res.status === 403 && phone) showLockedOut();
     if (!res.ok) {

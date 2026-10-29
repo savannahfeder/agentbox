@@ -150,7 +150,7 @@ describe('a thread lands in the project that owns its folder', () => {
       project: null,
       threads: [T('x', 'first', a, NOW), T('y', 'second', b, NOW - 1000)],
     });
-    expect(dests.map((d) => d.name)).toEqual(['Api', 'Api 2']);
+    expect(dests.map((d) => d.name)).toEqual(['API', 'API 2']);
   });
 });
 

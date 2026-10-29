@@ -38,7 +38,8 @@ import { dataFolderName, isNewUserBuild } from '../shared/side-build.mjs';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mjs';
 import { newUserWindow } from './new-user-window.mjs';
 import { openFreshUser } from './fresh-user.mjs';
-import { installCrashReports, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mjs';
+import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mjs';
+import { keepThePageAlive } from './when-the-page-stops.mjs';
 import { createAnalytics, createDailyCount } from './analytics.mjs';
 import { createUpdater } from './updater.mjs';
 import { quitStep, flushBeforeQuit, quitThenExit } from './quit-sequence.mjs';
@@ -285,6 +286,8 @@ let lastReloadAt = 0;
 // The wake sweep's one line, and whether there is a page to say it to yet.
 let pendingRecovery = null;
 let pageReady = false;
+// The line the page shows after this process reloaded it from a crash or a freeze.
+let pendingRevived = null;
 
 function reloadRenderer() {
   // The chord can now arrive twice, from the menu accelerator and from
@@ -492,7 +495,7 @@ async function createWindow() {
       // A reply she sends with the lid shut carries on in the cloud (shared/cloud-kit.mjs).
       carrying: (c) => supervisor.phoneCarrying(c),
       kitsFor: (slug) => supervisor.leavesKitsFor(slug),
-      adopt: ({ project, item, runId, replies }) => supervisor.adoptCloudRun({ product: project, itemId: item, runId, replies }),
+      adopt: ({ project, item, ...rest }) => supervisor.adoptCloudRun({ product: project, itemId: item, ...rest }),
       cloudReplies: ({ project, item, replies }) => supervisor.cloudRunReplies({ product: project, itemId: item, replies }),
       runHome: ({ project, item, runId }) => supervisor.cloudRunHome({ product: project, itemId: item, runId }),
       // And a new thread she starts with the lid shut.
@@ -503,6 +506,7 @@ async function createWindow() {
       toCarry: () => supervisor.carryWhileAsleep(),
       handedOver: (c) => supervisor.handedOver(c),
       takenBack: (c) => supervisor.takenBack(c),
+      carriedFinished: (commands) => supervisor.carriedFinished(commands),
     },
     // ROOMS, while switched on in Alpha features (docs/team/ROOMS-PLAN.md).
     rooms: roomsSetup({ config, store, supervisor, userDir }),
@@ -752,6 +756,14 @@ async function createWindow() {
   // renderer/index.html carries the app's name, so a throwaway copy went back
   // to saying "Agentbox" as soon as it drew anything.
   window.on('page-title-updated', (e) => e.preventDefault());
+
+  keepThePageAlive({
+    window,
+    dialog,
+    name: Name,
+    report: reportCrash,
+    onRevived: (line) => { reloadRequested = true; pendingRevived = line; },
+  });
 
   // THE MENU IS A BAR INSIDE THE WINDOW on Linux and Windows. On macOS it is
   // the system menu, so it stays. The menu itself stays everywhere: the Ctrl
@@ -1072,10 +1084,11 @@ async function createWindow() {
   ipcMain.handle('zero:boot-info', () => {
     const info = {
       reloaded: reloadRequested, builtAt: builtAt(), recovered: pendingRecovery,
-      screenDetail: currentScreenDetail(),
+      revived: pendingRevived, screenDetail: currentScreenDetail(),
     };
     reloadRequested = false;
     pendingRecovery = null;
+    pendingRevived = null;
     return info;
   });
   // The window's own uncaught errors. The renderer cannot write a report

@@ -144,7 +144,7 @@ import { createCodexWorker, mcpServerNames, resumeThreadParams, workerThreadPara
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mjs';
 import { cloudCodexMode } from './cloud-permission.mjs';
 import { createCodexApprovals } from './codex-approvals.mjs';
-import { approvalPublicKey } from './approvals.mjs';
+import { approvalPublicKey, listPending } from './approvals.mjs';
 import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexModels } from './codex-models.mjs';
 import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.mjs';
 import { accountName } from '../shared/account-names.mjs';
@@ -276,6 +276,11 @@ const HELD_RETRY_MS = [30 * 60_000, 2 * 3_600_000, 8 * 3_600_000];
 const CLOUD_STARTING_AT_ONCE = 2;
 // How long a cloud run may take to start before it stops holding others back.
 const CLOUD_START_PATIENCE_MS = 10 * 60_000;
+// A run paused to move to the cloud whose resume has not gone there by then
+// is placed like any other. And one moved is not moved again this soon, so a
+// cloud start that fails sends it back here once rather than back and forth.
+const TO_CLOUD_PATIENCE_MS = 10 * 60_000;
+const MOVE_TO_CLOUD_AGAIN_MS = 30 * 60_000;
 // Cloud runs failing in a row before the cloud rests, and for how long
 // (`_noteCloudOutcome`).
 const CLOUD_FAULTS_TO_REST = 3;
@@ -632,6 +637,8 @@ export class Supervisor {
       }
       // How many times the cloud has handed each thread back (`_keptHereByUs`).
       this.cloudHandBacks = Object.fromEntries(Object.entries(state.cloudHandBacks ?? {}).filter(([, v]) => Number.isFinite(v)));
+      // What each handed-back thread needed, for its cloud button's panel.
+      this._movedWhy = Object.fromEntries(Object.entries(state.movedWhy ?? {}).filter(([, v]) => v && typeof v.why === 'string'));
     } catch {
       this._handledAnswers = new Set();
       this._resumedWaits = new Set();
@@ -3380,6 +3387,20 @@ export class Supervisor {
     this.wake();
   }
 
+  /** The phone pass has finished joining the cloud's runs of these commands:
+   *  a hand-over still held for one of them is over, as `adoptCloudRun` or
+   *  `takenBack` would have said had the word reached them. */
+  carriedFinished(commands) {
+    const done = new Set(commands ?? []);
+    let changed = false;
+    for (const [item, mark] of Object.entries(this._carried ?? {})) {
+      if (mark?.command && done.has(mark.command)) { delete this._carried[item]; changed = true; }
+    }
+    if (!changed) return;
+    this._saveState();
+    this.wake();
+  }
+
   reapHungSessions(items, now = Date.now()) {
     if (!this.sessions.size) return [];
     const byId = new Map((items ?? []).map((i) => [i.id, i]));
@@ -4037,7 +4058,7 @@ export class Supervisor {
       // Their choice either way replaces the app's count of hand-backs too, so
       // "Run on the cloud" on a thread the app kept here sends it back now and
       // the cloud gets two fresh chances before it is kept again.
-      if (keep !== undefined && this.cloudHandBacks?.[id]) { delete this.cloudHandBacks[id]; changed = true; }
+      if (keep !== undefined && this.cloudHandBacks?.[id]) { delete this.cloudHandBacks[id]; delete this._movedWhy?.[id]; changed = true; }
       if (keep === null || keep === false) this._handedBack?.delete(id);
       const session = this.sessions.get(id);
       // A cloud run picked back up after a restart is followed in `_comingHome`, not `sessions`.
@@ -4053,6 +4074,80 @@ export class Supervisor {
     if (!changed) return;
     this._saveState();
     this.onChange?.();
+  }
+
+  // A RUN ON THIS MAC THE CLOUD COULD TAKE NOW: paused the way an urgent row
+  // pauses one (`_takeSlotFor`), so the sweep resumes the same session, and
+  // `_toCloud` sends that resume to the cloud. A Codex thread stays: this
+  // Mac's app-server holds it (`codexHeldHere`).
+  _movableToCloud(session, item = null) {
+    if (!session?.itemId || session.cloud || session.command || session.remoteIdle || session.stoppedByUs) return false;
+    if (engineOf(session.engine) !== 'claude') return false;
+    if (!this._cloudSetUp() || !this._cloudReady('claude') || !this._cloudSignedInAtAll('claude')) return false;
+    const rec = this._liveSessions[session.itemId];
+    if (!rec?.sessionId || !this.transcriptFile(rec)) return false;
+    let product = null;
+    try {
+      product = this.store.listProducts().find((p) => p.slug === session.product) ?? null;
+      item ??= this.store.listItems(Date.now()).find((i) => i.id === session.itemId && i.product === session.product) ?? null;
+    } catch { return false; }
+    return !!item && this._mayRunInCloud(item, product, session.cwd);
+  }
+
+  _movableIds(items) {
+    const byId = new Map((items ?? []).map((i) => [i.id, i]));
+    return [...this.sessions.values()].filter((s) => byId.has(s.itemId) && this._movableToCloud(s, byId.get(s.itemId))).map((s) => s.itemId);
+  }
+
+  // Everything moves every run the cloud could take; otherwise only these.
+  _movesToCloud(session, item = null) {
+    return (this._cloudFirst() || !!this._moveAsked?.has(session?.itemId)) && this._movableToCloud(session, item);
+  }
+
+  /** The thread menu's and the cloud menu's "Move to the cloud": ids of runs on this Mac. */
+  moveToCloud(ids = []) {
+    let moving = 0;
+    for (const id of ids ?? []) {
+      if (!this._movableToCloud(this.sessions.get(id))) continue;
+      (this._moveAsked ??= new Set()).add(id);
+      moving += 1;
+    }
+    if (moving) { this.wake?.(); this.onChange?.(); }
+    return { moving };
+  }
+
+  // Each tick, as many as the cloud can start now. A pause not yet started in
+  // the cloud holds one of its starts. The ones someone asked for go first,
+  // then the youngest, as with an urgent row: least work in flight. A run
+  // asking for an approval waits, since a pause would throw away the card in
+  // front of the person.
+  _moveRunsToTheCloud(items, now = Date.now()) {
+    for (const id of [...(this._moveAsked ?? [])]) if (!this.sessions.has(id)) this._moveAsked.delete(id);
+    for (const [id, at] of [...(this._toCloud ?? [])]) if (now - at > TO_CLOUD_PATIENCE_MS) this._toCloud.delete(id);
+    if (!this._cloudFirst() && !this._moveAsked?.size) return;
+    if (!this._cloudUsable('claude')) return;
+    const pausing = [...(this._toCloud?.keys() ?? [])].filter((id) => !this.sessions.has(id)).length;
+    let starts = CLOUD_STARTING_AT_ONCE - this._cloudStarting(now) - pausing;
+    let room = this._maxCloud() - this._cloudLoad() - pausing;
+    if (starts <= 0 || room <= 0) return;
+    const byId = new Map((items ?? []).map((i) => [i.id, i]));
+    const asked = (s) => !!this._moveAsked?.has(s.itemId);
+    let asking = null;
+    const candidates = [...this.sessions.values()]
+      .filter((s) => this._movesToCloud(s, byId.get(s.itemId) ?? null))
+      .filter((s) => asked(s) || !(now - (this._movedToCloudAt?.[s.itemId] ?? 0) < MOVE_TO_CLOUD_AGAIN_MS))
+      .filter((s) => !(asking ??= new Set(listPending(this.config.storeRoot).map((r) => r?.item))).has(s.itemId))
+      .sort((a, b) => asked(b) - asked(a) || (b.startedAt ?? 0) - (a.startedAt ?? 0));
+    for (const s of candidates) {
+      if (starts <= 0 || room <= 0) break;
+      (this._toCloud ??= new Map()).set(s.itemId, now);
+      (this._movedToCloudAt ??= {})[s.itemId] = now;
+      this._moveAsked?.delete(s.itemId);
+      this._kill(s);
+      this._recoverPending = true;
+      starts -= 1;
+      room -= 1;
+    }
   }
 
   // A CLOUD RUN THAT ENDED ON THE MARKED LINE (shared/cloud-hand-back.mjs):
@@ -4112,8 +4207,10 @@ export class Supervisor {
       const place = this.threadPlaces[i.id];
       const pinned = this.threadPins[i.id] === true;
       const onMac = this.threadOnMac[i.id] === true || this._keptHereByUs(i.id);
-      if (!Number.isFinite(place) && !pinned && !onMac) return i;
-      return { ...i, ...(pinned ? { pinned: true } : {}), ...(Number.isFinite(place) ? { place } : {}), ...(onMac ? { onMac: true } : {}) };
+      const moved = this._keptHereByUs(i.id) || i.id in (this.movedToMac ?? {});
+      const needsMac = moved && this._movedWhy?.[i.id]?.why === 'handed-back' ? this._movedWhy[i.id].detail ?? null : null;
+      if (!Number.isFinite(place) && !pinned && !onMac && !needsMac) return i;
+      return { ...i, ...(pinned ? { pinned: true } : {}), ...(Number.isFinite(place) ? { place } : {}), ...(onMac ? { onMac: true } : {}), ...(needsMac ? { needsMac } : {}) };
     });
   }
 
@@ -4924,6 +5021,10 @@ export class Supervisor {
       notInCloud: setUp ? this._cloudNotSignedInHere(now) : [],
       signIns: setUp ? this._cloudSignInsNow() : [],
       projects: setUp ? (this.store.listProducts?.() ?? []).filter((p) => this._cloudTakesProject(p)).map((p) => p.slug) : [],
+      // The Agentbox Cloud plan the server last said ('none' is no plan).
+      plan: this.cloudPlan ?? null,
+      // Runs on this Mac it could take now (`_movableToCloud`).
+      movable: setUp && this.sessions.size && this._cloudUsable('claude') ? this._movableIds(this.store.listItems(now)) : [],
     };
   }
 
@@ -5602,6 +5703,8 @@ export class Supervisor {
     // what cannot go there or when the cloud is at its cap. Chosen by her for
     // signing off with everything still working (docs/cloud/PLAN.md).
     const cloudOk = () => this._mayRunInCloud(item, product, cwd, { remoteOnly }) && this._cloudSlotFor(engine);
+    // Paused on this Mac to move to the cloud (`_moveRunsToTheCloud`).
+    if (item?.id && this._toCloud?.delete(item.id) && cloudOk()) return 'cloud';
     if (this._cloudFirst() && cloudOk()) return 'cloud';
     if (this._waitsForCloud(item, engine) && this._mayRunInCloud(item, product, cwd, { remoteOnly })) return 'cloud-wait';
     if (!localFull && this._localSlotFor(engine)) return 'local';
@@ -6085,6 +6188,7 @@ export class Supervisor {
       swap,
       lastStartAt: this._lastStartAt ?? 0,
       heldSince: this._memHeldSince ?? null,
+      roomy: autoAgents({ ...this._machine(), gated: false, nudge: this.config.agentsNudge }),
     });
     if (d.start) {
       if (d.why === 'off' || d.why === 'normal' || d.why === 'no-reading') this._memHeldSince = null;
@@ -6442,6 +6546,7 @@ export class Supervisor {
         threadOnMac: this.threadOnMac,
         movedToMac: this.movedToMac,
         cloudHandBacks: Object.fromEntries(Object.entries(this.cloudHandBacks ?? {}).slice(-500)),
+        movedWhy: Object.fromEntries(Object.entries(this._movedWhy ?? {}).slice(-500)),
         liveSessions: this._liveSessions,
         rowSessions: this._rowSessions,
         stoppedSessions: this._stoppedSessions,
@@ -6526,7 +6631,17 @@ export class Supervisor {
     const s = this.sessions.get(itemId);
     if (!s || s.product !== product || s.remoteIdle) return null;
     const runId = s.cloud && s.cwd ? readMarker(this._cloudPlace(s.cwd, product, itemId))?.runId : null;
-    return { since: s.startedAt, where: s.cloud ? 'cloud' : 'mac', ...(runId ? { runId } : {}), doing: currentActivity(s).map((a) => ({ label: a.label, startedAt: a.startedAt })) };
+    let movable = false;
+    try { movable = !s.cloud && this._movableNow().has(itemId); } catch { /* said as not movable */ }
+    return { since: s.startedAt, where: s.cloud ? 'cloud' : 'mac', ...(runId ? { runId } : {}), ...(movable ? { movable } : {}), doing: currentActivity(s).map((a) => ({ label: a.label, startedAt: a.startedAt })) };
+  }
+
+  // The phone asks for each running thread on every pass, so one read serves a few seconds.
+  _movableNow(now = Date.now()) {
+    if (this._movableSeen && now - this._movableSeen.at < 5_000) return this._movableSeen.ids;
+    const ids = new Set(this.sessions.size && this._cloudUsable('claude') ? this._movableIds(this.store.listItems(now)) : []);
+    this._movableSeen = { at: now, ids };
+    return ids;
   }
 
   status() {
@@ -6647,10 +6762,13 @@ export class Supervisor {
     // its card says why. Under "when this Mac is full" running here is the
     // rule, so nothing is said.
     const whyNotCloud = {};
+    let movable = [];
+    try { movable = this._movableIds(allThreads()); } catch {}
     try {
       if (this._cloudFirst() && this._cloudSetUp()) {
         for (const s of this.sessions.values()) {
-          if (!s.cloud && !s.command && s.whyLocal) whyNotCloud[s.itemId] = { at: 'mac', ...s.whyLocal };
+          if (movable.includes(s.itemId) && this._cloudUsable('claude')) whyNotCloud[s.itemId] = { at: 'mac', why: 'moving' };
+          else if (!s.cloud && !s.command && s.whyLocal) whyNotCloud[s.itemId] = { at: 'mac', ...s.whyLocal };
         }
         const byId = new Map(allThreads().map((i) => [i.id, i]));
         const productBySlug = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
@@ -7181,6 +7299,9 @@ export class Supervisor {
     // resume that quietly never happens is the failure this whole path exists
     // to end.
     this._drainResumeQueue(items);
+
+    // Runs on this Mac the cloud could take; the sweep above resumes them there.
+    try { this._moveRunsToTheCloud(items); } catch (e) { console.warn('zero: could not move a run to the cloud:', e.message); }
 
     // ONE QUEUE, ONE ORDER. Everything spawnable this tick is scored by the
     // same rule and the slots go to the top of that one list.
@@ -10394,7 +10515,8 @@ export class Supervisor {
     if (!named.length) return '';
     const who = named.join(' and ');
     return [`## ${who}, a teammate, is named`,
-      `The person named their teammate ${who} with @. What they ask of ${named.length > 1 ? 'each' : who} is ${named.length > 1 ? 'theirs' : `${who}'s`}: hand it over with team_pass (a short title, and everything needed in details), say in one line that you did, and do not do that part yourself.`].join('\n');
+      `The person named their teammate ${who} with @. What they ask of ${named.length > 1 ? 'each' : who} is ${named.length > 1 ? 'theirs' : `${who}'s`}: hand it over with team_pass (a short title, and everything needed in details), say in one line that you did, and do not do that part yourself.`,
+      ...(item?.id ? [`If they want ${named.length > 1 ? 'them' : who} to learn from this thread, put this thread's id, ${item.id}, in the details: the teammate is given it whole to learn from.`] : [])].join('\n');
   }
 
   /** The other threads these words name, summed up (shared/named-threads.mjs). */

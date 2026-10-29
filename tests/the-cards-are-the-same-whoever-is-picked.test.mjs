@@ -1,4 +1,5 @@
-// A CHAT OPENS UNDER THE SAME CARDS (w-b5f23cff71).
+// THE CARDS ARE THE SAME WHOEVER IS PICKED (w-b5f23cff71). It was "a chat opens
+// under the same cards" until chats moved to the Chats page (w-2b3e1a85e5).
 //
 // "I didn't like those cards up front ... when you click on a person's face,
 // it shows In Progress or the chat, and it keeps the same stuff up top. That's
@@ -30,7 +31,7 @@ describe('the cards over an open chat', () => {
       const html = renderToStaticMarkup(h(TeamStrip, { members, picked, onPick() {}, onMove() {} }));
       expect(html).toContain('class="ev-strip"');
       expect(html.match(/class="ev-t"/g)).toHaveLength(3);
-      expect(html).toContain('14 AGENTS WORKING');
+      expect(html).toContain('14 AGENTS');
     }
   });
 
@@ -40,8 +41,7 @@ describe('the cards over an open chat', () => {
     expect(app).not.toMatch(/compact=\{/);
   });
 
-  it('keep the chat under them filling the rest of the page, its box at the foot', () => {
-    expect(css).toMatch(/\.list-pane\.ev-open \{[^}]*flex-direction: column/);
-    expect(css).toMatch(/\.ev-space \{[^}]*flex: 1;[^}]*min-height: 0/);
+  it('have no chat under them to make room for', () => {
+    expect(css).not.toMatch(/\.ev-space|\.ev-open/);
   });
 });

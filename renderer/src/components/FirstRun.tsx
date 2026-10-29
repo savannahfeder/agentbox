@@ -14,14 +14,13 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { LAST_PRODUCT_KEY } from '../compose-project';
 import {
-  chatChoices, chatsHeadline, listKey, previousScreen, projectsToMake, readyEngines, stepNumber,
+  ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, installGate, listKey, previousScreen, projectsToMake, readyEngines,
   type Engine, type Screen,
 } from '../first-run';
 import './first-run.css';
 
 type Project = { slug: string; name: string };
 
-const ENGINE_NAME: Record<Engine, string> = { claude: 'Claude Code', codex: 'Codex' };
 const SEND = MAC ? ['⌘', '↵'] : ['Ctrl', '↵'];
 const LEAVE_MS = 260;
 const bare = (folder: string) => folder.replace(/\/+$/, '');
@@ -67,6 +66,7 @@ export function FirstRunFlow({ snap, home, onDone }: {
   const [ready, setReady] = useState<Engine[] | undefined>(undefined);
   const hasReady = !!ready?.length;
   const [setup, setSetup] = useState<{ engine: Engine; phase: string; error: string | null } | null>(null);
+  const gate = installGate(setup);
   const [threads, setThreads] = useState<SessionThread[] | null>(null);
   const [chatTicks, setChatTicks] = useState<Set<string>>(new Set());
   const [cursor, setCursor] = useState(0);
@@ -88,7 +88,7 @@ export function FirstRunFlow({ snap, home, onDone }: {
   }, []);
 
   useEffect(() => {
-    try { window.zero?.track?.('first_run_step', stepNumber(screen) ?? undefined); } catch {}
+    try { window.zero?.track?.('first_run_step', FIRST_RUN_STEP[screen]); } catch {}
   }, [screen]);
 
   // AN AGENT BEING INSTALLED OR SIGNED IN, watched until it is ready.
@@ -184,8 +184,8 @@ export function FirstRunFlow({ snap, home, onDone }: {
       if ((e.target as Element | null)?.closest('.ob-back') && (e.key === 'Enter' || e.key === ' ')) return;
       if (screen === 'welcome') {
         if (e.key === 'Enter' && hasReady) { e.preventDefault(); start(); }
-        else if (!hasReady && e.key === '1') startSetup('claude');
-        else if (!hasReady && e.key === '2') startSetup('codex');
+        else if (!hasReady && !gate.running && e.key === '1') startSetup('claude');
+        else if (!hasReady && !gate.running && e.key === '2') startSetup('codex');
         return;
       }
       const k = listKey(e);
@@ -202,7 +202,7 @@ export function FirstRunFlow({ snap, home, onDone }: {
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [screen, leaving, hasReady, chats, cursor, start, startSetup, bringIn, leave]);
+  }, [screen, leaving, hasReady, gate.running, chats, cursor, start, startSetup, bringIn, leave]);
 
   const cls = `ob-screen${leaving ? ' ob-leaving' : ''}`;
 
@@ -218,10 +218,10 @@ export function FirstRunFlow({ snap, home, onDone }: {
             <Mark />
             {ready && !hasReady ? (
               <>
-                <h1 className="ob-big ob-in" style={{ animationDelay: '1.3s' }}>Install Claude Code or Codex to start</h1>
+                <h1 className="ob-big ob-in" style={{ animationDelay: '1.3s' }}>{gate.heading}</h1>
                 <div className="ob-actions ob-in" style={{ animationDelay: '1.6s', marginTop: 40 }}>
-                  <button type="button" className="ob-btn" onClick={() => startSetup('claude')}>Install Claude Code <Key k="1" /></button>
-                  <button type="button" className="ob-btn" onClick={() => startSetup('codex')}>Install Codex <Key k="2" /></button>
+                  <button type="button" className="ob-btn" disabled={gate.running} onClick={() => startSetup('claude')}>Install Claude Code <Key k="1" /></button>
+                  <button type="button" className="ob-btn" disabled={gate.running} onClick={() => startSetup('codex')}>Install Codex <Key k="2" /></button>
                 </div>
               </>
             ) : (

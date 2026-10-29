@@ -68,7 +68,8 @@ describe('it sits at the right end of the tabs row', () => {
 
 describe('the header draws it only where there are no tabs', () => {
   it('the header asks for search only on the board', () => {
-    expect(element('HeaderActions')).toMatch(/onSearch=\{inboxDisplay\.view === 'board' \? openSearch : undefined\}/);
+    // With a team on the board sits under the tabs, which carry search (w-2b3e1a85e5).
+    expect(element('HeaderActions')).toMatch(/onSearch=\{!teamMode && inboxDisplay\.view === 'board' \? openSearch : undefined\}/);
   });
   it('and draws nothing when it is not asked', () => {
     expect(fn('HeaderActions')).toMatch(/\{onSearch && <SearchButton onSearch=\{onSearch\} \/>\}/);

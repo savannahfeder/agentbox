@@ -100,7 +100,7 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
     const cloud = facts.session?.where === 'cloud';
     const local = !cloud && away?.at === 'mac';
     return {
-      word: local ? 'Working locally' : shortWord('working'), mark: 'working', agent: true, live: true, cloud,
+      word: local ? (away?.why === 'moving' ? 'Moving to cloud' : 'Working locally') : shortWord('working'), mark: 'working', agent: true, live: true, cloud,
       title: local ? titled(live.line) : live.line, ...(local ? { why } : {}),
     };
   }

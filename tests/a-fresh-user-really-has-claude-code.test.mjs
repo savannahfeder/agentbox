@@ -83,6 +83,10 @@ function diskWithOnly(home, also = []) {
   return {
     exists: (p) => extra.has(String(p)) || (inside(p) && fs.existsSync(p)),
     dangles: (p) => inside(p) && dangling(p),
+    // No PATH either. The finder reads the one it was handed before it walks
+    // the list, and on a Mac that holds /opt/homebrew/bin, which `also` names:
+    // the machine would answer for a case about the list.
+    env: {},
   };
 }
 

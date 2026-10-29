@@ -274,7 +274,7 @@ export function snapshotKey(snapshot) {
 // one of these, or names a project she did not put on her phone, or a thread
 // that is not in it, is refused and says why.
 // A `setting` belongs to the computer, not a project (shared/phone-settings.mjs).
-export const PHONE_COMMANDS = ['reply', 'new', 'snooze', 'close', 'stop', 'run-now', 'send-now', 'reopen', 'schedule', 'approve', 'setting'];
+export const PHONE_COMMANDS = ['reply', 'new', 'snooze', 'close', 'stop', 'run-now', 'send-now', 'reopen', 'schedule', 'approve', 'setting', 'move-to-cloud'];
 
 // A PERMISSION CARD AS HER PHONE DRAWS IT: what the agent asks to do, with the
 // secrets in it hidden as a thread's words are, and the fingerprint of the card

@@ -9149,7 +9149,11 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 
 .fp-up {
   flex: none;
-  padding: 6px 12px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  align-self: stretch;
+  padding: 0;
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--film-strong);
@@ -9175,18 +9179,25 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 
 /* A fixed height, so walking into a folder with two things in it does not
    resize the card under the cursor that is about to click the next row. */
+/* The negative margin is the rows' own padding, so a folder's icon lines up
+   with the title and the path above it. */
 .fp-list {
   height: 320px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  margin: 0 -14px;
   padding: 4px;
   border-radius: var(--radius);
   background: var(--bg-raised);
 }
 
 .fp-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   text-align: left;
   padding: 7px 10px;
   border: 0;
@@ -9197,14 +9208,16 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
   cursor: pointer;
 }
 .fp-row:hover { background: var(--film-strong); }
+.fp-icon { flex: none; color: var(--text-faint); }
+.fp-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .fp-note { margin: 12px 10px; color: var(--text-faint); }
 
-.fp-refused { margin: 0 2px; color: var(--text-dim); }
+.fp-refused { margin: 0; color: var(--text-dim); }
 
 .fp-foot { display: flex; gap: 8px; align-items: center; }
 
-.fp-where {
+.fp-hint {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -9236,6 +9249,10 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 #needs-its-key strong { display: block; font-size: 17px; font-weight: 600; }
 #needs-its-key p { margin-top: 10px; color: var(--text-dim); font-size: 14px; line-height: 1.5; }
 #needs-its-key code { font-family: var(--mono); font-size: .95em; }
+/* THE SCREEN THAT DIED TWICE (renderer/src/main.tsx). The same sentence the
+   boundary shows, in plain html: React has unmounted the root by now, so
+   `.boot-stuck` has nothing left to draw it. */
+#screen-died { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 32px; background: var(--surface); color: var(--text-dim); font-size: 14px; line-height: 1.5; text-align: center; }
 /* Her Mac turned a reply from the phone down (renderer/src/cloud-bridge.ts). */
 .msg-sending.msg-refused { color: var(--code-minus); }
 

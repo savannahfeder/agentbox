@@ -450,11 +450,20 @@ function Details({ t, view, products, engines, models, call, onOpen }: { t: Team
 // What it does, in its own words, and everything it knows about you. Its
 // name is in the bar above, and how it is set is beside its chat.
 function About({ t, call, error, onOpen }: { t: Teammate; call: Call; error: string | null; onOpen: (open: string) => void }) {
+  // Its method: how it does the job, kept by it from what you said and showed.
+  const [method, setMethod] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    setMethod(null);
+    void api.teammates('method', { id: t.id }).then((r) => { if (live && r.ok) setMethod((r.value as { text?: string } | null)?.text ?? null); });
+    return () => { live = false; };
+  }, [t.id]);
   return <div className="tq-doc"><div className="tq-doc-in">
     {t.status === 'draft' && <p className="tq-doc-note">It is still setting itself up, and asks you in the chat before it starts.</p>}
     <div className="tq-desc">{t.job ? <ReactMarkdown remarkPlugins={MD}>{t.status === 'draft' ? jobLine(t) : t.job}</ReactMarkdown> : <p className="dim">No description yet. Tell it what you need below.</p>}
       {t.goal && <><h5>Its goal</h5><p>{goalLine(t.goal, t.counted)}</p></>}
       {yesFirst(t.asksFirst) && <><h5>What needs your yes first</h5><p>{yesFirst(t.asksFirst)}</p></>}
+      {method && <div className="tq-method"><ReactMarkdown remarkPlugins={MD}>{method}</ReactMarkdown></div>}
       {t.memory.length > 0 && <><h5>What it knows about you</h5>
         <ul className="tq-known">{t.memory.map((m) => <li key={m.id}><span>{m.text}</span><button type="button" className="tq-x" aria-label={`Forget ${m.text}`} title="Forget" onClick={() => { void call('forget', { id: t.id, memory: m.id }); }}>×</button></li>)}</ul></>}
     </div>

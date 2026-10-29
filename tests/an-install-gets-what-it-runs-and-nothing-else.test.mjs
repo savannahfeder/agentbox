@@ -100,7 +100,11 @@ for (const file of files) {
 const SUPPLIED_BY_THE_HOST = new Set(['electron']);
 
 describe('the dependency list', () => {
-  const declared = new Set(Object.keys(pkg.dependencies));
+  // node-pty is declared optional rather than required: it compiles on install
+  // and a Linux machine with no compiler cannot build it, which used to fail
+  // the whole install (tests/an-install-with-no-compiler-still-starts). The app
+  // asks for it at run time all the same, so it counts as declared here.
+  const declared = new Set([...Object.keys(pkg.dependencies), ...Object.keys(pkg.optionalDependencies ?? {})]);
 
   it('has every package the code that runs asks for', () => {
     const missing = [...wanted]

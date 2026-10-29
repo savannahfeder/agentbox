@@ -103,6 +103,7 @@ export function phoneSender({ client, rows, setRows, aliases, changed }: {
     answer: (p: unknown) => leave(REQUEST_CHANNELS.answer, p),
     stopSession: (p: unknown) => leave(REQUEST_CHANNELS.stopSession, p),
     runNow: (p: unknown) => leave(REQUEST_CHANNELS.runNow, p),
+    moveToCloud: (p: unknown) => leave(REQUEST_CHANNELS.moveToCloud, p),
     sendNow: (p: unknown) => leave(REQUEST_CHANNELS.sendNow, p),
     reopen: (p: unknown) => leave(REQUEST_CHANNELS.reopen, p),
     snooze: (p: unknown) => leave(REQUEST_CHANNELS.snooze, p),

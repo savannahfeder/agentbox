@@ -346,7 +346,7 @@ export function run({ bin = null, out = OUT, local = LOCAL, snapshot = false, lo
     if (!had) throw new Error(`No Claude Code on this machine and no ${shown(out)} to fall back on.`);
     const from = had.match(/READ_FROM = "([^"]*)"/)?.[1] ?? 'an older version';
     const at = had.match(/READ_AT = "([^"]*)"/)?.[1] ?? 'an unknown day';
-    log(`[claude-commands] no Claude Code here; keeping the list read from ${from} on ${at}`);
+    log(`[claude-commands] building without Claude Code installed, using the list read from ${from} on ${at}`);
     return;
   }
   // THE READ HAPPENS EVERY BUILD AND SO DOES THE REFUSAL. `build` throws with

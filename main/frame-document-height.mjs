@@ -16,6 +16,8 @@ export function reportDocumentHeight(page) {
     const height = Math.ceil(Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight ?? 0));
     if (height > 0 && height !== previous) {
       previous = height;
+      // The inbox is loaded from file://, an opaque origin no target but '*' can name; only a height leaves.
+      // nosemgrep: javascript.browser.security.wildcard-postmessage-configuration.wildcard-postmessage-configuration
       page.parent.postMessage({ type: 'agentbox-document-height', height }, '*');
     }
   };

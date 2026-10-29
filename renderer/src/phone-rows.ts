@@ -108,6 +108,7 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
       running.push({
         itemId: id, product: slug, startedAt: Number(live.since) || 0,
         ...(live.where === 'cloud' ? { where: 'cloud' } : {}),
+        ...(live.movable === true ? { movable: true } : {}),
         tail: [],
         activity: (Array.isArray(live.doing) ? live.doing : []).map((d: any, i: number) => ({ id: `live-${i}`, label: String(d?.label ?? ''), detail: '', startedAt: Number(d?.startedAt) || 0 })),
       });
@@ -304,7 +305,7 @@ export function commandFor(channel: string, p: any, aliases: Aliases = {}): { de
   }
   if (channel === REQUEST_CHANNELS.snooze && Number.isFinite(p.snoozedUntil) && p.snoozedUntil >= 0) return on(p.id, 'snooze', { until: p.snoozedUntil });
   if (channel === REQUEST_CHANNELS.schedule && Number.isFinite(p.runAt) && p.runAt >= 0) return on(p.id, 'schedule', { runAt: p.runAt });
-  const plain: Record<string, string> = { [REQUEST_CHANNELS.stopSession]: 'stop', [REQUEST_CHANNELS.runNow]: 'run-now', [REQUEST_CHANNELS.sendNow]: 'send-now', [REQUEST_CHANNELS.reopen]: 'reopen' };
+  const plain: Record<string, string> = { [REQUEST_CHANNELS.stopSession]: 'stop', [REQUEST_CHANNELS.runNow]: 'run-now', [REQUEST_CHANNELS.sendNow]: 'send-now', [REQUEST_CHANNELS.reopen]: 'reopen', [REQUEST_CHANNELS.moveToCloud]: 'move-to-cloud' };
   if (plain[channel] && p.id) return on(p.id, plain[channel], {});
   if (channel === REQUEST_CHANNELS.compose && (String(p.title ?? '').trim() || String(p.body ?? '').trim())) {
     return on(null, 'new', { title: String(p.title ?? ''), body: String(p.body ?? ''), ...phoneChoices('new', p) });

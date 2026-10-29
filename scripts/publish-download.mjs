@@ -63,6 +63,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NAME } from '../shared/product-name.mjs';
 import { liveDownload, noReleaseYet, RELEASE_REPO, DOWNLOAD_ASSET } from './lib/live-download.mjs';
+import { releaseNotes } from './lib/deploy-rules.mjs';
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO = RELEASE_REPO;
@@ -110,6 +111,20 @@ if (!fs.existsSync(dmg)) die(`There is no file at ${dmg}.`);
 const version = JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version;
 const tag = `v${version}`;
 const releaseDir = path.join(repo, 'release');
+
+// WHICH COMMIT THIS IS, FOR THE RELEASE PAGE (F-138). The deploy pins the build
+// to one commit and hands it over here; a run on its own has no commit and the
+// notes then say only the version, which is what they said before.
+const commit = process.env.AGENTBOX_RELEASE_COMMIT || '';
+const sourceVersion = commit ? versionAt(commit) : '';
+
+function versionAt(sha) {
+  try {
+    return JSON.parse(execFileSync('git', ['show', `${sha}:package.json`], { cwd: repo, encoding: 'utf8' })).version ?? '';
+  } catch {
+    return '';
+  }
+}
 
 // ---------------------------------------------------------------------------
 // THE TWO FILES THE UPDATER NEEDS, beside the dmg. Both are written by the same
@@ -287,6 +302,7 @@ console.log(`  ${appSays.split('\n').join('\n  ')}`);
 if (!publish) {
   console.log(`\nNothing was uploaded. This was the dry run.`);
   console.log(`It would create ${tag} on ${REPO} as a draft, put those three files on it, and then publish it.`);
+  console.log(`\nIts notes would read:\n\n  ${releaseNotes({ version, commit, sourceVersion }).split('\n').join('\n  ')}`);
   console.log(`To really publish it:\n\n  node scripts/publish-download.mjs ${target} --publish\n`);
   process.exit(0);
 }
@@ -319,7 +335,7 @@ if (!exists) {
     execFileSync('gh', [
       'release', 'create', tag, '--repo', REPO, '--draft',
       '--title', `Agentbox ${version}`,
-      '--notes', `Agentbox ${version}`,
+      '--notes', releaseNotes({ version, commit, sourceVersion }),
     ], { stdio: 'inherit' });
   } catch (err) {
     cleanup();

@@ -91,8 +91,9 @@ async function run(homeDir, text = 'hello', { resourceDocs = null, legacyResourc
   if (resourceDocs) fs.mkdirSync(path.join(resourceEnv.AGENTBOX_HOME, 'accounts', resourceEnv.STORE_ACCOUNT_ID), { recursive: true });
   fs.writeFileSync(mcpFile, JSON.stringify({ mcpServers: { agentbox: resourceDocs ? { command: '/unused/mcp/agentbox-mcp.sh', env: resourceEnv } : { command: process.execPath, args: [FAKE_STORE], env: { FAKE_STORE_LOG: path.join(tmp, 'store.log') } } } }));
   const stdin = new PassThrough(); const stdout = new PassThrough(); const stderr = new PassThrough();
-  let out = '';
+  let out = ''; let errText = '';
   stdout.on('data', (d) => { out += d; if (out.includes('"type":"result"') && !stdin.writableEnded) stdin.end(); });
+  stderr.on('data', (d) => { errText += d; });
   const done = cloudRun({
     argv: [FAKE_CLAUDE, '-p', '--output-format', 'stream-json', '--mcp-config', mcpFile],
     env: { ...process.env, ZERO_ITEM: 'w-1', ZERO_PRODUCT: 'p', CLAUDE_CONFIG_DIR: configDir, ...resourceEnv },
@@ -103,7 +104,7 @@ async function run(homeDir, text = 'hello', { resourceDocs = null, legacyResourc
   });
   stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: text } }) + '\n');
   expect(await done).toBe(0);
-  return JSON.parse(JSON.parse(out.split('\n').find((l) => l.includes('"type":"result"'))).result);
+  return { ...JSON.parse(JSON.parse(out.split('\n').find((l) => l.includes('"type":"result"'))).result), errText };
 }
 
 describe('her own instructions to Claude', () => {
@@ -127,6 +128,20 @@ describe('her own instructions to Claude', () => {
     const result = await run(path.join(tmp, 'home'), 'IDLE RESOURCE:large.txt', { resourceDocs: docs, legacyResources: true });
     expect(result.requested.status).toBe('unavailable');
     expect([...objects.keys()].some((k) => k.includes('/resource-'))).toBe(false);
+    // w-6771163ced: this was every request from the 2026-10-25 image, and
+    // neither the agent nor the Mac's log said so.
+    expect(result.requested.message).toMatch(/image is older than file delivery/);
+    expect(result.errText).toMatch(/this cloud image cannot take a file or skill the run asks this Mac for/);
+    expect(result.errText).toMatch(/request_cloud_resource file large\.txt: unavailable \(.*image is older/);
+  });
+
+  it('fetches a file from another product\'s documents in the same account', async () => {
+    const account = path.join(tmp, 'resource-store', 'accounts', 'acct-resources');
+    const docs = path.join(account, 'p'); fs.mkdirSync(docs, { recursive: true });
+    fs.mkdirSync(path.join(account, 'astral/videos/intro'), { recursive: true });
+    fs.writeFileSync(path.join(account, 'astral/videos/intro/index.html'), 'the intro film');
+    const result = await run(path.join(tmp, 'home'), 'IDLE RESOURCE:../astral/videos/intro/index.html', { resourceDocs: docs });
+    expect(result.requested).toMatchObject({ status: 'delivered', beginning: 'the intr' });
   });
 
   it('takes a shared skill reference through the real sandbox at its original path', async () => {

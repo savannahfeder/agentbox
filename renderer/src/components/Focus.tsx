@@ -102,6 +102,7 @@ import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
 import { recapFor } from '../recap';
 import type { LedgerLine } from '../thread-history';
 import type { LiveFacts } from '../live-line';
+import { whyWords } from '../where-why';
 import { offersRunNow } from '../run-now';
 import { AttachRow } from './AttachRow';
 import { BackToWhatSheWasReading } from './UrgentBar';
@@ -121,7 +122,7 @@ import {
 } from './Priority';
 import { SummaryPanel, SummaryRail, ThreadCrumb, ThreadStateMark, useSummaryOpen, useSummaryShortcut, type RepeatHandle } from '../threads/Summary';
 import { summaryFits, summaryPlace } from '../room';
-import { ThreadMenu, type ThreadPlace } from '../threads/ThreadMenu';
+import { ThreadMenu, type PlaceAct, type ThreadPlace } from '../threads/ThreadMenu';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { ChatAgentsContext, useChatMentions } from '../team/ChatAgents';
 import { useThreadMentions } from './ThreadMentions';
@@ -738,7 +739,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onPin?: (pin: boolean) => void;
   // Where it runs, and the menu's row that moves it (ThreadMenu PLACE_ROW).
   place?: ThreadPlace | null;
-  onPlace?: (keep: boolean) => void;
+  onPlace?: (keep: PlaceAct) => void;
   // Only ever called on an agent row a reply cannot reach: brings the app that
   // session is running inside to the front.
   onReveal?: () => void;
@@ -1535,6 +1536,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onPin={onPin}
       // A finished thread runs nowhere.
       place={canFinish ? runsIn : null}
+      placeFacts={{
+        running: !!session && session.where !== 'cloud',
+        moving: live.whyNotCloud?.why === 'moving',
+        why: live.whyNotCloud ? whyWords(live.whyNotCloud).body : null,
+        needs: item.needsMac ?? null,
+      }}
       onPlace={onPlace}
     />
   );

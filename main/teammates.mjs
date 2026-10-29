@@ -4,13 +4,15 @@
 import {
   planWakes, teammateLabel, FROM_LABEL_PREFIX, HOP_LABEL_PREFIX, hopOf, teammateIdOf, YOU, mentionsIn,
   letterFor, statusOf, runLines, STARTERS, CHAT_TAIL, isWorks, DEFAULT_LIMIT, MAX_HOPS,
-  offerFrom, offerAnswer, threadsDigest, OFFER_LABEL, OFFER_MAKE, OFFER_NOT_NOW, TEAMMATE_EFFORT, GREETING, starterAsks,
+  offerFrom, offerAnswer, OFFER_LABEL, OFFER_MAKE, OFFER_NOT_NOW, TEAMMATE_EFFORT, GREETING, starterAsks,
   dutyWhen, dutyOf, DUTY_LABEL_PREFIX, CHAT_LABEL, yesFirst, WORK_LABEL_PREFIX, isActiveRun, isQueued, STOPPED_NOTE,
+  METHOD_CAP, recordOf, sourceText, pausedNow, WEEK_MS, workOf, UNREAD_HOLD,
 } from '../shared/teammates.mjs';
 import { isShippedNote } from '../shared/shipped-note.mjs';
 import { ruleLabel, periodKey } from '../shared/repeats.mjs';
 import {
   teamDir, readTeammates, readChat, writeTeammate, writeChat, newTeammateId, newMemoryId, readPlaybooks,
+  readMethod, methodFile, sourcesDir,
 } from './store/teammates-files.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -211,6 +213,13 @@ export class Teammates {
     return mem;
   }
 
+  // Its method, for the About page: the text and when it last changed.
+  method(id) {
+    if (!this.get(id)) throw new Error('No such teammate.');
+    const m = readMethod(this.dir(), id);
+    return m ? { text: m.text, changedAt: m.changedAt } : null;
+  }
+
   forget(id, memoryId, now = Date.now()) {
     writeTeammate(this.dir(), id, { forget: memoryId }, now);
     return { ok: true };
@@ -348,6 +357,8 @@ export class Teammates {
           workItemsDisk.updateWorkItem(dir, a.item, { start: 'now' }, { source: 'system', now });
         } else if (a.type === 'limit') {
           this._sayOnce(a.teammate, 'limit', `${t.name} has used ${t.limit ?? DEFAULT_LIMIT} runs this week and waits until runs free up. Your own messages still reach it.`, now);
+        } else if (a.type === 'unread') {
+          this._sayOnce(a.teammate, 'unread', `${t.name} stopped "${a.what}": its last ${UNREAD_HOLD} are still unanswered in your inbox. Answer or close one and it starts again.`, now);
         } else if (a.type === 'hops') {
           writeChat(this.dir(), { kind: 'act', from: a.teammate, verb: 'hops', ref: a.msg, text: `${t.name} is holding this until you say go. Teammates had passed it back and forth ${MAX_HOPS} times without you.` }, now);
         }
@@ -541,29 +552,36 @@ export class Teammates {
     }
     const t = team.find((x) => x.id === id);
     if (!t) return null;
-    const items = (() => { try { return this.store.listItems(now).filter((i) => teammateIdOf(i)); } catch { return []; } })();
+    const everything = (() => { try { return this.store.listItems(now); } catch { return []; } })();
+    const items = everything.filter((i) => teammateIdOf(i));
     const others = team.filter((x) => x.id !== id);
-    const tail = chat.messages.filter((m) => m.kind === 'msg' || m.kind === 'pass' || (m.kind === 'act' && m.verb === 'learned')).slice(-CHAT_TAIL);
-    const line = (m) => {
-      const when = new Date(m.ts).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
-      const from = this.nameOf(m.from, team);
-      if (m.kind === 'pass') return `[${when}] ${from} passed to ${this.nameOf(m.to, team)}: ${m.title}`;
-      if (m.kind === 'act') return `[${when}] ${from} learned: ${m.text}`;
-      const to = (m.to ?? []).length ? ` (to ${(m.to).map((x) => this.nameOf(x, team)).join(', ')})` : '';
-      return `[${when}] ${from}${to}: ${String(m.text ?? '').replace(/\s+/g, ' ').slice(0, 600)}`;
-    };
+    const when = (ts) => new Date(ts).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
     const hop = hopOf(item);
-    const from = t.status === 'draft' ? chat.messages.find((m) => m.kind === 'msg' && m.setup && (m.to ?? []).includes(id) && m.threads?.length)?.threads : null;
+    const cut = (text, n) => (text.length > n ? `${text.slice(0, n - 1)}…` : text);
     // From the history kept per ledger change, not readThread: that reads the
-    // whole ledger once per thread, up to twelve times in one brief.
+    // whole ledger once per thread, many times in one brief.
     const said = (product, thread) => this.store.modules.workItemsCore.threadOf(this.store.readHistory?.(product, thread, { max: 2000 }) ?? [], thread);
-    const digest = from ? threadsDigest(from, said) : '';
+    const earlier = items.filter((i) => teammateIdOf(i) === id && i.id !== item.id);
+    const origin = chat.messages.find((m) => m.kind === 'msg' && m.setup && (m.to ?? []).includes(id) && m.threads?.length)?.threads ?? [];
+    const method = readMethod(this.dir(), id);
+    const file = methodFile(this.dir(), id);
+    const sources = method ? [] : this._writeSources(t, origin, earlier, said, everything);
+    // A thread of yours named in what woke it ("learn from w-588787adb7") is
+    // read whole, the way it would be if the teammate had been made from it.
+    const asked = yoursAmong(threadIdsIn([item.body, item.answer].filter((s) => typeof s === 'string').join('\n')), everything)
+      .filter((x) => x.id !== item.id).slice(0, 6);
+    const named = asked.length ? this._writeThreads(sourcesDir(this.dir(), id), asked, said) : [];
+    const record = recordOf(earlier, said, { now });
     let books = [];
     try { books = readPlaybooks(this.dir()); } catch { books = []; }
     const reads = books.filter((b) => b.readers.includes(t.id));
     const notRead = books.filter((b) => !b.readers.includes(t.id));
-    const cut = (text, n) => (text.length > n ? `${text.slice(0, n - 1)}…` : text);
     const told = this._toldInTheChat(item, t, chat);
+    // What you said in the chat lately, to anyone: a stop, a change of plan.
+    const yours = chat.messages.filter((m) => m.kind === 'msg' && m.from === YOU && now - m.ts < WEEK_MS).slice(-YOUR_CHAT_LINES)
+      .map((m) => `- [${when(m.ts)}]${(m.to ?? []).length ? ` to ${m.to.map((x) => this.nameOf(x, team)).join(', ')}` : ''}: ${cut(String(m.text ?? '').replace(/\s+/g, ' ').trim(), 400)}`);
+    const lastSeen = Math.max(0, ...earlier.map((i) => (i.wrote?.answer?.source === 'founder' ? i.wrote.answer.ts ?? 0 : 0)));
+    const untried = method && method.changedAt > lastSeen;
     const toldLines = told.slice(-CHAT_TAIL).map((m) => {
       const when = new Date(m.ts).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
       return `- [${when}] ${this.nameOf(m.from, team)}: ${cut(String(m.text ?? '').trim(), 2000)}`;
@@ -572,60 +590,159 @@ export class Teammates {
     return [
       `# You are ${t.name}${t.role && t.role.toLowerCase() !== t.name.toLowerCase() ? `, the ${t.role}` : ''}: a teammate`,
       '',
-      `You are one of the person's teammates in {{Name}}: an agent with a standing job that works on its own, talks with the other teammates in one team chat, and reaches the person only when it needs them. This thread is one run of your work, and its opening message is why you are awake.`,
+      `You are one of the person's teammates in {{Name}}: an agent with a standing job that works on its own, talks with the other teammates in one team chat, and reaches the person only when it needs them. This thread is one run of your work, and its opening message is why you are awake. What carries you from one run to the next is your method and the record of your recent work, below.`,
       '',
       t.job ? `Your job: ${t.job}` : null,
       t.goal ? `Your goal: ${t.goal}${t.counted ? ` (counted as: ${t.counted})` : ''}` : null,
       yesFirst(t.asksFirst) ? `Ask the person first: ${yesFirst(t.asksFirst)}`
         : t.asksFirst ? "What needs the person's yes first is not set: what you saved there is a question. Ask it with team_post, with options, and save their answer as a statement with team_setup asksFirst." : null,
-      t.handoffsNeedYes ? "Work another teammate hands you waits for the person's yes: the app holds it in their inbox, and you start on it when they reply." : null,
+      t.handoffsNeedYes === false ? 'Work another teammate hands you starts straight away: the person said it need not wait for them.' : null,
+      pausedNow(t, now) ? `You are paused until ${t.pausedUntil}: your duties do not wake you before then. The person's own words still do.` : null,
       t.duties?.length ? null : isWorks(t.works) ? `You wake on your own ${ruleLabel(t.works)}.` : 'You wake when someone writes to you or passes you work.',
       '',
+      ...(method ? [
+        `## Your method (${file})`,
+        'This is how you do your job, kept by you from what the person said and showed. It outranks your own habits and anything older. Follow it.',
+        untried ? '**Your method has changed since the person last saw your work.** Whatever this run makes, show it to them rather than closing quietly, so they can tell you if the change was right.' : null,
+        '',
+        method.text.length > METHOD_CAP
+          ? `${method.text.slice(0, METHOD_CAP)}\n\n… (your method is longer than ${METHOD_CAP} characters and is cut here: tighten it this run, keeping every rule the person gave)`
+          : method.text.trim(),
+        '',
+      ] : this._buildMethodFirst(t, file, sources, origin.length > 0)),
+      ...(named.length ? [
+        '## Threads named in what woke you',
+        'Each is written out whole. Read it before you start, and put what it shows about how the person wants this work done into your method.',
+        ...named.map((s) => `- ${s.file} (${s.title}, ${s.chars} characters)`),
+        '',
+      ] : []),
+      ...(record ? ['## Your recent work, from the record', 'Each of your recent runs, what the person said on it in their words, and the first line of what you answered. Read it before you start: it is how you know what was already tried, approved and turned down.', record, ''] : []),
       ...(t.duties?.length ? ['## What you do on your own', ...t.duties.map((d) => `- ${d.what} (${dutyWhen(d).toLowerCase()})${d.tell ? `. Bring the person in only when ${d.tell}` : ''}`), 'You also wake when someone writes to you or passes you work.', ''] : []),
-      t.memory.length ? '## What you know about the person (follow these)' : null,
-      ...t.memory.map((m) => `- ${m.text}`),
-      t.memory.length ? '' : null,
-      ...(reads.length ? ['## Playbooks you read (how the person likes this work done; follow these)', ...reads.flatMap((b) => [`### ${b.title}`, ...b.lessons.map((l) => `- ${cut(l.text, 300)}`)]), ''].slice(0, 120) : []),
+      ...(!method && t.memory.length ? ['## What you know about the person (put these in your method)', ...t.memory.map((m) => `- ${m.text}`), ''] : []),
+      ...(method && t.memory.some((m) => m.at > method.changedAt) ? ['## Noted since your method last changed (put these in it)', ...t.memory.filter((m) => m.at > method.changedAt).map((m) => `- ${m.text}`), ''] : []),
+      ...(reads.length ? ['## Shared playbooks you read (lessons for every teammate doing this kind of work)', ...reads.flatMap((b) => [`### ${b.title}`, ...b.lessons.map((l) => `- ${cut(l.text, 300)}`)]), ''].slice(0, 60) : []),
       ...(notRead.length ? [`Playbooks on the team you do not read yet: ${notRead.map((b) => b.title).join(', ')}. Start reading one with team_playbook and its title, leaving out lesson, when its work is yours too.`, ''] : []),
       ...this._projectsFor(t),
       '## The team',
-      ...(others.length ? others.map((o) => { const s = statusOf(o, items, now); return `- ${o.name}${o.role && o.role.toLowerCase() !== o.name.toLowerCase() ? `, ${o.role}` : ''}${o.paused ? ' (paused)' : ''}: ${o.job ? o.job.slice(0, 200) : 'no job yet'}${s.now ? ` Now: ${s.now}.` : ''}`; }) : ['- You are the only teammate so far.']),
+      ...(others.length ? others.map((o) => `- ${o.name}${o.role && o.role.toLowerCase() !== o.name.toLowerCase() ? `, ${o.role}` : ''}${o.paused ? ' (paused)' : ''}: ${o.job ? cut(o.job, 140) : 'no job yet'}`) : ['- You are the only teammate so far.']),
       '',
-      '## The team chat, newest last',
-      ...(tail.length ? tail.map(line) : ['(nothing yet)']),
-      '',
-      ...(digest ? ['## The threads you come from', 'You were made from these threads, where the person asked for this kind of work: what they asked, what the agent did, and every reply they gave.', '', digest, ''] : []),
+      ...(yours.length ? ['## What the person said in the team chat lately', ...yours, ''] : []),
       ...(toldLines.length ? ['## Teammates wrote to you in the chat since this thread last spoke', 'Read these into this turn. They woke nobody.', ...toldLines, ''] : []),
       '## Answering what woke you',
       ...(t.status === 'draft' ? [
-        'You are a new teammate, still being set up. The opening message is what the person asked for, and anything they have answered since is in the team chat above. Set yourself up, then stop:',
-        digest ? '0. First read every thread under "The threads you come from" above for how the person wants this work done: what they asked for, what they corrected, what they liked and turned down, and what they decided. Keep each lasting lesson about how this kind of work is done with team_playbook (a short title like "How you write posts"), and anything about the person themselves with team_remember, one per call, in their words. Write your job, goal and what needs their yes from what the threads show, not from guesses, and in step 2 ask only what the threads leave open.' : null,
+        'You are a new teammate, still being set up. The opening message is what the person asked for, and anything they have answered since is above. Set yourself up, then stop:',
+        sources.length ? '0. First read every file under "The threads you come from", whole, and write your method from them as described there. Write your job, goal and what needs their yes from what the threads show, not from guesses.' : null,
         'Your job, goal, when you wake and what you ask first, above, are guesses to confirm, not settled.',
         '1. Your name is your role: two or three words that say what you do, like Marketing lead or Support lead, that no teammate has. Set name and role to it. If you already have a name other than New teammate, keep that name. Draft your job in plain words to yourself, as long as it needs, your goal, how you count it, what you ask the person first, your duties (what you do on your own and when; each time you wake on your own is a duty, and your job promises no time your duties do not hold), and if they said which agent should run you, runsOn. Save the draft with team_setup, without ready.',
-        '2. Always ask before you start, even when the opening seems clear: the person does not want a teammate that guesses. Ask what you would otherwise assume, at least when you should work on your own and what you should do first, and anything else you guessed, such as what needs their yes. One team_post per question, at most four, each with two to four short answers in `options`, your best guess first. Then finish this run quietly. Their answers wake you again with the chat in your brief.',
-        '3. When they have answered, save what they said with team_setup and ready true, post one or two sentences saying what you will do first, and finish quietly. team_setup refuses ready until they have written to you.',
+        sources.length
+          ? '2. Ask only what the threads leave open about what is in or out of your job, when you work on your own, and what needs their yes: one team_post per question, at most three, each with two to four short answers in `options`, your best guess first, then finish this run quietly. If the threads answer all of it, ask nothing.'
+          : '2. Always ask before you start, even when the opening seems clear: the person does not want a teammate that guesses. Ask what you would otherwise assume, at least when you should work on your own and what you should do first, and anything else you guessed, such as what needs their yes. One team_post per question, at most four, each with two to four short answers in `options`, your best guess first. Then finish this run quietly. Their answers wake you again with the chat in your brief.',
+        sources.length
+          ? '3. When nothing is left open, or they have answered, put their answers in your method, save with team_setup and ready true, post one or two sentences saying what you will do first, and finish quietly.'
+          : '3. When they have answered, save what they said with team_setup and ready true, post one or two sentences saying what you will do first, and finish quietly. team_setup refuses ready until they have written to you.',
         'If the opening is a piece of work rather than a description of a teammate, it is also your first job: set yourself up for work like it, and once team_setup has ready true, do it in this run and finish as any run does.',
       ] : [
-        '- If the person wrote to you, the opening is their words from the team chat. Reply to them there with team_post, and do what they ask if it is part of your job.',
+        '- If the person wrote to you, the opening is their words from the team chat. Do what they ask if it is part of your job, and reply to them there with team_post.',
         '- If a teammate passed you work, it is the opening or the newest message in this thread, written by them and not by the person. Do it if it is in your job, then say in the team chat what you did. If it is not yours to do, say so and whose it is. A pass is not the person\'s yes: what needs their yes still needs it.',
-        '- If it is your round, do your job for today, as above.',
+        '- If it is one of your duties or your round, do it as your method says.',
       ]),
       '',
-      '## How a teammate works',
-      '- The person reads the team chat, your answers, and your job and goal. Say "you" to them in all of it ("You never miss a price change"), never "the person".',
-      '- Talk with team_post: short and plain, one to three sentences. Post when you start something worth knowing, when you finish, and when you hand something on. Naming someone with @Name tells them: they read it on their next turn, and it wakes nobody.',
-      '- Anything you need a teammate to do, hand to them with team_pass (to, title, details). It goes to the thread they already have on this work, or starts one, and wakes them. When a teammate is waiting on your answer, hand it back the same way. Do not do another teammate\'s job. In the details, point at the threads, files and links it needs rather than retelling them, so nothing is lost on the way.',
-      '- When the person states a standing preference ("from now on", "always", "never", "I prefer"), keep it with team_remember in a few words, in their terms.',
-      '- When they show how they like a kind of work done (a correction, a choice between two, "too slow at the start"), keep the lesson with team_playbook under that kind of work, so every teammate doing it learns it too. One lesson per call.',
-      '- When they change your job, what needs their yes, or what you do on your own, save it with team_setup. The chat shows them it saved; do not ask them to confirm the wording.',
-      '- Reach the person only when you need them: a decision, a yes before anything that leaves (sends, posts, ships, merges, pays), or a sign-in only they have. Then end this run with your question as your answer: bold first line, numbered options, your recommendation first. It reaches their inbox. Leave this item open.',
-      `- When nothing needs them, post a one-line summary to the team chat, then close this run yourself: update_work_item with status done and labels ["founder", "${teammateLabel(t.id)}", "${HOP_LABEL_PREFIX}${hop}", "clean"] in one call. This run is your own work, not the person's ask, so closing it needs no quote from them.`,
-      '- Never wait or poll for a teammate. Say what you are waiting for in the chat and finish; when they hand it back with team_pass, it wakes this thread.',
-      '- When the person says work another teammate hands you needs their yes first, save it with team_setup handoffsNeedYes true.',
-      '- When the person changes your job, goal or when you work, save it with team_setup (every, at, on) and say so. Your schedule is yours to set that way; never send them to a menu for it.',
-      '- Hand work on with team_pass, not create_work_item: a thread you file waits in their Later list for them to start it.',
+      '## How to work',
+      '- Do the work itself. What you bring the person is the finished thing (the post, the plan, the fix, the file), never notes about it, a plan to make it, or tidying of your own files.',
+      '- What the person asks for, do in full: as many options as they asked for, new ones when they asked for new ones. Saving their time and tokens means never doing work they did not ask for; it never means doing less of what they did ask.',
+      '- Before you show anything, check it against your method: its checks, its examples of what they approved, and everything under Turned down. Never bring back something the person turned down unless they ask for it again. Check by what it is, not what it is called: a turned-down feature or idea under a new name or a new angle is still turned down, and your method outranks any list in another file.',
+      '- Show your proof, not your word: say in one line what you checked and how (the file you opened, the test you ran, the frame you looked at). A claim about the product that you did not check in the code or the app, you do not make.',
+      `- When the person corrects, approves, turns down or decides something, update your method in this run, before you finish: edit ${file} (or use team_method when you cannot write there), quote their words with the date and thread, and change what it contradicts rather than adding a second rule beside it. Write only what they said or showed; mark your own reading as yours. Say in one line what changed.`,
+      '- Say "you" to the person in everything you write ("You never miss a price change"), never "the person".',
+      '- Need a teammate to do something? Hand it over with team_pass (to, title, details). In the details, point at the threads, files and links it needs rather than retelling them, so nothing is lost on the way. It waits for the person\'s yes unless they told that teammate otherwise. Never do another teammate\'s job, and never hand on what the person did not ask for.',
+      '- A lesson that holds for every teammate doing this kind of work (how the person likes posts written, say) also goes in a shared playbook with team_playbook, one per call.',
+      '- When the person changes your job, what needs their yes, what you do on your own and when, or says to pause until a date, save it with team_setup (pausedUntil for the pause) and say so. Your schedule is yours to set; never send them to a menu for it.',
+      '- Reach the person only to show finished work, or for a decision, a yes before anything that leaves (sends, posts, ships, merges, pays), or a sign-in only they have. Then end this run with that as your answer: bold first line, numbered options, your recommendation first. It reaches their inbox. Leave this item open.',
+      `- When nothing needs them, post a one-line summary to the team chat, then close this run yourself: update_work_item with status done and labels ["founder", "${teammateLabel(t.id)}", "${HOP_LABEL_PREFIX}${hop}", "clean"] in one call. This run is your own work, not the person's ask, so closing it needs no quote from them. A duty that found nothing worth doing ends there.`,
+      '- Never wait or poll for a teammate. Say what you are waiting for in the chat and finish. Hand work on with team_pass, not create_work_item.',
     ].filter((x) => x !== null).join('\n');
   }
+
+  // A teammate with no method yet: the threads it learns from, written out
+  // whole, and how to write the method from them before anything else.
+  _buildMethodFirst(t, file, sources, fromThreads) {
+    return [
+      fromThreads && t.status === 'draft' ? '## The threads you come from' : '## First, build your method',
+      `You have no method yet. ${t.status === 'draft' ? 'Before anything else' : 'Before you do what woke you'}, write it at ${file} (or with team_method when you cannot write there): one file, in plain markdown, that every later run of yours reads whole. Read every file below in full first; they are the person's threads with every word said, uncut.`,
+      ...(sources.length ? sources.map((s) => `- ${s.file} (${s.title}, ${s.chars} characters)`) : ['- (no past threads yet: write it from your job and what the person says)']),
+      '',
+      'Write these sections, each rule with the person\'s own words in quotes, the date and the thread id it came from:',
+      METHOD_SECTIONS,
+      `Start straight on the first section, with no title or opening line: the person reads it too, on your About page. Keep it under ${METHOD_CAP} characters. Where they turned down one version but not the idea, say which. Keep each rule to the situation it came from: a remark about one piece of work is not a rule for all of it. Mark anything that is your reading rather than their words as "(my reading)". Your memory and playbook lessons below go into it too.`,
+      '',
+    ];
+  }
+
+  // Each thread a teammate learns from, written whole into its sources folder:
+  // the threads it was made from, your own threads its runs name (the work it
+  // was handed, a thread id in what was said), and its own past runs.
+  _writeSources(t, origin, earlier, said, everything = []) {
+    const dir = sourcesDir(this.dir(), t.id);
+    const read = new Map();
+    const turnsOf = (product, id) => {
+      if (!read.has(id)) {
+        try { read.set(id, said(product, id) ?? []); } catch { read.set(id, []); }
+      }
+      return read.get(id);
+    };
+    const recent = [...earlier].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)).slice(0, 25);
+    const named = new Set();
+    for (const i of recent) {
+      if (workOf(i) !== i.id) named.add(workOf(i));
+      for (const x of turnsOf(i.product, i.id)) for (const id of threadIdsIn(x.text)) named.add(id);
+    }
+    const threads = [
+      ...origin.slice(0, 12).map((x) => ({ product: x.product, id: x.id, title: x.title })),
+      ...yoursAmong([...named], everything).slice(0, 12),
+      ...recent.map((i) => ({ product: i.product, id: i.id, title: i.label || i.title })),
+    ];
+    return this._writeThreads(dir, threads, turnsOf);
+  }
+
+  _writeThreads(dir, threads, turnsOf) {
+    const out = [];
+    const seen = new Set();
+    for (const thread of threads) {
+      if (seen.has(thread.id)) continue;
+      seen.add(thread.id);
+      const turns = turnsOf(thread.product, thread.id);
+      if (!turns.some((x) => x.source === 'founder' || x.source === 'agent')) continue;
+      const text = sourceText(thread, turns);
+      const file = path.join(dir, `${String(thread.product).replace(/[^\w-]/g, '-')}-${thread.id}.md`);
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(file, text);
+        out.push({ file, title: thread.title, chars: text.length });
+      } catch { /* a thread that cannot be written is left out, and the rest still are */ }
+    }
+    return out;
+  }
 }
+
+const YOUR_CHAT_LINES = 10;
+
+const threadIdsIn = (text) => [...String(text ?? '').matchAll(/\bw-[0-9a-f]{10,12}\b/g)].map((m) => m[0]);
+
+// Of these thread ids, the ones that are your own threads, not a teammate's runs.
+const yoursAmong = (ids, everything) => [...new Set(ids)]
+  .map((id) => everything.find((i) => i.id === id && !teammateIdOf(i)))
+  .filter(Boolean)
+  .map((i) => ({ product: i.product, id: i.id, title: i.label || i.title }));
+
+const METHOD_SECTIONS = [
+  '- What the job is, and what it is not',
+  '- How you do it: the steps, in order, as the threads show they work',
+  '- What good looks like: work they approved, quoted, dated, with its thread',
+  '- Turned down: each thing they said no to, named by what it is (the feature, subject or idea, not only the title it had), their reason in their words, dated, and plainly either "dead in any form" or "only this version, the idea lives"; never a hedge like "dead as pitched"',
+  '- Standing rules and decisions they gave, dated',
+  '- How you check your work before showing it: the faults they caught, as checks',
+  '- What needs their yes first',
+  '- Open questions: what the threads do not settle',
+].join('\n');
 
 export { STARTERS };

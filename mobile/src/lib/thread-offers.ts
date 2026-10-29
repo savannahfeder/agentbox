@@ -11,7 +11,7 @@ import { updatedWord } from '../../../renderer/src/threads/summary-rules';
 import { shownPriority } from '../../../shared/rank.mjs';
 import { doneSteps, summaryOf } from '../../../shared/thread-cards.mjs';
 
-export interface Session { startedAt: number; activity?: { id: string; label: string; detail: string; startedAt?: number }[]; helpers?: number; engine?: string }
+export interface Session { startedAt: number; activity?: { id: string; label: string; detail: string; startedAt?: number }[]; helpers?: number; engine?: string; where?: string; movable?: boolean }
 // What the computer said of the thread when nothing runs on it (phone-rows.ts `waitFacts`), so waiting reads Queued.
 type Waits = Pick<LiveFacts, 'queued' | 'runNow' | 'signInNeeded' | 'atLimit' | 'paused' | 'stalled' | 'shipping'>;
 interface Facts extends Waits { session: Session | null; inProgress: boolean; now: number }
@@ -32,6 +32,8 @@ export function offersOf(item: any, { session, inProgress, now }: Facts) {
     // In the open reply box's send slot while nothing is typed (Focus.tsx `stopButton`).
     stop: inProgress && !item.agent,
     runNow: offersRunNow(item, { session: session as any, queued: [], runNow: [], inProgress }),
+    // A run on the computer the cloud could take now (Supervisor#liveFor).
+    moveToCloud: !!session?.movable && session.where !== 'cloud' && !item.agent,
     // Only a running Claude Code step can be cut (ItemThread.tsx).
     sendNow: !!session && session.engine !== 'codex',
     sendBack: !item.agent && item.status === 'blocked' && !session,

@@ -16,6 +16,8 @@ export interface WorkItem {
   pinned?: boolean;
   /** Kept on this Mac whatever the cloud is set to (Supervisor#setThreadOnMac). */
   onMac?: boolean;
+  /** What the cloud handed this thread back for, in the run's own words ("your Stripe key"). */
+  needsMac?: string;
   // WHAT PEOPLE PUT ON EACH MESSAGE IN A CONVERSATION (w-560647d4db): by the
   // message's line uid, then by emoji, then the people on it. Folded out of the
   // presses the ledger holds (shared/work-items.mjs); absent on every row
@@ -440,6 +442,8 @@ export interface RunningSession {
    *  that started before a second engine existed, and every one of those was
    *  Claude Code, which is the reading `engineOf` makes in main/supervisor.mjs. */
   engine?: string;
+  /** On the phone: a run on the computer the cloud could take now (Supervisor#liveFor). */
+  movable?: boolean;
   tail: string[];
   /** Matched, still-running tool calls; absent on an older main process. */
   activity?: { id: string; label: string; detail: string; startedAt: number }[];
@@ -1380,6 +1384,7 @@ declare global {
       setThreadPlaces(p: { places: Record<string, number | null> }): Promise<unknown>;
       setThreadPins?(p: { pins: Record<string, true | null> }): Promise<unknown>;
       setThreadOnMac?(p: { onMac: Record<string, true | null> }): Promise<unknown>;
+      moveToCloud?(p: { ids: string[]; product?: string; id?: string }): Promise<{ moving?: number; ok?: boolean }>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
       compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
       routeThread?(p: { product: string; id: string; to: string }): Promise<{ ok: true }>;
@@ -1492,7 +1497,7 @@ declare global {
       // screenDetail is which set of theme pictures this screen wants, 'soft' or
       // 'sharp' (main/screen-detail.mjs). It rides here rather than being
       // pushed because the answer is needed on the first paint.
-      bootInfo?(): Promise<{ reloaded: boolean; builtAt: number; recovered?: string | null; screenDetail?: string }>;
+      bootInfo?(): Promise<{ reloaded: boolean; builtAt: number; recovered?: string | null; revived?: string | null; screenDetail?: string }>;
       onJoinRoom?(fn: () => void): () => void;
       takeJoin?(): Promise<string | null>;
       // Keeping Agentbox current (main/updater.mjs). Look again now, and restart

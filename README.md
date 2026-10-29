@@ -12,6 +12,7 @@
 
 <p align="center">
   <a href="#install">Get it</a> ·
+  <a href="#an-interface-that-helps-you-hyperfocus">Hyperfocus</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#what-matters-most-goes-first">Priorities</a> ·
   <a href="#built-for-the-keyboard">Keys</a> ·
@@ -24,7 +25,7 @@
 </p>
 
 <p align="center">
-  Free and open source. A Mac app, or in your browser on any platform with <code>npx agentbox-app</code>,<br>
+  Free and open source. A Mac app, or in your browser on Linux with <code>npx agentbox-app</code>,<br>
   on the Claude Code or Codex plan you already have. No server, no account, no extra subscription.
 </p>
 
@@ -32,23 +33,7 @@
 
 ## Install
 
-There are two ways to run it: in the browser, or as a Mac app. Both need Node 22 and Claude Code or Codex installed and signed in.
-
-**In your browser.** One command, nothing to install first:
-
-```
-npx agentbox-app
-```
-
-It starts on your machine and opens a tab. On Linux that open goes through `xdg-open`. Nothing is hosted: it listens only on `127.0.0.1`, and the address carries a key that is new every run. Add `--help` to see the options. `--no-open` prints the address and leaves the browser to you.
-
-From a checkout, build the screen once, then start it the same way. The install links the checkout's own command, so `npx` runs this copy rather than looking for `agentbox` on your PATH:
-
-```
-npm install
-npm run build
-npx agentbox-app
-```
+There are two ways to run it: in the browser, or as a Mac app. Both need Node 22 or newer and Claude Code or Codex installed and signed in.
 
 **As a desktop app.** Build it from this repo. `npm start` is the desktop command on Omarchy and on a Mac:
 
@@ -59,9 +44,32 @@ npm install
 npm start
 ```
 
+`npm install` ends with a run of deprecation warnings and a count of
+vulnerabilities. What is left after `npm audit fix` are advisories on Vite,
+Vitest and the Tiptap editor that only a new major version of each would clear.
+The install worked if it exits without an error.
+
+**In your browser.** One command, nothing to install first:
+
+```
+npx agentbox-app
+```
+
+It starts on your machine and opens a tab. On Linux that open goes through `xdg-open`. Nothing is hosted: it listens only on `127.0.0.1`, and the address carries a key that is new every run. Add `--help` to see the options. `--no-open` prints the address and leaves the browser to you.
+
+The terminal is the one piece that is compiled while it installs, and on Linux that needs `make` and a C++ compiler. Without them the install leaves the terminal out, everything else works, and the command says so each time it starts. On Debian or Ubuntu, `sudo apt install build-essential` and install again.
+
+From a checkout, build the screen once, then start it the same way. The install links the checkout's own command, so `npx` runs this copy rather than looking for `agentbox` on your PATH:
+
+```
+npm install
+npm run build
+npx agentbox-app
+```
+
 On Linux, `npm install` puts `agentbox` on `~/.local/bin` and adds the app to the launcher. The entry is `$XDG_DATA_HOME/applications/agentbox.desktop` (`~/.local/share/applications` when that variable is unset), and it runs `agentbox`. That command starts this checkout, and it is written before Electron has downloaded its binary, so the first launch off the launcher does that download. Open the app from the launcher.
 
-Two of this repo's dependencies need an install script to work: `node-pty`, which is the terminal, and `esbuild`. `package.json` names them in `allowScripts`, by name rather than pinned to a version, so a dependency bump does not need re-approving. `electron-winstaller` is denied there: it is only for packing a Windows installer, which this repo does not do. npm 11 and newer print anything in neither list on every install, and `npm approve-scripts --allow-scripts-pending` lists them.
+Two of this repo's dependencies need an install script to work: `node-pty`, which is the terminal and is the one optional dependency here, and `esbuild`. `package.json` names them in `allowScripts`, by name rather than pinned to a version, so a dependency bump does not need re-approving. `electron-winstaller` is denied there: it is only for packing a Windows installer, which this repo does not do. npm 11 and newer print anything in neither list on every install, and `npm approve-scripts --allow-scripts-pending` lists them.
 
 `npm start` builds the app and opens it. On first run it walks you through connecting Claude Code or Codex and choosing a folder to work in.
 
@@ -134,6 +142,22 @@ editing the test instead of the code, which is exactly the moment you want to be
 asked. Code changes open right beside the row.
 
 <img src="docs/readme/loop.webp" alt="An agent reports the usage test passes; the change beside it shows it edited the expected value in the test, and the reply sends it back to fix the code" width="100%">
+
+## An interface that helps you hyperfocus
+
+The app keeps one decision in front of you at a time.
+
+- **You only see the agents that need you.** Anything still working stays out
+  of the inbox, so there is nothing to check on and no window to watch.
+- **Each one opens as a single card.** What the agent did, what it needs from
+  you, and the options it is offering, numbered.
+- **One key answers it.** `1` `2` `3` take an option, `E` approves the
+  recommendation, `R` replies in your own words. The next card is already on
+  screen.
+- **Urgent tasks first.** Your project order decides the rest, so the card in
+  front of you is always the one worth answering next.
+
+<img src="docs/readme/hyperfocus.webp" alt="An agent's card shows what it found and three numbered options, then a key is pressed and the next card is already there" width="100%">
 
 ## What matters most goes first
 
@@ -231,11 +255,12 @@ matter:
 
 <br>
 
-Nothing, unless you are running a build that was signed and released with a
-PostHog key baked into it. A build made from this repo has no key, so a clone
-and a fork are silent, and with no key the whole path is off at every send.
+Nothing, unless you are running a released copy: the Mac app, or
+`npx agentbox-app`, each of which has a PostHog key baked in when it is
+released. A build made from this repo has no key, so a clone and a fork are
+silent, and with no key the whole path is off at every send.
 
-A released build counts eighteen things, and they are counts:
+A released copy counts eighteen things, and they are counts:
 
 - the app was opened
 - the app was used today, once a day
@@ -256,7 +281,8 @@ A released build counts eighteen things, and they are counts:
 - setup imported agents
 - counts were turned off
 
-Each carries a random install id, the app and platform version, and at most
+Each carries a random install id, the app and platform version, whether it
+came from the Mac app or the browser copy, and at most
 seven other things: how long something took, how many of a thing there were,
 which kind of row it was out of six fixed words, whether an agent or you did
 it, whether an agent's run failed, whether it happened in setup's practice

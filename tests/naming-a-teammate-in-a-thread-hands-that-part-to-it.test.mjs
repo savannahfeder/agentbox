@@ -28,6 +28,15 @@ describe('a teammate named in a thread', () => {
     expect(block).toMatch(/do not do that part yourself/);
   });
 
+  // "@Felix learn from this thread" is how a thread that went well teaches a
+  // teammate: the hand-off carries this thread's id, and the teammate's run is
+  // given the thread whole (a-teammate-works-from-one-method...).
+  it('tells the thread\'s agent to put this thread\'s id in the hand-off', () => {
+    const block = make().namedThreadsBlock(thread, { slug: 'p' }, ['@Felix learn how I want bugs filed from this thread']);
+    expect(block).toContain('w-1');
+    expect(block).toMatch(/learn from this thread/);
+  });
+
   it('says nothing for a name that is no started teammate, an email, or no name at all', () => {
     const sup = make();
     expect(sup.namedThreadsBlock(thread, { slug: 'p' }, ['@Iris write the article'])).toBe('');

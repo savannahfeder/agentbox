@@ -53,10 +53,16 @@ describe('the picker the app draws itself', () => {
   });
 });
 
-describe('the two screens that ask where the code is', () => {
+// THE FIRST TASK'S OWN FOLDER BUTTON WAS NOT IN THIS LIST, and it is the one a
+// brand-new person presses first (F-127, QA on Linux, 2026-10-28: four clicks,
+// no dialog, no picker, nothing said). Driven again in a Chromium tab against
+// this branch on Linux, the button opens the drawn picker, a typed path is
+// taken, and the task lands in the inbox against its project.
+describe('the three screens that ask where the code is', () => {
   for (const [what, file] of [
     ['the new project card', ['renderer', 'src', 'components', 'NewProject.tsx']],
     ['the first run', ['renderer', 'src', 'components', 'Onboarding.tsx']],
+    ['the first task', ['renderer', 'src', 'components', 'FirstRun.tsx']],
   ]) {
     const source = read(...file);
 
