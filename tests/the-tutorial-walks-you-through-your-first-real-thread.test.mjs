@@ -484,9 +484,10 @@ describe('the folder chip before a choice', () => {
     expect(box).toContain('const unpicked = !!ideas?.length && !projectChosen && !product?.repoPath;');
     expect(box).toContain("{unpicked ? 'Choose a folder' : product?.name ?? 'No project'}");
   });
+  // And then: "I thought it was actually a folder ... that can run code. It's just for personal tasks."
   it('says in the menu what a project with no folder is for', async () => {
     const box = await read();
-    expect(box).toContain('{!p.repoPath && <span className="tc-row-note">No folder · for work that isn’t code</span>}');
+    expect(box).toContain('{!p.repoPath && <span className="tc-row-note">For personal tasks</span>}');
   });
 });
 
@@ -498,5 +499,18 @@ describe('the command bar tip on a thread', () => {
     const t = noteSent(after('open', 'choose', 'reply', 'close'));
     expect(tourStep(t, at({ thread: true, options: true }))).toBe('palette');
     expect(tourStep(t, at({ thread: true, busy: true }))).toBe('busy');
+  });
+});
+
+describe('the glow around the working line', () => {
+  // The founder, 2026-10-29: "the highlight of thinking is a bit uneven ...
+  // it's got a lot more border on the bottom." A hidden copy of the word read
+  // out to screen readers sat lower and stretched it; the lattice, drawn
+  // without svg, fell outside it on the left.
+  it('measures what is seen: the lattice in, the screen reader copy out', async () => {
+    const fs = await import('node:fs');
+    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+    expect(tour).toContain("n.parentElement?.closest('.live-announcement')");
+    expect(tour).toContain("el.querySelectorAll('svg, .th-st, .live-mark')");
   });
 });

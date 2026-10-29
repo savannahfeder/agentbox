@@ -87,7 +87,7 @@ function snug(el: HTMLElement): Box {
       x0 = Math.min(x0, r.left); y0 = Math.min(y0, r.top); x1 = Math.max(x1, r.right); y1 = Math.max(y1, r.bottom);
     }
   }
-  for (const icon of el.querySelectorAll('svg, .th-st')) {
+  for (const icon of el.querySelectorAll('svg, .th-st, .live-mark')) {
     const r = icon.getBoundingClientRect();
     if (r.width) { x0 = Math.min(x0, r.left); x1 = Math.max(x1, r.right); }
   }

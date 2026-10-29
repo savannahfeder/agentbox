@@ -58,10 +58,10 @@ export function drawnWhole(behind: number, imported = false): boolean {
   return !imported && behind > 0 && behind < FOLD_FROM;
 }
 
-/** The line under the title while an agent works: the first paragraph of what you asked. */
-export function askLine(ask: string): string | null {
+/** The line under the title while an agent works: the first paragraph of what you asked, unless the title already says it. */
+export function askLine(ask: string, title = ''): string | null {
   const first = ask.trim().split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
-  if (!first) return null;
+  if (!first || first.toLowerCase() === title.replace(/\s+/g, ' ').trim().toLowerCase()) return null;
   return `You asked: ${/[.!?]$/.test(first) ? first : `${first}.`}`;
 }
 

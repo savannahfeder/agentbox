@@ -19,6 +19,11 @@ describe('the line under the title while an agent works', () => {
   it('keeps to the first paragraph of a long ask', () => {
     expect(askLine('Fix the login bug\n\nIt fails on Safari and only after a reload')).toBe('You asked: Fix the login bug.');
   });
+  it('is nothing while the title is still the ask itself', () => {
+    // Measured 2026-10-29: before a thread is named its title is your words, and the line said them twice.
+    expect(askLine('Research five note apps. Take your time.', 'Research five note apps. Take your time.')).toBe(null);
+    expect(askLine('Research five note apps', 'Note app research')).toBe('You asked: Research five note apps.');
+  });
   it('is nothing when there was no ask', () => {
     expect(askLine('')).toBe(null);
     expect(askLine('   ')).toBe(null);
@@ -31,7 +36,7 @@ describe('the page', () => {
     expect(page).toContain('const short = !earlierOpen && !working && drawnWhole(behind, broughtIn(item));');
   });
   it('says what you asked until the agent writes a summary of its own', () => {
-    expect(page).toContain('context={working && !queue.context ? askLine(item.body ?? item.title ?? \'\') : queue.context}');
+    expect(page).toContain('context={working && !queue.context ? askLine(item.body ?? item.title ?? \'\', rowTitle(item)) : queue.context}');
   });
   it('draws only the title and your ask before the agent has said anything', () => {
     expect(page).toContain('if (queue && working && !newest && !earlierOpen) return <>{queueHead}</>;');

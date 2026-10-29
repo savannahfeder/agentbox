@@ -388,7 +388,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
     <QueueSummary
       key={`${item.product}:${item.id}`}
       title={rowTitle(item)}
-      context={working && !queue.context ? askLine(item.body ?? item.title ?? '') : queue.context}
+      context={working && !queue.context ? askLine(item.body ?? item.title ?? '', rowTitle(item)) : queue.context}
       earlier={short ? 0 : behind}
       steps={!short && !!newest && (events.some((e) => e.kind === 'work') || after.length > 0)}
       open={earlierOpen}
