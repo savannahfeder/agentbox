@@ -2844,6 +2844,13 @@ export default function App() {
   useEffect(()=>{document.documentElement.dataset.reviewStyle=reviewLab ? reviewStyle : 'header-tools-open';},[reviewLab,reviewStyle]);
   const [artifactMode, setArtifactMode] = useState<ArtifactMode>('beside');
   const [artifactReturnBeside, setArtifactReturnBeside] = useState(false);
+  // Full screen belongs to the file it was asked for. Left set, the next file
+  // opened from a link in a message would open full screen too.
+  useEffect(() => {
+    if (openDoc) return;
+    setArtifactMode('beside');
+    setArtifactReturnBeside(false);
+  }, [openDoc]);
 
   /**
    * FULL SCREEN, AND THE TWO THINGS THAT RIDE ON TOP OF IT.
