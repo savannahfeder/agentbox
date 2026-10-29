@@ -138,6 +138,9 @@ export function Tour({ tour, view, thread, covered, onChange }: {
   const [step, setStep] = useState<TourStep | null>(null);
   const [box, setBox] = useState<Box | null>(null);
   const [cardAt, setCardAt] = useState<{ left: number; top: number } | null>(null);
+  // What was last set, so the reading eight times a second sets nothing that did not move.
+  const boxNow = useRef<Box | null>(null);
+  const cardNow = useRef<{ left: number; top: number } | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const shown = useRef<TourStep | null>(null);
   const shownAt = useRef(0);
@@ -165,11 +168,13 @@ export function Tour({ tour, view, thread, covered, onChange }: {
 
   // WHAT IS ON SCREEN, read a few times a second while there is anything left to say.
   useEffect(() => {
-    if (!live || !tour) { setStep(null); return undefined; }
+    if (!live || !tour) { if (shown.current) { shown.current = null; setStep(null); } return undefined; }
     const read = () => {
       const screen = readScreen(view, thread, covered);
       if (screen.typing && !tour.done.includes('reply')) { onChange(finishLesson(tour, 'reply')); return; }
       const wanted = tourStep(tour, screen);
+      // Already closed, by its agent: nothing is left for the close tip to point at.
+      if (wanted === 'close' && document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done')) { onChange(finishLesson(tour, 'close')); return; }
       // A screen still arriving (the inbox before its rows land) must not flash a tip.
       if (wanted !== settling.current.step) settling.current = { step: wanted, since: Date.now() };
       const next = wanted && Date.now() - settling.current.since < SETTLE_MS ? shown.current : wanted;
@@ -193,7 +198,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
       }
       if (next) before.current = screen;
       const b = next ? boxOf(next, targetsOf(next)) : null;
-      setBox((had) => (same(had, b) ? had : b));
+      if (!same(boxNow.current, b)) { boxNow.current = b; setBox(b); }
     };
     read();
     const t = setInterval(read, 120);
@@ -203,7 +208,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
   // THE CARD, beside the glow, kept inside the window.
   useEffect(() => {
     const c = cardRef.current;
-    if (!box || !step || !c) { setCardAt(null); return; }
+    if (!box || !step || !c) { if (cardNow.current) { cardNow.current = null; setCardAt(null); } return; }
     const w = c.offsetWidth, h = c.offsetHeight;
     const side = SAY[step].side;
     let left = side === 'below-right' ? box.x + box.w - w : box.x;
@@ -222,7 +227,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
     }
     left = Math.max(12, Math.min(left, window.innerWidth - w - 12));
     top = Math.max(12, Math.min(top, window.innerHeight - h - 12));
-    setCardAt((had) => (had && had.left === left && had.top === top ? had : { left, top }));
+    if (cardNow.current?.left !== left || cardNow.current?.top !== top) { cardNow.current = { left, top }; setCardAt(cardNow.current); }
   }, [box, step]);
 
   // THE WAYS OUT. A click anywhere but the glow puts this tip away, and the next

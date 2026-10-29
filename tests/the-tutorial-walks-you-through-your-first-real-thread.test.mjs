@@ -489,3 +489,28 @@ describe('the command bar tip on the empty inbox', () => {
     expect(tourStep(t, at({ rows: 0, composer: 'card', folder: true, ideas: true }))).toBe('pick');
   });
 });
+
+describe('the glow reading the window', () => {
+  // Main found on 2026-10-29 (the-open-task-hint-never-turns-a-loop-into-a-
+  // blank-screen) that a set which changes nothing still schedules a render,
+  // and inside someone else's update loop that unmounted the whole window.
+  // The tutorial reads the window eight times a second, so it sets only what moved.
+  it('sets the glow, the card and the tip only when they change', async () => {
+    const fs = await import('node:fs');
+    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+    expect(tour).toContain('if (!same(boxNow.current, b)) { boxNow.current = b; setBox(b); }');
+    expect(tour).toContain('if (cardNow.current?.left !== left || cardNow.current?.top !== top) { cardNow.current = { left, top }; setCardAt(cardNow.current); }');
+    expect(tour).not.toMatch(/setBox\(\(had\)/);
+  });
+});
+
+describe('a thread the agent closed itself', () => {
+  // Measured 2026-10-29 by the end-to-end walk: after "Thanks, that is all."
+  // the agent closed the thread, so it had no Done for the close tip to point
+  // at, and the tutorial waited on a close that had already happened.
+  it('counts as the close, so the tutorial goes on to the command bar', async () => {
+    const fs = await import('node:fs');
+    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+    expect(tour).toContain("if (wanted === 'close' && document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done')) { onChange(finishLesson(tour, 'close')); return; }");
+  });
+});
