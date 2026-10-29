@@ -171,7 +171,9 @@ describe('end to end, with the stand-in worker', () => {
   afterEach(async () => {
     try { booted?.supervisor.killAll(); booted?.supervisor.stop?.(); } catch { /* done */ }
     await wait(100);
-    if (dir) fs.rmSync(dir, { recursive: true, force: true });
+    // The killed worker can still be writing under `dir` when this walks it,
+    // which on macOS ends the rmdir in ENOTEMPTY; a retry sees it empty.
+    if (dir) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     dir = null; booted = null;
   });
 

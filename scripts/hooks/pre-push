@@ -244,12 +244,40 @@ echo ""
 # because it conflicts with the default minimum and vitest dies with
 # "options.minThreads and options.maxThreads must not conflict" before it runs
 # a single test.
+again="${TMPDIR:-/tmp}/zero-pre-push-$$-again.json"
+trap 'rm -f "$report" "$again"' EXIT INT TERM
 # shellcheck disable=SC2086
-if node_modules/.bin/vitest run --reporter=basic --no-file-parallelism $red; then
+if node_modules/.bin/vitest run --reporter=basic --reporter=json --outputFile.json="$again" --no-file-parallelism $red; then
   echo ""
   echo "pre-push: they all pass on their own, in $(( $(date +%s) - started ))s total."
   echo "That was the machine, not the code. Pushing."
   exit 0
+fi
+
+# A TEST ALREADY RED ON MAIN IS NOT THIS PUSH'S (w-73e6011de3). The app sets
+# AGENTBOX_RED_ON_MAIN, one file per line, from GitHub's last red run on main,
+# and a thread is already fixing those (main/main-went-red.mjs). Only a file
+# red here and not in that list refuses the push.
+if [ -n "${AGENTBOX_RED_ON_MAIN:-}" ]; then
+  still=$(node scripts/red-test-files.mjs "$again" 2>/dev/null)
+  [ -z "$still" ] && still="$red"
+  mine=""
+  for f in $still; do
+    if ! printf '%s\n' "$AGENTBOX_RED_ON_MAIN" | grep -qxF -- "$f"; then
+      mine="$mine $f"
+    fi
+  done
+  if [ -z "$mine" ]; then
+    echo ""
+    echo "pre-push: every test still red is already red on main, and a thread"
+    echo "is fixing those:"
+    printf '    %s\n' $still
+    echo "Pushing."
+    exit 0
+  fi
+  echo ""
+  echo "  These are red on this push and not red on main:"
+  printf '    %s\n' $mine
 fi
 
 refuse

@@ -87,7 +87,7 @@ export function ViewMenu({ display, onDisplay, products, items, shown, total, ta
     <View style={{ position: 'absolute', top: inset.top + size.topBar, left: 0, right: 0, bottom: 0, zIndex: 30 }}>
       <ScrollView style={{
         flexGrow: 0, maxHeight: height * 0.75, backgroundColor: color.bg, borderBottomWidth: 1, borderBottomColor: color.line,
-        shadowColor: '#000', shadowOpacity: 0.45, shadowRadius: 16, shadowOffset: { width: 0, height: 16 }, elevation: 12,
+        shadowColor: '#000', shadowOpacity: color.lift * 0.8, shadowRadius: 16, shadowOffset: { width: 0, height: 16 }, elevation: 12,
       }} contentContainerStyle={{ paddingTop: 4, paddingBottom: 6 }} accessibilityRole="menu" accessibilityLabel="Inbox view and filters">
         <Line label="View">
           <Choice label="List" on={display.view === 'list'} onPress={() => set({ view: 'list' })} />

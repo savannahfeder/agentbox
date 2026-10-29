@@ -20,7 +20,7 @@ import { color, font, size } from './theme';
 /** A square face: the photo, or two letters in mono on one grey tile for everyone (RoomFace.tsx). */
 export function Face({ name, size: s }: { name: string; size: number }) {
   return (
-    <View style={{ width: s, height: s, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: 'rgba(255, 255, 255, 0.07)', alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: s, height: s, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: color.film, alignItems: 'center', justifyContent: 'center' }}>
       <T style={{ fontFamily: font.mono, fontSize: Math.max(8, Math.round(s * 0.28 * 2) / 2), letterSpacing: 0.5, color: color.dim }}>{initialsOf(name)}</T>
     </View>
   );

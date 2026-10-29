@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { offerFrom, threadsDigest, OFFER_LABEL, OFFER_MAKE } from '../shared/teammates.mjs';
+import { offerFrom, OFFER_LABEL, OFFER_MAKE } from '../shared/teammates.mjs';
 
 const NOW = new Date(2026, 9, 24, 9, 0).getTime();
 const DAY = 86_400_000;
@@ -28,40 +28,6 @@ describe('the offer of a teammate', () => {
     const offer = offerFrom({ items, now: NOW });
     expect(offer.threads.map((t) => t.id).sort()).toEqual(['w-1', 'w-2', 'w-3']);
     expect(offer.threads[0]).toEqual({ product: 'site', id: 'w-1', title: 'Agentbox launch video, version 3' });
-  });
-});
-
-describe('what a new teammate reads of those threads', () => {
-  const turns = {
-    'w-1': [
-      { source: 'founder', field: 'body', text: 'Make a launch video for agentbox, 40 seconds.' },
-      { source: 'agent', field: 'result', text: 'Here are two cuts. '.repeat(200) },
-      { source: 'founder', field: 'answer', text: 'Too slow at the start. Always open on the product, never a logo.' },
-    ],
-    'w-2': [{ source: 'founder', field: 'body', text: 'Cut the intro.' }, { source: 'system', field: 'note', text: 'Moved to Later' }],
-  };
-  const read = (product, id) => turns[id] ?? [];
-  const threads = [{ product: 'site', id: 'w-1', title: 'Launch video' }, { product: 'site', id: 'w-2', title: 'Cut the intro' }, { product: 'site', id: 'w-9', title: 'Gone' }];
-
-  it('keeps your words whole and cuts the agent\'s long replies short', () => {
-    const text = threadsDigest(threads, read);
-    expect(text).toContain('### Launch video (site/w-1)');
-    expect(text).toContain('You: Make a launch video for agentbox, 40 seconds.');
-    expect(text).toContain('You: Too slow at the start. Always open on the product, never a logo.');
-    expect(text).toMatch(/Agent: Here are two cuts\.[^\n]{0,1300}…/);
-    expect(text).not.toMatch(/Here are two cuts\.[^\n]{1400}/);
-  });
-
-  it('leaves out the app\'s own notes, and still names a thread it cannot read', () => {
-    const text = threadsDigest(threads, read);
-    expect(text).not.toContain('Moved to Later');
-    expect(text).toContain('### Gone (site/w-9)');
-  });
-
-  it('stays inside its budget however long the threads are, and is nothing for no threads', () => {
-    const long = { 'w-1': Array.from({ length: 60 }, (_, i) => ({ source: 'founder', field: 'answer', text: `Note ${i} `.repeat(80) })) };
-    expect(threadsDigest([threads[0]], (p, id) => long[id], { cap: 6000 }).length).toBeLessThanOrEqual(6000);
-    expect(threadsDigest([], read)).toBe('');
   });
 });
 
@@ -105,15 +71,23 @@ describe('making a teammate from the offer', () => {
     expect(opening.text).not.toMatch(/\n\n- /);
     expect(opening.text.match(/^- /gm)).toHaveLength(3);
 
+    // Since 2026-10-29 the threads are written out whole, one file each, and
+    // the setup run reads them and writes its method from them.
     const brief = team.briefFor({ id: 'w-setup', labels: ['founder', `teammate:${mate.id}`, 'hop:0'] }, now);
     expect(brief).toContain('## The threads you come from');
-    for (const said of ['Group by what users notice, not by PR.', 'No internal refactors in it, ever.', 'Shorter. One line per change.']) expect(brief).toContain(`You: ${said}`);
-    expect(brief).toMatch(/read every thread under[^\n]*team_remember/i);
+    const files = [...brief.matchAll(/^- (\/\S+\.md) \(/gm)].map((m) => m[1]);
+    expect(files).toHaveLength(3);
+    const all = files.map((f) => fs.readFileSync(f, 'utf8')).join('\n');
+    for (const said of ['Group by what users notice, not by PR.', 'No internal refactors in it, ever.', 'Shorter. One line per change.']) expect(all).toContain(said);
+    expect(brief).toMatch(/read every file under "The threads you come from"[^\n]*write your method/i);
 
-    // Once it is set up, its runs carry what it learned, not the threads again.
-    const { writeTeammate } = await import('../main/store/teammates-files.mjs');
-    writeTeammate(team.dir(), mate.id, { status: 'active' }, now);
-    expect(team.briefFor({ id: 'w-next', labels: ['founder', `teammate:${mate.id}`, 'hop:0'] }, now)).not.toContain('## The threads you come from');
+    // Once it has written its method, its runs carry the method, not the threads again.
+    const { methodFile } = await import('../main/store/teammates-files.mjs');
+    fs.mkdirSync(path.dirname(methodFile(team.dir(), mate.id)), { recursive: true });
+    fs.writeFileSync(methodFile(team.dir(), mate.id), '# Method\n- Group by what users notice.\n');
+    const next = team.briefFor({ id: 'w-next', labels: ['founder', `teammate:${mate.id}`, 'hop:0'] }, now);
+    expect(next).not.toContain('## The threads you come from');
+    expect(next).toContain('- Group by what users notice.');
   });
 });
 

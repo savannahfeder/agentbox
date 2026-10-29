@@ -1990,8 +1990,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       {/* THE FILES A MESSAGE NAMES ARE SMALL FRAMED TILES (w-9ed13d72b3), and
           a file nothing can read gets none. The big review card below is
           only the review lab's sample now. */}
-      {/* One thing at a time reads a page or a note in place rather than as a tile. */}
-      {inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => <QueueFile key={path} product={product} path={path} md={md} onOpen={() => onOpenArtifact?.(path, 'focus')} />)}
+      {/* One thing at a time reads a page or a note in place rather than as a
+          tile, and not a second time while it is open on the side. */}
+      {inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && <QueueFile key={path} product={product} path={path} md={md}
+        onOpen={() => onOpenArtifact?.(path, 'focus')} onSide={() => onOpenArtifact?.(path, 'beside')} />)}
       {!page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths} revision={item.updatedAt} openDoc={openDoc} onOpen={path => onOpenArtifact?.(path, 'beside')} />}
       {inlineArtifacts && previewSample && <div className="artifact-entry-list" aria-label="Attachments">{previewPaths.map(path =>
         <DirectReview key={path} product={product} path={path} revision={item.updatedAt} open={openDoc === path}
