@@ -184,7 +184,7 @@ describe('the empty inbox during the tutorial', () => {
   it('offers the suggestions only once the project has a folder', async () => {
     const fs = await import('node:fs');
     const box = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
-    expect(box).toContain('const ideaRows = ideas?.length && product?.repoPath && !person && !mate ? (');
+    expect(box).toContain('const ideasShown = !!(ideas?.length && product?.repoPath && !person && !mate);');
   });
 });
 
@@ -249,5 +249,30 @@ describe('answering the agent', () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     expect(tour).toContain("if (screen.typing && !tour.done.includes('reply'))");
+  });
+});
+
+describe('while a chat brought in is being written up', () => {
+  // Measured 2026-10-29 in a fresh window: for the 13 seconds the rewrite took,
+  // the list had no row to point at, so "Press N" showed; opening the chat
+  // showed "Press R" over "Writing up where this chat stands…".
+  it('says nothing on the list or in the chat', () => {
+    expect(tourStep(startTour(), at({ rows: 0, preparing: true }))).toBe(null);
+    expect(tourStep(startTour(), at({ thread: true, preparing: true }))).toBe(null);
+  });
+  it('but still teaches the New thread box if it is opened', () => {
+    expect(tourStep(startTour(), at({ composer: 'card', preparing: true }))).toBe('pick');
+  });
+});
+
+describe('the down arrow on the empty inbox', () => {
+  // The founder, 2026-10-29, on the empty inbox after answering her first
+  // thread: "when I hit the down arrow, it doesn't actually do anything". ↓
+  // was heard only inside the text box, and nothing had the keyboard there.
+  it('reaches the suggestions when nothing else has the keyboard', async () => {
+    const fs = await import('node:fs');
+    const box = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
+    expect(box).toContain('if (at && at !== document.body) return;');
+    expect(box).toContain("window.addEventListener('keydown', down, true);");
   });
 });

@@ -33,6 +33,7 @@
 .one-earlier:focus-visible { outline: 2px solid var(--underline); outline-offset: 2px; }
 
 /* What the app did after the answer, quiet under it. */
+.one-catching-up { margin: 18px 0 0; font-size: 15px; color: var(--text-faint); }
 .one-app-note { margin: 14px 0 0; font-size: 13px; color: var(--text-faint); }
 
 .one-answer .one-q { margin: 0 0 8px; font-size: 17px; line-height: 1.45; font-weight: 600; color: var(--text); }

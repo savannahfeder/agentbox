@@ -42,6 +42,7 @@ import type { TraceSession } from '../notes';
 import type { AgentTurn, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
+import { catchUpDue } from '../../../shared/agent-import.mjs';
 import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, standsAt } from '../one-thing-at-a-time';
 import { rowTitle } from '../list-rules';
 import { askMarkUnread, say } from '../team/chat-events';
@@ -398,6 +399,15 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
       {after.map((act, i) => <ActLine key={`${act.at}-${i}`} act={act} />)}
     </div>
   );
+  // A chat just brought in is being written up as a thread (main/catch-up.mjs); its raw end is the look it replaces.
+  if (queue && catchUpDue(item)) {
+    return (
+      <>
+        {queueHead}
+        <p className="one-catching-up">Writing up where this chat stands…</p>
+      </>
+    );
+  }
   if (queue && newest && !earlierOpen && !short && from < 0) {
     return (
       <>

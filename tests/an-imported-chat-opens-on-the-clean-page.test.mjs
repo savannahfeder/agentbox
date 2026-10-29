@@ -45,3 +45,17 @@ describe('the page it opens on', () => {
     expect(page).toContain('const short = !earlierOpen && drawnWhole(behind, broughtIn(item));');
   });
 });
+
+describe('while it is still being written up', () => {
+  // Measured 2026-10-29 in a fresh window: the tip said "Press ↵ to open it"
+  // within a second of landing, and the rewrite (main/catch-up.mjs) landed
+  // twenty seconds later, so the first look was still the raw chat.
+  const read = (f) => fs.readFileSync(new URL(`../renderer/src/${f}`, import.meta.url), 'utf8');
+  it('the page says so instead of drawing the raw answer', () => {
+    expect(read('components/ItemThread.tsx')).toContain('if (queue && catchUpDue(item)) {');
+  });
+  it('the row says so, and the tutorial waits for it', () => {
+    expect(read('components/List.tsx')).toContain("data-catching-up={catchUpDue(item) ? '1' : undefined}");
+    expect(read('components/Tour.tsx')).toContain(".list-pane .row[data-item-id]:not([data-catching-up])");
+  });
+});

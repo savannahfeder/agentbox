@@ -11,3 +11,4 @@ export function whenWords(when: number | null | undefined, now?: number): string
 
 /** "in a terminal" or "in the Claude Code desktop app". */
 export function startedIn(source: string | null | undefined): string;
+export function catchUpDue(item: { labels?: string[]; status?: string } | null | undefined): boolean;

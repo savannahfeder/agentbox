@@ -2,20 +2,19 @@
 //
 // What broke: a Claude Code chat brought in at setup arrived as the agent's
 // raw last message, a long block with headings and code, and no question or
-// options. The founder, on the first imported chat she opened: "If our app
-// looks like Claude Code or Codex ... people are going to evaluate it as 'Oh
-// it's just the same'. I think for tasks that are imported, we need to
-// reformat them." So a chat brought in from Claude Code is owed one run that
-// resumes it, does no new work, and writes where it stands the way every
-// thread here reads: a context line, what was done, and one question with
-// options. The run is owed once: its label comes off when it starts.
+// options. The founder: "If our app looks like Claude Code or Codex ... people
+// are going to evaluate it as 'Oh it's just the same'." The first fix was an
+// agent run resuming the chat on Claude Code. Measured in fresh windows the
+// same morning, it never landed: the account was at its weekly limit, and the
+// dead run's "usage limit" line was drawn over the agent's answer. So the
+// rewrite is now a small-model call asked on any account or engine with room
+// (main/catch-up.mjs), and no agent run starts for it.
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mjs';
-import { machineryPath } from '../main/store/home.mjs';
-import { CATCH_UP_LABEL, catchUpDue, threadImportRow, THREAD_LABEL } from '../shared/agent-import.mjs';
+import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, threadImportRow, THREAD_LABEL } from '../shared/agent-import.mjs';
 
 const dirs = [];
 afterEach(() => { while (dirs.length) fs.rmSync(dirs.pop(), { recursive: true, force: true }); });
@@ -32,6 +31,17 @@ const imported = (over = {}) => ({
   wrote: { body: { ts: 1, source: 'founder' }, result: { ts: 2, source: 'agent' } },
   ...over,
 });
+const card = { title: 'Flaky test fix', context: 'The agent fixed a flaky test.', ask: 'Should I merge it?', said: 'I fixed it.', options: ['Merge it', 'Wait'] };
+const watching = (answer) => {
+  const sup = bare();
+  const writes = [];
+  sup.store = {
+    catchUpItem: (product, id, patch) => writes.push(['catchUp', patch]),
+    routeItem: (product, id, patch) => writes.push(['route', patch]),
+  };
+  sup._askSmall = async () => answer;
+  return { sup, writes };
+};
 
 describe('what is owed a catch-up', () => {
   it('a Claude Code chat just brought in', () => {
@@ -46,95 +56,60 @@ describe('what is owed a catch-up', () => {
   });
 });
 
-describe('the supervisor', () => {
-  it('starts it, although the row is a question with an agent answer waiting', () => {
+describe('no agent run starts for it', () => {
+  it('the row is a question with an answer waiting, and stays that way', () => {
     const sup = bare();
     sup.importedThreadFor = () => ({ sessionId: 'abc', imported: true, folder: '/x' });
-    expect(sup._isFreshWork(imported())).toBe(true);
-  });
-  it('does not start it when the chat cannot be resumed here', () => {
-    const sup = bare();
-    sup.importedThreadFor = () => null;
     expect(sup._isFreshWork(imported())).toBe(false);
   });
-  it('still leaves the same row alone once it has been caught up', () => {
-    const sup = bare();
-    sup.importedThreadFor = () => ({ sessionId: 'abc', imported: true, folder: '/x' });
-    expect(sup._isFreshWork(imported({ labels: [THREAD_LABEL, 'thread:abc'] }))).toBe(false);
+});
+
+describe('the rewrite', () => {
+  it('writes the name, the context and the answer with options, and is owed no more', async () => {
+    const { sup, writes } = watching(card);
+    await sup.catchUpTheImports([imported()]);
+    expect(writes[0][0]).toBe('catchUp');
+    expect(writes[0][1]).toMatchObject({ label: 'Flaky test fix', problem: 'The agent fixed a flaky test.' });
+    expect(writes[0][1].result).toMatch(/^\*\*Should I merge it\?\*\*/);
+    expect(writes[0][1].result).toContain('## Options\n1. Merge it (recommended)\n2. Wait');
+    expect(writes[1]).toEqual(['route', { labels: [THREAD_LABEL, 'thread:abc'] }]);
+  });
+  it('leaves the row as it was when no account has room, and tries again later', async () => {
+    const { sup, writes } = watching('');
+    await sup.catchUpTheImports([imported()], 1000);
+    expect(writes).toEqual([]);
+    await sup.catchUpTheImports([imported()], 2000);
+    expect(writes).toEqual([]);
+    expect(sup._catchUpMisses.get('p:w-1').count).toBe(1);
+  });
+  it('and stops being owed after its last try', async () => {
+    const { sup, writes } = watching('');
+    for (let i = 0; i < CATCH_UP_TRIES; i++) await sup.catchUpTheImports([imported()], i * 3_600_000);
+    expect(writes).toEqual([['route', { labels: [THREAD_LABEL, 'thread:abc'] }]]);
+  });
+  it('waits for a chat that has no answer to rewrite', async () => {
+    const { sup, writes } = watching(card);
+    await sup.catchUpTheImports([imported({ result: '' })]);
+    expect(writes).toEqual([]);
   });
 });
 
-describe('what the run is told', () => {
-  const sup = bare();
-  const brief = sup.catchUpBrief(imported(), { slug: 'p', name: 'P', dir: '/x' }, { folder: '/x' });
-  it('to do no new work and change nothing', () => {
-    expect(brief).toMatch(/Do no new work/);
-    expect(brief).toMatch(/change no files/i);
-  });
-  it('to leave the thread open for the person', () => {
-    expect(brief).toMatch(/Leave its status as it is/);
-  });
-  it('to write it the way every thread reads: context, what was done, one question with options', () => {
-    expect(brief).toMatch(/problem/);
-    expect(brief).toMatch(/progress/);
-    expect(brief).toMatch(/## Options/);
-  });
-  it('and it is the brief such a run gets, with the label taken off as it starts', () => {
-    const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
-    expect(src).toContain('else if (forkFrom?.imported && catchUpDue(item)) prompt = this.catchUpBrief(item, product, { folder: forkFrom.folder });');
-    expect(src).toContain('this.store.routeItem?.(item.product, item.id, { labels: (item.labels ?? []).filter((l) => l !== CATCH_UP_LABEL) });');
+describe('one name, not two', () => {
+  // Measured 2026-10-29 in a fresh window: the namer and the rewrite both took
+  // the row in the same tick, and the name changed twice in five seconds,
+  // ending on the namer's.
+  it('the namer leaves a chat still owed its rewrite, which names it', async () => {
+    const { wantsName } = await import('../main/row-label.mjs');
+    expect(wantsName(imported())).toBe(false);
+    expect(wantsName(imported({ labels: [THREAD_LABEL, 'thread:abc'] }))).toBe(true);
   });
 });
 
-describe('a catch-up that dies', () => {
-  // Measured 2026-10-29 in a fresh window on the founder's computer: the
-  // catch-up started, Claude Code was at its usage limit, and the imported chat
-  // was left reading "Claude Code hit its usage limit partway through".
-  const dying = () => {
-    const sup = bare();
-    const writes = [];
-    sup.store = { routeItem: (product, id, patch) => writes.push(patch), recordSessionResult: () => { throw new Error('wrote a sentence'); } };
-    return { sup, writes };
-  };
-  const row = imported({ labels: [THREAD_LABEL, 'thread:abc'] });
-  it('leaves the chat as it was and is owed again', () => {
-    const { sup, writes } = dying();
-    sup._catchUps = { 'w-1': 1 };
-    sup.sayTheRunDied(row, { tail: ['stderr: usage limit reached'] });
-    expect(writes).toEqual([{ labels: [THREAD_LABEL, 'thread:abc', CATCH_UP_LABEL], status: 'open' }]);
-    expect(sup._catchUps['w-1']).toBeUndefined();
-  });
-  it('and is marked spoken for, so the pass over resting rows writes nothing either', () => {
-    // The same morning: four seconds after the chat was left as it was, that
-    // pass wrote "Claude Code is at its usage limit, so nothing has been done".
-    const { sup } = dying();
-    sup._catchUps = { 'w-1': 1 };
-    sup._fruitless = { 'p:w-1': { runs: 1, endedAt: 123 } };
-    sup.sayTheRunDied(row, { tail: [] });
-    expect(sup._fruitless['p:w-1'].saidAt).toBe(123);
-  });
-  it('is not owed a fourth time', () => {
-    const { sup, writes } = dying();
-    sup._catchUps = { 'w-1': 3 };
-    sup.sayTheRunDied(row, { tail: [] });
-    expect(writes).toEqual([{ labels: [THREAD_LABEL, 'thread:abc'], status: 'open' }]);
-  });
-  it('and leaves no record of itself for the thread to draw', () => {
-    // Measured the same morning with a chat brought in fresh: the page opened on
-    // "This run stopped because the account hit its usage limit." in place of
-    // the agent's answer, read from the dead catch-up's own run log.
-    const project = fs.mkdtempSync(path.join(os.tmpdir(), 'catch-up-project-'));
-    dirs.push(project);
-    const log = machineryPath(project, path.join('sessions', 'w-1', '123.log'));
-    fs.mkdirSync(path.dirname(log), { recursive: true });
-    fs.writeFileSync(log, "08:14:45  You've hit your weekly limit\n");
-    const kept = machineryPath(project, path.join('sessions', 'w-1', '100.log'));
-    fs.writeFileSync(kept, 'an earlier run\n');
-    const { sup } = dying();
-    sup.store.listProducts = () => [{ slug: 'p', dir: project }];
-    sup._catchUps = { 'w-1': 1 };
-    sup.sayTheRunDied(row, { startedAt: 123, tail: [] });
-    expect(fs.existsSync(log)).toBe(false);
-    expect(fs.existsSync(kept)).toBe(true);
+describe('several chats brought in at once', () => {
+  it('are written up three at a time, not one a tick', async () => {
+    const { sup, writes } = watching(card);
+    const rows = ['w-1', 'w-2', 'w-3', 'w-4'].map((id) => imported({ id }));
+    await sup.catchUpTheImports(rows);
+    expect(writes.filter(([k]) => k === 'catchUp')).toHaveLength(3);
   });
 });

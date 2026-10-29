@@ -466,6 +466,13 @@ export class Store {
     return workItemsDisk.updateWorkItem(this.productDir(slug), id, { label: clean }, { source: 'agent' });
   }
 
+  // A chat brought in, rewritten as a thread (main/catch-up.mjs). The agent's
+  // words, so on agent authority like a worker's own summary and answer.
+  catchUpItem(slug, id, { label, problem, result }) {
+    const { workItemsDisk } = this.modules;
+    return workItemsDisk.updateWorkItem(this.productDir(slug), id, { label, problem, result }, { source: 'agent' });
+  }
+
   // Who a thread sent to Auto went to (shared/auto-route.mjs). On system
   // authority, so it never locks her labels against a later write, the `ship`
   // an agent adds among them.

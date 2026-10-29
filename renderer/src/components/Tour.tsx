@@ -33,10 +33,13 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   close: { words: <>When it is finished, press <K k="E" /> to close it</>, side: 'below-right' },
 };
 
+/** A chat still being written up is not pointed at until it reads as a thread. */
+const ROWS = '.list-pane .row[data-item-id]:not([data-catching-up])';
+
 const firstRow = (running: boolean) => {
-  const rows = [...document.querySelectorAll<HTMLElement>('.list-pane .row[data-item-id]')];
+  const rows = [...document.querySelectorAll<HTMLElement>(ROWS)];
   if (running) return rows.find((r) => r.querySelector('.s-running')) ?? null;
-  return document.querySelector<HTMLElement>('.list-pane .row.selected[data-item-id]') ?? rows[0] ?? null;
+  return rows.find((r) => r.classList.contains('selected')) ?? rows[0] ?? null;
 };
 
 const needsYouTab = () => document.querySelector<HTMLElement>('.tm-tab[data-hint="state-tab"]');
@@ -98,10 +101,11 @@ function readScreen(view: string, thread: boolean, covered: boolean): TourScreen
     folder: card?.dataset.tourFolder === '1',
     text: card?.dataset.tourText === '1',
     view,
-    rows: document.querySelectorAll('.list-pane .row[data-item-id]').length,
+    rows: document.querySelectorAll(ROWS).length,
     running: document.querySelectorAll('.list-pane .row[data-item-id] .s-running').length,
     waiting: Number(needsYouTab()?.querySelector('b')?.textContent) || 0,
     thread,
+    preparing: !!document.querySelector('.list-pane .row[data-catching-up], .one-catching-up'),
     typing: thread && !!document.activeElement?.closest('.dock-card'),
     options: !!document.querySelector('.opt-row'),
     covered,

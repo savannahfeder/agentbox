@@ -27,6 +27,8 @@ export interface TourScreen {
   rows: number;
   /** Rows an agent is on, in that list. */
   running: number;
+  /** A chat brought in is still being written up as a thread. */
+  preparing?: boolean;
   /** The count on the Needs you tab. */
   waiting?: number;
   /** A thread is open. */
@@ -58,6 +60,7 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
     if (!s.folder) return 'folder';
     return s.text ? 'send' : 'pick';
   }
+  if (s.preparing) return null;
   if (s.thread) {
     if (s.typing) return null;
     if (s.options && todo('choose')) return 'choose';

@@ -678,6 +678,23 @@ export function ThreadComposer({
     if (e.key === 'ArrowDown') { e.preventDefault(); rows[Math.min(rows.length - 1, at + 1)]?.focus(); }
     if (e.key === 'ArrowUp') { e.preventDefault(); if (at === 0) textRef.current?.focus(); else rows[at - 1]?.focus(); }
   };
+  // ↓ reaches the suggestions when nothing has the keyboard, as on the empty inbox after closing a thread.
+  const ideasShown = !!(ideas?.length && product?.repoPath && !person && !mate);
+  useEffect(() => {
+    if (!ideasShown) return undefined;
+    const down = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowDown' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      const at = document.activeElement;
+      if (at && at !== document.body) return;
+      const first = ideaList.current?.querySelector<HTMLButtonElement>('button');
+      if (!first) return;
+      e.preventDefault();
+      e.stopPropagation();
+      first.focus();
+    };
+    window.addEventListener('keydown', down, true);
+    return () => window.removeEventListener('keydown', down, true);
+  }, [ideasShown]);
   const talk = useWebDictation({ text, setText, field: textRef }, () => void send());
   // ⌘↵ SENDS WHEREVER THE CURSOR IS while the card is open (w-9f6975906c).
   // It used to be heard only inside the card, so once a menu or a click had
@@ -1091,7 +1108,7 @@ export function ThreadComposer({
   }
 
   // After the folder: the tutorial asks for that first, and a list under the card would sit beneath its menu.
-  const ideaRows = ideas?.length && product?.repoPath && !person && !mate ? (
+  const ideaRows = ideasShown && ideas ? (
     <div ref={ideaList} className="tc-ideas" data-tour="ideas" role="listbox" aria-label="Suggestions">
       {ideas.map((i) => (
         <button key={i.text} type="button" role="option" aria-selected={idea?.text === i.text && text.trim() === i.text}
