@@ -185,7 +185,7 @@ number of running sessions. Agentbox keeps one order and uses it for both.
 
 ## Built for the keyboard
 
-<img src="docs/readme/keys.webp" alt="The keys E, R, J, K and the number row light up over the inbox, then the command palette opens on the themes" width="100%">
+<img src="docs/readme/keys.webp" alt="The keys J, K, R, E and the number row light up over the inbox as a reply is sent and a row is marked done" width="100%">
 
 | Key | Does |
 |---|---|
@@ -199,9 +199,6 @@ number of running sessions. Agentbox keeps one order and uses it for both.
 | `S` | Show or hide the summary, in an open task |
 | `Z` | Undo |
 | `⌘K` or `Ctrl+K` | Everything else |
-
-Fifteen skins, each in light and dark, from plain slate to woodblock and riso
-prints. Press `⌘K` or `Ctrl+K` and type "theme". `Ctrl+K` is the same palette on Linux, where there is no Command key.
 
 ## Runs on the plan you already have
 
