@@ -145,8 +145,8 @@ export function tagScale(width) {
 }
 
 /**
- * HER OWN SIZE, KEPT AS A MULTIPLE OF THE AUTOMATIC ONE (2026-10-13). She
- * asked to be able to resize the tray, by dragging a corner of it.
+ * HER OWN SIZE, KEPT AS A MULTIPLE OF THE AUTOMATIC ONE (2026-10-13), set a
+ * notch at a time from the list's Size steps or the tag's menu.
  *
  * What she sets is not a height in pixels but how much bigger or smaller than
  * the automatic size she wants it, because the automatic size is the thing
@@ -155,7 +155,7 @@ export function tagScale(width) {
  * number the moment she plugs the big screen in.
  */
 export const TAG_ZOOM = { min: 0.75, max: 2, step: 0.1 };
-/** However far she drags, the tag stays a tag. */
+/** However many notches she takes, the tag stays a tag. */
 export const TAG_LIMITS = { min: 24, max: 80 };
 
 /** Her multiple, kept sane; nothing stored means the automatic size. */
@@ -174,31 +174,13 @@ export function tagScaleOn(width, zoom) {
   return tagHeightOn(width, zoom) / TAG_BASE;
 }
 
-/** The multiple a tag dragged to this height means, on this screen. */
-export function zoomFor(height, width) {
-  const h = clamp(Number.isFinite(height) ? height : 0, TAG_LIMITS.min, TAG_LIMITS.max);
-  return tagZoom(h / tagHeight(width));
-}
-
 /** One notch bigger or smaller, for the tag's own menu. */
 export function zoomStep(zoom, by) {
   return tagZoom(tagZoom(zoom) + by * TAG_ZOOM.step);
 }
 
-/** Every corner resizes it, because one ledge in one corner was not findable. */
+/** The four corners of a screen the tag can be placed in. */
 export const GRIPS = ['tl', 'tr', 'bl', 'br'];
-
-/**
- * How tall a drag on this corner means. The corner follows the cursor and the
- * opposite one stays where it is, the way a window resizes. The tag is four
- * times wider than it is tall, so sideways travel counts for about a third:
- * the diagonal still feels like a diagonal without the width running away.
- */
-export function heightFromDrag(corner, fromHeight, dx, dy) {
-  const down = corner.startsWith('b') ? dy : -dy;
-  const out = corner.endsWith('r') ? dx : -dx;
-  return Math.round(fromHeight + down + out * 0.35);
-}
 
 /**
  * HOW MUCH OF THE TAG'S SIZE THE LIST TAKES (2026-10-13). The tag is a glance

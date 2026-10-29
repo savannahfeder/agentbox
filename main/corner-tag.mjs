@@ -37,7 +37,7 @@
 // is, so it hands over what is ready and how many are working on
 // `zero:corner-tag`; shared/corner-tag.mjs puts it newest first.
 
-import { cardPlacement, cornerPlace, heightFromDrag, EDGE_SLACK, MARGIN, hiddenUntil, keepCorner, newSince, notDismissed, readyNow, restingSpot, spotFor, tagScaleOn, tagShows, tagZoom, zoomFor, zoomStep, GRIPS, HIDE_CHOICES } from '../shared/corner-tag.mjs';
+import { cardPlacement, cornerPlace, EDGE_SLACK, MARGIN, hiddenUntil, keepCorner, newSince, notDismissed, readyNow, restingSpot, spotFor, tagScaleOn, tagShows, tagZoom, zoomStep, GRIPS, HIDE_CHOICES } from '../shared/corner-tag.mjs';
 
 // How long the pointer may be off both the tag and its list before the list
 // shuts: long enough to cross the gap between them, short enough to feel like
@@ -116,8 +116,7 @@ export function createCornerTag({
   const areas = () => screen.getAllDisplays().map((d) => d.workArea);
   const areaOf = (r) => screen.getDisplayMatching({ x: Math.round(r.x), y: Math.round(r.y), width: Math.max(1, Math.round(r.width)), height: Math.max(1, Math.round(r.height)) }).workArea;
   // THE CLEAR BAND. The tag's window is the glass plus a few points of nothing
-  // on every side, so the resize arrows can hang over its corners the way a
-  // window's own do. Everything that places the window therefore works against
+  // on every side. Everything that places the window therefore works against
   // a screen grown by that band, which puts the GLASS where the gap from the
   // edge is measured to, and the list is placed against the glass rather than
   // the window. A click in the band is not the tag's: the page says so and the
@@ -132,11 +131,10 @@ export function createCornerTag({
   };
   // WHERE THE GLASS IS DRAWN INSIDE THAT WINDOW, as the page measured it. It
   // used to be worked out from the band alone, which is only the truth while
-  // the window is exactly the size the page asked for — and a grip drag widens
-  // the window first and lets the page catch up, so the last guess of a drag
-  // can outlive it. The list then lined up with a window edge that was no
-  // longer the glass's: "it is a little too far to the right... it's just the
-  // right sides that seem to be improperly aligned" (2026-10-13).
+  // the window is exactly the size the page asked for. The list then lined up
+  // with a window edge that was no longer the glass's: "it is a little too far
+  // to the right... it's just the right sides that seem to be improperly
+  // aligned" (2026-10-13).
   let inset = null;
   const glassOf = (r) => {
     if (inset) return { x: r.x + inset.x, y: r.y + inset.y, width: inset.width, height: inset.height };
@@ -156,7 +154,7 @@ export function createCornerTag({
   // How big the tag draws, from the width of the screen it is resting on. The
   // page multiplies everything by it, reports the size it came out, and this
   // file places that. A tag dragged to another screen is measured again there.
-  // ...and how much bigger or smaller than that she has dragged it to be.
+  // ...and how much bigger or smaller than that she has set it to be.
   let zoom = tagZoom(config.cornerTagZoom);
   const scaleNow = () => tagScaleOn((tag ? areaOf(tag) : areas()[0] ?? { width: 0 }).width, zoom);
   const sendState = () => {
@@ -183,20 +181,6 @@ export function createCornerTag({
   const screenFor = () => {
     const known = tag ?? (config.cornerTagSpot ? { ...config.cornerTagSpot, ...tagSize } : null);
     return known ? areaOf(known) : areas()[0];
-  };
-  // While a corner is held, the tag is placed from the corner opposite it
-  // rather than from its own last position, so the end she is not dragging
-  // does not creep across the screen as the size changes.
-  const resizeTo = (size) => {
-    if (!press?.grip || !tag) return;
-    tagSize = { width: Math.max(1, Math.round(size.width)), height: Math.max(1, Math.round(size.height)) };
-    const a = press.anchor;
-    tag = {
-      x: press.corner.endsWith('r') ? a.x : a.x - tagSize.width,
-      y: press.corner.startsWith('b') ? a.y : a.y - tagSize.height,
-      ...tagSize,
-    };
-    if (alive('tag')) wins.tag.setBounds(rounded(tag));
   };
 
   const placeTag = () => {
@@ -414,35 +398,6 @@ export function createCornerTag({
       closeCard();
       send('tag', 'corner-tag:dragging', true);
     }
-    // THE GRIP: the cursor sets the height, the page redraws everything from
-    // it, and what is remembered is how much bigger or smaller than this
-    // screen's automatic size that is.
-    if (press.grip) {
-      if (!press.moved) return;
-      const want = zoomFor(heightFromDrag(press.corner, press.fromHeight, dx, dy), areaOf(tag).width);
-      if (want === zoom) return;
-      const grew = want > zoom;
-      zoom = want;
-      sendState();
-      // THE WINDOW GROWS BEFORE THE PAGE DOES, never after. The page redraws
-      // at the new size and then reports it, a frame later; until that report
-      // the window is still the old rectangle, and a tag drawn larger than its
-      // window is a tag with its corners cut off, which is what she saw. So a
-      // growing drag widens the window on this side of the message straight
-      // away, by the same proportion, and the page's own measurement corrects
-      // it a frame later. Shrinking waits for the page: a window smaller than
-      // what is drawn in it clips, a window larger than it never does.
-      if (grew) {
-        // The glass the page is about to draw is the scale it was just handed
-        // (28 points times it), and everything in it grows together, so the
-        // width goes up by the same proportion until the page says otherwise.
-        // The window is that glass plus the band on every side.
-        const was = { w: Math.max(1, tagSize.width - 2 * frame), h: Math.max(1, tagSize.height - 2 * frame) };
-        const h = Math.ceil(28 * scaleNow());
-        resizeTo({ width: Math.ceil(was.w * h / was.h) + 2 * frame, height: h + 2 * frame });
-      }
-      return;
-    }
     if (press.moved && alive('tag')) {
       tag = { ...tag, x: press.from.x + dx, y: press.from.y + dy };
       wins.tag.setPosition(Math.round(tag.x), Math.round(tag.y));
@@ -466,21 +421,6 @@ export function createCornerTag({
     const p = press;
     if (!cancelled) follow();
     press = null;
-    if (p.grip) {
-      // The pointer is still on the tag, so the list waits for it to leave and
-      // come back, exactly as it does after a move. A press on a grip that
-      // never moved is not a click either: it does not open the app.
-      send('tag', 'corner-tag:dragging', false);
-      if (!p.moved) return;
-      // It has been dragged into a corner of its screen; let it settle back
-      // against the edge it is parked at, and remember where that is.
-      tag = { ...restingSpot({ x: tag.x, y: tag.y }, tagSize, areas().map(parkable)), ...tagSize };
-      if (alive('tag')) wins.tag.setBounds(rounded(tag));
-      place = cornerPlace(tag, framed(areaOf(tag)));
-      saveConfig(config, { cornerTagZoom: zoom, cornerTagSpot: { x: Math.round(tag.x), y: Math.round(tag.y) }, cornerTagPlace: place });
-      if (open) placeCard();
-      return;
-    }
     if (p.moved) {
       tag = { ...restingSpot({ x: tag.x, y: tag.y }, tagSize, areas().map(parkable)), ...tagSize };
       if (alive('tag')) wins.tag.setBounds(rounded(tag));
@@ -620,9 +560,6 @@ export function createCornerTag({
     const rect = inset ?? glassOf({ x: 0, y: 0, ...size });
     shape.tag = { rect, radius: radius(rect) };
     dress('tag');
-    // Mid-resize the page's own measurement is the truth: it places the tag
-    // from the corner she is not holding.
-    if (press?.grip) { resizeTo(size); if (open) placeCard(); return null; }
     tagSize = size;
     // Nothing moves under the pointer while it is dragging.
     if (press?.moved) return null;
@@ -659,22 +596,9 @@ export function createCornerTag({
   ipcMain.handle('corner-tag:press', (_e, at) => {
     const pt = Number.isFinite(at?.x) && Number.isFinite(at?.y) ? { x: at.x, y: at.y } : screen.getCursorScreenPoint?.();
     if (!pt || !tag || !tagUp() || press) return null;
-    const corner = GRIPS.includes(at?.corner) ? at.corner : 'br';
-    press = {
-      start: pt, from: { x: tag.x, y: tag.y }, moved: false, at: now(), timer: null,
-      // A press on a grip resizes instead of moving: the corner she has hold
-      // of follows the cursor, and the one opposite it stays exactly where it
-      // is, the way a window resizes.
-      // THE GLASS, NOT THE WINDOW. The window is the glass plus the band on
-      // every side; measuring the window here asked for the band's height
-      // again on the first pull of the cursor, and the tag leapt (she met it
-      // in the running app: "it jumps to about three times its size").
-      grip: !!at?.grip, corner, fromHeight: Math.max(1, tagSize.height - 2 * frame),
-      anchor: {
-        x: corner.endsWith('r') ? tag.x : tag.x + tag.width,
-        y: corner.startsWith('b') ? tag.y : tag.y + tag.height,
-      },
-    };
+    // Every press moves the tag, wherever on it it lands. A drag never
+    // resizes: corners that did caught presses meant to move it (w-7da9244ef7).
+    press = { start: pt, from: { x: tag.x, y: tag.y }, moved: false, at: now(), timer: null };
     press.timer = setTimer(step, FRAME_MS);
     return null;
   });
@@ -693,7 +617,7 @@ export function createCornerTag({
   ipcMain.handle('corner-tag:settings', () => { openSettings(); return null; });
 
   // A right-click on the tag offers the same choices as the list does.
-  // One place sets the size, whether it came from the grip or from the menu:
+  // One place sets the size, whether it came from the list's steps or the menu:
   // the page is told, it redraws and reports what it came out, and that is
   // what gets placed.
   const setZoom = (next) => {
@@ -707,8 +631,8 @@ export function createCornerTag({
   // swallowed by a transparent window floating over somebody's work — the
   // exact fault that took the first drawn shadow out. The page watches the
   // pointer (it keeps getting moves either way, because the window forwards
-  // them) and says when the thing under it is the glass or one of its corner
-  // arrows; the rest of the time the click goes straight through.
+  // them) and says when the thing under it is the glass; the rest of the time
+  // the click goes straight through.
   //
   // It is never switched while a press is live: a press that began on the tag
   // ends on the tag, wherever the cursor has got to.
@@ -747,8 +671,7 @@ export function createCornerTag({
     if (!alive('tag')) return null;
     closeCard();
     Menu.buildFromTemplate([
-      // Dragging the grip is the way most people will find; this is the way
-      // somebody looks second, and the only way back to the automatic size.
+      // Beside the list's Size steps, and the only way back to the automatic size.
       { label: 'Bigger', click: () => setZoom(zoomStep(zoom, 1)) },
       { label: 'Smaller', click: () => setZoom(zoomStep(zoom, -1)) },
       { label: 'Size for this screen', enabled: zoom !== 1, click: () => setZoom(1) },
