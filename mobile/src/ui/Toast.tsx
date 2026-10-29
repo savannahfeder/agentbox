@@ -37,7 +37,7 @@ function Card({ toast, dismiss }: { toast: Said; dismiss: () => void }) {
       style={{
         minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 14, paddingRight: 6,
         backgroundColor: color.pop, borderWidth: 1, borderColor: color.line, overflow: 'hidden',
-        shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 35, shadowOffset: { width: 0, height: 24 }, elevation: 16,
+        shadowColor: '#000', shadowOpacity: color.lift, shadowRadius: 35, shadowOffset: { width: 0, height: 24 }, elevation: 16,
       }}>
       {/* Only a toast that names a thread stays on one line; a plain one wraps (`.toast-plain`). */}
       <T numberOfLines={toast.goes ? 1 : undefined} style={{ flex: 1, minWidth: 0, fontSize: 13.5, lineHeight: 17.55 }}>{toast.line}</T>

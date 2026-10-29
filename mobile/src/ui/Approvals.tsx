@@ -14,12 +14,9 @@ import { color, font } from './theme';
 
 // The site's glass is --bg-raised at 62% over a 22px blur. The app has no
 // blur, and paint alone lets the words under it show through, so it is the
-// colour that glass makes over the wall, solid.
-const FILL = '#272524';
-// --film-strong, the command's block on the card.
-const FILM = 'rgba(255, 255, 255, 0.07)';
-const ON_SOLID = color.bg;
-const WASH = 'rgba(255, 255, 255, 0.04)';
+// colour that glass makes over the wall, solid (`color.sunk`). The command's
+// block on the card is --film-strong (`color.film`). Each is read while
+// drawing, so a new look reaches the card.
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(false);
@@ -35,7 +32,7 @@ function Ghost({ far }: { far?: boolean }) {
   return (
     <View style={{
       position: 'absolute', left: 0, right: 0, height: 40, top: far ? -13 : -7, transform: [{ scale: far ? 0.93 : 0.965 }], opacity: far ? 0.6 : 1,
-      backgroundColor: FILL, borderWidth: 1, borderColor: color.line,
+      backgroundColor: color.sunk, borderWidth: 1, borderColor: color.line,
     }} />
   );
 }
@@ -64,8 +61,8 @@ function Card({ a, verdict, waiting, answer }: { a: Approval; verdict: 'allow' |
   const small = { fontSize: 11.5, lineHeight: 15 };
   return (
     <Animated.View pointerEvents={verdict ? 'none' : 'auto'} style={[{
-      backgroundColor: FILL, borderWidth: 1, borderColor: verdict === 'allow' ? color.faint : color.line, paddingVertical: 12, paddingHorizontal: 14,
-      shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 35, shadowOffset: { width: 0, height: 24 }, elevation: 16,
+      backgroundColor: color.sunk, borderWidth: 1, borderColor: verdict === 'allow' ? color.faint : color.line, paddingVertical: 12, paddingHorizontal: 14,
+      shadowColor: '#000', shadowOpacity: color.lift, shadowRadius: 35, shadowOffset: { width: 0, height: 24 }, elevation: 16,
     }, card]}>
       <Animated.View style={recede}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 9 }}>
@@ -73,7 +70,7 @@ function Card({ a, verdict, waiting, answer }: { a: Approval; verdict: 'allow' |
           {words.waiting && <T style={{ ...small, color: color.faint }}>{words.waiting}</T>}
         </View>
         {/* The whole command, scrolling past six lines rather than cut. */}
-        <ScrollView style={{ maxHeight: 120, backgroundColor: FILM, marginBottom: 10 }} contentContainerStyle={{ paddingVertical: 9, paddingHorizontal: 11 }} nestedScrollEnabled>
+        <ScrollView style={{ maxHeight: 120, backgroundColor: color.film, marginBottom: 10 }} contentContainerStyle={{ paddingVertical: 9, paddingHorizontal: 11 }} nestedScrollEnabled>
           <T selectable style={{ fontFamily: font.mono, fontSize: 12, lineHeight: 18 }}>{words.command}</T>
         </ScrollView>
         {words.opens.map((line) => <T key={line} style={{ fontSize: 11.5, lineHeight: 16.7, color: color.dim, marginTop: -4, marginBottom: 10 }}>{line}</T>)}
@@ -93,10 +90,10 @@ function Card({ a, verdict, waiting, answer }: { a: Approval; verdict: 'allow' |
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable accessibilityRole="button" onPress={() => answer(true)}
             style={({ pressed }) => ({ flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: color.text, borderWidth: 1, borderColor: 'transparent', opacity: pressed ? 0.88 : 1 })}>
-            <T style={{ fontSize: 16, fontFamily: font.semibold, color: ON_SOLID }}>Allow</T>
+            <T style={{ fontSize: 16, fontFamily: font.semibold, color: color.bg }}>Allow</T>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={() => answer(false)}
-            style={({ pressed }) => ({ flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: WASH, borderWidth: 1, borderColor: pressed ? color.faint : color.lineStrong })}>
+            style={({ pressed }) => ({ flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: color.fill, borderWidth: 1, borderColor: pressed ? color.faint : color.lineStrong })}>
             {({ pressed }) => <T style={{ fontSize: 16, fontFamily: font.semibold, color: pressed ? color.text : color.dim }}>Deny</T>}
           </Pressable>
         </View>

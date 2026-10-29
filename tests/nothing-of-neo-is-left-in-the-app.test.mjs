@@ -81,6 +81,7 @@ describe('nothing a person sees offers it', () => {
 
   it('the phone is not handed a Neo switch', () => {
     const model = { ok: true, workspace: { alpha: { neo: true, rooms: true } }, projects: [] };
-    expect(phoneSettingsOf(model, { version: '1.0.0' }).workspace.alpha).toEqual({ rooms: true });
+    // The phone has Teammates and Multiplayer too since w-40b72c3f35; Neo is never among them.
+    expect(phoneSettingsOf(model, { version: '1.0.0' }).workspace.alpha).toEqual({ rooms: true, teammates: false, multiplayer: false });
   });
 });

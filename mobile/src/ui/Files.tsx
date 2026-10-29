@@ -80,8 +80,7 @@ export function SentFiles({ text, product }: { text: string; product: string }) 
 }
 
 const KIND_LABEL: Record<string, string> = { html: 'Design', image: 'Picture', markdown: 'Document', code: 'Code', website: 'Website' };
-// `--doc-page` under the Ember Grid theme.
-const PAGE = '#282625';
+// A tile's page is `--doc-page` (`color.sunk`); one still on its way is `--bg-raised` (`color.raised`).
 
 /** Every design and document a thread names, as small framed tiles; one the phone cannot read gets none. */
 export function ThreadFiles({ item, product }: { item: { id: string; result?: string | null; note?: string | null; body?: string | null; answer?: string | null }; product: string }) {
@@ -129,7 +128,7 @@ function FileTile({ product, path, open }: { product: string; path: string; open
   );
   return (
     <Pressable onPress={face ? open : undefined} accessibilityRole="button" accessibilityLabel={`Open ${name}`}>
-      <View style={{ height: 104, backgroundColor: face ? PAGE : RAISED, overflow: 'hidden' }}>
+      <View style={{ height: 104, backgroundColor: face ? color.sunk : color.raised, overflow: 'hidden' }}>
         {face?.html !== undefined ? <PageFrame html={face.html} desktop style={{ flex: 1 }} /> : face ? <MiniPage title={face.glance.title || name} blocks={face.glance.blocks} /> : null}
         <Ticks />
       </View>
@@ -140,7 +139,6 @@ function FileTile({ product, path, open }: { product: string; path: string; open
 
 // A file on its way holds its tile's place; one that is not on the phone gets none.
 const waiting = (error: string) => (/on its way/.test(error) ? undefined : null);
-const RAISED = '#2f2d2c';
 
 // The window's L-shaped corner marks, tucked onto the tile's corners.
 function Ticks() {
@@ -164,7 +162,7 @@ function MiniPage({ title, blocks }: { title: string; blocks: Glance['blocks'] }
         ? <T key={i} style={{ fontSize: 10, lineHeight: 14, fontFamily: font.medium, color: color.dim, marginTop: 3 }}>{b.text}</T>
         : <T key={i} style={{ fontSize: 10, lineHeight: 14, color: color.faint }}>{b.text}</T>))}
       <Svg style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '30%' }} width="100%" height="30%" pointerEvents="none">
-        <Defs><LinearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor={PAGE} stopOpacity={0} /><Stop offset="1" stopColor={PAGE} stopOpacity={1} /></LinearGradient></Defs>
+        <Defs><LinearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor={color.sunk} stopOpacity={0} /><Stop offset="1" stopColor={color.sunk} stopOpacity={1} /></LinearGradient></Defs>
         <Rect width="100%" height="100%" fill="url(#fade)" />
       </Svg>
     </View>
