@@ -165,6 +165,10 @@ import { runEndedProps } from './analytics.mjs';
 import { appendRun, runLedgerPath } from './run-ledger.mjs';
 
 const POLL_MS = 15_000;
+// The reasons a queued thread's line names (`status().cannotStart`).
+const SAID_WHY_NOT_STARTED = new Set(['setup', 'asleep', 'engine', 'login', 'memory', 'slow-folder', 'error']);
+// Making a thread's folder takes seconds; past this it is said to be slow.
+const SLOW_FOLDER_MS = 2 * 60_000;
 // A project's kit for a new thread from the phone: left again at most this
 // often, and once main has moved, looked for at most this often
 // (Supervisor#_leaveNewThreadKit).
@@ -2265,7 +2269,7 @@ export class Supervisor {
     const held = this._preparing.get(item.id);
     if (held) { held.item = item; held.opts = opts; this._saveState(); return true; }
     // A folder already there is made ready here too: `restoreTaskFolder` runs git over it.
-    const entry = { item, opts, engine };
+    const entry = { item, opts, engine, folderSince: Date.now() };
     this._preparing.set(item.id, entry);
     this._saveState();
     folderJob('restoreTaskFolder', base, item.id)
@@ -2317,7 +2321,10 @@ export class Supervisor {
         this._gotAFolderAfterAll(item.id);
         this._madeFolders.set(item.id, cwd);
         try { this.spawnWorker(entry.item, entry.opts); }
-        catch (error) { console.warn(`zero: could not start ${item.id}:`, error.message); }
+        catch (error) {
+          console.warn(`zero: could not start ${item.id}:`, error.message);
+          this._noteNotStarting(entry.item, 'error', entry.engine);
+        }
         finally { this._madeFolders.delete(item.id); }
         this.onChange?.();
       });
@@ -2354,7 +2361,10 @@ export class Supervisor {
         this._photos.set(item.id, photo);
         if (entry.madeFolder !== undefined) { this._madeFolders ??= new Map(); this._madeFolders.set(item.id, entry.madeFolder); }
         try { this.spawnWorker(entry.item, entry.opts); }
-        catch (error) { console.warn(`zero: could not start ${item.id}:`, error.message); }
+        catch (error) {
+          console.warn(`zero: could not start ${item.id}:`, error.message);
+          this._noteNotStarting(entry.item, 'error', entry.engine);
+        }
         finally {
           this._photos.delete(item.id);
           if (entry.madeFolder !== undefined) this._madeFolders?.delete(item.id);
@@ -5543,6 +5553,54 @@ export class Supervisor {
     this.onChange?.();
   }
 
+  // WHY A START WAS TURNED AWAY: counted once per thread and reason in a run
+  // of the app (a held row is asked every pass), and kept for the thread's
+  // line (`status().cannotStart`). `reason` is one of WAIT_REASONS.
+  _noteNotStarting(item, reason, engine = null) {
+    const now = Date.now();
+    const which = engine ? engineOf(engine) : null;
+    if (item?.id) (this._notStarting ??= new Map()).set(item.id, { why: reason, engine: which, at: now });
+    const key = `${item?.product ?? ''}:${item?.id ?? ''}:${reason}`;
+    if ((this._countedNotStarting ??= new Set()).has(key)) return;
+    this._countedNotStarting.add(key);
+    const seconds = Number.isFinite(item?.createdAt) ? Math.max(0, Math.round((now - item.createdAt) / 1000)) : null;
+    this.count?.('run_waiting', { reason, ...(which ? { engine: which } : {}), ...(seconds === null ? {} : { seconds }) });
+  }
+
+  // Every due row a pass would have looked at, for a pass that stops before
+  // looking at any (setup's hold, the pause, the brake).
+  _noteWaitingRows(reason, items = null) {
+    try {
+      const now = Date.now();
+      const bySlug = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
+      for (const item of items ?? this.store.listItems(now)) {
+        if (this.sessions.has(item.id) || !this.store.isDue(item, now)) continue;
+        const product = bySlug.get(item.product);
+        if (product && !this.worksHere(product)) continue;
+        const owed = this._isContinuation(item)
+          ? !answerSettled(item) && !this._answerDelivered(item)
+          : this._isFreshWork(item, now);
+        if (owed) this._noteNotStarting(item, reason, this._engineFor(item));
+      }
+    } catch (e) { console.warn('zero: could not note why nothing started:', e.message); }
+  }
+
+  // Why `_roomFor` said no, in the order it asks.
+  _whyNoRoom(engine, item) {
+    const which = engineOf(engine);
+    if (this._localSlotFor(which)) return this._waitsForCloud(item, which) ? 'cloud' : 'memory';
+    if (!this.engineChoices().some((e) => e.id === which)) return 'engine';
+    if (!this._liveProfilesFor(which).length) return 'login';
+    if (which === DEFAULT_ENGINE && this._spawnBraked()) return 'brake';
+    return 'slot';
+  }
+
+  // A throw still ends the pass, as it always has; it is counted first.
+  _startFromTheQueue(item, opts) {
+    try { return this.spawnWorker(item, opts); }
+    catch (error) { this._noteNotStarting(item, 'error', this._engineFor(item)); throw error; }
+  }
+
   // Held until a person writes on the row, or until its own next try.
   _heldFromStarting(item) {
     const key = `${item?.product}:${item?.id}`;
@@ -6718,6 +6776,22 @@ export class Supervisor {
       atLimit = this._waitingOnLimit(allThreads()
         .filter((i) => mayRunHere(i, productBySlug.get(i.product), me)));
     } catch {}
+    // QUEUED, BUT NOTHING WILL START IT UNTIL SOMETHING CHANGES, by id, with
+    // the reason the last pass gave. Only the reasons no other line explains:
+    // a full fleet is what Queued means, and held, folder and model rows
+    // already carry the app's own words.
+    const cannotStart = {};
+    try {
+      const now = Date.now();
+      for (const id of queued) {
+        const prep = this._preparing?.get(id);
+        const n = prep?.folderSince && now - prep.folderSince >= SLOW_FOLDER_MS
+          ? { why: 'slow-folder', engine: prep.engine, at: now }
+          : this._notStarting?.get(id);
+        if (!n || now - n.at > 2 * POLL_MS || !SAID_WHY_NOT_STARTED.has(n.why)) continue;
+        cannotStart[id] = { why: n.why, tool: engineLabel(n.engine ?? DEFAULT_ENGINE) };
+      }
+    } catch {}
     // WHY A THREAD IS NOT IN THE CLOUD, while the cloud takes Everything
     // (w-de59f3ff12): the Status cell says "Working locally" or "Queued" and
     // its card says why. Under "when this Mac is full" running here is the
@@ -6763,6 +6837,7 @@ export class Supervisor {
       // above, for the same reason: "Queued" over a Codex task while Codex
       // had no slot until the reset (found by the pre-deploy breaker).
       atLimit,
+      cannotStart,
       whyNotCloud,
       running: this.runsGoing().map((s) => ({
         itemId: s.itemId,
@@ -7054,7 +7129,12 @@ export class Supervisor {
     // Not dropped, because the line that woke it may have been written after
     // the running pass already read the queue, and a dropped wake there is the
     // fifteen second wait back again for exactly the row that asked for it.
-    if (this._ticking) { this._tickAgain = true; return; }
+    if (this._ticking) {
+      this._tickAgain = true;
+      // A pass that never ends starts nothing again, and no refusal is reached.
+      if (Date.now() - (this._lastTickAt ?? 0) >= SLEPT_GAP_MS) this._noteNotStarting({ id: `pass-${this._lastTickAt}` }, 'stuck');
+      return;
+    }
     this._ticking = true;
     const at = Date.now();
     if (this.forgiveSleep(at)) this._wokeAt = at;
@@ -7169,9 +7249,9 @@ export class Supervisor {
   }
 
   async _tick() {
-    if (this.paused) return;
+    if (this.paused) { this._noteWaitingRows('paused'); return; }
     this._refreshMemoryReading();
-    if (this.firstRunHolding()) return;
+    if (this.firstRunHolding()) { this._noteWaitingRows('setup'); return; }
     // Has a login landed since an account was found signed out? Ahead of the
     // brake below, which would otherwise hold the fleet past the sign-in.
     try { this._noticeSignIns(); } catch (e) { console.warn('zero: could not look for a sign-in:', e.message); }
@@ -7196,7 +7276,11 @@ export class Supervisor {
     // -- nothing about this changes at all.
     if (this._spawnBraked() && !this._anotherEngineCanRun()) {
       const at = Date.now();
-      try { this.sayItOnEveryStrandedRow(this.store.listItems(at), at); } catch (e) { console.warn('zero: could not count the stopped rows:', e.message); }
+      try {
+        const rows = this.store.listItems(at);
+        this.sayItOnEveryStrandedRow(rows, at);
+        this._noteWaitingRows('brake', rows);
+      } catch (e) { console.warn('zero: could not count the stopped rows:', e.message); }
       return;
     }
     const now = Date.now();
@@ -7306,7 +7390,10 @@ export class Supervisor {
 
     const queue = [];
     for (const item of items) {
-      if (noWorkHere.has(item.product)) continue;
+      if (noWorkHere.has(item.product)) {
+        if (!this.sessions.has(item.id) && this._isFreshWork(item, now, autonomous)) this._noteNotStarting(item, 'practice', this._engineFor(item));
+        continue;
+      }
       if (!mayRunHere(item, productBySlug.get(item.product), me)) continue;
       if (this.sessions.has(item.id)) continue;
       // Interrupted a moment ago so an Urgent row could have its slot. Putting
@@ -7419,7 +7506,12 @@ export class Supervisor {
     // A SHUT MAC STARTS NOTHING (shared/cloud-carry.mjs): what it would have
     // started is kept for the phone pass to hand to the cloud.
     const asleep = this.asleep();
+    // The git under a thread's folder has no deadline of its own (main/task-folders.mjs).
+    for (const entry of this._preparing?.values() ?? []) {
+      if (entry.folderSince && now - entry.folderSince >= SLOW_FOLDER_MS) this._noteNotStarting(entry.item, 'slow-folder', entry.engine);
+    }
     this._asleepQueue = asleep ? queue.filter((r) => !r.command).map(({ item, continuation }) => ({ item, continuation })) : [];
+    if (asleep) for (const { item } of queue) this._noteNotStarting(item, 'asleep', this._engineFor(item));
 
     for (const { item, continuation, command } of asleep ? [] : queue) {
       // The cap is real for both kinds. Uncapped, one restart's respawn wave
@@ -7447,7 +7539,10 @@ export class Supervisor {
       // and the mark written further down would then be a delivery that never
       // happened, permanently. Wait for the lease instead.
       if (continuation
-        && (answerSettled(item) || this._answerDelivered(item) || this.claimHeldElsewhere(item))) continue;
+        && (answerSettled(item) || this._answerDelivered(item) || this.claimHeldElsewhere(item))) {
+        if (!answerSettled(item) && !this._answerDelivered(item)) this._noteNotStarting(item, 'claim', this._engineFor(item));
+        continue;
+      }
       /*
        * A COMMAND THE USER TYPED NEVER QUEUES, EVEN WITH EVERY SLOT FULL.
        *
@@ -7460,7 +7555,7 @@ export class Supervisor {
       if (command) {
         this._handledAnswers.add(this._answerKey(item));
         this._saveState();
-        this.spawnWorker(item, { continuation: true });
+        this._startFromTheQueue(item, { continuation: true });
         continue;
       }
       // WHICH SUBSCRIPTION THIS ROW WOULD SPEND, asked once here and again
@@ -7474,6 +7569,8 @@ export class Supervisor {
       // nothing. A row this Mac's memory holds goes to the cloud instead when
       // it may (`_roomFor`).
       if (!this._roomFor(engine, item)) {
+        // A row being prepared holds its own slot; it is not waiting for one.
+        if (!this._preparing?.has(item.id)) this._noteNotStarting(item, this._whyNoRoom(engine, item), engine);
         // an Urgent row takes a slot rather than queueing behind work that
         // matters less. At most ONE session is interrupted per engine per
         // tick, and the urgent row spawns on the next one — the child has to
@@ -7486,10 +7583,10 @@ export class Supervisor {
         // that is still idle. See `spent` above for what this used to be.
         continue;
       }
-      if (!continuation) { this.spawnWorker(item); continue; }
+      if (!continuation) { this._startFromTheQueue(item); continue; }
       this._handledAnswers.add(this._answerKey(item));
       this._saveState();
-      this.spawnWorker(item, { continuation: true });
+      this._startFromTheQueue(item, { continuation: true });
     }
 
     // THE HOLD IS ONLY EVER ABOUT GETTING THE URGENT ROW STARTED, so it lets
@@ -9569,10 +9666,12 @@ export class Supervisor {
   }
 
   spawnWorker(item, { continuation = false, resumeSessionId = null, profile: forcedProfile = null, engine: forcedEngine = null, remoteOnly = false, shipFailure = null, asked = false } = {}) {
-    if (this._heldFromStarting(item)) return;
+    const refuse = (reason, engine = null) => this._noteNotStarting(item, reason, engine ?? forcedEngine);
+    if (this._heldFromStarting(item)) { refuse('held'); return; }
     // Every other way in (a resume on wake, a held thread's retry) meets the
     // same rule as the queue: a run started in a dark wake dies at the next.
     if (this.asleep()) {
+      refuse('asleep');
       if (continuation && item?.answer) this.redeliverAnswer(item, item.answer);
       return;
     }
@@ -9618,7 +9717,10 @@ export class Supervisor {
         this._preparing.delete(item.id);
         if (this.sessions.has(item.id)) return;
         try { this.spawnWorker(entry.item, entry.opts); }
-        catch (error) { console.warn(`zero: could not start ${item.id}:`, error.message); }
+        catch (error) {
+          console.warn(`zero: could not start ${item.id}:`, error.message);
+          this._noteNotStarting(entry.item, 'error', entry.engine);
+        }
         this.onChange?.();
       }, hold + 100);
       t.unref?.();
@@ -9631,6 +9733,7 @@ export class Supervisor {
     const claudeModelOnCodex = engine === 'codex' && !isEngine(item?.engine) && typeof item?.model === 'string'
       && (item.model.startsWith('claude-') || CLAUDE_MODELS.some(m => m.alias === item.model));
     if (item?.model && (!modelForEngine(item, engine) || claudeModelOnCodex)) {
+      refuse('model', engine);
       this._sayTheModelIsForAnotherEngine(claudeModelOnCodex ? { ...item, engine: 'claude' } : item, engine);
       // THE USER'S WORDS ARE NOT DELIVERED BY A WORKER THAT NEVER STARTED. The queue
       // writes the delivery mark before it calls this method and that mark is
@@ -9639,7 +9742,7 @@ export class Supervisor {
       if (continuation && item.answer) this.redeliverAnswer(item, item.answer);
       return;
     }
-    if (!this._hasSlotFor(engine, item) && !continuation) return;
+    if (!this._hasSlotFor(engine, item) && !continuation) { refuse(this._whyNoRoom(engine, item), engine); return; }
     // A TIED PROJECT WAITS RATHER THAN BORROWING A LOGIN, and this is where
     // "tied" stops being a word on a settings page. The engine's own slot check
     // above has already passed, and it is a check about the whole engine: with
@@ -9665,6 +9768,7 @@ export class Supervisor {
       if (forcedProfile && forcedProfile !== pinned) { forcedProfile = null; resumeSessionId = null; }
       const full = !continuation && this._loadOnProfile(pinned, engine) >= this._slotsPerAccount(engine);
       if ((full && !this._cloudSlotFor(engine)) || this._profileResting(this._accountKey(engine, pinned))) {
+        refuse(full ? 'slot' : 'login', engine);
         if (continuation && item.answer) this.redeliverAnswer(item, item.answer);
         return;
       }
@@ -9675,11 +9779,12 @@ export class Supervisor {
     // would go to one anyway, die in two seconds, and go again next tick. Held
     // here and handed back, it goes out the tick the account returns.
     if (continuation && !pinned && !this._liveProfilesFor(engine).length) {
+      refuse('login', engine);
       if (item.answer) this.redeliverAnswer(item, item.answer);
       return;
     }
     const product = this.store.listProducts().find((p) => p.slug === item.product);
-    if (!product) return;
+    if (!product) { refuse('project', engine); return; }
     // AND THIS IS WHERE "nothing ever runs in the practice project" IS ACTUALLY
     // ENFORCED. Every other path in this file arrives here — the fresh-work
     // pass, continuations, `resumeItems`, `resumeStopped`, the
@@ -9690,6 +9795,7 @@ export class Supervisor {
     // Practice was accepted and then never picked up by anything.
     if (!this.worksHere(product)) {
       console.warn(`zero: refusing to start a session in ${product.slug}: nothing runs in a practice project`);
+      refuse('practice', engine);
       return;
     }
     if (this._folderFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, asked })) return;
@@ -9708,6 +9814,7 @@ export class Supervisor {
     let cwd;
     try { cwd = this.workFolderFor(item, product); }
     catch (error) {
+      refuse('folder', engine);
       this._couldNotGetAFolder(item, error);
       if (continuation && item.answer) this.redeliverAnswer(item, item.answer);
       this.onChange?.();
@@ -9725,6 +9832,7 @@ export class Supervisor {
     const mayRunHereInstead = () => this._mayRunHereInstead({ item, engine, pinnedFull, continuation, heldForMemory, command: !!plan.command });
     let where = this._whereToRun({ item, product, cwd, engine, continuation, remoteOnly, localFull: pinnedFull || heldForMemory });
     if (!where) {
+      refuse('cloud', engine);
       if (continuation && item.answer) this.redeliverAnswer(item, item.answer);
       return;
     }
@@ -9742,6 +9850,7 @@ export class Supervisor {
         where = 'local';
         if (!plan.command) whyLocal = { why: 'codex-reply' };
       } else {
+        refuse('cloud', engine);
         if (continuation && item.answer) this.redeliverAnswer(item, item.answer);
         return;
       }
@@ -9759,6 +9868,7 @@ export class Supervisor {
         where = 'local';
         whyLocal = { why: 'codex-reply' };
       } else {
+        refuse('slot', engine);
         if (continuation && item.answer) this.redeliverAnswer(item, item.answer);
         return;
       }
@@ -9767,6 +9877,7 @@ export class Supervisor {
     // command she typed is over in seconds and never waits. A row held here
     // goes back to the queue, which sends it to the cloud if it can.
     if (where === 'local' && !plan.command && !this._memoryLetsLaunch(item, { asked: continuation || asked })) {
+      refuse('memory', engine);
       if (continuation && item.answer) this.redeliverAnswer(item, item.answer);
       return;
     }
@@ -9815,6 +9926,7 @@ export class Supervisor {
         where = 'local';
         whyLocal = { why: 'no-account', detail: engineOf(engine) };
       } else {
+        refuse('cloud', engine);
         this.removeSpawnFiles({ spawnFiles });
         if (continuation && item.answer) this.redeliverAnswer(item, item.answer);
         return;
@@ -9884,6 +9996,7 @@ export class Supervisor {
     // THAT an agent started work, and on which engine; nothing about the task.
     // `count` is set by main.mjs and is absent wherever nothing is sent.
     this.count?.('run_started', { engine });
+    this._notStarting?.delete(item.id);
     // Its worker, so a run left "running" by a crash can later be told ended.
     if (Number.isInteger(child?.pid)) this._leftoverCleaner?.worker(item.id, child.pid);
     if (harness.capabilities.remoteControl) {
