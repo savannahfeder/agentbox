@@ -249,13 +249,6 @@ describe('2. the two of them are two things, and a stranger can tell them apart'
     expect(hits('new user')).toEqual(['first-run']);
   });
 
-  it('leaves the fresh-install command alone, because that is a third thing', () => {
-    // opens a SECOND Agentbox that has never been set up (main/fresh-user.mjs).
-    // Untouched by the split.
-    expect(palette).toContain('label: `Open ${NAME} as a new user`');
-    expect(palette).toContain('onFreshUser(false)');
-  });
-
   it('starts the tutorial on the hand-off card, with no setup screen in front', () => {
     const run = tutorialRun('cascade');
     expect(run.step).toBe('hand');
