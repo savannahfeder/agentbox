@@ -254,6 +254,59 @@ describe('the clear band around the glass', () => {
   });
 });
 
+describe('a drag with the clear band in place', () => {
+  // The window the real page reports is the glass plus the band, so a drag
+  // from the corner is measured there too: it moves, and nothing changes size.
+  const BAND = 10;
+  const page = () => {
+    const r = rig();
+    r.call('zero:corner-tag', { ready: [{ id: 'w-1', title: 'Pricing page', says: 'is ready for you', since: r.clock() - 60_000 }], working: 3 });
+    r.call('corner-tag:ready', { part: 'tag' });
+    // the page draws the glass from the scale it is handed and reports the
+    // window: the glass plus the band on every side
+    const draw = () => {
+      const glass = Math.round(28 * r.scaleSent());
+      r.call('corner-tag:size', { part: 'tag', width: Math.round(glass * 3.9) + 2 * BAND, height: glass + 2 * BAND, glass: { x: BAND, y: BAND, width: Math.round(glass * 3.9), height: glass } });
+      return glass;
+    };
+    draw();
+    return { r, draw, glass: () => r.win().bounds.height - 2 * BAND };
+  };
+
+  it('follows the cursor one pixel for one, and the glass stays its size', () => {
+    const { r, draw, glass } = page();
+    const was = glass();
+    const b = r.win().bounds;
+    const grab = { x: b.x + b.width - 2, y: b.y + b.height - 2 };
+    r.cursor.x = grab.x; r.cursor.y = grab.y;
+    r.call('corner-tag:press', { x: grab.x, y: grab.y, grip: true, corner: 'br' });
+    r.cursor.x = grab.x - 28; r.cursor.y = grab.y - 28;
+    r.advance(16);
+    draw();
+    expect(glass()).toBe(was);
+    expect(r.win().bounds.x).toBe(b.x - 28);
+    expect(r.win().bounds.y).toBe(b.y - 28);
+    r.call('corner-tag:release', { cancelled: false });
+  });
+
+  it('keeps the window exactly the glass plus the band, so nothing is clipped', () => {
+    const { r, draw } = page();
+    const b = r.win().bounds;
+    const grab = { x: b.x + b.width - 2, y: b.y + b.height - 2 };
+    r.cursor.x = grab.x; r.cursor.y = grab.y;
+    r.call('corner-tag:press', { x: grab.x, y: grab.y, grip: true, corner: 'br' });
+    const drawnGlass = Math.round(28 * r.scaleSent());
+    for (const dy of [6, 14, 24, 40, 24, 10]) {
+      r.cursor.y = grab.y - dy;
+      r.advance(16);
+      expect(Math.round(28 * r.scaleSent())).toBe(drawnGlass);
+      draw();
+      expect(r.win().bounds.height).toBe(drawnGlass + 2 * BAND);
+    }
+    r.call('corner-tag:release', { cancelled: false });
+  });
+});
+
 describe('the Size steps in the list', () => {
   const open = () => {
     const r = rig();
