@@ -276,3 +276,20 @@ describe('the down arrow on the empty inbox', () => {
     expect(box).toContain("window.addEventListener('keydown', down, true);");
   });
 });
+
+describe('the practice tutorial does not offer itself on top', () => {
+  // The founder, 2026-10-29, making her first project from the New thread box:
+  // "It just strangely opened this modal layered on top. I don't think we
+  // should ask people for permission." The practice round's offer on a new
+  // project is for people who came through the old first run.
+  it('is never offered to someone the new first run took through', async () => {
+    const { offerOnNewProject } = await import('../renderer/src/tutorial.ts');
+    expect(offerOnNewProject({ made: true, walking: false, offered: false, touring: true })).toBe(false);
+    expect(offerOnNewProject({ made: true, walking: false, offered: false, touring: false })).toBe(true);
+  });
+  it('and the app says which people those are', async () => {
+    const fs = await import('node:fs');
+    const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+    expect(app).toContain('touring: tourRef.current !== null,');
+  });
+});

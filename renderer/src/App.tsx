@@ -1022,6 +1022,8 @@ export default function App() {
   // The tutorial on the inbox that follows it (components/Tour.tsx).
   const [tour, setTourState] = useState<TourState | null>(() => readTour(localStorage));
   const setTour = useCallback((t: TourState) => { saveTour(localStorage, t); setTourState(t); }, []);
+  const tourRef = useRef(tour);
+  tourRef.current = tour;
   const runRef = useRef<FirstRun | null>(null);
   runRef.current = run;
   // The same, for the Claude Code answer, so `finishRun` can refuse a press
@@ -7528,6 +7530,7 @@ export default function App() {
                 made: !!slug,
                 walking: runRef.current !== null,
                 offered: !neverOffered(localStorage),
+                touring: tourRef.current !== null,
               })) setOffer({ product: slug });
             } catch (err) {
               // Nothing is held open any more, because nothing was typed: the
