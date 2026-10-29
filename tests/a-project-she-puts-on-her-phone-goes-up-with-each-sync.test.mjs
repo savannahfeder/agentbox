@@ -123,6 +123,10 @@ describe('her choice is hers', () => {
 });
 
 describe('what her phone left goes through the window\'s own handlers', () => {
+  // Sent a minute ago, past the phone's Undo, which her Mac waits out
+  // (tests/undo-on-the-phone-works-because-the-mac-waits-for-it).
+  beforeEach(() => { cloud.now = () => Date.now() - 60_000; });
+
   it('a reply, a close, a snooze and a new thread, each to its handler', async () => {
     const a = store.composeItem('alpha', { title: 'Fix the login page', body: 'It loops.' });
     await phone.addPhoneCommand({ device: await device(), project: 'alpha', item: a.id, kind: 'reply', payload: { text: 'Use the new cookie.' } });

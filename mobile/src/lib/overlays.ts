@@ -4,9 +4,11 @@
 import { approvalReads } from '../../../renderer/src/approval-card';
 import { approvalStage, type Answered } from '../../../renderer/src/approval-stage';
 import { toastOpens, type ToastGoes } from '../../../renderer/src/toast-parts';
+import { PHONE_UNDO_MS } from '../../../shared/phone-undo.mjs';
 
-// App.tsx's TOAST_GOES_MS, its plain toast's 2500, and APPROVAL_EXIT_MS.
-export const TOAST_GOES_MS = 6000;
+// App.tsx's TOAST_GOES_MS, its plain toast's 2500, and APPROVAL_EXIT_MS. The
+// toast's Undo lasts as long as her Mac waits for it, less a margin (shared/phone-undo.mjs).
+export const TOAST_GOES_MS = PHONE_UNDO_MS;
 const TOAST_PLAIN_MS = 2500;
 export const APPROVAL_EXIT_MS = 420;
 
