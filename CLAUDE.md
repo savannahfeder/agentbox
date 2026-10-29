@@ -88,6 +88,13 @@ whole suite after the push (`scripts/lib/tests-the-push-runs.mjs`). So run
 `npm run test:changed` yourself before you say a branch is ready; the ship is
 not where you find out.
 
+A RED MAIN FIXES ITSELF (2026-10-29). When GitHub's whole-suite run on main
+goes red, the app files a thread that starts on its own, fixes the break or
+reverts the commit, and ships without review (`main/main-went-red.mjs`). After
+two fixes that leave main red, the next one waits in Needs you. While main is
+red, a push is refused only for tests it turned red itself: the ones already
+red on main are left out (`AGENTBOX_RED_ON_MAIN` in the pre-push hook).
+
 Local `main` only ever points at something that is on the public `main`. Moving
 it onto a branch is refused (`scripts/hooks/reference-transaction`), because a
 fast-forward writes no commit and so walked straight past the commit guards: on

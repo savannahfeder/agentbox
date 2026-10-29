@@ -15,6 +15,7 @@ const BY_ID: Record<string, string> = {
   'clear-filter': '×',
   'projects-page': '▤',
   search: '/',
+  'all-threads': '/',
   'view-inbox': '→',
   'view-progress': '→',
   'view-done': '→',
@@ -72,6 +73,7 @@ const BY_ID: Record<string, string> = {
 const BY_PREFIX: [string, string][] = [
   ['teammate-pause-', '‖'],
   ['teammate-', '@'],
+  ['thread-', '›'],
   ['priority-urgent', '↑'],
   ['priority-high', '↑'],
   ['priority-', '↓'],

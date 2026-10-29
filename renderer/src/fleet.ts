@@ -21,6 +21,8 @@ export interface Fleet {
   signInNeeded?: Record<string, string>;
   /** `supervisor.atLimit`: the tool that is out of usage and when it resets. */
   atLimit?: Record<string, { tool: string; until: number }>;
+  /** `supervisor.cannotStart`: queued, but the last pass could not start these, and why. */
+  cannotStart?: Record<string, { why: string; tool: string }>;
   /** `supervisor.shipping`: the app still owes these a ship. */
   shipping?: string[];
   /** `snapshot.approvals`: an agent on each of these is stopped on a permission

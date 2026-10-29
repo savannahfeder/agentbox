@@ -52,7 +52,8 @@ function ruleFor(selector) {
 
 describe('where ⌘K opens', () => {
   it('carries its own backdrop class, so moving it cannot move anything else', () => {
-    expect(palette).toContain('className="modal-backdrop palette-backdrop"');
+    // A phone adds its own class on top (command-k-on-a-phone).
+    expect(palette).toContain('className={`modal-backdrop palette-backdrop${phone ? \' palette-on-phone\' : \'\'}`}');
   });
 
   it('is centred with a held-back skirt, not pinned to the top of the window', () => {

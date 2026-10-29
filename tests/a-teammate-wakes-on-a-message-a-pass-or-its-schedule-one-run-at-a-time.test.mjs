@@ -155,7 +155,8 @@ describe('one run at a time', () => {
   it('a new run behind an active one is queued, and nothing is released while it runs', () => {
     const running = run(felix, { id: 'w-333333', status: 'claimed' });
     const p = { id: 'm-8', kind: 'pass', from: ada.id, to: felix.id, title: 'another', ts: NOW };
-    const acts = planWakes({ teammates: [ada, felix], chat: chat([p]), items: [running], now: NOW });
+    // Told to take hand-offs straight away; one held for your yes does not queue.
+    const acts = planWakes({ teammates: [ada, { ...felix, handoffsNeedYes: false }], chat: chat([p]), items: [running], now: NOW });
     expect(acts.find((a) => a.type === 'run' && a.teammate === felix.id).start).toBe('later');
     expect(acts.find((a) => a.type === 'release' && a.teammate === felix.id)).toBeUndefined();
   });
@@ -163,7 +164,7 @@ describe('one run at a time', () => {
   it('two wakes in one tick: the first starts now and the second waits', () => {
     const a = { id: 'm-9', kind: 'pass', from: ada.id, to: felix.id, title: 'one', ts: NOW };
     const b = { id: 'm-10', kind: 'pass', from: ada.id, to: felix.id, title: 'two', ts: NOW + 1 };
-    const acts = planWakes({ teammates: [ada, felix], chat: chat([a, b]), items: [], now: NOW });
+    const acts = planWakes({ teammates: [ada, { ...felix, handoffsNeedYes: false }], chat: chat([a, b]), items: [], now: NOW });
     expect(acts.filter((x) => x.type === 'run').map((x) => x.start)).toEqual(['now', 'later']);
   });
 

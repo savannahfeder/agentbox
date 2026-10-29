@@ -45,10 +45,13 @@ permissions:
   contents: read
 
 # A second push to the same branch cancels the first, so a branch pushed five
-# times in a minute pays for one run rather than five.
+# times in a minute pays for one run rather than five. NOT ON MAIN: each commit
+# there is its own group and runs to the end, because a red main starts its own
+# fix from the commit that broke it (main/main-went-red.mjs), and a cancelled
+# run names no commit.
 concurrency:
-  group: tests-${{ github.ref }}
-  cancel-in-progress: true
+  group: tests-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   vitest:

@@ -17,7 +17,7 @@ import { color, font } from '../ui/theme';
 const phoneSite: string | undefined = Constants.expoConfig?.extra?.cloud?.phoneSite ?? undefined;
 
 type Mode = 'sign-in' | 'sign-up' | 'check-email';
-const smallCaps = { fontFamily: font.mono, fontSize: 10.5, letterSpacing: 0.84, textTransform: 'uppercase' as const, color: color.faint };
+const smallCaps = { fontFamily: font.mono, fontSize: 10.5, letterSpacing: 0.84, textTransform: 'uppercase' as const, get color() { return color.faint; } };
 
 function Field({ label, secureTextEntry, ...rest }: { label: string } & React.ComponentProps<typeof TextInput>) {
   const [focused, setFocused] = useState(false);

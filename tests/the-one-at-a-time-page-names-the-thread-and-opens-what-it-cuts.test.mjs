@@ -80,7 +80,8 @@ describe('a page or a note read in place', () => {
   it('can be folded to its name from a button on its head, and starts open', () => {
     const html = renderToStaticMarkup(h(QueueFile, { product: 'p', path: 'reports/listings.md', md, onOpen: noop }));
     expect(html).toMatch(/<button type="button" class="one-filefold" aria-expanded="true"[^>]*>.*listings\.md/);
-    expect(visible(html)).toBe('listings.md Open full screen');
+    expect(visible(html)).toBe('listings.md');
+    expect(html).toContain('aria-label="Open full screen"');
   });
   it('and the fold keeps the way to open it full screen', () => {
     const tsx = read('renderer/src/components/OneThingAtATime.tsx');
