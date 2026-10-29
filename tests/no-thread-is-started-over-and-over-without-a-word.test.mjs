@@ -155,7 +155,7 @@ describe('where it sits', () => {
   const src = fs.readFileSync(new URL('../main/supervisor.mjs', import.meta.url), 'utf8');
   it('every run starts through the one door that asks it', () => {
     const door = src.slice(src.indexOf('  spawnWorker(item, {'), src.indexOf('  spawnWorker(item, {') + 400);
-    expect(door).toMatch(/if \(this\._heldFromStarting\(item\)\) return;/);
+    expect(door).toMatch(/if \(this\._heldFromStarting\(item\)\) (return;|\{ refuse\('held'\); return; \})/);
   });
   it('every run that ends is counted, before anything else is decided about it', () => {
     expect(src).toMatch(/this\._noteHowTheRunStarted\(item, session\);/);
