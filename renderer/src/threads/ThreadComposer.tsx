@@ -55,6 +55,7 @@ import { defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type 
 import { defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../effort';
 import { readLastEngine, startingEngine, writeLastEngine } from '../engines';
 import { repeatPresets } from '../components/When';
+import type { Idea } from '../first-run';
 import { readRule } from '../format';
 import { fitMenu } from '../keep-in-window';
 import { ModelMenu } from './ModelMenu';
@@ -109,8 +110,10 @@ export interface ComposeStart {
 }
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine,
+  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas,
 }: {
+  /** First-thread suggestions, offered only while the tutorial is walking someone to their first send. */
+  ideas?: Idea[] | null;
   statusLine?: string | null;
   /** On the page: whether the keyboard is in the box or words are left in it. */
   onWriting?: (writing: boolean) => void;
@@ -659,7 +662,22 @@ export function ThreadComposer({
     if (err) { restoreComposeDraft(taken); setError(err); }
     else { dropComposeDraft(taken); setText(''); onClose(); }
   };
-  const send = () => (person && sendAs === 'message' ? sendMessage() : sendTask());
+  // A picked suggestion that keeps a schedule sends as that repeating task, while its words are unchanged.
+  const [idea, setIdea] = useState<Idea | null>(null);
+  const ideaRule = idea?.repeat && text.trim() === idea.text ? (({ short: _s, label: _l, ...rule }) => rule)(idea.repeat) : null;
+  const send = () => (person && sendAs === 'message' ? sendMessage() : sendTask(ideaRule ? { repeat: ideaRule } : {}));
+  const ideaList = useRef<HTMLDivElement>(null);
+  const takeIdea = (i: Idea) => {
+    setIdea(i);
+    setText(i.text);
+    setTimeout(() => { const t = textRef.current; if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }, 0);
+  };
+  const ideaKeys = (e: { key: string; preventDefault(): void; currentTarget: HTMLButtonElement }) => {
+    const rows = [...(ideaList.current?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
+    const at = rows.indexOf(e.currentTarget);
+    if (e.key === 'ArrowDown') { e.preventDefault(); rows[Math.min(rows.length - 1, at + 1)]?.focus(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); if (at === 0) textRef.current?.focus(); else rows[at - 1]?.focus(); }
+  };
   const talk = useWebDictation({ text, setText, field: textRef }, () => void send());
   // ⌘↵ SENDS WHEREVER THE CURSOR IS while the card is open (w-9f6975906c).
   // It used to be heard only inside the card, so once a menu or a click had
@@ -1072,12 +1090,29 @@ export function ThreadComposer({
     };
   }
 
+  // After the folder: the tutorial asks for that first, and a list under the card would sit beneath its menu.
+  const ideaRows = ideas?.length && product?.repoPath && !person && !mate ? (
+    <div ref={ideaList} className="tc-ideas" data-tour="ideas" role="listbox" aria-label="Suggestions">
+      {ideas.map((i) => (
+        <button key={i.text} type="button" role="option" aria-selected={idea?.text === i.text && text.trim() === i.text}
+          className={`tc-idea${idea?.text === i.text && text.trim() === i.text ? ' on' : ''}`}
+          onClick={() => takeIdea(i)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); e.stopPropagation(); takeIdea(i); } else ideaKeys(e); }}>
+          <span>{i.text}</span>
+          {i.repeat && <small>{i.repeat.short}</small>}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
   const box = (
       <div
         ref={card}
         className={`tc-card${inline ? ' tc-inline' : ''}`}
         role={inline ? 'group' : 'dialog'}
         aria-label="New thread"
+        data-tour-folder={product?.repoPath ? '1' : '0'}
+        data-tour-text={text.trim() ? '1' : '0'}
         onFocus={inline ? writingNow : undefined}
         onBlur={inline ? writingNow : undefined}
         onClick={(e) => e.stopPropagation()}
@@ -1118,7 +1153,13 @@ export function ThreadComposer({
           onChange={(e) => { talk.typed(); setText(e.target.value); named.track(e.target); }}
           onSelect={(e) => named.track(e.currentTarget)}
           onScroll={(e) => named.track(e.currentTarget)}
-          onKeyDown={(e) => { named.keyDown(e); }}
+          onKeyDown={(e) => {
+            named.keyDown(e);
+            if (e.defaultPrevented || !ideas?.length || e.key !== 'ArrowDown' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+            if (e.currentTarget.value.slice(e.currentTarget.selectionEnd).includes('\n')) return;
+            e.preventDefault();
+            ideaList.current?.querySelector<HTMLButtonElement>('button')?.focus();
+          }}
           placeholder={mate === 'new' ? 'What should they do? They set themselves up from it and ask what they need' : mateRow ? `What should ${mateRow.name} do?` : person ? `Message ${names}` : placeholderFor(null)}
           onPaste={async (e) => {
             const pasted = await fromPaste(e);
@@ -1132,6 +1173,7 @@ export function ThreadComposer({
         />
         {named.menu}
         <AttachRow attachments={attachments} onRemove={(i) => setAttachments((x) => x.filter((_, j) => j !== i))} />
+        {!inline && ideaRows}
 
         {refusal && <div className="tc-note">{refusal}</div>}
         {dropped > 0 && (
@@ -1191,7 +1233,7 @@ export function ThreadComposer({
         ) : (
           <div className="tc-bar">
             {headChips}
-            <span className="tc-anchor" ref={anchor('project')}>
+            <span className="tc-anchor" ref={anchor('project')} data-tour="project">
               <button type="button" data-trigger className={`tc-chip ${open === 'project' ? 'open' : ''}`} title={product?.name ?? 'Which project'}
                 aria-haspopup="listbox" aria-expanded={open === 'project'} onClick={() => toggle('project')} onKeyDown={triggerKeys('project')}>
                 {product && <Swatch slug={product.slug} />}
@@ -1241,6 +1283,7 @@ export function ThreadComposer({
             </span>
           </div>
         )}
+        {inline && ideaRows}
       </div>
   );
   if (inline) return box;

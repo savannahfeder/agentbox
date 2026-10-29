@@ -319,3 +319,14 @@
 .tc-inline .tc-word-text { text-decoration: none; }
 .tc-inline .tc-menu { top: calc(100% + 8px); bottom: auto; left: 0; }
 .tc-inline .tc-menu.tc-right { left: auto; right: 0; }
+
+/* First-thread suggestions, while the tutorial is on (../tour.ts). */
+.tc-ideas { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.tc-inline .tc-ideas { margin-top: 16px; border: 1px solid var(--line); }
+.tc-idea {
+  display: flex; align-items: center; gap: 14px; height: 44px; padding: 0 24px;
+  background: none; border: 0; text-align: left; cursor: pointer;
+  font: inherit; font-size: 14.5px; color: var(--text-dim);
+}
+.tc-idea:hover, .tc-idea:focus-visible, .tc-idea.on { color: var(--text); background: var(--wash-strong); outline: none; }
+.tc-idea small { margin-left: auto; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }

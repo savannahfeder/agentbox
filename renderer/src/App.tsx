@@ -1,7 +1,6 @@
 import { previewFocus } from './preview-focus';
 import { cloudChord, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
 import { usePhoneBack, onCloudPhone, onPhone } from './phone-screen';
-import { lessonPosition } from './lesson-position';
 import { holdsReplies, writeHeldWhenHidden } from './phone-holds';
 import { pollEvery } from './phone-polls';
 import type {FocusControlStyle} from './focus-control';
@@ -143,8 +142,10 @@ import { needsStaging, walkStageKey } from './walk-staging';
 import { TutorialOffer } from './components/TutorialOffer';
 import { holdForStoppedAgent, neverWarned, rememberWarned } from './stopped-agent';
 import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './tutorial';
-import { FirstRunFlow, OpenLesson } from './components/FirstRun';
-import { finishedCount, landing as firstRunLanding, lessonsLeft, setLessons, type Lesson } from './first-run';
+import { FirstRunFlow } from './components/FirstRun';
+import { ideasFor } from './first-run';
+import { Tour } from './components/Tour';
+import { noteSent, readTour, saveTour, showIdeas, startTour, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   finishedCleared, firstRunNeeded, projectsOfTheirOwn, inboxCleared, laterCleared, laterId, laterIndex,
@@ -188,6 +189,8 @@ import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, rea
 import { boardStops, listStops, stepFromPlace, stepStop, stopKey, type Stop } from './threads/walk-rules';
 import { SAYS_UNDO, opensTheToast, saysWhereItWent, toastOpens, toastParts, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
+
+const FIRST_IDEAS = ideasFor();
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
 
@@ -1016,15 +1019,9 @@ export default function App() {
   const [home, setHome] = useState('');
   // The first run that starts on real work, while it is up.
   const [fresh, setFresh] = useState(false);
-  // What it leaves to teach in the inbox itself, once each: the key beside the
-  // first thread, and the lit 1 on the first options an agent offers.
-  const [lessons, setLessonList] = useState<Lesson[]>(() => lessonsLeft(localStorage));
-  const dropLesson = useCallback((l: Lesson) => setLessonList((had) => {
-    if (!had.includes(l)) return had;
-    const next = had.filter((x) => x !== l);
-    setLessons(localStorage, next);
-    return next;
-  }), []);
+  // The tutorial on the inbox that follows it (components/Tour.tsx).
+  const [tour, setTourState] = useState<TourState | null>(() => readTour(localStorage));
+  const setTour = useCallback((t: TourState) => { saveTour(localStorage, t); setTourState(t); }, []);
   const runRef = useRef<FirstRun | null>(null);
   runRef.current = run;
   // The same, for the Claude Code answer, so `finishRun` can refuse a press
@@ -6011,56 +6008,16 @@ export default function App() {
     // on whichever it was at launch.
   }, [firstRunPinned, theme, skin, machine]);
 
-  // THE FIRST RUN ENDS IN THE INBOX, on the task just sent when there is one,
-  // with two lessons left to give there.
-  const [landOn, setLandOn] = useState<string | null>(null);
-  const finishFresh = useCallback((sent: string | null, runAt = 0, draft?: string) => {
-    const to = firstRunLanding(sent, runAt);
-    try { window.zero?.track?.('first_run_finished', finishedCount(sent)); } catch {}
+  // THE FIRST RUN ENDS IN THE INBOX, where the tutorial takes over.
+  const finishFresh = useCallback((brought: number) => {
+    try { window.zero?.track?.('first_run_finished', brought); } catch {}
     finishFirstRun(localStorage);
-    setLessons(localStorage, ['open', 'pick']);
-    setLessonList(['open', 'pick']);
+    setTour(startTour());
     setFresh(false);
-    setView(to.view);
+    setView('inbox');
     setFocused(null);
     setSelected(0);
-    setLandOn(to.select);
-    if (draft?.trim()) {
-      setComposeInitial({ body: draft });
-      setModal('compose');
-    }
-  }, []);
-  // Its row arrives with a snapshot or two after the send.
-  const landAt = landOn ? list.findIndex((i) => i.id === landOn) : -1;
-  useEffect(() => { if (landAt >= 0) { setSelected(landAt); setLandOn(null); } }, [landAt]);
-  // A row that never comes must not take the cursor later, while you are elsewhere.
-  useEffect(() => {
-    if (!landOn) return undefined;
-    const t = setTimeout(() => setLandOn(null), 15_000);
-    return () => clearTimeout(t);
-  }, [landOn]);
-
-  // ↵ beside the row you are on, until a thread is opened.
-  const [lessonAt, setLessonAt] = useState<{ left: number; top: number } | null>(null);
-  useLayoutEffect(() => {
-    if (!lessons.includes('open') || focused || fresh || (view !== 'inbox' && view !== 'progress')) { setLessonAt(null); return; }
-    const title = document.querySelector('.list-pane .row.selected .th-cell-title') ?? document.querySelector('.list-pane .th-cell-title');
-    if (!title) { setLessonAt(null); return; }
-    const range = document.createRange();
-    range.selectNodeContents(title);
-    const r = range.getBoundingClientRect();
-    setLessonAt((previous) => lessonPosition(previous, { left: r.right + 20, top: r.top + r.height / 2 - 17 }));
-  }, [lessons, focused, fresh, view, list, selected]);
-  useEffect(() => { if (focused) dropLesson('open'); }, [focused, dropLesson]);
-
-  // The first option's key lit, until a thread that offered options is left.
-  const pickSeen = useRef(false);
-  useEffect(() => {
-    const on = !!focused && lessons.includes('pick');
-    document.body.classList.toggle('teach-pick', on);
-    if (on && document.querySelector('.opt-row')) pickSeen.current = true;
-    if (!focused && pickSeen.current) dropLesson('pick');
-  });
+  }, [setTour]);
 
   const openView = (next: View) => { roomsUi.leave(); teammatesUi.leave(); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); };
   useEffect(() => {
@@ -6868,7 +6825,7 @@ export default function App() {
                       // AND NOT UNDER THE LANDING (2026-10-06), which says the
                       // same thing louder: "Nothing needs you" and "You finished
                       // the tutorial" were drawn one on top of the other.
-                      ? run === null && !landing && <InboxClear slot={setClearSlot} />
+                      ? run === null && !landing && <InboxClear slot={setClearSlot} first={showIdeas(tour)} />
                       : <EmptyTab view={view} />
                 ) : <List
                   lead={view === 'inbox' && search === null && roomsUi.mentions.length
@@ -7017,6 +6974,7 @@ export default function App() {
              reads; everything else about the card is the card anybody uses. */
           initial={walkCard ? { body: `${TASK_TITLE}\n\n${TASK_BODY}` } : composeInitial}
           scripted={walkCard ? { labels: [FIRST_RUN_LABEL] } : null}
+          ideas={!walkCard && showIdeas(tour) ? FIRST_IDEAS : null}
           onOpenConversation={openConversation}
           // "Reorder" beside the project menu's heading: Settings on the
           // Projects page, which is where the order is set. The draft is
@@ -7038,6 +6996,9 @@ export default function App() {
           // it will land, so the row arrives in front of her. The tutorial
           // keeps the old order: its beat moves on from the card closing.
           onSending={walkCard ? undefined : (how) => {
+            // The tutorial's first send, which may be a repeating suggestion whose first run starts now.
+            const first = !!tour && showIdeas(tour);
+            if (first) setTour(noteSent(tour!));
             setModal(null);
             setComposeInitial(null);
             setPickProject(null);
@@ -7057,7 +7018,7 @@ export default function App() {
             // an agent is not waiting on her, so it never lands in Needs you.
             // On the Inbox the tab moves to where it did land, Running or
             // Scheduled, so she sees the row arrive instead of an unchanged page.
-            if (how.kind === 'task' && !teamOpen && !focused && (['inbox', 'progress', 'snoozed'] as View[]).includes(view)) {
+            if ((how.kind === 'task' || (first && how.kind === 'repeat')) && !teamOpen && !focused && (['inbox', 'progress', 'snoozed'] as View[]).includes(view)) {
               setView(later ? 'snoozed' : 'progress');
               setSelected(0);
               setMultiSel(new Set());
@@ -7597,7 +7558,9 @@ export default function App() {
           A ?modes= drawing stands INSTEAD of it, never over it: two full
           surfaces at once would photograph the welcome screen. */}
       {fresh && !modeDraft && <FirstRunFlow snap={snap} home={home} onDone={finishFresh} />}
-      <OpenLesson at={lessonAt} />
+      {!fresh && <Tour tour={tour} view={view} thread={!!focused}
+        covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose')}
+        onChange={setTour} />}
       {run && !modeDraft && !walkWaitsForSignIn && (
         <Onboarding
           run={run}

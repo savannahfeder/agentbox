@@ -3,28 +3,22 @@
 // holds what each rule is for.
 
 import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
-import { occurrenceId, periodKey, type RepeatShape } from '../../shared/repeats.mjs';
+import type { RepeatShape } from '../../shared/repeats.mjs';
 import { projectNameFor } from './agent-import-card';
-import { shortPath } from './onboarding';
 
-export type Step = 'chats' | 'task';
-export type Screen = 'welcome' | Step;
+export type Screen = 'welcome' | 'chats';
 export type Engine = 'claude' | 'codex';
 
-export function previousScreen(screen: Screen, { chats }: { chats: number }): Screen | null {
-  if (screen === 'welcome') return null;
-  return screen === 'task' && chats > 0 ? 'chats' : 'welcome';
+export function previousScreen(screen: Screen): Screen | null {
+  return screen === 'chats' ? 'welcome' : null;
 }
 
-const STEP_NUMBER: Record<Screen, number> = { welcome: 1, chats: 2, task: 3 };
+const STEP_NUMBER: Record<Screen, number> = { welcome: 1, chats: 2 };
 
 /** The number `first_run_step` carries for a screen. */
 export function stepNumber(screen: string): number | null {
   return STEP_NUMBER[screen as Screen] ?? null;
 }
-
-/** What `first_run_finished` carries: 1 when a task was sent, 0 when it was left with Not now. */
-export const finishedCount = (sent: string | null): number => (sent ? 1 : 0);
 
 export function readyEngines(readings: Array<{ engine: Engine; found?: boolean; signedIn?: boolean } | null>): Engine[] {
   return (['claude', 'codex'] as const).filter((engine) => readings.some((r) => r?.engine === engine && r.found && r.signedIn));
@@ -46,18 +40,8 @@ export function listKey(e: KeyLike): ListKey {
   return null;
 }
 
-/** Whether a key press is ⌘↵ or Ctrl+Enter, which sends from a text field. */
-export const isSend = (e: KeyLike): boolean => e.key === 'Enter' && !!(e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey;
 
 type ThreadLike = { folder?: string; short?: string; when?: number; imported?: boolean };
-
-export interface FolderChoice {
-  folder: string;
-  name: string;
-  short: string;
-  chats: number;
-  when: number;
-}
 
 const bare = (folder: string) => folder.replace(/\/+$/, '');
 
@@ -70,29 +54,6 @@ function placed(t: ThreadLike, home: string): boolean {
   if (!folder || folder === '/' || A_HOME.test(folder)) return false;
   // The chat's own `~/` path answers before the app has said where home is.
   return checkProjectFolder(folder, { home }).ok && (!t.short || checkProjectFolder(t.short, { home }).ok);
-}
-
-/** The folders your agents already ran in, busiest first. */
-export function folderChoices(threads: ThreadLike[], { home = '', max = 5 }: { home?: string; max?: number } = {}): FolderChoice[] {
-  const by = new Map<string, FolderChoice>();
-  for (const t of threads) {
-    if (!placed(t, home)) continue;
-    const folder = bare(String(t.folder));
-    const had = by.get(folder);
-    if (had) {
-      had.chats += 1;
-      had.when = Math.max(had.when, t.when ?? 0);
-      continue;
-    }
-    by.set(folder, {
-      folder,
-      name: projectNameFor({ name: folder.split('/').pop() ?? '' }),
-      short: t.short ? bare(t.short) : shortPath(folder, home),
-      chats: 1,
-      when: t.when ?? 0,
-    });
-  }
-  return [...by.values()].sort((a, b) => b.chats - a.chats || b.when - a.when).slice(0, max);
 }
 
 /** The newest chats not yet in the inbox, from any folder that can be a project. */
@@ -127,10 +88,6 @@ export function chatsHeadline(chats: Array<{ source?: string }>): string {
   return `Bring in your latest ${from}chats`;
 }
 
-export function stepsFor({ chats }: { chats: number }): Step[] {
-  return chats > 0 ? ['chats', 'task'] : ['task'];
-}
-
 export interface Idea {
   text: string;
   /** The schedule it keeps, with its words on the row and on the chip. None runs it once. */
@@ -145,32 +102,4 @@ export function ideasFor(): Idea[] {
     { text: 'Review the week’s changes for bugs', repeat: { every: 'week', on: 5, at: '16:00', short: 'Every Friday', label: 'Every Friday at 4:00pm' } },
     { text: 'Check for security holes and outdated packages', repeat: { every: 'week', on: 1, at: '09:00', short: 'Every Monday', label: 'Every Monday at 9:00am' } },
   ];
-}
-
-/** The id of the run a rule made now starts with: a new rule is owed at once. */
-export function firstRunOf(rule: RepeatShape & { id: string }, now = Date.now()): string | null {
-  const key = periodKey(rule, now);
-  return key ? occurrenceId(rule.id, key) : null;
-}
-
-/** Where the first run leaves you: on the task you sent, or in Needs you. */
-export function landing(sent: string | null, runAt = 0): { view: 'inbox' | 'progress' | 'snoozed'; select: string | null } {
-  return sent ? { view: runAt > Date.now() ? 'snoozed' : 'progress', select: sent } : { view: 'inbox', select: null };
-}
-
-/** The one-time lessons left after the first run: the key beside the first thread, and the lit 1. */
-export const TEACH_KEY = 'zero.firstRun.teach';
-export type Lesson = 'open' | 'pick';
-
-type Store = Pick<Storage, 'getItem' | 'setItem'>;
-
-export function lessonsLeft(store: Store): Lesson[] {
-  try {
-    const raw = store.getItem(TEACH_KEY);
-    return raw ? raw.split(',').filter((l): l is Lesson => l === 'open' || l === 'pick') : [];
-  } catch { return []; }
-}
-
-export function setLessons(store: Store, lessons: Lesson[]): void {
-  try { store.setItem(TEACH_KEY, lessons.join(',')); } catch { /* a lesson missed is not worth a failure */ }
 }

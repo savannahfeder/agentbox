@@ -105,7 +105,8 @@ describe('the component that draws it', () => {
   });
 
   it('leaves "Nothing needs you" for an inbox that really is clear', () => {
-    expect(pages).toContain('<h2>Nothing needs you</h2>');
+    // While the tutorial walks someone to their first thread, it says so instead (w-31c71743b5).
+    expect(pages).toContain("<h2>{first ? 'Give an agent its first task' : 'Nothing needs you'}</h2>");
   });
 });
 

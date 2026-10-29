@@ -508,9 +508,9 @@ export function ConnectComputer({ email, onSignOut }: { email: string | null; on
  *  heading, and under it the New thread box drawn open on the page: App.tsx
  *  puts the one composer into `slot`. What is in progress has its own tab and
  *  is not counted here. */
-export function InboxClear({ slot }: { slot: (el: HTMLDivElement | null) => void }) {
+export function InboxClear({ slot, first = false }: { slot: (el: HTMLDivElement | null) => void; first?: boolean }) {
   return <div className="th-clear th-start">
-    <h2>Nothing needs you</h2>
+    <h2>{first ? 'Give an agent its first task' : 'Nothing needs you'}</h2>
     <div className="th-clear-compose" ref={slot} />
   </div>;
 }
