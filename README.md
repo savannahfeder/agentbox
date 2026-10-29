@@ -184,7 +184,7 @@ number of running sessions. Agentbox keeps one order and uses it for both.
 
 ## Built for the keyboard
 
-<img src="docs/readme/keys.webp" alt="The keys E, R, J, K and the number row light up over the inbox, then the command palette opens on the themes" width="100%">
+<img src="docs/readme/keys.webp" alt="The keys J, K, R, E and the number row light up over the inbox as a reply is sent and a row is marked done" width="100%">
 
 | Key | Does |
 |---|---|
@@ -198,9 +198,6 @@ number of running sessions. Agentbox keeps one order and uses it for both.
 | `S` | Show or hide the summary, in an open task |
 | `Z` | Undo |
 | `⌘K` or `Ctrl+K` | Everything else |
-
-Fifteen skins, each in light and dark, from plain slate to woodblock and riso
-prints. Press `⌘K` or `Ctrl+K` and type "theme". `Ctrl+K` is the same palette on Linux, where there is no Command key.
 
 ## Runs on the plan you already have
 
@@ -259,7 +256,7 @@ Nothing, unless you are running a released copy: the Mac app, or
 released. A build made from this repo has no key, so a clone and a fork are
 silent, and with no key the whole path is off at every send.
 
-A released copy counts eighteen things, and they are counts:
+A released copy counts nineteen things, and they are counts:
 
 - the app was opened
 - the app was used today, once a day
@@ -272,6 +269,7 @@ A released copy counts eighteen things, and they are counts:
 - a reply was sent
 - a task finished
 - an agent started work
+- an agent could not start yet, and why, out of eighteen fixed words
 - an agent stopped work
 - the app was quit
 - the corner tag was hidden
@@ -282,13 +280,14 @@ A released copy counts eighteen things, and they are counts:
 
 Each carries a random install id, the app and platform version, whether it
 came from the Mac app or the browser copy, and at most
-seven other things: how long something took, how many of a thing there were,
+eight other things: how long something took, how many of a thing there were,
 which kind of row it was out of six fixed words, whether an agent or you did
 it, whether an agent's run failed, whether it happened in setup's practice
-project, and which coding agent ran it, Claude Code or Codex.
+project, which coding agent ran it, Claude Code or Codex, and why an agent
+could not start yet, out of eighteen fixed words.
 No file contents, no prompts, no paths, no titles, nothing you typed.
 `shared/analytics-events.mjs` is the whole list, and anything a caller attaches
-beyond those seven is dropped rather than sent, so nobody can widen it by
+beyond those eight is dropped rather than sent, so nobody can widen it by
 accident. Crash reports travel the same way and are scrubbed first
 (`shared/crash-scrub.mjs`).
 

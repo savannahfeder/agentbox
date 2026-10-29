@@ -463,7 +463,7 @@ function PaletteBox({ commands, findThreads, onSearchFor, onClose, phone = false
             ? <button type="button" className="palette-cancel" onClick={onClose}>Cancel</button>
             : <button type="button" className="palette-esc" aria-label="Close" onClick={onClose}>esc</button>}
         </div>
-        <div className={`palette-list${phone && !query.trim() ? ' palette-tiles' : ''}`} ref={listRef}>
+        <div className="palette-list" ref={listRef}>
           {filtered.length === 0 && <div className="palette-empty">{emptyLine(query)}</div>}
           {filtered.map((c, i) => (<Fragment key={keys[i]}>
             {labels.has(i) && <div className="palette-section">{labels.get(i)}</div>}
