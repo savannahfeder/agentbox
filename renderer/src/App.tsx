@@ -1,7 +1,7 @@
 import { previewFocus } from './preview-focus';
 import { cloudChord, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
 import { usePhoneBack, onCloudPhone, onPhone } from './phone-screen';
-import { lessonPosition } from './lesson-position';
+import { useLessonPlace } from './lesson-position';
 import { holdsReplies, writeHeldWhenHidden } from './phone-holds';
 import { pollEvery } from './phone-polls';
 import type {FocusControlStyle} from './focus-control';
@@ -6129,15 +6129,14 @@ export default function App() {
 
   // ↵ beside the row you are on, until a thread is opened, and never while a
   // card has the keyboard (`showsOpenLesson`).
-  const [lessonAt, setLessonAt] = useState<{ left: number; top: number } | null>(null);
-  useLayoutEffect(() => {
-    if (!showsOpenLesson({ lessons, focused: !!focused, fresh, view, modal })) { setLessonAt(null); return; }
+  const lessonAt = useLessonPlace(() => {
+    if (!showsOpenLesson({ lessons, focused: !!focused, fresh, view, modal })) return null;
     const title = document.querySelector('.list-pane .row.selected .th-cell-title') ?? document.querySelector('.list-pane .th-cell-title');
-    if (!title) { setLessonAt(null); return; }
+    if (!title) return null;
     const range = document.createRange();
     range.selectNodeContents(title);
     const r = range.getBoundingClientRect();
-    setLessonAt((previous) => lessonPosition(previous, { left: r.right + 20, top: r.top + r.height / 2 - 17 }));
+    return { left: r.right + 20, top: r.top + r.height / 2 - 17 };
   }, [lessons, focused, fresh, view, modal, list, selected]);
   useEffect(() => { if (focused) dropLesson('open'); }, [focused, dropLesson]);
 
