@@ -298,8 +298,10 @@ describe('the command bar', () => {
   // The founder, 2026-10-29: "make sure that our onboarding flow teaches people
   // about the Cmd+K menu bar." It is the last tip, once a first thread is closed.
   it('is pointed out on the list once the first thread is closed', () => {
-    expect(tourStep(after('compose', 'open', 'reply', 'close'), at({ rows: 0 }))).toBe('palette');
-    expect(tourStep(after('open', 'choose', 'close'), at({ view: 'progress', rows: 0 }))).toBe('palette');
+    expect(tourStep(noteSent(after('open', 'reply', 'close')), at({ rows: 0 }))).toBe('palette');
+    expect(tourStep(after('open', 'choose', 'close', 'start'), at({ view: 'progress', rows: 0 }))).toBe('palette');
+    // Measured with three chats brought in: the bar came before New thread, and pressing N used it up unread.
+    expect(tourStep(after('open', 'choose', 'close'), at({ rows: 2 }))).toBe('start');
     // Measured in the fresh window: closing the only thread leaves the empty inbox, where the box is drawn on the page.
     expect(tourStep(noteSent(after('open', 'reply', 'close')), at({ rows: 0, composer: 'inline' }))).toBe('palette');
   });

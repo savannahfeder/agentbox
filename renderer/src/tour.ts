@@ -71,8 +71,8 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
     return null;
   }
   if (s.composer === 'card') return null;
-  // The last tip: once a first thread is closed, the bar that reaches everything else.
-  if (!todo('close') && todo('palette') && (s.view === 'inbox' || s.view === 'progress')) return 'palette';
+  // The last tip, once a first thread is closed and New thread is known: the bar that reaches everything else.
+  if (!todo('close') && todo('palette') && (t.sent || !todo('start')) && (s.view === 'inbox' || s.view === 'progress')) return 'palette';
   if (t.sent && todo('working') && s.view === 'progress' && s.running > 0) return 'working';
   // The first task's answer lands in Needs you while you are still on In progress.
   if (t.sent && todo('open') && s.view !== 'inbox' && s.running === 0 && (s.waiting ?? 0) > 0) return 'answered';
