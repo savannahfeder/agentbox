@@ -144,7 +144,7 @@ import { TutorialOffer } from './components/TutorialOffer';
 import { holdForStoppedAgent, neverWarned, rememberWarned } from './stopped-agent';
 import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './tutorial';
 import { FirstRunFlow, OpenLesson } from './components/FirstRun';
-import { landing as firstRunLanding, lessonsLeft, setLessons, type Lesson } from './first-run';
+import { finishedCount, landing as firstRunLanding, lessonsLeft, setLessons, type Lesson } from './first-run';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   finishedCleared, firstRunNeeded, projectsOfTheirOwn, inboxCleared, laterCleared, laterId, laterIndex,
@@ -6016,6 +6016,7 @@ export default function App() {
   const [landOn, setLandOn] = useState<string | null>(null);
   const finishFresh = useCallback((sent: string | null, runAt = 0, draft?: string) => {
     const to = firstRunLanding(sent, runAt);
+    try { window.zero?.track?.('first_run_finished', finishedCount(sent)); } catch {}
     finishFirstRun(localStorage);
     setLessons(localStorage, ['open', 'pick']);
     setLessonList(['open', 'pick']);

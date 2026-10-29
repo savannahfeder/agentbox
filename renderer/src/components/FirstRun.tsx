@@ -19,7 +19,7 @@ import { WhenPicker, WHEN_NOW, type WhenValue } from './When';
 import FolderPicker from './FolderPicker';
 import { checkProjectFolder } from '../../../shared/project-folder-check.mjs';
 import {
-  chatChoices, chatsHeadline, firstRunOf, folderChoices, ideasFor, isSend, listKey, previousScreen, projectsToMake, readyEngines, stepsFor,
+  chatChoices, chatsHeadline, firstRunOf, folderChoices, ideasFor, isSend, listKey, previousScreen, projectsToMake, readyEngines, stepNumber, stepsFor,
   type Engine, type FolderChoice, type Screen, type Step,
 } from '../first-run';
 import './first-run.css';
@@ -140,6 +140,10 @@ export function FirstRunFlow({ snap, home, onDone }: {
     api.agentThreads().then((t) => { if (live) setThreads(t); }).catch(() => { if (live) setThreads([]); });
     return () => { live = false; };
   }, []);
+
+  useEffect(() => {
+    try { window.zero?.track?.('first_run_step', stepNumber(screen) ?? undefined); } catch {}
+  }, [screen]);
 
   // AN AGENT BEING INSTALLED OR SIGNED IN, watched until it is ready.
   useEffect(() => {

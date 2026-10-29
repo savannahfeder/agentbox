@@ -16,6 +16,16 @@ export function previousScreen(screen: Screen, { chats }: { chats: number }): Sc
   return screen === 'task' && chats > 0 ? 'chats' : 'welcome';
 }
 
+const STEP_NUMBER: Record<Screen, number> = { welcome: 1, chats: 2, task: 3 };
+
+/** The number `first_run_step` carries for a screen. */
+export function stepNumber(screen: string): number | null {
+  return STEP_NUMBER[screen as Screen] ?? null;
+}
+
+/** What `first_run_finished` carries: 1 when a task was sent, 0 when it was left with Not now. */
+export const finishedCount = (sent: string | null): number => (sent ? 1 : 0);
+
 export function readyEngines(readings: Array<{ engine: Engine; found?: boolean; signedIn?: boolean } | null>): Engine[] {
   return (['claude', 'codex'] as const).filter((engine) => readings.some((r) => r?.engine === engine && r.found && r.signedIn));
 }
