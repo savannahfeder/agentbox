@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
-import { finishLesson, LESSONS, lessonOf, skipTour, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { finishLesson, keyLearns, LESSONS, lessonOf, skipTour, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -216,6 +216,8 @@ export function Tour({ tour, view, thread, covered, onChange }: {
       onChange(finishLesson(tour, lessonOf(step)));
     };
     const key = (e: KeyboardEvent) => {
+      const typing = (e.target as Element | null)?.closest?.('input, textarea, [contenteditable="true"]');
+      if (!typing && keyLearns(step, e)) { onChange(finishLesson(tour, lessonOf(step))); return; }
       if (e.key !== 'Escape' || !ON_THE_LIST.includes(step)) return;
       e.preventDefault();
       e.stopPropagation();

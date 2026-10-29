@@ -324,3 +324,25 @@ describe('the command bar', () => {
     expect(tour).toContain("{step !== 'palette' && <div key={`glow-${step}`}");
   });
 });
+
+describe('a tip is learned by pressing its key', () => {
+  // Measured 2026-10-29 in the fresh window: E closed the first thread, but the
+  // card the close put up covered the window as the tip went, so the lesson
+  // was not counted and the command bar tip never came.
+  it('names the key each tip asks for', async () => {
+    const { keyLearns } = await import('../renderer/src/tour.ts');
+    expect(keyLearns('close', { key: 'e' })).toBe(true);
+    expect(keyLearns('close', { key: 'E' })).toBe(true);
+    expect(keyLearns('start', { key: 'n' })).toBe(true);
+    expect(keyLearns('open', { key: 'Enter' })).toBe(true);
+    expect(keyLearns('choose', { key: '2' })).toBe(true);
+    expect(keyLearns('reply', { key: 'r' })).toBe(true);
+  });
+  it('and not another key, or the same key with a modifier', async () => {
+    const { keyLearns } = await import('../renderer/src/tour.ts');
+    expect(keyLearns('close', { key: 'r' })).toBe(false);
+    expect(keyLearns('close', { key: 'e', metaKey: true })).toBe(false);
+    expect(keyLearns('choose', { key: '0' })).toBe(false);
+    expect(keyLearns('send', { key: 'Enter' })).toBe(false);
+  });
+});

@@ -52,6 +52,14 @@ export const finishLesson = (t: Tour, l: Lesson): Tour => (t.done.includes(l) ? 
 export const lessonOf = (s: TourStep): Lesson =>
   s === 'folder' || s === 'pick' || s === 'send' ? 'compose' : s === 'answered' ? 'open' : s;
 
+const KEYS: Partial<Record<TourStep, RegExp>> = { start: /^n$/i, open: /^Enter$/, choose: /^[1-9]$/, reply: /^r$/i, close: /^e$/i };
+
+/** Whether this key press is the one the tip on screen asks for, which is the lesson learned. */
+export function keyLearns(step: TourStep, e: { key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean }): boolean {
+  if (e.metaKey || e.ctrlKey || e.altKey) return false;
+  return !!KEYS[step]?.test(e.key);
+}
+
 /** The first-thread suggestions, until the first send or Skip. */
 export const showIdeas = (t: Tour | null): boolean => !!t && !t.sent && !t.skipped;
 
