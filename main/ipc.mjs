@@ -109,7 +109,7 @@ const NO_UPDATER = {
   move: () => ({ moved: false, error: null }),
 };
 
-const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget']);
+const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget', 'method']);
 const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markUnread', 'react', 'edit', 'deleteMessage', 'putFile', 'file', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute']);
 
 export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, onCount = () => {} }) {
@@ -910,6 +910,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       else if (op === 'goAhead') value = mates.goAhead(a.id, a.ref);
       else if (op === 'remember') value = mates.remember(a.id, a.text, { from: 'you' });
       else if (op === 'forget') value = mates.forget(a.id, a.memory);
+      else if (op === 'method') return { ok: true, value: mates.method(a.id) };
       supervisor.wake?.();
       push();
       return { ok: true, value: value ?? null };

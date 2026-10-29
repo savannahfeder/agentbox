@@ -95,7 +95,7 @@ describe('a teammate keeping a lesson', () => {
     expect(team.briefFor({ id: run.id, labels: run.labels })).toMatch(/Playbooks on the team.*How you write posts/s);
     core.teamPlaybook({ playbook: 'How you write posts' });
     const brief = team.briefFor({ id: run.id, labels: run.labels });
-    expect(brief).toMatch(/## Playbooks you read/);
+    expect(brief).toMatch(/## Shared playbooks you read/);
     expect(brief).toMatch(/How you write posts[\s\S]*Never write honestly/);
   });
 

@@ -65,11 +65,20 @@ const FIELDS = [
   'name', 'letter', 'role', 'job', 'goal', 'counted', 'works', 'asksFirst',
   'product', 'engine', 'model', 'effort', 'limit', 'paused', 'status',
   'endedAt', 'served', 'starter', 'createdAt', 'duties', 'dutyServed',
-  // Work another teammate hands it waits for your yes before it starts.
+  // Work another teammate hands it waits for your yes before it starts,
+  // unless this is saved false.
   'handoffsNeedYes',
+  // A date its duties and rounds do not wake it before.
+  'pausedUntil',
 ];
 
 export const STATUSES = ['draft', 'active'];
+
+export const isDate = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00`));
+
+export function pausedNow(t, now = Date.now()) {
+  return isDate(t?.pausedUntil) && dateKey(now) < t.pausedUntil;
+}
 
 export function isWorks(works) {
   return isRepeatRule(works);
@@ -163,6 +172,7 @@ function coerce(field, value) {
     case 'status': return STATUSES.includes(value) ? value : undefined;
     case 'endedAt': case 'createdAt': return Number.isFinite(value) ? value : value === null ? null : undefined;
     case 'served': return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+    case 'pausedUntil': return value === null ? null : isDate(value) ? value : undefined;
     case 'duties': return Array.isArray(value) ? value.map(cleanDuty).filter(Boolean).slice(0, 12) : value === null ? [] : undefined;
     case 'dutyServed': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
@@ -328,6 +338,26 @@ export function waitingOnYou(item) {
   return r.ts > a;
 }
 
+// A duty stops waking once this many of its results in a row reached you and
+// sat a day unanswered; your answer or close on any of them starts it again.
+export const UNREAD_HOLD = 3;
+
+export function dutyUnread(teammateId, dutyId, items, now = Date.now()) {
+  const reached = runsOf(teammateId, items)
+    .filter((i) => dutyOf(i) === dutyId && i.wrote?.result?.source === 'agent' && !(i.labels ?? []).includes('clean'))
+    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  let unread = 0;
+  for (const i of reached) {
+    const sentAt = i.wrote?.result?.ts ?? 0;
+    const answered = i.wrote?.answer?.source === 'founder' && (i.wrote.answer.ts ?? 0) >= sentAt;
+    const closed = i.status === 'done' && i.wrote?.status?.source === 'founder';
+    if (answered || closed || now - sentAt < 24 * 60 * 60 * 1000) return false;
+    unread += 1;
+    if (unread >= UNREAD_HOLD) return true;
+  }
+  return false;
+}
+
 export function isQueued(item) {
   return item?.status === 'open' && item?.start === 'later';
 }
@@ -426,7 +456,8 @@ function partFor(text, name) {
 //   with the sender, else its thread on the same work of yours in the same
 //   project, as a reply from the sender (`tell`). A thread its agent finished
 //   opens again; one you closed is not touched, and the hand-off starts a new
-//   thread. A receiver set to `handoffsNeedYes` holds it for your reply.
+//   thread. It is held for your reply unless the receiver saved
+//   `handoffsNeedYes: false`.
 // - A schedule that is owed becomes a run.
 // - One run at a time: a new run behind an active one is made queued, and a
 //   teammate with nothing active gets its oldest queued run released.
@@ -502,7 +533,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
           continue;
         }
       }
-      const hold = !fromYou && !!t.handoffsNeedYes;
+      const hold = !fromYou && t.handoffsNeedYes !== false;
       const home = fromYou ? null : homeOf(t, m);
       if (home && !closedByYou(home)) {
         const from = { teammate: m.from, name: byId.get(m.from)?.name ?? 'A teammate' };
@@ -530,7 +561,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
   }
 
   for (const t of live) {
-    if (t.paused || t.status !== 'active' || !isWorks(t.works)) continue;
+    if (t.paused || t.status !== 'active' || !isWorks(t.works) || pausedNow(t, now)) continue;
     const key = periodKey(t.works, now);
     if (!key || key <= servedOf(t)) continue;
     const id = newRun(t, { kind: 'schedule', key, label: t.works.every === 'week' ? 'week' : 'round' }, `${t.id}@${key}`);
@@ -538,8 +569,12 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
   }
 
   for (const t of live) {
-    if (t.paused || t.status !== 'active') continue;
+    if (t.paused || t.status !== 'active' || pausedNow(t, now)) continue;
     for (const d of t.duties ?? []) {
+      if (dutyUnread(t.id, d.id, items, now)) {
+        actions.push({ type: 'unread', teammate: t.id, duty: d.id, what: d.what });
+        continue;
+      }
       const served = t.dutyServed?.[d.id] ?? '';
       let key = null;
       if (d.after === 'ship') {
@@ -807,31 +842,76 @@ export function offerFrom({ items = [], offered = new Set(), now = Date.now() } 
 
 const OFFER_THREADS = 12;
 
+// ---------------------------------------------------------------- the method
+// A teammate's method is one file it keeps and reads whole every run: what
+// the job is, how it is done, what the person approved and turned down in
+// their words, and what needs their yes. Past this it is cut with a mark.
+export const METHOD_CAP = 16_000;
+
+const KEYS = /\b(sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|xox[abprs]-[A-Za-z0-9-]{10,})\b/g;
+const redact = (text) => String(text ?? '').replace(KEYS, '[key removed]');
+const cutText = (text, most) => (text.length > most ? `${text.slice(0, most).trimEnd()}… (cut, ${text.length - most} more characters)` : text);
+
 /**
- * What was said in the threads a teammate is made from, for its setup brief:
- * your words whole, the agent's cut short, the app's notes left out, all of
- * it inside `cap` characters. `read(product, id)` gives a thread's turns
- * ({ source, field, text }, oldest first).
+ * One thread written out for a teammate to learn from: every word the person
+ * said and every answer the agent gave, in order. A thread too long for `cap`
+ * loses the agent's words first; the person's are kept whole.
  */
-export function threadsDigest(threads, read, { cap = 40_000 } = {}) {
-  if (!threads?.length) return '';
-  const per = Math.floor(cap / threads.length);
-  const cut = (text, most) => (text.length > most ? `${text.slice(0, most).trimEnd()}…` : text);
-  const one = (t, agentMost, youMost) => {
+export function sourceText(thread, turns, { cap = 80_000 } = {}) {
+  const said = (turns ?? []).filter((x) => (x.source === 'founder' || x.source === 'agent') && String(x.text ?? '').trim());
+  const render = (agentMost) => [
+    `# ${thread.title} (${thread.product}/${thread.id})`,
+    ...said.map((x) => (x.source === 'founder'
+      ? `## You\n\n${redact(x.text.trim())}`
+      : `## The agent\n\n${cutText(redact(x.text.trim()), agentMost)}`)),
+  ].join('\n\n');
+  for (const most of [Infinity, 6000, 1500, 400]) {
+    const text = render(most);
+    if (text.length <= cap) return text;
+  }
+  return `${render(400).slice(0, cap - 90)}\n\n… (cut here: this thread is longer than ${cap} characters)`;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+export const RECORD_DAYS = 21;
+
+const headline = (text) => clip(String(text ?? '').split('\n').map((l) => l.replace(/\*\*|__|`|^#+\s*/g, '').trim()).find(Boolean) ?? '', 240);
+
+/**
+ * The record of a teammate's recent work, read off the ledger: each run of the
+ * last three weeks, oldest first, with every word the person said on it and
+ * the first line of its last answer. A quiet run the person never spoke on is
+ * left out. Past `cap` the oldest runs go first. `read(product, id)` gives a
+ * thread's turns.
+ */
+export function recordOf(runs, read, { now = Date.now(), cap = 8000, days = RECORD_DAYS } = {}) {
+  const since = now - days * DAY_MS;
+  const entries = [];
+  const ordered = [...(runs ?? [])].filter((r) => (r.createdAt ?? 0) >= since).sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+  for (const r of ordered) {
     let turns = [];
-    try { turns = read(t.product, t.id) ?? []; } catch { turns = []; }
-    const said = turns.filter((x) => x.source === 'founder' || x.source === 'agent').map((x) => (x.source === 'founder'
-      ? `You: ${cut(x.text.trim(), youMost)}`
-      : `Agent: ${cut(x.text.trim().replace(/\s*\n\s*/g, ' '), agentMost)}`));
-    return [`### ${t.title} (${t.product}/${t.id})`, ...(said.length ? said : ['(nothing could be read from this thread)'])].join('\n');
-  };
-  return threads.map((t) => {
-    for (const [agentMost, youMost] of [[1200, 4000], [300, 1500], [120, 600]]) {
-      const text = one(t, agentMost, youMost);
-      if (text.length <= per) return text;
-    }
-    return cut(one(t, 120, 600), per - 1);
-  }).join('\n\n').slice(0, cap);
+    try { turns = read(r.product, r.id) ?? []; } catch { turns = []; }
+    const yours = turns
+      .filter((x) => x.source === 'founder' && (x.field === 'body' || x.field === 'answer'))
+      .map((x) => String(x.text ?? '').trim())
+      .filter((x) => x && x !== '(withdrawn)');
+    if ((r.labels ?? []).includes('clean') && !yours.length) continue;
+    const last = [...turns].reverse().find((x) => x.source === 'agent' && x.field === 'result');
+    const state = waitingOnYou(r) ? 'waiting on you' : r.status === 'done' ? (stoppedByYou(r) ? 'stopped by you' : 'finished') : 'open';
+    const date = new Date(r.createdAt ?? now).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    entries.push([
+      `- ${date}, "${clip(r.label || r.title, 120)}" (${r.product}/${r.id}), ${state}:`,
+      ...yours.map((y) => `  You: "${clip(y, 800)}"`),
+      ...(last ? [`  It said: "${headline(last.text)}"`] : []),
+    ].join('\n'));
+  }
+  let dropped = 0;
+  while (entries.length && entries.join('\n').length > cap) {
+    entries.shift();
+    dropped += 1;
+  }
+  if (!entries.length) return '';
+  return [...(dropped ? [`(${dropped} older runs left out)`] : []), ...entries].join('\n');
 }
 
 /** What a tap on the offer meant: 'make', 'dismiss', or your own words to make one from. */

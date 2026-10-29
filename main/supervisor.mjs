@@ -10587,7 +10587,8 @@ export class Supervisor {
     if (!named.length) return '';
     const who = named.join(' and ');
     return [`## ${who}, a teammate, is named`,
-      `The person named their teammate ${who} with @. What they ask of ${named.length > 1 ? 'each' : who} is ${named.length > 1 ? 'theirs' : `${who}'s`}: hand it over with team_pass (a short title, and everything needed in details), say in one line that you did, and do not do that part yourself.`].join('\n');
+      `The person named their teammate ${who} with @. What they ask of ${named.length > 1 ? 'each' : who} is ${named.length > 1 ? 'theirs' : `${who}'s`}: hand it over with team_pass (a short title, and everything needed in details), say in one line that you did, and do not do that part yourself.`,
+      ...(item?.id ? [`If they want ${named.length > 1 ? 'them' : who} to learn from this thread, put this thread's id, ${item.id}, in the details: the teammate is given it whole to learn from.`] : [])].join('\n');
   }
 
   /** The other threads these words name, summed up (shared/named-threads.mjs). */
