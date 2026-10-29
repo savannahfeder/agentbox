@@ -17,27 +17,18 @@ type Here = { product: string; id: string } | null;
 
 export const toastLife = (toast: { goes?: ToastGoes }) => (toast.goes ? TOAST_GOES_MS : TOAST_PLAIN_MS);
 
-/** How far a toast is swiped toward its edge before it goes. */
+/** How far a toast is swiped down before it goes. */
 export const TOAST_SWIPE_PX = 24;
 // What a thread keeps at its foot: the reply box, 51 tall at the bottom of the screen.
 const OVER_THE_REPLY_BOX = 64;
 const OVER_THE_FOOT = 20;
 
-export interface ToastPlace { edge: 'top' | 'bottom'; lift: number; pill: boolean }
-// The three placements shown for a pick (w-e08ebeb562); the two not picked are deleted.
-export type ToastLook = 'bottom-bar' | 'top-bar' | 'bottom-pill';
-export const TOAST_LOOKS: ToastLook[] = ['bottom-bar', 'top-bar', 'bottom-pill'];
-// The preview's photographs switch it from outside; the app always draws the first.
-const look = (): ToastLook => (globalThis as { agentboxToastLook?: ToastLook }).agentboxToastLook ?? 'bottom-bar';
-
 /**
- * Where the toast sits. At the foot it rides just over a thread's reply box,
- * where the screen holds nothing she is reading; elsewhere just over the edge.
+ * How high off the foot the toast sits: just over a thread's reply box, where
+ * the screen holds nothing she is reading; elsewhere just over the edge. Her
+ * pick of three placements (w-e08ebeb562, 2026-10-29): "toast-1 bottom bar".
  */
-export function toastPlace(onThread: boolean, which: ToastLook = look()): ToastPlace {
-  if (which === 'top-bar') return { edge: 'top', lift: 0, pill: false };
-  return { edge: 'bottom', lift: onThread ? OVER_THE_REPLY_BOX : OVER_THE_FOOT, pill: which === 'bottom-pill' };
-}
+export const toastLift = (onThread: boolean) => (onThread ? OVER_THE_REPLY_BOX : OVER_THE_FOOT);
 export const toastTapOpens = (toast: { goes?: ToastGoes }, here: Here) => toastOpens(toast, here);
 
 /** The thread the screen shows, read from the route. */
