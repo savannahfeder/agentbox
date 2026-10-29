@@ -6104,6 +6104,27 @@ export default function App() {
   // it: a glance at Needs you in the meantime must not take the line away.
   useEffect(() => { if (justSent && list.length && view === 'progress') setJustSent(false); }, [justSent, list.length, view]);
 
+  // THE FIRST THREAD, FOLLOWED to whichever tab it goes to, In progress and
+  // then Needs you, until it is opened. Only when its tab changes, so it never
+  // pulls anybody back from somewhere they went themselves.
+  const firstSend = useRef(false);
+  const [firstThread, setFirstThread] = useState<string | null>(null);
+  const followedTab = useRef<string | null>(null);
+  useEffect(() => {
+    if (!firstThread) return;
+    const tab = tabOfState(tabState.get(firstThread) ?? null);
+    if (!tab) return;
+    if (tab === followedTab.current) return;
+    followedTab.current = tab;
+    if (!focused && (modal === null || modal === 'compose') && (['inbox', 'progress'] as View[]).includes(view) && tab !== view) setView(tab);
+    if (tab === 'inbox') setFirstThread(null);
+  }, [firstThread, tabState, focused, modal, view]);
+  // And the cursor on it, once its row is drawn there.
+  const followAt = firstThread ? list.findIndex((i) => i.id === firstThread) : -1;
+  useEffect(() => { if (followAt >= 0) setSelected(followAt); }, [followAt]);
+  useEffect(() => { if (focused) setFirstThread(null); }, [focused]);
+  // END OF THE FOLLOWING
+
   const openView = (next: View) => { roomsUi.leave(); teammatesUi.leave(); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); };
   useEffect(() => {
     if (!onPhone()) return;
@@ -7093,7 +7114,7 @@ export default function App() {
             // The tutorial's first send, which may be a repeating suggestion whose first run starts now.
             const first = !!tour && showIdeas(tour);
             // Sending the first task is finishing the first run; leaving without one is not.
-            if (first) { setTour(noteSent(tour!)); try { window.zero?.track?.('first_run_finished'); } catch {} }
+            if (first) { firstSend.current = true; setTour(noteSent(tour!)); try { window.zero?.track?.('first_run_finished'); } catch {} }
             setModal(null);
             setComposeInitial(null);
             setPickProject(null);
@@ -7156,6 +7177,7 @@ export default function App() {
               await refresh();
               return;
             }
+            if (firstSend.current && made?.id) { firstSend.current = false; setFirstThread(made.id); }
             const slug = how?.product ?? made?.product ?? '';
             const to = snap.products.find((x) => x.slug === slug)?.name;
             if (made?.id) showJustMade(made, to);

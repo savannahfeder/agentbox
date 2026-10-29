@@ -6,14 +6,15 @@ import { useEffect, useRef, useState } from 'react';
 import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
-import { finishLesson, keyLearns, LESSONS, lessonOf, skipTour, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { ConfettiBurst } from './ConfettiBurst';
+import { closesThread, finishLesson, keyLearns, LESSONS, lessonOf, skipTour, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
 type Side = 'above' | 'below' | 'below-right';
 
 const ON_THE_LIST: TourStep[] = ['start', 'working', 'answered', 'open', 'palette'];
-const IN_THE_BOX: TourStep[] = ['folder', 'pick', 'send'];
+const IN_THE_BOX: TourStep[] = ['folder', 'pick', 'write', 'send'];
 const CMD = MAC ? '⌘' : 'Ctrl';
 const GAP = 8;
 /** How long a tip waits for the screen to stop changing, and how long it must be up to count as seen. */
@@ -26,6 +27,7 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   start: { words: <>Press <K k="N" /> to give an agent a new task</>, side: 'below-right' },
   folder: { words: <>Choose the folder this agent will work in</>, side: 'below' },
   pick: { words: <>Press <K k="↓" /> to choose a suggestion, or type your own</>, side: 'below' },
+  write: { words: <>Type what you need done</>, side: 'below' },
   send: { words: <>Press <K k={CMD} /><K k="↵" /> to send it to an agent</>, side: 'below-right' },
   working: { words: <>An agent is working on this. Press <K k="N" /> to start another thread</>, side: 'below' },
   answered: { words: <>Your agent has answered. Press <K k="⇧" /><K k="⇥" /> to see it</>, side: 'below' },
@@ -57,6 +59,7 @@ function targetsOf(step: TourStep): HTMLElement[] {
       return chip ? [chip, ...one(chip.querySelector('.tc-menu'))] : [];
     }
     case 'pick': return one(card?.querySelector('[data-tour="ideas"]'));
+    case 'write': return one(card?.querySelector('textarea'));
     case 'send': return one(card?.querySelector('.tc-send'));
     case 'working': return one(firstRow(true));
     case 'answered': return one(needsYouTab());
@@ -105,6 +108,7 @@ function readScreen(view: string, thread: boolean, covered: boolean): TourScreen
     composer: !card ? 'none' : card.classList.contains('tc-inline') ? 'inline' : 'card',
     folder: card?.dataset.tourFolder === '1',
     text: card?.dataset.tourText === '1',
+    ideas: !!card?.querySelector('[data-tour="ideas"]'),
     view,
     rows: document.querySelectorAll(ROWS).length,
     running: document.querySelectorAll('.list-pane .row[data-item-id] .s-running').length,
@@ -142,6 +146,19 @@ export function Tour({ tour, view, thread, covered, onChange }: {
   const countedSteps = useRef(new Set<number>());
   const live = !!tour && !tour.skipped && LESSONS.some((l) => !tour.done.includes(l));
 
+  // THE FIRST THREAD CLOSED: one burst of confetti, the way the old walk ended.
+  const [burst, setBurst] = useState(0);
+  const hadClose = useRef(!!tour?.done.includes('close'));
+  useEffect(() => {
+    if (!hadClose.current && tour?.done.includes('close') && !tour.skipped) setBurst(Date.now());
+    hadClose.current = !!tour?.done.includes('close');
+  }, [tour]);
+  useEffect(() => {
+    if (!burst) return undefined;
+    const t = setTimeout(() => setBurst(0), 2600);
+    return () => clearTimeout(t);
+  }, [burst]);
+
   // WHAT IS ON SCREEN, read a few times a second while there is anything left to say.
   useEffect(() => {
     if (!live || !tour) { setStep(null); return undefined; }
@@ -157,7 +174,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
       const was = shown.current;
       if (was !== next) {
         // The first run's folder and first task are counted where they now happen.
-        const counted = next === 'folder' ? FIRST_RUN_STEP.where : next === 'pick' || next === 'send' ? FIRST_RUN_STEP.task : null;
+        const counted = next === 'folder' ? FIRST_RUN_STEP.where : next === 'pick' || next === 'write' || next === 'send' ? FIRST_RUN_STEP.task : null;
         if (counted && !tour.sent && !countedSteps.current.has(counted)) {
           countedSteps.current.add(counted);
           try { window.zero?.track?.('first_run_step', counted); } catch {}
@@ -225,6 +242,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
     };
     const key = (e: KeyboardEvent) => {
       const typing = (e.target as Element | null)?.closest?.('input, textarea, [contenteditable="true"]');
+      if (!typing && closesThread(e, thread)) { onChange(finishLesson(finishLesson(tour, lessonOf(step)), 'close')); return; }
       if (!typing && keyLearns(step, e)) { onChange(finishLesson(tour, lessonOf(step))); return; }
       if (e.key !== 'Escape' || !ON_THE_LIST.includes(step)) return;
       e.preventDefault();
@@ -234,11 +252,12 @@ export function Tour({ tour, view, thread, covered, onChange }: {
     window.addEventListener('pointerdown', down, true);
     window.addEventListener('keydown', key, true);
     return () => { window.removeEventListener('pointerdown', down, true); window.removeEventListener('keydown', key, true); };
-  }, [step, tour, onChange]);
+  }, [step, tour, thread, onChange]);
 
-  if (!step || !box || !tour) return null;
+  if (!step || !box || !tour) return burst ? <ConfettiBurst key={burst} /> : null;
   return (
     <>
+      {burst ? <ConfettiBurst key={burst} /> : null}
       {step !== 'palette' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
       <div key={`card-${step}`} ref={cardRef} className="tour-card" role="status"
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>

@@ -6,6 +6,7 @@
 // are in ./page-rules.ts; the look is ./pages.css, ported from the drawings
 // she approved.
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { LiveMark } from '../components/LiveMark';
 import { createPortal } from 'react-dom';
 import { useRowDrag } from './row-drag';
 import { chord } from '../this-keyboard';
@@ -558,7 +559,7 @@ const ClearMark = () => <svg className="th-clear-mark" width="22" height="22" vi
 /** The other tabs, empty: one quiet line where the rows would be. The words
  *  are in ./page-rules (`emptyTabWords`), where a test can read them. */
 export function EmptyTab({ view, starting = false, waiting = 0 }: { view: TabView; starting?: boolean; waiting?: number }) {
-  return <div className="th-empty"><span>{emptyTabWords(view, starting, waiting)}</span></div>;
+  return <div className="th-empty">{starting && view === 'progress' && <LiveMark />}<span>{emptyTabWords(view, starting, waiting)}</span></div>;
 }
 
 /* ------------------------------------------------------------ one thread's cells */

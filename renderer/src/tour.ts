@@ -3,7 +3,7 @@
 // tests/the-tutorial-walks-you-through-your-first-real-thread.test.mjs holds
 // what each rule is for.
 
-export type TourStep = 'start' | 'folder' | 'pick' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette';
+export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette';
 /** Each tip shows until it is done or put away, then never again. The New thread box's three steps are one. */
 export type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette';
 /** Every lesson there is; a tour with all of them done has nothing left to say. */
@@ -24,6 +24,8 @@ export interface TourScreen {
   folder: boolean;
   /** The box has words in it. */
   text: boolean;
+  /** The box offers suggestions (a project with a folder of code). */
+  ideas?: boolean;
   view: string;
   /** Rows in the list on screen. */
   rows: number;
@@ -50,7 +52,7 @@ export const skipTour = (t: Tour): Tour => ({ ...t, skipped: true });
 export const noteSent = (t: Tour): Tour => finishLesson({ ...t, sent: true }, 'compose');
 export const finishLesson = (t: Tour, l: Lesson): Tour => (t.done.includes(l) ? t : { ...t, done: [...t.done, l] });
 export const lessonOf = (s: TourStep): Lesson =>
-  s === 'folder' || s === 'pick' || s === 'send' ? 'compose' : s === 'answered' ? 'open' : s;
+  s === 'folder' || s === 'pick' || s === 'write' || s === 'send' ? 'compose' : s === 'answered' ? 'open' : s;
 
 const KEYS: Partial<Record<TourStep, RegExp>> = { start: /^n$/i, open: /^Enter$/, choose: /^[1-9]$/, reply: /^r$/i, close: /^e$/i };
 
@@ -58,6 +60,11 @@ const KEYS: Partial<Record<TourStep, RegExp>> = { start: /^n$/i, open: /^Enter$/
 export function keyLearns(step: TourStep, e: { key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean }): boolean {
   if (e.metaKey || e.ctrlKey || e.altKey) return false;
   return !!KEYS[step]?.test(e.key);
+}
+
+/** E on an open thread closes it, which is the close lesson whatever tip is up. */
+export function closesThread(e: { key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean }, thread: boolean): boolean {
+  return thread && !e.metaKey && !e.ctrlKey && !e.altKey && /^e$/i.test(e.key);
 }
 
 /** The first-thread suggestions, until the first send or Skip. */
@@ -68,7 +75,8 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
   const todo = (l: Lesson) => !t.done.includes(l);
   if (s.composer !== 'none' && !t.sent && todo('compose')) {
     if (!s.folder) return 'folder';
-    return s.text ? 'send' : 'pick';
+    if (s.text) return 'send';
+    return s.ideas === false ? 'write' : 'pick';
   }
   if (s.preparing) return null;
   if (s.thread) {

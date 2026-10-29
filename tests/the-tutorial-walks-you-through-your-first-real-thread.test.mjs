@@ -184,7 +184,7 @@ describe('the empty inbox during the tutorial', () => {
   it('offers the suggestions only once the project has a folder', async () => {
     const fs = await import('node:fs');
     const box = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
-    expect(box).toContain('const ideasShown = !!(ideas?.length && product?.repoPath && !person && !mate);');
+    expect(box).toContain('const ideasShown = !!(ideas?.length && (product?.repoPath || projectChosen) && !person && !mate);');
   });
 });
 
@@ -344,5 +344,75 @@ describe('a tip is learned by pressing its key', () => {
     expect(keyLearns('close', { key: 'e', metaKey: true })).toBe(false);
     expect(keyLearns('choose', { key: '0' })).toBe(false);
     expect(keyLearns('send', { key: 'Enter' })).toBe(false);
+  });
+});
+
+describe('My Workspace, chosen on purpose', () => {
+  // The founder, 2026-10-29: "it doesn't act like my workspace is legitimate
+  // but I would think that's probably something I should be able to select and
+  // have approved. Until it's selected, it probably shouldn't be viable."
+  it('counts as the folder once it is picked from the menu', async () => {
+    const fs = await import('node:fs');
+    const box = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
+    expect(box).toContain("data-tour-folder={product?.repoPath || projectChosen ? '1' : '0'}");
+    expect(box).toContain('setProjectChosen(true);');
+  });
+  it('has no suggestions, so the tip points at the words instead', () => {
+    expect(tourStep(startTour(), at({ composer: 'inline', folder: true, ideas: false }))).toBe('write');
+    expect(tourStep(startTour(), at({ composer: 'inline', folder: true, ideas: true }))).toBe('pick');
+    expect(tourStep(startTour(), at({ composer: 'inline', folder: true, ideas: false, text: true }))).toBe('send');
+    expect(lessonOf('write')).toBe('compose');
+  });
+});
+
+describe('closing the first thread', () => {
+  // The founder, 2026-10-29: "it would be nice if, at the end, it did a little
+  // thing. Previously we had confetti explode when it was done."
+  it('bursts the confetti once, as the close is learned', async () => {
+    const fs = await import('node:fs');
+    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+    expect(tour).toContain("if (!hadClose.current && tour?.done.includes('close') && !tour.skipped) setBurst(Date.now());");
+    expect(tour).toContain('{burst ? <ConfettiBurst key={burst} /> : null}');
+  });
+  it('draws the burst the walk once ended on', async () => {
+    const React = (await import('react')).default;
+    const { renderToStaticMarkup } = await import('react-dom/server');
+    globalThis.React = React;
+    const { ConfettiBurst } = await import('../renderer/src/components/ConfettiBurst.tsx');
+    const html = renderToStaticMarkup(React.createElement(ConfettiBurst));
+    expect(html).toContain('fr-burst');
+    expect((html.match(/fr-bit/g) ?? []).length).toBe(40);
+  });
+});
+
+describe('suggestions wherever the first task is typed', () => {
+  // The founder, 2026-10-29: "it should always propose suggestions if you ever
+  // need to type a task in. We don't want to have to force people to come up
+  // with a task because that's probably when they'll turn."
+  it('offers a set for My Workspace too, none of them about code it does not have', async () => {
+    const { ideasFor } = await import('../renderer/src/first-run.ts');
+    const plain = ideasFor({ folder: false });
+    expect(plain.length).toBeGreaterThanOrEqual(3);
+    for (const i of plain) expect(i.text).not.toMatch(/project|app|code|changes|packages/i);
+    expect(ideasFor({ folder: true })[0].text).toBe('Explain how this project is put together');
+  });
+  it('shows them once a folder is set or My Workspace is picked', async () => {
+    const fs = await import('node:fs');
+    const box = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
+    expect(box).toContain('const ideasShown = !!(ideas?.length && (product?.repoPath || projectChosen) && !person && !mate);');
+    expect(box).toContain('const offeredIdeas = product?.repoPath ? ideas ?? [] : ideasFor({ folder: false });');
+  });
+});
+
+describe('closing a thread before its tip comes up', () => {
+  // Measured 2026-10-29 in the fresh window: E pressed on the first answer
+  // while "Press R" was up counted the reply, not the close, so neither the
+  // confetti nor the command bar tip came.
+  it('counts as the close, whichever tip is up', async () => {
+    const { closesThread } = await import('../renderer/src/tour.ts');
+    expect(closesThread({ key: 'e' }, true)).toBe(true);
+    expect(closesThread({ key: 'E' }, true)).toBe(true);
+    expect(closesThread({ key: 'e' }, false)).toBe(false);
+    expect(closesThread({ key: 'e', metaKey: true }, true)).toBe(false);
   });
 });

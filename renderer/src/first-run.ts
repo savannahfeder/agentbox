@@ -118,8 +118,15 @@ export interface Idea {
   repeat?: RepeatShape & { short: string; label: string };
 }
 
-/** A look at the code, then jobs people want running and rarely have. None names the project: a folder can be called anything. */
-export function ideasFor(): Idea[] {
+/** A look at the code, then jobs people want running and rarely have. None names the project: a folder can be called anything.
+ *  My Workspace has no code, so it is offered work that needs none. */
+export function ideasFor({ folder = true }: { folder?: boolean } = {}): Idea[] {
+  if (!folder) return [
+    { text: 'Research three competitors and compare their pricing' },
+    { text: 'Draft a short post announcing what I am building' },
+    { text: 'Summarize this week’s AI news in five bullets', repeat: { every: 'week', on: 1, at: '09:00', short: 'Every Monday', label: 'Every Monday at 9:00am' } },
+    { text: 'Write a checklist for launching a new feature' },
+  ];
   return [
     { text: 'Explain how this project is put together' },
     { text: 'Test the app and flag what’s broken', repeat: { every: 'day', at: '08:00', short: 'Every morning', label: 'Every morning at 8:00am' } },

@@ -276,6 +276,7 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-cell-person .tm-av { margin-right: 9px; flex: none; }
 .th-empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; padding: 32px 24px 12vh; color: var(--text-faint); font-size: 14px; line-height: 21px; }
 .th-empty > span { max-width: 420px; }
+.th-empty > .live-mark { margin-right: 12px; }
 
 /* ------------------------------------------------------------ the view row */
 .th-bar { display: flex; align-items: center; gap: 24px; padding: 14px var(--row-r, 24px) 8px var(--text-x, 32px); min-height: 30px; }

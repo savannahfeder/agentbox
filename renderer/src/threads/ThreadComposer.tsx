@@ -55,7 +55,7 @@ import { defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type 
 import { defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../effort';
 import { readLastEngine, startingEngine, writeLastEngine } from '../engines';
 import { repeatPresets } from '../components/When';
-import type { Idea } from '../first-run';
+import { ideasFor, type Idea } from '../first-run';
 import { readRule } from '../format';
 import { fitMenu } from '../keep-in-window';
 import { ModelMenu } from './ModelMenu';
@@ -249,6 +249,8 @@ export function ThreadComposer({
     return startingProject(offered, { defaultProduct, remembered })?.slug ?? null;
   });
   const product = offered.find((p) => p.slug === productSlug) ?? startingProject(offered, { defaultProduct, remembered: null });
+  // Picked from the menu, My Workspace included: the tutorial takes it as the folder chosen.
+  const [projectChosen, setProjectChosen] = useState(false);
   const pickProject = (slug: string) => {
     setProductSlug(slug);
     try { localStorage.setItem(LAST_PRODUCT_KEY, slug); } catch { /* still picked for this card */ }
@@ -679,7 +681,8 @@ export function ThreadComposer({
     if (e.key === 'ArrowUp') { e.preventDefault(); if (at === 0) textRef.current?.focus(); else rows[at - 1]?.focus(); }
   };
   // ↓ reaches the suggestions when nothing has the keyboard, as on the empty inbox after closing a thread.
-  const ideasShown = !!(ideas?.length && product?.repoPath && !person && !mate);
+  const ideasShown = !!(ideas?.length && (product?.repoPath || projectChosen) && !person && !mate);
+  const offeredIdeas = product?.repoPath ? ideas ?? [] : ideasFor({ folder: false });
   useEffect(() => {
     if (!ideasShown) return undefined;
     const down = (e: KeyboardEvent) => {
@@ -861,7 +864,7 @@ export function ThreadComposer({
       ) : <span className="tc-menu-head">Project</span>}
       {offered.map((p) => (
         <button key={p.slug} type="button" data-item className={`tc-row ${p.slug === product?.slug ? 'on' : ''}`} onPointerEnter={hover}
-          onClick={() => { pickProject(p.slug); close('text'); }}>
+          onClick={() => { pickProject(p.slug); setProjectChosen(true); close('text'); }}>
           <Swatch slug={p.slug} /><span className="tc-row-label">{p.name}</span>
         </button>
       ))}
@@ -1108,9 +1111,9 @@ export function ThreadComposer({
   }
 
   // After the folder: the tutorial asks for that first, and a list under the card would sit beneath its menu.
-  const ideaRows = ideasShown && ideas ? (
+  const ideaRows = ideasShown ? (
     <div ref={ideaList} className="tc-ideas" data-tour="ideas" role="listbox" aria-label="Suggestions">
-      {ideas.map((i) => (
+      {offeredIdeas.map((i) => (
         <button key={i.text} type="button" role="option" aria-selected={idea?.text === i.text && text.trim() === i.text}
           className={`tc-idea${idea?.text === i.text && text.trim() === i.text ? ' on' : ''}`}
           onClick={() => takeIdea(i)}
@@ -1128,7 +1131,7 @@ export function ThreadComposer({
         className={`tc-card${inline ? ' tc-inline' : ''}`}
         role={inline ? 'group' : 'dialog'}
         aria-label="New thread"
-        data-tour-folder={product?.repoPath ? '1' : '0'}
+        data-tour-folder={product?.repoPath || projectChosen ? '1' : '0'}
         data-tour-text={text.trim() ? '1' : '0'}
         onFocus={inline ? writingNow : undefined}
         onBlur={inline ? writingNow : undefined}
@@ -1172,7 +1175,7 @@ export function ThreadComposer({
           onScroll={(e) => named.track(e.currentTarget)}
           onKeyDown={(e) => {
             named.keyDown(e);
-            if (e.defaultPrevented || !ideas?.length || e.key !== 'ArrowDown' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+            if (e.defaultPrevented || !ideasShown || e.key !== 'ArrowDown' || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
             if (e.currentTarget.value.slice(e.currentTarget.selectionEnd).includes('\n')) return;
             e.preventDefault();
             ideaList.current?.querySelector<HTMLButtonElement>('button')?.focus();

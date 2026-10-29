@@ -53,13 +53,13 @@ describe('the new first run counts each step', () => {
   // tutorial (renderer/src/tour.ts) showing the folder and the suggestions.
   it('counts the finish only when a first task was sent', () => {
     const app = read('renderer/src/App.tsx');
-    expect(app).toMatch(/if \(first\) \{ setTour\(noteSent\(tour!\)\); try \{ window\.zero\?\.track\?\.\('first_run_finished'\); \} catch \{\} \}/);
+    expect(app).toMatch(/if \(first\) \{ [^\n]*setTour\(noteSent\(tour!\)\); try \{ window\.zero\?\.track\?\.\('first_run_finished'\); \} catch \{\} \}/);
     expect(read('renderer/src/components/FirstRun.tsx')).not.toContain("'first_run_finished'");
   });
 
   it('counts the folder and the first task where the tutorial shows them, once each', () => {
     const tour = read('renderer/src/components/Tour.tsx');
-    expect(tour).toContain("const counted = next === 'folder' ? FIRST_RUN_STEP.where : next === 'pick' || next === 'send' ? FIRST_RUN_STEP.task : null;");
+    expect(tour).toContain("const counted = next === 'folder' ? FIRST_RUN_STEP.where : next === 'pick' || next === 'write' || next === 'send' ? FIRST_RUN_STEP.task : null;");
     expect(tour).toContain('if (counted && !tour.sent && !countedSteps.current.has(counted)) {');
   });
 });
