@@ -1,0 +1,124 @@
+// AN OPEN THREAD IS SENT ONLY THE AGENT LOGS THAT CHANGED.
+//
+// With a thread open while its agent works, the window reads the thread's
+// agent logs on every push: the last 20 runs, up to 120,000 characters each.
+// Measured 2026-10-30 on a copy with one such thread open (19 earlier runs and
+// a live one): 93 reads a minute, 213 MB a minute, for logs of which only the
+// live one was growing.
+//
+// So each log goes out with a stamp of its size and time, the window asks with
+// the stamps of the logs it holds, and a log whose stamp has not moved comes
+// back marked the same, without its text. A window that sends no stamps, or a
+// computer that knows nothing of them, gets and gives every log whole.
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { traceReader } from '../shared/trace-delta.mjs';
+import { withRuns } from '../renderer/src/thread-history';
+import { bootHeadless } from '../main/serve.mjs';
+import { encodeProjectPath, machineryPath } from '../main/store/home.mjs';
+
+const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const plain = (x) => JSON.parse(JSON.stringify(x));
+
+describe('through the real handler', () => {
+  let dir, booted, trace, logs, project;
+  const id = 'w-tracedelta1';
+  const slug = 'traces';
+
+  beforeAll(async () => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ab-trace-'));
+    const storeRoot = path.join(dir, 'store');
+    fs.writeFileSync(path.join(dir, 'zero.config.json'), JSON.stringify({ storeRoot, accountId: 'trace-account' }));
+    project = path.join(storeRoot, 'accounts', 'trace-account', slug);
+    fs.mkdirSync(project, { recursive: true });
+    fs.writeFileSync(path.join(project, 'project.json'), JSON.stringify({ schemaVersion: 2, id: slug, name: 'Traces' }));
+    const machinery = path.join(storeRoot, 'projects', encodeProjectPath(project));
+    fs.mkdirSync(machinery, { recursive: true });
+    fs.writeFileSync(path.join(machinery, '.origin'), `${project}\n`);
+    fs.writeFileSync(path.join(machinery, 'work-items.jsonl'), `${JSON.stringify({ id, ts: Date.now(), source: 'system', patch: { title: 'Traced', status: 'done', kind: 'task', labels: [] } })}\n`);
+    booted = await bootHeadless({ dataDir: dir, appDir: repoRoot, userDir: dir });
+    trace = booted.channels.get('zero:session-trace');
+    logs = machineryPath(project, path.join('sessions', id));
+    fs.mkdirSync(logs, { recursive: true });
+    for (const at of [1000, 2000, 3000]) fs.writeFileSync(path.join(logs, `${at}.log`), `run ${at} said this\n`.repeat(50));
+  }, 30_000);
+
+  afterAll(async () => {
+    await booted?.supervisor?.stopAll?.().catch?.(() => {});
+    if (dir) fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('a first read gets every log whole', async () => {
+    const answer = plain(await trace({}, { product: slug, id }));
+    expect(answer.sessions.map((s) => s.startedAt)).toEqual([1000, 2000, 3000]);
+    expect(answer.sessions.every((s) => s.text.startsWith('run ') && s.stamp)).toBe(true);
+  });
+
+  it('a read with the stamps it holds gets only the log that grew, and the window still holds every log', async () => {
+    const read = traceReader();
+    const key = `${slug}/${id}`;
+    const first = read.take(key, plain(await trace({}, { product: slug, id, have: read.have(key) })));
+    const same = plain(await trace({}, { product: slug, id, have: read.have(key) }));
+    expect(same.sessions.every((s) => s.same && s.text === undefined)).toBe(true);
+    expect(read.take(key, same).sessions).toBe(first.sessions);
+
+    fs.appendFileSync(path.join(logs, '3000.log'), 'and one more line\n');
+    const grew = plain(await trace({}, { product: slug, id, have: read.have(key) }));
+    expect(grew.sessions.filter((s) => !s.same).map((s) => s.startedAt)).toEqual([3000]);
+    const got = read.take(key, grew);
+    const whole = plain(await trace({}, { product: slug, id }));
+    expect(got.sessions).toEqual(whole.sessions.map(({ startedAt, text }) => ({ startedAt, text })));
+  });
+
+  it('a new run arrives whole, and one that left is gone', async () => {
+    const read = traceReader();
+    const key = `${slug}/${id}`;
+    read.take(key, plain(await trace({}, { product: slug, id, have: read.have(key) })));
+    fs.writeFileSync(path.join(logs, '4000.log'), 'the newest run\n');
+    fs.rmSync(path.join(logs, '1000.log'));
+    const answer = plain(await trace({}, { product: slug, id, have: read.have(key) }));
+    expect(answer.sessions.filter((s) => !s.same).map((s) => s.startedAt)).toEqual([4000]);
+    expect(read.take(key, answer).sessions.map((s) => s.startedAt)).toEqual([2000, 3000, 4000]);
+  });
+});
+
+describe('the window side', () => {
+  it('an answer from a computer that knows nothing of stamps is taken whole', () => {
+    const read = traceReader();
+    const old = { ok: true, sessions: [{ startedAt: 1, text: 'a' }, { startedAt: 2, text: 'b' }] };
+    expect(read.take('p/w-1', old).sessions).toEqual(old.sessions);
+    expect(read.have('p/w-1')).toBeUndefined();
+  });
+
+  it('a log marked the same that this window no longer holds asks for a whole read', () => {
+    const read = traceReader();
+    expect(read.take('p/w-1', { ok: true, sessions: [{ startedAt: 1, stamp: '5:1', same: true }] })).toBeNull();
+  });
+
+  it('another thread\'s logs are not offered as this one\'s', () => {
+    const read = traceReader();
+    read.take('p/w-1', { ok: true, sessions: [{ startedAt: 1, stamp: '5:1', text: 'a' }] });
+    expect(read.have('p/w-1')).toEqual({ 1: '5:1' });
+    expect(read.have('p/w-2')).toBeUndefined();
+  });
+
+  it('a log the window still holds is read into notes once, and a new one is read again', () => {
+    const pickup = [{ at: 9000, who: 'agent', said: 'An agent picked it up', pickup: true }];
+    const log = { startedAt: 1000, text: 'TOOL: Bash ls\nRESULT ok\n' };
+    const first = withRuns(pickup, [log])[0].runs[0];
+    expect(withRuns(pickup, [log])[0].runs[0]).toBe(first);
+    const fresh = withRuns(pickup, [{ ...log }])[0].runs[0];
+    expect(fresh).not.toBe(first);
+    expect(fresh).toEqual(first);
+  });
+
+  it('holds the logs of a few threads, not of every thread ever opened', () => {
+    const read = traceReader({ keep: 2 });
+    for (const n of [1, 2, 3]) read.take(`p/w-${n}`, { ok: true, sessions: [{ startedAt: 1, stamp: 's', text: 'x' }] });
+    expect(read.have('p/w-1')).toBeUndefined();
+    expect(read.have('p/w-3')).toEqual({ 1: 's' });
+  });
+});

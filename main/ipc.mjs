@@ -2269,7 +2269,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // The trace: what each session on this item actually did, from the logs the
   // supervisor persists under <product>/sessions/<item-id>/. Read-only.
-  ipcMain.handle('zero:session-trace', async (_e, { product, id }) => {
+  // `have` holds the stamps of the logs the screen already has; a log whose
+  // stamp has not moved is sent without its text (shared/trace-delta.mjs).
+  ipcMain.handle('zero:session-trace', async (_e, { product, id, have } = {}) => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const dir = store.listProducts().find((p) => p.slug === product)?.dir;
@@ -2280,10 +2282,14 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       files = fs.readdirSync(traceDir).filter((f) => f.endsWith('.log')).sort();
     } catch { return { ok: true, sessions: [] }; }
     const sessions = files.slice(-20).map((f) => {
+      const startedAt = Number(f.replace('.log', '')) || 0;
+      let stamp;
+      try { const st = fs.statSync(path.join(traceDir, f)); stamp = `${st.size}:${st.mtimeMs}`; } catch {}
+      if (stamp && have?.[startedAt] === stamp) return { startedAt, stamp, same: true };
       let text = '';
       try { text = fs.readFileSync(path.join(traceDir, f), 'utf8'); } catch {}
       if (text.length > 120_000) text = `… truncated (${text.length} bytes total)\n\n${text.slice(-120_000)}`;
-      return { startedAt: Number(f.replace('.log', '')) || 0, text };
+      return { startedAt, stamp, text };
     });
     return { ok: true, sessions };
   });
