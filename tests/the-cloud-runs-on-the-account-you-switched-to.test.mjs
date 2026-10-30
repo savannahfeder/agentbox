@@ -125,7 +125,7 @@ describe('a run that finds no account to take', () => {
 /* -------------------------- the app's side of it -------------------------- */
 const login = (dir, email, org) => {
   fs.mkdirSync(path.join(home, dir), { recursive: true });
-  fs.writeFileSync(path.join(home, dir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: `u-${dir}`, organizationUuid: org } }));
+  fs.writeFileSync(path.join(home, dir === '.claude' ? '' : dir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: email, accountUuid: `u-${dir}`, organizationUuid: org } }));
 };
 const make = (activeAccount = {}) => {
   login('.claude', 'me@example.test', 'org-me');
