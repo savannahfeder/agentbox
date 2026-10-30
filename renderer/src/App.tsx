@@ -6585,8 +6585,9 @@ export default function App() {
               the right end on the Inbox, which is the one page of threads now
               (w-05ff3d1438). Display holds the view, the sort and the filters.
               Not over a teammate's card or the team's setup. Search is drawn
-              here only on the board; on the list it ends the tabs row
-              (w-3c51d02de5). */}
+              here, on a phone only (searchInTheList). It ended the tabs row
+              (w-3c51d02de5) until an iPhone clipped it out of sight there,
+              because that row scrolls sideways (w-33511040d7). */}
           {!focused && !settingsOpen && !teamShown && (teammatesShown && !evOn ? teammatesUi.right : roomShown && roomsUi.heading?.right !== undefined ? roomsUi.heading.right : (
             <HeaderActions
               page="inbox"
@@ -6597,7 +6598,7 @@ export default function App() {
               // reading her threads (w-5a08121f99: about forty projects).
               items={items}
               onCompose={() => setModal('compose')}
-              onSearch={!teamMode && inboxDisplay.view === 'board' ? searchInTheList : undefined}
+              onSearch={searchInTheList}
               shown={displayedBox.length + theirRows.length}
               total={(mineShown ? shownBox.length : 0) + theirRows.length}
               tab={view}
@@ -6951,7 +6952,6 @@ export default function App() {
                     needs={team ? needsWord(picked, team.me) : undefined}
                     lit={needsYouLit(inbox, needsLookedAt)}
                     onView={(next) => { roomsUi.leave(); setView(next as View); setSelected(0); setMultiSel(new Set()); }}
-                    onSearch={searchInTheList}
                     team={teamTabs}
                   />
                 )}
