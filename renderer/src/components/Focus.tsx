@@ -102,7 +102,6 @@ import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
 import { recapFor } from '../recap';
 import type { LedgerLine } from '../thread-history';
 import type { LiveFacts } from '../live-line';
-import { whyWords } from '../where-why';
 import { offersRunNow } from '../run-now';
 import { AttachRow } from './AttachRow';
 import { BackToWhatSheWasReading } from './UrgentBar';
@@ -1538,8 +1537,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       place={canFinish ? runsIn : null}
       placeFacts={{
         running: !!session && session.where !== 'cloud',
-        moving: live.whyNotCloud?.why === 'moving',
-        why: live.whyNotCloud ? whyWords(live.whyNotCloud).body : null,
+        why: live.whyNotCloud ?? null,
         needs: item.needsMac ?? null,
       }}
       onPlace={onPlace}
