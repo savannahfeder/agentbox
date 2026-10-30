@@ -3802,6 +3802,17 @@ img.product-mark { object-fit: cover; opacity: 1; }
   transition: color 0.15s, background 0.15s;
 }
 .dock-send-later.set { padding-left: 10px; color: var(--text-dim); }
+/* Review looks (w-54cdf7c768). */
+.dock-send-pair.look-2, .dock-send-pair.look-4, .dock-send-pair.look-5 { align-items: center; gap: 12px; }
+.reply-later.reply-later-word { display: inline-block; }
+.reply-later-clock, .reply-later-words {
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 2px;
+  font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-faint);
+  background: none; border: 0; cursor: pointer; transition: color 0.14s;
+}
+.reply-later-clock.set, .reply-later-words.set { color: var(--text-dim); }
+.reply-later-clock:hover, .reply-later-clock[aria-expanded='true'],
+.reply-later-words:hover, .reply-later-words[aria-expanded='true'] { color: var(--text); }
 .dock-send-later:hover, .dock-send-later[aria-expanded='true'] { color: var(--text); background: var(--wash-strong); }
 .dock-send-later:focus-visible { outline: 1px solid var(--text); outline-offset: 1px; }
 /* A line only when there is something true to say: the first run of a repeat,

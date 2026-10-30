@@ -29,7 +29,7 @@ import { providerCommand } from '../../../shared/provider-commands.mjs';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent as BoxKeyEvent, type ReactNode } from 'react';
 import { TeamContext, firstName } from '../team/people';
 import {
-  allModels, joinNames, moreCount, recentModels, type Harness, type ModelPick,
+  allModels, joinNames, laterHint, moreCount, recentModels, type Harness, type ModelPick,
 } from '../threads/composer-rules';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
@@ -2452,6 +2452,10 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   const [sendAt, setSendAt] = useState(() => readDraftWhen(item));
   useEffect(() => { setSendAt(readDraftWhen(item)); }, [item.product, item.id]);
   const pickSendAt = (at: number) => { setSendAt(at); saveDraftWhen(item, at); };
+  // REVIEW ONLY: ?replyLater=1..5 draws each of the five looks drawn for this
+  // thread. Goes once one is picked.
+  const look = Number(new URLSearchParams(typeof location === 'undefined' ? '' : location.search).get('replyLater')) || 0;
+  const sendWord = look === 3 && sendAt ? `Send ${laterHint(sendAt)}` : look === 5 && sendAt ? 'Schedule' : 'Send';
   useEffect(() => {
     const restored = (event: Event) => {
       if ((event as CustomEvent).detail !== draftKey(item)) return;
@@ -3172,6 +3176,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           every note here is one: a sentence that grows a clause when something
           changes is a sentence that moves under her. */}
       {freshNote && <div className="compose-note">{freshNote}</div>}
+      {look === 5 && canWait && sendAt > 0 && <div className="compose-note">Sends {laterHint(sendAt)}, not now.</div>}
       {!talk.on && talk.problem && <div className="compose-note">{talk.problem}</div>}
       {/* ONE text run, ONE size, ONE baseline, and the app's own send button:
           the new-task card's footer, on the reply box, because they are the same
@@ -3325,6 +3330,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
               thing she ruled out (./Model.tsx). */}
           {levelSaid ? `, ${levelSaid}.` : '.'}
           </span>
+          {look === 1 && canWait && (
+            <>{' Sends '}<ReplyLater look="word" at={sendAt} onPick={pickSendAt} onClosed={() => ref.current?.focus()} />.</>
+          )}
           </>}
         </span>
         {/* WHAT WAS PHOTOGRAPHED WAS A REAL COLLISION, NOT A PREFERENCE. The
@@ -3367,14 +3375,16 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
             things to choose between; a stop INSTEAD of a dead Send is one
             thing that is always the thing she can do. */}
         {stop && !hasDraft ? stop : (
-        <span className="dock-send-pair">
+        <span className={`dock-send-pair look-${look}`}>
+        {canWait && (look === 2 || look === 5) && <ReplyLater look="clock" saysTime={look === 2} at={sendAt} onPick={pickSendAt} onClosed={() => ref.current?.focus()} />}
+        {canWait && look === 4 && <ReplyLater look="words" at={sendAt} onPick={pickSendAt} onClosed={() => ref.current?.focus()} />}
         <button
           className="dock-send"
           onClick={() => send()}
           disabled={!hasDraft || !!chat.block || saving}
           title={chat.block ?? `Send · ${SEND}`}
-        >{saving ? 'Sending…' : <>Send <kbd>{SEND}</kbd></>}</button>
-        {canWait && <ReplyLater at={sendAt} onPick={pickSendAt} onClosed={() => ref.current?.focus()} />}
+        >{saving ? 'Sending…' : <>{sendWord} <kbd>{SEND}</kbd></>}</button>
+        {canWait && (look === 0 || look === 3) && <ReplyLater look="caret" saysTime={look === 0} at={sendAt} onPick={pickSendAt} onClosed={() => ref.current?.focus()} />}
         </span>
         )}
         </>}
