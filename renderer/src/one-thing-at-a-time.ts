@@ -6,6 +6,8 @@ import type { AgentEvent, AgentTurn } from './types';
 import type { ItemOutcome } from './item-thread';
 import { optionsFrom } from './format';
 import { instructionOf } from '../../shared/repeats.mjs';
+import { rowTitle } from './list-rules';
+import { teammateIdOf } from '../../shared/teammates.mjs';
 
 export interface Spot { pos: number; total: number; index: number }
 
@@ -93,6 +95,16 @@ export function standsAt(events: AgentEvent[], newest: { at: number } | null): n
 /** How many messages the fold holds above the one the page is drawn from. */
 export function earlierThan(events: AgentEvent[], from: number): number {
   return events.slice(0, from).filter(said).length;
+}
+
+/**
+ * The page's name. A teammate's row is named after its answer's first line,
+ * which would leave the page drawing that line twice or not at all under the
+ * Context, so its page is named after what woke it; the answer is signed instead.
+ */
+export function pageTitle(item: Parameters<typeof rowTitle>[0]): string {
+  const own = (item.title ?? '').trim();
+  return teammateIdOf(item) && own ? own : rowTitle(item);
 }
 
 /** An answer opening with a line that is bold and nothing else wears it as its headline. */

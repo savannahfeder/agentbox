@@ -39,7 +39,8 @@ describe('what a handed-back thread needed', () => {
     expect(sup.withPlaces([{ id: 'w-a' }])).toEqual([{ id: 'w-a', needsMac: 'your Stripe key' }]);
     sup._noteCloudHandBack({ id: 'w-a', product: 'p' }, { cloud: true, result: NEED });
     const again = new Supervisor({ storeRoot: root, maxConcurrentSessions: 3 }, store, root);
-    expect(again.withPlaces([{ id: 'w-a' }])).toEqual([{ id: 'w-a', onMac: true, needsMac: 'your Stripe key' }]);
+    // A second hand-back no longer keeps it here (no-mark-the-app-sets-...).
+    expect(again.withPlaces([{ id: 'w-a' }])).toEqual([{ id: 'w-a', needsMac: 'your Stripe key' }]);
   });
 
   it('is forgotten once the person picks where it runs', () => {

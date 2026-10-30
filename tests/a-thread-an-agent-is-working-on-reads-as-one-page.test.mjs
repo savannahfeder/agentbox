@@ -36,7 +36,7 @@ describe('the page', () => {
     expect(page).toContain('const short = !earlierOpen && !working && drawnWhole(behind, broughtIn(item));');
   });
   it('says what you asked until the agent writes a summary of its own', () => {
-    expect(page).toContain("context={working && !queue.context ? workingContext(item.body ?? item.title ?? '', rowTitle(item), queue.repeats ?? null) : queue.context}");
+    expect(page).toContain("context={working && !queue.context ? workingContext(item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}");
   });
   it('draws only the title and your ask before the agent has said anything', () => {
     expect(page).toContain('if (queue && working && !newest && !earlierOpen) return <>{queueHead}</>;');

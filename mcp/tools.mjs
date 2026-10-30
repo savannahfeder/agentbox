@@ -18,7 +18,7 @@ import { listDocuments, readDocument, writeDocument } from './core/documents.mjs
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mjs';
 import { listWorkItems, updateItem, createClaimRegistry } from './core/work.mjs';
 import { readStandingInstruction, setStandingInstruction } from './core/repeats.mjs';
-import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod } from './core/teammates.mjs';
+import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire } from './core/teammates.mjs';
 import { readTeammates, teamDir } from '../main/store/teammates-files.mjs';
 import { legacyRoot } from '../main/store/project.mjs';
 import { listProductChats, readProductChat } from './core/chat.mjs';
@@ -287,6 +287,15 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
         lesson: z.string().optional().describe('the lesson, one sentence in their terms'),
       },
       run: ({ playbook, lesson }) => json(teamPlaybook({ playbook, lesson })),
+    },
+    {
+      name: 'team_hire',
+      description: 'Your primary employee only: make a new teammate the person said yes to, in a run their words started or answered. It wakes as a draft and sets itself up by asking them. Ask the person first, with options; never make one they did not agree to.',
+      schema: {
+        name: z.string().describe('a name that says its role, like Support lead'),
+        job: z.string().describe('its job in plain words'),
+      },
+      run: ({ name, job }) => json(teamHire({ name, job })),
     },
     {
       name: 'team_method',

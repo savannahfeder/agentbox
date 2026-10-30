@@ -123,11 +123,11 @@ describe('on a phone', () => {
 describe('on a phone, the Superhuman way', () => {
   // They were along the bottom until 2026-10-28, "super duper low"; under the
   // title they "do a lot better" (the-web-app-on-a-phone-matches-the-phone-apps-text-and-tabs).
-  it('the inboxes are words under the title, on a solid ground', () => {
+  it('the inboxes are words under the title, on the wall itself', () => {
     const bar = bodiesFor('.list-pane > .th-bar');
     expect(bar).toMatch(/position:\s*relative/);
-    // Solid: the base colour, with or without a wash laid over it.
-    expect(bar).toMatch(/background:[^;]*var\(--bg\)/);
+    // See-through: the flat colour read as "black" over the wall (w-33511040d7).
+    expect(bar).toMatch(/background:\s*transparent/);
     const tab = bodiesFor('.tm-tab');
     expect(tab).toMatch(/text-transform:\s*none/);
     expect(tab).toMatch(/font-family:\s*inherit/);
