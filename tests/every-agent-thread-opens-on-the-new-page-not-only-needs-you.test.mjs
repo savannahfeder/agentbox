@@ -78,7 +78,7 @@ describe('a thread you have answered since its answer', () => {
   it('and what you did after an answer still the newest word, a move to Later, is drawn under it', () => {
     // The app's own note, when there is one, sits between them
     // (tests/the-page-leads-with-the-agents-answer-not-the-apps-shipped-note).
-    expect(thread).toMatch(/<QueueAnswer text=\{clean\(newest\.text\)\} md=\{md\} name=\{rowTitle\(item\)\} \/>\s*(\{byApp && outcome && <p className="one-app-note">\{clean\(outcome\.text\)\}<\/p>\}\s*)?\{afterList\}/);
+    expect(thread).toMatch(/<QueueAnswer text=\{clean\(newest\.text\)\} md=\{md\} name=\{pageTitle\(item, teammate\?\.name\)\} \/>\s*(\{byApp && outcome && <p className="one-app-note">\{clean\(outcome\.text\)\}<\/p>\}\s*)?\{afterList\}/);
   });
   it('and not with no answer at all, where the whole conversation is drawn', () => {
     expect(standsAt([you(1, 'go')], null)).toBe(-1);

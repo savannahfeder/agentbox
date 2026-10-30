@@ -42,8 +42,7 @@ import type { TraceSession } from '../notes';
 import type { AgentTurn, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
-import { appWrote, drawnWhole, earlierCount, earlierThan, newestAnswer, standsAt } from '../one-thing-at-a-time';
-import { rowTitle } from '../list-rules';
+import { appWrote, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt } from '../one-thing-at-a-time';
 import { askMarkUnread, say } from '../team/chat-events';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { TeammatesContext } from '../teammates/row-lead';
@@ -384,7 +383,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   const queueHead = queue && (
     <QueueSummary
       key={`${item.product}:${item.id}`}
-      title={rowTitle(item)}
+      title={pageTitle(item, teammate?.name)}
       context={queue.context}
       earlier={short ? 0 : behind}
       steps={!short && !!newest && (events.some((e) => e.kind === 'work') || after.length > 0)}
@@ -402,7 +401,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
     return (
       <>
         {queueHead}
-        <QueueAnswer text={clean(newest.text)} md={md} name={rowTitle(item)} />
+        <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item, teammate?.name)} />
         {byApp && outcome && <p className="one-app-note">{clean(outcome.text)}</p>}
         {afterList}
         {madeList(made.atFoot)}
