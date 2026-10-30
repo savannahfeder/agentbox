@@ -81,6 +81,7 @@
   }
   :root:root:root .workspace-navigation .th-team,
   :root:root:root .workspace-navigation .workspace-tabs,
+  :root:root:root .workspace-navigation .workspace-find,
   :root:root:root .workspace-navigation button[aria-label="Feedback"],
   :root:root:root .workspace-navigation button[aria-label="Instructions"],
   :root:root:root .workspace-navigation .workspace-usage,
@@ -112,13 +113,13 @@
 
   /* The top bar: the title, then search, filters and (the side rail's)
      Settings as three plain icons of one size, no boxes. */
-  /* SOLID, IN THE WALL'S COLOUR, as is the page's root (above). Safari on
-     iOS paints the band behind the clock by matching the top of the page and
-     takes no notice of theme-color: over the wall's glow it gave up and drew
-     its own grey, (19, 20, 22), against a bar of (26, 24, 23) to (34, 29, 26)
-     sampled off a screenshot (2026-10-12). A flat bar gives it one colour to
-     match, and the glow starts under the bar's line. */
-  :root:root:root .workspace-layout > .topbar { padding: 0 48px 0 16px; height: var(--phone-top); min-height: var(--phone-top); flex-basis: var(--phone-top); background: var(--bg); border-bottom: 0; }
+  /* SEE-THROUGH, SO THE WALL'S DOTS AND GLOW RUN UP UNDER THE TITLE. It was
+     solid in the wall's flat colour from 2026-10-12, so Safari had one colour
+     to match behind the clock; that job is the edge strip's now (below), and
+     the flat bar read as "black" over a textured page ("before it was nice
+     when it matched the rest of the background texture and color",
+     2026-10-29). */
+  :root:root:root .workspace-layout > .topbar { padding: 0 48px 0 16px; height: var(--phone-top); min-height: var(--phone-top); flex-basis: var(--phone-top); background: transparent; border-bottom: 0; }
   /* SAFARI 26 COLOURS THE BAND BEHIND THE CLOCK from what touches the top of
      the page, and ignores theme-color. The page is one fixed body, so nothing
      short touched it and Safari drew its own grey there. This strip, in the
@@ -178,10 +179,11 @@
     height: 44px;
     padding: 0 calc(16px + env(safe-area-inset-right, 0px)) 0 calc(16px + env(safe-area-inset-left, 0px));
     align-items: stretch; gap: 12px; overflow-x: auto; scrollbar-width: none;
-    /* The wall's own colour, so the bar and the list never disagree ("a tad
-       bit different", 2026-10-11), with its one line a shadow at its foot,
-       not a border, so the picked tab's mark can lie over it. */
-    background: var(--bg); box-shadow: inset 0 -1px var(--line); border-top: 0; border-bottom: 0;
+    /* The wall itself shows through, so the bar and the list never disagree
+       ("a tad bit different", 2026-10-11; the flat colour read as "black",
+       2026-10-29), with its one line a shadow at its foot, not a border, so
+       the picked tab's mark can lie over it. */
+    background: transparent; box-shadow: inset 0 -1px var(--line); border-top: 0; border-bottom: 0;
   }
   :root:root:root .th-bar::-webkit-scrollbar { display: none; }
   /* SEARCH GOES UP INTO THE TOP BAR, left of the gear. At the end of the
@@ -194,6 +196,12 @@
   }
   :root:root:root .workspace-layout:has(.th-bar > .th-search) > .topbar { padding-right: 88px; }
   :root:root:root:has(.topbar input) .th-bar > .th-search { display: none; }
+  /* ON THE PHONE DOOR SEARCH IS DRAWN IN THE TOP BAR ITSELF (App.tsx), after
+     View and filters and before the gear. Pinned up there from inside the
+     tabs row, which scrolls sideways, an iPhone clipped it to that row and it
+     was not drawn at all ("the little search icon is gone", 2026-10-29). */
+  :root:root:root .topbar .th-right > .th-search { order: 1; }
+  :root:root:root:has(.topbar input) .topbar .th-right > .th-search { display: none; }
   /* From the left, 18px apart, as the phone app draws them. At 15px an iPhone
      set a step up draws them 16.8px, and the four with two-figure counts run
      383px there, inside a 402px phone. */

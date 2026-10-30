@@ -7,6 +7,11 @@ import { teammateIdOf } from '../../../shared/teammates.mjs';
 
 export type ChatEntry = TeamChatLine | TeamRunLine;
 
+/** Teammates as the Chats list draws them: the primary first, the rest as they were. */
+export function matesInOrder<T extends Pick<Teammate, 'id'> & { primary?: boolean }>(team: readonly T[]): T[] {
+  return [...team.filter((t) => t.primary), ...team.filter((t) => !t.primary)];
+}
+
 const toList = (to: TeamChatLine['to']): string[] => (Array.isArray(to) ? to : to ? [to] : []);
 
 // One teammate's page is the team chat seen through them: what they said and

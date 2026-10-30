@@ -107,6 +107,7 @@ export function TeammateMenu({ t, shown, onOpen, call, onDeleted }: { t: Teammat
     shown.kind === 'log' ? ['Hide its log', () => onOpen(t.id)] : ['Log', () => onOpen(`log:${t.id}`)],
     ...(shown.kind === 'chat' ? [[details ? 'Hide details' : 'Show details', () => setDetails(!details)] as [string, () => void]] : []),
     t.paused ? ['Resume', () => { void call('update', { id: t.id, patch: { paused: false } }); }] : ['Pause', () => { void call('update', { id: t.id, patch: { paused: true } }); }],
+    ...(!t.primary && t.status === 'active' ? [['Make primary', () => { void call('update', { id: t.id, patch: { primary: true } }); }] as [string, () => void]] : []),
     ['Delete', () => setAsking(true)],
   ];
   // The menu's call says only yes or no, and a refusal has to be read, so the

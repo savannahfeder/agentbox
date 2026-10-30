@@ -379,6 +379,8 @@ export interface Teammate {
   counted: string | null; asksFirst: string | null; works: TeammateWorks | null; worksLabel: string | null;
   product: string; engine: string | null; model: string | null; effort: string | null; limit: number;
   paused: boolean; status: 'draft' | 'active'; memory: TeammateMemory[]; createdAt: number; starter?: string | null;
+  /** The one you talk to: takes what Auto cannot place, and checks in. */
+  primary?: boolean;
   /** Its run is waiting for you to allow or deny a command (drawn from `approvals`, not the store). */
   asking?: boolean;
   /** It asked you something in the team chat and has not heard back (chat-lines `asksYou`). */

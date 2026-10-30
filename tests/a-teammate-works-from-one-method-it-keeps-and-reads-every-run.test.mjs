@@ -175,7 +175,7 @@ describe('a teammate method', () => {
 
   it('once it has a method, its memory lines are in the method, not repeated beside it', () => {
     const t = team.create({ name: 'Growth marketer' });
-    writeTeammate(team.dir(), t.id, { remember: { id: 'm-1', text: 'MEMORY-LINE-ONE' } }, Date.now());
+    writeTeammate(team.dir(), t.id, { remember: { id: 'm-1', text: 'MEMORY-LINE-ONE', at: Date.now() - 60_000 } }, Date.now() - 60_000);
     writeMethod(t, '# Method\n- the steps\n');
     expect(team.briefFor(run(t))).not.toContain('MEMORY-LINE-ONE');
   });
