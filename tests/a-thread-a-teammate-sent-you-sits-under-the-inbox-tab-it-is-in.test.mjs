@@ -17,24 +17,34 @@ const { TeammatesPage } = await import('../renderer/src/teammates/TeammatesPage.
 const { sentTab } = await import('../renderer/src/teammates/chat-lines.ts');
 const { TeammatesContext } = await import('../renderer/src/teammates/row-lead.tsx');
 
-const NOW = Date.now();
 const MIN = 60_000;
+// ON A CLOCK OF ITS OWN, because the chat starts a new window where a day ends.
+// The two threads here are 20 and 14 minutes old, so off `Date.now()` they
+// straddled midnight for seven minutes a day and the day heading landed between
+// them. Measured at 00:17 in the suite's Pacific zone: two windows; at noon: one.
+const NOON = Date.parse('2026-10-30T19:00:00Z');
+const JUST_PAST_MIDNIGHT = Date.parse('2026-10-30T07:17:00Z');
 const mate = { id: 't-a1a1a1a1a1', name: 'Marketing lead', letter: 'M', product: 'kestrel', status: 'active', paused: false, served: '', limit: 40, works: null, memory: [], playbooks: [], duties: [] };
-const sent = (id, said, ago) => ({
+const sent = (now, id, said, ago) => ({
   id, product: 'kestrel', status: 'open', kind: 'directive', labels: ['founder', teammateLabel(mate.id), 'hop:0'], priority: null, title: 'Launch video',
-  result: `**${said}**\n\nMore words.`, createdAt: NOW - ago - MIN, updatedAt: NOW - ago, wrote: { result: { ts: NOW - ago, source: 'agent' } },
+  result: `**${said}**\n\nMore words.`, createdAt: now - ago - MIN, updatedAt: now - ago, wrote: { result: { ts: now - ago, source: 'agent' } },
 });
-const cuts = sent('w-cuts', 'Two cuts of the launch video are ready', 20 * MIN);
-const posts = sent('w-posts', 'Three posts for tomorrow are ready', 14 * MIN);
-const items = [cuts, posts];
+const itemsAt = (now, apart = [20 * MIN, 14 * MIN]) => [
+  sent(now, 'w-cuts', 'Two cuts of the launch video are ready', apart[0]),
+  sent(now, 'w-posts', 'Three posts for tomorrow are ready', apart[1]),
+];
 const products = [{ slug: 'kestrel', name: 'Kestrel' }];
 
-function draw({ chat = [], tabOf = () => 'inbox' } = {}) {
-  const view = { list: [{ ...mate, ...statusOf(mate, items, NOW) }], chat, runs: runLines(items, [mate]), playbooks: [] };
-  // The app hands every row its teammates, as it does the inbox's.
-  return renderToStaticMarkup(React.createElement(TeammatesContext.Provider, { value: new Map([[mate.id, mate]]) }, React.createElement(TeammatesPage, {
-    view, items, open: mate.id, products, engines: [], me: 'Sam', onOpen() {}, onOpenThread() {}, onChanged() {}, tabOf, onOpenList() {},
-  })));
+function draw({ chat = [], tabOf = () => 'inbox', now = NOON, apart } = {}) {
+  const items = itemsAt(now, apart);
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+  try {
+    const view = { list: [{ ...mate, ...statusOf(mate, items, now) }], chat, runs: runLines(items, [mate]), playbooks: [] };
+    // The app hands every row its teammates, as it does the inbox's.
+    return renderToStaticMarkup(React.createElement(TeammatesContext.Provider, { value: new Map([[mate.id, mate]]) }, React.createElement(TeammatesPage, {
+      view, items, open: mate.id, products, engines: [], me: 'Sam', onOpen() {}, onOpenThread() {}, onChanged() {}, tabOf, onOpenList() {},
+    })));
+  } finally { clock.mockRestore(); }
 }
 
 describe('which inbox tab a window of sent threads names', () => {
@@ -69,11 +79,21 @@ describe('a thread a teammate sent you, in its chat', () => {
 
   it('puts threads sent one after another in one window, and a message between them starts a new one', () => {
     expect(draw().match(/class="tq-sent"/g)).toHaveLength(1);
-    const between = { id: 'c1', kind: 'msg', from: mate.id, to: [], text: 'I wrote three posts.', ts: NOW - 16 * MIN };
+    const between = { id: 'c1', kind: 'msg', from: mate.id, to: [], text: 'I wrote three posts.', ts: NOON - 16 * MIN };
     const html = draw({ chat: [between] });
     expect(html.match(/class="tq-sent"/g)).toHaveLength(2);
     // The window stands on its own, so the message after it names who wrote it.
     expect(html).toMatch(/<div class="rm-cm tq-m"><div class="h">[\s\S]*?<span>Marketing lead<\/span>[\s\S]*?I wrote three posts\./);
+  });
+
+  it('starts a second window where a day ends, and only there', () => {
+    // 00:17: the older thread is yesterday, the newer today, so each sits
+    // under its own day. This is the split that read as a broken test.
+    const over = draw({ now: JUST_PAST_MIDNIGHT });
+    expect(over.match(/class="tq-sent"/g)).toHaveLength(2);
+    expect(over).toMatch(/rm-label">Yesterday<[\s\S]*?class="tq-sent"[\s\S]*?rm-label">Today<[\s\S]*?class="tq-sent"/);
+    // The other side of the same boundary: both threads after midnight, one window.
+    expect(draw({ now: JUST_PAST_MIDNIGHT, apart: [12 * MIN, 6 * MIN] }).match(/class="tq-sent"/g)).toHaveLength(1);
   });
 
   it('opens the inbox at that tab from the tab, and the thread from its row', () => {

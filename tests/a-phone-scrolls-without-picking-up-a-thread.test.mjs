@@ -65,8 +65,11 @@ describe('on a phone, the top of the page', () => {
     const all = [...bodies.matchAll(new RegExp(`(?:^|[;{\\s])${prop}:\\s*([^;]+)`, 'g'))];
     return all.length ? all[all.length - 1][1].trim() : undefined;
   };
-  it('is a solid bar in the wall\'s colour, for Safari to match the band behind the clock to', () => {
-    expect(decl('.workspace-layout > .topbar', 'background')).toBe('var(--bg)');
+  // The bar was solid for Safari to match the band behind the clock to; the
+  // edge strip does that now, and the bar shows the wall (w-33511040d7).
+  it('lets the wall through, and the strip behind the clock wears the wall\'s colour', () => {
+    expect(decl('.workspace-layout > .topbar', 'background')).toBe('transparent');
+    expect(decl('.phone-edge-top', 'background')).toBe('var(--bg)');
   });
   it('and the page\'s root wears the same colour', () => {
     expect(decl(':root', 'background-color')).toBe('var(--bg)');

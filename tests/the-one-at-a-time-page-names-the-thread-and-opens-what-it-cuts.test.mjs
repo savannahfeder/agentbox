@@ -39,7 +39,7 @@ describe('the thread\'s name', () => {
     expect(draw({ title: '', context: 'c', you: null })).not.toContain('one-title');
   });
   it('and the thread page hands the summary the name', () => {
-    expect(read('renderer/src/components/ItemThread.tsx')).toMatch(/<QueueSummary[^>]*title=\{rowTitle\(item\)\}/);
+    expect(read('renderer/src/components/ItemThread.tsx')).toMatch(/<QueueSummary[^>]*title=\{pageTitle\(item\)\}/);
   });
 });
 
