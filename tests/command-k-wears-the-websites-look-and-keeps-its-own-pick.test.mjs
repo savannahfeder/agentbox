@@ -29,8 +29,8 @@ const draw = (props = {}) => renderToStaticMarkup(createElement(Palette, {
   onSetLook: noop, onOpenFilter: noop, onClearFilter: noop, onView: noop, onPause: noop, onResume: noop,
   onRankFirst: noop, onNewProject: noop, onNewThread: noop, onStanding: noop, onSettings: noop,
   onShortcuts: noop, keyHints: false, onSetKeyHints: noop,
-  onSearch: noop, onFirstRun: noop, onTutorial: noop, onImportAgents: noop, onFreshUser: noop,
-  onDemo: noop, onClose: noop, ...props,
+  onSearch: noop, onFirstRun: noop, onTutorial: noop, onImportAgents: noop,
+  onClose: noop, ...props,
 }));
 const overAThread = { itemCommands: [{ id: 'reply', label: 'Reply', keyHint: 'R', run: noop }] };
 

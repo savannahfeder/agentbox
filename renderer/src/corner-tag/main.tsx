@@ -14,7 +14,7 @@
 // - Off both the tag and the list for a moment, and the list shuts.
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { GRIPS, Grip, HIDE_CHOICES, cardLines, cardScale, inPoints, tagSays } from '../../../shared/corner-tag.mjs';
+import { Grip, HIDE_CHOICES, cardLines, cardScale, inPoints, tagSays } from '../../../shared/corner-tag.mjs';
 import { NAME } from '../../../shared/product-name.mjs';
 import { Lattice, Move, markMoves } from './lattice';
 import { MoveButton, PlacePicker } from './place';
@@ -41,8 +41,7 @@ type Bridge = {
   clickable: (on: boolean) => Promise<unknown>;
   hover: (part: Part, inside: boolean) => Promise<unknown>;
   toggle: () => Promise<unknown>;
-  // grip and corner say the press landed on one of the four resize corners.
-  press: (x: number, y: number, grip?: boolean, corner?: Grip) => Promise<unknown>;
+  press: (x: number, y: number) => Promise<unknown>;
   release: (cancelled?: boolean) => Promise<unknown>;
   go: (id: string | null) => Promise<unknown>;
   dismiss: (id: string) => Promise<unknown>;
@@ -199,7 +198,7 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
   // ours. Moves keep arriving either way, because the window forwards them.
   const overUs = (e: React.PointerEvent) => {
     const el = document.elementFromPoint(e.clientX, e.clientY);
-    return !!el?.closest('.ct-tag, .ct-grip');
+    return !!el?.closest('.ct-tag');
   };
 
   return (
@@ -235,47 +234,6 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
       <Mark scale={state.scale ?? 1} says={{ kind: says.kind, count: counts.ready }} />
       <span className="ct-count">{text}</span>
     </div>
-      {/* EVERY CORNER TAKES A DRAG, AND DRAWS NOTHING (2026-10-13). First a
-          ledge, then an arrow on each corner: "you accidentally see something
-          flash and you're like, oh wait, what was that... it really kills the
-          vibes". So the corners are bare: the pointer turning into the resize
-          arrow over them is the system's own affordance, and nothing in the
-          corner of her screen moves. Making it discoverable is the open
-          question, proposed rather than guessed at. The press goes through the
-          same door as a move, flagged as the grip, so the main process reads
-          the cursor exactly as it does for a drag. */}
-      {GRIPS.map((corner) => (
-        <span
-          key={corner}
-          className={`ct-grip ct-grip-${corner}`}
-          data-corner={corner}
-          aria-hidden
-          title="Drag to resize"
-          onPointerDown={(e) => {
-            if (e.button !== 0) return;
-            e.stopPropagation();
-            e.currentTarget.setPointerCapture(e.pointerId);
-            pressed.current = true;
-            bridge?.press(e.screenX, e.screenY, true, corner);
-          }}
-          onPointerUp={(e) => {
-            e.stopPropagation();
-            letGo(false);
-            if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
-          }}
-          onPointerCancel={() => letGo(true)}
-          onLostPointerCapture={() => letGo(true)}
-        >
-          {/* NOTHING IS DRAWN HERE ANY MORE (2026-10-13). An arrow that
-              appears as the pointer crosses a corner reads as a glitch:
-              "you accidentally see something flash and you're like, oh wait,
-              what was that... it really kills the vibes". The corner still
-              takes a drag and the pointer still turns into the resize arrow
-              over it, which is the system's own affordance and costs the tag
-              nothing. How somebody is meant to FIND that is a separate
-              question, and an open one. */}
-        </span>
-      ))}
     </div>
   );
 }
