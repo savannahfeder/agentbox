@@ -401,6 +401,8 @@ export interface Playbook {
 export interface TeamChatLine {
   id: string; kind: 'msg' | 'pass' | 'act'; from: string; to?: string[] | string; text?: string;
   title?: string; details?: string; verb?: string; ref?: string; options?: string[]; ts: number;
+  /** On your message: the answer it gives each of a teammate's questions, by question id. */
+  answers?: Record<string, string>;
   /** Said for you by one of your threads, when you asked it to. */
   via?: string; viaProduct?: string;
   /** The words that set a new teammate up; from a suggestion, with the threads it was made from. */
@@ -594,6 +596,8 @@ export interface SupervisorStatus {
   // Rows nothing can start because every login of their tool is out of usage,
   // id -> the tool's name and when it resets (0 when no login said).
   atLimit?: Record<string, { tool: string; until: number }>;
+  // Queued rows the last pass could not start, id -> why and the tool's name.
+  cannotStart?: Record<string, { why: string; tool: string }>;
   // Rows the app's ship queue still owes a ship (main/ship-queue.mjs). Waiting
   // on the app, not on a person: In progress, reading "Shipping".
   shipping?: string[];

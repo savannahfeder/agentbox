@@ -693,6 +693,20 @@
   :root:root:root #phone-alerts-ask button.quiet { background: none; color: var(--text-dim); }
   /* Both sit at the foot; the agent's question comes first and the offer waits. */
   :root:root:root body:has(.approvals) #phone-alerts-ask { display: none; }
+
+  /* EVERYTHING ELSE ON A PHONE ("The everything else page is misaligned",
+     2026-10-29). It had no phone rules, so its pieces kept the desktop's
+     32px left margin while the tabs over them start at 16px and the board
+     under them at 12px: three left edges on one screen. And the bar over an
+     AI teammate's board ran 157px off the right of a 393px screen, its
+     Message button out of reach. Every piece now sits on the phone's 16px. */
+  :root:root:root .list-pane:has(.ev-head) { --text-x: 16px; --row-r: 16px; }
+  :root:root:root .ev-board .th-board { padding: 0 16px; scroll-padding: 0 16px; }
+  :root:root:root .ev-bar { gap: 10px; }
+  :root:root:root .ev-bn { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* No room for a teammate's job beside its name; the name stays. */
+  :root:root:root .ev-bn em { display: none; }
+  :root:root:root .ev-right + .ev-msg { margin-left: 4px; }
 }
 
 /* A picture's placeholder while it loads is in styles.css: every window has it. */
@@ -728,13 +742,5 @@
 :root:root:root[data-door="phone"] .palette-phone .palette-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 :root:root:root[data-door="phone"] .palette-phone .palette-sub { font: 400 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
 :root:root:root[data-door="phone"] .palette-phone .palette-empty { padding: 16px; font-size: 16px; }
-/* Before anything is typed the commands are tiles, two to a row, and a long
-   name wraps rather than being cut: every word of it has to be readable. */
-:root:root:root[data-door="phone"] .palette-phone .palette-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 16px calc(16px + var(--phone-foot, 8px)); align-content: start; }
-:root:root:root[data-door="phone"] .palette-phone .palette-tiles .palette-item {
-  min-width: 0; min-height: 84px; padding: 12px; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 12px;
-  border: 1px solid var(--line); font-size: 15px; line-height: 1.3;
-}
-:root:root:root[data-door="phone"] .palette-phone .palette-tiles .palette-glyph { text-align: left; font-size: 16px; }
-:root:root:root[data-door="phone"] .palette-phone .palette-tiles .palette-text { max-width: 100%; }
-:root:root:root[data-door="phone"] .palette-phone .palette-tiles .palette-label { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; }
+/* A command's name wraps rather than being cut: every word of it has to be readable. */
+:root:root:root[data-door="phone"] .palette-phone .palette-item:not(.palette-thread) .palette-label { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; line-height: 1.3; }

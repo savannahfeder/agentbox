@@ -12,8 +12,10 @@ import fs from 'node:fs';
 const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
 describe('answers to tap, once you have answered', () => {
+  // Your own words to one question by name are lit as its answer since
+  // w-615b74b8cb; a plain message under several questions still lights none.
   it('show only the one you picked, and none when you answered in your own words', () => {
-    expect(read('renderer/src/teammates/TeammatesPage.tsx')).toMatch(/m\.options\.filter\(\(o\) => answered === null \|\| answered\.trim\(\) === o\)\.map\(/);
+    expect(read('renderer/src/teammates/TeammatesPage.tsx')).toMatch(/answered && \(m\.options\.includes\(answered\.text\.trim\(\)\) \|\| answered\.named\)/);
   });
 });
 

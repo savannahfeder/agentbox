@@ -227,13 +227,17 @@ export class Teammates {
 
   // Your words in the team chat. On a teammate's page they go to that
   // teammate; in the team chat to whoever they name with @.
-  post({ text, to = [], options, fresh = false } = {}, now = Date.now()) {
+  post({ text, to = [], options, fresh = false, answers } = {}, now = Date.now()) {
     const words = String(text ?? '').trim();
     if (!words) throw new Error('Nothing to send.');
     const team = this.list(now);
     const ids = new Set([...(Array.isArray(to) ? to : [to]).filter(Boolean), ...mentionsIn(words, team)]);
     const known = [...ids].filter((x) => team.some((t) => t.id === x));
-    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}) }, now);
+    // Which of its questions each answer is for, so the chat can show them one by one.
+    const said = answers && typeof answers === 'object' && !Array.isArray(answers)
+      ? Object.fromEntries(Object.entries(answers).filter(([, a]) => typeof a === 'string' && a.trim()).map(([q, a]) => [q, a.trim().slice(0, 2000)]))
+      : {};
+    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}), ...(Object.keys(said).length ? { answers: said } : {}) }, now);
   }
 
   // Your go-ahead for work held after too many hand-offs: the same work again,
@@ -581,7 +585,7 @@ export class Teammates {
     const yours = chat.messages.filter((m) => m.kind === 'msg' && m.from === YOU && now - m.ts < WEEK_MS).slice(-YOUR_CHAT_LINES)
       .map((m) => `- [${when(m.ts)}]${(m.to ?? []).length ? ` to ${m.to.map((x) => this.nameOf(x, team)).join(', ')}` : ''}: ${cut(String(m.text ?? '').replace(/\s+/g, ' ').trim(), 400)}`);
     const lastSeen = Math.max(0, ...earlier.map((i) => (i.wrote?.answer?.source === 'founder' ? i.wrote.answer.ts ?? 0 : 0)));
-    const untried = method && method.changedAt > lastSeen;
+    const untried = method && laterThan(method.changedAt, lastSeen);
     const toldLines = told.slice(-CHAT_TAIL).map((m) => {
       const when = new Date(m.ts).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
       return `- [${when}] ${this.nameOf(m.from, team)}: ${cut(String(m.text ?? '').trim(), 2000)}`;
@@ -619,7 +623,7 @@ export class Teammates {
       ...(record ? ['## Your recent work, from the record', 'Each of your recent runs, what the person said on it in their words, and the first line of what you answered. Read it before you start: it is how you know what was already tried, approved and turned down.', record, ''] : []),
       ...(t.duties?.length ? ['## What you do on your own', ...t.duties.map((d) => `- ${d.what} (${dutyWhen(d).toLowerCase()})${d.tell ? `. Bring the person in only when ${d.tell}` : ''}`), 'You also wake when someone writes to you or passes you work.', ''] : []),
       ...(!method && t.memory.length ? ['## What you know about the person (put these in your method)', ...t.memory.map((m) => `- ${m.text}`), ''] : []),
-      ...(method && t.memory.some((m) => m.at > method.changedAt) ? ['## Noted since your method last changed (put these in it)', ...t.memory.filter((m) => m.at > method.changedAt).map((m) => `- ${m.text}`), ''] : []),
+      ...(method && t.memory.some((m) => laterThan(m.at, method.changedAt)) ? ['## Noted since your method last changed (put these in it)', ...t.memory.filter((m) => laterThan(m.at, method.changedAt)).map((m) => `- ${m.text}`), ''] : []),
       ...(reads.length ? ['## Shared playbooks you read (lessons for every teammate doing this kind of work)', ...reads.flatMap((b) => [`### ${b.title}`, ...b.lessons.map((l) => `- ${cut(l.text, 300)}`)]), ''].slice(0, 60) : []),
       ...(notRead.length ? [`Playbooks on the team you do not read yet: ${notRead.map((b) => b.title).join(', ')}. Start reading one with team_playbook and its title, leaving out lesson, when its work is yours too.`, ''] : []),
       ...this._projectsFor(t),
@@ -725,6 +729,12 @@ export class Teammates {
 }
 
 const YOUR_CHAT_LINES = 10;
+
+// The method's time is the file's and everything it is compared with is
+// Date.now(); Linux stamps a file up to 16ms behind, so the one written second
+// can read first. A second is past that and under any gap a person makes.
+const CLOCKS_APART_MS = 1_000;
+const laterThan = (a, b) => a > b + CLOCKS_APART_MS;
 
 const threadIdsIn = (text) => [...String(text ?? '').matchAll(/\bw-[0-9a-f]{10,12}\b/g)].map((m) => m[0]);
 
