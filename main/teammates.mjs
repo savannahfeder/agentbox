@@ -99,6 +99,7 @@ export class Teammates {
       limit: Number.isInteger(base.limit) ? base.limit : DEFAULT_LIMIT,
       status: base.status === 'draft' ? 'draft' : 'active',
       starter: starter?.starter ?? null,
+      ...(base.primary && !team.some((x) => x.primary) ? { primary: true } : {}),
       createdAt: now,
       paused: false,
     };
@@ -139,7 +140,7 @@ export class Teammates {
   update(id, patch = {}, now = Date.now()) {
     const t = this.get(id, now);
     if (!t) throw new Error('No such teammate.');
-    const allowed = ['name', 'role', 'job', 'goal', 'counted', 'asksFirst', 'works', 'product', 'engine', 'model', 'effort', 'limit', 'paused', 'letter', 'handoffsNeedYes'];
+    const allowed = ['name', 'role', 'job', 'goal', 'counted', 'asksFirst', 'works', 'product', 'engine', 'model', 'effort', 'limit', 'paused', 'letter', 'handoffsNeedYes', 'primary'];
     const clean = {};
     for (const k of allowed) if (k in patch) clean[k] = patch[k];
     if ('product' in clean) clean.product = this._product(clean.product);
@@ -148,6 +149,11 @@ export class Teammates {
       writeChat(this.dir(), { kind: 'act', from: id, verb: clean.paused ? 'paused' : 'resumed' }, now);
     }
     writeTeammate(this.dir(), id, clean, now);
+    // One primary at a time.
+    if (clean.primary === true && !t.primary) {
+      for (const other of this.list(now).filter((x) => x.id !== id && x.primary)) writeTeammate(this.dir(), other.id, { primary: false }, now);
+      writeChat(this.dir(), { kind: 'act', from: id, verb: 'primary', text: `${t.name} is your primary employee: it takes what Auto is not sure of, and checks in with you.` }, now);
+    }
     // Its open runs follow it from their next turn. A model is one engine's
     // name, so a move to another engine clears it.
     const effort = ('effort' in clean ? clean.effort : t.effort) || TEAMMATE_EFFORT;
@@ -623,8 +629,13 @@ export class Teammates {
       ...(reads.length ? ['## Shared playbooks you read (lessons for every teammate doing this kind of work)', ...reads.flatMap((b) => [`### ${b.title}`, ...b.lessons.map((l) => `- ${cut(l.text, 300)}`)]), ''].slice(0, 60) : []),
       ...(notRead.length ? [`Playbooks on the team you do not read yet: ${notRead.map((b) => b.title).join(', ')}. Start reading one with team_playbook and its title, leaving out lesson, when its work is yours too.`, ''] : []),
       ...this._projectsFor(t),
+      ...(t.primary ? this._asPrimary(others, items, now) : []),
       '## The team',
-      ...(others.length ? others.map((o) => `- ${o.name}${o.role && o.role.toLowerCase() !== o.name.toLowerCase() ? `, ${o.role}` : ''}${o.paused ? ' (paused)' : ''}: ${o.job ? cut(o.job, 140) : 'no job yet'}`) : ['- You are the only teammate so far.']),
+      ...(others.length ? others.map((o) => {
+        const s = t.primary ? statusOf(o, items, now) : null;
+        const doing = s ? [s.now ? ` Now: ${s.now}.` : '', s.queued ? ` ${s.queued} queued.` : '', s.done.length ? ` Finished today: ${s.done.map((d) => d.title).join('; ')}.` : ''].join('') : '';
+        return `- ${o.name}${o.role && o.role.toLowerCase() !== o.name.toLowerCase() ? `, ${o.role}` : ''}${o.paused ? ' (paused)' : ''}: ${o.job ? cut(o.job, t.primary ? 240 : 140) : 'no job yet'}${doing}`;
+      }) : ['- You are the only teammate so far.']),
       '',
       ...(yours.length ? ['## What the person said in the team chat lately', ...yours, ''] : []),
       ...(toldLines.length ? ['## Teammates wrote to you in the chat since this thread last spoke', 'Read these into this turn. They woke nobody.', ...toldLines, ''] : []),
@@ -661,6 +672,25 @@ export class Teammates {
       `- When nothing needs them, post a one-line summary to the team chat, then close this run yourself: update_work_item with status done and labels ["founder", "${teammateLabel(t.id)}", "${HOP_LABEL_PREFIX}${hop}", "clean"] in one call. This run is your own work, not the person's ask, so closing it needs no quote from them. A duty that found nothing worth doing ends there.`,
       '- Never wait or poll for a teammate. Say what you are waiting for in the chat and finish. Hand work on with team_pass, not create_work_item.',
     ].filter((x) => x !== null).join('\n');
+  }
+
+  // What the primary is for, and what is waiting on the person across the team.
+  _asPrimary(others, items, now) {
+    const waiting = others.flatMap((o) => statusOf(o, items, now).waiting.map((w) => `- ${o.name}: "${w.title}" (${w.product}/${w.id})`));
+    return [
+      '## You are the primary employee',
+      "You are the person's main point of contact: the one teammate they talk to. Work reaches you three ways: they write to you, Auto gives you a thread it could not place (two teammates fit, or it spans several jobs), or it is your check-in.",
+      "- One teammate's job: hand it over with team_pass, with the person's words and what done looks like, and say in one line who has it. When this run started with the person's own words it starts at once; otherwise it waits for their yes. The result reaches their inbox from that teammate; do not relay it.",
+      '- Several jobs: split it, one owner for each piece and one team_pass each. Never two teammates on the same piece.',
+      "- Small, or nobody's job: do it yourself in this run.",
+      '- A kind of work that keeps coming and nobody owns: offer the person a new teammate for it, with options. On their yes, make it with team_hire (a name that says the role, and the job in plain words); it sets itself up by asking them.',
+      '- Your check-in: one message with what is waiting on the person, most urgent first, then what finished and what is stuck, each with its thread, in a few lines. When nothing needs them, post nothing and close this run quietly.',
+      "- Hand a teammate the outcome, not instructions for how to do its work: it works from its own method. Never do another teammate's job.",
+      '',
+      '## Waiting on the person, across the team',
+      ...(waiting.length ? waiting : ['- Nothing.']),
+      '',
+    ];
   }
 
   // A teammate with no method yet: the threads it learns from, written out

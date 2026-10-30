@@ -65,7 +65,7 @@ import { isUrgent, itemPriority, normalizeOrder, orderFromTiers, placedScore, pr
 import { keysForAgents } from '../shared/shortcuts.mjs';
 import { isCleanRun, ruleIdOf, nextRunAt, periodKey, occurrenceId } from '../shared/repeats.mjs';
 import { occurrenceFields } from './repeats.mjs';
-import { teammateIdOf, mentionsIn, teammatesOn, OFFER_LABEL, CHAT_LABEL } from '../shared/teammates.mjs';
+import { teammateIdOf, mentionsIn, teammatesOn, primaryOf, OFFER_LABEL, CHAT_LABEL } from '../shared/teammates.mjs';
 import { mayRunHere } from '../shared/team-rules.mjs';
 
 // WHO IS SIGNED IN, handed to the store server a worker talks through. An MCP
@@ -149,7 +149,7 @@ import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexM
 import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.mjs';
 import { accountName } from '../shared/account-names.mjs';
 import { nameRow, wantsName, askSmallModel } from './row-label.mjs';
-import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, NOBODY_WHY, FAILED_WHY } from '../shared/auto-route.mjs';
+import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mjs';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mjs';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
 import { signInFiles, signInStamp } from './sign-in-files.mjs';
@@ -3716,21 +3716,24 @@ export class Supervisor {
       .filter((i) => isAuto(i) && i.status === 'open' && !asksWho(i))
       .sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))[0];
     if (!next) return undefined;
-    let team = [];
-    try { team = teammatesOn(this.config) ? routeCandidates(this.store.teammates?.list?.(now) ?? []) : []; } catch { team = []; }
+    let all = [];
+    try { all = teammatesOn(this.config) ? this.store.teammates?.list?.(now) ?? [] : []; } catch { all = []; }
+    const team = routeCandidates(all);
+    // What Auto cannot place goes to the primary, when there is one.
+    const primary = primaryOf(all);
     const write = (decision) => {
-      this.store.routeItem(next.product, next.id, routedPatch(next, decision, { items, now: Date.now() }));
+      this.store.routeItem(next.product, next.id, routedPatch(next, orPrimary(decision, primary), { items, now: Date.now() }));
       this.wake();
     };
     if (!team.length) { write({ to: 'agent', why: NOBODY_WHY }); return undefined; }
     this._routing = true;
-    const prompt = routePrompt(next, team, items);
-    const clean = (text) => (readRoute(text, team) ? text : '');
+    const prompt = routePrompt(next, team, items, { primary });
+    const clean = (text) => (readRoute(text, team, primary) ? text : '');
     return this._askSmall((opts) => askSmallModel(prompt, clean, { ...opts, timeoutMs: ROUTE_TIMEOUT_MS }), { product: next.product })
-      .then((answer) => write(readRoute(answer, team) ?? { to: 'agent', why: FAILED_WHY }))
+      .then((answer) => write(readRoute(answer, team, primary)))
       .catch((e) => {
         console.warn('zero: could not route a thread:', e.message);
-        try { write({ to: 'agent', why: FAILED_WHY }); } catch { /* the thread is gone */ }
+        try { write(null); } catch { /* the thread is gone */ }
       })
       .finally(() => { this._routing = false; });
   }

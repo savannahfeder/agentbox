@@ -70,11 +70,18 @@ const FIELDS = [
   'handoffsNeedYes',
   // A date its duties and rounds do not wake it before.
   'pausedUntil',
+  // The one you talk to: takes what Auto cannot place, and checks in.
+  'primary',
 ];
 
 export const STATUSES = ['draft', 'active'];
 
 export const isDate = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00`));
+
+/** The primary teammate, while it is set up and working, or null. */
+export function primaryOf(team = []) {
+  return (team ?? []).find((t) => t?.primary && !t.endedAt && !t.paused && (t.status ?? 'active') === 'active') ?? null;
+}
 
 export function pausedNow(t, now = Date.now()) {
   return isDate(t?.pausedUntil) && dateKey(now) < t.pausedUntil;
@@ -168,7 +175,7 @@ function coerce(field, value) {
     case 'product': case 'engine': case 'model': case 'effort': case 'starter': return cleanText(value, 120);
     case 'works': return value === null ? null : isWorks(value) ? { every: value.every, at: value.at, ...(value.every === 'week' ? { on: value.on } : {}) } : undefined;
     case 'limit': return Number.isInteger(value) && value >= 1 && value <= 500 ? value : undefined;
-    case 'paused': case 'handoffsNeedYes': return !!value;
+    case 'paused': case 'handoffsNeedYes': case 'primary': return !!value;
     case 'status': return STATUSES.includes(value) ? value : undefined;
     case 'endedAt': case 'createdAt': return Number.isFinite(value) ? value : value === null ? null : undefined;
     case 'served': return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
@@ -533,7 +540,8 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
           continue;
         }
       }
-      const hold = !fromYou && t.handoffsNeedYes !== false;
+      // `yours`: the primary passing on what your own words asked of it.
+      const hold = !fromYou && !m.yours && t.handoffsNeedYes !== false;
       const home = fromYou ? null : homeOf(t, m);
       if (home && !closedByYou(home)) {
         const from = { teammate: m.from, name: byId.get(m.from)?.name ?? 'A teammate' };
@@ -695,6 +703,17 @@ export function starterAsks(team = []) {
 export const TEAMMATE_EFFORT = 'high';
 
 export const STARTERS = [
+  {
+    starter: 'chief', name: 'Chief of staff', role: 'Chief of staff', primary: true,
+    ask: 'Be the one I talk to',
+    outcome: 'Takes anything you send, gets it to the right teammate, and checks in with only what needs you',
+    sends: 'One check-in a weekday with what needs you',
+    job: 'Be the person\'s main point of contact. Take whatever they send you: hand it to the teammate whose job it is, do it yourself when it is small or nobody\'s, and offer a new teammate when a kind of work keeps coming and nobody owns it. Every weekday morning check in once with what is waiting on them, most urgent first, what finished and what is stuck. Stay quiet when nothing needs them.',
+    goal: 'You never have to chase a teammate',
+    counted: 'Things you had to chase yourself',
+    asksFirst: 'Before making a new teammate, or handing on work you did not ask for',
+    works: { every: 'weekday', at: '09:00' },
+  },
   {
     starter: 'quality', name: 'Quality lead', role: 'Quality lead',
     ask: 'Find bugs before your users do',
