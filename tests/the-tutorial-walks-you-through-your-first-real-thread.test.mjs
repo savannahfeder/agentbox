@@ -10,7 +10,7 @@
 // The founder's rules for it, after seeing it drawn:
 //  - "what if they don't want to? Can they just click away?" and "It's not good
 //    if, for the rest of the time, there's always a glowing button." Each tip
-//    shows until it is done, then never again; Skip tutorial and Escape end
+//    shows until it is done, then never again; End the tutorial in the command bar ends
 //    all of it.
 //  - "after you've gone through one flow, making a new thread probably
 //    shouldn't show those suggestions." They show only before the first send.

@@ -149,7 +149,7 @@ import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './
 import { FirstRunFlow } from './components/FirstRun';
 import { ideasFor, runOfRule } from './first-run';
 import { Tour } from './components/Tour';
-import { finishLesson, firstTask, noteSent, readTour, saveTour, showIdeas, startTour, type Tour as TourState } from './tour';
+import { finishLesson, firstTask, noteSent, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   finishedCleared, firstRunNeeded, projectsOfTheirOwn, inboxCleared, laterCleared, laterId, laterIndex,
@@ -6144,6 +6144,13 @@ export default function App() {
   // And the cursor on it, once its row is drawn there.
   const followAt = firstThread ? list.findIndex((i) => i.id === firstThread) : -1;
   useEffect(() => { if (followAt >= 0) setSelected(followAt); }, [followAt]);
+  // Closing the first thread ends on Needs you, not on an empty In progress it was followed to.
+  const wasClosed = useRef(!!tour?.done.includes('close'));
+  const closed = !!tour?.done.includes('close');
+  useEffect(() => {
+    if (closed && !wasClosed.current && view === 'progress') setView('inbox');
+    wasClosed.current = closed;
+  }, [closed, view]);
   // END OF THE FOLLOWING
 
   const openView = (next: View) => { roomsUi.leave(); teammatesUi.leave(); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); };
@@ -7520,6 +7527,7 @@ export default function App() {
         // is one line however many projects she has (w-aa3fa4cbf0).
         onOpenFilter={() => setModal('filter')}
         onClearFilter={() => { setBoxFilter(NO_FILTER); setModal(null); }}
+        onEndTutorial={tourLive(tour) ? () => { setTour(skipTour(tour!)); setModal(null); } : undefined}
         onView={(v) => { setView(v); setModal(null); setSelected(0); }}
         onPause={async (paused) => { await api.pauseSupervisor(paused); setModal(null); await refresh(); }}
         order={snap.supervisor.productOrder ?? []}

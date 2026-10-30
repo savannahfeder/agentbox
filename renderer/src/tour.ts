@@ -53,6 +53,7 @@ export const TOUR_KEY = 'zero.tour';
 
 export const startTour = (): Tour => ({ sent: false, skipped: false, done: [] });
 export const skipTour = (t: Tour): Tour => ({ ...t, skipped: true });
+export const tourLive = (t: Tour | null): boolean => !!t && !t.skipped && LESSONS.some((l) => !t.done.includes(l));
 export const noteSent = (t: Tour): Tour => finishLesson({ ...t, sent: true }, 'compose');
 export const finishLesson = (t: Tour, l: Lesson): Tour => (t.done.includes(l) ? t : { ...t, done: [...t.done, l] });
 export const lessonOf = (s: TourStep): Lesson =>

@@ -13,6 +13,7 @@ const BY_ID: Record<string, string> = {
   'new-thread': '✎',
   filter: '≡',
   'clear-filter': '×',
+  'end-tutorial': '×',
   'projects-page': '▤',
   search: '/',
   'all-threads': '/',

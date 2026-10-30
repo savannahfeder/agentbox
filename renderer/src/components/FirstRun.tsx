@@ -16,6 +16,7 @@ import { LAST_PRODUCT_KEY } from '../compose-project';
 import {
   ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, installGate, listKey, previousScreen, projectsToMake, readyEngines,
   type Engine, type Screen,
+  inHomeFolder,
 } from '../first-run';
 import './first-run.css';
 
@@ -124,7 +125,11 @@ export function FirstRunFlow({ snap, home, onDone }: {
     const p = known.find((k) => bare(k.repoPath ?? '') === folder);
     return p ? { slug: p.slug, name: p.name } : null;
   }, [known]);
-  const nameOf = useCallback((folder: string) => ownerOf(folder)?.name ?? naming.get(folder) ?? projectNameFor({ name: folder.split('/').pop() ?? '' }), [ownerOf, naming]);
+  const workspace = useMemo((): Project | null => {
+    const p = (snap?.products ?? []).find((x) => x.personal);
+    return p ? { slug: p.slug, name: p.name } : null;
+  }, [snap?.products]);
+  const nameOf = useCallback((folder: string) => (inHomeFolder(folder) ? workspace?.name : null) ?? ownerOf(folder)?.name ?? naming.get(folder) ?? projectNameFor({ name: folder.split('/').pop() ?? '' }), [ownerOf, naming]);
 
   const go = useCallback((next: Screen) => {
     setLeaving(true);
@@ -147,13 +152,14 @@ export function FirstRunFlow({ snap, home, onDone }: {
 
   /** The folder's project, made now if it has none. `counted` says this press was already counted once. */
   const projectFor = useCallback(async (folder: string, counted = false): Promise<Project | null> => {
+    if (inHomeFolder(folder)) return workspace;
     const had = ownerOf(folder);
     if (had) return had;
     try {
       const got = await api.createProduct({ name: nameOf(folder), repoPath: folder, ofMany: counted }) as { slug?: string } | null;
       return got?.slug ? { slug: got.slug, name: nameOf(folder) } : null;
     } catch { return null; }
-  }, [ownerOf, nameOf]);
+  }, [ownerOf, nameOf, workspace]);
 
   const picked = chats.filter((t) => chatTicks.has(t.id));
 
