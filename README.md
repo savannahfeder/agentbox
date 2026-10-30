@@ -33,7 +33,7 @@
 
 ## Install
 
-There are two ways to run it: in the browser, or as a Mac app. Both need Node 22 or newer and Claude Code or Codex installed and signed in.
+There are two ways to run it: in the browser, or as a Mac app. Both need Node 22.13 or newer and Claude Code or Codex installed and signed in.
 
 **As a desktop app.** Build it from this repo. `npm start` is the desktop command on Omarchy and on a Mac:
 
@@ -44,8 +44,7 @@ npm install
 npm start
 ```
 
-`npm install` ends with a run of deprecation warnings and a count of
-vulnerabilities. What is left after `npm audit fix` are advisories on Vite,
+`npm install` ends with a count of vulnerabilities. What is left after `npm audit fix` are advisories on Vite,
 Vitest and the Tiptap editor that only a new major version of each would clear.
 The install worked if it exits without an error.
 
