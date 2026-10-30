@@ -6167,6 +6167,8 @@ export default function App() {
     if (!firstThread) return;
     const tab = tabOfState(tabState.get(firstThread) ?? null);
     if (!tab) return;
+    if (tab !== 'inbox' && tab !== 'progress') { setFirstThread(null); return; }
+    if (focused?.id === firstThread && tab === 'inbox') { setFirstThread(null); return; }
     if (tab === followedTab.current) return;
     // Inside a thread or a card, it waits for you to come back to the list.
     if (focused || !(modal === null || modal === 'compose') || !(['inbox', 'progress'] as View[]).includes(view)) return;
@@ -6174,6 +6176,16 @@ export default function App() {
     if (tab !== view) setView(tab);
     if (tab === 'inbox') setFirstThread(null);
   }, [firstThread, tabState, focused, modal, view]);
+  // Opened as soon as it exists: once a task is sent, the next thing anybody does is look at it.
+  const openedFirst = useRef(false);
+  useEffect(() => {
+    if (!firstThread || openedFirst.current || focused || (modal !== null && modal !== 'compose')) return;
+    const row = [...inbox, ...progress].find((i) => i.id === firstThread);
+    if (!row) return;
+    openedFirst.current = true;
+    setFocused(row);
+    markSeen(row);
+  }, [firstThread, inbox, progress, focused, modal, markSeen]);
   // And the cursor on it, once its row is drawn there.
   const followAt = firstThread ? list.findIndex((i) => i.id === firstThread) : -1;
   useEffect(() => { if (followAt >= 0) setSelected(followAt); }, [followAt]);

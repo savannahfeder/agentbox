@@ -29,13 +29,13 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   pick: { words: <>Press <K k="↓" /> to choose a suggestion, or type your own</>, side: 'below' },
   write: { words: <>Type what you need done</>, side: 'below' },
   send: { words: <>Press <K k={CMD} /><K k="↵" /> to send it to an agent</>, side: 'below-right' },
-  working: { words: <>An agent is working on this. Press <K k="N" /> to start another thread</>, side: 'below' },
+  working: { words: <>An agent is working on this. Press <K k="↵" /> to watch it</>, side: 'below' },
   answered: { words: <>Your agent has answered. Press <K k="⇧" /><K k="⇥" /> to see it</>, side: 'below' },
   open: { words: <>This agent needs your answer. Press <K k="↵" /> to open it</>, side: 'below-right' },
   choose: { words: <>Press <K k="1" /> to choose the recommended option</>, side: 'above' },
   reply: { words: <>Press <K k="R" /> to answer this agent</>, side: 'above' },
   close: { words: <>When it is finished, press <K k="E" /> to close it</>, side: 'below-right' },
-  busy: { words: <>This agent is still working. Its answer will come to Needs you</>, side: 'below' },
+  busy: { words: <>This agent is working. Its answer will appear here</>, side: 'below' },
   palette: { words: <>Press <K k={CMD} /><K k="K" /> to find anything {Name} can do</>, side: 'below' },
 };
 
@@ -249,7 +249,14 @@ export function Tour({ tour, view, thread, covered, onChange }: {
       // After the press has reached the app: saving now redraws it first, and the press is lost.
       const later = (t: TourState) => setTimeout(() => onChange(t), 0);
       const typing = (e.target as Element | null)?.closest?.('input, textarea, [contenteditable="true"]');
-      if (!typing && closesThread(e, thread)) { later(closeLessons(step).reduce(finishLesson, tour)); return; }
+      // The app holds the first E on a thread waiting on an answer, so it counts only once the thread has gone.
+      if (!typing && closesThread(e, thread)) {
+        const was = document.querySelector('.focus-body .one-title')?.textContent ?? null;
+        setTimeout(() => {
+          if ((document.querySelector('.focus-body .one-title')?.textContent ?? null) !== was) onChange(closeLessons(step).reduce(finishLesson, tour));
+        }, 900);
+        return;
+      }
       if (!typing && keyLearns(step, e)) { later(finishLesson(tour, lessonOf(step))); return; }
       if (e.key !== 'Escape' || !ON_THE_LIST.includes(step)) return;
       e.preventDefault();

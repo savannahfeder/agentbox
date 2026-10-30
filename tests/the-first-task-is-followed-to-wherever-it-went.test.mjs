@@ -37,6 +37,14 @@ describe('the inbox after the first task is sent', () => {
     expect(app).not.toContain('useEffect(() => { if (focused) setFirstThread(null); }, [focused]);');
   });
 
+  it('never leads to Done or Later, and stops once you have read its answer', () => {
+    // Measured 2026-10-29 by the end-to-end walk: closing the first thread with
+    // E took the window to Done, away from the command bar tip.
+    const follow = app.slice(app.indexOf('// THE FIRST THREAD, FOLLOWED'), app.indexOf('// END OF THE FOLLOWING'));
+    expect(follow).toContain("if (tab !== 'inbox' && tab !== 'progress') { setFirstThread(null); return; }");
+    expect(follow).toContain("if (focused?.id === firstThread && tab === 'inbox') { setFirstThread(null); return; }");
+  });
+
   it("is the tutorial's first thread", () => {
     expect(app).toContain('if (firstSend.current && made?.id) { firstSend.current = false; setFirstThread(made.id); }');
   });

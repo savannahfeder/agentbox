@@ -58,7 +58,7 @@ export const finishLesson = (t: Tour, l: Lesson): Tour => (t.done.includes(l) ? 
 export const lessonOf = (s: TourStep): Lesson =>
   s === 'folder' || s === 'pick' || s === 'write' || s === 'send' ? 'compose' : s === 'answered' ? 'open' : s;
 
-const KEYS: Partial<Record<TourStep, RegExp>> = { start: /^n$/i, open: /^Enter$/, choose: /^[1-9]$/, reply: /^r$/i, close: /^e$/i };
+const KEYS: Partial<Record<TourStep, RegExp>> = { start: /^n$/i, working: /^Enter$/, open: /^Enter$/, choose: /^[1-9]$/, reply: /^r$/i, close: /^e$/i };
 
 /** Whether this key press is the one the tip on screen asks for, which is the lesson learned. */
 export function keyLearns(step: TourStep, e: { key: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean }): boolean {
@@ -100,8 +100,7 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
   const todo = (l: Lesson) => !t.done.includes(l);
   // The command bar is the last tip, so it goes before the suggestions on the empty inbox.
   if (!todo('close') && todo('palette') && (t.sent || !todo('start')) && s.composer === 'inline' && !s.thread) return 'palette';
-  const firstBox = !t.sent && todo('compose');
-  if (s.composer !== 'none' && (firstBox || s.ideas)) {
+  if (s.composer !== 'none' && !t.sent && todo('compose')) {
     if (!s.folder) return 'folder';
     if (s.menu) return null;
     if (s.text) return 'send';

@@ -116,13 +116,14 @@ describe('the suggestions', () => {
 });
 
 describe('a second New thread box during the tutorial', () => {
-  it('points at the suggestions again, but asks for no folder', () => {
+  // The founder, 2026-10-29: "I don't understand the purpose of it basically
+  // asking me two times over to create a new thread ... after I create a task,
+  // my natural logic is just to click into it." The suggestions stay in the box,
+  // but no tip pushes a second thread.
+  it('shows the suggestions without a tip pushing them', () => {
     const sent = noteSent(startTour());
-    expect(tourStep(sent, at({ composer: 'card', folder: true, ideas: true }))).toBe('pick');
-    expect(tourStep(sent, at({ composer: 'card', folder: true, ideas: true, text: true }))).toBe('send');
-  });
-  it('and nothing once the tutorial is over', () => {
-    expect(tourStep(noteSent(after('close', 'palette')), at({ composer: 'card', folder: true, ideas: false }))).toBe(null);
+    expect(tourStep(sent, at({ composer: 'card', folder: true, ideas: true }))).toBe(null);
+    expect(tourStep(sent, at({ composer: 'inline', rows: 0, folder: true, ideas: true }))).toBe(null);
   });
 });
 
@@ -486,7 +487,7 @@ describe('the command bar tip on the empty inbox', () => {
   it('comes before the suggestions once the first thread is closed', () => {
     const t = noteSent(after('open', 'reply', 'close'));
     expect(tourStep(t, at({ rows: 0, composer: 'inline', folder: true, ideas: true }))).toBe('palette');
-    expect(tourStep(t, at({ rows: 0, composer: 'card', folder: true, ideas: true }))).toBe('pick');
+    expect(tourStep(t, at({ rows: 0, composer: 'card', folder: true, ideas: true }))).toBe(null);
   });
 });
 
@@ -512,5 +513,39 @@ describe('a thread the agent closed itself', () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     expect(tour).toContain("if (wanted === 'close' && document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done')) { onChange(finishLesson(tour, 'close')); return; }");
+  });
+});
+
+describe('the first thread, once sent', () => {
+  // "after I create a task, my natural logic is just to click into it."
+  it('opens by itself, once its row is there', async () => {
+    const fs = await import('node:fs');
+    const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+    expect(app).toContain('if (!firstThread || openedFirst.current || focused || (modal !== null && modal !== \'compose\')) return;');
+    expect(app).toContain('openedFirst.current = true;');
+  });
+  it('and the tips say to watch it, not to start another', async () => {
+    const fs = await import('node:fs');
+    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+    expect(tour).not.toContain('to start another thread');
+    expect(tour).toContain('An agent is working on this. Press <K k="↵" /> to watch it');
+    expect(tour).toContain('This agent is working. Its answer will appear here');
+  });
+  it('Return on the working row is what that tip teaches', async () => {
+    const { keyLearns } = await import('../renderer/src/tour.ts');
+    expect(keyLearns('working', { key: 'Enter' })).toBe(true);
+  });
+});
+
+describe('E on a thread that is waiting on you', () => {
+  // The founder, 2026-10-29: "when i hit e here nothing happens". The app holds
+  // the first E on a thread waiting on an answer and says so in the header;
+  // the tutorial counted it as the close anyway and drew the command bar tip
+  // over that sentence. Measured again by the end-to-end walk the same night.
+  it('counts as the close only once the thread has really gone', async () => {
+    const fs = await import('node:fs');
+    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+    expect(tour).toContain("const was = document.querySelector('.focus-body .one-title')?.textContent ?? null;");
+    expect(tour).toContain("if ((document.querySelector('.focus-body .one-title')?.textContent ?? null) !== was) onChange(closeLessons(step).reduce(finishLesson, tour));");
   });
 });
