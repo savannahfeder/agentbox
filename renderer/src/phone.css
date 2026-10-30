@@ -81,6 +81,7 @@
   }
   :root:root:root .workspace-navigation .th-team,
   :root:root:root .workspace-navigation .workspace-tabs,
+  :root:root:root .workspace-navigation .workspace-find,
   :root:root:root .workspace-navigation button[aria-label="Feedback"],
   :root:root:root .workspace-navigation button[aria-label="Instructions"],
   :root:root:root .workspace-navigation .workspace-usage,
