@@ -529,7 +529,7 @@ describe('the first thread, once sent', () => {
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     expect(tour).not.toContain('to start another thread');
     expect(tour).toContain('An agent is working on this. Press <K k="↵" /> to watch it');
-    expect(tour).toContain('This agent is working. Its answer will appear here');
+    expect(tour).toContain('This agent is working. You can leave, and the Agent Tray will show you when it’s done');
   });
   it('Return on the working row is what that tip teaches', async () => {
     const { keyLearns } = await import('../renderer/src/tour.ts');

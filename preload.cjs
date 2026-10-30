@@ -147,6 +147,7 @@ contextBridge.exposeInMainWorld('zero', {
   // window is a fact only the main process holds, so the page reports and does
   // not decide (main/notify.mjs).
   notify: (arrivals, needsYou) => ipcRenderer.invoke('zero:notify', { arrivals, needsYou }),
+  notifyTest: () => ipcRenderer.invoke('zero:notify-test'),
   stopSession: (payload) => ipcRenderer.invoke('zero:stop-session', payload),
   runNow: (payload) => ipcRenderer.invoke('zero:run-now', payload),
   reopen: (payload) => ipcRenderer.invoke('zero:reopen', payload),

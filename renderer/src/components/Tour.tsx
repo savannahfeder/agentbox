@@ -20,6 +20,8 @@ const GAP = 8;
 /** How long a tip waits for the screen to stop changing, and how long it must be up to count as seen. */
 const SETTLE_MS = 500;
 const SEEN_MS = 1000;
+/** Set once the tutorial has sent its sample banner. */
+const NOTIFY_TRIED = 'zero.tour.notifyTried';
 
 const K = ({ k }: { k: string }) => <span className="tour-k">{k}</span>;
 
@@ -35,7 +37,7 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   choose: { words: <>Press <K k="1" /> to choose the recommended option</>, side: 'above' },
   reply: { words: <>Press <K k="R" /> to answer this agent</>, side: 'above' },
   close: { words: <>When it is finished, press <K k="E" /> to close it</>, side: 'below-right' },
-  busy: { words: <>This agent is working. Its answer will appear here</>, side: 'below' },
+  busy: { words: <>This agent is working. You can leave, and the Agent Tray will show you when it’s done</>, side: 'below' },
   palette: { words: <>Press <K k={CMD} /><K k="K" /> to find anything {Name} can do</>, side: 'below' },
 };
 
@@ -153,6 +155,12 @@ export function Tour({ tour, view, thread, covered, onChange }: {
   // once the first thread is closed and the command bar shown, and only when
   // nothing is over the window to hide it.
   const [burst, setBurst] = useState(0);
+  const [tried, setTried] = useState(() => { try { return !!localStorage.getItem(NOTIFY_TRIED); } catch { return false; } });
+  const tryNotifications = () => {
+    try { localStorage.setItem(NOTIFY_TRIED, '1'); } catch {}
+    setTried(true);
+    void (window.zero as { notifyTest?: () => Promise<unknown> } | undefined)?.notifyTest?.();
+  };
   const ended = (t: TourState | null) => !!t && !t.skipped && t.done.includes('close') && t.done.includes('palette');
   const hadEnded = useRef(ended(tour));
   useEffect(() => {
@@ -276,6 +284,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
       <div key={`card-${step}`} ref={cardRef} className="tour-card" role="status"
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
         <span className="tour-say">{SAY[step].words}</span>
+        {step === 'busy' && !tried && <button type="button" className="tour-act" onClick={tryNotifications}>Turn on notifications</button>}
         <button type="button" className="tour-skip" onClick={() => onChange(skipTour(tour))}>Skip tutorial</button>
       </div>
     </>
