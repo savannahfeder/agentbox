@@ -227,13 +227,17 @@ export class Teammates {
 
   // Your words in the team chat. On a teammate's page they go to that
   // teammate; in the team chat to whoever they name with @.
-  post({ text, to = [], options, fresh = false } = {}, now = Date.now()) {
+  post({ text, to = [], options, fresh = false, answers } = {}, now = Date.now()) {
     const words = String(text ?? '').trim();
     if (!words) throw new Error('Nothing to send.');
     const team = this.list(now);
     const ids = new Set([...(Array.isArray(to) ? to : [to]).filter(Boolean), ...mentionsIn(words, team)]);
     const known = [...ids].filter((x) => team.some((t) => t.id === x));
-    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}) }, now);
+    // Which of its questions each answer is for, so the chat can show them one by one.
+    const said = answers && typeof answers === 'object' && !Array.isArray(answers)
+      ? Object.fromEntries(Object.entries(answers).filter(([, a]) => typeof a === 'string' && a.trim()).map(([q, a]) => [q, a.trim().slice(0, 2000)]))
+      : {};
+    return writeChat(this.dir(), { kind: 'msg', from: YOU, to: known, text: words.slice(0, 8000), ...(options ? { options } : {}), ...(fresh ? { fresh: true } : {}), ...(Object.keys(said).length ? { answers: said } : {}) }, now);
   }
 
   // Your go-ahead for work held after too many hand-offs: the same work again,

@@ -22,5 +22,7 @@ export function loadLiquidGlass({ mac = process.platform === 'darwin', load = cr
     }),
     clear: (win) => native.clear(handle(win)),
     tone: (win) => native.tone(handle(win)),
+    // How bright the screen behind the glass is, 0 to 1, or null.
+    luma: (win) => (native.luma ? native.luma(handle(win)) : null),
   };
 }

@@ -25,7 +25,7 @@ export interface Command {
   run: () => void;
 }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, findThreads, onSearchFor, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose, cloud = null, onCloudMode, open = true, phone = false }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, findThreads, onSearchFor, onFirstRun, onTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -99,9 +99,6 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
    *  it and no import card after it. */
   onTutorial: () => void;
   onImportAgents: () => void;
-  onFreshUser: (withAgents: boolean, withTools?: boolean) => void;
-  /** Opens a second Agentbox on an invented studio's work, for demos. */
-  onDemo: () => void;
   onClose: () => void;
   /** The cloud, when this Mac is set up for it; null hides its rows. */
   cloud?: CloudStatus | null;
@@ -316,8 +313,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // up and leaves a project. The walk's last card says "type tutorial", so
     // this label must contain that word
     // (tests/the-tutorial-and-the-onboarding-are-two-things.test.mjs). The
-    // keywords are split so each word finds only one of the two rows, and
-    // "demo" is left to the demo row.
+    // keywords are split so each word finds only one of the two rows.
     {
       id: 'tutorial',
       label: 'Take the tutorial',
@@ -335,28 +331,6 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       keywords: 'onboarding first run new user welcome intro setup start over from scratch install fresh',
       run: onFirstRun,
     },
-    // A second Agentbox on an invented studio's work, so a demo does not show
-    // the user's own. Their copy keeps running (main/demo.mjs).
-    {
-      id: 'demo',
-      label: 'Open a demo inbox',
-      hint: 'invented work · yours keeps running',
-      keywords: 'demo demonstration present presentation pitch investor customer screen share screenshare record video sample fake example stage not mine hide my work',
-      run: onDemo,
-    },
-    // A second Agentbox that has never been set up, in its own window. It
-    // deletes nothing and does not link ~/.claude, so the real install's
-    // sessions stay out of it (main/fresh-user.mjs). With agents is
-    // `npm run fresh -- --with-agents`.
-    {
-      id: 'fresh-user',
-      label: `Open ${NAME} as a new user`,
-      hint: 'nothing set up · yours keeps running',
-      keywords: 'new user fresh install stranger onboarding first run clean empty blank test website download nothing of mine agents claude code sessions setup plan codex chatgpt not installed',
-      // Claude Code stays visible to the new copy: most new users have a plan,
-      // and hiding it made the app say they had none.
-      run: () => onFreshUser(false),
-    },
     {
       id: 'keyhints',
       label: keyHints ? 'Turn off keyboard shortcut hints' : 'Turn on keyboard shortcut hints',
@@ -364,7 +338,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, cloud, onCloudMode]);
+  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, cloud, onCloudMode]);
   return open ? <PaletteBox commands={commands} findThreads={findThreads} onSearchFor={onSearchFor} onClose={onClose} phone={phone} /> : null;
 }
 
@@ -387,7 +361,7 @@ export function threadRows(query: string, findThreads?: (q: string) => Command[]
 // The box itself, mounted fresh each time ⌘K opens, so it starts empty and focused.
 /** Commands about the Mac or its keyboard, which a phone has neither of, and
  *  Search threads, which the phone's field already is. */
-export const NOT_ON_A_PHONE = ['search', 'keyhints', 'shortcuts', 'stale', 'update', 'update-check', 'update-move', 'first-run', 'fresh-user', 'demo', 'tutorial', 'import-agents', 'open-terminal', 'remote-control', 'flip-view'];
+export const NOT_ON_A_PHONE = ['search', 'keyhints', 'shortcuts', 'stale', 'update', 'update-check', 'update-move', 'first-run', 'tutorial', 'import-agents', 'open-terminal', 'remote-control', 'flip-view'];
 
 /** The rows in the order drawn, and the label over the row each section starts
  *  at. A phone searches threads more than it runs commands, so they go first. */
@@ -463,7 +437,7 @@ function PaletteBox({ commands, findThreads, onSearchFor, onClose, phone = false
             ? <button type="button" className="palette-cancel" onClick={onClose}>Cancel</button>
             : <button type="button" className="palette-esc" aria-label="Close" onClick={onClose}>esc</button>}
         </div>
-        <div className={`palette-list${phone && !query.trim() ? ' palette-tiles' : ''}`} ref={listRef}>
+        <div className="palette-list" ref={listRef}>
           {filtered.length === 0 && <div className="palette-empty">{emptyLine(query)}</div>}
           {filtered.map((c, i) => (<Fragment key={keys[i]}>
             {labels.has(i) && <div className="palette-section">{labels.get(i)}</div>}

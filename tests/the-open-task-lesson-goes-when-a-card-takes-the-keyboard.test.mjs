@@ -58,7 +58,7 @@ describe('when the lesson is drawn', () => {
 describe('the screen asks that rule rather than keeping its own', () => {
   it('guards the plate with it, and redraws when the card opens or closes', () => {
     const app = fs.readFileSync(path.join(root, 'renderer/src/App.tsx'), 'utf8');
-    const block = app.slice(app.indexOf('const [lessonAt, setLessonAt]'), app.indexOf('useEffect(() => { if (focused) dropLesson'));
+    const block = app.slice(app.indexOf('const lessonAt = useLessonPlace('), app.indexOf('useEffect(() => { if (focused) dropLesson'));
     expect(block).toMatch(/showsOpenLesson\(/);
     expect(block).toMatch(/\[[^\]]*\bmodal\b[^\]]*\]\);\s*$/);
   });

@@ -74,11 +74,41 @@ export function asksYou(view: TeammatesView | null | undefined, id: string): boo
 }
 
 // What you said back to a teammate's question: your next words to it, or null
-// while it is still waiting on you.
+// while it is still waiting on you. Answers sent together say which question
+// each is for, and pass over the ones they leave out.
 export function answerTo(view: TeammatesView | null | undefined, q: TeamChatLine): string | null {
+  return answerOf(view, q)?.text ?? null;
+}
+
+// The same, and whether it was given to this question by name.
+export function answerOf(view: TeammatesView | null | undefined, q: TeamChatLine): { text: string; named: boolean } | null {
   if (!view || q.kind !== 'msg' || !q.options?.length) return null;
-  const next = view.chat.find((m) => m.kind === 'msg' && m.from === 'you' && m.ts > q.ts && toList(m.to).includes(q.from));
-  return next ? String(next.text ?? '') : null;
+  for (const m of view.chat) {
+    if (m.kind !== 'msg' || m.from !== 'you' || m.ts <= q.ts || !toList(m.to).includes(q.from)) continue;
+    if (!m.answers) return { text: String(m.text ?? ''), named: false };
+    if (q.id in m.answers) return { text: m.answers[q.id], named: true };
+  }
+  return null;
+}
+
+// The question a teammate's message asks: its last sentence that ends in a
+// question mark, else its first sentence.
+export function questionOf(text: string): string {
+  const sentences = String(text ?? '').replace(/\s+/g, ' ').trim().match(/[^.?!]+[.?!]*/g) ?? [];
+  const asked = sentences.filter((s) => s.trim().endsWith('?')).at(-1) ?? sentences[0] ?? '';
+  // A short lead such as "First question:" is the teammate counting, not asking.
+  const q = asked.trim().replace(/^[^:]{1,20}:\s*/, '');
+  return q.charAt(0).toUpperCase() + q.slice(1);
+}
+
+// Your answers to a teammate's questions as one message. Each answer goes
+// under the question it is for, because the teammate wakes on this message
+// alone; one answer needs no question over it.
+export function answersMessage(questions: Pick<TeamChatLine, 'id' | 'text'>[], picks: Record<string, string>): { text: string; answers: Record<string, string> } {
+  const answered = questions.map((q) => ({ q, a: (picks[q.id] ?? '').trim() })).filter((x) => x.a);
+  const answers = Object.fromEntries(answered.map(({ q, a }) => [q.id, a]));
+  if (answered.length === 1 && questions.length === 1) return { text: answered[0].a, answers };
+  return { text: answered.map(({ q, a }) => `> ${questionOf(q.text ?? '')}\n\n${a}`).join('\n\n'), answers };
 }
 
 // A teammate's run waiting its turn behind the one it is on. It is the

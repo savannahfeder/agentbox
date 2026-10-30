@@ -18,7 +18,7 @@ const draw = (props = {}) => renderToStaticMarkup(createElement(Palette, {
   products: [], supervisorPaused: false, look: 'dark', onSetLook: noop, onOpenFilter: noop, onClearFilter: noop,
   onView: noop, onPause: noop, onResume: noop, onRankFirst: noop, onNewProject: noop, onNewThread: noop,
   onStanding: noop, onSettings: noop, onShortcuts: noop, keyHints: true, onSetKeyHints: noop, onSearch: noop,
-  onFirstRun: noop, onTutorial: noop, onImportAgents: noop, onFreshUser: noop, onDemo: noop, onClose: noop,
+  onFirstRun: noop, onTutorial: noop, onImportAgents: noop, onClose: noop,
   onCheckUpdate: noop, onFlipView: noop, findThreads: () => [], ...props,
 }));
 const rows = (html) => [...html.matchAll(/class="palette-label">([^<]+)</g)].map((m) => m[1]);
@@ -36,13 +36,14 @@ describe('the box on a phone', () => {
     expect(phone).not.toContain('palette-foot');
   });
 
-  // The tiles were picked; drawn with one line each, "General agent
-  // instructions…" read "General agent instr…" (w-33611c2122).
-  it('lays the commands out as tiles before anything is typed, every name whole', () => {
-    expect(phone).toContain('class="palette-list palette-tiles"');
-    expect(desk).not.toContain('palette-tiles');
+  // Tiles shipped, then were swapped back for rows ("go with the normal
+  // rows instead"). A long name still wraps rather than being cut.
+  it('lists the commands as rows, never tiles, every name whole', () => {
+    expect(phone).toContain('class="palette-list"');
+    expect(phone).not.toContain('palette-tiles');
     const css = fs.readFileSync(new URL('../renderer/src/phone.css', import.meta.url), 'utf8');
-    expect(css).toMatch(/\.palette-tiles \.palette-label \{[^}]*white-space: normal;[^}]*text-overflow: clip;/);
+    expect(css).not.toContain('palette-tiles');
+    expect(css).toMatch(/\.palette-phone \.palette-item:not\(\.palette-thread\) \.palette-label \{[^}]*white-space: normal;[^}]*text-overflow: clip;/);
   });
 
   it('offers nothing about the Mac or its keyboard', () => {
