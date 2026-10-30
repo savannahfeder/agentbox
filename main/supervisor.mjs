@@ -293,11 +293,11 @@ const CLOUD_NO_ROOM = 79;
 const CLOUD_FULL_WAIT_MS = 30_000;
 const CLOUD_NO_ROOM_WAIT_MS = 5 * 60_000;
 // A thread whose cloud start dies this many times in a row before its agent
-// starts runs on this Mac from then on (`_cloudKeptOnMac`).
+// starts runs its request on this Mac (`_cloudKeptOnMac`).
 const CLOUD_STARTS_TO_GIVE_UP = 3;
-// Hand-backs before a thread stops being sent to the cloud at all
-// (`_keptHereByUs`). Two: one hand-back is a request that needed this Mac.
-const HAND_BACKS_TO_KEEP_ON_MAC = 2;
+// How long a move the app makes to this Mac lasts when no run here finishes
+// the request (`_movedHere`). Only the person's "Keep on this Mac" is for good.
+const APP_MOVE_TO_MAC_MS = 6 * 60 * 60_000;
 const CLOUD_REST_MS = 10 * 60_000;
 
 // How long a row we interrupted for an Urgent one is held out of the queue
@@ -631,13 +631,11 @@ export class Supervisor {
       // saved before moves had their own key held both in `threadOnMac`, and
       // nearly all of those were moves.
       if (Object.hasOwn(state, 'movedToMac')) {
-        this.movedToMac = Object.fromEntries(Object.entries(state.movedToMac ?? {}).filter(([, v]) => Number.isFinite(v)));
+        this.movedToMac = Object.fromEntries(Object.entries(state.movedToMac ?? {}).filter(([, v]) => Number.isFinite(v) && Date.now() >= v && Date.now() - v < APP_MOVE_TO_MAC_MS));
       } else {
         this.movedToMac = Object.fromEntries(Object.keys(this.threadOnMac).map((id) => [id, Date.now()]));
         this.threadOnMac = {};
       }
-      // How many times the cloud has handed each thread back (`_keptHereByUs`).
-      this.cloudHandBacks = Object.fromEntries(Object.entries(state.cloudHandBacks ?? {}).filter(([, v]) => Number.isFinite(v)));
       // What each handed-back thread needed, for its cloud button's panel.
       this._movedWhy = Object.fromEntries(Object.entries(state.movedWhy ?? {}).filter(([, v]) => v && typeof v.why === 'string'));
     } catch {
@@ -659,7 +657,6 @@ export class Supervisor {
       this.threadPins = {};
       this.threadOnMac = {};
       this.movedToMac = {};
-      this.cloudHandBacks = {};
     }
     // WHICH ROWS NOTHING HAS BEEN ABLE TO RUN ON, as of the last tick, for the
     // line above her list. Deliberately NOT persisted: it is derived from
@@ -4029,10 +4026,6 @@ export class Supervisor {
       changed ||= was !== (this.threadOnMac[id] === true);
       // The person's choice either way replaces a move the app made.
       if (keep !== undefined && id in (this.movedToMac ?? {})) { delete this.movedToMac[id]; delete this._movedWhy?.[id]; changed = true; }
-      // Their choice either way replaces the app's count of hand-backs too, so
-      // "Run on the cloud" on a thread the app kept here sends it back now and
-      // the cloud gets two fresh chances before it is kept again.
-      if (keep !== undefined && this.cloudHandBacks?.[id]) { delete this.cloudHandBacks[id]; delete this._movedWhy?.[id]; changed = true; }
       if (keep === null || keep === false) this._handedBack?.delete(id);
       const session = this.sessions.get(id);
       // A cloud run picked back up after a restart is followed in `_comingHome`, not `sessions`.
@@ -4057,6 +4050,8 @@ export class Supervisor {
   _movableToCloud(session, item = null) {
     if (!session?.itemId || session.cloud || session.command || session.remoteIdle || session.stoppedByUs) return false;
     if (engineOf(session.engine) !== 'claude') return false;
+    // Carrying a request the cloud handed back, which needs this Mac until it ends.
+    if (session.carriesHandBack) return false;
     if (!this._cloudSetUp() || !this._cloudReady('claude') || !this._cloudSignedInAtAll('claude')) return false;
     const rec = this._liveSessions[session.itemId];
     if (!rec?.sessionId || !this.transcriptFile(rec)) return false;
@@ -4132,27 +4127,31 @@ export class Supervisor {
     session.handedBack = true;
     this._handedBack ??= new Set();
     this._handedBack.add(item.id);
-    this.cloudHandBacks ??= {};
-    this.cloudHandBacks[item.id] = (this.cloudHandBacks[item.id] ?? 0) + 1;
     (this._movedWhy ??= {})[item.id] = { why: 'handed-back', detail: handBackWhat(session.result) };
     this._moveToMac(item.id);
     return true;
   }
 
-  // A THREAD THE CLOUD CANNOT RUN AT ALL. One hand-back is a request that
-  // needed this Mac and says nothing about the next one, which is why the move
-  // below lasts one request; two is the thread itself, and every reply after it
-  // would pay for a cloud start that can do nothing. So the move stops being
-  // spent, the row says "This Mac only" (`withPlaces`), and the person's "Run
-  // on the cloud" clears the count.
-  _keptHereByUs(id) {
-    return (this.cloudHandBacks?.[id] ?? 0) >= HAND_BACKS_TO_KEEP_ON_MAC;
+  // Moved here by the app (`_moveToMac`) and not yet spent or run out.
+  _movedHere(id, now = Date.now()) {
+    const at = id ? this.movedToMac?.[id] : undefined;
+    return Number.isFinite(at) && now >= at && now - at < APP_MOVE_TO_MAC_MS;
   }
 
-  // THE APP'S OWN MOVE TO THIS MAC LASTS ONE REQUEST. The person's "Keep on
-  // this Mac" (`threadOnMac`) is for good; this one is spent once a run here
-  // has carried the request to an answer, and the next reply goes to the cloud
-  // first again.
+  // A run here has taken the request up: its six hours start again, so one
+  // the app restarts under is resumed here rather than sent to the cloud.
+  _noteCarryingHandBack(id) {
+    if (!this._movedHere(id)) return false;
+    this.movedToMac[id] = Date.now();
+    this._saveState();
+    return true;
+  }
+
+  // THE APP'S OWN MOVE TO THIS MAC LASTS ONE REQUEST, however many came
+  // before: a hand-back says that request needed this Mac, not the next one,
+  // and a bounce costs the cloud seconds. The person's "Keep on this Mac"
+  // (`threadOnMac`) is for good; this one is spent once a run here has carried
+  // the request to an answer, and the next reply goes to the cloud first again.
   _moveToMac(id) {
     (this.movedToMac ??= {})[id] = Date.now();
     this._saveState();
@@ -4160,7 +4159,6 @@ export class Supervisor {
 
   _spendMoveToMac(item, session) {
     if (!item?.id || !(item.id in (this.movedToMac ?? {})) || session?.cloud || session?.exitFailed !== false) return;
-    if (this._keptHereByUs(item.id)) return;
     delete this.movedToMac[item.id];
     delete this._movedWhy?.[item.id];
     this._handedBack?.delete(item.id);
@@ -4180,8 +4178,8 @@ export class Supervisor {
     return items.map((i) => {
       const place = this.threadPlaces[i.id];
       const pinned = this.threadPins[i.id] === true;
-      const onMac = this.threadOnMac[i.id] === true || this._keptHereByUs(i.id);
-      const moved = this._keptHereByUs(i.id) || i.id in (this.movedToMac ?? {});
+      const onMac = this.threadOnMac[i.id] === true;
+      const moved = this._movedHere(i.id);
       const needsMac = moved && this._movedWhy?.[i.id]?.why === 'handed-back' ? this._movedWhy[i.id].detail ?? null : null;
       if (!Number.isFinite(place) && !pinned && !onMac && !needsMac) return i;
       return { ...i, ...(pinned ? { pinned: true } : {}), ...(Number.isFinite(place) ? { place } : {}), ...(onMac ? { onMac: true } : {}), ...(needsMac ? { needsMac } : {}) };
@@ -5702,7 +5700,7 @@ export class Supervisor {
   // stays on this Mac.
   _mayRunInCloud(item, product, cwd, { remoteOnly = false } = {}) {
     if (remoteOnly || teammateIdOf(item)) return false;
-    if (item?.id && (this.threadOnMac?.[item.id] === true || item.id in (this.movedToMac ?? {}))) return false;
+    if (item?.id && (this.threadOnMac?.[item.id] === true || this._movedHere(item.id))) return false;
     if (!product || !cwd || cwd === product.repoPath) return false;
     if (cwd === product.dir ? !item?.id || !this._cloudTakesPlain() : !product.repoPath) return false;
     if ((this.config.personalProducts || []).includes(product.slug)) return false;
@@ -5756,7 +5754,7 @@ export class Supervisor {
     if (!this._cloudFirst()) return { why: 'started-before' };
     if (item?.id && this.threadOnMac?.[item.id] === true) return { why: 'kept' };
     if (teammateIdOf(item)) return { why: 'teammate' };
-    if (item?.id && item.id in (this.movedToMac ?? {})) return this._movedWhy?.[item.id] ?? { why: 'handed-back', detail: null };
+    if (item?.id && this._movedHere(item.id)) return this._movedWhy?.[item.id] ?? { why: 'handed-back', detail: null };
     if (this._mustRunHere(item, engine)) return { why: 'codex-reply' };
     if (!this._cloudTakesProject(product)) return { why: 'project' };
     if (cwd !== null && !this._mayRunInCloud(item, product, cwd, { remoteOnly })) return { why: 'folder' };
@@ -6179,7 +6177,7 @@ export class Supervisor {
     if (!item || String(item.id || '').startsWith('digest-')) return false;
     // The team chat it talks through is files on this computer.
     if (teammateIdOf(item)) return false;
-    if (this.threadOnMac?.[item.id] === true || item.id in (this.movedToMac ?? {})) return false;
+    if (this.threadOnMac?.[item.id] === true || this._movedHere(item.id)) return false;
     return this._cloudTakesProject(this.store.listProducts?.().find((p) => p.slug === item.product));
   }
 
@@ -6567,7 +6565,6 @@ export class Supervisor {
         threadPins: this.threadPins,
         threadOnMac: this.threadOnMac,
         movedToMac: this.movedToMac,
-        cloudHandBacks: Object.fromEntries(Object.entries(this.cloudHandBacks ?? {}).slice(-500)),
         movedWhy: Object.fromEntries(Object.entries(this._movedWhy ?? {}).slice(-500)),
         liveSessions: this._liveSessions,
         rowSessions: this._rowSessions,
@@ -9989,7 +9986,8 @@ export class Supervisor {
       // Mac's slots (`_loadFor`), shown on the thread, remembered for a
       // restart (`_liveSessions`).
       cloud: where === 'cloud',
-      whyLocal: where === 'cloud' || plan.command ? null : whyLocal ?? this._whyLocal({ item, product, cwd, engine, remoteOnly }),
+      carriesHandBack: where !== 'cloud' && this._noteCarryingHandBack(item.id),
+      whyLocal:where === 'cloud' || plan.command ? null : whyLocal ?? this._whyLocal({ item, product, cwd, engine, remoteOnly }),
     };
     this._noteRunCarrying(item, session, { continuation });
     if (session.cloud) this._rememberCloudStart(item, session, { continuation });
@@ -10272,11 +10270,7 @@ export class Supervisor {
       this._leaveKitForThePhone(item, session);
       this._noteHowTheRunStarted(item, session);
       onLine(`session exited (${code})`);
-      if (this._noteCloudHandBack(item, session)) {
-        onLine(this._keptHereByUs(item.id)
-          ? 'the cloud has handed this thread back twice, so it stays on this computer'
-          : 'the cloud handed this thread back to this computer');
-      }
+      if (this._noteCloudHandBack(item, session)) onLine('the cloud handed this request back to this computer; the next one goes to the cloud');
       else if (this._cloudKeptOnMac(item, session, code, signal)) onLine('the cloud could not run this thread, so this request runs on this computer');
       this._spendMoveToMac(item, session);
       // WHAT THE RUN CHANGED, SAVED WHERE SHE CAN OPEN IT.

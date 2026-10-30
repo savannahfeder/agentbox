@@ -693,6 +693,20 @@
   :root:root:root #phone-alerts-ask button.quiet { background: none; color: var(--text-dim); }
   /* Both sit at the foot; the agent's question comes first and the offer waits. */
   :root:root:root body:has(.approvals) #phone-alerts-ask { display: none; }
+
+  /* EVERYTHING ELSE ON A PHONE ("The everything else page is misaligned",
+     2026-10-29). It had no phone rules, so its pieces kept the desktop's
+     32px left margin while the tabs over them start at 16px and the board
+     under them at 12px: three left edges on one screen. And the bar over an
+     AI teammate's board ran 157px off the right of a 393px screen, its
+     Message button out of reach. Every piece now sits on the phone's 16px. */
+  :root:root:root .list-pane:has(.ev-head) { --text-x: 16px; --row-r: 16px; }
+  :root:root:root .ev-board .th-board { padding: 0 16px; scroll-padding: 0 16px; }
+  :root:root:root .ev-bar { gap: 10px; }
+  :root:root:root .ev-bn { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* No room for a teammate's job beside its name; the name stays. */
+  :root:root:root .ev-bn em { display: none; }
+  :root:root:root .ev-right + .ev-msg { margin-left: 4px; }
 }
 
 /* A picture's placeholder while it loads is in styles.css: every window has it. */

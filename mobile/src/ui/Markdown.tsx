@@ -8,6 +8,7 @@ import { Image, Linking, Pressable, ScrollView, Text, View, type TextStyle } fro
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { isImagePath, referencedFiles } from '../../../renderer/src/referenced-files';
 import { inlineSpans, messageBlocks, type Block, type MentionKind, type Span } from '../lib/markdown';
+import { offerLink } from './LinkMenu';
 import { T } from './parts';
 import { Player } from './Player';
 import { color, font } from './theme';
@@ -18,6 +19,8 @@ export interface MessageFiles {
   picture(src: string): string | null | undefined;
   /** Open the file, the folder or the page it names; `among` are the pictures to step through from a picture. */
   open(src: string, among?: string[]): void;
+  /** A long press: offer to open it in the browser or share it (LinkMenu.ts). */
+  hold?(src: string): void;
   /** A folder's pictures as full paths on the phone, and what the folder goes by; null when the phone does not have it. */
   folder?(src: string): { title: string; pictures: string[]; total: number } | null;
   /** The link a film or a sound plays from, or null when the phone does not have it. */
@@ -62,6 +65,12 @@ function open(src: string, files?: MessageFiles, among?: string[]) {
   else if (WEB.test(src) || /^mailto:/i.test(src)) void Linking.openURL(src);
 }
 
+// A long press on a link: open it in the browser or share it. A site needs no files to find its address.
+function hold(src: string, files?: MessageFiles) {
+  if (files?.hold) files.hold(src);
+  else if (WEB.test(src) || /^mailto:/i.test(src)) offerLink(src, src, () => {});
+}
+
 /** Spans, as the nested words of one line of text. */
 function Words({ spans }: { spans: Span[] }) {
   const { files, italics } = useContext(Draw);
@@ -81,7 +90,7 @@ function Words({ spans }: { spans: Span[] }) {
           const { kind, src } = s.mention;
           const can = WEB.test(src) || /^mailto:/i.test(src) || !!files;
           return (
-            <Text key={i} onPress={can ? () => open(src, files) : undefined} accessibilityRole={can ? 'link' : undefined}
+            <Text key={i} onPress={can ? () => open(src, files) : undefined} onLongPress={can ? () => hold(src, files) : undefined} accessibilityRole={can ? 'link' : undefined}
               style={[style, { color: can ? color.text : color.dim },
                 can && { textDecorationLine: 'underline', textDecorationColor: color.lineStrong }]}>
               <MentionIcon kind={kind} tint={color.faint} />{s.text}
@@ -123,7 +132,7 @@ function Picture({ src, alt }: { src: string; alt: string }) {
       style={{ width: '100%', maxWidth: size.w, aspectRatio: size.w / size.h, borderWidth: 1, borderColor: color.line, backgroundColor: color.raised }} />
   );
   if (/^data:/i.test(src)) return drawn;
-  return <Pressable accessibilityRole="imagebutton" accessibilityLabel={alt || src} onPress={() => open(src, files, pictures)}>{drawn}</Pressable>;
+  return <Pressable accessibilityRole="imagebutton" accessibilityLabel={alt || src} onPress={() => open(src, files, pictures)} onLongPress={() => hold(src, files)}>{drawn}</Pressable>;
 }
 
 // MentionIcon's folder at the folder line's 15px (`.folder-preview-name .mention-icon`).
@@ -200,7 +209,7 @@ function Media({ src, label }: { src: string; label: string }) {
   const film = FILM.test(src);
   return (
     <View>
-      <Text onPress={() => open(src, files)} accessibilityRole="link" style={[BODY, { alignSelf: 'flex-start', marginBottom: 6, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }]}>
+      <Text onPress={() => open(src, files)} onLongPress={() => hold(src, files)} accessibilityRole="link" style={[BODY, { alignSelf: 'flex-start', marginBottom: 6, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }]}>
         <MentionIcon kind="media" tint={color.faint} />{label}
       </Text>
       {link && (film
@@ -294,7 +303,7 @@ function Table({ block }: { block: Extract<Block, { kind: 'table' }> }) {
                     // `th`: half the raised grey.
                     ...(r === 0 ? { backgroundColor: color.film } : {}),
                   }}>
-                    <T style={cellText(r, c)}><Words spans={row[c] ?? []} /></T>
+                    <T selectable style={cellText(r, c)}><Words spans={row[c] ?? []} /></T>
                   </View>
                 ))}
               </View>
@@ -357,14 +366,15 @@ function One({ block: b, tone, depth }: { block: Block; tone?: string; depth: nu
   const ink = tone ? { color: tone } : null;
   const headings = doc ? DOC_HEADING : HEADING;
   switch (b.kind) {
-    case 'p': return <T style={[body, ink]}><Words spans={b.spans} /></T>;
-    case 'h': return <T style={[body, ink, headings[b.depth] ?? headings[4]]}><Words spans={b.spans} /></T>;
+    // Selectable, so a hold selects words to copy (from the phone app, 2026-10-29: "I can't select text").
+    case 'p': return <T selectable style={[body, ink]}><Words spans={b.spans} /></T>;
+    case 'h': return <T selectable style={[body, ink, headings[b.depth] ?? headings[4]]}><Words spans={b.spans} /></T>;
     case 'code':
       return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           style={{ backgroundColor: color.raised, borderWidth: 1, borderColor: color.line }}
           contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: 14, flexGrow: 1 }}>
-          <T style={{ fontFamily: font.mono, fontSize: 13, lineHeight: 20.8, color: color.text }}>{b.text}</T>
+          <T selectable style={{ fontFamily: font.mono, fontSize: 13, lineHeight: 20.8, color: color.text }}>{b.text}</T>
         </ScrollView>
       );
     case 'quote':

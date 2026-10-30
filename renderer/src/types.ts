@@ -403,6 +403,8 @@ export interface Playbook {
 export interface TeamChatLine {
   id: string; kind: 'msg' | 'pass' | 'act'; from: string; to?: string[] | string; text?: string;
   title?: string; details?: string; verb?: string; ref?: string; options?: string[]; ts: number;
+  /** On your message: the answer it gives each of a teammate's questions, by question id. */
+  answers?: Record<string, string>;
   /** Said for you by one of your threads, when you asked it to. */
   via?: string; viaProduct?: string;
   /** The words that set a new teammate up; from a suggestion, with the threads it was made from. */
