@@ -121,14 +121,14 @@ const handler = (opening, closing) => {
 describe('the folds in App.tsx ask first', () => {
   it('clicking nothing does not fold the box while a note records, and still folds it otherwise', () => {
     const away = handler("if (modal !== 'reply') return;\n    const away", '}, [modal]);');
-    const asks = away.indexOf('if (aVoiceNoteIsRecording()) return;');
+    const asks = away.indexOf('if (aVoiceNoteIsRecording() || aBoxIsListening()) return;');
     expect(asks).toBeGreaterThan(-1);
     expect(away.indexOf('setModal(null);')).toBeGreaterThan(asks);
   });
 
   it('a click away from the box over a full-screen document does not fold it while a note records', () => {
     const fold = handler("if (!fullScreenDoc || modal !== 'reply') return;", '}, [fullScreenDoc, modal]);');
-    expect(fold).toMatch(/const foldBack = \(\) => \{ if \(!aVoiceNoteIsRecording\(\)\) setModal\(null\); \};/);
+    expect(fold).toMatch(/const foldBack = \(\) => \{ if \(!aVoiceNoteIsRecording\(\) && !aBoxIsListening\(\)\) setModal\(null\); \};/);
     expect(fold).not.toMatch(/foldBack = \(\) => setModal\(null\)/);
   });
 

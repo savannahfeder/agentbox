@@ -86,6 +86,12 @@ export const levelOf = (value: number) => Math.min(1, Math.max(0, value / 10));
 
 // One box listens at a time; the microphone is the phone's, not the box's.
 let holder: { leave(): void } | null = null;
+
+/**
+ * Whether a box is listening, or asking for the microphone to. Closing the box
+ * ends its dictation, so a click away must not close it meanwhile.
+ */
+export const aBoxIsListening = () => holder !== null;
 // Set when a phone that offered to listen on its own wanted speech recognition after all.
 let needsSpeech = false;
 
