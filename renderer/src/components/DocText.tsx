@@ -115,7 +115,7 @@ export function DocText({ product, src, text, mtime, onSaved, onNotice }: {
     const doc = mdToPmDoc(text);
     onDisk.current = text;
     baseMd.current = pmDocToMd(doc);
-    editor.commands.setContent(doc);
+    editor.commands.setContent(doc, { emitUpdate: false });
   }, [text, editor]);
 
   // ⌘S SAVES IT NOW.A markdown file was already saving itself on a pause and on

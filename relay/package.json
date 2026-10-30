@@ -4,6 +4,6 @@
   "type": "module",
   "description": "The relay a phone reaches its Mac through from anywhere. See worker.mjs.",
   "devDependencies": {
-    "wrangler": "4.149.0"
+    "wrangler": "4.156.0"
   }
 }

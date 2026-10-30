@@ -124,7 +124,7 @@ export function RichReply({ value, onChange, onPlain, placeholder, className, bo
   useEffect(() => {
     if (!editor || value === handed.current) return;
     handed.current = value;
-    editor.commands.setContent(chatDoc(value), false);
+    editor.commands.setContent(chatDoc(value), { emitUpdate: false });
     editor.commands.focus('end');
     onPlain?.(plainOf(editor.state.doc));
   }, [value, editor]);
