@@ -175,9 +175,32 @@ describe('a teammate method', () => {
 
   it('once it has a method, its memory lines are in the method, not repeated beside it', () => {
     const t = team.create({ name: 'Growth marketer' });
-    writeTeammate(team.dir(), t.id, { remember: { id: 'm-1', text: 'MEMORY-LINE-ONE' } }, Date.now());
+    writeTeammate(team.dir(), t.id, { remember: { id: 'm-1', text: 'MEMORY-LINE-ONE', at: Date.now() - 60_000 } }, Date.now() - 60_000);
     writeMethod(t, '# Method\n- the steps\n');
     expect(team.briefFor(run(t))).not.toContain('MEMORY-LINE-ONE');
+  });
+
+  // A method's time is the file's, stamped by the kernel from a coarse clock;
+  // a memory's is Date.now(). Measured on Linux 6.1 over an overlay file
+  // system: a file written after Date.now() was read stamped 8 to 16ms before
+  // it, so the method written second looked older than the memory and every
+  // run repeated a line that was already in it.
+  it('does not repeat a memory noted as the method was written, when the two clocks disagree', () => {
+    const t = team.create({ name: 'Growth marketer' });
+    const file = writeMethod(t, '# Method\n- the steps\n');
+    const at = Date.now();
+    fs.utimesSync(file, new Date(at - 16), new Date(at - 16));
+    writeTeammate(team.dir(), t.id, { remember: { id: 'm-1', text: 'MEMORY-LINE-ONE', at } }, at);
+    expect(team.briefFor(run(t))).not.toContain('MEMORY-LINE-ONE');
+  });
+
+  it('a memory noted a couple of seconds after the method is still shown', () => {
+    const t = team.create({ name: 'Growth marketer' });
+    const at = Date.now();
+    const file = writeMethod(t, '# Method\n- the steps\n');
+    fs.utimesSync(file, new Date(at - 2_500), new Date(at - 2_500));
+    writeTeammate(team.dir(), t.id, { remember: { id: 'm-1', text: 'MEMORY-LINE-ONE', at } }, at);
+    expect(team.briefFor(run(t))).toContain('MEMORY-LINE-ONE');
   });
 
   it('a memory line kept after the method last changed is shown, to be put into it', () => {

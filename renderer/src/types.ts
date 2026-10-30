@@ -379,6 +379,8 @@ export interface Teammate {
   counted: string | null; asksFirst: string | null; works: TeammateWorks | null; worksLabel: string | null;
   product: string; engine: string | null; model: string | null; effort: string | null; limit: number;
   paused: boolean; status: 'draft' | 'active'; memory: TeammateMemory[]; createdAt: number; starter?: string | null;
+  /** The one you talk to: takes what Auto cannot place, and checks in. */
+  primary?: boolean;
   /** Its run is waiting for you to allow or deny a command (drawn from `approvals`, not the store). */
   asking?: boolean;
   /** It asked you something in the team chat and has not heard back (chat-lines `asksYou`). */
@@ -401,6 +403,8 @@ export interface Playbook {
 export interface TeamChatLine {
   id: string; kind: 'msg' | 'pass' | 'act'; from: string; to?: string[] | string; text?: string;
   title?: string; details?: string; verb?: string; ref?: string; options?: string[]; ts: number;
+  /** On your message: the answer it gives each of a teammate's questions, by question id. */
+  answers?: Record<string, string>;
   /** Said for you by one of your threads, when you asked it to. */
   via?: string; viaProduct?: string;
   /** The words that set a new teammate up; from a suggestion, with the threads it was made from. */
