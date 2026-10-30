@@ -49,6 +49,11 @@ describe('the top bar of the web app on a phone', () => {
     expect(app).toMatch(/const searchInTheList = onPhone\(\) \? /);
   });
 
+  it('leaves the teammates\' faces off the tabs row on a phone; they are under Everything else', () => {
+    // "you shouldn't put teammates in the top bar" (2026-10-29).
+    expect(app).toMatch(/corner: evOn \|\| onPhone\(\) \? null : <CornerFaces/);
+  });
+
   it('puts search after View and filters and before the gear, and hides it while searching', () => {
     expect(bodyOf(':root:root:root .topbar .th-right > .th-search')).toMatch(/order:\s*1/);
     expect(bodyOf(':root:root:root:has(.topbar input) .topbar .th-right > .th-search')).toMatch(/display:\s*none/);

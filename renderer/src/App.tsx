@@ -6322,7 +6322,10 @@ export default function App() {
   const showCard = (m: Member) => keepHidden(unhideMember(evHidden, m.key));
   const teamTabs = teamMode ? {
     on: evOn, onNeeds: goNeedsYou, onEverything: () => pickMember('me'),
-    corner: evOn ? null : <CornerFaces members={evSplit.shown} onPick={(key) => pickMember(key)} />,
+    // Not on a phone: there Needs you is just the inbox, and the team is
+    // under Everything else ("you shouldn't put teammates in the top bar",
+    // w-33511040d7).
+    corner: evOn || onPhone() ? null : <CornerFaces members={evSplit.shown} onPick={(key) => pickMember(key)} />,
   } : null;
   const dayStart = new Date(now).setHours(0, 0, 0, 0);
   const evItems = evMember?.kind === 'mate' ? (mateRunsOf(items, evMember.key.slice('mate:'.length), dayStart)) : [];
