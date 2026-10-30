@@ -34,6 +34,6 @@ describe('the answer\'s headline', () => {
     expect(html).toContain('<h1 class="one-q">The dust is in — watch the opening and tell me if it lands.</h1>');
   });
   it('the page hands the answer its name', () => {
-    expect(thread).toMatch(/<QueueAnswer text=\{clean\(newest\.text\)\} md=\{md\} name=\{rowTitle\(item\)\} \/>/);
+    expect(thread).toMatch(/<QueueAnswer text=\{clean\(newest\.text\)\} md=\{md\} name=\{pageTitle\(item\)\}[^/]*\/>/);
   });
 });

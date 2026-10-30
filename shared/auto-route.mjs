@@ -30,10 +30,27 @@ export const AGENT_WHY = "No teammate's job covers this, so an agent took it.";
 export const NOBODY_WHY = 'You have no AI teammates working, so an agent took it.';
 export const FAILED_WHY = 'Auto could not decide, so an agent took it.';
 export const PICKED_WHY = 'You picked it.';
+// Read after "<primary> took this." on the thread.
+export const PRIMARY_WHY = 'Auto was not sure who should.';
+export const PRIMARY_TIE_WHY = 'Two teammates fit, so it decides who does the work.';
 
-/** The teammates a thread can go to: set up, not paused, not ended. */
+/**
+ * The teammates a thread can go to by their job: set up, not paused, not
+ * ended. The primary is not one of them; it is offered for what spans jobs.
+ */
 export function routeCandidates(teammates = []) {
-  return teammates.filter((t) => t && t.id && t.name && !t.endedAt && !t.paused && (t.status ?? 'active') === 'active');
+  return teammates.filter((t) => t && t.id && t.name && !t.primary && !t.endedAt && !t.paused && (t.status ?? 'active') === 'active');
+}
+
+/**
+ * PURE. What Auto could not place goes to the primary when there is one: two
+ * that fit, or no usable answer. A clear answer is left as it was.
+ */
+export function orPrimary(decision, primary) {
+  if (!primary) return decision ?? { to: 'agent', why: FAILED_WHY };
+  if (!decision) return { to: `mate:${primary.id}`, why: PRIMARY_WHY };
+  if (decision.ask) return { to: `mate:${primary.id}`, why: PRIMARY_TIE_WHY };
+  return decision;
 }
 
 const cut = (s, n) => {
@@ -52,7 +69,7 @@ function recentTitles(id, items, n = 6) {
 }
 
 /** PURE. The one question the small model is asked about a thread sent To Auto. */
-export function routePrompt(item, candidates, items = []) {
+export function routePrompt(item, candidates, items = [], { primary = null } = {}) {
   const who = candidates.map((t, n) => {
     const parts = [`[${n + 1}] ${t.name}${t.role && t.role.toLowerCase() !== t.name.toLowerCase() ? `, ${t.role}` : ''}.`];
     if (t.job) parts.push(`Job: ${cut(t.job, 300)}`);
@@ -71,11 +88,13 @@ export function routePrompt(item, candidates, items = []) {
     'Their AI teammates:',
     ...who,
     '[0] None of them: an ordinary coding agent does it.',
+    ...(primary ? [`[P] ${primary.name}, their primary teammate: only when the task needs several of the teammates above, or is about the team's work as a whole.`] : []),
     '',
     'Reply with exactly one line and nothing else, in one of these forms:',
     '  2 | It made the last four clips and runs the clip engine.',
     '  0 | -',
     '  1,2 | Both have worked on the captions.',
+    ...(primary ? ['  P | It needs a clip, the post and a fix.'] : []),
     'The number is who takes it. After the bar, one short plain sentence: for a',
     'teammate, start with "It" and say what in its job or recent threads fits.',
     'Name two numbers only when two teammates fit equally well and you cannot',
@@ -104,8 +123,10 @@ function cleanWhy(text) {
  *  line, a number or two, a bar, a sentence. Anything else is no answer, and a
  *  thread with no answer goes to an agent rather than waiting (FAILED_WHY).
  */
-export function readRoute(text, candidates) {
+export function readRoute(text, candidates, primary = null) {
   const line = String(text ?? '').split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+  const p = /^\[?P\]?\s*\|\s*(.*)$/i.exec(line);
+  if (p) return primary ? { to: `mate:${primary.id}`, why: cleanWhy(p[1]) || PRIMARY_WHY } : null;
   const m = /^\[?(\d{1,2})\]?(?:\s*,\s*\[?(\d{1,2})\]?)?\s*\|\s*(.*)$/.exec(line);
   if (!m) return null;
   const a = Number(m[1]);

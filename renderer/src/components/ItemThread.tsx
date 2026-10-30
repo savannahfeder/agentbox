@@ -42,8 +42,7 @@ import type { TraceSession } from '../notes';
 import type { AgentTurn, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
-import { appWrote, drawnWhole, earlierCount, earlierThan, newestAnswer, standsAt } from '../one-thing-at-a-time';
-import { rowTitle } from '../list-rules';
+import { appWrote, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt } from '../one-thing-at-a-time';
 import { askMarkUnread, say } from '../team/chat-events';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { TeammatesContext } from '../teammates/row-lead';
@@ -172,6 +171,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
 }) {
   const teammates = useContext(TeammatesContext);
   const teammateId = teammateIdOf(item);
+  const signer = teammateId ? teammates.get(teammateId) ?? null : null;
   // The offer of a teammate is the app's own words, so it is signed with its name.
   const teammate = teammateId ? teammates.get(teammateId) ?? null : (item.labels ?? []).includes(OFFER_LABEL) ? { name: Name } : null;
   // Keyed to its row: the effect below empties it only after the first paint
@@ -384,7 +384,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   const queueHead = queue && (
     <QueueSummary
       key={`${item.product}:${item.id}`}
-      title={rowTitle(item)}
+      title={pageTitle(item)}
       context={queue.context}
       earlier={short ? 0 : behind}
       steps={!short && !!newest && (events.some((e) => e.kind === 'work') || after.length > 0)}
@@ -402,7 +402,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
     return (
       <>
         {queueHead}
-        <QueueAnswer text={clean(newest.text)} md={md} name={rowTitle(item)} />
+        <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} by={signer ? { t: signer, at: newest.at } : null} />
         {byApp && outcome && <p className="one-app-note">{clean(outcome.text)}</p>}
         {afterList}
         {madeList(made.atFoot)}
