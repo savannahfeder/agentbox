@@ -7,13 +7,12 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { closeLessons, closesThread, finishLesson, keyLearns, learnedBy, LESSONS, lessonOf, skipTour, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, tourLive, tourStep, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
 type Side = 'above' | 'below' | 'below-right';
 
-const ON_THE_LIST: TourStep[] = ['start', 'working', 'answered', 'open', 'palette'];
 const IN_THE_BOX: TourStep[] = ['folder', 'pick', 'write', 'send'];
 const CMD = MAC ? '⌘' : 'Ctrl';
 const GAP = 8;
@@ -22,7 +21,7 @@ const SETTLE_MS = 500;
 const SEEN_MS = 1000;
 /** Set once the tutorial has sent its sample banner. */
 const NOTIFY_TRIED = 'zero.tour.notifyTried';
-const BUSY_TOLD = <>This agent is working. You can leave, and a notification will tell you when it’s done</>;
+const BUSY_TOLD = <>You’ll get a notification when it’s done. Explore the app while you wait</>;
 
 const K = ({ k }: { k: string }) => <span className="tour-k">{k}</span>;
 
@@ -150,7 +149,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
   const settling = useRef<{ step: TourStep | null; since: number }>({ step: null, since: 0 });
   const before = useRef<TourScreen | null>(null);
   const countedSteps = useRef(new Set<number>());
-  const live = !!tour && !tour.skipped && LESSONS.some((l) => !tour.done.includes(l));
+  const live = tourLive(tour);
 
   // THE END OF THE TUTORIAL: one burst of confetti, the way the old walk ended,
   // once the first thread is closed and the command bar shown, and only when
@@ -181,7 +180,9 @@ export function Tour({ tour, view, thread, covered, onChange }: {
     const read = () => {
       const screen = readScreen(view, thread, covered);
       if (screen.typing && !tour.done.includes('reply')) { onChange(finishLesson(tour, 'reply')); return; }
-      const wanted = tourStep(tour, screen);
+      const rawStep = tourStep(tour, screen);
+      // Told to go and explore, nobody is then asked to come back and watch.
+      const wanted = rawStep === 'working' && tried ? null : rawStep;
       // Already closed, by its agent: nothing is left for the close tip to point at.
       if (wanted === 'close' && document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done')) { onChange(finishLesson(tour, 'close')); return; }
       // A screen still arriving (the inbox before its rows land) must not flash a
@@ -213,7 +214,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
     read();
     const t = setInterval(read, 120);
     return () => clearInterval(t);
-  }, [live, tour, view, thread, covered, onChange]);
+  }, [live, tour, view, thread, covered, onChange, tried]);
 
   // THE CARD, beside the glow, kept inside the window.
   useEffect(() => {
@@ -240,9 +241,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
     if (cardNow.current?.left !== left || cardNow.current?.top !== top) { cardNow.current = { left, top }; setCardAt(cardNow.current); }
   }, [box, step]);
 
-  // THE WAYS OUT. A click anywhere but the glow puts this tip away, and the next
-  // one waits until you move somewhere else. Escape on the list, or Skip
-  // tutorial, ends all of it.
+  // A tip blocks nothing, so it has no way out of its own: the command bar has End the tutorial.
   useEffect(() => {
     if (!step || !tour) return undefined;
     const onTarget = (t: EventTarget | null) => {
@@ -268,10 +267,6 @@ export function Tour({ tour, view, thread, covered, onChange }: {
         return;
       }
       if (!typing && keyLearns(step, e)) { later(finishLesson(tour, lessonOf(step))); return; }
-      if (e.key !== 'Escape' || !ON_THE_LIST.includes(step)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      onChange(skipTour(tour));
     };
     window.addEventListener('pointerdown', down, true);
     window.addEventListener('keydown', key, true);
@@ -287,7 +282,6 @@ export function Tour({ tour, view, thread, covered, onChange }: {
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
         <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : SAY[step].words}</span>
         {step === 'busy' && !tried && <button type="button" className="tour-act" onClick={tryNotifications}>Turn on notifications</button>}
-        <button type="button" className="tour-skip" onClick={() => onChange(skipTour(tour))}>Skip tutorial</button>
       </div>
     </>
   );

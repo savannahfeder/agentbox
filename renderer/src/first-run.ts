@@ -69,10 +69,14 @@ const bare = (folder: string) => folder.replace(/\/+$/, '');
 // Anyone's home folder, so a window run with a throwaway home still refuses the real one.
 const A_HOME = /^\/(Users|home)\/[^/]+$|^\/root$/;
 
-/** Whether a chat ran in a folder that can be a project. */
+/** A home folder can't be a project, so a chat that ran there goes to My Workspace. */
+export const inHomeFolder = (folder: string): boolean => A_HOME.test(bare(folder));
+
+/** Whether a chat ran somewhere it can be brought in to. */
 function placed(t: ThreadLike, home: string): boolean {
   const folder = bare(String(t.folder ?? ''));
-  if (!folder || folder === '/' || A_HOME.test(folder)) return false;
+  if (!folder || folder === '/') return false;
+  if (A_HOME.test(folder)) return true;
   // The chat's own `~/` path answers before the app has said where home is.
   return checkProjectFolder(folder, { home }).ok && (!t.short || checkProjectFolder(t.short, { home }).ok);
 }
@@ -97,7 +101,7 @@ export function projectsToMake(chats: ThreadLike[], products: ProjectLike[]): Ar
   const out: Array<{ folder: string; name: string }> = [];
   for (const t of chats) {
     const folder = bare(String(t.folder ?? ''));
-    if (!folder || owned.has(folder)) continue;
+    if (!folder || owned.has(folder) || inHomeFolder(folder)) continue;
     owned.add(folder);
     const name = projectNameFor({ name: folder.split('/').pop() ?? '' }, taken);
     taken.push(name);
@@ -119,11 +123,11 @@ export interface Idea {
 }
 
 /** A look at the code, then jobs people want running and rarely have. None names the project: a folder can be called anything.
- *  My Workspace has no code, so it is offered work that needs none. */
+ *  My Workspace has no code and knows nothing about you, so it is offered work that needs neither. */
 export function ideasFor({ folder = true }: { folder?: boolean } = {}): Idea[] {
   if (!folder) return [
-    { text: 'Research three competitors and compare their pricing' },
-    { text: 'Draft a short post announcing what I am building' },
+    { text: 'Compare the three most popular note-taking tools and their pricing' },
+    { text: 'Write a one-page guide to getting started with AI agents' },
     { text: 'Summarize this week’s AI news in five bullets', repeat: { every: 'week', on: 1, at: '09:00', short: 'Every Monday', label: 'Every Monday at 9:00am' } },
     { text: 'Write a checklist for launching a new feature' },
   ];

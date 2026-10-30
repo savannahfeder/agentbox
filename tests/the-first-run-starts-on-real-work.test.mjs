@@ -86,13 +86,16 @@ describe('the chats offered', () => {
   ];
   const got = chatChoices(threads, { home: HOME });
   it('are the newest from every folder, with no folder to pick first', () => {
-    expect(got.map((t) => t.when)).toEqual([40, 30, 10]);
+    expect(got.map((t) => t.when)).toEqual([99, 40, 30, 10]);
   });
   it('leave out a chat already in the inbox', () => {
     expect(got.some((t) => t.imported)).toBe(false);
   });
+  it('keep a chat from the home folder, which goes to My Workspace rather than becoming a project', () => {
+    expect(got.map((t) => t.folder)).toContain(HOME);
+    expect(projectsToMake(got, []).map((p) => p.folder)).not.toContain(HOME);
+  });
   it('leave out a chat whose folder cannot be a project, since it would have nowhere to run', () => {
-    expect(got.map((t) => t.folder)).not.toContain(HOME);
     expect(got.map((t) => t.folder)).not.toContain(`${HOME}/Downloads`);
     expect(got.map((t) => t.folder)).not.toContain('');
   });

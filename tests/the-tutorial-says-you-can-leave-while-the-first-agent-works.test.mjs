@@ -29,7 +29,7 @@ describe('the tip while the first agent works', () => {
     expect(tour).toContain('busy: { words: <>This agent is working. You can leave and come back when it’s done</>');
   });
   it('after, says a notification will tell you', () => {
-    expect(tour).toContain('This agent is working. You can leave, and a notification will tell you when it’s done');
+    expect(tour).toContain('You’ll get a notification when it’s done. Explore the app while you wait');
     expect(tour).toContain("step === 'busy' && tried ? BUSY_TOLD : SAY[step].words");
   });
   it('never names a part of the app it has not shown', () => {
