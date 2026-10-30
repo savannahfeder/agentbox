@@ -73,7 +73,8 @@ export function buildMembers({ me, people = [], wall = null, cards = [], teammat
   const humans = people.filter((p) => p.id !== me?.id).slice().sort(byName);
   // A named room has no faces of its own; the team's chat wears the team's.
   const teamFaces = team?.faces.length ? team.faces : humans.map((p) => ({ name: p.name, url: p.avatarUrl ?? cardOf.get(p.id)?.avatarUrl ?? null }));
-  if (team) out.push({ key: team.key, kind: 'chat', team: true, name: 'Team chat', faces: teamFaces, last: team.last, unread: team.unread, agents: null, now: null, at: team.at });
+  // "Team", not "Team chat": its card opens everybody's work, and the chat is a tab under it.
+  if (team) out.push({ key: team.key, kind: 'chat', team: true, name: 'Team', faces: teamFaces, last: team.last, unread: team.unread, agents: null, now: null, at: team.at });
   for (const p of humans) {
     const c = cardOf.get(p.id);
     const running = cards.filter((t) => t.personId === p.id && t.state === 'running').sort((a, b) => b.updatedAt - a.updatedAt);
@@ -88,7 +89,8 @@ export function buildMembers({ me, people = [], wall = null, cards = [], teammat
     out.push({ key: `mate:${t.id}`, kind: 'mate', name: t.name, letter: t.letter || t.name.slice(0, 1), role: t.role, agents, starting: !!t.running && !agents, now });
   }
   const teamCard = out.find((m) => m.team);
-  if (teamCard) teamCard.agents = out.reduce((n, m) => n + (m.kind === 'person' || m.kind === 'mate' ? m.agents ?? 0 : 0), 0);
+  // Yours too: the Team's board is everybody's work.
+  if (teamCard) teamCard.agents = out.reduce((n, m) => n + (m.kind === 'chat' ? 0 : m.agents ?? 0), 0);
   // A chat with one person is that person's card; a chat with several, or a group, is a chat of its own.
   const theirs = new Set(personChats.values());
   const others = chats.filter((c) => c !== team && !theirs.has(c.key) && !(c.key.startsWith('direct:') && c.faces.length <= 1)).slice().sort((a, b) => b.at - a.at);
@@ -202,9 +204,9 @@ export function writeHidden(hidden: Hidden, store: Store = local()) {
   try { store?.setItem(HIDDEN_KEY, JSON.stringify(hidden)); } catch { /* kept for this window only */ }
 }
 
-/** How many rows of cards show: a count the grip left, every row, or null for the usual two. */
+/** How many rows of cards show: a count the grip left, every row, or null for the usual one. */
 export type CardRows = number | 'all' | null;
-const USUAL_ROWS = 2;
+const USUAL_ROWS = 1;
 
 export function rowsShown(choice: CardRows, total: number): number {
   return choice === 'all' ? total : Math.min(choice ?? USUAL_ROWS, total);

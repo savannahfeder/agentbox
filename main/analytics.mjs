@@ -85,7 +85,7 @@ export function analyticsKey(config, baked = BAKED) {
   return typeof key === 'string' && key.trim() ? key.trim() : null;
 }
 
-export function createAnalytics({ config, version, dir, client, env = process.env } = {}) {
+export function createAnalytics({ config, version, dir, client, env = process.env, kind = 'desktop' } = {}) {
   const key = analyticsKey(config);
   const hasDestination = !!key || !!client;
   // BOTH HALVES, AT EVERY SEND. See note 4 above.
@@ -100,8 +100,11 @@ export function createAnalytics({ config, version, dir, client, env = process.en
   // The version pair from section 5.1, on every event, set here and never by a
   // caller. `os.release` is the kernel release, which is what the page means by
   // the version of macOS and carries nothing about the machine or its owner.
+  // `app_kind` is 'desktop' or 'browser' (`npx agentbox-app`), so the two
+  // doors can be counted apart.
   const base = {
     app_version: version || '0.0.0',
+    app_kind: kind === 'browser' ? 'browser' : 'desktop',
     os_platform: process.platform,
     os_release: os.release(),
     os_arch: process.arch,

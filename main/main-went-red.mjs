@@ -21,6 +21,14 @@
 // a row per red commit would be a dozen rows about one mistake. The green
 // again lands on that same row as a note, so the row that told them reads as
 // finished where they are already looking.
+//
+// THE ROW STARTS ITS OWN FIX (w-73e6011de3, 2026-10-29). A proposal waited for
+// someone to say "it's broken, fix it" while every other ship bounced on the
+// same red tests, so the row is filed the way a repeating task's run is, and
+// its fix ships without review. Only when the fix's own ship leaves main red
+// is another row filed, and after FIX_TRIES of those it is a proposal again.
+// The tests still red are kept here for the push gate (`redOnMain`), so a
+// ship is refused only for tests it turned red itself.
 
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
@@ -33,6 +41,18 @@ export const GIVE_UP_MS = 30 * 60 * 1000;
 const STATE = 'main-tests.json';
 const WORKFLOW = 'tests';
 const LOG_BYTES = 16 * 1024 * 1024;
+
+/** The label on a row that is fixing main, and how many such rows one red spell gets. */
+export const MAIN_RED_LABEL = 'main-red';
+export const FIX_TRIES = 2;
+
+/** The test files main is known red on, as GitHub's log names them; [] when it is not. */
+export function redOnMain(userDir) {
+  try {
+    const red = JSON.parse(fs.readFileSync(path.join(userDir, STATE), 'utf8'))?.red;
+    return Array.isArray(red?.tests) ? red.tests.filter((t) => typeof t === 'string' && t) : [];
+  } catch { return []; }
+}
 
 /** `gh`, with its own words back and never a throw. */
 export function runGh(args, { cwd, timeout = 60 * 1000 } = {}) {
@@ -187,10 +207,36 @@ export function redContext({ sha, machines }) {
   ].join(' ');
 }
 
-/** The whole row: what failed, where, and the commit that did it. */
-export function redRow({ sha, subject, url, machines }) {
+/** What the row asks of whoever picks it up: an agent on its own, or a person once the fixes have failed. */
+function whatToDo({ tries, before }) {
+  const after = before ? [`The fix in ${before} shipped and main is still red, so this is try ${tries}.`, ''] : [];
+  if (tries > FIX_TRIES) {
+    return [
+      ...after,
+      `This needs you: ${FIX_TRIES} fixes shipped by agents did not turn main green, so`,
+      'nothing starts on this until you reply.',
+    ];
+  }
+  return [
+    ...after,
+    'Make main green again. Run the failing tests by name and watch them fail,',
+    'then fix whichever is wrong, the code or the test. If you cannot make them',
+    'pass in this run, undo the commit that broke them with `git revert` instead.',
+    '',
+    'This fix ships without waiting for approval: on 2026-10-29 it was agreed',
+    '(w-73e6011de3) that a fix for a red main ships on its own. When the tests',
+    'pass, commit on your branch and add the `ship` label to this task. If',
+    'neither a fix nor a revert works, set this task blocked and say why.',
+    '',
+    'A note lands here when main goes green again.',
+  ];
+}
+
+/** The whole row: what failed, where, the commit that did it, and what to do. */
+export function redRow({ sha, subject, url, machines, tries = 1, before = null }) {
+  const title = redTitle(machines);
   return {
-    title: redTitle(machines),
+    title: tries > 1 ? title.replace(/^main went red on GitHub/, 'main is still red after a fix') : title,
     problem: redContext({ sha, machines }),
     body: [
       "main's `tests` run went red on GitHub, at this commit:",
@@ -206,10 +252,7 @@ export function redRow({ sha, subject, url, machines }) {
         '',
       ]),
       ...(url ? [`The whole run: ${url}`, ''] : []),
-      'That run finishes about five minutes after the agent that shipped has',
-      'already ended, so nobody is watching it: main was red here from',
-      '2026-10-09 to 2026-10-13 and nothing said so. This is the only row filed',
-      'while main stays red, and a note lands here when it goes green again.',
+      ...whatToDo({ tries, before }),
     ].join('\n'),
   };
 }
@@ -263,7 +306,7 @@ export class MainTests {
     try { return JSON.parse(out); } catch { return null; }
   }
 
-  async watch({ product, sha } = {}) {
+  async watch({ product, sha, item } = {}) {
     const cwd = product?.repoPath;
     if (!cwd || !sha || !fs.existsSync(cwd)) return null;
     const until = this.now() + GIVE_UP_MS;
@@ -279,7 +322,7 @@ export class MainTests {
       const says = verdict(run);
       if (says === 'ignore') return null;
       if (says === 'passing') return this.wentGreen(product, run);
-      if (says === 'failing') return this.wentRed(product, run, cwd);
+      if (says === 'failing') return this.wentRed(product, run, cwd, item);
       if (this.now() >= until) {
         this.log.info?.(`main-tests: ${shortSha(sha)}'s run has not finished in half an hour; leaving it.`);
         return null;
@@ -289,10 +332,8 @@ export class MainTests {
     return null;
   }
 
-  /** One row, and only while main was not already known red. */
-  async wentRed(product, run, cwd) {
-    const state = this.read();
-    if (state.red) return null;
+  /** Each failed job's machine, the tests it names, and what the runner said. */
+  async machinesIn(run, cwd) {
     const jobs = (await this.ask(['api', `repos/{owner}/{repo}/actions/runs/${run.databaseId}/jobs`, '--paginate'], cwd))?.jobs ?? [];
     const machines = [];
     for (const job of jobs) {
@@ -302,16 +343,39 @@ export class MainTests {
       const tests = read ? failedTestsIn(out) : [];
       machines.push({ machine: machineOf(job), tests, read, said: read && !tests.length ? whatTheRunnerSaid(out) : [] });
     }
-    const row = redRow({ sha: run.headSha, subject: run.displayTitle, url: run.url, machines });
+    return machines;
+  }
+
+  /**
+   * One row per red spell, plus one per fix whose own ship left main red.
+   * Any other red run while main is known red only refreshes the tests it
+   * names, and a run whose log names none leaves the last list alone.
+   */
+  async wentRed(product, run, cwd, shipped) {
+    const state = this.read();
+    const machines = await this.machinesIn(run, cwd);
+    const tests = [...new Set(machines.flatMap((m) => m.tests))];
+    const known = tests.length ? tests : (state.red?.tests ?? []);
+    if (state.red && !(shipped?.id && shipped.id === state.red.id)) {
+      this.write({ ...state, red: { ...state.red, sha: run.headSha, tests: known } });
+      return null;
+    }
+    const tries = state.red ? (state.red.tries ?? 1) + 1 : 1;
+    const row = {
+      ...redRow({ sha: run.headSha, subject: run.displayTitle, url: run.url, machines, tries, before: state.red?.id ?? null }),
+      kind: 'task',
+    };
     let filed = null;
     try {
-      filed = this.store.fileItem(product.slug, { ...row, kind: 'task' });
+      filed = tries > FIX_TRIES
+        ? this.store.fileItem(product.slug, row)
+        : this.store.fileMainFix(product.slug, { ...row, labels: [MAIN_RED_LABEL] });
     } catch (e) {
       this.log.warn?.(`main-tests: could not file the red main: ${e.message}`);
       return null;
     }
-    this.write({ ...state, red: { product: product.slug, id: filed.id, sha: run.headSha } });
-    this.log.info?.(`main-tests: main went red at ${shortSha(run.headSha)}; filed ${filed.id}.`);
+    this.write({ ...state, red: { product: product.slug, id: filed.id, sha: run.headSha, tests: known, tries } });
+    this.log.info?.(`main-tests: main went red at ${shortSha(run.headSha)}; filed ${filed.id}, try ${tries}.`);
     return filed;
   }
 

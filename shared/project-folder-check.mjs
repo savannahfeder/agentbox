@@ -128,6 +128,45 @@ export function checkProjectFolder(folder, { home = '' } = {}) {
 }
 
 /**
+ * The folders people keep code in, tried in this order when there is nothing
+ *  to learn from. None of them is one of the guarded seven, so opening the
+ *  window on one costs no permission panel.
+ */
+const USUAL = ['dev', 'code', 'src', 'Projects', 'projects', 'Developer', 'repos', 'workspace'];
+
+/**
+ * WHERE THE SYSTEM'S FOLDER WINDOW OPENS, in order, best first (F-148).
+ *
+ *  Returns candidates rather than one answer because only main can see which
+ *  of them exist on the disk; it takes the first that does. The home folder is
+ *  last and is only ever a last resort: it is the one folder
+ *  `checkProjectFolder` refuses outright, so opening on it is opening on a
+ *  place where pressing the button cannot work.
+ *
+ *  `known` is the folders of the projects already connected. Their PARENT is
+ *  what gets offered, commonest first, because the folder beside the projects
+ *  somebody already has is where the next one is.
+ */
+export function chooserStartsIn(startIn, { known = [], home = '' } = {}) {
+  const h = tidyFolder(home);
+  const counts = new Map();
+  for (const f of known) {
+    const p = tidyFolder(f);
+    const cut = p.lastIndexOf('/');
+    if (cut <= 0) continue;
+    const parent = p.slice(0, cut);
+    if (!checkProjectFolder(parent, { home: h }).ok) continue;
+    counts.set(parent, (counts.get(parent) ?? 0) + 1);
+  }
+  const parents = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].length - b[0].length)
+    .map(([parent]) => parent);
+  const asked = tidyFolder(startIn);
+  const order = [asked, ...parents, ...(h ? USUAL.map((name) => `${h}/${name}`) : []), h];
+  return [...new Set(order.filter(Boolean))];
+}
+
+/**
  * WHERE A NEW PROJECT'S FOLDER IS PROPOSED, when nobody has pointed at one.
  *
  *  NOTHING CALLS THIS ANY MORE (w-33e1c968f0, 2026-10-05). A new project is

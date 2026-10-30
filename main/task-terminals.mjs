@@ -2,10 +2,9 @@
 import fs from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {createRequire} from 'node:module';
 import {commandRunning} from '../shared/terminal-state.mjs';
 import {loginShell} from './shell-path.mjs';
-const require=createRequire(import.meta.url);
+import {loadPty} from './pty.mjs';
 const LIMIT=262144;
 export function terminalEnv(source=process.env){
   const env={...source,TERM:'xterm-256color',COLORTERM:'truecolor'};
@@ -123,7 +122,7 @@ export const ENDED={
 const WATCHED_MS=600000;
 export class TaskTerminals {
   constructor({spawn,resolve,disposeProcess=disposeTerminalProcess,env=terminalEnv(),shell=loginShell(),idleMs=IDLE_MS,sweepMs=SWEEP_MS,now=()=>Date.now(),readPressure=null,watchedMs=WATCHED_MS}={}){
-    this.spawn=spawn??((...args)=>require('node-pty').spawn(...args));this.resolve=resolve;this.disposeProcess=disposeProcess;this.env=env;this.shell=shell;this.sessions=new Map();
+    this.spawn=spawn??((...args)=>loadPty().spawn(...args));this.resolve=resolve;this.disposeProcess=disposeProcess;this.env=env;this.shell=shell;this.sessions=new Map();
     this.idleMs=idleMs;this.now=now;this.readPressure=readPressure;this.watchedMs=watchedMs;
     // Keys whose shell this class ended on its own, and WHY. The next open on
     // one says so rather than handing her a blank screen where her scrollback

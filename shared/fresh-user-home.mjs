@@ -119,11 +119,11 @@ function link(from, to) {
 }
 
 // WHAT IS DELIBERATELY LINKED THROUGH, and why it is still an honest test.
-// Exactly two things, both of which a stranger already has before they ever
-// meet Agentbox, and neither of which Agentbox owns:
+// Tools and sign-ins a stranger already has before opening Agentbox:
 //
 //   ~/.local/bin/claude    Claude Code itself. The product's prerequisite.
 //   ~/Library/Keychains    where Claude Code's login actually lives.
+//   ~/.codex/auth.json    Codex's existing login, without its sessions or config.
 //
 // THE KEYCHAIN ONE IS NOT OPTIONAL AND IT IS NOT OBVIOUS. The token is a
 // `Claude Code-credentials` item in the login keychain, and macOS finds that
@@ -141,11 +141,12 @@ function link(from, to) {
 // can be tried on this Mac. The keychain still is, because Claude Code keeps
 // its sign-in there; `freshEnv(..., { ownSignIns: true })` gives that copy a
 // sign-in folder of its own so it reads and writes a different entry.
-export function prepareHome(home, { withAgents = false, withTools = true, realHome = os.homedir() } = {}) {
+export function prepareHome(home, { withAgents = false, withTools = true, realHome = os.homedir(), codexHome = process.env.CODEX_HOME || path.join(realHome, '.codex') } = {}) {
   const claudeBin = withTools
     ? link(path.join(realHome, '.local/bin/claude'), path.join(home, '.local/bin/claude'))
     : false;
   const keychain = link(path.join(realHome, 'Library/Keychains'), path.join(home, 'Library/Keychains'));
+  if (withTools) link(path.join(codexHome, 'auth.json'), path.join(home, '.codex/auth.json'));
   const agents = withAgents
     ? link(path.join(realHome, '.claude'), path.join(home, '.claude'))
     : false;

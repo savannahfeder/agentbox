@@ -63,6 +63,12 @@
 .ts-done { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px 0 9px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; color: var(--text-dim); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; }
 .ts-done:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .ts-done:focus-visible { outline: 2px solid var(--underline); outline-offset: 2px; }
+/* WHERE IT RUNS, Done's box with its own words (threads/PlaceButton.tsx). The
+   dot is the one accent: a thread the cloud handed back. */
+.ts-place-wrap { position: relative; display: inline-flex; }
+.ts-place.open { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
+.ts-place-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-left: -2px; }
+.th-pop.ts-place-pop { top: calc(100% + 8px); right: 0; width: 440px; font-size: 13px; }
 .th-menu.ts-more-menu { top: calc(100% + 6px); left: auto; right: 0; min-width: 264px; }
 /* THE BAR RISES WHILE ITS MENU IS OPEN. The bar is its own layer at 1 and the
    summary panel under it stands at 2, so the menu was drawn under the panel's

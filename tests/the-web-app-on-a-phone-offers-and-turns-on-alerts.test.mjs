@@ -104,9 +104,10 @@ describe('what it says', () => {
   });
   // The bar hangs off the body, outside the app that sets --phone-tabs, so it
   // sat over the bottom tabs; and it shared the foot with an agent's question.
-  it('the bar sits above the bottom tabs and waits while an agent asks something', () => {
+  // The tabs moved to the top on 2026-10-28, so it is told there are none.
+  it('the bar is told where the tabs are and waits while an agent asks something', () => {
     const css = fs.readFileSync(new URL('../renderer/src/phone.css', import.meta.url), 'utf8');
-    expect(css).toMatch(/:has\(\.app\.workspace-layout\) #phone-alerts-ask \{ --phone-tabs: 48px; \}/);
+    expect(css).toMatch(/:has\(\.app\.workspace-layout\) #phone-alerts-ask \{ --phone-tabs: 0px; \}/);
     expect(css).toMatch(/body:has\(\.approvals\) #phone-alerts-ask \{ display: none; \}/);
   });
 });

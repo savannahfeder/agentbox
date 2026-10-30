@@ -64,10 +64,11 @@ describe('a thread the cloud handed back', () => {
     expect(mayGoToTheCloud(sup)).toBe(false);
   });
 
-  it('is not the person\'s keep, so the thread\'s menu still offers to keep it here', () => {
+  // Not kept: the row carries only what the cloud needed, for its cloud button.
+  it('is not the person\'s keep, so the row says what it needs and nothing more', () => {
     const sup = make(tmp());
     sup._noteCloudHandBack(item, handedBack());
-    expect(sup.withPlaces([{ id: 'w-a' }])).toEqual([{ id: 'w-a' }]);
+    expect(sup.withPlaces([{ id: 'w-a' }])).toEqual([{ id: 'w-a', needsMac: 'the AWS keys' }]);
   });
 
   it('survives a restart until a run here carries the request', () => {

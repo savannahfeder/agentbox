@@ -43,7 +43,7 @@ describe('the cards over Everything else', () => {
 
   it('mark the chats as chats, not as one more person: the team chat, a group and a chat with two people', () => {
     const byKey = new Map(buildMembers(BASE).map((m) => [m.key, m]));
-    expect(byKey.get('room:r-team')).toMatchObject({ kind: 'chat', team: true, name: 'Team chat', last: 'Theo: Lock screen works' });
+    expect(byKey.get('room:r-team')).toMatchObject({ kind: 'chat', team: true, name: 'Team', last: 'Theo: Lock screen works' });
     expect(byKey.get('room:r-g1')).toMatchObject({ kind: 'chat', team: false });
     expect(byKey.get('room:r-g1').faces).toHaveLength(2);
   });

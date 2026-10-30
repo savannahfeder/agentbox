@@ -9,19 +9,16 @@ import FolderPicker from '../renderer/src/components/FolderPicker';
 globalThis.React = React;
 const source = fs.readFileSync(new URL('../renderer/src/components/FirstRun.tsx', import.meta.url), 'utf8');
 
-it('keeps Send disabled until a folder has been chosen', () => {
-  expect(source).toMatch(/disabled=\{!at \|\| !text\.trim\(\) \|\| busy\}/);
+it('never opens a folder window from the task screen or its shortcut', () => {
+  const next = source.slice(source.indexOf('const next = useCallback'), source.indexOf('const sendTo = useCallback'));
+  expect(next).not.toContain('chooseAnother');
+  expect(next).toContain("go('where')");
 });
 
-it('never opens a folder window from the Send handler or its shortcut', () => {
-  const send = source.slice(source.indexOf('const send ='), source.indexOf('const pickIdea ='));
-  expect(send).not.toContain('chooseAnother()');
-  expect(send).toContain('folderButton.current?.focus()');
-});
-
-it('explains that the agent needs the project’s files', () => {
-  expect(source).toContain('Choose the folder containing the project you want the agent to work on.');
-  expect(source).toContain('Choose project folder');
+it('names the folder action without a second line of instructions', () => {
+  expect(source).not.toContain('Choose the folder containing the project you want the agent to work on.');
+  expect(source).not.toContain('ob-folder-note');
+  expect(source).toContain('Choose its folder');
 });
 
 it('names the folder window for the project being chosen', () => {

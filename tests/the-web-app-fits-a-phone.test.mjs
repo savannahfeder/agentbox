@@ -32,10 +32,14 @@ describe('on a phone', () => {
     // 005, F-121), so the title keeps clear of four more points.
     expect(rule(':root:root:root .workspace-layout:has(.th-bar > .th-search) > .topbar')).toMatch(/padding-right: 88px;/);
   });
-  it('the inboxes are spread across the row, so the four fit a 393px phone', () => {
+  // Under the title since 2026-10-28, from the left and 18px apart as the
+  // phone app draws them: 383px for the four at a text size a step up, inside
+  // a 402px phone, and the bar scrolls sideways on a phone set larger still.
+  it('the inboxes start at the left, 18px apart, and scroll sideways rather than run off', () => {
     const r = rule(':root:root:root .tm-tabs');
-    expect(r).toMatch(/justify-content: space-between;/);
-    expect(r).toMatch(/gap: 10px;/);
+    expect(r).toMatch(/justify-content: flex-start;/);
+    expect(r).toMatch(/gap: 18px;/);
+    expect(phone).toMatch(/\.list-pane > \.th-bar \{[^}]*overflow-x: auto;/);
     expect(phone).toMatch(/:has\(\.topbar input\) \.th-bar > \.th-search \{ display: none; \}/);
   });
   it('a picture opened is as wide as the screen, less 8px each side', () => {

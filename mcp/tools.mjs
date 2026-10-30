@@ -18,7 +18,7 @@ import { listDocuments, readDocument, writeDocument } from './core/documents.mjs
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mjs';
 import { listWorkItems, updateItem, createClaimRegistry } from './core/work.mjs';
 import { readStandingInstruction, setStandingInstruction } from './core/repeats.mjs';
-import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook } from './core/teammates.mjs';
+import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire } from './core/teammates.mjs';
 import { readTeammates, teamDir } from '../main/store/teammates-files.mjs';
 import { legacyRoot } from '../main/store/project.mjs';
 import { listProductChats, readProductChat } from './core/chat.mjs';
@@ -264,7 +264,7 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
     },
     {
       name: 'team_pass',
-      description: 'Hand a piece of work to a teammate whose job it is, or hand an answer back to a teammate waiting on you. It goes to the thread they already have on this work, or starts one, wakes them, and shows in the team chat. A teammate set to need the person\'s yes for hand-offs gets it only after the person replies. On a thread that is not a teammate\'s run, use it when the person asks you to give something to one of their teammates (call team_roster first to see who is on the team). Put everything they need in the details: steps, files, links, what done looks like.',
+      description: 'Hand a piece of work to a teammate whose job it is, or hand an answer back to a teammate waiting on you. It goes to the thread they already have on this work, or starts one, and shows in the team chat. From a teammate it waits for the person\'s yes before they start, unless the person told the receiver it need not. On a thread that is not a teammate\'s run, use it when the person asks you to give something to one of their teammates (call team_roster first to see who is on the team). Put everything they need in the details: steps, files, links, what done looks like.',
       schema: {
         to: z.string().describe('the teammate\'s name'),
         title: z.string().describe('the work, in a short line'),
@@ -275,7 +275,7 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
     },
     {
       name: 'team_remember',
-      description: 'Keep a standing preference the person stated ("from now on", "always", "never", "I prefer"), so every later run of yours is briefed with it. A few words in their terms. The person sees it in the team chat and can undo it.',
+      description: 'Keep a standing preference the person stated ("from now on", "always", "never", "I prefer") in a few words, in their terms. The person sees it in the team chat and can undo it. If you have a method file, put it there too: your method is what every later run reads.',
       schema: { text: z.string().describe('the preference, in a few words') },
       run: ({ text: words }) => json(teamRemember({ text: words })),
     },
@@ -289,8 +289,27 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
       run: ({ playbook, lesson }) => json(teamPlaybook({ playbook, lesson })),
     },
     {
+      name: 'team_hire',
+      description: 'Your primary employee only: make a new teammate the person said yes to, in a run their words started or answered. It wakes as a draft and sets itself up by asking them. Ask the person first, with options; never make one they did not agree to.',
+      schema: {
+        name: z.string().describe('a name that says its role, like Support lead'),
+        job: z.string().describe('its job in plain words'),
+      },
+      run: ({ name, job }) => json(teamHire({ name, job })),
+    },
+    {
+      name: 'team_method',
+      description: 'Write your method, the one file every run of yours reads whole: send text to write all of it, or old (one passage exactly as it reads now) and new (what replaces it) to change one part. Use it when you cannot edit the method file with your own tools. The version it replaces is kept.',
+      schema: {
+        text: z.string().optional().describe('your whole method'),
+        old: z.string().optional().describe('one passage of it, exactly as it reads now'),
+        new: z.string().optional().describe('what replaces that passage'),
+      },
+      run: (args) => json(teamMethod(args)),
+    },
+    {
       name: 'team_setup',
-      description: 'Set or change who you are as a teammate: your name (your role, like Marketing lead), role, job (as long as it needs, in plain words to yourself), goal, how the goal is counted, what needs the person\'s yes first (a statement, never a question), what you do on your own (duties: a list, each { what, every: day|weekday|week, at: ["09:00", "15:00"], on: 0-6 for weekly } or { what, after: "ship", most: runs a week }, with tell: when to bring the person in; the list you send replaces the old one), which coding agent runs you when the person said (runsOn: claude or codex), and whether work other teammates hand you waits for the person\'s yes (handoffsNeedYes). A new teammate calls it to set itself up, and with ready true when it is set.',
+      description: 'Set or change who you are as a teammate: your name (your role, like Marketing lead), role, job (as long as it needs, in plain words to yourself), goal, how the goal is counted, what needs the person\'s yes first (a statement, never a question), what you do on your own (duties: a list, each { what, every: day|weekday|week, at: ["09:00", "15:00"], on: 0-6 for weekly } or { what, after: "ship", most: runs a week }, with tell: when to bring the person in; the list you send replaces the old one), which coding agent runs you when the person said (runsOn: claude or codex), whether work other teammates hand you waits for the person\'s yes (handoffsNeedYes, true unless they said otherwise), and a date your duties do not wake you before when they say to pause (pausedUntil: YYYY-MM-DD, or null to end it). A new teammate calls it to set itself up, and with ready true when it is set.',
       schema: {
         name: z.string().optional(),
         role: z.string().optional(),
@@ -309,6 +328,7 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
         })).optional(),
         runsOn: z.enum(['claude', 'codex']).optional(),
         handoffsNeedYes: z.boolean().optional(),
+        pausedUntil: z.string().nullable().optional(),
         ready: z.boolean().optional(),
       },
       run: (args) => json(teamSetup(args)),
@@ -361,11 +381,11 @@ export function buildTools({ holder, ownItem = process.env.ZERO_ITEM || null, re
 
   if (typeof requestCloudResource === 'function') tools.push({
     name: 'request_cloud_resource',
-    description: 'Fetch a missing task file or installed skill from this thread’s computer without moving the conversation there. Files use a relative path under this task checkout or its product documents; skills use their installed name. Delivered resources get a separate scratch path, preserving cloud edits. Returns delivered, denied, not_found, too_large, or unavailable. A delivered skill includes its scripts and references; read its returned SKILL.md. When the computer is unavailable, continue independent work and explain what is missing.',
+    description: 'Fetch a missing file, folder or installed skill from this thread’s computer without moving the conversation there. A file or folder is any path under this task checkout or the account’s documents, other products’ folders included: relative with a scope, or written out in full (`~/…` or absolute) with no scope. Skills use their installed name. Delivered resources get a separate scratch path, preserving cloud edits. Returns delivered, folder (its files, to ask for one by one), denied, not_found, too_large, or unavailable, with the reason. A delivered skill includes its scripts and references; read its returned SKILL.md. If the request names what could not be delivered, end the turn with the hand-back line rather than building around a guess; otherwise continue and explain what is missing.',
     schema: {
       kind: z.enum(['file', 'skill']),
-      path: z.string().describe('relative file path, or installed skill name'),
-      scope: z.enum(['task', 'documents']).optional().describe('required for a file; omitted for a skill'),
+      path: z.string().describe('file or folder path (relative, ~/…, or absolute), or installed skill name'),
+      scope: z.enum(['task', 'documents', 'account']).optional().describe('for a relative file path: this task, this product\'s documents, or the account\'s documents; omitted for a full path or a skill'),
     },
     run: async (args) => json(await requestCloudResource(args)),
   });

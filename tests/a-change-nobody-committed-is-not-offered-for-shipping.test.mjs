@@ -191,8 +191,11 @@ describe('the change saved for a thread carries it', () => {
 });
 
 describe('the offer the app makes off it', () => {
+  // A third fact joined these two for F-139, and it is read the same way
+  // (tests/the-first-commit-is-not-offered-before-git-knows-who-you-are).
   it('reads the two facts off a saved change, and nothing else as either', () => {
-    expect(standingFrom({ committed: true, uncommitted: false })).toEqual({ committed: true, uncommitted: false });
+    expect(standingFrom({ committed: true, uncommitted: false }))
+      .toEqual({ committed: true, uncommitted: false, knowsYou: null });
     expect(standingFrom({})).toEqual(UNREAD);
     expect(standingFrom(null)).toEqual(UNREAD);
     expect(standingFrom({ committed: 'yes' })).toEqual(UNREAD);

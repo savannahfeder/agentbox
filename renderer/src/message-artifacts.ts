@@ -113,6 +113,27 @@ export function documentCandidates(item: {
   return [...named, ...made.filter((p) => keep(p) && !seen.has(p.toLowerCase()))];
 }
 
+const BESIDE = /\.(md|markdown|html?)$/i;
+const LINK_LINE = /^\[[^\]]*\]\(<?([^)>\s]+)>?\)$/;
+const PATH_LINE = /^[`*_<]*([^\s`*_<>]+)[`*_>]*$/;
+
+/**
+ * The page or note the newest answer puts on a line of its own, which opens
+ * beside the thread by itself. The line is the agent's say: a draft still being
+ * worked on gets one, and once it is settled the agent names it in a sentence
+ * and it stays shut. A picture reads better inline, so only md and html count.
+ */
+export function besideDocument(answer: string | null | undefined, dir: string | null = null): string | null {
+  for (const raw of String(answer ?? '').split('\n')) {
+    const line = raw.trim();
+    const bare = line.match(LINK_LINE)?.[1] ?? line.match(PATH_LINE)?.[1];
+    if (!bare) continue;
+    const [path] = referencedFiles(bare, { dir });
+    if (path && BESIDE.test(path) && !isBookkeeping(path)) return path;
+  }
+  return null;
+}
+
 /**
  * The design or change to open on its own when she opens this card, or null
  * when the card has none. A card that names only words keeps the whole window

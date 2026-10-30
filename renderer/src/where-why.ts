@@ -54,5 +54,7 @@ function forCloud(why: string, detail: WhyNotCloud['detail']): string {
 export function whyWords(w: WhyNotCloud): WhyCard {
   if (w.at === 'wait-cloud') return { head: 'Queued for the cloud', body: forCloud(w.why, w.detail) };
   if (w.at === 'wait-mac') return { head: 'Queued to run locally', body: `${local(w.why, w.detail)} It starts when this computer has room.` };
+  // Supervisor#_moveRunsToTheCloud.
+  if (w.why === 'moving') return { head: 'Moving to the cloud', body: 'It keeps working here and moves as soon as the cloud has room, picking up where it left off.' };
   return { head: 'Running locally', body: local(w.why, w.detail) };
 }

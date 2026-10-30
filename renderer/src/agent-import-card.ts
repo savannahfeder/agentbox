@@ -3,6 +3,7 @@
 // own card in renderer/src/onboarding.ts.
 
 import type { AgentFile } from './onboarding';
+import { titleFromFileName } from '../../shared/name-words.mjs';
 import { Name } from '../../shared/product-name.mjs';
 
 export interface Project { slug: string; name: string; repoPath: string | null }
@@ -339,10 +340,7 @@ export function togglePicked(dests: Destination[], picked: string[], path: strin
 export function projectNameFor(folder: { name?: string } | null, taken: string[] = []): string {
   const n = (folder?.name ?? '').trim();
   if (!n) return '';
-  const base = /[A-Z\s]/.test(n)
-    ? n
-    : n.replace(/[-_.]+/g, ' ').split(' ').filter(Boolean)
-      .map((w) => w.replace(/^\w/, (c) => c.toUpperCase())).join(' ');
+  const base = /[A-Z\s]/.test(n) ? n : titleFromFileName(n);
   // `createProduct` throws on a slug it already has, so a taken name gets a
   // number. Two folders called `api` under two roots is the usual way here.
   const used = new Set(taken.map(slugFor));

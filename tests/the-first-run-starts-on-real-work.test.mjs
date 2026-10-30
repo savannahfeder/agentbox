@@ -150,7 +150,7 @@ describe('the projects a press makes', () => {
   it('are one per folder the chats ran in, named after the folder', () => {
     expect(projectsToMake(chats, [])).toEqual([
       { folder: `${HOME}/dev/northwind`, name: 'Northwind' },
-      { folder: `${HOME}/dev/api`, name: 'Api' },
+      { folder: `${HOME}/dev/api`, name: 'API' },
     ]);
   });
   it('leave out a folder a project already points at', () => {
@@ -163,16 +163,16 @@ describe('the projects a press makes', () => {
   });
   it('give two folders with one name two names', () => {
     const two = [thread(`${HOME}/a/api`, 2), thread(`${HOME}/b/api`, 1)];
-    expect(projectsToMake(two, []).map((p) => p.name)).toEqual(['Api', 'Api 2']);
+    expect(projectsToMake(two, []).map((p) => p.name)).toEqual(['API', 'API 2']);
   });
 });
 
 describe('the steps', () => {
-  it('are the chats and a first task when there are chats to bring in', () => {
-    expect(stepsFor({ chats: 3 })).toEqual(['chats', 'task']);
+  it('are the chats, a first task and its project when there are chats to bring in', () => {
+    expect(stepsFor({ chats: 3 })).toEqual(['chats', 'task', 'where']);
   });
-  it('are only the first task when there are none', () => {
-    expect(stepsFor({ chats: 0 })).toEqual(['task']);
+  it('are the first task and its project when there are none', () => {
+    expect(stepsFor({ chats: 0 })).toEqual(['task', 'where']);
   });
 });
 

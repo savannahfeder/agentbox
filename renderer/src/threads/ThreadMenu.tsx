@@ -34,20 +34,27 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { chord } from '../this-keyboard';
 import { DONE } from '../done-word';
+import { PlaceButton, type PlaceFacts } from './PlaceButton';
 
-export type ThreadMenuRowId = 'place' | 'run' | 'code' | 'terminal' | 'later' | 'pin' | 'done';
+export type ThreadMenuRowId = 'run' | 'code' | 'terminal' | 'later' | 'pin' | 'done';
 
 /**
- * WHERE THIS THREAD RUNS (2026-10-16), the first row on a thread the cloud is
- * running (`cloud`), could run (`here`), or that she keeps on this Mac
- * (`kept`). The words say what pressing it does, the detail where it is now.
+ * WHERE THIS THREAD RUNS: in the cloud now (`cloud`), free to go there
+ * (`here`), kept on this Mac by her (`kept`) or by the cloud handing it back
+ * (`needs`), or running here where the cloud could take it now (`move`). The
+ * top bar's PlaceButton draws it; ⌘K offers PLACE_ROW's words.
  */
-export type ThreadPlace = 'cloud' | 'here' | 'kept';
+export type ThreadPlace = 'cloud' | 'here' | 'kept' | 'move' | 'needs';
 export const PLACE_ROW: Record<ThreadPlace, { label: string; detail: string }> = {
   cloud: { label: 'Run on this Mac', detail: 'In the cloud now' },
   here: { label: 'Keep on this Mac', detail: 'Cloud allowed' },
   kept: { label: 'Run on the cloud', detail: 'This Mac only' },
+  move: { label: 'Move to the cloud', detail: 'On this Mac now' },
+  needs: { label: 'Run on the cloud', detail: 'Needs this Mac' },
 };
+/** What picking does: keep it on this Mac (true), let the cloud have it (false), or move its run now. */
+export type PlaceAct = boolean | 'move';
+export const placeAct = (place: ThreadPlace): PlaceAct => (place === 'move' ? 'move' : place !== 'kept' && place !== 'needs');
 export interface ThreadMenuRow { id: ThreadMenuRowId; label: string; key: string | null; detail?: string }
 
 /**
@@ -71,17 +78,15 @@ export interface ThreadMenuRow { id: ThreadMenuRowId; label: string; key: string
  * door to one verb; on a phone there was no door at all and the Later tab
  * could not be filled. It names no key for the same reason.
  */
-export function threadMenuRows({ change, terminal, finish, runNow = false, later = false, pin = null, place = null }: {
+export function threadMenuRows({ change, terminal, finish, runNow = false, later = false, pin = null }: {
   change: boolean;
   terminal: 'open' | 'closed' | null;
   finish: boolean;
   runNow?: boolean;
   later?: boolean;
   pin?: 'pinned' | 'unpinned' | null;
-  place?: ThreadPlace | null;
 }): ThreadMenuRow[] {
   const rows: ThreadMenuRow[] = [];
-  if (place) rows.push({ id: 'place', ...PLACE_ROW[place], key: null });
   if (runNow) rows.push({ id: 'run', label: 'Run now', key: null });
   if (change) rows.push({ id: 'code', label: 'View code changes', key: null });
   if (terminal) rows.push({ id: 'terminal', label: terminal === 'open' ? 'Hide terminal' : 'Open terminal', key: '⌘J' });
@@ -129,7 +134,7 @@ export function PinMark({ size = 16, className }: { size?: number; className?: s
 function LaterMark() {
   return <svg {...mark}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>;
 }
-const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { place: MacMark, run: RunMark, code: CodeMark, terminal: TerminalMark, later: LaterMark, pin: () => <PinMark />, done: DoneMark };
+const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { run: RunMark, code: CodeMark, terminal: TerminalMark, later: LaterMark, pin: () => <PinMark />, done: DoneMark };
 
 /** Three square dots, because every shape in this skin is square. */
 function Dots() {
@@ -139,10 +144,8 @@ function Dots() {
 /* ------------------------------------------------------------------- list */
 
 /** The open menu: one row per verb, its mark, its words, and its key or detail. */
-export function ThreadMenuList({ rows, change, onPick, place = null }: {
+export function ThreadMenuList({ rows, change, onPick }: {
   rows: ThreadMenuRow[];
-  /** Which way the place row points: to this Mac, or back to the cloud. */
-  place?: ThreadPlace | null;
   /** What the run changed, drawn by Focus ("+873 −41 in 7 files"). */
   change?: ReactNode;
   onPick: (id: ThreadMenuRowId) => void;
@@ -150,7 +153,7 @@ export function ThreadMenuList({ rows, change, onPick, place = null }: {
   return (
     <div className="th-menu ts-more-menu" role="menu" aria-label="Thread actions">
       {rows.map((row) => {
-        const Mark = row.id === 'place' && place === 'kept' ? CloudMark : MARKS[row.id];
+        const Mark = MARKS[row.id];
         return (
           <button key={row.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => onPick(row.id)}>
             <span className="ico"><Mark /></span>
@@ -165,7 +168,7 @@ export function ThreadMenuList({ rows, change, onPick, place = null }: {
 
 /* ----------------------------------------------------------------- button */
 
-export function ThreadMenu({ change = null, onViewChange, terminal = null, onToggleTerminal, onFinish = null, onRunNow = null, onLater = null, pinned = null, onPin, place = null, onPlace }: {
+export function ThreadMenu({ change = null, onViewChange, terminal = null, onToggleTerminal, onFinish = null, onRunNow = null, onLater = null, pinned = null, onPin, place = null, placeFacts = {}, onPlace }: {
   /** The change figures, or null when this run changed no code. */
   change?: ReactNode | null;
   onViewChange?: () => void;
@@ -180,12 +183,13 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
   /** Whether the thread is pinned now, or null where it cannot be. */
   pinned?: boolean | null;
   onPin?: (pin: boolean) => void;
-  /** Where it runs, or null where the cloud could never run it. */
+  /** Where it runs, or null where the cloud could never run it; drawn as PlaceButton. */
   place?: ThreadPlace | null;
+  placeFacts?: Omit<PlaceFacts, 'place'>;
   /** True keeps it on this Mac (moving it here if it is in the cloud). */
-  onPlace?: (keep: boolean) => void;
+  onPlace?: (keep: PlaceAct) => void;
 }) {
-  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change, terminal, finish: !!onFinish, runNow: !!onRunNow, later: !!onLater, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', place: onPlace ? place : null }));
+  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change, terminal, finish: !!onFinish, runNow: !!onRunNow, later: !!onLater, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned' }));
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -247,8 +251,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
 
   const pick = (id: ThreadMenuRowId) => {
     close(id === 'terminal');
-    if (id === 'place') onPlace?.(place !== 'kept');
-    else if (id === 'run') onRunNow?.();
+    if (id === 'run') onRunNow?.();
     else if (id === 'code') onViewChange?.();
     else if (id === 'terminal') onToggleTerminal?.();
     else if (id === 'later') onLater?.();
@@ -256,9 +259,10 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
     else onFinish?.();
   };
 
-  if (!rows.length && !done) return null;
+  if (!rows.length && !done && !place) return null;
   return (
     <span className="ts-more-wrap" ref={wrap}>
+      {place && <PlaceButton place={place} {...placeFacts} onPlace={onPlace} />}
       {done && (
         <button
           type="button"
@@ -285,7 +289,7 @@ export function ThreadMenu({ change = null, onViewChange, terminal = null, onTog
       >
         <Dots />
       </button>}
-      {open &&<ThreadMenuList rows={rows} change={change} onPick={pick} place={place} />}
+      {open &&<ThreadMenuList rows={rows} change={change} onPick={pick} />}
     </span>
   );
 }

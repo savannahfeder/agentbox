@@ -5,9 +5,13 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api';
 import { splitHeadline, type Spot } from '../one-thing-at-a-time';
+import { ArtifactControlGlyph } from './ArtifactControlGlyph';
 import { DocumentPreview } from './DocumentPreview';
 import { HtmlPreview } from './HtmlPreview';
 import '../one-thing-at-a-time.css';
+import { TeammateMark } from '../teammates/TeammatesRail';
+import { clock, dayHeading } from '../thread-history';
+import type { Teammate } from '../types';
 
 /** What this page reads in place rather than as a tile: a page an agent made, or a note. */
 export const readsInPlace = (path: string) => /\.(html?|md|markdown)$/i.test(path);
@@ -78,12 +82,18 @@ export function QueueSummary({ title, context, earlier, steps = false, open, onT
 
 const sameLine = (a: string, b: string) => a.replace(/\s+/g, ' ').trim().toLowerCase() === b.replace(/\s+/g, ' ').trim().toLowerCase();
 
-export function QueueAnswer({ text, md, name = '' }: { text: string; md: (text: string) => ReactNode; name?: string }) {
+export function QueueAnswer({ text, md, name = '', by = null }: {
+  text: string;
+  md: (text: string) => ReactNode;
+  name?: string;
+  /** The teammate that wrote it, which signs it. */
+  by?: { t: Pick<Teammate, 'letter' | 'name'>; at: number } | null;
+}) {
   const { headline, rest } = splitHeadline(text);
-  // A teammate's thread is named after this same line, so it is not said twice.
   const shown = headline && !sameLine(headline, name) ? headline : null;
   return (
     <div className="outcome one-answer">
+      {by && <div className="one-by"><TeammateMark t={by.t} size="hd" /><span>{by.t.name}</span><em>{`${dayHeading(by.at)} ${clock(by.at)}`}</em></div>}
       {shown && <h1 className="one-q">{shown}</h1>}
       {rest.trim() && md(rest)}
     </div>
@@ -97,7 +107,7 @@ export function QueueAnswer({ text, md, name = '' }: { text: string; md: (text: 
  * none) keeps its name and the way to open it; a note that cannot be read
  * draws nothing, and the answer still names it.
  */
-export function QueueFile({ product, path, md, onOpen }: { product: string; path: string; md: (text: string) => ReactNode; onOpen: () => void }) {
+export function QueueFile({ product, path, md, onOpen, onSide }: { product: string; path: string; md: (text: string) => ReactNode; onOpen: () => void; onSide?: () => void }) {
   const page = /\.html?$/i.test(path);
   const [url, setUrl] = useState<string | null | undefined>(undefined);
   const [text, setText] = useState<string | null | undefined>(undefined);
@@ -123,16 +133,16 @@ export function QueueFile({ product, path, md, onOpen }: { product: string; path
     <section className={`${page ? 'one-file one-page' : 'one-file one-note'}${folded ? ' one-folded' : expanded ? ' one-expanded' : ''}`}>
       <FilePreviewHeader path={path} folded={folded} expanded={expanded}
         onFold={() => { setExpanded(false); setFolded((f) => !f); }}
-        onCondense={() => setExpanded(false)} onOpen={onOpen} />
+        onCondense={() => setExpanded(false)} onOpen={onOpen} onSide={onSide} />
       {!folded && page && url && <HtmlPreview key={`${product}:${path}`} url={url} path={path} expanded={expanded} onExpandedChange={setExpanded} />}
       {!folded && !page && text != null && <DocumentPreview key={`${product}:${path}`} expanded={expanded} onExpandedChange={setExpanded}><div className="markdown one-notebody">{md(text)}</div></DocumentPreview>}
     </section>
   );
 }
 
-export function FilePreviewHeader({ path, folded, expanded, onFold, onCondense, onOpen }: {
+export function FilePreviewHeader({ path, folded, expanded, onFold, onCondense, onOpen, onSide }: {
   path: string; folded: boolean; expanded: boolean;
-  onFold: () => void; onCondense: () => void; onOpen: () => void;
+  onFold: () => void; onCondense: () => void; onOpen: () => void; onSide?: () => void;
 }) {
   const name = useRef<HTMLButtonElement>(null);
   return (
@@ -143,7 +153,13 @@ export function FilePreviewHeader({ path, folded, expanded, onFold, onCondense, 
       <div className="one-fileactions">
         {expanded && !folded && <button type="button" className="one-filecondense"
           onClick={() => { onCondense(); name.current?.focus({ preventScroll: true }); }}>Show preview</button>}
-        <button type="button" className="one-fileopen" onClick={onOpen}>Open full screen</button>
+        {onSide && <button type="button" className="one-fileopen" aria-label="Open on the side" title="Open on the side" onClick={onSide}>
+          <ArtifactControlGlyph><rect x="3" y="4" width="14" height="12" rx=".5" /><path d="M11 4v12" /></ArtifactControlGlyph>
+        </button>}
+        {/* The same corners the open file's own full screen mark draws (FocusControl). */}
+        <button type="button" className="one-fileopen" aria-label="Open full screen" title="Open full screen" onClick={onOpen}>
+          <ArtifactControlGlyph><path d="M7 3H3v4m10-4h4v4M3 13v4h4m6 0h4v-4" /></ArtifactControlGlyph>
+        </button>
       </div>
     </div>
   );

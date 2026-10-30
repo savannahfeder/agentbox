@@ -12,6 +12,7 @@
 // - THE EDGES. Safari paints its status bar and toolbar in the page's theme
 //   colour; the page now tells it the colour it is actually drawn in.
 import { useEffect, useRef } from 'react';
+import { followTextSize } from './phone-text';
 
 export const onPhone = () => typeof document !== 'undefined' && document.documentElement.dataset.door === 'phone';
 // The phone with the Mac shut, which reads her rows online rather than her
@@ -263,6 +264,7 @@ export function installPhoneScreen() {
   vv?.addEventListener('resize', fit);
   vv?.addEventListener('scroll', fit);
   installPictureZoom();
+  followTextSize();
 
   // What Safari 26 takes the colour behind the clock from (phone.css).
   if (!document.querySelector('.phone-edge-top')) {

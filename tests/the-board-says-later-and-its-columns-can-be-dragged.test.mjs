@@ -247,8 +247,10 @@ describe('the board itself', () => {
   });
   it('App.tsx hands the same order to the board and to J and K', () => {
     const app = readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-    expect(app).toContain('order: columnOrder');
+    // Everything else's board is the same order less Needs you (w-2b3e1a85e5).
+    expect(app).toContain('order: teamMode ? evColumns(columnOrder) : columnOrder');
     expect(app).toContain('columnOrder={columnOrder}');
+    expect(app).toContain('columnOrder={evColumns(columnOrder)}');
   });
   // Photographed 2026-10-02: the keyboard was on "Look into a cheaper email
   // provider"; Later was dropped first and the highlight jumped to "Clean up

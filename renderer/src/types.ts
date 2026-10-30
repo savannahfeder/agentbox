@@ -16,6 +16,8 @@ export interface WorkItem {
   pinned?: boolean;
   /** Kept on this Mac whatever the cloud is set to (Supervisor#setThreadOnMac). */
   onMac?: boolean;
+  /** What the cloud handed this thread back for, in the run's own words ("your Stripe key"). */
+  needsMac?: string;
   // WHAT PEOPLE PUT ON EACH MESSAGE IN A CONVERSATION (w-560647d4db): by the
   // message's line uid, then by emoji, then the people on it. Folded out of the
   // presses the ledger holds (shared/work-items.mjs); absent on every row
@@ -377,6 +379,8 @@ export interface Teammate {
   counted: string | null; asksFirst: string | null; works: TeammateWorks | null; worksLabel: string | null;
   product: string; engine: string | null; model: string | null; effort: string | null; limit: number;
   paused: boolean; status: 'draft' | 'active'; memory: TeammateMemory[]; createdAt: number; starter?: string | null;
+  /** The one you talk to: takes what Auto cannot place, and checks in. */
+  primary?: boolean;
   /** Its run is waiting for you to allow or deny a command (drawn from `approvals`, not the store). */
   asking?: boolean;
   /** It asked you something in the team chat and has not heard back (chat-lines `asksYou`). */
@@ -399,6 +403,8 @@ export interface Playbook {
 export interface TeamChatLine {
   id: string; kind: 'msg' | 'pass' | 'act'; from: string; to?: string[] | string; text?: string;
   title?: string; details?: string; verb?: string; ref?: string; options?: string[]; ts: number;
+  /** On your message: the answer it gives each of a teammate's questions, by question id. */
+  answers?: Record<string, string>;
   /** Said for you by one of your threads, when you asked it to. */
   via?: string; viaProduct?: string;
   /** The words that set a new teammate up; from a suggestion, with the threads it was made from. */
@@ -440,6 +446,8 @@ export interface RunningSession {
    *  that started before a second engine existed, and every one of those was
    *  Claude Code, which is the reading `engineOf` makes in main/supervisor.mjs. */
   engine?: string;
+  /** On the phone: a run on the computer the cloud could take now (Supervisor#liveFor). */
+  movable?: boolean;
   tail: string[];
   /** Matched, still-running tool calls; absent on an older main process. */
   activity?: { id: string; label: string; detail: string; startedAt: number }[];
@@ -590,6 +598,8 @@ export interface SupervisorStatus {
   // Rows nothing can start because every login of their tool is out of usage,
   // id -> the tool's name and when it resets (0 when no login said).
   atLimit?: Record<string, { tool: string; until: number }>;
+  // Queued rows the last pass could not start, id -> why and the tool's name.
+  cannotStart?: Record<string, { why: string; tool: string }>;
   // Rows the app's ship queue still owes a ship (main/ship-queue.mjs). Waiting
   // on the app, not on a person: In progress, reading "Shipping".
   shipping?: string[];
@@ -1380,6 +1390,7 @@ declare global {
       setThreadPlaces(p: { places: Record<string, number | null> }): Promise<unknown>;
       setThreadPins?(p: { pins: Record<string, true | null> }): Promise<unknown>;
       setThreadOnMac?(p: { onMac: Record<string, true | null> }): Promise<unknown>;
+      moveToCloud?(p: { ids: string[]; product?: string; id?: string }): Promise<{ moving?: number; ok?: boolean }>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
       compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[] }): Promise<WorkItem>;
       routeThread?(p: { product: string; id: string; to: string }): Promise<{ ok: true }>;
@@ -1492,7 +1503,7 @@ declare global {
       // screenDetail is which set of theme pictures this screen wants, 'soft' or
       // 'sharp' (main/screen-detail.mjs). It rides here rather than being
       // pushed because the answer is needed on the first paint.
-      bootInfo?(): Promise<{ reloaded: boolean; builtAt: number; recovered?: string | null; screenDetail?: string }>;
+      bootInfo?(): Promise<{ reloaded: boolean; builtAt: number; recovered?: string | null; revived?: string | null; screenDetail?: string }>;
       onJoinRoom?(fn: () => void): () => void;
       takeJoin?(): Promise<string | null>;
       // Keeping Agentbox current (main/updater.mjs). Look again now, and restart

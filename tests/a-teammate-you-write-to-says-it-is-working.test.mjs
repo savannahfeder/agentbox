@@ -116,7 +116,7 @@ describe('the card and the bar over the chat', () => {
 
   it('draw Starting, moving, where Not running was', () => {
     const strip = read('renderer/src/team/everything/TeamStrip.tsx');
-    expect(strip).toMatch(/<LiveMark still=\{!m\.agents && !m\.starting\} \/>\{m\.agents \? agentsWords\(m\.agents\)\.toUpperCase\(\) : m\.starting \? 'STARTING' : 'NOT RUNNING'\}/);
+    expect(strip).toMatch(/<LiveMark still=\{!m\.agents && !m\.starting\} \/>\{m\.agents \? agentsShort\(m\.agents\)\.toUpperCase\(\) : m\.starting \? 'STARTING' : 'NOT RUNNING'\}/);
     expect(strip).toMatch(/export function AgentsLine\(\{ n, still, starting = false \}/);
     expect(read('renderer/src/App.tsx')).toMatch(/<AgentsLine n=\{evMember\.agents\} starting=\{evMember\.starting\} \/>/);
   });

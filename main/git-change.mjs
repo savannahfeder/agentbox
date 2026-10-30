@@ -165,6 +165,26 @@ export function whereTheWorkStands(root) {
 }
 
 /**
+ * WHETHER GIT HERE CAN NAME AN AUTHOR, read when the run ends.
+ *
+ * Deliberately the same strict form of the question main/worker-git.mjs makes
+ * every worker ask: `user.useConfigOnly` turns off the identity git makes up
+ * out of the account and the host name, so a yes here means the worker gets a
+ * yes too. A looser reading would leave the app recommending a commit the
+ * worker then refuses to make, which is the loop a new user's first task ended
+ * in (F-139).
+ *
+ * Null where there is nothing to read, which is every product with no
+ * repository, and null leaves the offer where it was.
+ */
+export function gitKnowsYou(root) {
+  if (!root) return null;
+  if (tryGit(root, ['rev-parse', '--git-dir']) === null) return null;
+  const named = (who) => tryGit(root, ['-c', 'user.useConfigOnly=true', 'var', who]) !== null;
+  return named('GIT_AUTHOR_IDENT') && named('GIT_COMMITTER_IDENT');
+}
+
+/**
  * WHERE A HUNK STARTS IN EACH FILE, off its `@@` header —.
  *
  * Measured while looking into that: the pane had no line numbers at all, and
@@ -310,7 +330,8 @@ function patchBetweenTexts(before, after) {
  */
 export function changeFromRepo(snapshot) {
   if (!snapshot?.root) {
-    return { files: [], plus: 0, minus: 0, root: snapshot?.root ?? null, stands: whereTheWorkStands(snapshot?.root ?? null) };
+    const root = snapshot?.root ?? null;
+    return { files: [], plus: 0, minus: 0, root, stands: whereTheWorkStands(root), knowsYou: gitKnowsYou(root) };
   }
   const { root, head, before } = snapshot;
   const files = new Map();
@@ -375,6 +396,9 @@ export function changeFromRepo(snapshot) {
     // Whether any of this reached a commit, which the hunks above cannot say
     // and the ship offer has to know (renderer/src/ship-offer.ts).
     stands: whereTheWorkStands(root),
+    // And whether a commit could be made here at all, which decides what the
+    // offer over loose work asks for (renderer/src/ship-offer.ts).
+    knowsYou: gitKnowsYou(root),
     // When the photograph was taken, which is the run's own start and the only
     // honest answer to "how long did this take" for a run whose conversation
     // carried no edits at all.

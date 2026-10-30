@@ -4,6 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
+import { pickedName } from '../lib/attach';
 
 export interface Picked { name: string; dataBase64: string }
 
@@ -12,7 +13,7 @@ export async function pickPhotos(): Promise<Picked[]> {
   if (got.canceled) return [];
   const out: Picked[] = [];
   for (const a of got.assets) {
-    const name = a.fileName || `photo-${out.length + 1}.${a.type === 'video' ? 'mov' : 'jpg'}`;
+    const name = pickedName(a.fileName, a.type, out.length);
     out.push({ name, dataBase64: a.base64 ?? await new File(a.uri).base64() });
   }
   return out;

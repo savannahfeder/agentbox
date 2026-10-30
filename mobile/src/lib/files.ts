@@ -13,6 +13,17 @@ import { sentFileName } from '../../../renderer/src/phone-sends-files';
 
 type Places = Map<string, Place>;
 
+/**
+ * What a film in the phone's player shows: a centred spinner until it can
+ * play, one centred play button then, and the system's controls only once
+ * tapped, so its own loading glyphs never stand in for the film.
+ */
+export function filmFace({ status, tapped }: { status: string; tapped: boolean }): 'loading' | 'play' | 'controls' | 'error' {
+  if (status === 'error') return 'error';
+  if (tapped) return 'controls';
+  return status === 'readyToPlay' ? 'play' : 'loading';
+}
+
 export type Opening =
   | { kind: 'web'; url: string }
   | { kind: 'picture' | 'doc' | 'page' | 'media'; src: string; link: string; name: string }
@@ -48,6 +59,17 @@ export function openingOf(places: Places, links: Links, product: string, src: st
   if (kind === 'html') return { kind: 'page', ...shown };
   if (isMediaPath(src)) return { kind: 'media', ...shown };
   return { kind: 'elsewhere', link: at.link };
+}
+
+/**
+ * The address a long press offers to open in the browser or share: a site as
+ * written, a file by its own link. A folder has no one address, and a file the
+ * phone does not have has none at all.
+ */
+export function linkToShare(o: Opening): string | null {
+  if (o.kind === 'web') return o.url;
+  if (o.kind === 'folder' || o.kind === 'refused') return null;
+  return o.link;
 }
 
 /** A picture's link: undefined while it is on its way, null when the phone will not have it. */

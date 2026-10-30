@@ -1579,7 +1579,7 @@ function paneFrom(want: string, has: { team: boolean }): Pane {
 
 /* --------------------------------- screen --------------------------------- */
 
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
+export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
   /** Opens the feedback card. A phone has no Feedback button in its corner,
    *  so its own Settings page offers it (2026-10-12). */
   onFeedback?: () => void;
@@ -1611,6 +1611,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   usageReadings?: Usage[];
   now?: number;
   onSectionChange?: (section: string | null) => void;
+  /** The page up, by the name `startPane` takes back (`project:kestrel` for a
+   *  project), so a reload can reopen it. */
+  onPaneChange?: (pane: string) => void;
   // The new project card, from the Projects page.
   onNewProject?: () => void;
   // The running order, for the Projects page: every project already in order
@@ -1659,6 +1662,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // WHICH PAGE IS UP, for the window around this screen.
   useEffect(() => {
     onSectionChange?.(typeof pane === 'object' ? 'projects' : pane === 'general' ? null : pane);
+    onPaneChange?.(typeof pane === 'object' ? `project:${pane.project}` : pane);
   }, [pane]);
 
   const [error, setError] = useState<string | null>(null);
@@ -2176,7 +2180,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
             <Group id="corner-tag" label="Agent Tray">
               <Row
                 label="Show the Agent Tray"
-                desc="A small tag over your other apps says when an agent has something for you. Drag it anywhere; it keeps that corner on every screen, and sizes itself to the screen it is on. Drag its bottom-left corner to make it bigger or smaller, or right-click it for that, for hiding it a while, and for turning it off."
+                desc="A small tag over your other apps says when an agent has something for you. Drag it anywhere; it keeps that corner on every screen, and sizes itself to the screen it is on. Make it bigger or smaller with Size, at the foot of the list that opens when you point at it. Right-click it to hide it a while or turn it off."
               >
                 <Switch label="Show the Agent Tray" on={w.cornerTag !== false} onChange={(v) => setWorkspace('cornerTag', v)} />
               </Row>

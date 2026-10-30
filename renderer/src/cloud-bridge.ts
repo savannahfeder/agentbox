@@ -30,10 +30,12 @@ import {
 } from './phone-rows';
 import { dictationAllowed, setDictationAllowed } from './web-speech';
 import { phoneSender } from './phone-send';
+import { phoneRepeats } from './phone-repeats';
 import { setIconCount, startPhoneAlerts } from './phone-alerts';
 import { cloudAlertsVia } from './cloud-alerts';
 import { computerOf, type Change, type SettingsRow } from './phone-settings-view';
 import { computerAgents, webSettingChange, webSettingsModel, phoneEngines, phoneModelRefusal } from './web-settings';
+import { groupsOn, groupsSnapshot, phoneGroups } from './phone-groups';
 
 export {
   NOT_HERE, UNDONE, approvalCommand, closeToTakeBack, commandFor, macSeenOf, phoneHistory, phoneSlug, phoneStatusLine,
@@ -54,7 +56,7 @@ const READS = new Set([
   'cloudClipboardCode', 'projectInstructionsRead', 'codeFile', 'railNote',
   'agentConversation', 'phoneLink', 'teamStatus',
   // Where she dragged a row or a project to: kept on this page, not sent.
-  'setThreadPlaces', 'setThreadPins', 'setProductOrder', 'setProductHidden',
+  'setThreadPlaces', 'setProductOrder', 'setProductHidden',
 ]);
 // The reads whose callers take a field off the answer: each gets an empty
 // answer of its own shape, not null (tests/the-done-tab-opens-on-the-web-app).
@@ -107,6 +109,8 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
 
   let rows: PhoneRows = EMPTY_ROWS;
   let settingsRows: SettingsRow[] = [];
+  // The desktop's Groups, read straight from the account while the computer has them on.
+  const groups = phoneGroups(client);
   // This phone's alerts go to every computer of the account, newest first (cloud-alerts.ts).
   const computers = () => [...rows.projects]
     .sort((a, b) => (Date.parse(b.updated_at ?? '') || 0) - (Date.parse(a.updated_at ?? '') || 0))
@@ -183,6 +187,8 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
         client.select('phone_projects', PROJECTS_SELECT),
         readThreads((table, query) => client.select(table, query), threadCache),
         commands(),
+        // Its own failures are said on its own page (RoomsState.error), not over the inbox.
+        groupsOn(settingsRows) ? groups.refresh() : null,
       ]);
       // Read for a sign-in that has since ended: not hers to show.
       if (client.generation() !== asked) { threadCache.clear(); return; }
@@ -200,7 +206,9 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
     }
     // A run going stale changes nothing online, and still has to stop being drawn.
     const fresh = rows.threads.map((t) => !!t.snapshot?.live && Date.now() - Number(t.snapshot.live.at) < LIVE_FOR_MS);
-    const key = JSON.stringify([rows.threads.map((t) => [t.item, t.updated_at]), fresh, links.size, rows.commands.map((c) => [c.id, c.taken_at, c.claimed_by ?? null]), rows.projects, settingsRows, error, client.signedIn(), phoneStatusLine({ error, fetchedAt, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) })]);
+    const g = groups.state();
+    const groupsKey = g.rooms.map((r) => [r.id, r.lastAt, r.unread, r.wall, (g.messages[r.id] ?? []).map((m) => [m.id, m.editedAt ?? 0, !!m.deleted])]);
+    const key = JSON.stringify([groupsKey, g.error, rows.threads.map((t) => [t.item, t.updated_at]), fresh, links.size, rows.commands.map((c) => [c.id, c.taken_at, c.claimed_by ?? null]), rows.projects, settingsRows, error, client.signedIn(), phoneStatusLine({ error, fetchedAt, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) })]);
     if (key !== last) { last = key; changed(null); }
   }
 
@@ -315,12 +323,14 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
       const view = phoneView(rows);
       aliases = view.aliases;
       readAgents();
+      const g = groupsSnapshot({ settingsRows, session: client.session(), groups: groups.state() });
       return {
+        alpha: g.alpha,
         products: view.products, items: view.items, phoneWaiting: view.waiting,
         phoneStatus: client.signedIn() ? phoneStatusLine({ error, fetchedAt, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) }) : null,
         phoneConnect: phoneConnectState({ signedIn: client.signedIn(), started, error, projects: rows.projects, email: client.session()?.user.email }),
         phoneAccount: client.signedIn() ? { email: client.session()?.user.email ?? null, seenAt: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects), build } : null,
-        team: team(), agents: [], approvals: view.approvals,
+        team: g.team ?? team(), agents: [], approvals: view.approvals,
         // What the computer says of each thread it has not started (w-24119e8784), so waiting reads Queued, not Nothing running.
         supervisor: { ...SUPERVISOR, running: view.running, queued: view.queued, runNow: view.runNow, signInNeeded: view.signInNeeded, atLimit: view.atLimit, stalled: view.stalled, shipping: view.shipping, paused: view.paused, productOrder: view.products.map((p) => p.slug) },
         // The coding agents the computer offers, from its settings copy, so To offers Codex there too.
@@ -339,7 +349,15 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
     settingsRead: () => readWebSettings(),
     setWorkspaceSetting: (p: { key: string; value: unknown }) => changeSetting({ scope: 'workspace', key: p?.key, value: p?.value }),
     setProjectSetting: (p: { product: string; key: string; value: unknown }) => changeSetting({ scope: 'project', product: p?.product, key: p?.key, value: p?.value }),
-    repeats: async () => [],
+    // Each computer's repeating tasks ride with its settings copy (phone-repeats.ts).
+    repeats: async () => {
+      await boot;
+      if (!client.signedIn()) return [];
+      try { settingsRows = await readSettingsRows((table, query) => client.select(table, query)); } catch { /* the last copy read stands */ }
+      return phoneRepeats(settingsRows, rows.commands, rows.projects);
+    },
+    // The screens draw Groups from the snapshot, so it is read again after each answer.
+    rooms: (p: { op: string; args?: unknown[] }) => groups.door(p).finally(() => changed(null)),
     // Her Mac runs the agents; nothing here asks her to set one up.
     engineSetup: async () => ({ ok: true, phase: 'ready', found: true, signedIn: true }),
     dashboard: async () => null,
@@ -360,7 +378,7 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
       if (out.confirm) throw new Error('Check your email to confirm it, then sign in here.');
     }),
     teamSignOut: async () => {
-      client.signOut(); rows = EMPTY_ROWS; error = null; threadCache.clear();
+      client.signOut(); rows = EMPTY_ROWS; error = null; threadCache.clear(); groups.forget();
       places = new Map(); links.clear(); planReadAt = -Infinity; setDictationAllowed(false);
       for (const key of [...pages.keys()]) dropPage(key);
       changed(null);

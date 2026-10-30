@@ -13,9 +13,11 @@ import { attachmentLinks } from '../../../renderer/src/attachments';
 import { doItHereWrites } from '../../../renderer/src/threads-made';
 import type { PhoneSender } from '../../../renderer/src/phone-send';
 import type { WorkItem } from '../../../renderer/src/types';
+import { ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
 import type { Saved } from './attach';
 
-export interface Choices { priority?: number; permissionMode?: string; model?: string; effort?: string; engine?: string; runAt?: number; start?: 'later' | 'now' }
+export interface Choices { priority?: number; permissionMode?: string; model?: string; effort?: string; engine?: string; runAt?: number; start?: 'later' | 'now'; repeat?: RepeatShape }
+export interface RuleRef { product: string; id: string; title: string }
 
 export type Press =
   | { kind: 'reply'; text: string; choices?: Choices }
@@ -26,8 +28,12 @@ export type Press =
   | { kind: 'new'; product: string; text: string; saved?: Saved[]; choices?: Choices; to?: string; when?: string | null }
   | { kind: 'stop' }
   | { kind: 'run-now' }
+  | { kind: 'move-to-cloud' }
   | { kind: 'send-back' }
   | { kind: 'send-now' }
+  | { kind: 'pin'; pinned: boolean }
+  | { kind: 'repeat-at'; rule: RuleRef; to: RepeatShape }
+  | { kind: 'end-repeat'; rule: RuleRef }
   /** A proposal the thread filed, started as its own thread (App.tsx `resolve`); the item is the proposal. */
   | { kind: 'approve-filed' }
   /** A proposal done in the thread that filed it instead (App.tsx `doItHere`); the item is the proposal. */
@@ -52,11 +58,24 @@ const TOAST_TITLE = 48;
 const UNDO = ' · press Z to undo';
 
 export function planFor(press: Press, item: PressedItem | null, now = Date.now()): Plan | null {
+  if (press.kind === 'repeat-at') {
+    return { steps: [{ door: 'setRepeat', payload: { product: press.rule.product, id: press.rule.id, rule: press.to } }], toast: `Now ${ruleLabel(press.to)}` };
+  }
+  if (press.kind === 'end-repeat') {
+    return { steps: [{ door: 'endRepeat', payload: { product: press.rule.product, id: press.rule.id } }], toast: `Ended: ${press.rule.title}` };
+  }
   if (press.kind === 'new') {
     const message = threadMessage(press.text, press.saved ?? []);
     if (!message) return null;
     const body = [message.body, attachmentLinks(press.saved ?? [])].filter(Boolean).join('\n\n');
-    const { priority, ...rest } = press.choices ?? {};
+    const { priority, repeat, ...rest } = press.choices ?? {};
+    // Sent with Repeat, it is a rule whose runs are the threads (App.tsx's composer).
+    if (repeat) {
+      return {
+        steps: [{ door: 'composeRepeat', payload: { product: press.product, title: message.title, ...(body ? { body } : {}), priority: priority ?? 5, rule: repeat, ...(rest.engine ? { engine: rest.engine } : {}), ...(rest.model ? { model: rest.model } : {}) } }],
+        toast: `Repeating: ${ruleLabel(repeat)}`,
+      };
+    }
     return {
       steps: [{ door: 'compose', payload: { product: press.product, title: message.title, ...(body ? { body } : {}), kind: 'directive', priority: priority ?? 5, ...rest } }],
       toast: sentLine({ to: press.to ?? '', when: press.when ?? null, held: press.choices?.start === 'later' }),
@@ -132,10 +151,15 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       return { steps: [{ door: 'stopSession', payload: on }], toast: 'Stop sent. Your computer stops the agent when it gets it.' };
     case 'run-now':
       return { steps: [{ door: 'runNow', payload: on }], toast: 'Up next. It starts as soon as an agent is free.' };
+    case 'move-to-cloud':
+      return { steps: [{ door: 'moveToCloud', payload: { ...on, ids: [item.id] } }], toast: 'Moving to the cloud. It keeps working until the cloud has room.' };
     case 'send-back':
       return { steps: [{ door: 'reopen', payload: on }], toast: `Back in the queue → ${to}` };
     case 'send-now':
       return { steps: [{ door: 'sendNow', payload: on }] };
+    case 'pin':
+      // App.tsx's toast for the menu's row, which has no Undo there either.
+      return { steps: [{ door: 'setThreadPins', payload: { pins: { [item.id]: press.pinned ? true : null } } }], toast: press.pinned ? 'Pinned to the top of your list' : 'Unpinned' };
     case 'approve-filed':
       return reply('Approved. Run it.', {}, `Running → ${(item.title ?? '').slice(0, 40)}`, 'Approval withdrawn, back in your inbox');
     case 'do-here': {

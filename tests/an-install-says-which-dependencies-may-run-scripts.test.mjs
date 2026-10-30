@@ -30,9 +30,12 @@ const pkg = JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8'))
 
 describe('an install says which dependencies may run scripts', () => {
   it('allows the two the app needs built', () => {
-    // node-pty IS the terminal, and it is built by node-gyp on install.
+    // node-pty IS the terminal, and it is built by node-gyp on install. It sits
+    // in optionalDependencies because that build is the one that can fail
+    // (tests/an-install-with-no-compiler-still-starts); it is still built
+    // everywhere it can be, so its script still has to be allowed.
     expect(pkg.allowScripts['node-pty']).toBe(true);
-    expect(pkg.dependencies['node-pty']).toBeTruthy();
+    expect(pkg.optionalDependencies['node-pty']).toBeTruthy();
     // esbuild fetches its own binary, and vite is nothing without it.
     expect(pkg.allowScripts.esbuild).toBe(true);
   });

@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { teamConfigFile } from './phone-site-config.mjs';
+import { teamConfigFile, pagesProjectOf } from './phone-site-config.mjs';
 import { Name } from '../shared/product-name.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -49,6 +49,19 @@ function publishLegal(legal, out, given, log) {
   return 'published';
 }
 
+// THE PAGES ADDRESS SENDS A VISIT ON TO `phoneSite` when that is another address
+// (tests/the-web-apps-old-address-forwards-to-its-new-one.test.mjs). `_redirects`
+// cannot match a host and the CSP refuses inline scripts, hence a file loaded first.
+function forwarderFor(given) {
+  if (given.phoneSite == null) return null;
+  let site = null;
+  try { site = new URL(given.phoneSite); } catch { /* refused below */ }
+  if (site?.protocol !== 'https:' || site.pathname !== '/' || site.search || site.hash) throw new Error('phoneSite in team.config.json must be a plain https address');
+  const from = `${pagesProjectOf(given)}.pages.dev`;
+  if (site.hostname === from) return null;
+  return `if (location.hostname === ${JSON.stringify(from)}) location.replace(${JSON.stringify(site.origin)} + location.pathname + location.search + location.hash);\n`;
+}
+
 export function buildPhoneSite({ dist = path.join(root, 'renderer', 'dist'), out = path.join(root, 'phone-site'), configFile = teamConfigFile(root), icon = path.join(root, 'main', 'phone-icon.png'), legal = path.join(root, 'phone-legal'), log = console.log, stamp = commitHere() } = {}) {
   if (!fs.existsSync(path.join(dist, 'index.html'))) throw new Error('build the renderer first: npm run phone:build');
   if (!configFile || !fs.existsSync(configFile)) throw new Error('no team.config.json on this machine (cloud/ or ~/.agentbox/): the phone site needs the team cloud');
@@ -58,6 +71,7 @@ export function buildPhoneSite({ dist = path.join(root, 'renderer', 'dist'), out
   try { origin = new URL(url); } catch { throw new Error('cloud/team.config.json has no url'); }
   if (origin.protocol !== 'https:' || origin.pathname.replace(/\/+$/, '') !== '' || origin.search || origin.hash) throw new Error('the cloud url must be a plain https address');
   if (typeof anonKey !== 'string' || !/^[A-Za-z0-9._-]{20,4000}$/.test(anonKey)) throw new Error('cloud/team.config.json has no public key');
+  const forward = forwarderFor(given);
 
   fs.rmSync(out, { recursive: true, force: true });
   fs.cpSync(dist, out, {
@@ -70,8 +84,9 @@ export function buildPhoneSite({ dist = path.join(root, 'renderer', 'dist'), out
   const config = JSON.stringify({ url: origin.origin, anonKey }).replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/</g, '&lt;');
   const meta = `<meta name="agentbox-cloud" content='${config}'>`;
   const built = /^[0-9a-f]{40}$/.test(stamp?.sha ?? '') && Number.isFinite(Date.parse(stamp?.at)) ? `\n    <meta name="agentbox-build" content="${stamp.sha} ${new Date(stamp.at).toISOString()}">` : '';
+  if (forward) fs.writeFileSync(path.join(out, 'forward.js'), forward);
   const index = path.join(out, 'index.html');
-  fs.writeFileSync(index, fs.readFileSync(index, 'utf8').replace('<head>', `<head>\n    ${meta}${built}\n    <link rel="manifest" href="/manifest.webmanifest">`));
+  fs.writeFileSync(index, fs.readFileSync(index, 'utf8').replace('<head>', `<head>${forward ? '\n    <script src="/forward.js"></script>' : ''}\n    ${meta}${built}\n    <link rel="manifest" href="/manifest.webmanifest">`));
   fs.copyFileSync(icon, path.join(out, 'phone-icon.png'));
   // The worker that shows an alert while the app is closed (renderer/src/phone-alerts.ts registers it).
   fs.writeFileSync(path.join(out, 'phone-sw.js'), fs.readFileSync(path.join(root, 'main', 'phone-sw.js'), 'utf8').replaceAll('__APP_NAME__', Name));

@@ -9,7 +9,8 @@ import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
 import { cloudClient, type CloudClient } from '../../../renderer/src/cloud-rest';
-import { PROJECTS_SELECT, cloudCarriesOn, macSeenOf, phoneConnectState, phoneSlug, phoneStatusLine, phoneView, readCommands, readThreads, splitSlug, type PhoneRows } from '../../../renderer/src/phone-rows';
+import { PROJECTS_SELECT, cloudCarriesOn, macSeenOf, phoneConnectState, phoneSlug, phoneStatusLine, phoneView, readCommands, readSettingsRows, readThreads, splitSlug, type PhoneRows } from '../../../renderer/src/phone-rows';
+import { phoneRepeats, type RepeatSettingsRow } from '../../../renderer/src/phone-repeats';
 import { sendPhoneFeedback, type FeedbackFiles } from '../../../renderer/src/phone-feedback';
 import { phoneSender } from '../../../renderer/src/phone-send';
 import { fileOnPhone, objectsToSign, renewLinks, type Links } from '../../../renderer/src/phone-links';
@@ -34,6 +35,7 @@ export type Cloud = Pick<CloudClient, 'session' | 'signedIn' | 'generation' | 's
 
 const EMPTY: PhoneRows = { projects: [], threads: [], commands: [] };
 const EVERY_MS = 5000;
+const SETTINGS_EVERY_MS = 30_000;
 const PREVIEW = process.env.EXPO_PUBLIC_PREVIEW === '1';
 const APP_VERSION = Constants.expoConfig?.version ?? null;
 const BUILD = Constants.nativeBuildVersion ?? null;
@@ -63,6 +65,8 @@ function useCloudState() {
   const rowsNow = useRef<PhoneRows>(EMPTY);
   const setRows = useCallback((next: PhoneRows) => { rowsNow.current = next; setRowsNow(next); }, []);
   const links = useRef<Links>(new Map());
+  const [settingsRows, setSettingsRows] = useState<RepeatSettingsRow[]>([]);
+  const settingsAt = useRef(-Infinity);
   const [signedAt, setSignedAt] = useState(0);
 
   useEffect(() => {
@@ -83,6 +87,11 @@ function useCloudState() {
         ]);
         if (cloud.generation() !== asked) { cache.current.clear(); return; }
         setRows({ projects, threads, commands });
+        // The computer's settings copy carries its repeating tasks (main/phone-inbox.mjs); it changes far less often.
+        if (Date.now() - settingsAt.current > SETTINGS_EVERY_MS) {
+          settingsAt.current = Date.now();
+          void readSettingsRows(select).then((got) => { if (cloud.generation() === asked) setSettingsRows(got); }, () => { settingsAt.current = -Infinity; });
+        }
         setRead({ error: null, fetchedAt: Date.now(), first: false });
         // Links before the screens draw, so a picture is pointed at its file the moment it is drawn.
         const owner = cloud.session()?.user.id;
@@ -113,6 +122,7 @@ function useCloudState() {
 
   const view = useMemo(() => phoneView(rows, now), [rows, now]);
   const tabs = useMemo(() => phoneTabs(view, now), [view, now]);
+  const repeats = useMemo(() => phoneRepeats(settingsRows, rows.commands, rows.projects, now), [settingsRows, rows.commands, rows.projects, now]);
   const status = signedIn ? phoneStatusLine({ error: read.error, fetchedAt: read.fetchedAt, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) }, now) : null;
   // No computer has sent this account a project yet: the inbox says how to connect one.
   const connect = phoneConnectState({ signedIn, started: !read.first, error: read.error, projects: rows.projects, email: cloud?.session()?.user.email });
@@ -265,12 +275,14 @@ function useCloudState() {
     cache.current.clear();
     links.current.clear();
     setRows(EMPTY);
+    setSettingsRows([]);
+    settingsAt.current = -Infinity;
     setToast(null);
     setSignedIn(false);
   }, [cloud, setRows, keepAlerts]);
 
   return {
-    cloud, opened, signedIn, rows, view, tabs, status, loading: read.first, now, refresh, send, attach, fileOf, toast, say,
+    cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, now, refresh, send, attach, fileOf, toast, say,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
     notice, noticeRead, agreed, answerNotice, withdrawNotice: () => answerNotice(false),
     alerts, turnOnAlerts, turnOffAlerts,

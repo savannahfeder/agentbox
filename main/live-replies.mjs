@@ -105,13 +105,17 @@ export function submitReply(supervisor, payload, commit) {
 // The ledger preserves every reply even while capacity is full. A resumed
 // provider otherwise receives only its latest-answer field. Read backward to
 // the preceding response/delivery, preserving repeated words and write order.
+// `answeredThrough` is the newest reply a finished run settled, which may have
+// spoken by a rewrite rather than a result.
 export function queuedReplyText(item, history, delivered) {
  const pending=[];
  const latestTs=item.wrote?.answer?.ts;
+ const settled=item.answeredThrough??0;
  for(let i=history.length-1;i>=0;i--){
   const line=history[i];
   if(line.heartbeat||line.release)continue;
   if(line.patch?.result)break;
+  if(line.ts<=settled)break;
   const answer=line.patch?.answer;
   if(typeof answer!=='string'||!answer.trim())continue;
   if(answer==='(withdrawn)')break;
@@ -125,7 +129,7 @@ export function queuedReplyText(item, history, delivered) {
  // A teammate's words are always framed as theirs, even alone, so they are
  // never read as the person's or run as a command.
  if(!pending.length)return framedTeammate(toldNameOf(item),item.answer);
- if(!pending.some((p)=>p.from))return pending.length>1?pending.map((p)=>p.answer).join('\n\n'):item.answer;
+ if(pending.length===1&&!pending[0].from)return item.answer;
  return pending.map((p)=>(p.from?framedTeammate(p.from,p.answer):`The person wrote:\n\n${p.answer}`)).join('\n\n');
 }
 

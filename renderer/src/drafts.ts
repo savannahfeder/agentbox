@@ -42,6 +42,9 @@ export interface DraftStore {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
+  /** Only `repliesInFlight` walks the keys. */
+  readonly length?: number;
+  key?(index: number): string | null;
 }
 
 const backing = (store?: DraftStore): DraftStore =>
@@ -273,6 +276,97 @@ export function restoreFailedDraft(item: ItemRef, text: string, attachments: Dra
   saveDraft(item, [existing, text.trim()].filter(Boolean).join('\n\n'), store);
   saveDraftAttachments(item, [...readDraftAttachments(item, store), ...attachments], store);
   if (!store && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(item) }));
+}
+
+/* --------------------------- a reply in flight --------------------------- */
+
+// Send empties the box at once, but the words stay here until the write lands.
+// Between the two they were only in the page's memory (the undo hold, then the
+// call itself), so a reload, a crash or a call the reload aborted lost them for
+// good. The next load reads what is left here and puts back whatever never
+// reached its thread.
+
+/** One send not yet written: `body` is what went out, `words` and `attachments` what the box held. */
+export interface InFlightReply { words: string; body: string; attachments: DraftAttachment[]; at: number }
+
+const IN_FLIGHT = 'zero.replysending.';
+const inFlightKey = (item: ItemRef) => `${IN_FLIGHT}${item.product}:${item.id}`;
+
+function readInFlight(item: ItemRef, s: DraftStore): InFlightReply[] {
+  try {
+    const parsed = JSON.parse(s.getItem(inFlightKey(item)) ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter((r) => r && typeof r.words === 'string' && typeof r.at === 'number') : [];
+  } catch { return []; }
+}
+
+function writeInFlight(item: ItemRef, replies: InFlightReply[], s: DraftStore): void {
+  try {
+    if (!replies.length) { s.removeItem(inFlightKey(item)); return; }
+    const all = JSON.stringify(replies);
+    // Pictures are the first thing given up: the words are what must survive.
+    s.setItem(inFlightKey(item), all.length <= COMPOSE_DRAFT_MAX_BYTES ? all : JSON.stringify(replies.map((r) => ({ ...r, attachments: r.attachments.filter((a) => !a.dataBase64) }))));
+  } catch { /* a refused store is not a reason to lose the send */ }
+}
+
+/** Keep a send until it lands. Returns the stamp that `replyLanded` takes off. */
+export function markReplyInFlight(item: ItemRef, sent: { words: string; attachments: DraftAttachment[] }, body: string, at = Date.now(), store?: DraftStore): number {
+  const s = backing(store);
+  const replies = readInFlight(item, s);
+  while (replies.some((r) => r.at === at)) at += 1;
+  writeInFlight(item, [...replies, { words: sent.words, body, attachments: sent.attachments ?? [], at }], s);
+  return at;
+}
+
+/** The send stamped `at` was written, failed back into the box, or was taken back. */
+export function replyLanded(item: ItemRef, at: number, store?: DraftStore): void {
+  const s = backing(store);
+  writeInFlight(item, readInFlight(item, s).filter((r) => r.at !== at), s);
+}
+
+/** Every thread with a send that had not landed when the page went. */
+export function repliesInFlight(store?: DraftStore): Array<ItemRef & { replies: InFlightReply[] }> {
+  const s = backing(store);
+  const keys: string[] = [];
+  try { for (let i = 0; i < (s.length ?? 0); i++) { const k = s.key?.(i); if (k?.startsWith(IN_FLIGHT)) keys.push(k); } } catch { return []; }
+  return keys.flatMap((k) => {
+    const rest = k.slice(IN_FLIGHT.length);
+    const colon = rest.indexOf(':');
+    if (colon < 0) return [];
+    const item = { product: rest.slice(0, colon), id: rest.slice(colon + 1) };
+    const replies = readInFlight(item, s);
+    return replies.length ? [{ ...item, replies }] : [];
+  });
+}
+
+const flatWords = (s: string) => s.replace(/\s+/g, ' ').trim();
+
+/**
+ * Whether a send reached its thread: an answer in its history carries its
+ * words, or the phone shows it waiting for the computer. Text, not time: a
+ * phone's clock and its computer's need not agree, and a wrong yes loses the
+ * words where a wrong no only puts a sent reply back in the box.
+ */
+export function landedIn(reply: InFlightReply, lines: Array<{ source?: string; patch?: Record<string, unknown> | null }>, waiting: string[] = []): boolean {
+  const wanted = [reply.body, reply.words].map(flatWords).filter(Boolean);
+  if (!wanted.length) return true;
+  const has = (text: unknown) => typeof text === 'string' && wanted.some((w) => flatWords(text).includes(w));
+  return lines.some((l) => has(l.patch?.answer)) || waiting.some(has);
+}
+
+/**
+ * Put back each of these sends that never landed, after whatever the box holds
+ * now, and let all of them go. Sends made since `replies` was read are left
+ * alone. Returns how many came back.
+ */
+export function bringBackUnsent(item: ItemRef, replies: InFlightReply[], lines: Parameters<typeof landedIn>[1], waiting: string[] = [], store?: DraftStore): number {
+  let back = 0;
+  for (const r of replies) {
+    replyLanded(item, r.at, store);
+    if (landedIn(r, lines, waiting)) continue;
+    restoreFailedDraft(item, r.words, r.attachments, store);
+    back += 1;
+  }
+  return back;
 }
 
 // ---------------------------------------------------------------------------

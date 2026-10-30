@@ -75,8 +75,8 @@ import { KIT_VERSION, checkKit, kitKey } from '../../shared/cloud-kit.mjs';
 import { NEW_ITEM_MARK } from '../../shared/cloud-kit.mjs';
 import { APPROVALS_SERVER } from '../../shared/cloud-kit.mjs';
 import { asksPermission, approvalsHandshakes } from './kit.mjs';
-import { snapshotSkills } from './skills.mjs';
-import { createResourceRequests, resourceContextFor } from './resources.mjs';
+import { snapshotSkills, filesInFolder } from './skills.mjs';
+import { createResourceRequests, resourceContextFor, accountFolderFor } from './resources.mjs';
 
 // WHAT A CLOUD RUN IS TOLD ABOUT WHERE IT IS. Without it an agent there found
 // its film's files, ffmpeg and a key missing, and asked the person to move the
@@ -84,7 +84,7 @@ import { createResourceRequests, resourceContextFor } from './resources.mjs';
 export const CLOUD_NOTE = [
   '# You are running on a cloud machine, not on the person\'s own computer',
   '',
-  'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB) that is yours for this run and thrown away after it. It has: this task folder (its git branch and main, at the same path as on their computer); the project\'s documents folder at its usual path, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB) and any attachment the request names; the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder).',
+  'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB) that is yours for this run and thrown away after it. It has: this task folder (its git branch and main, at the same path as on their computer); the project\'s documents folder at its usual path, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB) and any file or folder the request names under the account\'s documents (up to 25 MB a file, 100 MB a folder); the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder).',
   '',
   'Install whatever else the work needs: you have sudo (`sudo apt-get update && sudo apt-get install -y <package>`, `pip install --user`, `npm install`). When you install a program the project will need again, add the same lines to `.agentbox/cloud-setup.sh` in the task folder and commit it: that script runs before every cloud run of this project, and its output from this run is in /tmp/agentbox-cloud-setup.log.',
   '',
@@ -92,7 +92,7 @@ export const CLOUD_NOTE = [
   '',
   `Only this task's own branch comes back to their computer. A commit, merge or reset on main or any other branch stays in this sandbox and is thrown away with it, so a merge done here has not happened. When the request includes merging into main, or changing any branch but this task's, do the rest of the work and commit it on this branch, then end your turn with the one line \`${HAND_BACK} merging into main\` (as below): the app merges on their computer.`,
   '',
-  `For a missing installed skill or task file, first use the store tool request_cloud_resource. Request a skill by name, or a file by its relative path under this task or the product's documents. It returns a separate scratch path when delivery succeeds; read the skill's SKILL.md there with its references and scripts. If the tool or resource is unavailable, finish independent work and explain exactly what is missing. Do not transfer the whole thread solely for a missing skill or task file. For a key, one of their apps, or a private repository this machine cannot reach, stop at once. Do not work around it, do not write to the work item, do not give the person commands to run, and do not offer to move the thread: the app moves it. End your turn with one line and nothing else: ${HAND_BACK} followed by what was missing, in a few words they would use (your AWS sign-in, the iOS simulator), since the app shows those words to them. A person who asks to have this thread moved to their computer is answered with this line as well. That line replaces your usual final answer and its options. The app then runs the same request again on their computer, where all of it is. A program you can install is not a reason to stop. Otherwise work as usual, and never write that line.`,
+  `For a missing installed skill or task file, first use the store tool request_cloud_resource. Request a skill by name, or a file or folder by its path: relative to this task or the product's documents, or any path under the account's documents, other products' folders included, written out in full as the request writes it (\`~/...\` works). It returns a separate scratch path when delivery succeeds; read the skill's SKILL.md there with its references and scripts. A folder answers with its files, which you then ask for. For something the request does not name, if it cannot be delivered, finish independent work and explain exactly what is missing. Do not transfer the whole thread solely for a missing skill or file the request does not name. For a key, one of their apps, a private repository this machine cannot reach, or a file, folder or skill the request names that request_cloud_resource cannot deliver, stop at once. Do not work around it, do not write to the work item, do not give the person commands to run, and do not offer to move the thread: the app moves it. End your turn with one line and nothing else: ${HAND_BACK} followed by what was missing, in a few words they would use (your AWS sign-in, the iOS simulator), since the app shows those words to them. A person who asks to have this thread moved to their computer is answered with this line as well. That line replaces your usual final answer and its options. The app then runs the same request again on their computer, where all of it is. A program you can install is not a reason to stop. Otherwise work as usual, and never write that line.`,
 ].join('\n');
 
 // The same, for a project with no repository, whose agent works in the
@@ -100,7 +100,7 @@ export const CLOUD_NOTE = [
 const notes = CLOUD_NOTE.split('\n\n');
 export const PLAIN_CLOUD_NOTE = [
   notes[0],
-  'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB) that is yours for this run and thrown away after it. It has: the project\'s documents folder, which is the folder you work in, at the same path as on their computer, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB) and any attachment the request names; what you write there goes back to their computer as you work. There is no git repository here. It also has the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder).',
+  'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB) that is yours for this run and thrown away after it. It has: the project\'s documents folder, which is the folder you work in, at the same path as on their computer, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB) and any file or folder the request names under the account\'s documents (up to 25 MB a file, 100 MB a folder); what you write there goes back to their computer as you work. There is no git repository here. It also has the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder).',
   'Install whatever else the work needs: you have sudo (`sudo apt-get update && sudo apt-get install -y <package>`, `pip install --user`, `npm install`).',
   'It does not have: any other file from their computer (documents over 256 KB, other threads\' design folders, large media, files under the home folder, /tmp from an earlier turn); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins).',
   notes[notes.length - 1],
@@ -174,6 +174,7 @@ const SANDBOX_NODE = '/usr/local/bin/node';
 // to the agent as its whole server having disconnected.
 const WITHHELD_TOOLS = new Set(['look_at_page']);
 const MAX_ATTACHMENT = 25 * 1024 * 1024;
+const FOLDER_CAP = { files: 300, bytes: 100 * 1024 * 1024 };
 const RESULTS_WAIT_MS = 3 * 60_000;
 // How often a run's new documents are fetched while it works.
 const DOCS_EVERY_MS = 10_000;
@@ -456,21 +457,34 @@ const inside = (p, root) => p === root || p.startsWith(root + path.sep);
 // Given `docs`, a picture named only by its short link, `![…](attachments/x.png)`,
 // is sent too: the documents folder travels without its attachments (./docs.mjs),
 // and the app writes every pasted picture there.
-export function filesNamedIn(text, { cwd, roots, docs = null }) {
+//
+// A folder goes with its files, all of them or none (`folderCap`), so the run
+// never takes a part for the whole. Never a store root, a folder holding the
+// task folder, or this product's documents (`docsFolder`), which travel by
+// their own rules.
+export function filesNamedIn(text, { cwd, roots, docs = null, home = null, docsFolder = docs, folderCap = FOLDER_CAP }) {
   const realRoots = roots.map(realOrNull).filter(Boolean);
   const realCwd = cwd ? realOrNull(cwd) || cwd : null;
+  const realDocs = docsFolder ? realOrNull(docsFolder) : null;
   const found = new Set();
   const take = (named) => {
     const real = realOrNull(named);
     if (!real) return;
     if (realCwd && inside(real, realCwd)) return;
-    if (!realRoots.some((r) => inside(real, r))) return;
-    try {
-      const st = fs.statSync(real);
-      if (st.isFile() && st.size <= MAX_ATTACHMENT) found.add(named);
-    } catch { /* not a file */ }
+    const root = realRoots.find((r) => inside(real, r));
+    if (!root) return;
+    let st;
+    try { st = fs.statSync(real); } catch { return; }
+    if (st.isFile()) { if (st.size <= MAX_ATTACHMENT) found.add(named); return; }
+    if (!st.isDirectory() || realRoots.some((r) => inside(r, real))) return;
+    if ((realCwd && inside(realCwd, real)) || (realDocs && (inside(real, realDocs) || inside(realDocs, real)))) return;
+    if (path.relative(root, real).split(path.sep).some((p) => p.startsWith('.'))) return;
+    const folder = filesInFolder(named, { ...folderCap, file: MAX_ATTACHMENT });
+    if (!folder.over) for (const f of folder.files) found.add(f.path);
   };
-  for (const m of String(text || '').matchAll(/(\/(?:[^\s"'`<>()\[\]{},;\\]|\\ )+)/g)) take(m[1].replace(/[.:]+$/, ''));
+  const said = String(text || '');
+  for (const m of said.matchAll(/(\/(?:[^\s"'`<>()\[\]{},;\\]|\\ )+)/g)) take(m[1].replace(/[.:]+$/, ''));
+  if (home) for (const m of said.matchAll(/(?:^|[\s"'`(\[{<,;=])~(\/(?:[^\s"'`<>()\[\]{},;\\]|\\ )+)/g)) take(path.join(home, m[1].replace(/[.:]+$/, '')));
   const pasted = docs && path.isAbsolute(docs) ? realOrNull(path.join(docs, 'attachments')) : null;
   if (pasted) {
     for (const rel of referencedFiles(...stringsIn(text), { dir: docs })) {
@@ -700,7 +714,7 @@ export async function cloudRun({
     while ((i = stdinBuf.indexOf('\n')) >= 0) {
       let line = stdinBuf.slice(0, i + 1);
       stdinBuf = stdinBuf.slice(i + 1);
-      const named = filesNamedIn(line, { cwd: plain ? null : cwd, roots, docs: env.AGENTBOX_DOCS });
+      const named = filesNamedIn(line, { cwd: plain ? null : cwd, roots, docs: env.AGENTBOX_DOCS, home: homeDir });
       if (codex) {
         const c = codexLineForTheCloud(line, { stubPath, codexHome, keep: mcpConfig.mcpServers, note: plain ? PLAIN_CLOUD_NOTE : CLOUD_NOTE });
         line = c.line;
@@ -903,7 +917,7 @@ export async function cloudRun({
     if (docsSent.length) sending.push(tarDocs(docsDir, docsSent).then((tgz) => sendFile(null, path.join(docsDir, '.agentbox-docs.tgz'), tgz, docsDir)));
   }
   const system = argValue(argv, '--append-system-prompt') || '';
-  for (const f of filesNamedIn(system, { cwd: plain ? null : cwd, roots })) sending.push(sendFile(f));
+  for (const f of filesNamedIn(system, { cwd: plain ? null : cwd, roots, home: homeDir, docsFolder: env.AGENTBOX_DOCS })) sending.push(sendFile(f));
   const codexOpen = kit?.codex && codex ? codexKitOpen(kit.codex, { stubPath, codexHome, keep: mcpConfig.mcpServers, note: plain ? PLAIN_CLOUD_NOTE : CLOUD_NOTE }) : null;
   if (codexOpen) {
     for (const c of codexOpen.conversations) conversations.add(c);
@@ -1029,6 +1043,7 @@ export async function cloudRun({
   offlineOn = (started.caps || []).includes('offline');
   resourceCapable = (started.caps || []).includes('resources');
   marker.resourceCapable = resourceCapable;
+  if (!resourceCapable) say('this cloud image cannot take a file or skill the run asks this Mac for; rebuild it (npm run deploy, or node scripts/cloud-setup.mjs)');
   if (!offlineOn) say('this cloud image stops at its next tool call while this Mac sleeps; rebuild it (node scripts/cloud-setup.mjs) to keep runs going');
   marker.offline = offlineOn;
   writeMarker(here,{ ...marker, pid: selfPid, state: 'running' });
@@ -1061,9 +1076,12 @@ export async function cloudRun({
   let outLine = '';
   const overdue = () => cancelled && Date.now() - cancelledAt > resultsWaitMs;
   const requestCloudResource = createResourceRequests({
-    cwd, docs: docs?.dir, ...resourceContextFor(marker, { engine, homeDir, configDir, codexHome }), runId,
+    cwd, docs: docs?.dir, account: accountFolderFor({ accountId: env.STORE_ACCOUNT_ID, roots, docs: docs?.dir || env.AGENTBOX_DOCS }),
+    ...resourceContextFor(marker, { engine, homeDir, configDir, codexHome }), runId,
     state: marker.resources ??= {}, save: () => saveMarker(),
-    stopped: () => !!finished || leaving || cancelled || !resourceCapable,
+    stopped: () => !!finished || leaving || cancelled,
+    capable: () => resourceCapable,
+    log: say,
     upload: async (name, body) => {
       const k = cacheKey(name);
       await sendOnce(storage, k, () => body);

@@ -13,6 +13,9 @@
 .first-run * { box-sizing: border-box; }
 .first-run button { font: inherit; cursor: pointer; }
 .first-run button:disabled { cursor: default; }
+.first-run .ob-back { position: absolute; left: 40px; top: 64px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border: 0; border-radius: 0; background: transparent; color: var(--text-dim); font-size: 14px; }
+.first-run .ob-back:hover:not(:disabled), .first-run .ob-back:focus-visible { background: var(--wash-strong); color: var(--text); }
+.first-run .ob-back:disabled { opacity: .5; }
 
 .first-run .ob-screen { position: absolute; inset: 0; transition: opacity .26s ease, transform .26s cubic-bezier(.2, .7, .2, 1); }
 .first-run .ob-screen.ob-leaving { opacity: 0; transform: translateY(-10px); }
@@ -95,7 +98,6 @@
 }
 .first-run .ob-write::placeholder { color: var(--text-faint); }
 .first-run .ob-bar { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
-.first-run .ob-folder-note { margin: 12px 0 0; font-size: 14px; color: var(--text-dim); }
 .first-run .fp-title { margin: 0 0 4px; font-size: 18px; line-height: 24px; font-weight: 500; }
 .first-run .ob-chips { display: flex; gap: 10px; }
 .first-run .ob-chip { display: inline-flex; align-items: center; gap: 9px; height: 36px; padding: 0 13px; font-size: 15px; color: var(--text-dim); border: 1px solid var(--line-strong); background: var(--film-strong); white-space: nowrap; }
@@ -106,6 +108,10 @@
 .first-run .ob-chip:hover .ob-x { color: var(--text); }
 .first-run .ob-repeat .compose-word { text-decoration: none; }
 .first-run .ob-repeat .ob-x { border: 0; background: none; padding: 4px; cursor: pointer; }
+/* The schedule menu drops from the chip's edge, as the other menus here do. */
+.first-run .ob-repeat { position: relative; }
+.first-run .ob-repeat .when-wrap { position: static; }
+.first-run .ob-repeat .when-menu { left: -1px; top: calc(100% + 6px); }
 .first-run .fp-use { color: var(--text); background: var(--wash-strong); border: 1px solid var(--line-strong); }
 .first-run .fp-use:disabled { color: var(--text-faint); background: none; }
 .first-run .ob-sw { width: 10px; height: 10px; flex: none; }
@@ -129,6 +135,16 @@
 .first-run .ob-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .first-run .ob-row small { padding-left: 18px; font-family: var(--mono); font-size: 11.5px; color: var(--text-faint); }
 .first-run .ob-ideas { margin-top: 36px; }
+
+/* The project screen: the task it is for above the question, then the folders. */
+.first-run .ob-said { max-width: 560px; margin: 0 0 18px; font-size: 15px; line-height: 22px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.first-run .ob-said + h1.ob-big { margin-top: 0; }
+.first-run .ob-places { width: 560px; margin-top: 32px; text-align: left; }
+.first-run .ob-places .ob-item { cursor: pointer; }
+/* A button showing words in place of its key is padded evenly. */
+.first-run .ob-btn.ob-plain { padding-right: 14px; }
+.first-run .ob-working { margin: 16px 0 0; color: var(--text-faint); font-size: 14px; }
+.first-run .ob-path { font-family: var(--mono); font-size: 11.5px; color: var(--text-faint); white-space: nowrap; }
 .first-run .ob-ideas .ob-item { height: 44px; border: 0; cursor: pointer; }
 .first-run .ob-ideas .ob-item:hover .ob-name { color: var(--text); }
 

@@ -6,7 +6,9 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
+import { readRule, repeatPresets } from '../../../renderer/src/format';
 import { engineModelLabel } from '../../../renderer/src/models';
+import { ruleLabel } from '../../../shared/repeats.mjs';
 import { readSettingsRows } from '../../../renderer/src/phone-rows';
 import { priorityIdOf, priorityLabelOf, priorityValueOf } from '../../../renderer/src/priority';
 import { agentChoices, agentWordFor, laterHint, momentFromWords, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
@@ -19,9 +21,9 @@ import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { AttachSheet, Attached } from './Attach';
 import { DictationProblem, Listening, MicButton, useDictation } from './Dictation';
-import { Caret, Clip, Clock } from './icons';
+import { Caret, Clip, Clock, Repeat } from './icons';
 import { TimeBox, TypingSheet } from './Later';
-import { Pickable, PriorityBars, Sheet, SheetHead, SheetRow, T } from './parts';
+import { Pickable, PriorityBars, Sheet, SheetHead, SheetRow, SheetSep, T } from './parts';
 import { ModelSheet, PrioritySheet, barsFor } from './Pickers';
 import { color, font, size } from './theme';
 
@@ -187,6 +189,10 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
   const { draft, sheet, setSheet, model, effort, projects, product, send, setError, offered, engine, codex } = form;
   const [typed, setTyped] = useState('');
   const moment = momentFromWords(typed, now);
+  // The rule's grammar reads first, as the desktop's When box does: "every friday 5pm" also holds a time.
+  const read = readRule(typed);
+  const rule = read && 'rule' in read ? read.rule : null;
+  const typedSend = () => { if (rule) void send({ repeat: rule }); else if (moment) void send({ runAt: moment.ts }); };
   return (
     <>
       <Sheet open={sheet === 'to'} close={() => setSheet(null)}>
@@ -207,9 +213,14 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
         <SheetRow label="Add it to Later" lead={<Clock />} onPress={() => void send({ start: 'later' })} />
         <SheetRow label="Tomorrow morning" lead={<Clock />} aside={laterHint(tomorrowMorning(now))} onPress={() => void send({ runAt: tomorrowMorning(now) })} />
         <SheetRow label="Monday morning" lead={<Clock />} aside={laterHint(mondayMorning(now))} onPress={() => void send({ runAt: mondayMorning(now) })} />
-        <TimeBox lead={<Clock />} value={typed} onChange={setTyped} placeholder="Or type: 3h, fri 6pm, tomorrow 9am"
-          onSubmit={() => { if (moment) void send({ runAt: moment.ts }); }} onLine={() => { if (moment) void send({ runAt: moment.ts }); }}
-          line={!typed.trim() ? null : moment ? { text: moment.hint, tone: 'ok' } : { text: 'Not a time yet', tone: 'unread' }} />
+        {/* Repeat it, the desktop's own presets (format.ts `repeatPresets`): a rule whose runs are the threads. */}
+        <SheetSep />
+        {repeatPresets(now).flatMap((r) => (r.rule ? [r.rule] : []).map((rule) => (
+          <SheetRow key={r.label} label={r.label} lead={<Repeat size={15} />} onPress={() => void send({ repeat: rule })} />
+        )))}
+        <TimeBox lead={<Clock />} value={typed} onChange={setTyped} placeholder="Or type: 3h, fri 6pm, every monday 9am"
+          onSubmit={typedSend} onLine={typedSend}
+          line={!typed.trim() ? null : rule ? { text: `Repeats ${ruleLabel(rule)}`, tone: 'ok' } : moment ? { text: moment.hint, tone: 'ok' } : { text: 'Not a time yet', tone: 'unread' }} />
       </TypingSheet>
     </>
   );

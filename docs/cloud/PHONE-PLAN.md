@@ -147,6 +147,12 @@ once), then the address goes in `~/.agentbox/team.config.json` as `phoneSite` an
 the database's allowed sign-in return addresses, and the migration
 `20261014000200_phone_inbox.sql` is applied.
 
+THE ADDRESS IS ON AGENTBOX.AC (2026-10-27). The web app is `app.agentbox.ac`, a
+custom domain on the same Pages project (a CNAME `app` to
+`agentbox-phone.pages.dev` at the domain's DNS), so every deploy reaches both
+addresses. Once `phoneSite` names the new one, each build adds `/forward.js`,
+which sends a visit on the Pages address there with its path kept.
+
 On 2026-10-26 the live site was four days behind, because only a person
 remembering to put it up ever did. Each build now carries the commit it came from
 (`<meta name="agentbox-build">`, shown on the web app's Account page), and

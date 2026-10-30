@@ -30,7 +30,7 @@
 // ever set by a fall-through (the 2026-08-10 bug).
 
 import { useEffect, useRef, useState } from 'react';
-import { dayAndTime, parseWhen, readRule } from '../format';
+import { dayAndTime, parseWhen, readRule, repeatPresets } from '../format';
 import { useKeepInWindow } from '../keep-in-window';
 import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../../shared/repeats.mjs';
 
@@ -95,20 +95,8 @@ function startPresets(now = Date.now()) {
   return rows;
 }
 
-// The bottom half. Repeat's presets, unchanged, with "Once" first as the way
-// back off rather than as a thing to notice on the card. Exported because the
-// New thread card's "Repeat it" offers the same rules, and two lists of them
-// would drift the way the two priority lists once did.
-export function repeatPresets(now = Date.now()): Array<{ label: string; rule: RepeatRuleValue | null }> {
-  const weekday = new Date(now).getDay();
-  const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][weekday];
-  return [
-    { label: 'Once', rule: null },
-    { label: 'Every morning at 8:00am', rule: { every: 'day', at: '08:00' } as RepeatRuleValue },
-    { label: 'Every weekday at 9:00am', rule: { every: 'weekday', at: '09:00' } as RepeatRuleValue },
-    { label: `Every ${dayName} at 9:00am`, rule: { every: 'week', on: weekday, at: '09:00' } as RepeatRuleValue },
-  ];
-}
+// The bottom half: Repeat's presets, kept in format.ts so the phone app offers the same ones.
+export { repeatPresets };
 
 /**
  * What a typed phrase means, or null if neither grammar reads it.

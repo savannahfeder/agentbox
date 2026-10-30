@@ -108,6 +108,7 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
       running.push({
         itemId: id, product: slug, startedAt: Number(live.since) || 0,
         ...(live.where === 'cloud' ? { where: 'cloud' } : {}),
+        ...(live.movable === true ? { movable: true } : {}),
         tail: [],
         activity: (Array.isArray(live.doing) ? live.doing : []).map((d: any, i: number) => ({ id: `live-${i}`, label: String(d?.label ?? ''), detail: '', startedAt: Number(d?.startedAt) || 0 })),
       });
@@ -138,6 +139,16 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
   }
   const ordered = [...rows.commands].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
   for (const c of ordered) {
+    if (isPinSetting(c)) {
+      const p = c.payload;
+      const takenAt = c.taken_at ? Date.parse(c.taken_at) || 0 : null;
+      const copyAt = Date.parse(rows.threads.find((t) => t.device === c.device && t.project === p.product && t.item === p.item)?.updated_at ?? '') || 0;
+      const standing = takenAt === null ? !c.outcome : c.outcome === 'done' && copyAt < takenAt && now - takenAt < LANDING_SHOWN_MS;
+      const key = `${phoneSlug(c.device, p.product)}/${p.item}`;
+      const row = items.get(key);
+      if (standing && row) items.set(key, { ...row, pinned: p.value === true });
+      continue;
+    }
     // Her computer's own hand-over to the cloud is not something she sent.
     if (c.kind === 'setting' || c.project === null || isCarried(c)) continue;
     const at = Date.parse(c.created_at) || now;
@@ -233,9 +244,11 @@ export async function readCommands(select: Select, now = Date.now()): Promise<Ph
 export const readSettingsRows = (select: Select) => select('phone_settings', 'select=device,name,settings,updated_at&order=updated_at.desc&limit=20');
 
 /** A change for one computer's settings, which its own handlers carry out. */
-export function settingCommand(device: string, change: { scope: 'workspace' | 'project'; key: string; value: unknown; product?: string }) {
+export function settingCommand(device: string, change: { scope: 'workspace' | 'project' | 'thread' | 'repeat'; key: string; value: unknown; product?: string; item?: string; id?: string }) {
   return { device, project: null, item: null, kind: 'setting', payload: change };
 }
+const isPinSetting = (c: PhoneRows['commands'][number]) => c.kind === 'setting' && c.payload?.scope === 'thread' && c.payload?.key === 'pinned'
+  && typeof c.payload?.product === 'string' && typeof c.payload?.item === 'string';
 
 // Each card drawn on the phone: where it is, and the fingerprint her Mac drew it with.
 export type Cards = Record<string, { device: string; project: string; item: string; card: string }>;
@@ -292,7 +305,7 @@ export function commandFor(channel: string, p: any, aliases: Aliases = {}): { de
   }
   if (channel === REQUEST_CHANNELS.snooze && Number.isFinite(p.snoozedUntil) && p.snoozedUntil >= 0) return on(p.id, 'snooze', { until: p.snoozedUntil });
   if (channel === REQUEST_CHANNELS.schedule && Number.isFinite(p.runAt) && p.runAt >= 0) return on(p.id, 'schedule', { runAt: p.runAt });
-  const plain: Record<string, string> = { [REQUEST_CHANNELS.stopSession]: 'stop', [REQUEST_CHANNELS.runNow]: 'run-now', [REQUEST_CHANNELS.sendNow]: 'send-now', [REQUEST_CHANNELS.reopen]: 'reopen' };
+  const plain: Record<string, string> = { [REQUEST_CHANNELS.stopSession]: 'stop', [REQUEST_CHANNELS.runNow]: 'run-now', [REQUEST_CHANNELS.sendNow]: 'send-now', [REQUEST_CHANNELS.reopen]: 'reopen', [REQUEST_CHANNELS.moveToCloud]: 'move-to-cloud' };
   if (plain[channel] && p.id) return on(p.id, plain[channel], {});
   if (channel === REQUEST_CHANNELS.compose && (String(p.title ?? '').trim() || String(p.body ?? '').trim())) {
     return on(null, 'new', { title: String(p.title ?? ''), body: String(p.body ?? ''), ...phoneChoices('new', p) });

@@ -268,6 +268,9 @@ async function main() {
   const account = who.Account;
   const bucket = `agentbox-cloud-${account}`;
   say(`account ${account}, ${REGION}`);
+  let before = {};
+  try { before = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch { /* first setup */ }
+  if (before.bucket && before.bucket !== bucket) throw new Error(`${CONFIG_PATH} is for ${before.bucket}, and this sign-in is account ${account}; sign in to that account's AWS and run this again`);
   const version = versions();
 
   ensureBucket(bucket);
@@ -288,7 +291,7 @@ async function main() {
   const runtime = await ensureRuntime(containerUri, runtimeRoleArn);
   ensureAppUser(bucket, runtime.arn);
 
-  const config = { region: REGION, bucket, runtimeArn: runtime.arn, runtimeId: runtime.id, image: containerUri, claudeCodeVersion: version.claude, codexVersion: version.codex, profile: NAMES.profile, madeAt: new Date().toISOString() };
+  const config = { ...before, region: REGION, bucket, runtimeArn: runtime.arn, runtimeId: runtime.id, image: containerUri, claudeCodeVersion: version.claude, codexVersion: version.codex, profile: NAMES.profile, madeAt: new Date().toISOString() };
   fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
   say(`done; wrote ${CONFIG_PATH}`);

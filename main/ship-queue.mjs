@@ -28,6 +28,7 @@ import path from 'node:path';
 import { Name } from '../shared/product-name.mjs';
 import { SHIP_FAILED } from '../shared/not-shipped.mjs';
 import { conflictBrief, earlyConflictNote } from './ship-conflict-brief.mjs';
+import { redOnMain } from './main-went-red.mjs';
 
 export const SHIP_LABEL = 'ship';
 const SHIP_MS = 20 * 60 * 1000;
@@ -361,7 +362,9 @@ export class ShipQueue {
 
   async ship({ item, product, script, cwd }, products = [], items = []) {
     this.log.info?.(`zero: shipping ${item.id} from ${cwd}`);
-    const { code, out } = await this.run(script, cwd);
+    // The push hook leaves tests already red on main out of its refusal.
+    const red = redOnMain(this.userDir);
+    const { code, out } = await this.run(script, cwd, red.length ? { env: { ...process.env, AGENTBOX_RED_ON_MAIN: red.join('\n') } } : undefined);
     try {
       // Already on main: there is nothing to fix, so nobody is woken.
       const already = /There is nothing to ship/.test(out);

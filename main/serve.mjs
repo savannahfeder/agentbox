@@ -38,8 +38,10 @@ import { Supervisor } from './supervisor.mjs';
 import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, unifyAgentInstructions } from './instruction-settings.mjs';
 import { registerIpc } from './ipc.mjs';
 import { reportFromRenderer } from './crash-report.mjs';
+import { createAnalytics, createDailyCount } from './analytics.mjs';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mjs';
+import { ensurePersonalProject } from './team/projects.mjs';
 import { loadCloudConfig, supabaseSession, headlessSessionFile } from './team/session.mjs';
 import { roomsSetup } from './team/room-setup.mjs';
 import { appHome, carryMisplacedMachinery, storeRootEnv } from './store/home.mjs';
@@ -164,12 +166,14 @@ export function answerWhatOnlyTheWindowAnswered(ipcMain) {
 /**
  * Boot the doing half, with no Electron anywhere.
  *
- *  Six lines, and they are the same six `main/main.mjs` runs. `analytics` and
- *  `updater` are left at the defaults `registerIpc` already has for them: one
- *  sends nothing and the other reports that there is nothing to update, which
- *  is the truth for a copy run out of npm.
+ *  The same steps `main/main.mjs` runs. `updater` is left
+ *  at the default `registerIpc` has for it, which reports that there is nothing
+ *  to update, the truth for a copy run out of npm. Counts are set up as the
+ *  desktop sets them up: the npm package carries the key `npm run deploy`
+ *  writes into it, and a checkout carries none and sends nothing.
+ *  `countClient` and `now` are for tests.
  */
-export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, userDir = dataDir, openExternal = openInBrowser, host = null } = {}) {
+export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, userDir = dataDir, openExternal = openInBrowser, host = null, countClient = null, now = Date.now } = {}) {
   const config = loadConfig(dataDir);
   // The browser editor uses the same user files as the desktop. Finish the
   // older migrations first so only user content enters the combined file.
@@ -189,6 +193,13 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   Object.assign(process.env, storeRootEnv(config.storeRoot));
   carryMisplacedMachinery(inheritedHome, config.storeRoot);
   keepAnswerModesIn({ userDir, storeRoot: config.storeRoot });
+  // EVERYBODY HAS SOMEWHERE TO SEND A THREAD, ON THIS DOOR TOO. main/main.mjs
+  // says why and makes it for the desktop; this is the door `npx agentbox-app`
+  // comes through. Before the store, as there: it reads the account root as it
+  // opens, so a project made after that is one the first snapshot does not carry.
+  try {
+    ensurePersonalProject(config.accountRoot);
+  } catch (err) { console.warn(`zero: could not make My Workspace: ${err.message}`); }
   const store = await new Store(config).init();
   const supervisor = new Supervisor(config, store, appDir, dataDir, userDir);
   const window = broadcastingWindow();
@@ -221,9 +232,19 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   // same way until this is fixed" and rested 15 minutes after the copy came
   // back (tests/control-c-on-the-browser-copy-does-not-fail-its-agents).
   host.app.on('before-quit', () => supervisor.killAll());
-  ipc = registerIpc({ store, supervisor, config, window, host, team });
+  // A tab has no window focus to count a day by, so the day is counted when
+  // the tab sends a count of its own, which is somebody doing something.
+  const analytics = createAnalytics({ config, version: readVersion(), dir: path.join(dataDir, 'crash-reports'), client: countClient, kind: 'browser' });
+  const usedToday = createDailyCount((name) => analytics.track(name));
+  if (analytics.enabled) {
+    analytics.track('app_opened');
+    usedToday(now());
+  }
+  supervisor.count = (name, props) => analytics.track(name, props);
+  host.app.on('before-quit', () => analytics.track('app_quit', { seconds: Math.round(process.uptime()) }));
+  ipc = registerIpc({ store, supervisor, config, window, analytics, host, team, onCount: () => usedToday(now()) });
   answerWhatOnlyTheWindowAnswered(host.ipcMain);
-  return { config, store, supervisor, window, host, ipc, team, channels: host.ipcMain.handlers };
+  return { config, store, supervisor, window, host, ipc, team, analytics, channels: host.ipcMain.handlers };
 }
 
 /** A token in the url, because the port alone is not a door key. */

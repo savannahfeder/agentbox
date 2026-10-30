@@ -5,7 +5,7 @@
 import { REQUEST_CHANNELS } from '../../shared/bridge-map.mjs';
 import { madeHere } from '../../shared/phone-snapshot.mjs';
 import {
-  NOT_HERE, UNDONE, approvalCommand, commandFor, phoneSlug, phoneView, realItem, takeBack, type Aliases, type PhoneRows,
+  NOT_HERE, UNDONE, approvalCommand, commandFor, phoneSlug, phoneView, realItem, settingCommand, splitSlug, takeBack, type Aliases, type PhoneRows,
 } from './phone-rows';
 
 type Command = PhoneRows['commands'][number];
@@ -61,10 +61,49 @@ export function phoneSender({ client, rows, setRows, aliases, changed }: {
     return { ok: true };
   };
 
+  // A change to one computer's own lists, left for that computer.
+  const setting = async (device: string, change: Parameters<typeof settingCommand>[1]) => {
+    const asked = client.generation();
+    const row = await client.insertCommand(settingCommand(device, change));
+    if (client.generation() === asked) setRows({ ...rows(), commands: [...rows().commands, row] });
+    changed();
+  };
+
   return {
+    // The window's door (App.tsx `pinThread`): ids to true, or null to unpin.
+    setThreadPins: async (p: { pins: Record<string, true | null> }) => {
+      for (const [id, pin] of Object.entries(p?.pins ?? {})) {
+        const t = rows().threads.find((r) => r.item === id);
+        if (!t) throw new Error('Only a thread your computer has made can be pinned.');
+        await setting(t.device, { scope: 'thread', key: 'pinned', product: t.project, item: id, value: pin === true });
+      }
+      return { ok: true };
+    },
+    // The repeating task doors (api.ts), for the computer that has the project.
+    composeRepeat: async (p: { product: string; title: string; body?: string; priority?: number; rule: Record<string, unknown>; engine?: string; model?: string }) => {
+      const where = splitSlug(p?.product);
+      if (!where) throw new Error(NOT_HERE);
+      const { every, on, at } = p.rule ?? {};
+      const value = { title: p.title, ...(p.body ? { body: p.body } : {}), ...(p.priority === undefined ? {} : { priority: p.priority }), every, ...(every === 'week' ? { on } : {}), at, ...(p.engine ? { engine: p.engine } : {}), ...(p.model ? { model: p.model } : {}) };
+      await setting(where.device, { scope: 'repeat', key: 'new', product: where.project, value });
+      return null;
+    },
+    setRepeat: async (p: { product: string; id: string; rule: Record<string, unknown> }) => {
+      const where = splitSlug(p?.product);
+      if (!where) throw new Error(NOT_HERE);
+      await setting(where.device, { scope: 'repeat', key: 'change', product: where.project, id: p.id, value: p.rule });
+      return null;
+    },
+    endRepeat: async (p: { product: string; id: string }) => {
+      const where = splitSlug(p?.product);
+      if (!where) throw new Error(NOT_HERE);
+      await setting(where.device, { scope: 'repeat', key: 'end', product: where.project, id: p.id, value: true });
+      return null;
+    },
     answer: (p: unknown) => leave(REQUEST_CHANNELS.answer, p),
     stopSession: (p: unknown) => leave(REQUEST_CHANNELS.stopSession, p),
     runNow: (p: unknown) => leave(REQUEST_CHANNELS.runNow, p),
+    moveToCloud: (p: unknown) => leave(REQUEST_CHANNELS.moveToCloud, p),
     sendNow: (p: unknown) => leave(REQUEST_CHANNELS.sendNow, p),
     reopen: (p: unknown) => leave(REQUEST_CHANNELS.reopen, p),
     snooze: (p: unknown) => leave(REQUEST_CHANNELS.snooze, p),

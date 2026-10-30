@@ -50,6 +50,34 @@ export async function readPortableFile(file, root, limit = SKILL_LIMITS.file, { 
   return { body, mode: 0o644 | (st.mode & 0o111) };
 }
 
+/**
+ * The files a folder would send: hidden, installed and private names left out,
+ * links followed only while they stay inside it. `over` is set, and the list
+ * cut short, once either cap is passed.
+ */
+export function filesInFolder(dir, { files: maxFiles = 300, bytes: maxBytes = SKILL_LIMITS.total, file: maxFile = SKILL_LIMITS.file, depth: maxDepth = SKILL_LIMITS.depth } = {}) {
+  const root = fs.realpathSync(dir);
+  const found = []; let bytes = 0; let over = false; const skipped = [];
+  const walk = (p, depth) => {
+    if (over || depth > maxDepth) return;
+    for (const name of fs.readdirSync(p).sort()) {
+      if (over) return;
+      if (name.startsWith('.') || ignored.has(name) || privateName.test(name) || /[\r\n\0]/.test(name)) continue;
+      const full = path.join(p, name);
+      let real; let st;
+      try { real = fs.realpathSync(full); st = fs.statSync(real); } catch { continue; }
+      if (!inside(real, root)) continue;
+      if (st.isDirectory()) { walk(full, depth + 1); continue; }
+      if (!st.isFile()) continue;
+      if (st.size > maxFile) { skipped.push(full); continue; }
+      if (found.length + 1 > maxFiles || bytes + st.size > maxBytes) { over = true; return; }
+      bytes += st.size; found.push({ path: full, bytes: st.size });
+    }
+  };
+  walk(path.resolve(dir), 0);
+  return { files: found, bytes, over, skipped };
+}
+
 async function readSkill(dir, limits) {
   const root = await fs.promises.realpath(dir);
   const files = []; const ancestors = new Set(); let bytes = 0;

@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { nameSlug } from '../../shared/product-name.mjs';
+import { CLOUD_ADDRESS, PHONE_SITE } from '../../shared/cloud-address.mjs';
 import { runningAsAFreshUser } from '../../shared/fresh-user-home.mjs';
 import { supabaseBackend } from './supabase-backend.mjs';
 import { signInWithGoogle, cancelGoogleSignIn } from './sign-in.mjs';
@@ -69,7 +70,18 @@ export function teamConfigOnThisMac(home = os.homedir()) {
 // A FRESH COPY HANDED A TEAM FILE IS A SECOND PERSON ON THAT TEAM (2026-10-21):
 // a power tester in her room. It loads that file and no other, so the ⌘K
 // window, which is handed none, stays the single-person app.
-export function loadCloudConfig(appDir, { packaged = isPackagedElectron(), home = os.homedir(), env = process.env } = {}) {
+export function loadCloudConfig(appDir, options = {}) {
+  return withPhoneSite(cloudConfigFound(appDir, options));
+}
+
+// A config for our own database without a site address gets the one that ships.
+function withPhoneSite(c) {
+  if (!c || c.phoneSite) return c;
+  const ours = (u) => String(u).replace(/\/+$/, '') === CLOUD_ADDRESS.supabaseUrl;
+  return ours(c.url) ? { ...c, phoneSite: PHONE_SITE } : c;
+}
+
+function cloudConfigFound(appDir, { packaged = isPackagedElectron(), home = os.homedir(), env = process.env } = {}) {
   if (packaged) return bakedTeam(appDir);
   if (runningAsAFreshUser(env) && !env.AGENTBOX_TEAM_CONFIG) return null;
   const tries = runningAsAFreshUser(env) ? [env.AGENTBOX_TEAM_CONFIG] : [

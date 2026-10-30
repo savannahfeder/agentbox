@@ -12,10 +12,10 @@ it('shows a task scheduled for later in Later after sending', () => {
   expect(landing('w-later', Date.now() + 3600000)).toEqual({ view: 'snoozed', select: 'w-later' });
   expect(landing('w-now', Date.now() - 1000)).toEqual({ view: 'progress', select: 'w-now' });
 });
-it('opens the app folder browser instead of a native dialog from onboarding', () => {
+it('checks the folder onboarding was handed, from either picker', () => {
   const source = fs.readFileSync(new URL('../renderer/src/components/FirstRun.tsx', import.meta.url), 'utf8');
   expect(source).toContain('<FolderPicker');
-  expect(source).not.toContain('api.chooseFolder(');
+  expect(source).toContain('api.chooseFolder(');
   expect(source).toContain('checkProjectFolder(folder');
 });
 describe('the first task schedule', () => {

@@ -1,10 +1,9 @@
-/* Everything else (w-b5f23cff71): the team's cards, the bar over the open one, its space. */
-.ev-page { display: flex; flex-direction: column; min-height: 0; }
-.list-pane.ev-open { display: flex; flex-direction: column; overflow: hidden; }
-.ev-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+/* Everything else (w-b5f23cff71): the team's cards, the bar over the open one, its work. */
 
-.ev-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; padding: 10px var(--row-r, 24px) 4px var(--text-x, 32px); flex: none; }
-.ev-card { box-sizing: border-box; min-width: 0; display: grid; grid-template-columns: 52px minmax(0, 1fr); column-gap: 14px; align-items: center; padding: 13px 15px; background: var(--wash); border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; position: relative; user-select: none; -webkit-user-select: none; }
+/* A face over a name over the agents line: narrow, so a row holds most of a team. */
+.ev-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; padding: 10px var(--row-r, 24px) 4px var(--text-x, 32px); flex: none; }
+.ev-card { box-sizing: border-box; min-width: 0; display: flex; flex-direction: column; align-items: stretch; gap: 14px; padding: 14px 14px 13px; background: var(--wash); border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; position: relative; user-select: none; -webkit-user-select: none; }
+.ev-card > .rm-pic, .ev-card > .ev-ai, .ev-card > .ev-hash, .ev-card > .ev-two { align-self: flex-start; }
 .ev-card:hover { border-color: var(--line-strong); }
 .ev-card.on { background: var(--wash-strong); border-color: var(--text-faint); }
 /* A chat is a place, not a member: no fill, its people's faces, a speech mark by its name. */
@@ -18,10 +17,7 @@
 .ev-t { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .ev-n { display: flex; align-items: baseline; gap: 0; min-width: 0; font-size: 14px; line-height: 19px; color: var(--text); }
 .ev-n .rm-quiet { margin-left: 8px; }
-.ev-role { margin-left: 8px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ev-bubble { flex: none; margin-right: 7px; color: var(--text-dim); position: relative; top: 1px; }
-.ev-on { font-size: 13px; line-height: 18px; color: var(--text-dim); }
-.ev-on.idle { color: var(--text-faint); }
 .ev-t .rm-ag { margin-top: 2px; }
 .ev-new { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); }
 
@@ -39,20 +35,14 @@
 .ev-bn em { font-style: normal; color: var(--text-faint); margin-left: 8px; }
 .ev-bar .tm-tabs { margin-left: 22px; align-self: stretch; }
 .ev-bar .tm-tab { height: 43px; line-height: 43px; }
-.ev-slot { display: flex; align-items: center; min-width: 0; margin-left: auto; }
-/* An open conversation names its person; the bar already did. */
-.ev-slot .cx-person { display: none; }
 .ev-right { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); white-space: nowrap; }
-.ev-slot + .ev-right { margin-left: 16px; }
 .ev-right .live-mark { width: 13px; height: 13px; gap: 1.5px; color: var(--text); }
-
-.ev-space { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.ev-space > .gr-page, .ev-space > .focus-pane { flex: 1; min-height: 0; }
-.ev-space .tq-chats .tq-lines, .ev-space .gr-chat .rm-full .rm-chat-list { padding-left: var(--text-x, 32px); }
-.ev-space .rm-compose.tq-compose { margin-left: var(--text-x, 32px); }
-/* A person's conversation sits on the bar's edge, not beside the Chats list it used to have. */
-.ev-open .cx-frame-main .focus, .ev-open .cx-frame-main .focus-dock-inner { margin-left: calc(var(--text-x, 32px) - 32px); }
-.ev-space .gr-side.tq-details { background: none; }
+/* The way to their chat, on the Chats page. */
+.ev-msg { flex: none; display: inline-flex; align-items: center; height: 28px; padding: 0 11px 0 10px; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
+.ev-msg:hover { color: var(--text); border-color: var(--text-faint); background: var(--wash); }
+.ev-msg .ev-bubble { color: inherit; }
+.ev-right + .ev-msg { margin-left: 16px; }
+.ev-bn + .ev-msg { margin-left: auto; }
 .ev-rows { padding-top: 4px; }
 /* Inside a teammate's own space every row is theirs; the name on each says nothing. */
 .ev-rows .tq-from { display: none; }
@@ -68,7 +58,16 @@
 /* The row's 24px gap less the magnifier's inset in a 24px square: the same 10px as between two faces. */
 .th-bar .ev-corner + .th-search { margin-left: -22px; width: 24px; }
 
-/* Two rows of cards unless you choose otherwise (CardsArea); the rest scroll, a whole row at a time.
+/* The cards' title, in the type of the board's column heads. */
+.ev-head { display: flex; align-items: center; height: 38px; margin: 6px var(--row-r, 24px) 0 var(--text-x, 32px); flex: none; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.ev-head b { font-weight: 400; color: var(--text-faint); margin-left: 8px; }
+.ev-head + .ev-cards { margin-top: -6px; }
+
+/* The lit card's work: In progress, Later and Done today. */
+.ev-board .th-board { grid-template-columns: repeat(3, minmax(260px, 1fr)); }
+.ev-board .th-board-wrap { min-height: 0; }
+
+/* One row of cards unless you choose otherwise (CardsArea); the rest scroll, a whole row at a time.
    The strip's top padding inside the box equals the gap, so a scrolled row sits where the first one does. */
 .ev-cards { flex: none; margin-top: 4px; overflow-y: auto; scroll-snap-type: y mandatory; }
 .ev-cards .ev-card { scroll-snap-align: start; scroll-margin-top: 10px; }

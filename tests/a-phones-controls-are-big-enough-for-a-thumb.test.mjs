@@ -118,7 +118,7 @@ describe.skipIf(!browserAvailable)('what a thumb has to hit', () => {
   it('and on every icon in the inbox\'s corner', () => everyOneOf({ open: false },
     ['.th-bar > .th-search', '.topbar .th-disp', '.workspace-navigation button[aria-label="Settings"]']));
 
-  it('is at least 44px tall on every inbox word along the foot', async () => {
+  it('is at least 44px tall on every inbox word under the title', async () => {
     const { browser, page } = await phoneScreen();
     try {
       const heights = await page.locator('.tm-tab').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)));
@@ -142,14 +142,13 @@ describe.skipIf(!browserAvailable)('what a thumb has to hit', () => {
 
 describe.skipIf(!browserAvailable)('and nothing moved to make room', () => {
   // The bigger boxes took room that was already empty. Measured against the
-  // rules they replaced: the chevron's ink and the title beside it, and the
-  // inbox words and the underline under the picked one, all to the pixel.
+  // rules they replaced: the chevron's ink and the title beside it, to the
+  // pixel. The inbox words were measured here too until they moved up under
+  // the title on purpose (2026-10-28); where they sit now is
+  // the-web-app-on-a-phone-matches-the-phone-apps-text-and-tabs.
   const AS_IT_WAS = `:root:root:root:root .workspace-task-header > .thread-crumb { height: 28px; overflow: hidden; }
     :root:root:root:root .thread-crumb > .back-esc.thread-crumb-back { height: 28px; min-width: 0; margin-left: 0; padding: 4px 8px 4px 4px; align-items: center; }
-    :root:root:root:root button.thread-crumb-name { height: 28px; }
-    :root:root:root:root .tm-tab { height: 32px; padding: 0; align-items: center; border-bottom: 2px solid transparent; }
-    :root:root:root:root .tm-tab.on { border-bottom-color: var(--accent); }
-    :root:root:root:root .tm-tab.on::after { display: none; }`;
+    :root:root:root:root button.thread-crumb-name { height: 28px; }`;
 
   const places = (page) => page.evaluate(() => {
     const off = (el, from) => [Math.round(el.left - from.left), Math.round(el.top - from.top)];
@@ -159,16 +158,13 @@ describe.skipIf(!browserAvailable)('and nothing moved to make room', () => {
     const ink = document.querySelector('.thread-crumb-back svg').getBoundingClientRect();
     const name = document.querySelector('.thread-crumb-name').getBoundingClientRect();
     const nameMid = [Math.round(name.left - head.left), Math.round(name.top + name.height / 2 - head.top)];
-    const bar = document.querySelector('.th-bar').getBoundingClientRect();
-    const word = document.querySelector('.tm-tab.on').getBoundingClientRect();
-    return { bar: Math.round(head.height), ink: off(ink, head), name: nameMid, word: off(word, bar), wordEnd: Math.round(word.bottom - bar.top) };
+    return { bar: Math.round(head.height), ink: off(ink, head), name: nameMid };
   });
 
-  it('the back arrow, the thread name, the inbox words and the underline sit where they always did', async () => {
+  it('the back arrow and the thread name sit where they always did', async () => {
     const { browser, page } = await phoneScreen();
     try {
       const now = await places(page);
-      const line = await page.locator('.tm-tab.on').evaluate((el) => getComputedStyle(el, '::after').top);
       await page.addStyleTag({ content: AS_IT_WAS });
       const before = await places(page);
       expect(now.bar).toBe(before.bar);
@@ -177,10 +173,6 @@ describe.skipIf(!browserAvailable)('and nothing moved to make room', () => {
       // place and its middle line, because the negative margin gives back
       // exactly the width the 44px minimum added.
       expect(now.name).toEqual(before.name);
-      // The word's own box is taller now; where its text starts is not.
-      expect(now.word).toEqual(before.word);
-      // And the underline fills the 2px the old box's border filled.
-      expect(parseFloat(line) + 2).toBe(before.wordEnd);
     } finally { await browser.close(); }
   });
 });

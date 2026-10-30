@@ -30,7 +30,11 @@ describe('a paused teammate', () => {
   });
 
   it('says Paused on its row in the Chats list, unless something waits on you there', () => {
-    expect(read('renderer/src/teammates/ChatsColumn.tsx')).toMatch(/waitsOnYou\(t\) \? <i className="cx-need"[^>]*\/> : t\.paused \? <span className="cx-st">Paused<\/span> : null/);
+    expect(read('renderer/src/teammates/ChatsColumn.tsx')).toMatch(/waitsOnYou\(t\) \? <i className="cx-need"[^>]*\/> : t\.paused \? <span className="cx-st">Paused<\/span> : t\.primary \? <span className="cx-st">Primary<\/span> : null/);
+  });
+
+  it('says Primary on the primary\'s row, below Paused and anything waiting on you', () => {
+    expect(read('renderer/src/teammates/ChatsColumn.tsx')).toContain('t.primary ? <span className="cx-st">Primary</span>');
   });
 });
 

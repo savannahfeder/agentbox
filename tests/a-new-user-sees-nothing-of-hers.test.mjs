@@ -28,50 +28,14 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const palette = read('renderer/src/components/Palette.tsx');
 const app = read('renderer/src/App.tsx');
 
-describe('⌘K offers one new user, and it is the blank one', () => {
-  it('has the blank row and no second row beside it', () => {
-    expect(palette).toContain("id: 'fresh-user',");
-    // No agents of hers, but her Claude Code, so it is detected (w-9f6975906c).
-    expect(palette).toContain('run: () => onFreshUser(false),');
-    expect(palette).not.toContain("id: 'fresh-user-agents',");
-    expect(palette).not.toContain("id: 'fresh-user-no-tools',");
-    expect(palette).not.toContain('run: () => onFreshUser(true),');
-  });
-
-  it('never hands the palette a fresh user without saying which kind', () => {
-    // The bug was a hard-coded `true` in App.tsx. If it comes back, the row
-    // silently goes back to showing her own sessions and nothing fails.
-    expect(app).not.toContain('api.openFreshUser(true');
-    // `withTools` joined it on 2026-10-05 (w-9f6975906c): the row for a new
-    // user with no Claude Code or Codex, which is how the plan setup is tried.
-    expect(app).toContain('api.openFreshUser(withAgents, withTools)');
-    expect(app).toContain('const openAsNewUser = useCallback(async (withAgents: boolean, withTools = true)');
-  });
-
+// The ⌘K row itself went on 2026-10-29 as a test rig
+// (tests/the-command-bar-holds-no-test-rigs.test.mjs); `npm run fresh` opens it.
+describe('⌘K says what setting up again does in a few words', () => {
   // HER LENGTH RULE, AS A NUMBER RATHER THAN AS TASTE.
-  it('says what the two onboarding rows do in a few words, not a paragraph', () => {
-    const hintOf = (id) => {
-      const row = palette.slice(palette.indexOf(`id: '${id}',`));
-      return row.slice(row.indexOf("hint: '") + 7, row.indexOf("',", row.indexOf("hint: '")));
-    };
-    for (const id of ['first-run', 'fresh-user']) {
-      expect(hintOf(id).length).toBeLessThanOrEqual(44);
-    }
-    // And the blank row still says the thing that makes it worth pressing.
-    expect(hintOf('fresh-user')).toContain('nothing set up');
-  });
-
-  it('can be found by the words she would type for it', () => {
-    const at = (id) => palette.slice(palette.indexOf(`id: '${id}',`), palette.indexOf(`id: '${id}',`) + 400);
-    expect(at('fresh-user')).toMatch(/keywords:.*\bblank\b/);
-    // The row that went is still reachable by the words that were on it.
-    expect(at('fresh-user')).toMatch(/keywords:.*\bagents\b/);
-  });
-
-  it('drops the no-agents note on the blank run, where it is the point', () => {
-    // Left in, it reads as a fault: "There is no ~/.claude on this Mac" is
-    // written for the other row.
-    expect(app).toContain("withAgents || !n.includes('.claude')");
+  it('not a paragraph', () => {
+    const row = palette.slice(palette.indexOf("id: 'first-run',"));
+    const hint = row.slice(row.indexOf("hint: '") + 7, row.indexOf("',", row.indexOf("hint: '")));
+    expect(hint.length).toBeLessThanOrEqual(44);
   });
 });
 

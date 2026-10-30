@@ -10,7 +10,7 @@ import {
   COPY, LOOK_AGAIN_FOR_MS, LOOK_AGAIN_MS, afterCheck, afterFound, enginesFor, foundHead, foundLede,
   foundRows, litRow, planName, planNote, planRows, readLog, readyEngines, setupLede, setupRows,
   worthLookingAgain,
-  type AskRow, type Engine, type EngineSetupState, type Plan, type StepRow,
+  type AskRow, type BarWords, type Engine, type EngineSetupState, type Plan, type StepRow,
 } from '../plan-setup';
 import { Cap } from './Onboarding';
 import { hoverLit } from '../onboarding';
@@ -506,12 +506,12 @@ export function PlanSetupCard({ plan, onDone, onSkip, state: given }: {
  *  run an agent: somebody skipped, or signed out since. Her words: "if somebody
  *  somehow has an issue, maybe that bar at the top makes sense".
  */
-export function PlanBar({ onSetup }: { onSetup: (plan: Plan) => void }) {
+export function PlanBar({ words, onSetup }: { words: BarWords; onSetup: (plan: Plan) => void }) {
   return (
     <div className="ps-bar" role="status">
-      <div className="ps-bar-say">{COPY.barSay} <span>{COPY.barSub}</span></div>
-      <button type="button" onClick={() => onSetup('claude')}>{COPY.barClaude}</button>
-      <button type="button" className="quiet" onClick={() => onSetup('codex')}>{COPY.barChatgpt}</button>
+      <div className="ps-bar-say">{words.say} <span>{COPY.barSub}</span></div>
+      <button type="button" onClick={() => onSetup(words.first.plan)}>{words.first.label}</button>
+      <button type="button" className="quiet" onClick={() => onSetup(words.second.plan)}>{words.second.label}</button>
     </div>
   );
 }

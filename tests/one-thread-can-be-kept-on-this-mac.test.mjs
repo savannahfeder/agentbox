@@ -25,14 +25,13 @@ const store = { listItems: () => [], listProducts: () => [product], isDue: () =>
 const make = (root) => new Supervisor({ storeRoot: root, maxConcurrentSessions: 3 }, store, root);
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'zero-onmac-'));
 
-describe('the row in the thread\'s menu', () => {
-  it('comes first, and says what it will do in each of the three states', () => {
-    const rows = (place) => threadMenuRows({ change: false, terminal: 'closed', finish: true, place });
-    expect(rows('cloud')[0]).toEqual({ id: 'place', ...PLACE_ROW.cloud, key: null });
-    expect(rows('here')[0]).toEqual({ id: 'place', ...PLACE_ROW.here, key: null });
-    expect(rows('kept')[0]).toEqual({ id: 'place', ...PLACE_ROW.kept, key: null });
+// The ⋯ menu's row moved to the top bar's place button on 2026-10-29
+// (the-cloud-button-on-a-thread-says-where-it-runs-and-what-it-needs); ⌘K
+// still offers these words.
+describe('the words ⌘K offers for where a thread runs', () => {
+  it('say what each does in every state', () => {
     // Each names what it does, and where the thread is now.
-    expect(new Set(Object.values(PLACE_ROW).map((r) => r.label + r.detail)).size).toBe(3);
+    expect(new Set(Object.values(PLACE_ROW).map((r) => r.label + r.detail)).size).toBe(Object.keys(PLACE_ROW).length);
     expect(PLACE_ROW.cloud.detail).toMatch(/cloud/i);
     expect(PLACE_ROW.kept.detail).toMatch(/Mac/);
     // Her words, 2026-10-16: "Run on the cloud", beside "Run on this Mac".
@@ -40,8 +39,8 @@ describe('the row in the thread\'s menu', () => {
     expect(PLACE_ROW.cloud.label).toBe('Run on this Mac');
   });
 
-  it('is not there where the cloud could never run the thread', () => {
-    expect(threadMenuRows({ change: false, terminal: 'closed', finish: true, place: null }).map((r) => r.id)).toEqual(['terminal', 'done']);
+  it('are no longer a row in the ⋯ menu', () => {
+    expect(threadMenuRows({ change: false, terminal: 'closed', finish: true }).map((r) => r.id)).toEqual(['terminal', 'done']);
   });
 });
 
