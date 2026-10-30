@@ -266,47 +266,6 @@ describe('how the demo rows are written', () => {
   });
 });
 
-describe('the ⌘K row', () => {
-  // Read out of the source in the shape ⌘K matches on, the way the tutorial's
-  // own test does it, so the row and this file cannot drift apart.
-  const palette = fs.readFileSync(new URL('../renderer/src/components/Palette.tsx', import.meta.url), 'utf8');
-  const row = (id) => {
-    const from = palette.indexOf(`id: '${id}'`);
-    expect(from, `no ⌘K row called ${id}`).toBeGreaterThan(-1);
-    const chunk = palette.slice(from, from + 900);
-    return {
-      label: /label: '([^']*)'/.exec(chunk)?.[1] ?? '',
-      hint: /hint: '([^']*)'/.exec(chunk)?.[1] ?? '',
-      keywords: /keywords: '([^']*)'/.exec(chunk)?.[1] ?? '',
-      at: from,
-    };
-  };
-
-  it('is found by the word she would type', () => {
-    const demo = row('demo');
-    expect(`${demo.label} ${demo.keywords}`.toLowerCase()).toContain('demo');
-    for (const word of ['present', 'pitch', 'screen share', 'investor']) {
-      expect(`${demo.label} ${demo.keywords}`.toLowerCase()).toContain(word);
-    }
-  });
-
-  it('is the only row that word finds, so her return key lands on it', () => {
-    // MEASURED 2026-09-02 BEFORE THIS WENT IN: typing "demo" returned two rows
-    // and the tutorial was first, because `demo` was in its keywords. Two rows
-    // under one word is a choice nobody should have to make correctly at speed,
-    // and this one gets made in front of a room.
-    const tutorial = row('tutorial');
-    expect(`${tutorial.label} ${tutorial.keywords}`.toLowerCase()).not.toContain('demo');
-  });
-
-  it('says it is not her work and that hers keeps running', () => {
-    const demo = row('demo');
-    expect(demo.hint).toMatch(/invented/i);
-    expect(demo.hint).toMatch(/yours keeps running/i);
-    expect(demo.hint.length).toBeLessThan(45);
-  });
-});
-
 describe('opening one', () => {
   it(`starts a second ${NAME}, detached, in the demo environment`, () => {
     const spawned = [];

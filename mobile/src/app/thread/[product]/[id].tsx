@@ -93,7 +93,7 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin }: {
         {/* Her words as typed; the files the app wrote into them are drawn, not read out. */}
         {yours ? (
           <>
-            {!!words.trim() && <T style={{ fontSize: 17, lineHeight: 26.35, fontFamily: font.medium }}>{words}</T>}
+            {!!words.trim() && <T selectable style={{ fontSize: 17, lineHeight: 26.35, fontFamily: font.medium }}>{words}</T>}
             <SentFiles text={e.text ?? ''} product={product} />
           </>
         ) : <Markdown text={e.text ?? ''} dir={dir} files={files} />}

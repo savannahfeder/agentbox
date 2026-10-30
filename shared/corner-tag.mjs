@@ -260,6 +260,18 @@ export function readyNow(ready, now) {
     .sort((a, b) => (Number.isFinite(b.since) ? b.since : now) - (Number.isFinite(a.since) ? a.since : now));
 }
 
+/**
+ * 'light' or 'dark' from how bright the screen behind the tray is, 0 to 1, or
+ * null without a reading. Near the middle it keeps the tone it had, so a
+ * mid-grey page does not flip the ink every time the reading drifts.
+ */
+export function toneFromLuma(luma, was = null) {
+  if (typeof luma !== 'number' || !(luma >= 0 && luma <= 1)) return null;
+  if (was === 'light' && luma >= 0.4) return 'light';
+  if (was === 'dark' && luma <= 0.6) return 'dark';
+  return luma >= 0.5 ? 'light' : 'dark';
+}
+
 /** Whether the tag is on screen right now; `ready` is how many are new. */
 export function tagShows({ on, hiddenUntil: until = 0, now, inApp, ready = 0 }) {
   if (on === false) return false;

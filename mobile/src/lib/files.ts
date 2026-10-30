@@ -61,6 +61,17 @@ export function openingOf(places: Places, links: Links, product: string, src: st
   return { kind: 'elsewhere', link: at.link };
 }
 
+/**
+ * The address a long press offers to open in the browser or share: a site as
+ * written, a file by its own link. A folder has no one address, and a file the
+ * phone does not have has none at all.
+ */
+export function linkToShare(o: Opening): string | null {
+  if (o.kind === 'web') return o.url;
+  if (o.kind === 'folder' || o.kind === 'refused') return null;
+  return o.link;
+}
+
 /** A picture's link: undefined while it is on its way, null when the phone will not have it. */
 export function pictureLink(places: Places, links: Links, product: string, src: string): string | null | undefined {
   const at = fileOnPhone(places, links, product, src);

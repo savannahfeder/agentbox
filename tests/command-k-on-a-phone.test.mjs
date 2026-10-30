@@ -18,7 +18,7 @@ const draw = (props = {}) => renderToStaticMarkup(createElement(Palette, {
   products: [], supervisorPaused: false, look: 'dark', onSetLook: noop, onOpenFilter: noop, onClearFilter: noop,
   onView: noop, onPause: noop, onResume: noop, onRankFirst: noop, onNewProject: noop, onNewThread: noop,
   onStanding: noop, onSettings: noop, onShortcuts: noop, keyHints: true, onSetKeyHints: noop, onSearch: noop,
-  onFirstRun: noop, onTutorial: noop, onImportAgents: noop, onFreshUser: noop, onDemo: noop, onClose: noop,
+  onFirstRun: noop, onTutorial: noop, onImportAgents: noop, onClose: noop,
   onCheckUpdate: noop, onFlipView: noop, findThreads: () => [], ...props,
 }));
 const rows = (html) => [...html.matchAll(/class="palette-label">([^<]+)</g)].map((m) => m[1]);

@@ -103,9 +103,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'DejaVu Sa
 /* THE MAC'S OWN LIQUID GLASS (macOS 26, w-93b3a1a796). The fill above is a
    fill: a page cannot see the screen behind its window, so the blur above
    blurs nothing. Where the Mac draws real glass behind the page
-   (main/liquid-glass.mjs), the page draws none, and its ink follows the
-   glass, which goes light over a white page and dark over a dark one. The
-   Mac's own light or dark setting still decides nothing. */
+   (main/liquid-glass.mjs), the page draws none, and its ink follows how
+   bright the screen behind the glass is: light over a white page, dark over
+   a dark one. The Mac's own light or dark setting still decides nothing. */
 .ct-native .ct-glass, .ct-native .ct-tag:hover, .ct-native .ct-tag.is-open {
   background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none;
 }

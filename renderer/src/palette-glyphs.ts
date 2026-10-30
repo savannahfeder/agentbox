@@ -36,8 +36,6 @@ const BY_ID: Record<string, string> = {
   'import-agents': '↓',
   tutorial: '?',
   'first-run': '↺',
-  demo: '◈',
-  'fresh-user': '○',
   keyhints: '⌘',
   // What acts on the thread.
   'remote-control': '⇄',

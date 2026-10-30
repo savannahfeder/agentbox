@@ -41,6 +41,7 @@ import { createPhoneAlerts } from './phone-alerts.mjs';
 import { PHONE_FILES_MAX, phoneFilesIn, phoneFileSafeName, phoneAttachmentRel } from '../shared/phone-files.mjs';
 import { runOfClaim, cloudCard } from '../shared/cloud-kit.mjs';
 import { isCarried } from '../shared/cloud-carry.mjs';
+import { heldForUndo } from '../shared/phone-undo.mjs';
 
 // A file her phone sent with a reply or a new thread (shared/phone-files.mjs).
 export { phoneFilesIn };
@@ -84,6 +85,9 @@ export function createPhoneInbox({
   stateFile,
   home = os.homedir(),
   now = Date.now,
+  // How long a phone send her Undo can take back is left alone (shared/phone-undo.mjs).
+  // The app passes PHONE_UNDO_HOLD_MS; none takes each one on sight.
+  undoHoldMs = 0,
   log = () => {},
   // How a thread's copy is made; a test counts the calls.
   build = threadSnapshot,
@@ -411,6 +415,8 @@ export function createPhoneInbox({
       }
       // Her answer to a card the cloud put on the phone is the cloud server's to give (cloud/gateway/phone.mjs).
       if (cmd.kind === 'approve' && cloudCard(cmd.payload?.approval)) continue;
+      // Still inside the phone's Undo: claimed now, Undo could never win. The next pass takes it.
+      if (!state.done[cmd.id] && heldForUndo(cmd, now(), undoHoldMs)) continue;
       let outcome = state.done[cmd.id];
       if (!outcome) {
         // A reply to a thread started on the phone goes to the row it became.

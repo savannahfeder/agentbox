@@ -1,14 +1,22 @@
-// The toast, as the phone site draws it (phone.css `.toast`): one slim line
-// under the top bar, Undo as a word on its right end, and a tap on the rest
-// opens the thread it names while the orange line under it runs out.
+// The toast after a press: one slim line with Undo as a word on its right end,
+// a tap on the rest opens the thread it names while the orange line under it
+// runs out (the phone site's `.toast`).
+//
+// It used to sit under the top bar, over the first thing on the screen, and
+// stayed its six seconds whatever you did. Her words from the phone app
+// (2026-10-29): "The toast that tells me the item has sent often blocks
+// important information. Not only is it poorly placed but I can't dismiss it."
+// Now it sits at the foot, over a thread's reply box (`toastLift`,
+// lib/overlays.ts), and a swipe down or the cross takes it away at once.
 import { router, useGlobalSearchParams, useSegments } from 'expo-router';
-import { useEffect, useRef } from 'react';
-import { Animated, Easing, Pressable, View } from 'react-native';
+import { useEffect, useMemo, useRef } from 'react';
+import { Animated, Easing, PanResponder, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { threadOnScreen, toastLife, toastTapOpens, TOAST_GOES_MS } from '../lib/overlays';
+import Svg, { Path } from 'react-native-svg';
+import { threadOnScreen, toastLife, toastLift, toastTapOpens, TOAST_GOES_MS, TOAST_SWIPE_PX } from '../lib/overlays';
 import { useCloud, type Toast as Said } from '../state/cloud';
 import { T } from './parts';
-import { color, size } from './theme';
+import { color } from './theme';
 
 function Clock() {
   const left = useRef(new Animated.Value(1)).current;
@@ -24,6 +32,14 @@ function Clock() {
   );
 }
 
+function Cross() {
+  return (
+    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={color.dim} strokeWidth={1.8} strokeLinecap="round">
+      <Path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5" />
+    </Svg>
+  );
+}
+
 function Card({ toast, dismiss }: { toast: Said; dismiss: () => void }) {
   const segments = useSegments();
   const params = useGlobalSearchParams();
@@ -32,29 +48,48 @@ function Card({ toast, dismiss }: { toast: Said; dismiss: () => void }) {
     dismiss();
     if (toast.goes) router.push({ pathname: '/thread/[product]/[id]', params: toast.goes });
   };
+  // A swipe down takes it away; a short one, or one up, springs back.
+  const drag = useRef(new Animated.Value(0)).current;
+  const swipe = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 6 && Math.abs(g.dy) > Math.abs(g.dx),
+    onPanResponderMove: (_, g) => drag.setValue(g.dy > 0 ? g.dy : g.dy / 4),
+    onPanResponderRelease: (_, g) => {
+      if (g.dy > TOAST_SWIPE_PX || g.vy > 0.6) {
+        Animated.timing(drag, { toValue: 140, duration: 160, useNativeDriver: true }).start(dismiss);
+      } else Animated.spring(drag, { toValue: 0, useNativeDriver: true }).start();
+    },
+  }), [drag, dismiss]);
   return (
-    <Pressable disabled={!opens} onPress={open} accessibilityRole={opens ? 'button' : undefined}
-      style={{
-        minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 14, paddingRight: 6,
-        backgroundColor: color.pop, borderWidth: 1, borderColor: color.line, overflow: 'hidden',
-        shadowColor: '#000', shadowOpacity: color.lift, shadowRadius: 35, shadowOffset: { width: 0, height: 24 }, elevation: 16,
-      }}>
-      {/* Only a toast that names a thread stays on one line; a plain one wraps (`.toast-plain`). */}
-      <T numberOfLines={toast.goes ? 1 : undefined} style={{ flex: 1, minWidth: 0, fontSize: 13.5, lineHeight: 17.55 }}>{toast.line}</T>
-      {toast.undo && (
-        <Pressable accessibilityRole="button" onPress={() => { const undo = toast.undo!; dismiss(); void undo(); }}
-          style={({ pressed }) => ({ height: 40, paddingHorizontal: 10, justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
-          <T style={{ fontSize: 13.5, lineHeight: 17.55, color: color.accent }}>Undo</T>
+    <Animated.View {...swipe.panHandlers} style={{ transform: [{ translateY: drag }], opacity: drag.interpolate({ inputRange: [-140, 0, 140], outputRange: [0, 1, 0] }) }}>
+      <Pressable disabled={!opens} onPress={open} accessibilityRole={opens ? 'button' : undefined}
+        style={{
+          minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 14, paddingRight: 4,
+          backgroundColor: color.pop, borderWidth: 1, borderColor: color.line, overflow: 'hidden',
+          shadowColor: '#000', shadowOpacity: color.lift, shadowRadius: 35, shadowOffset: { width: 0, height: 24 }, elevation: 16,
+        }}>
+        {/* Only a toast that names a thread stays on one line; a plain one wraps (`.toast-plain`). */}
+        <T numberOfLines={toast.goes ? 1 : undefined} style={{ flex: 1, minWidth: 0, fontSize: 13.5, lineHeight: 17.55, marginRight: 8 }}>{toast.line}</T>
+        {toast.undo && (
+          <Pressable accessibilityRole="button" onPress={() => { const undo = toast.undo!; dismiss(); void undo(); }}
+            style={({ pressed }) => ({ height: 40, paddingHorizontal: 8, justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+            <T style={{ fontSize: 13.5, lineHeight: 17.55, color: color.accent }}>Undo</T>
+          </Pressable>
+        )}
+        <Pressable accessibilityRole="button" accessibilityLabel="Dismiss" onPress={dismiss} hitSlop={6}
+          style={({ pressed }) => ({ width: 36, height: 40, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+          <Cross />
         </Pressable>
-      )}
-      {toast.goes && <Clock />}
-    </Pressable>
+        {toast.goes && <Clock />}
+      </Pressable>
+    </Animated.View>
   );
 }
 
 export function Toast() {
   const c = useCloud();
   const inset = useSafeAreaInsets();
+  const segments = useSegments();
+  const params = useGlobalSearchParams();
   const toast = c.toast;
   const dismiss = c.dismissToast;
   useEffect(() => {
@@ -64,8 +99,9 @@ export function Toast() {
     // By its key alone: the cloud redraws every few seconds, and a timer started over each time would never end.
   }, [toast?.key]);
   if (!toast) return null;
+  const bottom = inset.bottom + toastLift(!!threadOnScreen(segments, params));
   return (
-    <View pointerEvents="box-none" style={{ position: 'absolute', top: inset.top + size.topBar + 8, left: 12, right: 12 }}>
+    <View pointerEvents="box-none" style={{ position: 'absolute', left: 12, right: 12, bottom }}>
       <Card key={toast.key} toast={toast} dismiss={dismiss} />
     </View>
   );

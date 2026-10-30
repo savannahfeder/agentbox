@@ -906,7 +906,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       else if (op === 'update') value = mates.update(a.id, { ...a.patch, ...(a.patch && 'engine' in a.patch ? { engine: supervisor.engineOffered(a.patch.engine) ?? null } : {}) });
       else if (op === 'stop') value = mates.stop(a.id, { kill });
       else if (op === 'remove') value = mates.remove(a.id, { kill });
-      else if (op === 'post') value = mates.post({ text: a.text, to: a.to, fresh: a.fresh === true });
+      else if (op === 'post') value = mates.post({ text: a.text, to: a.to, fresh: a.fresh === true, answers: a.answers });
       else if (op === 'goAhead') value = mates.goAhead(a.id, a.ref);
       else if (op === 'remember') value = mates.remember(a.id, a.text, { from: 'you' });
       else if (op === 'forget') value = mates.forget(a.id, a.memory);
