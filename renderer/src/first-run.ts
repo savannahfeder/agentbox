@@ -3,7 +3,7 @@
 // holds what each rule is for.
 
 import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
-import type { RepeatShape } from '../../shared/repeats.mjs';
+import { repeatLabel, type RepeatShape } from '../../shared/repeats.mjs';
 import { projectNameFor } from './agent-import-card';
 
 export type Screen = 'welcome' | 'chats';
@@ -133,4 +133,10 @@ export function ideasFor({ folder = true }: { folder?: boolean } = {}): Idea[] {
     { text: 'Review the week’s changes for bugs', repeat: { every: 'week', on: 5, at: '16:00', short: 'Every Friday', label: 'Every Friday at 4:00pm' } },
     { text: 'Check for security holes and outdated packages', repeat: { every: 'week', on: 1, at: '09:00', short: 'Every Monday', label: 'Every Monday at 9:00am' } },
   ];
+}
+
+/** The run of a repeating task, found by its rule's label once the run exists. */
+export function runOfRule(ruleId: string, rows: { id: string; labels?: string[] }[]): string | null {
+  const label = repeatLabel(ruleId);
+  return rows.find((r) => r.labels?.includes(label))?.id ?? null;
 }

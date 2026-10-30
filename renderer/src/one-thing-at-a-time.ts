@@ -5,6 +5,7 @@
 import type { AgentEvent, AgentTurn } from './types';
 import type { ItemOutcome } from './item-thread';
 import { optionsFrom } from './format';
+import { instructionOf } from '../../shared/repeats.mjs';
 
 export interface Spot { pos: number; total: number; index: number }
 
@@ -60,8 +61,10 @@ export function drawnWhole(behind: number, imported = false): boolean {
 
 /** The line under the title while an agent works: the first paragraph of what you asked, unless the title already says it. */
 export function askLine(ask: string, title = ''): string | null {
-  const first = ask.trim().split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
-  if (!first || first.toLowerCase() === title.replace(/\s+/g, ' ').trim().toLowerCase()) return null;
+  const first = instructionOf(ask).trim().split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
+  const named = title.replace(/\s+/g, ' ').trim().toLowerCase();
+  // A repeating run's title is its ask with the day after it.
+  if (!first || named === first.toLowerCase() || named.startsWith(`${first.toLowerCase()} · `)) return null;
   return `You asked: ${/[.!?]$/.test(first) ? first : `${first}.`}`;
 }
 

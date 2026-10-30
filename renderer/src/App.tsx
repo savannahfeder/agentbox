@@ -147,7 +147,7 @@ import { TutorialOffer } from './components/TutorialOffer';
 import { holdForStoppedAgent, neverWarned, rememberWarned } from './stopped-agent';
 import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './tutorial';
 import { FirstRunFlow } from './components/FirstRun';
-import { ideasFor } from './first-run';
+import { ideasFor, runOfRule } from './first-run';
 import { Tour } from './components/Tour';
 import { finishLesson, firstTask, noteSent, readTour, saveTour, showIdeas, startTour, type Tour as TourState } from './tour';
 import {
@@ -6110,6 +6110,13 @@ export default function App() {
   // pulls anybody back from somewhere they went themselves.
   const firstSend = useRef(false);
   const [firstThread, setFirstThread] = useState<string | null>(null);
+  // A repeating task is sent as a rule; its first run is the thread to follow.
+  const [firstRule, setFirstRule] = useState<string | null>(null);
+  useEffect(() => {
+    if (!firstRule) return;
+    const run = runOfRule(firstRule, [...inbox, ...progress]);
+    if (run) { setFirstRule(null); setFirstThread(run); }
+  }, [firstRule, inbox, progress]);
   const followedTab = useRef<string | null>(null);
   useEffect(() => {
     if (!firstThread) return;
@@ -7205,6 +7212,7 @@ export default function App() {
               return;
             }
             if (firstSend.current && made?.id) { firstSend.current = false; setFirstThread(made.id); }
+            if (firstSend.current && how?.kind === 'repeat' && how.ruleId) { firstSend.current = false; setFirstRule(how.ruleId); }
             const slug = how?.product ?? made?.product ?? '';
             const to = snap.products.find((x) => x.slug === slug)?.name;
             if (made?.id) showJustMade(made, to);

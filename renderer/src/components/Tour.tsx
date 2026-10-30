@@ -22,6 +22,7 @@ const SETTLE_MS = 500;
 const SEEN_MS = 1000;
 /** Set once the tutorial has sent its sample banner. */
 const NOTIFY_TRIED = 'zero.tour.notifyTried';
+const BUSY_TOLD = <>This agent is working. You can leave, and a notification will tell you when it’s done</>;
 
 const K = ({ k }: { k: string }) => <span className="tour-k">{k}</span>;
 
@@ -37,7 +38,7 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   choose: { words: <>Press <K k="1" /> to choose the recommended option</>, side: 'above' },
   reply: { words: <>Press <K k="R" /> to answer this agent</>, side: 'above' },
   close: { words: <>When it is finished, press <K k="E" /> to close it</>, side: 'below-right' },
-  busy: { words: <>This agent is working. You can leave, and the Agent Tray will show you when it’s done</>, side: 'below' },
+  busy: { words: <>This agent is working. You can leave and come back when it’s done</>, side: 'below' },
   palette: { words: <>Press <K k={CMD} /><K k="K" /> to find anything {Name} can do</>, side: 'below' },
 };
 
@@ -183,9 +184,10 @@ export function Tour({ tour, view, thread, covered, onChange }: {
       const wanted = tourStep(tour, screen);
       // Already closed, by its agent: nothing is left for the close tip to point at.
       if (wanted === 'close' && document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done')) { onChange(finishLesson(tour, 'close')); return; }
-      // A screen still arriving (the inbox before its rows land) must not flash a tip.
+      // A screen still arriving (the inbox before its rows land) must not flash a
+      // tip, and the one before it no longer points at anything.
       if (wanted !== settling.current.step) settling.current = { step: wanted, since: Date.now() };
-      const next = wanted && Date.now() - settling.current.since < SETTLE_MS ? shown.current : wanted;
+      const next = wanted && Date.now() - settling.current.since < SETTLE_MS ? null : wanted;
       const was = shown.current;
       if (was !== next) {
         // The first run's folder and first task are counted where they now happen.
@@ -283,7 +285,7 @@ export function Tour({ tour, view, thread, covered, onChange }: {
       {step !== 'palette' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
       <div key={`card-${step}`} ref={cardRef} className="tour-card" role="status"
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
-        <span className="tour-say">{SAY[step].words}</span>
+        <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : SAY[step].words}</span>
         {step === 'busy' && !tried && <button type="button" className="tour-act" onClick={tryNotifications}>Turn on notifications</button>}
         <button type="button" className="tour-skip" onClick={() => onChange(skipTour(tour))}>Skip tutorial</button>
       </div>

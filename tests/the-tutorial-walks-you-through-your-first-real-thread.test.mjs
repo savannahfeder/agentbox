@@ -166,6 +166,15 @@ describe('a tip on a screen still arriving', () => {
     expect(tour).toMatch(/const SEEN_MS = 1000;/);
     expect(tour).toContain('if (was && seenFor >= SEEN_MS && !covered && learnedBy(was, before.current, screen))');
   });
+  // Measured 2026-10-29 walking the first run with the machine busy: the
+  // folder was chosen and the suggestions were up, and "Choose the folder this
+  // agent will work in" stayed on for most of a second while the next tip
+  // settled. A tip whose screen has gone is taken down at once.
+  it('takes a tip down at once when its screen has gone, rather than while the next settles', async () => {
+    const fs = await import('node:fs');
+    const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
+    expect(tour).toContain('const next = wanted && Date.now() - settling.current.since < SETTLE_MS ? null : wanted;');
+  });
 });
 
 describe('the send tip on the page', () => {
@@ -529,7 +538,7 @@ describe('the first thread, once sent', () => {
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     expect(tour).not.toContain('to start another thread');
     expect(tour).toContain('An agent is working on this. Press <K k="↵" /> to watch it');
-    expect(tour).toContain('This agent is working. You can leave, and the Agent Tray will show you when it’s done');
+    expect(tour).toContain('This agent is working. You can leave and come back when it’s done');
   });
   it('Return on the working row is what that tip teaches', async () => {
     const { keyLearns } = await import('../renderer/src/tour.ts');

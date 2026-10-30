@@ -159,7 +159,7 @@ export function createNotifier({ window, Notification, powerMonitor, icon = null
     // One banner on asking, from the tutorial: on a Mac it is also what asks whether banners are allowed.
     sample() {
       try {
-        const n = new Notification({ title: NAME, body: 'Notifications are on. You’ll hear here when an agent needs you.', silent: false, ...(icon ? { icon } : {}) });
+        const n = new Notification({ title: NAME, body: 'Notifications are on. You’ll get one when an agent is done.', silent: false, ...(icon ? { icon } : {}) });
         n.show();
       } catch { /* nothing to show it on */ }
     },
