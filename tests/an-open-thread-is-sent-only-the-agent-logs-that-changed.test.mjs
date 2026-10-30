@@ -73,6 +73,49 @@ describe('through the real handler', () => {
     expect(got.sessions).toEqual(whole.sessions.map(({ startedAt, text }) => ({ startedAt, text })));
   });
 
+  it('a log that grew sends only what it grew by, and the window ends up with what a whole read gives', async () => {
+    const read = traceReader();
+    const key = `${slug}/${id}`;
+    read.take(key, plain(await trace({}, { product: slug, id, have: read.have(key) })));
+    fs.appendFileSync(path.join(logs, '3000.log'), 'é one more line, not ascii\n');
+    const grew = plain(await trace({}, { product: slug, id, have: read.have(key) }));
+    const log = grew.sessions.find((s) => s.startedAt === 3000);
+    expect(log.text).toBeUndefined();
+    expect(log.more).toBe('é one more line, not ascii\n');
+    const whole = plain(await trace({}, { product: slug, id }));
+    expect(read.take(key, grew).sessions).toEqual(whole.sessions.map(({ startedAt, text }) => ({ startedAt, text })));
+  });
+
+  it('a log past the cap is cut the same way on both sides as it keeps growing', async () => {
+    const read = traceReader();
+    const key = `${slug}/${id}`;
+    const big = path.join(logs, '5000.log');
+    fs.writeFileSync(big, 'x'.repeat(119_000));
+    read.take(key, plain(await trace({}, { product: slug, id, have: read.have(key) })));
+    for (const more of ['y'.repeat(2_000), 'z'.repeat(500_000), 'tail end\n']) {
+      fs.appendFileSync(big, more);
+      const got = read.take(key, plain(await trace({}, { product: slug, id, have: read.have(key) })));
+      const whole = plain(await trace({}, { product: slug, id }));
+      expect(got.sessions.find((s) => s.startedAt === 5000).text).toBe(whole.sessions.find((s) => s.startedAt === 5000).text);
+    }
+    const text = (plain(await trace({}, { product: slug, id }))).sessions.find((s) => s.startedAt === 5000).text;
+    expect(text.startsWith('… truncated (')).toBe(true);
+    expect(text.endsWith('tail end\n')).toBe(true);
+    fs.rmSync(big);
+  });
+
+  it('a log replaced by a smaller one is sent whole, not stitched on', async () => {
+    const read = traceReader();
+    const key = `${slug}/${id}`;
+    const small = path.join(logs, '6000.log');
+    fs.writeFileSync(small, 'the first long version of this log\n');
+    read.take(key, plain(await trace({}, { product: slug, id, have: read.have(key) })));
+    fs.writeFileSync(small, 'short\n');
+    const got = read.take(key, plain(await trace({}, { product: slug, id, have: read.have(key) })));
+    expect(got.sessions.find((s) => s.startedAt === 6000).text).toBe('short\n');
+    fs.rmSync(small);
+  });
+
   it('a new run arrives whole, and one that left is gone', async () => {
     const read = traceReader();
     const key = `${slug}/${id}`;
@@ -103,6 +146,22 @@ describe('the window side', () => {
     read.take('p/w-1', { ok: true, sessions: [{ startedAt: 1, stamp: '5:1', text: 'a' }] });
     expect(read.have('p/w-1')).toEqual({ 1: '5:1' });
     expect(read.have('p/w-2')).toBeUndefined();
+  });
+
+  it('an older read landing after a newer one does not take a log back', () => {
+    const read = traceReader();
+    read.take('p/w-1', { ok: true, sessions: [{ startedAt: 1, stamp: '5:1', text: 'hello' }] });
+    read.take('p/w-1', { ok: true, sessions: [{ startedAt: 1, stamp: '11:2', more: ' world', from: 5 }] });
+    const late = read.take('p/w-1', { ok: true, sessions: [{ startedAt: 1, stamp: '5:1', same: true }] });
+    expect(late.sessions[0].text).toBe('hello world');
+    const later = read.take('p/w-1', { ok: true, sessions: [{ startedAt: 1, stamp: '5:1', text: 'hello' }] });
+    expect(later.sessions[0].text).toBe('hello world');
+  });
+
+  it('more that does not start where this window stands asks for a whole read', () => {
+    const read = traceReader();
+    read.take('p/w-1', { ok: true, sessions: [{ startedAt: 1, stamp: '5:1', text: 'hello' }] });
+    expect(read.take('p/w-1', { ok: true, sessions: [{ startedAt: 1, stamp: '20:2', more: 'x', from: 9 }] })).toBeNull();
   });
 
   it('a log the window still holds is read into notes once, and a new one is read again', () => {

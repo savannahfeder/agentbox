@@ -1358,7 +1358,7 @@ export type PhoneLink = {
 declare global {
   interface Window {
     zero?: {
-      snapshot(ask?: { since: string }): Promise<Snapshot>;
+      snapshot(ask?: { since?: string; open?: { product: string | null; id: string } | null }): Promise<Snapshot>;
       // The thread on screen, or null anywhere that is not one thread. Optional:
       // a preload from before this channel existed simply never says.
       looking?(p: { product: string | null; id: string | null }): Promise<boolean>;

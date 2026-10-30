@@ -498,6 +498,8 @@ export class Supervisor {
         this.spawnWorker(fresh, { continuation: true, shipFailure: reply });
       },
       afterShip: (shipped) => { this.onShipped(); this.watchMainsTests(shipped); this.reclaimShippedFolder(shipped); },
+      memoryGate: () => this._memoryGate?.gate ?? null,
+      shipScore: (item) => this.memoryGateScore(item.product, item.id) ?? 0,
     });
     // AND THEN SOMEBODY WATCHES THE RUN THAT SHIP STARTED. The whole suite runs
     // on GitHub for every push and takes about five minutes, which is after the

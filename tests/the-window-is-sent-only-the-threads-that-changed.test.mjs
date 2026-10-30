@@ -10,15 +10,18 @@
 // threads it already had.
 //
 // So the window asks with the token of the last answer it holds, and the
-// computer answers with the threads whose content changed since that answer,
-// the ones that are gone, and the order when it moved. A window, a phone or a
-// computer that knows nothing of tokens gets and gives the whole list, as before.
+// computer answers with the threads and other parts that changed since that
+// answer, the ones that are gone, and the order when it moved. A running agent
+// carries its live detail only to the screen that has its thread open: at 200
+// agents the 40-line log each one carried would be 8,000 lines on every read.
+// A window, a phone or a computer that knows nothing of tokens gets and gives
+// the whole list, as before.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { snapshotSender, snapshotReader } from '../shared/snapshot-delta.mjs';
+import { snapshotSender, snapshotReader, lightRunning } from '../shared/snapshot-delta.mjs';
 import { bootHeadless } from '../main/serve.mjs';
 import { encodeProjectPath } from '../main/store/home.mjs';
 
@@ -110,15 +113,15 @@ describe('the sender and the reader', () => {
     expect(plain(restarted.answer(whole([row('a')]), old)).items).toHaveLength(1);
   });
 
-  it('two answers to the same ask, landing in either order, each give the right list', () => {
+  it('two answers to the same ask, landing in order, each give the right list', () => {
     const send = snapshotSender();
     const read = snapshotReader();
     read.take(plain(send.answer(whole([row('a'), row('b')]), undefined)));
     const base = read.ask().since;
     const one = plain(send.answer(whole([row('a', { title: 'one' }), row('b')]), base));
     const two = plain(send.answer(whole([row('a', { title: 'one' }), row('b', { title: 'two' })]), base));
-    expect(read.take(two).items.map((i) => i.title)).toEqual(['one', 'two']);
     expect(read.take(one).items.map((i) => i.title)).toEqual(['one', 'Thread b']);
+    expect(read.take(two).items.map((i) => i.title)).toEqual(['one', 'two']);
   });
 
   it('an answer for a base the window has dropped is not drawn as a half list', () => {
@@ -133,6 +136,93 @@ describe('the sender and the reader', () => {
     expect(got.items.map((i) => i.id)).toEqual(['a']);
     expect(read.ask()).toBeUndefined();
     expect(read.take(null)).toBeNull();
+  });
+});
+
+describe('what else the window is sent', () => {
+  it('a part of the snapshot that did not change is not sent again, and one that did is', () => {
+    const send = snapshotSender();
+    const read = snapshotReader();
+    const rest = { products: [{ slug: 'p', name: 'P' }], config: { a: 1 }, supervisor: { running: [] } };
+    read.take(plain(send.answer(whole([row('a')], rest), undefined)));
+    const next = { ...rest, products: plain(rest.products), supervisor: { running: [{ itemId: 'a' }] } };
+    const answer = plain(send.answer(whole([row('a')], next), read.ask().since));
+    expect(answer.products).toBeUndefined();
+    expect(answer.config).toBeUndefined();
+    expect(answer.supervisor).toEqual({ running: [{ itemId: 'a' }] });
+    const got = read.take(answer);
+    expect(got.products).toEqual(rest.products);
+    expect(got.config).toEqual({ a: 1 });
+    expect(got.supervisor.running).toHaveLength(1);
+  });
+
+  it('a part that went away goes away in the window too', () => {
+    const send = snapshotSender();
+    const read = snapshotReader();
+    read.take(plain(send.answer(whole([row('a')], { team: { me: 1 } }), undefined)));
+    const answer = plain(send.answer({ products: whole([]).products, supervisor: whole([]).supervisor, items: [row('a')] }, read.ask().since));
+    expect(answer.delta.gone).toEqual(['team']);
+    expect('team' in read.take(answer)).toBe(false);
+  });
+
+  it('threads that did not change are never turned into text to find that out', () => {
+    const send = snapshotSender();
+    let turned = 0;
+    const counted = (id) => ({ ...row(id), toJSON() { turned += 1; return row(id); } });
+    const first = send.answer(whole(Array.from({ length: 200 }, (_, i) => counted(`t${i}`))), undefined);
+    turned = 0;
+    send.answer(whole(Array.from({ length: 200 }, (_, i) => ({ ...first.items[i] }))), first.snapshotToken);
+    expect(turned).toBe(0);
+  });
+
+  it('an older answer landing after a newer one does not put the list back', () => {
+    const send = snapshotSender();
+    const read = snapshotReader();
+    read.take(plain(send.answer(whole([row('a')]), undefined)));
+    const base = read.ask().since;
+    const older = plain(send.answer(whole([row('a', { title: 'older' })]), base));
+    const newer = plain(send.answer(whole([row('a', { title: 'newer' })]), base));
+    expect(read.take(newer).items[0].title).toBe('newer');
+    expect(read.take(older).items[0].title).toBe('newer');
+    expect(read.ask().since).toBe(newer.snapshotToken);
+  });
+
+  it('a computer that restarted is believed, though its count starts again', () => {
+    const read = snapshotReader();
+    const first = snapshotSender();
+    read.take(plain(first.answer(whole([row('a')]), undefined)));
+    read.take(plain(first.answer(whole([row('b')]), undefined)));
+    const restarted = snapshotSender();
+    expect(read.take(plain(restarted.answer(whole([row('c')]), undefined))).items[0].id).toBe('c');
+  });
+});
+
+describe('what a running agent costs the window', () => {
+  const session = (id) => ({ itemId: id, product: 'p', startedAt: 1, engine: 'claude', tail: Array.from({ length: 40 }, (_, i) => `line ${i}`), activity: [{ label: 'older' }, { label: 'newest' }], saying: 'halfway through a sentence', sayingAt: 5 });
+
+  it('an agent nobody has open carries its newest step and nothing else', () => {
+    const [light] = lightRunning([session('a')], { product: 'p', id: 'other' });
+    expect(light.tail).toEqual([]);
+    expect(light.activity).toEqual([{ label: 'newest' }]);
+    expect(light.saying).toBe('');
+    expect(light.itemId).toBe('a');
+    expect(light.startedAt).toBe(1);
+  });
+
+  it('the thread on screen keeps every detail, and only in its own project', () => {
+    const [same, other] = lightRunning([session('a'), { ...session('a'), product: 'q' }], { product: 'p', id: 'a' });
+    expect(same.tail).toHaveLength(40);
+    expect(same.saying).toBe('halfway through a sentence');
+    expect(other.tail).toEqual([]);
+  });
+
+  it('nothing open means nothing carries detail', () => {
+    expect(lightRunning([session('a')], null)[0].saying).toBe('');
+  });
+
+  it('two hundred agents with no thread open are a few kilobytes more, not hundreds', () => {
+    const light = lightRunning(Array.from({ length: 200 }, (_, i) => session(`t${i}`)), null);
+    expect(JSON.stringify(light).length).toBeLessThan(40_000);
   });
 });
 
@@ -178,6 +268,7 @@ describe('through the real store and the real handler', () => {
     const fresh = plain(await snapshot({}, undefined));
     expect(plain(got.items)).toEqual(fresh.items);
     expect(JSON.stringify(answer).length).toBeLessThan(JSON.stringify(fresh).length / 4);
+    expect(answer.products).toBeUndefined();
   });
 
   it('a window that asks with nothing gets the whole list, as every older one does', async () => {

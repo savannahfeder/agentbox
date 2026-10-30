@@ -22,15 +22,7 @@
 //
 // Worktrees belong in /tmp, which is where the other ninety are. Nothing here
 // deletes the two in wt/; they are somebody else's live work.
-import os from 'node:os';
 import { configDefaults, defineConfig } from 'vitest/config';
-
-// One worker per 4 GB of memory, and never more than vitest's own one per core
-// but one: a worker of this suite holds about half a gigabyte, and the Mac it
-// runs on is running agents too.
-export function testWorkers({ cores = os.availableParallelism(), bytes = os.totalmem() } = {}) {
-  return Math.max(1, Math.min(cores - 1, Math.floor(bytes / 4 / 1024 ** 3)));
-}
 
 export const SUITE_INCLUDE = ['tests/**/*.test.mjs'];
 
@@ -65,8 +57,5 @@ export default defineConfig({
     // the test was waiting for — is the one that gets shown.
     testTimeout: 60_000,
     hookTimeout: 60_000,
-    // Both, because vitest refuses a maximum below its own default minimum.
-    maxWorkers: testWorkers(),
-    minWorkers: 1,
   },
 });

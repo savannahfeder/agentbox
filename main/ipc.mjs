@@ -71,7 +71,8 @@ import { EVENT_NAMES } from '../shared/analytics-events.mjs';
 import { Name } from '../shared/product-name.mjs';
 import { handedOnByReply } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mjs';
-import { snapshotSender } from '../shared/snapshot-delta.mjs';
+import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mjs';
+import { traceAnswer } from '../shared/trace-delta.mjs';
 import { saveAttachments } from './save-attachments.mjs';
 import { stageAttachment } from './stage-attachment.mjs';
 
@@ -520,7 +521,9 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       // The open thread's own card first, which is the order the chord and the
       // Agents menu answer in too (shared/which-card-is-in-front.mjs).
       approvals: pendingApprovals(),
-      supervisor: running,
+      // A screen that says which thread it has open is sent only that thread's
+      // live detail.
+      supervisor: ask && 'open' in ask ? { ...running, running: lightRunning(running.running, ask.open) } : running,
       // WHETHER THERE ARE TWO CODING AGENTS TO CHOOSE BETWEEN, AND WHICH ONE
       // EACH ROW RUNS ON. Answered whole by the supervisor, because the two
       // rules underneath it -- the capability gate and "an August choice is not
@@ -2269,8 +2272,8 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
 
   // The trace: what each session on this item actually did, from the logs the
   // supervisor persists under <product>/sessions/<item-id>/. Read-only.
-  // `have` holds the stamps of the logs the screen already has; a log whose
-  // stamp has not moved is sent without its text (shared/trace-delta.mjs).
+  // `have` holds the stamps of the logs the screen already has
+  // (shared/trace-delta.mjs).
   ipcMain.handle('zero:session-trace', async (_e, { product, id, have } = {}) => {
     const fs = await import('node:fs');
     const path = await import('node:path');
@@ -2283,13 +2286,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     } catch { return { ok: true, sessions: [] }; }
     const sessions = files.slice(-20).map((f) => {
       const startedAt = Number(f.replace('.log', '')) || 0;
-      let stamp;
-      try { const st = fs.statSync(path.join(traceDir, f)); stamp = `${st.size}:${st.mtimeMs}`; } catch {}
-      if (stamp && have?.[startedAt] === stamp) return { startedAt, stamp, same: true };
-      let text = '';
-      try { text = fs.readFileSync(path.join(traceDir, f), 'utf8'); } catch {}
-      if (text.length > 120_000) text = `… truncated (${text.length} bytes total)\n\n${text.slice(-120_000)}`;
-      return { startedAt, stamp, text };
+      return traceAnswer({ fs, file: path.join(traceDir, f), startedAt, had: have?.[startedAt] });
     });
     return { ok: true, sessions };
   });

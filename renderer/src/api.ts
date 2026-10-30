@@ -45,6 +45,8 @@ async function teamCall(fn: () => Promise<TeamCallResult>): Promise<TeamCallResu
 // asks only for what changed since.
 const snapshots = snapshotReader();
 const traces = traceReader();
+// Which thread is on screen: only its agent's live detail is sent.
+let openThread: { product: string | null; id: string } | null = null;
 
 // READ SAFELY, BECAUSE THIS MODULE IS NOW REACHED FROM A COMPONENT THE TESTS
 // RENDER WITHOUT A WINDOW. The walk's last card is <ImportAgents> now, so
@@ -557,10 +559,10 @@ export const api = {
       }
       return fixtureSecondEngine(base, engineFixtures);
     }
-    const got = snapshots.take(await window.zero!.snapshot(snapshots.ask()));
+    const got = snapshots.take(await window.zero!.snapshot({ ...snapshots.ask(), open: openThread }));
     if (got) return got;
     // Built on a list this window no longer holds: a whole one, which take() never refuses.
-    return snapshots.take(await window.zero!.snapshot()) as Snapshot;
+    return snapshots.take(await window.zero!.snapshot({ open: openThread })) as Snapshot;
   },
 
   // WHERE YOU ARE, FOR THE ONE THING THAT DEPENDS ON IT: the approval card in
@@ -570,6 +572,7 @@ export const api = {
   async lookingAt(at: { product: string | null; id: string } | null): Promise<void> {
     // Fixtures have no main process to order the cards, and ?approvals is how
     // this card is reviewed, so the same shared rule is applied here.
+    openThread = at?.id ? { product: at.product, id: at.id } : null;
     if (useFixtures) { fixtureLooking = at; return; }
     try { await window.zero?.looking?.({ product: at?.product ?? null, id: at?.id ?? null }); } catch { /* the card simply stays where it was */ }
   },
