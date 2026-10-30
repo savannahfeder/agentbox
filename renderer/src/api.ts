@@ -19,6 +19,7 @@ import { USAGE_UNREADABLE } from '../../shared/usage.mjs';
 import { accountSentence } from '../../shared/spawn-trouble.mjs';
 import { MOVE_SAY } from '../../shared/where-it-runs-from.mjs';
 import { cardsInFront } from '../../shared/which-card-is-in-front.mjs';
+import { snapshotReader } from '../../shared/snapshot-delta.mjs';
 // THE SECOND FRONT DOOR, AND IT HAS TO BE BUILT BEFORE THE LINE BELOW RUNS.
 // `useFixtures` reads `window.zero` once, at module load, and on the desktop
 // preload.cjs has already put it there. In a browser tab nothing has, so this
@@ -38,6 +39,9 @@ async function teamCall(fn: () => Promise<TeamCallResult>): Promise<TeamCallResu
   if (!window.zero?.teamSignIn) return { ok: false, error: 'This build has no team cloud set up.' };
   try { return await fn(); } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
 }
+
+// The inbox as last answered, so each read asks only for what changed since.
+const snapshots = snapshotReader();
 
 // READ SAFELY, BECAUSE THIS MODULE IS NOW REACHED FROM A COMPONENT THE TESTS
 // RENDER WITHOUT A WINDOW. The walk's last card is <ImportAgents> now, so
@@ -550,7 +554,10 @@ export const api = {
       }
       return fixtureSecondEngine(base, engineFixtures);
     }
-    return window.zero!.snapshot();
+    const got = snapshots.take(await window.zero!.snapshot(snapshots.ask()));
+    if (got) return got;
+    // Built on a list this window no longer holds: a whole one, which take() never refuses.
+    return snapshots.take(await window.zero!.snapshot()) as Snapshot;
   },
 
   // WHERE YOU ARE, FOR THE ONE THING THAT DEPENDS ON IT: the approval card in

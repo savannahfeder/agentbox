@@ -71,6 +71,7 @@ import { EVENT_NAMES } from '../shared/analytics-events.mjs';
 import { Name } from '../shared/product-name.mjs';
 import { handedOnByReply } from '../shared/team-rules.mjs';
 import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mjs';
+import { snapshotSender } from '../shared/snapshot-delta.mjs';
 import { saveAttachments } from './save-attachments.mjs';
 import { stageAttachment } from './stage-attachment.mjs';
 
@@ -482,7 +483,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     try { return !!host.app?.accessibilitySupportEnabled; } catch { return false; }
   });
 
-  ipcMain.handle('zero:snapshot', () => {
+  // `ask.since` names the last answer the screen holds, and the threads that
+  // did not change since are left out (shared/snapshot-delta.mjs).
+  const snapshots = snapshotSender();
+  ipcMain.handle('zero:snapshot', (_e, ask) => {
     const now = Date.now();
     const items = store.listItems(now);
     const running = supervisor.status();
@@ -500,7 +504,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     // now. The Codex side never starts anything at all (main/codex-usage.mjs).
     const reading = usageFor === DEFAULT_ENGINE ? usage.read() : supervisor.codexUsage();
     const alpha = alphaFeatures(config);
-    return {
+    return snapshots.answer({
       products: store.listProducts(),
       // Each with the place she dragged it to, if she did (w-6e5b532a95).
       items: supervisor.withPlaces(items),
@@ -594,7 +598,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
           ...store.listProducts().map((p) => [p.slug, supervisor.effectivePermission(p.slug)]),
         ]),
       },
-    };
+    }, ask?.since);
   });
 
   // THE USER'S WORDS, INTO ONE OF THEIR LIVE AGENTS. The only thing in the app that writes
