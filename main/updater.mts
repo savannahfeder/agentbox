@@ -47,6 +47,7 @@
 // sentence. That page is in the website repo, not this one.
 
 import { createRequire } from 'node:module';
+import type { AppUpdater } from 'electron-updater';
 import { Name } from '../shared/product-name.mjs';
 import { MOVE_SAY } from '../shared/where-it-runs-from.mjs';
 
@@ -59,13 +60,42 @@ const FIRST_CHECK_MS = 20_000;
 // normal way Agentbox is used.
 const EVERY_MS = 6 * 60 * 60 * 1000;
 
+export interface UpdaterState {
+  phase: string;
+  currentVersion: string | null;
+  newVersion?: string | null;
+  percent?: number | null;
+  error?: string | null;
+  checkedAt?: number | null;
+  readyAt?: number | null;
+  source?: boolean;
+  changes?: string[];
+  behind?: number | null;
+  canMove?: boolean;
+  place?: string | null;
+  moveError?: string | null;
+}
+
+export type UpdaterView = ReturnType<typeof describe>;
+
+interface UpdaterLog {
+  info?: (...args: unknown[]) => void;
+  warn?: (...args: unknown[]) => void;
+  error?: (...args: unknown[]) => void;
+}
+
+interface UpdaterPlace {
+  state?: () => { place: string | null; canUpdate: boolean; offerMove: boolean };
+  move?: () => { moved: boolean; error: string | null };
+}
+
 /**
  * PURE, and the whole of what the screens are allowed to know.
  *
  * Kept separate from the class below so the states can be tested without an
  * Electron app, a network, or a packaged build.
  */
-export function describe(state) {
+export function describe(state: UpdaterState) {
   const { phase, currentVersion, newVersion, percent, error, checkedAt, readyAt, source, changes, behind } = state;
   const installing = phase === 'installing';
   return {
@@ -111,12 +141,18 @@ export function describe(state) {
  * packaged build, a signed release and a network, which is the only reason the
  * download bug (see the swallow in `check`) went seven reports unnoticed.
  */
-export function createUpdater({ app, log = console, onChanged = () => {}, autoUpdater: given = null, place = null }) {
+export function createUpdater({ app, log = console, onChanged = () => {}, autoUpdater: given = null, place = null }: {
+  app: { getVersion(): string };
+  log?: UpdaterLog;
+  onChanged?: (view: UpdaterView) => void;
+  autoUpdater?: AppUpdater | null;
+  place?: UpdaterPlace | null;
+}) {
   // READ ONCE, at construction (main/where-it-runs-from.mjs says why the
   // bundle cannot move under a running process). A build with no place passed
   // in — the tests, and `main/serve.mjs` — simply never offers the move.
   const where = place?.state?.() ?? { place: null, canUpdate: true, offerMove: false };
-  let state = {
+  let state: UpdaterState = {
     phase: 'idle',
     currentVersion: app.getVersion(),
     newVersion: null,
@@ -128,10 +164,10 @@ export function createUpdater({ app, log = console, onChanged = () => {}, autoUp
     place: where.place ?? null,
     moveError: null,
   };
-  let timer = null;
+  let timer: NodeJS.Timeout | null = null;
   let stopped = false;
 
-  const set = (next) => {
+  const set = (next: Partial<UpdaterState>) => {
     state = { ...state, ...next };
     try { onChanged(describe(state)); } catch {}
   };
@@ -139,13 +175,13 @@ export function createUpdater({ app, log = console, onChanged = () => {}, autoUp
   // Loaded lazily and inside a try, so a build that somehow shipped without the
   // dependency degrades to "no updates" instead of failing to boot at all. The
   // app not starting is a strictly worse outcome than the app not updating.
-  let autoUpdater = given;
+  let autoUpdater: AppUpdater | null = given;
   if (!autoUpdater) {
     try {
       ({ autoUpdater } = require('electron-updater'));
     } catch (e) {
       set({ phase: 'unsupported', error: 'This build has no updater in it.' });
-      log.warn?.('[updater] electron-updater is not available:', e?.message ?? e);
+      log.warn?.('[updater] electron-updater is not available:', (e as Error)?.message ?? e);
     }
   }
 
@@ -160,9 +196,9 @@ export function createUpdater({ app, log = console, onChanged = () => {}, autoUp
     // them out of the crash reporter and in the terminal where a build is
     // being watched.
     autoUpdater.logger = {
-      info: (...a) => log.info?.('[updater]', ...a),
-      warn: (...a) => log.warn?.('[updater]', ...a),
-      error: (...a) => log.error?.('[updater]', ...a),
+      info: (...a: unknown[]) => log.info?.('[updater]', ...a),
+      warn: (...a: unknown[]) => log.warn?.('[updater]', ...a),
+      error: (...a: unknown[]) => log.error?.('[updater]', ...a),
       debug: () => {},
     };
 
@@ -191,7 +227,7 @@ export function createUpdater({ app, log = console, onChanged = () => {}, autoUp
     }));
   }
 
-  async function check({ manual = false } = {}) {
+  async function check({ manual = false }: { manual?: boolean } = {}) {
     if (stopped || !autoUpdater) return describe(state);
     if (!autoUpdater.isUpdaterActive()) {
       // A build run from source. Say which it is rather than reporting a
@@ -273,8 +309,8 @@ export function createUpdater({ app, log = console, onChanged = () => {}, autoUp
 // electron-updater's errors arrive as Error objects whose `message` is
 // occasionally the entire server response. One line, and a sentence a person
 // can read, for the few we can name.
-export function shortError(e) {
-  const raw = String(e?.message ?? e ?? 'Something went wrong.').split('\n')[0].trim();
+export function shortError(e: unknown): string {
+  const raw = String((e as Error)?.message ?? e ?? 'Something went wrong.').split('\n')[0].trim();
   // AND THE NAME IS ON `code`, NOT IN THE MESSAGE. electron-updater builds
   // these through builder-util-runtime's `newError`, which puts the
   // ERR_UPDATER_ name on the error's `code` and leaves the message as prose
@@ -285,7 +321,7 @@ export function shortError(e) {
   // release artifacts (https://github.com/Astral-Agent/astral-releases/
   // releases/download/v0.1.0/latest-mac.yml): HttpErr…" to her. The sentence
   // for exactly that failure was already on the line below it.
-  const named = `${e?.code ?? ''} ${raw}`;
+  const named = `${(e as NodeJS.ErrnoException)?.code ?? ''} ${raw}`;
   // SQUIRREL'S OWN PARAGRAPH, WHICH IS 240 CHARACTERS AND HAS A URL IN IT.
   // "Cannot update while running on a read-only volume. The application is on
   // a read-only volume. Please move the application and try again. If you'll

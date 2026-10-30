@@ -85,7 +85,7 @@ describe('the zoom chords', () => {
   // getFocusedWebContents returning null was a silent no-op, and a silent
   // no-op is the entire complaint. The keystroke's own contents is the target.
   it('act on the contents the keystroke arrived on', () => {
-    expect(menu).toMatch(/export function applyZoom\(delta, target = null\)/);
+    expect(menu).toMatch(/export function applyZoom\(delta: number, target: WebContents \| null = null\)/);
     expect(menu).toMatch(/named: target/);
   });
 
@@ -201,7 +201,7 @@ describe('the View menu items', () => {
   });
 
   it('hand that window through to the main process', () => {
-    expect(menu).toMatch(/const zoom = \(delta, window\) =>/);
+    expect(menu).toMatch(/const zoom = \(delta: number, window: BaseWindow \| undefined\) =>/);
     expect(main).toMatch(/onZoom: \(delta, target\) => applyZoom\(delta, target \?\? window\?\.webContents \?\? null\)/);
   });
 });

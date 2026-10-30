@@ -9,17 +9,37 @@ import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
 
 export const SLOW_MS = 100;
 
-export function stallWatch({ clock = () => performance.now(), loop = monitorEventLoopDelay({ resolution: 20 }) } = {}) {
+interface SlowRequest {
+  channel: string;
+  times: number;
+  maxMs: number;
+}
+
+interface Freeze {
+  ms: number;
+  where: unknown;
+}
+
+interface EventLoopMonitor {
+  enable(): unknown;
+  reset(): void;
+  readonly max: number;
+}
+
+export function stallWatch(
+  { clock = () => performance.now(), loop = monitorEventLoopDelay({ resolution: 20 }) }:
+    { clock?: () => number; loop?: EventLoopMonitor } = {},
+) {
   loop.enable();
-  let slow = new Map();
-  let freezes = [];
+  let slow = new Map<string, SlowRequest>();
+  let freezes: Freeze[] = [];
   return {
     /** A freeze main/freeze-recorder.mjs caught, with the function that held it. */
-    noteFreeze({ ms, where }) {
+    noteFreeze({ ms, where }: Freeze) {
       freezes.push({ ms, where });
     },
-    time(channel, fn) {
-      return (...args) => {
+    time<Args extends unknown[], Result>(channel: string, fn: (...args: Args) => Result) {
+      return (...args: Args) => {
         const start = clock();
         try {
           return fn(...args);

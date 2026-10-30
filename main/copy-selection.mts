@@ -21,19 +21,30 @@
 // renderer/src/copy-out.ts), and if nothing has landed shortly after, the words
 // are written directly. Either way the old clipboard is gone.
 
+import type { Clipboard, WebContents } from 'electron';
+
+interface CopySelectionOptions {
+  waitMs?: number;
+  stepMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+}
+
 /**
  * Copy what a context menu was raised on.
  *
- * @param {{ copy: () => void }} contents the web contents the menu was raised on
- * @param {string} selectionText `params.selectionText` from the context-menu event
- * @param {{ clear: () => void, availableFormats: () => string[], writeText: (t: string) => void }} clipboard
- * @param {{ waitMs?: number, stepMs?: number, sleep?: (ms: number) => Promise<void> }} [opts]
- * @returns {Promise<'page' | 'direct'>} which of the two put it there
+ * @param contents the web contents the menu was raised on
+ * @param selectionText `params.selectionText` from the context-menu event
+ * @returns which of the two put it there
  */
-export async function copySelection(contents, selectionText, clipboard, opts = {}) {
+export async function copySelection(
+  contents: Pick<WebContents, 'copy'>,
+  selectionText: string,
+  clipboard: Pick<Clipboard, 'clear' | 'availableFormats' | 'writeText'>,
+  opts: CopySelectionOptions = {},
+): Promise<'page' | 'direct'> {
   const waitMs = opts.waitMs ?? 600;
   const stepMs = opts.stepMs ?? 25;
-  const sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   // Nothing selected (a Copy in an empty text box) has no words to fall back
   // on, and clearing would throw away her clipboard for nothing.
   if (!selectionText) {

@@ -50,38 +50,73 @@ const DROP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'content-
  * is left alone because gzip holds bytes back until it has enough of them.
  */
 const SQUEEZE = /^(application\/(json|javascript|manifest\+json)|text\/(html|css|javascript|plain)|image\/svg\+xml)/;
-export const squeezes = (head, contentType) => head?.zip === 'gzip' && SQUEEZE.test(String(contentType ?? ''));
+export const squeezes = (head: { zip?: unknown } | null | undefined, contentType: unknown): boolean => head?.zip === 'gzip' && SQUEEZE.test(String(contentType ?? ''));
 
 const enc = new TextEncoder();
-const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+const messageOf = (err: unknown): unknown => (err as { message?: unknown } | null | undefined)?.message ?? err;
+const hex = (bytes: Uint8Array): string => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+
+/** The part of a WebSocket this uses, so a test can hand in a stand-in. */
+export type RelaySocket = Pick<WebSocket, 'binaryType' | 'send' | 'close' | 'onopen' | 'onmessage' | 'onerror' | 'onclose'>;
+
+/** What a phone's request says about itself, before it is checked. */
+interface RequestHead {
+  nonce?: unknown;
+  ts?: unknown;
+  path?: unknown;
+  wait?: unknown;
+  method?: unknown;
+  zip?: unknown;
+  headers?: Record<string, unknown>;
+}
+
+export interface RelayClientOptions {
+  relayUrl: string;
+  key: () => string;
+  port: () => number;
+  WebSocketImpl?: new (url: string) => RelaySocket;
+  fetchImpl?: (input: string, init: RequestInit) => Promise<Response>;
+  log?: { warn?: (...args: unknown[]) => void; info?: (...args: unknown[]) => void };
+  onChange?: () => void;
+  waitMs?: number;
+  pingMs?: number;
+  graceMs?: number;
+}
+
+export interface RelayClient {
+  start(): void;
+  stop(): void;
+  restart(): void;
+  state: () => { connected: boolean; error: string | null; connecting: boolean };
+}
 
 export function createRelayClient({
   relayUrl, key, port, WebSocketImpl = globalThis.WebSocket, fetchImpl = (...a) => globalThis.fetch(...a),
   log = console, onChange = () => {}, waitMs = WAIT_MS, pingMs = PING_MS, graceMs = PONG_GRACE_MS,
-}) {
-  let ws = null;
-  let pinger = null;
+}: RelayClientOptions): RelayClient {
+  let ws: RelaySocket | null = null;
+  let pinger: ReturnType<typeof setInterval> | null = null;
   /** When the relay last answered a ping on this link; null until it ever has. */
-  let ponged = null;
+  let ponged: number | null = null;
   /** When the ping timer last ran, to tell a sleep from a slow tick. */
   let ticked = 0;
   let want = false;
   let connected = false;
-  let error = null;
+  let error: string | null = null;
   let retry = 1000;
-  let timer = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
   let gen = 0;
-  let forKey = null;
-  let ids = null;
-  let keys = null;
+  let forKey: string | null = null;
+  let ids: Awaited<ReturnType<typeof relayIds>> | null = null;
+  let keys: Awaited<ReturnType<typeof relayKeys>> | null = null;
   /** Requests answered lately, by nonce, so a recorded one sent again is refused. */
-  const answered = new Map();
+  const answered = new Map<string, number>();
   /** Answers being sent, so a phone that gives up stops them. */
-  const live = new Map();
+  const live = new Map<string, AbortController>();
   /** Pieces of requests too big for one message, until their last piece. */
-  const parts = new Map();
+  const parts = new Map<string, { chunks: Uint8Array[]; size: number }>();
 
-  async function ready() {
+  async function ready(): Promise<void> {
     const k = key();
     if (k === forKey) return;
     ids = await relayIds(k);
@@ -90,22 +125,22 @@ export function createRelayClient({
     answered.clear();
   }
 
-  function fresh(head) {
+  function fresh(head: RequestHead | null): boolean {
     const now = Date.now();
     for (const [n, at] of answered) if (now - at > 2 * SKEW_MS) answered.delete(n);
     if (typeof head?.nonce !== 'string' || head.nonce.length < 16) return false;
-    if (!Number.isFinite(head.ts) || Math.abs(now - head.ts) > SKEW_MS) return false;
+    if (typeof head.ts !== 'number' || !Number.isFinite(head.ts) || Math.abs(now - head.ts) > SKEW_MS) return false;
     if (answered.has(head.nonce)) return false;
     answered.set(head.nonce, now);
     return true;
   }
 
-  const send = (sock, bytes) => { try { sock.send(bytes); } catch { /* the socket went; the phone hears from the relay */ } };
+  const send = (sock: RelaySocket, bytes: string | Uint8Array): void => { try { sock.send(bytes); } catch { /* the socket went; the phone hears from the relay */ } };
 
-  async function answer(sock, id, sealed) {
-    const k = keys;
-    let head;
-    let body;
+  async function answer(sock: RelaySocket, id: Uint8Array, sealed: Uint8Array): Promise<void> {
+    const k = keys!;
+    let head: RequestHead;
+    let body: Uint8Array;
     try {
       ({ head, body } = unpackRequest(await open(k.up, sealed, 'req')));
     } catch {
@@ -122,8 +157,8 @@ export function createRelayClient({
     let seq = 0;
     // One at a time, in order: each frame's number is sealed into it, and a
     // "still working" frame from the timer must not overtake the head.
-    let queue = Promise.resolve();
-    const frame = (type, payload) => (queue = queue.then(async () => {
+    let queue: Promise<void> = Promise.resolve();
+    const frame = (type: number, payload: Uint8Array): Promise<void> => (queue = queue.then(async () => {
       const plain = new Uint8Array(1 + payload.length);
       plain[0] = type;
       plain.set(payload, 1);
@@ -134,14 +169,14 @@ export function createRelayClient({
     const answering = () => { if (waiting) clearInterval(waiting); waiting = null; };
     let sentHead = false;
     try {
-      const headers = { 'x-agentbox-relay': '1', 'x-forwarded-for': 'relay' };
+      const headers: Record<string, string> = { 'x-agentbox-relay': '1', 'x-forwarded-for': 'relay' };
       for (const name of PASS) if (head.headers?.[name]) headers[name] = String(head.headers[name]);
       const method = String(head.method || 'GET').toUpperCase();
       const res = await fetchImpl(`http://127.0.0.1:${port()}${head.path}`, {
         method, headers, body: method === 'GET' || method === 'HEAD' ? undefined : body, signal: ctl.signal,
       });
       answering();
-      const out = {};
+      const out: Record<string, string> = {};
       res.headers.forEach((v, name) => { if (!DROP.has(name)) out[name] = v; });
       const squeeze = !!res.body && squeezes(head, res.headers.get('content-type'));
       if (squeeze) out['x-agentbox-zip'] = 'gzip';
@@ -160,7 +195,7 @@ export function createRelayClient({
     } catch (err) {
       answering();
       if (ctl.signal.aborted) return;
-      log.warn?.('[relay] answering failed:', err?.message ?? err);
+      log.warn?.('[relay] answering failed:', messageOf(err));
       try {
         await queue.catch(() => {});
         if (!sentHead) {
@@ -176,14 +211,14 @@ export function createRelayClient({
     }
   }
 
-  async function onMessage(sock, data) {
+  async function onMessage(sock: RelaySocket, data: unknown): Promise<void> {
     if (typeof data === 'string') {
       if (data === PONG) ponged = Date.now();
       return;
     }
     const bytes = data instanceof ArrayBuffer ? new Uint8Array(data)
       : data instanceof Uint8Array ? data
-        : new Uint8Array(await data.arrayBuffer());
+        : new Uint8Array(await (data as { arrayBuffer(): Promise<ArrayBuffer> }).arrayBuffer());
     if (bytes.length < 1 + ID_BYTES) return;
     const id = bytes.slice(1, 1 + ID_BYTES);
     const idh = hex(id);
@@ -217,7 +252,7 @@ export function createRelayClient({
   // late, which is a laptop waking from sleep with every socket gone under it.
   // A relay that never answers (one deployed before pings) is only ever judged
   // by the second, so an old relay is not mistaken for a dead link.
-  function startPinging(sock) {
+  function startPinging(sock: RelaySocket): void {
     stopPinging();
     ponged = null;
     ticked = Date.now();
@@ -235,13 +270,13 @@ export function createRelayClient({
     }, pingMs);
   }
 
-  function stopPinging() {
+  function stopPinging(): void {
     if (pinger) clearInterval(pinger);
     pinger = null;
   }
 
   /** Let a dead link go and open a new one now, not after the backoff. */
-  function replace(sock) {
+  function replace(sock: RelaySocket): void {
     if (ws !== sock) return;
     stopPinging();
     ws = null;
@@ -255,19 +290,19 @@ export function createRelayClient({
     void connect();
   }
 
-  function schedule() {
+  function schedule(): void {
     if (!want || timer) return;
     timer = setTimeout(() => { timer = null; void connect(); }, retry);
     retry = Math.min(retry * 2, 30_000);
   }
 
-  async function connect() {
+  async function connect(): Promise<void> {
     const mine = ++gen;
-    try { await ready(); } catch (err) { error = String(err?.message ?? err); onChange(); schedule(); return; }
+    try { await ready(); } catch (err) { error = String(messageOf(err)); onChange(); schedule(); return; }
     if (!want || mine !== gen) return;
-    const url = `${relayUrl.replace(/^http/, 'ws').replace(/\/+$/, '')}/mac/${ids.room}?proof=${encodeURIComponent(ids.proof)}`;
-    let sock;
-    try { sock = new WebSocketImpl(url); } catch (err) { error = `Could not reach the relay: ${err?.message ?? err}`; onChange(); schedule(); return; }
+    const url = `${relayUrl.replace(/^http/, 'ws').replace(/\/+$/, '')}/mac/${ids!.room}?proof=${encodeURIComponent(ids!.proof)}`;
+    let sock: RelaySocket;
+    try { sock = new WebSocketImpl(url); } catch (err) { error = `Could not reach the relay: ${messageOf(err)}`; onChange(); schedule(); return; }
     ws = sock;
     sock.binaryType = 'arraybuffer';
     sock.onopen = () => {

@@ -17,24 +17,26 @@
 // drawing yours under a stranger's pointer; the app drawing her own dev server
 // for her is not that. tests/a-local-app-shows-in-the-pane-and-stays-signed-in.test.mjs
 
+import type { OnHeadersReceivedListenerDetails, WebContents } from 'electron';
+
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
-export function isLocalAddress(url) {
+export function isLocalAddress(url: string): boolean {
   try {
     const u = new URL(url);
     return (u.protocol === 'http:' || u.protocol === 'https:') && LOCAL_HOSTS.has(u.hostname);
   } catch { return false; }
 }
 
-const keyOf = (headers, name) => Object.keys(headers).find((k) => k.toLowerCase() === name);
+const keyOf = (headers: Record<string, string[]>, name: string) => Object.keys(headers).find((k) => k.toLowerCase() === name);
 
-function withoutFrameAncestors(policy) {
+function withoutFrameAncestors(policy: string): string {
   return policy.split(';').map((d) => d.trim()).filter((d) => d && !/^frame-ancestors(\s|$)/i.test(d)).join('; ');
 }
 
 // SameSite=None needs Secure, and Chromium takes Secure from http://localhost
 // because it counts loopback as a secure origin.
-function sentInsideTheWindow(cookie) {
+function sentInsideTheWindow(cookie: string): string {
   const parts = cookie.split(';').map((p) => p.trim());
   if (parts.some((p) => /^samesite\s*=\s*none$/i.test(p))) return cookie;
   const kept = parts.filter((p) => !/^samesite\s*=/i.test(p));
@@ -47,7 +49,7 @@ function sentInsideTheWindow(cookie) {
  * The headers a local app's response should carry inside the pane, or null
  * when nothing changes. `details` is Electron's onHeadersReceived details.
  */
-export function localAppHeaders({ url, resourceType, responseHeaders }) {
+export function localAppHeaders({ url, resourceType, responseHeaders }: Pick<OnHeadersReceivedListenerDetails, 'url' | 'resourceType' | 'responseHeaders'>): Record<string, string[]> | null {
   if (!responseHeaders || resourceType === 'mainFrame' || !isLocalAddress(url)) return null;
   const out = { ...responseHeaders };
   let changed = false;
@@ -72,7 +74,7 @@ export function localAppHeaders({ url, resourceType, responseHeaders }) {
 }
 
 /** Wire it to the window's own session, for that window's requests only. */
-export function letLocalAppsShowInThePane(contents) {
+export function letLocalAppsShowInThePane(contents: WebContents) {
   const filter = { urls: ['*://localhost/*', '*://127.0.0.1/*', '*://[::1]/*'] };
   contents.session.webRequest.onHeadersReceived(filter, (details, callback) => {
     const ours = details.webContentsId === contents.id;
