@@ -51,12 +51,26 @@ export function sharedBinDirs(home = os.homedir()) {
  * Relative entries are dropped. A "." or a "node_modules/.bin" on PATH would
  * let whatever folder the app sits in decide what gets spawned.
  */
-export function pathDirs(env = process.env) {
+export function pathDirs(env = process.env, platform = process.platform) {
+  const p = pathsOf(platform);
   const dirs = new Set();
-  for (const dir of String(env?.PATH ?? '').split(path.delimiter)) {
-    if (dir && path.isAbsolute(dir)) dirs.add(dir);
+  for (const dir of String(envValue(env, 'PATH', platform) ?? '').split(p.delimiter)) {
+    if (dir && p.isAbsolute(dir)) dirs.add(dir);
   }
   return [...dirs];
+}
+
+const pathsOf = (platform) => (platform === 'win32' ? path.win32 : path.posix);
+
+/**
+ * Windows reads environment keys case-insensitively, and a copy keeps the
+ * spelling it was started with. Explorer and PowerShell start it as `Path`.
+ */
+export function envValue(env, name, platform = process.platform) {
+  if (!env) return undefined;
+  if (platform !== 'win32') return env[name];
+  const key = Object.keys(env).find((k) => k.toUpperCase() === name.toUpperCase());
+  return key === undefined ? undefined : env[key];
 }
 
 /**
@@ -106,17 +120,21 @@ function newestFirst(a, b) {
  *   appCopies   a copy carried inside a desktop app, tried last of all
  *   evidence    files it leaves behind; never spawned, and only ever stop us
  *               saying it is missing
+ *   windows     `ownPaths` and the `packageExe` an npm install keeps beside
+ *               its shim, both ending in a real .exe
  */
-function engine({ bin, name, installUrl, ownPaths, appCopies = () => [], evidence }) {
-  return {
+function engine({ bin, name, installUrl, ownPaths, appCopies = () => [], evidence, windows = {} }) {
+  const spec = {
     bin,
     name,
     installUrl,
     ownPaths,
     appCopies,
     evidence,
+    windows,
     // The first that exists wins.
-    candidates(home = os.homedir(), readdir = defaultReaddir) {
+    candidates(home = os.homedir(), readdir = defaultReaddir, platform = process.platform) {
+      if (platform === 'win32') return windowsCandidates(spec, home);
       return [
         ...ownPaths(home),
         ...sharedBinDirs(home).map((dir) => path.join(dir, bin)),
@@ -124,6 +142,26 @@ function engine({ bin, name, installUrl, ownPaths, appCopies = () => [], evidenc
       ];
     },
   };
+  return spec;
+}
+
+/**
+ * ON WINDOWS ONLY A REAL .exe IS RETURNED. npm's extensionless shim is a
+ * `#!/bin/sh` script, and its `.cmd` needs cmd.exe, which strips the quotes
+ * from a JSON argument. The npm package keeps the real exe beside the shim.
+ */
+export function windowsCandidates(spec, home = os.homedir()) {
+  return spec.windows.ownPaths?.(home) ?? [];
+}
+
+// npm keeps its package beside the shim it writes, so a directory with no
+// shim is not looked into.
+function windowsExesIn(spec, dir, hasShim) {
+  const { packageExe } = spec.windows;
+  return [
+    path.win32.join(dir, `${spec.bin}.exe`),
+    ...(packageExe && hasShim ? [path.win32.join(dir, 'node_modules', ...packageExe)] : []),
+  ];
 }
 
 export const ENGINES = {
@@ -160,6 +198,10 @@ export const ENGINES = {
       path.join(home, '.claude/history.jsonl'),
       path.join(home, '.local/share/claude'),        // the installer's version store
     ],
+    windows: {
+      ownPaths: (home) => [path.win32.join(home, '.local', 'bin', 'claude.exe')],
+      packageExe: ['@anthropic-ai', 'claude-code', 'bin', 'claude.exe'],
+    },
   }),
 
   /**
@@ -415,7 +457,8 @@ export function askShellForAll(bins, { env = process.env, exists = fs.existsSync
  * Seed every engine's cached shell answer from one probe. If the shell fails,
  * each engine falls back to its own probe.
  */
-export function warmShellAnswers({ now = Date.now(), ...how } = {}) {
+export function warmShellAnswers({ now = Date.now(), platform = process.platform, ...how } = {}) {
+  if (platform === 'win32') return;
   let found = {};
   try { found = askShellForAll(engineKeys().map((k) => ENGINES[k].bin), how); } catch { return; }
   for (const key of engineKeys()) {
@@ -434,11 +477,11 @@ function askedShell(lookup) {
  * the app saying the tool is missing. A dangling candidate counts too.
  */
 export function installEvidence(key, {
-  home = os.homedir(), env = process.env, exists = fs.existsSync, dangles = defaultDangles,
+  home = os.homedir(), env = process.env, exists = fs.existsSync, dangles = defaultDangles, platform = process.platform,
 } = {}) {
   const spec = engineFor(key);
   for (const p of spec.evidence(home, env)) if (exists(p)) return p;
-  for (const p of spec.candidates(home, () => [])) if (dangles(p)) return p;
+  for (const p of spec.candidates(home, () => [], platform)) if (dangles(p)) return p;
   return null;
 }
 
@@ -456,6 +499,7 @@ export function findEngine(key, {
   shellLookup = null,
   readdir = defaultReaddir,
   dangles = defaultDangles,
+  platform = process.platform,
 } = {}) {
   const spec = engineFor(key);
   if (configured) {
@@ -465,11 +509,14 @@ export function findEngine(key, {
     };
   }
 
+  // Windows has no login shell holding a PATH of its own. The app inherits the
+  // person's PATH, so that and the list are the whole answer.
+  const windows = platform === 'win32';
   // The default probe uses the real environment and disk, not the injected
   // `exists`: a test faking only `exists` is asking about the list.
   const lookup = shellLookup ?? (() => askShell({ bin: spec.bin }));
-  const fromShell = askedShell(lookup);
-  const searched = spec.candidates(home, readdir);
+  const fromShell = windows ? { path: null, answered: true } : askedShell(lookup);
+  const searched = spec.candidates(home, readdir, platform);
   if (fromShell.path) {
     return { path: fromShell.path, found: true, certain: true, from: 'shell', searched, evidence: null };
   }
@@ -477,22 +524,26 @@ export function findEngine(key, {
   // Our own PATH before the hand-written list, for the reason the shell comes
   // before both: it is where their terminal really resolves the tool, while
   // the list is a guess that can still hold a copy they stopped using.
-  for (const dir of pathDirs(env)) {
-    const onPath = path.join(dir, spec.bin);
-    if (exists(onPath)) return { path: onPath, found: true, certain: true, from: 'path', searched, evidence: null };
+  for (const dir of pathDirs(env, platform)) {
+    const here = windows
+      ? windowsExesIn(spec, dir, exists(path.win32.join(dir, `${spec.bin}.cmd`)))
+      : [path.posix.join(dir, spec.bin)];
+    for (const onPath of here) {
+      if (exists(onPath)) return { path: onPath, found: true, certain: true, from: 'path', searched, evidence: null };
+    }
   }
 
   for (const candidate of searched) {
     if (exists(candidate)) return { path: candidate, found: true, certain: true, from: 'disk', searched, evidence: null };
   }
 
-  for (const candidate of spec.appCopies(home, readdir)) {
+  for (const candidate of windows ? [] : spec.appCopies(home, readdir)) {
     if (exists(candidate)) return { path: candidate, found: true, certain: true, from: 'app', searched, evidence: null };
   }
 
   // Any trace of the tool means we looked in the wrong places, so we may not
   // say it is missing.
-  const evidence = installEvidence(key, { home, env, exists, dangles });
+  const evidence = installEvidence(key, { home, env, exists, dangles, platform });
   return {
     path: null,
     found: false,
@@ -541,8 +592,10 @@ export function resolveEngine(key, configured = null, { now = Date.now(), shellL
  * held, for a caller that promised a fresh look (Check again, setup, the
  * update check). Never rejects.
  */
-export function lookAgain(key, { now = Date.now(), shellLookupLater = null } = {}) {
+export function lookAgain(key, { now = Date.now(), shellLookupLater = null, platform = process.platform } = {}) {
   const spec = engineFor(key);
+  // The Windows search never reads a shell answer (findEngine).
+  if (platform === 'win32') return Promise.resolve();
   return askAgain(key, shellLookupLater ?? (() => askShellLater({ bin: spec.bin })), now);
 }
 
