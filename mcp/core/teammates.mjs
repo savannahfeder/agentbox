@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import { readWorkItem } from '../../main/store/work-items.mjs';
 import { listProjects, legacyRoot } from '../../main/store/project.mjs';
 import {
-  teamDir, readTeammates, readChat, writeTeammate, writeChat, newMemoryId,
+  teamDir, readTeammates, readChat, writeTeammate, writeChat, newMemoryId, newTeammateId,
   readPlaybooks, writePlaybook, newPlaybookId, newLessonId, newDutyId, methodFile, sourcesDir, writeMethod,
 } from '../../main/store/teammates-files.mjs';
 import { teammateIdOf, hopOf, workOf, mentionsIn, isWorks, letterFor, cleanDuty, dutyStart, isDate, METHOD_CAP, YOU } from '../../shared/teammates.mjs';
@@ -76,7 +76,7 @@ export function teamPost({ text, to = [], options } = {}, ctx = {}) {
 }
 
 export function teamPass({ to, title, details, project: named } = {}, ctx = {}) {
-  const { dir, me, team, hop, writtenIn, project } = teammateContext({ ...ctx, outsider: true });
+  const { dir, me, team, hop, writtenIn, project, item } = teammateContext({ ...ctx, outsider: true });
   // The work is done where it is named, or for a thread handing it on, in that
   // thread's project; otherwise in the receiver's own.
   const where = named ? resolveProduct(named).id : me ? null : project.id;
@@ -84,15 +84,42 @@ export function teamPass({ to, title, details, project: named } = {}, ctx = {}) 
   if (!target) throw new Error('pass work to another teammate, not to yourself');
   const what = plain(title);
   if (!what) throw new Error('give the work a short title');
-  const m = writeChat(dir, { kind: 'pass', from: me?.id ?? YOU, to: target, title: what.slice(0, 200), details: String(details ?? '').slice(0, 6000), hop, ...writtenIn, ...(where ? { product: where } : {}) }, ctx.now);
+  const yours = !!me?.primary && startedByYou(item);
+  const m = writeChat(dir, { kind: 'pass', from: me?.id ?? YOU, to: target, title: what.slice(0, 200), details: String(details ?? '').slice(0, 6000), hop, ...writtenIn, ...(where ? { product: where } : {}), ...(yours ? { yours: true } : {}) }, ctx.now);
   const them = team.find((t) => t.id === target);
-  const held = me && them?.handoffsNeedYes !== false;
+  const held = me && !yours && them?.handoffsNeedYes !== false;
   return {
     passed: m.id, to: them?.name,
     note: held
       ? `${them.name} takes work from teammates only with the person's yes, so this waits in their inbox until they reply. Say so in your answer.`
-      : `It goes to the thread ${them?.name ?? 'they'} already has on this work, or starts one, and wakes them.`,
+      : yours ? `The person asked for this, so it starts now for ${them?.name ?? 'them'}, in the thread they already have on this work or a new one.`
+        : `It goes to the thread ${them?.name ?? 'they'} already has on this work, or starts one, and wakes them.`,
   };
+}
+
+// The person's own words started this run, or they have replied on it: the
+// opening is theirs, or their answer is the newest word on it.
+function startedByYou(item) {
+  if (item?.wrote?.body?.source === 'founder') return true;
+  return answeredInThread(item);
+}
+
+// The primary makes a teammate when the person said yes to one. It is a draft
+// that sets itself up by asking them, as one you made would.
+export function teamHire({ name, job } = {}, ctx = {}) {
+  const { dir, me, team, item, project } = teammateContext(ctx);
+  if (!me.primary) throw new Error('only your primary employee makes new teammates; suggest one to the person instead');
+  if (!startedByYou(item)) throw new Error('make a teammate only in a run started by the person\'s words or answered by them: ask them first, with options');
+  const role = plain(name).slice(0, 40);
+  const words = String(job ?? '').trim();
+  if (!role || !words) throw new Error('give the new teammate a name that says its role, and its job in plain words');
+  if (team.some((t) => t.name.toLowerCase() === role.toLowerCase())) throw new Error(`${role} is taken; pick another name`);
+  const now = ctx.now ?? Date.now();
+  const id = newTeammateId();
+  writeTeammate(dir, id, { name: role, role, letter: letterFor(role, team), job: words.slice(0, 2000), status: 'draft', product: me.product ?? project.id, createdAt: now, paused: false }, now);
+  writeChat(dir, { kind: 'msg', from: YOU, to: [id], text: words.slice(0, 8000), setup: true }, now);
+  writeChat(dir, { kind: 'act', from: me.id, verb: 'hired', text: `${me.name} made ${role}, which is setting itself up.` }, now);
+  return { teammate: { id, name: role, status: 'draft' }, note: `${role} wakes now to set itself up, and asks the person what it cannot tell from the job.` };
 }
 
 export function teamRemember({ text } = {}, ctx = {}) {
