@@ -22,6 +22,8 @@ import type { Choices, Press } from '../../../lib/actions';
 import { useDraft } from '../../../lib/drafts';
 import { typedWords } from '../../../lib/files';
 import { threadOf, type FiledRow, type Thread } from '../../../lib/thread';
+import { mateOf } from '../../../lib/teammates';
+import { TeammateMark } from '../../../ui/Teammates';
 import { screenGate } from '../../../lib/thread-gate';
 import { liveOf, offersOf, shownLevel, summaryParts, type Offers } from '../../../lib/thread-offers';
 import { waitFacts } from '../../../../../renderer/src/phone-rows';
@@ -304,6 +306,7 @@ export default function ThreadScreen() {
     );
   }
   const item = thread.item;
+  const mate = mateOf(item, c.team);
   const facts = { session: thread.session, inProgress: thread.inProgress, now: c.now };
   const offers = offersOf(item, facts);
   // With what the computer says of it while nothing runs, so waiting its turn reads Queued.
@@ -404,7 +407,14 @@ export default function ThreadScreen() {
           <View style={{ height: 22 }} />
           {thread.outcome && (
             <View style={{ marginTop: 28 }}>
-              {thread.outcome.label && (
+              {/* A teammate's answer is signed with its mark, name and time (OneThingAtATime.tsx `QueueAnswer`). */}
+              {mate ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 9 }}>
+                  <TeammateMark t={mate} />
+                  <T style={{ fontSize: 14, fontFamily: font.medium }}>{mate.name}</T>
+                  <T style={{ fontSize: 12.5, color: color.faint }}>{when(thread.outcome.at)}</T>
+                </View>
+              ) : thread.outcome.label && (
                 <T style={{ fontSize: 12, letterSpacing: 0.84, textTransform: 'uppercase', fontFamily: font.semibold, color: color.faint, marginBottom: 7 }}>{thread.outcome.label}</T>
               )}
               <Markdown text={thread.outcome.text} dir={dir} files={files} />
@@ -436,6 +446,7 @@ export default function ThreadScreen() {
         onMoveToCloud={() => void press({ kind: 'move-to-cloud' })}
         pinned={item.status === 'done' || item.waitsForMac ? null : !!item.pinned}
         onPin={(pin) => void press({ kind: 'pin', pinned: pin })}
+        onUnread={() => { c.markUnseen(item); back(); }}
         onClose={close} />
       {summary && <Summary thread={thread} now={c.now} close={() => setSummary(false)} />}
     </Wall>

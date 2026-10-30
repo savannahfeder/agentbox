@@ -28,5 +28,12 @@ export function markSeen(seen: Seen, item: { product: string; id: string }, stor
   return { ...seen, at };
 }
 
-export const isUnread = (item: { product: string; id: string; createdAt?: number; wrote?: any }, seen: Seen) =>
+/** Unread again until it is next opened (the web app's Mark unread). */
+export function markUnseen(seen: Seen, item: { product: string; id: string }, store: Store): Seen {
+  const at = { ...seen.at, [keyOf(item)]: 0 };
+  store.setItem(SEEN_AT_KEY, JSON.stringify(at));
+  return { ...seen, at };
+}
+
+export const isUnread =(item: { product: string; id: string; createdAt?: number; wrote?: any }, seen: Seen) =>
   arrivedAt(item as any) > (seen.at[keyOf(item)] ?? seen.since);

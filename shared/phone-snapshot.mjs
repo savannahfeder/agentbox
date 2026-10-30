@@ -138,6 +138,48 @@ export function phoneRepeatsOf(rules, slugs, { home = null } = {}) {
     .map((r) => ({ product: r.product, ...pick(r, REPEAT_FIELDS, 4000, { home }) }));
 }
 
+// YOUR AI TEAMMATES, AND YOUR CHAT WITH THEM (main/teammates.mjs `view`),
+// riding with the settings copy as the repeating tasks do. Named fields only;
+// the method, memory and playbooks stay on the computer.
+const MATE_FIELDS = ['id', 'name', 'letter', 'role', 'job', 'primary', 'paused', 'status', 'product', 'engine', 'model', 'now', 'queued', 'runsThisWeek', 'worksLabel', 'createdAt'];
+const CHAT_FIELDS = ['id', 'kind', 'from', 'to', 'text', 'title', 'details', 'verb', 'ref', 'options', 'ts', 'via', 'setup', 'start', 'product'];
+const RUN_FIELDS = ['id', 'kind', 'teammate', 'item', 'product', 'title', 'verb', 'by', 'byName', 'waiting', 'answered', 'text', 'ts', 'said'];
+export const TEAMMATES_LIMITS = { mates: 40, lines: 300, textChars: 3000, bytes: 120_000 };
+const ref = (r, ctx) => (r && typeof r.id === 'string' && typeof r.product === 'string' ? { id: r.id, product: r.product, title: clip(String(r.title ?? ''), 300, ctx) } : null);
+
+export function phoneTeammatesOf(view, { home = null, limits = TEAMMATES_LIMITS } = {}) {
+  if (!view || !Array.isArray(view.list)) return null;
+  const ctx = { home };
+  const n = limits.textChars;
+  const list = view.list.filter((t) => t && typeof t.id === 'string' && !t.endedAt).slice(0, limits.mates).map((t) => ({
+    ...pick(t, MATE_FIELDS, 600, ctx),
+    running: ref(t.running ? { ...t.running, title: '' } : null, ctx),
+    waiting: (Array.isArray(t.waiting) ? t.waiting : []).slice(0, 20).map((r) => ref(r, ctx)).filter(Boolean),
+    duties: (Array.isArray(t.duties) ? t.duties : []).slice(0, 12).map((d) => pick(d, ['id', 'what', 'when'], 300, ctx)),
+  }));
+  const lines = (all, fields) => (Array.isArray(all) ? all : []).filter((l) => l && typeof l.id === 'string' && Number.isFinite(l.ts)).slice(-limits.lines).map((l) => {
+    const out = pick(l, fields, n, ctx);
+    if (l.answers && typeof l.answers === 'object' && !Array.isArray(l.answers)) {
+      out.answers = Object.fromEntries(Object.entries(l.answers).filter(([, a]) => typeof a === 'string').slice(0, 20).map(([q, a]) => [String(q).slice(0, 80), clip(a, 2000, ctx)]));
+    }
+    return out;
+  });
+  const chat = lines(view.chat, CHAT_FIELDS);
+  const runs = lines(view.runs, RUN_FIELDS);
+  const out = { list, chat: [], runs: [], ...(typeof view.trouble === 'string' ? { trouble: clip(view.trouble, 300, ctx) } : {}) };
+  // The newest lines first, until it would not fit beside the settings.
+  let left = limits.bytes - bytesOf(out);
+  const newestFirst = [...chat.map((l, i) => ({ l, i })), ...runs.map((l, i) => ({ l, i }))].sort((a, b) => b.l.ts - a.l.ts || b.i - a.i).map((x) => x.l);
+  for (const l of newestFirst) {
+    left -= bytesOf(l) + 1;
+    if (left < 0) break;
+    (l.kind === 'run' ? out.runs : out.chat).push(l);
+  }
+  out.chat.reverse();
+  out.runs.reverse();
+  return out;
+}
+
 // `item` is the folded row; `history` is store.readHistory for it. `home` is
 // her home folder, written ~ in the copy.
 export function threadSnapshot(item, history = [], limits = SNAPSHOT_LIMITS, { home = null } = {}) {
@@ -324,6 +366,8 @@ const CHOICES = {
     assignee: (v) => typeof v === 'string' && v.length >= 1 && v.length <= 80, due: (v) => typeof v === 'string' && v.length <= 40,
     visibility: (v) => ['team', 'people', 'private'].includes(v),
     visibleTo: (v) => Array.isArray(v) && v.length <= 50 && v.every((x) => typeof x === 'string' && x.length <= 80),
+    // To Auto (shared/auto-route.mjs), and no other label.
+    labels: (v) => Array.isArray(v) && v.length === 1 && v[0] === 'auto',
   },
 };
 export function phoneChoices(kind, p) {

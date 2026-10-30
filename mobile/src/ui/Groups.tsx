@@ -124,8 +124,8 @@ function Switcher({ rooms, current, open, close, pick, now }: { rooms: Room[]; c
   );
 }
 
-/** `tabs` are the inbox's tabs, drawn under the bar as the inbox draws them. */
-export function GroupsPlace({ tabs }: { tabs?: ReactNode } = {}) {
+/** `tabs` are the inbox's tabs, drawn under the bar as the inbox draws them; opened from Chats, `onBack` goes back to it instead. */
+export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () => void } = {}) {
   const c = useCloud();
   const g = useGroups();
   const rooms = g.state.rooms;
@@ -162,15 +162,16 @@ export function GroupsPlace({ tabs }: { tabs?: ReactNode } = {}) {
   const faceOf = (id: string | null) => (id && people.get(id)) || nameOf(id);
   const names = [...people.values()].filter(Boolean);
 
+  const back = onBack ? <IconButton label="Back to Chats" onPress={onBack}><Back size={18} /></IconButton> : undefined;
   if (!g.state.ready) {
     return <>
-      <TopBar title="Groups" below={tabs} />
+      <TopBar left={back} title="Groups" below={tabs} />
       <View style={{ flex: 1 }}>{g.state.error && <T style={{ padding: size.inset, fontSize: 14, color: color.dim }}>{g.state.error}</T>}</View>
     </>;
   }
   if (!room) {
     return <>
-      <TopBar title="Groups" below={tabs} />
+      <TopBar left={back} title="Groups" below={tabs} />
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 80 }}>
         <T style={{ fontFamily: font.medium, fontSize: 18, lineHeight: 23, marginBottom: 8 }}>You are not in any groups yet.</T>
         <T style={{ fontSize: 14, lineHeight: 21, color: color.dim }}>{`Start one or find one to join in ${Name} on your computer. It shows up here.`}</T>
@@ -202,7 +203,7 @@ export function GroupsPlace({ tabs }: { tabs?: ReactNode } = {}) {
 
   return (
     <>
-      <TopBar left={root ? <IconButton label="Back to the chat" onPress={() => setThread(null)}><Back size={18} /></IconButton> : undefined} title={title}
+      <TopBar left={root ? <IconButton label="Back to the chat" onPress={() => setThread(null)}><Back size={18} /></IconButton> : back} title={title}
         right={<IconButton label="People" onPress={() => setSheet('people')}><PeopleGlyph /></IconButton>} below={root ? undefined : tabs} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: size.inset, paddingBottom: 16 }} keyboardShouldPersistTaps="handled"
