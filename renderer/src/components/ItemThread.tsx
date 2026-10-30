@@ -401,12 +401,13 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
       {after.map((act, i) => <ActLine key={`${act.at}-${i}`} act={act} />)}
     </div>
   );
-  // A chat just brought in is being written up as a thread (main/catch-up.mjs); its raw end is the look it replaces.
+  // A chat just brought in is being written up as a thread (main/catch-up.mjs). Its raw end stays readable until then.
   if (queue && catchUpDue(item)) {
     return (
       <>
         {queueHead}
-        <p className="one-catching-up">Writing up where this chat stands…</p>
+        <p className="one-catching-up"><span className="live-word is-shimmering">Getting this chat ready. Its summary and options will appear here.</span></p>
+        {newest && <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} />}
       </>
     );
   }

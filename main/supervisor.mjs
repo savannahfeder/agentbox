@@ -216,6 +216,8 @@ const DIGEST_RETRY_MS = 30 * 60_000;
 const NAME_RETRY_MS = 10 * 60_000;
 /** Rewrites of brought-in chats running at once (`catchUpTheImports`). */
 const CATCH_UP_AT_ONCE = 3;
+/** Someone is looking at these rows, so a miss is tried again far sooner than a name is. */
+const CATCH_UP_RETRY_MS = 60_000;
 // How long one account gets to say who takes a thread sent to Auto. A person is
 // waiting on this one, unlike a name, and a miss sends the thread to an agent.
 const ROUTE_TIMEOUT_MS = 60_000;
@@ -3615,7 +3617,7 @@ export class Supervisor {
   /**
    * A CHAT BROUGHT IN, REWRITTEN AS A THREAD (main/catch-up.mjs): its name, its
    * context and its answer with options. Never awaited, like the namer, and
-   * a few at once: the person is looking at these rows the moment setup ends. A miss waits ten minutes; after three the row keeps the
+   * a few at once: the person is looking at these rows the moment setup ends. A miss waits a minute; after three the row keeps the
    * agent's own last message.
    */
   catchUpTheImports(items, now = Date.now()) {
@@ -3624,7 +3626,7 @@ export class Supervisor {
     const key = (i) => `${i.product}:${i.id}`;
     const due = items
       .filter((i) => catchUpDue(i) && i.result && !this._catchingUp.has(key(i))
-        && !(now - (this._catchUpMisses.get(key(i))?.at ?? -Infinity) < NAME_RETRY_MS))
+        && !(now - (this._catchUpMisses.get(key(i))?.at ?? -Infinity) < CATCH_UP_RETRY_MS))
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
       .slice(0, Math.max(0, CATCH_UP_AT_ONCE - this._catchingUp.size));
     return Promise.all(due.map((next) => {

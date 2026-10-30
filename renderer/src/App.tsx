@@ -7729,7 +7729,8 @@ export default function App() {
       {fresh && !modeDraft && <FirstRunFlow snap={snap} home={home} onDone={finishFresh} />}
       {!fresh && <Tour tour={tour} view={view} thread={!!focused}
         covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose')}
-        onChange={setTour} />}
+        onChange={setTour}
+        onPoint={(id) => { const at = list.findIndex((i) => i.id === id); if (at >= 0) setSelected(at); }} />}
       {run && !modeDraft && !walkWaitsForSignIn && (
         <Onboarding
           run={run}

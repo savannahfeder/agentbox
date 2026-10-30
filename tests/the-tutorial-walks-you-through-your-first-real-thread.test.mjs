@@ -232,8 +232,8 @@ describe('while a chat brought in is being written up', () => {
   // Measured 2026-10-29 in a fresh window: for the 13 seconds the rewrite took,
   // the list had no row to point at, so "Press N" showed; opening the chat
   // showed "Press R" over "Writing up where this chat stands…".
-  it('says nothing on the list or in the chat', () => {
-    expect(tourStep(startTour(), at({ rows: 0, preparing: true }))).toBe(null);
+  it('says so on the list, and nothing in the chat, whose page says it', () => {
+    expect(tourStep(startTour(), at({ rows: 0, preparing: true }))).toBe('gettingReady');
     expect(tourStep(startTour(), at({ thread: true, preparing: true }))).toBe(null);
   });
   it('but still teaches the New thread box if it is opened', () => {
@@ -297,7 +297,7 @@ describe('the command bar', () => {
     // Drawn first on the page title: the glow hugged "Threads" and the card covered the tabs.
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
-    expect(tour).toContain("{step !== 'palette' && step !== 'busy' && <div key={`glow-${step}`}");
+    expect(tour).toContain("{step !== 'palette' && step !== 'busy' && step !== 'gettingReady' && <div key={`glow-${step}`}");
   });
 });
 

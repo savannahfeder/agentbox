@@ -3,7 +3,7 @@
 // tests/the-tutorial-walks-you-through-your-first-real-thread.test.mjs holds
 // what each rule is for.
 
-export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy';
+export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'gettingReady';
 /** Each tip shows until it is done or put away, then never again. The New thread box's three steps are one. */
 export type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy';
 /** Every lesson there is; a tour with all of them done has nothing left to say. */
@@ -57,7 +57,7 @@ export const tourLive = (t: Tour | null): boolean => !!t && !t.skipped && LESSON
 export const noteSent = (t: Tour): Tour => finishLesson({ ...t, sent: true }, 'compose');
 export const finishLesson = (t: Tour, l: Lesson): Tour => (t.done.includes(l) ? t : { ...t, done: [...t.done, l] });
 export const lessonOf = (s: TourStep): Lesson =>
-  s === 'folder' || s === 'pick' || s === 'write' || s === 'send' ? 'compose' : s === 'answered' ? 'open' : s;
+  s === 'folder' || s === 'pick' || s === 'write' || s === 'send' ? 'compose' : s === 'answered' || s === 'gettingReady' ? 'open' : s;
 
 const KEYS: Partial<Record<TourStep, RegExp>> = { start: /^n$/i, working: /^Enter$/, open: /^Enter$/, choose: /^[1-9]$/, reply: /^r$/i, close: /^e$/i };
 
@@ -96,6 +96,14 @@ export const showIdeas = (t: Tour | null): boolean => !!t && !t.skipped && !(t.d
 /** Before the first send: the box asks for a folder, and the empty inbox says to give a first task. */
 export const firstTask = (t: Tour | null): boolean => !!t && !t.sent && !t.skipped;
 
+/** One slow write-up must not hold back the threads already ready, or the tip on them. */
+export const stillPreparing = ({ thread, onPage, ready, writing }: { thread: boolean; onPage: boolean; ready: number; writing: number }): boolean =>
+  thread ? onPage : ready === 0 && writing > 0;
+
+/** The tip's ↵ has to open the row it lights, unless someone has walked the list themselves. */
+export const cursorOwed = (step: TourStep | null, { writing, byHand }: { writing: boolean; byHand: boolean }): boolean =>
+  step === 'open' && writing && !byHand;
+
 export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
   if (!t || t.skipped || s.covered) return null;
   const todo = (l: Lesson) => !t.done.includes(l);
@@ -107,7 +115,7 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
     if (s.text) return 'send';
     return s.ideas === false ? 'write' : 'pick';
   }
-  if (s.preparing) return null;
+  if (s.preparing) return !s.thread && s.view === 'inbox' && todo('open') ? 'gettingReady' : null;
   if (s.thread) {
     if (s.typing) return null;
     if (s.busy) return todo('busy') ? 'busy' : null;
