@@ -6048,7 +6048,9 @@ export class Supervisor {
       const id = n.item || item?.id;
       if (!product || !id || !n.note) { console.warn(`zero: ${n.note || 'a cloud run was kept aside'} (${folder})`); continue; }
       try {
-        if (this.store.cloudWorkKeptAside) this.store.cloudWorkKeptAside(product, id, n.note);
+        // A machine that died: the row is told, and runs on as before.
+        if (n.lost) this.store.noteItem?.(product, id, n.note);
+        else if (this.store.cloudWorkKeptAside) this.store.cloudWorkKeptAside(product, id, n.note);
         else this.store.noteItem?.(product, id, n.note);
       } catch (e) { console.warn('zero: could not say a cloud run was kept aside:', e.message); }
     }

@@ -178,6 +178,10 @@ const FOLDER_CAP = { files: 300, bytes: 100 * 1024 * 1024 };
 const RESULTS_WAIT_MS = 3 * 60_000;
 // How often a run's new documents are fetched while it works.
 const DOCS_EVERY_MS = 10_000;
+// How often a run's branch is sent home while it works, so a machine that dies
+// takes at most this much of it.
+const CHECKPOINT_EVERY_MS = 5 * 60_000;
+const NO_CHECKPOINT = 'the run saved no commits before its machine stopped';
 // Four missed reads of the run's events: asleep, or off the network for good.
 const OFFLINE_AFTER_MS = 90_000;
 export const INPUT_CLOSED_IN_CLOUD = 'agentbox_input_closed_in_cloud';
@@ -592,6 +596,7 @@ export async function cloudRun({
   // spoken to over stdin/stdout by the supervisor's own Codex client.
   engine = 'claude',
   docsEveryMs = DOCS_EVERY_MS,
+  checkpointEveryMs = CHECKPOINT_EVERY_MS,
   leaveFlushMs = LEAVE_FLUSH_MS,
   // How long the sandbox waits without word from this Mac before it counts
   // it asleep (cloud/sandbox/server.mjs "WHILE THE MAC IS AWAY").
@@ -1056,6 +1061,8 @@ export async function cloudRun({
   let cancelled = false;
   let cancelledAt = 0;
   let finished = null; // 'collected' | 'collect-failed' | 'failed' | 'lost'
+  // The sandbox answered with no run at all: its machine is gone.
+  let machineGone = false;
   let loginTrouble = null; // { state: 'missing'|'refused'|'expired', id }
   const servers = new Map(); // conn -> { proc, name, init, pending, swallow }
   let awayNoted = false;
@@ -1168,6 +1175,19 @@ export async function cloudRun({
       saveMarker();
     }
   })().catch((err) => say(`the run's documents stopped coming back early: ${err.message}`)) : null;
+
+  // THE BRANCH, WHILE IT WORKS, into one object the next send replaces. It is
+  // only read if the machine dies before the run's own results go up
+  // (`layCheckpoint`). A run with nothing new yet answers with a refusal,
+  // which is simply asked again next time.
+  const checkpointLoop = plain ? null : (async () => {
+    for (;;) {
+      const until = Date.now() + checkpointEveryMs;
+      while (Date.now() < until && !finished && !cancelled && !leaving) await sleep(Math.min(500, checkpointEveryMs));
+      if (finished || cancelled || leaving) return;
+      await retry(async () => transport.invoke(sessionId, { action: 'checkpoint', runId, bundleUrl: await storage.putUrl(keyOf(runId, 'checkpoint.bundle')) }), { what: 'save the run\'s commits', forever: false, stop: () => !!finished || cancelled || leaving });
+    }
+  })().catch((err) => say(`the run's commits stopped being saved as it works: ${err.message}`));
 
 
   // `init` is the handshake an earlier process had with this connection's
@@ -1387,7 +1407,7 @@ export async function cloudRun({
       // a Stop must end even when AWS cannot be reached.
       const page = await retry(() => transport.invoke(sessionId, { action: 'events', runId, since: cursor, waitMs: pollWaitMs }), { what: 'read the cloud run', forever: true, stop: () => overdue() || leaving });
       if (!page) continue;
-      if (!page.ok && page.error === 'no-run') { finished = 'lost'; break; }
+      if (!page.ok && page.error === 'no-run') { finished = 'lost'; machineGone = true; break; }
       // A call the sandbox may have given up on while this Mac was away is
       // made only once the sandbox says it has not: the agent was told it
       // did not reach the app (cloud/sandbox/server.mjs `mcp-claim`).
@@ -1413,6 +1433,7 @@ export async function cloudRun({
     finished = 'left';
     wake?.();
     await Promise.race([docsLoop, sleep(leaveFlushMs)]);
+    await Promise.race([checkpointLoop, sleep(leaveFlushMs)]);
     saveMarker({ pid: null });
     for (const sv of servers.values()) { sv.closed = true; sv.proc.stdin.end(); sv.proc.kill(); }
     return IMPORT_FAILED;
@@ -1426,6 +1447,7 @@ export async function cloudRun({
   wake?.();
   await sender;
   await docsLoop;
+  await checkpointLoop;
   await keptSettled(10_000);
   for (const s of servers.values()) { s.closed = true; s.proc.stdin.end(); s.proc.kill(); }
 
@@ -1439,10 +1461,13 @@ export async function cloudRun({
   // server counts a run until it is stopped (cloud/gateway/).
   const letGo = () => Promise.race([Promise.resolve(transport.stop?.(sessionId)).catch(() => {}), sleep(15_000)]);
   if (finished === 'failed') { clearMarker(here); await letGo(); return troubleWithLogin() ? LOGIN_TROUBLE : 1; }
-  const back = await bringHome({ ...marker }, { cursor, replay: (e) => absorb(e) });
+  const back = await bringHome({ ...marker }, { recovering: machineGone, cursor, replay: (e) => absorb(e) });
   if (back.ok) await letGo();
   if (!back.ok) {
-    say(`the cloud run's work could not be brought back (${back.why}); it is kept in the cloud for 7 days and will be tried again`);
+    const held = back.held || !!(await storage.get(keyOf(runId, 'done.json')).catch(() => null));
+    say(held
+      ? `the cloud run's work could not be brought back (${back.why}); it is kept in the cloud for 7 days and will be tried again`
+      : `the cloud run's work could not be brought back (${back.why}) and has not reached the cloud; its machine is asked again before the next run here`);
     writeMarker(here,{ ...marker, pid: null, state: back.state || 'import-failed', ...(back.laying ? { laying: back.laying } : {}) });
     // Its marker stays either way, so nothing ships the folder until its work
     // is home; a login that failed is still said, so no account here is
@@ -1450,6 +1475,8 @@ export async function cloudRun({
     return troubleWithLogin() ? LOGIN_TROUBLE : IMPORT_FAILED;
   }
   if (troubleWithLogin()) return LOGIN_TROUBLE;
+  // The machine's fault, not the thread's: its turn is asked again.
+  if (back.lost) return IMPORT_FAILED;
   return exitCodeOf(back.record);
 
   /* --------------------------- bringing it home -------------------------- */
@@ -1482,11 +1509,7 @@ export async function cloudRun({
         // the results one last time; without them the run is gone for good.
         await transport.stop?.(rec.sessionId).catch(() => {});
         done = await storage.get(k('done.json'));
-        if (!done) {
-          clearMarker(here);
-          say('an earlier cloud run in this folder ended without its results; its work is lost');
-          return { ok: true, exitCode: null, lost: true };
-        }
+        if (!done) return layCheckpoint(rec);
       } else {
         if (st.state === 'preparing' || st.state === 'running') {
           await retry(() => transport.invoke(rec.sessionId, { action: 'signal', runId: rec.runId, signal: 'SIGTERM' }), { what: 'stop the earlier run', forever: false });
@@ -1508,14 +1531,18 @@ export async function cloudRun({
     }
     if (!done) return { ok: false, why: 'its results never arrived' };
     const record = JSON.parse(done.toString('utf8'));
-    // The heavy half, two runs at a time across every cloud run on this Mac,
-    // and through files rather than memory: twenty runs finishing together
-    // must not unpack twenty sets of bundles and transcripts at once.
+    return inSpool((spool) => layHome(rec, record, { recovering, replay, from, spool }));
+  }
+
+  // The heavy half, two runs at a time across every cloud run on this Mac,
+  // and through files rather than memory: twenty runs finishing together
+  // must not unpack twenty sets of bundles and transcripts at once.
+  async function inSpool(fn) {
     const release = await takeImportSlot();
     try {
       const spool = fs.mkdtempSync(path.join(os.tmpdir(), `${nameSlug}-cloud-home-`));
       try {
-        return await layHome(rec, record, { recovering, replay, from, spool });
+        return await fn(spool);
       } finally {
         try { fs.rmSync(spool, { recursive: true, force: true }); } catch { /* the tmp folder's own cleaning */ }
       }
@@ -1524,13 +1551,44 @@ export async function cloudRun({
     }
   }
 
+  // A RUN WHOSE MACHINE DIED before its results went up. The commits it sent
+  // while it worked (`checkpointLoop`) are laid in as if it had ended there;
+  // its uncommitted files and conversation went with the machine. The row is
+  // told either way, or the next run starts as if nothing had happened.
+  async function layCheckpoint(rec) {
+    const item = rec.toolEnv?.ZERO_ITEM || env.ZERO_ITEM || null;
+    const product = rec.toolEnv?.ZERO_PRODUCT || env.ZERO_PRODUCT || null;
+    const stopped = 'This thread\'s cloud machine stopped before its run finished, so the run never sent its work back.';
+    const tell = (note) => { say(note); addCloudNews(cwd, { runId: rec.runId, item, product, note, lost: true }); };
+    if (rec.plain) {
+      clearMarker(here);
+      say(`${stopped} The documents it wrote came back as it worked; its conversation since it started is lost.`);
+      return { ok: true, exitCode: null, lost: true };
+    }
+    let back = null;
+    try {
+      back = await inSpool((spool) => layHome(rec, { checkpoint: true, exitCode: null, commits: 1 }, { recovering: false, replay: null, from: 0, spool }));
+    } catch (err) {
+      if (err.message !== NO_CHECKPOINT) throw err;
+    }
+    if (!back) {
+      clearMarker(here);
+      tell(`${stopped} None of its work had been saved yet, so that run's commits, files and conversation are lost. The thread picks up from where it was before that run.`);
+      return { ok: true, exitCode: null, lost: true };
+    }
+    if (!back.ok) return { ...back, held: true };
+    const last = (await git(cwd, ['log', '-1', '--format=%s', back.parked || 'HEAD']).catch(() => '')).trim();
+    tell(`${stopped} The commits it saved on the way are ${back.parked ? `on the branch ${back.parked}` : 'in the task folder'}${last ? `, the last one "${last}"` : ''}. Anything after that, its uncommitted files and its conversation since are lost.`);
+    return { ...back, lost: true };
+  }
+
   async function layHome(rec, record, { recovering, replay, from, spool }) {
     const k = (name) => keyOf(rec.runId, name);
     // WHAT THE RUN USED, for setting the plan limits from real work
     // (main/cloud/usage.mjs). Recorded as soon as its results are here,
     // whatever laying them into the folder does next: the machine ran either
     // way. Once per run, however many times this is tried.
-    appendCloudUsage({ runId: rec.runId, item: env.ZERO_ITEM, engine: rec.engine || engine, exitCode: record.exitCode, usage: record.usage }, { home: homeDir });
+    if (!record.checkpoint) appendCloudUsage({ runId: rec.runId, item: env.ZERO_ITEM, engine: rec.engine || engine, exitCode: record.exitCode, usage: record.usage }, { home: homeDir });
 
     // Anything the stream never delivered (the session was gone before the
     // Mac could read it) is replayed from the copy in S3, and so is what the
@@ -1564,7 +1622,8 @@ export async function cloudRun({
       const specs = [];
       if (record.commits > 0) specs.push(`refs/heads/${rec.branch}:${keep}`);
       if (record.strayHead) specs.push(`refs/agentbox/head:${keep}-head`);
-      await fetchBundle('out.bundle', specs, 'the commits bundle is missing');
+      if (record.checkpoint) await fetchBundle('checkpoint.bundle', specs, NO_CHECKPOINT);
+      else await fetchBundle('out.bundle', specs, 'the commits bundle is missing');
     }
     if (record.uncommitted) await fetchBundle('changes.bundle', [`refs/agentbox/changes:${keepChanges}`], 'the uncommitted work is missing');
     // The conversation's folders, each one the run said it uploaded.
