@@ -119,6 +119,7 @@ import { RoomBoard } from './team/rooms/RoomBoard';
 import { directConversations } from './team/rooms/conversations';
 import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-rules';
 import { MARK_UNREAD, SAY } from './team/chat-events';
+import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
 import { MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, CornerFaces, MateThreads, PersonThreads, SpaceBar, TeamStrip, TeamThreads } from './team/everything/TeamStrip';
 import { buildMembers, hideMember, mateRunsOf, orderMembers, personCardsOf, readCardRows, readHidden, readOrder, splitHidden, teamRunsOf, unhideMember, writeCardRows, writeHidden, writeOrder, type CardRows, type Hidden, type Member } from './team/everything/members';
@@ -2888,7 +2889,7 @@ export default function App() {
    */
   useEffect(() => {
     if (!fullScreenDoc || modal !== 'reply') return;
-    const foldBack = () => setModal(null);
+    const foldBack = () => { if (!aVoiceNoteIsRecording()) setModal(null); };
     const awayInTheApp = (e: MouseEvent) => {
       const at = e.target as HTMLElement | null;
       if (at?.closest?.('.focus-dock')) return;
@@ -3252,6 +3253,7 @@ export default function App() {
     const away = (e: MouseEvent) => {
       const el = e.target as HTMLElement | null;
       if (el?.closest?.(SOMETHING_WITH_A_JOB)) return;
+      if (aVoiceNoteIsRecording()) return;
       setModal(null);
       (document.activeElement as HTMLElement | null)?.blur?.();
     };
