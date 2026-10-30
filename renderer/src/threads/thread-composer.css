@@ -110,6 +110,8 @@
 .tc-chip svg { color: var(--text-faint); flex: none; }
 .tc-chip-name { display: inline-block; max-width: 200px; overflow: hidden; white-space: nowrap; }
 .tc-chip-name.cut { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+.tc-repeat-note { display: flex; align-items: center; gap: 6px; }
+.tc-repeat-note svg { color: var(--text-faint); flex: none; }
 
 .tc-swatch { width: 17px; height: 17px; display: inline-grid; place-items: center; flex: none; }
 .tc-swatch i { width: 9px; height: 9px; display: block; border-radius: var(--radius); }

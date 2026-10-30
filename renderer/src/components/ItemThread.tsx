@@ -43,7 +43,7 @@ import type { AgentTurn, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
 import { catchUpDue } from '../../../shared/agent-import.mjs';
-import { appWrote, askLine, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, standsAt } from '../one-thing-at-a-time';
+import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, standsAt, workingContext } from '../one-thing-at-a-time';
 import { rowTitle } from '../list-rules';
 import { askMarkUnread, say } from '../team/chat-events';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
@@ -76,7 +76,7 @@ const THEM = 'The agent';
 
 export function ItemThread({ item, engine, engineChoice, codexModels = [], codexModelDefault = null, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread, queue }: {
   /** One thing at a time (w-65bcefb857): the summary on top, the newest answer, the rest folded. */
-  queue?: { context: string | null };
+  queue?: { context: string | null; repeats?: string | null };
   // A CHAT'S THREAD, IN THE PANEL BESIDE IT (w-920461cbe6). The pane owns which
   // one is open and how wide it is; this draws it, because this is where the
   // replies were read. `host` is the pane the panel is drawn into. Absent
@@ -388,7 +388,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
     <QueueSummary
       key={`${item.product}:${item.id}`}
       title={rowTitle(item)}
-      context={working && !queue.context ? askLine(item.body ?? item.title ?? '', rowTitle(item)) : queue.context}
+      context={working && !queue.context ? workingContext(item.body ?? item.title ?? '', rowTitle(item), queue.repeats ?? null) : queue.context}
       earlier={short ? 0 : behind}
       steps={!short && !!newest && (events.some((e) => e.kind === 'work') || after.length > 0)}
       open={earlierOpen}

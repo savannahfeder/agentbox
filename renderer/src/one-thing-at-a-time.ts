@@ -68,6 +68,12 @@ export function askLine(ask: string, title = ''): string | null {
   return `You asked: ${/[.!?]$/.test(first) ? first : `${first}.`}`;
 }
 
+/** The line under a working thread's title: your ask, and its schedule if it repeats. */
+export function workingContext(ask: string, title: string, repeats: string | null): string | null {
+  const said = [askLine(ask, title), repeats && `${repeats}.`].filter(Boolean).join(' ');
+  return said || null;
+}
+
 /** A thread brought in from a Claude Code or Codex chat. */
 export const broughtIn = (item: { labels?: string[] }): boolean =>
   (item.labels ?? []).some((l) => l === 'thread-import' || l.startsWith('codex:'));

@@ -56,7 +56,7 @@ import { defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLast
 import { readLastEngine, startingEngine, writeLastEngine } from '../engines';
 import { repeatPresets } from '../components/When';
 import { ideasFor, type Idea } from '../first-run';
-import { readRule } from '../format';
+import { readRule, repeatsLine } from '../format';
 import { fitMenu } from '../keep-in-window';
 import { ModelMenu } from './ModelMenu';
 import { useThreadMentions } from '../components/ThreadMentions';
@@ -1198,6 +1198,11 @@ export function ThreadComposer({
         />
         {named.menu}
         <AttachRow attachments={attachments} onRemove={(i) => setAttachments((x) => x.filter((_, j) => j !== i))} />
+        {ideaRule && (
+          <div className="tc-note tc-repeat-note">
+            <RepeatIcon />{repeatsLine(ideaRule)}. <button type="button" onClick={() => setIdea(null)}>Send it once instead</button>
+          </div>
+        )}
         {!inline && ideaRows}
 
         {refusal && <div className="tc-note">{refusal}</div>}

@@ -55,7 +55,7 @@ import { commandDraft } from '../../../shared/claude-commands.mjs';
 import { CompactionResult, runCompaction, runCommand } from './CompactionResult';
 import { codexCommand, COMPACTION_COPY } from '../../../shared/codex-commands.mjs';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mjs';
-import { dayLabel, itemOptions, offerIsLive, optionsFrom, parseOptions, parseRepeat, stripOptionsSection, type ParsedOption } from '../format';
+import { dayLabel, itemOptions, offerIsLive, optionsFrom, parseOptions, parseRepeat, repeatsLine, stripOptionsSection, type ParsedOption } from '../format';
 import { ruleIdOf } from '../../../shared/repeats.mjs';
 import { shownPriority } from '../../../shared/rank.mjs';
 import { WhenPicker } from './When';
@@ -1824,7 +1824,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               item={item}
               chat={direct}
               // One thing at a time: the summary on top and the newest answer, the rest behind one line.
-              queue={page ? { context: item.problem ?? null } : undefined}
+              queue={page ? { context: item.problem ?? null, repeats: repeat ? repeatsLine(repeat.rule) : null } : undefined}
               /*
                * WHICH CODING AGENT THIS ROW RUNS ON, because one sentence in the
                  conversation depends on it: `blocked` after one of Claude Code's
