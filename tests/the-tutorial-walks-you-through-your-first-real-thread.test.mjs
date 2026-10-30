@@ -297,7 +297,7 @@ describe('the command bar', () => {
     // Drawn first on the page title: the glow hugged "Threads" and the card covered the tabs.
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
-    expect(tour).toContain("{step !== 'palette' && <div key={`glow-${step}`}");
+    expect(tour).toContain("{step !== 'palette' && step !== 'busy' && <div key={`glow-${step}`}");
   });
 });
 
