@@ -1,25 +1,12 @@
-// Phone replies opened another thread, and sign-in exposed a live approval under the finishing tap.
+// Sign-in exposed a live approval under the finishing tap.
+// This file also held "phone replies keep their thread" from 2026-10-28. That
+// was reversed the next day at her word, and its checks now live the other way
+// round in a-reply-on-the-phone-moves-on-like-the-computer (w-0e77857f54).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { replyMovesOn } from '../renderer/src/advance.ts';
 import { approvalStage, approvalClickAllowed } from '../renderer/src/approval-stage.ts';
 
 const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-
-describe('phone replies keep their thread', () => {
-  for (const onBoard of [false, true]) {
-    it(`stays with a reply, board=${onBoard}`, () => {
-      expect(replyMovesOn({ view: 'inbox', onBoard, index: 0, phone: true })).toBe(false);
-    });
-  }
-  it('keeps desktop inbox advancement', () => {
-    expect(replyMovesOn({ view: 'inbox', onBoard: false, index: 0, phone: false })).toBe(true);
-    expect(replyMovesOn({ view: 'progress', onBoard: false, index: 0, phone: false })).toBe(false);
-  });
-  it('passes the phone door to the shared reply rule', () => {
-    expect(app).toContain('phone: onPhone()');
-  });
-});
 
 describe('sign-in holds pending approval cards', () => {
   const a = { id: 'a' };

@@ -42,10 +42,13 @@ export function advanceAfter(p: { fromTask: boolean; index: number; id: string }
  * ends (w-65bcefb857). Opened from In progress or any other list, or from
  * search, she stays: "I quite often will just stick with one chat"
  * (tests/a-reply-keeps-you-on-the-thread-unless-you-are-clearing-your-inbox).
+ * The phone reads this same rule. A phone-only "stay" was added on 2026-10-28
+ * and taken out the next day at her word (w-0e77857f54): "Turn it back on, so
+ * the phone moves on after a reply just like the computer."
  */
-export function replyMovesOn(p: { view: string; onBoard: boolean; index: number; searching?: boolean; phone?: boolean }): boolean {
+export function replyMovesOn(p: { view: string; onBoard: boolean; index: number; searching?: boolean }): boolean {
   // With search open, the tab under it is not where the work is happening.
-  return !p.phone && !p.searching && advanceLandsHere(p) && p.index >= 0;
+  return !p.searching && advanceLandsHere(p) && p.index >= 0;
 }
 
 /**
