@@ -24,17 +24,19 @@ const pkg = JSON.parse(read('package.json'));
 describe('what the README promises about installing', () => {
   // F-146. ">=22" is a floor, so the sentence has to read as one.
   it('asks for the same Node the package does, as a floor and not one version', () => {
-    const floor = pkg.engines.node.match(/>=\s*(\d+)/)?.[1];
+    const floor = pkg.engines.node.match(/>=\s*(\d+(?:\.\d+)*)/)?.[1];
     expect(floor).toBeTruthy();
     expect(readme).toContain(`Node ${floor} or newer`);
     expect(readme).not.toMatch(new RegExp(`need Node ${floor} and`));
   });
 
   // F-143. The count moves with every advisory, so the words are checked and
-  // the number is not.
-  it('says that install ends on deprecation warnings and a vulnerability count', () => {
+  // the number is not. The deprecation warnings are gone
+  // (tests/a-clean-install-prints-no-deprecation-warnings), so the README no
+  // longer promises them.
+  it('says that install ends on a vulnerability count', () => {
     const install = readme.slice(readme.indexOf('## Install'), readme.indexOf('**In your browser.**'));
-    expect(install).toMatch(/deprecation warnings/);
+    expect(install).not.toMatch(/deprecation warnings/);
     expect(install).toMatch(/vulnerabilities/);
     expect(install).toMatch(/worked if it exits\s+without an error/);
   });

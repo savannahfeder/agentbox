@@ -65,7 +65,7 @@ describe('walking the onboarding again', () => {
      tests/the-tutorial-and-the-onboarding-are-two-things.test.mjs.
   */
   it('is a row in ⌘K, found by the words she would type', () => {
-    const row = palette.slice(palette.indexOf("id: 'first-run'"), palette.indexOf("id: 'fresh-user'"));
+    const row = palette.slice(palette.indexOf("id: 'first-run'"), palette.indexOf("id: 'keyhints'"));
     expect(row).toContain('label: `Set ${NAME} up again`');
     expect(row).toContain('run: onFirstRun');
     for (const word of ['onboarding', 'first run', 'new user', 'welcome']) {
@@ -87,34 +87,6 @@ describe('walking the onboarding again', () => {
   });
 });
 
-// AND THE OTHER HALF OF THE SAME MESSAGE. is bigger than walking the
-// onboarding again: a new user has no projects, no settings, no theme, no
-// store and no config file. That cannot be done by forgetting two keys, and it
-// must not be done by deleting anything, so it opens a SECOND Agentbox in a
-// throwaway home. What is pinned here is the row and the promise it makes.
-describe('being a brand new user', () => {
-  it('is its own row in \u2318K, separate from walking the onboarding again', () => {
-    const row = palette.slice(palette.indexOf("id: 'fresh-user'"), palette.indexOf("id: 'keyhints'"));
-    expect(row).toContain('label: `Open ${NAME} as a new user`');
-    // Two rows since 2026-08-23 (a-new-user-sees-nothing-of-hers), and this
-    // is the blank one: her own things do not come with it.
-    expect(row).toContain('run: () => onFreshUser(false)');
-    for (const word of ['new user', 'fresh install', 'stranger', 'website', 'download']) {
-      expect(row).toContain(word);
-    }
-    // THE HINT MAKES THE PROMISE THE FEATURE RESTS ON. Her own Agentbox keeps
-    // running; a row that could be read as a reset is the one thing this may
-    // never be.
-    expect(row).toMatch(/hint: '[^']*yours keeps running'/);
-  });
-
-  it('is wired to a handler that opens a window and deletes nothing', () => {
-    expect(app).toContain('onFreshUser={openAsNewUser}');
-    const at = app.indexOf('const openAsNewUser = useCallback');
-    const fn = app.slice(at, app.indexOf('}, [showToast]);', at));
-    expect(fn).toContain('api.openFreshUser(withAgents, withTools)');
-    // It may not touch the store, and it may not clear anything.
-    expect(fn).not.toMatch(/localStorage/);
-    expect(fn).not.toMatch(/restartFirstRun/);
-  });
-});
+// Being a brand new user (a SECOND Agentbox in a throwaway home) left \u2318K on
+// 2026-10-29 as a test rig; `npm run fresh` opens it
+// (tests/the-command-bar-holds-no-test-rigs.test.mjs).
