@@ -22,6 +22,7 @@ import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type VoiceControl } fr
 import { AttachRow } from '../../components/AttachRow';
 import { collectFiles, isImageName, type PendingAttachment } from '../../attachments';
 import { pictureUrl } from '../../picture';
+import { holdAtBottom } from '../../thread-bottom';
 import { I } from './icons';
 import { RoomFace } from './RoomFace';
 import { cardName, chatWidth, clockOf, mentionsIn, readChatWidth, writeChatWidth } from './room-rules';
@@ -125,7 +126,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
 
   const who = (id: string | null) => (id ? byId.get(id) : undefined);
   const nameOf = (id: string | null) => { const p = who(id); return p ? cardName(p) : 'Someone'; };
-  const listRef = useStick([room.id, thread, shown.length]);
+  const listRef = useStick([room.id, thread]);
   const slots = chatLayout(shown.map((m) => ({ at: m.at, by: m.by ?? '' })), now);
   const myNames = useMemo(() => {
     const name = people.find((p) => p.me)?.name;
@@ -156,7 +157,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
       {!root && onInvite && room.kind !== 'group' && <button type="button" className="ic" title={`Invite people to ${room.name}`} aria-label={`Invite people to ${room.name}`} onClick={onInvite}>{I.invite(14)}</button>}
       {onExpand && <button type="button" className="ic" title="Open full page" aria-label="Open full page" onClick={onExpand}>{I.expand()}</button>}
     </div>}
-    <div className="rm-chat-list" ref={listRef}>
+    <div className="rm-chat-list" ref={listRef}><div className="rm-chat-msgs">
       {shown.map((m, i) => {
         const slot = slots[i];
         const mine = m.by === meId;
@@ -206,7 +207,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
           </div>
         </div>;
       })}
-    </div>
+    </div></div>
     <Composer key={`${room.id}:${thread ?? ''}`} roomId={room.id} threadId={thread} people={others}
       placeholder={root ? `Reply to ${nameOf(root.by)}` : `Message ${room.kind === 'group' ? others.map((p) => p.name.split(' ')[0]).join(', ') || room.name : room.name}`}
       onPutFile={calls.onPutFile} onNotice={onNotice}
@@ -271,25 +272,20 @@ function RoomMarkdown({ text, names, loadFile, roomId, mine, me }: {
 }
 
 // Keeps the newest message in view while you are at the bottom, and leaves
-// you where you are when you have scrolled up to read.
+// you where you are when you have scrolled up to read. The hold follows the
+// list's own height too, which shrinks when a voice note or a long draft
+// grows the box under it.
 function useStick(deps: unknown[]) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const atBottom = useRef(true);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const on = () => {
-      atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-      el.classList.toggle('more-above', el.scrollTop > 4);
-    };
+    const on = () => el.classList.toggle('more-above', el.scrollTop > 4);
+    on();
     el.addEventListener('scroll', on);
     return () => el.removeEventListener('scroll', on);
   }, []);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (el && atBottom.current) el.scrollTop = el.scrollHeight;
-    el?.classList.toggle('more-above', (el?.scrollTop ?? 0) > 4);
-  }, deps); // eslint-disable-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => holdAtBottom(ref.current), deps); // eslint-disable-line react-hooks/exhaustive-deps
   return ref;
 }
 
