@@ -28,6 +28,9 @@ describe('how many cloud runs may start at once', () => {
     const b = new StartBudget({ ceiling: 5 });
     for (let i = 0; i < 50; i++) b.started(calm);
     expect(b.now()).toBe(5);
+    const usual = new StartBudget();
+    for (let i = 0; i < 50; i++) usual.started(calm);
+    expect(usual.now()).toBe(8);
   });
 
   it('a start that failed halves it, and never to nothing', () => {
@@ -52,7 +55,7 @@ describe('how many cloud runs may start at once', () => {
   });
 
   it('the app stalling halves it; a stall just under the line does not', () => {
-    const b = new StartBudget({ start: 16, stallLimitMs: 500 });
+    const b = new StartBudget({ start: 16, ceiling: 32, stallLimitMs: 500 });
     b.started({ pressure: 'normal', stallMs: 499 });
     expect(b.now()).toBe(17);
     b.started({ pressure: 'normal', stallMs: 500 });
@@ -73,7 +76,7 @@ describe('how many cloud runs may start at once', () => {
 
   it('after backing off it earns nothing until the cool-off has passed', () => {
     let at = 1000;
-    const b = new StartBudget({ start: 16, clock: () => at, coolMs: 10_000 });
+    const b = new StartBudget({ start: 16, ceiling: 32, clock: () => at, coolMs: 10_000 });
     b.failed();
     b.started(calm);
     expect(b.now()).toBe(8);

@@ -5,7 +5,7 @@
 // no agent, so what it costs this Mac does not change with how many agents the
 // hub is running (tests/a-window-can-be-a-client-of-a-hub-and-runs-no-agents).
 
-import { app, BrowserWindow, Notification, ipcMain, nativeImage, powerMonitor, shell } from 'electron';
+import { app, BrowserWindow, Notification, dialog, ipcMain, nativeImage, powerMonitor, shell } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { installNotifier } from './notify.mjs';
@@ -19,6 +19,13 @@ const waitingPage = (hubUrl) => `data:text/html;charset=utf-8,${encodeURICompone
 <body style="margin:0;height:100vh;display:grid;place-items:center;background:#1a1a1c;color:#e8e6e3;font:15px -apple-system,system-ui,sans-serif">
 <div style="max-width:440px;text-align:center"><p style="font-weight:600">${NAME} can't reach your hub</p>
 <p style="color:#a3a09b">Trying ${hubUrl} again every few seconds. Your agents keep running there.</p></div>`)}`;
+
+export function refuseToStart(why) {
+  app.whenReady().then(() => {
+    dialog.showErrorBox(`${NAME} can't start`, `This Mac names a hub that can't be used, and it will not run agents itself while it does: ${why}`);
+    app.quit();
+  });
+}
 
 export function startHubClient(hub) {
   if (!app.requestSingleInstanceLock()) { app.quit(); return; }

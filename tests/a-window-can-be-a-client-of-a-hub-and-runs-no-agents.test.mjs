@@ -15,7 +15,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readHubAddress } from '../main/hub-address.mjs';
+import { spawnSync } from 'node:child_process';
+import { readHubAddress, whichApp } from '../main/hub-address.mjs';
 import { withDesktopShell, onPhoneDoor } from '../renderer/src/browser-bridge';
 import { mayOpenOutside, sameHub } from '../main/hub-rules.mjs';
 
@@ -44,22 +45,41 @@ describe('whether this Mac has a hub', () => {
   it('another computer over plain http is refused: the key would cross the network readable', () => {
     const dir = home();
     write(dir, { url: 'http://hub.example.com', key: KEY });
-    expect(readHubAddress({}, dir)).toBeNull();
+    expect(readHubAddress({}, dir).invalid).toBeTruthy();
     write(dir, { url: 'http://127.0.0.1.example.com', key: KEY });
-    expect(readHubAddress({}, dir)).toBeNull();
+    expect(readHubAddress({}, dir).invalid).toBeTruthy();
   });
 
-  it('a damaged file, a missing or short key, or another scheme is no hub', () => {
+  it('a damaged file, a missing or short key, or another scheme is refused, and is not the same as no hub', () => {
     const dir = home();
     fs.mkdirSync(path.join(dir, '.agentbox'), { recursive: true });
     fs.writeFileSync(path.join(dir, '.agentbox', 'hub.json'), '{not json');
-    expect(readHubAddress({}, dir)).toBeNull();
+    expect(readHubAddress({}, dir).invalid).toMatch(/hub\.json/);
     write(dir, { url: 'https://hub.example.com' });
-    expect(readHubAddress({}, dir)).toBeNull();
+    expect(readHubAddress({}, dir).invalid).toBeTruthy();
     write(dir, { url: 'https://hub.example.com', key: 'short' });
-    expect(readHubAddress({}, dir)).toBeNull();
+    expect(readHubAddress({}, dir).invalid).toBeTruthy();
     write(dir, { url: 'file:///etc/passwd', key: KEY });
-    expect(readHubAddress({}, dir)).toBeNull();
+    expect(readHubAddress({}, dir).invalid).toBeTruthy();
+    expect(readHubAddress({ AGENTBOX_HUB: 'nonsense' }, home()).invalid).toBeTruthy();
+  });
+
+  it('a Mac that names a hub it cannot use starts no agents: two copies must never own one store', () => {
+    expect(whichApp(null)).toBe('whole');
+    expect(whichApp({ url: 'https://hub.example.com', key: KEY })).toBe('client');
+    expect(whichApp({ invalid: 'damaged' })).toBe('refuse');
+  });
+
+  it('the browser copy will not start agents on a Mac that names a hub either', () => {
+    const dir = home();
+    write(dir, { url: 'https://hub.example.com', key: KEY });
+    const env = { ...process.env, HOME: dir };
+    for (const k of Object.keys(env)) if (/^(AGENTBOX_|ZERO_|STORE_|ASTRAL_|XDG_)/.test(k)) delete env[k];
+    const data = path.join(dir, 'data');
+    const ran = spawnSync(process.execPath, [path.join(root, 'bin', 'agentbox.mjs'), '--dir', data, '--no-open'], { env, encoding: 'utf8', timeout: 20_000 });
+    expect(ran.status).toBe(1);
+    expect(ran.stderr).toMatch(/hub/);
+    expect(fs.existsSync(path.join(data, 'zero.config.json'))).toBe(false);
   });
 
   it('the environment names one for a test copy, ahead of the file', () => {
@@ -120,6 +140,21 @@ describe('what stays on this Mac', () => {
     const bridge = withDesktopShell({ openArtifact: () => ({ ok: true }) }, shell);
     await bridge.openArtifact({ src: 'https://example.com/a', mode: 'resolve' });
     expect(shell.calls).toEqual([]);
+  });
+
+  it('a press on this Mac\'s alert opens its thread, as does one the hub sends', () => {
+    let here = null;
+    let hub = null;
+    const offs = [];
+    const shell = { ...made(), onOpenItem: (fn) => { here = fn; return () => offs.push('here'); } };
+    const bridge = withDesktopShell({ onOpenItem: (fn) => { hub = fn; return () => offs.push('hub'); } }, shell);
+    const opened = [];
+    const off = bridge.onOpenItem((p) => opened.push(p.id));
+    here({ id: 'w-1' });
+    hub({ id: 'w-2' });
+    expect(opened).toEqual(['w-1', 'w-2']);
+    off();
+    expect(offs.sort()).toEqual(['here', 'hub']);
   });
 
   it('with no shell, as in a tab or on a phone, the bridge is left as it was', () => {

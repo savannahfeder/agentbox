@@ -51,6 +51,7 @@ type DesktopShell = {
   notify(payload: { arrivals: unknown; needsYou: unknown }): Promise<unknown>;
   badge(count: unknown): Promise<unknown>;
   open(address: string): Promise<unknown>;
+  onOpenItem?(fn: (payload: unknown) => void): () => void;
 };
 const desktopShell = (): DesktopShell | undefined => (typeof window === 'undefined' ? undefined : (window as any).agentboxShell);
 export const onPhoneDoor = (host = location.hostname, shell: unknown = desktopShell()) => !shell && !LOOPBACK.test(host);
@@ -59,8 +60,14 @@ export const onPhoneDoor = (host = location.hostname, shell: unknown = desktopSh
 export function withDesktopShell(bridge: Record<string, any>, shell?: DesktopShell) {
   if (!shell) return bridge;
   const hubOpens = bridge.openArtifact;
+  const hubSays = bridge.onOpenItem;
   return {
     ...bridge,
+    onOpenItem: (fn: (payload: unknown) => void) => {
+      const offHub = hubSays?.(fn);
+      const offHere = shell.onOpenItem?.(fn);
+      return () => { offHub?.(); offHere?.(); };
+    },
     notify: (arrivals: unknown, needsYou: unknown) => shell.notify({ arrivals, needsYou }),
     badge: (count: unknown) => shell.badge(count),
     openArtifact: async (p: { src?: string; mode?: string }) => {

@@ -21,6 +21,7 @@ import { NO_TERMINAL, ptyIsHere } from '../main/pty.mjs';
 import { learnShellDataDirs } from '../main/shell-path.mjs';
 import { startFreezeRecorder } from '../main/freeze-recorder.mjs';
 import { stallWatch } from '../main/stall-watch.mjs';
+import { readHubAddress } from '../main/hub-address.mjs';
 import { watchNewChatsFor } from '../main/new-chats-watch.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -59,6 +60,13 @@ if (args.includes('--help') || args.includes('-h')) {
 const dataDir = path.resolve(
   flag('dir', process.env.AGENTBOX_HOME ?? appHome()),
 );
+// A store has one owner: a machine that is a window onto a hub runs no agents,
+// whichever door it is opened through (main/hub-address.mjs).
+const hub = readHubAddress();
+if (hub) {
+  console.error(`This machine names a hub (${hub.url ?? hub.invalid}), so it will not run agents itself.`);
+  process.exit(1);
+}
 fs.mkdirSync(dataDir, { recursive: true });
 
 const dist = path.join(appDir, 'renderer', 'dist');

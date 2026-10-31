@@ -570,7 +570,10 @@ Electron, and the window already runs over http (renderer/src/browser-bridge.ts)
   is the same protocol in reverse from the hub's current state.
 - **The window.** `main/start.mjs` picks: with `~/.agentbox/hub.json` the process
   is main/hub-client.mjs and loads no store or supervisor. Alerts, the Dock count
-  and web links stay on the Mac; the rest goes to the hub.
+  and web links stay on the Mac; the rest goes to the hub. Every door refuses to
+  run agents on a machine that names a hub, a damaged file included. Still to do
+  before anyone runs on it: the client updating itself (main/main.mjs starts the
+  updater; this does not).
 - **Documents.** The hub's are the truth, with `~/Zero` a synced mirror: version
   preconditions, tombstones, conflict copies. Agents get pinned versions.
 - **The Mac's remaining role.** One paired outbound connector with no store. No
@@ -595,10 +598,11 @@ Electron, and the window already runs over http (renderer/src/browser-bridge.ts)
   be filled by 200 long polls; the gateway keeps authorization, accounting and
   revocation. AgentCore stays the sandbox.
 
-Done means, across three runs: at 1, 50 and 200 agents the Mac's client grows by
-at most 100 MiB with no per-run process and under 5% of a core idle. The hub at
-200 holds event-loop lag p99 under 50 ms and RSS under 8 GiB, with under 10%
-retained growth over eight hours. All 200 reach the agent within ten minutes, and
+Done means, across three runs, with memory read as macOS's footprint and across
+the whole process tree (RSS read 153 MB where footprint read 378 MB): at 1, 50
+and 200 agents the Mac's client grows by at most 100 MiB with no per-run process
+and under 5% of a core idle. The hub at 200 holds event-loop lag p99 under 50 ms
+and footprint under 8 GiB, with under 10% retained growth over eight hours. All 200 reach the agent within ten minutes, and
 200 simultaneous completions import within ten. At least 30 changes an hour on the
 real repository with its real tests. Killing the hub mid-write, mid-import and
 mid-ship, cutting relay, Mac and AWS, duplicating events, expiring ownership,
@@ -608,10 +612,19 @@ deterministic commands may stand in for most model calls, and real Claude and Co
 calls must exercise sign-in, tools and resume. One subscription's model throughput
 is shared however many machines run; that limit is the vendor's.
 
-Order: client mode (built); ownership and rollback; the documents mirror; hub
-provisioning and recovery; her cutover, with her OK; WebSocket transport and the
-load gates; parallel ship testing; the connector; automated onboarding, at which
-point the non-technical app is this with no connector.
+Measured 2026-10-30 on a stand-in cloud (real supervisor, relay host, shims and
+git imports; a fake gateway and sandboxes; a tiny repository; 2,000 threads): 200
+of 200 running within 90 s, event-loop max 49 to 111 ms, footprint 2.46 GB for the
+hub. That shows the hub's own code holds; it says nothing yet about real AgentCore,
+the Lambda gateway, real repository and transcript sizes, ships, or eight hours.
+
+Order: client mode (built); ownership, cutover and rollback with crash injection,
+between two local headless processes; a real 200-run, eight-hour test through the
+real gateway and AgentCore with real repository and transcript sizes and a
+simultaneous finish, before anyone's store moves; the WebSocket transport and the
+load gates; the documents mirror; hub provisioning and recovery; her cutover, with
+her OK; parallel ship testing; the connector; automated onboarding, at which point
+the non-technical app is this with no connector.
 
 ## Releasing the cloud to everyone (w-6633e825a7, 2026-10-19)
 

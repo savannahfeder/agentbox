@@ -50,15 +50,29 @@ describe('a ship and the memory check', () => {
     expect(await ready(turn)).toBe(true);
   });
 
-  it('it never waits for ever: past the longest wait it goes anyway', async () => {
+  it('told no, it says so and asks again, rather than running its tests into short memory', async () => {
     const { gate, later } = setup();
     gate.setPressure('critical');
-    const turn = shipSlot(gate, item);
+    let said = 0;
+    const turn = shipSlot(gate, item, 0, { turns: 3, onWait: () => { said += 1; } });
     expect(await ready(turn)).toBe(false);
     later(gate.maxWaitMs + 1);
+    expect(await ready(turn)).toBe(false);
+    expect(said).toBe(1);
+    gate.setPressure('normal');
     expect(await ready(turn)).toBe(true);
     (await turn)();
     expect(gate.running.size).toBe(0);
+  });
+
+  it('it never waits for ever: after its last turn it goes anyway', async () => {
+    const { gate, later } = setup();
+    gate.setPressure('critical');
+    const turn = shipSlot(gate, item, 0, { turns: 2 });
+    later(gate.maxWaitMs + 1);
+    expect(await ready(turn)).toBe(false);
+    later(gate.maxWaitMs + 1);
+    expect(await ready(turn)).toBe(true);
   });
 
   it('with the memory check off, a ship simply runs', async () => {
