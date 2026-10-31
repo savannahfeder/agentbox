@@ -6,6 +6,7 @@
 // right under them (the teammate chat, the group chat, the direct record),
 // so a short chat starts at the top as those chats always did. Checked on the
 // built app with a made-up team (scripts/scratch, designs/w-b5f23cff71).
+// Since w-2b3e1a85e5 a card opens work under the cards and its chat on the Chats page.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { createElement as h } from 'react';
@@ -56,21 +57,22 @@ describe('the cards', () => {
     expect(html).toMatch(/class="ev-card me on"/);
   });
 
-  it('draw a chat as a chat: no fill, its people\'s faces, a speech mark and its newest line, never agents', () => {
+  // The newest line went with what people are on (tests/a-card-says-who-not-what-they-are-on).
+  it('draw a chat as a chat: no fill, its people\'s faces and a speech mark, never agents', () => {
     const html = strip();
     const chat = html.slice(html.indexOf('ev-card chat'), html.indexOf('ev-card person'));
     expect(chat).toContain('ev-bubble');
     // One person's face, square (tests/two-people-in-a-chat-show-as-two-square-faces).
     expect(chat).toContain('rm-pic');
-    expect(chat).toContain('Theo: Lock screen works');
-    expect(chat).not.toContain('AGENTS WORKING');
+    expect(chat).not.toContain('Theo: Lock screen works');
+    expect(chat).not.toContain('AGENTS');
     const person = html.slice(html.indexOf('ev-card person'));
     expect(person).not.toContain('ev-bubble');
-    expect(person).toContain('14 AGENTS WORKING');
+    expect(person).toContain('14 AGENTS');
   });
 
   // They used to shrink to one line while a chat was open; they stay as they
-  // are now (tests/a-chat-opens-under-the-same-cards).
+  // are now (tests/the-cards-are-the-same-whoever-is-picked).
 
   it('end with a card that makes a new AI teammate', () => {
     expect(strip({ onAdd() {} })).toContain('New teammate');
@@ -84,18 +86,8 @@ describe('the cards', () => {
   });
 });
 
-describe('a card opens the chat the Chats page held, under the cards', () => {
-  it('has no Chats page or sidebar row of its own with a team on', () => {
-    expect(app).toContain('groups={teamMode ? null : roomsUi.live ? roomsUi.sidebarGroups(');
-    expect(app).toContain('<ChatsContext.Provider value={teamMode ? null : chatsValue}>');
-  });
-
-  it('draws the teammate chat, the group chat and a direct record under the cards', () => {
-    expect(app).toContain('<div className="ev-space">{teammatesUi.page}</div>');
-    expect(app).toContain('<div className="ev-space">{roomsUi.page}</div>');
-    expect(app).toMatch(/\{inTeamChat && <>\{evTabsRow\}\{evTop\}<\/>\}\s*<ChatsFrame/);
-  });
-
+// The chat itself is on the Chats page (w-2b3e1a85e5, tests/messages-open-on-the-chats-page-and-nowhere-else).
+describe('a card opens its chat', () => {
   it('opens a person\'s direct record, else your chat with them in Groups', () => {
     expect(app).toMatch(/const talk = person \? directWith\(person\) : null;\s*const chat = person && !talk \? personChats\.get\(person\) : undefined;/);
   });

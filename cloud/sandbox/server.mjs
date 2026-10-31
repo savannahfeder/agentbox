@@ -47,9 +47,79 @@ const CHUNK = 48 * 1024;
 const PAGE_BYTES = 8 * 1024 * 1024;
 // A single MCP line from the harness larger than this is refused.
 const MAX_MCP_LINE = 32 * 1024 * 1024;
+
+// Python's archive reader is available in the image; materialize only regular
+// files into a fresh directory before replacing an installed skill snapshot.
+export function unpackSkillArchive(file, destination) {
+  return sh('python3', ['-c', String.raw`import gzip, os, pathlib, shutil, sys, tarfile, tempfile
+archive, dest = sys.argv[1:]
+os.umask(0o022)
+parent = os.path.dirname(dest)
+os.makedirs(parent, exist_ok=True)
+stage = tempfile.mkdtemp(prefix='.skills-stage-', dir=parent)
+backup = None
+try:
+ with tempfile.TemporaryFile() as raw:
+  with gzip.open(archive, 'rb') as source:
+   size = 0
+   while True:
+    block = source.read(65536)
+    if not block: break
+    size += len(block)
+    if size > 128 * 1024 * 1024: raise ValueError('skill archive size cap exceeded')
+    raw.write(block)
+  raw.seek(0)
+  with tarfile.open(fileobj=raw, mode='r:') as tar:
+   seen = set(); total = 0; count = 0; entries = 0
+   for member in tar:
+    entries += 1
+    if entries > 100000: raise ValueError('skill archive entry count cap exceeded')
+    name = pathlib.PurePosixPath(member.name)
+    if name.is_absolute() or '..' in name.parts or len(name.parts) > 18 or any(c in member.name for c in '\r\n\0'):
+     raise ValueError('unsafe skill archive path')
+    if not member.isdir() and not member.isfile(): raise ValueError('skill archives cannot contain links or special files')
+    if not name.parts:
+     if not member.isdir(): raise ValueError('invalid skill archive entry')
+     continue
+    key = str(name)
+    if key in seen: raise ValueError('duplicate skill archive entry')
+    seen.add(key)
+    target = os.path.join(stage, *name.parts)
+    if member.isdir():
+     os.makedirs(target, exist_ok=True)
+     continue
+    count += 1; total += member.size
+    if count > 5000 or member.size > 25 * 1024 * 1024 or total > 100 * 1024 * 1024:
+     raise ValueError('skill archive file cap exceeded')
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    with tar.extractfile(member) as source, open(target, 'xb') as output:
+     shutil.copyfileobj(source, output, 65536)
+    os.chmod(target, 0o644 | (member.mode & 0o111))
+ os.chmod(stage, 0o755)
+ if os.path.lexists(dest):
+  backup = tempfile.mkdtemp(prefix='.skills-old-', dir=parent)
+  os.rmdir(backup); os.replace(dest, backup)
+ try:
+  os.replace(stage, dest)
+ except BaseException:
+  if backup: os.replace(backup, dest); backup = None
+  raise
+finally:
+ shutil.rmtree(stage, ignore_errors=True)
+ if backup:
+  if os.path.islink(backup): os.unlink(backup)
+  else: shutil.rmtree(backup, ignore_errors=True)
+`, file, destination], '/');
+}
+
+export async function unpackFileArchive(file, destination) {
+  if (/^\.skills-[a-f0-9]{64}\.tgz$/.test(path.basename(file))) return unpackSkillArchive(file, destination);
+  fs.mkdirSync(destination, { recursive: true });
+  await sh('tar', ['-xzf', file, '-C', destination], destination);
+}
 // What this server can do beyond the first version, said in a start's answer,
 // so a Mac knows rather than guesses whether its asks are honoured.
-const CAPS = ['offline', 'setup', 'kept', 'base', 'plain', 'hold'];
+const CAPS = ['offline', 'setup', 'kept', 'base', 'plain', 'hold', 'resources'];
 // A conversation sent home as only what the run added is listed in this file
 // (the same name in main/cloud/run.mjs).
 const TAILS = '.agentbox-tails.json';
@@ -592,6 +662,7 @@ export function createSandbox({
   async function prepareAndSpawn(r) {
     const { cwd, branch, bundleUrl, argv, env = {}, files = [], remote, changesRef, base, refs } = r.spec;
     try {
+      try { r.resourceRoot = makeResourceRoot(r.id); } catch (err) { r.resourceError = err.message; }
       const bundle = path.join(r.dir, 'in.bundle');
       fs.mkdirSync(cwd, { recursive: true });
       // A project with no repository runs in its documents folder, which
@@ -773,10 +844,69 @@ export function createSandbox({
     const body = await download(fetchImpl, f.url, f.path, stopping.signal);
     if (r && !f.untar) (r.placed ||= new Map()).set(f.path, { size: body.length, sha256: sha256(body) });
     if (f.untar) {
-      fs.mkdirSync(f.untar, { recursive: true });
-      await sh('tar', ['-xzf', f.path, '-C', f.untar], f.untar);
+      await unpackFileArchive(f.path, f.untar);
       fs.rmSync(f.path, { force: true });
     }
+  }
+
+  function protectedDirectory(dir) {
+    try { fs.mkdirSync(dir, { mode: 0o755 }); } catch (err) { if (err.code !== 'EEXIST') throw err; }
+    const st = fs.lstatSync(dir);
+    if (!st.isDirectory() || st.isSymbolicLink() || st.uid !== process.getuid?.()) throw new Error('resource directory is not owned by the server');
+    fs.chmodSync(dir, 0o755);
+    return dir;
+  }
+
+  function makeResourceRoot(id) {
+    const base = at('/tmp/agentbox-resources');
+    fs.mkdirSync(path.dirname(base), { recursive: true });
+    protectedDirectory(base);
+    return protectedDirectory(path.join(base, sha256(Buffer.from(id))));
+  }
+
+  async function placeResource(f, r) {
+    if (!r.resourceRoot) throw new Error(r.resourceError || 'resource storage is unavailable');
+    const logical = `/tmp/agentbox-resources/${sha256(Buffer.from(r.id))}`;
+    if (!f?.url || typeof f.path !== 'string' || !f.path.startsWith(logical + '/') || path.posix.normalize(f.path) !== f.path || /[\\\r\n\0]/.test(f.path)) throw new Error('invalid resource destination');
+    const parts = f.path.slice(logical.length + 1).split('/');
+    if (parts.length !== 2 || !/^[a-f0-9]{64}$/.test(parts[0]) || !parts[1]) throw new Error('invalid resource destination');
+    const archive = !!f.untar;
+    if (archive ? !/^\.skills-[a-f0-9]{64}\.tgz$/.test(parts[1]) || f.untar !== `${logical}/${parts[0]}/skills` : parts[1].startsWith('.')) throw new Error('invalid resource file');
+    makeResourceRoot(r.id);
+    const dir = protectedDirectory(path.join(r.resourceRoot, parts[0]));
+    const target = path.join(dir, archive ? 'skills' : parts[1]);
+    const existing = fs.lstatSync(target, { throwIfNoEntry: false });
+    if (existing && (existing.isSymbolicLink() || existing.uid !== process.getuid?.() || (archive ? !existing.isDirectory() : !existing.isFile() || existing.nlink !== 1))) throw new Error('unsafe existing resource');
+    const signal = AbortSignal.any([stopping.signal, AbortSignal.timeout(45_000)]);
+    const response = await fetchImpl(f.url, { signal });
+    if (!response.ok) throw new Error(`resource download failed (${response.status})`);
+    const limit = (archive ? 128 : 25) * 1024 * 1024;
+    const chunks = []; let bytes = 0;
+    if (response.body?.[Symbol.asyncIterator]) {
+      for await (const chunk of response.body) {
+        bytes += chunk.length;
+        if (bytes > limit) throw new Error('resource size cap exceeded');
+        chunks.push(Buffer.from(chunk));
+      }
+    } else {
+      const body = Buffer.from(await response.arrayBuffer());
+      if (body.length > limit) throw new Error('resource size cap exceeded');
+      chunks.push(body); bytes = body.length;
+    }
+    const body = Buffer.concat(chunks, bytes);
+    const job = fs.mkdtempSync(path.join(r.resourceRoot, '.incoming-'));
+    try {
+      const file = path.join(job, parts[1]);
+      const fd = fs.openSync(file, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o644);
+      try { fs.writeFileSync(fd, body); fs.fchmodSync(fd, 0o644 | (Number(f.mode) & 0o111)); } finally { fs.closeSync(fd); }
+      if (archive) {
+        const staged = path.join(job, 'skills');
+        await unpackSkillArchive(file, staged);
+        if (!existing) fs.renameSync(staged, target);
+      } else if (existing) {
+        if (sha256(fs.readFileSync(target)) !== sha256(body)) throw new Error('resource content changed');
+      } else fs.renameSync(file, target);
+    } finally { fs.rmSync(job, { recursive: true, force: true }); }
   }
 
   /* ----------------------------- THE SIGN-INS ----------------------------- */
@@ -1362,12 +1492,23 @@ export function createSandbox({
   // same number can be sent again.
   function sequenced(r, req, apply) {
     const step = async () => {
+      const resource = req.action === 'files' && req.resource === true;
+      if (resource && (!Number.isSafeInteger(req.n) || req.n < 1)) return { ok: false, error: 'bad-resource-sequence', consumed: true };
       if (req.n === undefined) return apply();
       const n = Number(req.n);
-      if (n <= r.inSeq) return { ok: true, dup: true };
+      if (n <= r.inSeq) {
+        if (resource) return { ...(r.resourceReceipts?.get(n) || { ok: false, error: 'resource-receipt-unavailable', consumed: true }), dup: true };
+        return { ok: true, dup: true };
+      }
       if (n !== r.inSeq + 1) return { ok: false, error: 'gap', expect: r.inSeq + 1 };
       const out = await apply();
-      if (out?.ok || out?.consumed) r.inSeq = n;
+      if (out?.ok || out?.consumed) {
+        r.inSeq = n;
+        if (resource) {
+          (r.resourceReceipts ??= new Map()).set(n, out);
+          while (r.resourceReceipts.size > 64) r.resourceReceipts.delete(r.resourceReceipts.keys().next().value);
+        }
+      }
       return out;
     };
     const p = (r.inputs || Promise.resolve()).then(step, step);
@@ -1379,7 +1520,7 @@ export function createSandbox({
     const action = req.action;
     if (action === 'status') {
       if (!run) return { ok: true, state: 'none' };
-      return { ok: true, runId: run.id, state: run.state, seq: run.log.index.length, inSeq: run.inSeq, exitCode: run.exitCode ?? null, manifest: run.manifest || null };
+      return { ok: true, runId: run.id, state: run.state, seq: run.log.index.length, inSeq: run.inSeq, exitCode: run.exitCode ?? null, manifest: run.manifest || null, caps: CAPS };
     }
     if (action === 'signin' || action === 'renew' || action === 'look') {
       if (run && run.id === req.runId) return { ok: true, already: true, state: run.state, seq: run.log.index.length, caps: CAPS };
@@ -1508,13 +1649,18 @@ export function createSandbox({
         // attachment named in the prompt, which arrives over stdin).
         return sequenced(r, req, async () => {
           try {
+            if (req.resource === true) {
+              if (!Array.isArray(req.files) || req.files.length !== 1) throw new Error('a resource delivery contains one resource');
+              await placeResource(req.files[0], r);
+              return { ok: true };
+            }
             for (const f of req.files || []) {
               if (!f?.url || !path.isAbsolute(f?.path || '')) return { ok: false, error: 'bad-file', consumed: true };
               await placeFile({ ...f, path: at(f.path), ...(f.untar ? { untar: at(f.untar) } : {}) }, r);
               if (runAs) await sh('chown', [`${runAs.uid}:${runAs.gid}`, at(f.path)], '/').catch(() => {});
             }
           } catch (err) {
-            return { ok: false, error: 'file-failed', message: err.message };
+            return { ok: false, error: 'file-failed', message: err.message, ...(req.resource === true ? { consumed: true } : {}) };
           }
           return { ok: true };
         });

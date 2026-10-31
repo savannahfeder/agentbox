@@ -198,7 +198,7 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
   const passwordField = (autoComplete: string, label: string) => (
     <label className={missing?.field === 'password' ? 'si-missing' : undefined}><span>{label}</span>
       <span className="si-pw">
-        <input ref={pwField} type={showPassword ? 'text' : 'password'} value={password} autoComplete={autoComplete} aria-invalid={missing?.field === 'password' || undefined} onChange={(e) => { setPassword(e.target.value); setMissing(null); }} />
+        <input ref={pwField} type={showPassword ? 'text' : 'password'} value={password} autoComplete={autoComplete} aria-invalid={missing?.field === 'password' || undefined} onChange={(e) => { setPassword(e.target.value); setMissing(null); setError(null); }} />
         <button type="button" className="si-pw-show" aria-pressed={showPassword} onClick={() => setShowPassword((on) => !on)}>{showPassword ? 'Hide' : 'Show'}</button>
       </span>
     </label>
@@ -285,11 +285,14 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
             <form className="si-form" onSubmit={submit}>
               {mode === 'sign-up' && (
                 <label className={missing?.field === 'name' ? 'si-missing' : undefined}><span>Name</span>
-                  <input ref={nameField} value={name} autoComplete="name" aria-invalid={missing?.field === 'name' || undefined} onChange={(e) => { setName(e.target.value); setMissing(null); }} />
+                  <input ref={nameField} value={name} autoComplete="name" aria-invalid={missing?.field === 'name' || undefined} onChange={(e) => { setName(e.target.value); setMissing(null); setError(null); }} />
                 </label>
               )}
+              {/* Editing either field takes the error down: a fixed password
+                  under a stale "Invalid login credentials" reads as a second
+                  failure (F-116). */}
               <label className={missing?.field === 'email' ? 'si-missing' : undefined}><span>Email</span>
-                <input ref={emailField} type="email" value={email} autoComplete="email" aria-invalid={missing?.field === 'email' || undefined} onChange={(e) => { setEmail(e.target.value); setMissing(null); }} />
+                <input ref={emailField} type="email" value={email} autoComplete="email" aria-invalid={missing?.field === 'email' || undefined} onChange={(e) => { setEmail(e.target.value); setMissing(null); setError(null); }} />
               </label>
               {passwordField(mode === 'sign-up' ? 'new-password' : 'current-password', 'Password')}
               <button type="submit" className="si-primary" disabled={!!busy}>

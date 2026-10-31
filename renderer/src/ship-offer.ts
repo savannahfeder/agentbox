@@ -40,21 +40,38 @@ export const COMMIT_FIRST_OFFER: ParsedOption[] = [
   { n: 2, text: 'Discard the change', recommended: false },
 ];
 
+// AND A COMMIT NEEDS A NAME AND AN EMAIL (F-139). A new user's first task
+// ended on "Commit it and ship (recommended)" drawn under the agent's own
+// "What name and email should I use for the commit?", and no press on the card
+// could answer that. So where git cannot name an author the recommended press
+// is the one that supplies one: it opens the reply box with its own words in
+// it and they type the name and email under them (./format.ts, needsYourWords),
+// which is how "Change something first" already works.
+export const NAME_YOURSELF_ASK = 'Git does not know who you are, so this change was never committed.';
+export const NAME_YOURSELF_OFFER: ParsedOption[] = [
+  { n: 1, text: 'Commit it and ship, as the name and email below', recommended: true },
+  { n: 2, text: 'Discard the change', recommended: false },
+];
+
 /**
  * What the folder a run worked in holds, as the saved change records it
- * (main/git-change.mjs). Null on either is "could not be read", which is every
- * product with no repository.
+ * (main/git-change.mjs). Null on any of them is "could not be read", which is
+ * every product with no repository.
  */
-export interface Standing { committed: boolean | null; uncommitted: boolean | null }
-export const UNREAD: Standing = { committed: null, uncommitted: null };
+export interface Standing {
+  committed: boolean | null;
+  uncommitted: boolean | null;
+  knowsYou: boolean | null;
+}
+export const UNREAD: Standing = { committed: null, uncommitted: null, knowsYou: null };
 
 /** The standing off a saved change. Anything that is not a yes or a no on the
  *  file is unread, never a guess. */
 export function standingFrom(change: unknown): Standing {
-  const c = change as { committed?: unknown; uncommitted?: unknown } | null | undefined;
+  const c = change as { committed?: unknown; uncommitted?: unknown; knowsYou?: unknown } | null | undefined;
   if (!c || typeof c !== 'object') return UNREAD;
   const flag = (v: unknown) => (typeof v === 'boolean' ? v : null);
-  return { committed: flag(c.committed), uncommitted: flag(c.uncommitted) };
+  return { committed: flag(c.committed), uncommitted: flag(c.uncommitted), knowsYou: flag(c.knowsYou) };
 }
 
 /**
@@ -73,7 +90,9 @@ export function standingFrom(change: unknown): Standing {
 export function shipOfferFor(stands: Standing): { ask: string; options: ParsedOption[]; headed: boolean } | null {
   if (stands.committed === false && stands.uncommitted === false) return null;
   if (stands.committed === false && stands.uncommitted === true) {
-    return { ask: NOT_COMMITTED_ASK, options: COMMIT_FIRST_OFFER, headed: true };
+    return stands.knowsYou === false
+      ? { ask: NAME_YOURSELF_ASK, options: NAME_YOURSELF_OFFER, headed: true }
+      : { ask: NOT_COMMITTED_ASK, options: COMMIT_FIRST_OFFER, headed: true };
   }
   return { ask: SHIP_ASK, options: SHIP_OFFER, headed: false };
 }

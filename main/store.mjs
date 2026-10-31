@@ -768,6 +768,19 @@ export class Store {
     );
   }
 
+  // A FIX FOR A RED MAIN, which runs without waiting for anyone: the app files
+  // it with the 'founder' label the way a repeating task's run is filed
+  // (main/repeats.mjs), because the person agreed that these start and ship on
+  // their own (main/main-went-red.mjs).
+  fileMainFix(slug, { title, body, problem, kind = 'task', priority = 5, labels = [] }) {
+    const { workItemsDisk } = this.modules;
+    return workItemsDisk.createWorkItem(
+      this.productDir(slug),
+      { title, body, problem, kind, priority, labels: [...new Set(['founder', ...labels])] },
+      { source: 'system' },
+    );
+  }
+
   // NEWS THE APP ITSELF HAS, ON A ROW THAT ALREADY EXISTS. The app's own words,
   // so 'system' and a note: the answer is theirs and the result is the agent's.
   // A note is a thread field, so a second one reads as the next thing said on

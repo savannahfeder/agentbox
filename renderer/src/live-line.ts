@@ -32,6 +32,8 @@
 import { spanLabel } from './notes';
 import { Name } from '../../shared/product-name.mjs';
 import { resetDay } from '../../shared/usage.mjs';
+import { MAC } from './this-keyboard';
+import { whyWords, type WhyCard } from './where-why';
 import type { RunningSession, WhyNotCloud, WorkItem } from './types';
 
 // THE FIFTH STATE, AND IT IS THE ONE SOMEBODY OUTSIDE THIS BUILDING ASKED FOR.
@@ -55,7 +57,29 @@ import type { RunningSession, WhyNotCloud, WorkItem } from './types';
 // waiting, but first in line, and the word changing is how the press shows.
 // `asking` is a worker stopped on a permission request: a live session, and
 // not working, because nothing moves until you answer it.
-export type LiveState = 'asking' | 'working' | 'elsewhere' | 'shipping' | 'next' | 'queued' | 'signin' | 'limit' | 'paused' | 'silent' | 'idle';
+export type LiveState = 'asking' | 'working' | 'elsewhere' | 'shipping' | 'next' | 'queued' | 'cannot' | 'signin' | 'limit' | 'paused' | 'silent' | 'idle';
+
+export interface CannotStart {
+  why: 'setup' | 'asleep' | 'engine' | 'login' | 'memory' | 'slow-folder' | 'error' | string;
+  /** "Claude Code" or "Codex". */
+  tool: string;
+}
+
+/** The sentence for a queued row nothing will start yet, or null for a reason it does not carry. */
+export function cannotStartLine({ why, tool }: CannotStart): string | null {
+  if (why === 'setup') return 'Agents wait while setup is open. This starts as soon as you finish or skip it.';
+  if (why === 'asleep') return 'This computer looks asleep to the app, so nothing starts until it wakes.';
+  if (why === 'engine') return `${tool} was not found on this computer, so nothing can start. Install it and this starts on its own.`;
+  if (why === 'login') {
+    return tool === 'Codex'
+      ? 'Codex has no account that can run right now. Open a terminal and run codex login, and this starts on its own.'
+      : `${tool} has no account that can run right now. Open a terminal, run claude, and type /login, and this starts on its own.`;
+  }
+  if (why === 'memory') return 'This computer is short of memory, so this waits for heavier work to finish.';
+  if (why === 'slow-folder') return 'Making this thread\'s own copy of the project is taking much longer than it should, so the agent has not started.';
+  if (why === 'error') return 'Starting an agent on this failed. The app tries again on its own.';
+  return null;
+}
 
 export interface LiveLine {
   state: LiveState;
@@ -79,6 +103,8 @@ export interface LiveFacts {
    *  tool is out of usage, each with the tool's name and when it resets (0 when
    *  no login said). */
   atLimit?: Record<string, { tool: string; until: number }>;
+  /** `supervisor.cannotStart`: queued rows the last pass could not start, and why. */
+  cannotStart?: Record<string, CannotStart>;
   /** The id is on `supervisor.shipping`: the app's ship queue still owes it a ship. */
   shipping?: boolean;
   /** An approval in the spool names this thread, so its agent has stopped on a
@@ -163,6 +189,7 @@ export function shortWord(state: LiveState, helpers = 0): string {
   if (state === 'shipping') return 'Shipping';
   if (state === 'next') return 'Up next';
   if (state === 'queued') return 'Queued';
+  if (state === 'cannot') return 'Not started';
   if (state === 'signin') return 'Signed out';
   if (state === 'limit') return 'At its limit';
   if (state === 'paused') return 'Paused';
@@ -191,6 +218,32 @@ export function shortSpan(ms: number): string {
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
   return `${hours}h ${minutes % 60}m`;
+}
+
+export interface LivePlace {
+  /** Said after the time: "on this Mac", "in the cloud". */
+  word: string;
+  /** Why it is not in the cloud, on hover; null on a cloud run. */
+  why: WhyCard | null;
+}
+
+// A phone or a browser tab (browser-bridge.ts, cloud-bridge.ts) is not the
+// machine the run is on, so "this Mac" there would name the wrong one.
+const inATab = () => typeof document !== 'undefined' && document.documentElement.dataset.shell === 'tab';
+
+/**
+ * Where a run is, for the working line of an open thread. Said only where it
+ * is news: a cloud run, or a local one while the cloud takes Everything, the
+ * only time the supervisor gives a reason.
+ */
+export function livePlace(facts: LiveFacts, { mac = MAC, tab = inATab() }: { mac?: boolean; tab?: boolean } = {}): LivePlace | null {
+  const session = facts.session;
+  if (!session) return null;
+  if (session.where === 'cloud') return { word: 'in the cloud', why: null };
+  const away = facts.whyNotCloud;
+  if (away?.at !== 'mac') return null;
+  const machine = tab ? 'your computer' : mac ? 'this Mac' : 'this computer';
+  return { word: `on ${machine}`, why: { head: `Running on ${machine}`, body: whyWords(away).body } };
 }
 
 /**
@@ -228,7 +281,7 @@ export function cameBackEmpty(
 
 export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null {
   const {
-    session = null, queued = [], runNow = [], stalled = false, paused = false, silent = null, signInNeeded = {}, atLimit = {},
+    session = null, queued = [], runNow = [], stalled = false, paused = false, silent = null, signInNeeded = {}, atLimit = {}, cannotStart = {},
     inProgress = false, scheduledUntil = 0, now = Date.now(), shipping = false,
   } = facts;
 
@@ -369,6 +422,10 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
       line: `${limit.tool} is at its usage limit, so this starts on its own when it resets${day ? ` on ${day}` : ''}${at ? ` at ${at}` : ''}.`,
     };
   }
+
+  // QUEUED IS A PROMISE THAT AN AGENT IS COMING, and for these it is not.
+  const notYet = queued.includes(item.id) && cannotStart[item.id] ? cannotStartLine(cannotStart[item.id]) : null;
+  if (notYet) return { state: 'cannot', line: notYet };
 
   if (queued.includes(item.id) && runNow.includes(item.id)) {
     return {

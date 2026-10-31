@@ -153,6 +153,9 @@ const ANSWERS = {
   // app is never drawn behind it, so there is nothing for a picture to show
   // through to.
   '#needs-its-key': 'opaque',
+  // A SCREEN THAT DIED TWICE (renderer/src/main.tsx). React has unmounted the
+  // root by the time this goes up, so there is nothing behind it either.
+  '#screen-died': 'opaque',
   // THE APP DRAWN BEHIND THE WALK'S THEME STEP. Shot that way once, on the
   // day it was built: the tab strip printed twice on one line.
   '.fr-look-app': 'photograph',

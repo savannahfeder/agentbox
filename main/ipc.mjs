@@ -61,7 +61,7 @@ import { readImportableThreads, readSearchableThreads } from './importable-threa
 import { readChatEnds } from './agent-sessions.mjs';
 import { markImported } from '../shared/agent-import.mjs';
 import { codexIdOf, importChoice, isCodexImportRow, isNotImportedRow } from '../shared/codex-import.mjs';
-import { checkProjectFolder } from '../shared/project-folder-check.mjs';
+import { checkProjectFolder, chooserStartsIn } from '../shared/project-folder-check.mjs';
 import { openFreshUser } from './fresh-user.mjs';
 import { openDemo } from './demo.mjs';
 import { AgentSchedule } from './agent-schedule.mjs';
@@ -109,10 +109,10 @@ const NO_UPDATER = {
   move: () => ({ moved: false, error: null }),
 };
 
-const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget']);
+const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget', 'method']);
 const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markUnread', 'react', 'edit', 'deleteMessage', 'putFile', 'file', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute']);
 
-export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null }) {
+export function registerIpc({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, onCount = () => {} }) {
   // The three Electron things, or a plain Node stand-in for them. There is no
   // default: a caller that forgets says so here rather than throwing eighty
   // lines further down on `ipcMain.handle` of undefined.
@@ -229,6 +229,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // a number (2026-10-06): which setup step was reached.
   ipcMain.handle('zero:track', (_e, { name, count } = {}) => {
     if (!EVENT_NAMES.includes(name)) return false;
+    onCount();
     return analytics.track(name, Number.isFinite(count) ? { count } : undefined);
   });
 
@@ -795,6 +796,13 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
     return { ok: true };
   });
 
+  // RUNS ON THIS MAC TO MOVE TO THE CLOUD, by id.
+  ipcMain.handle('zero:move-to-cloud', (_e, { ids }) => {
+    const out = supervisor.moveToCloud(ids);
+    push();
+    return out;
+  });
+
   // PINNED THREADS (w-20323283e6): id to true, or null to unpin.
   ipcMain.handle('zero:set-thread-pins', (_e, { pins }) => {
     supervisor.setThreadPins(pins);
@@ -904,10 +912,11 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       else if (op === 'update') value = mates.update(a.id, { ...a.patch, ...(a.patch && 'engine' in a.patch ? { engine: supervisor.engineOffered(a.patch.engine) ?? null } : {}) });
       else if (op === 'stop') value = mates.stop(a.id, { kill });
       else if (op === 'remove') value = mates.remove(a.id, { kill });
-      else if (op === 'post') value = mates.post({ text: a.text, to: a.to, fresh: a.fresh === true });
+      else if (op === 'post') value = mates.post({ text: a.text, to: a.to, fresh: a.fresh === true, answers: a.answers });
       else if (op === 'goAhead') value = mates.goAhead(a.id, a.ref);
       else if (op === 'remember') value = mates.remember(a.id, a.text, { from: 'you' });
       else if (op === 'forget') value = mates.forget(a.id, a.memory);
+      else if (op === 'method') return { ok: true, value: mates.method(a.id) };
       supervisor.wake?.();
       push();
       return { ok: true, value: value ?? null };
@@ -1261,7 +1270,15 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // The refusal is HERE rather than on the screens, so the path never reaches
   // the renderer at all and no screen can take it by accident. What comes back
   // is the sentence, which the screens show as it stands.
+  // AND IT OPENS WHERE THE PROJECTS ARE, NOT ON HOME (F-148). A first run with
+  // nothing connected yet opened the window on the home folder, which is the
+  // one folder the check above refuses: a tester saw a single folder listed and
+  // had to press Ctrl+L to type a path. shared/project-folder-check.mjs orders
+  // the candidates; the first that exists on this disk is the one.
   ipcMain.handle('zero:choose-folder', async (_e, { startIn } = {}) => {
+    const connected = store.listProducts().map((p) => p.repoPath).filter(Boolean);
+    const isDir = (p) => { try { return fsWatch.statSync(p).isDirectory(); } catch { return false; } };
+    const openAt = chooserStartsIn(startIn, { known: connected, home: os.homedir() }).find(isDir) ?? null;
     const r = await dialog.showOpenDialog(window, {
       // The title is what the screen behind it asks. On Linux the chooser
       // draws one, and it was still asking "Where is its code?", the heading
@@ -1269,7 +1286,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
       title: 'Pick a project folder',
       buttonLabel: 'Use this folder',
       properties: ['openDirectory', 'createDirectory'],
-      ...(startIn ? { defaultPath: startIn } : {}),
+      ...(openAt ? { defaultPath: openAt } : {}),
     });
     // NO MAC DIALOG TO OPEN, WHICH IS THE BROWSER AND NOT AN ERROR. The screen
     // draws its own picker instead, on `zero:list-folders` below, and comes
@@ -1712,8 +1729,10 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   const engineSetup = createEngineSetup({
     find: (engine) => {
       const finders = {
-        claude: async () => { const s = await lookAgainFor('claude', config); return { found: s.claudeFound, path: s.claudeBin }; },
-        codex: async () => { const s = await lookAgainFor('codex', config); return { found: s.found, path: s.bin }; },
+        // `certain` travels with the answer, so a search that established
+        // nothing does not read as a computer with nothing on it.
+        claude: async () => { const s = await lookAgainFor('claude', config); return { found: s.claudeFound, path: s.claudeBin, certain: s.claudeCertain }; },
+        codex: async () => { const s = await lookAgainFor('codex', config); return { found: s.found, path: s.bin, certain: s.certain }; },
       };
       return finders[engine]?.() ?? { found: false, path: null };
     },

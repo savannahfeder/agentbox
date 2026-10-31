@@ -49,9 +49,15 @@ const ASKING_MS = 20_000;
 // again with the words kept; one that ends at once is failing, and stops.
 const RESTARTS = 20;
 const LIVED_MS = 1000;
+// SAFARI ON iOS 27 CAN START A RECOGNISER THAT NEVER HEARS: start fires, then
+// no word, error or end (bugs.webkit.org/show_bug.cgi?id=321436). One that has
+// heard nothing this long is given up on, with the words kept.
+export const DEAF_MS = 8000;
+
+type Timers = { setTimeout(fn: () => void, ms: number): unknown; clearTimeout(id: any): void };
 
 /** The browser's recogniser as a Speech, or null where it has none. */
-export function webSpeech(win: Win, { now = Date.now }: { now?: () => number } = {}): Speech | null {
+export function webSpeech(win: Win, { now = Date.now, timers = globalThis as unknown as Timers }: { now?: () => number; timers?: Timers } = {}): Speech | null {
   const Make = win.SpeechRecognition ?? win.webkitSpeechRecognition;
   if (!Make) return null;
   let on: SpeechEvents | null = null;
@@ -64,13 +70,27 @@ export function webSpeech(win: Win, { now = Date.now }: { now?: () => number } =
     const began = now();
     // What is heard but not yet final, written as final if this one ends early.
     let pending = '';
+    let deaf: unknown = null;
+    const hears = () => { if (deaf !== null) timers.clearTimeout(deaf); deaf = null; };
     r.lang = win.navigator?.language ?? '';
     r.continuous = true;
     r.interimResults = true;
-    r.onstart = () => { if (live === r) on?.start(); };
+    r.onstart = () => {
+      if (live !== r) return;
+      deaf = timers.setTimeout(() => {
+        deaf = null;
+        if (live !== r || !wanted) return;
+        live = null;
+        wanted = false;
+        on?.error('not-hearing', '');
+        r.abort();
+      }, DEAF_MS);
+      on?.start();
+    };
     // Each final result once, and what is still being heard after the last one.
     r.onresult = (e) => {
       if (live !== r) return;
+      hears();
       const heard: string[] = [];
       for (let i = e.resultIndex; i < e.results.length; i += 1) {
         const res = e.results[i];
@@ -86,6 +106,7 @@ export function webSpeech(win: Win, { now = Date.now }: { now?: () => number } =
       on?.error(e.error, e.message ?? '');
     };
     r.onend = () => {
+      hears();
       if (live !== r) return;
       live = null;
       if (wanted && on && restarts < RESTARTS && now() - began >= LIVED_MS) {
@@ -96,7 +117,7 @@ export function webSpeech(win: Win, { now = Date.now }: { now?: () => number } =
       wanted = false;
       on?.end();
     };
-    r.onspeechstart = () => { if (live === r) on?.level(7); };
+    r.onspeechstart = () => { if (live === r) { hears(); on?.level(7); } };
     r.onspeechend = () => { if (live === r) on?.level(0); };
     r.start();
   };

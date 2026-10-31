@@ -2,20 +2,24 @@
 // that asks where from, and the files waiting to go, each with a way to drop
 // it. A picture waits as its thumbnail, as on the phone site (AttachRow.tsx).
 import { useState } from 'react';
-import { Image, Pressable, View } from 'react-native';
+import { Image, Platform, Pressable, View } from 'react-native';
 import { isImageName } from '../../../renderer/src/attachments';
+import { pickAfterClose } from '../lib/attach';
 import { pickFiles, pickPhotos, type Picked } from '../platform/pick';
 import { Clip, Cross } from './icons';
 import { Sheet, SheetHead, SheetRow, T } from './parts';
 import { color } from './theme';
 
 export function AttachSheet({ open, close, add, fail }: { open: boolean; close: () => void; add: (files: Picked[]) => void; fail: (why: string) => void }) {
-  const from = (pick: () => Promise<Picked[]>) => async () => {
+  const [after] = useState(() => pickAfterClose({ ios: Platform.OS === 'ios' }));
+  const from = (pick: () => Promise<Picked[]>) => () => {
     close();
-    try { add(await pick()); } catch (err) { fail(String((err as Error)?.message ?? err)); }
+    after.request(async () => {
+      try { add(await pick()); } catch (err) { fail(String((err as Error)?.message ?? err)); }
+    });
   };
   return (
-    <Sheet open={open} close={close}>
+    <Sheet open={open} close={close} onGone={after.gone}>
       <SheetHead>Attach</SheetHead>
       <SheetRow label="Photo library" onPress={from(pickPhotos)} />
       <SheetRow label="Files" onPress={from(pickFiles)} />

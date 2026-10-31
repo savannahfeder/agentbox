@@ -71,21 +71,9 @@ describe('the mode reaches the thread', () => {
     expect(params('full-access')).toMatchObject({ sandbox: 'danger-full-access', approvalPolicy: 'never' });
   });
 
-  // w-ca48e69535: auto on a second Codex login carded the user for
-  // almost every step, because the reviewer lived only in the first login's
-  // config.toml. The thread has to carry it, so any account behaves the same.
-  //
-  // IT CARRIES IT ON ALL THREE NOW, AND THE VALUE CHANGED (w-36c51443df). This
-  // test used to assert `auto_review` on `auto` and NO FIELD AT ALL on the other
-  // two, which is the same defect this row was written to close from the other
-  // side: an absent field means the login's own `approvals_reviewer` decides,
-  // and on a real Mac that key said `auto_review` -- so a worker left its
-  // sandbox and wrote into the home directory with zero cards raised. The
-  // original requirement, one behaviour on any account, is unchanged and is
-  // better served by naming the reviewer everywhere.
-  it('hands its asks to her, on any account and on every mode', () => {
+  it('names each mode\'s reviewer on any account', () => {
     for (const id of CODEX_MODE_ORDER) {
-      expect(params(id), id).toMatchObject({ approvalsReviewer: 'user' });
+      expect(params(id), id).toMatchObject({ approvalsReviewer: id === 'auto' ? 'auto_review' : 'user' });
     }
   });
 

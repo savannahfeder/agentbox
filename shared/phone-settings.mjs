@@ -6,6 +6,7 @@ import { CLAUDE_PERMISSION_MODES } from './work-items.mjs';
 import { CODEX_MODE_ORDER } from './codex-modes.mjs';
 import { AGENT_MODES } from './agents.mjs';
 import { WEB_ALERTS_KEY, WEB_ALERTS_TEST_KEY, webAlertsOk, webAlertsTestOk } from './web-alerts.mjs';
+import { isRepeatRule } from './repeats.mjs';
 
 export const SETTINGS_VERSION = 1;
 
@@ -25,6 +26,8 @@ const WORKSPACE = {
   adhdMode: bool,
   alphaRooms: bool,
   alphaTeammates: bool,
+  alphaMultiplayer: bool,
+  importNew: bool,
   agentsAuto: bool,
   memoryGate: bool,
   cleanupLeftovers: bool,
@@ -47,13 +50,65 @@ const PROJECT = {
   account: (v) => v === 'any' || accountId(v),
 };
 
+// A pin is one person's list on one computer (main/supervisor.mjs
+// threadPins), so it travels as a setting of that computer, not a thread command.
+const THREAD = { pinned: bool };
+const THREAD_ID = /^[\w-]{1,120}$/;
+
 /** Why the Mac should not carry out this change, or null. */
 export function checkSetting(p) {
   if (!p || typeof p !== 'object') return 'not a setting';
-  const rules = p.scope === 'workspace' ? WORKSPACE : p.scope === 'project' ? PROJECT : null;
+  if (p.scope === 'repeat') return checkRepeatChange(p);
+  const rules = p.scope === 'workspace' ? WORKSPACE : p.scope === 'project' ? PROJECT : p.scope === 'thread' ? THREAD : null;
   if (!rules || !Object.hasOwn(rules, p.key)) return 'not a setting your phone can change';
-  if (p.scope === 'project' && !(typeof p.product === 'string' && SLUG.test(p.product))) return 'that setting needs its project';
+  if (p.scope !== 'workspace' && !(typeof p.product === 'string' && SLUG.test(p.product))) return 'that setting needs its project';
+  if (p.scope === 'thread' && !(typeof p.item === 'string' && THREAD_ID.test(p.item))) return 'that needs its thread';
   return rules[p.key](p.value) ? null : 'not a value that setting takes';
+}
+
+// A REPEATING TASK MADE, CHANGED OR ENDED ON A PHONE, handed to the window's
+// own three handlers (main/ipc.mjs), which still gate the engine and model.
+const REPEAT_ID = /^[\w-]{1,120}$/;
+const REPEAT_FIELDS = {
+  title: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 500,
+  body: (v) => typeof v === 'string' && v.length <= 20_000,
+  priority: (v) => Number.isInteger(v) && v >= 0 && v <= 9,
+  engine: (v) => v === 'claude' || v === 'codex',
+  model: (v) => typeof v === 'string' && v.length > 0 && v.length <= 100,
+};
+const SCHEDULE = ['every', 'on', 'at'];
+const scheduleOf = (v) => ({ every: v.every, ...(v.every === 'week' ? { on: v.on } : {}), at: v.at });
+
+function checkRepeatChange(p) {
+  if (!['new', 'change', 'end'].includes(p.key)) return 'not a setting your phone can change';
+  if (!(typeof p.product === 'string' && SLUG.test(p.product))) return 'that setting needs its project';
+  if (p.key !== 'new' && !(typeof p.id === 'string' && REPEAT_ID.test(p.id))) return 'that needs its repeating task';
+  if (p.key === 'end') return p.value === true ? null : 'not a value that setting takes';
+  const v = p.value;
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return 'not a value that setting takes';
+  const keys = Object.keys(v);
+  if (keys.some((k) => !Object.hasOwn(REPEAT_FIELDS, k) && !SCHEDULE.includes(k))) return 'not a value that setting takes';
+  if (p.key === 'new' && !REPEAT_FIELDS.title(v.title)) return 'a repeating task needs its words';
+  if (keys.some((k) => REPEAT_FIELDS[k] && !REPEAT_FIELDS[k](v[k]))) return 'not a value that setting takes';
+  // The schedule is whole or absent: half of one cannot be checked.
+  const timed = keys.some((k) => SCHEDULE.includes(k));
+  if ((p.key === 'new' || timed) && !isRepeatRule(v)) return 'not a schedule this computer can keep';
+  if (p.key === 'change' && !keys.length) return 'not a value that setting takes';
+  return null;
+}
+
+function repeatRoute(p) {
+  if (p.key === 'end') return ['zero:end-repeat', { product: p.product, id: p.id }];
+  const { title, body, priority, engine, model } = p.value;
+  const timed = SCHEDULE.some((k) => Object.hasOwn(p.value, k));
+  if (p.key === 'change') {
+    const rule = Object.fromEntries(Object.entries({ title, body, priority, engine, model }).filter(([, v]) => v !== undefined));
+    return ['zero:set-repeat', { product: p.product, id: p.id, rule: timed ? { ...rule, ...scheduleOf(p.value) } : rule }];
+  }
+  return ['zero:compose-repeat', {
+    product: p.product, title, body: body ?? '', priority: priority ?? 5, rule: scheduleOf(p.value),
+    ...(engine ? { engine } : {}), ...(model ? { model } : {}),
+  }];
 }
 
 function profileFor(model, engine, id) {
@@ -66,6 +121,8 @@ function profileFor(model, engine, id) {
 
 /** The window's own handler for a checked change, and what to hand it. */
 export function settingRoute(p, model) {
+  if (p.scope === 'thread') return ['zero:set-thread-pins', { pins: { [p.item]: p.value === true ? true : null } }];
+  if (p.scope === 'repeat') return repeatRoute(p);
   if (p.scope === 'project') {
     const value = p.key === 'account' && p.value !== 'any' ? profileFor(model, 'claude', p.value) : p.value;
     return ['zero:settings-set-project', { product: p.product, key: p.key, value }];
@@ -91,11 +148,14 @@ export function phoneSettingsOf(model, { version }) {
       cornerTag: !!w.cornerTag,
       diagnostics: !!w.diagnostics,
       adhdMode: !!w.adhdMode,
-      alpha: { rooms: !!w.alpha?.rooms },
+      alpha: { rooms: !!w.alpha?.rooms, teammates: !!w.alpha?.teammates, multiplayer: !!w.alpha?.multiplayer },
+      importNew: w.importNew === true,
       outsideAgents: w.outsideAgents,
       permission: w.permission,
       codexMode: w.codexMode ?? null,
       engines: (w.engineChoices ?? []).map((e) => e.id),
+      claudeModels: (w.claudeModels ?? []).map(({ id, label, model, defaultLevel }) => ({ id, label, model, defaultLevel })),
+      codexFreePlan: !!w.codexFreePlan,
       // WHAT To AND Model OFFER ON THE PHONE AND THE WEB (w-24119e8784): the
       // agent a thread runs on when nobody picks, and Codex's models with their
       // own levels. Names and words only, never a path.

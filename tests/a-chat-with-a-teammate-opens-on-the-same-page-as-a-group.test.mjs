@@ -71,8 +71,7 @@ describe('the page it opens on', () => {
   // The Chats list and bar come from a-persons-chat-opened-from-chats-keeps-the-chats-list.
   it('lists who is in it down the right, inside the Chats frame', () => {
     expect(hook).toMatch(/chatPeople: \(people: string\[\]\) => \{[\s\S]{0,200}directPeople\(\{ people, rooms: all, team, meId \}\)[\s\S]{0,100}<PeoplePanel/);
-    // Under Everything else's cards a chat with one person leaves the list out: their card is over it.
-    expect(app).toMatch(/\{inChats && roomsUi\.live && !\(inTeamChat && talkPeople\.length === 1\) && roomsUi\.chatPeople\(directs\.find\(\(d\) => d\.id === focused\.id\)\?\.people \?\? \[\]\)\}\s*<\/ChatsFrame>/);
+    expect(app).toMatch(/\{inChats && roomsUi\.live && roomsUi\.chatPeople\(directs\.find\(\(d\) => d\.id === focused\.id\)\?\.people \?\? \[\]\)\}\s*<\/ChatsFrame>/);
     const css = read('../renderer/src/team/rooms/rooms.css');
     expect(css).toContain('.cx-frame-main:has(> .gr-side) { flex-direction: row; }');
   });

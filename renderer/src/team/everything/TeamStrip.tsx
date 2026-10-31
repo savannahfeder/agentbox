@@ -11,6 +11,7 @@ import { moveMember, type Member, type TeamRun } from './members';
 import './everything.css';
 
 const agentsWords = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'} working`;
+const agentsShort = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
 
 /** A person's photo or initials, an AI teammate's dashed letter, a chat's faces. */
 export function MemberFace({ m, size }: { m: Member; size: number }) {
@@ -33,23 +34,22 @@ const BUBBLE = <svg className="ev-bubble" width="12" height="12" viewBox="0 0 24
 function Card({ m, on, drop, onPick, drag, onHide }: {
   m: Member; on: boolean; drop: 'before' | 'after' | null; onPick: () => void; drag: Record<string, unknown>; onHide?: () => void;
 }) {
-  const chat = m.kind === 'chat';
+  const chat = m.kind === 'chat' && !(m.team && m.agents != null);
   const corner = (m.kind === 'chat' || m.kind === 'person') && onHide
     && <button type="button" className="ev-x" aria-label={`Hide ${m.name}`} title="Hide" onClick={(e) => { e.stopPropagation(); onHide(); }}>×</button>;
   const attrs = { role: 'button', tabIndex: 0, className: `ev-card ${m.kind}${on ? ' on' : ''}${drop ? ` drop-${drop}` : ''}`, 'data-key': m.key, title: m.name,
     onClick: onPick, onKeyDown: (e: { key: string; preventDefault: () => void }) => { if (e.key === 'Enter') { e.preventDefault(); onPick(); } }, ...drag };
+  // Who, and how many agents they run; never what they are on (w-2b3e1a85e5).
   return <div {...attrs}>
     {corner}
-    <MemberFace m={m} size={52} />
+    <MemberFace m={m} size={44} />
     <div className="ev-t">
-      <span className="ev-n">{chat && BUBBLE}<span className="rm-one">{m.name}</span>
-        {m.level != null && <span className="rm-quiet">{m.level}</span>}{m.role && <span className="ev-role">{m.role}</span>}</span>
+      <span className="ev-n">{m.kind === 'chat' && BUBBLE}<span className="rm-one">{m.name}</span>
+        {m.level != null && <span className="rm-quiet">{m.level}</span>}</span>
       {chat
-        ? <><span className="ev-on rm-one">{m.last || 'No messages yet'}</span>
-          <span className="rm-ag">{m.unread ? <><i className="ev-new" />New messages</> : 'Chat'}</span></>
-        : <><span className={`ev-on rm-one${m.agents ? '' : ' idle'}`}>{m.now ?? ' '}</span>
-          {m.agents == null ? <span className="rm-ag"> </span>
-            : <span className="rm-ag"><LiveMark still={!m.agents && !m.starting} />{m.agents ? agentsWords(m.agents).toUpperCase() : m.starting ? 'STARTING' : 'NOT RUNNING'}</span>}</>}
+        ? <span className="rm-ag">{m.unread ? <><i className="ev-new" />New messages</> : 'Chat'}</span>
+        : m.agents == null ? <span className="rm-ag"> </span>
+          : <span className="rm-ag"><LiveMark still={!m.agents && !m.starting} />{m.agents ? agentsShort(m.agents).toUpperCase() : m.starting ? 'STARTING' : 'NOT RUNNING'}{m.unread && <i className="ev-new" aria-label="New messages" />}</span>}
     </div>
   </div>;
 }
@@ -83,9 +83,9 @@ export function TeamStrip({ members, picked, onPick, onMove, onAdd, adding = fal
         onDrop: (e: DragEvent<HTMLElement>) => { e.preventDefault(); if (dragging) onMove(moveMember(keys, dragging, m.key, sideOf(e))); end(); },
         onDragEnd: end,
       }} />)}
-    {onAdd && <button type="button" className={`ev-card ev-add${adding ? ' on' : ''}`} onClick={onAdd}>
-      <span className="ev-ai" style={{ width: 52, height: 52, fontSize: 18 }} aria-hidden="true">+</span>
-      <div className="ev-t"><span className="ev-n">New teammate</span><span className="ev-on idle rm-one">An AI teammate with a job of its own</span></div>
+    {onAdd && <button type="button" className={`ev-card ev-add${adding ? ' on' : ''}`} onClick={onAdd} title="An AI teammate with a job of its own">
+      <span className="ev-ai" style={{ width: 44, height: 44, fontSize: 16 }} aria-hidden="true">+</span>
+      <div className="ev-t"><span className="ev-n">New teammate</span><span className="rm-ag">AI teammate</span></div>
     </button>}
   </div>;
 }
@@ -115,17 +115,17 @@ export function HiddenList({ hidden, onShow, startOpen = false }: { hidden: Memb
 }
 
 /** Over the open card's space: whose it is, its tabs, and anything it carries on the right. */
-export function SpaceBar({ m, tabs, onTab, right, slot }: {
+export function SpaceBar({ m, tabs, onTab, right, onMessage }: {
   m: Member; tabs: { id: string; label: string; count?: number; on: boolean }[]; onTab?: (id: string) => void; right?: ReactNode;
-  /** Where an open conversation draws its own buttons. */
-  slot?: (el: HTMLDivElement | null) => void;
+  /** Their chat, which is on the Chats page. */
+  onMessage?: () => void;
 }) {
   return <div className="ev-bar">
     <MemberFace m={m} size={22} />
     <span className="ev-bn">{m.kind === 'me' ? 'Your threads' : m.name}{m.role && <em>{m.role}</em>}</span>
     {tabs.length > 0 && <div className="tm-tabs">{tabs.map((t) => <button type="button" key={t.id} className={`tm-tab${t.on ? ' on' : ''}`} onClick={() => onTab?.(t.id)}>{t.label}{!!t.count && <b>{t.count}</b>}</button>)}</div>}
-    {slot && <div className="ev-slot" ref={slot} />}
     {right != null && <span className="ev-right">{right}</span>}
+    {onMessage && <button type="button" className="ev-msg" onClick={onMessage}>{BUBBLE}Message</button>}
   </div>;
 }
 

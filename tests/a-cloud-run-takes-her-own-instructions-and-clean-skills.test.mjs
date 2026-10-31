@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { createSandbox } from '../cloud/sandbox/server.mjs';
 import { cloudRun, tarOf } from '../main/cloud/run.mjs';
 import { tarDocs } from '../main/cloud/docs.mjs';
+import { checkKit, kitKey, startPayload } from '../shared/cloud-kit.mjs';
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const FAKE_CLAUDE = here('./fixtures/cloud/fake-claude.mjs');
@@ -82,26 +83,97 @@ const storage = {
   async putUrl(k) { return `${s3Url}/${encodeURIComponent(k)}`; },
 };
 
-async function run(homeDir) {
+async function run(homeDir, text = 'hello', { resourceDocs = null, legacyResources = false, failResourceDelivery = false } = {}) {
   const configDir = path.join(tmp, 'mac', 'claude-home');
   fs.mkdirSync(configDir, { recursive: true });
   const mcpFile = path.join(tmp, 'mac', 'mcp.json');
-  fs.writeFileSync(mcpFile, JSON.stringify({ mcpServers: { agentbox: { command: process.execPath, args: [FAKE_STORE], env: { FAKE_STORE_LOG: path.join(tmp, 'store.log') } } } }));
+  const resourceEnv = resourceDocs ? { STORE_ACCOUNT_ID: 'acct-resources', AGENTBOX_HOME: path.join(tmp, 'resource-store'), AGENTBOX_DOCS: resourceDocs } : {};
+  if (resourceDocs) fs.mkdirSync(path.join(resourceEnv.AGENTBOX_HOME, 'accounts', resourceEnv.STORE_ACCOUNT_ID), { recursive: true });
+  fs.writeFileSync(mcpFile, JSON.stringify({ mcpServers: { agentbox: resourceDocs ? { command: '/unused/mcp/agentbox-mcp.sh', env: resourceEnv } : { command: process.execPath, args: [FAKE_STORE], env: { FAKE_STORE_LOG: path.join(tmp, 'store.log') } } } }));
   const stdin = new PassThrough(); const stdout = new PassThrough(); const stderr = new PassThrough();
-  let out = '';
+  let out = ''; let errText = '';
   stdout.on('data', (d) => { out += d; if (out.includes('"type":"result"') && !stdin.writableEnded) stdin.end(); });
+  stderr.on('data', (d) => { errText += d; });
   const done = cloudRun({
     argv: [FAKE_CLAUDE, '-p', '--output-format', 'stream-json', '--mcp-config', mcpFile],
-    env: { ...process.env, ZERO_ITEM: 'w-1', ZERO_PRODUCT: 'p', CLAUDE_CONFIG_DIR: configDir },
-    cwd: mac, transport, storage, login: LOGIN, stdin, stdout, stderr, remoteCommand: process.execPath, stubPath: STUB,
+    env: { ...process.env, ZERO_ITEM: 'w-1', ZERO_PRODUCT: 'p', CLAUDE_CONFIG_DIR: configDir, ...resourceEnv },
+    cwd: mac, transport: legacyResources ? { ...transport, invoke: async (...args) => { const result = await transport.invoke(...args); return result.caps ? { ...result, caps: result.caps.filter((c) => c !== 'resources') } : result; } } : transport,
+    storage: failResourceDelivery ? { ...storage, getUrl: async (k) => k.includes('/resource-') ? `${s3Url}/missing-resource` : storage.getUrl(k) } : storage,
+    login: LOGIN, stdin, stdout, stderr, remoteCommand: process.execPath, stubPath: STUB,
     pollWaitMs: 200, resultsWaitMs: 8000, watchParent: false, signals: new EventEmitter(), homeDir,
   });
-  stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: 'hello' } }) + '\n');
+  stdin.write(JSON.stringify({ type: 'user', message: { role: 'user', content: text } }) + '\n');
   expect(await done).toBe(0);
-  return JSON.parse(JSON.parse(out.split('\n').find((l) => l.includes('"type":"result"'))).result);
+  return { ...JSON.parse(JSON.parse(out.split('\n').find((l) => l.includes('"type":"result"'))).result), errText };
 }
 
 describe('her own instructions to Claude', () => {
+  it('delivers a missing document through the real store tool before its result reaches the agent', async () => {
+    const docs = path.join(tmp, 'docs'); fs.mkdirSync(docs);
+    const body = 'portable'.repeat(40_000); const original = path.join(docs, 'large.txt'); fs.writeFileSync(original, body);
+    const result = await run(path.join(tmp, 'home'), 'IDLE RESOURCE:large.txt', { resourceDocs: docs });
+    expect(result.requested).toMatchObject({ status: 'delivered', length: body.length, beginning: 'portable' });
+    expect(result.requested.path.startsWith('/tmp/agentbox-resources/')).toBe(true);
+    expect(fs.readFileSync(original, 'utf8')).toBe(body);
+  });
+
+  it('continues normally when a requested resource cannot be downloaded', async () => {
+    const docs = path.join(tmp, 'docs'); fs.mkdirSync(docs); fs.writeFileSync(path.join(docs, 'large.txt'), 'portable'.repeat(40_000));
+    const result = await run(path.join(tmp, 'home'), 'IDLE RESOURCE:large.txt', { resourceDocs: docs, failResourceDelivery: true });
+    expect(result.requested.status).toBe('unavailable');
+  });
+
+  it('returns unavailable on an older cloud image instead of attempting the unsupported delivery', async () => {
+    const docs = path.join(tmp, 'docs'); fs.mkdirSync(docs); fs.writeFileSync(path.join(docs, 'large.txt'), 'portable'.repeat(40_000));
+    const result = await run(path.join(tmp, 'home'), 'IDLE RESOURCE:large.txt', { resourceDocs: docs, legacyResources: true });
+    expect(result.requested.status).toBe('unavailable');
+    expect([...objects.keys()].some((k) => k.includes('/resource-'))).toBe(false);
+    // w-6771163ced: this was every request from the 2026-10-25 image, and
+    // neither the agent nor the Mac's log said so.
+    expect(result.requested.message).toMatch(/image is older than file delivery/);
+    expect(result.errText).toMatch(/this cloud image cannot take a file or skill the run asks this Mac for/);
+    expect(result.errText).toMatch(/request_cloud_resource file large\.txt: unavailable \(.*image is older/);
+  });
+
+  it('fetches a file from another product\'s documents in the same account', async () => {
+    const account = path.join(tmp, 'resource-store', 'accounts', 'acct-resources');
+    const docs = path.join(account, 'p'); fs.mkdirSync(docs, { recursive: true });
+    fs.mkdirSync(path.join(account, 'astral/videos/intro'), { recursive: true });
+    fs.writeFileSync(path.join(account, 'astral/videos/intro/index.html'), 'the intro film');
+    const result = await run(path.join(tmp, 'home'), 'IDLE RESOURCE:../astral/videos/intro/index.html', { resourceDocs: docs });
+    expect(result.requested).toMatchObject({ status: 'delivered', beginning: 'the intr' });
+  });
+
+  it('takes a shared skill reference through the real sandbox at its original path', async () => {
+    const home = path.join(tmp, 'home');
+    const dir = path.join(home, '.agents/skills/taste'); fs.mkdirSync(path.join(dir, 'references'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'SKILL.md'), '# Taste');
+    const reference = path.join(dir, 'references/layout.md'); fs.writeFileSync(reference, 'the shared reference');
+    expect((await run(home, `IDLE ATTACH:${reference}`)).attached).toBe('the shared reference');
+  });
+
+  it('pins Codex skill bytes in the phone kit and re-signs them without the Mac', async () => {
+    const home = path.join(tmp, 'home'); const codexHome = path.join(home, '.codex-2');
+    const dir = path.join(home, '.agents/skills/taste'); fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'SKILL.md'), '# Taste');
+    const kit = { device: 'device', project: 'p', item: 'w-1', frame: { before: '', after: '' }, codex: { start: { cwd: mac }, turn: {} } };
+    const make = () => cloudRun({ argv: ['app-server'], engine: 'codex', remoteCommand: 'codex',
+      env: { ZERO_ITEM: 'w-1', ZERO_PRODUCT: 'p', CODEX_HOME: codexHome }, cwd: mac, transport, storage,
+      login: { engine: 'codex', id: 'L2', key: 'logins/codex/L2.json' }, kit, homeDir: home,
+      stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), watchParent: false, signals: new EventEmitter() });
+    expect(await make()).toBe(0);
+    const saved = JSON.parse(objects.get(kitKey('device', 'p', 'w-1')).toString());
+    expect(checkKit(saved)).toBeNull();
+    const skillFiles = saved.files.filter((f) => f.untar?.endsWith('/skills'));
+    expect(skillFiles.map((f) => f.untar)).toContain(path.join(codexHome, 'skills'));
+    expect(skillFiles.length).toBeGreaterThan(0);
+    expect(skillFiles.every((f) => /skills-[a-f0-9]{64}/.test(f.key))).toBe(true);
+    fs.rmSync(home, { recursive: true });
+    const payload = await startPayload(saved, { runId: 'from-phone', loginName: (key) => key, getUrl: async (key) => `https://storage.invalid/${key}`, putUrl: async (key) => `https://storage.invalid/${key}` });
+    expect(payload.files.filter((f) => f.untar?.endsWith('/skills')).map((f) => f.untar)).toEqual(skillFiles.map((f) => f.untar));
+    for (const f of skillFiles) expect(objects.has(f.key)).toBe(true);
+  });
+
   it('reach the agent in the cloud, in the folder Claude Code reads them from', async () => {
     const home = path.join(tmp, 'home');
     fs.mkdirSync(path.join(home, '.claude'), { recursive: true });

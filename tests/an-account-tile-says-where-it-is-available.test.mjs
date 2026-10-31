@@ -28,6 +28,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlaceTiles, accountTile } from '../renderer/src/components/Settings';
 import { SETUP } from '../renderer/src/cloud-setup.ts';
+import { whatTakesEscape } from '../renderer/src/settings-escape.ts';
 import { recordCloudLogin } from '../main/cloud/logins.mjs';
 import { Supervisor } from '../main/supervisor.mjs';
 
@@ -122,8 +123,11 @@ describe('the cloud’s sign-in, opened from the tile', () => {
     expect(app).toMatch(/<CloudSetup[\s\S]{0,200}signInAs=\{cloudSignInAs\}/);
   });
 
+  // The rule moved into ../renderer/src/settings-escape.ts when an open menu
+  // joined it there (QA batch 005, F-124); the cloud screen still outranks both.
   it('Escape belongs to the cloud screen while it is over Settings, and must NOT close Settings under it', () => {
-    expect(read('renderer/src/components/Settings.tsx')).toMatch(/if \(document\.querySelector\('\.ps-over'\)\) return;/);
+    expect(read('renderer/src/components/Settings.tsx')).toMatch(/const takes = whatTakesEscape\(document\);\s*\n\s*if \(takes === 'over'\) return;/);
+    expect(whatTakesEscape({ querySelector: (s) => (s === '.ps-over' ? {} : null) })).toBe('over');
   });
 });
 

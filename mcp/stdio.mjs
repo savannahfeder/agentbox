@@ -33,8 +33,8 @@ console.log = (...args) => console.error(LOG, ...args);
  * cloud run's connection when many share a process (main/cloud/run.mjs), each
  * holding its own claims (`holder`). Returns a close that gives them back.
  */
-export async function serveStore({ input = process.stdin, output = process.stdout, holder, ownItem } = {}) {
-  const { account, tools, claims } = buildTools({ holder, ...(ownItem !== undefined ? { ownItem } : {}) });
+export async function serveStore({ input = process.stdin, output = process.stdout, holder, ownItem, requestCloudResource } = {}) {
+  const { account, tools, claims } = buildTools({ holder, requestCloudResource, ...(ownItem !== undefined ? { ownItem } : {}) });
 
   const server = new McpServer(
     { name: nameSlug, version: '1.0.0' },

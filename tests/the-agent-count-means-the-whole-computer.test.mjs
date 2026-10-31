@@ -68,6 +68,44 @@ describe('the fleet runs the number you picked, on any number of logins', () => 
   });
 });
 
+// 2026-10-27: Automatic said 6 on her 16 GB Mac, Codex was signed in beside
+// Claude, and each engine was held to 6 on its own. The minute log read
+// "capacity 12" all evening; nine ran at once and the Mac stopped answering.
+describe('the number holds with Codex signed in too', () => {
+  function both({ agentsAuto = true, agentsAtOnce } = {}) {
+    const dir = tmp();
+    const config = {
+      home: dir, appDir: dir, storeRoot: dir,
+      authProfiles: ['default', `${dir}/.claude-2`, `${dir}/.claude-3`],
+      codexProfiles: ['default', `${dir}/.codex-2`],
+      codexBin: '/nonexistent/codex', engineChoice: '2026-09-04T00:00:00Z',
+      maxConcurrentSessions: 3, agentsAuto, agentsAtOnce, memoryGate: true,
+    };
+    const sup = new Supervisor(config, { listItems: () => [], listProducts: () => [], isDue: () => true }, dir);
+    sup._profilesFor = (engine) => (engine === 'claude' ? config.authProfiles : config.codexProfiles);
+    sup._machine = () => ({ memBytes: 16 * 1024 ** 3, cores: 10 });
+    return sup;
+  }
+
+  it('Automatic on a 16 GB Mac runs 6 in all, not 6 of each', () => {
+    const sup = both();
+    expect(sup._capacityFor('codex')).toBe(6);
+    expect(sup._capacity()).toBe(6);
+  });
+
+  it('a number picked on the menu is the whole computer across both', () => {
+    expect(both({ agentsAuto: false, agentsAtOnce: 4 })._capacity()).toBe(4);
+  });
+
+  it('a full Claude fleet leaves no room for Codex on this Mac', () => {
+    const sup = both();
+    for (let n = 0; n < 6; n++) sup.sessions.set(`c-${n}`, { itemId: `c-${n}`, engine: 'claude' });
+    expect(sup._localSlotFor('codex')).toBe(false);
+    sup.sessions.delete('c-0');
+    expect(sup._localSlotFor('codex')).toBe(true);
+  });
+});
+
 describe('a number stored per login before is not taken as a choice', () => {
   const load = (file) => {
     const dir = tmp();

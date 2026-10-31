@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Name } from '../shared/product-name.mjs';
-import { codexPosture, codexReviewer } from '../shared/codex-modes.mjs';
+import { codexPosture } from '../shared/codex-modes.mjs';
 
 /**
  * What a worker thread may do. The sandbox is the wall; the approval policy
@@ -39,9 +39,8 @@ import { codexPosture, codexReviewer } from '../shared/codex-modes.mjs';
  * and who answers that ask is `approvalsReviewer`, not this policy. See
  * `workerThreadParams`, which names it on every start.
  *
- * File changes are still carded. The approval request carries no path or diff,
- * so main/codex-approvals.mjs draws the card from the `item/started` for the
- * same itemId.
+ * When a file-change approval reaches the person, its request carries no path
+ * or diff. main/codex-approvals.mjs reads `item/started` for the same itemId.
  */
 export const WORKER_APPROVAL_POLICY = 'on-request';
 export const WORKER_SANDBOX = 'workspace-write';
@@ -145,23 +144,13 @@ const plainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
  * unasked (`sayUnasked`).
  */
 export function workerThreadParams({ cwd, model = null, instructions = null, mcpServers = [], storeServer = null, mode = null, reviewer = null } = {}) {
-  // `mode` is one of shared/codex-modes.mjs and sets both the sandbox and the
-  // approval policy. No mode means the default posture.
-  const posture = mode
-    ? codexPosture(mode, { reviewer })
-    : { approvalPolicy: WORKER_APPROVAL_POLICY, sandbox: WORKER_SANDBOX, approvalsReviewer: codexReviewer(reviewer) };
+  const posture = codexPosture(mode, { reviewer });
   const params = {
     cwd,
     ephemeral: false,
     approvalPolicy: posture.approvalPolicy,
     sandbox: posture.sandbox,
-    // Always sent, never conditional. Omitted, it is not a neutral field:
-    // Codex reads `approvals_reviewer` from the top of whichever CODEX_HOME
-    // bills the run, and a home that says `auto_review` has its own subagent
-    // answer the escalation. Measured 2026-10-09 on codex-cli 0.160.0: a
-    // worker wrote into the home directory, reached three external sites, and
-    // raised zero cards. `scripts/qa-codex-live.mjs approvals default home`
-    // is that run; a third argument of `user` shows the card it suppressed.
+    // Omission inherits the account's reviewer, so every mode names its own.
     approvalsReviewer: posture.approvalsReviewer,
     config: {
       mcp_servers: mcpIsolation(mcpServers, storeServer),

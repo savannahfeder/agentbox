@@ -106,20 +106,17 @@ describe('on a phone, a new thread', () => {
   });
 });
 
-describe('on a phone, the inboxes along the bottom', () => {
-  it('keep only part of the home bar\'s inset under them, never less than a little', () => {
+// The inboxes moved from the foot to under the title on 2026-10-28; what they
+// look like there is the-web-app-on-a-phone-matches-the-phone-apps-text-and-tabs.
+describe('on a phone, the foot of the screen', () => {
+  // All of the inset since 2026-10-28, as the phone app keeps it: the inset
+  // less 14px was "super duper low" beside it.
+  it('keeps the home bar\'s inset, never less than a little', () => {
     const foot = bodiesFor(':root').match(/--phone-foot:\s*([^;]+)/);
-    expect(foot?.[1]).toMatch(/max\(\s*\d+px,\s*calc\(env\(safe-area-inset-bottom, 0px\) - \d+px\)\s*\)/);
-    expect(last('.list-pane > .th-bar', 'padding')).toMatch(/var\(--phone-foot\)/);
-    expect(last('.list-pane > .th-bar', 'padding')).not.toMatch(/safe-area-inset-bottom/);
+    expect(foot?.[1]).toMatch(/max\(\s*\d+px,\s*env\(safe-area-inset-bottom, 0px\)\s*\)/);
   });
 
-  it('underline the picked one just under its word, not at the foot of the bar', () => {
-    expect(last('.tm-tab', 'height')).toBe('32px');
-    expect(last('.tm-tab', 'border-bottom')).toMatch(/2px solid transparent/);
-  });
-
-  it('and everything that floats above them uses the same inset', () => {
+  it('and everything that floats there uses that inset', () => {
     for (const piece of ['.topbar .th-new', '.approvals', '#phone-alerts-ask']) {
       expect(last(piece, 'bottom')).toMatch(/var\(--phone-foot\)/);
     }

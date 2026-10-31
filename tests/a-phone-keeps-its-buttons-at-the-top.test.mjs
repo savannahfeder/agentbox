@@ -121,10 +121,11 @@ describe('on a phone', () => {
 // each picker a narrow box pinned to its chip, and the permission card hung off
 // the left edge.
 describe('on a phone, the Superhuman way', () => {
-  it('the inboxes are words along the bottom, on a solid ground', () => {
+  // They were along the bottom until 2026-10-28, "super duper low"; under the
+  // title they "do a lot better" (the-web-app-on-a-phone-matches-the-phone-apps-text-and-tabs).
+  it('the inboxes are words under the title, on a solid ground', () => {
     const bar = bodiesFor('.list-pane > .th-bar');
-    expect(bar).toMatch(/position:\s*fixed/);
-    expect(bar).toMatch(/bottom:\s*0/);
+    expect(bar).toMatch(/position:\s*relative/);
     // Solid: the base colour, with or without a wash laid over it.
     expect(bar).toMatch(/background:[^;]*var\(--bg\)/);
     const tab = bodiesFor('.tm-tab');
@@ -186,7 +187,8 @@ describe('on a phone, the Superhuman way', () => {
 
   it('the bar title is smaller and a step heavier than the desktop\'s', () => {
     const title = bodiesFor('.workspace-layout > .topbar .workspace-title');
-    expect(title).toMatch(/font-size:\s*19px/);
+    // 19px, times the iPhone's text size since 2026-10-28, as the phone app draws it.
+    expect(title).toMatch(/font-size:\s*calc\(19px \* var\(--phone-type, 1\)\)/);
     expect(title).toMatch(/font-weight:\s*500/);
   });
 

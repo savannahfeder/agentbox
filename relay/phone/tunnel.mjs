@@ -75,7 +75,11 @@ export async function tunnelFetch(request, ctx, fetchImpl = (...a) => fetch(...a
   const method = request.method.toUpperCase();
   const body = method === 'GET' || method === 'HEAD' ? new Uint8Array(0) : new Uint8Array(await request.arrayBuffer());
   const nonce = b64u(globalThis.crypto.getRandomValues(new Uint8Array(16)));
-  const head = { v: 1, ts: Date.now(), nonce, method, path: url.pathname + url.search, headers, ...(wait ? { wait: 1 } : {}) };
+  // A phone that can open gzip says so, and the computer squeezes words on the
+  // way back (main/relay-client.mjs, SQUEEZE). One that cannot is sent them as
+  // before, and so is any phone by a computer too old to squeeze.
+  const zip = typeof DecompressionStream === 'function' ? { zip: 'gzip' } : {};
+  const head = { v: 1, ts: Date.now(), nonce, method, path: url.pathname + url.search, headers, ...(wait ? { wait: 1 } : {}), ...zip };
   const sealed = await seal(ctx.keys.up, packRequest(head, body), 'req');
 
   let res;
@@ -126,5 +130,8 @@ export async function tunnelFetch(request, ctx, fetchImpl = (...a) => fetch(...a
     cancel() { reader.cancel().catch(() => {}); },
   });
   const nullBody = status === 204 || status === 304 || method === 'HEAD';
-  return new Response(nullBody ? null : bodyStream, { status, headers: out });
+  const squeezed = out['x-agentbox-zip'] === 'gzip';
+  delete out['x-agentbox-zip'];
+  const opened = squeezed ? bodyStream.pipeThrough(new DecompressionStream('gzip')) : bodyStream;
+  return new Response(nullBody ? null : opened, { status, headers: out });
 }

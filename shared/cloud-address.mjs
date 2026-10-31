@@ -10,3 +10,7 @@ export const CLOUD_ADDRESS = Object.freeze({
   supabaseUrl: 'https://lywvthwkhkfzhqivvond.supabase.co',
   anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5d3Z0aHdraGtmemhxaXZ2b25kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4Mjg5NDYsImV4cCI6MjEwNjQwNDk0Nn0.ZL4sL5ZJ6KC-EcTpbzLAeuOTgoEftF8f7xfaRvXY5kY', // public-check: allow (Supabase's public anon key, role "anon")
 });
+
+// The web app phones open, which signs in to that same database. Only for a
+// copy signed in to it: another team's cloud has its own site or none.
+export const PHONE_SITE = 'https://agentbox-phone.pages.dev';

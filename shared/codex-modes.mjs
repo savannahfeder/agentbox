@@ -52,38 +52,10 @@ export const CODEX_DEFAULT_MODE = 'auto';
  */
 export const CODEX_REVIEWERS = ['user', 'auto_review', 'guardian_subagent'];
 
-/**
- * THE ONE THAT PUTS THE QUESTION IN FRONT OF A PERSON, which is the whole
- *  reason this constant has a name instead of being a string in three places.
- *  It is also the protocol's own default; Agentbox sends it explicitly anyway,
- *  for the reason `codexReviewer` gives.
- */
+/** The reviewer that puts the question in front of the person. */
 export const ASKS_THE_PERSON = 'user';
 
-/**
- * The reviewer to send, given whatever a caller asked for.
- *
- *  THE FIELD IS ALWAYS SENT, AND THAT IS THE POINT. It was absent before, so
- *  the value came from a top-level `approvals_reviewer` in whichever Codex home
- *  billed the run. Measured 2026-10-09 on codex-cli 0.160.0 against a real
- *  app-server: with the field absent and that key set to `auto_review`, a
- *  worker asked to write outside its workspace had the escalation APPROVED by
- *  Codex's own subagent, wrote into the home directory, and reached three
- *  external sites -- with ZERO approval cards raised and no server request on
- *  the wire at all. The same run with `approvalsReviewer: 'user'` raised a card
- *  reading "The sandbox blocked this write outside the workspace. Do you
- *  approve...". The reproduction is `scripts/qa-codex-live.mjs approvals`.
- *
- *  So a file nobody in this app reads was deciding what a worker may do. Naming
- *  the reviewer on every start takes that vote away, and `user` is the value,
- *  because "ask" in a mode's own sentence has to mean asking the person.
- *
- *  THIS IS NOT A REVERSAL OF w-ca48e69535. That row put `auto_review` on `auto`
- *  to stop two logins behaving differently -- a home with no config sent asks to
- *  her inbox, a home with one did not. Naming the reviewer explicitly fixes that
- *  same inconsistency and fixes it in the direction the mode already promised.
- *  One mode, one behaviour, whichever account the run is on.
- */
+/** Invalid explicit reviewers fall back to asking the person. */
 export function codexReviewer(asked = null) {
   return CODEX_REVIEWERS.includes(asked) ? asked : ASKS_THE_PERSON;
 }
@@ -98,10 +70,8 @@ export function codexReviewer(asked = null) {
  *  rather than simply failing. On `full-access` there is nothing left to ask
  *  about, so it is `never`.
  *
- *  NO ROW NAMES A REVIEWER, because all three get the same one and a per-row
- *  value is how the last hole stayed open: two of the three named none, fell
- *  through to her config, and behaved differently from the one that did.
- *  `codexPosture` supplies it, once, below.
+ *  `codexPosture` explicitly supplies each mode's reviewer so the account's
+ *  configuration cannot change who answers an escalation.
  */
 export const CODEX_MODES = {
   'read-only': {
@@ -115,7 +85,7 @@ export const CODEX_MODES = {
     label: 'Auto',
     sandbox: 'workspace-write',
     approvalPolicy: 'on-request',
-    what: 'Works inside the project folder. Asks you before going outside it or onto the network.',
+    what: 'Works in the project folder. Codex automatically reviews requests for access outside it or to the network.',
   },
   'full-access': {
     label: 'Full access',
@@ -139,14 +109,10 @@ export function isCodexMode(word) {
  */
 export function codexPosture(mode, { reviewer = null } = {}) {
   const row = CODEX_MODES[mode] ?? CODEX_MODES[CODEX_DEFAULT_MODE];
-  // The reviewer is named on EVERY mode, `full-access` included. Its policy is
-  // `never` so it changes no behaviour there today, and that is exactly why it
-  // is named: one answer in the table rather than two, so a later change to the
-  // policy cannot silently hand the decision back to a config file.
   return {
     sandbox: row.sandbox,
     approvalPolicy: row.approvalPolicy,
-    approvalsReviewer: codexReviewer(reviewer),
+    approvalsReviewer: codexReviewer(reviewer ?? (row === CODEX_MODES.auto ? 'auto_review' : ASKS_THE_PERSON)),
   };
 }
 
@@ -172,7 +138,7 @@ export const CODEX_MODE_COMMAND = {
 /** One sentence per row of the menu, in the same voice as the Claude Code list. */
 export const CODEX_MODE_HINT = {
   'read-only': 'reads and searches, writes nothing',
-  auto: 'works in the project folder, asks to leave it',
+  auto: 'works in the project folder, reviews extra access automatically',
   'full-access': 'anything, anywhere, without asking',
 };
 

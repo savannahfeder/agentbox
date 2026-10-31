@@ -18,6 +18,7 @@
 // "Script not run"). The one such frame is the small preview under a message,
 // and that one is told not to scroll at all (ArtifactThumbnail.tsx).
 import { DOC_SCHEMES, isScheme } from '../shared/schemes.mjs';
+import { DOCUMENT_HEIGHT_SCRIPT, wantsDocumentHeight } from './frame-document-height.mjs';
 
 const RULES = (thumb) => `@layer agentbox-scrollbars {
   ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -79,6 +80,9 @@ const SCRIPT = `(${quietScrollbars.toString()})(window, ${JSON.stringify(AT_REST
 function quiet(frame) {
   if (!frame || !wantsQuietScrollbars(frame.url)) return;
   frame.executeJavaScript(SCRIPT).catch(() => { /* a sandbox without scripts, or the frame went away */ });
+  if (wantsDocumentHeight(frame.url)) {
+    frame.executeJavaScript(DOCUMENT_HEIGHT_SCRIPT).catch(() => { /* the document navigated away */ });
+  }
 }
 
 /** Every page frame in this window gets the quiet scrollbar as its document is ready. */

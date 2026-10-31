@@ -41,6 +41,16 @@ const PING = 'ping';
 const PONG = 'pong';
 /** What the phone does not want back: the relay's stream is its own framing. */
 const DROP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'content-length', 'content-encoding']);
+/**
+ * WORDS GO SQUEEZED, to a phone that says it can open them (w-f430aa863d).
+ * Every answer used to cross the relay as it left the phone server: the
+ * screen's 2.5 MB of script and style on each open, and the inbox, 1.47 MB of
+ * json for one of her projects alone, on each open and every poll after. Both
+ * gzip to about a quarter. Pictures are squeezed already, and the live stream
+ * is left alone because gzip holds bytes back until it has enough of them.
+ */
+const SQUEEZE = /^(application\/(json|javascript|manifest\+json)|text\/(html|css|javascript|plain)|image\/svg\+xml)/;
+export const squeezes = (head, contentType) => head?.zip === 'gzip' && SQUEEZE.test(String(contentType ?? ''));
 
 const enc = new TextEncoder();
 const hex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -133,10 +143,12 @@ export function createRelayClient({
       answering();
       const out = {};
       res.headers.forEach((v, name) => { if (!DROP.has(name)) out[name] = v; });
+      const squeeze = !!res.body && squeezes(head, res.headers.get('content-type'));
+      if (squeeze) out['x-agentbox-zip'] = 'gzip';
       sentHead = true;
       await frame(FRAME.HEAD, enc.encode(JSON.stringify({ status: res.status, headers: out })));
       if (res.body) {
-        const reader = res.body.getReader();
+        const reader = (squeeze ? res.body.pipeThrough(new CompressionStream('gzip')) : res.body).getReader();
         for (;;) {
           const { value, done } = await reader.read();
           if (done) break;

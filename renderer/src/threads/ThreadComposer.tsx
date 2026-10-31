@@ -111,8 +111,9 @@ export interface ComposeStart {
 }
 
 export function ThreadComposer({
-  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver,
+  products, items, engines, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine,
 }: {
+  statusLine?: string | null;
   /** On the page: whether the keyboard is in the box or words are left in it. */
   onWriting?: (writing: boolean) => void;
   /** On the page: filled with a reading of the box, for the dialog to open on. */
@@ -666,7 +667,7 @@ export function ThreadComposer({
     else { dropComposeDraft(taken); setText(''); onClose(); }
   };
   const send = () => (person && sendAs === 'message' ? sendMessage() : sendTask(whenToSend(when)));
-  const talk = useWebDictation({ text, setText }, () => void send());
+  const talk = useWebDictation({ text, setText, field: textRef }, () => void send());
   // ⌘↵ SENDS WHEREVER THE CURSOR IS while the card is open (w-9f6975906c).
   // It used to be heard only inside the card, so once a menu or a click had
   // taken focus out of it the key did nothing: "Command+Enter in the tutorial
@@ -1122,6 +1123,7 @@ export function ThreadComposer({
         )}
 
         {named.chips}
+        {statusLine && <div className="tc-note tc-connection-status" role="status">{statusLine}</div>}
         <textarea
           ref={textRef}
           className={`tc-text ${named.over}`}

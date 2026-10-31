@@ -90,9 +90,16 @@ async function turn(text) {
   }
   const list = await call('tools/list', {});
   const names = (list.result?.tools || []).map((t) => t.name);
-  const tool = text.includes('LOOK') ? 'look_at_page' : 'note';
-  const reply = await call('tools/call', { name: tool, arguments: { text } });
+  const resource = (text.match(/RESOURCE:(\S+)/) || [])[1];
+  const tool = resource ? 'request_cloud_resource' : text.includes('LOOK') ? 'look_at_page' : 'note';
+  const reply = await call('tools/call', { name: tool, arguments: resource ? { kind: 'file', scope: 'documents', path: resource } : { text } });
   const said = reply.result?.content?.[0]?.text ?? JSON.stringify(reply);
+  let requested = null;
+  if (resource) {
+    const answer = JSON.parse(said);
+    const data = answer.status === 'delivered' ? fs.readFileSync(at(answer.path), 'utf8') : '';
+    requested = { ...answer, length: data.length, beginning: data.slice(0, 8) };
+  }
   if (text.includes('SLOW')) await new Promise((r) => setTimeout(r, 1500));
   if (text.includes('SWITCH')) execSync('git checkout -q -b somewhere-else');
   if (!text.includes('IDLE')) {
@@ -124,7 +131,7 @@ async function turn(text) {
   fs.appendFileSync(path.join(dir, `${sessionId}.jsonl`), JSON.stringify({ type: 'user', text }) + '\n');
   out({ type: 'assistant', message: { content: [{ type: 'text', text: 'working' }] } });
   const settings = readSettings();
-  out({ type: 'result', subtype: 'success', is_error: false, session_id: sessionId, result: JSON.stringify({ said, names, attached, found, memory: readMemory(), settings, hookScripts: readHookScripts(settings), token: process.env.CLAUDE_CODE_OAUTH_TOKEN || null, home: process.env.HOME === undefined ? null : 'set' }) });
+  out({ type: 'result', subtype: 'success', is_error: false, session_id: sessionId, result: JSON.stringify({ said, names, attached, found, ...(resource ? { requested } : {}), memory: readMemory(), settings, hookScripts: readHookScripts(settings), token: process.env.CLAUDE_CODE_OAUTH_TOKEN || null, home: process.env.HOME === undefined ? null : 'set' }) });
 }
 
 // Her own instructions and settings, where Claude Code reads them: its config

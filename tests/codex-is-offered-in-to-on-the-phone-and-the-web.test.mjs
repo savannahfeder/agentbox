@@ -92,7 +92,7 @@ describe('the web app and the phone app read it', () => {
   });
 
   it('the web app\'s snapshot carries the agents', () => {
-    expect(fs.readFileSync(new URL('../renderer/src/cloud-bridge.ts', import.meta.url), 'utf8')).toMatch(/engines: webEngines\(computerOf\(settingsRows\)\)/);
+    expect(fs.readFileSync(new URL('../renderer/src/cloud-bridge.ts', import.meta.url), 'utf8')).toMatch(/engines: phoneEngines\(settingsRows, rows\.projects, view\.items\)/);
   });
 });
 

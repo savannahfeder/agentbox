@@ -7,7 +7,7 @@
 // "private" must never put a row that SHARES the thread under the return key.
 
 import type { Seen } from './threads/summary-rules';
-import { PLACE_ROW, type ThreadPlace } from './threads/ThreadMenu';
+import { PLACE_ROW, placeAct, type PlaceAct, type ThreadPlace } from './threads/ThreadMenu';
 
 export type TeamRoute = 'agent' | 'me' | 'back';
 
@@ -15,7 +15,7 @@ export type ThreadDoes =
   | { act: 'see'; to: 'team' | 'private'; already: boolean }
   | { act: 'people' }
   | { act: 'pin'; pin: boolean }
-  | { act: 'place'; keep: boolean }
+  | { act: 'place'; keep: PlaceAct }
   | { act: 'code' }
   | { act: 'summary' }
   | { act: 'rename' }
@@ -121,7 +121,7 @@ export function threadCommands(f: ThreadFacts): ThreadCommand[] {
       label: PLACE_ROW[f.place].label,
       hint: PLACE_ROW[f.place].detail.charAt(0).toLowerCase() + PLACE_ROW[f.place].detail.slice(1),
       keywords: 'cloud mac computer here local where runs machine',
-      does: { act: 'place', keep: f.place !== 'kept' },
+      does: { act: 'place', keep: placeAct(f.place) },
     });
   }
   if (f.repeats) rows.push({ id: 'end-repeat', label: 'Stop repeating', keywords: 'repeat repeating recurring every daily weekly stop end cancel', does: { act: 'end-repeat' } });

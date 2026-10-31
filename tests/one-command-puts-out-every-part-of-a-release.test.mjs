@@ -128,6 +128,16 @@ describe('the deploy script', () => {
     expect(at("'scripts/publish-download.mjs'")).toBeLessThan(at("'scripts/cloud-gateway-setup.mjs'"));
   });
 
+  // w-6771163ced: file delivery reached main on 2026-10-28 and no cloud run
+  // could use it, because the image those runs start from was last built on
+  // 2026-10-25 and nothing in a release rebuilt it.
+  it('rebuilds the cloud machine\'s image before the cloud server, against the same AWS settings', () => {
+    const at = (s) => deploy.indexOf(s);
+    expect(at("'scripts/cloud-setup.mjs'")).toBeGreaterThan(at("'scripts/publish-download.mjs'"));
+    expect(at("'scripts/cloud-setup.mjs'")).toBeLessThan(at("'scripts/cloud-gateway-setup.mjs'"));
+    expect(deploy).toMatch(/live\('node', \['scripts\/cloud-setup\.mjs'\], \{ AGENTBOX_CLOUD_CONFIG: serverFile \}\)/);
+  });
+
   it('never handles the Apple password: Apple\'s own tool keeps it in the Keychain', () => {
     expect(deploy).not.toMatch(/APPLE_APP_SPECIFIC_PASSWORD\s*[:=]/);
     expect(deploy).toMatch(/delete appleEnv\.APPLE_APP_SPECIFIC_PASSWORD/);

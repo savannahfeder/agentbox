@@ -237,7 +237,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   // Focus and close belong to the pane whatever is in it.
   const paneMarks = (
     <>
-      {onMode && focusControlStyle && <FocusControl style={focusControlStyle} focused={!!headerTarget} onClick={() => headerTarget ? onClose() : onMode('focus')} />}
+      {onMode && focusControlStyle && <FocusControl style={focusControlStyle} focused={!!headerTarget} onClick={() => onMode(headerTarget ? 'beside' : 'focus')} />}
       <button type="button" className="web-bar-step" title={headerTarget ? 'Exit Focus' : 'Close this page (esc)'} aria-label="Close" onClick={onClose}>
         {focusControlStyle ? <ArtifactControlGlyph kind="close" /> : <CloseGlyph />}
       </button>
@@ -269,7 +269,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
             ))}
           </div>
           <span className="doc-marks">
-            {onMode && (focusControlStyle ? <FocusControl style={focusControlStyle} focused={!!headerTarget} onClick={()=>headerTarget ? onClose() : onMode('focus')}/> : !headerTarget && <button type="button" className="artifact-expand" aria-label="Expand preview" title="Expand preview to Focus" onClick={() => onMode('focus')}><Glyph><path d="M14 5h5v5M19 5l-6 6M10 19H5v-5M5 19l6-6" /></Glyph><span>Focus</span></button>)}
+            {onMode && (focusControlStyle ? <FocusControl style={focusControlStyle} focused={!!headerTarget} onClick={() => onMode(headerTarget ? 'beside' : 'focus')}/> : !headerTarget && <button type="button" className="artifact-expand" aria-label="Expand preview" title="Expand preview to Focus" onClick={() => onMode('focus')}><Glyph><path d="M14 5h5v5M19 5l-6 6M10 19H5v-5M5 19l6-6" /></Glyph><span>Focus</span></button>)}
             {/* The two marks she approved, and nothing beside them. */}
             <button
               type="button"

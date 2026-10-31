@@ -260,6 +260,19 @@ describe('a codex row carrying a codex model, on a mac with no codex', () => {
 
 /* ===================== the boundaries either side of it ================== */
 
+describe('a legacy phone model on Codex', () => {
+  it('explains a legacy phone Claude alias before starting Codex or blaming its plan', () => {
+    const sup = build({ codex: true, engine: 'codex' });
+    sup.spawnWorker(row({ model: 'opus' }));
+    expect(spawns).toEqual([]);
+    expect(sup.written).toHaveLength(1);
+    expect(sup.written[0].patch.result).toContain('Claude Code');
+    expect(sup.written[0].patch.result).toContain('opus');
+    expect(sup.written[0].patch.result).not.toContain("account's plan");
+    expect(sup.written[0].patch.result).toBe('This task chose Claude Code model "opus", but this computer would run it with Codex. Nothing has been done. Pick a Codex model to continue, or use a computer with Claude Code.');
+  });
+});
+
 describe('what is not refused', () => {
   // THE FALLBACK ITSELF, WHICH IS CORRECT AND STAYS. A row marked for Codex on
   // her laptop, read on a Mac without it, still gets worked.

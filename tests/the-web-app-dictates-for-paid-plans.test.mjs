@@ -60,8 +60,8 @@ describe('the plan, from the computer to the web app', () => {
 
   it('reaches the page through the bridge, read again once a minute', () => {
     const bridge = read('renderer/src/cloud-bridge.ts');
-    expect(bridge).toMatch(/dictationAllowed\(await readSettingsRows\(/);
-    expect(bridge).toMatch(/setDictationAllowed\(/);
+    expect(bridge).toMatch(/const next = await readSettingsRows\(/);
+    expect(bridge).toContain('setDictationAllowed(dictationAllowed(next))');
     expect(bridge).toMatch(/PLAN_READ_MS = 60_000/);
   });
 

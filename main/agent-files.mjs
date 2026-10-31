@@ -19,6 +19,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { titleFromFileName } from '../shared/name-words.mjs';
 import { GUARDED } from '../shared/project-folder-check.mjs';
 import { RECENT_DAYS, isScratchFolder } from './agent-sessions.mjs';
 
@@ -164,17 +165,12 @@ export function oneLine(description, max = 160) {
  *
  *  The short words stay shouted, because "Leon Okafor Qa" is not what she
  *  called it and a screen that renames her own agents is worse than one that
- *  shows the file name raw. */
-const SHOUTED = new Set(['qa', 'ui', 'ux', 'api', 'cli', 'ai', 'db', 'pr', 'seo', 'css', 'html', 'sql', 'mcp']);
-
+ *  shows the file name raw. The list of them is shared/name-words.mjs, which
+ *  the project names read too (F-137). */
 export function agentTitle(name) {
   const n = (name ?? '').trim();
   if (!n || /[A-Z\s]/.test(n)) return n;
-  return n
-    .replace(/[-_]+/g, ' ')
-    .split(' ')
-    .map((w) => (SHOUTED.has(w) ? w.toUpperCase() : w.replace(/^\w/, (c) => c.toUpperCase())))
-    .join(' ');
+  return titleFromFileName(n);
 }
 
 function readDir(dir, scope, { now = Date.now() } = {}) {

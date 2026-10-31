@@ -20,7 +20,7 @@ const MIN = 60_000;
 
 describe('your computer, as the web app\'s Account page says it', () => {
   it('online a moment ago', () => {
-    expect(computerSays({ seenAt: NOW - 2 * MIN, cloud: false }, NOW)).toEqual({ label: 'Your computer is online', desc: 'New threads and replies start there within a few seconds.' });
+    expect(computerSays({ seenAt: NOW - MIN, cloud: false }, NOW)).toEqual({ label: 'Your computer is online', desc: 'New threads and replies start there within a few seconds.' });
   });
   it('away, with Agentbox Cloud carrying on', () => {
     expect(computerSays({ seenAt: NOW - 3 * 60 * MIN, cloud: true }, NOW)).toEqual({ label: 'Your computer was last online 3 hours ago', desc: 'Agentbox Cloud starts your new threads and replies while it is off.' });

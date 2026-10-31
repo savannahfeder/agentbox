@@ -22,6 +22,18 @@
 //   - TEN MINUTES HELD, ONE STARTS ANYWAY, and the ten minutes start again from
 //     it. A reading stuck on "tight" by mistake costs a slow queue, never a
 //     stopped one.
+//   - THE WORST READING OF THE LAST THREE MINUTES DECIDES, not the newest
+//     (w-9c7ca4b8a9). 2026-10-27, 21:40 to 22:00 her time, the minute log read
+//     tight or critical in 16 of 20 minutes and normal in the other 4, and
+//     each normal ten seconds let more agents in: one running became nine in
+//     eight minutes, the kernel said critical, and her Mac was unusable. Memory does not come
+//     back in ten seconds; a reading that does is the compressor catching up.
+//   - THE KERNEL'S WARN ALONE HOLDS ONLY A MAC ALREADY RUNNING ITS OWN NUMBER
+//     (`roomy`, what it carries without this check: 4 at 16 GB). A 16 GB Mac
+//     reports warn in bursts all day at 30 to 50% free, and with the window
+//     above that held the second agent for an hour (2026-10-28). The freeze
+//     read the same warn; what differed was nine agents running. Free memory
+//     under the line and the kernel's critical still hold at any count.
 //
 // Pure, so every one of those is a test (tests/no-new-agent-starts-while-memory-is-short).
 
@@ -45,18 +57,38 @@ export function readMacPressureNow() {
 export const STALE_MS = 60_000;
 /** The longest new work waits on memory before one agent starts anyway. */
 export const MAX_HOLD_MS = 10 * 60_000;
+/** How far back a short reading still holds starts after a normal one. */
+export const SETTLE_MS = 3 * 60_000;
+
+const RANK = { normal: 0, tight: 1, critical: 2 };
+/** `kern.memorystatus_vm_pressure_level`'s warn; 1 is normal and 4 critical. */
+const WARN_LEVEL = 2;
+
+/** The worst of the readings stamped inside `windowMs` of `now`. Pure. */
+export function worstPressure(readings, now, windowMs = SETTLE_MS) {
+  let worst = 'normal';
+  for (const r of readings ?? []) {
+    if (!r || !(Math.abs(now - Number(r.at)) <= windowMs)) continue;
+    if (!Number.isFinite(r.level) && !Number.isFinite(r.freePct)) continue;
+    const p = pressureFrom(r);
+    if (RANK[p] > RANK[worst]) worst = p;
+  }
+  return worst;
+}
 
 /**
  * Whether one more agent may start now, and why. `reading` is
  * `{ level, freePct, at }` from `readMacPressure`, stamped when it arrived.
+ * `recent` is the readings before it; the worst inside `settleMs` decides.
  * `heldSince` is when the current hold began (null when nothing is held);
- * `lastStartAt` is when an agent last started.
+ * `lastStartAt` is when an agent last started. Under `roomy` agents running,
+ * the kernel's warn level is not counted.
  */
 export function startDecision({
-  on, reading, now, running,
+  on, reading, recent = [], now, running,
   urgent = false, asked = false, swap = false,
-  lastStartAt = 0, heldSince = null,
-  staleMs = STALE_MS, maxHoldMs = MAX_HOLD_MS,
+  lastStartAt = 0, heldSince = null, roomy = 0,
+  staleMs = STALE_MS, maxHoldMs = MAX_HOLD_MS, settleMs = SETTLE_MS,
 }) {
   if (!on) return { start: true, why: 'off' };
   if (!(running > 0)) return { start: true, why: 'nothing-running' };
@@ -64,7 +96,10 @@ export function startDecision({
   const at = Number(reading?.at);
   const known = reading && (Number.isFinite(reading.level) || Number.isFinite(reading.freePct));
   if (!known || !Number.isFinite(at) || Math.abs(now - at) > staleMs) return { start: true, why: 'no-reading' };
-  const pressure = pressureFrom(reading);
+  const readings = running < roomy
+    ? [reading, ...recent].map((r) => (r?.level === WARN_LEVEL ? { ...r, level: null } : r))
+    : [reading, ...recent];
+  const pressure = worstPressure(readings, now, settleMs);
   if (pressure === 'normal') return { start: true, why: 'normal' };
   if (pressure === 'tight' && (urgent || asked)) return { start: true, why: 'urgent' };
   const waitingSince = Math.max(heldSince ?? now, Number(lastStartAt) || 0);

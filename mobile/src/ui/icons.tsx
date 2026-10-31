@@ -61,7 +61,21 @@ export const Clock =({ size = 15, tint = color.faint }: P) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round"><Circle cx={12} cy={12} r={8.5} /><Path d="M12 7.5V12l3 2" /></Svg>
 );
 
-export const Caret = ({ size = 12, tint = '#fff' }: P) => (
+/** A repeating task (threads/Pages.tsx `RepeatMark`). */
+export const Repeat = ({ size = 14, tint = color.faint }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={tint} strokeWidth={1.4}>
+    <Path d="M13 6.5A5.5 5.5 0 0 0 3.2 4.8M3 2.5v2.6h2.6" /><Path d="M3 9.5a5.5 5.5 0 0 0 9.8 1.7M13 13.5v-2.6h-2.6" />
+  </Svg>
+);
+
+/** A pinned thread (threads/ThreadMenu.tsx `PinMark`), square-headed like every shape here. */
+export const Pin = ({ size = 13, tint = color.faint }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M8 3h8l-1.5 6 3.5 3.5H6L9.5 9z" /><Path d="M12 12.5V21" />
+  </Svg>
+);
+
+export const Caret =({ size = 12, tint = '#fff' }: P) => (
   <Svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d="m4 6 4 4 4-4" /></Svg>
 );
 

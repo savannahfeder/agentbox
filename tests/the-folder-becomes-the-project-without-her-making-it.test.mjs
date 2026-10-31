@@ -138,20 +138,20 @@ describe('a tick belongs to one folder', () => {
   });
 
   it('proposes two names the store will accept, not the same one twice', () => {
-    expect(dests.map((d) => d.name)).toEqual(['Api', 'Api 2']);
+    expect(dests.map((d) => d.name)).toEqual(['API', 'API 2']);
     expect(new Set(dests.map((d) => slugFor(d.name))).size).toBe(2);
   });
 
   it('steps around a project she already has by that name', () => {
     const taken = [{ slug: 'api', name: 'Api', repoPath: '/Users/s/elsewhere' }];
     const got = destinations({ found: { user: [], project: [] }, folders, products: taken, project: null });
-    expect(got.map((d) => d.name)).toEqual(['Api 2', 'Api 3']);
+    expect(got.map((d) => d.name)).toEqual(['API 2', 'API 3']);
   });
 
   it('derives the same slug the store does, which is what makes that check real', () => {
     expect(slugFor('Sidecar Desktop')).toBe('sidecar-desktop');
-    expect(slugFor('Api 2')).toBe('api-2');
-    expect(projectNameFor({ name: 'api' }, ['Api'])).toBe('Api 2');
+    expect(slugFor('API 2')).toBe('api-2');
+    expect(projectNameFor({ name: 'api' }, ['API'])).toBe('API 2');
   });
 });
 

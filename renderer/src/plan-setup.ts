@@ -29,6 +29,9 @@ export interface EngineSetupState {
   bin?: string | null;
   /** Whether it was on the computer before this setup started. */
   already?: boolean;
+  /** Whether this reading established anything: false when the search or the
+   *  sign-in check did not answer, which is not the same as a no. */
+  certain?: boolean;
 }
 
 export const COPY = {
@@ -116,9 +119,11 @@ export const COPY = {
   hideLog: 'Hide what is happening',
 
   barSay: 'Agents cannot start until they have a plan to run on.',
+  /** When one tool is already on the disk, so the thing missing has a name. */
+  barSignedOut: (name: string) => `Agents cannot start until you sign in to your ${name} plan.`,
   barSub: 'Takes a couple of clicks.',
-  barClaude: 'Set up with Claude',
-  barChatgpt: 'Set up with ChatGPT',
+  barSetUp: (name: string) => `Set up with ${name}`,
+  barSignIn: (name: string) => `Sign in to ${name}`,
 } as const;
 
 /** The plan's name, the word on screen. Never "Claude Code" or "Codex" here. */
@@ -142,6 +147,49 @@ export function enginesFor(plan: Plan): Engine[] {
  */
 export function needsPlan(readiness: Array<Pick<EngineSetupState, 'found' | 'signedIn'>>): boolean {
   return !readiness.some((r) => r.found && r.signedIn);
+}
+
+/**
+ * AND WHETHER THE BAR MAY SAY SO OUT LOUD. `barSay` is an absolute claim about
+ *  what the app will do, so only a certain no raises it.
+ *
+ *  The walk keeps `needsPlan`: it asks a question and offers a way past, so
+ *  asking on an unsure reading costs a click. This tells rather than asks.
+ */
+export function sureNoPlan(readings: Array<Pick<EngineSetupState, 'found' | 'signedIn' | 'certain'>>): boolean {
+  return needsPlan(readings) && readings.every((r) => r.certain !== false);
+}
+
+export interface BarWords {
+  say: string;
+  first: { plan: Plan; label: string };
+  second: { plan: Plan; label: string };
+}
+
+type BarReading = Pick<EngineSetupState, 'engine' | 'found' | 'signedIn' | 'certain'>;
+
+/**
+ * AND WHAT IT SAYS ONCE IT HAS SPOKEN (F-151). Somebody who installed Codex a
+ *  screen ago was given Set up with Claude as the loud button and a sentence
+ *  naming neither. A tool already on the disk is a choice they have made, so
+ *  it leads, and what it is short of is a sign-in rather than a plan.
+ *
+ *  Null is the whole of "draw nothing", so the bar has one question to ask.
+ */
+export function planBar(readings: BarReading[]): BarWords | null {
+  if (!sureNoPlan(readings)) return null;
+  const here = readings.filter((r) => r.found).map((r) => r.engine as Engine);
+  const word = (engine: Engine) => (here.includes(engine) ? COPY.barSignIn : COPY.barSetUp)(planName(engine));
+  const button = (engine: Engine) => ({ plan: engine as Plan, label: word(engine) });
+  // Only one on the disk can lead on being there, and only then can the
+  // sentence name the one plan that is a sign-in away.
+  const lead = here.length === 1 ? here[0] : 'claude';
+  const other: Engine = lead === 'claude' ? 'codex' : 'claude';
+  return {
+    say: here.length === 1 ? COPY.barSignedOut(planName(lead)) : COPY.barSay,
+    first: button(lead),
+    second: button(other),
+  };
 }
 
 /**

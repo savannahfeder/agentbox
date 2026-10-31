@@ -13,17 +13,24 @@
 //                                     style 'clear' is the clear glass, which a
 //                                     light page shows through; otherwise regular
 //   clear(handle)                  -> take it away
-//   tone(handle)                   -> 'light' or 'dark': which way the glass went
-//                                     over what is behind it, so ink can follow
+//   tone(handle)                   -> 'light' or 'dark': the glass's appearance.
+//                                     On macOS 27 this is the Mac's own setting
+//                                     whatever is behind it, so it is a fallback
+//   luma(handle)                   -> how bright the screen behind the glass is,
+//                                     0 to 1, or null until there is a reading
 //
-// Glass the size of the tray decides from what is behind it. Glass the size of
-// its list follows the Mac's own dark or light setting instead, which on a
-// dark Mac over a white page is a grey slab; the list is held to the tray's
-// reading with `tone`.
+// The brightness comes from the glass's own backdrop layer, which the system
+// samples for the blur; asked to track luma, it reports it to the layer's
+// delegate. That is not published API, so every step is asked for first and
+// a Mac without it gets null, and the tray the glass's appearance.
 //
 // `handle` is BrowserWindow.getNativeWindowHandle(): the window's NSView.
 #include <node_api.h>
+#include <unordered_map>
 #import <AppKit/AppKit.h>
+#import <QuartzCore/QuartzCore.h>
+#import <objc/message.h>
+#import <objc/runtime.h>
 
 static NSString *const kGlassId = @"agentbox-liquid-glass";
 
@@ -153,12 +160,82 @@ static napi_value Tone(napi_env env, napi_callback_info info) {
   return out;
 }
 
+static char kLumaKey;
+static char kWatchedKey;
+static SEL TracksLuma() { return NSSelectorFromString(@"setTracksLuma:"); }
+static SEL LumaRate() { return NSSelectorFromString(@"setLumaUpdateRate:"); }
+static SEL DidChangeLuma() { return NSSelectorFromString(@"backdropLayer:didChangeLuma:"); }
+
+// The delegate's own handler for each class hooked, called after the reading
+// is kept, so the glass goes on doing whatever it does with it.
+static std::unordered_map<Class, IMP> lumaHandlers;
+
+static void KeepLuma(id self, SEL cmd, CALayer *layer, double luma) {
+  if (layer) objc_setAssociatedObject(layer, &kLumaKey, @(luma), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+  for (Class k = object_getClass(self); k; k = class_getSuperclass(k)) {
+    auto found = lumaHandlers.find(k);
+    if (found == lumaHandlers.end()) continue;
+    if (found->second && found->second != (IMP)KeepLuma) ((void (*)(id, SEL, CALayer *, double))found->second)(self, cmd, layer, luma);
+    return;
+  }
+}
+
+static void HookLuma(Class k) {
+  if (!k || lumaHandlers.count(k)) return;
+  Method had = class_getInstanceMethod(k, DidChangeLuma());
+  IMP before = had ? method_getImplementation(had) : nullptr;
+  if (!class_addMethod(k, DidChangeLuma(), (IMP)KeepLuma, "v@:@d")) {
+    before = method_setImplementation(class_getInstanceMethod(k, DidChangeLuma()), (IMP)KeepLuma);
+  }
+  lumaHandlers[k] = before;
+}
+
+static CALayer *BackdropIn(CALayer *layer, int depth) {
+  Class backdrop = NSClassFromString(@"CABackdropLayer");
+  if (!layer || !backdrop || depth > 12) return nil;
+  if ([layer isKindOfClass:backdrop]) return layer;
+  for (CALayer *sub in layer.sublayers) {
+    CALayer *found = BackdropIn(sub, depth + 1);
+    if (found) return found;
+  }
+  return nil;
+}
+
+// The backdrop layer appears once the glass has drawn, so this is tried on
+// every reading until it takes.
+static CALayer *WatchedBackdrop(NSView *glass) {
+  CALayer *layer = BackdropIn(glass.layer, 0);
+  if (!layer || ![layer respondsToSelector:TracksLuma()] || !layer.delegate) return nil;
+  if (!objc_getAssociatedObject(layer, &kWatchedKey)) {
+    HookLuma(object_getClass(layer.delegate));
+    ((void (*)(id, SEL, BOOL))objc_msgSend)(layer, TracksLuma(), YES);
+    if ([layer respondsToSelector:LumaRate()]) ((void (*)(id, SEL, double))objc_msgSend)(layer, LumaRate(), 0.25);
+    objc_setAssociatedObject(layer, &kWatchedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+  }
+  return layer;
+}
+
+static napi_value Luma(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value argv[1];
+  napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+  NSView *root = argc > 0 ? ViewOf(env, argv[0]) : nil;
+  NSView *glass = root ? GlassIn(root) : nil;
+  CALayer *layer = glass ? WatchedBackdrop(glass) : nil;
+  NSNumber *luma = layer ? objc_getAssociatedObject(layer, &kLumaKey) : nil;
+  napi_value out;
+  if (luma) napi_create_double(env, luma.doubleValue, &out);
+  else napi_get_null(env, &out);
+  return out;
+}
+
 static napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor props[] = {
     { "available", nullptr, Available, nullptr, nullptr, nullptr, napi_default, nullptr },
     { "set", nullptr, Set, nullptr, nullptr, nullptr, napi_default, nullptr },
     { "clear", nullptr, Clear, nullptr, nullptr, nullptr, napi_default, nullptr },
     { "tone", nullptr, Tone, nullptr, nullptr, nullptr, napi_default, nullptr },
+    { "luma", nullptr, Luma, nullptr, nullptr, nullptr, napi_default, nullptr },
   };
   napi_define_properties(env, exports, sizeof(props) / sizeof(props[0]), props);
   return exports;

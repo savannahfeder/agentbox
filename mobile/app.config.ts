@@ -40,7 +40,8 @@ const config: ExpoConfig = {
   version: '0.1.0',
   orientation: 'portrait',
   icon: './assets/icon.png',
-  userInterfaceStyle: 'dark',
+  // Automatic so Match system can read the phone's own light or dark (state/look.tsx).
+  userInterfaceStyle: 'automatic',
   backgroundColor: '#1a1817',
   ios: {
     // iPhone only; it still runs in an iPad's iPhone mode, where reviewers sometimes test.

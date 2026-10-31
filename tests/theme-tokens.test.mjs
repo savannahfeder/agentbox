@@ -210,6 +210,10 @@ describe('no raw colour outside the token blocks', () => {
       // is one rule and the two rows it serves are different sizes; measured, a
       // literal per row is how they ended up 2.79px apart.
       '--tick-line',
+      // Which step of the waiting logo's lap a dot starts on, written per dot
+      // by components/LogoOrbit.tsx so the orange runs round the ring in order.
+      // A time, never a colour.
+      '--orbit-delay',
       // The two the header band on a task is built out of, shipped 2026-08-29.
       // Both are geometry and neither names a colour: the band's only colour is
       // --line, the hairline, which every theme answers.

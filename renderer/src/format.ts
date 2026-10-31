@@ -234,9 +234,15 @@ export function discardsTheChange(option: string): boolean {
   return DISCARDS.test(bareOption(option));
 }
 
+// AND THE APP'S OWN OFFER WHERE GIT CANNOT NAME AN AUTHOR (F-139,
+// ./ship-offer.ts). The name and email are the whole point of the press, so
+// sending it as it stands says nothing; it opens the box with its own words in
+// it, exactly as "Change something first" does.
+const NAMES_NOBODY = /^commit it and ship, as the name and email below$/i;
+
 export function needsYourWords(option: string): boolean {
   const words = bareOption(option);
-  return SAYS_NOTHING.test(words) || /^(?:something|anything) else$/i.test(words);
+  return SAYS_NOTHING.test(words) || NAMES_NOBODY.test(words) || /^(?:something|anything) else$/i.test(words);
 }
 
 // What Enter means in the schedule box, in one place so the key handler and the
@@ -324,6 +330,21 @@ export function parseRepeat(raw: string): RepeatParse {
     return shapeOf(buried[1], buried[2]);
   }
   return null;
+}
+
+// Repeat's presets, with "Once" first as the way back off rather than as a
+// thing to notice. The When picker, the New thread card's "Repeat it" and the
+// phone app all offer these, and two lists of them would drift the way the two
+// priority lists once did.
+export function repeatPresets(now = Date.now()): Array<{ label: string; rule: RepeatRuleValue | null }> {
+  const weekday = new Date(now).getDay();
+  const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][weekday];
+  return [
+    { label: 'Once', rule: null },
+    { label: 'Every morning at 8:00am', rule: { every: 'day', at: '08:00' } as RepeatRuleValue },
+    { label: 'Every weekday at 9:00am', rule: { every: 'weekday', at: '09:00' } as RepeatRuleValue },
+    { label: `Every ${dayName} at 9:00am`, rule: { every: 'week', on: weekday, at: '09:00' } as RepeatRuleValue },
+  ];
 }
 
 /**

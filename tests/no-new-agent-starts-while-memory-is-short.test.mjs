@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { startDecision, STALE_MS, MAX_HOLD_MS } from '../main/start-hold.mjs';
+import { startDecision, STALE_MS, MAX_HOLD_MS, SETTLE_MS } from '../main/start-hold.mjs';
 import { Supervisor } from '../main/supervisor.mjs';
 import { memoryReading } from '../main/settings.mjs';
 
@@ -71,6 +71,19 @@ describe('the rule', () => {
     // The one it let through restarts the wait, so it is one every ten minutes, not a flood.
     expect(startDecision({ ...held, heldSince: NOW - MAX_HOLD_MS, lastStartAt: NOW - 1_000 }).start).toBe(false);
   });
+
+  // 2026-10-27: tight or critical 16 minutes in 20, normal for a moment in
+  // between, and every normal moment let more agents in, one to nine.
+  it('one normal reading after a short one does not let an agent in for three minutes', () => {
+    const short = read(40, { level: 2, age: 30_000 });
+    expect(startDecision({ ...base, reading: read(56), recent: [short] })).toEqual({ start: false, why: 'tight' });
+    expect(startDecision({ ...base, reading: read(56), recent: [read(3, { age: 60_000 })] })).toEqual({ start: false, why: 'critical' });
+    expect(startDecision({ ...base, reading: read(56), recent: [read(40, { level: 2, age: SETTLE_MS + 1 })] })).toEqual({ start: true, why: 'normal' });
+    // An urgent row still starts on a tight minute, as it does on a tight reading.
+    expect(startDecision({ ...base, urgent: true, reading: read(56), recent: [short] }).start).toBe(true);
+    // An unreadable reading in the window is not a short one.
+    expect(startDecision({ ...base, reading: read(56), recent: [{ level: null, freePct: null, at: NOW }] }).start).toBe(true);
+  });
 });
 
 describe('the fleet', () => {
@@ -117,6 +130,31 @@ describe('the fleet', () => {
     await sup.tick();
     expect(started).toEqual([]);
     setFree(40);
+    await sup.tick();
+    expect(started).toEqual(['q-0', 'q-1']);
+  });
+
+  it('a reading that flips back to normal for a moment does not start the queue', async () => {
+    setup({ freePct: 8 });
+    sup._memReading = null;
+    // Through the real reading path, so the history is kept the way the app keeps it.
+    sup._refreshMemoryReading();
+    await vi.advanceTimersByTimeAsync(0);
+    await sup.tick();
+    expect(started).toEqual([]);
+    sup._fakeFree = 40;
+    await vi.advanceTimersByTimeAsync(10_000);
+    sup._refreshMemoryReading();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sup._memReading.freePct).toBe(40);
+    await sup.tick();
+    expect(started).toEqual([]);
+    // Normal for three minutes running, and the queue moves.
+    for (let s = 0; s < SETTLE_MS / 10_000; s++) {
+      await vi.advanceTimersByTimeAsync(10_000);
+      sup._refreshMemoryReading();
+      await vi.advanceTimersByTimeAsync(0);
+    }
     await sup.tick();
     expect(started).toEqual(['q-0', 'q-1']);
   });

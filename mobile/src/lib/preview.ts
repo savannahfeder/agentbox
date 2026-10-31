@@ -41,7 +41,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(90), source: 'founder', patch: { body: stuckAsk } },
         { ts: at(14), source: 'agent', patch: { status: 'blocked', note: stuckNote } },
       ]),
-      thread('agentbox', { id: 'w-8b9c0d1e2f', title: 'Draw three versions of the inbox', status: 'blocked', priority: 5, body: roundAsk, note: roundNote, createdAt: at(70), updatedAt: at(9), wrote: { body: her(at(70)), status: agent(at(9)), note: agent(at(9)) } }, [
+      thread('agentbox', { id: 'w-8b9c0d1e2f', title: 'Draw three versions of the inbox', status: 'blocked', pinned: true, priority: 5, body: roundAsk, note: roundNote, createdAt: at(70), updatedAt: at(9), wrote: { body: her(at(70)), status: agent(at(9)), note: agent(at(9)) } }, [
         { ts: at(70), source: 'founder', patch: { body: roundAsk } },
         { ts: at(9), source: 'agent', patch: { status: 'blocked', note: roundNote } },
       ], { attached }),
@@ -84,6 +84,9 @@ export function previewRows(now = Date.now()): PhoneRows {
       thread('site', { id: 'w-6f7a8b9c0d', title: 'Try a light theme for the phone', status: 'open', priority: 0, body: 'Try a light theme.', snoozedUntil: now + 20 * 60 * MIN, createdAt: at(800), updatedAt: at(700), wrote: { body: her(at(800)), snoozedUntil: her(at(700)) } }, [
         { ts: at(800), source: 'founder', patch: { body: 'Try a light theme.' } },
       ]),
+      // Two runs of the daily report (previewSettings' repeating tasks): one quiet, one with news.
+      thread('agentbox', { id: 'w-r1a2b3c4d5', title: 'Daily report', labels: ['repeat:r-preview-1', 'clean'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Nothing new since yesterday.', createdAt: at(26 * 60), updatedAt: at(26 * 60 - 6), wrote: { status: agent(at(26 * 60 - 6)) } }, []),
+      thread('agentbox', { id: 'w-r2b3c4d5e6', title: 'Daily report', labels: ['repeat:r-preview-1'], status: 'done', priority: 5, body: 'Write the daily report.', result: 'Two sign-ups failed at the email step. The fix is in its own thread.', createdAt: at(120), updatedAt: at(112), wrote: { status: agent(at(112)) } }, []),
       thread('agentbox', { id: 'w-7a8b9c0d1e', title: 'Rename the Display menu', status: 'done', priority: 0, body: 'Rename it to View.', result: 'Renamed.', createdAt: at(3000), updatedAt: at(1500), wrote: { body: her(at(3000)), result: agent(at(1600)), status: her(at(1500)) } }, [
         { ts: at(3000), source: 'founder', patch: { body: 'Rename it to View.' } },
         { ts: at(1600), source: 'agent', patch: { result: 'Renamed.' } },
@@ -117,6 +120,11 @@ export function previewSettings(now = Date.now()) {
         { slug: 'film', name: 'Launch film', onPhone: true, autonomous: false, permission: 'plan', codexMode: 'workspace', account: 'any', running: 1 },
         { slug: 'site', name: 'Website', onPhone: true, autonomous: false, permission: 'workspace', codexMode: 'workspace', account: 'any', running: 0 },
       ],
+      // The repeating tasks a Mac sends with its settings (shared/phone-snapshot.mjs phoneRepeatsOf).
+      repeats: [
+        { product: 'agentbox', id: 'r-preview-1', title: 'Daily report', body: 'Write the daily report: sign-ups, failed runs, and anything that needs me. Say "nothing new" if nothing changed.', priority: 5, every: 'weekday', at: '09:00', createdAt: now - 9 * 24 * 60 * MIN, served: '', lastOccurrence: 'w-r2b3c4d5e6' },
+        { product: 'site', id: 'r-preview-2', title: 'Check the launch page numbers', body: 'Check the launch page numbers and tell me what moved.', priority: 5, every: 'week', on: 4, at: '08:00', createdAt: now - 20 * 24 * 60 * MIN, served: '' },
+      ],
     },
   };
 }
@@ -127,6 +135,81 @@ const PREVIEW_TEAM = {
   people: [{ id: 'preview', email: 'you@example.com', name: 'You' }, { id: 'p-2', email: 'sam@example.com', name: 'Sam Rivera' }, { id: 'p-3', email: 'kai@example.com', name: 'Kai Ito' }],
   invites: [{ email: 'lee@example.com' }],
 };
+
+/** Groups as the cloud keeps them (20261021000000_rooms.sql), for the Groups tab. Every name is made up. */
+export function previewGroups(now = Date.now()) {
+  const iso = (ms: number) => new Date(ms).toISOString();
+  const at = (m: number) => iso(now - m * MIN);
+  const yesterday = new Date(now).setHours(0, 0, 0, 0) - 7 * 60 * MIN;
+  const rooms = [
+    { id: 'r-team', name: 'Astral', kind: 'room', team_id: 't-preview', listed: false, invite_only: false, role: 'member', members: 3, created_at: at(90 * 24 * 60) },
+    { id: 'r-launch', name: 'Launch week', kind: 'room', team_id: null, listed: false, invite_only: false, role: 'owner', members: 4, created_at: at(9 * 24 * 60) },
+    { id: 'r-maya', name: 'Maya C.', kind: 'group', team_id: null, listed: false, invite_only: false, role: 'owner', members: 2, created_at: at(3 * 24 * 60) },
+  ];
+  const members: Record<string, string[]> = { 'r-team': ['preview', 'p-2', 'p-3'], 'r-launch': ['preview', 'p-2', 'p-4', 'p-5'], 'r-maya': ['preview', 'p-4'] };
+  const profile = (id: string, name: string, extra: Record<string, unknown> = {}) => ({ person_id: id, display_name: name, avatar_url: null, show_working: 'everyone', show_agents: true, show_level: true, show_status: true, ...extra });
+  const profiles = [
+    profile('preview', 'Ada L.'), profile('p-2', 'Sam R.'), profile('p-3', 'Kai I.', { show_working: 'team' }),
+    profile('p-4', 'Maya C.'), profile('p-5', 'Lee P.', { status_text: 'In interviews until 3' }),
+  ];
+  const presence = [
+    ['preview', 2, 'Plan the phone app', 410], ['p-2', 2, 'Draw the sign-in screen', 640], ['p-3', 1, null, 95], ['p-4', 3, 'Cut the launch film to 60 seconds', 1900], ['p-5', 0, null, 30],
+  ].map(([id, agents, on, hours]) => ({ person_id: id, device: 'a1b2c3d4e5f6', agents_running: agents, working_on: on, working_private: false, working_at: at(4), hours_total: hours, updated_at: at(1) }));
+  let n = 0;
+  const msg = (room: string, by: string, when: string, body: string, extra: Record<string, unknown> = {}) =>
+    ({ id: `gm-${++n}`, room_id: room, by_person: by, body, in_reply_to: null, mentions: [], created_at: when, edited_at: null, deleted_at: null, ...extra });
+  const messages = [
+    msg('r-team', 'p-2', iso(yesterday), 'Pushed the new sign-in screens. Five versions in the designs folder.'),
+    msg('r-team', 'preview', iso(yesterday + 4 * MIN), 'Looking now. The quiet one reads best on a phone.'),
+    msg('r-team', 'p-3', at(52), 'The login meter shows the reset time now. Can someone check it on a Max account?'),
+    msg('r-team', 'p-2', at(49), 'On it.'),
+    msg('r-team', 'preview', at(31), 'Morning. I am moving the inbox to the cloud today, one table at a time.'),
+    msg('r-team', 'p-3', at(12), 'Nice. Shout if the phone commands table gets in your way, I touched it last week.'),
+    msg('r-team', 'p-2', at(4), 'Sign-in screen is down to two. @Ada L. which do you want?', { mentions: ['preview'] }),
+    msg('r-launch', 'p-4', at(300), 'First cut of the film is up. Ninety seconds, needs to be sixty.'),
+    msg('r-launch', 'p-5', at(240), 'Open on the inbox, not the logo.'),
+    msg('r-launch', 'preview', at(200), 'Agreed. And end on the phone.'),
+    msg('r-launch', 'p-4', at(18), 'Sixty-second cut is rendering now.'),
+    msg('r-maya', 'p-4', at(140), 'Can I borrow your voice for the last line of the film?'),
+    msg('r-maya', 'preview', at(132), 'Yes. Send me the line.'),
+  ];
+  const sentence = messages.find((m) => m.body.startsWith('The login meter'))!;
+  messages.push(msg('r-team', 'p-2', at(47), 'Checked: it says 6:19pm, which is right.', { in_reply_to: sentence.id }));
+  messages.push(msg('r-team', 'p-3', at(46), 'Thanks.', { in_reply_to: sentence.id }));
+  const reads = [{ room_id: 'r-team', read_at: at(20) }, { room_id: 'r-launch', read_at: at(100) }, { room_id: 'r-maya', read_at: at(130) }];
+  const cards = [{ person_id: 'p-3', title: 'Fix the login meter', state: 'running', visible: true, updated_at: at(10) }];
+  const names: Record<string, string> = { preview: 'Ada Lovelace', 'p-2': 'Sam Rivera', 'p-3': 'Kai Ito', 'p-4': 'Maya Chen', 'p-5': 'Lee Park' };
+  return {
+    rpc(name: string, args: Record<string, any>) {
+      if (name === 'my_rooms') return rooms;
+      if (name === 'room_people') return members[args.r] ?? [];
+      if (name === 'room_names') return (members[args.r] ?? []).map((id) => ({ person_id: id, name: profiles.find((p) => p.person_id === id)?.display_name ?? names[id], avatar_url: null, has_card: true }));
+      if (name === 'mark_room_read') { const r = reads.find((x) => x.room_id === args.r); if (r && args.at > r.read_at) r.read_at = args.at; return null; }
+      return [];
+    },
+    select(table: string, query: string) {
+      const q = new URLSearchParams(query);
+      if (table === 'room_profiles') return profiles;
+      if (table === 'room_presence') return presence;
+      if (table === 'room_reads') return reads;
+      if (table === 'thread_cards') return cards;
+      if (table !== 'room_messages') return null;
+      let rows = [...messages];
+      const room = q.get('room_id')?.slice(3);
+      if (room) rows = rows.filter((m) => m.room_id === room);
+      if (q.get('mentions')) rows = rows.filter((m) => (m.mentions as string[]).includes('preview'));
+      const when = q.get('created_at');
+      if (when?.startsWith('gt.')) rows = rows.filter((m) => m.created_at > when.slice(3));
+      if (when?.startsWith('lt.')) rows = rows.filter((m) => m.created_at < when.slice(3));
+      return rows.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, Number(q.get('limit') ?? 200));
+    },
+    send(row: Record<string, any>) {
+      const made = msg(row.room_id, 'preview', new Date().toISOString(), row.body, { in_reply_to: row.in_reply_to ?? null, mentions: row.mentions ?? [] });
+      messages.push(made);
+      return made;
+    },
+  };
+}
 
 /** A stand-in for the sign-in client (renderer/src/cloud-rest.ts), signed in. */
 export function previewCloud(now = () => Date.now()) {
@@ -144,7 +227,12 @@ export function previewCloud(now = () => Date.now()) {
   const takeSetting = (c: PhoneRows['commands'][number]) => setTimeout(() => {
     const { scope, key, value, product } = c.payload ?? {};
     const w: any = settings.settings.workspace;
-    if (scope === 'project') Object.assign(settings.settings.projects.find((p) => p.slug === product) ?? {}, { [key]: value });
+    const repeats: any[] = (settings.settings as any).repeats;
+    if (scope === 'thread') { const t = rows.threads.find((r) => r.project === product && r.item === c.payload.item); if (t) { t.snapshot.item.pinned = value || undefined; t.updated_at = new Date(now() + 1).toISOString(); } }
+    else if (scope === 'repeat' && key === 'end') (settings.settings as any).repeats = repeats.filter((r) => !(r.product === product && r.id === c.payload.id));
+    else if (scope === 'repeat' && key === 'change') Object.assign(repeats.find((r) => r.product === product && r.id === c.payload.id) ?? {}, value);
+    else if (scope === 'repeat' && key === 'new') repeats.push({ product, id: `r-${c.id}`, priority: 5, createdAt: now(), served: '', ...value });
+    else if (scope === 'project') Object.assign(settings.settings.projects.find((p) => p.slug === product) ?? {}, { [key]: value });
     else if (key === 'alphaRooms') w.alpha.rooms = value;
     else if (key === 'memoryGate') w.memoryGate.on = value;
     else if (key === 'memoryGateSlots') w.memoryGate.slots = value;
@@ -157,12 +245,15 @@ export function previewCloud(now = () => Date.now()) {
     settings.updated_at = new Date(now()).toISOString();
   }, 1500);
   const devices = new Map<string, Record<string, any>>();
+  const groups = previewGroups(now());
   const session = () => (signedIn ? { access_token: 'preview', refresh_token: 'preview', expires_at: now() + 3600_000, user: { id: 'preview', email: 'you@example.com' } } : null);
   return {
     session,
     signedIn: () => signedIn,
     generation: () => 0,
     async select(table: string, query: string) {
+      const group = groups.select(table, query);
+      if (group) return group;
       if (table === 'phone_projects') return rows.projects;
       if (table === 'phone_threads') return rows.threads;
       if (table === 'phone_commands') return /taken_at=is\.null/.test(query) ? rows.commands.filter((c) => !c.taken_at) : rows.commands.filter((c) => c.taken_at);
@@ -174,6 +265,7 @@ export function previewCloud(now = () => Date.now()) {
       return [];
     },
     async insert(table: string, row: Record<string, any>) {
+      if (table === 'room_messages') return groups.send(row);
       if (table === 'team_invites' && !team.invites.some((i) => i.email === row.email)) team.invites.push({ email: row.email });
       return row;
     },
@@ -188,7 +280,7 @@ export function previewCloud(now = () => Date.now()) {
       if (table === 'team_members') { const gone = team.members.filter((m) => m.person_id === eq('person_id')); team.members = team.members.filter((m) => m.person_id !== eq('person_id')); return gone; }
       return [];
     },
-    async rpc() { return []; },
+    async rpc(name: string, args: Record<string, any> = {}) { return groups.rpc(name, args); },
     async listFiles() { return []; },
     async removeFiles() {},
     async update(_table: string, query: string, patch: Record<string, unknown>) {

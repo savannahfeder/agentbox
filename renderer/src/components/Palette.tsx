@@ -3,7 +3,7 @@
 
 import { cloudCommands, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { chord } from '../this-keyboard';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { Product, View } from '../types';
 import { DONE } from '../done-word';
 import { commandKeys } from '../palette-keys';
@@ -25,7 +25,7 @@ export interface Command {
   run: () => void;
 }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, onClose, cloud = null, onCloudMode, open = true }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, findThreads, onSearchFor, onFirstRun, onTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -89,21 +89,24 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   boardUp?: boolean;
   onFlipView?: () => void;
   onSearch: () => void;
+  /** The threads a query finds, best first. Absent, the box finds commands only. */
+  findThreads?: (query: string) => Command[];
+  /** Opens the thread search with this query already typed. */
+  onSearchFor?: (query: string) => void;
   /** Walks the welcome screen again on this install, to test the first run. */
   onFirstRun: () => void;
   /** The tutorial alone: the practice project, with no setup screens before
    *  it and no import card after it. */
   onTutorial: () => void;
   onImportAgents: () => void;
-  onFreshUser: (withAgents: boolean, withTools?: boolean) => void;
-  /** Opens a second Agentbox on an invented studio's work, for demos. */
-  onDemo: () => void;
   onClose: () => void;
   /** The cloud, when this Mac is set up for it; null hides its rows. */
   cloud?: CloudStatus | null;
   onCloudMode?: (mode: CloudMode) => void;
   /** Drawn only while open. */
   open?: boolean;
+  /** Drawn for a phone: full screen, threads first, no keys. */
+  phone?: boolean;
 }) {
   const commands: Command[] = useMemo(() => [
     // First, and labelled "project" because that is the word people type. Row
@@ -310,8 +313,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // up and leaves a project. The walk's last card says "type tutorial", so
     // this label must contain that word
     // (tests/the-tutorial-and-the-onboarding-are-two-things.test.mjs). The
-    // keywords are split so each word finds only one of the two rows, and
-    // "demo" is left to the demo row.
+    // keywords are split so each word finds only one of the two rows.
     {
       id: 'tutorial',
       label: 'Take the tutorial',
@@ -329,28 +331,6 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       keywords: 'onboarding first run new user welcome intro setup start over from scratch install fresh',
       run: onFirstRun,
     },
-    // A second Agentbox on an invented studio's work, so a demo does not show
-    // the user's own. Their copy keeps running (main/demo.mjs).
-    {
-      id: 'demo',
-      label: 'Open a demo inbox',
-      hint: 'invented work · yours keeps running',
-      keywords: 'demo demonstration present presentation pitch investor customer screen share screenshare record video sample fake example stage not mine hide my work',
-      run: onDemo,
-    },
-    // A second Agentbox that has never been set up, in its own window. It
-    // deletes nothing and does not link ~/.claude, so the real install's
-    // sessions stay out of it (main/fresh-user.mjs). With agents is
-    // `npm run fresh -- --with-agents`.
-    {
-      id: 'fresh-user',
-      label: `Open ${NAME} as a new user`,
-      hint: 'nothing set up · yours keeps running',
-      keywords: 'new user fresh install stranger onboarding first run clean empty blank test website download nothing of mine agents claude code sessions setup plan codex chatgpt not installed',
-      // Claude Code stays visible to the new copy: most new users have a plan,
-      // and hiding it made the app say they had none.
-      run: () => onFreshUser(false),
-    },
     {
       id: 'keyhints',
       label: keyHints ? 'Turn off keyboard shortcut hints' : 'Turn on keyboard shortcut hints',
@@ -358,12 +338,48 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, onFreshUser, onDemo, cloud, onCloudMode]);
-  return open ? <PaletteBox commands={commands} onClose={onClose} /> : null;
+  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, cloud, onCloudMode]);
+  return open ? <PaletteBox commands={commands} findThreads={findThreads} onSearchFor={onSearchFor} onClose={onClose} phone={phone} /> : null;
+}
+
+/** How many threads the box lists under the commands before "See all". */
+export const THREADS_SHOWN = 5;
+
+/** The thread rows a query adds under the matching commands: the best few,
+ *  then one row that opens the full search when there are more. */
+export function threadRows(query: string, findThreads?: (q: string) => Command[], onSearchFor?: (q: string) => void): Command[] {
+  const q = query.trim();
+  if (!q || !findThreads) return [];
+  const found = findThreads(q);
+  const rows = found.slice(0, THREADS_SHOWN);
+  if (found.length > THREADS_SHOWN && onSearchFor) {
+    rows.push({ id: 'all-threads', label: `See all ${found.length} threads`, run: () => onSearchFor(q) });
+  }
+  return rows;
 }
 
 // The box itself, mounted fresh each time ⌘K opens, so it starts empty and focused.
-function PaletteBox({ commands, onClose }: { commands: Command[]; onClose: () => void }) {
+/** Commands about the Mac or its keyboard, which a phone has neither of, and
+ *  Search threads, which the phone's field already is. */
+export const NOT_ON_A_PHONE = ['search', 'keyhints', 'shortcuts', 'stale', 'update', 'update-check', 'update-move', 'first-run', 'tutorial', 'import-agents', 'open-terminal', 'remote-control', 'flip-view'];
+
+/** The rows in the order drawn, and the label over the row each section starts
+ *  at. A phone searches threads more than it runs commands, so they go first. */
+export function paletteOrder(matched: Command[], threads: Command[], phone = false): { rows: Command[]; labels: Map<number, string> } {
+  const labels = new Map<number, string>();
+  if (!phone) {
+    if (threads.length) labels.set(matched.length, 'Threads');
+    return { rows: [...matched, ...threads], labels };
+  }
+  if (threads.length) {
+    labels.set(0, 'Threads');
+    if (matched.length) labels.set(threads.length, 'Commands');
+  }
+  return { rows: [...threads, ...matched], labels };
+}
+
+// The box itself, mounted fresh each time ⌘K opens, so it starts empty and focused.
+function PaletteBox({ commands, findThreads, onSearchFor, onClose, phone = false }: { commands: Command[]; findThreads?: (q: string) => Command[]; onSearchFor?: (q: string) => void; onClose: () => void; phone?: boolean }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -373,13 +389,17 @@ function PaletteBox({ commands, onClose }: { commands: Command[]; onClose: () =>
 
   useEffect(() => inputRef.current?.focus(), []);
 
-  const filtered = useMemo(() => {
+  const offered = useMemo(() => (phone ? commands.filter((c) => !NOT_ON_A_PHONE.includes(c.id)) : commands), [commands, phone]);
+  const matched = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return commands;
+    if (!q) return offered;
     // Ranked as well as filtered, so "rem" puts Remind Me above Remote Control
     // (../palette-rows).
-    return rankMatches(q, commands.filter((c) => matchesQuery(q, c)));
-  }, [commands, query]);
+    return rankMatches(q, offered.filter((c) => matchesQuery(q, c)));
+  }, [offered, query]);
+  const threads = useMemo(() => threadRows(query, findThreads, onSearchFor), [query, findThreads, onSearchFor]);
+  const { rows: filtered, labels } = useMemo(() => paletteOrder(matched, threads, phone), [matched, threads, phone]);
+  const isThread = (c: Command) => c.id.startsWith('thread-') || c.id === 'all-threads';
 
   // Unique keys, so two lists sharing an id cannot leave a stale row alive
   // through the filter (../palette-keys).
@@ -393,8 +413,8 @@ function PaletteBox({ commands, onClose }: { commands: Command[]; onClose: () =>
   }, [selected]);
 
   return (
-    <div className="modal-backdrop palette-backdrop" onClick={onClose}>
-      <div className="modal palette palette-k" onClick={(e) => e.stopPropagation()}>
+    <div className={`modal-backdrop palette-backdrop${phone ? ' palette-on-phone' : ''}`} onClick={onClose}>
+      <div className={`modal palette palette-k${phone ? ' palette-phone' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="palette-query">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.6" /><path d="M10.4 10.4L14 14" /></svg>
           <input
@@ -402,7 +422,8 @@ function PaletteBox({ commands, onClose }: { commands: Command[]; onClose: () =>
             className="palette-input"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type a command…"
+            placeholder={phone ? 'Search' : findThreads ? 'Search threads or type a command…' : 'Type a command…'}
+            enterKeyHint="go"
             onKeyDown={(e) => {
               if (e.key === 'Escape') onClose();
               // Clamped at 0 as well as at the end, because with nothing matching
@@ -412,24 +433,28 @@ function PaletteBox({ commands, onClose }: { commands: Command[]; onClose: () =>
               if (e.key === 'Enter' && filtered[selected]) filtered[selected].run();
             }}
           />
-          <button type="button" className="palette-esc" aria-label="Close" onClick={onClose}>esc</button>
+          {phone
+            ? <button type="button" className="palette-cancel" onClick={onClose}>Cancel</button>
+            : <button type="button" className="palette-esc" aria-label="Close" onClick={onClose}>esc</button>}
         </div>
         <div className="palette-list" ref={listRef}>
           {filtered.length === 0 && <div className="palette-empty">{emptyLine(query)}</div>}
-          {filtered.map((c, i) => (
+          {filtered.map((c, i) => (<Fragment key={keys[i]}>
+            {labels.has(i) && <div className="palette-section">{labels.get(i)}</div>}
             <div
-              key={keys[i]}
-              className={`palette-item ${i === selected ? 'selected' : ''}`}
+              className={`palette-item ${isThread(c) ? 'palette-thread ' : ''}${i === selected ? 'selected' : ''}`}
               onClick={c.run}
               onMouseEnter={() => setSelected(i)}
             >
               <span className="palette-glyph" aria-hidden="true">{glyphFor(c)}</span>
-              <span className="palette-label">{c.label}</span>
-              {c.keyHint ? <span className="palette-key">{c.keyHint}</span> : c.hint && <span className="palette-hint">{c.hint}</span>}
+              {phone
+                ? <span className="palette-text"><span className="palette-label">{c.label}</span>{isThread(c) && c.hint && <span className="palette-sub">{c.hint}</span>}</span>
+                : <span className="palette-label">{c.label}</span>}
+              {!phone && (c.keyHint ? <span className="palette-key">{c.keyHint}</span> : c.hint && <span className="palette-hint">{c.hint}</span>)}
             </div>
-          ))}
+          </Fragment>))}
         </div>
-        <div className="palette-foot" aria-hidden="true"><span><b>↑ ↓</b> move</span><span><b>↵</b> select</span></div>
+        {!phone && <div className="palette-foot" aria-hidden="true"><span><b>↑ ↓</b> move</span><span><b>↵</b> select</span></div>}
       </div>
     </div>
   );

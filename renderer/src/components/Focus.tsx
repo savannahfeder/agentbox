@@ -65,7 +65,7 @@ import { sameRule, type RepeatShape as RepeatRuleValue } from '../../../shared/r
 import { collectFiles, fromPaste, persistAttachments, type PendingAttachment } from '../attachments';
 import { onPictureLinks, pictureLinksVersion, pictureUrl, sentPictureLink } from '../picture';
 import { Listening, MicButton, useWebDictation } from './WebDictation';
-import { playerShelf } from '../player-shelf';
+import { firstFrameSrc, playerShelf } from '../player-shelf';
 import { handleCopyOut, blockCopyText } from '../copy-out';
 import { diagramSource } from '../diagram-fence';
 import { DiagramBlock } from './DiagramBlock';
@@ -103,6 +103,7 @@ import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mjs';
 import { recapFor } from '../recap';
 import type { LedgerLine } from '../thread-history';
 import type { LiveFacts } from '../live-line';
+import { whyWords } from '../where-why';
 import { offersRunNow } from '../run-now';
 import { AttachRow } from './AttachRow';
 import { BackToWhatSheWasReading } from './UrgentBar';
@@ -122,7 +123,7 @@ import {
 } from './Priority';
 import { SummaryPanel, SummaryRail, ThreadCrumb, ThreadStateMark, useSummaryOpen, useSummaryShortcut, type RepeatHandle } from '../threads/Summary';
 import { summaryFits, summaryPlace } from '../room';
-import { ThreadMenu, type ThreadPlace } from '../threads/ThreadMenu';
+import { ThreadMenu, type PlaceAct, type ThreadPlace } from '../threads/ThreadMenu';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { ChatAgentsContext, useChatMentions } from '../team/ChatAgents';
 import { useThreadMentions } from './ThreadMentions';
@@ -322,7 +323,9 @@ const players = playerShelf<HTMLMediaElement>({
     const player = document.createElement(film ? 'video' : 'audio');
     player.controls = true;
     player.preload = 'metadata';
-    player.src = url;
+    // Kept in the page on an iPhone, which otherwise opens it full screen.
+    if (film) (player as HTMLVideoElement).playsInline = true;
+    player.src = film ? firstFrameSrc(url) : url;
     return player;
   },
   drop: (player) => { player.pause(); player.removeAttribute('src'); player.load(); player.remove(); },
@@ -737,7 +740,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onPin?: (pin: boolean) => void;
   // Where it runs, and the menu's row that moves it (ThreadMenu PLACE_ROW).
   place?: ThreadPlace | null;
-  onPlace?: (keep: boolean) => void;
+  onPlace?: (keep: PlaceAct) => void;
   // Only ever called on an agent row a reply cannot reach: brings the app that
   // session is running inside to the front.
   onReveal?: () => void;
@@ -1522,15 +1525,24 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       key={`${item.product}:${item.id}`}
       change={changeFigures}
       onViewChange={() => onOpenDoc?.(changePathFor(item.id))}
-      terminal={direct ? null : terminalOpen ? 'open' : 'closed'}
+      /* A PHONE HAS NO TERMINAL AND NO ⌘J (QA batch 005, F-118), and it is the
+         only way it has of putting a thread off (F-117). */
+      terminal={direct || onPhone() ? null : terminalOpen ? 'open' : 'closed'}
       onToggleTerminal={() => window.dispatchEvent(new Event('task-terminal-toggle'))}
       onFinish={canFinish ? onResolve : null}
       onRunNow={waiting && onRunNow ? onRunNow : null}
+      onLater={onPhone() && canFinish ? onSnooze ?? null : null}
       // A finished thread has nothing to be pinned for.
       pinned={canFinish && onPin ? !!item.pinned : null}
       onPin={onPin}
       // A finished thread runs nowhere.
       place={canFinish ? runsIn : null}
+      placeFacts={{
+        running: !!session && session.where !== 'cloud',
+        moving: live.whyNotCloud?.why === 'moving',
+        why: live.whyNotCloud ? whyWords(live.whyNotCloud).body : null,
+        needs: item.needsMac ?? null,
+      }}
       onPlace={onPlace}
     />
   );
@@ -1979,8 +1991,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       {/* THE FILES A MESSAGE NAMES ARE SMALL FRAMED TILES (w-9ed13d72b3), and
           a file nothing can read gets none. The big review card below is
           only the review lab's sample now. */}
-      {/* One thing at a time reads a page or a note in place rather than as a tile. */}
-      {inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => <QueueFile key={path} product={product} path={path} md={md} onOpen={() => onOpenArtifact?.(path, 'focus')} />)}
+      {/* One thing at a time reads a page or a note in place rather than as a
+          tile, and not a second time while it is open on the side. */}
+      {inlineArtifacts && !previewSample && page && previewPaths.filter(readsInPlace).map((path) => path !== openDoc && <QueueFile key={path} product={product} path={path} md={md}
+        onOpen={() => onOpenArtifact?.(path, 'focus')} onSide={() => onOpenArtifact?.(path, 'beside')} />)}
       {!page && inlineArtifacts && !previewSample && <MessageFiles product={product} paths={previewPaths} revision={item.updatedAt} openDoc={openDoc} onOpen={path => onOpenArtifact?.(path, 'beside')} />}
       {inlineArtifacts && previewSample && <div className="artifact-entry-list" aria-label="Attachments">{previewPaths.map(path =>
         <DirectReview key={path} product={product} path={path} revision={item.updatedAt} open={openDoc === path}
@@ -2945,7 +2959,9 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
     if (mode !== null && exactClear(q)) { pickMode(null); return; }
     setText(next);
   };
-  const talk = useWebDictation({ text, setText }, () => void send());
+  const talk = useWebDictation({ text, setText, field: ref }, () => void send());
+  // A box that is listening is in use before its first word arrives.
+  const held = hasDraft || talk.on;
   // Clicking away folds the composer, on EXACTLY the rule Escape already
   // follows: a draft holds it open. The modals already did this; the dock is
   // the one composer that is not a modal, so it never had a way out except a
@@ -2957,14 +2973,14 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
   // not happening. The draft survives either way (saveDraft runs on every
   // keystroke), but a box that vanishes mid-sentence still reads as loss.
   useEffect(() => {
-    if (hasDraft) return;
+    if (held) return;
     const away = (e: MouseEvent) => {
       const card = (e.target as HTMLElement)?.closest?.('.dock-card');
       if (!card) onClose();
     };
     document.addEventListener('mousedown', away);
     return () => document.removeEventListener('mousedown', away);
-  }, [hasDraft, onClose]);
+  }, [held, onClose]);
   /*
    * THE CLICK-AWAY THAT SHUT THE MODE MENU IS GONE WITH THE CHIP THAT OPENED
      IT (2026-08-26). The menu is now only ever open because a slash is the
@@ -3038,7 +3054,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') send();
     if (e.key === 'Escape') {
       e.stopPropagation();
-      if (hasDraft) ref.current?.blur();
+      if (held) ref.current?.blur();
       else onClose();
     }
   };
@@ -3383,7 +3399,7 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
           onClick={() => send()}
           disabled={!hasDraft || !!chat.block || saving}
           title={chat.block ?? `Send · ${SEND}`}
-        >{saving ? 'Sending…' : <>{sendWord} <kbd>{SEND}</kbd></>}</button>
+        >{saving ? 'Sending…' : sendWord === 'Send' ? <>Send <kbd>{SEND}</kbd></> : <>{sendWord} <kbd>{SEND}</kbd></>}</button>
         {canWait && (look === 0 || look === 3) && <ReplyLater look="caret" saysTime={look === 0} at={sendAt} onPick={pickSendAt} onClosed={() => ref.current?.focus()} />}
         </span>
         )}

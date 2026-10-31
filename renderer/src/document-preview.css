@@ -5,4 +5,6 @@
   border: 0; border-top: 1px solid var(--line); background: var(--wash); color: var(--text-dim); font: inherit; font-size: 13px; cursor: pointer; }
 .document-preview-toggle:hover { color: var(--text); }
 .document-preview-toggle:focus-visible { outline: 2px solid var(--underline); outline-offset: -3px; }
-.focus-pane[data-file-previews="page"] .inline-image-open { max-height: min(560px, 60vh); overflow: hidden; }
+/* On the picture, not the button around it, which cut the picture off.
+   320px leaves room for the top bar, the options and the reply box. */
+.focus-pane[data-file-previews="page"] .inline-image { max-height: calc(100vh - 320px); }

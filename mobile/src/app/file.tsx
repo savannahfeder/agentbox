@@ -17,6 +17,7 @@ import { Markdown } from '../ui/Markdown';
 import { PageFrame } from '../ui/PageFrame';
 import { IconButton, T, TopBar, Wall } from '../ui/parts';
 import { Player } from '../ui/Player';
+import { Skeleton } from '../ui/Skeleton';
 import { color } from '../ui/theme';
 
 const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
@@ -73,6 +74,7 @@ function Doc({ product, src, style }: { product: string; src: string; style: obj
       <ScrollView contentContainerStyle={{ paddingTop: 6, paddingHorizontal: 16, paddingBottom: 40 }}>
         {doc && ('text' in doc ? <Markdown doc text={doc.text} dir={dir} files={files} /> : <Said words={doc.error} />)}
       </ScrollView>
+      {!doc && <View style={StyleSheet.absoluteFill}><Skeleton /></View>}
     </View>
   );
 }
@@ -85,7 +87,7 @@ function Page({ product, src, style }: { product: string; src: string; style: ob
     pageOnPhone(c.view.places, c.links, product, src, readLink).then((r) => { if (live) setPage(r.ok ? { html: r.html } : { error: r.error }); });
     return () => { live = false; };
   }, [product, src, c.signedAt]);
-  return <View style={style}>{page && ('html' in page ? <PageFrame html={page.html} style={{ flex: 1 }} /> : <Said words={page.error} />)}</View>;
+  return <View style={style}>{page ? ('html' in page ? <PageFrame html={page.html} style={{ flex: 1 }} /> : <Said words={page.error} />) : <Skeleton />}</View>;
 }
 
 // The dark room's own ink, `--read-paper` over `--read-ground`.

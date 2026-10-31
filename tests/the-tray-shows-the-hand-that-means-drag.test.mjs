@@ -5,9 +5,8 @@
 // page's own comment admitted it: "the tag is movable as it is, with nothing
 // drawn to say so". The only sentence saying otherwise is in Settings, and the
 // tag went on showing the plain arrow, so pointing at it taught you it was a
-// button. The resize corners already lean on the pointer for exactly this, so
-// the tag does too: the hand over the glass, the resize arrows on the corners,
-// and the plain arrow everywhere else, because the window is wider than the
+// button. So the pointer says it: the hand over the glass, and the plain arrow
+// everywhere else, because the window is wider than the
 // glass and a click in that band belongs to whatever is underneath.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -25,11 +24,10 @@ describe('pointing at the tray', () => {
     expect(rule('.ct-tag.is-dragging')).toMatch(/cursor:\s*grabbing/);
   });
 
-  it('leaves the resize arrows on the four corners', () => {
-    expect(rule('.ct-grip-tl')).toMatch(/cursor:\s*nwse-resize/);
-    expect(rule('.ct-grip-tr')).toMatch(/cursor:\s*nesw-resize/);
-    expect(rule('.ct-grip-bl')).toMatch(/cursor:\s*nesw-resize/);
-    expect(rule('.ct-grip-br')).toMatch(/cursor:\s*nwse-resize/);
+  // The corners used to show resize arrows and resize it; they move it now
+  // (tests/the-tray-changes-size-only-from-its-size-buttons).
+  it('shows no resize arrow anywhere on it', () => {
+    expect(css).not.toMatch(/-resize/);
   });
 
   it('leaves the plain arrow over the clear band around the glass', () => {

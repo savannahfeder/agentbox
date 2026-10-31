@@ -44,6 +44,8 @@ const PROBLEMS: Record<string, string> = {
   'service-not-allowed': 'Dictation is not available on this phone.',
   busy: 'Dictation is busy. Try again in a moment.',
   'no-speech': 'Nothing was heard.',
+  // The web app's own (web-speech.ts DEAF_MS).
+  'not-hearing': 'Nothing was heard. Try the keyboard\'s microphone.',
   interrupted: 'Dictation stopped.',
 };
 

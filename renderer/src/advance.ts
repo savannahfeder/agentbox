@@ -43,9 +43,9 @@ export function advanceAfter(p: { fromTask: boolean; index: number; id: string }
  * search, she stays: "I quite often will just stick with one chat"
  * (tests/a-reply-keeps-you-on-the-thread-unless-you-are-clearing-your-inbox).
  */
-export function replyMovesOn(p: { view: string; onBoard: boolean; index: number; searching?: boolean }): boolean {
+export function replyMovesOn(p: { view: string; onBoard: boolean; index: number; searching?: boolean; phone?: boolean }): boolean {
   // With search open, the tab under it is not where the work is happening.
-  return !p.searching && advanceLandsHere(p) && p.index >= 0;
+  return !p.phone && !p.searching && advanceLandsHere(p) && p.index >= 0;
 }
 
 /**

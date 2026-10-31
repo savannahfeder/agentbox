@@ -77,7 +77,7 @@ describe('Codex opened from the desktop', () => {
     setups.push(setup);
     setup.start('codex');
     expect((await settled(setup)).phase).toBe('ready');
-    expect(await setup.readiness('codex')).toEqual({ engine: 'codex', found: true, signedIn: true });
+    expect(await setup.readiness('codex')).toEqual({ engine: 'codex', found: true, signedIn: true, certain: true });
     expect(m.env.PATH).toBe('/usr/bin:/bin');
   });
 

@@ -124,7 +124,7 @@ if (path.basename(process.argv[1] || '') === 'terminal-host.mjs') {
   const sockPath = process.argv[2];
   // Loaded before the socket opens, so a host that cannot make a shell never
   // answers and the app keeps its terminals itself.
-  (await import('node:module')).createRequire(import.meta.url)('node-pty');
+  (await import('./pty.mjs')).loadPty();
   const { TaskTerminals } = await import('./task-terminals.mjs');
   const { readMacPressureWord } = await import('./leftovers.mjs');
   const terminals = new TaskTerminals({ readPressure: process.platform === 'darwin' ? readMacPressureWord : null });

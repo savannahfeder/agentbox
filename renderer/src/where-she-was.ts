@@ -95,6 +95,9 @@ export interface Place {
   // The Settings screen, which is a screen rather than a modal and so is a
   // place she can be reloaded out of.
   settings?: boolean;
+  // Its page, by the name a link uses (`claude`, `project:kestrel`), so Settings
+  // reads it back through the same `paneFrom` and an unknown one lands on General.
+  settingsPage?: string;
   // What she had typed into the search field. '' is the field open and empty,
   // undefined is not searching, which is the same two states App.tsx keeps.
   search?: string;
@@ -136,7 +139,10 @@ export function readPlace(storage: Pick<Storage, 'getItem'>): Place | null {
       place.doc = { product: d.product, src: d.src };
     }
   }
-  if (p.settings === true) place.settings = true;
+  if (p.settings === true) {
+    place.settings = true;
+    if (typeof p.settingsPage === 'string' && p.settingsPage) place.settingsPage = p.settingsPage;
+  }
   if (typeof p.search === 'string') place.search = p.search;
   if (typeof p.row === 'string' && p.row) place.row = p.row;
   return place;

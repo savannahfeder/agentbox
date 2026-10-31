@@ -4,13 +4,14 @@
 // Which teammate the session is comes from the app, not the model: the run it
 // was started for (`ZERO_ITEM`) carries `teammate:<id>`, so no argument names
 // who is speaking and no session can speak as another teammate.
+import fs from 'node:fs';
 import { readWorkItem } from '../../main/store/work-items.mjs';
 import { listProjects, legacyRoot } from '../../main/store/project.mjs';
 import {
-  teamDir, readTeammates, readChat, writeTeammate, writeChat, newMemoryId,
-  readPlaybooks, writePlaybook, newPlaybookId, newLessonId, newDutyId,
+  teamDir, readTeammates, readChat, writeTeammate, writeChat, newMemoryId, newTeammateId,
+  readPlaybooks, writePlaybook, newPlaybookId, newLessonId, newDutyId, methodFile, sourcesDir, writeMethod,
 } from '../../main/store/teammates-files.mjs';
-import { teammateIdOf, hopOf, workOf, mentionsIn, isWorks, letterFor, cleanDuty, dutyStart, YOU } from '../../shared/teammates.mjs';
+import { teammateIdOf, hopOf, workOf, mentionsIn, isWorks, letterFor, cleanDuty, dutyStart, isDate, METHOD_CAP, YOU } from '../../shared/teammates.mjs';
 import { periodKey } from '../../shared/repeats.mjs';
 import { resolveProduct, resolveAccount } from './account.mjs';
 
@@ -75,7 +76,7 @@ export function teamPost({ text, to = [], options } = {}, ctx = {}) {
 }
 
 export function teamPass({ to, title, details, project: named } = {}, ctx = {}) {
-  const { dir, me, team, hop, writtenIn, project } = teammateContext({ ...ctx, outsider: true });
+  const { dir, me, team, hop, writtenIn, project, item } = teammateContext({ ...ctx, outsider: true });
   // The work is done where it is named, or for a thread handing it on, in that
   // thread's project; otherwise in the receiver's own.
   const where = named ? resolveProduct(named).id : me ? null : project.id;
@@ -83,15 +84,42 @@ export function teamPass({ to, title, details, project: named } = {}, ctx = {}) 
   if (!target) throw new Error('pass work to another teammate, not to yourself');
   const what = plain(title);
   if (!what) throw new Error('give the work a short title');
-  const m = writeChat(dir, { kind: 'pass', from: me?.id ?? YOU, to: target, title: what.slice(0, 200), details: String(details ?? '').slice(0, 6000), hop, ...writtenIn, ...(where ? { product: where } : {}) }, ctx.now);
+  const yours = !!me?.primary && startedByYou(item);
+  const m = writeChat(dir, { kind: 'pass', from: me?.id ?? YOU, to: target, title: what.slice(0, 200), details: String(details ?? '').slice(0, 6000), hop, ...writtenIn, ...(where ? { product: where } : {}), ...(yours ? { yours: true } : {}) }, ctx.now);
   const them = team.find((t) => t.id === target);
-  const held = me && them?.handoffsNeedYes;
+  const held = me && !yours && them?.handoffsNeedYes !== false;
   return {
     passed: m.id, to: them?.name,
     note: held
       ? `${them.name} takes work from teammates only with the person's yes, so this waits in their inbox until they reply. Say so in your answer.`
-      : `It goes to the thread ${them?.name ?? 'they'} already has on this work, or starts one, and wakes them.`,
+      : yours ? `The person asked for this, so it starts now for ${them?.name ?? 'them'}, in the thread they already have on this work or a new one.`
+        : `It goes to the thread ${them?.name ?? 'they'} already has on this work, or starts one, and wakes them.`,
   };
+}
+
+// The person's own words started this run, or they have replied on it: the
+// opening is theirs, or their answer is the newest word on it.
+function startedByYou(item) {
+  if (item?.wrote?.body?.source === 'founder') return true;
+  return answeredInThread(item);
+}
+
+// The primary makes a teammate when the person said yes to one. It is a draft
+// that sets itself up by asking them, as one you made would.
+export function teamHire({ name, job } = {}, ctx = {}) {
+  const { dir, me, team, item, project } = teammateContext(ctx);
+  if (!me.primary) throw new Error('only your primary employee makes new teammates; suggest one to the person instead');
+  if (!startedByYou(item)) throw new Error('make a teammate only in a run started by the person\'s words or answered by them: ask them first, with options');
+  const role = plain(name).slice(0, 40);
+  const words = String(job ?? '').trim();
+  if (!role || !words) throw new Error('give the new teammate a name that says its role, and its job in plain words');
+  if (team.some((t) => t.name.toLowerCase() === role.toLowerCase())) throw new Error(`${role} is taken; pick another name`);
+  const now = ctx.now ?? Date.now();
+  const id = newTeammateId();
+  writeTeammate(dir, id, { name: role, role, letter: letterFor(role, team), job: words.slice(0, 2000), status: 'draft', product: me.product ?? project.id, createdAt: now, paused: false }, now);
+  writeChat(dir, { kind: 'msg', from: YOU, to: [id], text: words.slice(0, 8000), setup: true }, now);
+  writeChat(dir, { kind: 'act', from: me.id, verb: 'hired', text: `${me.name} made ${role}, which is setting itself up.` }, now);
+  return { teammate: { id, name: role, status: 'draft' }, note: `${role} wakes now to set itself up, and asks the person what it cannot tell from the job.` };
 }
 
 export function teamRemember({ text } = {}, ctx = {}) {
@@ -124,8 +152,18 @@ function answeredSince(dir, id) {
 const SAID = {
   name: 'its name', role: 'its role', job: 'its job', goal: 'its goal', counted: 'how it counts its goal',
   asksFirst: 'what needs your yes first', works: 'when it works', duties: 'what it does on its own',
-  handoffsNeedYes: 'whether work from teammates waits for your yes',
+  handoffsNeedYes: 'whether work from teammates waits for your yes', pausedUntil: 'when it is paused until',
 };
+
+// Made from your threads and has written its method from them: the threads
+// answered what a newcomer would otherwise have to ask.
+function learnedFromThreads(dir, id) {
+  try {
+    return fs.readdirSync(sourcesDir(dir, id)).length > 0 && fs.statSync(methodFile(dir, id)).size > 0;
+  } catch {
+    return false;
+  }
+}
 
 // Duties keep their id, and what they have served, when one with the same
 // words is set again.
@@ -145,7 +183,7 @@ function dutiesFrom(list, me, now) {
   return { duties: out, served };
 }
 
-export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at, on, duties, runsOn, handoffsNeedYes, ready } = {}, ctx = {}) {
+export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at, on, duties, runsOn, handoffsNeedYes, pausedUntil, ready } = {}, ctx = {}) {
   const { dir, me, team, item } = teammateContext(ctx);
   const now = ctx.now ?? Date.now();
   if (typeof asksFirst === 'string' && /\?\s*$/.test(asksFirst)) {
@@ -183,9 +221,13 @@ export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at
     if (typeof handoffsNeedYes !== 'boolean') throw new Error('handoffsNeedYes is true or false');
     patch.handoffsNeedYes = handoffsNeedYes;
   }
+  if (pausedUntil !== undefined) {
+    if (pausedUntil !== null && !isDate(pausedUntil)) throw new Error('pausedUntil is a date, YYYY-MM-DD, or null to stop pausing');
+    patch.pausedUntil = pausedUntil;
+  }
   // A new teammate asks before it starts, so ready waits for the person's
-  // own words to it after the ask that made it.
-  if (ready === true && me.status === 'draft' && !answeredSince(dir, me.id) && !answeredInThread(item)) {
+  // own words to it after the ask that made it, unless their threads answered.
+  if (ready === true && me.status === 'draft' && !answeredSince(dir, me.id) && !answeredInThread(item) && !learnedFromThreads(dir, me.id)) {
     throw new Error('ask you first: post your questions with team_post, each with options, and finish; you can go ready once the person has answered');
   }
   if (ready === true) patch.status = 'active';
@@ -197,7 +239,29 @@ export function teamSetup({ name, role, job, goal, counted, asksFirst, every, at
     writeChat(dir, { kind: 'act', from: me.id, verb: 'updated', text: `Updated ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0]}` }, now);
   }
   const after = readTeammates(dir, now).find((t) => t.id === me.id);
-  return { teammate: { name: after.name, role: after.role, job: after.job, goal: after.goal, counted: after.counted, asksFirst: after.asksFirst, works: after.works, duties: after.duties, runsOn: after.engine ?? 'your default', handoffsNeedYes: !!after.handoffsNeedYes, status: after.status } };
+  return { teammate: { name: after.name, role: after.role, job: after.job, goal: after.goal, counted: after.counted, asksFirst: after.asksFirst, works: after.works, duties: after.duties, runsOn: after.engine ?? 'your default', handoffsNeedYes: after.handoffsNeedYes !== false, pausedUntil: after.pausedUntil ?? null, status: after.status } };
+}
+
+// The teammate's method, written whole or one passage at a time. Through the
+// store because a Codex run may write only inside its own task folder.
+export function teamMethod({ text, old, new: replacement } = {}, ctx = {}) {
+  const { dir, me } = teammateContext(ctx);
+  let current = '';
+  try { current = fs.readFileSync(methodFile(dir, me.id), 'utf8'); } catch { /* none yet */ }
+  let next;
+  if (typeof text === 'string') {
+    if (!text.trim()) throw new Error('your method cannot be empty');
+    next = text;
+  } else if (typeof old === 'string' && typeof replacement === 'string') {
+    const at = old ? current.indexOf(old) : -1;
+    if (at < 0) throw new Error('that passage is not in your method: copy it exactly as it reads now');
+    if (current.indexOf(old, at + 1) >= 0) throw new Error('that passage is in your method more than once: include enough around it to say which');
+    next = `${current.slice(0, at)}${replacement}${current.slice(at + old.length)}`;
+  } else {
+    throw new Error('send text (your whole method), or old and new (one passage as it reads now, and what replaces it)');
+  }
+  const file = writeMethod(dir, me.id, next);
+  return { saved: file, characters: next.length, ...(next.length > METHOD_CAP ? { note: `Your method is over ${METHOD_CAP} characters, so your runs see it cut. Tighten it.` } : {}) };
 }
 
 // A lesson about how the person likes a kind of work done, kept in the

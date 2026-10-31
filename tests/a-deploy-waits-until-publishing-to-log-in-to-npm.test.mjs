@@ -26,6 +26,7 @@ function deploy({ signedIn = false, expireDuringBuild = false, buildOk = true,
     fs: {
       existsSync: () => true,
       readFileSync: () => JSON.stringify({ version: '1.0.0', posthogKey: 'test', bucket: 'test', runtimeArn: 'test' }),
+      writeFileSync: () => {},
     },
     console: { log: (...args) => messages.push(args.join(' ')), error: (...args) => messages.push(args.join(' ')) },
     process: {

@@ -109,7 +109,7 @@ describe('the pages', () => {
   // page's five seconds and the inbox's five seconds ran out of step.
   it('read what the computer did with a change alongside its copy, not from the inbox\'s last read', () => {
     expect(bridge).toMatch(/\[settingsRows, settingCommands\] = await Promise\.all\(\[readSettingsRows\(.*\), commands\(\)\]\)/);
-    expect(bridge).toContain('return webSettingsModel(settingsRows, settingCommands, sentSettings);');
+    expect(bridge).toContain('return webSettingsModel(settingsRows, settingCommands, sentSettings, rows.projects);');
   });
   // In Chromium: Open on a project went straight back to the list, because the
   // desktop's own project list is empty here; and the Codex page threw

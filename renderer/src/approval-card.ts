@@ -32,6 +32,15 @@ export type ApprovalReading = {
 };
 
 /**
+ * WHAT A PHONE IS TOLD AFTER IT ANSWERS (F-115). The stamp on the leaving card
+ * is at full strength for about 170ms, which a laptop catches and a phone does
+ * not; the toast outlasts it. It says what follows from the press rather than
+ * the word alone, because "Denied" leaves open whether the agent heard.
+ */
+export const approvalAnswered = (allow: boolean) =>
+  (allow ? 'Allowed. The agent carries on.' : 'Denied. The agent carries on without it.');
+
+/**
  * One approval's `input`, as the two lines her eye actually lands on.
  *
  * `changes` is first because it is the only key that says the question is about

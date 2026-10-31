@@ -18,16 +18,17 @@ it('rejects a frame navigated to remote content',()=>{
 // September 25: the three @xterm packages moved to devDependencies, because
 // they are compiled into renderer/dist at build time and a copy installed from
 // npm never loads one. node-pty stayed, because main/terminal.mjs requires it
-// at run time. NOTHING ABOUT THE PROPERTY BELOW CHANGED: each of the four is
-// still pinned to a caret range and the lockfile still records the integrity
-// hash of the exact build that was tested. Which of the two lists holds a
-// package says when it is needed, not how carefully it is pinned, so this now
-// asks whichever list holds it.
+// at run time. October 29: node-pty moved on to optionalDependencies, so that
+// a Linux install with no compiler finishes without it. NOTHING ABOUT THE
+// PROPERTY BELOW CHANGED: each of the four is still pinned to a caret range and
+// the lockfile still records the integrity hash of the exact build that was
+// tested. Which list holds a package says when it is needed, not how carefully
+// it is pinned, so this asks whichever list holds it.
 it('allows compatible terminal upgrades while locking each tested build' ,()=>{
  const p=JSON.parse(fs.readFileSync('package.json')),l=JSON.parse(fs.readFileSync('package-lock.json'));
  for(const name of ['@xterm/xterm','@xterm/addon-fit','@xterm/addon-serialize','node-pty']){
-  const declared=p.dependencies[name]??p.devDependencies[name];
-  const inLock=l.packages[''].dependencies?.[name]??l.packages[''].devDependencies?.[name];
+  const declared=p.dependencies[name]??p.devDependencies[name]??p.optionalDependencies[name];
+  const inLock=l.packages[''].dependencies?.[name]??l.packages[''].devDependencies?.[name]??l.packages[''].optionalDependencies?.[name];
   expect(declared,`${name} is in neither list`).toMatch(/^\^\d+\.\d+\.\d+$/);
   expect(semver.satisfies(l.packages['node_modules/'+name].version,declared)).toBe(true);
   expect(inLock).toBe(declared);

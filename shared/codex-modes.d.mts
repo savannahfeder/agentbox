@@ -8,10 +8,7 @@ import type { CodexModeId } from '../renderer/src/types';
 
 /**
  * THE PAIR A MODE REALLY IS. `sandbox` and `approvalPolicy` go straight into
- *  Codex's `thread/start`. NO ROW CARRIES A REVIEWER any more: all three get
- *  the same one and `codexPosture` supplies it, because a per-row value is how
- *  the 2026-10-09 hole stayed open -- two of the three named none, fell through
- *  to a config file, and behaved differently from the one that did. They are
+ *  Codex's `thread/start`. `codexPosture` supplies each mode's reviewer. They are
  *  plain strings rather than unions on purpose: the authority for what Codex
  *  accepts is Codex's own schema, quoted in the .mjs, and a union here would be
  *  a third copy of it that nothing checks.

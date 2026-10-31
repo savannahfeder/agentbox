@@ -142,7 +142,9 @@ describe('the hint is drawn on the row the keys act on', () => {
   });
 
   it('gives ⌘K the same row, so the menu cannot mean a different task', () => {
-    expect(app).toMatch(/const target = focused \?\? pointed;/);
+    // A phone draws no pointed row, so there it is the open thread or none
+    // (command-k-on-a-phone).
+    expect(app).toMatch(/const target = focused \?\? \(onPhone\(\) \? null : pointed\);/);
   });
 
   it('takes the hover from a pointer that MOVES, never from one that rests', () => {

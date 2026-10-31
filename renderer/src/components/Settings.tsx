@@ -31,7 +31,8 @@ import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings 
 import { onCloudPhone, onPhone, phoneSized } from '../phone-screen';
 import { computerSays, type PhoneRows } from '../phone-rows';
 import { changesOn, readingOf, type Reading, type SettingsRow } from '../phone-settings-view';
-import { lastAccountAsk, webSettingsPages } from '../web-settings';
+import { lastAccountAsk, webProjectRow, webSettingsGroups, webSettingsPages } from '../web-settings';
+import { whatTakesEscape } from '../settings-escape';
 import { WebAlertsGroup } from './WebAlerts';
 import { api, RESTART_NOTE } from '../api';
 import { updateLook } from '../update-row';
@@ -1578,7 +1579,7 @@ function paneFrom(want: string, has: { team: boolean }): Pane {
 
 /* --------------------------------- screen --------------------------------- */
 
-export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
+export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
   /** Opens the feedback card. A phone has no Feedback button in its corner,
    *  so its own Settings page offers it (2026-10-12). */
   onFeedback?: () => void;
@@ -1610,6 +1611,9 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   usageReadings?: Usage[];
   now?: number;
   onSectionChange?: (section: string | null) => void;
+  /** The page up, by the name `startPane` takes back (`project:kestrel` for a
+   *  project), so a reload can reopen it. */
+  onPaneChange?: (pane: string) => void;
   // The new project card, from the Projects page.
   onNewProject?: () => void;
   // The running order, for the Projects page: every project already in order
@@ -1658,6 +1662,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
   // WHICH PAGE IS UP, for the window around this screen.
   useEffect(() => {
     onSectionChange?.(typeof pane === 'object' ? 'projects' : pane === 'general' ? null : pane);
+    onPaneChange?.(typeof pane === 'object' ? `project:${pane.project}` : pane);
   }, [pane]);
 
   const [error, setError] = useState<string | null>(null);
@@ -1723,8 +1728,11 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
     // A search with words in it is emptied by its own Escape (`searchKeys`).
     const clearing = (e: KeyboardEvent) => !!queryRef.current && e.target === searchBox.current;
     const onKey = (e: KeyboardEvent) => {
-      // A screen over this one, such as the cloud's sign-in, takes its own keys.
-      if (document.querySelector('.ps-over')) return;
+      // A screen over this one, such as the cloud's sign-in, takes its own
+      // keys; so does an open menu inside it (../settings-escape.ts).
+      const takes = whatTakesEscape(document);
+      if (takes === 'over') return;
+      if (e.key === 'Escape' && takes === 'menu') return;
       if (e.key === 'Escape' && !clearing(e)) { e.preventDefault(); e.stopPropagation(); onClose(); return; }
       // ⌘F, or / from anywhere that is not a box being typed in, goes to the search.
       const typing = e.target instanceof HTMLElement && e.target.closest('input, textarea, [contenteditable="true"]');
@@ -2172,7 +2180,7 @@ export function Settings({ look, onSetLook, tune, onSetTune, onResetTune, keyHin
             <Group id="corner-tag" label="Agent Tray">
               <Row
                 label="Show the Agent Tray"
-                desc="A small tag over your other apps says when an agent has something for you. Drag it anywhere; it keeps that corner on every screen, and sizes itself to the screen it is on. Drag its bottom-left corner to make it bigger or smaller, or right-click it for that, for hiding it a while, and for turning it off."
+                desc="A small tag over your other apps says when an agent has something for you. Drag it anywhere; it keeps that corner on every screen, and sizes itself to the screen it is on. Make it bigger or smaller with Size, at the foot of the list that opens when you point at it. Right-click it to hide it a while or turn it off."
               >
                 <Switch label="Show the Agent Tray" on={w.cornerTag !== false} onChange={(v) => setWorkspace('cornerTag', v)} />
               </Row>
@@ -2692,10 +2700,18 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
     const claude = pane === 'claude';
     const mode = read(claude ? 'permission' : 'codexMode', claude ? w.permission : (w.codexMode ?? 'auto'));
     const account = read('activeAccount', null);
-    const found = claude ? w.claude?.found : w.codex?.found;
+    // Nothing installed is one answer, not one answer and two more under it
+    // (QA batch 005, F-119).
+    const groups = webSettingsGroups(w, claude ? 'claude' : 'codex');
+    if (!groups.includes('accounts')) {
+      return (
+        <Page title={claude ? 'Claude Code' : 'Codex'}>
+          <Group id="status" label="Status"><Row label={`${claude ? 'Claude Code' : 'Codex'} is not on this computer`} /></Group>
+        </Page>
+      );
+    }
     return (
       <Page title={claude ? 'Claude Code' : 'Codex'}>
-        {!found && <Group id="status" label="Status"><Row label={`${claude ? 'Claude Code' : 'Codex'} is not on this computer`} /></Group>}
         <Group id="accounts" label="Signed in">
           <WebAccounts engine={claude ? 'claude' : 'codex'} list={(claude ? w.accounts : w.codexAccounts) ?? []} reading={account} refusedAsk={lastAccountAsk(web.commands, web.computer.device)}
             onUse={(id) => onWorkspace('activeAccount', { engine: claude ? 'claude' : 'codex', account: id })} />
@@ -2759,7 +2775,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
       </Page>
     );
   }
-  const projects: Array<{ slug: string; name: string; running?: number; autonomous: boolean; permission: string; codexMode: string; account: string }> = s.projects ?? [];
+  const projects: Array<{ slug: string; name: string; running?: number; onPhone?: boolean; autonomous: boolean; permission: string; codexMode: string; account: string }> = s.projects ?? [];
   const p = typeof pane === 'object' ? projects.find((x) => x.slug === pane.project) : undefined;
   if (p) {
     const own = (key: string, copy: unknown) => readingOf(changes, 'project', key, copy, p.slug);
@@ -2802,7 +2818,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
       <Page title="Projects">
         <Group id="projects">
           {projects.length ? projects.map((x) => (
-            <Row key={x.slug} label={x.name} desc={x.running ? `${x.running} running` : undefined}>
+            <Row key={x.slug} label={x.name} desc={webProjectRow(x).desc}>
               <button type="button" className="set-ghost" onClick={() => onOpenProject(x.slug)}>Open</button>
             </Row>
           )) : <Row label="No projects yet." />}

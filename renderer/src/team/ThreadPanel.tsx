@@ -13,7 +13,7 @@
 // same `.chat-msg` blocks in the same materials, so they read as one chat.
 //
 // The rules (which replies, the line, the width) are ./chat-threads.ts.
-import { useContext, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type SetStateAction } from 'react';
 import { Face, TeamContext } from './people';
 import { ChatFold } from './ChatFold';
 import { MessageActions, Reactions } from './ChatActions';
@@ -30,6 +30,7 @@ import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type VoiceControl } fr
 import { RichReply, type RichBox } from './RichReply';
 import { AttachRow } from '../components/AttachRow';
 import { collectFiles, persistAttachments, type PendingAttachment } from '../attachments';
+import { draftKey, readDraft, readDraftAttachments, restoreFailedDraft, saveDraft, saveDraftAttachments } from '../drafts';
 import type { AgentTurn } from '../types';
 import './chat.css';
 
@@ -39,7 +40,11 @@ const useBeforePaint = typeof window === 'undefined' ? useEffect : useLayoutEffe
 /** How far one arrow press moves the edge, for a keyboard. */
 const NUDGE = 24;
 
-export function ThreadPanel({ product, id, people, parent, replies, md, width, reactions, onReact, onEdit, onMarkUnread, onCopied, onHandToAgent, onSend, onClose, onResize }: {
+export function ThreadPanel(props: Parameters<typeof ThreadPanelBody>[0]) {
+  return <ThreadPanelBody key={JSON.stringify([props.product, props.id, props.parent.uid ?? props.parent.at])} {...props} />;
+}
+
+function ThreadPanelBody({ product, id, people, parent, replies, md, width, reactions, onReact, onEdit, onMarkUnread, onCopied, onHandToAgent, onSend, onClose, onResize }: {
   /** The conversation's project, where a picture sent here is saved. */
   product: string;
   /** The conversation, which the @ menu remembers an agent's last project under. */
@@ -72,11 +77,35 @@ export function ThreadPanel({ product, id, people, parent, replies, md, width, r
   const panel = useRef<HTMLElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement | null>(null);
-  const [draft, setDraft] = useState('');
-  // A PICTURE GOES IN HERE THE WAYS IT GOES INTO THE CHAT'S OWN BOX
-  // (w-140ac855b1): pasted, dropped, or picked with the paperclip. This box
-  // took words only, so a screenshot pasted into a thread went nowhere.
-  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const [draftItem] = useState(() => ({ product, id: `chat-thread:${JSON.stringify([id ?? '', parent.uid ?? parent.at])}` }));
+  const [draft, setDraftState] = useState(() => typeof localStorage === 'undefined' ? '' : readDraft(draftItem));
+  const [attachments, setAttachmentsState] = useState<PendingAttachment[]>(() => typeof localStorage === 'undefined' ? [] : readDraftAttachments(draftItem));
+  const currentDraft = useRef(draft);
+  const currentAttachments = useRef(attachments);
+  const [tooBig, setTooBig] = useState(0);
+  const setDraft = (change: SetStateAction<string>) => {
+    const next = typeof change === 'function' ? change(currentDraft.current) : change;
+    currentDraft.current = next;
+    saveDraft(draftItem, next);
+    setDraftState(next);
+  };
+  const setAttachments = (change: SetStateAction<PendingAttachment[]>) => {
+    const next = typeof change === 'function' ? change(currentAttachments.current) : change;
+    currentAttachments.current = next;
+    setTooBig(saveDraftAttachments(draftItem, next).dropped.length);
+    setAttachmentsState(next);
+  };
+  useEffect(() => {
+    const restored = (event: Event) => {
+      if ((event as CustomEvent).detail !== draftKey(draftItem)) return;
+      currentDraft.current = readDraft(draftItem);
+      currentAttachments.current = readDraftAttachments(draftItem);
+      setDraftState(currentDraft.current);
+      setAttachmentsState(currentAttachments.current);
+    };
+    window.addEventListener('zero:reply-restored', restored);
+    return () => window.removeEventListener('zero:reply-restored', restored);
+  }, [draftItem]);
   const filePicker = useRef<HTMLInputElement>(null);
   // Said under the box until the next try, such as the microphone being refused.
   const [notice, setNotice] = useState<string | null>(null);
@@ -95,8 +124,7 @@ export function ThreadPanel({ product, id, people, parent, replies, md, width, r
   // The message being edited in place, by uid, and the one asking to be deleted.
   const [editing, setEditing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-  // A new thread starts empty, with the box ready.
-  useEffect(() => { setDraft(''); setAttachments([]); setSending([]); setEditing(null); setDeleting(null); box.current?.focus(); }, [parent.uid]);
+  useEffect(() => { box.current?.focus(); }, []);
 
   // THE CHAT BOX'S @ AND # MENUS (Focus.tsx, DockComposer), counting in the
   // words as shown and editing through the editor so formatting round a
@@ -148,8 +176,7 @@ export function ThreadPanel({ product, id, people, parent, replies, md, width, r
     // An agent with no project does not go out; the line under the box says why.
     if (chat.block) { setNotice(chat.block); return; }
     const putBack = (why: string) => {
-      setDraft(words);
-      setAttachments(files);
+      restoreFailedDraft(draftItem, words, files);
       setNotice(`Not sent: ${why} Your message is still in the box.`);
     };
     setDraft('');
@@ -349,6 +376,9 @@ export function ThreadPanel({ product, id, people, parent, replies, md, width, r
             onClick={(b) => chat.click(b as unknown as HTMLTextAreaElement)}
           />
           <AttachRow attachments={attachments} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
+          {tooBig > 0 && <div className="compose-note" role="alert">{tooBig === 1
+            ? 'One pasted image is too big to save. Closing the box loses it.'
+            : `${tooBig} pasted images are too big to save. Closing the box loses them.`}</div>}
           {notice
             ? <div className="compose-note" role="alert">{notice}</div>
             : chat.block && <div className="compose-note">{chat.block}</div>}

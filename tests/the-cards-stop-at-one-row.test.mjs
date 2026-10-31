@@ -1,12 +1,14 @@
-// THE CARDS STOP AT TWO ROWS (w-b5f23cff71).
+// THE CARDS STOP AT ONE ROW (w-b5f23cff71, then w-2b3e1a85e5).
 //
 // "There's a point after which we should stop expanding this section at the
 // top because it completely overloads the space below." The screenshot had
 // eleven cards and New teammate in four rows over an open chat, which left
 // the chat a message box and two lines. The cards area drew every row until
-// you dragged the grip. Now it draws two rows, the rest scroll inside it, and
-// a line under them says how many more there are; "Show fewer" puts it back.
-// The grip still moves it between none and all, a whole row at a time.
+// you dragged the grip, then two. Of five layouts drawn on 2026-10-28, the one
+// picked was "the team at the top with the board below, and the team by
+// default only showing one row". Now it draws one row, the rest scroll inside
+// it, and a line under them says how many more there are; "Show fewer" puts
+// it back. The grip still moves it between none and all, a whole row at a time.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { moreLine, readCardRows, rowsShown, writeCardRows } from '../renderer/src/team/everything/members.ts';
@@ -14,14 +16,15 @@ import { moreLine, readCardRows, rowsShown, writeCardRows } from '../renderer/sr
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
 describe('how many rows of cards show', () => {
-  it('is two until you choose, however many there are', () => {
-    expect(rowsShown(null, 4)).toBe(2);
-    expect(rowsShown(null, 3)).toBe(2);
-    expect(rowsShown(null, 2)).toBe(2);
+  it('is one until you choose, however many there are', () => {
+    expect(rowsShown(null, 4)).toBe(1);
+    expect(rowsShown(null, 3)).toBe(1);
+    expect(rowsShown(null, 2)).toBe(1);
   });
 
   it('is never more rows than there are', () => {
     expect(rowsShown(null, 1)).toBe(1);
+    expect(rowsShown(null, 0)).toBe(0);
     expect(rowsShown(3, 2)).toBe(2);
     expect(rowsShown('all', 4)).toBe(4);
   });
@@ -44,17 +47,16 @@ describe('the line under the cards', () => {
     expect(moreLine(2, 3, 0)).toEqual({ words: 'Show all', next: 'all' });
   });
 
-  it('brings the usual two rows back when the cards were dragged away', () => {
+  it('brings the usual row back when the cards were dragged away', () => {
     expect(moreLine(0, 4, 12)).toEqual({ words: 'Show the cards', next: null });
   });
 
-  it('offers fewer once every row of more than two shows', () => {
+  it('offers fewer once every row of more than one shows', () => {
     expect(moreLine(4, 4, 0)).toEqual({ words: 'Show fewer', next: null });
-    expect(moreLine(3, 3, 0)).toEqual({ words: 'Show fewer', next: null });
+    expect(moreLine(2, 2, 0)).toEqual({ words: 'Show fewer', next: null });
   });
 
-  it('says nothing when two rows or fewer hold every card', () => {
-    expect(moreLine(2, 2, 0)).toBeNull();
+  it('says nothing when one row holds every card', () => {
     expect(moreLine(1, 1, 0)).toBeNull();
     expect(moreLine(0, 0, 0)).toBeNull();
   });
@@ -66,7 +68,7 @@ describe('the choice', () => {
     return { box, store: { getItem: (k) => box.get(k) ?? null, setItem: (k, v) => box.set(k, String(v)), removeItem: (k) => box.delete(k) } };
   };
 
-  it('is the usual two when nothing was chosen', () => {
+  it('is the usual one when nothing was chosen', () => {
     expect(readCardRows({ getItem: () => null })).toBeNull();
   });
 
@@ -82,7 +84,7 @@ describe('the choice', () => {
     expect(readCardRows(store)).toBeNull();
   });
 
-  it('is the usual two when what was kept makes no sense', () => {
+  it('is the usual one when what was kept makes no sense', () => {
     const { box, store } = memory();
     for (const bad of ['tall', '-1', '1.5', '']) {
       box.set('agentbox.everything.cardRows', bad);
@@ -120,7 +122,7 @@ describe('in the app', () => {
 
   // The first build kept every row open after "Show 6 more", and at three
   // cards a row that was five rows over a chat whose space measured 0px. It
-  // is for finding someone, so picking them puts the two rows back, and only
+  // is for finding someone, so picking them puts the usual row back, and only
   // the grip's choice is kept.
   it('folds Show N more back once a card is picked, and does not keep it', () => {
     expect(area).toContain('useLayoutEffect(() => { setOpen(false); }, [picked]);');

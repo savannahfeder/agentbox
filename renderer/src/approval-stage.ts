@@ -14,6 +14,10 @@
 
 export interface StagedApproval { id: string }
 
+export function approvalClickAllowed(phone: boolean, detail: number, pressed: string | null, target: string): boolean {
+  return !phone || detail === 0 || pressed === target;
+}
+
 export interface Answered {
   id: string;
   allow: boolean;
@@ -38,7 +42,9 @@ export function approvalStage<T extends StagedApproval>(
   pending: readonly T[] | null | undefined,
   answered: Answered | null | undefined,
   leaving: T | null | undefined,
+  blocked = false,
 ): Stage<T> {
+  if (blocked) return { card: null, verdict: null, waiting: 0 };
   const queue = Array.isArray(pending) ? pending.filter(Boolean) : [];
 
   // The answered card keeps the stage: still in the snapshot if the push has

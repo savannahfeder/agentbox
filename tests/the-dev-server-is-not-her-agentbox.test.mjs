@@ -126,7 +126,8 @@ describe('the screen she was describing', () => {
     // If this line moves, the diagnosis in main/dev-window.mjs stops being true
     // and starts lying to whoever reads it next.
     expect(read('renderer/src/App.tsx')).toMatch(/if \(!snap\) return <Booting \/>;/);
-    expect(read('renderer/src/App.tsx')).toMatch(/<div className="boot"><span>\{NAME\}<\/span><\/div>/);
+    // Since w-eb1e55360c the boot screen is the moving logo, not the name.
+    expect(read('renderer/src/App.tsx')).toMatch(/<div className="boot" role="status" aria-label=\{`\$\{NAME\} is loading`\}><LogoOrbit \/><\/div>/);
   });
 });
 

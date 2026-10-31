@@ -14,6 +14,7 @@
 // without a window.
 
 import { PRACTICE_NAME, PRACTICE_TASK } from '../../shared/first-run-practice.mjs';
+import { titleFromFileName } from '../../shared/name-words.mjs';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import { DONE } from './done-word';
 // The walk's own question card, and the one answer this file shares with it:
@@ -447,14 +448,7 @@ export function stepBack(step: Step): Step | null {
  * THE NAME IS TAKEN FROM THE FOLDER. `~/Desktop/dev/agentbox-v2` reads as
  *  `Agentbox v2`, because the folder is a path and the name is a name. */
 export function nameFromFolder(path: string): string {
-  const base = path.replace(/\/+$/, '').split('/').pop() ?? '';
-  return base
-    .replace(/[-_.]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .split(' ')
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(' ');
+  return titleFromFileName(path.replace(/\/+$/, '').split('/').pop() ?? '');
 }
 
 /**

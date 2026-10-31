@@ -325,6 +325,9 @@ describe('teammates through the store', () => {
   it('a second pass while the teammate is busy is queued, then released when it is free', async () => {
     const ada = team.create({ starter: 'quality' });
     const felix = team.create({ starter: 'maintainer' });
+    // Told to take hand-offs straight away; one held for your yes does not queue.
+    const { writeTeammate } = await import('../main/store/teammates-files.mjs');
+    writeTeammate(team.dir(), felix.id, { handoffsNeedYes: false }, Date.now());
     const go = team.post({ text: 'go', to: [ada.id] });
     const also = team.post({ text: 'and this', to: [ada.id], fresh: true });
     await tick(Date.now());

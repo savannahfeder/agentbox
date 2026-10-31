@@ -207,7 +207,7 @@ describe('the account\'s skills', () => {
     const skill = path.join(configDir(), 'skills', 'writing', 'SKILL.md');
     fs.mkdirSync(path.dirname(skill), { recursive: true });
     fs.writeFileSync(skill, 'write plainly\n');
-    const folders = () => puts.filter((p) => /^runs\/cache\/\d+\/folder-[0-9a-f]{64}\.tgz$/.test(p.key));
+    const folders = () => puts.filter((p) => /^runs\/cache\/\d+\/skills-[0-9a-f]{64}\.tgz$/.test(p.key));
 
     expect(await launch().done).toBe(0);
     expect(folders()).toHaveLength(1);

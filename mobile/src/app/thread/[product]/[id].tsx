@@ -32,6 +32,7 @@ import { useCloud } from '../../../state/cloud';
 import { AttachSheet, Attached } from '../../../ui/Attach';
 import { SentFiles, ThreadFiles, useMessageFiles } from '../../../ui/Files';
 import { Back, Clip, DoneMark, More, Panel } from '../../../ui/icons';
+import { Waiting } from '../../../ui/LogoOrbit';
 import { Markdown, type MessageFiles } from '../../../ui/Markdown';
 import { footRoom, IconButton, Pickable, PriorityBars, RunningMark, T, TopBar, Wall } from '../../../ui/parts';
 import { ModelSheet, ModeSheet, PrioritySheet, barsFor } from '../../../ui/Pickers';
@@ -92,7 +93,7 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin }: {
         {/* Her words as typed; the files the app wrote into them are drawn, not read out. */}
         {yours ? (
           <>
-            {!!words.trim() && <T style={{ fontSize: 17, lineHeight: 26.35, fontFamily: font.medium }}>{words}</T>}
+            {!!words.trim() && <T selectable style={{ fontSize: 17, lineHeight: 26.35, fontFamily: font.medium }}>{words}</T>}
             <SentFiles text={e.text ?? ''} product={product} />
           </>
         ) : <Markdown text={e.text ?? ''} dir={dir} files={files} />}
@@ -292,13 +293,13 @@ export default function ThreadScreen() {
 
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
   const gate = screenGate(c);
-  if (gate === 'wait') return <Wall><View /></Wall>;
+  if (gate === 'wait') return <Wall><Waiting /></Wall>;
   if (gate === 'sign-in') return <Redirect href="/sign-in" />;
   if (!thread) {
     return (
       <Wall>
         <TopBar left={<IconButton label="Back" onPress={back}><Back /></IconButton>} />
-        <T style={{ padding: size.inset, color: color.dim }}>{c.loading ? '' : 'This thread is not on your phone.'}</T>
+        {c.loading ? <Waiting list /> : <T style={{ padding: size.inset, color: color.dim }}>This thread is not on your phone.</T>}
       </Wall>
     );
   }
@@ -428,10 +429,13 @@ export default function ThreadScreen() {
         </ScrollView>
         <Dock thread={thread} offers={offers} busy={busy} setBusy={setBusy} setError={setError} stop={() => void press({ kind: 'stop' })} />
       </KeyboardAvoidingView>
-      <ThreadMenu open={menu} close={() => setMenu(false)} now={c.now} laterNow={offers.laterNow} runNow={offers.runNow}
+      <ThreadMenu open={menu} close={() => setMenu(false)} now={c.now} laterNow={offers.laterNow} runNow={offers.runNow} moveToCloud={offers.moveToCloud}
         onLater={(until, label) => void press({ kind: 'later', until, label }, item, back)}
         onBack={() => void press({ kind: 'later', until: 0 })}
         onRunNow={() => void press({ kind: 'run-now' })}
+        onMoveToCloud={() => void press({ kind: 'move-to-cloud' })}
+        pinned={item.status === 'done' || item.waitsForMac ? null : !!item.pinned}
+        onPin={(pin) => void press({ kind: 'pin', pinned: pin })}
         onClose={close} />
       {summary && <Summary thread={thread} now={c.now} close={() => setSummary(false)} />}
     </Wall>

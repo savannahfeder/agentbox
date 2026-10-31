@@ -44,7 +44,9 @@ describe('on a phone, a row', () => {
 describe('on a phone, View and filters', () => {
   it('is one icon: the faces stay in its menu, not on its button', () => {
     expect(last('.th-disp .th-faces', 'display')).toBe('none');
-    expect(last('.topbar .th-disp', 'width')).toBe('40px');
+    // 44, the thumb's floor, since QA batch 005 F-121 measured these three
+    // corner icons as the ones a finger kept missing.
+    expect(last('.topbar .th-disp', 'width')).toBe('44px');
   });
 });
 

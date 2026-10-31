@@ -43,7 +43,17 @@
 .si-wait-row button { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
 .si-wait-row button:hover:not(:disabled) { color: var(--text); text-decoration-color: var(--text-dim); }
 .si-wait-row button:disabled { opacity: .45; cursor: default; }
-.si-error { margin: 14px 0 0; font-size: 13px; line-height: 19px; color: #e8836b; }
+/* WHAT WENT WRONG, AS A BLOCK AND NOT A FOOTNOTE (F-116). 13px of #e8836b at
+   the foot of the card was the faintest thing on a screen whose whole job at
+   that moment is to say the password was wrong. Same ink, a step brighter and
+   heavier, on a tint that marks it as the one thing here that is not ordinary. */
+.si-error {
+  margin: 14px 0 0; padding: 10px 12px;
+  border: 1px solid rgba(245, 168, 148, .32); border-radius: var(--radius);
+  background: rgba(232, 131, 107, .1);
+  font-size: 14px; line-height: 20px; font-weight: 500; color: #f5a894;
+}
+:root[data-theme="light"] .si-error { border-color: rgba(176, 58, 31, .3); background: rgba(176, 58, 31, .07); color: #9d3318; }
 .si-switch { margin: 20px 0 0; font-size: 13px; color: var(--text-faint); }
 .si-switch button { background: none; border: 0; padding: 0; font: inherit; color: var(--text); cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
 .si-switch button:hover { text-decoration-color: var(--text-dim); }

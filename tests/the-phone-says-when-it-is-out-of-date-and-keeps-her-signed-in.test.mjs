@@ -31,7 +31,7 @@ describe('the line over her inbox', () => {
   it('says when her computer was last online, once it has been away a while', () => {
     expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - 3 * 24 * 60 * MIN }, NOW)).toBe('Your computer was last online 3 days ago. What you send waits for it.');
     expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - 40 * MIN }, NOW)).toBe('Your computer was last online 40 minutes ago. What you send waits for it.');
-    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - 9 * MIN }, NOW)).toBe(null);
+    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - MIN }, NOW)).toBe(null);
     // No computer has ever put anything here: the inbox asks for one instead
     // (tests/the-web-app-says-when-no-computer-has-connected.test.mjs).
     expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: 0 }, NOW)).toBe(null);
@@ -44,7 +44,7 @@ describe('the line over her inbox', () => {
 });
 
 describe('her Mac', () => {
-  it('says it is still there every few minutes, even with nothing new to send', async () => {
+  it('says it is still there every thirty seconds, even with nothing new to send', async () => {
     const cloud = createMemoryCloud();
     let now = NOW;
     cloud.now = () => now;
@@ -57,12 +57,12 @@ describe('her Mac', () => {
     const seen = async () => (await memoryBackend(cloud, me).phoneProjects())[0].updatedAt;
     await inbox.syncOnce();
     expect(await seen()).toBe(NOW);
-    now += MIN;
+    now += 29_999;
     await inbox.syncOnce();
     expect(await seen()).toBe(NOW);
-    now += 5 * MIN;
+    now += 1;
     await inbox.syncOnce();
-    expect(await seen()).toBe(NOW + 6 * MIN);
+    expect(await seen()).toBe(NOW + 30_000);
   });
 
   it('takes the other commands when one reply\'s file cannot be fetched just now, and that one next time', async () => {

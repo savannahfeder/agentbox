@@ -30,8 +30,8 @@ describe('a person\'s chat opened from the Chats list', () => {
   });
 
   it('wears the Chats bar, not the thread page\'s: Chats over the list, its name over the chat', () => {
-    // Under Everything else's cards (w-b5f23cff71) the top bar is the inbox's, and the bar under the cards holds the chat's buttons.
-    expect(app).toMatch(/focused \? \(inTeamChat \? <><h1 className="workspace-title">[^\n]{0,120}<\/h1><div className="workspace-artifact-header" ref=\{setArtifactHeader\} \/><\/> : inChats \? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">Chats<\/span><\/div><div className="workspace-task-header cx-task-header" ref=\{setTaskHeader\} \/><\/div>/);
+    // With a team on too: no chat opens under Everything else's cards any more (w-2b3e1a85e5).
+    expect(app).toMatch(/focused \? \(inChats \? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">Chats<\/span><\/div><div className="workspace-task-header cx-task-header" ref=\{setTaskHeader\} \/><\/div>/);
     expect(app).toMatch(/\$\{focused && !settingsOpen && !inChats \? ' workspace-task' : ''\}/);
     expect(focus).toMatch(/const barContent = inChats\s*\? <><h1 className="workspace-title gc-head-group cx-person"><span className="rm-one">\{threadName\}<\/span><\/h1>/);
   });
