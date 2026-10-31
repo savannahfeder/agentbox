@@ -181,7 +181,7 @@ describe('the Status cell', () => {
   it('keeps Queued, with a card saying it waits for the cloud', () => {
     const cell = statusCell(row, facts({ queued: ['w-1'], whyNotCloud: { at: 'wait-cloud', why: 'starting-in-turn' } }));
     expect(cell.word).toBe('Queued');
-    expect(cell.why).toEqual({ head: 'Queued for the cloud', body: 'The cloud starts threads a few at a time, and this one is next in line.' });
+    expect(cell.why).toEqual({ head: 'Queued for the cloud', body: 'The cloud starts threads a few at a time, and this one is in line.' });
   });
 
   it('draws the card under the word in the list, hidden until hovered', () => {

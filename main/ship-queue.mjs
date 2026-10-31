@@ -385,14 +385,15 @@ export class ShipQueue {
     this.log.info?.(`zero: shipping ${item.id} from ${cwd}`);
     // The push hook leaves tests already red on main out of its refusal.
     const red = redOnMain(this.userDir);
-    const giveBack = await shipSlot(this.memoryGate(), item, this.shipScore(item), {
+    const gate = this.memoryGate();
+    const giveBack = gate && await shipSlot(gate, item, this.shipScore(item), {
       onWait: () => { try { this.store.noteItem?.(item.product, item.id, 'Waiting for memory on this computer before shipping.'); } catch { /* the ship still waits */ } },
     });
     let ran;
     try {
       ran = await this.run(script, cwd, red.length ? { env: { ...process.env, AGENTBOX_RED_ON_MAIN: red.join('\n') } } : undefined);
     } finally {
-      giveBack();
+      giveBack?.();
     }
     const { code, out } = ran;
     try {

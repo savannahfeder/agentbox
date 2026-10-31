@@ -317,10 +317,10 @@ stdout and stderr come back byte for byte. Its life:
   fault (redeliver, no attempt spent) rather than a finished run.
 - **Slots (R13).** Local capacity counts local sessions only. A Claude thread
   may take a cloud slot when no local slot is free, cloud runs are on, fewer
-  than `maxCloudSessions` cloud runs are live (default 50 through the shared
+  than `maxCloudSessions` cloud runs are live (default 200 through the shared
   host, 20 without it), and an account is healthy. With Everything
   (`cloudRuns: 'all'`) a thread that may go to the cloud waits for a cloud slot
-  (cap, two starting, accounts at their limit or renewing) and never falls back
+  (cap, the earned number starting, accounts at their limit or renewing) and never falls back
   to the Mac (2026-10-17, her Mac overloaded with Everything on). "Starting"
   is this Mac packing and sending a run; once the cloud takes its start, the
   next one begins (2026-10-20), and the run's log says how long each part of
