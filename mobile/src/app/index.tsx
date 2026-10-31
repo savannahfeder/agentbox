@@ -9,7 +9,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { Name } from '../../../shared/product-name.mjs';
 import { InboxComposer } from '../ui/NewThreadForm';
-import { phoneBoard, shownTabs, type Row, type TabId } from '../lib/tabs';
+import { phoneBoard, shownTabs, TABS, type Row, type TabId } from '../lib/tabs';
+import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
+import { EverythingPlace } from '../ui/Everything';
 import { bottomTabs, type PlaceId } from '../lib/groups';
 import { useGroups } from '../state/groups';
 import { GroupsPlace } from '../ui/Groups';
@@ -132,12 +134,11 @@ function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: an
  * moved up: "the nav at the bottom is very good so just shift that ui upward,
  * without messing much with spacing". The bar's line along their top is gone,
  * since the title bar's is under them; they scroll sideways when they do not fit. */
-function Tabs({ on, counts, pick, groups }: { on: PlaceId; counts: Record<PlaceId, number>; pick: (t: PlaceId) => void; groups: boolean }) {
-  const teammates = !!useCloud().team;
+function Tabs({ on, counts, pick, team }: { on: PlaceId; counts: Record<PlaceId, number>; pick: (t: PlaceId) => void; team: boolean }) {
   return (
     <View style={{ height: size.tabs, flexDirection: 'row', alignItems: 'center' }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', paddingLeft: size.inset, paddingRight: 8, gap: 22 }}>
-        {bottomTabs(groups, teammates).map((t) => (
+        {bottomTabs(team).map((t) => (
           <Pressable key={t.id} onPress={() => pick(t.id)} accessibilityRole="tab" accessibilityState={{ selected: on === t.id }}
             style={{ height: 32, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: on === t.id ? color.accent : 'transparent' }}>
             <T style={{ fontSize: 15, lineHeight: 30, color: on === t.id ? color.text : color.dim }}>{t.label}</T>
@@ -209,12 +210,12 @@ function FilteredEmpty({ tab, hidden, clear }: { tab: TabId; hidden: number; cle
 }
 
 /** The board: a column a swipe, each scrolling on its own (phone.css `.th-board`). */
-function Board({ columns, foot }: { columns: ReturnType<typeof phoneBoard>; foot: number }) {
+function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phoneBoard>; foot: number; inset?: number }) {
   const { width } = useWindowDimensions();
-  const col = Math.round((width - 24) * 0.86);
+  const col = Math.round((width - inset * 2) * 0.86);
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={col + 12} decelerationRate="fast"
-      contentContainerStyle={{ paddingHorizontal: 12, gap: 12 }} style={{ flex: 1 }}>
+      contentContainerStyle={{ paddingHorizontal: inset, gap: 12 }} style={{ flex: 1 }}>
       {columns.map((c) => (
         <ScrollView key={c.state} style={{ width: col }} contentContainerStyle={{ paddingBottom: 88 + foot }} showsVerticalScrollIndicator={false}>
           <View style={{ height: 38, paddingTop: 8, flexDirection: 'row', alignItems: 'center' }}>
@@ -252,12 +253,27 @@ export default function Threads() {
   const inset = useSafeAreaInsets();
   const groups = useGroups();
   const [place, setPlace] = useState<PlaceId>('inbox');
-  // A group opened from Chats, drawn in Chats' place until you go back.
-  const [chatGroup, setChatGroup] = useState(false);
-  // Groups or teammates switched off on the computer while open: back to the threads.
-  const onGroups = place === 'groups' && groups.on && !c.team;
-  const onChats = (place === 'chats' || place === 'groups') && !!c.team;
-  const tab: TabId = place === 'groups' || place === 'chats' ? 'inbox' : place;
+  // A group opened from Chats or a card, drawn in Chats' place until you go back to where you were.
+  const [chatGroup, setChatGroup] = useState<PlaceId | null>(null);
+  // Groups and teammates both off on the computer while open: back to the threads.
+  const teamMode = !!c.team || groups.on;
+  const onChats = teamMode && place === 'chats';
+  const onEverything = teamMode && place !== 'inbox' && place !== 'chats';
+  // In progress, Later and Done are your own card's work on Everything else.
+  const [mineTab, setMineTab] = useState<Exclude<TabId, 'inbox'>>('progress');
+  const [evView, setEvViewRaw] = useState<EvView>(() => evViewOf(appStore));
+  const setEvView = (v: EvView) => { setEvViewRaw(v); keepEvView(v, appStore); };
+  const tab: TabId = onEverything ? mineTab : place === 'everything' || place === 'chats' || teamMode ? 'inbox' : place;
+  const openGroup = (id: string) => { groups.setLast(id); setChatGroup(place); setPlace('chats'); };
+  // A command from Search (app/search.tsx).
+  useEffect(() => {
+    const w = c.wanted;
+    if (!w) return;
+    c.takeWanted();
+    setChatGroup(w.group ? 'chats' : null);
+    if (w.menu) setMenu(true);
+    if (w.place !== 'inbox' && w.place !== 'chats' && w.place !== 'everything' && teamMode) { setMineTab(w.place); setPlace('everything'); } else setPlace(w.place);
+  }, [c.wanted]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pulling, setPulling] = useState(false);
   const [menu, setMenu] = useState(false);
   // Remembered between launches, as the site keeps it in the page's storage.
@@ -265,18 +281,23 @@ export default function Threads() {
   const setDisplay = (d: Display) => { setDisplayRaw(d); writeDisplay('inbox', d, appStore); };
   const order = useMemo(() => c.view.products.map((p) => p.slug), [c.view.products]);
   const shown = useMemo(() => shownTabs(c.tabs, display, c.now, order), [c.tabs, display, c.now, order]);
-  const board = useMemo(() => (display.view === 'board' ? phoneBoard(c.view, c.tabs, display, c.now) : null), [display, c.view, c.tabs, c.now]);
+  const board = useMemo(() => (!teamMode && display.view === 'board' ? phoneBoard(c.view, c.tabs, display, c.now) : null), [teamMode, display, c.view, c.tabs, c.now]);
+  // Your card's board: your own threads, and what waits on you is Needs you, so it is no column (whose-board.ts).
+  const mineBoard = useMemo(() => (onEverything && evView === 'board'
+    ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, display, c.now).filter((col) => col.state !== 'waiting') : null), [onEverything, evView, display, c.view, c.tabs, c.now]);
+  const rowOf = useMemo(() => new Map(Object.values(c.tabs).flat().map((r) => [r.key, r])), [c.tabs]);
   if (!c.opened) return <Wall><Waiting /></Wall>;
   if (!c.signedIn) return <Redirect href="/sign-in" />;
-  const rows = shown.rows[tab];
+  // Under your own card, your threads without your AI teammates' runs, which their cards hold.
+  const rows = onEverything ? myItems(shown.rows[tab].map((r) => ({ ...r, labels: r.item?.labels }))) as typeof shown.rows[TabId] : shown.rows[tab];
   // Later counts its repeating tasks too, as the desktop's does (App.tsx `scheduledCount`).
   // Messages in your groups that name you lead Needs you, and count in it (App.tsx `MentionRows`).
   const mentions = groups.on ? mentionRows(groups.state.mentions) : [];
-  const openMention = (m: MentionRowData) => { groups.setLast(m.roomId); if (c.team) { setChatGroup(true); setPlace('chats'); } else setPlace('groups'); };
-  const counts = { inbox: shown.rows.inbox.length + mentions.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, groups: groups.unread, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0) };
+  const openMention = (m: MentionRowData) => openGroup(m.roomId);
+  const counts = { inbox: shown.rows.inbox.length + mentions.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0) };
   const repeatsShown = tab === 'snoozed' && c.repeats.length > 0;
   const mentionsShown = tab === 'inbox' && mentions.length > 0;
-  const hidden = shown.whole[tab] - rows.length;
+  const hidden = shown.whole[tab] - shown.rows[tab].length;
   const foot = footRoom(inset);
   const clear = () => setDisplay({ ...display, priorities: [], projects: [], updated: 'any', privacy: 'any' });
   // A permission card sits over the corner the pen is in, so the pen moves up to the bar (8fa6c548).
@@ -291,51 +312,67 @@ export default function Threads() {
       </Wall>
     );
   }
-  if (onGroups) {
-    return (
-      <Wall>
-        <GroupsPlace tabs={<Tabs on="groups" counts={counts} pick={setPlace} groups />} />
-      </Wall>
-    );
-  }
   if (onChats) {
     return (
       <Wall>
         {chatGroup && groups.on
-          ? <GroupsPlace onBack={() => setChatGroup(false)} />
-          : <ChatsPlace tabs={<Tabs on="chats" counts={counts} pick={setPlace} groups={groups.on} />} openGroup={(id) => { groups.setLast(id); setChatGroup(true); }} />}
+          ? <GroupsPlace onBack={() => { setPlace(chatGroup); setChatGroup(null); }} />
+          : <ChatsPlace tabs={<Tabs on="chats" counts={counts} pick={setPlace} team />} openGroup={(id) => { groups.setLast(id); setChatGroup('chats'); }} />}
       </Wall>
     );
   }
+  // With a team on, List and Board in the View menu are Everything else's (App.tsx `headerDisplay`).
+  const headerDisplay = teamMode ? { ...display, view: evView } : display;
+  const onHeaderDisplay = !teamMode ? setDisplay : (d: Display) => {
+    if (d.view !== evView) { setEvView(d.view as EvView); if (place === 'inbox') setPlace('everything'); }
+    setDisplay({ ...d, view: display.view });
+  };
+  const threadRow = (i: any, first: boolean) => {
+    const r = rowOf.get(`${i.product}/${i.id}`);
+    return r ? <ThreadRow key={r.key} row={r} first={first} unread={c.unread(i)} mate={mateOf(i, c.team)} /> : null;
+  };
+  const list = (
+    <FlatList
+      data={rows}
+      keyExtractor={(r) => r.key}
+      renderItem={({ item, index }) => <ThreadRow row={item} first={index === 0 && !repeatsShown && !mentionsShown} unread={c.unread(item.item)} mate={mateOf(item.item, c.team)} />}
+      refreshControl={<RefreshControl tintColor={color.dim} refreshing={pulling} onRefresh={async () => { setPulling(true); await c.refresh(); setPulling(false); }} />}
+      keyboardShouldPersistTaps="handled"
+      ListHeaderComponent={repeatsShown ? <RepeatRows repeats={c.repeats} items={c.view.items} now={c.now} />
+        : mentionsShown ? <View>{mentions.map((m, i) => <MentionRow key={m.id} m={m} first={i === 0} now={c.now} open={() => openMention(m)} />)}</View> : undefined}
+      ListEmptyComponent={c.loading ? <Waiting list /> : repeatsShown || mentionsShown ? undefined : hidden > 0 ? <FilteredEmpty tab={tab} hidden={hidden} clear={clear} />
+        : tab === 'inbox' ? <InboxClear />
+          : <T style={{ paddingHorizontal: size.inset, paddingTop: 28, fontSize: 15, lineHeight: 23, color: color.dim }}>{EMPTY[tab]}</T>}
+      contentContainerStyle={{ paddingBottom: 96 }}
+    />
+  );
+  // Your card's words for its list; its board's columns already say them.
+  const mineTabs = evView === 'list' ? (
+    <View style={{ flexDirection: 'row', gap: 14, marginLeft: 8 }}>
+      {TABS.filter((t) => t.id !== 'inbox').map((t) => (
+        <Pressable key={t.id} onPress={() => setMineTab(t.id as typeof mineTab)} accessibilityRole="tab" accessibilityState={{ selected: mineTab === t.id }} hitSlop={6}>
+          <T style={{ fontSize: 13, color: mineTab === t.id ? color.text : color.faint }}>{t.label}</T>
+        </Pressable>
+      ))}
+    </View>
+  ) : undefined;
   return (
     <Wall>
-      <TopBar title="Threads" right={<>
+      <TopBar title={teamMode ? 'Inbox' : 'Threads'} right={<>
         <IconButton label="Search threads" onPress={() => router.push('/search')}><Magnifier size={18} /></IconButton>
         {penUp && <IconButton label="New thread" onPress={() => router.push('/new')}><Pen size={18} tint={color.dim} /></IconButton>}
         <ViewButton display={display} open={menu} onPress={() => setMenu(!menu)} />
         <IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>
-      </>} below={board ? undefined : <Tabs on={tab} counts={counts} pick={setPlace} groups={groups.on} />} />
+      </>} below={board ? undefined : <Tabs on={onEverything ? 'everything' : tab} counts={counts} pick={setPlace} team={teamMode} />} />
       {/* `.phone-status` (threads/pages.css): the line saying what you see may be out of date. */}
       {c.status && (
         <View accessibilityRole="alert" style={{ marginTop: 6, marginHorizontal: size.inset, marginBottom: 2, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: color.lineStrong }}>
           <T style={{ fontSize: 13, lineHeight: 18.2, color: color.dim }}>{c.status}</T>
         </View>
       )}
-      {board ? <Board columns={board} foot={foot} /> : (
-        <FlatList
-          data={rows}
-          keyExtractor={(r) => r.key}
-          renderItem={({ item, index }) => <ThreadRow row={item} first={index === 0 && !repeatsShown && !mentionsShown} unread={c.unread(item.item)} mate={mateOf(item.item, c.team)} />}
-          refreshControl={<RefreshControl tintColor={color.dim} refreshing={pulling} onRefresh={async () => { setPulling(true); await c.refresh(); setPulling(false); }} />}
-          keyboardShouldPersistTaps="handled"
-          ListHeaderComponent={repeatsShown ? <RepeatRows repeats={c.repeats} items={c.view.items} now={c.now} />
-            : mentionsShown ? <View>{mentions.map((m, i) => <MentionRow key={m.id} m={m} first={i === 0} now={c.now} open={() => openMention(m)} />)}</View> : undefined}
-          ListEmptyComponent={c.loading ? <Waiting list /> : repeatsShown || mentionsShown ? undefined : hidden > 0 ? <FilteredEmpty tab={tab} hidden={hidden} clear={clear} />
-            : tab === 'inbox' ? <InboxClear />
-              : <T style={{ paddingHorizontal: size.inset, paddingTop: 28, fontSize: 15, lineHeight: 23, color: color.dim }}>{EMPTY[tab]}</T>}
-          contentContainerStyle={{ paddingBottom: 96 }}
-        />
-      )}
+      {onEverything
+        ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
+        : board ? <Board columns={board} foot={foot} /> : list}
       {!penUp && !(inboxEmpty && !board) && <Pressable accessibilityLabel="New thread" accessibilityRole="button" onPress={() => router.push('/new')}
         style={({ pressed }) => ({
           position: 'absolute', right: 20, bottom: foot + 16, width: 56, height: 56, borderRadius: 28,
@@ -344,7 +381,7 @@ export default function Threads() {
         })}>
         <Pen />
       </Pressable>}
-      {menu && <ViewMenu display={display} onDisplay={setDisplay} products={c.view.products} items={c.view.items} shown={rows.length} total={shown.whole[tab]} tab={tab} close={() => setMenu(false)} />}
+      {menu && <ViewMenu display={headerDisplay} onDisplay={onHeaderDisplay} products={c.view.products} items={c.view.items} shown={rows.length} total={shown.whole[tab]} tab={tab} close={() => setMenu(false)} />}
     </Wall>
   );
 }

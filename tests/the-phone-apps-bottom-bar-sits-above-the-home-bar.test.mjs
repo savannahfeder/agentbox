@@ -38,6 +38,6 @@ describe("the inbox's search", () => {
   });
 
   it('is in the top bar on the list and the board alike', () => {
-    expect(inbox).toMatch(/<TopBar title="Threads" right=\{<>\s*<IconButton label="Search threads" onPress=\{\(\) => router\.push\('\/search'\)\}><Magnifier size=\{18\} \/><\/IconButton>/);
+    expect(inbox).toMatch(/<TopBar title=\{teamMode \? 'Inbox' : 'Threads'\} right=\{<>\s*<IconButton label="Search threads" onPress=\{\(\) => router\.push\('\/search'\)\}><Magnifier size=\{18\} \/><\/IconButton>/);
   });
 });

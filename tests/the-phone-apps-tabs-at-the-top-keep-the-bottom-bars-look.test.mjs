@@ -39,11 +39,10 @@ describe("the phone app's tabs, now at the top", () => {
     expect(tabs).toMatch(/height: 32, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: on === t\.id \? color\.accent : 'transparent'/);
     expect(tabs).not.toMatch(/position: 'absolute'/);
   });
-  it('are drawn inside the title bar, on the list, on Groups and on Chats, and never at the foot', () => {
-    expect(inbox).toMatch(/below=\{board \? undefined : <Tabs on=\{tab\} counts=\{counts\} pick=\{setPlace\} groups=\{groups\.on\} \/>\}/);
-    expect(inbox).toMatch(/<GroupsPlace tabs=\{<Tabs on="groups"/);
+  it('are drawn inside the title bar, on the list and on Chats, and never at the foot', () => {
+    expect(inbox).toMatch(/below=\{board \? undefined : <Tabs on=\{onEverything \? 'everything' : tab\} counts=\{counts\} pick=\{setPlace\} team=\{teamMode\} \/>\}/);
     expect(inbox).toMatch(/<ChatsPlace tabs=\{<Tabs on="chats"/);
     expect(fs.readFileSync('mobile/src/ui/Teammates.tsx', 'utf8')).toMatch(/<TopBar title="Chats" right=\{[^\n]*below=\{tabs\} \/>/);
-    expect(inbox.match(/<Tabs /g)).toHaveLength(3);
+    expect(inbox.match(/<Tabs /g)).toHaveLength(2);
   });
 });

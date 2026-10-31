@@ -54,10 +54,16 @@ function useGroupsState() {
     void groups.markRead(roomId).catch(() => { /* read again at the next look */ });
     setState(groups.state());
   }, [groups]);
+  // A file a message links, as base64, or null when the cloud does not have it.
+  const fileOf = useCallback(async (roomId: string, name: string): Promise<string | null> => {
+    if (!groups) return null;
+    const got = await groups.door({ op: 'file', args: [roomId, name] });
+    return got.ok ? (got.value as string | null) : null;
+  }, [groups]);
   const setLast = useCallback((id: string) => { setLastRaw(id); appStore.setItem(LAST_GROUP_KEY, id); }, []);
 
   return {
-    on, state, last, setLast, send, markRead, refresh, setWatching,
+    on, state, last, setLast, send, markRead, refresh, setWatching, fileOf,
     unread: state.rooms.filter((r) => r.unread > 0).length,
     meId: cloud?.session()?.user.id ?? null,
   };

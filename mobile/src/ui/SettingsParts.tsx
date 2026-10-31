@@ -11,17 +11,23 @@ import { Back, Caret } from './icons';
 import { Sheet, SheetHead, SheetRow, T, Wall } from './parts';
 import { color, font, size } from './theme';
 
-export function Page({ title, lede, back = 'Settings', children }: { title: string; lede?: string; back?: string; children: ReactNode }) {
+export function Page({ title, lede, back = 'Settings', right, head, children }: { title: string; lede?: string; back?: string; /** At the right of the Back row. */ right?: ReactNode; /** Takes the Back row's place (Settings' search field). */ head?: ReactNode; children: ReactNode }) {
   const inset = useSafeAreaInsets();
   const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
   return (
     <Wall>
       <View style={{ paddingTop: inset.top }}>
-        <View style={{ height: size.topBar, flexDirection: 'row', alignItems: 'center', paddingLeft: size.inset, paddingRight: 8 }}>
-          <Pressable onPress={leave} accessibilityRole="button" style={{ height: 40, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 10 }}>
-            <Back size={14} />
-            <T style={{ fontSize: 13, letterSpacing: 0.52, color: color.dim }}>{back}</T>
-          </Pressable>
+        <View style={{ height: size.topBar, flexDirection: 'row', alignItems: 'center', paddingLeft: head ? 12 : size.inset, paddingRight: head ? 12 : 8 }}>
+          {head ?? (
+            <>
+              <Pressable onPress={leave} accessibilityRole="button" style={{ height: 40, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 10 }}>
+                <Back size={14} />
+                <T style={{ fontSize: 13, letterSpacing: 0.52, color: color.dim }}>{back}</T>
+              </Pressable>
+              <View style={{ flex: 1 }} />
+              {right}
+            </>
+          )}
         </View>
       </View>
       <ScrollView contentContainerStyle={{ paddingTop: 20, paddingHorizontal: size.inset, paddingBottom: 40 + inset.bottom }}>

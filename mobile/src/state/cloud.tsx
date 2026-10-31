@@ -26,6 +26,7 @@ import { withDeadline } from '../lib/deadline';
 import { keptStore } from '../lib/kept';
 import { previewCloud } from '../lib/preview';
 import { ALERTS_KEY, leaveAddress, readAlerts, takeAddressBack, type KeptAlerts } from '../lib/push-device';
+import type { PlaceId } from '../lib/groups';
 import { phoneTabs } from '../lib/tabs';
 import { onTheirWay, teamFrom } from '../lib/teammates';
 import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen } from '../lib/unread';
@@ -248,6 +249,10 @@ function useCloudState() {
     return made;
   }, [sender, say, agreed]);
 
+  // Where a command in Search sends the inbox page, and a permission card put aside (App.tsx `minimizedApproval`).
+  const [wanted, setWanted] = useState<{ place: PlaceId; menu?: boolean; group?: boolean } | null>(null);
+  const [minimizedApproval, setMinimizedApproval] = useState<string | null>(null);
+
   // A message to a teammate, someone new, or a go-ahead, left for the computer
   // that sent the teammates (shared/phone-settings.mjs `teammate`).
   const askTeammate = useCallback(async (key: 'post' | 'describe' | 'goAhead', value: Record<string, unknown>) => {
@@ -312,7 +317,7 @@ function useCloudState() {
 
   return {
     cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, now, refresh, send, attach, fileOf, toast, say,
-    team, teamPending, watchTeam, askTeammate,
+    team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
     notice, noticeRead, agreed, answerNotice, withdrawNotice: () => answerNotice(false),
     alerts, turnOnAlerts, turnOffAlerts,
