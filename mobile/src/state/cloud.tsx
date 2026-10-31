@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
 import { cloudClient, type CloudClient } from '../../../renderer/src/cloud-rest';
-import { PROJECTS_SELECT, cloudCarriesOn, macSeenOf, phoneConnectState, phoneSlug, phoneStatusLine, phoneView, readCommands, readSettingsRows, readThreads, splitSlug, type PhoneRows } from '../../../renderer/src/phone-rows';
+import { PROJECTS_SELECT, cloudCarriesOn, macSeenOf, phoneConnectState, phoneSlug, phoneStatusLine, phoneView, readCommands, readSettingsRows, readThreads, settingCommand, splitSlug, type PhoneRows } from '../../../renderer/src/phone-rows';
 import { phoneRepeats, type RepeatSettingsRow } from '../../../renderer/src/phone-repeats';
 import { sendPhoneFeedback, type FeedbackFiles } from '../../../renderer/src/phone-feedback';
 import { phoneSender } from '../../../renderer/src/phone-send';
@@ -27,7 +27,8 @@ import { keptStore } from '../lib/kept';
 import { previewCloud } from '../lib/preview';
 import { ALERTS_KEY, leaveAddress, readAlerts, takeAddressBack, type KeptAlerts } from '../lib/push-device';
 import { phoneTabs } from '../lib/tabs';
-import { isUnread, markSeen as markSeenIn, readSeen } from '../lib/unread';
+import { onTheirWay, teamFrom } from '../lib/teammates';
+import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen } from '../lib/unread';
 import { alertToken, alertTokenIfAllowed, setIconCount } from '../platform/alerts';
 import { appStore, persist } from '../platform/persist';
 
@@ -36,6 +37,8 @@ export type Cloud = Pick<CloudClient, 'session' | 'signedIn' | 'generation' | 's
 const EMPTY: PhoneRows = { projects: [], threads: [], commands: [] };
 const EVERY_MS = 5000;
 const SETTINGS_EVERY_MS = 30_000;
+// Your teammates ride with the settings, so while a chat with one is open they are read with the threads.
+const TEAM_WATCHED_MS = EVERY_MS;
 const PREVIEW = process.env.EXPO_PUBLIC_PREVIEW === '1';
 const APP_VERSION = Constants.expoConfig?.version ?? null;
 const BUILD = Constants.nativeBuildVersion ?? null;
@@ -67,6 +70,7 @@ function useCloudState() {
   const links = useRef<Links>(new Map());
   const [settingsRows, setSettingsRows] = useState<RepeatSettingsRow[]>([]);
   const settingsAt = useRef(-Infinity);
+  const teamWatched = useRef(0);
   const [signedAt, setSignedAt] = useState(0);
 
   useEffect(() => {
@@ -88,7 +92,7 @@ function useCloudState() {
         if (cloud.generation() !== asked) { cache.current.clear(); return; }
         setRows({ projects, threads, commands });
         // The computer's settings copy carries its repeating tasks (main/phone-inbox.mjs); it changes far less often.
-        if (Date.now() - settingsAt.current > SETTINGS_EVERY_MS) {
+        if (Date.now() - settingsAt.current > (teamWatched.current > 0 ? TEAM_WATCHED_MS : SETTINGS_EVERY_MS)) {
           settingsAt.current = Date.now();
           void readSettingsRows(select).then((got) => { if (cloud.generation() === asked) setSettingsRows(got); }, () => { settingsAt.current = -Infinity; });
         }
@@ -123,11 +127,21 @@ function useCloudState() {
   const view = useMemo(() => phoneView(rows, now), [rows, now]);
   const tabs = useMemo(() => phoneTabs(view, now), [view, now]);
   const repeats = useMemo(() => phoneRepeats(settingsRows, rows.commands, rows.projects, now), [settingsRows, rows.commands, rows.projects, now]);
+  const team = useMemo(() => teamFrom(settingsRows), [settingsRows]);
+  const teamPending = useMemo(() => onTheirWay(rows.commands, team, now), [rows.commands, team, now]);
+  /** A chat with a teammate is on screen until the returned function runs. */
+  const watchTeam = useCallback(() => {
+    teamWatched.current += 1;
+    settingsAt.current = -Infinity;
+    void refresh();
+    return () => { teamWatched.current -= 1; };
+  }, [refresh]);
   const status = signedIn ? phoneStatusLine({ error: read.error, fetchedAt: read.fetchedAt, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) }, now) : null;
   // No computer has sent this account a project yet: the inbox says how to connect one.
   const connect = phoneConnectState({ signedIn, started: !read.first, error: read.error, projects: rows.projects, email: cloud?.session()?.user.email });
   const [seen, setSeen] = useState(() => readSeen(appStore));
   const markSeen = useCallback((item: { product: string; id: string }) => setSeen((s) => markSeenIn(s, item, appStore)), []);
+  const markUnseen = useCallback((item: { product: string; id: string }) => setSeen((s) => markUnseenIn(s, item, appStore)), []);
   const unread = useCallback((item: { product: string; id: string }) => isUnread(item, seen), [seen]);
   const aliases = useRef(view.aliases);
   aliases.current = view.aliases;
@@ -234,6 +248,21 @@ function useCloudState() {
     return made;
   }, [sender, say, agreed]);
 
+  // A message to a teammate, someone new, or a go-ahead, left for the computer
+  // that sent the teammates (shared/phone-settings.mjs `teammate`).
+  const askTeammate = useCallback(async (key: 'post' | 'describe' | 'goAhead', value: Record<string, unknown>) => {
+    if (!cloud || !team) throw new Error('Your computer has not sent your teammates yet.');
+    if (key !== 'goAhead' && !agreed) {
+      router.push('/ai-notice');
+      throw new Error('Not sent yet. Your agent needs your yes first.');
+    }
+    const asked = cloud.generation();
+    const row = await cloud.insertCommand(settingCommand(team.device, { scope: 'teammate', key, value }));
+    if (cloud.generation() === asked) setRows({ ...rowsNow.current, commands: [...rowsNow.current.commands, row] });
+    setNow(Date.now());
+    return row;
+  }, [cloud, team, agreed, setRows]);
+
   // Files go to your own storage, in the folder of the computer the project is
   // on, as the phone site sends them; the message then links them.
   const attach = useCallback(async (product: string, files: Picked[]): Promise<Saved[]> => {
@@ -283,10 +312,11 @@ function useCloudState() {
 
   return {
     cloud, opened, signedIn, rows, view, tabs, repeats, status, loading: read.first, now, refresh, send, attach, fileOf, toast, say,
+    team, teamPending, watchTeam, askTeammate,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
     notice, noticeRead, agreed, answerNotice, withdrawNotice: () => answerNotice(false),
     alerts, turnOnAlerts, turnOffAlerts,
-    connect, markSeen, unread, sendFeedback, version: APP_VERSION, build: BUILD,
+    connect, markSeen, markUnseen, unread, sendFeedback, version: APP_VERSION, build: BUILD,
     // The one map of her files' links, filled in place; `signedAt` moves when it does.
     links: links.current, signedAt,
   };

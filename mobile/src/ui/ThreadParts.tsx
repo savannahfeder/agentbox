@@ -153,6 +153,7 @@ export function LiveLine({ live }: { live: Live }) {
       <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 13.5, lineHeight: 20, fontFamily: font.medium, color: live.working ? color.text : color.dim }}>{live.word}</T>
       {live.working && live.more > 0 && <T style={{ fontSize: 13.5, lineHeight: 20, color: color.faint }}>{`+${live.more}`}</T>}
       {!!live.span && <T style={{ fontSize: 13.5, lineHeight: 20, color: color.faint }}>{live.span}</T>}
+      {!!live.place && <T style={{ fontSize: 13.5, lineHeight: 20, color: color.faint }}>{live.place}</T>}
     </>
   );
   return (

@@ -119,9 +119,10 @@ describe('the tabs on the phone app', () => {
   it('are drawn inside the top bar, above its one line, and only there', () => {
     expect(between(parts, 'export function TopBar(')).toMatch(/\{below\}/);
     expect(inbox).toMatch(/below=\{board \? undefined : <Tabs on=\{tab\} counts=\{counts\} pick=\{setPlace\} groups=\{groups\.on\} \/>\}/);
-    // And under Groups' own bar while Groups is open, never along the foot.
+    // And under Groups' or Chats' own bar while one is open, never along the foot.
     expect(inbox).toMatch(/<GroupsPlace tabs=\{<Tabs on="groups"/);
-    expect(inbox.match(/<Tabs /g)).toHaveLength(2);
+    expect(inbox).toMatch(/<ChatsPlace tabs=\{<Tabs on="chats"/);
+    expect(inbox.match(/<Tabs /g)).toHaveLength(3);
   });
   it('draw no line of their own; the picked word is underlined, as at the bottom', () => {
     // The look itself is in the-phone-apps-tabs-at-the-top-keep-the-bottom-bars-look.

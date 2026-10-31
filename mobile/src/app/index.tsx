@@ -6,13 +6,18 @@ import { Redirect, router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { readDisplay, writeDisplay, filteredEmptyWords, type Display } from '../../../renderer/src/threads/page-rules';
+import { readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { Name } from '../../../shared/product-name.mjs';
 import { InboxComposer } from '../ui/NewThreadForm';
 import { phoneBoard, shownTabs, type Row, type TabId } from '../lib/tabs';
 import { bottomTabs, type PlaceId } from '../lib/groups';
 import { useGroups } from '../state/groups';
 import { GroupsPlace } from '../ui/Groups';
+import { ChatsPlace, TeammateMark, teammatesWaiting } from '../ui/Teammates';
+import { Face } from '../ui/Groups';
+import { mentionRows, type MentionRow as MentionRowData } from '../../../renderer/src/team/rooms/room-rules';
+import { mateOf } from '../lib/teammates';
+import type { Teammate } from '../../../renderer/src/types';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { Magnifier, StateGlyph, ViewButton, ViewMenu } from '../ui/Filters';
@@ -33,7 +38,7 @@ const EMPTY: Record<Exclude<TabId, 'inbox'>, string> = {
 
 const open = (product: string, id: string) => router.push({ pathname: '/thread/[product]/[id]', params: { product, id } });
 
-function ThreadRow({ row, first, unread }: { row: Row; first: boolean; unread: boolean }) {
+function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unread: boolean; mate: Teammate | null }) {
   // "not started" or "2 tasks to approve", faint after the title (Pages.tsx `RowCells`).
   const aside = row.held ? 'not started' : row.toApprove;
   const small = { fontSize: 11, lineHeight: 20, color: color.faint };
@@ -46,7 +51,10 @@ function ThreadRow({ row, first, unread }: { row: Row; first: boolean; unread: b
       {unread && <View style={{ position: 'absolute', left: 5, top: 22, width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent }} />}
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         {row.running && <View style={{ marginRight: row.cloud ? 6 : 8 }}><RunningMark cloud={row.cloud}><Cloud /></RunningMark></View>}
+        {/* A thread a teammate's run sent you says whose it is before its title (teammates/row-lead.tsx). */}
+        {mate && <View style={{ marginRight: 7 }}><TeammateMark t={mate} /></View>}
         <T numberOfLines={2} style={{ flexShrink: 1, fontSize: 16, lineHeight: 21.6, letterSpacing: -0.16 }}>
+          {mate ? <Text style={{ color: color.dim }}>{`${mate.name}  `}</Text> : null}
           {row.title}{aside ? <Text style={{ color: color.faint }}>{`  ${aside}`}</Text> : null}
         </T>
         {/* Pinned, faint after the title as the desktop draws it (pages.css `.th-pin`); a closed thread keeps no pin. */}
@@ -58,6 +66,30 @@ function ThreadRow({ row, first, unread }: { row: Row; first: boolean; unread: b
         <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 1 }}>{row.projectName}</T>
         <T style={small}>·</T>
         <T style={small}>{row.when}</T>
+      </View>
+    </Pressable>
+  );
+}
+
+/** A message in a group that names you, at the top of Needs you until you read the group past it (team/rooms/MentionRows.tsx). */
+function MentionRow({ m, first, now, open }: { m: MentionRowData; first: boolean; now: number; open: () => void }) {
+  const small = { fontSize: 11, lineHeight: 20, color: color.faint };
+  return (
+    <Pressable onPress={open} accessibilityLabel={`${m.byName || 'Someone'} mentioned you in ${m.roomName}, unread`}
+      style={({ pressed }) => ({ minHeight: 64, paddingTop: 14, paddingBottom: 14, paddingLeft: size.inset, paddingRight: 12, backgroundColor: pressed ? color.fill : 'transparent' })}>
+      {!first && <View style={{ position: 'absolute', top: 0, left: 0, right: 12, height: 1, backgroundColor: color.rowLine }} />}
+      <View style={{ position: 'absolute', left: 5, top: 22, width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent }} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Face name={m.byName || 'Someone'} size={20} />
+        <T numberOfLines={2} style={{ flexShrink: 1, fontSize: 16, lineHeight: 21.6, letterSpacing: -0.16 }}>
+          <Text style={{ fontFamily: font.medium }}>{`${m.byName || 'Someone'}  `}</Text>
+          <Text style={{ color: color.dim }}>{m.count > 1 ? `sent you ${m.count} messages` : m.body}</Text>
+        </T>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
+        <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 1 }}>{`# ${m.roomName}`}</T>
+        <T style={small}>·</T>
+        <T style={small}>{updatedWords(m.at, now)}</T>
       </View>
     </Pressable>
   );
@@ -101,10 +133,11 @@ function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: an
  * without messing much with spacing". The bar's line along their top is gone,
  * since the title bar's is under them; they scroll sideways when they do not fit. */
 function Tabs({ on, counts, pick, groups }: { on: PlaceId; counts: Record<PlaceId, number>; pick: (t: PlaceId) => void; groups: boolean }) {
+  const teammates = !!useCloud().team;
   return (
     <View style={{ height: size.tabs, flexDirection: 'row', alignItems: 'center' }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', paddingLeft: size.inset, paddingRight: 8, gap: 22 }}>
-        {bottomTabs(groups).map((t) => (
+        {bottomTabs(groups, teammates).map((t) => (
           <Pressable key={t.id} onPress={() => pick(t.id)} accessibilityRole="tab" accessibilityState={{ selected: on === t.id }}
             style={{ height: 32, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: on === t.id ? color.accent : 'transparent' }}>
             <T style={{ fontSize: 15, lineHeight: 30, color: on === t.id ? color.text : color.dim }}>{t.label}</T>
@@ -219,9 +252,12 @@ export default function Threads() {
   const inset = useSafeAreaInsets();
   const groups = useGroups();
   const [place, setPlace] = useState<PlaceId>('inbox');
-  // Groups switched off on the computer while open: back to the threads.
-  const onGroups = place === 'groups' && groups.on;
-  const tab: TabId = place === 'groups' ? 'inbox' : place;
+  // A group opened from Chats, drawn in Chats' place until you go back.
+  const [chatGroup, setChatGroup] = useState(false);
+  // Groups or teammates switched off on the computer while open: back to the threads.
+  const onGroups = place === 'groups' && groups.on && !c.team;
+  const onChats = (place === 'chats' || place === 'groups') && !!c.team;
+  const tab: TabId = place === 'groups' || place === 'chats' ? 'inbox' : place;
   const [pulling, setPulling] = useState(false);
   const [menu, setMenu] = useState(false);
   // Remembered between launches, as the site keeps it in the page's storage.
@@ -234,15 +270,19 @@ export default function Threads() {
   if (!c.signedIn) return <Redirect href="/sign-in" />;
   const rows = shown.rows[tab];
   // Later counts its repeating tasks too, as the desktop's does (App.tsx `scheduledCount`).
-  const counts = { inbox: shown.rows.inbox.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, groups: groups.unread };
+  // Messages in your groups that name you lead Needs you, and count in it (App.tsx `MentionRows`).
+  const mentions = groups.on ? mentionRows(groups.state.mentions) : [];
+  const openMention = (m: MentionRowData) => { groups.setLast(m.roomId); if (c.team) { setChatGroup(true); setPlace('chats'); } else setPlace('groups'); };
+  const counts = { inbox: shown.rows.inbox.length + mentions.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, groups: groups.unread, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0) };
   const repeatsShown = tab === 'snoozed' && c.repeats.length > 0;
+  const mentionsShown = tab === 'inbox' && mentions.length > 0;
   const hidden = shown.whole[tab] - rows.length;
   const foot = footRoom(inset);
   const clear = () => setDisplay({ ...display, priorities: [], projects: [], updated: 'any', privacy: 'any' });
   // A permission card sits over the corner the pen is in, so the pen moves up to the bar (8fa6c548).
   const penUp = c.view.approvals.length > 0;
   // The empty inbox draws the form itself, so it needs no pen.
-  const inboxEmpty = tab === 'inbox' && rows.length === 0 && hidden === 0 && !c.loading;
+  const inboxEmpty = tab === 'inbox' && rows.length === 0 && hidden === 0 && !c.loading && !mentionsShown;
   if (c.connect) {
     return (
       <Wall>
@@ -255,6 +295,15 @@ export default function Threads() {
     return (
       <Wall>
         <GroupsPlace tabs={<Tabs on="groups" counts={counts} pick={setPlace} groups />} />
+      </Wall>
+    );
+  }
+  if (onChats) {
+    return (
+      <Wall>
+        {chatGroup && groups.on
+          ? <GroupsPlace onBack={() => setChatGroup(false)} />
+          : <ChatsPlace tabs={<Tabs on="chats" counts={counts} pick={setPlace} groups={groups.on} />} openGroup={(id) => { groups.setLast(id); setChatGroup(true); }} />}
       </Wall>
     );
   }
@@ -276,11 +325,12 @@ export default function Threads() {
         <FlatList
           data={rows}
           keyExtractor={(r) => r.key}
-          renderItem={({ item, index }) => <ThreadRow row={item} first={index === 0 && !repeatsShown} unread={c.unread(item.item)} />}
+          renderItem={({ item, index }) => <ThreadRow row={item} first={index === 0 && !repeatsShown && !mentionsShown} unread={c.unread(item.item)} mate={mateOf(item.item, c.team)} />}
           refreshControl={<RefreshControl tintColor={color.dim} refreshing={pulling} onRefresh={async () => { setPulling(true); await c.refresh(); setPulling(false); }} />}
           keyboardShouldPersistTaps="handled"
-          ListHeaderComponent={repeatsShown ? <RepeatRows repeats={c.repeats} items={c.view.items} now={c.now} /> : undefined}
-          ListEmptyComponent={c.loading ? <Waiting list /> : repeatsShown ? undefined : hidden > 0 ? <FilteredEmpty tab={tab} hidden={hidden} clear={clear} />
+          ListHeaderComponent={repeatsShown ? <RepeatRows repeats={c.repeats} items={c.view.items} now={c.now} />
+            : mentionsShown ? <View>{mentions.map((m, i) => <MentionRow key={m.id} m={m} first={i === 0} now={c.now} open={() => openMention(m)} />)}</View> : undefined}
+          ListEmptyComponent={c.loading ? <Waiting list /> : repeatsShown || mentionsShown ? undefined : hidden > 0 ? <FilteredEmpty tab={tab} hidden={hidden} clear={clear} />
             : tab === 'inbox' ? <InboxClear />
               : <T style={{ paddingHorizontal: size.inset, paddingTop: 28, fontSize: 15, lineHeight: 23, color: color.dim }}>{EMPTY[tab]}</T>}
           contentContainerStyle={{ paddingBottom: 96 }}

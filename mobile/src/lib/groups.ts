@@ -3,10 +3,15 @@
 import { TABS, type TabId } from './tabs';
 import type { Room, RoomCard, RoomMessage } from '../../../renderer/src/types';
 
-export type PlaceId = TabId | 'groups';
+export type PlaceId = TabId | 'groups' | 'chats';
 
-/** The bottom bar: the four tabs, and Groups after Done while the computer has Groups on. */
-export function bottomTabs(groups: boolean): { id: PlaceId; label: string }[] {
+/**
+ * The bottom bar: the four tabs, then Chats while the computer has AI
+ * teammates on (your teammates and your groups are one page, as the desktop's
+ * Chats is), else Groups while it has Groups on.
+ */
+export function bottomTabs(groups: boolean, teammates = false): { id: PlaceId; label: string }[] {
+  if (teammates) return [...TABS, { id: 'chats', label: 'Chats' }];
   return groups ? [...TABS, { id: 'groups', label: 'Groups' }] : [...TABS];
 }
 
