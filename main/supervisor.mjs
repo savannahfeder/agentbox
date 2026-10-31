@@ -4097,7 +4097,7 @@ export class Supervisor {
     if (!this._cloudFirst() && !this._moveAsked?.size) return;
     if (!this._cloudUsable('claude')) return;
     const pausing = [...(this._toCloud?.keys() ?? [])].filter((id) => !this.sessions.has(id)).length;
-    let starts = CLOUD_STARTING_AT_ONCE - this._cloudStarting(now) - pausing;
+    let starts = this._startBudget.now() - this._cloudStarting(now) - pausing;
     let room = this._maxCloud() - this._cloudLoad() - pausing;
     if (starts <= 0 || room <= 0) return;
     const byId = new Map((items ?? []).map((i) => [i.id, i]));
