@@ -8,6 +8,23 @@ import { readUsageReport } from '../shared/claude-usage.mjs';
 import { localZone, USAGE_UNREADABLE } from '../shared/usage.mjs';
 import { runClaudeUsage } from './claude-usage-process.mjs';
 import { NO_METERED_KEY } from './harnesses/claude.mjs';
+import { CERTIFICATES, LOCALE, PROXIES } from './shell-path.mjs';
+
+// WHAT A USAGE CHECK MAY INHERIT, BY NAME. Claude Code picks its login from
+// more than CLAUDE_CONFIG_DIR (CLAUDE_SECURESTORAGE_CONFIG_DIR outranks it, set
+// or empty), so a clear-list lets through whichever one nobody has named yet.
+// USER is the keychain entry's account; the rest find programs, the network
+// and the language.
+const USAGE_KEEPS = ['PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', ...LOCALE, ...PROXIES, ...CERTIFICATES];
+
+export function usageEnv(input, profile) {
+  const env = {};
+  for (const key of USAGE_KEEPS) if (typeof input?.[key] === 'string') env[key] = input[key];
+  if (profile !== 'default') env.CLAUDE_CONFIG_DIR = profile;
+  return env;
+}
+
+export const USAGE_WHOSE_UNKNOWN = 'Could not tell which account to read. Refresh to try again.';
 
 // WHERE THE READING RUNS, AND WHY IT IS NOT "WHEREVER THE APP IS". An app
 // opened from Finder has `/` as its working directory, and this used to spawn
@@ -74,8 +91,11 @@ export class ClaudeUsage {
     this._missedUntil = 0;
   }
 
+  // Null when the account cannot be named. That is never read as the default
+  // login: a reading of the default under another account's name is the one
+  // answer worse than none.
   _who() {
-    try { return this._account() ?? { profile: 'default' }; } catch { return { profile: 'default' }; }
+    try { return this._account() ?? null; } catch { return null; }
   }
 
   /**
@@ -98,8 +118,14 @@ export class ClaudeUsage {
     return this._last ? { limits: this._last.limits, at: this._last.at, profile: this._last.profile } : null;
   }
 
+  /** Drop the last reading, so nothing serves it again. */
+  forget() {
+    this._last = null;
+  }
+
   _syncProfile() {
-    const account = this._who().profile || 'default';
+    const who = this._who();
+    const account = who ? who.profile || 'default' : null;
     if (account !== this._selectedProfile) {
       this._selectedProfile = account;
       this._generation++;
@@ -111,14 +137,14 @@ export class ClaudeUsage {
 
   _maybeRefresh() {
     const now = this._now();
-    if (this._busy || now < this._missedUntil) return;
+    if (this._busy || now < this._missedUntil || this._selectedProfile === null) return;
     if (this._last && now - this._last.at < STALE_MS) return;
     this._refresh();
   }
 
   /** Ask again now, whatever the cache says. The settings screen's own button. */
   async refreshNow() {
-    this._syncProfile();
+    if (this._syncProfile() === null) return { ok: false, error: USAGE_WHOSE_UNKNOWN };
     this._missedUntil = 0;
     // Join an existing reading, including one begun by the background poll.
     // If it belongs to the previous login, wait for it and then ask this one.
@@ -136,6 +162,7 @@ export class ClaudeUsage {
     const generation = this._generation;
     const bin = (() => { try { return this._bin(); } catch { return null; } })();
     const failure = (error = USAGE_UNREADABLE) => ({ ok: false, error });
+    if (profile === null) return Promise.resolve(failure(USAGE_WHOSE_UNKNOWN));
     if (!bin) { this._missed(); return Promise.resolve(failure()); }
     this._busy = true;
     this._pendingGeneration = generation;
@@ -161,11 +188,7 @@ export class ClaudeUsage {
       // Even unchanged percentages now have a newly checked time to draw.
       this._onChange();
     };
-    const env = { ...(this._who().env ?? process.env) };
-    for (const key of Object.keys(env)) {
-      if (/^ANTHROPIC_|^CLAUDE_CODE_/.test(key) || ['CLAUDECODE', 'CLAUDE_PID', 'CLAUDE_EFFORT', 'CLAUDE_CONFIG_DIR'].includes(key)) delete env[key];
-    }
-    if (profile !== 'default') env.CLAUDE_CONFIG_DIR = profile;
+    const env = usageEnv(this._who()?.env ?? process.env, profile);
     try { this._run(
       bin,
       ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
