@@ -4,7 +4,7 @@
 
 import { dayLabel } from '../../../renderer/src/format';
 import { hiddenUntil, parkedByAgent } from '../../../renderer/src/list-rules';
-import { liveLine, shortSpan, shortWord, type LiveFacts } from '../../../renderer/src/live-line';
+import { liveLine, livePlace, shortSpan, shortWord, type LiveFacts } from '../../../renderer/src/live-line';
 import { priorityIdOf, type PriorityId } from '../../../renderer/src/priority';
 import { offersRunNow } from '../../../renderer/src/run-now';
 import { updatedWord } from '../../../renderer/src/threads/summary-rules';
@@ -66,6 +66,8 @@ export function liveOf(item: any, { session, inProgress, now, ...waits }: Facts)
     word: working ? (activity[activity.length - 1]?.label || 'Thinking') : live.state === 'signin' || live.state === 'limit' ? live.line : shortWord(live.state, session?.helpers ?? 0),
     more: Math.max(0, activity.length - 1),
     span: session ? shortSpan(Math.max(0, now - session.startedAt)) : null,
+    // "in the cloud" on a cloud run, as the web app's working line ends (live-line.ts `livePlace`).
+    place: livePlace({ session: session as any }, { tab: true })?.word ?? null,
     rows: activity.map((a) => ({ label: a.label, detail: a.detail })),
   };
 }

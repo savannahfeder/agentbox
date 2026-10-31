@@ -16,7 +16,7 @@ import type { WorkItem } from '../../../renderer/src/types';
 import { ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
 import type { Saved } from './attach';
 
-export interface Choices { priority?: number; permissionMode?: string; model?: string; effort?: string; engine?: string; runAt?: number; start?: 'later' | 'now'; repeat?: RepeatShape }
+export interface Choices { priority?: number; permissionMode?: string; model?: string; effort?: string; engine?: string; runAt?: number; start?: 'later' | 'now'; repeat?: RepeatShape; labels?: string[] }
 export interface RuleRef { product: string; id: string; title: string }
 
 export type Press =

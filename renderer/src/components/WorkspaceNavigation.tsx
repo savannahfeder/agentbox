@@ -9,7 +9,7 @@ import { SidebarMove, SidebarUpdate } from './SidebarUpdate';
 import { changeLines, closedHere, readMoveClosed, readUpdateClosed, writeMoveClosed, writeUpdateClosed } from '../update-row';
 import { AccountMenu } from '../team/account-menu';
 import type { Invisible } from '../team/rooms/GoInvisible';
-import { caps, chord } from '../this-keyboard';
+import { chord } from '../this-keyboard';
 
 // The search glass drawn at the sidebar's stroke, like Feedback's plane.
 function SearchGlyph() {
@@ -155,9 +155,11 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
     <div className="th-team" title={collapsed ? undefined : teamName}>
       {mark}<span className="th-team-name">{teamName}</span>
     </div>
+    {/* Search is a way to look, not a place to go, so it sits above the tabs
+        rather than among them, and its keys are text rather than caps. */}
+    {onPalette && <div className="workspace-find"><button type="button" aria-label="Search" title={`Search · ${chord('⌘K')}`} onClick={onPalette}><SearchGlyph /><span>Search</span><small className="workspace-keys" aria-hidden="true">{chord('⌘K')}</small></button></div>}
     <nav className="workspace-tabs" aria-label="Threads">
       <button data-tab="inbox" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label={inboxLabel} aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `${inboxLabel} · ${waitingDescription}` : collapsed ? inboxLabel : undefined} onClick={() => onView('inbox')}><SidebarIcon view="inbox" /><span>{inboxLabel}</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
-      {onPalette && <button data-tab="palette" className="workspace-tab" aria-label="Search" title={`Search · ${chord('⌘K')}`} onClick={onPalette}><SearchGlyph /><span>Search</span><small className="workspace-keys" aria-hidden="true">{caps('⌘K').map((c) => <kbd key={c}>{c}</kbd>)}</small></button>}
       {/* THERE IS NO TEAM TAB (w-05ff3d1438, 2026-10-01). The Team page and
           the Inbox were one question on two pages, so they are one page: the
           faces at the end of the Inbox's tab bar pick whose threads are on

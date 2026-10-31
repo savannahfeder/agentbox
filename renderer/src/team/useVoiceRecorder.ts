@@ -4,7 +4,7 @@
 // ./voice-recording.ts; this hands them the real microphone and this Mac's
 // store, and puts back into the box whatever was kept for it.
 import { useEffect, useRef, useState } from 'react';
-import { voiceRecording, type Arrival, type Recorded, type RecordingEnv, type StreamLike, type VoicePhase } from './voice-recording';
+import { aNoteIsRecording, voiceRecording, type Arrival, type Recorded, type RecordingEnv, type StreamLike, type VoicePhase } from './voice-recording';
 import { indexedVoiceStore, listedVoiceStore, memoryVoiceStore, type VoiceDraftStore } from './voice-drafts';
 
 export type { Arrival, Recorded, VoicePhase };
@@ -21,7 +21,8 @@ async function toBase64(blob: Blob): Promise<string> {
 
 let store: VoiceDraftStore | null = null;
 const theStore = () => (store ??= listedVoiceStore(typeof indexedDB === 'undefined' ? memoryVoiceStore() : indexedVoiceStore()));
-const busy = { id: null as string | null };
+const busy: RecordingEnv['busy'] = { id: null };
+export const aVoiceNoteIsRecording = () => aNoteIsRecording(busy);
 
 const browser = (): RecordingEnv => ({
   ask: async () => (await window.zero?.micAccess?.()) ?? 'granted',

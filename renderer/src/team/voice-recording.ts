@@ -45,9 +45,15 @@ export type RecordingEnv = {
    * Shared by every box in the window: one note records at a time, and a note
    * still being written down after it stopped is waited for, not skipped.
    */
-  busy: { id: string | null; finishing?: Map<string, { done: Promise<void>; delivers: boolean }> };
+  busy: { id: string | null; finishing?: Map<string, { done: Promise<void>; delivers: boolean }>; recording?: Set<object> };
   newId: () => string;
 };
+
+/**
+ * Whether any box in the window is waiting for the microphone or recording.
+ * Folding a box ends its note, so a click away must not fold one meanwhile.
+ */
+export const aNoteIsRecording = (busy: RecordingEnv['busy']) => !!busy.recording?.size;
 
 /** How long a sent note is kept, in case the send is undone or fails. */
 export const SENT_KEEP_MS = 10 * 60_000;
@@ -89,7 +95,13 @@ export function voiceRecording(env: RecordingEnv, key: string, on: {
   let asking = 0;
   let gone = false;
   let phase: VoicePhase = 'idle';
-  const setPhase = (p: VoicePhase) => { phase = p; on.phase(p); };
+  const me = {};
+  const recordingNow = (env.busy.recording ??= new Set());
+  const setPhase = (p: VoicePhase) => {
+    phase = p;
+    if (p === 'idle') recordingNow.delete(me); else recordingNow.add(me);
+    on.phase(p);
+  };
   const finishing = (env.busy.finishing ??= new Map());
   // A store that will not write is said once, since a crash would now cost the note.
   let warned = false;
@@ -256,6 +268,7 @@ export function voiceRecording(env: RecordingEnv, key: string, on: {
   function dispose() {
     gone = true;
     asking += 1;
+    recordingNow.delete(me);
     const l = live;
     if (!l) return;
     endLive('gone');

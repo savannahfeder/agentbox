@@ -68,6 +68,10 @@ function Card({ a, verdict, waiting, answer }: { a: Approval; verdict: 'allow' |
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 9 }}>
           <T style={{ flex: 1, minWidth: 0, fontSize: 13, lineHeight: 18.2, fontFamily: font.semibold }}>{words.lede}</T>
           {words.waiting && <T style={{ ...small, color: color.faint }}>{words.waiting}</T>}
+          {/* Put aside to read what is under it; Review in the top bar brings it back (App.tsx `minimizedApproval`). */}
+          <Pressable onPress={() => c.setMinimizedApproval(a.id)} accessibilityRole="button" hitSlop={8}>
+            <T style={{ ...small, color: color.dim }}>Minimize</T>
+          </Pressable>
         </View>
         {/* The whole command, scrolling past six lines rather than cut. */}
         <ScrollView style={{ maxHeight: 120, backgroundColor: color.film, marginBottom: 10 }} contentContainerStyle={{ paddingVertical: 9, paddingHorizontal: 11 }} nestedScrollEnabled>
@@ -124,7 +128,7 @@ export function Approvals() {
   }, [answered]);
 
   const { card, verdict, waiting } = cardOnStage(pending, answered, leaving.current);
-  if (!card) return null;
+  if (!card || c.minimizedApproval === card.id) return null;
   const answer = async (allow: boolean) => {
     setAnswered({ id: card.id, allow });
     try { await c.send({ kind: 'approve', approval: card.id, allow }, null); } catch (err) {

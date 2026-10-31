@@ -223,6 +223,7 @@ export function createTeamService({
       readSettings: phone.readSettings ?? null,
       pinsOf: () => phone.pins?.() ?? {},
       repeatsOf: phone.repeats ?? null,
+      teammatesOf: phone.teammates ?? null,
       version: phone.version ?? '',
       idleMs: phone.idleMs ?? null,
       // The lid shut: projects whose threads carry on in the cloud, and runs it started (shared/cloud-kit.mjs).

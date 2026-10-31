@@ -85,7 +85,7 @@ describe('what may be sent', () => {
     expect(payload).toEqual({
       text: 'hello',
       files: [{ name: 'shot.png', type: 'image/png', data: 'AAAA' }],
-      app: { version: '1.2.3', os: 'darwin 25.5.0' },
+      app: { version: '1.2.3', os: 'darwin 25.5.0', install: '' },
     });
   });
 });

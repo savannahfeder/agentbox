@@ -2,6 +2,7 @@
 // file-derived store, and a supervisor of headless sessions.
 
 import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, screen as electronScreen, shell, session, safeStorage, systemPreferences } from 'electron';
+import './no-default-menu.mjs';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mjs';
 import { roomsSetup } from './team/room-setup.mjs';
@@ -34,6 +35,7 @@ import { carryHerBriefsAcross, joinMessageRules, setAsideShippedMessageRules, un
 import * as approvals from './approvals.mjs';
 import { recoveryToast } from '../shared/recovery.mjs';
 import { phoneWaitsOf } from '../shared/phone-snapshot.mjs';
+import { teammatesOn } from '../shared/teammates.mjs';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mjs';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mjs';
 import { newUserWindow } from './new-user-window.mjs';
@@ -479,6 +481,7 @@ async function createWindow() {
       readSettings: () => phoneSettings?.() ?? null,
       pins: () => supervisor.threadPins,
       repeats: () => store.listRepeats(),
+      teammates: () => (teammatesOn(config) ? store.teammatesView() : null),
       version: app.getVersion(),
       live: (slug, id) => supervisor.liveFor(slug, id),
       // Why each thread nothing runs on is waiting, so the phone does not read it as "Nothing running".

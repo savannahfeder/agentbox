@@ -830,7 +830,7 @@ export function registerIpc({ store, supervisor, config, window, analytics = NO_
   // and the macOS release ride along so a report can be matched to a build.
   ipcMain.handle('zero:send-feedback', async (_e, { text, files } = {}) => sendFeedback({
     url: feedbackUrl(config),
-    payload: feedbackPayload({ text, files, app: { version: app.getVersion(), os: `${process.platform} ${os.release()}` } }),
+    payload: feedbackPayload({ text, files, app: { version: app.getVersion(), os: `${process.platform} ${os.release()}`, install: analytics.installId } }),
   }));
 
   // THE TEAM'S DOORS. Each answers { ok, team } or { ok: false, error } with
