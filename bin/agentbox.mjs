@@ -20,6 +20,7 @@ import { appHome } from '../main/store/home.mjs';
 import { NO_TERMINAL, ptyIsHere } from '../main/pty.mjs';
 import { learnShellDataDirs } from '../main/shell-path.mjs';
 import { startFreezeRecorder } from '../main/freeze-recorder.mjs';
+import { stallWatch } from '../main/stall-watch.mjs';
 import { watchNewChatsFor } from '../main/new-chats-watch.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -72,6 +73,7 @@ if (!fs.existsSync(path.join(dist, 'index.html'))) {
 // workers signed in to ~/.claude and ~/.codex (w-6d8c543a43).
 await learnShellDataDirs();
 const booted = await bootHeadless({ dataDir, appDir, userDir: dataDir });
+booted.supervisor.stalls = stallWatch();
 // What held the thread each time it froze, as the desktop records it.
 startFreezeRecorder({
   dir: path.join(dataDir, 'memory-log'),

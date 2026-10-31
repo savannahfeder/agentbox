@@ -548,6 +548,71 @@ input. In order:
    its own still waits for the Mac: a new-thread kit does not carry its
    conversation.
 
+## The hub: 200 at once, and the Mac does not care (agreed with Codex, 2026-10-30)
+
+The cloud lent each agent a computer and left the rest on the Mac: the store, a
+task folder per thread, a process per run, packing, bringing home, shipping. So
+every agent added to the Mac, shipping was one queue, and "Everything" still left
+most agent-hours there. Moving the hub, not rewriting it: `bootHeadless`
+(main/serve.mjs) already runs the store, the supervisor and every handler with no
+Electron, and the window already runs over http (renderer/src/browser-bridge.ts).
+
+- **The hub.** One dedicated EC2 Graviton machine per account, us-east-1,
+  encrypted EBS, systemd, the existing headless entry. Always on while the
+  account is active: schedules, repeats, phone commands and sign-in renewals need
+  it whether or not a screen is open. Idle stop waits for an outside scheduler.
+- **One writer.** An ownership record `{owner, epoch, state}` in the gateway's
+  conditionally written ledger. Cutover: pause admission, drain or checkpoint runs
+  and ships, stop every writer on the Mac, copy store, folders, transcripts and
+  config, verify a manifest, quarantine the Mac's store read-only, advance the
+  epoch, start the hub. Every mutation and result carries the epoch; a stale one
+  is refused. A Mac that names a hub never falls back to running agents. Rollback
+  is the same protocol in reverse from the hub's current state.
+- **The window.** `main/start.mjs` picks: with `~/.agentbox/hub.json` the process
+  is main/hub-client.mjs and loads no store or supervisor. Alerts, the Dock count
+  and web links stay on the Mac; the rest goes to the hub.
+- **Documents.** The hub's are the truth, with `~/Zero` a synced mirror: version
+  preconditions, tombstones, conflict copies. Agents get pinned versions.
+- **The Mac's remaining role.** One paired outbound connector with no store. No
+  capabilities by default; grants name account, device, thread, operation, path
+  roots, expiry and limits. Agents call `request_resource` or `request_execution`
+  and stay in the cloud, rather than ending with AGENTBOX-NEEDS-THE-COMPUTER and
+  rerunning the whole request on the Mac. "Keep on this Mac" and Xcode projects
+  become a placement the hub dispatches bounded jobs to. A person with no connector
+  uploads or picks files.
+- **Code and ships.** One GitHub App on chosen repositories. Sandboxes fetch base
+  commits from GitHub plus immutable deltas from the hub; workers never hold push
+  credentials. Testing runs in parallel in ship sandboxes on immutable cumulative
+  candidates; publishing stays serial per repository, by compare-and-swap against
+  the tested main; a moved main means rebuilding and rerunning on the new merged
+  tree; failing batches split. Policy, test selection and the script stay outside
+  the candidate (main/ship-queue.mjs). Five-change batches at 5 to 10 minutes
+  suggest 30 to 60 changes an hour, not 200 instant ships.
+- **Hub limits.** Stream parsing and folding move to workers with bounded queues;
+  one shared versioned projection, client deltas from it. Starts are earned
+  (main/cloud/start-budget.mjs). The hub talks to sandboxes over AgentCore
+  WebSockets with replay cursors, out of the Lambda path, whose reserved 200 would
+  be filled by 200 long polls; the gateway keeps authorization, accounting and
+  revocation. AgentCore stays the sandbox.
+
+Done means, across three runs: at 1, 50 and 200 agents the Mac's client grows by
+at most 100 MiB with no per-run process and under 5% of a core idle. The hub at
+200 holds event-loop lag p99 under 50 ms and RSS under 8 GiB, with under 10%
+retained growth over eight hours. All 200 reach the agent within ten minutes, and
+200 simultaneous completions import within ten. At least 30 changes an hour on the
+real repository with its real tests. Killing the hub mid-write, mid-import and
+mid-ship, cutting relay, Mac and AWS, duplicating events, expiring ownership,
+racing pushes and restoring a backup lose no acknowledged write, ship nothing
+twice and accept no stale owner. Real AgentCore, packing, imports, store and ships;
+deterministic commands may stand in for most model calls, and real Claude and Codex
+calls must exercise sign-in, tools and resume. One subscription's model throughput
+is shared however many machines run; that limit is the vendor's.
+
+Order: client mode (built); ownership and rollback; the documents mirror; hub
+provisioning and recovery; her cutover, with her OK; WebSocket transport and the
+load gates; parallel ship testing; the connector; automated onboarding, at which
+point the non-technical app is this with no connector.
+
 ## Releasing the cloud to everyone (w-6633e825a7, 2026-10-19)
 
 Everything above runs in the owner's own AWS account, set up by a script with
