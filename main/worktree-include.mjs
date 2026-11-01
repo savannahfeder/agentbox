@@ -269,10 +269,13 @@ export function carryLocalFiles(root, folder) {
     if (tracksIt(folder, rel)) { no(rel, 'this branch tracks it'); continue; }
     if (reachedThroughALink(folder, rel)) { no(rel, 'a link stands where it would have to be written'); continue; }
     if (fs.existsSync(to)) continue; // already there; silent
-    if (isLink(from) && !carriableLink(root, from)) { no(rel, 'it is a link to somewhere outside the repository'); continue; }
+    // A link out of the checkout would be shared by every task, so what it points at is copied instead.
+    const outside = isLink(from) && !carriableLink(root, from);
+    const copyFrom = outside ? realDirOf(from) : from;
+    if (!copyFrom) { no(rel, 'it is a link to somewhere outside the repository'); continue; }
     try {
       fs.mkdirSync(path.dirname(to), { recursive: true });
-      copyTree(from, to);
+      copyTree(copyFrom, to);
     } catch (error) {
       no(rel, `it could not be copied: ${String(error?.stderr ?? error?.message ?? '').trim()}`);
       continue;
@@ -298,6 +301,11 @@ export function carryLocalFiles(root, folder) {
       refused.map((r) => `  ${r.path}: ${r.why}`).join('\n')}`);
   }
   return { carried, source };
+}
+
+/** The directory a link leads to, or null when it leads nowhere or to a file. */
+function realDirOf(abs) {
+  try { const real = fs.realpathSync(abs); return fs.statSync(real).isDirectory() ? real : null; } catch { return null; }
 }
 
 /**

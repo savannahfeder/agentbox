@@ -2,7 +2,6 @@ import { previewFocus } from './preview-focus';
 import { PhoneStatus } from './components/PhoneStatus';
 import { cloudChord, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
 import { usePhoneBack, onCloudPhone, onPhone } from './phone-screen';
-import { useLessonPlace } from './lesson-position';
 import { holdsReplies, writeHeldWhenHidden } from './phone-holds';
 import { pollEvery } from './phone-polls';
 import type {FocusControlStyle} from './focus-control';
@@ -88,6 +87,7 @@ import { approvalAnswered, approvalReads } from './approval-card';
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
 import { belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
+import { filedByThePerson } from '../../shared/answers.mjs';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mjs';
 import { focusTheReplyBox } from './focus-at-end';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
@@ -150,8 +150,14 @@ import { needsStaging, walkStageKey } from './walk-staging';
 import { TutorialOffer } from './components/TutorialOffer';
 import { holdForStoppedAgent, neverWarned, rememberWarned } from './stopped-agent';
 import { comeBackTo, neverOffered, offerOnNewProject, rememberOffered } from './tutorial';
-import { FirstRunFlow, OpenLesson } from './components/FirstRun';
-import { landing as firstRunLanding, lessonsLeft, setLessons, showsOpenLesson, type Lesson } from './first-run';
+import { FirstRunFlow } from './components/FirstRun';
+import { ClassicFirstRun, OpenLesson } from './components/FirstRunClassic';
+import { landing as firstRunLanding, lessonsLeft, setLessons, showsOpenLesson, type Lesson } from './first-run-classic';
+import { useLessonPlace } from './lesson-position';
+import { ideasFor, runOfRule } from './first-run';
+import { Tour } from './components/Tour';
+import { laterTabShown } from './later-tab';
+import { THREAD_CLOSED, finishLesson, firstTask, noteSent, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   finishedCleared, firstRunNeeded, projectsOfTheirOwn, inboxCleared, laterCleared, laterId, laterIndex,
@@ -184,7 +190,8 @@ import { Face, TeamContext, firstName, teamView } from './team/people';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
-import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, CloudContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, WaitingContext } from './threads/Pages';
+import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, LiveContext, CloudContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
+import { offersTryAgain } from './try-again';
 import { cloudOffer, type OfferGo } from './cloud-upgrade';
 import { FleetContext, queuedWithHeld, type Fleet } from './fleet';
 import { factsFor } from './status-word';
@@ -197,6 +204,19 @@ import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, rea
 import { boardStops, listStops, stepFromPlace, stepStop, stopKey, type Stop } from './threads/walk-rules';
 import { SAYS_UNDO, opensTheToast, saysWhereItWent, toastOpens, toastParts, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
+
+const FIRST_IDEAS = ideasFor();
+
+/** Which first run this install shows, half each (shared/onboarding-arm.mjs). */
+type Arm = 'tour' | 'classic';
+const ARM_WAIT_MS = 3000;
+async function armNow(): Promise<Arm> {
+  try {
+    const asked = (window.zero as { onboardingArm?: () => Promise<unknown> } | undefined)?.onboardingArm?.();
+    const word = await Promise.race([asked, new Promise((r) => setTimeout(() => r(null), ARM_WAIT_MS))]);
+    return word === 'classic' ? 'classic' : 'tour';
+  } catch { return 'tour'; }
+}
 
 type Modal = null | 'compose' | 'filter' | 'palette' | 'reply' | 'snooze' | 'standing';
 
@@ -482,7 +502,7 @@ export default function App() {
       // a send still in this page's own queue is not drawn twice.
       const mine = new Set(here.map((s) => s.text.trim()));
       const away = (snap?.phoneWaiting ?? []).filter((w) => w.product === item.product && w.id === item.id && !mine.has(w.text.trim()));
-      return [...here, ...away.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}), ...(w.cloud ? { cloud: true } : {}) }))];
+      return [...here, ...away.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}), ...(w.cloud ? { cloud: true } : {}), ...(w.sent ? { sent: true } : {}) }))];
     },
     [sending, snap?.phoneWaiting],
   );
@@ -1025,8 +1045,9 @@ export default function App() {
   const [home, setHome] = useState('');
   // The first run that starts on real work, while it is up.
   const [fresh, setFresh] = useState(false);
-  // What it leaves to teach in the inbox itself, once each: the key beside the
-  // first thread, and the lit 1 on the first options an agent offers.
+  const [arm, setArm] = useState<Arm | null>(null);
+  const askingArm = useRef(false);
+  // The first run on main leaves two lessons in the inbox, once each: the key beside the first thread, and the lit 1 on its options.
   const [lessons, setLessonList] = useState<Lesson[]>(() => lessonsLeft(localStorage));
   const dropLesson = useCallback((l: Lesson) => setLessonList((had) => {
     if (!had.includes(l)) return had;
@@ -1034,6 +1055,17 @@ export default function App() {
     setLessons(localStorage, next);
     return next;
   }), []);
+  // The tutorial on the inbox that follows it (components/Tour.tsx).
+  const [tour, setTourState] = useState<TourState | null>(() => readTour(localStorage));
+  const setTour = useCallback((t: TourState) => { saveTour(localStorage, t); setTourState(t); }, []);
+  const tourRef = useRef(tour);
+  tourRef.current = tour;
+  // The tutorial's last tip is the command bar, learned the moment it opens.
+  const paletteWasOpen = useRef(false);
+  useEffect(() => {
+    if (paletteWasOpen.current && modal !== 'palette' && tour && !tour.done.includes('palette')) setTour(finishLesson(tour, 'palette'));
+    paletteWasOpen.current = modal === 'palette';
+  }, [modal, tour, setTour]);
   const runRef = useRef<FirstRun | null>(null);
   runRef.current = run;
   // The same, for the Claude Code answer, so `finishRun` can refuse a press
@@ -1054,7 +1086,10 @@ export default function App() {
     // A new install gets the first run that starts on real work
     // (components/FirstRun.tsx); `?firstrun=` still walks the old one.
     if (forcedRun.current) setRun({ ...RUN_START, step: forcedRun.current });
-    else setFresh(true);
+    else if (!askingArm.current) {
+      askingArm.current = true;
+      void armNow().then((a) => { setArm(a); setFresh(true); });
+    }
     // AND THE LOOK IS WRITTEN DOWN HERE, on the one line that knows this Mac
     // has never been used. Before this, only the three setup screens and inbox
     // zero painted the lake and nothing was stored, so every other screen fell
@@ -1697,7 +1732,7 @@ export default function App() {
   // A RELOAD WRITES WHAT IS HELD BEFORE IT HAPPENS (w-47218417a5). The window
   // above lives only in this page, so ⌘R inside it used to throw the close or
   // answer away and the thread came back to her inbox untouched. main asks
-  // before it reloads and waits for this to finish (main/write-before-reload.mjs).
+  // before it reloads and waits for this to finish (main/write-before-reload.mts).
   // `pagehide` covers the window closing or the app quitting, where nobody
   // asks: the write's first step leaves for main before the page goes.
   // A PHONE PUT AWAY never sends `pagehide`: iOS hides the page, freezes it and
@@ -2675,7 +2710,7 @@ export default function App() {
     ? teammateRows(cards, { tab: view, picked, me: team?.me ?? null, display: DEFAULT_DISPLAY.inbox, products: snap?.products ?? [], now }).length : 0);
   // THE TABS A PRESS OF TAB MOVES ALONG: the list the bar is drawing, so there
   // is no second copy of the order to fall out of step with it.
-  const stateTabOrder = useMemo(() => INBOX_TABS.map((t) => t.view), []);
+  const stateTabOrder = useMemo(() => INBOX_TABS.map((t) => t.view).filter((v) => v !== 'snoozed' || laterTabShown({ count: snoozed.length, view, walking: !!run })), [snoozed.length, view, run]);
   // The inbox as she sees it, whichever tab is up: her filter AND her display
   // menu. Finishing a task from inside it advances through THIS, never the
   // whole inbox, or the next task opened can be one she has hidden
@@ -4078,6 +4113,7 @@ export default function App() {
       return;
     }
     if (closesAgain(pendingRef.current, item)) return;
+    if (!stay) window.dispatchEvent(new CustomEvent(THREAD_CLOSED));
     const undid = [{ product: item.product, id: item.id, words: UNDID_CLOSING }];
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, status: 'done', ...(unshippedOk ? { closeUnshipped: true } : {}) });
@@ -4110,7 +4146,7 @@ export default function App() {
     const options = itemOptions(item);
     const recommended = options.find((o) => o.recommended) ?? options[0];
     const isProposal = item.status === 'open' && item.kind !== 'question' && item.kind !== 'review'
-      && !(item.labels ?? []).includes('founder') && !liveAnswer(item);
+      && !filedByThePerson(item) && !liveAnswer(item);
     const approveWith = async (answer: string, toast: string) => {
       const undid = [{ product: item.product, id: item.id, words: 'Undid your approval' }];
       await deferCommit(item, async () => {
@@ -5187,6 +5223,18 @@ export default function App() {
     await refresh();
   }, [refresh, showToast, leaveResolved]);
 
+  // TRY AGAIN on one thread nothing will start (try-again.ts): Resume's own
+  // path, from the row, the thread and ⌘K. It leaves you where you are.
+  const tryAgain = useCallback(async (item: WorkItem) => {
+    if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
+    const r = await (window.zero as any)?.resumeItems?.({ ids: [item.id] });
+    showToast(r?.resumed ? 'Trying again now.'
+      : r?.queued ? 'Queued. It starts as soon as an agent is free.'
+      : r?.working ? 'Already running.'
+      : 'It cannot start on this computer.');
+    await refresh();
+  }, [refresh, showToast]);
+
   const undo = useCallback(async () => {
     // Inside the grace window: a perfect undo, nothing was ever written.
     const pending = pendingRef.current;
@@ -6088,10 +6136,19 @@ export default function App() {
     // on whichever it was at launch.
   }, [firstRunPinned, theme, skin, machine]);
 
-  // THE FIRST RUN ENDS IN THE INBOX, on the task just sent when there is one,
-  // with two lessons left to give there.
+  // THE FIRST RUN ENDS IN THE INBOX, where the tutorial takes over.
+  const finishFresh = useCallback(() => {
+    finishFirstRun(localStorage);
+    setTour(startTour());
+    setFresh(false);
+    setView('inbox');
+    setFocused(null);
+    setSelected(0);
+  }, [setTour]);
+
+  // THE FIRST RUN ON MAIN ENDS IN THE INBOX, on the task just sent when there is one, with its two lessons left to give.
   const [landOn, setLandOn] = useState<string | null>(null);
-  const finishFresh = useCallback((sent: string | null, runAt = 0, draft?: string) => {
+  const finishClassic = useCallback((sent: string | null, runAt = 0, draft?: string) => {
     const to = firstRunLanding(sent, runAt);
     finishFirstRun(localStorage);
     setLessons(localStorage, ['open', 'pick']);
@@ -6121,22 +6178,7 @@ export default function App() {
     const t = setTimeout(() => setLandOn(null), 15_000);
     return () => clearTimeout(t);
   }, [landOn]);
-
-  // AND THE SAME MOMENT FOR EVERY OTHER SEND. `landOn` is the walk's own
-  // landing and nothing else sets it, so every task sent from the compose card
-  // spent its round trip under "Nothing is running."
-  const [justSent, setJustSent] = useState(false);
-  useEffect(() => {
-    if (!justSent) return undefined;
-    const t = setTimeout(() => setJustSent(false), 15_000);
-    return () => clearTimeout(t);
-  }, [justSent]);
-  // The row arriving is what ends it, and only on the tab that was waiting for
-  // it: a glance at Needs you in the meantime must not take the line away.
-  useEffect(() => { if (justSent && list.length && view === 'progress') setJustSent(false); }, [justSent, list.length, view]);
-
-  // ↵ beside the row you are on, until a thread is opened, and never while a
-  // card has the keyboard (`showsOpenLesson`).
+  // ↵ beside the row you are on, until a thread is opened, and never while a card has the keyboard (`showsOpenLesson`).
   const lessonAt = useLessonPlace(() => {
     if (!showsOpenLesson({ lessons, focused: !!focused, fresh, view, modal })) return null;
     const title = document.querySelector('.list-pane .row.selected .th-cell-title') ?? document.querySelector('.list-pane .th-cell-title');
@@ -6147,7 +6189,6 @@ export default function App() {
     return { left: r.right + 20, top: r.top + r.height / 2 - 17 };
   }, [lessons, focused, fresh, view, modal, list, selected]);
   useEffect(() => { if (focused) dropLesson('open'); }, [focused, dropLesson]);
-
   // The first option's key lit, until a thread that offered options is left.
   const pickSeen = useRef(false);
   useEffect(() => {
@@ -6156,6 +6197,65 @@ export default function App() {
     if (on && document.querySelector('.opt-row')) pickSeen.current = true;
     if (!focused && pickSeen.current) dropLesson('pick');
   });
+
+  // EVERY SEND, while its row is on its way: the tab says it is starting rather than "Nothing is running."
+  const [justSent, setJustSent] = useState(false);
+  useEffect(() => {
+    if (!justSent) return undefined;
+    const t = setTimeout(() => setJustSent(false), 15_000);
+    return () => clearTimeout(t);
+  }, [justSent]);
+  // The row arriving is what ends it, and only on the tab that was waiting for
+  // it: a glance at Needs you in the meantime must not take the line away.
+  useEffect(() => { if (justSent && list.length && view === 'progress') setJustSent(false); }, [justSent, list.length, view]);
+
+  // THE FIRST THREAD, FOLLOWED to whichever tab it goes to, In progress and
+  // then Needs you, until it is opened. Only when its tab changes, so it never
+  // pulls anybody back from somewhere they went themselves.
+  const firstSend = useRef(false);
+  const [firstThread, setFirstThread] = useState<string | null>(null);
+  // A repeating task is sent as a rule; its first run is the thread to follow.
+  const [firstRule, setFirstRule] = useState<string | null>(null);
+  useEffect(() => {
+    if (!firstRule) return;
+    const run = runOfRule(firstRule, [...inbox, ...progress]);
+    if (run) { setFirstRule(null); setFirstThread(run); }
+  }, [firstRule, inbox, progress]);
+  const followedTab = useRef<string | null>(null);
+  useEffect(() => {
+    if (!firstThread) return;
+    const tab = tabOfState(tabState.get(firstThread) ?? null);
+    if (!tab) return;
+    if (tab !== 'inbox' && tab !== 'progress') { setFirstThread(null); return; }
+    if (focused?.id === firstThread && tab === 'inbox') { setFirstThread(null); return; }
+    if (tab === followedTab.current) return;
+    // Inside a thread or a card, it waits for you to come back to the list.
+    if (focused || !(modal === null || modal === 'compose') || !(['inbox', 'progress'] as View[]).includes(view)) return;
+    followedTab.current = tab;
+    if (tab !== view) setView(tab);
+    if (tab === 'inbox') setFirstThread(null);
+  }, [firstThread, tabState, focused, modal, view]);
+  // Opened as soon as it exists: once a task is sent, the next thing anybody does is look at it.
+  const openedFirst = useRef(false);
+  useEffect(() => {
+    if (!firstThread || openedFirst.current || focused || (modal !== null && modal !== 'compose')) return;
+    const row = [...inbox, ...progress].find((i) => i.id === firstThread);
+    if (!row) return;
+    openedFirst.current = true;
+    setFocused(row);
+    markSeen(row);
+  }, [firstThread, inbox, progress, focused, modal, markSeen]);
+  // And the cursor on it, once its row is drawn there.
+  const followAt = firstThread ? list.findIndex((i) => i.id === firstThread) : -1;
+  useEffect(() => { if (followAt >= 0) setSelected(followAt); }, [followAt]);
+  // Closing the first thread ends on Needs you, not on an empty In progress it was followed to.
+  const wasClosed = useRef(!!tour?.done.includes('close'));
+  const closed = !!tour?.done.includes('close');
+  useEffect(() => {
+    if (closed && !wasClosed.current && view === 'progress') setView('inbox');
+    wasClosed.current = closed;
+  }, [closed, view]);
+  // END OF THE FOLLOWING
 
   const openView = (next: View) => { roomsUi.leave(); teammatesUi.leave(); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); };
   useEffect(() => {
@@ -6413,6 +6513,7 @@ export default function App() {
     <TeammatesContext.Provider value={teammatesById}>
     <ChatsContext.Provider value={chatsValue}>
     <FreeAgentContext.Provider value={freeWaitIds}>
+    <TryAgainContext.Provider value={tryAgain}>
     <CloudOfferContext.Provider value={cloudOfferNow ? { offer: cloudOfferNow, onGo: (go) => void onCloudGo(go) } : null}>
     <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${railOpen ? ' gt-rail-open' : ''}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}`}>
 
@@ -6872,6 +6973,7 @@ export default function App() {
                   // Auto asking her who takes it is stalled for the list, not a dead agent.
                   stalled={(snap.supervisor.stalled?.includes(focused.id) ?? false) && !asksWho(focused)}
                   onRedeliver={() => redeliver(focused)}
+                  onTryAgain={() => void tryAgain(focused)}
                   onClose={closeThreadOntoItsTab}
                   onResolve={() => markDone(focused)}
                   onPick={(n) => pickAimedHere(focused, n)}
@@ -6967,6 +7069,7 @@ export default function App() {
                     lit={needsYouLit(inbox, needsLookedAt)}
                     onView={(next) => { roomsUi.leave(); setView(next as View); setSelected(0); setMultiSel(new Set()); }}
                     team={teamTabs}
+                    keepLater={!!run}
                   />
                 )}
                 {evTop}
@@ -6987,7 +7090,7 @@ export default function App() {
                       // AND NOT UNDER THE LANDING (2026-10-06), which says the
                       // same thing louder: "Nothing needs you" and "You finished
                       // the tutorial" were drawn one on top of the other.
-                      ? run === null && !landing && <InboxClear slot={setClearSlot} />
+                      ? run === null && !landing && <InboxClear slot={setClearSlot} first={firstTask(tour)} />
                       : <EmptyTab view={view} starting={!!landOn || justSent} waiting={needsYouCount.inbox} />
                 ) : <List
                   lead={view === 'inbox' && search === null && roomsUi.mentions.length
@@ -7140,6 +7243,8 @@ export default function App() {
              reads; everything else about the card is the card anybody uses. */
           initial={walkCard ? { body: `${TASK_TITLE}\n\n${TASK_BODY}` } : composeInitial}
           scripted={walkCard ? { labels: [FIRST_RUN_LABEL] } : null}
+          ideas={!walkCard && showIdeas(tour) ? FIRST_IDEAS : null}
+          askFolder={firstTask(tour)}
           onOpenConversation={openConversation}
           // "Reorder" beside the project menu's heading: Settings on the
           // Projects page, which is where the order is set. The draft is
@@ -7161,6 +7266,10 @@ export default function App() {
           // it will land, so the row arrives in front of her. The tutorial
           // keeps the old order: its beat moves on from the card closing.
           onSending={walkCard ? undefined : (how) => {
+            // The tutorial's first send, which may be a repeating suggestion whose first run starts now.
+            const first = firstTask(tour);
+            // Sending the first task is finishing the first run; leaving without one is not.
+            if (first) { firstSend.current = true; setTour(noteSent(tour!)); try { window.zero?.track?.('first_run_finished'); } catch {} }
             setModal(null);
             setComposeInitial(null);
             setPickProject(null);
@@ -7180,7 +7289,7 @@ export default function App() {
             // an agent is not waiting on her, so it never lands in Needs you.
             // On the Inbox the tab moves to where it did land, Running or
             // Scheduled, so she sees the row arrive instead of an unchanged page.
-            if (how.kind === 'task' && !teamOpen && !focused && (['inbox', 'progress', 'snoozed'] as View[]).includes(view)) {
+            if ((how.kind === 'task' || (first && how.kind === 'repeat')) && !teamOpen && !focused && (['inbox', 'progress', 'snoozed'] as View[]).includes(view)) {
               setView(later ? 'snoozed' : 'progress');
               setSelected(0);
               setMultiSel(new Set());
@@ -7223,6 +7332,8 @@ export default function App() {
               await refresh();
               return;
             }
+            if (firstSend.current && made?.id) { firstSend.current = false; setFirstThread(made.id); }
+            if (firstSend.current && how?.kind === 'repeat' && how.ruleId) { firstSend.current = false; setFirstRule(how.ruleId); }
             const slug = how?.product ?? made?.product ?? '';
             const to = snap.products.find((x) => x.slug === slug)?.name;
             if (made?.id) showJustMade(made, to);
@@ -7288,7 +7399,7 @@ export default function App() {
         staleFiles={snap.restartNeeded?.files ?? []}
         /*
          * A newer Agentbox that has already downloaded itself. The palette is
-           the glance surface for it, not the rail (main/updater.mjs).
+           the glance surface for it, not the rail (main/updater.mts).
 
            `closed` is empty ON PURPOSE and it is the whole of "rejecting an
            update loses nothing": closing the row hides the ROW, and ⌘K goes
@@ -7389,7 +7500,7 @@ export default function App() {
             // Approve lives here by NAME only, for everything resolve
             // covers; no key drives it. E is archive, never approval.
             ...(!target.agent && !target.answer && (target.kind === 'review' || (target.kind === 'question' && recommended)
-              || (target.status === 'open' && target.kind !== 'question' && !(target.labels ?? []).includes('founder')))
+              || (target.status === 'open' && target.kind !== 'question' && !filedByThePerson(target)))
               ? [{ id: 'approve',
                   label: target.kind === 'question' ? 'Approve recommended'
                     : target.kind === 'review' ? 'Approve (proceed as proposed)' : 'Approve (run it)',
@@ -7412,7 +7523,12 @@ export default function App() {
             // then unreachable by every path that spawns anything. Resume is
             // for a row that has STOPPED. A row already under way is
             // excluded, and the stop above is what it gets instead.
-            ...(!target.agent && !working(target) && !stoppableNow(target)
+            // TRY AGAIN on a thread nothing will start (try-again.ts), in place
+            // of Resume this agent, which is the same press under another name.
+            ...(offersTryAgain(target, { ...factsFor(fleet, target.id), inProgress: stoppableNow(target), now })
+              ? [{ id: 'try-again', label: 'Try again', keywords: 'resume restart retry start stuck run again',
+                   run: () => { setModal(null); void tryAgain(target); } }]
+              : !target.agent && !working(target) && !stoppableNow(target)
               ? [{ id: 'resume-any',
                    label: target.status === 'done' ? 'Resume this agent (reopen and carry on)' : 'Resume this agent',
                    run: () => { setModal(null); putAgentBackOn([target]); } }]
@@ -7509,7 +7625,7 @@ export default function App() {
             ...(target.status === 'blocked'
               ? [{ id: 'send-back', label: 'Send back to agent', run: () => { setModal(null); sendBack(target); } }]
               : []),
-            ...(snap.supervisor.stalled?.includes(target.id)
+            ...(snap.supervisor.stalled?.includes(target.id) && !offersTryAgain(target, { ...factsFor(fleet, target.id), now })
               ? [{ id: 'redeliver', label: 'Restart the agent (it stopped)', run: () => { setModal(null); redeliver(target); } }]
               : []),
             ...(!focused ? [{ id: 'open', label: 'Open', keyHint: '↵', run: () => { setModal(null); open(); } }] : []),
@@ -7527,6 +7643,7 @@ export default function App() {
         // is one line however many projects she has (w-aa3fa4cbf0).
         onOpenFilter={() => setModal('filter')}
         onClearFilter={() => { setBoxFilter(NO_FILTER); setModal(null); }}
+        onEndTutorial={tourLive(tour) ? () => { setTour(skipTour(tour!)); setModal(null); } : undefined}
         onView={(v) => { setView(v); setModal(null); setSelected(0); }}
         onPause={async (paused) => { await api.pauseSupervisor(paused); setModal(null); await refresh(); }}
         order={snap.supervisor.productOrder ?? []}
@@ -7695,6 +7812,7 @@ export default function App() {
                 made: !!slug,
                 walking: runRef.current !== null,
                 offered: !neverOffered(localStorage),
+                touring: tourRef.current !== null,
               })) setOffer({ product: slug });
             } catch (err) {
               // Nothing is held open any more, because nothing was typed: the
@@ -7724,8 +7842,14 @@ export default function App() {
           its tether draws over whatever the app has open. w-82bb9e2c69.
           A ?modes= drawing stands INSTEAD of it, never over it: two full
           surfaces at once would photograph the welcome screen. */}
-      {fresh && !modeDraft && <FirstRunFlow snap={snap} home={home} onDone={finishFresh} />}
+      {fresh && !modeDraft && arm === 'classic' && <ClassicFirstRun snap={snap} home={home} onDone={finishClassic} />}
+      {fresh && !modeDraft && arm === 'tour' && <FirstRunFlow snap={snap} home={home} onDone={finishFresh} />}
       <OpenLesson at={lessonAt} />
+      {!fresh && <Tour tour={tour} view={view} thread={!!focused}
+        covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
+        palette={modal === 'palette'}
+        onChange={setTour}
+        onPoint={(id) => { const at = list.findIndex((i) => i.id === id); if (at >= 0) setSelected(at); }} />}
       {run && !modeDraft && !walkWaitsForSignIn && (
         <Onboarding
           run={run}
@@ -8214,6 +8338,7 @@ export default function App() {
       <FindBar />
     </div>
     </CloudOfferContext.Provider>
+    </TryAgainContext.Provider>
     </FreeAgentContext.Provider>
     </ChatsContext.Provider>
     </TeammatesContext.Provider>

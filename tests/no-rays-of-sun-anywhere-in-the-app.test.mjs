@@ -23,7 +23,7 @@ const RAYS = /\b(sun ?rays?|sunburst|sun ?burst|rays)\b|skin-rays/i;
 
 const READ = ['renderer', 'shared', 'main', 'scripts', 'docs', 'designs', 'mobile', 'cloud', 'bin', '.claude'];
 const SKIP = new Set(['node_modules', 'scratch', 'dist', '.git', 'worktrees']);
-const TEXT = /\.(css|tsx?|mjs|cjs|js|html|md|json|svg)$/;
+const TEXT = /\.(css|tsx?|mjs|mts|cjs|js|html|md|json|svg)$/;
 
 function* files(dir) {
   if (!fs.existsSync(dir)) return;

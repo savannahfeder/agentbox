@@ -314,9 +314,9 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
         AGENT IS IN, which can be a command minutes long, with
         the one way to stop waiting (w-f37a34def6). */}
     {e.pending
-      ? <span className={`msg-when msg-sending${e.refused ? ' msg-refused' : ''}`}>{e.refused ? `Not sent: ${e.refused}` : e.held ? 'Sending… press Z to undo' : onCloudPhone() ? (e.cloud ? `Working in ${Name} Cloud` : 'Waiting for your computer') : cutting ? 'Sending now…' : onSendNow ? 'Waiting for its current step' : 'Sending…'}</span>
+      ? <span className={`msg-when msg-sending${e.refused ? ' msg-refused' : ''}`}>{e.refused ? `Not sent: ${e.refused}` : e.held ? 'Sending… press Z to undo' : onCloudPhone() ? (e.sent ? 'Sent' : e.cloud ? `Working in ${Name} Cloud` : 'Waiting for your computer') : cutting ? 'Sending now…' : onSendNow ? 'Waiting for its current step' : 'Sending…'}</span>
       : <span className="msg-when">{time}</span>}
-    {e.pending && !e.held && !cutting && onSendNow && (
+    {e.pending && !e.held && !e.sent && !cutting && onSendNow && (
       <button type="button" className="msg-now" onClick={() => { setCutting(true); onSendNow(); }}>
         Send now
       </button>

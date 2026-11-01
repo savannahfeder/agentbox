@@ -220,7 +220,7 @@ export class Repeats {
       // run is made (`occurrenceFields`). A run is an ordinary work item, so
       // this is the same pair `composeItem` writes for a task she types by
       // hand and it is read by the same `engineFor`.
-      const { created } = workItemsDisk.createWorkItemIfAbsent(productDir, id, occurrenceFields({ ...rule, id: ruleId }, key), { source: 'system', now });
+      const { created } = workItemsDisk.createWorkItemIfAbsent(productDir, id, occurrenceFields({ ...rule, id: ruleId }, key, now), { source: 'system', now });
 
       // Told once per streak, and that is a durable fact rather than an
       // intention: a crash after filing cannot file it twice, and one before it
@@ -239,9 +239,9 @@ export class Repeats {
 }
 
 /** The row a period's run is made as, before it exists (a sleeping Mac hands it over, shared/cloud-carry.mjs). */
-export function occurrenceFields(rule, key) {
+export function occurrenceFields(rule, key, now) {
   return {
-    title: `${rule.title} · ${dayStamp(key)}`,
+    title: `${rule.title} · ${dayStamp(key, now)}`,
     body: `${OCCURRENCE_PROTOCOL.replace('<REPEAT_LABEL>', repeatLabel(rule.id))}\n\n${standingInstruction(rule)}`,
     kind: 'directive',
     priority: rule.priority ?? 5,
@@ -251,9 +251,13 @@ export function occurrenceFields(rule, key) {
   };
 }
 
-function dayStamp(key) {
+// A run made after the day it serves (the first run of a new rule, or a Mac
+// asleep through it) is named for the day it ran.
+function dayStamp(key, now) {
   const [y, m, d] = key.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const served = new Date(y, m - 1, d);
+  const day = now != null && now > served.getTime() + 86_400_000 ? new Date(now) : served;
+  return day.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 // The period keys the misses covered, oldest first, for the alert's wording.

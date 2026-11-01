@@ -2,7 +2,7 @@
 //
 // d872fdb (2026-10-05) moved package.json to 0.1.8 and left package-lock.json
 // at 0.1.7. Every `npm install` in a checkout then rewrote the lockfile to
-// match, which left a tracked file edited, and main/source-updater.mjs reads an
+// match, which left a tracked file edited, and main/source-updater.mts reads an
 // edited tracked file as "changes of your own" and stops offering the restart.
 // The founder, that evening: "I dont see the restart component in the sidebar
 // that occurs when changes have made." Measured in her app folder: the only

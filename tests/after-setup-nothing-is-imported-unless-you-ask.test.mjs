@@ -2,7 +2,7 @@
 //
 // Asked before launch (w-db6f5e331e, 2026-10-05): "after onboarding for both
 // anthropic and openai harnesses, it should only import on command, not
-// continuously". Until this change the Codex watch (main/codex-watch.mjs) read
+// continuously". Until this change the Codex watch (main/codex-watch.mts) read
 // every Codex conversation once a minute and filed an "Import into ...?" row
 // for each new one in a project's folder. On the Codex-only test Mac that put
 // two rows in the inbox nobody had asked for, a minute after setup was skipped.
@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mjs';
-import { scanCodex } from '../main/codex-watch.mjs';
+import { scanCodex } from '../main/codex-watch.mts';
 import { codexIdOf, isCodexMirrorRow } from '../shared/codex-import.mjs';
 
 const NOW = Date.parse('2026-10-05T14:00:00-07:00');
@@ -74,7 +74,7 @@ describe('importing is something you ask for', () => {
   it('nothing in the main process files rows on its own', () => {
     // The only callers of the store's import doors are the card's IPC handlers.
     const read = (f) => fs.readFileSync(new URL(`../main/${f}`, import.meta.url), 'utf8');
-    for (const f of ['main.mjs', 'supervisor.mjs', 'codex-watch.mjs']) {
+    for (const f of ['main.mjs', 'supervisor.mjs', 'codex-watch.mts']) {
       expect(read(f), f).not.toMatch(/askAboutCodexThreads\(|importThreadRows\(|importCodexThreads\(/);
     }
   });

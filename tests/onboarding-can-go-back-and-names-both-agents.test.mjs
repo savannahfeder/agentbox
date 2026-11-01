@@ -6,10 +6,8 @@ import { previousScreen, readyEngines } from '../renderer/src/first-run';
 
 describe('going back during setup', () => {
   it('returns to the page that preceded this one', () => {
-    expect(previousScreen('chats', { chats: 3 })).toBe('welcome');
-    expect(previousScreen('task', { chats: 3 })).toBe('chats');
-    expect(previousScreen('task', { chats: 0 })).toBe('welcome');
-    expect(previousScreen('welcome', { chats: 3 })).toBe(null);
+    expect(previousScreen('chats')).toBe('welcome');
+    expect(previousScreen('welcome')).toBe(null);
   });
   it('wires a visible Back button into the current flow', () => {
     const source = fs.readFileSync(new URL('../renderer/src/components/FirstRun.tsx', import.meta.url), 'utf8');

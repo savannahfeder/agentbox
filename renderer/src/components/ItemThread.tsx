@@ -43,7 +43,8 @@ import { withEveryRun } from '../every-run';
 import type { AgentTurn, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
-import { appWrote, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt, workingFrom } from '../one-thing-at-a-time';
+import { catchUpDue } from '../../../shared/agent-import.mjs';
+import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt, workingContext, workingFrom } from '../one-thing-at-a-time';
 import { gapIndex } from '../../../shared/agents.mjs';
 import { askMarkUnread, say } from '../team/chat-events';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
@@ -76,7 +77,7 @@ const THEM = 'The agent';
 
 export function ItemThread({ item, engine, engineChoice, codexModels = [], codexModelDefault = null, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread, queue }: {
   /** One thing at a time (w-65bcefb857): the summary on top, the newest answer, the rest folded. */
-  queue?: { context: string | null };
+  queue?: { context: string | null; repeats?: string | null };
   // A CHAT'S THREAD, IN THE PANEL BESIDE IT (w-920461cbe6). The pane owns which
   // one is open and how wide it is; this draws it, because this is where the
   // replies were read. `host` is the pane the panel is drawn into. Absent
@@ -397,13 +398,13 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   const start = stands > gapIndex(events, omitted) ? stands : -1;
   const alone = !!newest && !working && stands < 0;
   const behind = start >= 0 ? earlierThan(events, start) + omitted : alone ? earlierCount(events, byApp ? null : outcome) + omitted : 0;
-  const short = !earlierOpen && drawnWhole(behind);
+  const short = !earlierOpen && drawnWhole(behind, broughtIn(item));
   const from = short || earlierOpen ? -1 : start;
   const queueHead = queue && (
     <QueueSummary
       key={`${item.product}:${item.id}`}
       title={pageTitle(item)}
-      context={queue.context}
+      context={working && !queue.context ? workingContext(item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}
       earlier={short ? 0 : behind}
       steps={!short && alone && (events.some((e) => e.kind === 'work') || after.length > 0)}
       open={earlierOpen}
@@ -416,6 +417,16 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
       {after.map((act, i) => <ActLine key={`${act.at}-${i}`} act={act} />)}
     </div>
   );
+  // A chat just brought in is being written up as a thread (main/catch-up.mjs). Its raw end stays readable until then.
+  if (queue && catchUpDue(item)) {
+    return (
+      <>
+        {queueHead}
+        <p className="one-catching-up"><span className="live-word is-shimmering">Getting this chat ready. Its summary and options will appear here.</span></p>
+        {newest && <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} />}
+      </>
+    );
+  }
   if (alone && !earlierOpen && !short) {
     return (
       <>

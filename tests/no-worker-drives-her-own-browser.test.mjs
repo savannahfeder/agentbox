@@ -31,7 +31,7 @@ function* files(dir) {
   for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
     const rel = path.join(dir, entry.name);
     if (entry.isDirectory()) yield* files(rel);
-    else if (entry.name.endsWith('.mjs') || entry.name.endsWith('.cjs')) yield rel;
+    else if (/\.(mjs|mts|cjs)$/.test(entry.name)) yield rel;
   }
 }
 

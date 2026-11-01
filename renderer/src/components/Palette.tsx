@@ -25,7 +25,7 @@ export interface Command {
   run: () => void;
 }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, findThreads, onSearchFor, onFirstRun, onTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, onSearch, findThreads, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -54,6 +54,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   filtering?: boolean;
   onOpenFilter: () => void;
   onClearFilter: () => void;
+  onEndTutorial?: () => void;
   onView: (view: View) => void;
   onPause: (paused: boolean) => void;
   onResume: () => void;
@@ -123,6 +124,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // opens the corner's filter menu with the keyboard in it.
     { id: 'filter', label: 'Filter…', hint: 'Project, priority or agent', run: onOpenFilter },
     ...(filtering ? [{ id: 'clear-filter', label: 'Clear filter', run: onClearFilter }] : []),
+    ...(onEndTutorial ? [{ id: 'end-tutorial', label: 'End the tutorial', keywords: 'skip stop hide tips', run: onEndTutorial }] : []),
     // Per project, only "rank first" is offered. The whole order is set on the
     // Projects page, which the next row opens.
     ...(onOpenProjects ? [{
@@ -201,7 +203,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetLook(r.to!),
     })),
     // Above the stale-files row, which only concerns a build on this machine.
-    // Shown only once the download has finished (main/updater.mjs).
+    // Shown only once the download has finished (main/updater.mts).
     ...(updateReady ? [{
       id: 'update',
       label: `Restart to update ${NAME}`,
@@ -338,7 +340,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onImportAgents, cloud, onCloudMode]);
+  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onSearch, onFirstRun, onTutorial, onEndTutorial, onImportAgents, cloud, onCloudMode]);
   return open ? <PaletteBox commands={commands} findThreads={findThreads} onSearchFor={onSearchFor} onClose={onClose} phone={phone} /> : null;
 }
 

@@ -44,9 +44,13 @@ describe('the tabs, with a team on', () => {
     expect(tabs(true)).not.toContain('corner');
   });
 
-  it('stay four without a team', () => {
-    const html = renderToStaticMarkup(h(StateTabs, { view: 'inbox', counts: {}, onView() {} }));
+  it('stay four without a team, once something is in Later', () => {
+    const html = renderToStaticMarkup(h(StateTabs, { view: 'inbox', counts: { snoozed: 1 }, onView() {} }));
     expect(html.match(/class="tm-tab( [^"]*)?"/g)).toHaveLength(4);
+  });
+  it('are three while Later is empty', () => {
+    const html = renderToStaticMarkup(h(StateTabs, { view: 'inbox', counts: {}, onView() {} }));
+    expect(html.match(/class="tm-tab( [^"]*)?"/g)).toHaveLength(3);
   });
 });
 

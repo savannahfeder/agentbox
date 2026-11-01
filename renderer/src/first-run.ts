@@ -3,23 +3,20 @@
 // holds what each rule is for.
 
 import { checkProjectFolder } from '../../shared/project-folder-check.mjs';
-import { occurrenceId, periodKey, type RepeatShape } from '../../shared/repeats.mjs';
+import { repeatLabel, type RepeatShape } from '../../shared/repeats.mjs';
 import { projectNameFor } from './agent-import-card';
-import { shortPath } from './onboarding';
 
-export type Step = 'chats' | 'task' | 'where';
-export type Screen = 'welcome' | Step;
+export type Screen = 'welcome' | 'chats';
 export type Engine = 'claude' | 'codex';
 
-/** The number each screen is counted under as `first_run_step`. In the twenties
- *  because the walk this replaced counted 1 to 15 (BEAT in ./onboarding.ts). */
-export const FIRST_RUN_STEP: Record<Screen, number> = { welcome: 21, chats: 22, task: 23, where: 24 };
-
-export function previousScreen(screen: Screen, { chats }: { chats: number }): Screen | null {
-  if (screen === 'welcome') return null;
-  if (screen === 'where') return 'task';
-  return screen === 'task' && chats > 0 ? 'chats' : 'welcome';
+export function previousScreen(screen: Screen): Screen | null {
+  return screen === 'chats' ? 'welcome' : null;
 }
+
+/** The number each screen is counted under as `first_run_step`. In the twenties
+ *  because the walk this replaced counted 1 to 15 (BEAT in ./onboarding.ts). The
+ *  folder and the first task are now the tutorial's (./tour.ts), on the inbox. */
+export const FIRST_RUN_STEP = { welcome: 21, chats: 22, task: 23, where: 24 } as const;
 
 export function readyEngines(readings: Array<{ engine: Engine; found?: boolean; signedIn?: boolean } | null>): Engine[] {
   return (['claude', 'codex'] as const).filter((engine) => readings.some((r) => r?.engine === engine && r.found && r.signedIn));
@@ -64,59 +61,33 @@ export function listKey(e: KeyLike): ListKey {
   return null;
 }
 
-/** Whether a key press is ⌘↵ or Ctrl+Enter, which sends from a text field. */
-export const isSend = (e: KeyLike): boolean => e.key === 'Enter' && !!(e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey;
 
-type ThreadLike = { folder?: string; short?: string; when?: number; imported?: boolean };
-
-export interface FolderChoice {
-  folder: string;
-  name: string;
-  short: string;
-  chats: number;
-  when: number;
-}
+type ThreadLike = { folder?: string; short?: string; when?: number; imported?: boolean; lastSaid?: string; endUnknown?: boolean };
 
 const bare = (folder: string) => folder.replace(/\/+$/, '');
 
 // Anyone's home folder, so a window run with a throwaway home still refuses the real one.
 const A_HOME = /^\/(Users|home)\/[^/]+$|^\/root$/;
 
-/** Whether a chat ran in a folder that can be a project. */
+/** A home folder can't be a project, so a chat that ran there goes to My Workspace. */
+export const inHomeFolder = (folder: string): boolean => A_HOME.test(bare(folder));
+
+/** Whether a chat ran somewhere it can be brought in to. */
 function placed(t: ThreadLike, home: string): boolean {
   const folder = bare(String(t.folder ?? ''));
-  if (!folder || folder === '/' || A_HOME.test(folder)) return false;
+  if (!folder || folder === '/') return false;
+  if (A_HOME.test(folder)) return true;
   // The chat's own `~/` path answers before the app has said where home is.
   return checkProjectFolder(folder, { home }).ok && (!t.short || checkProjectFolder(t.short, { home }).ok);
 }
 
-/** The folders your agents already ran in, busiest first. */
-export function folderChoices(threads: ThreadLike[], { home = '', max = 5 }: { home?: string; max?: number } = {}): FolderChoice[] {
-  const by = new Map<string, FolderChoice>();
-  for (const t of threads) {
-    if (!placed(t, home)) continue;
-    const folder = bare(String(t.folder));
-    const had = by.get(folder);
-    if (had) {
-      had.chats += 1;
-      had.when = Math.max(had.when, t.when ?? 0);
-      continue;
-    }
-    by.set(folder, {
-      folder,
-      name: projectNameFor({ name: folder.split('/').pop() ?? '' }),
-      short: t.short ? bare(t.short) : shortPath(folder, home),
-      chats: 1,
-      when: t.when ?? 0,
-    });
-  }
-  return [...by.values()].sort((a, b) => b.chats - a.chats || b.when - a.when).slice(0, max);
-}
+/** Read to the end and the agent said nothing: brought in, it would open on her own words alone. */
+const unanswered = (t: ThreadLike) => typeof t.lastSaid === 'string' && !t.endUnknown && !t.lastSaid.trim();
 
 /** The newest chats not yet in the inbox, from any folder that can be a project. */
 export function chatChoices<T extends ThreadLike>(threads: T[], { home = '', max = 8 }: { home?: string; max?: number } = {}): T[] {
   return threads
-    .filter((t) => !t.imported && placed(t, home))
+    .filter((t) => !t.imported && placed(t, home) && !unanswered(t))
     .sort((a, b) => (b.when ?? 0) - (a.when ?? 0))
     .slice(0, max);
 }
@@ -130,7 +101,7 @@ export function projectsToMake(chats: ThreadLike[], products: ProjectLike[]): Ar
   const out: Array<{ folder: string; name: string }> = [];
   for (const t of chats) {
     const folder = bare(String(t.folder ?? ''));
-    if (!folder || owned.has(folder)) continue;
+    if (!folder || owned.has(folder) || inHomeFolder(folder)) continue;
     owned.add(folder);
     const name = projectNameFor({ name: folder.split('/').pop() ?? '' }, taken);
     taken.push(name);
@@ -145,18 +116,21 @@ export function chatsHeadline(chats: Array<{ source?: string }>): string {
   return `Bring in your latest ${from}chats`;
 }
 
-export function stepsFor({ chats }: { chats: number }): Step[] {
-  return chats > 0 ? ['chats', 'task', 'where'] : ['task', 'where'];
-}
-
 export interface Idea {
   text: string;
   /** The schedule it keeps, with its words on the row and on the chip. None runs it once. */
   repeat?: RepeatShape & { short: string; label: string };
 }
 
-/** A look at the code, then jobs people want running and rarely have. None names the project: a folder can be called anything. */
-export function ideasFor(): Idea[] {
+/** A look at the code, then jobs people want running and rarely have. None names the project: a folder can be called anything.
+ *  My Workspace has no code and knows nothing about you, so it is offered work that needs neither. */
+export function ideasFor({ folder = true }: { folder?: boolean } = {}): Idea[] {
+  if (!folder) return [
+    { text: 'Compare the three most popular note-taking tools and their pricing' },
+    { text: 'Write a one-page guide to getting started with AI agents' },
+    { text: 'Summarize this week’s AI news in five bullets', repeat: { every: 'week', on: 1, at: '09:00', short: 'Every Monday', label: 'Every Monday at 9:00am' } },
+    { text: 'Write a checklist for launching a new feature' },
+  ];
   return [
     { text: 'Explain how this project is put together' },
     { text: 'Test the app and flag what’s broken', repeat: { every: 'day', at: '08:00', short: 'Every morning', label: 'Every morning at 8:00am' } },
@@ -165,47 +139,8 @@ export function ideasFor(): Idea[] {
   ];
 }
 
-/** The id of the run a rule made now starts with: a new rule is owed at once. */
-export function firstRunOf(rule: RepeatShape & { id: string }, now = Date.now()): string | null {
-  const key = periodKey(rule, now);
-  return key ? occurrenceId(rule.id, key) : null;
-}
-
-/** Where the first run leaves you: on the task you sent, or in Needs you. */
-export function landing(sent: string | null, runAt = 0): { view: 'inbox' | 'progress' | 'snoozed'; select: string | null } {
-  return sent ? { view: runAt > Date.now() ? 'snoozed' : 'progress', select: sent } : { view: 'inbox', select: null };
-}
-
-/** The one-time lessons left after the first run: the key beside the first thread, and the lit 1. */
-export const TEACH_KEY = 'zero.firstRun.teach';
-export type Lesson = 'open' | 'pick';
-
-type Store = Pick<Storage, 'getItem' | 'setItem'>;
-
-export function lessonsLeft(store: Store): Lesson[] {
-  try {
-    const raw = store.getItem(TEACH_KEY);
-    return raw ? raw.split(',').filter((l): l is Lesson => l === 'open' || l === 'pick') : [];
-  } catch { return []; }
-}
-
-/**
- * Whether the "↵ Open task" plate may be drawn. A plate promises a key, so it
- * goes while any card holds the keyboard: with the compose card open, ↵ puts a
- * newline in the box. App.tsx has held that rule for the hover plates since
- * they were built, and this is the same rule for the lesson.
- */
-export function showsOpenLesson({ lessons, focused, fresh, view, modal }: {
-  lessons: Lesson[];
-  focused: boolean;
-  fresh: boolean;
-  view: string;
-  modal: string | null;
-}): boolean {
-  if (!lessons.includes('open') || focused || fresh || modal) return false;
-  return view === 'inbox' || view === 'progress';
-}
-
-export function setLessons(store: Store, lessons: Lesson[]): void {
-  try { store.setItem(TEACH_KEY, lessons.join(',')); } catch { /* a lesson missed is not worth a failure */ }
+/** The run of a repeating task, found by its rule's label once the run exists. */
+export function runOfRule(ruleId: string, rows: { id: string; labels?: string[] }[]): string | null {
+  const label = repeatLabel(ruleId);
+  return rows.find((r) => r.labels?.includes(label))?.id ?? null;
 }

@@ -1,6 +1,6 @@
 // ON LINUX THE APP NEVER FINISHED QUITTING (w-badfef97d5, 2026-10-24).
 //
-// `main/quit-sequence.mjs` holds `will-quit` open for two seconds so the last
+// `main/quit-sequence.mts` holds `will-quit` open for two seconds so the last
 // batch of counts can leave, then calls `app.quit()` a second time to let the
 // quit through. On Linux that second call does NOTHING. Measured on a real
 // launch under Xvfb with every quit event logged:
@@ -44,7 +44,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import {
   flushBeforeQuit, FLUSH_DEADLINE_MS, SECOND_QUIT_DEADLINE_MS, EXIT_DEADLINE_MS,
-} from '../main/quit-sequence.mjs';
+} from '../main/quit-sequence.mts';
 
 const repo = path.join(path.dirname(new URL(import.meta.url).pathname), '..');
 
@@ -131,12 +131,12 @@ describe('a quit held for the last counts still ends the app', () => {
   });
 
   it('is the only app.quit() left in the quit sequence', () => {
-    const code = fs.readFileSync(path.join(repo, 'main', 'quit-sequence.mjs'), 'utf8')
+    const code = fs.readFileSync(path.join(repo, 'main', 'quit-sequence.mts'), 'utf8')
       .split('\n').filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line)).join('\n');
     // One, inside quitThenExit. A bare `app.quit()` anywhere else here is a way
     // out that can be ignored again.
     expect(code.match(/app\.quit\(\)/g)).toHaveLength(1);
-    const source = fs.readFileSync(path.join(repo, 'main', 'quit-sequence.mjs'), 'utf8');
+    const source = fs.readFileSync(path.join(repo, 'main', 'quit-sequence.mts'), 'utf8');
     expect(source).toMatch(/quitThenExit\(app, \{[^}]*deadlineMs: SECOND_QUIT_DEADLINE_MS/);
   });
 });
