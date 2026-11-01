@@ -28,14 +28,14 @@ import { codexPosture } from '../shared/codex-modes.mjs';
 export interface McpServerEntry {
   enabled?: boolean;
   command?: string;
-  env?: Record<string, string | undefined>;
+  env?: Record<string, string | null | undefined>;
   args?: string[];
 }
 
 export interface StoreServer {
   name?: string;
   command?: string;
-  env?: Record<string, string | undefined>;
+  env?: Record<string, string | null | undefined>;
   args?: string[];
 }
 

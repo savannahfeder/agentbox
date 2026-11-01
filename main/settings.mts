@@ -107,12 +107,12 @@ export interface MemoryGateReading {
   running?: { holdsSlot?: boolean }[];
   waiting?: unknown[];
   pressure?: string;
-  freePct?: number;
+  freePct?: number | null;
   counts?: { asked?: number; waited?: number; refused?: number };
 }
 
 export interface LeftoverReading {
-  leftovers?: { programs: number; kept: number; stopsAt: number }[];
+  leftovers?: { programs: number; kept: number; stopsAt: number | null }[];
   survivors?: unknown[];
 }
 
@@ -131,7 +131,7 @@ export interface SettingsSupervisor {
   _accountKey(engine: string | null | undefined, profile: string | null | undefined): string;
   engineChoices(): unknown[];
   engineFacts(): { workspace: string; [fact: string]: unknown };
-  engineTrouble(engine: string): { cause: string } | null | undefined;
+  engineTrouble(engine: string): { cause?: string } | null | undefined;
   _codexHome(): string;
   _codexOfferHomes(): string[];
   _codexWorkspaceModel(): string | null;
@@ -140,8 +140,8 @@ export interface SettingsSupervisor {
   memoryGateStatus?(): MemoryGateReading | null | undefined;
   startHoldStatus?(): { holding?: boolean } | null | undefined;
   leftoverStatus?(): LeftoverReading | null | undefined;
-  strayFolders?(): { project?: string; path: string }[] | null | undefined;
-  onChange?(): void;
+  strayFolders?(): { project?: string; path?: unknown }[] | null | undefined;
+  onChange?: (() => void) | null;
   wake?(): void;
   accountChosen?(engine: string, profile: string | null): void;
   setMemoryGate?(on: boolean): Promise<unknown> | undefined;
@@ -1244,7 +1244,7 @@ export function leftoverSettings({ config, supervisor }: { config: SettingsConfi
     if (!total) now = 'Nothing left running by finished agents.';
     else {
       const timed = list.filter((l) => l.programs && l.stopsAt);
-      const next = timed.map((l) => l.stopsAt).sort((a, b) => a - b)[0];
+      const next = timed.map((l) => l.stopsAt as number).sort((a, b) => a - b)[0];
       const soon = timed.reduce((n, l) => n + l.programs, 0);
       const open = stoppable - soon;
       const when = (ms: number) => {
@@ -1278,13 +1278,13 @@ export function leftoverSettings({ config, supervisor }: { config: SettingsConfi
  * trains the reaction it exists to prevent.
  */
 export function strayFolderSettings({ supervisor }: { supervisor?: SettingsSupervisor }, home = os.homedir()) {
-  let list: { project?: string; path: string }[] = [];
+  let list: { project?: string; path?: unknown }[] = [];
   try { list = supervisor?.strayFolders?.() ?? []; } catch { list = []; }
   if (!list.length) return null;
   const count = list.length;
   const one = count === 1;
   const projects = [...new Set(list.map((w) => w.project).filter(Boolean))];
-  const named = list.slice(0, 3).map((w) => shortPath(w.path, home));
+  const named = list.slice(0, 3).map((w) => shortPath(w.path as string, home));
   const rest = count - named.length;
   const of = projects.length ? ` of ${projects.slice(0, 2).join(' and ')}${projects.length > 2 ? ' and other projects' : ''}` : '';
   const now = `${count} ${one ? 'copy' : 'copies'}${of} ${one ? 'was' : 'were'} made by hand outside the folder ${NAME} keeps its own in, and ${one ? 'is' : 'are'} holding disk until you remove ${one ? 'it' : 'them'}: ${named.join(', ')}${rest > 0 ? ` and ${rest} more` : ''}. ${NAME} never removes a folder it did not make.`;
