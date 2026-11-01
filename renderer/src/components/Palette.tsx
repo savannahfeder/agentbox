@@ -406,11 +406,12 @@ export function paletteOrder(all: Command[], threads: Command[], phone = false, 
   // is not "reSUMe interrUPted agents".
   const named = (c: Command) => namesIt(query, c.label);
   const matched = all.filter((c) => !ASKED_FOR_BY_NAME.has(c.id) || !query.trim() || named(c));
-  // When the words name a thread, a command goes above it only if its label
-  // starts with them: "Waits on <that thread>" names it too.
-  const aThreadIsNamed = threads.some((t) => namesIt(query, t.label));
+  // "Waits on <that thread>" names a thread the words name, so it stays below
+  // that thread unless its label starts with them.
   const said = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
-  const ahead = (c: Command) => named(c) && (!aThreadIsNamed || said(c.label).startsWith(said(query)));
+  const namedTitles = threads.filter((t) => namesIt(query, t.label)).map((t) => said(t.label));
+  const carriesANamedTitle = (c: Command) => namedTitles.some((t) => said(c.label).includes(t));
+  const ahead = (c: Command) => named(c) && (!carriesANamedTitle(c) || said(c.label).startsWith(said(query)));
   if (!phone) {
     // A command the words only touch by keyword comes after the threads they found.
     if (threads.length && query.trim()) {
