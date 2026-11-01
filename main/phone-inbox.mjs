@@ -67,6 +67,9 @@ const SWEEP_EVERY_MS = 3600_000;
 const ADOPT_WITHIN_MS = 7 * 24 * 3600_000;
 const ADOPTED_KEPT_MS = 8 * 24 * 3600_000;
 const ADOPT_TRIES = 3;
+// A thread the cloud answered while its run is not home keeps the cloud's copy
+// this long at most, so a run that never comes home cannot freeze it.
+const CLOUD_COPY_HELD_MS = 12 * 3600_000;
 // Reading the settings parses Codex's model cache (199KB) on a Mac with both agents.
 const SETTINGS_EVERY_MS = 60_000;
 
@@ -241,6 +244,8 @@ export function createPhoneInbox({
         if (here.size && here.size % THREADS_PER_TURN === 0) await breathe();
         here.add(item.id);
         const sk = `${p.slug}:${item.id}`;
+        // The cloud's copy holds her reply and its answer, which this ledger does not yet.
+        if (cloudCopies.has(sk)) continue;
         const history = historyOf(p.slug, item.id);
         const inputs = inputsOf(item, history);
         const live = liveNow(sk, p.slug, item.id);
@@ -501,7 +506,15 @@ export function createPhoneInbox({
   // cannot be made its own after a few tries is said once and let go.
   const adoptTrouble = new Set();
   const sayOnce = (kind, line) => { if (!adoptTrouble.has(kind)) log(line); adoptTrouble.add(kind); };
+  // THE THREADS WHOSE COPY ONLINE IS THE CLOUD'S FOR NOW (2026-10-31,
+  // w-3e955eadb4). The cloud server writes her reply and its answer into the
+  // thread's copy (cloud/gateway/phone.mjs relayTurn). Until the run is home,
+  // this computer's ledger has neither, and a copy sent from here would write
+  // over both: that is how a message she sent at 11:41 was nowhere for hours.
+  // Filled by every adoptCloudRuns pass, read by the publish that follows it.
+  let cloudCopies = new Set();
   async function adoptCloudRuns() {
+    cloudCopies = new Set();
     if (!adopt || !backend.cloudPhoneCommands) return 0;
     still();
     const claimed = (await backend.cloudPhoneCommands(device, new Date(now() - ADOPT_WITHIN_MS).toISOString()))
@@ -561,7 +574,11 @@ export function createPhoneInbox({
             sayOnce(`adopt:${err?.message}`, `phone: could not join the cloud's run for ${item}: ${err?.message ?? err}`);
           }
         }
-        if (out === 'busy') { sayOnce(`busy:${runId}`, `phone: the cloud's run for ${item} waits for other cloud work to come home first`); continue; }
+        if (out === 'busy') {
+          sayOnce(`busy:${runId}`, `phone: the cloud's run for ${item} waits for other cloud work to come home first`);
+          holdCopy(project, item, cmds);
+          continue;
+        }
         rec.tries += 1;
         if (out === 'failed' && rec.tries < ADOPT_TRIES) { state.adopted[runId] = rec; save(); continue; }
         if (out === 'no-kit') sayOnce(`kit:${runId}`, `phone: no kit here for ${item}, so her reply runs on this computer`);
@@ -577,6 +594,7 @@ export function createPhoneInbox({
       if (!rec.home) {
         try { rec.home = !runHome || !!runHome({ project, item, runId }); } catch { rec.home = false; }
       }
+      if (!rec.home) holdCopy(project, item, cmds);
       if (rec.home) {
         for (const c of cmds) {
           if (c.takenAt || rec.marked.includes(c.id)) continue;
@@ -592,6 +610,13 @@ export function createPhoneInbox({
     const finished = [...new Set(Object.values(state.adopted).filter((r) => r?.done).flatMap((r) => [...(r.placed ?? []), ...(r.marked ?? [])]))];
     try { carriedFinished(finished); } catch { /* the supervisor's trouble, not the phone's */ }
     return n;
+  }
+
+  // A reply the cloud took into this run, sent within CLOUD_COPY_HELD_MS, leaves the thread's copy to the cloud.
+  function holdCopy(project, item, cmds) {
+    if (!project || !item) return;
+    const newest = Math.max(...cmds.filter((c) => c.kind === 'reply' && !isCarried(c)).map((c) => Date.parse(c.createdAt ?? c.created_at ?? '') || 0), 0);
+    if (newest && now() - newest < CLOUD_COPY_HELD_MS) cloudCopies.add(`${project}:${item}`);
   }
 
   // EACH ROW A SLEEPING MAC WOULD HAVE STARTED, written as its own command for

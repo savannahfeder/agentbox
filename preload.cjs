@@ -18,7 +18,7 @@ if (process.platform !== 'darwin') {
 }
 
 // EVERY ASK BEFORE A RELOAD IS ANSWERED, held write or not. main waits for
-// this before it reloads (main/write-before-reload.mjs), so a page with
+// this before it reloads (main/write-before-reload.mts), so a page with
 // nothing held, or one that has not set a handler yet, says so at once rather
 // than making ⌘R sit out the wait.
 let writeHeld = null;
@@ -136,7 +136,7 @@ contextBridge.exposeInMainWorld('zero', {
   cornerTag: (state) => ipcRenderer.invoke('zero:corner-tag', state),
   // Whether this page came up from ⌘R, and which build it is running.
   bootInfo: () => ipcRenderer.invoke('zero:boot-info'),
-  // KEEPING AGENTBOX CURRENT (main/updater.mjs). The state of it rides the
+  // KEEPING AGENTBOX CURRENT (main/updater.mts). The state of it rides the
   // snapshot, so these two are only the verbs: look again now, and restart onto
   // the version that has already downloaded. Nothing here can start a download,
   // because nothing needs to; that happens on its own in the background.
@@ -147,6 +147,7 @@ contextBridge.exposeInMainWorld('zero', {
   // window is a fact only the main process holds, so the page reports and does
   // not decide (main/notify.mjs).
   notify: (arrivals, needsYou) => ipcRenderer.invoke('zero:notify', { arrivals, needsYou }),
+  notifyTest: () => ipcRenderer.invoke('zero:notify-test'),
   stopSession: (payload) => ipcRenderer.invoke('zero:stop-session', payload),
   runNow: (payload) => ipcRenderer.invoke('zero:run-now', payload),
   reopen: (payload) => ipcRenderer.invoke('zero:reopen', payload),
@@ -223,6 +224,7 @@ contextBridge.exposeInMainWorld('zero', {
   // something happened and can say nothing about what.
   // A number may ride with it (which setup step), and main keeps only a number.
   track: (name, count) => ipcRenderer.invoke('zero:track', { name, count }),
+  onboardingArm: () => ipcRenderer.invoke('zero:onboarding-arm'),
   sessionTrace: (payload) => ipcRenderer.invoke('zero:session-trace', payload),
   // Everything that happened on one task, as the ledger lines it happened as.
   itemHistory: (payload) => ipcRenderer.invoke('zero:item-history', payload),

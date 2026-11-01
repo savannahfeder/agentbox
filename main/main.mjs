@@ -14,20 +14,20 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { configDir, loadConfig, saveConfig } from './config.mjs';
-import { installMenu, applyZoom, requestFind } from './menu.mjs';
-import { zoomDeltaFor } from './zoom-keys.mjs';
-import { copySelection } from './copy-selection.mjs';
-import { screenDetailFor } from './screen-detail.mjs';
+import { installMenu, applyZoom, requestFind } from './menu.mts';
+import { zoomDeltaFor } from './zoom-keys.mts';
+import { copySelection } from './copy-selection.mts';
+import { screenDetailFor } from './screen-detail.mts';
 import { Store } from './store.mjs';
 import { storeRootEnv } from './store/home.mjs';
 import { keepAnswerModesIn } from './answer-modes.mjs';
 import { Supervisor } from './supervisor.mjs';
-import { startCodexWatch } from './codex-watch.mjs';
+import { startCodexWatch } from './codex-watch.mts';
 import { watchNewChatsFor } from './new-chats-watch.mjs';
 import { readCodexThreadsOffThread } from './codex-threads.mjs';
 import { appSessionFolders } from './agent-homes.mjs';
 import { registerIpc } from './ipc.mjs';
-import { stallWatch } from './stall-watch.mjs';
+import { stallWatch } from './stall-watch.mts';
 import { startFreezeRecorder } from './freeze-recorder.mjs';
 import { applyThrough, phoneDevice } from './phone-inbox.mjs';
 import { answerWhatOnlyTheWindowAnswered } from './serve.mjs';
@@ -38,30 +38,30 @@ import { phoneWaitsOf } from '../shared/phone-snapshot.mjs';
 import { teammatesOn } from '../shared/teammates.mjs';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mjs';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mjs';
-import { newUserWindow } from './new-user-window.mjs';
+import { newUserWindow } from './new-user-window.mts';
 import { openFreshUser } from './fresh-user.mjs';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mjs';
-import { keepThePageAlive } from './when-the-page-stops.mjs';
+import { keepThePageAlive } from './when-the-page-stops.mts';
 import { createAnalytics, createDailyCount } from './analytics.mjs';
-import { createUpdater } from './updater.mjs';
-import { quitStep, flushBeforeQuit, quitThenExit } from './quit-sequence.mjs';
+import { createUpdater } from './updater.mts';
+import { quitStep, flushBeforeQuit, quitThenExit } from './quit-sequence.mts';
 import { createPlace } from '../shared/where-it-runs-from.mjs';
-import { createSourceUpdater } from './source-updater.mjs';
+import { createSourceUpdater } from './source-updater.mts';
 import { learnShellDataDirs, recoverShellPath } from './shell-path.mjs';
 import { installNotifier } from './notify.mjs';
 import { createCornerTag } from './corner-tag.mjs';
 import { loadLiquidGlass } from './liquid-glass.mjs';
 import { DOC_SCHEMES, DocGrants, docPath } from './doc-scheme.mjs';
-import { quietTheFramesScrollbars } from './frame-scrollbars.mjs';
-import { letLocalAppsShowInThePane } from './local-app-frames.mjs';
-import { hardenAttachedWebview } from './webview-guard.mjs';
+import { quietTheFramesScrollbars } from './frame-scrollbars.mts';
+import { letLocalAppsShowInThePane } from './local-app-frames.mts';
+import { hardenAttachedWebview } from './webview-guard.mts';
 import { IMG_SCHEMES, imgPath, mediaResponse, mediaType, servable } from './img-scheme.mjs';
 import { hotWindowVerdict, storeHasWork } from './dev-window.mjs';
-import { writeHeldThenReload } from './write-before-reload.mjs';
+import { writeHeldThenReload } from './write-before-reload.mts';
 import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterInAPage } from '../shared/artifact-keys.mjs';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 import { JOIN_SCHEME, ourLink, tokenFromLink } from '../shared/room-links.mjs';
-import { getMic } from './mic.mjs';
+import { getMic } from './mic.mts';
 
 // HOW LONG TO WAIT AFTER THE LID OPENS, and the wait is for the network rather
 // than for the wake. `powerMonitor`'s resume event fires while wifi is still
@@ -306,7 +306,7 @@ function reloadRenderer() {
   // The page may be holding something she did in the last three seconds (a
   // close, an answer, a reply) for Z to take back. It is written first, or the
   // reload throws it away and the thread comes back to her inbox
-  // (w-47218417a5). See write-before-reload.mjs.
+  // (w-47218417a5). See write-before-reload.mts.
   void writeHeldThenReload({
     webContents: window.webContents,
     ipcMain,
@@ -522,7 +522,7 @@ async function createWindow() {
   // folder a project points at gets a row asking yes or no, and the ones she
   // said yes to follow Codex's latest answer.
   // AND IT IS WHERE A CODEX AGENT IS COUNTED, because it is the one thing that
-  // already reads them (main/codex-watch.mjs). The switch is checked by
+  // already reads them (main/codex-watch.mts). The switch is checked by
   // `analytics.track` itself, so this hands it over unconditionally.
   // Every Codex folder on the machine, read fresh each minute so a login made
   // while the app is open is followed too (main/agent-homes.mjs).
@@ -537,7 +537,7 @@ async function createWindow() {
   const newChatsWatch = watchNewChatsFor({ store, config, supervisor });
   quitStep(app, 'before-quit', 'newChatsWatch.stop', () => newChatsWatch.stop());
   // Whatever is still queued goes with the app rather than dying in memory,
-  // and the quit WAITS for it (main/quit-sequence.mjs). It did not: the
+  // and the quit WAITS for it (main/quit-sequence.mts). It did not: the
   // process went as soon as this returned, so the last batch was a POST that
   // never left, which on an install that opens the app once is everything we
   // would ever have heard from it (w-60c8ddbab6).
@@ -689,7 +689,7 @@ async function createWindow() {
       if (!params.isEditable && params.selectionText.trim()) {
         items.push(
           // Through copySelection, because `contents.copy()` alone was measured
-          // landing nothing in the real app (main/copy-selection.mjs).
+          // landing nothing in the real app (main/copy-selection.mts).
           { label: 'Copy', accelerator: 'CommandOrControl+C', registerAccelerator: false, click: () => copySelection(contents, params.selectionText, clipboard) },
           { type: 'separator' },
         );
@@ -774,7 +774,7 @@ async function createWindow() {
   if (process.platform !== 'darwin') window.setMenuBarVisibility(false);
 
   // WHICH PICTURE SET THIS WINDOW IS ON, and a shout when it changes.
-  // main/screen-detail.mjs has the rule and the reasoning; this is the wiring.
+  // main/screen-detail.mts has the rule and the reasoning; this is the wiring.
   // The initial answer rides bootInfo rather than being pushed, for the same
   // reason everything else there does: a push races the renderer's first
   // effects and would be dropped by the page it is for. After that, the two
@@ -813,7 +813,7 @@ async function createWindow() {
   const junk = session.fromPartition('persist:junk');
   junk.setUserAgent(junk.getUserAgent().replace(/\s?(zero|Electron)\/\S+/gi, ''));
 
-  // THE APP KEEPS ITSELF CURRENT (main/updater.mjs). It checks a few seconds
+  // THE APP KEEPS ITSELF CURRENT (main/updater.mts). It checks a few seconds
   // from now, downloads anything newer in the background, and then waits: the
   // restart is a button she presses, never something that happens under her.
   // `pushUpdate` is filled in on the next line, because the updater has to
@@ -821,7 +821,7 @@ async function createWindow() {
   // knows how to reach the window.
   //
   // AND A COPY RUN FROM SOURCE watches its git branch instead of a release
-  // feed (main/source-updater.mjs), because that is how teammates run the team
+  // feed (main/source-updater.mts), because that is how teammates run the team
   // build and their updates are pushes to main, not releases.
   //
   // AND WHERE THIS COPY IS RUNNING FROM (shared/where-it-runs-from.mjs). An
@@ -1113,18 +1113,18 @@ async function createWindow() {
   // The pane draws a website now, which is the first code in this window that
   // nobody here wrote, so every webview is pinned below the tag: no preload,
   // sandboxed, context-isolated, node off, web security on, and no sound
-  // before a click. main/webview-guard.mjs is the rule and the reasons.
+  // before a click. main/webview-guard.mts is the rule and the reasons.
   window.webContents.on('will-attach-webview', (_e, webPreferences, params) => {
     hardenAttachedWebview(webPreferences, params);
   });
 
   // A page in the pane hides its scrollbar until you scroll, like the app's own
-  // (frame-scrollbars.mjs). Without it, a mouse on macOS gets a white track.
+  // (frame-scrollbars.mts). Without it, a mouse on macOS gets a white track.
   quietTheFramesScrollbars(window.webContents);
 
   // A local app a worker names (http://localhost:3006) draws in the pane even
   // when it refuses to be framed, and its sign-in cookie sticks there
-  // (main/local-app-frames.mjs).
+  // (main/local-app-frames.mts).
   letLocalAppsShowInThePane(window.webContents);
 
   // Escape must ALWAYS leave the junk browser, even when the guest page has
@@ -1135,7 +1135,7 @@ async function createWindow() {
     // A LINK IN A WEBSITE THAT WANTS A NEW WINDOW GOES TO YOUR OWN BROWSER.
     // The pane is one page at a time; a second Electron window would be a
     // browser we have not designed, and `allowpopups` is off anyway
-    // (webview-guard.mjs), so without this such a link does nothing at all.
+    // (webview-guard.mts), so without this such a link does nothing at all.
     contents.setWindowOpenHandler(({ url }) => {
       if (/^https?:/.test(url)) shell.openExternal(url);
       return { action: 'deny' };

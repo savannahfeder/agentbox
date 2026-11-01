@@ -142,7 +142,7 @@ export function applySkin(skin: SkinChoice, root: Root = document.documentElemen
 }
 
 // A picture ships a sharp copy and a soft '-sm' copy resampled to 1536 wide.
-// main/screen-detail.mjs picks which one a screen gets, because only the main
+// main/screen-detail.mts picks which one a screen gets, because only the main
 // process sees the display's real density. devicePixelRatio here includes page zoom.
 export type SkinDetail = 'soft' | 'sharp';
 

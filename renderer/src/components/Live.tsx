@@ -13,6 +13,7 @@ import { api } from '../api';
 import { onPhone } from '../phone-screen';
 import { pollEvery, oneAtATime } from '../phone-polls';
 import { runNodes } from '../item-thread';
+import { offersTryAgain } from '../try-again';
 import type { AgentWork } from '../types';
 import type { WorkItem } from '../types';
 
@@ -24,7 +25,7 @@ const TICK_MS = 15_000;
 // Only this lowest status line owns the lattice and shimmer (2026-09-19).
 // The task header repeats status in plain text, never another animation.
 
-export function Live({ item, facts }: { item: WorkItem; facts: LiveFacts }) {
+export function Live({ item, facts, onTryAgain }: { item: WorkItem; facts: LiveFacts; onTryAgain?: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const detailId = useId();
   const [history, setHistory] = useState<AgentWork[]>([]);
@@ -61,6 +62,18 @@ export function Live({ item, facts }: { item: WorkItem; facts: LiveFacts }) {
   }, [counting]);
 
   const live = liveLine(item, { ...facts, now });
+  // TRY AGAIN where nothing will start this (../try-again.ts). A stopped
+  // thread's bar above the conversation already carries it.
+  const retry = onTryAgain && !facts.stalled && offersTryAgain(item, { ...facts, now })
+    ? <button type="button" className="live-retry" onClick={onTryAgain}>Try again</button>
+    : null;
+  // Out of In progress the line says nothing, so a thread the app's own note
+  // left stopped gets the one line that is true of it.
+  if (!live && retry) {
+    return <div className="live-activity"><div className="live-brief live-idle">
+      <LiveMark still /><span className="live-word">{shortWord('idle')}</span>{retry}
+    </div></div>;
+  }
   if (!live) return null;
 
   const working = live.state === 'working';
@@ -109,6 +122,7 @@ export function Live({ item, facts }: { item: WorkItem; facts: LiveFacts }) {
           </button>
         ) : <span className="live-word">{live.state === 'signin' || live.state === 'limit' || live.state === 'cannot' ? live.line : word}</span>}
         {!working && span && <span className="live-span">{span}</span>}
+        {retry}
         <span className="live-announcement" role="status">{working ? word : live.line}</span>
       </div>
       {working && expanded && (

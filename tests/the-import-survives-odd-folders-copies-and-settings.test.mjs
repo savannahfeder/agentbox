@@ -22,7 +22,7 @@ import path from 'node:path';
 import { appSessionFolders, claudeDataDirs, codexDataDirs, sessionFolders } from '../main/agent-homes.mjs';
 import { readSessionThreads } from '../main/agent-sessions.mjs';
 import { readCodexThreads } from '../main/codex-threads.mjs';
-import { scanCodex } from '../main/codex-watch.mjs';
+import { scanCodex } from '../main/codex-watch.mts';
 
 const NOW = Date.UTC(2026, 9, 11, 18);
 let home;

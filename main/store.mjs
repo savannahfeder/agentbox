@@ -23,7 +23,7 @@ import { patchProjectAt } from './store/project.mjs';
 import { imgUrl } from './img-scheme.mjs';
 import { teamOf, PERSONAL_FLAG } from './team/projects.mjs';
 import {
-  agentImportRow, agentsNeedingRows, threadImportRow, threadsNeedingRows,
+  agentImportRow, agentsNeedingRows, threadImportRow, threadsNeedingRows, CATCH_UP_LABEL,
 } from '../shared/agent-import.mjs';
 import {
   CODEX_IMPORT_LABEL, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow, codexMirrorPatch, isCodexImportRow, isCodexMirrorRow,
@@ -464,6 +464,13 @@ export class Store {
     const clean = String(label ?? '').trim();
     if (!clean) return null;
     return workItemsDisk.updateWorkItem(this.productDir(slug), id, { label: clean }, { source: 'agent' });
+  }
+
+  // A chat brought in, rewritten as a thread (main/catch-up.mjs). The agent's
+  // words, so on agent authority like a worker's own summary and answer.
+  catchUpItem(slug, id, { label, problem, result }) {
+    const { workItemsDisk } = this.modules;
+    return workItemsDisk.updateWorkItem(this.productDir(slug), id, { label, problem, result }, { source: 'agent' });
   }
 
   // Who a thread sent to Auto went to (shared/auto-route.mjs). On system
@@ -1398,7 +1405,7 @@ export class Store {
   /* ---------------------------- codex conversations ----------------------- */
   // HER CODEX CONVERSATIONS ASK TO COME IN, AND HER YES OR NO DECIDES. The
   // words and the rules are in shared/codex-import.mjs;
-  // main/codex-watch.mjs calls the first two every minute; the bridge calls
+  // main/codex-watch.mts calls the first two every minute; the bridge calls
   // answerCodexImport when she answers.
 
   /** Every row in every product, each stamped with its product slug. */
@@ -1490,6 +1497,8 @@ export class Store {
     // it draws under You, not under an agent's name.
     workItemsDisk.updateWorkItem(dir, id, { body: patch.body }, { source: 'founder', now: bodyAt });
     const mirrored = workItemsDisk.updateWorkItem(dir, id, { kind: patch.kind, labels: patch.labels, result: patch.result }, { source: 'agent', now: now + 1 });
+    // At the real moment: the rows above wear the chat's own time, and an engine older than the choice is ignored.
+    workItemsDisk.updateWorkItem(dir, id, { engine: patch.engine }, { source: 'agent', now: Math.max(now + 1, Date.now()) });
     // Only a row that was not open is reopened; on an open one the line reads
     // as "You sent it back" in the thread.
     if (item.status === 'open') return mirrored;
@@ -1575,9 +1584,14 @@ export class Store {
       if (item.answer) continue;
       const t = byId.get(codexIdOf(item));
       if (!t) continue;
+      // Written up here (main/catch-up.mjs) since Codex last said anything: the write-up stands.
+      const wroteUpAt = item.wrote?.problem?.ts ?? 0;
+      if (wroteUpAt && (t.when ?? 0) <= wroteUpAt) continue;
       const patch = codexMirrorPatch(t);
       if (patch.result === item.result) continue;
+      const labels = item.labels ?? [];
       workItemsDisk.updateWorkItem(this.productDir(item.product), item.id, { result: patch.result }, { source: 'agent', now });
+      if (wroteUpAt && !labels.includes(CATCH_UP_LABEL)) workItemsDisk.updateWorkItem(this.productDir(item.product), item.id, { labels: [...labels, CATCH_UP_LABEL] }, { source: 'system', now });
       refreshed += 1;
     }
     return refreshed;

@@ -14,7 +14,7 @@
 // it. That is a bug you cannot hit on the machine that made it.
 //
 // So this reads the runtime code and demands the two lists agree. The subtlety
-// worth keeping: main/analytics.mjs and main/updater.mjs load theirs with a
+// worth keeping: main/analytics.mjs and main/updater.mts load theirs with a
 // `require()` at the moment of use, not with an import at the top, so a search
 // for import statements finds neither. The scan below covers both shapes, and
 // posthog-node is the package that proved it needs to.
@@ -34,7 +34,7 @@ function runtimeFiles(dir, out = []) {
   for (const entry of fs.readdirSync(path.join(here, dir), { withFileTypes: true })) {
     const rel = `${dir}/${entry.name}`;
     if (entry.isDirectory()) runtimeFiles(rel, out);
-    else if (/\.(mjs|cjs|js)$/.test(entry.name)) out.push(rel);
+    else if (/\.(mjs|mts|cjs|js)$/.test(entry.name) && !entry.name.endsWith('.d.mts')) out.push(rel);
   }
   return out;
 }

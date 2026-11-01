@@ -49,9 +49,18 @@ describe('the new first run counts each step', () => {
     expect(screen).toMatch(/track\?\.\('first_run_step', FIRST_RUN_STEP\[screen\]\)/);
   });
 
+  // Since w-31c71743b5 the first task is sent from the inbox, with the
+  // tutorial (renderer/src/tour.ts) showing the folder and the suggestions.
   it('counts the finish only when a first task was sent', () => {
-    const screen = read('renderer/src/components/FirstRun.tsx');
-    expect(screen).toMatch(/if \(sent\) [^\n]*track\?\.\('first_run_finished'\)/);
+    const app = read('renderer/src/App.tsx');
+    expect(app).toMatch(/if \(first\) \{ [^\n]*setTour\(noteSent\(tour!\)\); try \{ window\.zero\?\.track\?\.\('first_run_finished'\); \} catch \{\} \}/);
+    expect(read('renderer/src/components/FirstRun.tsx')).not.toContain("'first_run_finished'");
+  });
+
+  it('counts the folder and the first task where the tutorial shows them, once each', () => {
+    const tour = read('renderer/src/components/Tour.tsx');
+    expect(tour).toContain("const counted = next === 'folder' ? FIRST_RUN_STEP.where : next === 'pick' || next === 'write' || next === 'send' ? FIRST_RUN_STEP.task : null;");
+    expect(tour).toContain('if (counted && !tour.sent && !countedSteps.current.has(counted)) {');
   });
 });
 

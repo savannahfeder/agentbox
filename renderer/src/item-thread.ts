@@ -111,6 +111,8 @@ export interface PendingSaid {
   refused?: string;
   // Agentbox Cloud took it with the computer shut.
   cloud?: boolean;
+  // Taken, and its thread's copy has not shown it yet (renderer/src/phone-rows.ts `copyShows`).
+  sent?: boolean;
 }
 
 export interface ItemThread {
@@ -678,7 +680,7 @@ export function itemThread(
       && p.node.who === 'you' && (p.node.at ?? 0) >= mine.at
       && said(p.node.text ?? '') === words);
     if (landed) { spent.add(landed); continue; }
-    placed.push({ node: { at: mine.at, who: 'you', text: mine.text, pending: true, held: mine.held, ...(mine.refused ? { refused: mine.refused } : {}), ...(mine.cloud ? { cloud: true } : {}) }, run: null, answer: null });
+    placed.push({ node: { at: mine.at, who: 'you', text: mine.text, pending: true, held: mine.held, ...(mine.refused ? { refused: mine.refused } : {}), ...(mine.cloud ? { cloud: true } : {}), ...(mine.sent ? { sent: true } : {}) }, run: null, answer: null });
   }
 
   // TOOL-CALL SCAFFOLDING OFF EVERY MESSAGE FIRST, before two of them are

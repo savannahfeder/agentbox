@@ -96,7 +96,7 @@ function whoHasIt(made) {
   if (made?.taken !== false) return '';
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
-import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy } from '../shared/answers.mjs';
+import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson } from '../shared/answers.mjs';
 import { DEFAULT_SESSIONS_AT_ONCE } from './config.mjs';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mjs';
 import { effectiveProfiles } from './account-discovery.mjs';
@@ -104,7 +104,7 @@ import { referencedFiles, isImagePath } from '../shared/referenced-files.mjs';
 import { namedThreadsBlock } from '../shared/named-threads.mjs';
 import { changePath } from './code-change.mjs';
 import { snapshotRepo } from './git-change.mjs';
-import { importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mjs';
+import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mjs';
 import { readTranscriptHead } from './agent-sessions.mjs';
 import { claudeSessionOpen } from './claude-session-open.mjs';
 import { planStamp, readPlan } from './claude-plan.mjs';
@@ -149,6 +149,7 @@ import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexM
 import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.mjs';
 import { accountName } from '../shared/account-names.mjs';
 import { nameRow, wantsName, askSmallModel } from './row-label.mjs';
+import { catchUpRow, catchUpResult } from './catch-up.mjs';
 import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mjs';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mjs';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
@@ -214,6 +215,10 @@ const DIGEST_RETRY_MS = 30 * 60_000;
 // How long a row the namer could not name waits before it is asked about again,
 // so it cannot hold the rows behind it (nameTheRows).
 const NAME_RETRY_MS = 10 * 60_000;
+/** Rewrites of brought-in chats running at once (`catchUpTheImports`). */
+const CATCH_UP_AT_ONCE = 3;
+/** Someone is looking at these rows, so a miss is tried again far sooner than a name is. */
+const CATCH_UP_RETRY_MS = 60_000;
 // How long one account gets to say who takes a thread sent to Auto. A person is
 // waiting on this one, unlike a name, and a miss sends the thread to an agent.
 const ROUTE_TIMEOUT_MS = 60_000;
@@ -1089,7 +1094,7 @@ export class Supervisor {
       for (const key of Object.keys(this._deliveryAttempts)) if (key.startsWith(prefix)) delete this._deliveryAttempts[key];
       // Resuming a row by name is her saying run this now, which outranks a
       // rest the fleet earned on it exactly as it outranks the attempt cap.
-      delete this._fruitless[`${item.product}:${item.id}`];
+      this._endRest(item.product, item.id);
       this.forgetDeadStarts(item);
 
       if (this._roomFor(this._engineFor(item), item, { asked: true })) {
@@ -1668,14 +1673,34 @@ export class Supervisor {
     this._runNow.set(id, { product, at: Date.now(), started: false });
     // Asking for a row by name outranks a rest the fleet earned on it, the
     // same way `resumeItems` treats it.
-    if (this._fruitless[`${product}:${id}`]) {
-      delete this._fruitless[`${product}:${id}`];
-      this._saveState();
-    }
+    if (this._endRest(product, id)) this._saveState();
     this.forgetDeadStarts(item);
     this.onChange?.();
     this.wake();
     return { ok: true };
+  }
+
+  // A PUSH STARTS THE ROW EVEN WHERE THE QUEUE'S OWN RULES WOULD WALK PAST IT:
+  // the app's own note on it, a tag an agent wrote, a rest. She asked for it by
+  // name. Not a row nobody has given to an agent yet (the walk's own, one sent
+  // to Auto, a question waiting on her).
+  _pushedByHer(item) {
+    return this._runNow.has(item.id) && item.status === 'open'
+      && item.kind !== 'question' && item.kind !== 'review'
+      && !(item.labels ?? []).includes(FIRST_RUN_LABEL) && !isAuto(item);
+  }
+
+  // ASKING FOR A ROW BY NAME ENDS ITS REST AND KEEPS OUR PROMISE. The same
+  // record says our own words on the row promised a retry (`_weSaidItRunsAgain`).
+  // Deleting it made the queue read those words as an answer, so a row a usage
+  // limit stopped never started again once Run now had touched it.
+  _endRest(product, id) {
+    const key = `${product}:${id}`;
+    const seen = this._fruitless[key];
+    if (!seen) return false;
+    if (seen.saidTs) seen.runs = 0;
+    else delete this._fruitless[key];
+    return true;
   }
 
   // A push lasts while its task runs, so a second push cannot pause the first,
@@ -3620,6 +3645,42 @@ export class Supervisor {
       })
       .catch((e) => console.warn('zero: could not name a row:', e.message))
       .finally(() => { this._naming = false; });
+  }
+
+  /**
+   * A CHAT BROUGHT IN, REWRITTEN AS A THREAD (main/catch-up.mjs): its name, its
+   * context and its answer with options. Never awaited, like the namer, and
+   * a few at once: the person is looking at these rows the moment setup ends. A miss waits a minute; after three the row keeps the
+   * agent's own last message.
+   */
+  catchUpTheImports(items, now = Date.now()) {
+    this._catchingUp ??= new Set();
+    this._catchUpMisses ??= new Map();
+    const key = (i) => `${i.product}:${i.id}`;
+    const due = items
+      .filter((i) => catchUpDue(i) && i.result && !this._catchingUp.has(key(i))
+        && !(now - (this._catchUpMisses.get(key(i))?.at ?? -Infinity) < CATCH_UP_RETRY_MS))
+      .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+      .slice(0, Math.max(0, CATCH_UP_AT_ONCE - this._catchingUp.size));
+    return Promise.all(due.map((next) => {
+      this._catchingUp.add(key(next));
+      const labels = (next.labels ?? []).filter((l) => l !== CATCH_UP_LABEL);
+      return this._askSmall((opts) => catchUpRow(next, opts), { product: next.product })
+        .then((card) => {
+          if (!card) {
+            const misses = (this._catchUpMisses.get(key(next))?.count ?? 0) + 1;
+            this._catchUpMisses.set(key(next), { count: misses, at: now });
+            if (misses >= CATCH_UP_TRIES) this.store.routeItem?.(next.product, next.id, { labels });
+            return;
+          }
+          this._catchUpMisses.delete(key(next));
+          this.store.catchUpItem(next.product, next.id, { label: card.title, problem: card.context, result: catchUpResult(card) });
+          this.store.routeItem?.(next.product, next.id, { labels });
+          this.onChange?.();
+        })
+        .catch((e) => console.warn('zero: could not catch up a chat:', e.message))
+        .finally(() => { this._catchingUp.delete(key(next)); });
+    }));
   }
 
   /**
@@ -6779,8 +6840,11 @@ export class Supervisor {
         // tagged a finished thread QUEUED. Resting, settled and already
         // delivered are all inside those two, so a row the tick is going to
         // walk past is never advertised as waiting its turn.
+        // And what she asked for by name: a push (`_pushedByHer`) or a resume
+        // waiting for a slot (`_drainResumeQueue`).
         .filter((i) => (this._isContinuation(i) && !answerSettled(i) && !this._answerDelivered(i))
-          || this._isFreshWork(i, nowTs, autonomous) || settingUp(i.id))
+          || this._isFreshWork(i, nowTs, autonomous) || settingUp(i.id)
+          || this._pushedByHer(i) || this._resumeQueue.has(i.id))
         .map((i) => i.id);
       for (const id of this._recovering ?? []) if (heldBySweep(id) && !this._comingHome?.has(id) && !queued.includes(id)) queued.push(id);
     } catch {}
@@ -7230,15 +7294,10 @@ export class Supervisor {
    */
   _isFreshWork(item, now = Date.now(), autonomous = new Set(this.config.autonomousProducts ?? [])) {
     // A worker can put the 'founder' label on any row through the store MCP
-    // (create_work_item/update_work_item take a free labels array), and nothing
-    // else here checked who wrote it, so a forged label auto-spawned a run she
-    // never asked for. Every MCP write is source 'agent' and the fold refuses to
-    // let an agent line overwrite a founder-held label, so a label we KNOW an
-    // agent authored is the forged one and nothing else. A label with no
-    // recorded author (a legacy row from before `wrote` tracking) keeps its old
-    // treatment rather than being newly refused.
-    const founderInitiated = (item.labels ?? []).includes('founder')
-      && item.wrote?.labels?.source !== 'agent';
+    // (create_work_item/update_work_item take a free labels array), so a label
+    // we KNOW an agent authored is a forged one and starts nothing
+    // (`filedByThePerson`, which the lists read too).
+    const founderInitiated = filedByThePerson(item);
     return !(item.labels ?? []).includes(FIRST_RUN_LABEL)
       // Sent to Auto and not yet given to anyone (`routeTheThreads`).
       && !isAuto(item)
@@ -7337,6 +7396,8 @@ export class Supervisor {
     // And is there a row still wearing the first line of what she dictated?
     // One a tick, never awaited, silent on every failure (nameTheRows above).
     try { this.nameTheRows(items); } catch (e) { console.warn('zero: could not name a row:', e.message); }
+    // And is there a chat just brought in still reading as the end of a terminal session?
+    try { this.catchUpTheImports(items, now); } catch (e) { console.warn('zero: could not catch up a chat:', e.message); }
     // And has a teammate written something that needs sorting by urgency?
     try { this.sortTheMessages(items, process.env.AGENTBOX_PERSON_ID); } catch (e) { console.warn('zero: could not sort a message:', e.message); }
     // And is there a thread sent to Auto still waiting to be given to someone?
@@ -7436,7 +7497,7 @@ export class Supervisor {
         continue;
       }
       const continuation = this._isContinuation(item);
-      if (!continuation && !this._isFreshWork(item, now, autonomous)) continue;
+      if (!continuation && !this._isFreshWork(item, now, autonomous) && !this._pushedByHer(item)) continue;
       // ONE OF CLAUDE CODE'S OWN EIGHT COMMANDS, typed into this row's reply
       // box, ON A ROW THAT IS GOING TO CLAUDE CODE. `commandPrompt` is null for
       // everything else, so this is false for every ordinary message.
@@ -9824,8 +9885,9 @@ export class Supervisor {
       refuse('practice', engine);
       return;
     }
-    if (this._folderFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, asked })) return;
-    if (this._photoFirst(item, product, engine, { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, asked })) return;
+    const startAgain = { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, shipFailure, asked };
+    if (this._folderFirst(item, product, engine, startAgain)) return;
+    if (this._photoFirst(item, product, engine, startAgain)) return;
 
     // THE ROW'S OWN FOLDER, RESOLVED BEFORE ANYTHING IS ALLOCATED FOR THE RUN.
     // Everything downstream follows this one word: the snapshot the change card
