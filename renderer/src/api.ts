@@ -312,11 +312,6 @@ export function updateShape(wanted: string): UpdateState {
       phase: 'installing', ready: false, installing: true, source: true, currentVersion: '5c6afa7', newVersion: '9e1b204',
       changes: ['Teammates get a restart prompt when main moves'], behind: 1, readyAt: Date.now() - 12 * 60_000,
     },
-    // Restart pressed with agents mid-run (main/source-updater.mjs `whenNothingRuns`).
-    waiting: {
-      phase: 'ready', ready: true, source: true, currentVersion: '5c6afa7', newVersion: '9e1b204',
-      changes: ['Teammates get a restart prompt when main moves'], behind: 1, readyAt: Date.now() - 12 * 60_000, waitingFor: 3,
-    },
     current: { phase: 'current' },
     error: { phase: 'error', error: 'Could not reach the internet.' },
     // A COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS

@@ -206,9 +206,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // Shown only once the download has finished (main/updater.mjs).
     ...(updateReady ? [{
       id: 'update',
-      label: `Restart to update ${NAME}`,
-      hint: `version ${updateReady} has downloaded · restarting puts you back where you were`,
-      ...(updateWaiting ? { label: `Restart now to update ${NAME}`, hint: sayWaiting(updateWaiting) } : {}),
+      label: updateWaiting ? `Restart now to update ${NAME}` : `Restart to update ${NAME}`,
+      hint: updateWaiting ? sayWaiting(updateWaiting) : `version ${updateReady} has downloaded · restarting puts you back where you were`,
       keywords: 'update upgrade new version restart',
       run: () => onInstallUpdate?.(),
     }] : []),

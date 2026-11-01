@@ -6668,13 +6668,6 @@ export class Supervisor {
     ].filter((s) => !s.remoteIdle);
   }
 
-  /** How many runs a quit would cut off: every local one, a Codex cloud run (`killAll` cancels it), and a ship under way. */
-  runsAQuitStops() {
-    let n = 0;
-    for (const s of this.sessions.values()) if (!(s.cloud && s.engine !== 'codex')) n += 1;
-    return n + (this.shipQueue?.busy ? 1 : 0);
-  }
-
   /** What the phone is told of the agent running on one thread: since, where, its current steps. Null when none is. */
   liveFor(product, itemId) {
     const s = this.sessions.get(itemId);

@@ -14,11 +14,6 @@
 // package.json or the lockfile changed, rebuilds the screens, and relaunches.
 // Nothing happens until that button is pressed.
 //
-// AND NOT WHILE AN AGENT IS MID-RUN (w-2a5f57325e). A quit cuts off every
-// local worker's helpers, so a press with agents running waits for them,
-// before the fast-forward, and the card says how many. A second press
-// restarts now.
-//
 // IT NEVER TOUCHES WORK SOMEBODY HAS NOT PUSHED. Four cases get no offer at
 // all, each stated in `error` so Settings can say why: a folder that is not a
 // checkout, a branch that follows nothing, tracked files with edits in them,
@@ -45,7 +40,6 @@ const EVERY_MS = 30 * 60 * 1000;
 const FETCH_MS = 60_000;
 const INSTALL_MS = 10 * 60 * 1000;
 const BUILD_MS = 5 * 60 * 1000;
-const WAIT_EVERY_MS = 5_000;
 // How many change titles the row lists. The rest are counted, not named.
 const LISTED = 5;
 
@@ -161,9 +155,6 @@ export function createSourceUpdater({
   // runs from source, where the script is on disk.
   brand = async () => (await import('../scripts/brand-electron.mjs')).brandElectron(),
   relaunch = () => { app?.relaunch(); app?.quit(); },
-  // How many runs a quit would cut off right now (supervisor `runsAQuitStops`).
-  running = () => 0,
-  waitEveryMs = WAIT_EVERY_MS,
 } = {}) {
   const git = gitIn(appDir);
   // The commit this process booted from. Read once, now, because it is the
@@ -184,38 +175,10 @@ export function createSourceUpdater({
     readyAt: null,
     changes: [],
     behind: null,
-    waitingFor: null,
   };
   let timer = null;
   let stopped = false;
   let pending = Promise.resolve();
-  // A restart held until the running agents finish: `{ then, timer }`.
-  let holding = null;
-
-  const countRunning = () => { try { return Math.max(0, Number(running()) || 0); } catch { return 0; } };
-
-  function release() {
-    if (!holding) return null;
-    clearInterval(holding.timer);
-    const { then } = holding;
-    holding = null;
-    set({ waitingFor: null });
-    return then;
-  }
-
-  function whenNothingRuns(then) {
-    const n = countRunning();
-    if (!n) { then(); return; }
-    set({ waitingFor: n });
-    const timer = setInterval(() => {
-      if (stopped) { clearInterval(timer); holding = null; return; }
-      const now = countRunning();
-      if (!now) { release()?.(); return; }
-      if (now !== state.waitingFor) set({ waitingFor: now });
-    }, waitEveryMs);
-    timer.unref?.();
-    holding = { then, timer };
-  }
 
   const set = (next) => {
     state = { ...state, ...next };
@@ -238,7 +201,7 @@ export function createSourceUpdater({
   }
 
   async function check() {
-    if (stopped || holding) return describe(state);
+    if (stopped) return describe(state);
     if (state.phase === 'checking' || state.phase === 'installing') return describe(state);
     if (!bootHead) {
       set({ phase: 'unsupported', error: SAY.notRepo, checkedAt: Date.now() });
@@ -280,7 +243,7 @@ export function createSourceUpdater({
     return describe(state);
   }
 
-  async function apply({ now = false } = {}) {
+  async function apply() {
     const ok = await preconditions();
     if (ok.why) {
       set({ phase: 'unsupported', error: ok.why, newVersion: null, changes: [], behind: null, readyAt: null });
@@ -328,30 +291,18 @@ export function createSourceUpdater({
     // opens with about itself — an app that does not come back up is worse
     // than one wearing the wrong icon.
     try { await brand(); } catch (e) { log.warn?.('[source-updater] could not rebrand the bundle:', e?.message ?? e); }
-    const go = () => {
-      log.info?.('[source-updater] built', state.newVersion, '- relaunching');
-      relaunch();
-    };
-    // A run that started during the build holds the relaunch too.
-    if (now) go(); else whenNothingRuns(go);
+    log.info?.('[source-updater] built', state.newVersion, '- relaunching');
+    relaunch();
   }
 
-  function begin({ now }) {
+  // THE BUTTON. Returns at once; the work takes about a minute and the row
+  // says "Updating" while it runs.
+  function install() {
+    if (stopped || state.phase !== 'ready') return false;
     set({ phase: 'installing', error: null });
-    pending = apply({ now }).catch((e) => {
+    pending = apply().catch((e) => {
       set({ phase: 'ready', error: `The update stopped: ${failureLine(e?.message ?? e)}` });
     });
-  }
-
-  // THE BUTTON. Returns at once. With agents mid-run it waits for them before
-  // touching the folder, because a quit cuts off their helpers; pressed again
-  // while it waits, it restarts now.
-  function install() {
-    if (stopped) return false;
-    const held = release();
-    if (held) { if (state.phase === 'installing') held(); else begin({ now: true }); return true; }
-    if (state.phase !== 'ready') return false;
-    whenNothingRuns(() => begin({ now: false }));
     return true;
   }
 
@@ -367,8 +318,6 @@ export function createSourceUpdater({
     stopped = true;
     if (timer) clearInterval(timer);
     timer = null;
-    if (holding) clearInterval(holding.timer);
-    holding = null;
   }
 
   return {
