@@ -16,7 +16,9 @@
 // connects to the same headless Chrome, does one thing and lets go; its
 // address is kept in $PHONE_OUT/phone.json.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -72,7 +74,8 @@ if (isMain) {
   const log = (extra = {}) => fs.appendFileSync(path.join(out, 'actions.jsonl'), `${JSON.stringify({ at: Date.now(), verb, args, ...extra })}\n`);
 
   async function launch() {
-    const profile = path.join(out, 'chrome-profile');
+    // Out of $PHONE_OUT, which may be a synced folder: a browser profile is tens of megabytes of nothing.
+    const profile = path.join(os.tmpdir(), 'agentbox-phone-profiles', crypto.createHash('sha1').update(out).digest('hex').slice(0, 12));
     fs.mkdirSync(profile, { recursive: true });
     if (freeProfile(profile)) await new Promise((r) => setTimeout(r, 500));
     const { chrome, wsUrl } = await launchChrome({ profile, detached: true, width: IPHONE.width, height: IPHONE.height });

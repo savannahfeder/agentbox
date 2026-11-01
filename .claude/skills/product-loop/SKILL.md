@@ -38,6 +38,7 @@ folder ranks every issue, worst first, with pictures.
 | `--codex-home` | the Codex login the week is read from and spent on | `$CODEX_HOME` or `~/.codex` |
 | `--target` | how much of the week to have used at its reset | 90 |
 | `--focus` | what shipped and wants leaning on | none |
+| `--out` | the run folder; on the cloud, the thread's designs folder, which outlives the machine | a folder under `/tmp` |
 
 In the Agentbox cloud nothing a session starts can sign in: use
 `--engine external`, read each `stretch-N.prompt.md` the runner writes, run

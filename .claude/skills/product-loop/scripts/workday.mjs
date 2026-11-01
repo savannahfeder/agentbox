@@ -3,7 +3,7 @@
 //
 //   node workday.mjs --who founder,new-user [--minutes 30] [--stretches 2 | --pace [--hours 10]]
 //                    [--engine codex|claude|external] [--model <id>] [--focus "what to lean on"]
-//                    [--codex-home ~/.codex] [--target 90] [--url <preview address>]
+//                    [--codex-home ~/.codex] [--target 90] [--url <preview address>] [--out <folder>]
 //
 // Each person (../../power-test/people) gets a folder with two commands,
 // `phone` (phone.mjs, the app at an iPhone's size) and `diary` (the power
@@ -88,7 +88,7 @@ if (isMain) {
   const deadline = Date.now() + Number(opt('hours', pace ? 10 : 24)) * 60 * MIN;
   const maxStretches = pace ? Infinity : Number(opt('stretches', 1));
   const codexHome = String(opt('codex-home', process.env.CODEX_HOME || path.join(os.homedir(), '.codex'))).replace(/^~(?=\/)/, os.homedir());
-  const root = path.join(os.tmpdir(), 'agentbox-product-loop', `${new Date().toISOString().replace(/[:.]/g, '-')}-phone`);
+  const root = path.resolve(opt('out', path.join(os.tmpdir(), 'agentbox-product-loop', `${new Date().toISOString().replace(/[:.]/g, '-')}-phone`)));
   fs.mkdirSync(root, { recursive: true });
 
   // The preview, built once per version of mobile/ and served from here.
