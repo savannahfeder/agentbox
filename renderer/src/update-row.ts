@@ -89,7 +89,13 @@ export const MOVE_CLOSED_KEY = 'zero.moveClosed';
 export const SAY = {
   restart: 'Restart to update',
   installing: `Updating. ${NAME} restarts by itself in about a minute.`,
+  restartNow: 'Restart now',
 } as const;
+
+/** Restart was pressed with agents mid-run (main/source-updater.mjs). */
+export function sayWaiting(n: number): string {
+  return n === 1 ? 'Restarts when the agent running now finishes.' : `Restarts when the ${n} agents running now finish.`;
+}
 
 // ASKING NOW, RATHER THAN WAITING FOR THE CLOCK (w-39d6c237f7, 2026-10-07).
 // "A way to pull a new version on demand, as many apps do, instead of waiting
@@ -148,6 +154,8 @@ export function updateLook(
   state: UpdateState | null | undefined,
   { checking = false }: { checking?: boolean } = {},
 ): UpdateLook {
+  const waiting = state?.waitingFor ?? 0;
+  if (waiting > 0) return { sentence: sayWaiting(waiting), button: SAY.restartNow, restart: true, move: false, busy: false };
   const installing = !!state?.installing;
   const phase = checking && !installing ? 'checking' : (state?.phase ?? 'idle');
   const ready = phase === 'ready';

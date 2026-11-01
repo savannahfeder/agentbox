@@ -23,7 +23,7 @@
 
 import type { ReactNode } from 'react';
 import { NAME } from '../../../shared/product-name.mjs';
-import { MOVE_SAY, SAY } from '../update-row';
+import { MOVE_SAY, SAY, sayWaiting } from '../update-row';
 import { sayWhere } from '../../../shared/where-it-runs-from.mjs';
 
 export const SIDE_SAY = {
@@ -109,8 +109,10 @@ function RailCard({ icon, title, text, closeTip, changed, onClose, row }: {
   </div>;
 }
 
-export function SidebarUpdate({ installing, changes = [], error = null, collapsed, rail = false, onRestart, onClose }: {
+export function SidebarUpdate({ installing, changes = [], error = null, waitingFor = null, collapsed, rail = false, onRestart, onClose }: {
   installing: boolean;
+  /** Restart was pressed and waits for this many running agents; pressing again restarts now. */
+  waitingFor?: number | null;
   /** What changed, already counted (`changeLines`). Empty for an installed app. */
   changes?: string[];
   /** Why the last restart did not finish, if it did not. */
@@ -124,16 +126,19 @@ export function SidebarUpdate({ installing, changes = [], error = null, collapse
 }) {
   const changed = changes.length ? `${SIDE_SAY.changed}\n${changes.map((c) => `- ${c}`).join('\n')}` : '';
   const failed = error ? `${error.replace(/\.?$/, '.')} Pressing it again tries again.` : '';
+  const waiting = waitingFor && waitingFor > 0 ? sayWaiting(waitingFor) : '';
+  const go = waiting ? SAY.restartNow : SAY.restart;
+  const text = waiting || failed || SIDE_SAY.how;
 
   if (collapsed || rail) {
-    const tip = installing ? SAY.installing : [failed || `${SAY.restart}. ${SIDE_SAY.how}`, changed].filter(Boolean).join('\n\n');
+    const tip = installing ? SAY.installing : [waiting || failed || `${SAY.restart}. ${SIDE_SAY.how}`, changed].filter(Boolean).join('\n\n');
     const row = <button type="button" className="sb-update-row" data-installing={installing || undefined} disabled={installing}
-      title={tip} aria-label={installing ? SIDE_SAY.installing : SAY.restart} onClick={onRestart}>
-      <RestartIcon /><span>{installing ? SIDE_SAY.installing : SAY.restart}</span>
+      title={tip} aria-label={installing ? SIDE_SAY.installing : go} onClick={onRestart}>
+      <RestartIcon /><span>{installing ? SIDE_SAY.installing : go}</span>
     </button>;
     // While it rebuilds there is nothing to press, so there is no card to rise.
     if (!rail || installing) return row;
-    return <RailCard icon={<RestartIcon />} title={SIDE_SAY.title} text={failed || SIDE_SAY.how} closeTip={SIDE_SAY.closeTip} changed={changed} onClose={onClose} row={row} />;
+    return <RailCard icon={<RestartIcon />} title={SIDE_SAY.title} text={text} closeTip={SIDE_SAY.closeTip} changed={changed} onClose={onClose} row={row} />;
   }
 
   // Pointing at it names what changed: the card is narrow, and a list of
@@ -141,7 +146,7 @@ export function SidebarUpdate({ installing, changes = [], error = null, collapse
   return <div className="sb-update-card" data-installing={installing || undefined} title={changed || undefined}>
     <div className="sb-update-card-title"><RestartIcon /><span>{installing ? SIDE_SAY.installing : SIDE_SAY.title}</span></div>
     {!installing && <button type="button" className="sb-update-close" aria-label={SIDE_SAY.close} title={SIDE_SAY.closeTip} onClick={onClose}><CloseIcon /></button>}
-    <p>{installing ? `${NAME} restarts by itself in about a minute.` : error ? `${error.replace(/\.?$/, '.')} Pressing it again tries again.` : SIDE_SAY.how}</p>
-    {!installing && <button type="button" className="sb-update-go" onClick={onRestart}>{SAY.restart}</button>}
+    <p>{installing ? `${NAME} restarts by itself in about a minute.` : text}</p>
+    {!installing && <button type="button" className="sb-update-go" onClick={onRestart}>{go}</button>}
   </div>;
 }

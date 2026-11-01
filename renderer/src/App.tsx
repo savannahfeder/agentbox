@@ -6446,7 +6446,7 @@ export default function App() {
           `onInvite` is still handed in, for the account menu. */}
       <WorkspaceNavigation
         onPalette={() => setModal('palette')}
-        update={announcesUpdate(snap?.update, { walking, closed: '' }) ? { installing: !!snap?.update?.installing, version: snap?.update?.newVersion, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
+        update={announcesUpdate(snap?.update, { walking, closed: '' }) ? { installing: !!snap?.update?.installing && !snap?.update?.waitingFor, version: snap?.update?.newVersion, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error, waitingFor: snap?.update?.waitingFor ?? null } : null}
         onUpdate={() => { void api.updateInstall(); }}
         /* AND THE COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS
            (shared/where-it-runs-from.mjs): the same card, in the same place,
@@ -7299,6 +7299,7 @@ export default function App() {
         updateReady={announcesUpdate(snap.update, { walking, closed: '' })
           ? (snap.update?.newVersion ?? null)
           : null}
+        updateWaiting={snap.update?.waitingFor ?? null}
         onInstallUpdate={() => { setModal(null); void api.updateInstall(); }}
         /* LOOKING NOW, FROM ⌘K (w-39d6c237f7). The palette closes and the
            answer arrives as a toast in the Settings row's own words, so the

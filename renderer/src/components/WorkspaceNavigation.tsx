@@ -61,7 +61,7 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   invisible?: Invisible | null;
   // A NEW VERSION WAITING (SidebarUpdate.tsx). Null when there is none.
   // `version` is what its × closes, until a newer one arrives.
-  update?: { installing: boolean; version?: string | null; changes?: string[]; behind?: number | null; error?: string | null } | null; onUpdate?: () => void;
+  update?: { installing: boolean; version?: string | null; changes?: string[]; behind?: number | null; error?: string | null; waitingFor?: number | null } | null; onUpdate?: () => void;
   // OR A COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS (SidebarMove, and
   // shared/where-it-runs-from.mjs). Null on every copy that can, which is
   // nearly all of them. `place` is what its × closes.
@@ -97,7 +97,7 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   // place in the foot list and grows upward (SidebarUpdate.tsx, `RailCard`).
   const asRow = collapsed || rail;
   const updateCard = showUpdate && !asRow;
-  const updateView = showUpdate && update && onUpdate && <SidebarUpdate installing={update.installing} changes={changeLines(update)} error={update.error ?? null}
+  const updateView = showUpdate && update && onUpdate && <SidebarUpdate installing={update.installing} changes={changeLines(update)} error={update.error ?? null} waitingFor={update.waitingFor ?? null}
     collapsed={collapsed} rail={rail} onRestart={onUpdate} onClose={closeUpdate} />;
   // THE MOVE CARD STANDS WHERE THE UPDATE CARD WOULD, and never both: a
   // version on the disk is the news, and a copy that cannot update itself

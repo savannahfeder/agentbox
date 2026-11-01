@@ -102,6 +102,8 @@ export function describe(state) {
     changes: Array.isArray(changes) ? changes : [],
     behind: typeof behind === 'number' ? behind : null,
     installing,
+    // Restart was pressed and waits for this many running agents.
+    waitingFor: state.waitingFor > 0 ? state.waitingFor : null,
   };
 }
 

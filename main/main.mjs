@@ -838,6 +838,7 @@ async function createWindow() {
     app,
     appDir,
     onChanged: () => pushUpdate(),
+    running: () => supervisor.runsAQuitStops(),
   });
 
   // The desktop door. `main/serve.mjs` is the other one and hands over plain

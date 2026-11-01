@@ -5509,7 +5509,8 @@ export class Supervisor {
       product: item.product ?? null,
       engine: session.engine ?? null,
       seconds: Math.max(0, Math.round((at - session.startedAt) / 1000)),
-      failed: !!session.exitFailed,
+      // A quit or an update cut it off; the worker did not fail.
+      failed: !!session.exitFailed && !session.cutOffByQuit,
     }, { file: this.runLedger ?? runLedgerPath() });
   }
 
@@ -6665,6 +6666,13 @@ export class Supervisor {
       ...this.sessions.values(),
       ...[...(this._comingHome?.values() ?? [])].filter((v) => !this.sessions.has(v.itemId)),
     ].filter((s) => !s.remoteIdle);
+  }
+
+  /** How many runs a quit would cut off: every local one, a Codex cloud run (`killAll` cancels it), and a ship under way. */
+  runsAQuitStops() {
+    let n = 0;
+    for (const s of this.sessions.values()) if (!(s.cloud && s.engine !== 'codex')) n += 1;
+    return n + (this.shipQueue?.busy ? 1 : 0);
   }
 
   /** What the phone is told of the agent running on one thread: since, where, its current steps. Null when none is. */
@@ -10489,13 +10497,13 @@ export class Supervisor {
       // starts quitting within the grace, the person stopped it, not the task.
       if (!session.stoppedByUs && !this._quitting && diedOfAStopSignal(code, signal)) {
         const t = setTimeout(() => {
-          if (this._quitting) session.stoppedByUs = true;
+          if (this._quitting) session.stoppedByUs = session.cutOffByQuit = true;
           settleExit(code, signal, how);
         }, QUIT_GRACE_MS);
         t.unref?.();
         return;
       }
-      if (this._quitting) session.stoppedByUs = true;
+      if (this._quitting) session.stoppedByUs = session.cutOffByQuit = true;
       settleExit(code, signal, how);
     });
     this.onChange?.();

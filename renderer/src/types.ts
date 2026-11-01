@@ -900,6 +900,8 @@ export interface UpdateState {
   changes?: string[];
   behind?: number | null;
   installing?: boolean;
+  // Restart was pressed and waits for this many running agents.
+  waitingFor?: number | null;
   // WHERE THIS COPY IS RUNNING FROM, when that is a place macOS will not let
   // it update itself (shared/where-it-runs-from.mjs). `canMove` is the one
   // question the screens ask, `place` is which read-only place it is, and
