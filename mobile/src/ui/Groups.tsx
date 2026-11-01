@@ -3,17 +3,18 @@
 // switches group; People sits at the bar's right. A reply opens its thread,
 // as on the desktop (renderer/src/team/rooms/RoomChat.tsx).
 import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { AppState, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
+import { File, Paths } from 'expo-file-system';
 import Svg, { Circle, Path } from 'react-native-svg';
 import type { Room, RoomMessage } from '../../../renderer/src/types';
 import { Name } from '../../../shared/product-name.mjs';
 import { cardName, clockOf, initialsOf, markMentions, mentionsIn } from '../../../renderer/src/team/rooms/room-rules';
 import { newLineAt, READ_AFTER_MS } from '../../../renderer/src/team/rooms/room-chat-rules';
 import { updatedWords } from '../../../renderer/src/threads/page-rules';
-import { chatRoots, dayWords, groupName, groupsInOrder, groupToOpen, onWords, peopleInOrder, repliesTo, startsRun } from '../lib/groups';
+import { bodyParts, chatRoots, dayWords, groupName, groupsInOrder, groupToOpen, onWords, peopleInOrder, pictureType, repliesTo, startsRun } from '../lib/groups';
 import { useCloud } from '../state/cloud';
 import { useGroups } from '../state/groups';
-import { Back, Caret } from './icons';
+import { Back, Caret, Clip } from './icons';
 import { IconButton, RunningMark, Sheet, SheetHead, SheetRow, T, TopBar } from './parts';
 import { color, font, size } from './theme';
 
@@ -41,16 +42,73 @@ function GroupMark({ room }: { room: Room }) {
   return <View style={{ width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}><T style={{ fontFamily: font.mono, fontSize: 15, color: color.faint }}>#</T></View>;
 }
 
-function Body({ text, names }: { text: string; names: string[] }) {
+const pictures = new Map<string, Promise<string | null>>();
+
+/** A picture a message carries, fetched once for each group and name (RoomChat.tsx `RoomPicture`). */
+function RoomPicture({ roomId, name, alt }: { roomId: string; name: string; alt: string }) {
+  const g = useGroups();
+  const [data, setData] = useState<string | null | undefined>(undefined);
+  const [shape, setShape] = useState(4 / 3);
+  const uri = data ? `data:${pictureType(name)};base64,${data}` : null;
+  useEffect(() => {
+    let live = true;
+    const key = `${roomId}/${name}`;
+    let got = pictures.get(key);
+    if (!got) { got = g.fileOf(roomId, name).catch(() => null); pictures.set(key, got); }
+    void got.then((d) => { if (live) setData(d); });
+    return () => { live = false; };
+  }, [roomId, name, g.fileOf]);
+  useEffect(() => { if (uri) Image.getSize(uri, (w, h) => { if (w && h) setShape(w / h); }, () => {}); }, [uri]);
+  if (data === null) return <T style={{ fontSize: 13.5, lineHeight: 20, color: color.faint }}>{alt || 'A picture that is not here any more'}</T>;
   return (
-    <T style={{ fontSize: 15.5, lineHeight: 22.5 }}>
-      {markMentions(text, names).map((p, i) => (p.mention ? <T key={i} style={{ fontSize: 15.5, lineHeight: 22.5, color: color.accent }}>{p.text}</T> : p.text))}
-    </T>
+    <View style={{ width: '100%', maxWidth: 280, aspectRatio: shape, marginVertical: 6, backgroundColor: color.film }}>
+      {!!uri && <Image source={{ uri }} accessibilityLabel={alt} resizeMode="contain" style={{ width: '100%', height: '100%' }} />}
+    </View>
   );
 }
 
-function Message({ m, run, nameOf, faceOf, names, replies, onThread }: {
-  m: RoomMessage; run: boolean; nameOf: (id: string | null) => string; faceOf: (id: string | null) => string; names: string[]; replies: number; onThread?: () => void;
+/** A file a message carries, by its name. Tapped, it goes to the phone's own share sheet, or a new tab in the preview. */
+function RoomFile({ roomId, name, label }: { roomId: string; name: string; label: string }) {
+  const g = useGroups();
+  const c = useCloud();
+  const [busy, setBusy] = useState(false);
+  const open = async () => {
+    setBusy(true);
+    try {
+      const data = await g.fileOf(roomId, name);
+      if (!data) { c.say('That file is not here any more.'); return; }
+      if (Platform.OS === 'web') { window.open(`data:application/octet-stream;base64,${data}`, '_blank'); return; }
+      const copy = new File(Paths.cache, name);
+      if (copy.exists) copy.delete();
+      copy.create();
+      copy.write(Uint8Array.from(atob(data), (x) => x.charCodeAt(0)));
+      await Share.share({ url: copy.uri });
+    } catch (err) { c.say(String((err as Error)?.message ?? err)); } finally { setBusy(false); }
+  };
+  return (
+    <Pressable onPress={() => void open()} disabled={busy} accessibilityRole="button" style={({ pressed }) => ({ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, height: 34, paddingHorizontal: 11, borderWidth: 1, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: busy ? 0.6 : 1 })}>
+      <Clip size={14} />
+      <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 13.5, color: color.dim }}>{label}</T>
+    </Pressable>
+  );
+}
+
+function Body({ text, names, roomId }: { text: string; names: string[]; roomId: string }) {
+  return (
+    <>
+      {bodyParts(text).map((part, k) => (part.kind === 'picture' ? <RoomPicture key={k} roomId={roomId} name={part.name} alt={part.alt} />
+        : part.kind === 'file' ? <RoomFile key={k} roomId={roomId} name={part.name} label={part.label} />
+          : (
+            <T key={k} style={{ fontSize: 15.5, lineHeight: 22.5 }}>
+              {markMentions(part.text, names).map((p, i) => (p.mention ? <T key={i} style={{ fontSize: 15.5, lineHeight: 22.5, color: color.accent }}>{p.text}</T> : p.text))}
+            </T>
+          )))}
+    </>
+  );
+}
+
+function Message({ m, run, nameOf, faceOf, names, replies, onThread, roomId }: {
+  m: RoomMessage; run: boolean; nameOf: (id: string | null) => string; faceOf: (id: string | null) => string; names: string[]; replies: number; onThread?: () => void; roomId: string;
 }) {
   const who = nameOf(m.by);
   return (
@@ -64,7 +122,7 @@ function Message({ m, run, nameOf, faceOf, names, replies, onThread }: {
             <T style={{ fontSize: 12, color: color.faint }}>{clockOf(m.at)}</T>
           </View>
         )}
-        {m.deleted ? <T style={{ fontSize: 14.5, lineHeight: 22, color: color.faint }}>This message was deleted.</T> : <Body text={m.body} names={names} />}
+        {m.deleted ? <T style={{ fontSize: 14.5, lineHeight: 22, color: color.faint }}>This message was deleted.</T> : <Body text={m.body} names={names} roomId={roomId} />}
         {replies > 0 && onThread && (
           <Pressable onPress={onThread} accessibilityRole="button" hitSlop={6} style={{ alignSelf: 'flex-start', marginTop: 4 }}>
             <T style={{ fontSize: 13, color: color.dim, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{replies} {replies === 1 ? 'reply' : 'replies'}</T>
@@ -124,8 +182,8 @@ function Switcher({ rooms, current, open, close, pick, now }: { rooms: Room[]; c
   );
 }
 
-/** `tabs` are the inbox's tabs, drawn under the bar as the inbox draws them. */
-export function GroupsPlace({ tabs }: { tabs?: ReactNode } = {}) {
+/** `tabs` are the inbox's tabs, drawn under the bar as the inbox draws them; opened from Chats, `onBack` goes back to it instead. */
+export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () => void } = {}) {
   const c = useCloud();
   const g = useGroups();
   const rooms = g.state.rooms;
@@ -162,15 +220,16 @@ export function GroupsPlace({ tabs }: { tabs?: ReactNode } = {}) {
   const faceOf = (id: string | null) => (id && people.get(id)) || nameOf(id);
   const names = [...people.values()].filter(Boolean);
 
+  const back = onBack ? <IconButton label="Back to Chats" onPress={onBack}><Back size={18} /></IconButton> : undefined;
   if (!g.state.ready) {
     return <>
-      <TopBar title="Groups" below={tabs} />
+      <TopBar left={back} title="Groups" below={tabs} />
       <View style={{ flex: 1 }}>{g.state.error && <T style={{ padding: size.inset, fontSize: 14, color: color.dim }}>{g.state.error}</T>}</View>
     </>;
   }
   if (!room) {
     return <>
-      <TopBar title="Groups" below={tabs} />
+      <TopBar left={back} title="Groups" below={tabs} />
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 80 }}>
         <T style={{ fontFamily: font.medium, fontSize: 18, lineHeight: 23, marginBottom: 8 }}>You are not in any groups yet.</T>
         <T style={{ fontSize: 14, lineHeight: 21, color: color.dim }}>{`Start one or find one to join in ${Name} on your computer. It shows up here.`}</T>
@@ -202,7 +261,7 @@ export function GroupsPlace({ tabs }: { tabs?: ReactNode } = {}) {
 
   return (
     <>
-      <TopBar left={root ? <IconButton label="Back to the chat" onPress={() => setThread(null)}><Back size={18} /></IconButton> : undefined} title={title}
+      <TopBar left={root ? <IconButton label="Back to the chat" onPress={() => setThread(null)}><Back size={18} /></IconButton> : back} title={title}
         right={<IconButton label="People" onPress={() => setSheet('people')}><PeopleGlyph /></IconButton>} below={root ? undefined : tabs} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: size.inset, paddingBottom: 16 }} keyboardShouldPersistTaps="handled"
@@ -214,7 +273,7 @@ export function GroupsPlace({ tabs }: { tabs?: ReactNode } = {}) {
             return (
               <View key={m.id}>
                 {isNew ? <Rule label="New" accent /> : day && !root ? <Rule label={dayWords(m.at, c.now)} /> : null}
-                <Message m={m} run={startsRun(shown, i) || isNew || (!!root && i === 1)} nameOf={nameOf} faceOf={faceOf} names={names}
+                <Message m={m} roomId={room.id} run={startsRun(shown, i) || isNew || (!!root && i === 1)} nameOf={nameOf} faceOf={faceOf} names={names}
                   replies={root ? 0 : repliesTo(messages, m.id).length} onThread={root ? undefined : () => setThread(m.id)} />
               </View>
             );
