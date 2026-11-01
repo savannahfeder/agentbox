@@ -9,7 +9,7 @@
 // rather than waiting for an app that may not come back.
 //
 // Lines of JSON over a socket only this user can reach. The first line says
-// what the connection is for: `{op:'start', runId, bin, argv, env, cwd}`,
+// what the connection is for: `{op:'start', runId, bin, argv, env, cwd, spool}`,
 // `{op:'attach', runId, out, err}` or `{op:'hello'}`. After that the app sends
 // `{t:'i', d}` input, `{t:'I'}` end of input, `{t:'k', s}` a signal, `{t:'bye'}`
 // to let go; this sends `{t:'started', pid}`, `{t:'state', ...}`, `{t:'o', d}`,
@@ -75,15 +75,21 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
     idle();
   };
 
-  function startRun(sock, { runId, bin, argv, env, cwd }, send) {
-    if (!validId(runId) || runs.has(runId) || typeof bin !== 'string' || !Array.isArray(argv)) {
+  // Each app names its own spool folder: copies of the app share one host.
+  function startRun(sock, { runId, bin, argv, env, cwd, spool }, send) {
+    const dirFor = typeof spool === 'string' && path.isAbsolute(spool) ? spool : spoolDir;
+    let files = null;
+    try {
+      fs.mkdirSync(dirFor, { recursive: true, mode: 0o700 });
+      files = spoolFiles(dirFor, runId);
+      if (validId(runId)) for (const f of [files.out, files.err]) fs.writeFileSync(f, '', { mode: 0o600 });
+    } catch (e) { log(`run host: ${e.message}`); files = null; }
+    if (!files || !validId(runId) || runs.has(runId) || typeof bin !== 'string' || !Array.isArray(argv)) {
       send({ t: 'e', d: Buffer.from('agentbox: the run host was sent no run it could start\n').toString('base64') });
       send({ t: 'x', code: 75, signal: null, ended: false });
       sock.end();
       return;
     }
-    const files = spoolFiles(spoolDir, runId);
-    for (const f of [files.out, files.err]) fs.writeFileSync(f, '', { mode: 0o600 });
     const run = { runId, files, out: 0, err: 0, client: null, exit: null, child: null, forgetTimer: null };
     runs.set(runId, run);
     let child;

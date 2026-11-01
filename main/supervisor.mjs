@@ -5922,6 +5922,11 @@ export class Supervisor {
     }
   }
 
+  /** Where the run host keeps what this app's runs print. */
+  _runSpool() {
+    return path.join(this.userDir, 'run-spool');
+  }
+
   // THE RUN HOST'S SOCKET (main/run-host.mjs), starting one if none of this
   // code's is running. It outlives the app, so a quit leaves its runs going.
   // A host that lost a run before it started is not used again for ten
@@ -5934,7 +5939,7 @@ export class Supervisor {
     if (running || (had?.exitCode === RUN_HOST_ALREADY_THERE && fs.existsSync(this._runHostSock))) return this._runHostSock;
     try {
       const log = fs.openSync(path.join(this.userDir, 'run-host.log'), 'a');
-      const proc = spawn(process.execPath, [fileURLToPath(new URL('./run-host.mjs', import.meta.url)), this._runHostSock, path.join(this.userDir, 'run-spool')], {
+      const proc = spawn(process.execPath, [fileURLToPath(new URL('./run-host.mjs', import.meta.url)), this._runHostSock, this._runSpool()], {
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
         detached: true,
         stdio: ['ignore', log, log],
@@ -5982,7 +5987,7 @@ export class Supervisor {
     const h = rec?.hosted;
     if (!this.hostRuns || !h?.runId || !h.sock || rec.cloud || this.sessions.has(item.id)) return false;
     const alive = Number.isInteger(h.pid) && pidAlive(h.pid);
-    if (!alive && !fs.existsSync(spoolFiles(path.join(this.userDir, 'run-spool'), h.runId).exit)) return false;
+    if (!alive && !fs.existsSync(spoolFiles(this._runSpool(), h.runId).exit)) return false;
     if (!fs.existsSync(h.sock)) return false;
     const product = this.store.listProducts().find((p) => p.slug === item.product);
     if (!product) return false;

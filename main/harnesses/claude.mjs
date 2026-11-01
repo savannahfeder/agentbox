@@ -72,7 +72,7 @@ export const claudeHarness = {
     const runEnv = { ...claudeLaunchEnv(bin, env), STORE_ACCOUNT_ID: sup.config.accountId, ...storeRootEnv(sup.config.storeRoot),
       ...(profile !== 'default' ? { [definition.homeEnv]: profile } : {}),
       ZERO_PRODUCT: item.product, ZERO_ITEM: item.id, ...sup.memoryGateEnv(item) };
-    if (host) return new HostedRun({ sockPath: host, runId: crypto.randomUUID(), start: { bin, argv, env: runEnv, cwd } });
+    if (host) return new HostedRun({ sockPath: host, runId: crypto.randomUUID(), start: { bin, argv, env: runEnv, cwd, spool: sup._runSpool() } });
     return spawn(bin, argv, { cwd, env: runEnv, stdio: ['pipe', 'pipe', 'pipe'] });
   },
   readers: () => ({ capture: captureStream, stream: streamingText, summarize: summarizeStreamLine, trace: traceStreamLine, activity: claudeActivity }),
