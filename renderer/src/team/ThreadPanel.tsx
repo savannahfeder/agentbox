@@ -23,6 +23,7 @@ import { AgentAnswers, useChatMentions } from './ChatAgents';
 import { useThreadMentions } from '../components/ThreadMentions';
 import { withQuote } from './chat-quote';
 import { clock } from '../thread-history';
+import { holdAtBottom } from '../thread-bottom';
 import { THREAD_WIDTH, threadLine } from './chat-threads';
 import { holdTheEdge } from './hold-the-edge';
 import { FormatBar } from './FormatBar';
@@ -148,12 +149,10 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
     panel.current?.parentElement?.style.setProperty('--chat-thread-w', `${width}px`);
   }, [width]);
 
-  // AT THE NEWEST REPLY, on opening and whenever one arrives.
+  // AT THE NEWEST REPLY, on opening and whenever one arrives, and held there
+  // while the box under it grows, as with a voice note added.
   const shown = replies.length + sending.length;
-  useBeforePaint(() => {
-    const el = body.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [parent.uid, shown]);
+  useBeforePaint(() => holdAtBottom(body.current), [parent.uid, shown]);
 
   // The words, then a link to each file, the way the chat's box sends them.
   // Send while a note records finishes it and sends it with the words. A send
@@ -323,14 +322,14 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
           </svg>
         </button>
       </div>
-      <div className="chat-thread-body" ref={body}>
+      <div className="chat-thread-body" ref={body}><div className="chat-thread-msgs">
         {said(parent, false, shown === 0)}
         {(replies.length > 0 || sending.length > 0) && (
           <div className="chat-day chat-thread-count">{threadLine([...replies, ...sending.map((s) => ({ at: s.at, who: 'you' as const, text: s.text }))]).count}</div>
         )}
         {replies.map((r, k) => said(r, false, k === shown - 1))}
         {sending.map((s, k) => said({ at: s.at, who: 'you', text: s.text }, true, replies.length + k === shown - 1))}
-      </div>
+      </div></div>
       <div className="chat-thread-foot">
         <div
           className="chat-thread-box"

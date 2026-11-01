@@ -42,7 +42,8 @@ import type { TraceSession } from '../notes';
 import type { AgentTurn, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
-import { appWrote, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt } from '../one-thing-at-a-time';
+import { appWrote, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt, workingFrom } from '../one-thing-at-a-time';
+import { gapIndex } from '../../../shared/agents.mjs';
 import { askMarkUnread, say } from '../team/chat-events';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { TeammatesContext } from '../teammates/row-lead';
@@ -376,18 +377,23 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
   // The app's own note ("Shipped to main as …") goes under the agent's answer rather than in its place.
   const byApp = !!queue && appWrote(outcome, item.wrote);
   const newest = queue ? newestAnswer(events, byApp ? null : outcome) : null;
+  // While an agent works, its sentences are steps, not answers: drawn from where this round began.
+  const working = !!queue && !!session;
   // Answered since (a reply or a pick the agent is working on): drawn from that answer down.
-  const stands = queue && newest && !earlierOpen ? standsAt(events, newest) : -1;
-  const behind = stands >= 0 ? earlierThan(events, stands) : newest ? earlierCount(events, byApp ? null : outcome) : 0;
+  const stands = !queue ? -1 : working ? workingFrom(events) : standsAt(events, newest);
+  // Starting inside the opening a long thread's window keeps would cut off its gap line.
+  const start = stands > gapIndex(events, omitted) ? stands : -1;
+  const alone = !!newest && !working && stands < 0;
+  const behind = start >= 0 ? earlierThan(events, start) + omitted : alone ? earlierCount(events, byApp ? null : outcome) + omitted : 0;
   const short = !earlierOpen && drawnWhole(behind);
-  const from = short ? -1 : stands;
+  const from = short || earlierOpen ? -1 : start;
   const queueHead = queue && (
     <QueueSummary
       key={`${item.product}:${item.id}`}
       title={pageTitle(item)}
       context={queue.context}
       earlier={short ? 0 : behind}
-      steps={!short && !!newest && (events.some((e) => e.kind === 'work') || after.length > 0)}
+      steps={!short && alone && (events.some((e) => e.kind === 'work') || after.length > 0)}
       open={earlierOpen}
       onToggle={() => { setEarlierOpen((open) => !open); setWhole(true); }}
     />
@@ -398,7 +404,7 @@ export function ItemThread({ item, engine, engineChoice, codexModels = [], codex
       {after.map((act, i) => <ActLine key={`${act.at}-${i}`} act={act} />)}
     </div>
   );
-  if (queue && newest && !earlierOpen && !short && from < 0) {
+  if (alone && !earlierOpen && !short) {
     return (
       <>
         {queueHead}
