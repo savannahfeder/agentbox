@@ -1,9 +1,10 @@
 // User-owned shells. Never provider tool calls; no transcript or analytics writes.
 import fs from 'node:fs';
+import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {commandRunning} from '../shared/terminal-state.mjs';
-import {terminalShell} from './shell-path.mjs';
+import {terminalShell,windowsRoot} from './shell-path.mjs';
 import {loadPty} from './pty.mjs';
 const LIMIT=262144;
 export function terminalEnv(source=process.env){
@@ -40,9 +41,14 @@ export function terminalPlace({store,supervisor,product,id,agent}){
 export function terminalFolder(args){return terminalPlace(args).cwd;}
 // Enumerate only descendants of our own shell, including background process
 // groups. Kill children before shell; closing a pane never calls this.
-export function disposeTerminalProcess(pty,platform=process.platform){
-  // node-pty on Windows throws on any signal, and its bare kill ends the shell's children too.
-  if(platform==='win32'){try{pty.kill();}catch{}return;}
+export function disposeTerminalProcess(pty,platform=process.platform,run=execFileSync){
+  // node-pty on Windows throws on any signal, and its kill misses a child with
+  // a console of its own. taskkill by full path, never from the shell's folder.
+  if(platform==='win32'){
+    try{run(path.win32.join(windowsRoot(),'System32','taskkill.exe'),['/T','/F','/PID',String(pty.pid)],{windowsHide:true,timeout:5000,stdio:'ignore'});}catch{}
+    try{pty.kill();}catch{}
+    return;
+  }
   const descendants=[];
   try{
     const rows=execFileSync('/bin/ps',['-axo','pid=,ppid='],{encoding:'utf8',timeout:2000}).trim().split('\n').map(s=>s.trim().split(/\s+/).map(Number));
