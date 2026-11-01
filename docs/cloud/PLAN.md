@@ -548,7 +548,167 @@ input. In order:
    its own still waits for the Mac: a new-thread kit does not carry its
    conversation.
 
-## The hub: 200 at once, and the Mac does not care (agreed with Codex, 2026-10-30)
+## Cloud threads: the cloud in charge, the computer asked when needed (2026-10-31)
+
+Replaces the machine-per-account design in "The hub" below. What survives from
+that section is the thin window, and the measurements of it.
+
+Today every cloud agent is a process on the Mac (main/cloud/run.mjs): it packs
+the folder, pumps events, runs the agent's tools and brings the work home. The
+Mac is in charge and holds the record, so each agent costs it memory, and the
+cloud stops being useful when it sleeps. The gateway function already carries a
+thread while the Mac is away (cloud/gateway/phone.mjs). This makes that the
+permanent home of a cloud thread.
+
+Settled, not to be reopened:
+
+- **No always-on machine**, shared or per account. The function runs on AWS
+  Lambda with its timers, and the sandboxes on AgentCore, on AWS credits.
+- **Any harness.** The sandbox server runs a command and knows no harness. Each
+  harness is an adapter: how to start, send a turn, read a turn's end, answer an
+  approval and resume. Claude Code and Codex first.
+- **Each person's own plan**, signed in through the vendor's own flow. No API
+  keys and no model use paid for by us.
+- **Desktop and phone only.** The web version is going away. Both are windows on
+  one database.
+- **Local threads stay as they are**, on the computer, under the memory check.
+  Most future users never have one.
+
+| | Local thread | Cloud thread today | Cloud thread in this plan |
+|---|---|---|---|
+| In charge | Computer | Computer | Function |
+| Where the record lives | Computer | Computer | Database and S3 |
+| Where the agent runs | Computer | Sandbox | Sandbox |
+| Processes on the computer per agent | Worker | Proxy and tool servers | None |
+| With the computer shut | Stops | Phone replies only | Carries on |
+
+### How a cloud thread runs
+
+- **One place in charge.** A thread has `placement` (`local` or `cloud`) and an
+  owner generation. Every write carries the generation and a stale one is refused,
+  so a computer and the function can never both run it.
+- **Starting.** A new command row calls the function through a database webhook,
+  so the run starts at once. The one-minute sweep stays as the backstop for a
+  missed call. The run id is stored before the launch, there is at most one active
+  run per thread, and an ambiguous start is checked against AgentCore before it
+  is replaced.
+- **The guards come too.** A held thread, a bounded number of attempts, and a
+  thread nothing will start being in Needs you (CLAUDE.md) are extracted so both
+  the supervisor and the function use one copy. Building this updates the
+  CLAUDE.md rule that names `spawnWorker`.
+- **Reporting.** The sandbox posts each turn's end and its usage to the function
+  with a credential good for that run only, and uploads what it made. Nothing
+  polls a run nobody is watching. The sweep's `peek` remains the backstop, and a run
+  that stops reporting is declared dead by the sweep. An open thread reads its live
+  output through the function, only while it is on screen. Today the server only
+  recognises Claude's turn end (cloud/sandbox/server.mjs:502), so each harness
+  adapter brings a reader.
+- **The record.** Ordered messages and events, runs, file versions and approvals
+  live in the database, and file bytes and transcripts in S3 under the person.
+  `phone_threads` stays as a copy for apps not yet updated: it truncates
+  (shared/phone-snapshot.mjs:16), so it cannot be the truth.
+- **Between turns.** A sandbox is restored from S3 for each turn, then waits briefly
+  for the next reply and stops. Waiting costs memory, so the wait is set from a
+  measured cold start, not the 20 minutes `IDLE_CLOSE_MS` uses today.
+- **Tools.** The agent's Agentbox tools are an HTTP MCP endpoint on the function,
+  which checks the run's credential on every call. The credential names one person
+  and one thread. No service key enters a sandbox.
+- **The window.** A person with only cloud threads runs main/hub-client.mjs pointed
+  at the cloud, with no store or supervisor. A person with both runs the full app,
+  which shows cloud threads from the database as it shows phone rows today.
+- **Signing up** makes a workspace and first project with no computer, which today
+  it does not (mobile/src/state/cloud.tsx:127), and asks for a Claude or ChatGPT
+  sign-in.
+
+### Asking for things: one tool, whatever is missing
+
+`request_cloud_resource` and the hand-back line (shared/cloud-hand-back.mjs) are
+the start of this. They become one tool the agent calls with what it needs and why:
+a file or folder, a saved sign-in, or (where allowed) running something on the
+computer. Every call answers within a deadline:
+
+1. **The cloud already has it** (uploaded file, saved sign-in): delivered now.
+2. **The computer is online** (it reported in the last minute; `macSeenOf` already
+   tracks this): the request goes in a row, the desktop app picks it up over its
+   outbound connection, and what it may hand over without asking goes up to S3.
+   Anything else shows the person Allow once, Always for this folder, or No.
+3. **The computer is shut, or has not picked it up in 60 seconds:** the tool answers
+   `computer_unavailable` at once. The agent tries another way. If there is none it
+   says what it needs and ends its turn. The sandbox stops and the thread goes to
+   Needs you, on the phone too, with the choices: upload it, open the computer, or
+   carry on without. The answer starts the next turn.
+
+No sandbox ever sits waiting on a person, and no request waits for ever.
+
+Rules: a path keeps the checks in main/cloud/resources.mjs (real path, inside a
+granted root, size limits). Grants name person, device, folder, read or write, and
+expiry. Whatever comes up is treated as untrusted input. The rule that no worker
+drives the person's browser is untouched.
+
+**Going local, briefly.** Two forms, both off by default and offered only to people
+who turned on running things on their computer. People who are not developers get
+files only:
+
+- **Move the turn.** The thread's placement moves to the computer for one turn
+  (a new generation), the worker runs there through the supervisor, then it goes
+  back. This is the hand-back that exists today, plus the return.
+- **Borrow one command.** One bounded command runs in a dedicated task folder on
+  the computer and its output comes back. Built after moving the turn.
+
+### Bringing things into the cloud for good
+
+Anything a thread keeps coming back to the computer for should stop needing it.
+
+- **A saved sign-in for any tool** (AWS, Expo, GitHub, Vercel and so on), per
+  person. It generalises what the plans' sign-ins do: the tool's own login runs on a
+  throwaway sandbox, the person finishes it through a link or code on whichever
+  device, and the tool's config files are kept in that person's `logins/`. A tool is
+  a small recipe: the login command, the files to keep, a check, and how it expires.
+- **Asked for in the moment.** An agent asks for a sign-in the cloud does not have,
+  and the person sees "Sign in to Expo for the cloud". It stays afterwards.
+- **Learned.** The function counts what each person's threads came back for
+  (`handBackWhat`, and `computer_unavailable` answers). The second time, it offers
+  the saved sign-in or the upload.
+- **Attached only where allowed.** An agent can read anything on its sandbox, and a
+  hostile document can try to make it send that elsewhere. So a saved sign-in joins a
+  run only for a tool the person allowed for that project, least-powerful login
+  first, with a Remove that also revokes where the vendor allows it.
+
+What cannot come: Xcode and the iOS simulator (the sandbox is Linux), the person's
+own browser and its sign-ins, and files they never upload. These go local or ask.
+
+### Order
+
+0. **Now:** ship the window, ship-queue and earned-start fixes on this branch. They
+   help everyone on today's path.
+1. **The week, for people with no computer involved:** signing up with no computer,
+   a run started and reported by the function, the record in the database, uploads
+   and downloads, Stop, approvals, push, the thin window. Invitation only. Out of
+   it: Gmail and Drive, repeating tasks, teams, mixed local and cloud.
+2. **Asking and saved sign-ins:** the asking tool across computer online and shut,
+   then the sign-in recipes, starting with whichever hand-backs are most common.
+3. **Developers on this path:** code from GitHub through one GitHub App, publishing
+   from the cloud one at a time per repository, moving a turn local and back. Until
+   then developers keep today's path, where the Mac is in charge.
+
+### What has to be shown
+
+- 200 at once through the real function and AgentCore, running a fixed command
+  rather than a model, with all 200 finishing together: none lost, none started
+  twice.
+- Killing the function mid-start, mid-report and mid-request, and delivering each
+  event twice: the thread ends up correct, and in Needs you if nothing will restart
+  it.
+- The computer shutting mid-request: the agent gets its answer within the deadline.
+- One person's credential reaching another's thread, file, or sign-in: refused.
+- The cost of a real task, with the cold start measured and the wait chosen from it.
+
+Known limits: a person's plan limit is the vendor's and is shared by all their
+threads, however many sandboxes run. Sign-ins saved in the cloud are held by us and
+are a target. Model and tool providers change their login flows, and each recipe
+can break on its own.
+
+## The hub: 200 at once, and the Mac does not care (agreed with Codex, 2026-10-30; replaced as the design by "Cloud threads" above)
 
 The cloud lent each agent a computer and left the rest on the Mac: the store, a
 task folder per thread, a process per run, packing, bringing home, shipping. So
