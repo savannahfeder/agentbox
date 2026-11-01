@@ -78,6 +78,18 @@ export function pictureLink(places: Places, links: Links, product: string, src: 
   return at.ok ? at.link : at.waiting ? undefined : null;
 }
 
+const SIGNED = /\/storage\/v1\/object\/sign\/[^?#]+/;
+
+/**
+ * What to draw a picture from. A signed link gets a new token every launch,
+ * but the file it names is named by its contents, so its path is a cache key
+ * that never goes stale.
+ */
+export function pictureSource(uri: string): { uri: string; cacheKey?: string } {
+  const path = SIGNED.exec(uri)?.[0];
+  return path ? { uri, cacheKey: path } : { uri };
+}
+
 /** A picture's width and height as its computer listed them, or null. */
 export function pictureShapeOf(places: Places, product: string, src: string): { w: number; h: number } | null {
   const e = findFile(places, product, src)?.entry;
