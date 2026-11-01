@@ -54,6 +54,6 @@ it('can minimize a phone card without answering it and review it again', () => {
 it('shows the waiting warning beside new threads and replies too', () => {
   const app = read('../renderer/src/App.tsx');
   expect(app.includes('statusLine={snap.phoneStatus}')).toBe(true);
-  expect(app.includes('aboveDock={<>{snap.phoneStatus')).toBe(true);
+  expect(app).toContain('aboveDock={<><PhoneStatus message={snap.phoneStatus} />');
   expect(read('../renderer/src/phone.css').includes('.tc-connection-status { order: 2;')).toBe(true);
 });

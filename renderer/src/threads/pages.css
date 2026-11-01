@@ -504,6 +504,8 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 /* Picked is a soft grey here, not an orange box: one small dot beside On is
    the menu's only orange (picked 2026-10-16 as calmer). */
 .th-cloud-pop .opts > button.picked, .th-cloud-pop .opts > button.picked:hover { border-color: var(--line-strong); background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); }
+/* A place this thread cannot go: dim and still, the note under it says why. */
+.th-cloud-pop .opts > button:disabled, .th-cloud-pop .opts > button:disabled:hover { opacity: .4; cursor: default; border-color: var(--line); color: var(--text-dim); }
 .th-cloud-pop .th-cloud-on-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-inline-end: 7px; vertical-align: 1px; }
 /* THE CLOUD ON: the cloud and its count orange, the box left plain. */
 .th-disp.th-cloud.lit svg, .th-disp.th-cloud.lit b { color: var(--accent); }
@@ -568,3 +570,8 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 :root[data-theme="light"] .th-why-card { background: var(--surface); box-shadow: 0 12px 32px rgba(0,0,0,.12); }
 .th-why-card b { display: block; margin-bottom: 3px; font-weight: 500; color: var(--text); }
 .th-cell-state.has-card:hover .th-why-card { display: block; }
+.phone-status-dismissible { display: flex; align-items: center; gap: 8px; padding-right: 0; }
+.phone-status-dismissible > span { flex: 1; min-width: 0; }
+.phone-status-dismissible > button { display: grid; place-items: center; flex: 0 0 44px; min-height: 44px; margin-block: -9px; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; cursor: pointer; }
+.phone-status-dismissible > button:hover { color: var(--text); }
+.phone-status-dismissible > button:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }

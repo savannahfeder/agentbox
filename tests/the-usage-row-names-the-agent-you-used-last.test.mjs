@@ -75,8 +75,8 @@ describe('pointing at it', () => {
   });
   it('opens the panel, after a beat in the sidebar so a pointer crossing the foot does not flash it', () => {
     const pill = read('../renderer/src/components/UsagePill.tsx');
-    expect(pill).toContain('onMouseEnter={enter} onMouseLeave={leave}');
-    expect(pill).toContain('if (sidebar) linger.current = setTimeout(() => setHovering(true), 120);');
+    expect(pill).toContain('onMouseEnter={enter} onMouseMove={move} onMouseLeave={leave}');
+    expect(pill).toContain('linger.current = setTimeout(() => { linger.current = null; setHovering(true); }, 120);');
   });
   it('tags the agent used last when there is more than one', () => {
     expect(read('../renderer/src/components/UsagePill.tsx')).toContain('<small>Last used</small>');

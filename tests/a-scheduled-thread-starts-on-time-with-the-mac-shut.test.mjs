@@ -184,16 +184,18 @@ describe('what a sleeping Mac hands over ahead of time', () => {
     expect(await sup.carryWhileAsleep()).toEqual([]);
   });
 
-  it('a hand-over left more than twelve hours is written again, replacing the old one', async () => {
+  // CARRY_AGAIN_MS, and why it is half an hour rather than the twelve it was:
+  // tests/a-reply-the-cloud-could-not-start-is-handed-over-again.
+  it('a hand-over the cloud has not started in half an hour is written again, replacing the old one', async () => {
     const { sup } = handing([fresh('w-1')]);
-    sup._carried['w-1'] = { command: 'c-old', kind: 'run-now', at: Date.now() - 13 * HOUR };
+    sup._carried['w-1'] = { command: 'c-old', kind: 'run-now', at: Date.now() - 31 * MIN };
     const list = await sup.carryWhileAsleep();
     expect(list).toEqual([expect.objectContaining({ item: 'w-1', replaces: 'c-old' })]);
   });
 
-  it('one written recently is not written again', async () => {
+  it('one written in the last half hour is not written again', async () => {
     const { sup } = handing([fresh('w-1')]);
-    sup._carried['w-1'] = { command: 'c-new', kind: 'run-now', at: Date.now() - HOUR };
+    sup._carried['w-1'] = { command: 'c-new', kind: 'run-now', at: Date.now() - 20 * MIN };
     expect(await sup.carryWhileAsleep()).toEqual([]);
   });
 });
