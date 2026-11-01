@@ -197,7 +197,6 @@ export function ChoicesShow({ count, onShow }: { count: number; onShow: () => vo
 export function QueueNav({ spot, onStep }: { spot: Spot; onStep: (dir: 1 | -1) => void }) {
   return (
     <span className="one-nav">
-      <span className="one-pos">{spot.pos} of {spot.total}</span>
       <button type="button" className="ts-more one-step" data-hint="previous-thread" data-hint-align="right" aria-label="Previous thread (K)" disabled={spot.index <= 0} onClick={() => onStep(-1)}>{chevron(true)}</button>
       <button type="button" className="ts-more one-step" data-hint="next-thread" data-hint-align="right" aria-label="Next thread (J)" disabled={spot.pos >= spot.total} onClick={() => onStep(1)}>{chevron(false)}</button>
     </span>
