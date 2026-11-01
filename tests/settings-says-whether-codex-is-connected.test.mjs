@@ -267,7 +267,7 @@ describe('the three states are the finder\'s answer, not a guess', () => {
 
 describe('Check again really looks again', () => {
   it('throws the remembered shell answer away before searching', () => {
-    expect(read('main/settings.mts')).toContain('export function recheckCodex(config) {\n  forgetCodexBin();');
+    expect(read('main/settings.mts')).toContain('export function recheckCodex(config: SettingsConfig) {\n  forgetCodexBin();');
   });
 
   // AND IT IS WORTH PRESSING, which is the half a Claude Code copy would miss:

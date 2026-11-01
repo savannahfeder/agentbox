@@ -269,7 +269,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   const team = cloudConfig ? createTeamService({
     session: supabaseSession({
       cloudConfig,
-      sessionFile: headlessSessionFile({ userDir, storeRoot: config.storeRoot }),
+      sessionFile: headlessSessionFile({ userDir, storeRoot: config.storeRoot } as Parameters<typeof headlessSessionFile>[0]),
       openExternal: host.shell.openExternal,
     }),
     store,

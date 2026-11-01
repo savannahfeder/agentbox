@@ -1,9 +1,9 @@
 // The app: the agent inbox. Electron shell around a keyboard-first renderer, a
 // file-derived store, and a supervisor of headless sessions.
 
-import type { ContextMenuParams, MenuItemConstructorOptions, WebContents } from 'electron';
 import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, screen as electronScreen, shell, session, safeStorage, systemPreferences } from 'electron';
 import './no-default-menu.mts';
+import type { ContextMenuParams, MenuItemConstructorOptions, WebContents } from 'electron';
 import * as workItemsDisk from './store/work-items.mjs';
 import { createTeamService, teamStateFile } from './team/index.mts';
 import { roomsSetup } from './team/room-setup.mts';

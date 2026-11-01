@@ -73,7 +73,7 @@ describe('the zoom chords', () => {
   it('are handled in the main process, not only by a menu accelerator', () => {
     const handler = inputHandler();
     expect(handler).toMatch(/zoomDeltaFor\(input\)/);
-    expect(handler).toMatch(/applyZoom\(zoomDelta, window\.webContents\)/);
+    expect(handler).toMatch(/applyZoom\(zoomDelta, window!?\.webContents\)/);
   });
 
   it('are swallowed, so the page never also acts on them', () => {

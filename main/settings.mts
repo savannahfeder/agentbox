@@ -59,9 +59,9 @@ export interface SettingsConfig {
   codexModel?: string | null;
   outsideAgents?: unknown;
   sessionArgs?: string[] | null;
-  projectSessionArgs?: Record<string, string[]>;
-  projectCodexMode?: Record<string, string>;
-  projectAccounts?: Record<string, string>;
+  projectSessionArgs?: Record<string, string[] | null | undefined> | null;
+  projectCodexMode?: Record<string, string | null | undefined> | null;
+  projectAccounts?: Record<string, string | null | undefined> | null;
   projectAgents?: Record<string, string[]>;
   authProfiles?: string[] | null;
   codexProfiles?: (string | null)[] | null;
@@ -71,7 +71,7 @@ export interface SettingsConfig {
   agentsAuto?: boolean | null;
   agentsNudge?: number;
   planSlotsFrom?: unknown;
-  maxConcurrentSessions?: number;
+  maxConcurrentSessions?: number | null;
   memoryGate?: boolean | null;
   memoryGateSlots?: number | null;
   cleanupLeftovers?: boolean | null;
@@ -81,12 +81,12 @@ export interface SettingsConfig {
   adhdMode?: boolean | null;
   importNew?: boolean | null;
   cornerTag?: boolean | null;
-  activeAccount?: Record<string, string | null> | null;
+  activeAccount?: Record<string, string | null | undefined> | null;
   alphaRooms?: boolean | null;
   diagnostics?: boolean;
   posthogKey?: unknown;
   posthogHost?: string;
-  alphaTeammates?: boolean | null;
+  alphaTeammates?: unknown;
   alphaMultiplayer?: boolean | null;
   [key: string]: unknown;
 }
@@ -790,7 +790,7 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       // it goes quiet once somebody is at or under the suggestion.
       slotsSuggested: slotsHere.slots,
       slotsMax: MAX_SLOTS,
-      machineNote: machineNote(slotsHere, config.maxConcurrentSessions),
+      machineNote: machineNote(slotsHere, config.maxConcurrentSessions as number | undefined),
       memoryGate: memoryGateSettings({ config, supervisor }),
       leftovers: leftoverSettings({ config, supervisor }),
       strayFolders: strayFolderSettings({ supervisor }),

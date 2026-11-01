@@ -66,6 +66,7 @@ import { codexTranscriptFile } from '../codex-session.mts';
 import { CLIENT_INFO } from '../codex-app-server.mjs';
 import { appendCloudUsage } from './usage.mts';
 import { docsFolderFor, docsToSend, tarDocs, layDocs } from './docs.mts';
+import type { LaidFile } from './docs.mts';
 import { troubleCause, limitResetMoment } from '../../shared/spawn-trouble.mjs';
 import { HAND_BACK } from '../../shared/cloud-hand-back.mjs';
 import { sentLine } from '../../shared/cloud-start.mjs';
@@ -117,8 +118,8 @@ export interface McpConfig {
 export interface RunDocs {
   dir: string;
   sentAt: number;
-  sent: unknown;
-  laid: Record<string, unknown>;
+  sent?: string[] | null;
+  laid: Record<string, LaidFile>;
   ack: string | null;
 }
 
@@ -1191,10 +1192,10 @@ export async function cloudRun({
     sending.push(sendFile(null, path.join(codexHome, 'config.toml'), Buffer.from(codexConfigForTheCloud(toml))));
   }
   // The project's documents folder (main/cloud/docs.mts), at its own path.
-  let docsSent = [];
+  let docsSent: string[] = [];
   if (docsDir) {
     docsSent = docsToSend(docsDir, { item: env.ZERO_ITEM });
-    if (docsSent.length) sending.push(tarDocs(docsDir, docsSent).then((tgz) => sendFile(null, path.join(docsDir, '.agentbox-docs.tgz'), tgz, docsDir)));
+    if (docsSent.length) sending.push(tarDocs(docsDir, docsSent).then((tgz) => sendFile(null, path.join(docsDir, '.agentbox-docs.tgz'), tgz as Buffer, docsDir)));
   }
   const system = argValue(argv, '--append-system-prompt') || '';
   for (const f of filesNamedIn(system, { cwd: plain ? null : cwd, roots, home: homeDir, docsFolder: env.AGENTBOX_DOCS })) sending.push(sendFile(f));

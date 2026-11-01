@@ -59,7 +59,7 @@ describe('where the engine is written', () => {
   // the answer for that reason since launch week; the engine joins it there.
   it('is above the answer, where the model already is', () => {
     const source = fs.readFileSync(new URL('../main/store.mts', import.meta.url), 'utf8');
-    const body = source.slice(source.indexOf('answerItem(slug, id,'), source.indexOf('composeItem(slug,'));
+    const body = source.slice(source.indexOf('answerItem(slug'), source.indexOf('composeItem(slug'));
     const engine = body.indexOf("{ engine: engine ?? '' }");
     expect(engine).toBeGreaterThan(-1);
     expect(engine).toBeLessThan(body.indexOf("{ model: model ?? '' }"));

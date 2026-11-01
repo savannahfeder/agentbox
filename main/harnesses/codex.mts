@@ -7,6 +7,7 @@ import { codexModels, codexDefaultModel, codexModelLevels } from '../codex-model
 import { codexTranscriptFile, workerThreadParams, refusedCodexWorker } from '../codex-session.mts';
 import { codexKeyRefusal } from '../codex-account.mts';
 import { compactCodexThread } from '../codex-compaction.mts';
+import type { CompactServer } from '../codex-compaction.mts';
 import { captureCodexEvent, codexStreamingText, summarizeCodexEvent, traceCodexEvent, rememberCodexChange, changeFromCodexTurn } from '../codex.mjs';
 import { codexActivity } from '../agent-activity.mts';
 import { runCodexCommand } from '../provider-commands.mts';
@@ -52,7 +53,7 @@ export const codexHarness = {
     const { client, handshake } = sup._codexServer(sup._codexProfileHome(rec.profile ?? 'default'));
     const mcpServers = await sup._codexIsolation(client, handshake);
     const params = workerThreadParams({ cwd, mcpServers, storeServer: null });
-    return compactCodexThread({ server: client, threadId: rec.sessionId, threadParams: params });
+    return compactCodexThread({ server: client as CompactServer, threadId: rec.sessionId, threadParams: params });
   },
   settleApproval: (sup: HarnessSupervisor, ...args: unknown[]) => sup.settleCodexApproval(...args),
   approvalChanged: (sup: HarnessSupervisor, ...args: unknown[]) => sup.codexCardChanged(...args),

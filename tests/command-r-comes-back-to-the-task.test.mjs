@@ -151,7 +151,7 @@ describe('the app is wired to it', () => {
     // The harness copies these three lines into its
     // own harness so it can press a real ⌘R. If they move, the harness is
     // proving something the app no longer does.
-    expect(mainProcess).toMatch(/reloadRequested = true;\n\s*window\.webContents\.reloadIgnoringCache\(\);/);
+    expect(mainProcess).toMatch(/reloadRequested = true;\n\s*window!?\.webContents\.reloadIgnoringCache\(\);/);
     expect(mainProcess).toMatch(/if \(key === 'r'\) \{\n\s*reloadRenderer\(\);/);
     expect(mainProcess).toMatch(/reloaded: reloadRequested[\s\S]{0,200}?reloadRequested = false;/);
   });

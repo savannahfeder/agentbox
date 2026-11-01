@@ -236,7 +236,7 @@ describe('the founder’s own writing does not go inside a signed bundle', () =>
     // developer's config and opens on the developer's inbox. What is pinned here is unchanged, that
     // main.mts asks for the writable folder and hands it to loadConfig; the
     // three answers are pinned in tests/a-brand-new-user-opens-beside-her-own.
-    expect(main).toContain('configDir({ appDir, userData: app.getPath(\'userData\'), packaged: app.isPackaged })');
+    expect(main).toContain('configDir({ appDir, userData: app.getPath(\'userData\'), packaged: app.isPackaged }');
     expect(main).toContain('loadConfig(dataDir)');
     // And her own folder, which is the data folder whether or not the app is
     // packaged, because the checkout is not a place to keep what the user typed.

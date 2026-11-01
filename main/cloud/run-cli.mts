@@ -94,7 +94,7 @@ export async function cloudRunFromArgs({ args, env, cwd, stdin, stdout, stderr, 
   // The cloud account it runs on (main/cloud/logins.mts pickCloudLogin). The
   // folder below only says where the conversation is kept.
   const { rec, trouble } = importOnly ? { rec: null, trouble: null } : loginForCloudRun(engine, env);
-  if (!importOnly && !rec) { say(trouble); return LOGIN_TROUBLE; }
+  if (!importOnly && !rec) { say(trouble!); return LOGIN_TROUBLE; }
   const dir = rec?.key;
   let made: Awaited<ReturnType<typeof clientsFor>>;
   try { made = await clientsFor(config); } catch (err) { say((err as Error).message); return LOGIN_TROUBLE; }
@@ -113,12 +113,12 @@ export async function cloudRunFromArgs({ args, env, cwd, stdin, stdout, stderr, 
     // A missing or refused login is marked so the menu asks for a new sign-in;
     // an expired Codex one is left for the supervisor to renew.
     onLoginTrouble: ({ state, id }) => {
-      if (state === 'expired') markCloudLogin(engine, dir, id, { expiresAt: Date.now() });
-      else markCloudLogin(engine, dir, id, { broken: state });
+      if (state === 'expired') markCloudLogin(engine, dir!, id, { expiresAt: Date.now() });
+      else markCloudLogin(engine, dir!, id, { broken: state });
     },
     // An account at its usage limit sits out until it resets; the next run
     // takes another cloud account, or this Mac.
-    onLimit: ({ until }) => { if (rec) markCloudLogin(engine, dir, rec.id, { limitedUntil: until }); },
+    onLimit: ({ until }) => { if (rec) markCloudLogin(engine, dir!, rec.id, { limitedUntil: until }); },
     imageCaps: imageCapsToTry(config),
     onCaps: (caps) => noteImageCaps(config, caps),
     remoteCommand: codex ? 'codex' : 'claude',

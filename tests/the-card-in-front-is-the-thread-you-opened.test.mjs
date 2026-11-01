@@ -88,7 +88,7 @@ describe('the screen, the chord and the Agents menu', () => {
     // have been pressed, and the phone, which draws every card as a list of its
     // own and has no thread open on this computer.
     expect(main.match(/approvals\.listPending\(/g)).toHaveLength(2);
-    expect(main).toMatch(/let cardInFront = \(\) => approvals\.listPending\(config\.storeRoot\)\[0\]/);
+    expect(main).toMatch(/let cardInFront(?:: [^\n]*?)? = \(\) => approvals\.listPending\(config\.storeRoot\)\[0\]/);
     expect(main).toMatch(/cardInFront = \(\) => ipc\.pendingApprovals\(\)\[0\]/);
   });
 

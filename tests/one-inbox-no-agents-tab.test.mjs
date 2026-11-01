@@ -162,7 +162,7 @@ describe('what a session says about itself, read off a real transcript', () => {
     const tail = await readTailOf(LINES);
     expect(tail.about).toBe(`${Name} product not displaying in Harbour`);
     expect(tail.lastAsked).toBe('sounds good. just make sure the login is remembered.');
-    expect(tail.touched).toEqual(['sync-service.mjs', 'store.mts']);
+    expect(tail.touched).toEqual(['sync-service.mjs', 'store.mjs']);
     expect(tail.lastSaid).toContain('The sync is running steadily');
     expect(tail.lastActiveAt).toBe(Date.parse('2026-08-12T17:03:00.000Z'));
   });
@@ -199,7 +199,7 @@ describe('what a session says about itself, read off a real transcript', () => {
       timestamp: '2026-08-12T17:04:00.000Z',
       message: { content: [{ type: 'tool_use', name: 'Edit', input: { file_path: '/x/sync-service.mjs' } }] },
     }];
-    expect((await readTailOf(again)).touched).toEqual(['store.mts', 'sync-service.mjs']);
+    expect((await readTailOf(again)).touched).toEqual(['store.mjs', 'sync-service.mjs']);
   });
 
   // A YOUNG SESSION'S FIRST LINE IS NOT HALF A LINE. The tail read skips its

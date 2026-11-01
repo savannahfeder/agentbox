@@ -127,7 +127,7 @@ describe('the keychain', () => {
     expect(main).not.toMatch(/\.\.\.\(safeStorage\.isEncryptionAvailable\(\)/);
     const calls = [...main.matchAll(/safeStorage\.isEncryptionAvailable\(\)/g)];
     expect(calls.length).toBeGreaterThan(0);
-    for (const c of calls) expect(main.slice(c.index - 30, c.index)).toMatch(/(encrypt|decrypt): \((text|buf)\) => \($/);
+    for (const c of calls) expect(main.slice(c.index - 30, c.index)).toMatch(/(encrypt|decrypt): \((text|buf)(: \w+)?\) => \($/);
   });
 });
 

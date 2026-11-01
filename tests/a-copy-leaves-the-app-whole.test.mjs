@@ -189,7 +189,7 @@ describe('a file she right-clicks', () => {
   });
 
   it('is only ever a file inside a root the app already owns', () => {
-    const body = main.slice(main.indexOf('const copyFile = (file)'));
+    const body = main.slice(main.indexOf('const copyFile = (file'));
     expect(body.slice(0, body.indexOf('};'))).toMatch(/if \(!file \|\| !servable\(file, imageRoots\(\)\)\) return false;/);
   });
 
